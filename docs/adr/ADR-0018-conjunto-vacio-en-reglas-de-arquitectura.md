@@ -1,6 +1,6 @@
 # ADR-0018: Conjunto vacío en las reglas de arquitectura y caducidad de sus excepciones
 
-- **Estado:** Propuesto
+- **Estado:** Aceptado
 - **Fecha:** 2026-09-16
 - **Decisores:** Propietario del producto y arquitecto
 - **Contexto técnico:** Pruebas de arquitectura de `apps/api/app` (paquete `com.confia.architecture`), `apps/api/app/src/test/resources/archunit.properties`, capacidad `build-integrity` de F0 (cambios 1 y 4), integración continua. Complementa ADR-0002 y ADR-0008.
