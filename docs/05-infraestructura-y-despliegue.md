@@ -936,7 +936,7 @@ jobs:
           tags: ${{ env.IMAGE_PORTAL_WEB }}:${{ github.sha }}
 
       - name: trivy scan api image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE_API }}@${{ steps.push-api.outputs.digest }}
           severity: HIGH,CRITICAL

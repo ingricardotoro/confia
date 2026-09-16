@@ -951,7 +951,7 @@ jobs:
       # Baseline scan of both dependency chains (pom.xml and pnpm-lock.yaml). The definitive
       # Maven scanner is fixed in F0 (docs/03-seguridad.md, section 13).
       - name: maven and pnpm dependency scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -962,7 +962,7 @@ jobs:
       - name: build image
         run: docker build -f infra/docker/api.Dockerfile -t confia-api:ci .
       - name: trivy image scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: confia-api:ci
           severity: HIGH,CRITICAL

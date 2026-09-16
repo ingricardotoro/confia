@@ -77,7 +77,9 @@ permanente por trabajos que aún no pueden pasar.
 
 ### 6. Escaneo de dependencias
 
-`aquasecurity/trivy-action@0.28.0` en modo `fs`, severidad `HIGH,CRITICAL`, `exit-code: 1`. Es la
+`aquasecurity/trivy-action@v0.36.0` en modo `fs`, severidad `HIGH,CRITICAL`, `exit-code: 1`. La
+versión escrita en `docs/06` §14.5 (`0.28.0`, sin `v`) no resuelve: la etiqueta real lleva prefijo
+`v` y se adopta la vigente. Es la
 línea base ya escrita en `docs/06` §14.5 y `docs/03` §13 delega en F0 la herramienta definitiva.
 **Alternativa descartada:** escanear solo al etiquetar una versión, que deja la regla nacida
 desactivada.
