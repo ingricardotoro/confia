@@ -1,0 +1,203 @@
+===== PAGE 1 =====
+ 
+Fecha del informe 1 
+Desarrollo de Sistema Administrativo 
+   
+SISTEMA DE GESTION DE PAGOS ESTUDIANTILES. 
+Información General  
+El ingeniero MARVIN RICARDO TORO en representación de  SITE–CONNECTION, 
+empresa especializada en el desarrollo de soluciones  tecnológicas y software a la medida, 
+se complace en ofrecer su propuesta de servicios para el desarrollo de un software 
+administrativo con el objetivo de gestionar el registro de pagos estudiantiles.  
+ 
+El aplicativo tendrá como nombre CONFIA por las siglas de Control Financiero Académico 
+Objetivo 
+Diseñar y desarrollar un sistema web, dinámico y seguro, para modernizar y centralizar toda 
+la administración de los registros de pagos estudiantiles , facturación y cobros. Permitiendo 
+de esta manera una fácil creación, búsqueda, edición, auditoria y generación de reportes de 
+todos los pagos pendientes y ya realizados.  
+Objetivos Específicos 
+☐ 1. Administrar los estudiantes de la institución.  
+☐ 2. Gestionar los responsables de pago de cada estudiante. 
+☐ 3. Administrar los conceptos de pagos (Colegiatura, matricula, transporte, etc). 
+☐ 4. Administración de usuarios administrativos y control de acceso. 
+☐ 5. Administrar los pagos y estados de cuenta pendientes. 
+☐ 6. Generación de reportes financieros. 
+7. Descarga de archivos CSV, Excel 
+8. Registro automático de la facturación por cada pago. 
+9. Gestión de facturación y su complimiento con el SAR. 
+10. Control de abono de pagos, pagos parciales y promesas de pago.  
+===== PAGE 2 =====
+ 
+Desarrollo de Sistema Administrativo 
+SISTEMA DE GESTION DE PAGOS ESTUDIANTILES. 
+Fecha del informe 2 
+11. Gestión automática de cobros atrasados y notificaciones.  
+12. Elaborar manuales técnicos del diseño lógico y físico del sistema. 
+13. Realizar la implementación de la aplicación en los servidore.  
+14. Brindar las capacitaciones al personal administrativo.  
+15. Transferencia tecnológica al departamento de sistemas.  
+Módulos del Sistema Control de Pagos  
+☐ 1. Módulo de Acceso y seguridad: Gestión de usuarios, roles y permisos. 
+☐ 2. Módulo de Gestión Organizativa: Modalidades, grados, secciones, etc. 
+☐ 3. Módulo de Configuraciones: Para la gestión de facturación CAI, etc.  
+☐ 4. Módulo de Estudiantes y Responsables: Registrar y asociar responsables de 
+pagos con estudiantes.  
+☐ 5. Módulo de Conceptos de pago:  Crear los productos a pagar (matricula, etc).  
+☐ 6. Módulo de Becas y Descuentos: Administración de los tipos de becas existentes. 
+☐ 7. Módulo de PAGOS: Gestión completo del registro de pago.  
+☐ 8. Módulo de Promesas: Administración de las promesas de pago realizadas.  
+☐ 9. Módulo de Cobros: Administración de las notificaciones por atraso de pago. 
+☐ 10. Módulo de Facturación: Gestión completa del proceso de facturación.  
+☐ 11. Dashboard General: Panel principal para los administradores. 
+☐ 12. Módulo de Estadísticas: Gestión de reportes en EXCEL y PDF.  
+Módulo de Acceso 
+Este módulo resulta fundamental para mantener un control eficiente sobre las personas 
+usuarias que acceden al sistema. Además, proporciona el primer nivel de seguridad, 
+permitiendo el ingreso únicamente a quienes estén registradas y cuenten con una clave 
+encriptada. Así, se garantiza la protección y confidencialidad de la información dentro de 
+la plataforma.          
+===== PAGE 3 =====
+ 
+Desarrollo de Sistema Administrativo 
+SISTEMA DE GESTION DE PAGOS ESTUDIANTILES. 
+Fecha del informe 3 
+Módulo de Gestión Organizativa 
+Este módulo brindará la gestión necesaria para la creación, edición y eliminación de las 
+áreas organizativas como departamentos, áreas, modalidades, cursos, grados, y 
+secciones se requieran integrar.   
+Esto permitirá realizar filtros de búsquedas en el Sistema para que los usuarios 
+administrativos realicen búsquedas específicas de los registros , además de facilitar la 
+creación de reportes estadísticos mediante filtros de áreas y modalidades. 
+Configuraciones Generales 
+Desde este módulo se podrán administrar tod as las configuraciones que se requieren 
+para el funcionamiento de en los distintos módulos, como ser las monedas y métodos de 
+pago, los datos de configuración de facturación, los años, parciales, impuestos, etc.   
+También puede agregarse otras configuraciones que pueden ser de utilizad para los 
+filtros de reportes. 
+Módulo de Estudiantes y Responsables 
+Este módulo ofrece la posibilidad de realizar registros de los datos estudiantiles, además 
+de poder registrar y asignar uno o varios responsables de sus pagos.  
+Este módulo será el responsable de recolectar toda la información básica y necesaria 
+que un estudiantes o responsable debe brindar para el funcionamiento del sistema, como 
+correo o teléfono.  
+Este módulo será un equivalente de la matricula actual de la institución. Cada estudiante 
+estará registrado en el grado y sección correspondiente al presente año.  
+Módulo de Conceptos de Pago 
+Este módulo permite la creación, edición, consulta y eliminación de todos los productos 
+y servicios disponibles que ha sido creado por la administración y que serán motivos de 
+pago por los representantes.  facilitando así su administración y actualización constante.  
+===== PAGE 4 =====
+ 
+Desarrollo de Sistema Administrativo 
+SISTEMA DE GESTION DE PAGOS ESTUDIANTILES. 
+Fecha del informe 4 
+Además, integra potentes filtros de búsqueda que agilizan la localización de los diferentes 
+pagos existentes  según diversas categorías, asignaciones o fechas de creación , 
+optimizando la experiencia de las personas usuarias y mejorando la eficiencia en la toma 
+de decisiones relacionadas con los pagos dentro del sistema. 
+Módulo de Becas y Descuentos 
+El Módulo permite la creación de descuentos específicos, en fechas o pagos específicos 
+, además de gestionar las becas institucionales, brindando un panorama claro de los 
+usuarios que gozan de este beneficio además de sus implicaciones financieras. 
+Módulo de Pagos 
+ 
+Este módulo es el centro principal del sistema, desde aquí se visualizarán y registrarán 
+todos los pagos de la organización. Este módulo será de fácil manejo y brindará 
+información actualizada sobre los procesos de atraso y pagos pendientes.  
+El módulo contara con filtros de búsquedas específicos que ayudaran a la revisión. 
+En la primera etapa deseo que un módulo de pagos para  la administración y sus usuarios 
+de conta bilidad, los cua les podrán registrar los pagos que s e lleguen a realizar en la 
+oficina de manera presencia  en efectivo o con tarjeta , o registrar l os pa gos que por 
+transferencias bancarias hayan realizado y se les notificó. La idea es tener este módulo 
+de administración en un servidor independiente.   
+Pero también deseamos tener un portal web  desde el cual el padre de familia pueda 
+ingresar con el correo su correo personal y visualizar los hijos o estudiantes que tenga 
+asignado como encargado, podrá ver su administración de pagos realizados y sus pagos 
+faltantes.  Este portal si estará en otro servidor web para que sea accesible  por los 
+padres.   
+Un objetivo futuro es crear una app para los padres de familia, que puedan realizar y ver 
+lo mismo que en el portal web. En este portal y versión móvil también se tiene pensado 
+ofrecer comunicación con las oficinas de la institución y poder recibir solicitudes de 
+===== PAGE 5 =====
+ 
+Desarrollo de Sistema Administrativo 
+SISTEMA DE GESTION DE PAGOS ESTUDIANTILES. 
+Fecha del informe 5 
+documentos estudiant iles, como constancias de matrícula, de pago, de conducta, 
+certificaciones, etc., además de poder enviar justificaciones de inasistencia. 
+En el portal de los padres se pretende enlazar una pasarela de pago con el banco de la 
+institución para la realización de estos pagos.  
+ 
+La razón de esta separación de servidores, es para mantener una seguridad en la 
+información, la administración desea en lo posible tener separada o alejada el acceso de 
+los padres o estudiantes a los módulos administrativos, puedes recomendarme una mejor 
+estrategia para lograr este objetivo , no tengo un equipo de trabajo, seré el único 
+desarrollador del sistema para que lo tomes en cuenta.  
+Módulo de Promesas 
+El Módulo de promesas de pagos, será el encargado de registrar los compromisos de 
+pagos que ha confirmado un responsable de pago, podremos ver el historial de los 
+compromisos realizado anteriormente, además de tener alertas que nos indiquen sobre 
+los compromisos no realizados. 
+ 
+Módulo de cobros  
+Desde este módulo se podrán configurar de manera automática las notificaciones que 
+se enviarán por correo electrónico a los responsables de pagos, para los casos de 
+pagos en estado de retraso.  
+De igual manera se verá todo el historial de notificaciones realizadas.  
+Módulo de Facturación  
+Este Modulo permitirá llevará el control de la facturación interna de la institución, 
+pudiendo realizar una factura por cada pago realizado, y generando los reportes de 
+facturación necesarios para el área de contabilidad.  
+ 
+===== PAGE 6 =====
+ 
+Desarrollo de Sistema Administrativo 
+SISTEMA DE GESTION DE PAGOS ESTUDIANTILES. 
+Fecha del informe 6 
+Módulo de Dashboard 
+Proporcionar una asistencia virtual inmediata y automatizada para resolver consultas 
+frecuentes, brinda al usuario un resumen estadístico de todo lo ocurrido en sistemas, esta 
+pensado para la alta gerencia y contara con filtros de ayuda por fechas y modalidades. 
+Entre los principales beneficios del Dashboard general serán: 
+• Monitoreo centralizado: Brinda indicadores, alertas y accesos directos a las 
+funciones principales, lo que favorece la toma de decisiones informadas y la 
+gestión eficiente de procesos. 
+• Mejora de la experiencia de uso: Ofrece una interfaz amigable que reduce la curva 
+de aprendizaje y facilita la adaptación al sistema, incluso para quienes lo utilizan 
+por primera vez. 
+ 
+ 
+Módulo de Estadísticas y Reportes 
+Este módulo estará dedicado a la visualización gráfica y analítica de los datos recopilados 
+a través de los distintos formularios del sistema, permitiendo a los trabajadores de la 
+organización generar reportes, identificar tendencias y tomar decisiones basadas en 
+datos reales. 
+Mejora en la toma de decisiones: Permite analizar información clave y detectar patrones 
+para implementar acciones más efectivas. 
+
+===== PAGE 7 =====
+ 
+Desarrollo de Sistema Administrativo 
+SISTEMA DE GESTION DE PAGOS ESTUDIANTILES. 
+Fecha del informe 7 
+Transparencia y rendición de cuentas: Facilita el acceso a resultados y métricas, 
+promoviendo una gestión abierta y verificable. 
+  
+Estilos de Interfaces 
+Como recomendación fundamental para este proyecto, se sugiere implementar una interfaz 
+que destaque por su limpieza visual, claridad en la disposición de los elementos y una 
+experiencia amigable para las personas usuarias.  
+Es esencial que sea responsiva, adaptándose eficientemente a diferentes dispositivos, y que 
+adopte un estilo administrativo que facilite la gestión y el acceso a la información. La inclusión 
+de grids o tablas dinámicas permitirá organizar los datos de mane ra intuitiva y flexible, 
+mientras que el uso de iconos y colores descriptivos contribuirá a una navegación más 
+sencilla y a la rápida identificación de funciones y módulos dentro del sistema. 
+
+===== PAGE 8 =====
+ 
+Desarrollo de Sistema Administrativo 
+SISTEMA DE GESTION DE PAGOS ESTUDIANTILES. 
+Fecha del informe 8 
+Interfaz de Ejemplo: 
+ 

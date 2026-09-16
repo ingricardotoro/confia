@@ -1,0 +1,81 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+.yarn/
+
+# Build output
+dist/
+build/
+out/
+.next/
+.turbo/
+*.tsbuildinfo
+# Maven build output (includes JaCoCo and PIT reports)
+target/
+
+# Environment and secrets
+# NEVER commit real credentials. Only .env.example belongs in the repository.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+*.age
+*.enc
+
+# Test and coverage output
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+blob-report/
+reports/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# Database and local data
+*.sqlite
+*.sqlite3
+*.db
+pgdata/
+docker-volumes/
+
+# Business data. Real student, guardian and payment data must never reach the repository.
+*.csv
+*.xlsx
+*.xls
+!docs/**/*.csv
+backups/
+dumps/
+uploads/
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.recommended.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code local overrides
+.claude/settings.local.json
+
+# Generated skill registry (regenerated locally by the skill-registry skill)
+.atl/
+
+# Temporary
+tmp/
+temp/
+.cache/

@@ -1,0 +1,44 @@
+# openspec/config.yaml
+# CONFIA — SDD configuration. See openspec/project.md and docs/01-arquitectura.md
+# for the full source of truth; this file only encodes machine-readable phase rules.
+schema: spec-driven
+
+context: |
+  Stack (declared, no code yet): Java 25 + Spring Boot 4.1 + Maven backend (ADR-0013),
+  jOOQ + PostgreSQL 18 (ADR-0015), Flyway, Spring Modulith + ArchUnit, db-scheduler (ADR-0016).
+  Frontend: React 19 + Vite + TanStack (Router/Query/Table/Form), Tailwind v4, shadcn/ui,
+  in a pnpm workspaces + Turborepo monorepo. Architecture: hexagonal per business capability,
+  screaming structure, domain/application/infrastructure/web layering.
+  Project is pre-code (planning phase only): no apps/, no pom.xml, no package.json, not a
+  Git repository yet. Runnable tooling and strict TDD activate starting F0.
+
+strict_tdd: false # runner does not exist yet (see testing capabilities); revisit at F0
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Product owner approves the proposal before specs/design/tasks proceed
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (DEBE/NO DEBE, MUST/MUST NOT) consistent with existing specs
+    - Business specs are written in neutral professional Spanish, matching openspec/specs/*
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale; elevate real architecture decisions to an ADR in docs/adr/
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - A change with more than 15 tasks is too large and must be split (openspec/changes/README.md)
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns and the hexagonal layering rules in docs/01-arquitectura.md
+      - Money arithmetic only inside packages/domain equivalents; never number/float for money
+    tdd: false # no test runner present yet; becomes true once F0 tooling lands
+    test_command: "./mvnw verify" # backend (declared, not yet runnable)
+  verify:
+    test_command: "./mvnw verify" # backend; frontend equivalents are pnpm scripts, both declared-only
+    build_command: "./mvnw verify"
+    coverage_threshold: 0 # declared target is 80% global / 95% domain via JaCoCo once runnable
+  archive:
+    - Warn before merging destructive deltas
+    - Merge change id as folder prefix with archive date under openspec/archive/<date>-<id>/
