@@ -37,9 +37,9 @@ Nota: `strict_tdd` permanece en `false` en `openspec/config.yaml` para este camb
 
 ## Phase 2: Reglas del `maven-enforcer-plugin`
 
-- [ ] 2.1 Agregar `maven-enforcer-plugin` al POM padre en fase `validate`: `requireJavaVersion` (25), convergencia de dependencias, `bannedDependencies` para Hibernate, Jakarta Persistence, Spring Data JPA, Spring Data JDBC, Quartz, JobRunr y otros programadores de tareas (el controlador JDBC de PostgreSQL y el JDBC del JDK no se prohíben). Verificación: agregar Hibernate temporalmente en un módulo de prueba rompe `./mvnw verify`; al retirarla vuelve a verde. — Requisito: Dependencias de persistencia y de tareas prohibidas
-- [ ] 2.2 Agregar regla del enforcer que restringe `apps/api/kernel` a dependencias del JDK. Verificación: agregar temporalmente una dependencia de Spring al `pom.xml` de `kernel` rompe la construcción; al retirarla vuelve a verde. — Requisito: Pureza del módulo `kernel`
-- [ ] 2.3 Agregar un perfil del enforcer que prohíbe versiones `SNAPSHOT`, activado únicamente por una propiedad que la integración continua fija solo en `main`; documentar el mecanismo de activación confirmado en el POM. — Infraestructura (soporta Req. 8: la excepción por rama queda documentada, no oculta)
+- [x] 2.1 Agregar `maven-enforcer-plugin` al POM padre en fase `validate`: `requireJavaVersion` (25), convergencia de dependencias, `bannedDependencies` para Hibernate, Jakarta Persistence, Spring Data JPA, Spring Data JDBC, Quartz, JobRunr y otros programadores de tareas (el controlador JDBC de PostgreSQL y el JDBC del JDK no se prohíben). Verificación: agregar Hibernate temporalmente en un módulo de prueba rompe `./mvnw verify`; al retirarla vuelve a verde. — Requisito: Dependencias de persistencia y de tareas prohibidas
+- [x] 2.2 Agregar regla del enforcer que restringe `apps/api/kernel` a dependencias del JDK. Verificación: agregar temporalmente una dependencia de Spring al `pom.xml` de `kernel` rompe la construcción; al retirarla vuelve a verde. — Requisito: Pureza del módulo `kernel`
+- [x] 2.3 Agregar un perfil del enforcer que prohíbe versiones `SNAPSHOT`, activado únicamente por una propiedad que la integración continua fija solo en `main`; documentar el mecanismo de activación confirmado en el POM. — Infraestructura (soporta Req. 8: la excepción por rama queda documentada, no oculta)
 
 ## Phase 3: Lanzador `APP_PROFILE`, ArchUnit y fixtures permanentes
 
