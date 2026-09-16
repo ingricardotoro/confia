@@ -12,9 +12,9 @@
 | Estrategia de entrega | single-pr |
 | Estrategia de cadena | size-exception |
 
-Decision needed before apply: Yes
-Chained PRs recommended: Yes
-Chain strategy: size-exception
+Decision needed before apply: Resolved — `size:exception` aceptada explícitamente por el propietario del producto el 2026-09-15 para este cambio y solo para este. Se entrega en un PR único.
+Chained PRs recommended: No (excepción otorgada; las cuatro unidades quedan como guía de revisión, no como PR separados)
+Chain strategy: n/a (single-pr con size:exception)
 400-line budget risk: High
 
 ### Suggested Work Units
@@ -30,10 +30,10 @@ Nota: `strict_tdd` permanece en `false` en `openspec/config.yaml` para este camb
 
 ## Phase 1: Reactor Maven y prueba de humo
 
-- [ ] 1.1 Crear `apps/api/pom.xml` (POM padre): Java 25, BOM de Spring Boot 4.1, módulos `kernel` y `app`, Surefire y Failsafe declarados. Versiones y objetivos exactos de complementos se confirman contra su documentación al implementar. Verificación: `./mvnw -N validate` resuelve sin error. — Infraestructura
-- [ ] 1.2 Comprometer el Maven Wrapper (`apps/api/mvnw`, `mvnw.cmd`, `.mvn/wrapper/`) y fijar el bit ejecutable con `git update-index --chmod=+x apps/api/mvnw`; confirmar que `.gitattributes` ya cubre `mvnw text eol=lf`. Verificación: `./mvnw -v` funciona en checkout limpio sin Maven instalado. — Infraestructura
-- [ ] 1.3 Crear `apps/api/kernel/pom.xml` sin dependencias fuera del JDK, `package-info.java`, y `apps/api/kernel/src/test/java/com/confia/kernel/BuildSmokeTest.java` trivial en verde. Verificación: `./mvnw -pl apps/api/kernel test` termina en verde. — Requisito: Pureza del módulo `kernel`
-- [ ] 1.4 Crear `apps/api/app/pom.xml`, artefacto `confia-api`, dependiente de `kernel`. Verificación: `./mvnw verify` desde `apps/api` termina en verde con solo la prueba de humo. — Infraestructura
+- [x] 1.1 Crear `apps/api/pom.xml` (POM padre): Java 25, BOM de Spring Boot 4.1, módulos `kernel` y `app`, Surefire y Failsafe declarados. Versiones y objetivos exactos de complementos se confirman contra su documentación al implementar. Verificación: `./mvnw -N validate` resuelve sin error. — Infraestructura
+- [x] 1.2 Comprometer el Maven Wrapper (`apps/api/mvnw`, `mvnw.cmd`, `.mvn/wrapper/`) y fijar el bit ejecutable con `git update-index --chmod=+x apps/api/mvnw`; confirmar que `.gitattributes` ya cubre `mvnw text eol=lf`. Verificación: `./mvnw -v` funciona en checkout limpio sin Maven instalado. — Infraestructura
+- [x] 1.3 Crear `apps/api/kernel/pom.xml` sin dependencias fuera del JDK, `package-info.java`, y `apps/api/kernel/src/test/java/com/confia/kernel/BuildSmokeTest.java` trivial en verde. Verificación: `./mvnw -pl apps/api/kernel test` termina en verde. — Requisito: Pureza del módulo `kernel`
+- [x] 1.4 Crear `apps/api/app/pom.xml`, artefacto `confia-api`, dependiente de `kernel`. Verificación: `./mvnw verify` desde `apps/api` termina en verde con solo la prueba de humo. — Infraestructura
 
 ## Phase 2: Reglas del `maven-enforcer-plugin`
 
@@ -52,5 +52,5 @@ Nota: `strict_tdd` permanece en `false` en `openspec/config.yaml` para este camb
 
 ## Phase 4: Integración continua y verificación final
 
-- [ ] 4.1 Crear `.github/workflows/ci.yml` con el trabajo `backend` (`./mvnw verify` sobre `apps/api`) y el escaneo `aquasecurity/trivy-action@0.28.0` en modo `fs`, severidad `HIGH,CRITICAL`, `exit-code: 1`. Disparador en empujes a `change/**` y `main`; confirmar durante la implementación si también dispara en `pull_request` (`docs/06` §14.5). Sin trabajos `frontend`, `e2e` ni `quality-gate` (llegan en cambios 3 y 11); sin `-Pmutation-gate` (cambio 2). — Requisito: Integración continua verifica cada empuje; Vulnerabilidad alta o crítica rompe la construcción
+- [ ] 4.1 Crear `.github/workflows/ci.yml` con el trabajo `backend` (`./mvnw verify` sobre `apps/api`) y el escaneo `aquasecurity/trivy-action@0.28.0` en modo `fs`, severidad `HIGH,CRITICAL`, `exit-code: 1`. Disparador en empujes a `change/**` y `main`, y en `pull_request` hacia `main` (`docs/06` §14.5; decisión ya cerrada en `design.md`, no vuelve a evaluarse al implementar). Sin trabajos `frontend`, `e2e` ni `quality-gate` (llegan en cambios 3 y 11); sin `-Pmutation-gate` (cambio 2). — Requisito: Integración continua verifica cada empuje; Vulnerabilidad alta o crítica rompe la construcción
 - [ ] 4.2 En un checkout limpio, ejecutar `./mvnw verify` de extremo a extremo; empujar la rama `change/maven-workspace-and-ci-skeleton` y confirmar en `github.com/ingricardotoro/confia` → Actions que el flujo termina en verde. — Requisito: Integración continua verifica cada empuje (cierre)
