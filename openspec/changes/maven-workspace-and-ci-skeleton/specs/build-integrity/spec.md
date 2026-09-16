@@ -118,20 +118,23 @@ cambio, con resultado visible en el remoto.
 
 ### Requisito: Vulnerabilidad alta o crítica rompe la construcción
 
-El sistema DEBE escanear vulnerabilidades de dependencias en cada verificación y DEBE romper la
-construcción ante severidad alta o crítica (ADR-0008, ADR-0013).
+El sistema DEBE escanear las vulnerabilidades de sus dependencias en cada verificación de
+integración continua y DEBE romper esa verificación ante severidad alta o crítica (ADR-0008,
+ADR-0013). El escaneo vive en la integración continua y no en `./mvnw verify`, porque depende de
+una base de datos de vulnerabilidades en línea y encarecería cada construcción local.
 
 #### Escenario: Vulnerabilidad crítica
 
 - **DADO** una dependencia con vulnerabilidad pública crítica
-- **CUANDO** se ejecuta `./mvnw verify`
-- **ENTONCES** la construcción falla señalando esa dependencia
+- **CUANDO** la integración continua verifica el empuje
+- **ENTONCES** la verificación falla señalando esa dependencia y el resultado en rojo queda visible
+  en el remoto
 
 #### Escenario: Solo severidad baja
 
 - **DADO** dependencias con vulnerabilidades solo de severidad baja o media
-- **CUANDO** se ejecuta `./mvnw verify`
-- **ENTONCES** el escaneo no rompe la construcción
+- **CUANDO** la integración continua verifica el empuje
+- **ENTONCES** el escaneo no rompe la verificación
 
 ### Requisito: Ninguna regla se desactiva sin un ADR
 
