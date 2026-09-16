@@ -1,0 +1,56 @@
+name: ci
+
+# Partial and honest (design.md decision 5): only the jobs this change can leave green today.
+# frontend, e2e and quality-gate arrive with changes 3 and 11 (docs/06 §14.5 declares the full
+# workflow this grows into). No -Pmutation-gate/-Pmutation-report: those profiles arrive with
+# change 2.
+
+on:
+  push:
+    branches: [change/**, main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Must match apps/api/pom.xml and ADR-0013, check 2.
+  JAVA_VERSION: '25'
+  JAVA_DISTRIBUTION: temurin
+
+jobs:
+  backend:
+    name: backend verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+      # `verify` runs, in order: maven-enforcer-plugin (Java version, dependency convergence,
+      # banned dependencies, kernel purity, and — only on main, see -Dconfia.ci.mainBranch below —
+      # no SNAPSHOT), compilation, unit tests, and the ArchUnit + Spring Modulith architecture
+      # tests under apps/api/app/src/test/java/com/confia/architecture (task 2, task 3).
+      - name: verify
+        working-directory: apps/api
+        run: ./mvnw --batch-mode verify ${{ github.ref == 'refs/heads/main' && '-Dconfia.ci.mainBranch=true' || '' }}
+
+  security:
+    name: security scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Baseline scan of the Maven dependency tree (ADR-0008, ADR-0013). pnpm and the container
+      # image scan arrive with changes 3 and 11.
+      - name: maven dependency scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: apps/api
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: '1'
