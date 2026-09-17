@@ -372,3 +372,34 @@ razonables, y ninguna la puede tomar el verificador:
    demostrar hasta el cambio 11, que es el que vuelve a tocar el escaneo de contenedores.
 
 La opción 1 es la que deja el registro más honesto y cuesta poco: dos empujes y dos reversiones.
+
+---
+
+## Addendum del orquestador: evidencia observada de los requisitos 6 y 7
+
+Capturada el 2026-09-17 mediante dos empujes desechables autorizados por el propietario, ya
+revertidos (`aaec6a2`). No la produjo la fase de verificación, por lo que el veredicto de la ronda 3
+sigue siendo el vigente hasta que una ronda nueva lo reemplace.
+
+| Prueba | Commit | Corrida | Resultado |
+|---|---|---|---|
+| Violación de capas en código de producción | `bc013e4` | `35188175663` | `backend verify` **rojo** |
+| Dependencia vulnerable, alcance `provided` | `bc013e4` | `35188175663` | `security scanning` **verde**, 0 hallazgos |
+| Misma dependencia, alcance de compilación | `0ca32d4` | `35188358113` | `security scanning` **rojo**, bloqueó |
+| Revertido todo | `aaec6a2` | `35188476297` | Ambos trabajos **verdes** |
+
+**Requisito 6, escenario «empuje con violación»: demostrado.** El registro remoto muestra
+`Architecture Violation ... was violated (2 times)`, nombrando
+`com.confia.probe.domain.ProbeDomain.describe()` llamando a
+`com.confia.probe.infrastructure.ProbeInfrastructure.value()` en `ProbeDomain.java:19`. Cierra W1.
+
+**Requisito 7, escenario «vulnerabilidad crítica»: demostrado.** Con `log4j-core:2.14.1` en alcance
+de compilación, el escaneo reportó `Total: 3 (HIGH: 1, CRITICAL: 2)` con CVE-2021-44228,
+CVE-2021-45046 y CVE-2021-45105, y falló el trabajo. Cierra C2-bis.
+
+**Hallazgo nuevo (W8): el escaneo ignora el alcance `provided`.** La única diferencia entre las dos
+corridas fue el alcance de la dependencia. Con `provided`, Trivy reportó cero hallazgos sobre los
+tres `pom.xml`; con alcance de compilación, los reportó todos. Una biblioteca vulnerable declarada
+como provista por el entorno de ejecución pasaría sin ser vista. Corresponde decidir si el escaneo
+debe cubrir también ese alcance, por ejemplo analizando un SBOM resuelto en lugar de los `pom.xml`
+en crudo, como contempla `docs/03-seguridad.md` sección 13.
