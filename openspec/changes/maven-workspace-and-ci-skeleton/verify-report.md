@@ -1,45 +1,44 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:7ab993f96839313d074f738b0b11fbf02e37c2724ff644afe25676a15328f490
+evidence_revision: sha256:1cb69bc1e2f5aff8f104ad73551c16e3554cfa8514cefa4c507c0d0cb9d30602
 verdict: fail
 blockers: 1
 critical_findings: 1
-requirements: 4/8
-scenarios: 12/16
+requirements: 5/8
+scenarios: 13/16
 test_command: ./mvnw -B verify
 test_exit_code: 0
-test_output_hash: sha256:7b77ecb04546e761e1091b127cbed9ff257b55171da5489817f607da0c21a8f5
+test_output_hash: sha256:79315232a4f63a765b15cd7d50dd2e9a77fbf6272cb5b84f44494a45e9d44e84
 build_command: ./mvnw -B verify
 build_exit_code: 0
-build_output_hash: sha256:7b77ecb04546e761e1091b127cbed9ff257b55171da5489817f607da0c21a8f5
+build_output_hash: sha256:79315232a4f63a765b15cd7d50dd2e9a77fbf6272cb5b84f44494a45e9d44e84
 ```
 
-## Verification Report — Ronda 2
+## Verification Report — Ronda 3
 
 **Change**: maven-workspace-and-ci-skeleton (F0, cambio 1 de 13)
-**Version**: `specs/build-integrity/spec.md` — 8 requisitos, 16 escenarios (especificación enmendada
-tras la ronda 1: el requisito 7 ahora exige el escaneo en integración continua y no en `./mvnw verify`)
+**Version**: `specs/build-integrity/spec.md` — 8 requisitos, 16 escenarios
 **Mode**: Standard (`strict_tdd: false`)
-**Commit verificado**: `1f3b3288b0bcac030706df950bd02d849ee23720`, rama `change/maven-workspace-and-ci-skeleton`
+**Commit verificado**: `3d773886facbe94ac63aeaf75eab1bcb76aa3197`, rama `change/maven-workspace-and-ci-skeleton`
 **Comando real**: `JAVA_HOME=<jdk-25.0.3.9-hotspot> ./mvnw -B verify`, ejecutado en `apps/api`
 
-Criterio de conteo, idéntico al de la ronda 1: un escenario cuenta como completado solo si es
+Criterio de conteo, idéntico al de las rondas 1 y 2: un escenario cuenta como completado solo si es
 COMPLIANT; un requisito cuenta como completado solo si todos sus escenarios lo son.
 
 ---
 
-### Ronda 1: qué se encontró y cómo se cerró
+### Rondas 1 y 2: qué se encontró y cómo quedó cerrado
 
-La ronda 1 terminó en **FAIL** con tres hallazgos críticos, cuatro advertencias y cuatro sugerencias.
+| Hallazgo | Origen | Estado al cierre de la ronda 3 | Evidencia decisiva |
+|---|---|---|---|
+| **C1** — requisito 5 implementado a medias, con un Javadoc que afirmaba una garantía inexistente | Ronda 1 | **Cerrado** | La Fase 5 sustituyó la regla parcial por una `Architectures.layeredArchitecture()` completa; la ronda 2 confirmó que las tres direcciones de ADR-0002 se expresan y se detectan |
+| **C2** — requisito 7 implementado en una capa distinta de la exigida | Ronda 1 | **Cerrado** | La especificación se enmendó: el requisito 7 sitúa el escaneo en integración continua, que es donde está. Residuo escalado a C2-bis en esta ronda |
+| **C3** — requisito 8 incumplido, desactivación global sin ADR | Ronda 1 | **Cerrado** | ADR-0018 más dos mecanismos ejecutables; reverificado en esta ronda con las probes R4 a R7 |
+| **C1-bis** — la regla de capas contaba dependencias del JDK como violaciones, lo que anulaba su mitad negativa y habría hecho imposible su mitad de producción | Ronda 2 (bloqueante) | **Cerrado** | Probes R1, R2 y R3 de esta ronda. Es el hallazgo central de la ronda 3 y se detalla abajo |
+| **W6** — la versión declarada de ArchUnit no era la que se ejecutaba | Ronda 2 | **Cerrado** | Probe R9: `version managed from 1.4.2`, declarado igual a resuelto |
+| **W7** — el escáner de supresiones no cubría los archivos donde viven las reglas del enforcer | Ronda 2 | **Cerrado en su parte principal** | Probe R4: una supresión sin cita dentro de `apps/api/pom.xml` ahora rompe la construcción. Queda un residuo menor (S7) |
 
-| Hallazgo | Estado tras la remediación | Evidencia de esta ronda |
-|---|---|---|
-| **C1** — requisito 5 implementado a medias, con un Javadoc que afirmaba una garantía inexistente | **Cerrado en parte, y reabierto por un defecto nuevo** | El Javadoc falso desapareció y las tres direcciones de ADR-0002 sí se expresan y se detectan (probe H). Pero la regla nueva incorpora `consideringAllDependencies()`, que introduce el defecto C1-bis de abajo |
-| **C2** — requisito 7 implementado en una capa distinta de la exigida | **Cerrado** | La especificación se enmendó: el requisito 7 ahora sitúa el escaneo en integración continua de forma explícita, que es donde está. El residuo (escenario negativo nunca ejercitado) baja a W5 |
-| **C3** — requisito 8 incumplido, desactivación global sin ADR | **Cerrado, y verificado de forma adversarial** | Probes A, B, C, E y F: las cinco mutaciones rompen la construcción |
-
-Las advertencias y sugerencias de la ronda 1 se reevalúan una por una en la sección
-"Estado de los hallazgos de la ronda 1".
+Las advertencias que siguen abiertas se reevalúan una por una en "Estado de los hallazgos previos".
 
 ---
 
@@ -47,22 +46,25 @@ Las advertencias y sugerencias de la ronda 1 se reevalúan una por una en la sec
 
 | Metric | Value |
 |--------|-------|
-| Tasks total | 21 (15 originales + 6 de la Fase 5) |
-| Tasks complete | 21 |
+| Tasks total | 24 (15 originales + 6 de la Fase 5 + 3 de la Fase 6) |
+| Tasks complete | 24 |
 | Tasks incomplete | 0 |
 
-Las 21 casillas están marcadas `[x]`. Se comprobó una por una contra el código, no contra el texto de
-la tarea. Las seis de la Fase 5 describen con exactitud lo que el commit `1f3b328` contiene: la tarea
-5.1 sustituye la clase (no solo edita el Javadoc, desviación ya declarada en `apply-progress`), y las
-5.2 a 5.5 corresponden a cambios reales y verificables. La tarea 5.6 afirma haber probado la no
-vacuidad borrando el paquete `fixture`; **esa prueba se reprodujo y es correcta en su resultado, pero
-insuficiente como garantía**, por lo que se detalla en C1-bis.
+Las 24 casillas están marcadas `[x]`, contadas con `grep -cE "^- \[x\]" tasks.md` (24) y
+`grep -cE "^- \[ \]" tasks.md` (0). Se comprobaron contra el código, no contra el texto de la tarea.
+Las tres de la Fase 6 describen con exactitud lo que el commit `3d77388` contiene, y las tres se
+reprodujeron de forma independiente en esta ronda (probes R1 a R4 y R9). Una sola imprecisión
+documental, sin efecto sobre el comportamiento: las tareas 6.1 y `apply-progress` afirman que la
+sobrecarga variádica de `assertRuleRejects` es retrocompatible con "los otros cuatro llamadores",
+pero los llamadores restantes son tres (`NoCyclesTest`, `NoCrossModuleDomainImportsTest` y
+`NoTechnicalLayerPackageNamesTest`); `SpringModulithVerificationTest` no usa ese ayudante. Se
+registra como S8.
 
 ---
 
 ### Build & Tests Execution
 
-**Build**: Passed — `BUILD SUCCESS`, exit 0.
+**Build**: Passed — `BUILD SUCCESS`, exit 0, 22.7 s.
 
 ```text
 [INFO] --- enforcer:3.6.3:enforce (enforce-build-integrity) @ confia-api-parent ---
@@ -72,6 +74,9 @@ insuficiente como garantía**, por lo que se detalla en C1-bis.
 [INFO] --- enforcer:3.6.3:enforce (enforce-kernel-purity) @ confia-kernel ---
 [INFO] Rule 0: org.apache.maven.enforcer.rules.dependency.BannedDependencies passed
 ```
+
+`DependencyConvergence` sigue en verde en los tres módulos después del anclaje de ArchUnit de la
+tarea 6.2, que era el riesgo explícito de esa tarea.
 
 **Tests**: 23 passed / 0 failed / 0 skipped (1 en `confia-kernel`, 22 en `confia-api`).
 
@@ -87,35 +92,78 @@ insuficiente como garantía**, por lo que se detalla en C1-bis.
 [INFO] Tests run: 10, ... -- in com.confia.bootstrap.ConfiaApplicationTest
 ```
 
-**Integración continua**: corrida `35167872324` sobre `1f3b328`, ambos trabajos en verde
-(`backend verify` y `security scanning`), confirmado con `gh run view`.
+**Integración continua**: corrida `35179705314` sobre `3d773886facbe94ac63aeaf75eab1bcb76aa3197`,
+ambos trabajos en verde, confirmado con `gh run view --json headSha,conclusion,jobs`:
+`security scanning` 24 s y `backend verify` 43 s, `conclusion: success` en ambos. El registro del
+trabajo `backend` reproduce las mismas 22 pruebas y los mismos resultados del enforcer que la
+ejecución local.
 
 **Coverage**: no disponible — JaCoCo y los umbrales llegan con el cambio 2 (fuera de alcance).
 
 #### Evidencia negativa ejecutada por esta ronda
 
-Todas las mutaciones corrieron sobre copias aisladas en el directorio temporal de la sesión. El árbol
-real no se modificó en ningún momento: `git status --porcelain` quedó vacío antes y después.
+Todas las mutaciones corrieron sobre copias aisladas extraídas con `git archive HEAD` al directorio
+temporal de la sesión. El árbol real no se modificó en ningún momento: `git status --porcelain`
+quedó vacío antes y después, y `git rev-parse HEAD` sigue en `3d77388`.
 
 | Probe | Qué se forzó | Resultado observado | Exit |
 |---|---|---|---|
-| A | `archRule.failOnEmptyShould=false` reintroducido | FAIL. `SuppressionCitesAdrTest`: «archunit.properties:10 sets failOnEmptyShould=false, which ADR-0018 forbids in any file» | 1 |
-| B | `allowEmptyShould(true)` nuevo **sin** cita de ADR | FAIL. «NoTechnicalLayerPackageNamesTest.java:28 suppresses a rule with no ADR-NNNN citation within 4 lines» | 1 |
-| C | `allowEmptyShould(true)` nuevo **con** cita, ausente del inventario | FAIL. «allowEmptyShould( call sites must match ... inventory exactly», expected 1 but was 2 | 1 |
-| D | Paquete `fixture` borrado por completo | FAIL. Las cinco mitades negativas caen (4 `Failures` + 1 `Error`) | 1 |
-| E | Primer módulo de negocio (`com.confia.organization.domain.Organization`) | FAIL. `EmptyShouldExceptionInventoryTest` nombra la regla y la condición; **además** `LayeredArchitectureTest` cae por `java.lang.Object` y `java.lang.String` (ver C1-bis) | 1 |
-| F | Cita a un ADR inexistente (`ADR-9999`) | FAIL. «LayeredArchitectureTest.java:58 cites ADR-9999, which does not exist under docs/adr/» | 1 |
-| G | Fixtures de capas **neutralizados** (clases y paquetes intactos, sin ninguna dependencia entre capas) | **BUILD SUCCESS**, `LayeredArchitectureTest` 2/2 en verde. La mitad negativa «rechaza» un fixture que no viola nada (ver C1-bis) | 0 |
-| H | Volcado del mensaje real de la regla de capas contra el fixture verdadero | La regla sí detecta las importaciones reales, pero son 4 de **37** violaciones; las otras 33 son `java.lang.Object` y `java.lang.String` | 0 |
+| R1 | Fixture de capas **conservado** (clases y paquetes intactos), retiradas solo las dependencias ofensoras de `BadDomain`, `BadApplication` y `BadWeb` | **FAIL**. `LayeredArchitectureTest.rejectsTheFixtureLayeringViolations:90`, `Tests run: 22, Failures: 1`, `BUILD FAILURE` | 1 |
+| R2 | Clase de negocio mínima `com.confia.organization.domain.Organization`, sin dependencias fuera del JDK | `LayeredArchitectureTest` **2/2 en verde** (sin violaciones espurias); falla `EmptyShouldExceptionInventoryTest` con el mensaje de caducidad correcto | 1 |
+| R3 | Volcado del mensaje real de la regla de capas contra el fixture intacto | **18 violaciones, todas deliberadas**; ninguna de `java.lang.Object` ni `java.lang.String` | 1 |
+| R4 | `failOnEmptyShould=false` sin cita insertado en `apps/api/pom.xml` (W7) | FAIL. «`pom.xml:6` sets failOnEmptyShould=false, which ADR-0018 forbids in any file» | 1 |
+| R5 | `archRule.failOnEmptyShould=false` restituido en `archunit.properties` | FAIL. «`archunit.properties:10` sets failOnEmptyShould=false» | 1 |
+| R6 | `allowEmptyShould(true)` nuevo **sin** cita de ADR en un `.java` | FAIL. «`ProbeUncitedSuppression.java:11` suppresses a rule with no ADR-NNNN citation within 4 lines» | 1 |
+| R7 | `allowEmptyShould(true)` **con** cita, ausente del inventario | FAIL. «allowEmptyShould( call sites must match ... inventory exactly», `but was: 2` | 1 |
+| R8 | Hibernate 6.6.15.Final agregado a `app/pom.xml` | FAIL. `BannedDependencies`: `org.hibernate.orm:hibernate-core <--- banned`, y de forma transitiva `jakarta.persistence:jakarta.persistence-api` | 1 |
+| R9 | Volcado `./mvnw -X test-compile` del reactor completo | `com.tngtech.archunit:archunit:jar:1.4.2:test (scope managed from compile) (version managed from 1.4.2)` | 0 |
 
-Las probes A, B, C, E y F cierran C3 de forma concluyente: los dos mecanismos que ADR-0018 exige
-(inventario de caducidad y escáner de supresiones) existen y **muerden**.
+#### Por qué C1-bis queda cerrado
 
-La probe G es el hallazgo nuevo de esta ronda y contradice la conclusión que la probe D sugiere por
-sí sola. La D demuestra que borrar el paquete `fixture` rompe la construcción; la G demuestra que
-**conservar el paquete y quitarle todas las violaciones no la rompe**. La no vacuidad de la regla de
-capas, por tanto, no está probada: solo está probada frente al caso extremo de que el paquete
-desaparezca por completo.
+La ronda 2 no rechazó el cambio porque la regla de capas dejara pasar una violación real: rechazó
+porque la prueba que la respaldaba no discriminaba. La probe G de aquella ronda conservó el paquete
+`fixture` y le quitó todas las violaciones, y aun así
+`rejectsTheFixtureLayeringViolations` pasó en verde, porque `consideringAllDependencies()` seguía
+lanzando `AssertionError` por `java.lang.Object`. Esa misma probe es la que había que invertir.
+
+La probe R1 es exactamente esa mutación, repetida de primera mano sobre una copia aislada del
+commit actual: las tres clases y sus cuatro paquetes de capa siguen ahí, solo desaparecen las
+dependencias entre capas. El resultado se invirtió:
+
+```text
+[ERROR] com.confia.architecture.LayeredArchitectureTest.rejectsTheFixtureLayeringViolations
+[ERROR]   LayeredArchitectureTest.rejectsTheFixtureLayeringViolations:90
+[ERROR] Tests run: 22, Failures: 1, Errors: 0, Skipped: 0
+[INFO] BUILD FAILURE
+```
+
+La probe R3 lo confirma desde el otro lado. Contra el fixture intacto la regla ahora reporta 18
+violaciones y **las 18 son las deliberadas** —los campos, parámetros de constructor y tipos de
+retorno de `BadDomain`, `BadApplication` y `BadWeb` hacia `SomeInfrastructureType` y
+`SomeWebType`—, frente a las 37 de la ronda 2 de las que solo 4 eran reales. El encabezado de la
+regla lo dice de forma literal: `Rule 'Layered architecture considering only dependencies in
+layers, ...'`. No queda ruido del JDK.
+
+La probe R2 cierra la segunda consecuencia que la ronda 2 anticipó, la que afectaba al cambio 4. Se
+agregó una única clase de negocio mínima sin dependencias fuera del JDK. En la ronda 2 eso producía
+tres violaciones espurias (`extends class <java.lang.Object>`, `calls constructor
+<java.lang.Object.<init>()>`, `has return type <java.lang.String>`). Ahora `LayeredArchitectureTest`
+pasa 2/2, y lo único que rompe la construcción es el mecanismo previsto por ADR-0018, con el
+mensaje correcto:
+
+```text
+[ERROR] EmptyShouldExceptionInventoryTest.everyExceptionsConditionStillHolds:43
+[LayeredArchitectureTest.productionCodeRespectsLayeringYet's ADR-0018 exception no longer holds
+(no class in apps/api/app production code resides in a domain, application, infrastructure or web
+package yet, because no business module exists (change 4 introduces the first one)). Remove
+allowEmptyShould(true) from that rule and this inventory entry, or update the condition and cite
+the ADR that extends it (ADR-0018, section 2).]
+```
+
+Esto importa más que el conteo de violaciones: el "rojo programado" que ADR-0018 sección 2 anuncia
+para el cambio 4 ya es el rojo correcto, señalando la caducidad de la excepción y la línea a
+retirar, y no el rojo engañoso por `java.lang.Object` que la ronda 2 advirtió que alguien podría
+silenciar con la herramienta equivocada.
 
 ---
 
@@ -123,28 +171,36 @@ desaparezca por completo.
 
 | Requirement | Scenario | Test | Result |
 |-------------|----------|------|--------|
-| 1. Frontera de dominio entre módulos | Importación cruzada de dominio | `NoCrossModuleDomainImportsTest > rejectsTheFixtureCrossModuleDomainImport` y `SpringModulithVerificationTest > rejectsTheFixtureModuleCrossingInternalAccess` (no vacuas, probe D) | COMPLIANT |
+| 1. Frontera de dominio entre módulos | Importación cruzada de dominio | `NoCrossModuleDomainImportsTest > rejectsTheFixtureCrossModuleDomainImport` y `SpringModulithVerificationTest > rejectsTheFixtureModuleCrossingInternalAccess`; no vacuas por la probe D de la ronda 2, evidencia heredada (ver nota) | COMPLIANT |
 | 1. Frontera de dominio entre módulos | Cada módulo usa solo su propio dominio | `NoCrossModuleDomainImportsTest > productionCodeHasNoCrossModuleDomainImportYet` | PARTIAL |
-| 2. Pureza del módulo `kernel` | `kernel` importa Spring | `enforce-kernel-purity` en fase `validate` (probe P2 de la ronda 1; `kernel/pom.xml` no cambió en `1f3b328`) | COMPLIANT |
+| 2. Pureza del módulo `kernel` | `kernel` importa Spring | `enforce-kernel-purity` en fase `validate`; probe P2 de la ronda 1, evidencia heredada (ver nota) | COMPLIANT |
 | 2. Pureza del módulo `kernel` | `kernel` solo usa el JDK | `./mvnw -B verify` y `BuildSmokeTest`, reejecutados en esta ronda | COMPLIANT |
-| 3. Dependencias prohibidas | Se agrega Hibernate | Probe P1 de la ronda 1 (`apps/api/pom.xml` no cambió en `1f3b328`) | COMPLIANT |
-| 3. Dependencias prohibidas | Sin dependencias prohibidas | `./mvnw -B verify` de esta ronda: reglas 0-2 `passed`; probe P3 de la ronda 1 | COMPLIANT |
-| 4. Paquetes con nombre de capa técnica | Paquete `services` | `NoTechnicalLayerPackageNamesTest > rejectsTheFixtureServicesPackage` (no vacua, probe D) | COMPLIANT |
+| 3. Dependencias prohibidas | Se agrega Hibernate | **Probe R8, reejecutada en esta ronda** contra el POM actual | COMPLIANT |
+| 3. Dependencias prohibidas | Sin dependencias prohibidas | `./mvnw -B verify` de esta ronda: reglas 0-2 `passed` en los tres módulos | COMPLIANT |
+| 4. Paquetes con nombre de capa técnica | Paquete `services` | `NoTechnicalLayerPackageNamesTest > rejectsTheFixtureServicesPackage`; no vacua por la probe D de la ronda 2, evidencia heredada (ver nota) | COMPLIANT |
 | 4. Paquetes con nombre de capa técnica | Paquetes por capacidad de negocio | `NoTechnicalLayerPackageNamesTest > productionCodeHasNoTechnicalLayerPackageNameYet` | COMPLIANT |
-| 5. Reglas de capas y ausencia de ciclos | `domain` importa `infrastructure` | `LayeredArchitectureTest > rejectsTheFixtureLayeringViolations` — **la regla detecta la importación (probe H), pero la prueba que la cubre no discrimina (probe G)** | PARTIAL |
-| 5. Reglas de capas y ausencia de ciclos | Ciclo entre dos paquetes | `NoCyclesTest > rejectsTheFixtureTwoPackageCycle` (no vacua, probe D) | COMPLIANT |
+| 5. Reglas de capas y ausencia de ciclos | `domain` importa `infrastructure` | `LayeredArchitectureTest > rejectsTheFixtureLayeringViolations`, **ahora discriminante (probes R1 y R3)** | COMPLIANT |
+| 5. Reglas de capas y ausencia de ciclos | Ciclo entre dos paquetes | `NoCyclesTest > rejectsTheFixtureTwoPackageCycle`; no vacua por la probe D de la ronda 2, evidencia heredada (ver nota) | COMPLIANT |
 | 6. Integración continua verifica cada empuje | Empuje con violación | Sin corrida roja causada por una violación de arquitectura | PARTIAL |
-| 6. Integración continua verifica cada empuje | Empuje sin violaciones | Corrida `35167872324` sobre `1f3b328`: ambos trabajos en verde | COMPLIANT |
+| 6. Integración continua verifica cada empuje | Empuje sin violaciones | Corrida `35179705314` sobre `3d77388`: ambos trabajos en verde | COMPLIANT |
 | 7. Vulnerabilidad alta o crítica rompe la verificación | Vulnerabilidad crítica | (ninguna) — nunca se introdujo una dependencia vulnerable | UNTESTED |
-| 7. Vulnerabilidad alta o crítica rompe la verificación | Solo severidad baja | Trabajo `security scanning` de la corrida `35167872324`: escaneo ejecutado, sin hallazgos, no rompe | COMPLIANT |
-| 8. Ninguna regla se desactiva sin un ADR | Exclusión sin justificación | `SuppressionCitesAdrTest` (probes A, B, C, F) | COMPLIANT |
-| 8. Ninguna regla se desactiva sin un ADR | Excepción documentada por ADR | `allowEmptyShould(true)` citado a ADR-0018 más `EmptyShouldExceptionInventoryTest` (probe E) | COMPLIANT |
+| 7. Vulnerabilidad alta o crítica rompe la verificación | Solo severidad baja | Trabajo `security scanning` de la corrida `35179705314`: escaneo ejecutado con `severity: HIGH,CRITICAL` y `exit-code: 1`, sin hallazgos, no rompe | COMPLIANT |
+| 8. Ninguna regla se desactiva sin un ADR | Exclusión sin justificación | `SuppressionCitesAdrTest` (probes R4, R5, R6, R7) | COMPLIANT |
+| 8. Ninguna regla se desactiva sin un ADR | Excepción documentada por ADR | `allowEmptyShould(true)` citado a ADR-0018 más `EmptyShouldExceptionInventoryTest` (probe R2) | COMPLIANT |
 
-**Compliance summary**: 12/16 escenarios COMPLIANT; 3 PARTIAL; 1 UNTESTED.
-**Requisitos completos**: 4/8 (requisitos 2, 3, 4 y 8).
+**Compliance summary**: 13/16 escenarios COMPLIANT; 2 PARTIAL; 1 UNTESTED.
+**Requisitos completos**: 5/8 (requisitos 2, 3, 4, 5 y 8).
 
-Nota sobre el requisito 8: pasa de incumplido a completo. Es el avance más sólido de esta ronda y el
-único requisito que la remediación cerró por entero.
+**Nota sobre la evidencia heredada.** Cuatro escenarios se apoyan en probes de rondas anteriores en
+vez de reejecutarlas. La justificación es que sus archivos no cambiaron: `git show --stat 3d77388`
+enumera exactamente cinco archivos —`ArchitectureTestSupport.java`, `LayeredArchitectureTest.java`,
+`SuppressionCitesAdrTest.java`, `apps/api/pom.xml` y `tasks.md`—, de modo que
+`NoCrossModuleDomainImportsTest`, `NoCyclesTest`, `NoTechnicalLayerPackageNamesTest`,
+`SpringModulithVerificationTest` y `kernel/pom.xml` están intactos desde la ronda que los probó.
+El caso de `apps/api/pom.xml` es distinto: ese archivo **sí** cambió, y por eso el escenario
+«Se agrega Hibernate» no se heredó sino que se volvió a ejecutar (probe R8). El diff de ese archivo
+confirma además que el bloque del enforcer no se tocó: las únicas líneas añadidas son el comentario
+de `archunit.version` y la entrada de `dependencyManagement`.
 
 ---
 
@@ -153,17 +209,20 @@ Nota sobre el requisito 8: pasa de incumplido a completo. Es el avance más sól
 | Requirement | Status | Notes |
 |------------|--------|-------|
 | 1. Frontera de dominio entre módulos | Implementado | Sin cambios desde la ronda 1. Regla doble (ArchUnit y Spring Modulith), derivación del módulo por prefijo de paquete, sin nombres fijos |
-| 2. Pureza del módulo `kernel` | Implementado | `kernel/pom.xml` intacto en `1f3b328` |
-| 3. Dependencias prohibidas | Implementado | `apps/api/pom.xml` intacto en `1f3b328` |
+| 2. Pureza del módulo `kernel` | Implementado | `kernel/pom.xml` intacto en `3d77388` |
+| 3. Dependencias prohibidas | Implementado | Bloque del enforcer intacto; reverificado en ejecución (probe R8), incluida la captura transitiva de `jakarta.persistence` |
 | 4. Paquetes con nombre de capa técnica | Implementado | Los 9 nombres en la regla; sigue habiendo un solo fixture (S1) |
-| 5. Reglas de capas y ausencia de ciclos | **Parcial** | Ciclos: completo. Capas: las tres direcciones de ADR-0002 ya se expresan, pero `consideringAllDependencies()` las hace inservibles contra código real y no discriminantes contra el fixture. Ver C1-bis |
+| 5. Reglas de capas y ausencia de ciclos | **Implementado** | Deja de ser parcial. Las tres direcciones de ADR-0002 se expresan y ahora el ámbito de dependencias es el correcto: `consideringOnlyDependenciesInLayers()` descarta todo origen o destino que no pertenezca a una capa declarada, sin fijar ningún prefijo de paquete a mano |
 | 6. Integración continua verifica cada empuje | Implementado | Disparador y matriz de Java sin cambios; corrida verde verificada sobre el commit exacto |
-| 7. Vulnerabilidad alta o crítica rompe la verificación | Implementado | Con la especificación enmendada, la implementación coincide con la capa exigida. El registro confirma `trivy fs apps/api`, `[vuln] Vulnerability scanning is enabled`, `Number of language-specific files num=3`, `[pom] Detecting vulnerabilities...` y `Clean (no security findings detected)`. Falta ejercitar el bloqueo (W5) |
-| 8. Ninguna regla se desactiva sin un ADR | **Implementado** | Deja de ser prosa. Dos mecanismos ejecutables, ambos probados de forma adversarial. La única excepción vigente está declarada, citada y con caducidad verificada |
+| 7. Vulnerabilidad alta o crítica rompe la verificación | Implementado | Con la especificación enmendada, la implementación coincide con la capa exigida. Falta ejercitar el bloqueo (C2-bis) |
+| 8. Ninguna regla se desactiva sin un ADR | Implementado | Dos mecanismos ejecutables, ambos probados de forma adversarial, ahora también sobre los `pom.xml` |
 
 **Comprobación de alcance**: no se encontró nada implementado fuera del alcance aprobado. El commit
-`1f3b328` toca 11 archivos: 8 fuentes de prueba bajo `com.confia.architecture`, `archunit.properties`,
-`package-info.java` y `tasks.md`. Ni POMs, ni `ci.yml`, ni código de producción, ni módulos de negocio.
+`3d77388` toca cinco archivos y ninguno es código de producción, POM de módulo nuevo, flujo de
+integración continua ni módulo de negocio. En el acumulado de la rama, los 46 archivos se reparten
+entre `apps/api` y `.github` (36 archivos, 1988 inserciones) y documentación y artefactos de
+OpenSpec (10 archivos). Todo ello corresponde a la tabla "Cambios de archivos" de `design.md`, más
+ADR-0018 y sus dos referencias en `docs/`, que la propia remediación de la ronda 1 introdujo.
 
 ---
 
@@ -172,12 +231,12 @@ Nota sobre el requisito 8: pasa de incumplido a completo. Es el avance más sól
 | Decision | Followed? | Notes |
 |----------|-----------|-------|
 | 1. Reactor de tres POM | Sí | Sin cambios |
-| 2. Enforcer en `validate` | Sí | Sin cambios; reglas `passed` en la corrida de esta ronda |
+| 2. Enforcer en `validate` | Sí | Reglas `passed` en local y en integración continua; probe R8 confirma que rompe cuando debe |
 | 2b. SNAPSHOT prohibido solo en main | Sí | Sin cambios (probe P5 de la ronda 1) |
-| 3. Reglas auto-probadas con fixture permanente | **Parcial** | El mecanismo se reforzó de verdad para cuatro de las cinco reglas. Para la regla de capas, la mitad negativa sigue sin poder distinguir un rechazo real de ruido del JDK (probe G) |
+| 3. Reglas auto-probadas con fixture permanente | **Sí** | Deja de ser parcial. Las cinco mitades negativas fallan si su fixture desaparece (probe D, ronda 2) y la de capas falla además si el fixture deja de violar algo conservando sus clases (probe R1) |
 | 4. Lanzador por `APP_PROFILE` | Sí | Sin cambios; 10 pruebas en verde |
 | 5. Integración continua parcial y honesta | Sí | Sin cambios |
-| 6. Escaneo de dependencias | Sí | La pregunta «por confirmar» número 6 queda resuelta por el registro: Trivy en modo `fs` reconoce los tres `pom.xml` y los analiza. No hace falta la ruta de SBOM CycloneDX en este cambio |
+| 6. Escaneo de dependencias | Sí | Trivy en modo `fs` sobre `apps/api`; la pregunta «por confirmar» 6 quedó resuelta en la ronda 2 |
 
 ---
 
@@ -185,133 +244,88 @@ Nota sobre el requisito 8: pasa de incumplido a completo. Es el avance más sól
 
 **CRITICAL**:
 
-- **C1-bis — La regla de capas nueva cuenta dependencias del JDK como violaciones de capa, lo que
-  anula su mitad negativa y hará imposible su mitad de producción.**
-  `LayeredArchitectureTest.layeringRule()` (líneas 32-50) usa `.consideringAllDependencies()`. Con esa
-  opción, ArchUnit evalúa **toda** dependencia, incluidas las que apuntan a clases que no pertenecen a
-  ninguna capa declarada, y las cláusulas `mayNotAccessAnyLayer()` y `mayOnlyAccessLayers(...)` las
-  marcan como violación. Dos consecuencias, ambas verificadas de primera mano:
+- **C2-bis — El escenario «Vulnerabilidad crítica» del requisito 7 nunca se ha ejercitado.**
+  Es el residuo de C2 después de la enmienda de la especificación de la ronda 1, registrado como W5
+  en la ronda 2. Esta ronda deja de degradarlo, por coherencia con el propio criterio de la fase: la
+  tabla de decisión de `sdd-verify` clasifica como CRITICAL `UNTESTED` todo escenario sin una prueba
+  que lo cubra y que haya pasado en ejecución, y este no la tiene.
 
-  1. **La mitad negativa no demuestra nada.** En la probe G se conservaron las tres clases de fixture
-     de capas y sus paquetes, y se les quitaron todas las dependencias entre capas. La regla siguió
-     lanzando `AssertionError` —por `java.lang.Object` y `java.lang.String`— y
-     `rejectsTheFixtureLayeringViolations` pasó en verde: `Tests run: 2, Failures: 0`, `BUILD SUCCESS`.
-     Es decir, esa prueba pasa con cualquier conjunto de clases no vacío, viole o no las capas.
-     `assertRuleRejects` filtra el mensaje de conjunto vacío («failed to check any classes», «is
-     empty») pero no el ruido del JDK, de modo que el refuerzo de la tarea 5.5 cubre el caso de la
-     probe D y deja abierto el de la probe G. La probe H lo confirma desde el otro lado: contra el
-     fixture verdadero la regla reporta **37 violaciones**, de las cuales solo 4 son las importaciones
-     deliberadas; las 33 restantes son `extends class <java.lang.Object>`, `calls constructor
-     <java.lang.Object.<init>()>` y `has return type <java.lang.String>`.
-  2. **La mitad de producción no podrá pasar nunca.** En la probe E se agregó una sola clase de
-     negocio mínima, `com.confia.organization.domain.Organization`, sin ninguna dependencia fuera del
-     JDK. `productionCodeRespectsLayeringYet` falló con tres violaciones, todas espurias:
-     `Class <...Organization> extends class <java.lang.Object>`,
-     `Constructor <...Organization.<init>()> calls constructor <java.lang.Object.<init>()>` y
-     `Method <...Organization.name()> has return type <java.lang.String>`.
+  Lo que sí está probado: el escaneo existe, corre en cada empuje, reconoce los tres `pom.xml` y
+  está configurado para bloquear (`severity: HIGH,CRITICAL`, `exit-code: 1`); la corrida
+  `35179705314` lo muestra ejecutándose y terminando en verde sin hallazgos. Lo que no está probado
+  es lo único que el escenario afirma: que ante una vulnerabilidad alta o crítica la verificación
+  **falla**. Un escaneo configurado para bloquear pero nunca observado bloqueando es exactamente la
+  «regla que nunca falló» que esta capacidad existe para impedir, y ADR-0008 y ADR-0013 lo exigen de
+  forma explícita.
 
-  Por qué es crítico y no una advertencia: es el mismo defecto de fondo que C1 señaló en la ronda 1
-  —una garantía escrita que el código no entrega— trasladado de un Javadoc a la definición de la
-  regla. La ronda 1 aceptó el escenario «`domain` importa `infrastructure`» como COMPLIANT sobre la
-  base de que la mitad negativa era no vacua; esa base ya no se sostiene. Y afecta directamente al
-  cambio 4: ADR-0018 sección 2 anuncia un rojo programado cuando aparezca el primer módulo de negocio,
-  pero será un rojo distinto y engañoso, causado por `java.lang.Object` en vez de por la caducidad de
-  la excepción, lo que hace probable que alguien lo silencie con la herramienta equivocada.
-
-  Corrección sugerida (no aplicada): acotar el ámbito de dependencias de la regla, por ejemplo con
-  `.consideringOnlyDependenciesInAnyPackage("com.confia..")`, o conservar `consideringAllDependencies()`
-  y añadir un `ignoreDependency` para todo lo que resida fuera de `com.confia..`. Además, reforzar la
-  mitad negativa para que afirme sobre el contenido del mensaje —que nombre `BadDomain`,
-  `BadApplication` y `BadWeb`— y no solo sobre el tipo de excepción; es la pieza de S2 que sigue
-  pendiente y que aquí es determinante, no cosmética.
+  No es una regresión de la Fase 6 ni un defecto introducido por la remediación: es un hueco que las
+  rondas 1 y 2 aplazaron. Tampoco se pudo cerrar desde esta fase, que no tiene Trivy instalado en
+  local ni acceso de red. Cerrarlo requiere un empuje desechable con una dependencia de
+  vulnerabilidad pública conocida, observar el trabajo `security scanning` en rojo, y revertirlo.
 
 **WARNING**:
 
 - **W1 — El escenario «Empuje con violación» (Req. 6) sigue sin ejercitarse con una violación de
-  arquitectura.** Sin cambios desde la ronda 1. La confianza sigue siendo indirecta: el trabajo
-  ejecuta el mismo `./mvnw verify` que las probes A-F demuestran que falla.
+  arquitectura.** Sin cambios desde la ronda 1. La confianza es indirecta pero sólida: el trabajo
+  `backend` ejecuta el mismo `./mvnw verify` que las probes R1 y R4 a R8 demuestran que falla. Se
+  mantiene como advertencia y no como crítico porque su mecanismo sí tiene pruebas que pasan en
+  ejecución; lo que falta es la observación del rojo en el remoto.
 - **W2 — El escenario «Cada módulo usa solo su propio dominio» (Req. 1) solo se cumple de forma
-  aproximada.** Sin cambios: su premisa son dos módulos de negocio y todavía no existen.
-- **W3 — El diff sigue por encima del presupuesto de revisión, y creció.** La Fase 5 añade 416
-  inserciones y 48 borrados sobre un cambio que ya superaba las 800 líneas concedidas. Cubierto por la
-  excepción `size:exception` del 2026-09-15; se deja constancia, no bloquea.
+  aproximada.** Sin cambios: su premisa son dos módulos de negocio y todavía no existen. Es una
+  limitación de secuencia del roadmap, no un defecto de este cambio; se cierra en los cambios 4 y 7.
+- **W3 — El diff sigue por encima del presupuesto de revisión.** El acumulado de la rama es de 46
+  archivos y 3285 inserciones, muy por encima de las 800 líneas concedidas. Cubierto por la
+  excepción `size:exception` del 2026-09-15. Se deja constancia, no bloquea. El lote de la Fase 6
+  por sí solo fue de 117 líneas.
 - **W4 — La tarea 4.2 la cerró el orquestador, no `sdd-apply`.** Sin cambios; solo trazabilidad.
-- **W5 — El escenario negativo del requisito 7 nunca se ejercitó.** Es el residuo de C2 después de la
-  enmienda de la especificación. El escaneo corre, reconoce los tres `pom.xml` y está configurado para
-  bloquear (`severity: HIGH,CRITICAL`, `exit-code: 1`), pero nunca se introdujo una dependencia
-  vulnerable que demuestre el bloqueo. No se pudo ejercitar en esta ronda: Trivy no está instalado
-  localmente y esta fase no dispone de acceso a la red. Se reporta como advertencia y no como
-  bloqueante porque la ruta de cumplimiento existe, está configurada y se observó ejecutándose;
-  cerrarlo requiere un empuje desechable con una dependencia de vulnerabilidad conocida.
-- **W6 — La versión declarada de ArchUnit no es la que se usa.** `apps/api/pom.xml:35` declara
-  `archunit.version=1.5.0` y `app/pom.xml` la aplica a `archunit-junit5`, pero
-  `spring-modulith-core:2.1.1` declara `com.tngtech.archunit:archunit:1.4.2` a menor profundidad y
-  gana la mediación de Maven. Verificado de primera mano con un volcado de `-X`:
-
-  ```text
-  com.tngtech.archunit:archunit-junit5:jar:1.5.0:test
-  com.tngtech.archunit:archunit-junit5-api:jar:1.5.0:test
-  com.tngtech.archunit:archunit-junit5-engine:jar:1.5.0:test
-  com.tngtech.archunit:archunit-junit5-engine-api:jar:1.5.0:test
-  com.tngtech.archunit:archunit:jar:1.4.2:test
-  ```
-
-  Coincide con el repositorio local: el directorio de `archunit` 1.5.0 contiene únicamente el POM, sin
-  JAR, mientras que el de 1.4.2 sí tiene JAR. El `DependencyConvergence` del enforcer no lo detecta
-  porque son artefactos distintos, no dos versiones del mismo. **Severidad: riesgo latente, no un
-  defecto de este cambio.** La combinación funciona hoy —las 22 pruebas pasan— y ninguna cláusula de
-  la especificación la prohíbe, pero es una pareja no soportada por el proveedor y la propiedad del
-  POM afirma algo distinto de lo que se ejecuta, que es justo la clase de discrepancia silenciosa que
-  esta capacidad existe para evitar. Corrección recomendada (no aplicada, y a decidir por el
-  propietario): importar `com.tngtech.archunit:archunit-bom` en el `dependencyManagement` del POM
-  padre, que alinea `archunit` y `archunit-junit5` de una sola vez; como alternativa, declarar
-  `com.tngtech.archunit:archunit` explícitamente con la misma propiedad de versión. Lo primero es
-  preferible: no deja una segunda versión que mantener a mano.
-- **W7 — El escáner de supresiones no cubre los archivos donde vive la mayoría de las reglas.**
-  `SuppressionCitesAdrTest.SCANNED_EXTENSIONS` es `{".java", ".properties"}` y su raíz es `apps/api`.
-  Quedan fuera los `pom.xml` —donde están todas las reglas del `maven-enforcer-plugin`— y
-  `.github/workflows/ci.yml`. Hoy el comentario de `apps/api/pom.xml` líneas 112-114 pide citar el ADR
-  ante cualquier exclusión futura del enforcer, pero eso vuelve a ser prosa sin mecanismo, que es
-  exactamente lo que ADR-0018 quiso erradicar. El ADR lo permite —su sección 3.b describe un catálogo
-  que crece por herramienta— así que no es un incumplimiento, pero sí una cobertura menor de la que el
-  requisito 8 sugiere. Sugerencia: añadir `.xml` y `.yml` al conjunto de extensiones.
 
 **SUGGESTION**:
 
-- **S1 — Solo 1 de los 9 nombres de paquete prohibidos tiene fixture.** Sin cambios desde la ronda 1.
-- **S2 — Parcialmente cerrada.** `assertRuleRejects` ya descarta el mensaje de conjunto vacío, lo que
-  la probe D confirma. Lo que la ronda 1 pedía —afirmar sobre el mensaje de la violación— sigue
-  pendiente, y para la regla de capas ha dejado de ser una mejora opcional: es la causa de C1-bis.
+- **S1 — Solo 1 de los 9 nombres de paquete prohibidos tiene fixture.** Sin cambios.
+- **S2 — Cerrada para la regla que importaba, abierta para las demás.** La mitad negativa de la
+  regla de capas ya afirma sobre el contenido del mensaje, y eso es lo que cerró C1-bis. Los otros
+  tres llamadores de `assertRuleRejects` siguen pasando cero fragmentos, de modo que su rechazo solo
+  está protegido contra el ruido de conjunto vacío. Pasarles también sus fragmentos esperados es
+  barato y elimina la misma clase de defecto antes de que reaparezca.
 - **S3 — La lista de programadores de tareas prohibidos sigue siendo una enumeración cerrada.** Sin
-  cambios desde la ronda 1.
-- **S4 — Cachear el repositorio local de Maven en el trabajo `security` resultó menos necesario de lo
-  que la ronda 1 supuso.** El registro de la corrida `35167872324` muestra el escaneo completo en unos
-  dos segundos leyendo los tres `pom.xml`, sin invocar Maven. Se mantiene como sugerencia de
-  robustez, con prioridad baja.
-- **S5 — `SuppressionCitesAdrTest` se excluye a sí mismo por nombre de archivo, no por ruta.** Un
-  archivo futuro llamado igual en otro paquete quedaría sin escanear. Trivial, pero gratuito de
-  corregir.
-- **S6 — El filtro que descarta el texto de conjunto vacío es amplio.** Una violación legítima cuyo
-  mensaje contuviera esa misma cadena se leería como vacuidad. Falla del lado seguro, así que es
-  menor.
+  cambios.
+- **S4 — Cachear el repositorio local de Maven en el trabajo `security`.** Prioridad baja; el
+  escaneo tardó 24 s.
+- **S5 — `SuppressionCitesAdrTest` se excluye a sí mismo por nombre de archivo, no por ruta.** Sin
+  cambios. Un archivo futuro con el mismo nombre en otro paquete quedaría sin escanear.
+- **S6 — El filtro que descarta el texto de conjunto vacío es amplio.** Sin cambios. Una violación
+  legítima cuyo mensaje contuviera «is empty» se leería como vacuidad. Falla del lado seguro.
+- **S7 (nueva) — Residuo de W7: el escáner cubre `.java`, `.properties` y `.xml` bajo `apps/api`,
+  pero no `.github/workflows/ci.yml`.** La parte que importaba de W7 está cerrada: los `pom.xml`,
+  donde viven todas las reglas del enforcer, ahora se escanean (probe R4). No es un incumplimiento
+  —ADR-0018 sección 3.b acota el escáner al árbol de fuentes de `apps/api`— y hoy no existe ningún
+  `.yml` bajo `apps/api`, así que el hueco se reduce a ese único archivo.
+- **S8 (nueva) — Imprecisión documental en la tarea 6.1 y en `apply-progress`.** Ambas dicen «los
+  otros cuatro llamadores» de `assertRuleRejects`; son tres. Sin efecto sobre el comportamiento.
 
 ---
 
-### Estado de los hallazgos de la ronda 1
+### Estado de los hallazgos previos
 
-| Ronda 1 | Estado | Comentario |
-|---|---|---|
-| C1 | Parcial, reabierto como C1-bis | La garantía falsa se movió del Javadoc a la definición de la regla |
-| C2 | **Cerrado** | Enmienda de la especificación; residuo en W5 |
-| C3 | **Cerrado** | Único hallazgo cerrado con verificación adversarial completa |
-| W1 | Abierto | Sin cambios |
-| W2 | Abierto | Sin cambios |
-| W3 | Abierto | Creció; cubierto por `size:exception` |
-| W4 | Abierto | Solo trazabilidad |
-| S1 | Abierto | Sin cambios |
-| S2 | **Parcial** | La mitad fácil se cerró; la que importaba sigue abierta y es la causa de C1-bis |
-| S3 | Abierto | Sin cambios |
-| S4 | Abierto, prioridad menor | Evidencia nueva de integración continua lo desdramatiza |
+| Hallazgo | Ronda | Estado | Comentario |
+|---|---|---|---|
+| C1 | 1 | **Cerrado** | La regla completa de capas sustituyó a la parcial y el Javadoc falso desapareció |
+| C2 | 1 | Cerrado en su forma original, residuo escalado | La capa exigida y la implementada ya coinciden; el escenario negativo sigue sin ejercitarse y pasa a C2-bis |
+| C3 | 1 | **Cerrado** | Reverificado en esta ronda con cuatro mutaciones (R4 a R7) |
+| C1-bis | 2 | **Cerrado** | Probes R1, R2 y R3. Era el bloqueante de la ronda 2 |
+| W1 | 1 | Abierto | Sin cambios |
+| W2 | 1 | Abierto | Sin cambios; limitación de secuencia del roadmap |
+| W3 | 1 | Abierto | Cubierto por `size:exception` |
+| W4 | 1 | Abierto | Solo trazabilidad |
+| W5 | 2 | **Escalado a C2-bis** | Deja de reportarse como advertencia; ver CRITICAL |
+| W6 | 2 | **Cerrado** | `version managed from 1.4.2`: lo declarado coincide con lo resuelto, sin romper `DependencyConvergence` |
+| W7 | 2 | **Cerrado**, con residuo menor | Los `pom.xml` se escanean; queda `ci.yml` fuera (S7) |
+| S1 | 1 | Abierto | Sin cambios |
+| S2 | 1 | **Cerrada donde importaba** | Ver S2 arriba |
+| S3 | 1 | Abierto | Sin cambios |
+| S4 | 1 | Abierto, prioridad baja | Sin cambios |
+| S5 | 2 | Abierto | Sin cambios |
+| S6 | 2 | Abierto | Sin cambios |
 
 ---
 
@@ -319,26 +333,42 @@ Nota sobre el requisito 8: pasa de incumplido a completo. Es el avance más sól
 
 **FAIL**
 
-La remediación hizo bien el trabajo más difícil. El requisito 8 pasó de incumplirse a tener dos
-mecanismos ejecutables que muerden de verdad: cinco mutaciones deliberadas —propiedad global en
-`false`, supresión sin cita, supresión no inventariada, cita a un ADR inexistente y aparición del
-primer módulo de negocio— rompen la construcción, cada una con el mensaje correcto y señalando la
-línea exacta. Eso cierra C3 sin reservas y es un resultado mejor que el que la ronda 1 pedía.
+Conviene separar dos cosas que apuntan en direcciones distintas.
 
-El cambio no pasa por un solo hallazgo, y es el mismo defecto de fondo que la ronda 1 ya había
-señalado, en otro lugar. La regla de capas que sustituyó a la parcial cubre por fin las tres
-direcciones de ADR-0002, pero `consideringAllDependencies()` la hace contar `java.lang.Object` y
-`java.lang.String` como violaciones de capa. La consecuencia medida es doble: su prueba negativa pasa
-en verde contra un fixture al que se le quitaron todas las violaciones, de modo que ya no demuestra
-que la regla detecte nada; y su mitad de producción falla ante la primera clase de negocio real, con
-tres violaciones espurias. La ronda 1 dio por COMPLIANT el escenario «domain importa infrastructure»
-porque la mitad negativa era no vacua; esa base desapareció y el escenario baja a PARTIAL.
+**La remediación de la Fase 6 hizo su trabajo y lo hizo bien.** El bloqueante C1-bis está cerrado, y
+cerrado por la razón correcta. La ronda 2 no rechazó el cambio porque una violación real se colara,
+sino porque la prueba que respaldaba la regla de capas pasaba en verde contra un fixture al que se
+le habían quitado todas las violaciones. La corrección no silenció el síntoma:
+`consideringOnlyDependenciesInLayers()` deriva el filtro de las cuatro capas ya declaradas, sin
+fijar a mano ningún prefijo de paquete que después haya que mantener sincronizado, y la aserción
+sobre el mensaje obliga a que el rechazo nombre `BadDomain`, `BadApplication` y `BadWeb`. Las tres
+probes exigidas lo confirman de primera mano: la mutación que antes pasaba ahora falla (R1), la
+clase de negocio mínima ya no produce violaciones espurias (R2), y contra el fixture intacto las 18
+violaciones reportadas son las 18 deliberadas (R3), frente a 4 de 37 en la ronda anterior. Los dos
+mecanismos de ADR-0018 siguen mordiendo después de tocar `ArchitectureTestSupport` y
+`SuppressionCitesAdrTest` a la vez (R4 a R7), el anclaje de ArchUnit dejó de ser una mediación
+invisible sin romper la convergencia (R9), y el escáner llegó a los archivos donde viven las reglas
+del enforcer. W6 y W7 quedan cerrados.
 
-Conviene ser preciso sobre el alcance del defecto: la regla **sí** detecta las importaciones
-prohibidas reales, como muestra la probe H. No hay una violación de arquitectura que hoy se cuele. Lo
-que falta es la prueba que impida que eso cambie mañana sin que nadie se entere, que es precisamente
-la razón de ser de esta capacidad.
+**Y sin embargo el cambio no pasa**, porque el requisito 7 tiene un escenario que nunca se ha
+ejercitado. Un escaneo configurado para bloquear pero jamás observado bloqueando no demuestra el
+requisito que dice cumplir, y degradarlo a advertencia por tercera ronda consecutiva sería
+justamente la erosión que esta capacidad existe para impedir.
 
-Las otras dos novedades —la versión de ArchUnit declarada que no coincide con la que se ejecuta, y el
-escáner de supresiones que no mira los POM donde viven las reglas del enforcer— son riesgos latentes
-que conviene registrar y decidir, no motivos de rechazo.
+**Lo que el propietario tiene que decidir, porque no es una decisión de esta fase.** Tres escenarios
+no se pueden cerrar desde dentro de este cambio con el alcance actual: «Cada módulo usa solo su
+propio dominio» necesita dos módulos de negocio que llegan en los cambios 4 y 7; «Empuje con
+violación» y «Vulnerabilidad crítica» necesitan sendos empujes desechables contra el remoto. Es
+decir, 8/8 requisitos es inalcanzable aquí tal como está escrita la especificación. Hay tres salidas
+razonables, y ninguna la puede tomar el verificador:
+
+1. **Ejercitar los dos empujes desechables** (una violación de arquitectura y una dependencia con
+   vulnerabilidad pública conocida), observar ambos rojos en el remoto y revertirlos. Cierra C2-bis
+   y W1, y deja el cambio en 7/8, con el único pendiente atado al roadmap.
+2. **Enmendar la especificación**, como ya se hizo en la ronda 1 con la capa del requisito 7, para
+   que los escenarios que dependen de módulos de negocio futuros o de empujes desechables se
+   declaren explícitamente fuera del alcance de este cambio y se trasladen a los cambios 4 y 7.
+3. **Archivar con el FAIL documentado**, aceptando de forma expresa que el requisito 7 queda sin
+   demostrar hasta el cambio 11, que es el que vuelve a tocar el escaneo de contenedores.
+
+La opción 1 es la que deja el registro más honesto y cuesta poco: dos empujes y dos reversiones.
