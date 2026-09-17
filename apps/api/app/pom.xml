@@ -39,6 +39,16 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- THROWAWAY PROBE — DO NOT KEEP. Known-critical vulnerability (Log4Shell) used to prove
+         that the dependency scan blocks the build on HIGH/CRITICAL severity, as build-integrity
+         requirement 7 demands. Reverted immediately after the red run is recorded. -->
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <version>2.14.1</version>
+      <scope>provided</scope>
+    </dependency>
+
     <dependency>
       <groupId>com.tngtech.archunit</groupId>
       <artifactId>archunit-junit5</artifactId>
