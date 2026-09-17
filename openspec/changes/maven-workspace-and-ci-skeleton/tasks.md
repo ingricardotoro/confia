@@ -55,3 +55,45 @@ Nota: `strict_tdd` permanece en `false` en `openspec/config.yaml` para este camb
 - [x] 4.1 Crear `.github/workflows/ci.yml` con el trabajo `backend` (`./mvnw verify` sobre `apps/api`) y el escaneo `aquasecurity/trivy-action@v0.36.0` en modo `fs`, severidad `HIGH,CRITICAL`, `exit-code: 1`. Disparador en empujes a `change/**` y `main`, y en `pull_request` hacia `main` (`docs/06` §14.5; decisión ya cerrada en `design.md`, no vuelve a evaluarse al implementar). Sin trabajos `frontend`, `e2e` ni `quality-gate` (llegan en cambios 3 y 11); sin `-Pmutation-gate` (cambio 2). — Requisito: Integración continua verifica cada empuje; Vulnerabilidad alta o crítica rompe la construcción
 - [x] 4.2 En un checkout limpio, ejecutar `./mvnw verify` de extremo a extremo; empujar la rama `change/maven-workspace-and-ci-skeleton` y confirmar en `github.com/ingricardotoro/confia` → Actions que el flujo termina en verde. **Evidencia:** `./mvnw -B verify` reejecutado por el orquestador con JDK 25.0.3 → `BUILD SUCCESS`, 20 pruebas, 0 fallos; corrida `35057671700` (commit `2bf1c22`) en verde en ambos trabajos, tras corregir la etiqueta inexistente `trivy-action@0.28.0` por `v0.36.0`. — Requisito: Integración continua verifica cada empuje (cierre)
   - **Parcialmente cumplido por `sdd-apply`:** `./mvnw verify` de extremo a extremo confirmado en verde localmente en checkout limpio (ver apply-progress). El empuje de la rama y la confirmación en GitHub Actions quedan para la fase de entrega del orquestador (`sdd-apply` no empuja ni abre pull request por contrato de esta ejecución).
+
+## Fase 5: Correcciones de la verificación
+
+Lote de remediación sobre los hallazgos críticos C1 y C3 de `verify-report.md`. Alcance exacto: cerrar
+esos dos hallazgos; C2, las advertencias W1–W4 y las sugerencias S1–S4 quedan fuera.
+
+- [x] 5.1 (C1) Sustituir la regla parcial de `DomainDoesNotDependOnOuterLayersTest` (que solo
+  verificaba `domain` hacia afuera y cuyo Javadoc afirmaba falsamente que las tres reglas de
+  ADR-0002 estaban "collapsed into one direction check") por una única regla
+  `Architectures.layeredArchitecture()` completa en `LayeredArchitectureTest.java`: `web` solo
+  depende de `application`, `application` solo depende de `domain`, `infrastructure` implementa
+  los puertos de `application` (depende de `application` y `domain`, nadie depende de ella), y
+  `domain`/`infrastructure`/`web` nunca son alcanzados fuera de lo permitido. Fixtures negativos
+  nuevos bajo `fixture/layering/application/` y `fixture/layering/web/` prueban cada dirección
+  prohibida. — Requisito: Reglas de capas y ausencia de ciclos (C1)
+- [x] 5.2 (C3) Restaurar `archRule.failOnEmptyShould=true` explícito en `archunit.properties`
+  (ADR-0018) y declarar la única excepción vigente con `allowEmptyShould(true)` en la mitad de
+  producción de `LayeredArchitectureTest`, citando ADR-0018 junto al código; la mitad de fixture
+  nunca lleva la excepción. — Requisito: Ninguna regla se desactiva sin un ADR (C3)
+- [x] 5.3 (C3) Implementar el inventario de caducidad exigido por ADR-0018 sección 3.a
+  (`EmptyShouldExceptionInventoryTest`): declara la única excepción vigente, su condición ("no
+  existe módulo de negocio bajo `apps/api/app`") y el ADR que la autoriza; falla nombrando la regla
+  el día que la condición deje de cumplirse. — Requisito: Ninguna regla se desactiva sin un ADR (C3)
+- [x] 5.4 (C3) Implementar el escáner de supresiones exigido por ADR-0018 sección 3.b
+  (`SuppressionCitesAdrTest`): recorre `apps/api`, falla ante un marcador de supresión
+  (`allowEmptyShould(`, `@ArchIgnore`) sin cita `ADR-NNNN` adyacente, ante un ADR citado que no
+  existe en `docs/adr/`, ante cualquier `failOnEmptyShould=false`, y ante una discrepancia entre el
+  número de `allowEmptyShould(` y las entradas del inventario de la tarea 5.3. Verificado con tres
+  mutaciones deliberadas (propiedad global en `false`, cita ausente): las tres las detecta. —
+  Requisito: Ninguna regla se desactiva sin un ADR (C3)
+- [x] 5.5 (C3, hallazgo incidental) Fortalecer `ArchitectureTestSupport.assertRuleRejects` para
+  distinguir un rechazo real de un `AssertionError` producido solo por conjunto vacío (mensajes
+  `"failed to check any classes"` / `"is empty"` de ArchUnit): sin este cambio, con
+  `failOnEmptyShould=true` restaurado, borrar el paquete `fixture` dejaba en verde 4 de las 5
+  pruebas negativas en lugar de romper la construcción — exactamente el riesgo que ADR-0018,
+  sección "Cumplimiento y verificación" punto 4, exige impedir. — Requisito: Ninguna regla se
+  desactiva sin un ADR (C3)
+- [x] 5.6 Prueba de no vacuidad de cierre: en una copia aislada con el paquete `fixture` borrado,
+  las cinco pruebas negativas (`LayeredArchitectureTest`, `NoCrossModuleDomainImportsTest`,
+  `NoCyclesTest`, `NoTechnicalLayerPackageNamesTest`, `SpringModulithVerificationTest`) fallan
+  (4 `Failures` + 1 `Error`); `./mvnw -B verify` completo en checkout real: `BUILD SUCCESS`, 22
+  pruebas en `confia-api`, 0 fallos. — Verificación
