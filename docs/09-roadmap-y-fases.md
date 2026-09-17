@@ -76,6 +76,12 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
 6. Infraestructura de idempotencia: cabecera obligatoria, índice único, respuesta reproducible (brecha B7).
 7. Logs estructurados con redacción por lista de campos, métricas, trazas con OpenTelemetry.
 8. Contenedores, entorno de preproducción, canalización de integración y despliegue continuo.
+   **Pendiente heredado del cambio 1 (hallazgo W8):** el escaneo de dependencias sobre los
+   `pom.xml` en crudo **ignora las dependencias de alcance `provided`**, comprobado el 2026-09-17
+   con una prueba deliberada: la misma dependencia vulnerable dio cero hallazgos con `provided` y
+   tres (dos críticas) con alcance de compilación. Al armar la canalización completa hay que
+   cubrir ese alcance, por ejemplo analizando un SBOM resuelto en lugar de los `pom.xml`, como
+   contempla `docs/03-seguridad.md` sección 13.
 9. Respaldo en dos niveles según ADR-0014: respaldo automático de RDS con restauración a un punto en el tiempo dentro de AWS, más respaldo lógico nocturno cifrado y copia fuera de sitio en un proveedor distinto de AWS (brecha B10).
 10. Sistema de diseño base en `packages/ui` con tokens, átomos y verificación de accesibilidad automatizada.
 11. Semilla de datos ficticios para desarrollo y capacitación.
