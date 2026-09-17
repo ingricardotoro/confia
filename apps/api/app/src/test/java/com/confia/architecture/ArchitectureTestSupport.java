@@ -50,11 +50,22 @@ final class ArchitectureTestSupport {
      * false confidence ADR-0018's compliance section 4 forbids. The two extra assertions below
      * rule out ArchUnit's own empty-set wording ("failed to check any classes", "Layer 'X' is
      * empty") so only a genuine violation counts as a rejection.
+     *
+     * <p>{@code expectedMessageFragments} (verify-report.md C1-bis, S2) makes the check
+     * discriminating on top of that: an {@link AssertionError} that is neither empty-set noise nor
+     * unrelated JDK-dependency noise still is not proof the rule rejected the fixture's deliberate
+     * violations unless the message actually names them. Every fragment must appear in the
+     * exception message; callers that pass none keep the exact behavior this method had before
+     * this parameter existed.
      */
-    static void assertRuleRejects(ArchRule rule, JavaClasses classes) {
-        assertThatThrownBy(() -> rule.check(classes))
+    static void assertRuleRejects(ArchRule rule, JavaClasses classes,
+            String... expectedMessageFragments) {
+        var assertion = assertThatThrownBy(() -> rule.check(classes))
                 .isInstanceOf(AssertionError.class)
                 .hasMessageNotContaining("failed to check any classes")
                 .hasMessageNotContaining("is empty");
+        for (String fragment : expectedMessageFragments) {
+            assertion = assertion.hasMessageContaining(fragment);
+        }
     }
 }

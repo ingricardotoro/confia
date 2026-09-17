@@ -97,3 +97,45 @@ esos dos hallazgos; C2, las advertencias W1–W4 y las sugerencias S1–S4 queda
   `NoCyclesTest`, `NoTechnicalLayerPackageNamesTest`, `SpringModulithVerificationTest`) fallan
   (4 `Failures` + 1 `Error`); `./mvnw -B verify` completo en checkout real: `BUILD SUCCESS`, 22
   pruebas en `confia-api`, 0 fallos. — Verificación
+
+## Fase 6: Segunda corrección de verificación
+
+Lote de remediación sobre los hallazgos C1-bis (bloqueante), W6 y W7 de la ronda 2 de
+`verify-report.md`. Alcance exacto: cerrar esos tres; todo lo demás (W1, W2, W5, las sugerencias
+restantes, el archivo de especificación y cualquier módulo de negocio) queda fuera.
+
+- [x] 6.1 (C1-bis, bloqueante) `LayeredArchitectureTest.layeringRule()` cambia
+  `.consideringAllDependencies()` por `.consideringOnlyDependenciesInLayers()`, confirmado con
+  `javap -c` contra el jar resuelto de `archunit` 1.4.2: `consideringAllDependencies()` no aplica
+  ningún filtro (su lambda es la identidad), mientras que `consideringOnlyDependenciesInLayers()`
+  marca como irrelevante toda dependencia cuyo origen o destino no pertenezca a ninguna capa
+  declarada — exactamente `java.lang.Object` y `java.lang.String`. `ArchitectureTestSupport.
+  assertRuleRejects` gana una sobrecarga con fragmentos de mensaje esperados (variádica,
+  retrocompatible con los otros cuatro llamadores) y `rejectsTheFixtureLayeringViolations` ahora
+  exige que el mensaje nombre `BadDomain`, `BadApplication` y `BadWeb`. — Requisito: Reglas de
+  capas y ausencia de ciclos (C1-bis)
+  - **Prueba obligatoria de discriminación (probe G invertida):** en una copia aislada, se
+    neutralizaron las tres dependencias ofensoras de `BadDomain`, `BadApplication` y `BadWeb`
+    (se conservaron las clases y los paquetes, no se borró `fixture`). Antes de este cambio esa
+    neutralización dejaba `rejectsTheFixtureLayeringViolations` en verde (probe G del informe de
+    verificación); con `consideringOnlyDependenciesInLayers()` la misma neutralización ahora
+    **falla**: `LayeredArchitectureTest.rejectsTheFixtureLayeringViolations:90 Expecting code to
+    raise a throwable`. Prueba borrada tras la verificación; el árbol real quedó intacto
+    (`git status --porcelain` vacío antes y después).
+- [x] 6.2 (W6) `apps/api/pom.xml` declara una entrada de `dependencyManagement` explícita para
+  `com.tngtech.archunit:archunit:1.4.2` (comentario que cita W6 y explica la mediación de Maven vía
+  `spring-modulith-core`), en vez de dejar que la versión real del artefacto `archunit` (distinto de
+  `archunit-junit5`, que sigue en `archunit.version=1.5.0`) dependa de una mediación implícita.
+  Evidencia: `./mvnw -pl app -X test-compile` muestra `com.tngtech.archunit:archunit:jar:1.4.2:test
+  (version managed from 1.4.2)`; `./mvnw -B validate` conserva `Rule 1:
+  DependencyConvergence passed` en los tres módulos; `./mvnw -B verify` completo en verde. No se
+  sube a 1.5.0: ese jar nunca se descargó en este entorno (solo su POM; PKIX en Windows bloquea
+  Maven Central), y 1.4.2 es el que ya está probado desde el lote de aplicación original. —
+  Infraestructura (cierre de riesgo latente, no requisito de la especificación)
+- [x] 6.3 (W7) `SuppressionCitesAdrTest.SCANNED_EXTENSIONS` agrega `.xml` a `.java` y
+  `.properties`, para cubrir los `pom.xml` donde viven las reglas del `maven-enforcer-plugin`.
+  **Prueba obligatoria:** en una copia aislada del repositorio completo, se insertó
+  `<!-- failOnEmptyShould=false -->` sin cita de ADR en `apps/api/pom.xml`; la prueba lo detectó:
+  `[undocumented or invalid suppressions found] Expecting empty but was: [".../pom.xml:116 sets
+  failOnEmptyShould=false, which ADR-0018 forbids..."]`. Copia borrada tras la verificación. —
+  Requisito: Ninguna regla se desactiva sin un ADR (cobertura, W7)

@@ -32,6 +32,11 @@
 
     <spring-boot.version>4.1.1</spring-boot.version>
     <spring-modulith.version>2.1.1</spring-modulith.version>
+    <!--
+      Declares the archunit-junit5* wrapper artifacts only (app/pom.xml). It does NOT pin the
+      plain "com.tngtech.archunit:archunit" core artifact: see the dependencyManagement entry
+      below for why that one is declared separately (verify-report.md W6).
+    -->
     <archunit.version>1.5.0</archunit.version>
 
     <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
@@ -55,6 +60,25 @@
         <version>${spring-modulith.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <!--
+        verify-report.md W6: app/pom.xml declares archunit-junit5 at ${archunit.version} (1.5.0),
+        but archunit-junit5-api and archunit-junit5-engine (both 1.5.0) each transitively require
+        the plain "archunit" core artifact at 1.5.0 too, while spring-modulith-core:2.1.1 depends
+        directly on "archunit" 1.4.2 at a shallower depth. Maven's nearest-wins mediation silently
+        resolves the core artifact to 1.4.2 (confirmed with `./mvnw -X`) despite no property ever
+        saying so, and DependencyConvergence does not flag it. Declaring the version here, matching
+        what mediation already resolves, makes the declaration true instead of an invisible
+        mediation outcome. Not raised to 1.5.0: the "archunit" 1.5.0 jar itself never downloaded
+        into the local repository on this machine (only its POM did; a Windows PKIX trust-store gap
+        blocks new Maven Central downloads here), while 1.4.2 is already cached and is the version
+        every test in this module has actually run against since the original apply batch.
+      -->
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit</artifactId>
+        <version>1.4.2</version>
+        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>

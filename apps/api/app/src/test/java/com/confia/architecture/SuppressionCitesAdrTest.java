@@ -25,6 +25,13 @@ import org.junit.jupiter.api.Test;
  * what turns the build-integrity requirement "ninguna regla se desactiva sin un ADR" into an
  * executable check instead of prose in a {@code package-info.java}.
  *
+ * <p>verify-report.md W7: {@code .xml} joined the scanned extensions alongside {@code .java} and
+ * {@code .properties} because the {@code pom.xml} files under {@code apps/api} are exactly where
+ * every {@code maven-enforcer-plugin} rule and its possible future exclusions live; a scanner that
+ * never looked at them left that surface covered only by the prose comment at {@code
+ * apps/api/pom.xml}'s {@code enforce-build-integrity} execution, which is precisely the kind of
+ * unmechanized "regla" ADR-0018 exists to replace.
+ *
  * <p>The marker catalog starts with {@code allowEmptyShould(}, {@code failOnEmptyShould} and
  * ArchUnit's {@code @ArchIgnore} exclusion annotation (ADR-0018, section 3.b) and grows with every
  * tool that gains its own exclusion mechanism (JaCoCo and PIT in change 2, dependency-cruiser and
@@ -36,7 +43,7 @@ import org.junit.jupiter.api.Test;
 class SuppressionCitesAdrTest {
 
     private static final String SELF_FILE_NAME = "SuppressionCitesAdrTest.java";
-    private static final Set<String> SCANNED_EXTENSIONS = Set.of(".java", ".properties");
+    private static final Set<String> SCANNED_EXTENSIONS = Set.of(".java", ".properties", ".xml");
     private static final int ADJACENT_LINES = 4;
 
     private static final Pattern ALLOW_EMPTY_SHOULD_CALL =
