@@ -190,7 +190,10 @@
       SNAPSHOT ban, main branch only (design.md decision 2). The enforcer plugin has no concept of
       Git branches, so the CI workflow (.github/workflows/ci.yml) activates this profile only when
       building `main`, by passing -Dconfia.ci.mainBranch=true to `./mvnw verify`. A working branch
-      never sets that property and may carry a punctual SNAPSHOT; `main` never may.
+      never sets that property and may carry a punctual SNAPSHOT dependency; `main` never may.
+      The rule bans SNAPSHOT dependencies only, not the project's own version: apps/api is never
+      published, stays at x.y.z-SNAPSHOT on every branch, and reaches `main` unchanged through
+      merges, so requireReleaseVersion made `main` permanently red (CI run 35298912884).
     -->
     <profile>
       <id>no-snapshots-on-main</id>
@@ -214,15 +217,16 @@
                 </goals>
                 <configuration>
                   <rules>
-                    <requireReleaseVersion>
-                      <message>
-                        main never builds a SNAPSHOT version of apps/api (design.md decision 2).
-                      </message>
-                    </requireReleaseVersion>
                     <requireReleaseDeps>
                       <message>
                         main never depends on a SNAPSHOT dependency (design.md decision 2).
                       </message>
+                      <!-- The reactor's own parent and sibling modules share its SNAPSHOT
+                           version by design; only external dependencies are checked. -->
+                      <failWhenParentIsSnapshot>false</failWhenParentIsSnapshot>
+                      <excludes>
+                        <exclude>com.confia:*</exclude>
+                      </excludes>
                     </requireReleaseDeps>
                   </rules>
                   <fail>true</fail>
