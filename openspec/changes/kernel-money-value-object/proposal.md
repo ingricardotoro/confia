@@ -264,4 +264,9 @@ conversación. El orquestador las presenta.
 - El umbral global de 80 % sobre `app` espera al cambio 4.
 - **D2 resuelta:** el presupuesto de revisión es de **800 líneas** de cambio efectivo por pull
   request. `CLAUDE.md` y `docs/15-flujo-de-trabajo-git.md` §3 se alinearon con ese valor.
-- **D5 sigue pendiente y bloquea la fase de aplicación**: el pronóstico de código supera 800 líneas.
+- **D5 resuelta (opción B):** dos pull requests encadenados, cada uno dentro de 800 líneas. El
+  primero trae las herramientas (JaCoCo, PIT, integración continua y `openspec/config.yaml`) con la
+  construcción, la igualdad, la suma, la resta y las comparaciones de `Money`. El segundo trae la
+  multiplicación, `Percentage`, el redondeo, `allocate`, las propiedades de jqwik y las regresiones.
+  Encadenamiento según `docs/15-flujo-de-trabajo-git.md` §3: cada pull request apunta al anterior
+  y se fusionan en orden (`delivery_strategy: auto-chain`, `chain_strategy: stacked-to-main`).
