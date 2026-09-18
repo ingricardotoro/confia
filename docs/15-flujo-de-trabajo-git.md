@@ -140,8 +140,9 @@ feat: add payments, fix ledger, update docs -> tres commits en uno
 
 ## 3. Tamaño de los pull requests
 
-**Máximo cuatrocientas líneas de cambio efectivo.** Por encima de eso, la calidad de la revisión cae
-de forma abrupta, y con un solo desarrollador la revisión ya es el eslabón más débil.
+**Máximo ochocientas líneas de cambio efectivo.** Por encima de eso, la calidad de la revisión cae
+de forma abrupta, y con un solo desarrollador la revisión ya es el eslabón más débil. El propietario
+del producto fijó este presupuesto el 2026-09-18 (antes eran cuatrocientas).
 
 ### Cómo dividir uno grande
 
