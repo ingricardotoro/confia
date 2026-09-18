@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.confia</groupId>
+    <artifactId>confia-api-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>confia-kernel</artifactId>
+  <packaging>jar</packaging>
+
+  <name>CONFIA Kernel</name>
+  <description>
+    Compilation boundary with zero dependencies outside the JDK (ADR-0002, ADR-0013). Money,
+    identifiers and the base domain error live here once a change needs them; no business rule
+    ever lives in this module. Test-scope dependencies (JUnit, AssertJ) are allowed: only
+    compile/runtime/provided dependencies are banned by the enforcer execution below.
+  </description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!--
+        Kernel purity (ADR-0002, ADR-0013): no compile/runtime/provided dependency may exist in
+        this module, only test-scope. This is what makes "kernel importa Spring" fail the build
+        instead of merely violating a convention nobody enforces.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-kernel-purity</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <excludes>
+                    <exclude>*:*:*:*:compile</exclude>
+                    <exclude>*:*:*:*:runtime</exclude>
+                    <exclude>*:*:*:*:provided</exclude>
+                    <exclude>*:*:*:*:system</exclude>
+                  </excludes>
+                  <message>
+                    apps/api/kernel must not depend on anything outside the JDK (ADR-0002,
+                    ADR-0013). Only test-scope dependencies are allowed in this module.
+                  </message>
+                </bannedDependencies>
+              </rules>
+              <fail>true</fail>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

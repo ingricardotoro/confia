@@ -1,0 +1,63 @@
+name: ci
+
+# Partial and honest (design.md decision 5): only the jobs this change can leave green today.
+# frontend, e2e and quality-gate arrive with changes 3 and 11 (docs/06 §14.5 declares the full
+# workflow this grows into). No -Pmutation-gate/-Pmutation-report: those profiles arrive with
+# change 2.
+
+on:
+  push:
+    branches: [change/**, main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Must match apps/api/pom.xml and ADR-0013, check 2.
+  JAVA_VERSION: '25'
+  JAVA_DISTRIBUTION: temurin
+
+jobs:
+  backend:
+    name: backend verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+      # `verify` runs, in order: maven-enforcer-plugin (Java version, dependency convergence,
+      # banned dependencies, kernel purity, and — only on main, see -Dconfia.ci.mainBranch below —
+      # no SNAPSHOT), compilation, unit tests, and the ArchUnit + Spring Modulith architecture
+      # tests under apps/api/app/src/test/java/com/confia/architecture (task 2, task 3).
+      - name: verify
+        working-directory: apps/api
+        run: ./mvnw --batch-mode verify ${{ github.ref == 'refs/heads/main' && '-Dconfia.ci.mainBranch=true' || '' }}
+
+  security:
+    name: security scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      # Baseline scan of the Maven dependency tree (ADR-0008, ADR-0013). pnpm and the container
+      # image scan arrive with changes 3 and 11.
+      - name: maven dependency scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: apps/api
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: '1'

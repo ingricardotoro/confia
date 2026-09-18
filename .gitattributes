@@ -1,0 +1,28 @@
+# Normalize line endings: LF in the repository, native in the working copy.
+* text=auto eol=lf
+
+# Windows scripts must keep CRLF to run on Windows.
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# The Maven Wrapper must stay LF and executable so `./mvnw` works on Linux CI.
+# The executable bit is set once with: git update-index --chmod=+x mvnw
+mvnw      text eol=lf
+mvnw.cmd  text eol=crlf
+
+# Shell scripts run on Linux hosts and in containers.
+*.sh text eol=lf
+
+# Binary files: never normalized, never diffed as text.
+*.jar   binary
+*.war   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.docx  binary
+*.xlsx  binary
+*.woff  binary
+*.woff2 binary

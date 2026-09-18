@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.confia</groupId>
+  <artifactId>confia-api-parent</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>CONFIA API Parent</name>
+  <description>
+    Reactor parent for the CONFIA backend. Centralizes the Java version, the Spring Boot 4.1 BOM
+    and every build-integrity verification (maven-enforcer-plugin, Surefire, Failsafe). No module
+    declares its own plugin version: everything is managed here so a rule cannot silently drift
+    between modules.
+  </description>
+
+  <modules>
+    <module>kernel</module>
+    <module>app</module>
+  </modules>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!-- Single source of truth for the Java version (ADR-0013). -->
+    <java.version>25</java.version>
+    <maven.compiler.release>${java.version}</maven.compiler.release>
+
+    <spring-boot.version>4.1.1</spring-boot.version>
+    <spring-modulith.version>2.1.1</spring-modulith.version>
+    <!--
+      Declares the archunit-junit5* wrapper artifacts only (app/pom.xml). It does NOT pin the
+      plain "com.tngtech.archunit:archunit" core artifact: see the dependencyManagement entry
+      below for why that one is declared separately (verify-report.md W6).
+    -->
+    <archunit.version>1.5.0</archunit.version>
+
+    <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+    <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
+    <maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
+    <maven-failsafe-plugin.version>3.6.0</maven-failsafe-plugin.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.modulith</groupId>
+        <artifactId>spring-modulith-bom</artifactId>
+        <version>${spring-modulith.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!--
+        verify-report.md W6: app/pom.xml declares archunit-junit5 at ${archunit.version} (1.5.0),
+        but archunit-junit5-api and archunit-junit5-engine (both 1.5.0) each transitively require
+        the plain "archunit" core artifact at 1.5.0 too, while spring-modulith-core:2.1.1 depends
+        directly on "archunit" 1.4.2 at a shallower depth. Maven's nearest-wins mediation silently
+        resolves the core artifact to 1.4.2 (confirmed with `./mvnw -X`) despite no property ever
+        saying so, and DependencyConvergence does not flag it. Declaring the version here, matching
+        what mediation already resolves, makes the declaration true instead of an invisible
+        mediation outcome. Not raised to 1.5.0: the "archunit" 1.5.0 jar itself never downloaded
+        into the local repository on this machine (only its POM did; a Windows PKIX trust-store gap
+        blocks new Maven Central downloads here), while 1.4.2 is already cached and is the version
+        every test in this module has actually run against since the original apply batch.
+      -->
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit</artifactId>
+        <version>1.4.2</version>
+        <scope>test</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${maven-compiler-plugin.version}</version>
+          <configuration>
+            <release>${maven.compiler.release}</release>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${maven-surefire-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <version>${maven-failsafe-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>${maven-enforcer-plugin.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
+    <plugins>
+      <!--
+        Failsafe wired now, on an empty integration-test suite, so no module ever needs to touch
+        this block again to gain *IT.java coverage (design.md, testing strategy, "Integración").
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        maven-enforcer-plugin, bound to validate (docs/06 §14.1): fails the build before compiling
+        anything if the Java version drifts, dependencies do not converge, or a banned dependency
+        appears anywhere in apps/api. Per requirement "Ninguna regla se desactiva sin un ADR": any
+        exclusion added later to this execution MUST cite the authorizing ADR in a comment next to
+        it. No exclusion exists today.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-build-integrity</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[25,26)</version>
+                </requireJavaVersion>
+                <dependencyConvergence/>
+                <!--
+                  Banned dependencies (ADR-0015: persistence; ADR-0016: task scheduling). The
+                  PostgreSQL JDBC driver and the JDK's own java.sql are NOT banned: jOOQ and the
+                  transactional component depend on them.
+                -->
+                <bannedDependencies>
+                  <excludes>
+                    <exclude>org.hibernate:*</exclude>
+                    <exclude>org.hibernate.orm:*</exclude>
+                    <exclude>jakarta.persistence:*</exclude>
+                    <exclude>javax.persistence:*</exclude>
+                    <exclude>org.springframework.data:spring-data-jpa</exclude>
+                    <exclude>org.springframework.data:spring-data-jdbc</exclude>
+                    <exclude>org.quartz-scheduler:*</exclude>
+                    <exclude>org.jobrunr:*</exclude>
+                  </excludes>
+                  <message>
+                    Banned dependency (ADR-0015 forbids Hibernate/JPA/Spring Data JPA/Spring Data
+                    JDBC; ADR-0016 forbids Quartz/JobRunr and other task schedulers). Adding a new
+                    scheduler or persistence library to this list requires a new ADR, never a
+                    silent exclusion here.
+                  </message>
+                </bannedDependencies>
+              </rules>
+              <fail>true</fail>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <!--
+      SNAPSHOT ban, main branch only (design.md decision 2). The enforcer plugin has no concept of
+      Git branches, so the CI workflow (.github/workflows/ci.yml) activates this profile only when
+      building `main`, by passing -Dconfia.ci.mainBranch=true to `./mvnw verify`. A working branch
+      never sets that property and may carry a punctual SNAPSHOT; `main` never may.
+    -->
+    <profile>
+      <id>no-snapshots-on-main</id>
+      <activation>
+        <property>
+          <name>confia.ci.mainBranch</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>enforce-no-snapshots-on-main</id>
+                <phase>validate</phase>
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <configuration>
+                  <rules>
+                    <requireReleaseVersion>
+                      <message>
+                        main never builds a SNAPSHOT version of apps/api (design.md decision 2).
+                      </message>
+                    </requireReleaseVersion>
+                    <requireReleaseDeps>
+                      <message>
+                        main never depends on a SNAPSHOT dependency (design.md decision 2).
+                      </message>
+                    </requireReleaseDeps>
+                  </rules>
+                  <fail>true</fail>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

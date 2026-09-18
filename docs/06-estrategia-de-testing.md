@@ -604,7 +604,7 @@ umbrales y el orden, no la sintaxis de cada complemento.
 | Versión de Java, convergencia de dependencias, sin `SNAPSHOT` en la rama principal, módulo de núcleo sin dependencias fuera del JDK, dependencias prohibidas de Hibernate, Jakarta Persistence, Spring Data JPA y Spring Data JDBC, y de Quartz, JobRunr o cualquier otra biblioteca de programación distinta de db-scheduler | `maven-enforcer-plugin` | `validate` | Falla ante cualquier violación (ADR-0013, ADR-0015, ADR-0016) |
 | Generación de código de jOOQ | Migraciones de Flyway aplicadas sobre un PostgreSQL 18 temporal y generación de clases; mecanismo concreto validado en F0 | `generate-sources` | Una consulta incompatible con el esquema no compila (ADR-0015) |
 | Pruebas unitarias | Surefire con JUnit, AssertJ y jqwik (`*Test.java`) | `test` | Todas en verde |
-| Pruebas de arquitectura | ArchUnit y verificación de módulos de Spring Modulith (ADR-0002), más las reglas monetarias de ADR-0004 y las de acceso a datos de ADR-0015 (jOOQ solo en `infrastructure`, propiedad de tablas por módulo, transacciones solo en el componente de `shared/security`, SQL plano solo en la lista aprobada de reportes) y las de trabajos en segundo plano de ADR-0016 (sin `@Scheduled`, `@EnableScheduling` ni `@Async` en el código de producción) | `test` | Cero violaciones |
+| Pruebas de arquitectura | ArchUnit y verificación de módulos de Spring Modulith (ADR-0002), más las reglas monetarias de ADR-0004 y las de acceso a datos de ADR-0015 (jOOQ solo en `infrastructure`, propiedad de tablas por módulo, transacciones solo en el componente de `shared/security`, SQL plano solo en la lista aprobada de reportes) y las de trabajos en segundo plano de ADR-0016 (sin `@Scheduled`, `@EnableScheduling` ni `@Async` en el código de producción). Comportamiento ante conjunto vacío: `archRule.failOnEmptyShould` queda en `true`; una regla solo puede evaluarse contra cero clases con una excepción declarada por regla, que cita ADR-0018 y caduca de forma verificada (inventario de caducidad y escáner de supresiones, ADR-0018) | `test` | Cero violaciones |
 | Pruebas de integración | Failsafe con JUnit y Testcontainers (`*IT.java`) | `integration-test` y `verify` | Todas en verde |
 | Trabajos en segundo plano (ADR-0016) | Pruebas de integración con Testcontainers: arranque por perfil (el ejecutor de tareas solo existe en `confia-worker`), programación dentro de transacciones confirmadas y revertidas, doble ejecución por tipo de tarea con un solo efecto, lista aprobada de campos de los datos de cada tipo de tarea, contexto de seguridad del manejador (solo ve datos de la institución de la tarea) y verificación de esquema con el catálogo cerrado de ADR-0017, exactamente cuatro tablas sin `institution_id`: tres tablas técnicas y la tabla raíz de instituciones (`docs/03-seguridad.md`, sección 6.4) | `integration-test` y `verify` | Todas en verde. Agregar una tabla a la lista aprobada exige un ADR |
 | Tablas técnicas y eventos persistidos (ADR-0017) | Prueba de configuración de bibliotecas (creación automática de esquema de Spring Modulith desactivada, modo de finalización `DELETE`, modo de archivo inactivo); lista aprobada de campos por tipo de evento que se persiste en el registro, sin datos personales; matriz de permisos sobre las tres tablas técnicas y casos de uso del portal ejecutados con `confia_portal_app` (`docs/03-seguridad.md`, sección 6.4) | `test` e `integration-test` | Todas en verde |
@@ -816,7 +816,7 @@ jobs:
     name: secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
@@ -827,8 +827,8 @@ jobs:
     name: backend verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -863,7 +863,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@v4
         with:
           name: openapi
@@ -894,7 +894,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend, frontend]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@v4
         with:
           name: openapi
@@ -929,7 +929,7 @@ jobs:
     name: security scanning
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: semgrep
         uses: semgrep/semgrep-action@v1
         with:
@@ -951,7 +951,7 @@ jobs:
       # Baseline scan of both dependency chains (pom.xml and pnpm-lock.yaml). The definitive
       # Maven scanner is fixed in F0 (docs/03-seguridad.md, section 13).
       - name: maven and pnpm dependency scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -962,7 +962,7 @@ jobs:
       - name: build image
         run: docker build -f infra/docker/api.Dockerfile -t confia-api:ci .
       - name: trivy image scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: confia-api:ci
           severity: HIGH,CRITICAL
@@ -992,8 +992,8 @@ jobs:
     name: full mutation run on kernel and domain packages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '25'
@@ -1006,7 +1006,7 @@ jobs:
     name: k6 load budgets
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: grafana/setup-k6-action@v1
       - name: payment registration load
         run: k6 run perf/k6/register-payment.js
@@ -1017,7 +1017,7 @@ jobs:
     name: owasp zap baseline
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: zap baseline scan
         uses: zaproxy/action-baseline@v0.12.0
         with:

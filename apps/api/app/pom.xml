@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.confia</groupId>
+    <artifactId>confia-api-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>confia-api</artifactId>
+  <packaging>jar</packaging>
+
+  <name>CONFIA API</name>
+  <description>
+    Single deployable artifact with three entry points (admin, portal, worker), selected at
+    startup by APP_PROFILE (ADR-0003, ADR-0013). No business module exists yet: this change only
+    installs the launcher and the architecture verification that will guard every module added
+    from change 4 onward.
+  </description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.confia</groupId>
+      <artifactId>confia-kernel</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <version>${archunit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.modulith</groupId>
+      <artifactId>spring-modulith-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
