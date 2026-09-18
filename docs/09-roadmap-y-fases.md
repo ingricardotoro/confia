@@ -69,6 +69,14 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
 **Entregables:**
 
 1. Monorepo con `pnpm workspaces` y Turborepo, con el backend como proyecto Maven con Maven Wrapper en `apps/api`. Reglas de dependencia verificadas por ArchUnit y Spring Modulith en el backend, y por `dependency-cruiser` y ESLint en el frontend. Generación del OpenAPI y de `packages/contracts` con orval como paso obligatorio de la construcción. Medición del consumo real de memoria de los tres procesos de la JVM con los límites de Docker Compose (ADR-0013). Una violación rompe la construcción.
+   **Pendientes heredados del cambio 1 (`maven-workspace-and-ci-skeleton`, archivado el
+   2026-09-17):** (a) hallazgo W2: el escenario «Cada módulo usa solo su propio dominio» de
+   `openspec/specs/build-integrity/spec.md` quedó diferido a los cambios 4
+   (`institution-root-and-multitenancy-baseline`) y 7 (`staff-authentication-mfa-sessions`); el
+   cambio 7 es el que introduce el segundo módulo de negocio y puede demostrarlo; (b) el cambio 4
+   dispara el rojo programado de ADR-0018: al existir el primer módulo de negocio,
+   `EmptyShouldExceptionInventoryTest` exige retirar `allowEmptyShould(true)` de
+   `LayeredArchitectureTest` y su entrada del inventario, y su `tasks.md` debe preverlo.
 2. Módulo de núcleo del backend con el objeto de valor `Money` (`BigDecimal` a escala cuatro con moneda explícita), reglas de redondeo y errores de dominio, con cobertura del 95 % medida con JaCoCo y pruebas de mutación con PIT.
 3. Autenticación del personal con MFA, roles, permisos, sesiones y bloqueo por fuerza bruta.
 4. **Matriz de autorización** documentada y verificada por pruebas: qué rol puede hacer qué operación (brecha A7).
