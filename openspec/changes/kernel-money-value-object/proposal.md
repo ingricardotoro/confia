@@ -262,5 +262,6 @@ conversación. El orquestador las presenta.
   ADR-0018.
 - **D4 aprobada:** se crea la capacidad técnica `money`.
 - El umbral global de 80 % sobre `app` espera al cambio 4.
-- **D2 y D5 siguen pendientes y bloquean la fase de aplicación**, no la de especificación ni la de
-  diseño.
+- **D2 resuelta:** el presupuesto de revisión es de **800 líneas** de cambio efectivo por pull
+  request. `CLAUDE.md` y `docs/15-flujo-de-trabajo-git.md` §3 se alinearon con ese valor.
+- **D5 sigue pendiente y bloquea la fase de aplicación**: el pronóstico de código supera 800 líneas.
