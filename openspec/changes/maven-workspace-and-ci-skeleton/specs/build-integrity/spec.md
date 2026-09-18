@@ -23,11 +23,13 @@ de otro módulo de negocio.
 - **CUANDO** el módulo A importa una clase de `domain` del módulo B
 - **ENTONCES** `./mvnw verify` falla por la importación prohibida
 
-#### Escenario: Cada módulo usa solo su propio dominio
-
-- **DADO** los mismos dos módulos
-- **CUANDO** ninguno importa el `domain` del otro
-- **ENTONCES** `./mvnw verify` termina en verde
+> **Escenario diferido.** El escenario «Cada módulo usa solo su propio dominio» (DADO dos módulos
+> de negocio existentes, CUANDO ninguno importa el `domain` del otro, ENTONCES `./mvnw verify`
+> termina en verde) no pertenece a este cambio: su premisa exige dos módulos de negocio y este
+> cambio no crea ninguno. Se traslada a los cambios de F0 que introducen esos módulos:
+> `institution-root-and-multitenancy-baseline` (cambio 4, primer módulo) y
+> `staff-authentication-mfa-sessions` (cambio 7, segundo módulo, único que puede demostrarlo).
+> Hallazgo W2 del informe de verificación de este cambio.
 
 ### Requisito: Pureza del módulo `kernel`
 
