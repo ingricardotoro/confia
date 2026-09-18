@@ -65,6 +65,7 @@ Lo único que se edita de un ADR ya aceptado es su línea de estado.
 | [0016](ADR-0016-trabajos-en-segundo-plano.md) | Trabajos en segundo plano con db-scheduler sobre PostgreSQL | Aceptado | 2026-09-15 | Tareas durables en una tabla de PostgreSQL, programadas dentro de la transacción del negocio y ejecutadas solo en el trabajador. Sin intermediario de mensajes |
 | [0017](ADR-0017-tablas-tecnicas-y-tabla-raiz.md) | Tablas técnicas de bibliotecas y tabla raíz de institución | Aceptado | 2026-09-15 | Catálogo cerrado de cuatro tablas exceptuadas, permisos exactos por rol, sin datos personales en tablas técnicas y portal sin permisos de modificación ni borrado |
 | [0018](ADR-0018-conjunto-vacio-en-reglas-de-arquitectura.md) | Conjunto vacío en las reglas de arquitectura y caducidad de sus excepciones | Aceptado | 2026-09-16 | El valor predeterminado de ArchUnit ante conjunto vacío vuelve a `true`. La excepción se declara regla por regla, cita este ADR y caduca con el primer módulo de negocio, verificado por un inventario que rompe la construcción |
+| [0019](ADR-0019-error-de-dominio-base-en-el-nucleo.md) | Error de dominio base en el núcleo | Propuesto | 2026-09-18 | `DomainException` abstracta y no comprobada en `kernel`, con código estable en kebab-case que alimenta el `type` de Problem Details. Los errores de programación siguen usando las excepciones del JDK |
 
 ## Cómo aprobar un ADR
 
