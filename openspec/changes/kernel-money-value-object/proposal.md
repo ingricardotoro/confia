@@ -270,3 +270,10 @@ conversación. El orquestador las presenta.
   multiplicación, `Percentage`, el redondeo, `allocate`, las propiedades de jqwik y las regresiones.
   Encadenamiento según `docs/15-flujo-de-trabajo-git.md` §3: cada pull request apunta al anterior
   y se fusionan en orden (`delivery_strategy: auto-chain`, `chain_strategy: stacked-to-main`).
+- **D5 ajustada tras el diseño (2026-09-18):** la estimación detallada del diseño (1318 a 1767
+  líneas) no permite dos pull requests garantizados bajo 800 en el extremo alto. El propietario
+  acepta el reparto equilibrado de `design.md`: el primero trae herramientas, semilla, construcción,
+  igualdad, suma, resta y `negate`; el segundo trae comparaciones, multiplicación, `Percentage`,
+  redondeo, `allocate`, propiedades y regresiones. Durante la aplicación se mide el diff real al
+  cerrar cada pull request; si alguno supera 800 líneas, la aplicación se detiene y decide el
+  propietario, con los puntos de corte que nombra el diseño.
