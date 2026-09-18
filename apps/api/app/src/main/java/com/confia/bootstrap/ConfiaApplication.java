@@ -1,5 +1,7 @@
 package com.confia.bootstrap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -18,6 +20,8 @@ import org.springframework.context.ConfigurableApplicationContext;
  * </pre>
  */
 public final class ConfiaApplication {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ConfiaApplication.class);
 
     private ConfiaApplication() {
     }
@@ -45,7 +49,7 @@ public final class ConfiaApplication {
         try {
             profile = AppProfile.resolve(rawProfile);
         } catch (UnknownAppProfileException ex) {
-            System.err.println(ex.getMessage());
+            LOG.error("{}", ex.getMessage());
             return LaunchOutcome.exit(1);
         }
 
