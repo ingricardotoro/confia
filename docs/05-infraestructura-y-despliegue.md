@@ -878,7 +878,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: docker/login-action@v3
         with:
@@ -897,7 +897,7 @@ jobs:
       # Web images need the generated contract: backend OpenAPI first, then
       # packages/contracts regenerated with orval, then the static builds.
       # The Turborepo task name is fixed in F0.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '25'
@@ -936,7 +936,7 @@ jobs:
           tags: ${{ env.IMAGE_PORTAL_WEB }}:${{ github.sha }}
 
       - name: trivy scan api image
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.IMAGE_API }}@${{ steps.push-api.outputs.digest }}
           severity: HIGH,CRITICAL
@@ -952,7 +952,7 @@ jobs:
       id-token: write   # required for OIDC federation with AWS, no long-lived AWS keys
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       # Federates with AWS via OIDC and assumes a role scoped to this environment,
       # instead of long-lived AWS access keys stored as secrets. There is no open SSH
       # port on the instance (ADR-0014); the exact action and role permissions are
@@ -991,7 +991,7 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: assume aws deployment role
         uses: aws-actions/configure-aws-credentials@v4
         with:

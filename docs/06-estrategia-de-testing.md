@@ -816,7 +816,7 @@ jobs:
     name: secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
@@ -827,8 +827,8 @@ jobs:
     name: backend verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -863,7 +863,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@v4
         with:
           name: openapi
@@ -894,7 +894,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend, frontend]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@v4
         with:
           name: openapi
@@ -929,7 +929,7 @@ jobs:
     name: security scanning
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: semgrep
         uses: semgrep/semgrep-action@v1
         with:
@@ -951,7 +951,7 @@ jobs:
       # Baseline scan of both dependency chains (pom.xml and pnpm-lock.yaml). The definitive
       # Maven scanner is fixed in F0 (docs/03-seguridad.md, section 13).
       - name: maven and pnpm dependency scan
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -962,7 +962,7 @@ jobs:
       - name: build image
         run: docker build -f infra/docker/api.Dockerfile -t confia-api:ci .
       - name: trivy image scan
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: confia-api:ci
           severity: HIGH,CRITICAL
@@ -992,8 +992,8 @@ jobs:
     name: full mutation run on kernel and domain packages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '25'
@@ -1006,7 +1006,7 @@ jobs:
     name: k6 load budgets
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: grafana/setup-k6-action@v1
       - name: payment registration load
         run: k6 run perf/k6/register-payment.js
@@ -1017,7 +1017,7 @@ jobs:
     name: owasp zap baseline
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: zap baseline scan
         uses: zaproxy/action-baseline@v0.12.0
         with:
