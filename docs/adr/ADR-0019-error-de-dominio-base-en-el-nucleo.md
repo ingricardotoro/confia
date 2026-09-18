@@ -1,6 +1,6 @@
 # ADR-0019: Error de dominio base en el núcleo, con código estable legible por máquina
 
-- **Estado:** Propuesto
+- **Estado:** Aceptado
 - **Fecha:** 2026-09-18
 - **Decisores:** Propietario del producto y arquitecto
 - **Contexto técnico:** Módulo `apps/api/kernel` (paquete `com.confia.kernel`), paquete `domain` de
