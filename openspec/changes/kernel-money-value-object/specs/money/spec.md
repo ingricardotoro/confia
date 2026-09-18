@@ -23,8 +23,13 @@ Fuentes de verdad: `CLAUDE.md` reglas 1 a 5, `docs/01-arquitectura.md` §4 y §6
 El sistema DEBE normalizar todo importe de `Money` a escala cuatro decimal, coherente con
 `NUMERIC(14,4)`. La normalización NO DEBE truncar en silencio: el sistema DEBE rechazar la
 construcción cuando el valor de entrada tiene más de cuatro decimales, en vez de descartar dígitos.
-`Money` DEBE ofrecer fábricas desde `String` y desde `BigDecimal`; el sistema NO DEBE ofrecer ninguna
-fábrica de `Money` desde `double` ni desde `float`.
+El sistema DEBE rechazar la construcción cuando la cadena de entrada no tiene la forma de un decimal
+plano (`-?\d+(\.\d+)?`, sin notación exponencial, sin signo `+`, sin espacios ni separadores de
+miles), con el código de error de dominio `money-amount-malformed`. El sistema DEBE rechazar la
+construcción cuando el valor absoluto del importe supera `9999999999.9999`, el límite de
+`NUMERIC(14,4)`, con el código de error de dominio `money-amount-out-of-range`. `Money` DEBE ofrecer
+fábricas desde `String` y desde `BigDecimal`; el sistema NO DEBE ofrecer ninguna fábrica de `Money`
+desde `double` ni desde `float`.
 
 #### Escenario: Construcción desde una cadena decimal válida
 
@@ -64,6 +69,19 @@ fábrica de `Money` desde `double` ni desde `float`.
 - **DADO** la cadena decimal `"1.00001"`
 - **CUANDO** se intenta construir `Money` a partir de esa cadena
 - **ENTONCES** la construcción falla en vez de truncar el quinto decimal en silencio
+
+#### Escenario: Rechazo de una cadena de importe mal formada
+
+- **DADO** la cadena `"1,234.56"`, con separador de miles
+- **CUANDO** se intenta construir `Money` a partir de esa cadena
+- **ENTONCES** la construcción falla con el código de error de dominio `money-amount-malformed`
+
+#### Escenario: Rechazo de construcción por encima del límite de `NUMERIC(14,4)`
+
+- **DADO** la cadena decimal `"10000000000.0000"`, un dígito entero más que el máximo representable
+  en `NUMERIC(14,4)`
+- **CUANDO** se intenta construir `Money` a partir de esa cadena
+- **ENTONCES** la construcción falla con el código de error de dominio `money-amount-out-of-range`
 
 #### Escenario: Ausencia de fábrica desde coma flotante
 
@@ -118,7 +136,10 @@ igualdad.
 
 `Money.add` y `Money.subtract` DEBEN operar únicamente entre importes de la misma moneda y DEBEN
 conservar precisión exacta a escala cuatro sin redondeo intermedio. Ante monedas distintas, el
-sistema DEBE lanzar `CurrencyMismatchException`.
+sistema DEBE lanzar `CurrencyMismatchException`. El invariante de rango de `Money` (valor absoluto
+menor o igual a `9999999999.9999`) se verifica sobre el resultado de toda operación, no solo sobre la
+construcción inicial: un resultado de `add` o `subtract` fuera de ese rango DEBE fallar con el código
+de error de dominio `money-amount-out-of-range`, sin construir ningún `Money`.
 
 #### Escenario: Suma exitosa en la misma moneda
 
@@ -138,15 +159,21 @@ sistema DEBE lanzar `CurrencyMismatchException`.
 - **CUANDO** se intenta sumarlos con `add`
 - **ENTONCES** se lanza `CurrencyMismatchException` y ningún `Money` se construye
 
-#### Escenario: Precisión exacta más allá del límite de `NUMERIC(14,4)`
+#### Escenario: Suma que excede el límite superior de `NUMERIC(14,4)`
 
 - **DADO** `Money` construido con el importe máximo representable en `NUMERIC(14,4)`,
-  `9999999999.9999`
-- **CUANDO** se le suma `Money.of("0.01", CurrencyCode.HNL)`
-- **ENTONCES** el resultado es exacto dentro de `kernel`, porque `BigDecimal` es de precisión
-  arbitraria; validar que ese resultado no exceda el rango de la columna `NUMERIC(14,4)` es
-  responsabilidad del conversor de persistencia que introduce un cambio posterior (fuera de alcance
-  de esta especificación)
+  `9999999999.9999`, en HNL
+- **CUANDO** se le suma `Money.of("0.0001", CurrencyCode.HNL)`
+- **ENTONCES** la operación falla con el código de error de dominio `money-amount-out-of-range`, sin
+  construir ningún `Money`
+
+#### Escenario: Resta que excede el límite inferior de `NUMERIC(14,4)`
+
+- **DADO** `Money` construido con el importe mínimo representable en `NUMERIC(14,4)`,
+  `-9999999999.9999`, en HNL
+- **CUANDO** se le resta `Money.of("0.0001", CurrencyCode.HNL)`
+- **ENTONCES** la operación falla con el código de error de dominio `money-amount-out-of-range`, sin
+  construir ningún `Money`
 
 ### Requisito: Redondeo explícito con `HALF_UP` en toda operación que redondea
 
@@ -181,7 +208,8 @@ El sistema DEBE representar todo porcentaje utilizado en operaciones de `Money` 
 de valor `Percentage`, construido desde `String` o desde `BigDecimal`. El sistema NO DEBE ofrecer una
 fábrica de `Percentage` desde `double` ni desde `float`. `Money.percentage(Percentage, RoundingMode)`
 DEBE recibir ese tipo explícito; ningún método de `Money` DEBE aceptar un `BigDecimal` o un número
-crudo como porcentaje.
+crudo como porcentaje. El sistema DEBE restringir `Percentage` al intervalo cerrado `[0, 100]`; un
+valor fuera de ese intervalo DEBE fallar con el código de error de dominio `percentage-out-of-range`.
 
 #### Escenario: Aplicación de un porcentaje con redondeo explícito
 
@@ -196,6 +224,12 @@ crudo como porcentaje.
 - **DADO** `Money.of("500.00", CurrencyCode.HNL)` y `Percentage.of("0")`
 - **CUANDO** se invoca `percentage(Percentage.of("0"), RoundingMode.HALF_UP)`
 - **ENTONCES** el resultado es `Money.of("0.00", CurrencyCode.HNL)` y el importe base no se modifica
+
+#### Escenario: Rechazo de un porcentaje fuera de rango
+
+- **DADO** la cadena decimal `"100.01"`
+- **CUANDO** se intenta construir `Percentage.of("100.01")`
+- **ENTONCES** la construcción falla con el código de error de dominio `percentage-out-of-range`
 
 #### Escenario: Ausencia de fábrica de `Percentage` desde coma flotante
 
@@ -365,7 +399,7 @@ excepción de dominio de `kernel`, incluida `CurrencyMismatchException`, DEBE he
 - **DADO** `CurrencyMismatchException`
 - **CUANDO** se verifica su jerarquía y su `code()`
 - **ENTONCES** hereda de `DomainException`, es una excepción no comprobada, y `code()` devuelve un
-  identificador estable propio (por ejemplo, `MONEY_CURRENCY_MISMATCH`)
+  identificador estable propio (por ejemplo, `currency-mismatch`)
 
 #### Escenario: `DomainException` no se instancia directamente
 
