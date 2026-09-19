@@ -22,10 +22,14 @@ Fuentes de verdad: `CLAUDE.md` reglas 1 a 5, `docs/01-arquitectura.md` §4 y §6
 
 El sistema DEBE normalizar todo importe de `Money` a escala cuatro decimal, coherente con
 `NUMERIC(14,4)`. La normalización NO DEBE truncar en silencio: el sistema DEBE rechazar la
-construcción cuando el valor de entrada tiene más de cuatro decimales, en vez de descartar dígitos.
-El sistema DEBE rechazar la construcción cuando la cadena de entrada no tiene la forma de un decimal
-plano (`-?\d+(\.\d+)?`, sin notación exponencial, sin signo `+`, sin espacios ni separadores de
-miles), con el código de error de dominio `money-amount-malformed`. El sistema DEBE rechazar la
+construcción cuando el valor de entrada tiene más de cuatro decimales distintos de cero, en vez de
+descartar dígitos, con el código de error de dominio `money-scale-exceeded`; los ceros sobrantes a
+la derecha no pierden información y se aceptan. El sistema DEBE rechazar la construcción cuando la
+cadena de entrada no tiene la forma de un decimal plano (`-?\d+(\.\d+)?`, sin notación exponencial,
+sin signo `+`, sin espacios ni separadores de miles) o cuando supera 64 caracteres, con el código de
+error de dominio `money-amount-malformed`. Cuando una entrada incumple varias reglas, el sistema DEBE
+informar una sola, en este orden de precedencia: `money-amount-malformed`, luego
+`money-scale-exceeded`, luego `money-amount-out-of-range`. El sistema DEBE rechazar la
 construcción cuando el valor absoluto del importe supera `9999999999.9999`, el límite de
 `NUMERIC(14,4)`, con el código de error de dominio `money-amount-out-of-range`. `Money` DEBE ofrecer
 fábricas desde `String` y desde `BigDecimal`; el sistema NO DEBE ofrecer ninguna fábrica de `Money`
@@ -68,7 +72,30 @@ desde `double` ni desde `float`.
 
 - **DADO** la cadena decimal `"1.00001"`
 - **CUANDO** se intenta construir `Money` a partir de esa cadena
-- **ENTONCES** la construcción falla en vez de truncar el quinto decimal en silencio
+- **ENTONCES** la construcción falla con el código de error de dominio `money-scale-exceeded`, en vez
+  de truncar el quinto decimal en silencio
+
+#### Escenario: Ceros sobrantes a la derecha aceptados
+
+- **DADO** la cadena decimal `"1.000000"`, con seis decimales todos cero
+- **CUANDO** se construye `Money` a partir de esa cadena
+- **ENTONCES** la construcción tiene éxito y el importe normalizado es `1.0000`
+
+#### Escenario: Longitud máxima de la cadena de importe
+
+- **DADO** una cadena decimal válida de exactamente 64 caracteres dentro del rango representable, y
+  otra de 65 caracteres
+- **CUANDO** se construye `Money` a partir de cada una
+- **ENTONCES** la de 64 caracteres se acepta y la de 65 falla con el código de error de dominio
+  `money-amount-malformed`
+
+#### Escenario: Precedencia entre los errores de construcción
+
+- **DADO** la cadena `"1,234.56789"`, mal formada y con más de cuatro decimales, y la cadena
+  `"10000000000.00001"`, con más de cuatro decimales y fuera de rango
+- **CUANDO** se intenta construir `Money` a partir de cada una
+- **ENTONCES** la primera falla con `money-amount-malformed` y la segunda con
+  `money-scale-exceeded`: el sistema informa una sola causa, la de mayor precedencia
 
 #### Escenario: Rechazo de una cadena de importe mal formada
 
