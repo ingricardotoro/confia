@@ -176,7 +176,7 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
     adiciones + 3 eliminaciones = 313 líneas de autor**, dentro del pronóstico de `design.md`
     (232–334) y muy por debajo de 800. Se continúa sin consultar al propietario.
 
-- [ ] 1.7 **Verificación final de PR A**: en checkout limpio, con `JAVA_HOME` en
+- [x] 1.7 **Verificación final de PR A**: en checkout limpio, con `JAVA_HOME` en
   `C:/Program Files/Eclipse Adoptium/jdk-25.0.3.9-hotspot` y `MAVEN_OPTS` con el almacén de confianza
   `Windows-ROOT`, ejecutar `./mvnw -B verify` en `apps/api`. Confirmar que las tres reglas de
   ADR-0004 §Cumplimiento 2 pasan sobre producción y rechazan sus tres fixtures, y (si se aplicó 1.5)
@@ -184,6 +184,15 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
   `change/institution-root-and-multitenancy-baseline` y confirmar en la integración continua que el
   trabajo `backend` termina en verde. — Capacidad `build-integrity`; criterios de éxito de la
   propuesta («Cada regla de ADR-0004 §Cumplimiento 2 rechaza su fixture negativo...»)
+  - **Evidencia (2026-09-19):** árbol de trabajo limpio (`git status` sin cambios) en
+    `change/institution-root-and-multitenancy-baseline`, commit `ea1ec76`. `./mvnw -B verify` en
+    `apps/api` con `JAVA_HOME`/`MAVEN_OPTS` fijados: **BUILD SUCCESS**, 172 pruebas en `kernel` + 43
+    en `app` (incluidas las 12 de `MonetaryFloatingPointTest`), sin `Rule violated` de JaCoCo (la
+    puerta `BUNDLE` de 80 % pasó en silencio). Las tres reglas de ADR-0004 §Cumplimiento 2 pasan
+    sobre producción real y rechazan sus tres fixtures (tareas 1.2–1.4). **Pendiente fuera de mi
+    alcance en esta ejecución:** empujar la rama y confirmar el trabajo `backend` en la integración
+    continua — el lanzamiento de esta fase instruye explícitamente no empujar ni abrir PR (lo hace
+    el orquestador); queda como siguiente paso del orquestador antes de dar PR A por cerrado en CI.
 
 ---
 
