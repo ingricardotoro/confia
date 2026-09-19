@@ -216,7 +216,7 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   en la construcción inicial. REFACTOR: ninguno esperado. — Especificación `money`, requisitos
   «Suma y resta solo entre la misma moneda» e «Importes negativos como información contable»
 
-- [ ] 1.13 **Demostración de que las puertas fallan** (misma lógica que el cambio 1: una regla que
+- [x] 1.13 **Demostración de que las puertas fallan** (misma lógica que el cambio 1: una regla que
   nunca falló no prueba nada), sin comprometer el cambio: (a) comentar temporalmente una aserción de
   `MoneyConstructionTest` y observar que `jacoco:check` rompe `./mvnw verify` por debajo de 95 %;
   revertir. (b) debilitar temporalmente una aserción de `Money` y observar que
@@ -227,16 +227,29 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   observadas en el informe de verificación; si el entorno local no ejecuta PIT, (b) y (c) quedan
   para la integración continua con autorización explícita del propietario para un commit temporal.
   — Capacidad `build-integrity`, ambos requisitos (demostración de bloqueo/aviso por rama)
+  - *Evidencia observada (2026-09-18, local, JDK 25):* (a) comentar aserciones no sirve: otras
+    pruebas cubren las mismas líneas (cobertura seguía en 100 %). Se usó en su lugar un método
+    temporal sin cubrir en `CurrencyCode`: `jacoco:check` falló con «Coverage checks have not been
+    met»; revertido. (b) Con puntuación real de 93 y `-Dconfia.pit.mutationThreshold=95`,
+    `-Pmutation-gate` falló con «Mutation score of 93 is below threshold of 95», mientras
+    `-Pmutation-report` con el mismo umbral terminó en verde. (c) `help:evaluate`: sin perfil
+    umbral 80 y fase `none`; `-Pmutation-report` 0/`verify`; `-Pmutation-gate` 80/`verify`;
+    `-Dconfia.ci.mainBranch=true` 80/`verify`; ambos perfiles activos 80/`verify` (gana la puerta).
 
-- [ ] 1.14 **Medir el diff real de PR 1** con `git diff --numstat main...change/kernel-money-value-object`,
+- [x] 1.14 **Medir el diff real de PR 1** con `git diff --numstat main...change/kernel-money-value-object`,
   excluyendo `openspec/` y `docs/adr/ADR-0019-error-de-dominio-base-en-el-nucleo.md` (y su fila en
   `docs/adr/README.md`), tal como fija `design.md` («Qué se cuenta»). Si el total cabe en 800
   líneas, continuar. **Si supera 800, detener la aplicación y consultar al propietario** entre un
   tercer PR en el punto de corte `1a` (instrumental + semilla) / `1b` (`Money` exacto) o una
   excepción de tamaño para PR 1; nunca decidir esto sin el propietario. — Decisión D2/D5 de la
   propuesta; `design.md`, «Control durante la aplicación»
+  - *Resultado (2026-09-18):* 1337 líneas, por encima de 800. El propietario eligió partir PR 1 en
+    el punto de corte del diseño: **PR 1a** (`change/kernel-money-value-object`, commits `30dbea4`
+    y `780c5cb`, unas 646 líneas: instrumental y semilla) y **PR 1b**
+    (`change/kernel-money-value-object-exact`, base PR 1a, commit `26ef15d`, unas 691 líneas:
+    `Money` exacto). PR 2 pasa a tener base en PR 1b.
 
-- [ ] 1.15 **Verificación final de PR 1**: en checkout limpio, con `JAVA_HOME` en
+- [x] 1.15 **Verificación final de PR 1**: en checkout limpio, con `JAVA_HOME` en
   `C:/Program Files/Eclipse Adoptium/jdk-25.0.3.9-hotspot`, ejecutar `./mvnw -B verify` en
   `apps/api`. Confirmar cobertura de líneas y de ramas de `kernel` ≥ 95 % (JaCoCo) y, si PIT corrió
   localmente, puntuación de mutación ≥ 80 sobre las clases nuevas; si no corrió localmente, dejar
@@ -245,6 +258,10 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   termina en verde con la selección de perfil de la tarea 1.9. — Capacidad `build-integrity`,
   ambos requisitos; criterios de éxito de la propuesta (`./mvnw verify` en verde, cobertura ≥ 95 %,
   mutación ≥ 80, `main`/`change/**` usan el perfil correcto)
+  - *Evidencia local (2026-09-18, `-Pmutation-gate`):* PR 1a en `780c5cb`: `BUILD SUCCESS`,
+    JaCoCo cumplido, PIT 13/13 (100 %). PR 1b en `26ef15d`: `BUILD SUCCESS`, JaCoCo 100 % de
+    líneas y ramas en `kernel`, PIT 50/54 (93 %; cuatro mutantes supervivientes a revisar en
+    PR 2). La corrida en GitHub Actions se registra al empujar cada rama.
 
 ---
 
