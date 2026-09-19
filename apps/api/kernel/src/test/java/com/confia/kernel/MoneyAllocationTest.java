@@ -80,7 +80,21 @@ class MoneyAllocationTest {
     void rejectsAnEmptyWeightList() {
         Money total = Money.of("100.00", CurrencyCode.HNL);
 
-        assertThatThrownBy(() -> total.allocate()).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> total.allocate())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("empty");
+    }
+
+    @Test
+    void assignsTheLeftoverToTheHighestRemainderEvenWhenItIsNotTheFirstIndex() {
+        Money total = Money.of("0.07", CurrencyCode.HNL);
+
+        List<Money> parts = total.allocate(1, 2);
+
+        // Exact quotients are 2 and 4 (remainders 1 and 2); the single leftover unit must go to
+        // index 1, the highest remainder, not to index 0 merely because it comes first.
+        assertThat(parts).containsExactly(
+                Money.of("0.02", CurrencyCode.HNL), Money.of("0.05", CurrencyCode.HNL));
     }
 
     @Test

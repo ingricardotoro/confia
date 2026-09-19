@@ -212,10 +212,10 @@ public final class Money implements Comparable<Money> {
         BigInteger[] minorUnitParts =
                 distributeByLargestRemainder(totalMinorUnits, ratios, weightSum);
 
-        int sign = amount.signum();
+        boolean negative = amount.signum() == -1;
         List<Money> parts = new ArrayList<>(ratios.length);
         for (BigInteger part : minorUnitParts) {
-            BigInteger signedPart = sign < 0 ? part.negate() : part;
+            BigInteger signedPart = negative ? part.negate() : part;
             parts.add(Money.of(new BigDecimal(signedPart, minorUnitDigits), currency));
         }
         return List.copyOf(parts);
