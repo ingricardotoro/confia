@@ -80,6 +80,26 @@ class MoneyPropertiesTest {
                 .isEqualByComparingTo(exact.setScale(CurrencyCode.HNL.minorUnitDigits(), RoundingMode.HALF_UP));
     }
 
+    /**
+     * The spec's coherence requirement also covers multiplication by an exact decimal factor. An
+     * amount in cents times a factor with at most two decimals always fits scale four, so {@link
+     * RoundingMode#UNNECESSARY} proves the operation never rounds implicitly: it would throw if it
+     * had to.
+     */
+    @Property(tries = TRIES)
+    void sequencesWithAnExactDecimalFactorMatchAFullScaleBigDecimalCalculation(
+            @ForAll("boundedAmounts") Money a, @ForAll("boundedAmounts") Money b,
+            @ForAll("boundedAmounts") Money c, @ForAll("boundedAmounts") Money d,
+            @ForAll("exactDecimalFactors") BigDecimal factor) {
+        BigDecimal exact = a.amount().add(b.amount()).subtract(c.amount())
+                .multiply(factor).add(d.amount());
+        Money viaMoney = a.add(b).subtract(c).multiply(factor, RoundingMode.UNNECESSARY).add(d);
+
+        assertThat(viaMoney.amount()).isEqualByComparingTo(exact);
+        assertThat(viaMoney.roundToMinorUnit(RoundingMode.HALF_UP).amount())
+                .isEqualByComparingTo(exact.setScale(CurrencyCode.HNL.minorUnitDigits(), RoundingMode.HALF_UP));
+    }
+
     @Property(tries = TRIES)
     void percentageMatchesTheExactProductRoundedOnce(
             @ForAll("boundedAmounts") Money base, @ForAll("percentages") Percentage percentage) {
@@ -116,6 +136,12 @@ class MoneyPropertiesTest {
     @Provide
     Arbitrary<List<Integer>> ratios() {
         return Arbitraries.integers().between(1, 1000).list().ofMinSize(1).ofMaxSize(20);
+    }
+
+    /** Factors in [-99.99, 99.99] with at most two decimals. */
+    @Provide
+    Arbitrary<BigDecimal> exactDecimalFactors() {
+        return Arbitraries.integers().between(-9_999, 9_999).map(hundredths -> BigDecimal.valueOf(hundredths, 2));
     }
 
     @Provide
