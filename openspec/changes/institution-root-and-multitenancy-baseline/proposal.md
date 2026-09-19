@@ -6,7 +6,7 @@
 - **Exploración:** `openspec/changes/institution-root-and-multitenancy-baseline/exploration.md`
 - **Rama:** `change/institution-root-and-multitenancy-baseline`
 - **Estado:** aprobada por el propietario el 2026-09-19 (P3, `openspec/config.yaml`,
-  `rules.proposal`). D1, D2, P1 y P3 resueltas; P2 condicionada al diseño
+  `rules.proposal`). D1, D2, P1, P2 y P3 resueltas
 
 ## Intención
 
@@ -289,6 +289,9 @@ dependa de `InstitutionId` y de `InstitutionRepository`.
   se fusionan en orden (`delivery_strategy: auto-chain`, `chain_strategy: stacked-to-main`). Al
   cerrar cada pull request se mide el diff real; si supera 800 líneas, la aplicación se detiene y
   decide el propietario.
+- **P2 (capas vacías): excepción por capa mediante ADR-0020, aceptado.** La sonda sobre ArchUnit
+  1.4.2 confirmó que las capas `infrastructure` y `web` vacías hacen fallar la regla de capas y que
+  `optionalLayer` lo resuelve sin relajar `domain` ni `application` (ver `design.md`, «Sonda de P2»).
 
 ## Decisiones que confirma el propietario al aprobar
 
