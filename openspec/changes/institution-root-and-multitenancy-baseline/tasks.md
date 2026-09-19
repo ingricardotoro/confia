@@ -118,7 +118,7 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
     `rejectsTheFixtureRawBigDecimalComparison` falló sola (1 de 5); se revirtió y las 5 volvieron a
     verde.
 
-- [ ] 1.4 **TDD — reglas 3, 4 y 5, campos/retornos/parámetros de coma flotante en tipos
+- [x] 1.4 **TDD — reglas 3, 4 y 5, campos/retornos/parámetros de coma flotante en tipos
   monetarios.** ROJO: extender `MonetaryFloatingPointTest` con el predicado `MONETARY_TYPE` (`Money`,
   `Percentage`, o toda clase con un campo de esos tipos) y las tres reglas que prohíben `double`,
   `float`, `Double` y `Float` como campo declarado, como retorno y como parámetro (con la condición
@@ -133,6 +133,15 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
   uno a uno y observar el fallo correspondiente; revertir. REFACTOR: ninguno esperado. — Capacidad
   `build-integrity`, mismo requisito (escenario «Fixture con un campo `double` en un tipo monetario»
   y «Código de producción sin infracciones»)
+  - **Evidencia (2026-09-19):** ROJO observado: `cannot find symbol` para las tres reglas nuevas (6
+    errores de compilación). VERDE: 12/12 pruebas, incluida `productionImportIncludesTheKernelMonetaryTypes`
+    (confirma `Money` y `Percentage` en `productionClasses()`) y la reconfirmación de que
+    `productionCodeNeverConstructsBigDecimalFromFloatingPoint` (tarea 1.2) sigue en verde con
+    `Money.multiply(long)` en producción, probando que la regla 1 distingue las sobrecargas. No
+    vacuidad, uno a uno: (a) campo neutralizado → solo `rejectsTheFixtureFloatingPointField` falla
+    (1/12); (b) retorno neutralizado → solo `rejectsTheFixtureFloatingPointReturn` falla (1/12); (c)
+    parámetro neutralizado → solo `rejectsTheFixtureFloatingPointParameter` falla (1/12). Las tres
+    neutralizaciones se revirtieron; 12/12 en verde al final.
 
 - [ ] 1.5 **JaCoCo `BUNDLE` de 80 % en `app`, condicionado al resultado de la tarea 1.1.** Si la
   medición de 1.1 alcanza 80 % de líneas y de ramas: añadir a `apps/api/app/pom.xml` la ejecución
