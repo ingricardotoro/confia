@@ -285,7 +285,7 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
     (métodos ausentes). GREEN: `./mvnw -pl kernel test -Dtest=MoneyComparisonTest` → 9/9;
     conjunto completo del módulo, 52/52. Sin REFACTOR.
 
-- [ ] 2.2 **TDD — `Percentage`** (`PercentageTest`). ROJO: construcción válida desde `String` y
+- [x] 2.2 **TDD — `Percentage`** (`PercentageTest`). ROJO: construcción válida desde `String` y
   desde `BigDecimal` en puntos porcentuales, a escala 4; rechazo fuera de `[0, 100]`
   (`percentage-out-of-range`, ejemplo `"100.01"`); ausencia de fábrica desde `double`/`float` (no
   compila); mismas reglas de forma y escala que `Money` (`money-scale-exceeded` /
@@ -299,6 +299,10 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   forma/escala extraída en la tarea 1.11 si aplica sin acoplar `Money` y `Percentage` entre sí más
   allá de lo necesario. — Especificación `money`, requisito «`Percentage` como colaborador
   explícito de `Money`» (los cuatro escenarios propios de `Percentage`)
+  - *Evidencia (2026-09-18, local):* RED: errores de compilación en `PercentageTest` (símbolos
+    ausentes). GREEN: `./mvnw -pl kernel test -Dtest=PercentageTest` → 14/14. Sin REFACTOR: la
+    validación de forma/escala se mantiene propia de `Percentage`, sin acoplarla a `Money` (la
+    reutilización del diseño es condicional, "si aplica").
 
 - [ ] 2.3 **TDD — `multiply`** (segunda parte de `MoneyArithmeticTest`). ROJO: `multiply(long)`
   exacto sin redondeo (`1234.55 × 3 = 3703.65`, sin necesidad de redondear porque cabe en la escala
