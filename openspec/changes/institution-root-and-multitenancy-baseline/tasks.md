@@ -1,0 +1,471 @@
+# Tareas: raíz de institución y base multi-institución
+
+## Review Workload Forecast
+
+| Campo | Valor |
+|---|---|
+| Presupuesto de revisión de esta sesión (guardia literal de la fase) | 400 líneas |
+| Presupuesto de revisión vigente para este cambio (decisión del propietario, P1) | **800 líneas** de cambio efectivo por pull request (`CLAUDE.md`, `docs/15-flujo-de-trabajo-git.md` §3) — prevalece sobre el valor de sesión; no se re-decide aquí |
+| Líneas de autor estimadas (código, sin `openspec/` ni `docs/adr/`) | 1 127 a 1 669, según `design.md` §«Pronóstico de tamaño por corte» |
+| Riesgo frente al presupuesto de 400 (guardia literal de la fase) | **High** — cualquier corte individual supera 400 |
+| Riesgo frente al presupuesto de 800 vigente (P1) | **Low a Medium** — con la subdivisión B1/B2 ya planificada, cada pull request cae dentro de 800 salvo el extremo alto de B1 (hasta 700, dentro) y de B2 (hasta 345, dentro); el corte A (232–334) y C (185–290) caben con holgura. El riesgo real se confirma con la tarea de medición de cada PR |
+| Pull requests encadenados recomendados | Sí — ya decidido por el propietario (P1, opción B) |
+| División sugerida | PR A (`change/institution-root-and-multitenancy-baseline`, base `main`) → PR B1 (`...-domain`, base PR A) → PR B2 (`...-domain-attributes`, base PR B1) → PR C (`...-application`, base PR B2) |
+| Estrategia de entrega | `auto-chain` |
+| Estrategia de cadena | `stacked-to-main` |
+
+Decision needed before apply: No
+Chained PRs recommended: Yes
+Chain strategy: stacked-to-main
+400-line budget risk: High
+
+**Nota sobre el excedente frente al presupuesto de sesión (ya resuelta, no bloquea la aplicación):**
+la política de la sesión SDD registra 400 líneas; el proyecto fija 800 para este cambio
+(`CLAUDE.md`, `docs/15` §3, decisión P1 del propietario). Se sigue el valor de 800, como instruye el
+lanzamiento de esta fase. Si al cerrar un PR el diff real supera 800, la tarea de medición de ese PR
+(1.6, 2.9, 3.9 o 4.3) detiene la aplicación y consulta al propietario, con los puntos de subdivisión
+que ya nombra `design.md` («Pronóstico de tamaño por corte»). Esto ya está decidido como
+procedimiento; no es una decisión pendiente antes de iniciar `sdd-apply`.
+
+### Nota sobre el límite de quince tareas por pull request
+
+Esta lista tiene **31 tareas en total**, repartidas en cuatro pull requests (7, 10, 10 y 4). **El
+propietario del producto aceptó esta excepción el 2026-09-19, con un máximo de quince tareas por
+pull request.** El
+lanzamiento de esta fase fija el límite en **quince tareas por pull request**, no por cambio SDD
+completo; cada uno de los cuatro pull requests queda muy por debajo de ese límite. Se deja constancia
+de esta interpretación (igual que en el precedente `kernel-money-value-object`, que superó quince
+tareas en total con dos pull requests, cada uno dentro del límite) por si el propietario prefiere una
+lectura distinta de `openspec/config.yaml` («Un cambio con más de quince tareas es demasiado grande y
+debe dividirse»); no se decide aquí, se informa.
+
+### Suggested Work Units
+
+| Unit | Goal | Likely PR | Focused test command | Runtime harness | Rollback boundary |
+|------|------|-----------|----------------------|-----------------|-------------------|
+| A | Puertas y reglas de ADR-0004 §Cumplimiento 2, sin módulo de negocio; JaCoCo `BUNDLE` de 80 % en `app` si la medición lo permite | PR A (`change/institution-root-and-multitenancy-baseline`) | `./mvnw -pl apps/api/app -am test -Dtest=MonetaryFloatingPointTest` | `./mvnw -B verify` en `apps/api`, JDK 25 | Revertir el pull request completo; `apps/api/app/pom.xml` y `openspec/config.yaml` vuelven a su estado del cambio 3; ningún otro módulo depende de este PR |
+| B1 | `InstitutionId`, `Institution` mínima (`id`, `legalName`, `tradeName`, `isActive`), sus errores, ciclo A completo de ADR-0018/ADR-0020, puertas del `domain` | PR B1 (`...-domain`) | `./mvnw -pl apps/api/app -am test -Dtest=InstitutionCreationTest,InstitutionLifecycleTest,OrganizationErrorCodesTest` | `./mvnw -B verify -Pmutation-report` en `apps/api` | Revertir el PR B1; el módulo `organization` desaparece, la excepción de ADR-0018 vuelve con su condición original (que se cumple de nuevo), PR A queda intacto y completo por sí solo |
+| B2 | Atributos restantes del agregado (`rtn`, `address`, `defaultCurrency`, `locale`, `timezone`) con sus invariantes, precedencia completa, catálogo a once códigos | PR B2 (`...-domain-attributes`) | `./mvnw -pl apps/api/app -am test -Dtest=InstitutionCreationTest,InstitutionLifecycleTest,OrganizationErrorCodesTest` | `./mvnw -B verify -Pmutation-report` en `apps/api` | Revertir el PR B2 sin fusionar; PR B1 queda intacto y completo por sí solo (institución sin RTN/dirección/moneda/localización/huso horario, sin consumidores fuera del módulo) |
+| C | Puertos `InstitutionRepository` y `CurrentInstitutionProvider`, caso de uso `ResolveCurrentInstitution`, dos errores de resolución, catálogo a trece códigos | PR C (`...-application`) | `./mvnw -pl apps/api/app -am test -Dtest=ResolveCurrentInstitutionTest,OrganizationErrorCodesTest` | `./mvnw -B verify -Pmutation-report` en `apps/api` | Revertir el PR C; el módulo `organization` queda sin capa `application`, sin afectar `domain`; ningún bean de Spring se registra en ningún PR |
+
+Ejecutor de todas las tareas: `./mvnw -B verify` en `apps/api`, con `JAVA_HOME` en
+`C:/Program Files/Eclipse Adoptium/jdk-25.0.3.9-hotspot` (JDK 25) y
+`MAVEN_OPTS=-Djavax.net.ssl.trustStoreType=Windows-ROOT` (`design.md`, «Restricciones del entorno
+local»). La integración continua en `ubuntu-latest` es la fuente de verdad; nunca se baja un umbral
+ni se omite una prueba para pasar en local.
+
+**Estado ya resuelto, no se re-planifica:** la sonda de P2 (paso B0 del diseño) ya se ejecutó el
+2026-09-19 con resultado (b) — la regla de capas falla con `Infrastructure` y `Web` vacías, y
+`optionalLayer` lo resuelve sin relajar `Domain` ni `Application` — y el propietario aceptó ADR-0020
+el mismo día (estado Aceptado, `docs/adr/ADR-0020-capas-opcionales-en-la-regla-de-capas.md`, ya con su
+fila en `docs/adr/README.md`). Las tareas de este documento aplican directamente la opción A de
+ADR-0020; ninguna tarea repite la sonda.
+
+---
+
+## PR A — Puertas y reglas de ADR-0004, sin módulo de negocio
+
+Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `main`. Compila y pasa
+`./mvnw verify` con las reglas nuevas en verde sobre el código de producción existente
+(`com.confia.bootstrap` y `kernel`).
+
+- [ ] 1.1 **Medición de cobertura de `app` con solo `bootstrap`.** Declarar `jacoco-maven-plugin` en
+  `apps/api/app/pom.xml` con las ejecuciones `prepare-agent` y `report` (heredadas del padre) pero
+  **sin** ejecución `check` todavía. Ejecutar `./mvnw -B -pl apps/api/app -am verify` y leer el
+  informe HTML/XML de JaCoCo de `app` (cobertura de líneas y de ramas sobre `com.confia.bootstrap`,
+  sin ningún módulo de negocio). Registrar el porcentaje exacto como evidencia: decide si la regla
+  `BUNDLE` de 80 % entra en la tarea 1.5 de este PR o se traslada a la tarea 2.7 de PR B1
+  (`design.md`, decisión 9, «Por corte»; «Por confirmar», punto 5). Sin RED/GREEN (medición, no
+  comportamiento de producción). — Capacidad `build-integrity`, requisito «Cobertura global mínima
+  del módulo `app`» (precondición de la decisión de corte)
+
+- [ ] 1.2 **TDD — regla 1, `NO_BIG_DECIMAL_FROM_FLOATING_POINT`.** ROJO: crear
+  `apps/api/app/src/test/java/com/confia/architecture/MonetaryFloatingPointTest.java` con la regla
+  que prohíbe `new BigDecimal(double)`, `new BigDecimal(double, MathContext)` y
+  `BigDecimal.valueOf(double)` en `productionClasses()`, y el fixture
+  `apps/api/app/src/test/java/com/confia/architecture/fixture/monetary/FloatingPointBigDecimal.java`
+  con las tres llamadas prohibidas en métodos distintos; la prueba de rechazo del fixture falla al
+  no existir aún la regla. VERDE: la regla pasa sobre el código de producción real (ya no vacío:
+  incluye `com.confia.bootstrap` y `kernel`) y rechaza el fixture nombrando la clase infractora.
+  Neutralizar el fixture (quitar una de las tres llamadas) y observar que la prueba de rechazo falla,
+  como prueba de no vacuidad (lección de Engram #354); revertir la neutralización sin comprometerla.
+  REFACTOR: ninguno esperado. — Capacidad `build-integrity`, requisito «Prohibición de coma flotante
+  para importes y de igualdad cruda de `BigDecimal` fuera de `Money`» (escenario «Fixture que
+  construye `BigDecimal` desde `double`» y «Código de producción sin infracciones»)
+
+- [ ] 1.3 **TDD — regla 2, `NO_BIG_DECIMAL_EQUALS_OUTSIDE_MONEY`.** ROJO: extender
+  `MonetaryFloatingPointTest` con la regla que prohíbe `BigDecimal.equals(Object)` en clases que no
+  pertenecen a `Money` (ni a sus anidadas), y crear el fixture
+  `.../fixture/monetary/RawBigDecimalComparison.java` con `left.equals(right)` sobre `BigDecimal`
+  como tipo estático. VERDE: la regla rechaza el fixture nombrando la clase infractora y no rechaza
+  a `Money`, que queda fuera de la selección (confirmar con una aserción explícita o con la ejecución
+  de la prueba). Neutralizar el fixture y observar el fallo de la prueba de rechazo; revertir.
+  REFACTOR: ninguno esperado. — Capacidad `build-integrity`, mismo requisito (escenario «Fixture que
+  invoca `BigDecimal.equals` fuera de `Money`»)
+
+- [ ] 1.4 **TDD — reglas 3, 4 y 5, campos/retornos/parámetros de coma flotante en tipos
+  monetarios.** ROJO: extender `MonetaryFloatingPointTest` con el predicado `MONETARY_TYPE` (`Money`,
+  `Percentage`, o toda clase con un campo de esos tipos) y las tres reglas que prohíben `double`,
+  `float`, `Double` y `Float` como campo declarado, como retorno y como parámetro (con la condición
+  propia de la regla de parámetros) en un tipo monetario; escribir además
+  `productionImportIncludesTheKernelMonetaryTypes`, que afirma que `productionClasses()` contiene
+  `Money` y `Percentage`. Crear el fixture `.../fixture/monetary/FloatingPointPriceTag.java` con
+  campo `Money price` (lo hace monetario), campo `double discountRate`, método `double
+  discountRate()` y método `void applyRate(float rate)`. VERDE: las tres reglas rechazan el fixture
+  nombrando la clase infractora; la regla de `Money.multiply(long)` (que llama internamente a
+  `BigDecimal.valueOf(long)`, no `valueOf(double)`) sigue pasando sin excepción, confirmando que la
+  regla 1 distingue las sobrecargas por firma exacta. Neutralizar cada miembro infractor del fixture
+  uno a uno y observar el fallo correspondiente; revertir. REFACTOR: ninguno esperado. — Capacidad
+  `build-integrity`, mismo requisito (escenario «Fixture con un campo `double` en un tipo monetario»
+  y «Código de producción sin infracciones»)
+
+- [ ] 1.5 **JaCoCo `BUNDLE` de 80 % en `app`, condicionado al resultado de la tarea 1.1.** Si la
+  medición de 1.1 alcanza 80 % de líneas y de ramas: añadir a `apps/api/app/pom.xml` la ejecución
+  `jacoco-check` con la regla `BUNDLE` (`LINE` y `BRANCH`, `COVEREDRATIO` mínimo `0.80`), y en el
+  mismo commit actualizar el comentario de `coverage_threshold` en `openspec/config.yaml` a
+  `95 # kernel and every module's domain package, line+branch (JaCoCo); 80 global on app`. Demostrar
+  el fallo bajando temporalmente el umbral configurado a un valor por encima de la cobertura real (o
+  comentando una prueba de `bootstrap` si existe) y observando que `jacoco:check` rompe `./mvnw
+  verify`; revertir sin comprometer. Si la medición de 1.1 **no** alcanza 80 % (previsible en la
+  cobertura de ramas, `design.md` «Por confirmar» punto 5): no declarar esta regla aquí; dejar
+  constancia explícita en este PR de que se traslada a la tarea 2.7 de PR B1, sin bajar el umbral ni
+  excluir `ConfiaApplication.main`. — Capacidad `build-integrity`, requisito «Cobertura global mínima
+  del módulo `app`» (ambos escenarios)
+
+- [ ] 1.6 **Medir el diff real de PR A** con
+  `git diff --numstat main...change/institution-root-and-multitenancy-baseline -- . ':(exclude)openspec' ':(exclude)docs/adr'`.
+  Si el total cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y consultar al
+  propietario**, con el corte A como unidad ya mínima (no tiene subdivisión natural adicional
+  planificada); registrar la decisión que tome. — P1 de la propuesta; `design.md`, «Pronóstico de
+  tamaño por corte»
+
+- [ ] 1.7 **Verificación final de PR A**: en checkout limpio, con `JAVA_HOME` en
+  `C:/Program Files/Eclipse Adoptium/jdk-25.0.3.9-hotspot` y `MAVEN_OPTS` con el almacén de confianza
+  `Windows-ROOT`, ejecutar `./mvnw -B verify` en `apps/api`. Confirmar que las tres reglas de
+  ADR-0004 §Cumplimiento 2 pasan sobre producción y rechazan sus tres fixtures, y (si se aplicó 1.5)
+  que la cobertura de `app` ≥ 80 % rompe la construcción por debajo del umbral. Empujar la rama
+  `change/institution-root-and-multitenancy-baseline` y confirmar en la integración continua que el
+  trabajo `backend` termina en verde. — Capacidad `build-integrity`; criterios de éxito de la
+  propuesta («Cada regla de ADR-0004 §Cumplimiento 2 rechaza su fixture negativo...»)
+
+---
+
+## PR B1 — `InstitutionId`, `Institution` mínima, ciclo de ADR-0018/ADR-0020, puertas del `domain`
+
+Rama `...-domain` (por ejemplo `change/institution-root-and-multitenancy-baseline-domain`), base PR
+A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras apunta al PR A
+(`-Pmutation-report`).
+
+- [ ] 2.1 **TDD — `InstitutionId`.** ROJO: crear
+  `apps/api/kernel/src/test/java/com/confia/kernel/InstitutionIdTest.java`: construcción desde un
+  `UUID` válido expone ese mismo `UUID`; un valor nulo lanza `NullPointerException`; dos instancias
+  con el mismo `UUID` son iguales y su `hashCode` coincide; dos instancias con `UUID` distinto no son
+  iguales. VERDE: crear `apps/api/kernel/src/main/java/com/confia/kernel/InstitutionId.java` como
+  `public record InstitutionId(UUID value)` con constructor compacto que aplica
+  `Objects.requireNonNull(value, "value")`; actualizar
+  `apps/api/kernel/src/main/java/com/confia/kernel/package-info.java` para mencionar los
+  identificadores entre los tipos del núcleo. Sin código nuevo en `KernelErrorCodesTest` (el nulo es
+  un error de programación, ADR-0019 punto 6). REFACTOR: ninguno esperado. — Especificación
+  `organization`, requisito «Identificador de institución en el núcleo (`InstitutionId`)» (los tres
+  escenarios)
+
+- [ ] 2.2 **TDD — `Institution` mínima (caso feliz + `legalName`).** ROJO: crear
+  `apps/api/app/src/main/java/com/confia/organization/package-info.java` (documenta la capacidad
+  `organization`, qué queda fuera de alcance y qué cambio lo aporta) y
+  `apps/api/app/src/test/java/com/confia/organization/domain/InstitutionCreationTest.java` con: caso
+  feliz de construcción con `id`, `legalName` y `tradeName` válidos, `isActive` verdadero; rechazo de
+  `legalName` en blanco (`institution-legal-name-blank`) y de más de 200 puntos de código
+  (`institution-legal-name-too-long`, con los límites exactos 200/201); `id` nulo lanza
+  `NullPointerException`; `legalName` nulo lanza `NullPointerException`. VERDE: crear
+  `apps/api/app/src/main/java/com/confia/organization/domain/Institution.java` (`public final class
+  Institution`, constructor privado, fábrica `create(InstitutionId id, String legalName, String
+  tradeName)` que exige `strip()` + no vacío + máximo 200 puntos de código para `legalName`,
+  `isActive` verdadero al crear, `MAX_NAME_LENGTH = 200`) y
+  `apps/api/app/src/main/java/com/confia/organization/domain/InvalidInstitutionException.java`
+  (`final`, hereda de `DomainException`, fábricas de paquete `legalNameBlank()` y
+  `legalNameTooLong()` con los códigos `institution-legal-name-blank` e
+  `institution-legal-name-too-long`, mensajes que nunca repiten la entrada). Ejecutar `./mvnw -B
+  verify` completo en `apps/api`: **observar el rojo programado** de
+  `EmptyShouldExceptionInventoryTest` (ADR-0018 §2) al aparecer la primera clase en
+  `organization.domain`; registrar el mensaje exacto como evidencia, sin corregirlo todavía.
+  REFACTOR: ninguno esperado. — Especificación `organization`, requisito «Construcción de
+  `Institution` y sus atributos de identidad obligatorios» (escenarios de `legalName` y de atributos
+  obligatorios nulos, parcial: sin `address` todavía); ADR-0018 §2 (rojo programado, ahora observado)
+
+- [ ] 2.3 **Cierre de la caducidad de ADR-0018 (parte común).** En
+  `apps/api/app/src/test/java/com/confia/architecture/LayeredArchitectureTest.java`: borrar
+  `.allowEmptyShould(true)` y el comentario que la acompaña; renombrar la prueba a
+  `productionCodeRespectsLayering`; borrar `LAYER_SEGMENTS` y `noBusinessModuleExistsYet` con su
+  Javadoc y los imports que queden sin uso (`JavaClass`, `JavaClasses`, `Arrays`, `Set`, según
+  aplique). En
+  `apps/api/app/src/test/java/com/confia/architecture/EmptyShouldExceptionInventoryTest.java`: borrar
+  la única entrada existente; `EXCEPTIONS` queda `List.of()`. Ejecutar `./mvnw -B -pl apps/api/app
+  -am test -Dtest=EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest`: el inventario pasa
+  (lista vacía) y `SuppressionCitesAdrTest` pasa con su conteo en 0 == 0 (sin cambios en ese
+  archivo). Ejecutar `productionCodeRespectsLayering` de forma aislada y **registrar si falla**
+  nombrando `Layer 'Infrastructure' is empty` y `Layer 'Web' is empty`, confirmando en código el
+  resultado (b) ya observado en la sonda de `design.md`. — ADR-0018 §2 y §3.a (caducidad cerrada);
+  criterios de éxito de la propuesta («`LayeredArchitectureTest` evalúa clases reales... sin
+  `allowEmptyShould(true)`, y el inventario ya no contiene la entrada vencida»)
+
+- [ ] 2.4 **Aplicación de ADR-0020 (opción A, ya aceptada): capas opcionales por marcador.** ROJO:
+  en `apps/api/app/src/test/java/com/confia/architecture/SuppressionCitesAdrTest.java`, añadir el
+  patrón `OPTIONAL_LAYER_CALL` (`\.optionalLayer\(`) y `WITH_OPTIONAL_LAYERS_TRUE`
+  (`withOptionalLayers\(\s*true\s*\)`) a la lista de marcadores con nombre, con sus ejemplos y la
+  aserción de que ninguno aparece todavía (`0 == 0`); ejecutar la prueba y confirmar que pasa antes
+  de tocar `LayeredArchitectureTest` (los patrones existen pero no se usan aún). En
+  `EmptyShouldExceptionInventoryTest`, añadir el `enum Marker { ALLOW_EMPTY_SHOULD, OPTIONAL_LAYER }`,
+  el campo `marker` en `ExpiringException`, `countOf(Marker)`, y las dos entradas nuevas
+  (`Infrastructure` con condición «ninguna clase de producción reside en un paquete `infrastructure`»,
+  `Web` con condición «ninguna clase de producción reside en un paquete `web`»), cada una apuntando a
+  un método `noProductionClassInLayer(JavaClasses, String)` que todavía no existe en
+  `LayeredArchitectureTest`: la compilación falla (rojo). VERDE: en `LayeredArchitectureTest`, separar
+  la regla en `productionLayeringRule()` (con `optionalLayer("Infrastructure")` y
+  `optionalLayer("Web")`, cada llamada con el comentario que cita ADR-0020 y la condición de
+  caducidad) y `fixtureLayeringRule()` (las cuatro capas obligatorias, sin cambios de comportamiento
+  frente al fixture existente), con el método común `constrained(LayeredArchitecture)` que conserva
+  las ocho cláusulas `whereLayer` y el `because()` existentes; añadir el método de paquete
+  `static boolean noProductionClassInLayer(JavaClasses classes, String layerSegment)`. Ejecutar
+  `./mvnw -B -pl apps/api/app -am test -Dtest=LayeredArchitectureTest,EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest`:
+  las tres pasan; `SuppressionCitesAdrTest` ahora exige 2 == 2 apariciones de `.optionalLayer(`.
+  **Demostración de caducidad** (sin comprometer): añadir temporalmente una clase mínima en un
+  paquete `com.confia.organization.infrastructure` de prueba, ejecutar
+  `EmptyShouldExceptionInventoryTest` y observar que falla nombrando la entrada de `Infrastructure`;
+  borrar la clase temporal (`git status` limpio) antes de continuar. REFACTOR: ninguno esperado. —
+  ADR-0020 (opción A completa); `design.md`, «Ediciones exactas de las pruebas de arquitectura»
+  (parte «Solo si se aplica ADR-0020»)
+
+- [ ] 2.5 **TDD — activación y desactivación.** ROJO: crear
+  `apps/api/app/src/test/java/com/confia/organization/domain/InstitutionLifecycleTest.java`:
+  desactivar una institución activa tiene éxito e `isActive` pasa a falso sin modificar otro
+  atributo; reactivar una inactiva tiene éxito; activar una ya activa falla con
+  `institution-already-active` sin modificar el estado; desactivar una ya inactiva falla con
+  `institution-already-inactive` sin modificar el estado; dos instituciones con el mismo `id` pero
+  atributos distintos son iguales (igualdad por identidad) y su `hashCode` coincide. VERDE: añadir
+  `activate()` y `deactivate()` a `Institution` (mutan solo `active`, sin idempotencia) y crear
+  `apps/api/app/src/main/java/com/confia/organization/domain/InstitutionStateException.java`
+  (`final`, hereda de `DomainException`, fábricas de paquete para `institution-already-active` e
+  `institution-already-inactive`); implementar `equals`/`hashCode` de `Institution` sobre `id`.
+  REFACTOR: ninguno esperado. — Especificación `organization`, requisito «Activación y desactivación
+  de una institución» (los cuatro escenarios) y requisito «Jerarquía de errores de dominio del módulo
+  `organization`» (escenario de herencia de `DomainException`, parcial)
+
+- [ ] 2.6 **`OrganizationErrorCodesTest` con seis códigos.** Crear
+  `apps/api/app/src/test/java/com/confia/organization/domain/OrganizationErrorCodesTest.java`
+  (espejo de `KernelErrorCodesTest`): catálogo cerrado de
+  `institution-legal-name-blank`, `institution-legal-name-too-long`, `institution-trade-name-blank`,
+  `institution-trade-name-too-long`, `institution-already-active`, `institution-already-inactive`;
+  formato kebab-case `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` de máximo 64 caracteres; ausencia de repetidos;
+  prefijo `institution-`; cada código pertenece a una subclase de `DomainException`. Verificación:
+  falla si dos excepciones comparten código o si un código incumple el formato. — Especificación
+  `organization`, requisito «Catálogo de códigos del módulo: formato y ausencia de repetidos» (ambos
+  escenarios, parcial: seis de los once códigos de este corte)
+
+- [ ] 2.7 **Puertas de calidad del `domain` en `app`.** En `apps/api/app/pom.xml`: si la tarea 1.5
+  no declaró la regla `BUNDLE`, declararla ahora (`LINE`/`BRANCH` `COVEREDRATIO` 0.80) y actualizar
+  el comentario de `coverage_threshold` en `openspec/config.yaml` en el mismo commit. Declarar la
+  regla `PACKAGE` de `jacoco-check` con `<include>com.confia.*.domain</include>` y
+  `<include>com.confia.*.domain.*</include>`, `LINE`/`BRANCH` `COVEREDRATIO` 0.95. Adherirse a
+  `pitest-maven` con `targetClasses`/`targetTests` = `com.confia.*.domain.*`, y añadir
+  `junit-platform-launcher` en alcance `test` (mismo motivo que `kernel`: `pitest-junit5-plugin`
+  1.2+ lo exige); reutilizar los perfiles `mutation-gate` y `mutation-report` del padre sin cambios.
+  Ejecutar `./mvnw -B -pl apps/api/app -am verify -Pmutation-report` como humo: confirmar que JaCoCo
+  mide `com.confia.organization.domain` y que PIT genera y evalúa mutantes sobre esas clases sin
+  romper por `failWhenNoMutations=true`. — Capacidad `build-integrity`, requisitos «Cobertura global
+  mínima del módulo `app`» (si aplica aquí) y «Cobertura y mutación del paquete `domain` de cada
+  módulo de negocio» (ambos escenarios de cobertura, más los dos de mutación por selección de perfil,
+  heredados del comportamiento ya probado en `kernel`)
+
+- [ ] 2.8 **Demostración de que las puertas fallan** (sin comprometer): (a) comentar temporalmente
+  una aserción de `InstitutionCreationTest` u `OrganizationErrorCodesTest` y observar que la regla
+  `PACKAGE` rompe `./mvnw verify` por debajo de 95 %; revertir. (b) debilitar temporalmente una
+  aserción de `Institution` (por ejemplo, aceptar `legalName` en blanco) y observar que
+  `-Pmutation-gate` rompe por debajo de 80 mientras `-Pmutation-report` termina en verde y solo
+  informa; revertir. Registrar ambas evidencias observadas. — Capacidad `build-integrity`, mismo
+  requisito (escenarios de umbral de cobertura y de selección de perfil de mutación)
+
+- [ ] 2.9 **Medir el diff real de PR B1** con `git diff --numstat <base-de-PR-A>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`
+  (rama actual contra la base real de PR A, que puede ser `main` o el commit final de PR A si aún no
+  se fusionó). Si cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y consultar
+  al propietario** entre una subdivisión adicional dentro de B1 o una excepción de tamaño; no
+  decidirlo sin el propietario. — P1 de la propuesta; `design.md`, «Pronóstico de tamaño por corte»
+
+- [ ] 2.10 **Verificación final de PR B1**: en checkout limpio, con `JAVA_HOME` en JDK 25, ejecutar
+  `./mvnw -B verify -Pmutation-gate` en `apps/api`. Confirmar cobertura de `organization.domain` ≥
+  95 % (líneas y ramas) y puntuación de mutación ≥ 80. Confirmar que `productionCodeRespectsLayering`
+  pasa con las capas `Infrastructure` y `Web` opcionales. Empujar la rama `...-domain` (apuntando a
+  PR A) y confirmar en la integración continua que el trabajo `backend` termina en verde con
+  `-Pmutation-report`. — Capacidad `build-integrity`, ambos requisitos nuevos; criterios de éxito de
+  la propuesta relativos a cobertura, mutación y ADR-0018/ADR-0020
+
+---
+
+## PR B2 — Atributos restantes del agregado (`rtn`, `address`, `defaultCurrency`, `locale`, `timezone`)
+
+Rama `...-domain-attributes`, base PR B1. La firma de `Institution.create(...)` cambia en este PR
+(pasa de tres a ocho parámetros); es aceptable porque el agregado no tiene consumidores fuera del
+módulo (`design.md`, «Pronóstico de tamaño por corte»).
+
+- [ ] 3.1 **TDD — `rtn`.** ROJO: extender `InstitutionCreationTest` con la nueva firma de
+  `Institution.create(id, legalName, tradeName, rtn, ...)` (los parámetros siguientes se añaden en
+  tareas posteriores de este mismo PR; usar valores válidos fijos para ellos mientras no tengan su
+  propia validación): rechazo de `rtn` vacío, de `rtn` con guiones (`"0801-1990-12345"`), de `rtn` de
+  21 dígitos, y aceptación de `rtn` de 1, 14 y 20 dígitos, todos con el código
+  `institution-rtn-invalid`. VERDE: extender `Institution.create(...)` con el parámetro `rtn`
+  (`String`, `requireNonNull`, patrón `^[0-9]{1,20}$`, `MAX_RTN_DIGITS = 20`) y añadir a
+  `InvalidInstitutionException` la fábrica de paquete `rtnInvalid()` con el código
+  `institution-rtn-invalid`; actualizar todas las llamadas existentes a `create(...)` en
+  `InstitutionCreationTest` y `InstitutionLifecycleTest` para incluir el nuevo parámetro. REFACTOR:
+  ninguno esperado. — Especificación `organization`, requisito «RTN presente y numérico, con el
+  formato exacto pendiente» (ambos escenarios)
+
+- [ ] 3.2 **TDD — `address`.** ROJO: extender `InstitutionCreationTest` con el parámetro `address`:
+  rechazo de `address` vacía o de solo espacios (`institution-address-blank`), aceptación con exactamente
+  500 puntos de código y rechazo con 501 (`institution-address-too-long`). VERDE: extender
+  `Institution.create(...)` con `address` (`strip()`, no vacío, máximo 500 puntos de código,
+  `MAX_ADDRESS_LENGTH = 500`) y añadir a `InvalidInstitutionException` las fábricas `addressBlank()`
+  y `addressTooLong()`. Actualizar llamadas existentes a `create(...)`. REFACTOR: ninguno esperado. —
+  Especificación `organization`, requisito «Construcción de `Institution` y sus atributos de
+  identidad obligatorios» (escenarios de `address`, completando el requisito iniciado en la tarea
+  2.2)
+
+- [ ] 3.3 **TDD — `defaultCurrency`.** ROJO: extender `InstitutionCreationTest` con el parámetro
+  `defaultCurrency` (`CurrencyCode` de `kernel`): un valor nulo lanza `NullPointerException`, no un
+  error de dominio; un valor `HNL` o `USD` se acepta. VERDE: extender `Institution.create(...)` con
+  `defaultCurrency` (`requireNonNull`, sin validación de dominio adicional porque `CurrencyCode` ya
+  es un conjunto cerrado). Actualizar llamadas existentes a `create(...)`. REFACTOR: ninguno
+  esperado. — Especificación `organization`, requisito «Moneda por defecto, localización y huso
+  horario válidos» (escenario «Moneda por defecto nula»)
+
+- [ ] 3.4 **TDD — `locale`.** ROJO: extender `InstitutionCreationTest` con el parámetro `locale`
+  (`java.util.Locale`): `Locale.forLanguageTag("es-HN")` se acepta; `Locale.ROOT` (sin idioma) falla
+  con `institution-locale-invalid`; un `locale` nulo lanza `NullPointerException`. VERDE: extender
+  `Institution.create(...)` con `locale` (`requireNonNull`, rechaza idioma vacío) y añadir a
+  `InvalidInstitutionException` la fábrica `localeInvalid()`. Actualizar llamadas existentes a
+  `create(...)`. REFACTOR: ninguno esperado. — Especificación `organization`, mismo requisito
+  (escenarios «Localización sin idioma»)
+
+- [ ] 3.5 **TDD — `timezone`.** ROJO: extender `InstitutionCreationTest` con el parámetro `timezone`
+  (`java.time.ZoneId`): `ZoneId.of("America/Tegucigalpa")` se acepta; `ZoneOffset.ofHours(-6)`
+  (desplazamiento fijo) falla con `institution-timezone-invalid`; un `timezone` nulo lanza
+  `NullPointerException`. VERDE: extender `Institution.create(...)` con `timezone` (`requireNonNull`,
+  rechaza instancias de `ZoneOffset`) y añadir a `InvalidInstitutionException` la fábrica
+  `timezoneInvalid()`; con esto la firma de `create(...)` queda completa según `design.md`
+  «Contratos e interfaces». Actualizar llamadas existentes a `create(...)`. REFACTOR: ninguno
+  esperado. — Especificación `organization`, mismo requisito (escenarios «Huso horario reconocido» y
+  «Huso horario de desplazamiento fijo»)
+
+- [ ] 3.6 **TDD — nombre comercial opcional y sus límites.** ROJO: extender `InstitutionCreationTest`
+  (si no quedó cubierto en la tarea 2.2): construcción exitosa con `tradeName` nulo (`tradeName` en
+  el resultado es nulo); rechazo de `tradeName` provisto como cadena de solo espacios
+  (`institution-trade-name-blank`); rechazo de `tradeName` de 201 caracteres y aceptación de 200
+  (`institution-trade-name-too-long`). VERDE: confirmar/ajustar la validación de `tradeName` en
+  `Institution.create(...)` (nulo permitido; si no es nulo, mismas reglas que `legalName`) y las
+  fábricas `tradeNameBlank()`/`tradeNameTooLong()` de `InvalidInstitutionException` (si no se
+  completaron en 2.2, completarlas aquí). REFACTOR: ninguno esperado. — Especificación
+  `organization`, requisito «Nombre comercial opcional» (ambos escenarios)
+
+- [ ] 3.7 **TDD — precedencia de invariantes.** ROJO: añadir a `InstitutionCreationTest` una prueba
+  parametrizada que confirma el orden exacto de `design.md` («Flujo de datos»): primero
+  `requireNonNull` de los siete argumentos obligatorios (todos salvo `tradeName`), luego las reglas
+  de negocio en el orden `legalName` → `tradeName` (si no es nulo) → `rtn` → `address` → `locale` →
+  `timezone`; con al menos tres pares de atributos simultáneamente inválidos (por ejemplo, `legalName`
+  en blanco y `rtn` inválido a la vez → falla con `institution-legal-name-blank`; `tradeName` en
+  blanco y `address` vacía a la vez → falla con `institution-trade-name-blank`; `rtn` inválido y
+  `timezone` de desplazamiento fijo a la vez → falla con `institution-rtn-invalid`), confirmando que
+  se lanza una sola excepción, la primera que aplica. VERDE: ajustar el orden de las comprobaciones
+  dentro de `Institution.create(...)` si la implementación incremental de las tareas 3.1 a 3.6 no
+  coincide exactamente con este orden. REFACTOR: extraer el orden de validación a un método privado
+  legible si mejora la claridad. — `design.md`, «Agregado `Institution`», tabla de atributos e
+  invariantes (orden de evaluación); no hay escenario propio en la especificación, pero está
+  implícito en el requisito «Construcción de `Institution`...» al exigir «una sola excepción, la
+  primera que aplica»
+
+- [ ] 3.8 **`toString()` sin RTN ni dirección.** Extender `InstitutionLifecycleTest` con una
+  aserción sobre `Institution.toString()` que confirma el formato `"Institution[id=..., tradeName=...]"`
+  y la ausencia literal del `rtn` y de la `address` usados en el fixture de la prueba (ahora
+  significativa, porque ambos atributos existen desde este PR). Ajustar `Institution.toString()` si
+  no cumple el formato exacto. — `design.md`, decisión 5, «Razones puntuales» (mensajes técnicos que
+  nunca repiten la entrada, `CLAUDE.md` regla 11); no hay escenario propio en la especificación
+
+- [ ] 3.9 **`OrganizationErrorCodesTest` a once códigos.** Extender el catálogo cerrado de la tarea
+  2.6 con `institution-rtn-invalid`, `institution-address-blank`, `institution-address-too-long`,
+  `institution-locale-invalid`, `institution-timezone-invalid` (once códigos en total para el corte
+  B). Confirmar formato, unicidad, prefijo y herencia de `DomainException` para los cinco nuevos. —
+  Especificación `organization`, requisito «Catálogo de códigos del módulo: formato y ausencia de
+  repetidos» (completa los once del corte B)
+
+- [ ] 3.10 **Medir el diff real de PR B2 y verificación final.** Medir con
+  `git diff --numstat <base-de-PR-B1>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`. Si cabe
+  en 800 líneas, continuar; **si supera 800, detener la aplicación y consultar al propietario** entre
+  una subdivisión adicional o una excepción de tamaño. Si cabe: en checkout limpio, con `JAVA_HOME`
+  en JDK 25, ejecutar `./mvnw -B verify -Pmutation-gate` en `apps/api`; confirmar cobertura de
+  `organization.domain` ≥ 95 % y mutación ≥ 80 sobre el agregado completo. Empujar la rama
+  `...-domain-attributes` (apuntando a PR B1) y confirmar en la integración continua que el trabajo
+  `backend` termina en verde. — P1 de la propuesta; capacidad `build-integrity`, ambos requisitos;
+  criterios de éxito de la propuesta relativos a `Institution` inválida y al catálogo de códigos
+
+---
+
+## PR C — Capa `application`: puertos y caso de uso
+
+Rama `...-application`, base PR B2.
+
+- [ ] 4.1 **TDD — `ResolveCurrentInstitution`, caso activo.** ROJO: crear
+  `apps/api/app/src/test/java/com/confia/organization/application/InMemoryInstitutionRepository.java`
+  y `.../FixedCurrentInstitutionProvider.java` (dobles de prueba, en `src/test`) y
+  `apps/api/app/src/test/java/com/confia/organization/application/ResolveCurrentInstitutionTest.java`
+  con: un `CurrentInstitutionProvider` que resuelve un `InstitutionId` conocido y un
+  `InstitutionRepository` que devuelve, para ese identificador, una `Institution` con `isActive`
+  verdadero → el caso de uso devuelve esa `Institution`; el constructor de `ResolveCurrentInstitution`
+  rechaza cada puerto nulo con `NullPointerException`. VERDE: crear
+  `apps/api/app/src/main/java/com/confia/organization/application/InstitutionRepository.java`
+  (`Optional<Institution> findById(InstitutionId id)`),
+  `.../CurrentInstitutionProvider.java` (`InstitutionId currentInstitutionId()`, con el Javadoc que
+  fija el contrato de ADR-0009: el valor se deriva del token autenticado y nunca de un parámetro,
+  cabecera o cuerpo del cliente) y
+  `.../ResolveCurrentInstitution.java` (`final`, sin anotaciones de Spring, constructor con
+  `requireNonNull` de ambos puertos, `execute()` que resuelve el identificador y carga la
+  institución). Ningún bean de Spring se registra: la clase no lleva anotaciones y no se escanea
+  desde `com.confia.bootstrap`. REFACTOR: ninguno esperado. — Especificación `organization`,
+  requisitos «Puerto de salida para cargar una institución por identificador» (escenario «Carga con
+  dobles en memoria»), «Puerto de salida para la institución de la solicitud en curso» (su
+  escenario) y «Caso de uso de resolución de la institución en curso» (escenario «Resolución exitosa
+  de una institución activa»)
+
+- [ ] 4.2 **TDD — institución inexistente e inactiva.** ROJO: extender
+  `ResolveCurrentInstitutionTest`: un `InstitutionRepository` sin ninguna institución registrada bajo
+  el identificador resuelto → el caso de uso falla con `institution-not-found`; un
+  `InstitutionRepository` que devuelve una `Institution` con `isActive` falso → el caso de uso falla
+  con `institution-inactive`; el doble `InMemoryInstitutionRepository` sin ninguna institución
+  registrada devuelve una ausencia de resultado sin lanzar ninguna excepción, para cualquier
+  `InstitutionId`. VERDE: crear
+  `apps/api/app/src/main/java/com/confia/organization/domain/InstitutionNotFoundException.java`
+  (`final`, hereda de `DomainException`, constructor público, código `institution-not-found`) y
+  `.../InstitutionInactiveException.java` (constructor público, código `institution-inactive`);
+  implementar en `ResolveCurrentInstitution.execute()` el rechazo de ausencia de resultado y de
+  institución inactiva con esos errores. Extender `OrganizationErrorCodesTest` a trece códigos
+  (once del corte B más `institution-not-found` e `institution-inactive`), confirmando que ambos son
+  construibles con constructor público (a diferencia de las fábricas de paquete del resto del
+  catálogo) y que igual heredan de `DomainException` con formato válido. REFACTOR: ninguno esperado.
+  — Especificación `organization`, requisitos «Puerto de salida para cargar una institución por
+  identificador» (escenario «Ausencia de resultado para un identificador desconocido»), «Caso de uso
+  de resolución de la institución en curso» (escenarios «Rechazo de una institución inexistente» y
+  «Rechazo de una institución inactiva») y «Catálogo de códigos del módulo» (trece códigos completos)
+
+- [ ] 4.3 **Medir el diff real de PR C** con
+  `git diff --numstat <base-de-PR-B2>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`. Si
+  cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y consultar al propietario**;
+  el corte C ya es la unidad más pequeña de las cuatro (185–290 líneas estimadas), por lo que un
+  exceso aquí sería inesperado y merece revisión aparte antes de subdividir. — P1 de la propuesta;
+  `design.md`, «Pronóstico de tamaño por corte»
+
+- [ ] 4.4 **Verificación final de PR C y cierre del cambio.** En checkout limpio, con `JAVA_HOME` en
+  JDK 25, ejecutar `./mvnw -B verify` y `./mvnw -B verify -Pmutation-report` en `apps/api`. Confirmar
+  que `organization.domain` mantiene cobertura ≥ 95 % y mutación ≥ 80 con las dos clases de error
+  nuevas incluidas, y que `organization.application` no está sujeta a las puertas de `domain` (sin
+  regla `PACKAGE` sobre ella). Empujar la rama `...-application` (apuntando a PR B2) y confirmar en
+  la integración continua que el trabajo `backend` termina en verde. Repasar la lista completa de
+  «Criterios de éxito» de `proposal.md` contra el estado final del reactor y dejar constancia de cada
+  uno como cumplido u observado. — Capacidad `organization` y `build-integrity` completas; todos los
+  criterios de éxito de la propuesta
