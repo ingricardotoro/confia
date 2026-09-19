@@ -25,7 +25,7 @@ class MoneyConstructionTest {
     }
 
     @Test
-    void zeroIsZeroAndReportsIsZeroTrue() {
+    void zeroConstructsToScaleFourZero() {
         Money zero = Money.zero(CurrencyCode.HNL);
 
         assertThat(zero.amount()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -152,6 +152,15 @@ class MoneyConstructionTest {
     }
 
     @Test
+    void hashCodeCombinesTheNormalizedAmountAndTheCurrency() {
+        Money money = Money.of("1250.15", CurrencyCode.USD);
+
+        assertThat(money.hashCode())
+                .isEqualTo(31 * money.amount().hashCode() + money.currency().hashCode());
+        assertThat(money.hashCode()).isNotEqualTo(Money.of("1250.15", CurrencyCode.HNL).hashCode());
+    }
+
+    @Test
     void theSameAmountInDifferentCurrenciesIsNotEqual() {
         assertThat(Money.of("100.00", CurrencyCode.HNL))
                 .isNotEqualTo(Money.of("100.00", CurrencyCode.USD));
@@ -214,6 +223,14 @@ class MoneyConstructionTest {
                 .isInstanceOf(InvalidMoneyAmountException.class)
                 .extracting(exception -> ((InvalidMoneyAmountException) exception).code())
                 .isEqualTo(InvalidMoneyAmountException.OUT_OF_RANGE);
+    }
+
+    @Test
+    void acceptsAStringOfExactlySixtyFourCharacters() {
+        String atTheLimit = "1." + "0".repeat(62);
+
+        assertThat(atTheLimit).hasSize(64);
+        assertThat(Money.of(atTheLimit, CurrencyCode.HNL).toPlainString()).isEqualTo("1.0000");
     }
 
     @Test

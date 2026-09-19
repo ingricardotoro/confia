@@ -32,6 +32,16 @@ class MoneyArithmeticTest {
     }
 
     @Test
+    void addingOrSubtractingZeroLeavesTheAmountUnchanged() {
+        Money amount = Money.of("10.00", CurrencyCode.HNL);
+        Money zero = Money.zero(CurrencyCode.HNL);
+
+        assertThat(amount.add(zero)).isEqualTo(amount);
+        assertThat(amount.subtract(zero)).isEqualTo(amount);
+        assertThat(zero.subtract(amount)).isEqualTo(amount.negate());
+    }
+
+    @Test
     void addingDifferentCurrenciesThrowsAndConstructsNoMoney() {
         Money hnl = Money.of("100.00", CurrencyCode.HNL);
         Money usd = Money.of("100.00", CurrencyCode.USD);

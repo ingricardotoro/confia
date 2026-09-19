@@ -358,7 +358,10 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   colegiatura de tres meses); mil sumas consecutivas de `0.1` sobre `Money.zero(HNL)` dan
   exactamente `100.00` (la acumulación de mil sumas); `0.1 + 0.2 == 0.3` exactamente (el caso
   clásico). Estos cuatro casos ya se ejercitaron en las tareas 2.3, 2.4 y esta misma tarea consolida
-  su forma permanente en un único archivo, conforme exige la especificación. — Especificación
+  su forma permanente en un único archivo, conforme exige la especificación. *Actualización del
+  2026-09-18 (revisión de los PR #3 y #4):* `MoneyRegressionTest` ya existe en PR 1b con los dos
+  casos que solo usan `add` (mil sumas de `0.1` y `0.1 + 0.2`); esta tarea añade únicamente los dos
+  que dependen de `multiply` y `percentage`. — Especificación
   `money`, requisito «Casos de regresión permanentes de ADR-0004» (los cuatro escenarios)
 
 - [ ] 2.9 **`MoneyApiShapeTest`**: reflexión del JDK sobre `Money` y `Percentage` completos (ambos
