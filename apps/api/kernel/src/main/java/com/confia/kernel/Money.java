@@ -72,8 +72,9 @@ public final class Money implements Comparable<Money> {
     }
 
     /**
-     * Entry point for {@code NUMERIC} values returned by the database driver: accepts any input
-     * scale, including negative, because that is exactly what the driver hands back.
+     * Entry point for {@code NUMERIC} values returned by the database driver: accepts a negative
+     * scale, because that is what the driver can hand back, but bounds the scale before any
+     * rescaling (see {@link #MAX_INPUT_SCALE}).
      *
      * @throws InvalidMoneyAmountException {@link InvalidMoneyAmountException#SCALE_EXCEEDED} if it
      *     has more than four significant decimal digits; {@link

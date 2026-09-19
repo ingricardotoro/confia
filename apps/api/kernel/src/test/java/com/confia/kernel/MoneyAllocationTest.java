@@ -141,4 +141,12 @@ class MoneyAllocationTest {
         assertThatThrownBy(() -> parts.add(Money.zero(CurrencyCode.HNL)))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
+
+    @Test
+    void allocateRejectsANullRatiosArray() {
+        Money total = Money.of("100.00", CurrencyCode.HNL);
+
+        assertThatThrownBy(() -> total.allocate((int[]) null))
+                .isInstanceOf(NullPointerException.class);
+    }
 }
