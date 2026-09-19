@@ -2,6 +2,7 @@ package com.confia.kernel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.RoundingMode;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -10,9 +11,10 @@ import org.junit.jupiter.api.Test;
  * prevent. Do not delete or weaken any of them: a change that breaks one is a money defect, not an
  * outdated test.
  *
- * <p>This class holds the cases that need only {@code add}. The cases that need {@code multiply}
- * and {@code percentage} (the 15 % tax on 6.70 and the tuition times three) join it in PR 2
- * together with those operations.
+ * <p>The two cases that need only {@code add} arrived in PR 1b. This task adds the two that need
+ * {@code multiply} and {@code percentage}: the tax composes {@code percentage()} (which rounds
+ * only to scale four by design, design.md decision 6) with {@code roundToMinorUnit(HALF_UP)} to
+ * reach the spec's final displayed value.
  */
 class MoneyRegressionTest {
 
@@ -33,5 +35,23 @@ class MoneyRegressionTest {
 
         assertThat(total).isEqualTo(Money.of("100.00", CurrencyCode.HNL));
         assertThat(total.toPlainString()).isEqualTo("100.0000");
+    }
+
+    @Test
+    void theFifteenPercentTaxOnSixSeventyRoundsToOneZeroOneNeverOneZeroZero() {
+        // Exact intermediate is 1.0050 (percentage() rounds only to scale four); a double would
+        // compute 6.70 * 0.15 as 1.0049999999999999, which rounds down to 1.00 instead.
+        Money tax = Money.of("6.70", CurrencyCode.HNL)
+                .percentage(Percentage.of("15"), RoundingMode.HALF_UP)
+                .roundToMinorUnit(RoundingMode.HALF_UP);
+
+        assertThat(tax).isEqualTo(Money.of("1.01", CurrencyCode.HNL));
+    }
+
+    @Test
+    void threeMonthsOfTuitionAtOneThousandTwoThirtyFourFiftyFiveIsExactlyThreeThousandSevenZeroThreeSixtyFive() {
+        Money threeMonthsOfTuition = Money.of("1234.55", CurrencyCode.HNL).multiply(3);
+
+        assertThat(threeMonthsOfTuition).isEqualTo(Money.of("3703.65", CurrencyCode.HNL));
     }
 }

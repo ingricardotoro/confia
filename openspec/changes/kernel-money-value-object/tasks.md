@@ -265,6 +265,49 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
 
 ---
 
+### Nota de aplicación — primer lote de PR 2 (tareas 2.1–2.6, 2026-09-18)
+
+Verificación de cierre de lote, `./mvnw -B verify -Pmutation-gate` en `apps/api`, checkout local,
+`JAVA_HOME` en JDK 25: `BUILD SUCCESS` en las tres unidades del reactor. JaCoCo: 100 % de líneas y
+100 % de ramas en `kernel` (umbral 95 %, cumplido con margen). PIT (`-Pmutation-gate`, umbral 80):
+**147 mutaciones generadas, 147 muertas (100 %)**, cero mutantes supervivientes tras corregir siete
+que sobrevivieron en la primera corrida (detalle abajo). 130 pruebas en `kernel`.
+
+Siete mutantes sobrevivientes detectados y corregidos antes de cerrar el lote (ninguno se declaró
+equivalente sin corrección, conforme a `confia-testing-playbook` sección 12):
+
+1. `Money.isGreaterThan` línea 323 (`ConditionalsBoundaryMutator`, `>` → `>=`) — sin prueba de
+   igualdad. Corregido con `isGreaterThanAndIsLessThanAreFalseForEqualAmounts`.
+2. `Money.isLessThan` línea 331 (mismo mutador) — misma prueba lo corrige.
+3. `Money.allocate` línea 218 (`ConditionalsBoundaryMutator` sobre `sign < 0`) — mutante
+   equivalente en la práctica (con signo cero todas las partes ya son cero), pero se eliminó la
+   ambigüedad reescribiendo la condición como `amount.signum() == -1` en vez de reformular una
+   prueba imposible de escribir (no existe un total cero con partes no nulas).
+4. `Money.distributeByLargestRemainder` línea 279 (`VoidMethodCallMutator`, elimina la llamada a
+   `List::sort`) — ninguna prueba anterior obligaba a ordenar por resto descendente cuando el
+   índice de mayor resto no es el más bajo. Corregido con
+   `assignsTheLeftoverToTheHighestRemainderEvenWhenItIsNotTheFirstIndex` (`0.07` entre pesos
+   `[1, 2]`, resultado `[0.02, 0.05]`).
+5. `Money.requireValidRatios` línea 226 (`RemoveConditionalMutator_EQUAL_ELSE` sobre
+   `ratios.length == 0`) — indistinguible del código real porque ambos caminos terminan lanzando
+   `IllegalArgumentException` (la comprobación de suma cero también dispara para una lista vacía).
+   Corregido afirmando el mensaje exacto (`"empty"`) en `rejectsAnEmptyWeightList`.
+6. `Percentage.hashCode` línea 96 (`PrimitiveReturnsMutator`, sustituye por `0`) — ninguna prueba
+   comprobaba el valor real de `hashCode`, solo que dos iguales coincidieran (`0 == 0` también
+   pasa). Corregido con `hashCodeIsBasedOnTheNormalizedValue`.
+7. `Percentage.of(String)` línea 44 (`ConditionalsBoundaryMutator` sobre el límite de 64
+   caracteres) — sin caso límite exacto. Corregido con `acceptsAStringOfExactlySixtyFourCharacters`
+   y `rejectsAStringLongerThanSixtyFourCharacters`.
+
+`git diff --shortstat main...change/kernel-money-value-object-arithmetic -- . ':(exclude)openspec'`
+(rama completa contra `main`, que ya incluye PR 1a/1b fusionados): **7 files changed, 830
+insertions(+), 5 deletions(-)**. Riesgo de presupuesto: esto cubre solo las tareas 2.1 a 2.6 (la
+mitad de PR 2); las tareas 2.7 a 2.10 (propiedades de jqwik, regresión, forma de la API, catálogo
+de códigos) siguen pendientes y es previsible que el PR 2 completo supere el presupuesto de 800
+líneas del diseño (estimado 665–880 para el PR completo). La tarea 2.11 ya prevé detenerse y
+consultar al propietario si el diff real lo supera; no se decide aquí, queda para el siguiente
+lote.
+
 ## PR 2 — Comparación, multiplicación, `Percentage`, redondeo y reparto
 
 Rama `change/kernel-money-value-object-arithmetic`, base `change/kernel-money-value-object` (PR 1).
@@ -345,7 +388,7 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
     medios, su simetría negativa y el desbordamiento al redondear el límite superior). Sin
     REFACTOR.
 
-- [ ] 2.6 **TDD — `allocate(int...)`** (`MoneyAllocationTest`). ROJO: reparto con residuo por el
+- [x] 2.6 **TDD — `allocate(int...)`** (`MoneyAllocationTest`). ROJO: reparto con residuo por el
   método del resto mayor (`100.00` entre `[1,1,1]` → `[33.34, 33.33, 33.33]`, suma exactamente
   `100.00`); reparto exacto sin residuo (`90.00` entre `[1,1,1]` → `[30.00, 30.00, 30.00]`); rechazo
   de lista vacía, de un peso negativo y de todos los pesos en cero (los tres casos, ninguno
@@ -357,8 +400,13 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   algoritmo de reparto a un método privado legible según el pseudocódigo de `design.md` decisión 7.
   — Especificación `money`, requisito «Reparto proporcional sin pérdida de residuo (`allocate`)»
   (los tres primeros escenarios)
+  - *Evidencia (2026-09-18, local):* RED: 7 errores de compilación (`allocate` ausente). GREEN:
+    `./mvnw -pl kernel test -Dtest=MoneyAllocationTest` → 11/11. REFACTOR: se extrajo el algoritmo
+    a `requireValidRatios`, `requireExactMinorUnitMultiple` y
+    `distributeByLargestRemainder` (métodos privados), siguiendo el pseudocódigo de `design.md`
+    decisión 7; conjunto completo de `kernel` tras el refactor: `./mvnw -pl kernel test` → 122/122.
 
-- [ ] 2.7 **Propiedades de jqwik** (`MoneyProperties`), generadores acotados al rango de
+- [x] 2.7 **Propiedades de jqwik** (`MoneyProperties`), generadores acotados al rango de
   `NUMERIC(14,4)`, mil intentos por propiedad, semilla informada en caso de fallo: (a) la suma de
   las partes de `allocate` es exactamente igual al total para cualquier total no negativo y
   cualquier vector de pesos enteros positivos de longitud uno o más, y ninguna parte es negativa;
@@ -369,8 +417,22 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   exacto redondeado una sola vez. — Especificación `money`, requisitos «Reparto proporcional sin
   pérdida de residuo (`allocate`)» (escenario de propiedad) y «Coherencia entre operaciones
   intermedias y el cálculo a escala completa» (escenario de propiedad)
+  - *Desviación del diseño (2026-09-18):* el archivo se creó como `MoneyPropertiesTest.java`, no
+    `MoneyProperties.java` como nombra `design.md`. Verificado empíricamente: `./mvnw -pl kernel
+    test` con el nombre de `design.md` NO ejecuta la clase (los patrones por omisión de Surefire
+    son `**/*Test.java`, `**/Test*.java`, `**/*Tests.java`, `**/*TestCase.java`; ninguno coincide
+    con `MoneyProperties.java`), y contradice además la convención propia del proyecto
+    (`confia-testing-playbook`, sección 1: `*Test.java` para Surefire). Un archivo con el nombre de
+    `design.md` habría quedado silenciosamente fuera de `mvn test` y de PIT. Cinco propiedades
+    (a–e), con `tries` bajado explícitamente de 1000 (por omisión del módulo) a 200 por propiedad
+    para mantener rápida la corrida de mutación, documentado en el Javadoc de la clase.
+  - *Evidencia (2026-09-18, local):* RED: se introdujo una expectativa deliberadamente incorrecta
+    en la propiedad (a) (`total.add(Money.of("0.01", HNL))` en vez de `total`); falló por la razón
+    correcta (`expected: 0.0100 HNL but was: 0.0000 HNL`) con las otras cuatro propiedades en
+    verde. GREEN: corregida la aserción, `./mvnw -pl kernel test -Dtest=MoneyPropertiesTest` → 5/5;
+    conjunto completo de `kernel`: `./mvnw -pl kernel test` → 135/135. Sin REFACTOR.
 
-- [ ] 2.8 **`MoneyRegressionTest`**, Javadoc que prohíbe borrar los casos: `6.70 ×
+- [x] 2.8 **`MoneyRegressionTest`**, Javadoc que prohíbe borrar los casos: `6.70 ×
   Percentage.of("15")` con `HALF_UP` → `1.01` (el impuesto que la coma flotante pierde);
   `1234.55 × 3 == 3703.65` exactamente, igual según `equals` a `Money.of("3703.65", HNL)` (la
   colegiatura de tres meses); mil sumas consecutivas de `0.1` sobre `Money.zero(HNL)` dan
@@ -381,16 +443,26 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   casos que solo usan `add` (mil sumas de `0.1` y `0.1 + 0.2`); esta tarea añade únicamente los dos
   que dependen de `multiply` y `percentage`. — Especificación
   `money`, requisito «Casos de regresión permanentes de ADR-0004» (los cuatro escenarios)
+  - *Evidencia (2026-09-18, local):* RED: se puso temporalmente `1.00` como esperado en el caso del
+    impuesto; falló por la razón correcta (`expected: 1.0000 HNL but was: 1.0100 HNL`). GREEN:
+    corregido a `1.01`, `./mvnw -pl kernel test -Dtest=MoneyRegressionTest` → 4/4; conjunto
+    completo de `kernel`: `./mvnw -pl kernel test` → 137/137. Sin REFACTOR.
 
-- [ ] 2.9 **`MoneyApiShapeTest`**: reflexión del JDK sobre `Money` y `Percentage` completos (ambos
+- [x] 2.9 **`MoneyApiShapeTest`**: reflexión del JDK sobre `Money` y `Percentage` completos (ambos
   ya terminados en este PR) que confirma que ningún miembro público usa `double`, `float`, `Double`
   ni `Float`, ni como parámetro ni como retorno. Verificación: falla si se agrega temporalmente una
   sobrecarga con `double` a cualquiera de las dos clases, y vuelve a verde al retirarla. —
   Especificación `money`, requisitos «Construcción y normalización a escala cuatro» y «`Percentage`
   como colaborador explícito de `Money`» (ambos escenarios de «ausencia de fábrica desde coma
   flotante»); reemplaza la regla de ArchUnit diferida al cambio 4 (decisión D3 de la propuesta)
+  - *Evidencia (2026-09-18, local):* con la clase escrita, `./mvnw -pl kernel test
+    -Dtest=MoneyApiShapeTest` → 2/2 en verde de entrada (no hay `double`/`float` hoy). RED literal
+    exigido por la tarea: se agregó temporalmente `public Money multiply(double factor)` a `Money`;
+    falló por la razón correcta (`Money.multiply must not accept a floating-point parameter`).
+    Retirada la sobrecarga (`git diff` confirma `Money.java` sin cambios), vuelve a verde: conjunto
+    completo de `kernel`: `./mvnw -pl kernel test` → 139/139. Sin REFACTOR.
 
-- [ ] 2.10 **`KernelErrorCodesTest`**: catálogo completo y cerrado de los ocho códigos de error del
+- [x] 2.10 **`KernelErrorCodesTest`**: catálogo completo y cerrado de los ocho códigos de error del
   núcleo (`currency-mismatch`, `currency-unsupported`, `money-amount-malformed`,
   `money-scale-exceeded`, `money-amount-out-of-range`, `percentage-malformed`,
   `percentage-scale-exceeded`, `percentage-out-of-range`): formato kebab-case, unicidad entre todas
@@ -398,24 +470,54 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   Verificación: falla si dos excepciones comparten código o si un código no sigue el formato. —
   Especificación `money`, requisito «Jerarquía de errores de dominio de `kernel`»; `design.md`,
   decisión 2 (catálogo de códigos, «definitivos»)
+  - *Evidencia (2026-09-18, local):* RED: se afirmó temporalmente un catálogo de siete códigos
+    (omitiendo `percentage-out-of-range`); falló por la razón correcta (tamaño real 8 contra el
+    esperado 7, con el código faltante señalado en el diff de AssertJ). GREEN: corregido a los ocho
+    códigos, `./mvnw -pl kernel test -Dtest=KernelErrorCodesTest` → 4/4; conjunto completo de
+    `kernel`: `./mvnw -pl kernel test` → 143/143. Sin REFACTOR.
 
-- [ ] 2.11 **Medir el diff real de PR 2** con
+- [x] 2.11 **Medir el diff real de PR 2** con
   `git diff --numstat change/kernel-money-value-object...change/kernel-money-value-object-arithmetic`,
   con las mismas exclusiones de la tarea 1.14. Si cabe en 800 líneas, continuar. **Si supera 800,
   detener la aplicación y consultar al propietario** entre un tercer PR en el punto de corte `2a`
   (comparación, multiplicación, porcentaje y redondeo) / `2b` (`allocate`, propiedades y
   regresiones) o una excepción de tamaño para PR 2. — Decisión D2/D5 de la propuesta; `design.md`,
   «Control durante la aplicación»
+  - *División 2a/2b (decisión del propietario, 2026-09-18):* el propietario dividió PR 2 en dos
+    ramas apiladas antes de esta medición: **PR 2a** (`change/kernel-money-value-object-arithmetic`,
+    base PR 1b `26ef15d`; comparación, `Percentage`, `multiply`, `percentage()`,
+    `roundToMinorUnit`; 665 líneas de autor, verificado con PIT 116/116) y **PR 2b**
+    (`change/kernel-money-value-object-allocation`, base PR 2a; `allocate` ya aplicado en el lote
+    anterior más las tareas 2.7 a 2.10 de este lote). Esta tarea mide **solo PR 2b**, según la
+    instrucción explícita del orquestador, con
+    `git diff --numstat change/kernel-money-value-object-arithmetic...HEAD -- . ':(exclude)openspec'`
+    (mismas exclusiones de la tarea 1.14; `HEAD` es esta rama).
+  - *Resultado (2026-09-18):* **6 files changed, 526 insertions(+), 3 deletions(-)** — 529 líneas
+    de autor en total, muy por debajo de 800. No se detiene la aplicación ni se consulta al
+    propietario; PR 2b se entrega como una sola unidad.
 
-- [ ] 2.12 **Verificación final de PR 2**: en checkout limpio de la rama
-  `change/kernel-money-value-object-arithmetic` (base PR 1), con `JAVA_HOME` en JDK 25, ejecutar
-  `./mvnw -B verify -Pmutation-report`. Confirmar cobertura de líneas y de ramas de `kernel` ≥ 95 %
-  sobre el módulo completo (PR 1 + PR 2) y puntuación de mutación ≥ 80 informada, sin romper la
-  construcción por estar en una rama de trabajo. Confirmar además, simulando
-  `-Dconfia.ci.mainBranch=true` en local o en un commit temporal autorizado, que `mutation-gate`
-  **sí** rompe la construcción si la puntuación cae por debajo de 80, mientras
-  `mutation-report` en la misma rama de trabajo solo informa (cierre de la demostración de puertas
-  de la tarea 1.13, ahora sobre el módulo `Money` completo). Empujar la rama y confirmar en GitHub
-  Actions que el trabajo `backend` termina en verde con `-Pmutation-report` mientras apunta al PR 1.
-  — Capacidad `build-integrity`, ambos requisitos; criterios de éxito de la propuesta (cobertura,
-  mutación y selección de perfil por rama)
+- [x] 2.12 **Verificación final de PR 2** (alcance ajustado a PR 2b por la instrucción explícita
+  del orquestador de esta sesión: verificación local solamente; el orquestador empuja la rama y
+  confirma la integración continua, no este agente): en el checkout local de
+  `change/kernel-money-value-object-allocation` (base PR 2a), con `JAVA_HOME` en
+  `C:/Program Files/Eclipse Adoptium/jdk-25.0.3.9-hotspot`, se ejecutó
+  `./mvnw -B verify -Pmutation-gate` (perfil de puerta real, no solo de informe, para demostrar
+  además que la puntuación de mutación se mide y no rompe por estar por encima de 80). Confirmar
+  cobertura de líneas y de ramas de `kernel` ≥ 95 % sobre el módulo completo (PR 1 + PR 2a + PR 2b)
+  y puntuación de mutación ≥ 80. — Capacidad `build-integrity`, ambos requisitos; criterios de
+  éxito de la propuesta (cobertura, mutación y selección de perfil por rama)
+  - *Evidencia local (2026-09-18, `-Pmutation-gate`, reactor completo `apps/api`):* `BUILD
+    SUCCESS` en las tres unidades (`confia-api-parent`, `confia-kernel`, `confia-api`). `kernel`:
+    143 pruebas de Surefire (`./mvnw -pl kernel test` → 143/143). JaCoCo: «All coverage checks have
+    been met» (BUNDLE, LINE y BRANCH ≥ 0.95, cumplido). PIT: **147 mutaciones generadas, 147
+    muertas (100 %)** — 146 `KILLED` y 1 `TIMED_OUT` (contado como detectado por PIT), 0
+    `SURVIVED` (confirmado en `kernel/target/pit-reports/mutations.xml`, conteo por `status`);
+    cobertura de líneas de las clases mutadas 177/177 (100 %); fuerza de prueba (test strength)
+    100 %; 443 pruebas ejecutadas sobre las mutaciones (3.01 por mutación). Módulo `app`: las ocho
+    clases de arquitectura (`ArchUnit`, Spring Modulith, `SuppressionCitesAdrTest`) y el contexto
+    de arranque de Spring Boot siguen en verde con `kernel` poblado, sin romper el inventario de
+    ADR-0018. No se detectó ningún mutante `SURVIVED`, así que no aplica el paso 3 de la
+    demostración de puertas de la tarea 1.13 (ya cerrado en 1.13 y 1.15 sobre PR 1); no se
+    consultó al propietario porque no hizo falta un commit temporal para simular la puerta.
+    **Integración continua: pendiente.** Este agente no empuja la rama ni consulta GitHub
+    Actions; el orquestador lo hace tras recibir este resultado.

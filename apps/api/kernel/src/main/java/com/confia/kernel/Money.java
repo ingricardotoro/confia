@@ -1,7 +1,11 @@
 package com.confia.kernel;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -68,8 +72,9 @@ public final class Money implements Comparable<Money> {
     }
 
     /**
-     * Entry point for {@code NUMERIC} values returned by the database driver: accepts any input
-     * scale, including negative, because that is exactly what the driver hands back.
+     * Entry point for {@code NUMERIC} values returned by the database driver: accepts a negative
+     * scale, because that is what the driver can hand back, but bounds the scale before any
+     * rescaling (see {@link #MAX_INPUT_SCALE}).
      *
      * @throws InvalidMoneyAmountException {@link InvalidMoneyAmountException#SCALE_EXCEEDED} if it
      *     has more than four significant decimal digits; {@link
@@ -222,6 +227,102 @@ public final class Money implements Comparable<Money> {
         Objects.requireNonNull(rounding, "rounding");
         BigDecimal roundedToMinorUnit = amount.setScale(currency.minorUnitDigits(), rounding);
         return new Money(roundedToMinorUnit.setScale(SCALE, RoundingMode.UNNECESSARY), currency);
+    }
+
+    /**
+     * Distributes this total proportionally to {@code ratios}, in the currency's minor unit,
+     * using the largest-remainder method: no division ever silently discards the remainder
+     * (design.md, decision 7). Ties on the remainder favor the lower index, matching the business
+     * expectation that the first installments absorb the extra cent. The sum of the returned
+     * parts always equals this total exactly.
+     *
+     * @throws IllegalArgumentException if {@code ratios} is empty, contains a negative weight, is
+     *     entirely zero, or if this amount is not an exact multiple of the currency's minor unit
+     *     (a programming error, design.md decision 7)
+     */
+    public List<Money> allocate(int... ratios) {
+        Objects.requireNonNull(ratios, "ratios");
+        long weightSum = requireValidRatios(ratios);
+
+        int minorUnitDigits = currency.minorUnitDigits();
+        BigInteger totalMinorUnits = requireExactMinorUnitMultiple(minorUnitDigits);
+        BigInteger[] minorUnitParts =
+                distributeByLargestRemainder(totalMinorUnits, ratios, weightSum);
+
+        boolean negative = amount.signum() == -1;
+        List<Money> parts = new ArrayList<>(ratios.length);
+        for (BigInteger part : minorUnitParts) {
+            BigInteger signedPart = negative ? part.negate() : part;
+            parts.add(Money.of(new BigDecimal(signedPart, minorUnitDigits), currency));
+        }
+        return List.copyOf(parts);
+    }
+
+    /** @return the sum of {@code ratios}, guaranteed positive */
+    private static long requireValidRatios(int[] ratios) {
+        if (ratios.length == 0) {
+            throw new IllegalArgumentException("ratios must not be empty");
+        }
+        long weightSum = 0;
+        for (int ratio : ratios) {
+            if (ratio < 0) {
+                throw new IllegalArgumentException("ratios must not contain a negative weight");
+            }
+            weightSum += ratio;
+        }
+        if (weightSum <= 0) {
+            throw new IllegalArgumentException("ratios must not be all zero");
+        }
+        return weightSum;
+    }
+
+    /** @return this amount's absolute value, expressed as an exact count of minor units */
+    private BigInteger requireExactMinorUnitMultiple(int minorUnitDigits) {
+        BigInteger minorUnitFactor = BigInteger.TEN.pow(SCALE - minorUnitDigits);
+        BigInteger unscaledAmount = amount.unscaledValue().abs();
+        if (unscaledAmount.remainder(minorUnitFactor).signum() != 0) {
+            throw new IllegalArgumentException(
+                    "amount must be an exact multiple of the currency's minor unit to allocate");
+        }
+        return unscaledAmount.divide(minorUnitFactor);
+    }
+
+    /**
+     * Largest-remainder method (design.md, decision 7): each weight's exact quotient and
+     * remainder in minor units, then the leftover units go one by one to the highest remainders,
+     * lower index first on a tie.
+     *
+     * @return one non-negative part per ratio, summing exactly to {@code totalMinorUnits}
+     */
+    private static BigInteger[] distributeByLargestRemainder(
+            BigInteger totalMinorUnits, int[] ratios, long weightSum) {
+        BigInteger weightSumAsBigInteger = BigInteger.valueOf(weightSum);
+        int partCount = ratios.length;
+        BigInteger[] quotients = new BigInteger[partCount];
+        BigInteger[] remainders = new BigInteger[partCount];
+        BigInteger distributed = BigInteger.ZERO;
+        for (int i = 0; i < partCount; i++) {
+            BigInteger numerator = totalMinorUnits.multiply(BigInteger.valueOf(ratios[i]));
+            BigInteger[] divideAndRemainder = numerator.divideAndRemainder(weightSumAsBigInteger);
+            quotients[i] = divideAndRemainder[0];
+            remainders[i] = divideAndRemainder[1];
+            distributed = distributed.add(quotients[i]);
+        }
+
+        List<Integer> indicesByRemainderDescendingThenIndexAscending = new ArrayList<>();
+        for (int i = 0; i < partCount; i++) {
+            indicesByRemainderDescendingThenIndexAscending.add(i);
+        }
+        indicesByRemainderDescendingThenIndexAscending.sort(
+                Comparator.<Integer, BigInteger>comparing(i -> remainders[i]).reversed()
+                        .thenComparingInt(Integer::intValue));
+
+        int leftover = totalMinorUnits.subtract(distributed).intValueExact();
+        for (int i = 0; i < leftover; i++) {
+            int index = indicesByRemainderDescendingThenIndexAscending.get(i);
+            quotients[index] = quotients[index].add(BigInteger.ONE);
+        }
+        return quotients;
     }
 
     private void requireSameCurrency(Money other) {
