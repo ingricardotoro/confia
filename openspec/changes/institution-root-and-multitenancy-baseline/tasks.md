@@ -102,7 +102,7 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
     No vacuidad: se comentaron las tres llamadas del fixture y `rejectsTheFixtureFloatingPointBigDecimalConstruction`
     falló (1 fallo de 2 pruebas); se revirtió la neutralización y las 2 pruebas volvieron a verde.
 
-- [ ] 1.3 **TDD — regla 2, `NO_BIG_DECIMAL_EQUALS_OUTSIDE_MONEY`.** ROJO: extender
+- [x] 1.3 **TDD — regla 2, `NO_BIG_DECIMAL_EQUALS_OUTSIDE_MONEY`.** ROJO: extender
   `MonetaryFloatingPointTest` con la regla que prohíbe `BigDecimal.equals(Object)` en clases que no
   pertenecen a `Money` (ni a sus anidadas), y crear el fixture
   `.../fixture/monetary/RawBigDecimalComparison.java` con `left.equals(right)` sobre `BigDecimal`
@@ -111,6 +111,12 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
   de la prueba). Neutralizar el fixture y observar el fallo de la prueba de rechazo; revertir.
   REFACTOR: ninguno esperado. — Capacidad `build-integrity`, mismo requisito (escenario «Fixture que
   invoca `BigDecimal.equals` fuera de `Money`»)
+  - **Evidencia (2026-09-19):** ROJO observado: `cannot find symbol NO_BIG_DECIMAL_EQUALS_OUTSIDE_MONEY`
+    y `cannot find symbol NOT_MONEY`/`Money` al compilar. VERDE: 5/5 pruebas, incluida la aserción
+    explícita `NOT_MONEY.test(productionClasses().get(Money.class))` es `false`. No vacuidad: se
+    cambió `left.equals(right)` por `left.compareTo(right) == 0` en el fixture;
+    `rejectsTheFixtureRawBigDecimalComparison` falló sola (1 de 5); se revirtió y las 5 volvieron a
+    verde.
 
 - [ ] 1.4 **TDD — reglas 3, 4 y 5, campos/retornos/parámetros de coma flotante en tipos
   monetarios.** ROJO: extender `MonetaryFloatingPointTest` con el predicado `MONETARY_TYPE` (`Money`,

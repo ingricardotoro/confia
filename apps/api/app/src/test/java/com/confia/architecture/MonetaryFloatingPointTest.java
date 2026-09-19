@@ -3,8 +3,13 @@ package com.confia.architecture;
 import static com.confia.architecture.ArchitectureTestSupport.assertRuleRejects;
 import static com.confia.architecture.ArchitectureTestSupport.fixtureClasses;
 import static com.confia.architecture.ArchitectureTestSupport.productionClasses;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.belongToAnyOf;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import com.confia.kernel.Money;
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchRule;
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -35,6 +40,20 @@ class MonetaryFloatingPointTest {
                     + "BigDecimal.valueOf(double) all round the binary floating-point value before "
                     + "any monetary type ever sees it (CLAUDE.md, rule 1)");
 
+    /**
+     * Rule 2 (design.md, decision 3): forbids {@link BigDecimal#equals(Object)} outside {@link
+     * Money} (and any of its nested classes, none exist today): it also compares scale, so {@code
+     * 1.0} and {@code 1.00} come out unequal (CLAUDE.md, rule 1).
+     */
+    private static final DescribedPredicate<JavaClass> NOT_MONEY =
+            DescribedPredicate.not(belongToAnyOf(Money.class));
+
+    private static final ArchRule NO_BIG_DECIMAL_EQUALS_OUTSIDE_MONEY = noClasses()
+            .that(NOT_MONEY)
+            .should().callMethod(BigDecimal.class, "equals", Object.class)
+            .because("ADR-0004 §Cumplimiento 2 forbids BigDecimal.equals(Object) outside Money: it "
+                    + "also compares scale, so 1.0 and 1.00 come out unequal (CLAUDE.md, rule 1)");
+
     @Test
     void productionCodeNeverConstructsBigDecimalFromFloatingPoint() {
         NO_BIG_DECIMAL_FROM_FLOATING_POINT.check(productionClasses());
@@ -44,5 +63,21 @@ class MonetaryFloatingPointTest {
     void rejectsTheFixtureFloatingPointBigDecimalConstruction() {
         assertRuleRejects(NO_BIG_DECIMAL_FROM_FLOATING_POINT, fixtureClasses(),
                 "FloatingPointBigDecimal");
+    }
+
+    @Test
+    void productionCodeNeverCallsBigDecimalEqualsOutsideMoney() {
+        NO_BIG_DECIMAL_EQUALS_OUTSIDE_MONEY.check(productionClasses());
+    }
+
+    @Test
+    void rejectsTheFixtureRawBigDecimalComparison() {
+        assertRuleRejects(NO_BIG_DECIMAL_EQUALS_OUTSIDE_MONEY, fixtureClasses(),
+                "RawBigDecimalComparison");
+    }
+
+    @Test
+    void moneyIsExcludedFromTheEqualsRuleSelection() {
+        assertThat(NOT_MONEY.test(productionClasses().get(Money.class))).isFalse();
     }
 }
