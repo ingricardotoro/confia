@@ -24,6 +24,18 @@ public final class Money implements Comparable<Money> {
     private static final Pattern PLAIN_DECIMAL = Pattern.compile("-?\\d+(\\.\\d+)?");
     private static final int MAX_STRING_LENGTH = 64;
 
+    /**
+     * Largest |scale| accepted from a caller-supplied {@link BigDecimal} (the precision of {@link
+     * java.math.MathContext#DECIMAL128}). Rescaling costs about 10^|scale|, so a value such as
+     * {@code 1E-500000000} would hang the calling thread; it is rejected before any rescaling. A
+     * value with more than 34 decimals is rejected even if they are all zeros: that is the price of
+     * never inspecting its digits (design.md, decision 4).
+     */
+    static final int MAX_INPUT_SCALE = 34;
+
+    /** Integer digits of {@code 9999999999.9999}: anything with more is out of range. */
+    private static final int MAX_INTEGER_DIGITS = 10;
+
     private final BigDecimal amount;
     private final CurrencyCode currency;
 
@@ -67,12 +79,31 @@ public final class Money implements Comparable<Money> {
     public static Money of(BigDecimal amount, CurrencyCode currency) {
         Objects.requireNonNull(amount, "amount");
         Objects.requireNonNull(currency, "currency");
-        return new Money(normalizeToScale(amount), currency);
+        return new Money(normalizeToScale(requireBoundedScale(amount)), currency);
     }
 
     public static Money zero(CurrencyCode currency) {
         Objects.requireNonNull(currency, "currency");
         return new Money(BigDecimal.ZERO.setScale(SCALE, RoundingMode.UNNECESSARY), currency);
+    }
+
+    /**
+     * Guard for a caller-supplied {@link BigDecimal}, applied before any rescaling (which costs
+     * about 10^|scale|): an absurd positive scale is rejected as too many decimals, and a negative
+     * scale that can only mean a number too large for the range is rejected without computing it.
+     * The string factory needs no such guard: its 64-character limit already bounds the scale.
+     */
+    private static BigDecimal requireBoundedScale(BigDecimal amount) {
+        if (amount.signum() == 0) {
+            return BigDecimal.ZERO;
+        }
+        if (amount.scale() > MAX_INPUT_SCALE) {
+            throw InvalidMoneyAmountException.scaleExceeded(amount.scale());
+        }
+        if (amount.scale() < 0 && (long) amount.precision() - amount.scale() > MAX_INTEGER_DIGITS) {
+            throw InvalidMoneyAmountException.outOfRange();
+        }
+        return amount;
     }
 
     /**
@@ -155,6 +186,11 @@ public final class Money implements Comparable<Money> {
     public Money multiply(BigDecimal factor, RoundingMode rounding) {
         Objects.requireNonNull(factor, "factor");
         Objects.requireNonNull(rounding, "rounding");
+        if (Math.abs((long) factor.scale()) > MAX_INPUT_SCALE) {
+            // A factor comes from code, not from a user: an absurd scale is a programming error.
+            throw new IllegalArgumentException(
+                    "factor scale must be within +/-" + MAX_INPUT_SCALE + ", was " + factor.scale());
+        }
         return new Money(amount.multiply(factor).setScale(SCALE, rounding), currency);
     }
 

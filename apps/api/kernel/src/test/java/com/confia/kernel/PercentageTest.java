@@ -2,10 +2,13 @@ package com.confia.kernel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Duration;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
@@ -164,5 +167,96 @@ class PercentageTest {
     @Test
     void toStringAppendsThePercentSign() {
         assertThat(Percentage.of("15").toString()).isEqualTo("15.0000%");
+    }
+
+    @Test
+    void constructsTheMinimumRepresentablePercentage() {
+        Percentage minimum = Percentage.of("0.0001");
+
+        assertThat(minimum.value()).isEqualByComparingTo(new BigDecimal("0.0001"));
+    }
+
+    @Test
+    void ofRejectsANullArgument() {
+        assertThatThrownBy(() -> Percentage.of((String) null))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Percentage.of((BigDecimal) null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void rejectsAnExtremelyLargePositiveInputScaleWithoutHanging() {
+        // Same denial-of-service guard as Money.of(BigDecimal, CurrencyCode); see its test class
+        // for the measured cost of an unbounded setScale.
+        BigDecimal extremeScale = new BigDecimal(BigInteger.ONE, 500_000_000);
+
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () ->
+                assertThatThrownBy(() -> Percentage.of(extremeScale))
+                        .isInstanceOf(InvalidPercentageException.class)
+                        .extracting(exception -> ((InvalidPercentageException) exception).code())
+                        .isEqualTo(InvalidPercentageException.SCALE_EXCEEDED));
+    }
+
+    @Test
+    void rejectsAnExtremelyNegativeInputScaleWithoutHanging() {
+        BigDecimal extremeScale = new BigDecimal(BigInteger.ONE, -500_000_000);
+
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () ->
+                assertThatThrownBy(() -> Percentage.of(extremeScale))
+                        .isInstanceOf(InvalidPercentageException.class)
+                        .extracting(exception -> ((InvalidPercentageException) exception).code())
+                        .isEqualTo(InvalidPercentageException.OUT_OF_RANGE));
+    }
+
+    @Test
+    void treatsAZeroValueOfAnExtremeScaleAsZeroWithoutHanging() {
+        BigDecimal extremePositiveScaleZero = new BigDecimal(BigInteger.ZERO, 500_000_000);
+        BigDecimal extremeNegativeScaleZero = new BigDecimal(BigInteger.ZERO, -500_000_000);
+
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
+            assertThat(Percentage.of(extremePositiveScaleZero).value())
+                    .isEqualByComparingTo(BigDecimal.ZERO);
+            assertThat(Percentage.of(extremeNegativeScaleZero).value())
+                    .isEqualByComparingTo(BigDecimal.ZERO);
+        });
+    }
+
+    @Test
+    void acceptsABigDecimalInputScaleOfExactlyThirtyFourWhenAllTrailingDigitsAreZero() {
+        BigDecimal atTheLimit = new BigDecimal("1").setScale(34);
+
+        assertThat(Percentage.of(atTheLimit).toPlainString()).isEqualTo("1.0000");
+    }
+
+    @Test
+    void rejectsABigDecimalInputScaleOfThirtyFiveEvenWithOnlyTrailingZeros() {
+        BigDecimal oneMoreThanTheLimit = new BigDecimal("1").setScale(35);
+
+        assertThatThrownBy(() -> Percentage.of(oneMoreThanTheLimit))
+                .isInstanceOf(InvalidPercentageException.class)
+                .extracting(exception -> ((InvalidPercentageException) exception).code())
+                .isEqualTo(InvalidPercentageException.SCALE_EXCEEDED);
+    }
+
+    @Test
+    void theBigDecimalFactoryAcceptsANegativeScaleAtExactlyThreeIntegerDigits() {
+        // 1E+2 has precision 1 and scale -2: one hundred, the top of the range.
+        assertThat(Percentage.of(new BigDecimal("1E+2")).toPlainString()).isEqualTo("100.0000");
+    }
+
+    @Test
+    void theBigDecimalFactoryRejectsANegativeScaleBeyondThreeIntegerDigitsAsOutOfRange() {
+        assertThatThrownBy(() -> Percentage.of(new BigDecimal("1E+3")))
+                .isInstanceOf(InvalidPercentageException.class)
+                .extracting(exception -> ((InvalidPercentageException) exception).code())
+                .isEqualTo(InvalidPercentageException.OUT_OF_RANGE);
+    }
+
+    @Test
+    void theBigDecimalFactoryKeepsScaleExceededAheadOfOutOfRange() {
+        assertThatThrownBy(() -> Percentage.of(new BigDecimal("1000.00001")))
+                .isInstanceOf(InvalidPercentageException.class)
+                .extracting(exception -> ((InvalidPercentageException) exception).code())
+                .isEqualTo(InvalidPercentageException.SCALE_EXCEEDED);
     }
 }
