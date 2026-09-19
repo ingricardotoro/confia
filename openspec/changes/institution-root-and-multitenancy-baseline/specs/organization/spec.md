@@ -75,10 +75,11 @@ todo módulo de negocio pueda usarlo en sus firmas sin importar el `domain` de `
 El sistema DEBE construir el agregado raíz `Institution` con los atributos
 `id` (`InstitutionId`), `legalName`, `tradeName`, `rtn`, `address`, `defaultCurrency`
 (`CurrencyCode` de `kernel`), `locale`, `timezone` e `isActive`, según
-`docs/02-modelo-de-dominio.md` §3.1. El sistema DEBE rechazar la construcción cuando `legalName`
-es nulo, vacío o contiene solo espacios en blanco, con el código de error de dominio
-`institution-legal-name-blank`. El sistema DEBE rechazar la construcción cuando `address` es nulo,
-vacío o contiene solo espacios en blanco, con el código de error de dominio
+`docs/02-modelo-de-dominio.md` §3.1. Todo atributo obligatorio nulo (todos salvo `tradeName`) es un
+error de programación y DEBE producir `NullPointerException`, no un error de dominio (ADR-0019). El
+sistema DEBE rechazar la construcción cuando `legalName` está vacío o contiene solo espacios en
+blanco, con el código de error de dominio `institution-legal-name-blank`, y cuando `address` está
+vacía o contiene solo espacios en blanco, con el código de error de dominio
 `institution-address-blank`. Los textos se guardan sin espacios de borde. El sistema DEBE rechazar
 un `legalName` de más de 200 caracteres (puntos de código), con `institution-legal-name-too-long`,
 y una `address` de más de 500, con `institution-address-too-long`. Toda instancia nueva de

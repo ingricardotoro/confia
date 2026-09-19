@@ -173,8 +173,11 @@ algo que tiene identidad y ciclo de vida; el repositorio del cambio 5 persiste e
 `record` (igualdad por todos los atributos, contraria a una entidad); una fábrica de rehidratación
 `restore(..., boolean active)` (sin consumidor hasta el cambio 5, que la añade con su repositorio).
 
-**Atributos e invariantes** (orden de evaluación: primero todos los nulos, después las reglas de
-negocio en el orden de la tabla; una sola excepción, la primera que aplica):
+**Atributos e invariantes** (orden de evaluación: primero los nulos de los siete argumentos
+obligatorios, después las reglas de negocio en el orden de la tabla; una sola excepción, la primera
+que aplica). Un argumento obligatorio nulo es un error de programación y lanza
+`NullPointerException` (ADR-0019). `tradeName` es la única excepción: es opcional y `null` significa
+«sin nombre comercial», así que se acepta; una cadena en blanco sí se rechaza.
 
 | Atributo | Tipo | Regla | Código si se incumple |
 |---|---|---|---|
@@ -335,8 +338,8 @@ Construcción del agregado:
 ```
 create(id, legalName, tradeName, rtn, address, currency, locale, zone)
    │
-   ├── requireNonNull de los ocho argumentos ──> NullPointerException (programación)
-   ├── strip + blank + longitud (legalName, tradeName, address)
+   ├── requireNonNull de los siete obligatorios (todos salvo tradeName) ──> NullPointerException
+   ├── strip + blank + longitud (legalName, address; tradeName solo si no es null)
    ├── ^[0-9]{1,20}$ (rtn)
    ├── idioma no vacío (locale), no ZoneOffset (zone)
    │        └── InvalidInstitutionException(code)        (primera regla incumplida)
