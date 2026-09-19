@@ -406,7 +406,7 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
     `distributeByLargestRemainder` (métodos privados), siguiendo el pseudocódigo de `design.md`
     decisión 7; conjunto completo de `kernel` tras el refactor: `./mvnw -pl kernel test` → 122/122.
 
-- [ ] 2.7 **Propiedades de jqwik** (`MoneyProperties`), generadores acotados al rango de
+- [x] 2.7 **Propiedades de jqwik** (`MoneyProperties`), generadores acotados al rango de
   `NUMERIC(14,4)`, mil intentos por propiedad, semilla informada en caso de fallo: (a) la suma de
   las partes de `allocate` es exactamente igual al total para cualquier total no negativo y
   cualquier vector de pesos enteros positivos de longitud uno o más, y ninguna parte es negativa;
@@ -417,6 +417,20 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   exacto redondeado una sola vez. — Especificación `money`, requisitos «Reparto proporcional sin
   pérdida de residuo (`allocate`)» (escenario de propiedad) y «Coherencia entre operaciones
   intermedias y el cálculo a escala completa» (escenario de propiedad)
+  - *Desviación del diseño (2026-09-18):* el archivo se creó como `MoneyPropertiesTest.java`, no
+    `MoneyProperties.java` como nombra `design.md`. Verificado empíricamente: `./mvnw -pl kernel
+    test` con el nombre de `design.md` NO ejecuta la clase (los patrones por omisión de Surefire
+    son `**/*Test.java`, `**/Test*.java`, `**/*Tests.java`, `**/*TestCase.java`; ninguno coincide
+    con `MoneyProperties.java`), y contradice además la convención propia del proyecto
+    (`confia-testing-playbook`, sección 1: `*Test.java` para Surefire). Un archivo con el nombre de
+    `design.md` habría quedado silenciosamente fuera de `mvn test` y de PIT. Cinco propiedades
+    (a–e), con `tries` bajado explícitamente de 1000 (por omisión del módulo) a 200 por propiedad
+    para mantener rápida la corrida de mutación, documentado en el Javadoc de la clase.
+  - *Evidencia (2026-09-18, local):* RED: se introdujo una expectativa deliberadamente incorrecta
+    en la propiedad (a) (`total.add(Money.of("0.01", HNL))` en vez de `total`); falló por la razón
+    correcta (`expected: 0.0100 HNL but was: 0.0000 HNL`) con las otras cuatro propiedades en
+    verde. GREEN: corregida la aserción, `./mvnw -pl kernel test -Dtest=MoneyPropertiesTest` → 5/5;
+    conjunto completo de `kernel`: `./mvnw -pl kernel test` → 135/135. Sin REFACTOR.
 
 - [ ] 2.8 **`MoneyRegressionTest`**, Javadoc que prohíbe borrar los casos: `6.70 ×
   Percentage.of("15")` con `HALF_UP` → `1.01` (el impuesto que la coma flotante pierde);
