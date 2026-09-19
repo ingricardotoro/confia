@@ -49,6 +49,12 @@ Si al llegar a la fase de tareas los cambios 5 u 11 superan el presupuesto, se d
 `jooq-flyway-testcontainers-wiring` más `audit-log-and-transaction-runner`; el 11 en
 `dockerfiles-and-local-compose` más `cicd-pipeline-and-preprod-deploy`.
 
+**Nota (2026-09-19, decisión D1 de `institution-root-and-multitenancy-baseline`).** El cambio 4
+entrega el módulo `organization` sin tabla. La migración de `organization_institution` (seguridad a
+nivel de fila sobre su propia clave primaria, ADR-0009 y ADR-0017; prefijo según ADR-0015) y su
+repositorio jOOQ pasan al cambio 5, y esa migración es la primera del cambio 5. Si el cambio 5 se
+divide, la división asigna ambas cosas de forma explícita a una de sus partes.
+
 **Hallazgo.** `docs/09-roadmap-y-fases.md` §3 no incluye el módulo `organization` en F0, pero
 ADR-0009 exige `institution_id NOT NULL` desde la primera migración y ADR-0017 asigna la tabla raíz
 de institución a ese módulo. Se recomienda incorporar el cambio 4, con la entidad raíz mínima, al
