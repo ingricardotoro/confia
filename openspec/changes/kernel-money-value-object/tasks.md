@@ -331,7 +331,7 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
     redondea solo a escala 4 (design.md, decisión 4); el resultado final `0.62`/`1.01` de la
     especificación exige además `roundToMinorUnit` (tarea 2.5), verificado en conjunto en 2.8.
 
-- [ ] 2.5 **TDD — `roundToMinorUnit(RoundingMode)`**. ROJO: los tres puntos medios exactos
+- [x] 2.5 **TDD — `roundToMinorUnit(RoundingMode)`**. ROJO: los tres puntos medios exactos
   obligatorios `0.615`, `2.345`, `1.005` redondeados con `HALF_UP` a la escala menor de la moneda dan
   `0.62`, `2.35`, `1.01`; su simetría negativa `-0.615`, `-2.345`, `-1.005` da `-0.62`, `-2.35`,
   `-1.01`; redondear el máximo representable `9999999999.9999` con `HALF_UP` produce
@@ -340,6 +340,10 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   re-expresa a escala 4, verifica el invariante de rango sobre el resultado). REFACTOR: ninguno
   esperado. — Especificación `money`, requisito «Redondeo explícito con `HALF_UP` en toda operación
   que redondea» (ambos escenarios de puntos medios)
+  - *Evidencia (2026-09-18, local):* RED: 7 errores de compilación (`roundToMinorUnit` ausente).
+    GREEN: `./mvnw -pl kernel test -Dtest=MoneyArithmeticTest` → 25/25 (incluye los tres puntos
+    medios, su simetría negativa y el desbordamiento al redondear el límite superior). Sin
+    REFACTOR.
 
 - [ ] 2.6 **TDD — `allocate(int...)`** (`MoneyAllocationTest`). ROJO: reparto con residuo por el
   método del resto mayor (`100.00` entre `[1,1,1]` → `[33.34, 33.33, 33.33]`, suma exactamente

@@ -214,4 +214,41 @@ class MoneyArithmeticTest {
 
         assertThat(result).isEqualTo(base);
     }
+
+    @Test
+    void roundsHalfUpAtTheThreeMandatoryExactMidpoints() {
+        assertThat(Money.of("0.615", CurrencyCode.HNL).roundToMinorUnit(RoundingMode.HALF_UP))
+                .isEqualTo(Money.of("0.62", CurrencyCode.HNL));
+        assertThat(Money.of("2.345", CurrencyCode.HNL).roundToMinorUnit(RoundingMode.HALF_UP))
+                .isEqualTo(Money.of("2.35", CurrencyCode.HNL));
+        assertThat(Money.of("1.005", CurrencyCode.HNL).roundToMinorUnit(RoundingMode.HALF_UP))
+                .isEqualTo(Money.of("1.01", CurrencyCode.HNL));
+    }
+
+    @Test
+    void roundingIsSymmetricForNegativeMidpoints() {
+        assertThat(Money.of("-0.615", CurrencyCode.HNL).roundToMinorUnit(RoundingMode.HALF_UP))
+                .isEqualTo(Money.of("-0.62", CurrencyCode.HNL));
+        assertThat(Money.of("-2.345", CurrencyCode.HNL).roundToMinorUnit(RoundingMode.HALF_UP))
+                .isEqualTo(Money.of("-2.35", CurrencyCode.HNL));
+        assertThat(Money.of("-1.005", CurrencyCode.HNL).roundToMinorUnit(RoundingMode.HALF_UP))
+                .isEqualTo(Money.of("-1.01", CurrencyCode.HNL));
+    }
+
+    @Test
+    void roundingTheMaximumRepresentableAmountUpOverflowsTheRange() {
+        Money atTheLimit = Money.of("9999999999.9999", CurrencyCode.HNL);
+
+        assertThatThrownBy(() -> atTheLimit.roundToMinorUnit(RoundingMode.HALF_UP))
+                .isInstanceOf(InvalidMoneyAmountException.class)
+                .extracting(exception -> ((InvalidMoneyAmountException) exception).code())
+                .isEqualTo(InvalidMoneyAmountException.OUT_OF_RANGE);
+    }
+
+    @Test
+    void roundingAnAmountAlreadyAtTheMinorUnitScaleIsUnchanged() {
+        Money exact = Money.of("30.00", CurrencyCode.HNL);
+
+        assertThat(exact.roundToMinorUnit(RoundingMode.HALF_UP)).isEqualTo(exact);
+    }
 }

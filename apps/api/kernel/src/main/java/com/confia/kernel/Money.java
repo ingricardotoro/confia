@@ -173,6 +173,21 @@ public final class Money implements Comparable<Money> {
         return new Money(exactShare.setScale(SCALE, rounding), currency);
     }
 
+    /**
+     * Rounds to this currency's minor unit (two decimals for both HNL and USD today) and
+     * re-expresses the result at scale four (design.md, decision 4). This is the only point where
+     * an amount actually loses precision below scale four, and it always happens explicitly.
+     *
+     * @throws InvalidMoneyAmountException {@link InvalidMoneyAmountException#OUT_OF_RANGE} if
+     *     rounding up carries the result past {@code 9999999999.9999} (for example,
+     *     {@code 9999999999.9999} rounded {@code HALF_UP} becomes {@code 10000000000.00})
+     */
+    public Money roundToMinorUnit(RoundingMode rounding) {
+        Objects.requireNonNull(rounding, "rounding");
+        BigDecimal roundedToMinorUnit = amount.setScale(currency.minorUnitDigits(), rounding);
+        return new Money(roundedToMinorUnit.setScale(SCALE, RoundingMode.UNNECESSARY), currency);
+    }
+
     private void requireSameCurrency(Money other) {
         Objects.requireNonNull(other, "other");
         if (currency != other.currency) {
