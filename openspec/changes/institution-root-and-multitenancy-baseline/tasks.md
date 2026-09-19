@@ -163,12 +163,18 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
     minimum is 0.95` y el mismo mensaje para `branches`; se revirtió a 0.80 y `verify` volvió a
     BUILD SUCCESS.
 
-- [ ] 1.6 **Medir el diff real de PR A** con
+- [x] 1.6 **Medir el diff real de PR A** con
   `git diff --numstat main...change/institution-root-and-multitenancy-baseline -- . ':(exclude)openspec' ':(exclude)docs/adr'`.
   Si el total cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y consultar al
   propietario**, con el corte A como unidad ya mínima (no tiene subdivisión natural adicional
   planificada); registrar la decisión que tome. — P1 de la propuesta; `design.md`, «Pronóstico de
   tamaño por corte»
+  - **Evidencia (2026-09-19):** `git diff --numstat main...change/institution-root-and-multitenancy-baseline
+    -- . ':(exclude)openspec' ':(exclude)docs/adr'` → `apps/api/app/pom.xml` 45+/3-;
+    `MonetaryFloatingPointTest.java` 183+/0-; `FloatingPointBigDecimal.java` 32+/0-;
+    `FloatingPointPriceTag.java` 29+/0-; `RawBigDecimalComparison.java` 21+/0-. **Total: 310
+    adiciones + 3 eliminaciones = 313 líneas de autor**, dentro del pronóstico de `design.md`
+    (232–334) y muy por debajo de 800. Se continúa sin consultar al propietario.
 
 - [ ] 1.7 **Verificación final de PR A**: en checkout limpio, con `JAVA_HOME` en
   `C:/Program Files/Eclipse Adoptium/jdk-25.0.3.9-hotspot` y `MAVEN_OPTS` con el almacén de confianza
