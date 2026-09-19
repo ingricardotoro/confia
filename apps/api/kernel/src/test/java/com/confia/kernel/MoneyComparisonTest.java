@@ -121,4 +121,18 @@ class MoneyComparisonTest {
         assertThat(hundred.compareTo(fifty)).isPositive();
         assertThat(fifty.compareTo(Money.of("50.00", CurrencyCode.HNL))).isZero();
     }
+
+    @Test
+    void everyComparisonMethodRejectsANullArgument() {
+        Money amount = Money.of("10.00", CurrencyCode.HNL);
+
+        assertThatThrownBy(() -> amount.compareTo(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> amount.isGreaterThan(null))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> amount.isGreaterThanOrEqual(null))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> amount.isLessThan(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> amount.isLessThanOrEqual(null))
+                .isInstanceOf(NullPointerException.class);
+    }
 }
