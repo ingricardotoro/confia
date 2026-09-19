@@ -19,6 +19,8 @@ class MoneyComparisonTest {
 
         assertThat(hundred.isGreaterThan(fifty)).isTrue();
         assertThat(fifty.isLessThan(hundred)).isTrue();
+        assertThat(fifty.isGreaterThan(hundred)).isFalse();
+        assertThat(hundred.isLessThan(fifty)).isFalse();
     }
 
     @Test
@@ -90,6 +92,24 @@ class MoneyComparisonTest {
 
         assertThat(a.isGreaterThanOrEqual(b)).isTrue();
         assertThat(a.isLessThanOrEqual(b)).isTrue();
+    }
+
+    @Test
+    void isGreaterThanAndIsLessThanAreFalseForEqualAmounts() {
+        Money a = Money.of("100.00", CurrencyCode.HNL);
+        Money b = Money.of("100.00", CurrencyCode.HNL);
+
+        assertThat(a.isGreaterThan(b)).isFalse();
+        assertThat(a.isLessThan(b)).isFalse();
+    }
+
+    @Test
+    void isGreaterThanOrEqualAndIsLessThanOrEqualAreFalseWhenNotSatisfied() {
+        Money fifty = Money.of("50.00", CurrencyCode.HNL);
+        Money hundred = Money.of("100.00", CurrencyCode.HNL);
+
+        assertThat(fifty.isGreaterThanOrEqual(hundred)).isFalse();
+        assertThat(hundred.isLessThanOrEqual(fifty)).isFalse();
     }
 
     @Test

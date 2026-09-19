@@ -117,6 +117,46 @@ class PercentageTest {
     }
 
     @Test
+    void isEqualToItselfByReference() {
+        Percentage percentage = Percentage.of("5");
+
+        assertThat(percentage).isEqualTo(percentage);
+    }
+
+    @Test
+    void isNeverEqualToAnObjectOfAnotherType() {
+        Percentage percentage = Percentage.of("5");
+
+        assertThat(percentage).isNotEqualTo("5.0000");
+        assertThat(percentage).isNotEqualTo(null);
+    }
+
+    @Test
+    void rejectsAStringLongerThanSixtyFourCharacters() {
+        String tooLong = "1".repeat(65);
+
+        assertThatThrownBy(() -> Percentage.of(tooLong))
+                .isInstanceOf(InvalidPercentageException.class)
+                .extracting(exception -> ((InvalidPercentageException) exception).code())
+                .isEqualTo(InvalidPercentageException.MALFORMED);
+    }
+
+    @Test
+    void acceptsAStringOfExactlySixtyFourCharacters() {
+        String atTheLimit = "1." + "0".repeat(62);
+
+        assertThat(atTheLimit).hasSize(64);
+        assertThat(Percentage.of(atTheLimit).toPlainString()).isEqualTo("1.0000");
+    }
+
+    @Test
+    void hashCodeIsBasedOnTheNormalizedValue() {
+        Percentage percentage = Percentage.of("15");
+
+        assertThat(percentage.hashCode()).isEqualTo(percentage.value().hashCode());
+    }
+
+    @Test
     void toPlainStringIsExact() {
         assertThat(Percentage.of("15").toPlainString()).isEqualTo("15.0000");
     }
