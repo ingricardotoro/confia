@@ -15,6 +15,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * ADR-0018, mechanism (b), "Escáner de supresiones sin ADR": walks every source file under {@code
@@ -32,10 +35,16 @@ import org.junit.jupiter.api.Test;
  * apps/api/pom.xml}'s {@code enforce-build-integrity} execution, which is precisely the kind of
  * unmechanized "regla" ADR-0018 exists to replace.
  *
- * <p>The marker catalog starts with {@code allowEmptyShould(}, {@code failOnEmptyShould} and
- * ArchUnit's {@code @ArchIgnore} exclusion annotation (ADR-0018, section 3.b) and grows with every
- * tool that gains its own exclusion mechanism (JaCoCo and PIT in change 2, dependency-cruiser and
- * ESLint in change 3).
+ * <p>The marker catalog started with {@code allowEmptyShould(}, {@code failOnEmptyShould} and
+ * ArchUnit's {@code @ArchIgnore} exclusion annotation (ADR-0018, section 3.b) and grew, in change
+ * 2, with JaCoCo's and PIT's own exclusion mechanisms (design.md, decision 13): PIT's per-class,
+ * per-method, per-test-class and per-group exclusion tags and its {@code avoidCallsTo} filter;
+ * {@code <skip>true</skip>} on any plugin execution plus the {@code skipPitest}/{@code
+ * jacoco.skip} properties; JaCoCo's {@code <haltOnFailure>false</haltOnFailure>}, which turns a
+ * coverage gate into a report; JaCoCo's own {@code <exclude>} class-path patterns (distinct from
+ * the enforcer's dependency-coordinate excludes, which always carry a {@code :}); and {@code
+ * @Generated}, which JaCoCo omits from coverage when retained at runtime. It grows further with
+ * every tool that gains its own exclusion mechanism (dependency-cruiser and ESLint in change 3).
  *
  * <p>This file excludes itself from the walk: it necessarily spells out the marker patterns it
  * looks for, which is cataloging a marker, not suppressing a rule.
@@ -51,7 +60,38 @@ class SuppressionCitesAdrTest {
     private static final Pattern ARCH_IGNORE_ANNOTATION = Pattern.compile("@ArchIgnore\\b");
     private static final Pattern FAIL_ON_EMPTY_SHOULD_FALSE =
             Pattern.compile("failOnEmptyShould\\s*=\\s*false");
+
+    // JaCoCo and PIT suppression markers (design.md, decision 13).
+    private static final Pattern PIT_EXCLUSION_TAG = Pattern.compile(
+            "<(excludedClasses|excludedMethods|excludedTestClasses|excludedGroups|avoidCallsTo)>");
+    private static final Pattern PLUGIN_SKIP_FLAG =
+            Pattern.compile("<skip>\\s*true|\\b(skipPitest|jacoco\\.skip)\\b");
+    private static final Pattern JACOCO_NON_BLOCKING_THRESHOLD =
+            Pattern.compile("<haltOnFailure>\\s*false");
+    // Deliberately excludes ':' so it never matches the enforcer's dependency-coordinate excludes
+    // (for example <exclude>org.hibernate:*</exclude>), which always carry a groupId:artifactId.
+    private static final Pattern JACOCO_CLASS_EXCLUSION = Pattern.compile("<exclude>[^<:]*</exclude>");
+    private static final Pattern GENERATED_ANNOTATION = Pattern.compile("@Generated\\b");
+
     private static final Pattern ADR_CITATION = Pattern.compile("ADR-(\\d{4})");
+
+    /**
+     * Every marker whose presence requires an adjacent {@code ADR-NNNN} citation. {@link
+     * #everyNamedPatternMatchesItsExampleAndSparesLegitimateEnforcerExcludes()} proves each one
+     * matches its own example and does not match a legitimate, uncited enforcer exclusion.
+     */
+    private static final List<NamedPattern> ADR_CITED_PATTERNS = List.of(
+            new NamedPattern("allowEmptyShould( call", ALLOW_EMPTY_SHOULD_CALL),
+            new NamedPattern("@ArchIgnore annotation", ARCH_IGNORE_ANNOTATION),
+            new NamedPattern("PIT exclusion tag", PIT_EXCLUSION_TAG),
+            new NamedPattern("Plugin skip flag", PLUGIN_SKIP_FLAG),
+            new NamedPattern("JaCoCo non-blocking threshold", JACOCO_NON_BLOCKING_THRESHOLD),
+            new NamedPattern("JaCoCo class exclusion", JACOCO_CLASS_EXCLUSION),
+            new NamedPattern("@Generated annotation", GENERATED_ANNOTATION));
+
+    /** A suppression marker pattern, named for test reporting and the catalog documentation. */
+    private record NamedPattern(String name, Pattern pattern) {
+    }
 
     @Test
     void everySuppressionCitesAnExistingAdrAndNoGlobalEscapeHatchRemains() throws IOException {
@@ -73,10 +113,11 @@ class SuppressionCitesAdrTest {
                 }
                 if (ALLOW_EMPTY_SHOULD_CALL.matcher(line).find()) {
                     allowEmptyShouldOccurrences++;
-                    requireAdjacentAdrCitation(lines, i, file, adrDirectory, problems);
                 }
-                if (ARCH_IGNORE_ANNOTATION.matcher(line).find()) {
-                    requireAdjacentAdrCitation(lines, i, file, adrDirectory, problems);
+                for (NamedPattern namedPattern : ADR_CITED_PATTERNS) {
+                    if (namedPattern.pattern().matcher(line).find()) {
+                        requireAdjacentAdrCitation(lines, i, file, adrDirectory, problems);
+                    }
                 }
             }
         }
@@ -87,6 +128,35 @@ class SuppressionCitesAdrTest {
                         + "inventory exactly (ADR-0018): every exception is declared, and every "
                         + "declared exception corresponds to a real allowEmptyShould(true) call")
                 .isEqualTo(EmptyShouldExceptionInventoryTest.EXCEPTIONS.size());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("namedPatternExamples")
+    void everyNamedPatternMatchesItsExampleAndSparesLegitimateEnforcerExcludes(
+            String name, Pattern pattern, String matchingExample) {
+        assertThat(pattern.matcher(matchingExample).find())
+                .as("%s must match its own catalog example: %s", name, matchingExample)
+                .isTrue();
+        assertThat(pattern.matcher("<exclude>org.hibernate:*</exclude>").find())
+                .as("%s must not match a legitimate, uncited enforcer bannedDependencies exclude",
+                        name)
+                .isFalse();
+    }
+
+    static Stream<Arguments> namedPatternExamples() {
+        return Stream.of(
+                Arguments.of("allowEmptyShould( call", ALLOW_EMPTY_SHOULD_CALL,
+                        ".allowEmptyShould(true)"),
+                Arguments.of("@ArchIgnore annotation", ARCH_IGNORE_ANNOTATION, "@ArchIgnore"),
+                Arguments.of("PIT exclusion tag", PIT_EXCLUSION_TAG,
+                        "<excludedClasses>com.example.Generated</excludedClasses>"),
+                Arguments.of("Plugin skip flag", PLUGIN_SKIP_FLAG, "<skip>true</skip>"),
+                Arguments.of("JaCoCo non-blocking threshold", JACOCO_NON_BLOCKING_THRESHOLD,
+                        "<haltOnFailure>false</haltOnFailure>"),
+                Arguments.of("JaCoCo class exclusion", JACOCO_CLASS_EXCLUSION,
+                        "<exclude>com/example/Generated.class</exclude>"),
+                Arguments.of("@Generated annotation", GENERATED_ANNOTATION,
+                        "@Generated(\"tool\")"));
     }
 
     private static void requireAdjacentAdrCitation(List<String> lines, int markerLine, Path file,

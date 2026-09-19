@@ -4,15 +4,15 @@
 schema: spec-driven
 
 context: |
-  Stack (declared, no code yet): Java 25 + Spring Boot 4.1 + Maven backend (ADR-0013),
-  jOOQ + PostgreSQL 18 (ADR-0015), Flyway, Spring Modulith + ArchUnit, db-scheduler (ADR-0016).
-  Frontend: React 19 + Vite + TanStack (Router/Query/Table/Form), Tailwind v4, shadcn/ui,
-  in a pnpm workspaces + Turborepo monorepo. Architecture: hexagonal per business capability,
-  screaming structure, domain/application/infrastructure/web layering.
-  Project is pre-code (planning phase only): no apps/, no pom.xml, no package.json, not a
-  Git repository yet. Runnable tooling and strict TDD activate starting F0.
+  Stack: Java 25 + Spring Boot 4.1 + Maven backend (ADR-0013), jOOQ + PostgreSQL 18 (ADR-0015),
+  Flyway, Spring Modulith + ArchUnit, db-scheduler (ADR-0016). Frontend: React 19 + Vite +
+  TanStack (Router/Query/Table/Form), Tailwind v4, shadcn/ui, in a pnpm workspaces + Turborepo
+  monorepo. Architecture: hexagonal per business capability, screaming structure,
+  domain/application/infrastructure/web layering.
+  Code exists since F0 change 1: Maven reactor in apps/api (kernel, app) and CI in
+  .github/workflows/ci.yml. Frontend apps and packages do not exist yet.
 
-strict_tdd: false # runner does not exist yet (see testing capabilities); revisit at F0
+strict_tdd: true # runner: ./mvnw verify in apps/api, JAVA_HOME must point to JDK 25
 
 rules:
   proposal:
@@ -32,13 +32,14 @@ rules:
   apply:
     guidelines:
       - Follow existing code patterns and the hexagonal layering rules in docs/01-arquitectura.md
-      - Money arithmetic only inside packages/domain equivalents; never number/float for money
-    tdd: false # no test runner present yet; becomes true once F0 tooling lands
-    test_command: "./mvnw verify" # backend (declared, not yet runnable)
+      - Money arithmetic only through com.confia.kernel.Money; business money rules live in the
+        domain package of the owning module; never double/float for money
+    tdd: true
+    test_command: "./mvnw verify" # in apps/api, JDK 25
   verify:
-    test_command: "./mvnw verify" # backend; frontend equivalents are pnpm scripts, both declared-only
+    test_command: "./mvnw verify" # add -Pmutation-report to include PIT
     build_command: "./mvnw verify"
-    coverage_threshold: 0 # declared target is 80% global / 95% domain via JaCoCo once runnable
+    coverage_threshold: 95 # kernel line+branch (JaCoCo); 80 global arrives with change 4
   archive:
     - Warn before merging destructive deltas
     - Merge change id as folder prefix with archive date under openspec/archive/<date>-<id>/
