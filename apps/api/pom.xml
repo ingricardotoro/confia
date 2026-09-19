@@ -43,6 +43,24 @@
     <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
     <maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
     <maven-failsafe-plugin.version>3.6.0</maven-failsafe-plugin.version>
+
+    <!-- Java 25 support confirmed against release notes: jacoco.org/jacoco/trunk/doc/changes.html,
+         "Release 0.8.14 (2025/10/11)", "JaCoCo now officially supports Java 25". -->
+    <jacoco-maven-plugin.version>0.8.14</jacoco-maven-plugin.version>
+    <pitest-maven.version>1.30.0</pitest-maven.version>
+    <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
+    <!-- jqwik: test-scope only in kernel (ADR-0013; enforce-kernel-purity only bans
+         compile/runtime/provided/system, so this does not need an exclusion there). Not managed by
+         the Spring Boot BOM. -->
+    <jqwik.version>1.10.1</jqwik.version>
+
+    <!-- confia.pit.phase=none: PIT never runs on a plain ./mvnw verify with no profile active
+         (design.md, decision 9). The mutation-report and mutation-gate profiles below rebind it to
+         verify and choose the effective threshold; declared in this order on purpose so that
+         mutation-gate, declared last, wins if both profiles are ever active at once (decision 10). -->
+    <confia.pit.phase>none</confia.pit.phase>
+    <confia.pit.mutationThreshold>80</confia.pit.mutationThreshold>
+    <confia.pit.effectiveThreshold>${confia.pit.mutationThreshold}</confia.pit.effectiveThreshold>
   </properties>
 
   <dependencyManagement>
@@ -80,6 +98,19 @@
         <version>1.4.2</version>
         <scope>test</scope>
       </dependency>
+      <!--
+        jqwik: property-based testing for kernel (design.md decision 5 of the proposal; ADR-0004
+        §Cumplimiento 6). Not part of the Spring Boot BOM, so it is managed here explicitly. Its own
+        transitive junit-platform-* dependencies are overridden by junit-bom (imported above through
+        spring-boot-dependencies) at 6.0.3, which is what keeps enforcer's dependencyConvergence
+        rule green.
+      -->
+      <dependency>
+        <groupId>net.jqwik</groupId>
+        <artifactId>jqwik</artifactId>
+        <version>${jqwik.version}</version>
+        <scope>test</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -108,6 +139,75 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
           <version>${maven-enforcer-plugin.version}</version>
+        </plugin>
+        <!--
+          Coverage gate (docs/06 §14.1). Version and generic executions managed here; each module
+          that wants the check binds its own jacoco:check execution with its own thresholds
+          (design.md, decision 8), so today only kernel opts in and app is not held to 95 % before
+          change 4 introduces its own domain packages and global 80 % rule.
+        -->
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco-maven-plugin.version}</version>
+          <executions>
+            <execution>
+              <id>jacoco-prepare-agent</id>
+              <goals>
+                <goal>prepare-agent</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>jacoco-report</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>report</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <!--
+          Mutation gate (docs/06 §14.1, design.md decisions 9 and 10). Declared once here with the
+          plugin dependency on pitest-junit5-plugin (required from its 1.2 line on, which stopped
+          bundling junit-platform-launcher, itself added to kernel's test scope in task 1.3) and a
+          single mutationCoverage execution whose phase and threshold come from properties. Each
+          module that wants PIT declares this plugin in its own <plugins> with its own
+          targetClasses/targetTests (decision 9); app does not declare it, so PIT never runs there
+          until change 4.
+        -->
+        <plugin>
+          <groupId>org.pitest</groupId>
+          <artifactId>pitest-maven</artifactId>
+          <version>${pitest-maven.version}</version>
+          <dependencies>
+            <dependency>
+              <groupId>org.pitest</groupId>
+              <artifactId>pitest-junit5-plugin</artifactId>
+              <version>${pitest-junit5-plugin.version}</version>
+            </dependency>
+          </dependencies>
+          <configuration>
+            <mutators>
+              <mutator>STRONGER</mutator>
+            </mutators>
+            <threads>2</threads>
+            <timestampedReports>false</timestampedReports>
+            <outputFormats>
+              <outputFormat>HTML</outputFormat>
+              <outputFormat>XML</outputFormat>
+            </outputFormats>
+            <failWhenNoMutations>true</failWhenNoMutations>
+            <mutationThreshold>${confia.pit.effectiveThreshold}</mutationThreshold>
+          </configuration>
+          <executions>
+            <execution>
+              <id>pit-mutation</id>
+              <phase>${confia.pit.phase}</phase>
+              <goals>
+                <goal>mutationCoverage</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -236,6 +336,40 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+
+    <!--
+      Mutation profiles (design.md decisions 9, 10 and 11; docs/06 §14.1). Both only set the two
+      properties that pitest-maven's managed execution above reads: which phase runs PIT and which
+      mutation score fails the build. mutation-report is declared FIRST and mutation-gate SECOND on
+      purpose: Maven injects active profile properties in POM declaration order and the last one
+      wins, so if both are ever active at the same time (for example
+      "-Pmutation-report -Dconfia.ci.mainBranch=true"), mutation-gate wins and the build blocks.
+      Confirmed with `mvn help:evaluate -Dexpression=confia.pit.effectiveThreshold` in task 1.13.
+    -->
+    <profile>
+      <!-- Explicit only: never activates on a plain ./mvnw verify, which would force every local
+           run to download and execute PIT (see "Restricciones del entorno local" in design.md). -->
+      <id>mutation-report</id>
+      <properties>
+        <confia.pit.phase>verify</confia.pit.phase>
+        <confia.pit.effectiveThreshold>0</confia.pit.effectiveThreshold>
+      </properties>
+    </profile>
+    <profile>
+      <!-- Declared last: wins over mutation-report when both are active. Activates the same way as
+           no-snapshots-on-main, with -Pmutation-gate as an explicit alternative. -->
+      <id>mutation-gate</id>
+      <activation>
+        <property>
+          <name>confia.ci.mainBranch</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <properties>
+        <confia.pit.phase>verify</confia.pit.phase>
+        <confia.pit.effectiveThreshold>${confia.pit.mutationThreshold}</confia.pit.effectiveThreshold>
+      </properties>
     </profile>
   </profiles>
 </project>

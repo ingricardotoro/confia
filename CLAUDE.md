@@ -200,7 +200,8 @@ Una tarea no está terminada hasta que cumple todo lo siguiente:
 
 - Commits convencionales. Sin atribución de herramientas de IA.
 - Una rama por cambio SDD, nombrada con el identificador del cambio.
-- Los pull requests que superen cuatrocientas líneas se dividen en unidades revisables.
+- Los pull requests que superen ochocientas líneas de cambio efectivo se dividen en unidades
+  revisables (`docs/15-flujo-de-trabajo-git.md` §3).
 - Las migraciones de base de datos se revisan con especial cuidado y nunca se editan una vez
   aplicadas en producción.
 

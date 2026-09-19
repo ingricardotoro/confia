@@ -2,8 +2,11 @@ name: ci
 
 # Partial and honest (design.md decision 5): only the jobs this change can leave green today.
 # frontend, e2e and quality-gate arrive with changes 3 and 11 (docs/06 §14.5 declares the full
-# workflow this grows into). No -Pmutation-gate/-Pmutation-report: those profiles arrive with
-# change 2.
+# workflow this grows into). JaCoCo (95 % line+branch on kernel) and PIT (mutation score 80 on
+# kernel) run as part of `verify` since change 2, with the mutation profile selected by branch:
+# main activates mutation-gate (blocks below threshold) via the same confia.ci.mainBranch
+# property that already activates no-snapshots-on-main; every other branch and pull request uses
+# mutation-report (never blocks, only informs) (design.md, decisions 10 and 11).
 
 on:
   push:
@@ -38,11 +41,25 @@ jobs:
           cache: maven
       # `verify` runs, in order: maven-enforcer-plugin (Java version, dependency convergence,
       # banned dependencies, kernel purity, and — only on main, see -Dconfia.ci.mainBranch below —
-      # no SNAPSHOT), compilation, unit tests, and the ArchUnit + Spring Modulith architecture
-      # tests under apps/api/app/src/test/java/com/confia/architecture (task 2, task 3).
+      # no SNAPSHOT), compilation, unit tests (JUnit, AssertJ, jqwik), the ArchUnit + Spring
+      # Modulith architecture tests under apps/api/app/src/test/java/com/confia/architecture
+      # (task 2, task 3), JaCoCo coverage on kernel (95 % line+branch, always blocking), and PIT
+      # mutation testing on kernel (score 80): -Dconfia.ci.mainBranch=true on main activates both
+      # no-snapshots-on-main and mutation-gate (blocks below threshold) with a single property;
+      # every other branch and pull request activates mutation-report instead (never blocks, only
+      # informs) (design.md, decisions 10 and 11).
       - name: verify
         working-directory: apps/api
-        run: ./mvnw --batch-mode verify ${{ github.ref == 'refs/heads/main' && '-Dconfia.ci.mainBranch=true' || '' }}
+        run: ./mvnw --batch-mode verify ${{ github.ref == 'refs/heads/main' && '-Dconfia.ci.mainBranch=true' || '-Pmutation-report' }}
+      - name: upload coverage and mutation reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: backend-reports
+          path: |
+            apps/api/**/target/site/jacoco/
+            apps/api/**/target/pit-reports/
+          retention-days: 14
 
   security:
     name: security scanning

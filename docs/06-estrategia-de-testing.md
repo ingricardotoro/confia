@@ -841,7 +841,7 @@ jobs:
       # Mutation blocks on main and only reports on work branches (section 3).
       - name: verify
         working-directory: apps/api
-        run: ./mvnw --batch-mode verify -P${{ github.ref == 'refs/heads/main' && 'mutation-gate' || 'mutation-report' }}
+        run: ./mvnw --batch-mode verify ${{ github.ref == 'refs/heads/main' && '-Dconfia.ci.mainBranch=true' || '-Pmutation-report' }}
         env:
           TESTCONTAINERS_RYUK_DISABLED: 'false'
       - name: upload openapi

@@ -77,6 +77,9 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    dispara el rojo programado de ADR-0018: al existir el primer módulo de negocio,
    `EmptyShouldExceptionInventoryTest` exige retirar `allowEmptyShould(true)` de
    `LayeredArchitectureTest` y su entrada del inventario, y su `tasks.md` debe preverlo.
+   **Pendiente heredado del cambio 2 (`kernel-money-value-object`, decisión D3 del 2026-09-18):**
+   el cambio 4 incorpora las reglas de ArchUnit de ADR-0004 §Cumplimiento 2, que prohíben `double`
+   y `float` para importes y `BigDecimal.equals` fuera de `Money`.
 2. Módulo de núcleo del backend con el objeto de valor `Money` (`BigDecimal` a escala cuatro con moneda explícita), reglas de redondeo y errores de dominio, con cobertura del 95 % medida con JaCoCo y pruebas de mutación con PIT.
 3. Autenticación del personal con MFA, roles, permisos, sesiones y bloqueo por fuerza bruta.
 4. **Matriz de autorización** documentada y verificada por pruebas: qué rol puede hacer qué operación (brecha A7).
