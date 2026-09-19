@@ -432,7 +432,7 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
     verde. GREEN: corregida la aserción, `./mvnw -pl kernel test -Dtest=MoneyPropertiesTest` → 5/5;
     conjunto completo de `kernel`: `./mvnw -pl kernel test` → 135/135. Sin REFACTOR.
 
-- [ ] 2.8 **`MoneyRegressionTest`**, Javadoc que prohíbe borrar los casos: `6.70 ×
+- [x] 2.8 **`MoneyRegressionTest`**, Javadoc que prohíbe borrar los casos: `6.70 ×
   Percentage.of("15")` con `HALF_UP` → `1.01` (el impuesto que la coma flotante pierde);
   `1234.55 × 3 == 3703.65` exactamente, igual según `equals` a `Money.of("3703.65", HNL)` (la
   colegiatura de tres meses); mil sumas consecutivas de `0.1` sobre `Money.zero(HNL)` dan
@@ -443,6 +443,10 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   casos que solo usan `add` (mil sumas de `0.1` y `0.1 + 0.2`); esta tarea añade únicamente los dos
   que dependen de `multiply` y `percentage`. — Especificación
   `money`, requisito «Casos de regresión permanentes de ADR-0004» (los cuatro escenarios)
+  - *Evidencia (2026-09-18, local):* RED: se puso temporalmente `1.00` como esperado en el caso del
+    impuesto; falló por la razón correcta (`expected: 1.0000 HNL but was: 1.0100 HNL`). GREEN:
+    corregido a `1.01`, `./mvnw -pl kernel test -Dtest=MoneyRegressionTest` → 4/4; conjunto
+    completo de `kernel`: `./mvnw -pl kernel test` → 137/137. Sin REFACTOR.
 
 - [ ] 2.9 **`MoneyApiShapeTest`**: reflexión del JDK sobre `Money` y `Percentage` completos (ambos
   ya terminados en este PR) que confirma que ningún miembro público usa `double`, `float`, `Double`
