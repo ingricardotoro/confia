@@ -17,9 +17,9 @@
   <name>CONFIA API</name>
   <description>
     Single deployable artifact with three entry points (admin, portal, worker), selected at
-    startup by APP_PROFILE (ADR-0003, ADR-0013). No business module exists yet: this change only
-    installs the launcher and the architecture verification that will guard every module added
-    from change 4 onward.
+    startup by APP_PROFILE (ADR-0003, ADR-0013). Change 4 adds the ADR-0004 §Cumplimiento 2
+    floating-point rules and the module-wide 80% JaCoCo coverage gate (BUNDLE, LINE and BRANCH);
+    the first business module lands in this same change's PR B.
   </description>
 
   <dependencies>
@@ -54,13 +54,42 @@
 
   <build>
     <plugins>
-      <!-- Coverage measurement for this module (task 1.1): only the prepare-agent/report
-           executions managed in the parent pluginManagement, inherited unchanged. No jacoco-check
-           execution yet — whether the BUNDLE coverage gate belongs in this pull request or in
-           PR B1 depends on what this measurement reports (design.md, decision 9, "Por corte"). -->
+      <!-- Coverage gate for this module (design.md decision 9; task 1.1 measured 89.7% line and
+           84.6% branch coverage on com.confia.bootstrap alone, both above 80%, so the BUNDLE rule
+           is declared in this pull request rather than deferred to PR B1). The prepare-agent and
+           report executions are inherited unchanged from the parent pluginManagement; this
+           execution only adds the check bound to verify (task 1.5). -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>jacoco-check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.80</minimum>
+                    </limit>
+                    <limit>
+                      <counter>BRANCH</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.80</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

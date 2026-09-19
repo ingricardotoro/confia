@@ -143,7 +143,7 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
     parámetro neutralizado → solo `rejectsTheFixtureFloatingPointParameter` falla (1/12). Las tres
     neutralizaciones se revirtieron; 12/12 en verde al final.
 
-- [ ] 1.5 **JaCoCo `BUNDLE` de 80 % en `app`, condicionado al resultado de la tarea 1.1.** Si la
+- [x] 1.5 **JaCoCo `BUNDLE` de 80 % en `app`, condicionado al resultado de la tarea 1.1.** Si la
   medición de 1.1 alcanza 80 % de líneas y de ramas: añadir a `apps/api/app/pom.xml` la ejecución
   `jacoco-check` con la regla `BUNDLE` (`LINE` y `BRANCH`, `COVEREDRATIO` mínimo `0.80`), y en el
   mismo commit actualizar el comentario de `coverage_threshold` en `openspec/config.yaml` a
@@ -155,6 +155,13 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
   constancia explícita en este PR de que se traslada a la tarea 2.7 de PR B1, sin bajar el umbral ni
   excluir `ConfiaApplication.main`. — Capacidad `build-integrity`, requisito «Cobertura global mínima
   del módulo `app`» (ambos escenarios)
+  - **Evidencia (2026-09-19):** la medición de 1.1 alcanzó 80 %, así que se declaró la regla
+    `BUNDLE` (`LINE`/`BRANCH`, mínimo 0.80) en `apps/api/app/pom.xml` y se actualizó el comentario
+    de `coverage_threshold` en `openspec/config.yaml` en el mismo commit. `./mvnw -B -pl app -am
+    verify` en verde. Demostración del fallo: se subió temporalmente el mínimo a 0.95 y `verify`
+    rompió con `Rule violated for bundle confia-api: lines covered ratio is 0.89, but expected
+    minimum is 0.95` y el mismo mensaje para `branches`; se revirtió a 0.80 y `verify` volvió a
+    BUILD SUCCESS.
 
 - [ ] 1.6 **Medir el diff real de PR A** con
   `git diff --numstat main...change/institution-root-and-multitenancy-baseline -- . ':(exclude)openspec' ':(exclude)docs/adr'`.
