@@ -144,8 +144,19 @@ vista del revisor y ninguna superficie pública que no se haya decidido.
   distintos de cero falla con `money-scale-exceeded`; ceros de más (`"1.000000"`) se aceptan porque
   no se pierde información. `of(String)` acepta solo `-?\d+(\.\d+)?`, con longitud máxima de 64
   caracteres: sin notación exponencial, sin signo `+`, sin espacios, sin separadores de miles. Es la
-  forma exacta del campo `amount` de la API. `of(BigDecimal)` acepta cualquier escala, incluida la
-  negativa, porque es el valor que entrega el controlador de base de datos.
+  forma exacta del campo `amount` de la API. `of(BigDecimal)` acepta escalas negativas, porque es
+  el valor que entrega el controlador de base de datos, pero **acota la escala antes de reescalar**
+  (revisión de seguridad del PR #5): reescalar cuesta del orden de 10^|escala|, y un valor como
+  `1E-500000000` colgaba el hilo. Con `MAX_INPUT_SCALE = 34` (la precisión de `DECIMAL128`): un
+  cero de cualquier escala es cero; una escala mayor que 34 falla con `money-scale-exceeded`, aunque
+  todos los decimales sean cero (el precio de no inspeccionar los dígitos); una escala negativa con
+  más de diez dígitos enteros falla con `money-amount-out-of-range` sin calcular el valor. La
+  precedencia se mantiene: la comprobación rápida de rango solo actúa con escala negativa, donde no
+  puede haber exceso de decimales. `Percentage.of(BigDecimal)` aplica la misma guardia con tres
+  dígitos enteros y los códigos `percentage-*`. `multiply(BigDecimal, RoundingMode)` rechaza un
+  factor con escala fuera de `[-34, 34]` con `IllegalArgumentException` (error de programación,
+  ADR-0019). No se añade ningún código al catálogo. La cadena de `of(String)` no necesita la
+  guardia: su longitud máxima de 64 caracteres ya acota la escala.
 - **Igualdad:** misma moneda y `amount.compareTo(other.amount) == 0`. Con la escala normalizada,
   `compareTo` y `equals` coinciden, pero se usa `compareTo` para que la igualdad no dependa de la
   normalización. `hashCode` es `31 * amount.hashCode() + currency.hashCode()`, coherente porque la
