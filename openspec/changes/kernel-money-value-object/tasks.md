@@ -35,7 +35,7 @@ pull request.** Las razones concretas son:
 1. **TDD estricto exige orden ROJO → VERDE → REFACTOR por comportamiento.** `openspec/config.yaml`
    activa `strict_tdd: true` en este mismo cambio; cada tarea de comportamiento agrupa su propio
    ciclo completo (para mantenerla en un archivo/comportamiento, no para evitar la disciplina), pero
-   los 13 requisitos y 45 escenarios de `specs/money/spec.md` no caben en menos de una decena de
+   los 13 requisitos y 51 escenarios de `specs/money/spec.md` (45 al planificar) no caben en menos de una decena de
    ciclos sin mezclar comportamientos no relacionados en una sola tarea.
 2. **Dos pull requests encadenados, cada uno con sus propias puertas.** La decisión D5 exige que
    cada PR compile, pase JaCoCo (95 %) y PIT (80) **sobre lo que contiene**, con la medición del
