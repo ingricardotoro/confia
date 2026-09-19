@@ -23,6 +23,9 @@ public final class Percentage {
     private static final Pattern PLAIN_DECIMAL = Pattern.compile("-?\\d+(\\.\\d+)?");
     private static final int MAX_STRING_LENGTH = 64;
 
+    /** Integer digits of {@code 100}: anything with more is out of range. */
+    private static final int MAX_INTEGER_DIGITS = 3;
+
     private final BigDecimal value;
 
     private Percentage(BigDecimal normalizedValue) {
@@ -55,7 +58,26 @@ public final class Percentage {
      */
     public static Percentage of(BigDecimal percentagePoints) {
         Objects.requireNonNull(percentagePoints, "percentagePoints");
-        return new Percentage(normalizeToScale(percentagePoints));
+        return new Percentage(normalizeToScale(requireBoundedScale(percentagePoints)));
+    }
+
+    /**
+     * Guard for a caller-supplied {@link BigDecimal}, applied before any rescaling (which costs
+     * about 10^|scale|): an absurd positive scale is rejected as too many decimals, and a negative
+     * scale that can only mean a number too large for the range is rejected without computing it.
+     * The string factory needs no such guard: its 64-character limit already bounds the scale.
+     */
+    private static BigDecimal requireBoundedScale(BigDecimal value) {
+        if (value.signum() == 0) {
+            return BigDecimal.ZERO;
+        }
+        if (value.scale() > Money.MAX_INPUT_SCALE) {
+            throw InvalidPercentageException.scaleExceeded(value.scale());
+        }
+        if (value.scale() < 0 && (long) value.precision() - value.scale() > MAX_INTEGER_DIGITS) {
+            throw InvalidPercentageException.outOfRange();
+        }
+        return value;
     }
 
     /**

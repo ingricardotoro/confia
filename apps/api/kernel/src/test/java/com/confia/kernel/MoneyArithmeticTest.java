@@ -2,10 +2,13 @@ package com.confia.kernel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
@@ -165,6 +168,59 @@ class MoneyArithmeticTest {
     }
 
     @Test
+    void multiplyingByADecimalFactorRejectsNullArguments() {
+        Money amount = Money.of("10.00", CurrencyCode.HNL);
+
+        assertThatThrownBy(() -> amount.multiply(null, RoundingMode.HALF_UP))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> amount.multiply(BigDecimal.ONE, null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void multiplyingByADecimalFactorWithAnExtremelyLargePositiveScaleFailsWithoutHanging() {
+        // Regression: an unbounded multiply/setScale on a factor with a huge scale costs roughly
+        // 10^|scale| (measured: a scale of ten million takes about 1.4 seconds; five hundred
+        // million never returns). This is a programming error, not a domain condition: the
+        // caller controls the factor, never external input.
+        Money base = Money.of("10.00", CurrencyCode.HNL);
+        BigDecimal extremeScale = new BigDecimal(BigInteger.ONE, 500_000_000);
+
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () ->
+                assertThatThrownBy(() -> base.multiply(extremeScale, RoundingMode.HALF_UP))
+                        .isInstanceOf(IllegalArgumentException.class));
+    }
+
+    @Test
+    void multiplyingByADecimalFactorWithAnExtremelyNegativeScaleFailsWithoutHanging() {
+        Money base = Money.of("10.00", CurrencyCode.HNL);
+        BigDecimal extremeScale = new BigDecimal(BigInteger.ONE, -500_000_000);
+
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () ->
+                assertThatThrownBy(() -> base.multiply(extremeScale, RoundingMode.HALF_UP))
+                        .isInstanceOf(IllegalArgumentException.class));
+    }
+
+    @Test
+    void multiplyingByADecimalFactorAtTheScaleLimitOfThirtyFourSucceeds() {
+        Money base = Money.of("10.00", CurrencyCode.HNL);
+        BigDecimal factorAtTheLimit = new BigDecimal("2").setScale(34);
+
+        Money result = base.multiply(factorAtTheLimit, RoundingMode.HALF_UP);
+
+        assertThat(result).isEqualTo(Money.of("20.00", CurrencyCode.HNL));
+    }
+
+    @Test
+    void multiplyingByADecimalFactorOneScaleBeyondTheLimitFails() {
+        Money base = Money.of("10.00", CurrencyCode.HNL);
+        BigDecimal factorOneBeyondTheLimit = new BigDecimal("2").setScale(35);
+
+        assertThatThrownBy(() -> base.multiply(factorOneBeyondTheLimit, RoundingMode.HALF_UP))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void multiplyingByADecimalFactorThatExceedsTheUpperLimitFailsAfterRounding() {
         Money nearTheLimit = Money.of("9999999999.9999", CurrencyCode.HNL);
 
@@ -173,6 +229,29 @@ class MoneyArithmeticTest {
                 .isInstanceOf(InvalidMoneyAmountException.class)
                 .extracting(exception -> ((InvalidMoneyAmountException) exception).code())
                 .isEqualTo(InvalidMoneyAmountException.OUT_OF_RANGE);
+    }
+
+    @Test
+    void percentageRejectsNullArguments() {
+        Money amount = Money.of("10.00", CurrencyCode.HNL);
+
+        assertThatThrownBy(() -> amount.percentage(null, RoundingMode.HALF_UP))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> amount.percentage(Percentage.of("5"), null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void theSpecExampleChainsPercentageThenRoundToMinorUnitEndToEnd() {
+        // specs/money/spec.md, "Aplicación de un porcentaje con redondeo explícito": the exact
+        // intermediate 0.6150 is a separate, documented step from the final displayed 0.62.
+        Money base = Money.of("12.30", CurrencyCode.HNL);
+
+        Money intermediate = base.percentage(Percentage.of("5"), RoundingMode.HALF_UP);
+        Money result = intermediate.roundToMinorUnit(RoundingMode.HALF_UP);
+
+        assertThat(intermediate).isEqualTo(Money.of("0.6150", CurrencyCode.HNL));
+        assertThat(result).isEqualTo(Money.of("0.62", CurrencyCode.HNL));
     }
 
     @Test
@@ -250,5 +329,13 @@ class MoneyArithmeticTest {
         Money exact = Money.of("30.00", CurrencyCode.HNL);
 
         assertThat(exact.roundToMinorUnit(RoundingMode.HALF_UP)).isEqualTo(exact);
+    }
+
+    @Test
+    void roundToMinorUnitRejectsANullRoundingMode() {
+        Money amount = Money.of("10.00", CurrencyCode.HNL);
+
+        assertThatThrownBy(() -> amount.roundToMinorUnit(null))
+                .isInstanceOf(NullPointerException.class);
     }
 }
