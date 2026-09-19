@@ -272,7 +272,7 @@ El nombre debe empezar por `change/` para que `ci.yml` ejecute su verificación 
 PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y recibe su ejecución de
 `pull_request`.
 
-- [ ] 2.1 **TDD — comparación total** (`MoneyComparisonTest`). ROJO: `isGreaterThan` verdadero y su
+- [x] 2.1 **TDD — comparación total** (`MoneyComparisonTest`). ROJO: `isGreaterThan` verdadero y su
   simétrico `isLessThan` también verdadero en la misma moneda; `isZero`, `isPositive`, `isNegative`
   correctos sobre cero, positivo y negativo (los demás predicados falsos en cada caso);
   `compareTo`, `isGreaterThan` o cualquier otra comparación entre monedas distintas lanza
@@ -281,6 +281,9 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   `isZero`, `isPositive`, `isNegative`, `isGreaterThan`, `isGreaterThanOrEqual`, `isLessThan`,
   `isLessThanOrEqual` sobre `compareTo`. REFACTOR: ninguno esperado. — Especificación `money`,
   requisito «Comparación total ordenada entre importes de la misma moneda» (los tres escenarios)
+  - *Evidencia (2026-09-18, local):* RED: 21 errores de compilación en `MoneyComparisonTest`
+    (métodos ausentes). GREEN: `./mvnw -pl kernel test -Dtest=MoneyComparisonTest` → 9/9;
+    conjunto completo del módulo, 52/52. Sin REFACTOR.
 
 - [ ] 2.2 **TDD — `Percentage`** (`PercentageTest`). ROJO: construcción válida desde `String` y
   desde `BigDecimal` en puntos porcentuales, a escala 4; rechazo fuera de `[0, 100]`

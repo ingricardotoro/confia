@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  * single private constructor below, which is where the scale-four and {@code NUMERIC(14,4)} range
  * invariants are enforced without exception (design.md, decision 4).
  */
-public final class Money {
+public final class Money implements Comparable<Money> {
 
     public static final int SCALE = 4;
 
@@ -138,6 +138,46 @@ public final class Money {
         if (currency != other.currency) {
             throw new CurrencyMismatchException(currency, other.currency);
         }
+    }
+
+    public boolean isZero() {
+        return amount.signum() == 0;
+    }
+
+    public boolean isPositive() {
+        return amount.signum() > 0;
+    }
+
+    public boolean isNegative() {
+        return amount.signum() < 0;
+    }
+
+    /**
+     * Compares amounts within the same currency; consistent with {@link #equals(Object)}.
+     * Ordering a collection with mixed currencies fails on purpose.
+     *
+     * @throws CurrencyMismatchException if {@code other} is a different currency
+     */
+    @Override
+    public int compareTo(Money other) {
+        requireSameCurrency(other);
+        return amount.compareTo(other.amount);
+    }
+
+    public boolean isGreaterThan(Money other) {
+        return compareTo(other) > 0;
+    }
+
+    public boolean isGreaterThanOrEqual(Money other) {
+        return compareTo(other) >= 0;
+    }
+
+    public boolean isLessThan(Money other) {
+        return compareTo(other) < 0;
+    }
+
+    public boolean isLessThanOrEqual(Money other) {
+        return compareTo(other) <= 0;
     }
 
     /**
