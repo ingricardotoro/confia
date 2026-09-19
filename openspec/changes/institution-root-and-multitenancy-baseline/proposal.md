@@ -6,7 +6,7 @@
 - **Exploración:** `openspec/changes/institution-root-and-multitenancy-baseline/exploration.md`
 - **Rama:** `change/institution-root-and-multitenancy-baseline`
 - **Estado:** aprobada por el propietario el 2026-09-19 (P3, `openspec/config.yaml`,
-  `rules.proposal`). D1, D2 y P3 resueltas; P1 pendiente antes de aplicar; P2 condicionada al diseño
+  `rules.proposal`). D1, D2, P1 y P3 resueltas; P2 condicionada al diseño
 
 ## Intención
 
@@ -282,6 +282,13 @@ dependa de `InstitutionId` y de `InstitutionRepository`.
 - **D2 (alcance de entidades): solo `Institution`.** `AcademicYear`, `Modality`, `Grade`,
   `Section` y `BillingPeriod` permanecen en el entregable 1 de F1 (`docs/09`).
 - **P3 (aprobación): aprobada**, incluida la ubicación de `InstitutionId` en `kernel`.
+- **P1 (forma de entrega): opción B.** Pull requests encadenados dentro de este cambio SDD, con los
+  cortes A (reglas de ArchUnit de ADR-0004 y puerta global del 80 %), B (`InstitutionId`,
+  `Institution`, retirada de la excepción de ADR-0018 y puertas del dominio) y C (capa de aplicación).
+  Encadenamiento según `docs/15-flujo-de-trabajo-git.md` §3: cada pull request apunta al anterior y
+  se fusionan en orden (`delivery_strategy: auto-chain`, `chain_strategy: stacked-to-main`). Al
+  cerrar cada pull request se mide el diff real; si supera 800 líneas, la aplicación se detiene y
+  decide el propietario.
 
 ## Decisiones que confirma el propietario al aprobar
 
