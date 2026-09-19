@@ -69,7 +69,7 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
 `./mvnw verify` con las reglas nuevas en verde sobre el código de producción existente
 (`com.confia.bootstrap` y `kernel`).
 
-- [ ] 1.1 **Medición de cobertura de `app` con solo `bootstrap`.** Declarar `jacoco-maven-plugin` en
+- [x] 1.1 **Medición de cobertura de `app` con solo `bootstrap`.** Declarar `jacoco-maven-plugin` en
   `apps/api/app/pom.xml` con las ejecuciones `prepare-agent` y `report` (heredadas del padre) pero
   **sin** ejecución `check` todavía. Ejecutar `./mvnw -B -pl apps/api/app -am verify` y leer el
   informe HTML/XML de JaCoCo de `app` (cobertura de líneas y de ramas sobre `com.confia.bootstrap`,
@@ -78,6 +78,10 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
   (`design.md`, decisión 9, «Por corte»; «Por confirmar», punto 5). Sin RED/GREEN (medición, no
   comportamiento de producción). — Capacidad `build-integrity`, requisito «Cobertura global mínima
   del módulo `app`» (precondición de la decisión de corte)
+  - **Evidencia (2026-09-19):** `./mvnw -B -pl app -am verify` en verde (31 pruebas, 0 fallos).
+    Informe JaCoCo de `app` (7 clases de `com.confia.bootstrap`): líneas 35/39 = **89.7 %**, ramas
+    11/13 = **84.6 %**, instrucciones 157/169 = 92.9 %. Ambos porcentajes superan 80 %, así que la
+    regla `BUNDLE` **entra en este PR** (tarea 1.5), no se traslada a PR B1.
 
 - [ ] 1.2 **TDD — regla 1, `NO_BIG_DECIMAL_FROM_FLOATING_POINT`.** ROJO: crear
   `apps/api/app/src/test/java/com/confia/architecture/MonetaryFloatingPointTest.java` con la regla

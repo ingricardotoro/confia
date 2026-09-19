@@ -51,4 +51,17 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Coverage measurement for this module (task 1.1): only the prepare-agent/report
+           executions managed in the parent pluginManagement, inherited unchanged. No jacoco-check
+           execution yet — whether the BUNDLE coverage gate belongs in this pull request or in
+           PR B1 depends on what this measurement reports (design.md, decision 9, "Por corte"). -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
 </project>
