@@ -133,6 +133,31 @@ public final class Money implements Comparable<Money> {
         return new Money(amount.negate(), currency);
     }
 
+    /**
+     * Exact, no rounding involved: multiplying a scale-four amount by an integer factor never
+     * needs more than scale four (design.md, decision 5). Verifies the {@code NUMERIC(14,4)}
+     * range on the exact result.
+     *
+     * @throws InvalidMoneyAmountException {@link InvalidMoneyAmountException#OUT_OF_RANGE} if the
+     *     exact result exceeds {@code 9999999999.9999} in absolute value
+     */
+    public Money multiply(long factor) {
+        return new Money(amount.multiply(BigDecimal.valueOf(factor)), currency);
+    }
+
+    /**
+     * Multiplies by a decimal factor with a single explicit rounding to scale four (design.md,
+     * decision 5). There is deliberately no overload with an implicit rounding mode.
+     *
+     * @throws InvalidMoneyAmountException {@link InvalidMoneyAmountException#OUT_OF_RANGE} if the
+     *     rounded result exceeds {@code 9999999999.9999} in absolute value
+     */
+    public Money multiply(BigDecimal factor, RoundingMode rounding) {
+        Objects.requireNonNull(factor, "factor");
+        Objects.requireNonNull(rounding, "rounding");
+        return new Money(amount.multiply(factor).setScale(SCALE, rounding), currency);
+    }
+
     private void requireSameCurrency(Money other) {
         Objects.requireNonNull(other, "other");
         if (currency != other.currency) {

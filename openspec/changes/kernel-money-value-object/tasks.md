@@ -304,7 +304,7 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
     validación de forma/escala se mantiene propia de `Percentage`, sin acoplarla a `Money` (la
     reutilización del diseño es condicional, "si aplica").
 
-- [ ] 2.3 **TDD — `multiply`** (segunda parte de `MoneyArithmeticTest`). ROJO: `multiply(long)`
+- [x] 2.3 **TDD — `multiply`** (segunda parte de `MoneyArithmeticTest`). ROJO: `multiply(long)`
   exacto sin redondeo (`1234.55 × 3 = 3703.65`, sin necesidad de redondear porque cabe en la escala
   interna); `multiply(BigDecimal, RoundingMode)` con un único redondeo a escala 4 explícito, sin
   modo implícito. VERDE: implementar `multiply(long factor)` (exacto, sin `RoundingMode`) y
@@ -313,6 +313,9 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   requisitos «Redondeo explícito con `HALF_UP` en toda operación que redondea» (escenario de
   multiplicación exacta) y «Casos de regresión permanentes de ADR-0004» (la colegiatura de tres
   meses, verificada aquí y confirmada de nuevo como regresión permanente en la tarea 2.8)
+  - *Evidencia (2026-09-18, local):* RED: 5 errores de compilación (`multiply` ausente). GREEN:
+    `./mvnw -pl kernel test -Dtest=MoneyArithmeticTest` → 17/17 (incluye desbordamiento de rango
+    en ambas sobrecargas). Sin REFACTOR.
 
 - [ ] 2.4 **TDD — `percentage(Percentage, RoundingMode)`**. ROJO: aplicación con redondeo explícito
   (`12.30` × `Percentage.of("5")` con `HALF_UP` → `0.62`, intermedio exacto `0.6150`); tasa cero deja
