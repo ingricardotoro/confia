@@ -81,6 +81,16 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    el cambio 4 incorpora las reglas de ArchUnit de ADR-0004 §Cumplimiento 2, que prohíben `double`
    y `float` para importes y `BigDecimal.equals` fuera de `Money`.
 2. Módulo de núcleo del backend con el objeto de valor `Money` (`BigDecimal` a escala cuatro con moneda explícita), reglas de redondeo y errores de dominio, con cobertura del 95 % medida con JaCoCo y pruebas de mutación con PIT.
+   **Pendientes heredados del cambio 2 (`kernel-money-value-object`, archivado el 2026-09-19):**
+   (a) `Money.allocate` no limita la cantidad de partes; debe acotarse antes de que los pesos
+   puedan provenir de una entrada externa. (b) La validación de cadenas y de escala está duplicada
+   entre `Money` y `Percentage`; se unifica cuando aparezca un tercer consumidor. (c)
+   `docs/03-seguridad.md` no tiene una regla que obligue a los objetos de valor del núcleo a acotar
+   la escala de un `BigDecimal` recibido del llamador; la revisión de seguridad del PR #5 tuvo que
+   corregir justo esa denegación de servicio. (d) `gentle-ai sdd-archive-compose` no reconoce los
+   encabezados en español (`### Requisito:`); mientras no se resuelva la incidencia
+   Gentleman-Programming/gentle-ai#4797, los deltas sobre capacidades existentes se fusionan a mano
+   con verificación byte a byte.
 3. Autenticación del personal con MFA, roles, permisos, sesiones y bloqueo por fuerza bruta.
 4. **Matriz de autorización** documentada y verificada por pruebas: qué rol puede hacer qué operación (brecha A7).
 5. Bitácora de auditoría de solo inserción, encadenada por hash, sin permiso de actualización ni borrado para el rol de aplicación (brecha B6).
