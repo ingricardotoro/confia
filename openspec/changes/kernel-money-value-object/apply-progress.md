@@ -126,10 +126,16 @@ decision D2. No owner consultation needed; PR 2b ships as a single unit.
 
 ### Remaining tasks
 
-None. All of 2.1–2.12 are complete. **CI is pending**: this agent verified locally only; the
-orchestrator pushes `change/kernel-money-value-object-allocation` and confirms GitHub Actions'
-`backend` job is green (it should run with `-Pmutation-report` while this branch's base, PR 2a, is
-unmerged, per `ci.yml`'s branch selection from task 1.9).
+None. All of 2.1–2.12 are complete. CI confirmed green after the merges: PR #5 and PR #6 were
+merged into `main` on 2026-09-19, and `main` run 35452164229 passed with `mutation-gate` active
+(JaCoCo met, PIT 176/178; the two survivors are equivalent mutants in `requireBoundedScale`).
+
+### Lost TDD evidence (verify report W2)
+
+The RED/GREEN evidence of PR 1 tasks 1.5, 1.6 and 1.10–1.12 lived only in the Engram topic
+`sdd/kernel-money-value-object/apply-progress`, and a later upsert of the same topic key
+overwrote it. It is not recoverable. From now on TDD evidence is kept in this file and in
+`tasks.md`, never only in Engram.
 
 ## Known finding carried from PR 1 (informational, not a blocker)
 
