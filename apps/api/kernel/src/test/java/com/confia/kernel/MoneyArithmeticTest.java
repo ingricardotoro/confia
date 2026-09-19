@@ -174,4 +174,44 @@ class MoneyArithmeticTest {
                 .extracting(exception -> ((InvalidMoneyAmountException) exception).code())
                 .isEqualTo(InvalidMoneyAmountException.OUT_OF_RANGE);
     }
+
+    @Test
+    void appliesAPercentageWithAnExactIntermediateAtScaleFour() {
+        Money base = Money.of("12.30", CurrencyCode.HNL);
+
+        Money result = base.percentage(Percentage.of("5"), RoundingMode.HALF_UP);
+
+        // Exact intermediate: 12.30 x 5 / 100 = 0.6150. Rounding to the minor unit (0.62) is a
+        // separate, explicit step (roundToMinorUnit).
+        assertThat(result).isEqualTo(Money.of("0.6150", CurrencyCode.HNL));
+    }
+
+    @Test
+    void aZeroRateLeavesTheBaseUnmodifiedAndReturnsZero() {
+        Money base = Money.of("500.00", CurrencyCode.HNL);
+
+        Money result = base.percentage(Percentage.of("0"), RoundingMode.HALF_UP);
+
+        assertThat(result).isEqualTo(Money.zero(CurrencyCode.HNL));
+        assertThat(base).isEqualTo(Money.of("500.00", CurrencyCode.HNL));
+    }
+
+    @Test
+    void theFloatingPointTaxAdr0004Case() {
+        Money base = Money.of("6.70", CurrencyCode.HNL);
+
+        Money result = base.percentage(Percentage.of("15"), RoundingMode.HALF_UP);
+
+        // Exact intermediate: 6.70 x 15 / 100 = 1.0050, never 1.00 as double arithmetic would give.
+        assertThat(result).isEqualTo(Money.of("1.0050", CurrencyCode.HNL));
+    }
+
+    @Test
+    void aHundredPercentReturnsTheSameAmount() {
+        Money base = Money.of("42.00", CurrencyCode.HNL);
+
+        Money result = base.percentage(Percentage.of("100"), RoundingMode.HALF_UP);
+
+        assertThat(result).isEqualTo(base);
+    }
 }

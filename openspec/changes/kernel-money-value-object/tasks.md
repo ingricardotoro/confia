@@ -317,7 +317,7 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
     `./mvnw -pl kernel test -Dtest=MoneyArithmeticTest` → 17/17 (incluye desbordamiento de rango
     en ambas sobrecargas). Sin REFACTOR.
 
-- [ ] 2.4 **TDD — `percentage(Percentage, RoundingMode)`**. ROJO: aplicación con redondeo explícito
+- [x] 2.4 **TDD — `percentage(Percentage, RoundingMode)`**. ROJO: aplicación con redondeo explícito
   (`12.30` × `Percentage.of("5")` con `HALF_UP` → `0.62`, intermedio exacto `0.6150`); tasa cero deja
   el importe base sin modificar y devuelve `Money.zero`; el caso permanente de ADR-0004
   (`6.70` × `Percentage.of("15")` con `HALF_UP` → `1.01`, intermedio exacto `1.0050`, nunca `1.00`).
@@ -326,6 +326,10 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   escala 4. REFACTOR: ninguno esperado. — Especificación `money`, requisitos «`Percentage` como
   colaborador explícito de `Money`» (escenarios de aplicación y de tasa cero) y «Casos de regresión
   permanentes de ADR-0004» (el impuesto que la coma flotante pierde)
+  - *Evidencia (2026-09-18, local):* RED: 4 errores de compilación (`percentage` ausente). GREEN:
+    `./mvnw -pl kernel test -Dtest=MoneyArithmeticTest` → 21/21. Sin REFACTOR. Nota: `percentage()`
+    redondea solo a escala 4 (design.md, decisión 4); el resultado final `0.62`/`1.01` de la
+    especificación exige además `roundToMinorUnit` (tarea 2.5), verificado en conjunto en 2.8.
 
 - [ ] 2.5 **TDD — `roundToMinorUnit(RoundingMode)`**. ROJO: los tres puntos medios exactos
   obligatorios `0.615`, `2.345`, `1.005` redondeados con `HALF_UP` a la escala menor de la moneda dan

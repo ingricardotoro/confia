@@ -158,6 +158,21 @@ public final class Money implements Comparable<Money> {
         return new Money(amount.multiply(factor).setScale(SCALE, rounding), currency);
     }
 
+    /**
+     * Applies a rate expressed in percentage points: {@code amount x percentage / 100}, computed
+     * exactly and rounded once, explicitly, to scale four (design.md, decision 6). There is
+     * deliberately no overload with an implicit rounding mode.
+     *
+     * @throws InvalidMoneyAmountException {@link InvalidMoneyAmountException#OUT_OF_RANGE} if the
+     *     rounded result exceeds {@code 9999999999.9999} in absolute value
+     */
+    public Money percentage(Percentage percentage, RoundingMode rounding) {
+        Objects.requireNonNull(percentage, "percentage");
+        Objects.requireNonNull(rounding, "rounding");
+        BigDecimal exactShare = amount.multiply(percentage.value()).movePointLeft(2);
+        return new Money(exactShare.setScale(SCALE, rounding), currency);
+    }
+
     private void requireSameCurrency(Money other) {
         Objects.requireNonNull(other, "other");
         if (currency != other.currency) {
