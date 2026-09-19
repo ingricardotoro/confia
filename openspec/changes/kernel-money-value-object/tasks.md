@@ -476,13 +476,25 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
     códigos, `./mvnw -pl kernel test -Dtest=KernelErrorCodesTest` → 4/4; conjunto completo de
     `kernel`: `./mvnw -pl kernel test` → 143/143. Sin REFACTOR.
 
-- [ ] 2.11 **Medir el diff real de PR 2** con
+- [x] 2.11 **Medir el diff real de PR 2** con
   `git diff --numstat change/kernel-money-value-object...change/kernel-money-value-object-arithmetic`,
   con las mismas exclusiones de la tarea 1.14. Si cabe en 800 líneas, continuar. **Si supera 800,
   detener la aplicación y consultar al propietario** entre un tercer PR en el punto de corte `2a`
   (comparación, multiplicación, porcentaje y redondeo) / `2b` (`allocate`, propiedades y
   regresiones) o una excepción de tamaño para PR 2. — Decisión D2/D5 de la propuesta; `design.md`,
   «Control durante la aplicación»
+  - *División 2a/2b (decisión del propietario, 2026-09-18):* el propietario dividió PR 2 en dos
+    ramas apiladas antes de esta medición: **PR 2a** (`change/kernel-money-value-object-arithmetic`,
+    base PR 1b `26ef15d`; comparación, `Percentage`, `multiply`, `percentage()`,
+    `roundToMinorUnit`; 665 líneas de autor, verificado con PIT 116/116) y **PR 2b**
+    (`change/kernel-money-value-object-allocation`, base PR 2a; `allocate` ya aplicado en el lote
+    anterior más las tareas 2.7 a 2.10 de este lote). Esta tarea mide **solo PR 2b**, según la
+    instrucción explícita del orquestador, con
+    `git diff --numstat change/kernel-money-value-object-arithmetic...HEAD -- . ':(exclude)openspec'`
+    (mismas exclusiones de la tarea 1.14; `HEAD` es esta rama).
+  - *Resultado (2026-09-18):* **6 files changed, 526 insertions(+), 3 deletions(-)** — 529 líneas
+    de autor en total, muy por debajo de 800. No se detiene la aplicación ni se consulta al
+    propietario; PR 2b se entrega como una sola unidad.
 
 - [ ] 2.12 **Verificación final de PR 2**: en checkout limpio de la rama
   `change/kernel-money-value-object-arithmetic` (base PR 1), con `JAVA_HOME` en JDK 25, ejecutar
