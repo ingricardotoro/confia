@@ -77,7 +77,7 @@ se sustituye una versión por una cacheada incompatible para pasar en local.
 Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw verify` con JaCoCo a
 95 % y PIT a 80 sobre lo que contiene. Ninguna operación se entrega sin su prueba en el mismo PR.
 
-- [ ] 1.1 `openspec/config.yaml`: `strict_tdd: true`, `rules.apply.tdd: true`,
+- [x] 1.1 `openspec/config.yaml`: `strict_tdd: true`, `rules.apply.tdd: true`,
   `rules.apply.test_command: "./mvnw verify"` (en `apps/api`, JDK 25),
   `rules.verify.coverage_threshold: 95` (líneas y ramas de `kernel`; el umbral global de 80 % sobre
   `app` llega con el cambio 4, decisión ya cerrada), y actualizar el bloque `context` para retirar
@@ -86,7 +86,7 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   `docs/13-metodologia-sdd.md`. — Alcance de la propuesta, punto 9; sin RED/GREEN (no es
   comportamiento de producción)
 
-- [ ] 1.2 `apps/api/pom.xml` (POM padre): `pluginManagement` de `jacoco-maven-plugin` (versión con
+- [x] 1.2 `apps/api/pom.xml` (POM padre): `pluginManagement` de `jacoco-maven-plugin` (versión con
   soporte oficial de Java 25, `0.8.14` o posterior; confirmar contra las notas de versión, nunca
   bajar a `0.8.12` cacheada) y de `org.pitest:pitest-maven` con la dependencia de complemento
   `org.pitest:pitest-junit5-plugin`; propiedades `confia.pit.phase=none`,
@@ -99,7 +99,7 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   Capacidad `build-integrity`, requisitos «Cobertura mínima del módulo `kernel`» y «Puntuación de
   mutación del módulo `kernel` según la rama»; sin RED/GREEN (configuración de build)
 
-- [ ] 1.3 `apps/api/kernel/pom.xml`: declarar `jqwik` (versión gestionada por la propiedad
+- [x] 1.3 `apps/api/kernel/pom.xml`: declarar `jqwik` (versión gestionada por la propiedad
   `jqwik.version` en `dependencyManagement` del padre) y `junit-platform-launcher` en alcance
   `test` (no toca `enforce-kernel-purity`, que solo prohíbe `compile`/`runtime`/`provided`/`system`);
   añadir el complemento `jacoco-maven-plugin` con la ejecución `check` en fase `verify` sobre
@@ -111,14 +111,14 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   `./mvnw -pl apps/api/kernel -am validate` resuelve sin error. — Capacidad `build-integrity`,
   ambos requisitos nuevos; `design.md` decisiones 8, 9 y 12; sin RED/GREEN (configuración de build)
 
-- [ ] 1.4 Eliminar `apps/api/kernel/src/test/java/com/confia/kernel/BuildSmokeTest.java` (su
+- [x] 1.4 Eliminar `apps/api/kernel/src/test/java/com/confia/kernel/BuildSmokeTest.java` (su
   Javadoc «sin reglas de negocio todavía» queda falso) y actualizar
   `apps/api/kernel/src/main/java/com/confia/kernel/package-info.java` para documentar el paquete
   plano `com.confia.kernel` (`design.md`, decisión 1: sin subpaquetes, por la verificación de Spring
   Modulith de `app`). Verificación: `./mvnw -pl apps/api/kernel test` sigue en verde sin la prueba
   de humo retirada. — `design.md`, «Cambios de archivos»; sin RED/GREEN (limpieza)
 
-- [ ] 1.5 **TDD — `DomainException`** (ADR-0019). ROJO: escribir
+- [x] 1.5 **TDD — `DomainException`** (ADR-0019). ROJO: escribir
   `apps/api/kernel/src/test/java/com/confia/kernel/DomainExceptionTest.java` contra una subclase de
   prueba: `code()` estable, formato kebab-case `<sujeto>-<condición>`, `DomainException` es
   abstracta y no instanciable directamente, es una excepción no comprobada (no exige `throws` ni
@@ -130,7 +130,7 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   dominio de `kernel`» (escenarios «no se instancia directamente», «no obliga a declararse ni a
   capturarse»)
 
-- [ ] 1.6 **TDD — `CurrencyCode` y `UnsupportedCurrencyException`**. ROJO: escribir
+- [x] 1.6 **TDD — `CurrencyCode` y `UnsupportedCurrencyException`**. ROJO: escribir
   `CurrencyCodeTest.java` cubriendo `HNL` y `USD` con sus dígitos de unidad menor,
   `fromIsoCode` sensible a mayúsculas, `UnsupportedCurrencyException` (código
   `currency-unsupported`, mensaje que nunca repite la entrada rechazada) ante un código fuera del
@@ -142,7 +142,7 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   hereda de `DomainException`). REFACTOR: limpiar el analizador de `fromIsoCode`. — Especificación
   `money`, requisito «Moneda cerrada al conjunto habilitado» (ambos escenarios)
 
-- [ ] 1.7 **Prueba de humo de PIT y jqwik sobre Java 25 y JUnit 6**, antes de escribir `Money`
+- [x] 1.7 **Prueba de humo de PIT y jqwik sobre Java 25 y JUnit 6**, antes de escribir `Money`
   (`design.md`, «Secuencia de implementación», paso 3): ejecutar
   `./mvnw -pl apps/api/kernel -am verify -Pmutation-report` y confirmar que (a) JaCoCo instrumenta
   clases compiladas para Java 25, (b) PIT genera y evalúa mutantes sobre `DomainException` y
@@ -155,7 +155,7 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   `ubuntu-latest`. — Capacidad `build-integrity`, ambos requisitos; riesgo de la propuesta «PIT y
   jqwik nunca se descargaron en esta máquina»
 
-- [ ] 1.8 `SuppressionCitesAdrTest`: agregar los marcadores de JaCoCo y PIT del catálogo de
+- [x] 1.8 `SuppressionCitesAdrTest`: agregar los marcadores de JaCoCo y PIT del catálogo de
   `design.md` decisión 13 (exclusiones de PIT, desactivación de cualquier complemento,
   `haltOnFailure=false` de JaCoCo, exclusión de clases de JaCoCo, `@Generated`) a la lista de
   patrones con nombre, y una prueba parametrizada que confirma, para cada patrón, que coincide con
@@ -163,7 +163,7 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   `./mvnw -pl apps/api/app test -Dtest=SuppressionCitesAdrTest` en verde. — ADR-0018, sección 3.b
   (obligación asignada a este cambio, no forma parte del catálogo original del cambio 1)
 
-- [ ] 1.9 `.github/workflows/ci.yml`: seleccionar el perfil de mutación según `github.ref` en el
+- [x] 1.9 `.github/workflows/ci.yml`: seleccionar el perfil de mutación según `github.ref` en el
   paso `verify` del trabajo `backend`
   (`-Dconfia.ci.mainBranch=true` en `main`, `-Pmutation-report` en cualquier otro caso, incluidos
   `change/**` y `pull_request`), agregar `upload-artifact` fijado por SHA de commit con los reportes
@@ -173,7 +173,7 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   — Capacidad `build-integrity`, requisito «Puntuación de mutación del módulo `kernel` según la
   rama» (escenario «Selección de perfil de mutación según la rama»)
 
-- [ ] 1.10 **TDD — `CurrencyMismatchException` e `InvalidMoneyAmountException`**. ROJO: pruebas que
+- [x] 1.10 **TDD — `CurrencyMismatchException` e `InvalidMoneyAmountException`**. ROJO: pruebas que
   confirman que ambas heredan de `DomainException`, que `CurrencyMismatchException` expone
   `expected()`/`actual()` de tipo `CurrencyCode` con código `currency-mismatch`, y que
   `InvalidMoneyAmountException` tiene tres fábricas de paquete privadas por causa (`malformed()`,
@@ -183,7 +183,7 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   requisito «Jerarquía de errores de dominio de `kernel`» (escenario de `CurrencyMismatchException`)
   y requisito «Construcción y normalización a escala cuatro» (códigos de error)
 
-- [ ] 1.11 **TDD — construcción e igualdad de `Money`** (`MoneyConstructionTest`). ROJO: escribir
+- [x] 1.11 **TDD — construcción e igualdad de `Money`** (`MoneyConstructionTest`). ROJO: escribir
   los escenarios de la especificación `money`: cadena decimal válida normalizada a escala 4;
   `Money.zero(HNL)`; importe negativo; mínimo representable `0.01`; límite de `NUMERIC(14,4)`
   `9999999999.9999`; rechazo con más de cuatro decimales (`money-scale-exceeded`); rechazo de cadena
@@ -205,7 +205,7 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
   escala cuatro», «Igualdad por importe normalizado y moneda» y «Exposición del importe sin
   acoplarse al DTO de la API»
 
-- [ ] 1.12 **TDD — `add`, `subtract`, `negate`** (primera parte de `MoneyArithmeticTest`). ROJO:
+- [x] 1.12 **TDD — `add`, `subtract`, `negate`** (primera parte de `MoneyArithmeticTest`). ROJO:
   suma exitosa en la misma moneda; resta exitosa en la misma moneda; suma de monedas distintas
   lanza `CurrencyMismatchException` sin construir ningún `Money`; suma que excede el límite
   superior de `NUMERIC(14,4)` falla con `money-amount-out-of-range` sin construir ningún `Money`;
