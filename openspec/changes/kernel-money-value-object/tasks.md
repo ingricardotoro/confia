@@ -462,7 +462,7 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
     Retirada la sobrecarga (`git diff` confirma `Money.java` sin cambios), vuelve a verde: conjunto
     completo de `kernel`: `./mvnw -pl kernel test` → 139/139. Sin REFACTOR.
 
-- [ ] 2.10 **`KernelErrorCodesTest`**: catálogo completo y cerrado de los ocho códigos de error del
+- [x] 2.10 **`KernelErrorCodesTest`**: catálogo completo y cerrado de los ocho códigos de error del
   núcleo (`currency-mismatch`, `currency-unsupported`, `money-amount-malformed`,
   `money-scale-exceeded`, `money-amount-out-of-range`, `percentage-malformed`,
   `percentage-scale-exceeded`, `percentage-out-of-range`): formato kebab-case, unicidad entre todas
@@ -470,6 +470,11 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   Verificación: falla si dos excepciones comparten código o si un código no sigue el formato. —
   Especificación `money`, requisito «Jerarquía de errores de dominio de `kernel`»; `design.md`,
   decisión 2 (catálogo de códigos, «definitivos»)
+  - *Evidencia (2026-09-18, local):* RED: se afirmó temporalmente un catálogo de siete códigos
+    (omitiendo `percentage-out-of-range`); falló por la razón correcta (tamaño real 8 contra el
+    esperado 7, con el código faltante señalado en el diff de AssertJ). GREEN: corregido a los ocho
+    códigos, `./mvnw -pl kernel test -Dtest=KernelErrorCodesTest` → 4/4; conjunto completo de
+    `kernel`: `./mvnw -pl kernel test` → 143/143. Sin REFACTOR.
 
 - [ ] 2.11 **Medir el diff real de PR 2** con
   `git diff --numstat change/kernel-money-value-object...change/kernel-money-value-object-arithmetic`,
