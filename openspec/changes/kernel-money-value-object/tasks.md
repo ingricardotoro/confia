@@ -265,6 +265,49 @@ Rama `change/kernel-money-value-object`, base `main`. Compila y pasa `./mvnw ver
 
 ---
 
+### Nota de aplicación — primer lote de PR 2 (tareas 2.1–2.6, 2026-09-18)
+
+Verificación de cierre de lote, `./mvnw -B verify -Pmutation-gate` en `apps/api`, checkout local,
+`JAVA_HOME` en JDK 25: `BUILD SUCCESS` en las tres unidades del reactor. JaCoCo: 100 % de líneas y
+100 % de ramas en `kernel` (umbral 95 %, cumplido con margen). PIT (`-Pmutation-gate`, umbral 80):
+**147 mutaciones generadas, 147 muertas (100 %)**, cero mutantes supervivientes tras corregir siete
+que sobrevivieron en la primera corrida (detalle abajo). 130 pruebas en `kernel`.
+
+Siete mutantes sobrevivientes detectados y corregidos antes de cerrar el lote (ninguno se declaró
+equivalente sin corrección, conforme a `confia-testing-playbook` sección 12):
+
+1. `Money.isGreaterThan` línea 323 (`ConditionalsBoundaryMutator`, `>` → `>=`) — sin prueba de
+   igualdad. Corregido con `isGreaterThanAndIsLessThanAreFalseForEqualAmounts`.
+2. `Money.isLessThan` línea 331 (mismo mutador) — misma prueba lo corrige.
+3. `Money.allocate` línea 218 (`ConditionalsBoundaryMutator` sobre `sign < 0`) — mutante
+   equivalente en la práctica (con signo cero todas las partes ya son cero), pero se eliminó la
+   ambigüedad reescribiendo la condición como `amount.signum() == -1` en vez de reformular una
+   prueba imposible de escribir (no existe un total cero con partes no nulas).
+4. `Money.distributeByLargestRemainder` línea 279 (`VoidMethodCallMutator`, elimina la llamada a
+   `List::sort`) — ninguna prueba anterior obligaba a ordenar por resto descendente cuando el
+   índice de mayor resto no es el más bajo. Corregido con
+   `assignsTheLeftoverToTheHighestRemainderEvenWhenItIsNotTheFirstIndex` (`0.07` entre pesos
+   `[1, 2]`, resultado `[0.02, 0.05]`).
+5. `Money.requireValidRatios` línea 226 (`RemoveConditionalMutator_EQUAL_ELSE` sobre
+   `ratios.length == 0`) — indistinguible del código real porque ambos caminos terminan lanzando
+   `IllegalArgumentException` (la comprobación de suma cero también dispara para una lista vacía).
+   Corregido afirmando el mensaje exacto (`"empty"`) en `rejectsAnEmptyWeightList`.
+6. `Percentage.hashCode` línea 96 (`PrimitiveReturnsMutator`, sustituye por `0`) — ninguna prueba
+   comprobaba el valor real de `hashCode`, solo que dos iguales coincidieran (`0 == 0` también
+   pasa). Corregido con `hashCodeIsBasedOnTheNormalizedValue`.
+7. `Percentage.of(String)` línea 44 (`ConditionalsBoundaryMutator` sobre el límite de 64
+   caracteres) — sin caso límite exacto. Corregido con `acceptsAStringOfExactlySixtyFourCharacters`
+   y `rejectsAStringLongerThanSixtyFourCharacters`.
+
+`git diff --shortstat main...change/kernel-money-value-object-arithmetic -- . ':(exclude)openspec'`
+(rama completa contra `main`, que ya incluye PR 1a/1b fusionados): **7 files changed, 830
+insertions(+), 5 deletions(-)**. Riesgo de presupuesto: esto cubre solo las tareas 2.1 a 2.6 (la
+mitad de PR 2); las tareas 2.7 a 2.10 (propiedades de jqwik, regresión, forma de la API, catálogo
+de códigos) siguen pendientes y es previsible que el PR 2 completo supere el presupuesto de 800
+líneas del diseño (estimado 665–880 para el PR completo). La tarea 2.11 ya prevé detenerse y
+consultar al propietario si el diff real lo supera; no se decide aquí, queda para el siguiente
+lote.
+
 ## PR 2 — Comparación, multiplicación, `Percentage`, redondeo y reparto
 
 Rama `change/kernel-money-value-object-arithmetic`, base `change/kernel-money-value-object` (PR 1).
