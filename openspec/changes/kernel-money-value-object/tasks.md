@@ -448,13 +448,19 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
     corregido a `1.01`, `./mvnw -pl kernel test -Dtest=MoneyRegressionTest` → 4/4; conjunto
     completo de `kernel`: `./mvnw -pl kernel test` → 137/137. Sin REFACTOR.
 
-- [ ] 2.9 **`MoneyApiShapeTest`**: reflexión del JDK sobre `Money` y `Percentage` completos (ambos
+- [x] 2.9 **`MoneyApiShapeTest`**: reflexión del JDK sobre `Money` y `Percentage` completos (ambos
   ya terminados en este PR) que confirma que ningún miembro público usa `double`, `float`, `Double`
   ni `Float`, ni como parámetro ni como retorno. Verificación: falla si se agrega temporalmente una
   sobrecarga con `double` a cualquiera de las dos clases, y vuelve a verde al retirarla. —
   Especificación `money`, requisitos «Construcción y normalización a escala cuatro» y «`Percentage`
   como colaborador explícito de `Money`» (ambos escenarios de «ausencia de fábrica desde coma
   flotante»); reemplaza la regla de ArchUnit diferida al cambio 4 (decisión D3 de la propuesta)
+  - *Evidencia (2026-09-18, local):* con la clase escrita, `./mvnw -pl kernel test
+    -Dtest=MoneyApiShapeTest` → 2/2 en verde de entrada (no hay `double`/`float` hoy). RED literal
+    exigido por la tarea: se agregó temporalmente `public Money multiply(double factor)` a `Money`;
+    falló por la razón correcta (`Money.multiply must not accept a floating-point parameter`).
+    Retirada la sobrecarga (`git diff` confirma `Money.java` sin cambios), vuelve a verde: conjunto
+    completo de `kernel`: `./mvnw -pl kernel test` → 139/139. Sin REFACTOR.
 
 - [ ] 2.10 **`KernelErrorCodesTest`**: catálogo completo y cerrado de los ocho códigos de error del
   núcleo (`currency-mismatch`, `currency-unsupported`, `money-amount-malformed`,
