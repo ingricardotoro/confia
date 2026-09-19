@@ -156,6 +156,11 @@
               <goals>
                 <goal>prepare-agent</goal>
               </goals>
+              <configuration>
+                <!-- Start from an empty jacoco.exec on every run: appending let leftover data from an
+                     earlier full run satisfy the gate for a narrower run (verify report W3). -->
+                <append>false</append>
+              </configuration>
             </execution>
             <execution>
               <id>jacoco-report</id>
