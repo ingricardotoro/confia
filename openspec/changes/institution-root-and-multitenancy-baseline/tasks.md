@@ -83,7 +83,7 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
     11/13 = **84.6 %**, instrucciones 157/169 = 92.9 %. Ambos porcentajes superan 80 %, así que la
     regla `BUNDLE` **entra en este PR** (tarea 1.5), no se traslada a PR B1.
 
-- [ ] 1.2 **TDD — regla 1, `NO_BIG_DECIMAL_FROM_FLOATING_POINT`.** ROJO: crear
+- [x] 1.2 **TDD — regla 1, `NO_BIG_DECIMAL_FROM_FLOATING_POINT`.** ROJO: crear
   `apps/api/app/src/test/java/com/confia/architecture/MonetaryFloatingPointTest.java` con la regla
   que prohíbe `new BigDecimal(double)`, `new BigDecimal(double, MathContext)` y
   `BigDecimal.valueOf(double)` en `productionClasses()`, y el fixture
@@ -96,6 +96,11 @@ Rama `change/institution-root-and-multitenancy-baseline` (rama actual), base `ma
   REFACTOR: ninguno esperado. — Capacidad `build-integrity`, requisito «Prohibición de coma flotante
   para importes y de igualdad cruda de `BigDecimal` fuera de `Money`» (escenario «Fixture que
   construye `BigDecimal` desde `double`» y «Código de producción sin infracciones»)
+  - **Evidencia (2026-09-19):** ROJO observado: `cannot find symbol NO_BIG_DECIMAL_FROM_FLOATING_POINT`
+    al compilar `MonetaryFloatingPointTest` (`./mvnw -B -pl app -am test -Dtest=MonetaryFloatingPointTest
+    -Dsurefire.failIfNoSpecifiedTests=false`). VERDE: 2/2 pruebas en verde tras añadir la regla.
+    No vacuidad: se comentaron las tres llamadas del fixture y `rejectsTheFixtureFloatingPointBigDecimalConstruction`
+    falló (1 fallo de 2 pruebas); se revirtió la neutralización y las 2 pruebas volvieron a verde.
 
 - [ ] 1.3 **TDD — regla 2, `NO_BIG_DECIMAL_EQUALS_OUTSIDE_MONEY`.** ROJO: extender
   `MonetaryFloatingPointTest` con la regla que prohíbe `BigDecimal.equals(Object)` en clases que no
