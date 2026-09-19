@@ -534,7 +534,7 @@ nombre del parámetro); ninguna firma pública recibe ni devuelve `double`, `flo
 | `apps/api/kernel/src/main/java/com/confia/kernel/InvalidPercentageException.java` | Crear | 2 | Tres códigos |
 | `apps/api/kernel/src/test/java/com/confia/kernel/PercentageTest.java` | Crear | 2 | Rango, escala, forma |
 | `apps/api/kernel/src/test/java/com/confia/kernel/MoneyAllocationTest.java` | Crear | 2 | Casos de ejemplo de `allocate`, pesos cero, negativos, errores |
-| `apps/api/kernel/src/test/java/com/confia/kernel/MoneyProperties.java` | Crear | 2 | Propiedades de jqwik (ver «Estrategia de pruebas») |
+| `apps/api/kernel/src/test/java/com/confia/kernel/MoneyPropertiesTest.java` | Crear | 2 | Propiedades de jqwik (ver «Estrategia de pruebas») |
 | `apps/api/kernel/src/test/java/com/confia/kernel/MoneyRegressionTest.java` | Crear | 2 | Los cuatro casos permanentes de ADR-0004, marcados como tales en el Javadoc |
 
 Contenido de `openspec/config.yaml` tras el cambio (solo lo que cambia):
@@ -626,7 +626,7 @@ del primer pull request.
 | A. Aritmética exacta | `add`, `subtract`, `negate` (15–25); `CurrencyMismatchException` (25–30); primera parte de `MoneyArithmeticTest` (55–75) | 95 a 130 |
 | K. Comparación | `compareTo`, signo y cuatro comparaciones en `Money` (30–40); `MoneyComparisonTest` (45–60) | 75 a 100 |
 | X. Guardas transversales | `MoneyApiShapeTest` (30–40); `KernelErrorCodesTest` (25–35) | 55 a 75 |
-| R. Multiplicación, porcentaje, redondeo y reparto | Operaciones en `Money` (100–130), `Percentage` (60–80), `InvalidPercentageException` (30–40), `PercentageTest` (70–90), segunda parte de `MoneyArithmeticTest` (90–120), `MoneyAllocationTest` (70–90), `MoneyProperties` (80–110), `MoneyRegressionTest` (35–45) | 535 a 705 |
+| R. Multiplicación, porcentaje, redondeo y reparto | Operaciones en `Money` (100–130), `Percentage` (60–80), `InvalidPercentageException` (30–40), `PercentageTest` (70–90), segunda parte de `MoneyArithmeticTest` (90–120), `MoneyAllocationTest` (70–90), `MoneyPropertiesTest` (80–110), `MoneyRegressionTest` (35–45) | 535 a 705 |
 | **Total** | | **1 318 a 1 767** |
 
 Esta estimación es más alta que la de la propuesta (1 065 a 1 445) porque desglosa archivo por
@@ -677,7 +677,7 @@ base `main`.
   cuatro comparaciones y `MoneyComparisonTest`.
 - `multiply(long)`, `multiply(BigDecimal, RoundingMode)`, `percentage`, `roundToMinorUnit`,
   `allocate`; `Percentage` e `InvalidPercentageException`; `PercentageTest`, segunda parte de
-  `MoneyArithmeticTest`, `MoneyAllocationTest`, `MoneyProperties`, `MoneyRegressionTest`.
+  `MoneyArithmeticTest`, `MoneyAllocationTest`, `MoneyPropertiesTest`, `MoneyRegressionTest`.
 - `MoneyApiShapeTest` (cubre `Money` y `Percentage` completos) y `KernelErrorCodesTest` (los ocho
   códigos).
 
