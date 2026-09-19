@@ -496,15 +496,28 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
     de autor en total, muy por debajo de 800. No se detiene la aplicación ni se consulta al
     propietario; PR 2b se entrega como una sola unidad.
 
-- [ ] 2.12 **Verificación final de PR 2**: en checkout limpio de la rama
-  `change/kernel-money-value-object-arithmetic` (base PR 1), con `JAVA_HOME` en JDK 25, ejecutar
-  `./mvnw -B verify -Pmutation-report`. Confirmar cobertura de líneas y de ramas de `kernel` ≥ 95 %
-  sobre el módulo completo (PR 1 + PR 2) y puntuación de mutación ≥ 80 informada, sin romper la
-  construcción por estar en una rama de trabajo. Confirmar además, simulando
-  `-Dconfia.ci.mainBranch=true` en local o en un commit temporal autorizado, que `mutation-gate`
-  **sí** rompe la construcción si la puntuación cae por debajo de 80, mientras
-  `mutation-report` en la misma rama de trabajo solo informa (cierre de la demostración de puertas
-  de la tarea 1.13, ahora sobre el módulo `Money` completo). Empujar la rama y confirmar en GitHub
-  Actions que el trabajo `backend` termina en verde con `-Pmutation-report` mientras apunta al PR 1.
-  — Capacidad `build-integrity`, ambos requisitos; criterios de éxito de la propuesta (cobertura,
-  mutación y selección de perfil por rama)
+- [x] 2.12 **Verificación final de PR 2** (alcance ajustado a PR 2b por la instrucción explícita
+  del orquestador de esta sesión: verificación local solamente; el orquestador empuja la rama y
+  confirma la integración continua, no este agente): en el checkout local de
+  `change/kernel-money-value-object-allocation` (base PR 2a), con `JAVA_HOME` en
+  `C:/Program Files/Eclipse Adoptium/jdk-25.0.3.9-hotspot`, se ejecutó
+  `./mvnw -B verify -Pmutation-gate` (perfil de puerta real, no solo de informe, para demostrar
+  además que la puntuación de mutación se mide y no rompe por estar por encima de 80). Confirmar
+  cobertura de líneas y de ramas de `kernel` ≥ 95 % sobre el módulo completo (PR 1 + PR 2a + PR 2b)
+  y puntuación de mutación ≥ 80. — Capacidad `build-integrity`, ambos requisitos; criterios de
+  éxito de la propuesta (cobertura, mutación y selección de perfil por rama)
+  - *Evidencia local (2026-09-18, `-Pmutation-gate`, reactor completo `apps/api`):* `BUILD
+    SUCCESS` en las tres unidades (`confia-api-parent`, `confia-kernel`, `confia-api`). `kernel`:
+    143 pruebas de Surefire (`./mvnw -pl kernel test` → 143/143). JaCoCo: «All coverage checks have
+    been met» (BUNDLE, LINE y BRANCH ≥ 0.95, cumplido). PIT: **147 mutaciones generadas, 147
+    muertas (100 %)** — 146 `KILLED` y 1 `TIMED_OUT` (contado como detectado por PIT), 0
+    `SURVIVED` (confirmado en `kernel/target/pit-reports/mutations.xml`, conteo por `status`);
+    cobertura de líneas de las clases mutadas 177/177 (100 %); fuerza de prueba (test strength)
+    100 %; 443 pruebas ejecutadas sobre las mutaciones (3.01 por mutación). Módulo `app`: las ocho
+    clases de arquitectura (`ArchUnit`, Spring Modulith, `SuppressionCitesAdrTest`) y el contexto
+    de arranque de Spring Boot siguen en verde con `kernel` poblado, sin romper el inventario de
+    ADR-0018. No se detectó ningún mutante `SURVIVED`, así que no aplica el paso 3 de la
+    demostración de puertas de la tarea 1.13 (ya cerrado en 1.13 y 1.15 sobre PR 1); no se
+    consultó al propietario porque no hizo falta un commit temporal para simular la puerta.
+    **Integración continua: pendiente.** Este agente no empuja la rama ni consulta GitHub
+    Actions; el orquestador lo hace tras recibir este resultado.
