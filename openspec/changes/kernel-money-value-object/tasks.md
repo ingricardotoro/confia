@@ -345,7 +345,7 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
     medios, su simetría negativa y el desbordamiento al redondear el límite superior). Sin
     REFACTOR.
 
-- [ ] 2.6 **TDD — `allocate(int...)`** (`MoneyAllocationTest`). ROJO: reparto con residuo por el
+- [x] 2.6 **TDD — `allocate(int...)`** (`MoneyAllocationTest`). ROJO: reparto con residuo por el
   método del resto mayor (`100.00` entre `[1,1,1]` → `[33.34, 33.33, 33.33]`, suma exactamente
   `100.00`); reparto exacto sin residuo (`90.00` entre `[1,1,1]` → `[30.00, 30.00, 30.00]`); rechazo
   de lista vacía, de un peso negativo y de todos los pesos en cero (los tres casos, ninguno
@@ -357,6 +357,11 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   algoritmo de reparto a un método privado legible según el pseudocódigo de `design.md` decisión 7.
   — Especificación `money`, requisito «Reparto proporcional sin pérdida de residuo (`allocate`)»
   (los tres primeros escenarios)
+  - *Evidencia (2026-09-18, local):* RED: 7 errores de compilación (`allocate` ausente). GREEN:
+    `./mvnw -pl kernel test -Dtest=MoneyAllocationTest` → 11/11. REFACTOR: se extrajo el algoritmo
+    a `requireValidRatios`, `requireExactMinorUnitMultiple` y
+    `distributeByLargestRemainder` (métodos privados), siguiendo el pseudocódigo de `design.md`
+    decisión 7; conjunto completo de `kernel` tras el refactor: `./mvnw -pl kernel test` → 122/122.
 
 - [ ] 2.7 **Propiedades de jqwik** (`MoneyProperties`), generadores acotados al rango de
   `NUMERIC(14,4)`, mil intentos por propiedad, semilla informada en caso de fallo: (a) la suma de
