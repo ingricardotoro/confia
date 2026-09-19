@@ -272,7 +272,7 @@ El nombre debe empezar por `change/` para que `ci.yml` ejecute su verificación 
 PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y recibe su ejecución de
 `pull_request`.
 
-- [ ] 2.1 **TDD — comparación total** (`MoneyComparisonTest`). ROJO: `isGreaterThan` verdadero y su
+- [x] 2.1 **TDD — comparación total** (`MoneyComparisonTest`). ROJO: `isGreaterThan` verdadero y su
   simétrico `isLessThan` también verdadero en la misma moneda; `isZero`, `isPositive`, `isNegative`
   correctos sobre cero, positivo y negativo (los demás predicados falsos en cada caso);
   `compareTo`, `isGreaterThan` o cualquier otra comparación entre monedas distintas lanza
@@ -281,8 +281,11 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   `isZero`, `isPositive`, `isNegative`, `isGreaterThan`, `isGreaterThanOrEqual`, `isLessThan`,
   `isLessThanOrEqual` sobre `compareTo`. REFACTOR: ninguno esperado. — Especificación `money`,
   requisito «Comparación total ordenada entre importes de la misma moneda» (los tres escenarios)
+  - *Evidencia (2026-09-18, local):* RED: 21 errores de compilación en `MoneyComparisonTest`
+    (métodos ausentes). GREEN: `./mvnw -pl kernel test -Dtest=MoneyComparisonTest` → 9/9;
+    conjunto completo del módulo, 52/52. Sin REFACTOR.
 
-- [ ] 2.2 **TDD — `Percentage`** (`PercentageTest`). ROJO: construcción válida desde `String` y
+- [x] 2.2 **TDD — `Percentage`** (`PercentageTest`). ROJO: construcción válida desde `String` y
   desde `BigDecimal` en puntos porcentuales, a escala 4; rechazo fuera de `[0, 100]`
   (`percentage-out-of-range`, ejemplo `"100.01"`); ausencia de fábrica desde `double`/`float` (no
   compila); mismas reglas de forma y escala que `Money` (`money-scale-exceeded` /
@@ -296,8 +299,12 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   forma/escala extraída en la tarea 1.11 si aplica sin acoplar `Money` y `Percentage` entre sí más
   allá de lo necesario. — Especificación `money`, requisito «`Percentage` como colaborador
   explícito de `Money`» (los cuatro escenarios propios de `Percentage`)
+  - *Evidencia (2026-09-18, local):* RED: errores de compilación en `PercentageTest` (símbolos
+    ausentes). GREEN: `./mvnw -pl kernel test -Dtest=PercentageTest` → 14/14. Sin REFACTOR: la
+    validación de forma/escala se mantiene propia de `Percentage`, sin acoplarla a `Money` (la
+    reutilización del diseño es condicional, "si aplica").
 
-- [ ] 2.3 **TDD — `multiply`** (segunda parte de `MoneyArithmeticTest`). ROJO: `multiply(long)`
+- [x] 2.3 **TDD — `multiply`** (segunda parte de `MoneyArithmeticTest`). ROJO: `multiply(long)`
   exacto sin redondeo (`1234.55 × 3 = 3703.65`, sin necesidad de redondear porque cabe en la escala
   interna); `multiply(BigDecimal, RoundingMode)` con un único redondeo a escala 4 explícito, sin
   modo implícito. VERDE: implementar `multiply(long factor)` (exacto, sin `RoundingMode`) y
@@ -306,8 +313,11 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   requisitos «Redondeo explícito con `HALF_UP` en toda operación que redondea» (escenario de
   multiplicación exacta) y «Casos de regresión permanentes de ADR-0004» (la colegiatura de tres
   meses, verificada aquí y confirmada de nuevo como regresión permanente en la tarea 2.8)
+  - *Evidencia (2026-09-18, local):* RED: 5 errores de compilación (`multiply` ausente). GREEN:
+    `./mvnw -pl kernel test -Dtest=MoneyArithmeticTest` → 17/17 (incluye desbordamiento de rango
+    en ambas sobrecargas). Sin REFACTOR.
 
-- [ ] 2.4 **TDD — `percentage(Percentage, RoundingMode)`**. ROJO: aplicación con redondeo explícito
+- [x] 2.4 **TDD — `percentage(Percentage, RoundingMode)`**. ROJO: aplicación con redondeo explícito
   (`12.30` × `Percentage.of("5")` con `HALF_UP` → `0.62`, intermedio exacto `0.6150`); tasa cero deja
   el importe base sin modificar y devuelve `Money.zero`; el caso permanente de ADR-0004
   (`6.70` × `Percentage.of("15")` con `HALF_UP` → `1.01`, intermedio exacto `1.0050`, nunca `1.00`).
@@ -316,8 +326,12 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   escala 4. REFACTOR: ninguno esperado. — Especificación `money`, requisitos «`Percentage` como
   colaborador explícito de `Money`» (escenarios de aplicación y de tasa cero) y «Casos de regresión
   permanentes de ADR-0004» (el impuesto que la coma flotante pierde)
+  - *Evidencia (2026-09-18, local):* RED: 4 errores de compilación (`percentage` ausente). GREEN:
+    `./mvnw -pl kernel test -Dtest=MoneyArithmeticTest` → 21/21. Sin REFACTOR. Nota: `percentage()`
+    redondea solo a escala 4 (design.md, decisión 4); el resultado final `0.62`/`1.01` de la
+    especificación exige además `roundToMinorUnit` (tarea 2.5), verificado en conjunto en 2.8.
 
-- [ ] 2.5 **TDD — `roundToMinorUnit(RoundingMode)`**. ROJO: los tres puntos medios exactos
+- [x] 2.5 **TDD — `roundToMinorUnit(RoundingMode)`**. ROJO: los tres puntos medios exactos
   obligatorios `0.615`, `2.345`, `1.005` redondeados con `HALF_UP` a la escala menor de la moneda dan
   `0.62`, `2.35`, `1.01`; su simetría negativa `-0.615`, `-2.345`, `-1.005` da `-0.62`, `-2.35`,
   `-1.01`; redondear el máximo representable `9999999999.9999` con `HALF_UP` produce
@@ -326,6 +340,10 @@ PR 1 (`-Pmutation-report`); al fusionarse PR 1, PR 2 se redirige a `main` y reci
   re-expresa a escala 4, verifica el invariante de rango sobre el resultado). REFACTOR: ninguno
   esperado. — Especificación `money`, requisito «Redondeo explícito con `HALF_UP` en toda operación
   que redondea» (ambos escenarios de puntos medios)
+  - *Evidencia (2026-09-18, local):* RED: 7 errores de compilación (`roundToMinorUnit` ausente).
+    GREEN: `./mvnw -pl kernel test -Dtest=MoneyArithmeticTest` → 25/25 (incluye los tres puntos
+    medios, su simetría negativa y el desbordamiento al redondear el límite superior). Sin
+    REFACTOR.
 
 - [ ] 2.6 **TDD — `allocate(int...)`** (`MoneyAllocationTest`). ROJO: reparto con residuo por el
   método del resto mayor (`100.00` entre `[1,1,1]` → `[33.34, 33.33, 33.33]`, suma exactamente

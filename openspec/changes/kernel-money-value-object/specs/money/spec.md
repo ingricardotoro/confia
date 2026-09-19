@@ -117,6 +117,17 @@ desde `double` ni desde `float`.
 - **ENTONCES** ninguna fábrica acepta un parámetro `double` ni `float`; el código que lo intente no
   compila
 
+#### Escenario: Escala extrema en un `BigDecimal` de entrada
+
+- **DADO** un `BigDecimal` de escala positiva mayor que 34 (por ejemplo `1E-500000000`) y otro de
+  escala negativa que solo puede representar un número mayor que el límite (por ejemplo `1E+10` o
+  `1E+500000000`)
+- **CUANDO** se construye `Money` o `Percentage` a partir de cada uno
+- **ENTONCES** el primero falla con `money-scale-exceeded` (o `percentage-scale-exceeded`) y el
+  segundo con `money-amount-out-of-range` (o `percentage-out-of-range`), antes de cualquier
+  reescalado y en tiempo acotado; una escala de hasta 34 sigue aceptándose cuando los decimales
+  sobrantes son cero, y un cero de cualquier escala se normaliza a cero
+
 ### Requisito: Moneda cerrada al conjunto habilitado
 
 El sistema DEBE representar la moneda con un tipo cerrado, `CurrencyCode`, restringido al conjunto
@@ -228,6 +239,21 @@ punto medio exacto alejándose de cero.
 - **CUANDO** se multiplica por el factor entero exacto `3`
 - **ENTONCES** el resultado es `Money.of("3703.65", CurrencyCode.HNL)`, sin necesidad de redondeo
   porque el resultado cabe en la escala interna
+
+#### Escenario: Factor decimal de escala absurda
+
+- **DADO** un factor `BigDecimal` cuya escala está fuera de `[-34, 34]`
+- **CUANDO** se invoca `multiply(factor, HALF_UP)`
+- **ENTONCES** la operación falla de inmediato con `IllegalArgumentException`, porque un factor
+  proviene del código y una escala así es un error de programación (ADR-0019), sin llegar a
+  multiplicar
+
+#### Escenario: Desbordamiento de rango en multiplicación y redondeo
+
+- **DADO** importes cerca del máximo representable de `NUMERIC(14,4)`
+- **CUANDO** se multiplican por un entero o por un factor decimal cuyo resultado supera el límite,
+  o se aplica `roundToMinorUnit(HALF_UP)` a `9999999999.9999`
+- **ENTONCES** cada operación falla con `money-amount-out-of-range` y no construye ningún `Money`
 
 ### Requisito: `Percentage` como colaborador explícito de `Money`
 

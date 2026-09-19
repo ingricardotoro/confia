@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  * single private constructor below, which is where the scale-four and {@code NUMERIC(14,4)} range
  * invariants are enforced without exception (design.md, decision 4).
  */
-public final class Money {
+public final class Money implements Comparable<Money> {
 
     public static final int SCALE = 4;
 
@@ -23,6 +23,18 @@ public final class Money {
     /** {@code of(String, CurrencyCode)}'s accepted shape: no exponent, no '+', no separators. */
     private static final Pattern PLAIN_DECIMAL = Pattern.compile("-?\\d+(\\.\\d+)?");
     private static final int MAX_STRING_LENGTH = 64;
+
+    /**
+     * Largest |scale| accepted from a caller-supplied {@link BigDecimal} (the precision of {@link
+     * java.math.MathContext#DECIMAL128}). Rescaling costs about 10^|scale|, so a value such as
+     * {@code 1E-500000000} would hang the calling thread; it is rejected before any rescaling. A
+     * value with more than 34 decimals is rejected even if they are all zeros: that is the price of
+     * never inspecting its digits (design.md, decision 4).
+     */
+    static final int MAX_INPUT_SCALE = 34;
+
+    /** Integer digits of {@code 9999999999.9999}: anything with more is out of range. */
+    private static final int MAX_INTEGER_DIGITS = 10;
 
     private final BigDecimal amount;
     private final CurrencyCode currency;
@@ -67,12 +79,31 @@ public final class Money {
     public static Money of(BigDecimal amount, CurrencyCode currency) {
         Objects.requireNonNull(amount, "amount");
         Objects.requireNonNull(currency, "currency");
-        return new Money(normalizeToScale(amount), currency);
+        return new Money(normalizeToScale(requireBoundedScale(amount)), currency);
     }
 
     public static Money zero(CurrencyCode currency) {
         Objects.requireNonNull(currency, "currency");
         return new Money(BigDecimal.ZERO.setScale(SCALE, RoundingMode.UNNECESSARY), currency);
+    }
+
+    /**
+     * Guard for a caller-supplied {@link BigDecimal}, applied before any rescaling (which costs
+     * about 10^|scale|): an absurd positive scale is rejected as too many decimals, and a negative
+     * scale that can only mean a number too large for the range is rejected without computing it.
+     * The string factory needs no such guard: its 64-character limit already bounds the scale.
+     */
+    private static BigDecimal requireBoundedScale(BigDecimal amount) {
+        if (amount.signum() == 0) {
+            return BigDecimal.ZERO;
+        }
+        if (amount.scale() > MAX_INPUT_SCALE) {
+            throw InvalidMoneyAmountException.scaleExceeded(amount.scale());
+        }
+        if (amount.scale() < 0 && (long) amount.precision() - amount.scale() > MAX_INTEGER_DIGITS) {
+            throw InvalidMoneyAmountException.outOfRange();
+        }
+        return amount;
     }
 
     /**
@@ -133,11 +164,111 @@ public final class Money {
         return new Money(amount.negate(), currency);
     }
 
+    /**
+     * Exact, no rounding involved: multiplying a scale-four amount by an integer factor never
+     * needs more than scale four (design.md, decision 5). Verifies the {@code NUMERIC(14,4)}
+     * range on the exact result.
+     *
+     * @throws InvalidMoneyAmountException {@link InvalidMoneyAmountException#OUT_OF_RANGE} if the
+     *     exact result exceeds {@code 9999999999.9999} in absolute value
+     */
+    public Money multiply(long factor) {
+        return new Money(amount.multiply(BigDecimal.valueOf(factor)), currency);
+    }
+
+    /**
+     * Multiplies by a decimal factor with a single explicit rounding to scale four (design.md,
+     * decision 5). There is deliberately no overload with an implicit rounding mode.
+     *
+     * @throws InvalidMoneyAmountException {@link InvalidMoneyAmountException#OUT_OF_RANGE} if the
+     *     rounded result exceeds {@code 9999999999.9999} in absolute value
+     */
+    public Money multiply(BigDecimal factor, RoundingMode rounding) {
+        Objects.requireNonNull(factor, "factor");
+        Objects.requireNonNull(rounding, "rounding");
+        if (Math.abs((long) factor.scale()) > MAX_INPUT_SCALE) {
+            // A factor comes from code, not from a user: an absurd scale is a programming error.
+            throw new IllegalArgumentException(
+                    "factor scale must be within +/-" + MAX_INPUT_SCALE + ", was " + factor.scale());
+        }
+        return new Money(amount.multiply(factor).setScale(SCALE, rounding), currency);
+    }
+
+    /**
+     * Applies a rate expressed in percentage points: {@code amount x percentage / 100}, computed
+     * exactly and rounded once, explicitly, to scale four (design.md, decision 6). There is
+     * deliberately no overload with an implicit rounding mode.
+     *
+     * @throws InvalidMoneyAmountException {@link InvalidMoneyAmountException#OUT_OF_RANGE} if the
+     *     rounded result exceeds {@code 9999999999.9999} in absolute value
+     */
+    public Money percentage(Percentage percentage, RoundingMode rounding) {
+        Objects.requireNonNull(percentage, "percentage");
+        Objects.requireNonNull(rounding, "rounding");
+        BigDecimal exactShare = amount.multiply(percentage.value()).movePointLeft(2);
+        return new Money(exactShare.setScale(SCALE, rounding), currency);
+    }
+
+    /**
+     * Rounds to this currency's minor unit (two decimals for both HNL and USD today) and
+     * re-expresses the result at scale four (design.md, decision 4). This is the only point where
+     * an amount actually loses precision below scale four, and it always happens explicitly.
+     *
+     * @throws InvalidMoneyAmountException {@link InvalidMoneyAmountException#OUT_OF_RANGE} if
+     *     rounding up carries the result past {@code 9999999999.9999} (for example,
+     *     {@code 9999999999.9999} rounded {@code HALF_UP} becomes {@code 10000000000.00})
+     */
+    public Money roundToMinorUnit(RoundingMode rounding) {
+        Objects.requireNonNull(rounding, "rounding");
+        BigDecimal roundedToMinorUnit = amount.setScale(currency.minorUnitDigits(), rounding);
+        return new Money(roundedToMinorUnit.setScale(SCALE, RoundingMode.UNNECESSARY), currency);
+    }
+
     private void requireSameCurrency(Money other) {
         Objects.requireNonNull(other, "other");
         if (currency != other.currency) {
             throw new CurrencyMismatchException(currency, other.currency);
         }
+    }
+
+    public boolean isZero() {
+        return amount.signum() == 0;
+    }
+
+    public boolean isPositive() {
+        return amount.signum() > 0;
+    }
+
+    public boolean isNegative() {
+        return amount.signum() < 0;
+    }
+
+    /**
+     * Compares amounts within the same currency; consistent with {@link #equals(Object)}.
+     * Ordering a collection with mixed currencies fails on purpose.
+     *
+     * @throws CurrencyMismatchException if {@code other} is a different currency
+     */
+    @Override
+    public int compareTo(Money other) {
+        requireSameCurrency(other);
+        return amount.compareTo(other.amount);
+    }
+
+    public boolean isGreaterThan(Money other) {
+        return compareTo(other) > 0;
+    }
+
+    public boolean isGreaterThanOrEqual(Money other) {
+        return compareTo(other) >= 0;
+    }
+
+    public boolean isLessThan(Money other) {
+        return compareTo(other) < 0;
+    }
+
+    public boolean isLessThanOrEqual(Money other) {
+        return compareTo(other) <= 0;
     }
 
     /**
