@@ -699,12 +699,18 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
     `InstitutionLifecycleTest` 9/9 (1 nueva), `OrganizationErrorCodesTest` 5/5 (sin cambios).
     REFACTOR: ninguno necesario.
 
-- [ ] 3.9 **`OrganizationErrorCodesTest` a once códigos.** Extender el catálogo cerrado de la tarea
+- [x] 3.9 **`OrganizationErrorCodesTest` a once códigos.** Extender el catálogo cerrado de la tarea
   2.6 con `institution-rtn-invalid`, `institution-address-blank`, `institution-address-too-long`,
   `institution-locale-invalid`, `institution-timezone-invalid` (once códigos en total para el corte
   B). Confirmar formato, unicidad, prefijo y herencia de `DomainException` para los cinco nuevos. —
   Especificación `organization`, requisito «Catálogo de códigos del módulo: formato y ausencia de
   repetidos» (completa los once del corte B)
+  - **Evidencia (2026-09-19):** sin ciclo ROJO propio, igual que la tarea 2.6: los cinco códigos
+    nuevos ya son alcanzables desde producción desde las tareas 3.1–3.5. VERDE inmediato:
+    `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest,InstitutionLifecycleTest,
+    OrganizationErrorCodesTest -Dsurefire.failIfNoSpecifiedTests=false` → 44/44
+    (`OrganizationErrorCodesTest` 5/5, catálogo exacto de once códigos, sin repetidos, formato
+    kebab-case, prefijo `institution-`, herencia de `DomainException` para los cinco nuevos).
 
 - [ ] 3.10 **Medir el diff real de PR B2 y verificación final.** Medir con
   `git diff --numstat <base-de-PR-B1>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`. Si cabe
