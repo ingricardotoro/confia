@@ -221,7 +221,7 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
     desigualdad). `package-info.java` actualizado para nombrar `InstitutionId` explícitamente entre
     los tipos del núcleo. Sin cambios en `KernelErrorCodesTest` (el nulo es error de programación).
 
-- [ ] 2.2 **TDD — `Institution` mínima (caso feliz + `legalName`).** ROJO: crear
+- [x] 2.2 **TDD — `Institution` mínima (caso feliz + `legalName`).** ROJO: crear
   `apps/api/app/src/main/java/com/confia/organization/package-info.java` (documenta la capacidad
   `organization`, qué queda fuera de alcance y qué cambio lo aporta) y
   `apps/api/app/src/test/java/com/confia/organization/domain/InstitutionCreationTest.java` con: caso
@@ -243,6 +243,25 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   REFACTOR: ninguno esperado. — Especificación `organization`, requisito «Construcción de
   `Institution` y sus atributos de identidad obligatorios» (escenarios de `legalName` y de atributos
   obligatorios nulos, parcial: sin `address` todavía); ADR-0018 §2 (rojo programado, ahora observado)
+  - **Evidencia (2026-09-19):** ROJO observado: `cannot find symbol class Institution` /
+    `InvalidInstitutionException` (compilación) al ejecutar `./mvnw -B -pl app -am test
+    -Dtest=InstitutionCreationTest -Dsurefire.failIfNoSpecifiedTests=false`. VERDE: 11/11 pruebas.
+    **Desviación registrada:** además de `legalName`, esta tarea implementa ya la validación
+    completa de `tradeName` (blanco y máximo 200 puntos de código,
+    `institution-trade-name-blank`/`institution-trade-name-too-long`), adelantando parte del
+    requisito «Nombre comercial opcional» (nominalmente de la tarea 3.6 en PR B2). Necesario para
+    que el catálogo de seis códigos de la tarea 2.6 (en este mismo PR B1) tenga las cuatro fábricas
+    de `InvalidInstitutionException` realmente alcanzables desde producción, no fábricas muertas sin
+    invocar — relevante para las puertas de cobertura 95 %/mutación 80 de la tarea 2.7, también en
+    este PR. La tarea 3.6 en PR B2 encontrará ambas fábricas ya completas y solo confirmará el
+    comportamiento. `./mvnw -B verify` completo: **rojo programado observado**, mensaje exacto de
+    `EmptyShouldExceptionInventoryTest.everyExceptionsConditionStillHolds`: "`LayeredArchitectureTest.
+    productionCodeRespectsLayeringYet's ADR-0018 exception no longer holds (no class in
+    apps/api/app production code resides in a domain, application, infrastructure or web package
+    yet, because no business module exists (change 4 introduces the first one)). Remove
+    allowEmptyShould(true) from that rule and this inventory entry, or update the condition and
+    cite the ADR that extends it (ADR-0018, section 2).`" `LayeredArchitectureTest` sigue en verde
+    (todavía conserva `allowEmptyShould(true)`); se cierra en la tarea 2.3. Sin comprometer el rojo.
 
 - [ ] 2.3 **Cierre de la caducidad de ADR-0018 (parte común).** En
   `apps/api/app/src/test/java/com/confia/architecture/LayeredArchitectureTest.java`: borrar
