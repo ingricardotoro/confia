@@ -292,6 +292,22 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
     en la tarea 2.4 no cerraría este rojo mientras `Application` siga vacía y obligatoria; se verifica
     en la tarea 2.4 antes de comprometer ese cambio.
 
+- [ ] 2.3b **Puertos de la capa `application` (adelantados desde la tarea 4.1, decisión del
+  propietario del 2026-09-19).** Crear
+  `apps/api/app/src/main/java/com/confia/organization/application/InstitutionRepository.java`
+  (`Optional<Institution> findById(InstitutionId id)`) y
+  `.../CurrentInstitutionProvider.java` (`InstitutionId currentInstitutionId()`, con el Javadoc que
+  fija el contrato de ADR-0009: el valor se deriva del token autenticado y nunca de un parámetro,
+  cabecera o cuerpo del cliente). Son interfaces sin implementación en este cambio: el adaptador de
+  persistencia llega con el cambio 5 y el de seguridad con el cambio 7. Sin anotaciones de Spring.
+  **Motivo del adelanto:** ADR-0020 §2 mantiene `Application` como capa siempre obligatoria, de modo
+  que dejarla vacía hasta el PR C haría fallar `productionCodeRespectsLayering` en los PR B1 y B2.
+  Con los puertos aquí, la capa deja de estar vacía por una razón real y no hace falta ampliar
+  ninguna excepción. Sin ciclo ROJO/VERDE propio: son interfaces sin comportamiento; su prueba llega
+  con el caso de uso en la tarea 4.1. — Especificación `organization`, requisitos «Puerto de salida
+  para cargar una institución por identificador» y «Puerto de salida para la institución de la
+  solicitud en curso»; ADR-0009; ADR-0020 §2
+
 - [ ] 2.4 **Aplicación de ADR-0020 (opción A, ya aceptada): capas opcionales por marcador.** ROJO:
   en `apps/api/app/src/test/java/com/confia/architecture/SuppressionCitesAdrTest.java`, añadir el
   patrón `OPTIONAL_LAYER_CALL` (`\.optionalLayer\(`) y `WITH_OPTIONAL_LAYERS_TRUE`
@@ -497,17 +513,14 @@ Rama `...-application`, base PR B2.
 
 - [ ] 4.1 **TDD — `ResolveCurrentInstitution`, caso activo.** ROJO: crear
   `apps/api/app/src/test/java/com/confia/organization/application/InMemoryInstitutionRepository.java`
-  y `.../FixedCurrentInstitutionProvider.java` (dobles de prueba, en `src/test`) y
+  y `.../FixedCurrentInstitutionProvider.java` (dobles de prueba, en `src/test`, sobre los puertos
+  creados en la tarea 2.3b) y
   `apps/api/app/src/test/java/com/confia/organization/application/ResolveCurrentInstitutionTest.java`
   con: un `CurrentInstitutionProvider` que resuelve un `InstitutionId` conocido y un
   `InstitutionRepository` que devuelve, para ese identificador, una `Institution` con `isActive`
   verdadero → el caso de uso devuelve esa `Institution`; el constructor de `ResolveCurrentInstitution`
   rechaza cada puerto nulo con `NullPointerException`. VERDE: crear
   `apps/api/app/src/main/java/com/confia/organization/application/InstitutionRepository.java`
-  (`Optional<Institution> findById(InstitutionId id)`),
-  `.../CurrentInstitutionProvider.java` (`InstitutionId currentInstitutionId()`, con el Javadoc que
-  fija el contrato de ADR-0009: el valor se deriva del token autenticado y nunca de un parámetro,
-  cabecera o cuerpo del cliente) y
   `.../ResolveCurrentInstitution.java` (`final`, sin anotaciones de Spring, constructor con
   `requireNonNull` de ambos puertos, `execute()` que resuelve el identificador y carga la
   institución). Ningún bean de Spring se registra: la clase no lleva anotaciones y no se escanea
