@@ -29,7 +29,9 @@ procedimiento; no es una decisión pendiente antes de iniciar `sdd-apply`.
 
 ### Nota sobre el límite de quince tareas por pull request
 
-Esta lista tiene **31 tareas en total**, repartidas en cuatro pull requests (7, 10, 10 y 4). **El
+Esta lista tiene **32 tareas en total** (31 al planificar, más la 2.3b que el propietario adelantó
+el 2026-09-19), repartidas en cinco pull requests tras la partición de PR B1 (7, 11, 10 y 4, con el
+corte adicional de PR B1-gates). **El
 propietario del producto aceptó esta excepción el 2026-09-19, con un máximo de quince tareas por
 pull request.** El
 lanzamiento de esta fase fija el límite en **quince tareas por pull request**, no por cambio SDD

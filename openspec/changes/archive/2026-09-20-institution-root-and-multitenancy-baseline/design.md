@@ -256,6 +256,11 @@ interfaz, que se contradicen entre sí (14 y 13).
 
 ### 8. Capa `application`: puertos y caso de uso
 
+> **Ajuste del 2026-09-19.** Los dos puertos se entregaron en el corte B1, no en el C: ADR-0020 §2
+> mantiene `Application` como capa siempre obligatoria, así que dejarla vacía hasta el corte C habría
+> hecho fallar `productionCodeRespectsLayering` en B1 y B2. El propietario prefirió adelantar los
+> puertos antes que ampliar una excepción. El corte C conserva el caso de uso.
+
 **Elección:**
 
 - `InstitutionRepository` (puerto de salida): `Optional<Institution> findById(InstitutionId id)`.
@@ -405,8 +410,8 @@ primera clase en organization.domain
 | `apps/api/app/src/test/java/com/confia/architecture/SuppressionCitesAdrTest.java` | Modificar | B (solo con ADR-0020) | Marcador `optionalLayer(`, prohibición de `withOptionalLayers(true)`, conteo por tipo de marcador |
 | `docs/adr/ADR-0020-capas-opcionales-en-la-regla-de-capas.md` | Crear | B | Escrito en esta fase, estado Propuesto |
 | `docs/adr/README.md` | Modificar | B | Fila de ADR-0020, escrita en esta fase |
-| `apps/api/app/src/main/java/com/confia/organization/application/InstitutionRepository.java` | Crear | C | Puerto de salida |
-| `apps/api/app/src/main/java/com/confia/organization/application/CurrentInstitutionProvider.java` | Crear | C | Puerto de salida, contrato de ADR-0009 en el Javadoc |
+| `apps/api/app/src/main/java/com/confia/organization/application/InstitutionRepository.java` | Crear | B1 | Puerto de salida (adelantado del corte C al B1, decisión del propietario del 2026-09-19) |
+| `apps/api/app/src/main/java/com/confia/organization/application/CurrentInstitutionProvider.java` | Crear | B1 | Puerto de salida, contrato de ADR-0009 en el Javadoc (adelantado del corte C al B1) |
 | `apps/api/app/src/main/java/com/confia/organization/application/ResolveCurrentInstitution.java` | Crear | C | Caso de uso |
 | `apps/api/app/src/main/java/com/confia/organization/domain/InstitutionNotFoundException.java` | Crear | C | `institution-not-found` |
 | `apps/api/app/src/main/java/com/confia/organization/domain/InstitutionInactiveException.java` | Crear | C | `institution-inactive` |
