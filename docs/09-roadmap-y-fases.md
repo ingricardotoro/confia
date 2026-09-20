@@ -92,6 +92,15 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    Gentleman-Programming/gentle-ai#4797, los deltas sobre capacidades existentes se fusionan a mano
    con verificación byte a byte.
 3. Autenticación del personal con MFA, roles, permisos, sesiones y bloqueo por fuerza bruta.
+   **Pendientes heredados del cambio 4 (`institution-root-and-multitenancy-baseline`, archivado el
+   2026-09-20):** el adaptador de `CurrentInstitutionProvider` sobre el token llega aquí y su
+   fusión exige la prueba de integración que pide ADR-0009: demostrar que ninguna cabecera,
+   parámetro ni cuerpo de la petición influye en la institución resuelta. Hoy ese contrato solo
+   está en el Javadoc del puerto. El primer endpoint de administración de instituciones debe acotar
+   el tamaño de las cadenas en su DTO con Jakarta Bean Validation (200 y 500 caracteres), para que
+   un texto enorme no llegue entero al dominio; y el traductor de errores a Problem Details debe
+   confirmar, antes de exponer la diferencia entre `institution-not-found` e `institution-inactive`,
+   que el identificador sigue viniendo solo del token.
 4. **Matriz de autorización** documentada y verificada por pruebas: qué rol puede hacer qué operación (brecha A7).
 5. Bitácora de auditoría de solo inserción, encadenada por hash, sin permiso de actualización ni borrado para el rol de aplicación (brecha B6).
 6. Infraestructura de idempotencia: cabecera obligatoria, índice único, respuesta reproducible (brecha B7).
@@ -106,6 +115,11 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    transitivas son invisibles por definición para un análisis de lo declarado. Al armar la
    canalización completa hay que escanear un SBOM resuelto en lugar de los `pom.xml`, como
    contempla `docs/03-seguridad.md` sección 13.
+   **Pendiente heredado del cambio 4 para el cambio 5 (migración de `organization_institution`):**
+   la longitud de la columna del RTN hereda la guarda técnica de 1 a 20 dígitos del dominio y **no
+   es una regla fiscal**; debe decirlo su propia especificación para no crear una segunda verdad
+   implícita mientras `docs/04-cumplimiento-fiscal-sar.md` sección 1 siga marcando el formato como
+   pendiente de validación con la contadora.
 9. Respaldo en dos niveles según ADR-0014: respaldo automático de RDS con restauración a un punto en el tiempo dentro de AWS, más respaldo lógico nocturno cifrado y copia fuera de sitio en un proveedor distinto de AWS (brecha B10).
 10. Sistema de diseño base en `packages/ui` con tokens, átomos y verificación de accesibilidad automatizada.
 11. Semilla de datos ficticios para desarrollo y capacitación.
