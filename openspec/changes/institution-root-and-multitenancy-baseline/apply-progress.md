@@ -65,8 +65,10 @@ push or open PRs).
 ## PR B1 — `InstitutionId`, `Institution` mínima, ciclo de ADR-0018/ADR-0020, puertas del `domain`
 
 Branch `change/institution-root-and-multitenancy-baseline-domain`, base PR A (`e3b9e84`).
-**Status: BLOCKED at task 2.9 on 2026-09-19, size overage — reported to the owner, not decided
-here.** The prior blocker (task 2.4 vs ADR-0020) was resolved by the owner moving the
+**Status: RESOLVED on 2026-09-19 — the owner split PR B1 at commit `0fe434e` (see the PR B1-gates
+section below). This slice keeps tasks 2.1–2.8 plus the lifecycle work; the catalogue and the
+domain gates moved to PR B1-gates. Tasks 2.9 and 2.10 are closed with evidence in `tasks.md`.** The
+blocker below is kept for history. The prior blocker (task 2.4 vs ADR-0020) was resolved by the owner moving the
 `application`-layer ports from task 4.1 (PR C) into this PR as task 2.3b. Tasks 2.1–2.8 done and
 committed; task 2.9's own measurement now exceeds the 800-line PR budget (933 lines), which is one
 of this apply batch's explicit hard stops. Task 2.10 has not started and must not start until the
@@ -208,6 +210,39 @@ its own preliminary PR, or `InstitutionLifecycleTest`'s coverage-closure tests m
 `./mvnw -B verify -Pmutation-gate` output, test counts, both JaCoCo rules and every PIT survivor —
 is included in this apply run's return summary regardless, so the owner has complete information
 without needing another apply pass just to gather it.
+
+## PR B1-gates — Catálogo de códigos y puertas de calidad del `domain`
+
+Rama `change/institution-root-and-multitenancy-baseline-domain-gates`, base PR B1 (`0fe434e`),
+fusionada como PR #11. Nace de la partición que el propietario decidió el 2026-09-19 cuando PR B1
+midió 933 líneas: este corte se lleva `OrganizationErrorCodesTest` (catálogo cerrado de seis
+códigos en ese momento) y las puertas de calidad del `domain` en `apps/api/app/pom.xml` (regla
+`PACKAGE` de JaCoCo al 95 % sobre `com.confia.*.domain` y adhesión de PIT sobre
+`com.confia.*.domain.*`, reutilizando los perfiles `mutation-gate` y `mutation-report`).
+
+- **Tamaño:** 160 líneas de autor, contra la base de PR B1.
+- **Evidencia:** `./mvnw -B verify -Pmutation-gate` en verde con 245 pruebas, JaCoCo `BUNDLE` 80 %
+  y `PACKAGE` 95 % cumplidas, y PIT de `organization.domain` 32/32 (100 %). Corrida de integración
+  continua `35486736412` en verde.
+- **Demostraciones de fallo de puerta** (revertidas, ninguna comprometida): desactivar la clase de
+  ciclo de vida baja el paquete a 0.69 de líneas y 0.42 de ramas y rompe la construcción; subir
+  `confia.pit.mutationThreshold` por encima de la puntuación real falla con `mutation-gate` y no
+  con `mutation-report`.
+- **Cobertura del 95 % alcanzada con pruebas, nunca bajando el umbral:** al cablear la regla, el
+  paquete medía 0.85 en ramas; se cerró añadiendo los casos límite que faltaban de `equals` y
+  `hashCode`.
+
+## Corrección posterior a las tareas (commit `f64a5ec`, en `main`)
+
+La revisión de la cadena (`/confia-revision` del 2026-09-20) encontró que el escenario «Un código
+incumple el formato» de `specs/organization/spec.md` no tenía prueba: los catálogos de `organization`
+y de `kernel` solo afirmaban que los códigos válidos casan con el patrón kebab-case, de modo que un
+patrón que aceptara cualquier cosa habría pasado. El commit `f64a5ec` añadió
+`theKebabCasePatternRejectsAMalformedCode` a ambas clases y, además, la nota que marca como
+ilustrativos los RTN de la plantilla de recibo en `docs/ui-ux/04-patrones-de-interaccion.md`. No
+tiene tarea propia porque nació de la revisión, después de que las 32 estuvieran cerradas; queda
+registrado aquí para que el libro mayor no lo omita. Con él, `kernel` pasa a 177 pruebas y `app` a
+99.
 
 ## PR B2 — Atributos restantes del agregado (`rtn`, `address`, `defaultCurrency`, `locale`, `timezone`)
 
