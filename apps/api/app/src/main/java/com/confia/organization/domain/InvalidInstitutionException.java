@@ -19,6 +19,7 @@ public final class InvalidInstitutionException extends DomainException {
     public static final String RTN_INVALID = "institution-rtn-invalid";
     public static final String ADDRESS_BLANK = "institution-address-blank";
     public static final String ADDRESS_TOO_LONG = "institution-address-too-long";
+    public static final String LOCALE_INVALID = "institution-locale-invalid";
 
     private InvalidInstitutionException(String code, String message) {
         super(code, message);
@@ -72,5 +73,13 @@ public final class InvalidInstitutionException extends DomainException {
     static InvalidInstitutionException addressTooLong() {
         return new InvalidInstitutionException(ADDRESS_TOO_LONG,
                 "address exceeds " + Institution.MAX_ADDRESS_LENGTH + " characters");
+    }
+
+    /**
+     * {@code locale} carries no language (for example {@link java.util.Locale#ROOT}, which is what
+     * {@link java.util.Locale#forLanguageTag} returns for an invalid language tag).
+     */
+    static InvalidInstitutionException localeInvalid() {
+        return new InvalidInstitutionException(LOCALE_INVALID, "locale must carry a language");
     }
 }

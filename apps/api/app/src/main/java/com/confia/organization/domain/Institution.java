@@ -2,6 +2,7 @@ package com.confia.organization.domain;
 
 import com.confia.kernel.CurrencyCode;
 import com.confia.kernel.InstitutionId;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -36,16 +37,18 @@ public final class Institution {
     private final String rtn;
     private final String address;
     private final CurrencyCode defaultCurrency;
+    private final Locale locale;
     private boolean active;
 
     private Institution(InstitutionId id, String legalName, String tradeName, String rtn,
-            String address, CurrencyCode defaultCurrency) {
+            String address, CurrencyCode defaultCurrency, Locale locale) {
         this.id = id;
         this.legalName = legalName;
         this.tradeName = tradeName;
         this.rtn = rtn;
         this.address = address;
         this.defaultCurrency = defaultCurrency;
+        this.locale = locale;
         this.active = true;
     }
 
@@ -65,18 +68,22 @@ public final class Institution {
      *     spaces, non-blank, at most {@value #MAX_ADDRESS_LENGTH} code points
      * @param defaultCurrency the institution's default currency; never {@code null} (the enabled
      *     set is already closed by {@link CurrencyCode} itself, so no domain error applies here)
-     * @throws NullPointerException if {@code id}, {@code legalName}, {@code rtn}, {@code address}
-     *     or {@code defaultCurrency} is {@code null}
+     * @param locale the institution's locale; never {@code null}, must carry a language (rejects
+     *     {@link Locale#ROOT}, which is what {@link Locale#forLanguageTag} returns for an invalid
+     *     language tag)
+     * @throws NullPointerException if {@code id}, {@code legalName}, {@code rtn}, {@code address},
+     *     {@code defaultCurrency} or {@code locale} is {@code null}
      * @throws InvalidInstitutionException if {@code legalName}, a non-null {@code tradeName},
-     *     {@code rtn} or {@code address} violates its rule
+     *     {@code rtn}, {@code address} or {@code locale} violates its rule
      */
     public static Institution create(InstitutionId id, String legalName, String tradeName,
-            String rtn, String address, CurrencyCode defaultCurrency) {
+            String rtn, String address, CurrencyCode defaultCurrency, Locale locale) {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(legalName, "legalName");
         Objects.requireNonNull(rtn, "rtn");
         Objects.requireNonNull(address, "address");
         Objects.requireNonNull(defaultCurrency, "defaultCurrency");
+        Objects.requireNonNull(locale, "locale");
 
         String normalizedLegalName = requireValidText(legalName, MAX_NAME_LENGTH,
                 InvalidInstitutionException::legalNameBlank,
@@ -91,9 +98,12 @@ public final class Institution {
         String normalizedAddress = requireValidText(address, MAX_ADDRESS_LENGTH,
                 InvalidInstitutionException::addressBlank,
                 InvalidInstitutionException::addressTooLong);
+        if (locale.getLanguage().isEmpty()) {
+            throw InvalidInstitutionException.localeInvalid();
+        }
 
         return new Institution(id, normalizedLegalName, normalizedTradeName, rtn,
-                normalizedAddress, defaultCurrency);
+                normalizedAddress, defaultCurrency, locale);
     }
 
     private static String requireValidText(String rawText, int maxLength,
@@ -131,6 +141,10 @@ public final class Institution {
 
     public CurrencyCode defaultCurrency() {
         return defaultCurrency;
+    }
+
+    public Locale locale() {
+        return locale;
     }
 
     public boolean isActive() {

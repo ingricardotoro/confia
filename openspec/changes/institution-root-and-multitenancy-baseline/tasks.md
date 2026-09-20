@@ -593,13 +593,22 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
     `HNL`/`USD` aceptadas), `InstitutionLifecycleTest` 8/8 (sin regresión), `OrganizationErrorCodesTest`
     5/5 (sin cambios, catálogo sigue en seis). REFACTOR: ninguno necesario.
 
-- [ ] 3.4 **TDD — `locale`.** ROJO: extender `InstitutionCreationTest` con el parámetro `locale`
+- [x] 3.4 **TDD — `locale`.** ROJO: extender `InstitutionCreationTest` con el parámetro `locale`
   (`java.util.Locale`): `Locale.forLanguageTag("es-HN")` se acepta; `Locale.ROOT` (sin idioma) falla
   con `institution-locale-invalid`; un `locale` nulo lanza `NullPointerException`. VERDE: extender
   `Institution.create(...)` con `locale` (`requireNonNull`, rechaza idioma vacío) y añadir a
   `InvalidInstitutionException` la fábrica `localeInvalid()`. Actualizar llamadas existentes a
   `create(...)`. REFACTOR: ninguno esperado. — Especificación `organization`, mismo requisito
   (escenarios «Localización sin idioma»)
+  - **Evidencia (2026-09-19):** ROJO observado: `./mvnw -B -pl app -am test
+    -Dtest=InstitutionCreationTest,InstitutionLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → errores de compilación, `create` de seis parámetros no aplica a las llamadas de siete
+    parámetros y `cannot find symbol locale()`. VERDE: tras añadir `locale` (`java.util.Locale`,
+    `requireNonNull`, rechaza `getLanguage().isEmpty()`) a `Institution.create(...)` y la fábrica
+    `localeInvalid()` a `InvalidInstitutionException`, y actualizar las llamadas existentes:
+    `InstitutionCreationTest` 24/24 (2 nuevas: `Locale.ROOT` rechazado, `locale` nulo),
+    `InstitutionLifecycleTest` 8/8 (sin regresión), `OrganizationErrorCodesTest` 5/5 (sin cambios,
+    catálogo sigue en seis). REFACTOR: ninguno necesario.
 
 - [ ] 3.5 **TDD — `timezone`.** ROJO: extender `InstitutionCreationTest` con el parámetro `timezone`
   (`java.time.ZoneId`): `ZoneId.of("America/Tegucigalpa")` se acepta; `ZoneOffset.ofHours(-6)`
