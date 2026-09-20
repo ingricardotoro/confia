@@ -482,11 +482,16 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
     archivo de producción ni de prueba quedó modificado; `git status` limpio durante toda la
     demostración.
 
-- [ ] 2.9 **Medir el diff real de PR B1** con `git diff --numstat <base-de-PR-A>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`
+- [x] 2.9 **Medir el diff real de PR B1** con `git diff --numstat <base-de-PR-A>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`
   (rama actual contra la base real de PR A, que puede ser `main` o el commit final de PR A si aún no
   se fusionó). Si cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y consultar
   al propietario** entre una subdivisión adicional dentro de B1 o una excepción de tamaño; no
   decidirlo sin el propietario. — P1 de la propuesta; `design.md`, «Pronóstico de tamaño por corte»
+  - *Resultado (2026-09-19):* 933 líneas, por encima de 800. El propietario decidió partir PR B1 en
+    el commit `0fe434e`: **PR B1** (rama `...-domain`, 773 líneas: puertos, ADR-0020, `Institution`
+    con su ciclo de vida) y **PR B1-gates** (rama `...-domain-gates`, base PR B1, 160 líneas:
+    catálogo de códigos y puertas de calidad del `domain`). Las dos ramas verifican en verde por
+    separado; PR B2 pasa a tener base en PR B1-gates.
   - **Medición (2026-09-19), sin decisión tomada — DETENIDO, se consulta al propietario:**
     `git diff --numstat e3b9e84...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'` (base real de
     PR A, commit `e3b9e84`, confirmado con `git merge-base`) →
@@ -505,13 +510,19 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
     2.10 hasta recibir esa decisión (coincide con el punto de parada dura fijado explícitamente en
     el lanzamiento de esta fase).
 
-- [ ] 2.10 **Verificación final de PR B1**: en checkout limpio, con `JAVA_HOME` en JDK 25, ejecutar
+- [x] 2.10 **Verificación final de PR B1**: en checkout limpio, con `JAVA_HOME` en JDK 25, ejecutar
   `./mvnw -B verify -Pmutation-gate` en `apps/api`. Confirmar cobertura de `organization.domain` ≥
   95 % (líneas y ramas) y puntuación de mutación ≥ 80. Confirmar que `productionCodeRespectsLayering`
   pasa con las capas `Infrastructure` y `Web` opcionales. Empujar la rama `...-domain` (apuntando a
   PR A) y confirmar en la integración continua que el trabajo `backend` termina en verde con
   `-Pmutation-report`. — Capacidad `build-integrity`, ambos requisitos nuevos; criterios de éxito de
   la propuesta relativos a cobertura, mutación y ADR-0018/ADR-0020
+  - *Evidencia (2026-09-19, `-Pmutation-gate`):* **PR B1** en `0fe434e`: `BUILD SUCCESS`, 176
+    pruebas de `kernel` y 61 de `app`, todas las reglas de JaCoCo cumplidas, PIT de `kernel`
+    176/178; corrida de integración continua `35486736639` en verde. **PR B1-gates** en `6eb311b`:
+    `BUILD SUCCESS`, 245 pruebas, JaCoCo `BUNDLE` 80 % y `PACKAGE` 95 % sobre
+    `organization.domain`, PIT de `organization.domain` 32/32 (100 %); corrida `35486736412` en
+    verde.
 
 ---
 
