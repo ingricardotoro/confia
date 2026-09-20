@@ -202,7 +202,7 @@ Rama `...-domain` (por ejemplo `change/institution-root-and-multitenancy-baselin
 A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras apunta al PR A
 (`-Pmutation-report`).
 
-- [ ] 2.1 **TDD — `InstitutionId`.** ROJO: crear
+- [x] 2.1 **TDD — `InstitutionId`.** ROJO: crear
   `apps/api/kernel/src/test/java/com/confia/kernel/InstitutionIdTest.java`: construcción desde un
   `UUID` válido expone ese mismo `UUID`; un valor nulo lanza `NullPointerException`; dos instancias
   con el mismo `UUID` son iguales y su `hashCode` coincide; dos instancias con `UUID` distinto no son
@@ -214,6 +214,12 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   un error de programación, ADR-0019 punto 6). REFACTOR: ninguno esperado. — Especificación
   `organization`, requisito «Identificador de institución en el núcleo (`InstitutionId`)» (los tres
   escenarios)
+  - **Evidencia (2026-09-19):** ROJO observado: `cannot find symbol class InstitutionId` (10 errores
+    de compilación) al ejecutar `./mvnw -B -pl kernel -am test -Dtest=InstitutionIdTest
+    -Dsurefire.failIfNoSpecifiedTests=false`. VERDE: `InstitutionId` como `record` con constructor
+    compacto (`Objects.requireNonNull`); 4/4 pruebas en verde (construcción, nulo, igualdad/hashCode,
+    desigualdad). `package-info.java` actualizado para nombrar `InstitutionId` explícitamente entre
+    los tipos del núcleo. Sin cambios en `KernelErrorCodesTest` (el nulo es error de programación).
 
 - [ ] 2.2 **TDD — `Institution` mínima (caso feliz + `legalName`).** ROJO: crear
   `apps/api/app/src/main/java/com/confia/organization/package-info.java` (documenta la capacidad
