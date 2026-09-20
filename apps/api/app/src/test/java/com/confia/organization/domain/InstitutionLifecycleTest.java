@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.kernel.CurrencyCode;
 import com.confia.kernel.InstitutionId;
+import java.time.ZoneId;
 import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ class InstitutionLifecycleTest {
     private static final String VALID_ADDRESS = "Colonia Palmira, Tegucigalpa";
     private static final CurrencyCode VALID_CURRENCY = CurrencyCode.HNL;
     private static final Locale VALID_LOCALE = Locale.forLanguageTag("es-HN");
+    private static final ZoneId VALID_TIMEZONE = ZoneId.of("America/Tegucigalpa");
 
     @Test
     void deactivatingAnActiveInstitutionSucceedsWithoutModifyingOtherAttributes() {
@@ -73,9 +75,9 @@ class InstitutionLifecycleTest {
     void twoInstitutionsWithTheSameIdAreEqualRegardlessOfOtherAttributes() {
         InstitutionId id = anId();
         Institution first = Institution.create(id, "Instituto San Marcos", "Colegio San Marcos",
-                VALID_RTN, VALID_ADDRESS, VALID_CURRENCY, VALID_LOCALE);
+                VALID_RTN, VALID_ADDRESS, VALID_CURRENCY, VALID_LOCALE, VALID_TIMEZONE);
         Institution second = Institution.create(id, "Instituto Diferente", null, VALID_RTN,
-                VALID_ADDRESS, VALID_CURRENCY, VALID_LOCALE);
+                VALID_ADDRESS, VALID_CURRENCY, VALID_LOCALE, VALID_TIMEZONE);
 
         assertThat(first).isEqualTo(second);
         assertThat(first.hashCode()).isEqualTo(second.hashCode());
@@ -107,7 +109,7 @@ class InstitutionLifecycleTest {
 
     private static Institution anInstitution() {
         return Institution.create(anId(), "Instituto San Marcos", "Colegio San Marcos", VALID_RTN,
-                VALID_ADDRESS, VALID_CURRENCY, VALID_LOCALE);
+                VALID_ADDRESS, VALID_CURRENCY, VALID_LOCALE, VALID_TIMEZONE);
     }
 
     private static InstitutionId anId() {

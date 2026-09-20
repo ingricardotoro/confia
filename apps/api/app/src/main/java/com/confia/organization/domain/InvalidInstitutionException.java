@@ -20,6 +20,7 @@ public final class InvalidInstitutionException extends DomainException {
     public static final String ADDRESS_BLANK = "institution-address-blank";
     public static final String ADDRESS_TOO_LONG = "institution-address-too-long";
     public static final String LOCALE_INVALID = "institution-locale-invalid";
+    public static final String TIMEZONE_INVALID = "institution-timezone-invalid";
 
     private InvalidInstitutionException(String code, String message) {
         super(code, message);
@@ -81,5 +82,15 @@ public final class InvalidInstitutionException extends DomainException {
      */
     static InvalidInstitutionException localeInvalid() {
         return new InvalidInstitutionException(LOCALE_INVALID, "locale must carry a language");
+    }
+
+    /**
+     * {@code timezone} is a fixed offset ({@link java.time.ZoneOffset}) instead of a region
+     * identifier; a fixed offset does not track the region's historical and future daylight-saving
+     * rules (ADR-0011, point 5).
+     */
+    static InvalidInstitutionException timezoneInvalid() {
+        return new InvalidInstitutionException(TIMEZONE_INVALID,
+                "timezone must be a region identifier, not a fixed offset");
     }
 }

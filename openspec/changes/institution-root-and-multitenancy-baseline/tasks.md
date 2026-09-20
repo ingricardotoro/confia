@@ -610,7 +610,7 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
     `InstitutionLifecycleTest` 8/8 (sin regresión), `OrganizationErrorCodesTest` 5/5 (sin cambios,
     catálogo sigue en seis). REFACTOR: ninguno necesario.
 
-- [ ] 3.5 **TDD — `timezone`.** ROJO: extender `InstitutionCreationTest` con el parámetro `timezone`
+- [x] 3.5 **TDD — `timezone`.** ROJO: extender `InstitutionCreationTest` con el parámetro `timezone`
   (`java.time.ZoneId`): `ZoneId.of("America/Tegucigalpa")` se acepta; `ZoneOffset.ofHours(-6)`
   (desplazamiento fijo) falla con `institution-timezone-invalid`; un `timezone` nulo lanza
   `NullPointerException`. VERDE: extender `Institution.create(...)` con `timezone` (`requireNonNull`,
@@ -619,6 +619,16 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
   «Contratos e interfaces». Actualizar llamadas existentes a `create(...)`. REFACTOR: ninguno
   esperado. — Especificación `organization`, mismo requisito (escenarios «Huso horario reconocido» y
   «Huso horario de desplazamiento fijo»)
+  - **Evidencia (2026-09-19):** ROJO observado: `./mvnw -B -pl app -am test
+    -Dtest=InstitutionCreationTest,InstitutionLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → errores de compilación, `create` de siete parámetros no aplica a las llamadas de ocho
+    parámetros y `cannot find symbol timezone()`. VERDE: tras añadir `timezone` (`java.time.ZoneId`,
+    `requireNonNull`, rechaza instancias de `ZoneOffset`) a `Institution.create(...)` (firma final de
+    ocho parámetros, según `design.md` «Contratos e interfaces») y la fábrica `timezoneInvalid()` a
+    `InvalidInstitutionException`, y actualizar las llamadas existentes: `InstitutionCreationTest`
+    27/27 (3 nuevas: huso horario reconocido, desplazamiento fijo rechazado, huso horario nulo),
+    `InstitutionLifecycleTest` 8/8 (sin regresión), `OrganizationErrorCodesTest` 5/5 (sin cambios,
+    catálogo sigue en seis). REFACTOR: ninguno necesario.
 
 - [ ] 3.6 **TDD — nombre comercial opcional y sus límites.** ROJO: extender `InstitutionCreationTest`
   (si no quedó cubierto en la tarea 2.2): construcción exitosa con `tradeName` nulo (`tradeName` en

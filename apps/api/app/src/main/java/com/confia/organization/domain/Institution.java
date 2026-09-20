@@ -2,6 +2,8 @@ package com.confia.organization.domain;
 
 import com.confia.kernel.CurrencyCode;
 import com.confia.kernel.InstitutionId;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -38,10 +40,11 @@ public final class Institution {
     private final String address;
     private final CurrencyCode defaultCurrency;
     private final Locale locale;
+    private final ZoneId timezone;
     private boolean active;
 
     private Institution(InstitutionId id, String legalName, String tradeName, String rtn,
-            String address, CurrencyCode defaultCurrency, Locale locale) {
+            String address, CurrencyCode defaultCurrency, Locale locale, ZoneId timezone) {
         this.id = id;
         this.legalName = legalName;
         this.tradeName = tradeName;
@@ -49,6 +52,7 @@ public final class Institution {
         this.address = address;
         this.defaultCurrency = defaultCurrency;
         this.locale = locale;
+        this.timezone = timezone;
         this.active = true;
     }
 
@@ -71,19 +75,24 @@ public final class Institution {
      * @param locale the institution's locale; never {@code null}, must carry a language (rejects
      *     {@link Locale#ROOT}, which is what {@link Locale#forLanguageTag} returns for an invalid
      *     language tag)
+     * @param timezone the institution's timezone; never {@code null}, must be a region identifier,
+     *     not a fixed offset ({@link ZoneOffset}), because a fixed offset does not track the
+     *     region's historical and future daylight-saving rules (ADR-0011, point 5)
      * @throws NullPointerException if {@code id}, {@code legalName}, {@code rtn}, {@code address},
-     *     {@code defaultCurrency} or {@code locale} is {@code null}
+     *     {@code defaultCurrency}, {@code locale} or {@code timezone} is {@code null}
      * @throws InvalidInstitutionException if {@code legalName}, a non-null {@code tradeName},
-     *     {@code rtn}, {@code address} or {@code locale} violates its rule
+     *     {@code rtn}, {@code address}, {@code locale} or {@code timezone} violates its rule
      */
     public static Institution create(InstitutionId id, String legalName, String tradeName,
-            String rtn, String address, CurrencyCode defaultCurrency, Locale locale) {
+            String rtn, String address, CurrencyCode defaultCurrency, Locale locale,
+            ZoneId timezone) {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(legalName, "legalName");
         Objects.requireNonNull(rtn, "rtn");
         Objects.requireNonNull(address, "address");
         Objects.requireNonNull(defaultCurrency, "defaultCurrency");
         Objects.requireNonNull(locale, "locale");
+        Objects.requireNonNull(timezone, "timezone");
 
         String normalizedLegalName = requireValidText(legalName, MAX_NAME_LENGTH,
                 InvalidInstitutionException::legalNameBlank,
@@ -101,9 +110,12 @@ public final class Institution {
         if (locale.getLanguage().isEmpty()) {
             throw InvalidInstitutionException.localeInvalid();
         }
+        if (timezone instanceof ZoneOffset) {
+            throw InvalidInstitutionException.timezoneInvalid();
+        }
 
         return new Institution(id, normalizedLegalName, normalizedTradeName, rtn,
-                normalizedAddress, defaultCurrency, locale);
+                normalizedAddress, defaultCurrency, locale, timezone);
     }
 
     private static String requireValidText(String rawText, int maxLength,
@@ -145,6 +157,10 @@ public final class Institution {
 
     public Locale locale() {
         return locale;
+    }
+
+    public ZoneId timezone() {
+        return timezone;
     }
 
     public boolean isActive() {
