@@ -209,4 +209,13 @@ public final class Institution {
     public int hashCode() {
         return id.hashCode();
     }
+
+    /**
+     * Shows only {@link #id()} and {@link #tradeName()}; never {@link #rtn()} nor {@link
+     * #address()} (design.md, decision 5, "Razones puntuales"; CLAUDE.md, rule 11).
+     */
+    @Override
+    public String toString() {
+        return "Institution[id=" + id + ", tradeName=" + tradeName + "]";
+    }
 }

@@ -107,6 +107,27 @@ class InstitutionLifecycleTest {
         assertThat(first).isNotEqualTo(second);
     }
 
+    /**
+     * design.md, decision 5, "Razones puntuales": {@code toString()} shows only {@code id} and
+     * {@code tradeName}; it never includes {@code rtn} or {@code address}, which are now
+     * meaningful to check since both attributes exist from this PR (CLAUDE.md, rule 11: technical
+     * messages never repeat raw input).
+     */
+    @Test
+    void toStringShowsIdAndTradeNameButNeverRtnOrAddress() {
+        InstitutionId id = anId();
+        Institution institution = Institution.create(id, "Instituto San Marcos",
+                "Colegio San Marcos", VALID_RTN, VALID_ADDRESS, VALID_CURRENCY, VALID_LOCALE,
+                VALID_TIMEZONE);
+
+        String representation = institution.toString();
+
+        assertThat(representation)
+                .isEqualTo("Institution[id=" + id + ", tradeName=Colegio San Marcos]");
+        assertThat(representation).doesNotContain(VALID_RTN);
+        assertThat(representation).doesNotContain(VALID_ADDRESS);
+    }
+
     private static Institution anInstitution() {
         return Institution.create(anId(), "Instituto San Marcos", "Colegio San Marcos", VALID_RTN,
                 VALID_ADDRESS, VALID_CURRENCY, VALID_LOCALE, VALID_TIMEZONE);

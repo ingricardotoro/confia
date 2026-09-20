@@ -683,12 +683,21 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
     verde. REFACTOR: ninguno necesario — el orden de comprobaciones ya era legible sin extraerlo a
     un método adicional.
 
-- [ ] 3.8 **`toString()` sin RTN ni dirección.** Extender `InstitutionLifecycleTest` con una
+- [x] 3.8 **`toString()` sin RTN ni dirección.** Extender `InstitutionLifecycleTest` con una
   aserción sobre `Institution.toString()` que confirma el formato `"Institution[id=..., tradeName=...]"`
   y la ausencia literal del `rtn` y de la `address` usados en el fixture de la prueba (ahora
   significativa, porque ambos atributos existen desde este PR). Ajustar `Institution.toString()` si
   no cumple el formato exacto. — `design.md`, decisión 5, «Razones puntuales» (mensajes técnicos que
   nunca repiten la entrada, `CLAUDE.md` regla 11); no hay escenario propio en la especificación
+  - **Evidencia (2026-09-19):** ROJO observado: `./mvnw -B -pl app -am test
+    -Dtest=InstitutionLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false` →
+    `toStringShowsIdAndTradeNameButNeverRtnOrAddress` falla, `expected:
+    "Institution[id=InstitutionId[value=...], tradeName=Colegio San Marcos]" but was:
+    "com.confia.organization.domain.Institution@..."` (`Object.toString()` por defecto). VERDE: tras
+    sobrescribir `Institution.toString()` con el formato exacto (`"Institution[id=" + id + ",
+    tradeName=" + tradeName + "]"`): `InstitutionCreationTest` 30/30 (sin regresión),
+    `InstitutionLifecycleTest` 9/9 (1 nueva), `OrganizationErrorCodesTest` 5/5 (sin cambios).
+    REFACTOR: ninguno necesario.
 
 - [ ] 3.9 **`OrganizationErrorCodesTest` a once códigos.** Extender el catálogo cerrado de la tarea
   2.6 con `institution-rtn-invalid`, `institution-address-blank`, `institution-address-too-long`,
