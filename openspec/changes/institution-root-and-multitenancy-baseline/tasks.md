@@ -418,7 +418,7 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
     → 5/5 (catálogo exacto, sin repetidos, formato kebab-case y longitud máxima, prefijo
     `institution-`, herencia de `DomainException`).
 
-- [ ] 2.7 **Puertas de calidad del `domain` en `app`.** En `apps/api/app/pom.xml`: si la tarea 1.5
+- [x] 2.7 **Puertas de calidad del `domain` en `app`.** En `apps/api/app/pom.xml`: si la tarea 1.5
   no declaró la regla `BUNDLE`, declararla ahora (`LINE`/`BRANCH` `COVEREDRATIO` 0.80) y actualizar
   el comentario de `coverage_threshold` en `openspec/config.yaml` en el mismo commit. Declarar la
   regla `PACKAGE` de `jacoco-check` con `<include>com.confia.*.domain</include>` y
@@ -432,6 +432,24 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   mínima del módulo `app`» (si aplica aquí) y «Cobertura y mutación del paquete `domain` de cada
   módulo de negocio» (ambos escenarios de cobertura, más los dos de mutación por selección de perfil,
   heredados del comportamiento ya probado en `kernel`)
+  - **Evidencia (2026-09-19):** tarea 1.5 ya había declarado `BUNDLE` (80 %) y el comentario de
+    `coverage_threshold`, así que solo se añadió la regla `PACKAGE` (95 % líneas/ramas sobre
+    `com.confia.*.domain` y `com.confia.*.domain.*`), la adhesión a `pitest-maven`
+    (`targetClasses`/`targetTests` = `com.confia.*.domain.*`, espejo exacto de `kernel/pom.xml`) y
+    `junit-platform-launcher` en alcance `test`. **Primer humo:**
+    `./mvnw -B -pl app -am verify -Pmutation-report` rompió por
+    `Rule violated for package com.confia.organization.domain: branches covered ratio is 0.85, but
+    expected minimum is 0.95` — cobertura real insuficiente (no una demostración deliberada de la
+    tarea 2.8), causada por tres ramas de `Institution.equals` sin ejercitar
+    (`this == other`, `!(other instanceof Institution)`, ids distintos) y por
+    `Institution.hashCode()` sin una aserción que distinga su valor de una constante. Se añadieron
+    a `InstitutionLifecycleTest` los casos faltantes (autoigualdad, no igual a un tipo distinto ni a
+    `null`, dos instituciones con `id` distinto nunca son iguales, y `hashCode()` igual al de `id()`)
+    sin tocar la aplicación ni sus reglas de negocio. **Humo final:**
+    `./mvnw -B -pl app -am verify -Pmutation-report` → BUILD SUCCESS; JaCoCo mide
+    `com.confia.organization.domain` (regla `PACKAGE` cumplida) y PIT genera y evalúa 32 mutaciones
+    sobre ese paquete, 32/32 muertas (100 %, informativo en esta rama), sin romper por
+    `failWhenNoMutations=true`.
 
 - [ ] 2.8 **Demostración de que las puertas fallan** (sin comprometer): (a) comentar temporalmente
   una aserción de `InstitutionCreationTest` u `OrganizationErrorCodesTest` y observar que la regla

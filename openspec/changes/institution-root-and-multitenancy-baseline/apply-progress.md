@@ -78,8 +78,9 @@ ADR-0020 or accept a red `productionCodeRespectsLayering`. Tasks 2.1–2.3b done
 | 2.3b `application` ports (`InstitutionRepository`, `CurrentInstitutionProvider`), moved forward from task 4.1 | Done | `c940a22` |
 | 2.4 Apply ADR-0020 (`optionalLayer` for Infrastructure/Web) | Done | `a26d685` |
 | 2.5 Activate/deactivate lifecycle, identity equality | Done | `0fe434e` |
-| 2.6 `OrganizationErrorCodesTest` (six codes) | Done | pending commit this batch |
-| 2.7–2.10 | Not started | — |
+| 2.6 `OrganizationErrorCodesTest` (six codes) | Done | `545e546` |
+| 2.7 Domain quality gates (`PACKAGE` 95%, PIT adhesion) | Done | pending commit this batch |
+| 2.8–2.10 | Not started | — |
 
 ### TDD Cycle Evidence
 
@@ -92,6 +93,7 @@ ADR-0020 or accept a red `productionCodeRespectsLayering`. Tasks 2.1–2.3b done
 | 2.4 | Compile error: `cannot find symbol method noProductionClassInLayer(JavaClasses,String) / location: class LayeredArchitectureTest` (2 occurrences), after adding the `OPTIONAL_LAYER` marker entries to `EmptyShouldExceptionInventoryTest` | `LayeredArchitectureTest`/`EmptyShouldExceptionInventoryTest`/`SuppressionCitesAdrTest` 13/13 green; `SuppressionCitesAdrTest` confirms 2==2 `.optionalLayer(` and 0==0 `.allowEmptyShould(` | None expected/needed | Expiry demonstrated: temporary `TempExpiryProbe` class in `organization.infrastructure` made `EmptyShouldExceptionInventoryTest` fail naming the exact `Infrastructure` entry; removed, `git status` clean |
 | 2.5 | `cannot find symbol method deactivate()/activate()` and `cannot find symbol class InstitutionStateException` (compile error) | 16/16 pass (`InstitutionLifecycleTest` 5/5 + `InstitutionCreationTest` 11/11, no regression) | None expected/needed | N/A (no branching logic beyond the state guard, already exercised by the four transition tests) |
 | 2.6 | N/A — catalog test over codes already implemented in tasks 2.2/2.5, mirrors `KernelErrorCodesTest`'s own pattern of no red when the catalog pre-exists | 5/5 pass immediately | None expected/needed | N/A (catalog assertion, no branching logic to neutralize) |
+| 2.7 | N/A (build-integrity wiring); first smoke run failed for real: `branches covered ratio is 0.85, but expected minimum is 0.95` on `organization.domain`, from untested `Institution.equals`/`hashCode` branches | `./mvnw -B -pl app -am verify -Pmutation-report` BUILD SUCCESS after closing the gap; PIT 32/32 mutations killed (100%, informational on this branch) | None expected/needed | Closed by adding the missing equality/hash edge-case tests, not by touching production logic or thresholds |
 
 ### Work Unit Evidence (through task 2.3)
 
