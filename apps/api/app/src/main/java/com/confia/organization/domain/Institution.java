@@ -1,5 +1,6 @@
 package com.confia.organization.domain;
 
+import com.confia.kernel.CurrencyCode;
 import com.confia.kernel.InstitutionId;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -34,15 +35,17 @@ public final class Institution {
     private final String tradeName;
     private final String rtn;
     private final String address;
+    private final CurrencyCode defaultCurrency;
     private boolean active;
 
     private Institution(InstitutionId id, String legalName, String tradeName, String rtn,
-            String address) {
+            String address, CurrencyCode defaultCurrency) {
         this.id = id;
         this.legalName = legalName;
         this.tradeName = tradeName;
         this.rtn = rtn;
         this.address = address;
+        this.defaultCurrency = defaultCurrency;
         this.active = true;
     }
 
@@ -60,17 +63,20 @@ public final class Institution {
      *     rule — the exact SAR format is deliberately not invented, design.md decision 7)
      * @param address the institution's postal address; never {@code null}, stripped of border
      *     spaces, non-blank, at most {@value #MAX_ADDRESS_LENGTH} code points
-     * @throws NullPointerException if {@code id}, {@code legalName}, {@code rtn} or {@code address}
-     *     is {@code null}
+     * @param defaultCurrency the institution's default currency; never {@code null} (the enabled
+     *     set is already closed by {@link CurrencyCode} itself, so no domain error applies here)
+     * @throws NullPointerException if {@code id}, {@code legalName}, {@code rtn}, {@code address}
+     *     or {@code defaultCurrency} is {@code null}
      * @throws InvalidInstitutionException if {@code legalName}, a non-null {@code tradeName},
      *     {@code rtn} or {@code address} violates its rule
      */
     public static Institution create(InstitutionId id, String legalName, String tradeName,
-            String rtn, String address) {
+            String rtn, String address, CurrencyCode defaultCurrency) {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(legalName, "legalName");
         Objects.requireNonNull(rtn, "rtn");
         Objects.requireNonNull(address, "address");
+        Objects.requireNonNull(defaultCurrency, "defaultCurrency");
 
         String normalizedLegalName = requireValidText(legalName, MAX_NAME_LENGTH,
                 InvalidInstitutionException::legalNameBlank,
@@ -87,7 +93,7 @@ public final class Institution {
                 InvalidInstitutionException::addressTooLong);
 
         return new Institution(id, normalizedLegalName, normalizedTradeName, rtn,
-                normalizedAddress);
+                normalizedAddress, defaultCurrency);
     }
 
     private static String requireValidText(String rawText, int maxLength,
@@ -121,6 +127,10 @@ public final class Institution {
 
     public String address() {
         return address;
+    }
+
+    public CurrencyCode defaultCurrency() {
+        return defaultCurrency;
     }
 
     public boolean isActive() {

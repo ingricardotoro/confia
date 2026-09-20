@@ -577,13 +577,21 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
     tooLongError)` para reutilizarse entre `legalName`/`tradeName` (200) y `address` (500), sin
     cambiar ningún comportamiento observable.
 
-- [ ] 3.3 **TDD — `defaultCurrency`.** ROJO: extender `InstitutionCreationTest` con el parámetro
+- [x] 3.3 **TDD — `defaultCurrency`.** ROJO: extender `InstitutionCreationTest` con el parámetro
   `defaultCurrency` (`CurrencyCode` de `kernel`): un valor nulo lanza `NullPointerException`, no un
   error de dominio; un valor `HNL` o `USD` se acepta. VERDE: extender `Institution.create(...)` con
   `defaultCurrency` (`requireNonNull`, sin validación de dominio adicional porque `CurrencyCode` ya
   es un conjunto cerrado). Actualizar llamadas existentes a `create(...)`. REFACTOR: ninguno
   esperado. — Especificación `organization`, requisito «Moneda por defecto, localización y huso
   horario válidos» (escenario «Moneda por defecto nula»)
+  - **Evidencia (2026-09-19):** ROJO observado: `./mvnw -B -pl app -am test
+    -Dtest=InstitutionCreationTest,InstitutionLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → errores de compilación, `create` de cinco parámetros no aplica a las llamadas de seis
+    parámetros y `cannot find symbol defaultCurrency()`. VERDE: tras añadir `defaultCurrency`
+    (`CurrencyCode`, `requireNonNull`, sin regla de dominio adicional) a `Institution.create(...)` y
+    actualizar las llamadas existentes: `InstitutionCreationTest` 22/22 (2 nuevas: moneda nula,
+    `HNL`/`USD` aceptadas), `InstitutionLifecycleTest` 8/8 (sin regresión), `OrganizationErrorCodesTest`
+    5/5 (sin cambios, catálogo sigue en seis). REFACTOR: ninguno necesario.
 
 - [ ] 3.4 **TDD — `locale`.** ROJO: extender `InstitutionCreationTest` con el parámetro `locale`
   (`java.util.Locale`): `Locale.forLanguageTag("es-HN")` se acepta; `Locale.ROOT` (sin idioma) falla
