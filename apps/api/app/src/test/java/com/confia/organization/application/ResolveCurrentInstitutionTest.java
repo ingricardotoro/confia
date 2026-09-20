@@ -2,10 +2,13 @@ package com.confia.organization.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.kernel.CurrencyCode;
 import com.confia.kernel.InstitutionId;
 import com.confia.organization.domain.Institution;
+import com.confia.organization.domain.InstitutionInactiveException;
+import com.confia.organization.domain.InstitutionNotFoundException;
 import java.time.ZoneId;
 import java.util.Locale;
 import java.util.UUID;
@@ -31,6 +34,14 @@ class ResolveCurrentInstitutionTest {
     }
 
     @Test
+    void inMemoryRepositoryReturnsAnAbsentResultForAnyUnregisteredIdentifier() {
+        InMemoryInstitutionRepository repository = new InMemoryInstitutionRepository();
+
+        assertThat(repository.findById(anId())).isEmpty();
+        assertThat(repository.findById(anId())).isEmpty();
+    }
+
+    @Test
     void fixedProviderReturnsItsConfiguredIdentifier() {
         InstitutionId id = anId();
         FixedCurrentInstitutionProvider provider = new FixedCurrentInstitutionProvider(id);
@@ -50,6 +61,34 @@ class ResolveCurrentInstitutionTest {
         Institution resolved = useCase.execute();
 
         assertThat(resolved).isEqualTo(activeInstitution);
+    }
+
+    @Test
+    void rejectsResolutionWhenNoInstitutionIsRegisteredForTheCurrentIdentifier() {
+        InMemoryInstitutionRepository repository = new InMemoryInstitutionRepository();
+        ResolveCurrentInstitution useCase = new ResolveCurrentInstitution(
+                new FixedCurrentInstitutionProvider(anId()), repository);
+
+        assertThatThrownBy(useCase::execute)
+                .isInstanceOf(InstitutionNotFoundException.class)
+                .extracting(error -> ((InstitutionNotFoundException) error).code())
+                .isEqualTo(InstitutionNotFoundException.CODE);
+    }
+
+    @Test
+    void rejectsResolutionWhenTheResolvedInstitutionIsInactive() {
+        InstitutionId id = anId();
+        Institution inactiveInstitution = anActiveInstitution(id);
+        inactiveInstitution.deactivate();
+        InMemoryInstitutionRepository repository = new InMemoryInstitutionRepository();
+        repository.register(inactiveInstitution);
+        ResolveCurrentInstitution useCase = new ResolveCurrentInstitution(
+                new FixedCurrentInstitutionProvider(id), repository);
+
+        assertThatThrownBy(useCase::execute)
+                .isInstanceOf(InstitutionInactiveException.class)
+                .extracting(error -> ((InstitutionInactiveException) error).code())
+                .isEqualTo(InstitutionInactiveException.CODE);
     }
 
     @Test

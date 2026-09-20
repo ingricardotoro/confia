@@ -2,6 +2,8 @@ package com.confia.organization.application;
 
 import com.confia.kernel.InstitutionId;
 import com.confia.organization.domain.Institution;
+import com.confia.organization.domain.InstitutionInactiveException;
+import com.confia.organization.domain.InstitutionNotFoundException;
 import java.util.Objects;
 
 /**
@@ -28,9 +30,17 @@ public final class ResolveCurrentInstitution {
      * Resolves the active institution for the request currently in flight.
      *
      * @return the current request's active institution
+     * @throws InstitutionNotFoundException if no institution is registered for the resolved
+     *     identifier
+     * @throws InstitutionInactiveException if the resolved institution exists but is not active
      */
     public Institution execute() {
         InstitutionId id = currentInstitutionProvider.currentInstitutionId();
-        return institutionRepository.findById(id).orElseThrow();
+        Institution institution = institutionRepository.findById(id)
+                .orElseThrow(InstitutionNotFoundException::new);
+        if (!institution.isActive()) {
+            throw new InstitutionInactiveException();
+        }
+        return institution;
     }
 }

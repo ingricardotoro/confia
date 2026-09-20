@@ -788,7 +788,7 @@ Rama `...-application`, base PR B2.
     caso feliz del caso de uso, dos nulos de constructor). `./mvnw -B -pl app -am test` completo:
     94/94 en verde, sin regresión. REFACTOR: ninguno necesario.
 
-- [ ] 4.2 **TDD — institución inexistente e inactiva.** ROJO: extender
+- [x] 4.2 **TDD — institución inexistente e inactiva.** ROJO: extender
   `ResolveCurrentInstitutionTest`: un `InstitutionRepository` sin ninguna institución registrada bajo
   el identificador resuelto → el caso de uso falla con `institution-not-found`; un
   `InstitutionRepository` que devuelve una `Institution` con `isActive` falso → el caso de uso falla
@@ -807,6 +807,30 @@ Rama `...-application`, base PR B2.
   identificador» (escenario «Ausencia de resultado para un identificador desconocido»), «Caso de uso
   de resolución de la institución en curso» (escenarios «Rechazo de una institución inexistente» y
   «Rechazo de una institución inactiva») y «Catálogo de códigos del módulo» (trece códigos completos)
+  - **Evidencia (2026-09-20):** ROJO observado: `./mvnw -B -pl app -am test
+    -Dtest=ResolveCurrentInstitutionTest -Dsurefire.failIfNoSpecifiedTests=false` → 9 errores de
+    compilación, `cannot find symbol class InstitutionNotFoundException` / `InstitutionInactiveException`
+    (importación y uso en las dos pruebas nuevas). VERDE: tras crear
+    `InstitutionNotFoundException` (`final`, hereda de `DomainException`, constructor público sin
+    argumentos, código `institution-not-found`) e `InstitutionInactiveException` (mismo patrón,
+    código `institution-inactive`), e implementar en `ResolveCurrentInstitution.execute()` el
+    rechazo de ausencia de resultado (`orElseThrow(InstitutionNotFoundException::new)`) y de
+    institución inactiva (`if (!institution.isActive()) throw new InstitutionInactiveException()`):
+    `ResolveCurrentInstitutionTest` 8/8 (3 nuevas: ausencia del doble en memoria sin excepción para
+    dos identificadores distintos, rechazo por inexistencia, rechazo por inactividad).
+    `OrganizationErrorCodesTest` extendido a trece códigos (`catalogHasExactlyTheThirteenCodesOfTheCompleteModule`,
+    más una prueba dedicada `theTwoResolutionExceptionsAreConstructibleWithAPublicNoArgumentConstructor`
+    que confirma que ambas excepciones nuevas se construyen con constructor público sin argumentos, a
+    diferencia de las fábricas de paquete del resto del catálogo) → 6/6. Verificación completa:
+    `./mvnw -B verify -Pmutation-gate` en `apps/api` → **BUILD SUCCESS**; 176 pruebas de `kernel` +
+    98 de `app` = 274 en total; JaCoCo (`jacoco.xml`) `com.confia.organization.domain` en líneas
+    79/79 = 100 % y ramas 20/20 = 100 % (regla `PACKAGE` de 95 % cumplida con margen); `BUNDLE`
+    global de `app` sin `Rule violated` ("All coverage checks have been met"); PIT sobre
+    `com.confia.organization.domain`: 49 mutaciones generadas, 49 muertas (100 %, cero
+    supervivientes) — `ResolveCurrentInstitution` (capa `application`) queda fuera del alcance de
+    PIT (`targetClasses`/`targetTests` = `com.confia.*.domain.*`), como exige esta misma tarea
+    («`organization.application` no está sujeta a las puertas de `domain`», confirmado
+    anticipadamente aquí y reconfirmado en la tarea 4.4). REFACTOR: ninguno necesario.
 
 - [ ] 4.3 **Medir el diff real de PR C** con
   `git diff --numstat <base-de-PR-B2>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`. Si
