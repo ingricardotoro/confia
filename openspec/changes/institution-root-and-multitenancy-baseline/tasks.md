@@ -202,7 +202,7 @@ Rama `...-domain` (por ejemplo `change/institution-root-and-multitenancy-baselin
 A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras apunta al PR A
 (`-Pmutation-report`).
 
-- [ ] 2.1 **TDD — `InstitutionId`.** ROJO: crear
+- [x] 2.1 **TDD — `InstitutionId`.** ROJO: crear
   `apps/api/kernel/src/test/java/com/confia/kernel/InstitutionIdTest.java`: construcción desde un
   `UUID` válido expone ese mismo `UUID`; un valor nulo lanza `NullPointerException`; dos instancias
   con el mismo `UUID` son iguales y su `hashCode` coincide; dos instancias con `UUID` distinto no son
@@ -214,8 +214,14 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   un error de programación, ADR-0019 punto 6). REFACTOR: ninguno esperado. — Especificación
   `organization`, requisito «Identificador de institución en el núcleo (`InstitutionId`)» (los tres
   escenarios)
+  - **Evidencia (2026-09-19):** ROJO observado: `cannot find symbol class InstitutionId` (10 errores
+    de compilación) al ejecutar `./mvnw -B -pl kernel -am test -Dtest=InstitutionIdTest
+    -Dsurefire.failIfNoSpecifiedTests=false`. VERDE: `InstitutionId` como `record` con constructor
+    compacto (`Objects.requireNonNull`); 4/4 pruebas en verde (construcción, nulo, igualdad/hashCode,
+    desigualdad). `package-info.java` actualizado para nombrar `InstitutionId` explícitamente entre
+    los tipos del núcleo. Sin cambios en `KernelErrorCodesTest` (el nulo es error de programación).
 
-- [ ] 2.2 **TDD — `Institution` mínima (caso feliz + `legalName`).** ROJO: crear
+- [x] 2.2 **TDD — `Institution` mínima (caso feliz + `legalName`).** ROJO: crear
   `apps/api/app/src/main/java/com/confia/organization/package-info.java` (documenta la capacidad
   `organization`, qué queda fuera de alcance y qué cambio lo aporta) y
   `apps/api/app/src/test/java/com/confia/organization/domain/InstitutionCreationTest.java` con: caso
@@ -237,8 +243,27 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   REFACTOR: ninguno esperado. — Especificación `organization`, requisito «Construcción de
   `Institution` y sus atributos de identidad obligatorios» (escenarios de `legalName` y de atributos
   obligatorios nulos, parcial: sin `address` todavía); ADR-0018 §2 (rojo programado, ahora observado)
+  - **Evidencia (2026-09-19):** ROJO observado: `cannot find symbol class Institution` /
+    `InvalidInstitutionException` (compilación) al ejecutar `./mvnw -B -pl app -am test
+    -Dtest=InstitutionCreationTest -Dsurefire.failIfNoSpecifiedTests=false`. VERDE: 11/11 pruebas.
+    **Desviación registrada:** además de `legalName`, esta tarea implementa ya la validación
+    completa de `tradeName` (blanco y máximo 200 puntos de código,
+    `institution-trade-name-blank`/`institution-trade-name-too-long`), adelantando parte del
+    requisito «Nombre comercial opcional» (nominalmente de la tarea 3.6 en PR B2). Necesario para
+    que el catálogo de seis códigos de la tarea 2.6 (en este mismo PR B1) tenga las cuatro fábricas
+    de `InvalidInstitutionException` realmente alcanzables desde producción, no fábricas muertas sin
+    invocar — relevante para las puertas de cobertura 95 %/mutación 80 de la tarea 2.7, también en
+    este PR. La tarea 3.6 en PR B2 encontrará ambas fábricas ya completas y solo confirmará el
+    comportamiento. `./mvnw -B verify` completo: **rojo programado observado**, mensaje exacto de
+    `EmptyShouldExceptionInventoryTest.everyExceptionsConditionStillHolds`: "`LayeredArchitectureTest.
+    productionCodeRespectsLayeringYet's ADR-0018 exception no longer holds (no class in
+    apps/api/app production code resides in a domain, application, infrastructure or web package
+    yet, because no business module exists (change 4 introduces the first one)). Remove
+    allowEmptyShould(true) from that rule and this inventory entry, or update the condition and
+    cite the ADR that extends it (ADR-0018, section 2).`" `LayeredArchitectureTest` sigue en verde
+    (todavía conserva `allowEmptyShould(true)`); se cierra en la tarea 2.3. Sin comprometer el rojo.
 
-- [ ] 2.3 **Cierre de la caducidad de ADR-0018 (parte común).** En
+- [x] 2.3 **Cierre de la caducidad de ADR-0018 (parte común).** En
   `apps/api/app/src/test/java/com/confia/architecture/LayeredArchitectureTest.java`: borrar
   `.allowEmptyShould(true)` y el comentario que la acompaña; renombrar la prueba a
   `productionCodeRespectsLayering`; borrar `LAYER_SEGMENTS` y `noBusinessModuleExistsYet` con su
@@ -253,8 +278,48 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   resultado (b) ya observado en la sonda de `design.md`. — ADR-0018 §2 y §3.a (caducidad cerrada);
   criterios de éxito de la propuesta («`LayeredArchitectureTest` evalúa clases reales... sin
   `allowEmptyShould(true)`, y el inventario ya no contiene la entrada vencida»)
+  - **Evidencia (2026-09-19):** `EmptyShouldExceptionInventoryTest` (lista vacía) y
+    `SuppressionCitesAdrTest` (0 == 0 llamadas `allowEmptyShould(`) pasan:
+    `./mvnw -B -pl app -am test -Dtest=EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → 9/9. `productionCodeRespectsLayering` ejecutada de
+    forma aislada (`-Dtest=LayeredArchitectureTest#productionCodeRespectsLayering`) **falla**,
+    confirmando el resultado (b) de la sonda: nombra `Layer 'Application' is empty`, `Layer
+    'Infrastructure' is empty` y `Layer 'Web' is empty`. **Hallazgo no cubierto por la sonda de
+    design.md, registrado para la tarea 2.4:** la sonda de P2 solo probó `optionalLayer` con una
+    muestra donde `domain` **y** `application` ya tenían clases; en el estado real de este PR,
+    `application` sigue vacía (sus puertos llegan en PR C, tarea 4.1) y ADR-0020 declara `Application`
+    siempre obligatoria (§2 de su decisión). Aplicar `optionalLayer` solo a `Infrastructure` y `Web`
+    en la tarea 2.4 no cerraría este rojo mientras `Application` siga vacía y obligatoria; se verifica
+    en la tarea 2.4 antes de comprometer ese cambio.
 
-- [ ] 2.4 **Aplicación de ADR-0020 (opción A, ya aceptada): capas opcionales por marcador.** ROJO:
+- [x] 2.3b **Puertos de la capa `application` (adelantados desde la tarea 4.1, decisión del
+  propietario del 2026-09-19).** Crear
+  `apps/api/app/src/main/java/com/confia/organization/application/InstitutionRepository.java`
+  (`Optional<Institution> findById(InstitutionId id)`) y
+  `.../CurrentInstitutionProvider.java` (`InstitutionId currentInstitutionId()`, con el Javadoc que
+  fija el contrato de ADR-0009: el valor se deriva del token autenticado y nunca de un parámetro,
+  cabecera o cuerpo del cliente). Son interfaces sin implementación en este cambio: el adaptador de
+  persistencia llega con el cambio 5 y el de seguridad con el cambio 7. Sin anotaciones de Spring.
+  **Motivo del adelanto:** ADR-0020 §2 mantiene `Application` como capa siempre obligatoria, de modo
+  que dejarla vacía hasta el PR C haría fallar `productionCodeRespectsLayering` en los PR B1 y B2.
+  Con los puertos aquí, la capa deja de estar vacía por una razón real y no hace falta ampliar
+  ninguna excepción. Sin ciclo ROJO/VERDE propio: son interfaces sin comportamiento; su prueba llega
+  con el caso de uso en la tarea 4.1. — Especificación `organization`, requisitos «Puerto de salida
+  para cargar una institución por identificador» y «Puerto de salida para la institución de la
+  solicitud en curso»; ADR-0009; ADR-0020 §2
+  - **Evidencia (2026-09-19):** sin ciclo ROJO/VERDE propio, como indica el motivo del adelanto: son
+    interfaces sin comportamiento (`InstitutionRepository.findById(InstitutionId)` devuelve
+    `Optional<Institution>`; `CurrentInstitutionProvider.currentInstitutionId()` devuelve
+    `InstitutionId`, con el Javadoc del contrato de ADR-0009 citando textualmente
+    «Implementación del aislamiento»). Compilación en verde:
+    `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → 11/11 (sin regresión). **Comprobación del motivo del adelanto:**
+    `productionCodeRespectsLayering` ejecutada de forma aislada ya no nombra `Application` como capa
+    vacía, solo `Layer 'Infrastructure' is empty` y `Layer 'Web' is empty` — confirma en código que
+    los dos puertos bastan para que `application` deje de estar vacía, antes de que la tarea 2.4
+    aplique `optionalLayer` a las otras dos.
+
+- [x] 2.4 **Aplicación de ADR-0020 (opción A, ya aceptada): capas opcionales por marcador.** ROJO:
   en `apps/api/app/src/test/java/com/confia/architecture/SuppressionCitesAdrTest.java`, añadir el
   patrón `OPTIONAL_LAYER_CALL` (`\.optionalLayer\(`) y `WITH_OPTIONAL_LAYERS_TRUE`
   (`withOptionalLayers\(\s*true\s*\)`) a la lista de marcadores con nombre, con sus ejemplos y la
@@ -280,8 +345,41 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   borrar la clase temporal (`git status` limpio) antes de continuar. REFACTOR: ninguno esperado. —
   ADR-0020 (opción A completa); `design.md`, «Ediciones exactas de las pruebas de arquitectura»
   (parte «Solo si se aplica ADR-0020»)
+  - **Evidencia (2026-09-19):** paso 1 (patrones sin usar): tras añadir `OPTIONAL_LAYER_CALL` y
+    `WITH_OPTIONAL_LAYERS_TRUE` a `SuppressionCitesAdrTest` (con el ejemplo
+    `.optionalLayer("Web")` y la prueba dedicada de que `WITH_OPTIONAL_LAYERS_TRUE` distingue
+    `true` de `false`), `./mvnw -B -pl app -am test -Dtest=SuppressionCitesAdrTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → 10/10 en verde (`0 == 0` apariciones de
+    `.optionalLayer(`). ROJO observado: al añadir a `EmptyShouldExceptionInventoryTest` el `enum
+    Marker`, `countOf(Marker)` y las dos entradas `OPTIONAL_LAYER` apuntando a
+    `LayeredArchitectureTest.noProductionClassInLayer(...)`, la compilación falla exactamente como
+    predijo la tarea: `cannot find symbol / method
+    noProductionClassInLayer(com.tngtech.archunit.core.domain.JavaClasses,java.lang.String) /
+    location: class com.confia.architecture.LayeredArchitectureTest` (dos apariciones, una por
+    entrada). VERDE: tras separar `LayeredArchitectureTest` en `productionLayeringRule()`
+    (`optionalLayer("Infrastructure")`/`optionalLayer("Web")`, cada una con el comentario que cita
+    ADR-0020), `fixtureLayeringRule()` (cuatro capas obligatorias, sin cambios de comportamiento) y
+    `constrained(LayeredArchitecture)` con las ocho cláusulas `whereLayer` y el `because()`
+    existentes, más el método de paquete `noProductionClassInLayer`, y tras ajustar
+    `SuppressionCitesAdrTest` para comparar cada contador contra
+    `EmptyShouldExceptionInventoryTest.countOf(Marker....)` en vez del `EXCEPTIONS.size()` global
+    (necesario porque el inventario ahora mezcla dos tipos de marcador):
+    `./mvnw -B -pl app -am test
+    -Dtest=LayeredArchitectureTest,EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → 13/13 en verde; `SuppressionCitesAdrTest` confirma
+    `2 == 2` apariciones de `.optionalLayer(` y `0 == 0` de `.allowEmptyShould(`. **Demostración de
+    caducidad** (sin comprometer): se creó temporalmente
+    `apps/api/app/src/main/java/com/confia/organization/infrastructure/TempExpiryProbe.java` (una
+    clase mínima, sin lógica); `EmptyShouldExceptionInventoryTest` falló nombrando exactamente la
+    entrada esperada: "`LayeredArchitectureTest.productionLayeringRule, layer Infrastructure's
+    ADR-0020 exception no longer holds (no production class resides in an infrastructure package
+    yet ...)`"; se borró el archivo y el directorio temporal, `git status` quedó limpio (solo los
+    tres archivos de prueba de arquitectura modificados) antes de continuar. **Verificación del
+    punto de control de esta fase:** `./mvnw -B verify` completo en `apps/api` → BUILD SUCCESS, 56
+    pruebas (`productionCodeRespectsLayering` pasa con `Infrastructure` y `Web` opcionales, sin
+    ampliar ninguna excepción), puerta JaCoCo `BUNDLE` de 80 % cumplida.
 
-- [ ] 2.5 **TDD — activación y desactivación.** ROJO: crear
+- [x] 2.5 **TDD — activación y desactivación.** ROJO: crear
   `apps/api/app/src/test/java/com/confia/organization/domain/InstitutionLifecycleTest.java`:
   desactivar una institución activa tiene éxito e `isActive` pasa a falso sin modificar otro
   atributo; reactivar una inactiva tiene éxito; activar una ya activa falla con
@@ -295,6 +393,13 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   REFACTOR: ninguno esperado. — Especificación `organization`, requisito «Activación y desactivación
   de una institución» (los cuatro escenarios) y requisito «Jerarquía de errores de dominio del módulo
   `organization`» (escenario de herencia de `DomainException`, parcial)
+  - **Evidencia (2026-09-19):** ROJO observado:
+    `./mvnw -B -pl app -am test -Dtest=InstitutionLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → `cannot find symbol method deactivate()/activate()` y
+    `cannot find symbol class InstitutionStateException` (compilación). VERDE:
+    `./mvnw -B -pl app -am test -Dtest=InstitutionLifecycleTest,InstitutionCreationTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → 16/16 (5 nuevas de `InstitutionLifecycleTest` + 11 de
+    `InstitutionCreationTest`, sin regresión). REFACTOR: ninguno necesario.
 
 - [ ] 2.6 **`OrganizationErrorCodesTest` con seis códigos.** Crear
   `apps/api/app/src/test/java/com/confia/organization/domain/OrganizationErrorCodesTest.java`
@@ -459,17 +564,14 @@ Rama `...-application`, base PR B2.
 
 - [ ] 4.1 **TDD — `ResolveCurrentInstitution`, caso activo.** ROJO: crear
   `apps/api/app/src/test/java/com/confia/organization/application/InMemoryInstitutionRepository.java`
-  y `.../FixedCurrentInstitutionProvider.java` (dobles de prueba, en `src/test`) y
+  y `.../FixedCurrentInstitutionProvider.java` (dobles de prueba, en `src/test`, sobre los puertos
+  creados en la tarea 2.3b) y
   `apps/api/app/src/test/java/com/confia/organization/application/ResolveCurrentInstitutionTest.java`
   con: un `CurrentInstitutionProvider` que resuelve un `InstitutionId` conocido y un
   `InstitutionRepository` que devuelve, para ese identificador, una `Institution` con `isActive`
   verdadero → el caso de uso devuelve esa `Institution`; el constructor de `ResolveCurrentInstitution`
   rechaza cada puerto nulo con `NullPointerException`. VERDE: crear
   `apps/api/app/src/main/java/com/confia/organization/application/InstitutionRepository.java`
-  (`Optional<Institution> findById(InstitutionId id)`),
-  `.../CurrentInstitutionProvider.java` (`InstitutionId currentInstitutionId()`, con el Javadoc que
-  fija el contrato de ADR-0009: el valor se deriva del token autenticado y nunca de un parámetro,
-  cabecera o cuerpo del cliente) y
   `.../ResolveCurrentInstitution.java` (`final`, sin anotaciones de Spring, constructor con
   `requireNonNull` de ambos puertos, `execute()` que resuelve el identificador y carga la
   institución). Ningún bean de Spring se registra: la clase no lleva anotaciones y no se escanea

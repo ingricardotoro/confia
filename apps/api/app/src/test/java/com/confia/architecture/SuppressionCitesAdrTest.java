@@ -61,6 +61,14 @@ class SuppressionCitesAdrTest {
     private static final Pattern FAIL_ON_EMPTY_SHOULD_FALSE =
             Pattern.compile("failOnEmptyShould\\s*=\\s*false");
 
+    // ADR-0020 markers: optionalLayer( needs an adjacent ADR citation, like allowEmptyShould(;
+    // withOptionalLayers(true) is an outright ban in any file, like failOnEmptyShould=false, because
+    // it would make all four layers optional instead of only Infrastructure and Web (ADR-0020,
+    // option C, explicitly rejected).
+    private static final Pattern OPTIONAL_LAYER_CALL = Pattern.compile("\\.optionalLayer\\(");
+    private static final Pattern WITH_OPTIONAL_LAYERS_TRUE =
+            Pattern.compile("withOptionalLayers\\(\\s*true\\s*\\)");
+
     // JaCoCo and PIT suppression markers (design.md, decision 13).
     private static final Pattern PIT_EXCLUSION_TAG = Pattern.compile(
             "<(excludedClasses|excludedMethods|excludedTestClasses|excludedGroups|avoidCallsTo)>");
@@ -87,7 +95,8 @@ class SuppressionCitesAdrTest {
             new NamedPattern("Plugin skip flag", PLUGIN_SKIP_FLAG),
             new NamedPattern("JaCoCo non-blocking threshold", JACOCO_NON_BLOCKING_THRESHOLD),
             new NamedPattern("JaCoCo class exclusion", JACOCO_CLASS_EXCLUSION),
-            new NamedPattern("@Generated annotation", GENERATED_ANNOTATION));
+            new NamedPattern("@Generated annotation", GENERATED_ANNOTATION),
+            new NamedPattern("optionalLayer( call", OPTIONAL_LAYER_CALL));
 
     /** A suppression marker pattern, named for test reporting and the catalog documentation. */
     private record NamedPattern(String name, Pattern pattern) {
@@ -101,6 +110,7 @@ class SuppressionCitesAdrTest {
 
         List<String> problems = new ArrayList<>();
         int allowEmptyShouldOccurrences = 0;
+        int optionalLayerOccurrences = 0;
 
         for (Path file : files) {
             List<String> lines = Files.readAllLines(file);
@@ -111,8 +121,17 @@ class SuppressionCitesAdrTest {
                             + "ADR-0018 forbids in any file; use per-rule allowEmptyShould(true) "
                             + "instead, cited to the ADR that authorizes it.");
                 }
+                if (WITH_OPTIONAL_LAYERS_TRUE.matcher(line).find()) {
+                    problems.add(file + ":" + (i + 1) + " sets withOptionalLayers(true), which "
+                            + "ADR-0020 forbids in any file because it makes all four layers "
+                            + "optional instead of only Infrastructure and Web; use per-layer "
+                            + "optionalLayer(...) instead, cited to the ADR that authorizes it.");
+                }
                 if (ALLOW_EMPTY_SHOULD_CALL.matcher(line).find()) {
                     allowEmptyShouldOccurrences++;
+                }
+                if (OPTIONAL_LAYER_CALL.matcher(line).find()) {
+                    optionalLayerOccurrences++;
                 }
                 for (NamedPattern namedPattern : ADR_CITED_PATTERNS) {
                     if (namedPattern.pattern().matcher(line).find()) {
@@ -127,7 +146,21 @@ class SuppressionCitesAdrTest {
                 .as("allowEmptyShould( call sites must match EmptyShouldExceptionInventoryTest's "
                         + "inventory exactly (ADR-0018): every exception is declared, and every "
                         + "declared exception corresponds to a real allowEmptyShould(true) call")
-                .isEqualTo(EmptyShouldExceptionInventoryTest.EXCEPTIONS.size());
+                .isEqualTo(EmptyShouldExceptionInventoryTest.countOf(
+                        EmptyShouldExceptionInventoryTest.Marker.ALLOW_EMPTY_SHOULD));
+        assertThat(optionalLayerOccurrences)
+                .as("optionalLayer( call sites must match EmptyShouldExceptionInventoryTest's "
+                        + "inventory exactly (ADR-0020): every exception is declared, and every "
+                        + "declared exception corresponds to a real optionalLayer(...) call")
+                .isEqualTo(EmptyShouldExceptionInventoryTest.countOf(
+                        EmptyShouldExceptionInventoryTest.Marker.OPTIONAL_LAYER));
+    }
+
+    @Test
+    void withOptionalLayersTrueMatchesItsOwnExampleAndSparesFalse() {
+        assertThat(WITH_OPTIONAL_LAYERS_TRUE.matcher("withOptionalLayers(true)").find()).isTrue();
+        assertThat(WITH_OPTIONAL_LAYERS_TRUE.matcher("withOptionalLayers(false)").find())
+                .isFalse();
     }
 
     @ParameterizedTest(name = "{0}")
@@ -156,7 +189,9 @@ class SuppressionCitesAdrTest {
                 Arguments.of("JaCoCo class exclusion", JACOCO_CLASS_EXCLUSION,
                         "<exclude>com/example/Generated.class</exclude>"),
                 Arguments.of("@Generated annotation", GENERATED_ANNOTATION,
-                        "@Generated(\"tool\")"));
+                        "@Generated(\"tool\")"),
+                Arguments.of("optionalLayer( call", OPTIONAL_LAYER_CALL,
+                        ".optionalLayer(\"Web\")"));
     }
 
     private static void requireAdjacentAdrCitation(List<String> lines, int markerLine, Path file,

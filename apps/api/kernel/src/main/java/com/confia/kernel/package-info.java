@@ -7,7 +7,7 @@
  *
  * <p>No business rule lives in this package: it exists only to hold cross-cutting, framework-free
  * building blocks ({@code Money}, {@code CurrencyCode}, {@code Percentage}, {@code
- * DomainException} and identifiers).
+ * DomainException} and identifiers such as {@code InstitutionId}).
  *
  * <p><strong>Every public type of this module lives directly in this single, flat package —
  * there are no subpackages such as {@code com.confia.kernel.money}.</strong> {@code app} depends
