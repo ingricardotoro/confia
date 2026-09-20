@@ -757,7 +757,7 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
 
 Rama `...-application`, base PR B2.
 
-- [ ] 4.1 **TDD — `ResolveCurrentInstitution`, caso activo.** ROJO: crear
+- [x] 4.1 **TDD — `ResolveCurrentInstitution`, caso activo.** ROJO: crear
   `apps/api/app/src/test/java/com/confia/organization/application/InMemoryInstitutionRepository.java`
   y `.../FixedCurrentInstitutionProvider.java` (dobles de prueba, en `src/test`, sobre los puertos
   creados en la tarea 2.3b) y
@@ -775,6 +775,18 @@ Rama `...-application`, base PR B2.
   dobles en memoria»), «Puerto de salida para la institución de la solicitud en curso» (su
   escenario) y «Caso de uso de resolución de la institución en curso» (escenario «Resolución exitosa
   de una institución activa»)
+  - **Evidencia (2026-09-20):** los puertos `InstitutionRepository` y `CurrentInstitutionProvider`
+    ya existían desde la tarea 2.3b (PR B1), así que esta tarea cubre solo el caso de uso y sus
+    dobles de prueba, como instruye el lanzamiento de esta fase. ROJO observado: `./mvnw -B -pl app
+    -am test -Dtest=ResolveCurrentInstitutionTest -Dsurefire.failIfNoSpecifiedTests=false` → 4
+    errores de compilación, `cannot find symbol class ResolveCurrentInstitution`. VERDE: tras crear
+    `ResolveCurrentInstitution` (`final`, sin anotaciones de Spring, constructor con
+    `Objects.requireNonNull` de ambos puertos, `execute()` que resuelve el identificador y carga la
+    institución con `Optional::orElseThrow` sin argumentos como implementación mínima — el rechazo
+    con `institution-not-found`/`institution-inactive` llega en la tarea 4.2):
+    `ResolveCurrentInstitutionTest` 5/5 (doble de repositorio con registro, doble de proveedor fijo,
+    caso feliz del caso de uso, dos nulos de constructor). `./mvnw -B -pl app -am test` completo:
+    94/94 en verde, sin regresión. REFACTOR: ninguno necesario.
 
 - [ ] 4.2 **TDD — institución inexistente e inactiva.** ROJO: extender
   `ResolveCurrentInstitutionTest`: un `InstitutionRepository` sin ninguna institución registrada bajo
