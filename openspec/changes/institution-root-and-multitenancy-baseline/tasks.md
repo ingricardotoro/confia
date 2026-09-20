@@ -263,7 +263,7 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
     cite the ADR that extends it (ADR-0018, section 2).`" `LayeredArchitectureTest` sigue en verde
     (todavía conserva `allowEmptyShould(true)`); se cierra en la tarea 2.3. Sin comprometer el rojo.
 
-- [ ] 2.3 **Cierre de la caducidad de ADR-0018 (parte común).** En
+- [x] 2.3 **Cierre de la caducidad de ADR-0018 (parte común).** En
   `apps/api/app/src/test/java/com/confia/architecture/LayeredArchitectureTest.java`: borrar
   `.allowEmptyShould(true)` y el comentario que la acompaña; renombrar la prueba a
   `productionCodeRespectsLayering`; borrar `LAYER_SEGMENTS` y `noBusinessModuleExistsYet` con su
@@ -278,6 +278,19 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   resultado (b) ya observado en la sonda de `design.md`. — ADR-0018 §2 y §3.a (caducidad cerrada);
   criterios de éxito de la propuesta («`LayeredArchitectureTest` evalúa clases reales... sin
   `allowEmptyShould(true)`, y el inventario ya no contiene la entrada vencida»)
+  - **Evidencia (2026-09-19):** `EmptyShouldExceptionInventoryTest` (lista vacía) y
+    `SuppressionCitesAdrTest` (0 == 0 llamadas `allowEmptyShould(`) pasan:
+    `./mvnw -B -pl app -am test -Dtest=EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → 9/9. `productionCodeRespectsLayering` ejecutada de
+    forma aislada (`-Dtest=LayeredArchitectureTest#productionCodeRespectsLayering`) **falla**,
+    confirmando el resultado (b) de la sonda: nombra `Layer 'Application' is empty`, `Layer
+    'Infrastructure' is empty` y `Layer 'Web' is empty`. **Hallazgo no cubierto por la sonda de
+    design.md, registrado para la tarea 2.4:** la sonda de P2 solo probó `optionalLayer` con una
+    muestra donde `domain` **y** `application` ya tenían clases; en el estado real de este PR,
+    `application` sigue vacía (sus puertos llegan en PR C, tarea 4.1) y ADR-0020 declara `Application`
+    siempre obligatoria (§2 de su decisión). Aplicar `optionalLayer` solo a `Infrastructure` y `Web`
+    en la tarea 2.4 no cerraría este rojo mientras `Application` siga vacía y obligatoria; se verifica
+    en la tarea 2.4 antes de comprometer ese cambio.
 
 - [ ] 2.4 **Aplicación de ADR-0020 (opción A, ya aceptada): capas opcionales por marcador.** ROJO:
   en `apps/api/app/src/test/java/com/confia/architecture/SuppressionCitesAdrTest.java`, añadir el

@@ -5,11 +5,7 @@ import static com.confia.architecture.ArchitectureTestSupport.fixtureClasses;
 import static com.confia.architecture.ArchitectureTestSupport.productionClasses;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
-import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.lang.ArchRule;
-import java.util.Arrays;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -66,13 +62,8 @@ class LayeredArchitectureTest {
     }
 
     @Test
-    void productionCodeRespectsLayeringYet() {
-        // ADR-0018: no business module exists yet under apps/api/app, so all four layers above
-        // are empty for production code today. This exception expires the moment a business
-        // module (change 4) adds a class to any of them; see EmptyShouldExceptionInventoryTest,
-        // whose inventory entry for this rule must be removed together with this call.
-        ArchRule rule = layeringRule().allowEmptyShould(true);
-        rule.check(productionClasses());
+    void productionCodeRespectsLayering() {
+        layeringRule().check(productionClasses());
     }
 
     @Test
@@ -88,21 +79,5 @@ class LayeredArchitectureTest {
         // still throws but no longer names BadDomain, BadApplication or BadWeb is not a rejection of
         // the layering violations, it is noise, and this assertion now tells the two apart.
         assertRuleRejects(layeringRule(), fixtureClasses(), "BadDomain", "BadApplication", "BadWeb");
-    }
-
-    private static final Set<String> LAYER_SEGMENTS =
-            Set.of("domain", "application", "infrastructure", "web");
-
-    /**
-     * Package-visible for {@link EmptyShouldExceptionInventoryTest}: {@code true} while the
-     * ADR-0018 exception on {@link #productionCodeRespectsLayeringYet()} is still justified,
-     * {@code false} the moment any production class lands in a domain, application,
-     * infrastructure or web package.
-     */
-    static boolean noBusinessModuleExistsYet(JavaClasses classes) {
-        return classes.stream()
-                .map(JavaClass::getPackageName)
-                .flatMap(name -> Arrays.stream(name.split("\\.")))
-                .noneMatch(LAYER_SEGMENTS::contains);
     }
 }

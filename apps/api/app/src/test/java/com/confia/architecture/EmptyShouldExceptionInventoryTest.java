@@ -21,15 +21,13 @@ import org.junit.jupiter.api.Test;
  */
 class EmptyShouldExceptionInventoryTest {
 
-    /** Package-visible for {@link SuppressionCitesAdrTest}'s count check. */
-    static final List<ExpiringException> EXCEPTIONS = List.of(
-            new ExpiringException(
-                    "LayeredArchitectureTest.productionCodeRespectsLayeringYet",
-                    "ADR-0018",
-                    "no class in apps/api/app production code resides in a domain, application, "
-                            + "infrastructure or web package yet, because no business module "
-                            + "exists (change 4 introduces the first one)",
-                    LayeredArchitectureTest::noBusinessModuleExistsYet));
+    /**
+     * Package-visible for {@link SuppressionCitesAdrTest}'s count check. Empty since ADR-0018's
+     * exception on {@code LayeredArchitectureTest.productionCodeRespectsLayeringYet} expired the
+     * moment {@code organization.domain} added its first production class (change 4); the
+     * mechanism itself stays in place for whichever future exception needs it.
+     */
+    static final List<ExpiringException> EXCEPTIONS = List.of();
 
     @Test
     void everyExceptionsConditionStillHolds() {
