@@ -5,7 +5,9 @@ import static com.confia.architecture.ArchitectureTestSupport.fixtureClasses;
 import static com.confia.architecture.ArchitectureTestSupport.productionClasses;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
+import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.library.Architectures.LayeredArchitecture;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -41,13 +43,51 @@ import org.junit.jupiter.api.Test;
  */
 class LayeredArchitectureTest {
 
-    private static ArchRule layeringRule() {
-        return layeredArchitecture()
+    /**
+     * The rule evaluated against real production code (ADR-0020 §2, option A): {@code
+     * Infrastructure} and {@code Web} are declared {@code optionalLayer(...)} because {@code
+     * organization} has no production class in either yet — the only honest {@code
+     * infrastructure} adapter is change 5's jOOQ repository, and {@code web} has no business use
+     * case until administration lands (proposal, "Dentro de alcance", point 4). {@code Domain} and
+     * {@code Application} stay always mandatory, per ADR-0020 §2, point 2: a class that
+     * accidentally stops landing in one of those two must still fail the build.
+     *
+     * <p>Each {@code optionalLayer(...)} call is declared and caducates in {@link
+     * EmptyShouldExceptionInventoryTest#EXCEPTIONS} and counted by {@link
+     * SuppressionCitesAdrTest}.
+     */
+    private static ArchRule productionLayeringRule() {
+        return constrained(layeredArchitecture()
+                .consideringOnlyDependenciesInLayers()
+                .layer("Domain").definedBy("..domain..")
+                .layer("Application").definedBy("..application..")
+                // ADR-0020: optional while no production class resides in an infrastructure
+                // package (change 5 adds the first jOOQ adapter).
+                .optionalLayer("Infrastructure").definedBy("..infrastructure..")
+                // ADR-0020: optional while no production class resides in a web package (the
+                // first business controller adds one).
+                .optionalLayer("Web").definedBy("..web.."));
+    }
+
+    /**
+     * The rule evaluated against the permanent fixture package (ADR-0020 §2, point 1: "nunca en
+     * la mitad de fixture"). Every layer stays mandatory: {@link
+     * ArchitectureTestSupport#fixtureClasses()} always has classes in all four layers (task 3.3 of
+     * the maven-workspace-and-ci-skeleton change), and a fixture that stopped matching one of them
+     * must fail the build, not read as a legitimate rejection (ADR-0018 §1.4).
+     */
+    private static ArchRule fixtureLayeringRule() {
+        return constrained(layeredArchitecture()
                 .consideringOnlyDependenciesInLayers()
                 .layer("Domain").definedBy("..domain..")
                 .layer("Application").definedBy("..application..")
                 .layer("Infrastructure").definedBy("..infrastructure..")
-                .layer("Web").definedBy("..web..")
+                .layer("Web").definedBy("..web.."));
+    }
+
+    /** The eight {@code whereLayer} dependency clauses shared by both rule halves (ADR-0002). */
+    private static ArchRule constrained(LayeredArchitecture layers) {
+        return layers
                 .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Infrastructure")
                 .whereLayer("Domain").mayNotAccessAnyLayer()
                 .whereLayer("Application").mayOnlyBeAccessedByLayers("Web", "Infrastructure")
@@ -61,9 +101,21 @@ class LayeredArchitectureTest {
                         + "on domain, and nothing depends back the other way (ADR-0002)");
     }
 
+    /**
+     * {@code true} when no class in {@code classes} lives in a package whose name contains {@code
+     * layerSegment} as a dot-delimited segment (the same matching {@code "..<segment>.."} package
+     * predicates use). Package-visible for {@link EmptyShouldExceptionInventoryTest}'s ADR-0020
+     * expiry conditions.
+     */
+    static boolean noProductionClassInLayer(JavaClasses classes, String layerSegment) {
+        String needle = "." + layerSegment + ".";
+        return classes.stream()
+                .noneMatch(javaClass -> ("." + javaClass.getPackageName() + ".").contains(needle));
+    }
+
     @Test
     void productionCodeRespectsLayering() {
-        layeringRule().check(productionClasses());
+        productionLayeringRule().check(productionClasses());
     }
 
     @Test
@@ -78,6 +130,7 @@ class LayeredArchitectureTest {
         // classes that must appear in the violation message closes that gap: a build where the rule
         // still throws but no longer names BadDomain, BadApplication or BadWeb is not a rejection of
         // the layering violations, it is noise, and this assertion now tells the two apart.
-        assertRuleRejects(layeringRule(), fixtureClasses(), "BadDomain", "BadApplication", "BadWeb");
+        assertRuleRejects(fixtureLayeringRule(), fixtureClasses(), "BadDomain", "BadApplication",
+                "BadWeb");
     }
 }

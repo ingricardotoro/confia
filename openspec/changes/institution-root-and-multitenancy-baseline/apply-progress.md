@@ -75,8 +75,8 @@ ADR-0020 or accept a red `productionCodeRespectsLayering`. Tasks 2.1–2.3b done
 | 2.1 `InstitutionId` in kernel | Done | `32d5370` |
 | 2.2 Minimal `Institution` (id, legalName, tradeName, isActive) | Done | `43d1c01` |
 | 2.3 Close ADR-0018's common expiry (empty inventory, rename rule) | Done | `e2ac46e` |
-| 2.3b `application` ports (`InstitutionRepository`, `CurrentInstitutionProvider`), moved forward from task 4.1 | Done | pending commit this batch |
-| 2.4 Apply ADR-0020 (`optionalLayer` for Infrastructure/Web) | In progress | — |
+| 2.3b `application` ports (`InstitutionRepository`, `CurrentInstitutionProvider`), moved forward from task 4.1 | Done | `c940a22` |
+| 2.4 Apply ADR-0020 (`optionalLayer` for Infrastructure/Web) | Done | pending commit this batch |
 | 2.5–2.10 | Not started | — |
 
 ### TDD Cycle Evidence
@@ -87,6 +87,7 @@ ADR-0020 or accept a red `productionCodeRespectsLayering`. Tasks 2.1–2.3b done
 | 2.2 | `cannot find symbol class Institution` / `InvalidInstitutionException` (compile errors) | 11/11 tests pass | None expected/needed | Full `./mvnw -B verify`: scheduled ADR-0018 red observed in `EmptyShouldExceptionInventoryTest`, exact message recorded in `tasks.md`; `LayeredArchitectureTest` still green (still carries `allowEmptyShould(true)`) |
 | 2.3 | N/A (this task closes a scheduled red, it does not add new behavior) | `EmptyShouldExceptionInventoryTest` + `SuppressionCitesAdrTest` green (9/9, count 0==0) | None expected/needed | `productionCodeRespectsLayering` run in isolation fails as predicted by design.md's probe outcome (b), naming `Application`, `Infrastructure` and `Web` as empty — one layer more than the probe's own sample tested (see Blocker, now resolved) |
 | 2.3b | N/A — interfaces only, no RED/GREEN cycle (explicitly documented in tasks.md, matching the task's own "sin ciclo ROJO/VERDE propio") | `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest -Dsurefire.failIfNoSpecifiedTests=false` → 11/11, no regression | None expected/needed | `productionCodeRespectsLayering` run in isolation now names only `Infrastructure` and `Web` as empty, no longer `Application` — confirms the two ports resolved the blocker before task 2.4 touches `optionalLayer` |
+| 2.4 | Compile error: `cannot find symbol method noProductionClassInLayer(JavaClasses,String) / location: class LayeredArchitectureTest` (2 occurrences), after adding the `OPTIONAL_LAYER` marker entries to `EmptyShouldExceptionInventoryTest` | `LayeredArchitectureTest`/`EmptyShouldExceptionInventoryTest`/`SuppressionCitesAdrTest` 13/13 green; `SuppressionCitesAdrTest` confirms 2==2 `.optionalLayer(` and 0==0 `.allowEmptyShould(` | None expected/needed | Expiry demonstrated: temporary `TempExpiryProbe` class in `organization.infrastructure` made `EmptyShouldExceptionInventoryTest` fail naming the exact `Infrastructure` entry; removed, `git status` clean |
 
 ### Work Unit Evidence (through task 2.3)
 

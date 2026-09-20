@@ -319,7 +319,7 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
     los dos puertos bastan para que `application` deje de estar vacía, antes de que la tarea 2.4
     aplique `optionalLayer` a las otras dos.
 
-- [ ] 2.4 **Aplicación de ADR-0020 (opción A, ya aceptada): capas opcionales por marcador.** ROJO:
+- [x] 2.4 **Aplicación de ADR-0020 (opción A, ya aceptada): capas opcionales por marcador.** ROJO:
   en `apps/api/app/src/test/java/com/confia/architecture/SuppressionCitesAdrTest.java`, añadir el
   patrón `OPTIONAL_LAYER_CALL` (`\.optionalLayer\(`) y `WITH_OPTIONAL_LAYERS_TRUE`
   (`withOptionalLayers\(\s*true\s*\)`) a la lista de marcadores con nombre, con sus ejemplos y la
@@ -345,6 +345,39 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   borrar la clase temporal (`git status` limpio) antes de continuar. REFACTOR: ninguno esperado. —
   ADR-0020 (opción A completa); `design.md`, «Ediciones exactas de las pruebas de arquitectura»
   (parte «Solo si se aplica ADR-0020»)
+  - **Evidencia (2026-09-19):** paso 1 (patrones sin usar): tras añadir `OPTIONAL_LAYER_CALL` y
+    `WITH_OPTIONAL_LAYERS_TRUE` a `SuppressionCitesAdrTest` (con el ejemplo
+    `.optionalLayer("Web")` y la prueba dedicada de que `WITH_OPTIONAL_LAYERS_TRUE` distingue
+    `true` de `false`), `./mvnw -B -pl app -am test -Dtest=SuppressionCitesAdrTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → 10/10 en verde (`0 == 0` apariciones de
+    `.optionalLayer(`). ROJO observado: al añadir a `EmptyShouldExceptionInventoryTest` el `enum
+    Marker`, `countOf(Marker)` y las dos entradas `OPTIONAL_LAYER` apuntando a
+    `LayeredArchitectureTest.noProductionClassInLayer(...)`, la compilación falla exactamente como
+    predijo la tarea: `cannot find symbol / method
+    noProductionClassInLayer(com.tngtech.archunit.core.domain.JavaClasses,java.lang.String) /
+    location: class com.confia.architecture.LayeredArchitectureTest` (dos apariciones, una por
+    entrada). VERDE: tras separar `LayeredArchitectureTest` en `productionLayeringRule()`
+    (`optionalLayer("Infrastructure")`/`optionalLayer("Web")`, cada una con el comentario que cita
+    ADR-0020), `fixtureLayeringRule()` (cuatro capas obligatorias, sin cambios de comportamiento) y
+    `constrained(LayeredArchitecture)` con las ocho cláusulas `whereLayer` y el `because()`
+    existentes, más el método de paquete `noProductionClassInLayer`, y tras ajustar
+    `SuppressionCitesAdrTest` para comparar cada contador contra
+    `EmptyShouldExceptionInventoryTest.countOf(Marker....)` en vez del `EXCEPTIONS.size()` global
+    (necesario porque el inventario ahora mezcla dos tipos de marcador):
+    `./mvnw -B -pl app -am test
+    -Dtest=LayeredArchitectureTest,EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → 13/13 en verde; `SuppressionCitesAdrTest` confirma
+    `2 == 2` apariciones de `.optionalLayer(` y `0 == 0` de `.allowEmptyShould(`. **Demostración de
+    caducidad** (sin comprometer): se creó temporalmente
+    `apps/api/app/src/main/java/com/confia/organization/infrastructure/TempExpiryProbe.java` (una
+    clase mínima, sin lógica); `EmptyShouldExceptionInventoryTest` falló nombrando exactamente la
+    entrada esperada: "`LayeredArchitectureTest.productionLayeringRule, layer Infrastructure's
+    ADR-0020 exception no longer holds (no production class resides in an infrastructure package
+    yet ...)`"; se borró el archivo y el directorio temporal, `git status` quedó limpio (solo los
+    tres archivos de prueba de arquitectura modificados) antes de continuar. **Verificación del
+    punto de control de esta fase:** `./mvnw -B verify` completo en `apps/api` → BUILD SUCCESS, 56
+    pruebas (`productionCodeRespectsLayering` pasa con `Infrastructure` y `Web` opcionales, sin
+    ampliar ninguna excepción), puerta JaCoCo `BUNDLE` de 80 % cumplida.
 
 - [ ] 2.5 **TDD — activación y desactivación.** ROJO: crear
   `apps/api/app/src/test/java/com/confia/organization/domain/InstitutionLifecycleTest.java`:
