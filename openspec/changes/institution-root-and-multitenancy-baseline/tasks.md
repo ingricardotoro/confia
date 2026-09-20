@@ -487,6 +487,23 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   se fusionó). Si cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y consultar
   al propietario** entre una subdivisión adicional dentro de B1 o una excepción de tamaño; no
   decidirlo sin el propietario. — P1 de la propuesta; `design.md`, «Pronóstico de tamaño por corte»
+  - **Medición (2026-09-19), sin decisión tomada — DETENIDO, se consulta al propietario:**
+    `git diff --numstat e3b9e84...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'` (base real de
+    PR A, commit `e3b9e84`, confirmado con `git merge-base`) →
+    16 archivos, **933 líneas de autor** (878 adiciones + 55 eliminaciones), desglose:
+    `apps/api/app/pom.xml` 49+/0-; `CurrentInstitutionProvider.java` 33+/0-;
+    `InstitutionRepository.java` 29+/0-; `Institution.java` 137+/0-;
+    `InstitutionStateException.java` 29+/0-; `InvalidInstitutionException.java` 50+/0-;
+    `organization/package-info.java` 19+/0-; `EmptyShouldExceptionInventoryTest.java` 48+/21-;
+    `LayeredArchitectureTest.java` 58+/30-; `SuppressionCitesAdrTest.java` 38+/3-;
+    `InstitutionCreationTest.java` 121+/0-; `InstitutionLifecycleTest.java` 106+/0-;
+    `OrganizationErrorCodesTest.java` 87+/0-; `InstitutionId.java` (kernel) 23+/0-;
+    `kernel/package-info.java` 1+/1-; `InstitutionIdTest.java` 50+/0-. **933 > 800**, así que esta
+    tarea se detiene exactamente como instruye su propio texto: no se decide aquí entre una
+    subdivisión adicional dentro de B1 o una excepción de tamaño (`size:exception`); se reporta al
+    propietario/orquestador. No se marca esta tarea como completada ni se continúa con la tarea
+    2.10 hasta recibir esa decisión (coincide con el punto de parada dura fijado explícitamente en
+    el lanzamiento de esta fase).
 
 - [ ] 2.10 **Verificación final de PR B1**: en checkout limpio, con `JAVA_HOME` en JDK 25, ejecutar
   `./mvnw -B verify -Pmutation-gate` en `apps/api`. Confirmar cobertura de `organization.domain` ≥
