@@ -39,7 +39,7 @@ rules:
   verify:
     test_command: "./mvnw verify" # add -Pmutation-report to include PIT
     build_command: "./mvnw verify"
-    coverage_threshold: 95 # kernel line+branch (JaCoCo); 80 global arrives with change 4
+    coverage_threshold: 95 # kernel and every module's domain package, line+branch (JaCoCo); 80 global on app
   archive:
     - Warn before merging destructive deltas
     - Merge change id as folder prefix with archive date under openspec/archive/<date>-<id>/
