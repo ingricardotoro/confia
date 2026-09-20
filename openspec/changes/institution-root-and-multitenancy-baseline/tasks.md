@@ -832,14 +832,27 @@ Rama `...-application`, base PR B2.
     («`organization.application` no está sujeta a las puertas de `domain`», confirmado
     anticipadamente aquí y reconfirmado en la tarea 4.4). REFACTOR: ninguno necesario.
 
-- [ ] 4.3 **Medir el diff real de PR C** con
+- [x] 4.3 **Medir el diff real de PR C** con
   `git diff --numstat <base-de-PR-B2>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`. Si
   cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y consultar al propietario**;
   el corte C ya es la unidad más pequeña de las cuatro (185–290 líneas estimadas), por lo que un
   exceso aquí sería inesperado y merece revisión aparte antes de subdividir. — P1 de la propuesta;
   `design.md`, «Pronóstico de tamaño por corte»
+  - **Evidencia (2026-09-20):** base real de PR B2 confirmada con `git merge-base
+    change/institution-root-and-multitenancy-baseline-application
+    change/institution-root-and-multitenancy-baseline-domain-attributes` → `a6c1bb7` (extremo de PR
+    B2). `git diff --numstat a6c1bb7...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'` → 7
+    archivos: `ResolveCurrentInstitution.java` 46+/0-; `InstitutionInactiveException.java` 25+/0-;
+    `InstitutionNotFoundException.java` 25+/0-; `FixedCurrentInstitutionProvider.java` 22+/0-;
+    `InMemoryInstitutionRepository.java` 29+/0-; `ResolveCurrentInstitutionTest.java` 119+/0-;
+    `OrganizationErrorCodesTest.java` 26+/8-. **Total: 292 adiciones + 8 eliminaciones = 300 líneas
+    de autor**, ligeramente por encima del pronóstico de `design.md` para C (185–290, mismo patrón
+    de subestimación leve que en B1/B2, aquí solo 10 líneas sobre el máximo) y muy por debajo de
+    800; se continúa sin consultar al propietario, exactamente como indica el texto de esta tarea.
+    Árbol de trabajo limpio (`git status` sin cambios salvo `tasks.md` en edición) antes de la
+    verificación final de la tarea 4.4.
 
-- [ ] 4.4 **Verificación final de PR C y cierre del cambio.** En checkout limpio, con `JAVA_HOME` en
+- [x] 4.4 **Verificación final de PR C y cierre del cambio.** En checkout limpio, con `JAVA_HOME` en
   JDK 25, ejecutar `./mvnw -B verify` y `./mvnw -B verify -Pmutation-report` en `apps/api`. Confirmar
   que `organization.domain` mantiene cobertura ≥ 95 % y mutación ≥ 80 con las dos clases de error
   nuevas incluidas, y que `organization.application` no está sujeta a las puertas de `domain` (sin
@@ -848,3 +861,63 @@ Rama `...-application`, base PR B2.
   «Criterios de éxito» de `proposal.md` contra el estado final del reactor y dejar constancia de cada
   uno como cumplido u observado. — Capacidad `organization` y `build-integrity` completas; todos los
   criterios de éxito de la propuesta
+  - **Evidencia (2026-09-20):** árbol de trabajo limpio (`git status` sin cambios de código, solo
+    `tasks.md` en edición) en `change/institution-root-and-multitenancy-baseline-application`, commit
+    `67ea727`. `./mvnw -B verify` en `apps/api` con `JAVA_HOME`/`MAVEN_OPTS` fijados: **BUILD
+    SUCCESS**, 176 pruebas de `kernel` + 98 de `app` = 274 en total, todas en verde, JaCoCo
+    ("All coverage checks have been met", sin `Rule violated`). `./mvnw -B verify -Pmutation-report`:
+    **BUILD SUCCESS**; PIT sobre `com.confia.organization.domain` (`targetClasses`/`targetTests` =
+    `com.confia.*.domain.*`): línea de cobertura mutada 75/75 = 100 %, **49 mutaciones generadas, 49
+    muertas (100 %), cero supervivientes**, incluidas las dos clases de error nuevas
+    (`InstitutionNotFoundException`, `InstitutionInactiveException`). PIT de `kernel`: 178
+    mutaciones, 176 muertas (99 %); el único mutador con supervivientes es
+    `ConditionalsBoundaryMutator` (24 generadas, 22 muertas, 2 supervivientes), preexistente y ajeno
+    a este cambio — mismo 99 % ya documentado en las tareas 2.10 (PR B1) y 3.10 (PR B2). JaCoCo
+    (`jacoco.xml`) confirma `com.confia.organization.domain` en líneas 79/79 = 100 % y ramas 20/20 =
+    100 % (regla `PACKAGE` de 95 % cumplida con margen); `ResolveCurrentInstitution` (paquete
+    `com.confia.organization.application`) tiene cobertura completa (36/36 instrucciones, 12/12
+    líneas, 2/2 ramas) pero **no** aparece en `<includes>` de la regla `PACKAGE`
+    (`com.confia.*.domain`, `com.confia.*.domain.*`, confirmado leyendo `app/pom.xml` líneas
+    102–106): `organization.application` no está sujeta a las puertas de `domain`, exactamente como
+    exige esta tarea. **Pendiente fuera de mi alcance en esta ejecución:** empujar la rama
+    `...-application` y confirmar el trabajo `backend` en la integración continua — el lanzamiento
+    de esta fase instruye explícitamente no empujar ni abrir PR (lo hace el orquestador); queda como
+    siguiente paso del orquestador antes de dar PR C y el cambio completo por cerrados en CI.
+
+    **Repaso de «Criterios de éxito» de `proposal.md` contra el estado final del reactor:**
+    1. `./mvnw verify` en `apps/api` termina en verde con JDK 25 — **cumplido localmente**
+       (`./mvnw -B verify` de esta misma evidencia); la confirmación en la integración continua
+       queda pendiente del empuje de rama, fuera del alcance de `sdd-apply`.
+    2. `LayeredArchitectureTest` evalúa clases reales de `organization` sin `allowEmptyShould(true)`,
+       y el inventario de ADR-0018 ya no contiene la entrada vencida — **cumplido** (tareas 2.3–2.4
+       de PR B1; sin cambios en PR C).
+    3. Ninguna excepción de conjunto vacío nueva existe sin la aprobación de P2 — **cumplido**: las
+       dos entradas `OPTIONAL_LAYER` de `EmptyShouldExceptionInventoryTest` (tarea 2.4) están
+       amparadas por ADR-0020 (aceptado); PR C no añade ninguna entrada nueva.
+    4. Cada regla de ADR-0004 §Cumplimiento 2 rechaza su fixture negativo nombrando la clase
+       infractora, y su mitad de producción pasa sin excepción — **cumplido** (PR A, tareas
+       1.2–1.4; reconfirmado en esta misma ejecución: `MonetaryFloatingPointTest` sigue en las 274
+       pruebas en verde).
+    5. La cobertura global de `app` por debajo de 80 % rompe la construcción — **cumplido** (regla
+       `BUNDLE`, PR A tarea 1.5; demostración de fallo en la tarea 1.5 y en la 2.8).
+    6. La cobertura de `organization.domain` por debajo de 95 % rompe la construcción; su puntuación
+       de mutación por debajo de 80 rompe en la rama principal y solo informa en las ramas de
+       trabajo — **cumplido**: cobertura real 100 %/100 % (líneas/ramas) y mutación 100 % en esta
+       ejecución; demostración de fallo ya registrada en la tarea 2.8 (perfil `mutation-gate` rompe
+       por debajo del umbral, `mutation-report` solo informa), sin repetirla aquí porque no cambia
+       con las dos clases nuevas.
+    7. Construir una `Institution` inválida lanza una subclase de `DomainException` con un código
+       kebab-case del catálogo del módulo; todos los códigos cumplen el formato y no se repiten —
+       **cumplido** (`InstitutionCreationTest`, `OrganizationErrorCodesTest`, trece códigos en esta
+       ejecución, sin repetidos, formato kebab-case, prefijo `institution-`).
+    8. El caso de uso de resolución rechaza una institución inexistente o inactiva con su error de
+       dominio — **cumplido** (tarea 4.2: `rejectsResolutionWhenNoInstitutionIsRegisteredFor...` e
+       `...IsInactive`, con los códigos `institution-not-found`/`institution-inactive`).
+    9. `openspec/changes/foundations-plan/exploration.md` registra la nota fechada de D1 —
+       **cumplido**, ya presente («Nota (2026-09-19, decisión D1 de
+       `institution-root-and-multitenancy-baseline`)», líneas 52–55 de ese archivo), sin cambios
+       necesarios en PR C.
+
+    Los nueve criterios de éxito quedan cumplidos u observados; el único punto abierto (la
+    confirmación en la integración continua remota del criterio 1) depende del empuje de rama, que
+    esta fase no ejecuta por instrucción explícita del lanzamiento.
