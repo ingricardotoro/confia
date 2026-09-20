@@ -532,7 +532,7 @@ Rama `...-domain-attributes`, base PR B1. La firma de `Institution.create(...)` 
 (pasa de tres a ocho parámetros); es aceptable porque el agregado no tiene consumidores fuera del
 módulo (`design.md`, «Pronóstico de tamaño por corte»).
 
-- [ ] 3.1 **TDD — `rtn`.** ROJO: extender `InstitutionCreationTest` con la nueva firma de
+- [x] 3.1 **TDD — `rtn`.** ROJO: extender `InstitutionCreationTest` con la nueva firma de
   `Institution.create(id, legalName, tradeName, rtn, ...)` (los parámetros siguientes se añaden en
   tareas posteriores de este mismo PR; usar valores válidos fijos para ellos mientras no tengan su
   propia validación): rechazo de `rtn` vacío, de `rtn` con guiones (`"0801-1990-12345"`), de `rtn` de
@@ -544,6 +544,16 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
   `InstitutionCreationTest` y `InstitutionLifecycleTest` para incluir el nuevo parámetro. REFACTOR:
   ninguno esperado. — Especificación `organization`, requisito «RTN presente y numérico, con el
   formato exacto pendiente» (ambos escenarios)
+  - **Evidencia (2026-09-19):** ROJO observado:
+    `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest,InstitutionLifecycleTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → errores de compilación, `create` de tres parámetros
+    no aplica a las llamadas de cuatro parámetros y `cannot find symbol RTN_INVALID`/`rtn()`. VERDE:
+    tras añadir `rtn` (`String`, `requireNonNull`, `RTN_PATTERN = ^[0-9]{1,20}$`,
+    `MAX_RTN_DIGITS = 20`) a `Institution.create(...)` y la fábrica `rtnInvalid()` a
+    `InvalidInstitutionException`, y actualizar las llamadas existentes:
+    `InstitutionCreationTest` 15/15 (4 nuevas: RTN vacío, RTN con guiones/21 dígitos, RTN de 1 y 20
+    dígitos, RTN nulo), `InstitutionLifecycleTest` 8/8 (sin regresión), `OrganizationErrorCodesTest`
+    5/5 (sin cambios, catálogo sigue en seis). REFACTOR: ninguno necesario.
 
 - [ ] 3.2 **TDD — `address`.** ROJO: extender `InstitutionCreationTest` con el parámetro `address`:
   rechazo de `address` vacía o de solo espacios (`institution-address-blank`), aceptación con exactamente

@@ -16,6 +16,7 @@ public final class InvalidInstitutionException extends DomainException {
     public static final String LEGAL_NAME_TOO_LONG = "institution-legal-name-too-long";
     public static final String TRADE_NAME_BLANK = "institution-trade-name-blank";
     public static final String TRADE_NAME_TOO_LONG = "institution-trade-name-too-long";
+    public static final String RTN_INVALID = "institution-rtn-invalid";
 
     private InvalidInstitutionException(String code, String message) {
         super(code, message);
@@ -46,5 +47,17 @@ public final class InvalidInstitutionException extends DomainException {
     static InvalidInstitutionException tradeNameTooLong() {
         return new InvalidInstitutionException(TRADE_NAME_TOO_LONG,
                 "trade name exceeds " + Institution.MAX_NAME_LENGTH + " characters");
+    }
+
+    /**
+     * {@code rtn} is not a sequence of 1 to {@link Institution#MAX_RTN_DIGITS} ASCII digits: empty,
+     * containing a separator or a non-digit character, or exceeding the technical guard length.
+     * This does not validate the exact SAR tax identification number format, which is not
+     * confirmed against a primary source (design.md, decision 7).
+     */
+    static InvalidInstitutionException rtnInvalid() {
+        return new InvalidInstitutionException(RTN_INVALID,
+                "rtn must be between 1 and " + Institution.MAX_RTN_DIGITS
+                        + " ASCII digits, with no separators");
     }
 }
