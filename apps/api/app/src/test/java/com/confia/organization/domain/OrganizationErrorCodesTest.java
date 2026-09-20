@@ -67,6 +67,15 @@ class OrganizationErrorCodesTest {
     }
 
     @Test
+    void theKebabCasePatternRejectsAMalformedCode() {
+        // Without this, the format check above could pass against a pattern that accepts anything.
+        assertThat("Institution-Rtn-Invalid").doesNotMatch(KEBAB_CASE);
+        assertThat("institution_rtn_invalid").doesNotMatch(KEBAB_CASE);
+        assertThat("institution--rtn").doesNotMatch(KEBAB_CASE);
+        assertThat("-institution-rtn").doesNotMatch(KEBAB_CASE);
+    }
+
+    @Test
     void everyCodeCarriesTheModulePrefix() {
         for (String code : allOrganizationErrorCodes()) {
             assertThat(code).as("code '%s' must start with '%s'", code, MODULE_PREFIX)
