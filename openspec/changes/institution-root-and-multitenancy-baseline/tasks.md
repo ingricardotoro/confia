@@ -653,7 +653,7 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
     -Dsurefire.failIfNoSpecifiedTests=false` → 27/27, incluidos los cuatro escenarios de
     `tradeName`.
 
-- [ ] 3.7 **TDD — precedencia de invariantes.** ROJO: añadir a `InstitutionCreationTest` una prueba
+- [x] 3.7 **TDD — precedencia de invariantes.** ROJO: añadir a `InstitutionCreationTest` una prueba
   parametrizada que confirma el orden exacto de `design.md` («Flujo de datos»): primero
   `requireNonNull` de los siete argumentos obligatorios (todos salvo `tradeName`), luego las reglas
   de negocio en el orden `legalName` → `tradeName` (si no es nulo) → `rtn` → `address` → `locale` →
@@ -668,6 +668,20 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
   invariantes (orden de evaluación); no hay escenario propio en la especificación, pero está
   implícito en el requisito «Construcción de `Institution`...» al exigir «una sola excepción, la
   primera que aplica»
+  - **Evidencia (2026-09-19):** la implementación incremental de las tareas 3.1–3.5 ya coincidía
+    exactamente con el orden de `design.md` (`requireNonNull` de los siete obligatorios primero;
+    luego `legalName` → `tradeName` → `rtn` → `address` → `locale` → `timezone`), así que la prueba
+    parametrizada (`@ParameterizedTest`/`@MethodSource`, con los tres pares exactos del enunciado)
+    pasó en verde de inmediato: `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → 30/30 (3 nuevos casos). **No vacuidad (sin
+    comprometer):** se intercambió temporalmente el orden de las comprobaciones de `rtn` y
+    `timezone` en `Institution.create(...)`; al reejecutar solo la prueba parametrizada,
+    `onlyTheFirstApplicableInvariantThrowsWhenSeveralAttributesAreSimultaneouslyInvalid` falló
+    exactamente en el caso `rtn` inválido + `timezone` de desplazamiento fijo (1 de 3), recibiendo
+    `institution-timezone-invalid` en vez de `institution-rtn-invalid`; se revirtió el intercambio
+    (`git diff` del archivo de producción quedó vacío) y las 43 pruebas del módulo volvieron a
+    verde. REFACTOR: ninguno necesario — el orden de comprobaciones ya era legible sin extraerlo a
+    un método adicional.
 
 - [ ] 3.8 **`toString()` sin RTN ni dirección.** Extender `InstitutionLifecycleTest` con una
   aserción sobre `Institution.toString()` que confirma el formato `"Institution[id=..., tradeName=...]"`

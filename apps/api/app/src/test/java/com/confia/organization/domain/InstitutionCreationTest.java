@@ -9,7 +9,12 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.stream.Stream;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Construction of {@link Institution} and its identity attributes (specs/organization/spec.md,
@@ -315,6 +320,42 @@ class InstitutionCreationTest {
                 "Colegio San Marcos", VALID_RTN, VALID_ADDRESS, VALID_CURRENCY, VALID_LOCALE,
                 null))
                 .isInstanceOf(NullPointerException.class);
+    }
+
+    /**
+     * design.md, "Flujo de datos": all seven mandatory {@code requireNonNull} checks run before
+     * any business rule, and business rules run in the exact order {@code legalName} →
+     * {@code tradeName} (if not null) → {@code rtn} → {@code address} → {@code locale} →
+     * {@code timezone}. Only the first applicable rule's exception is ever thrown, even when
+     * several attributes are simultaneously invalid.
+     */
+    @ParameterizedTest
+    @MethodSource("invariantPrecedenceCases")
+    void onlyTheFirstApplicableInvariantThrowsWhenSeveralAttributesAreSimultaneouslyInvalid(
+            ThrowingCallable construction, String expectedCode) {
+        assertThatThrownBy(construction)
+                .isInstanceOf(InvalidInstitutionException.class)
+                .extracting(exception -> ((InvalidInstitutionException) exception).code())
+                .isEqualTo(expectedCode);
+    }
+
+    private static Stream<Arguments> invariantPrecedenceCases() {
+        return Stream.of(
+                Arguments.of(
+                        (ThrowingCallable) () -> Institution.create(anId(), "   ",
+                                "Colegio San Marcos", "0801-1990-12345", VALID_ADDRESS,
+                                VALID_CURRENCY, VALID_LOCALE, VALID_TIMEZONE),
+                        InvalidInstitutionException.LEGAL_NAME_BLANK),
+                Arguments.of(
+                        (ThrowingCallable) () -> Institution.create(anId(), "Instituto San Marcos",
+                                "   ", VALID_RTN, "", VALID_CURRENCY, VALID_LOCALE,
+                                VALID_TIMEZONE),
+                        InvalidInstitutionException.TRADE_NAME_BLANK),
+                Arguments.of(
+                        (ThrowingCallable) () -> Institution.create(anId(), "Instituto San Marcos",
+                                "Colegio San Marcos", "0801-1990-12345", VALID_ADDRESS,
+                                VALID_CURRENCY, VALID_LOCALE, ZoneOffset.ofHours(-6)),
+                        InvalidInstitutionException.RTN_INVALID));
     }
 
     static InstitutionId anId() {
