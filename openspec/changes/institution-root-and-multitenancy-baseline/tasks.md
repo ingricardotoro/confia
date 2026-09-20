@@ -379,7 +379,7 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
     pruebas (`productionCodeRespectsLayering` pasa con `Infrastructure` y `Web` opcionales, sin
     ampliar ninguna excepción), puerta JaCoCo `BUNDLE` de 80 % cumplida.
 
-- [ ] 2.5 **TDD — activación y desactivación.** ROJO: crear
+- [x] 2.5 **TDD — activación y desactivación.** ROJO: crear
   `apps/api/app/src/test/java/com/confia/organization/domain/InstitutionLifecycleTest.java`:
   desactivar una institución activa tiene éxito e `isActive` pasa a falso sin modificar otro
   atributo; reactivar una inactiva tiene éxito; activar una ya activa falla con
@@ -393,6 +393,13 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   REFACTOR: ninguno esperado. — Especificación `organization`, requisito «Activación y desactivación
   de una institución» (los cuatro escenarios) y requisito «Jerarquía de errores de dominio del módulo
   `organization`» (escenario de herencia de `DomainException`, parcial)
+  - **Evidencia (2026-09-19):** ROJO observado:
+    `./mvnw -B -pl app -am test -Dtest=InstitutionLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → `cannot find symbol method deactivate()/activate()` y
+    `cannot find symbol class InstitutionStateException` (compilación). VERDE:
+    `./mvnw -B -pl app -am test -Dtest=InstitutionLifecycleTest,InstitutionCreationTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → 16/16 (5 nuevas de `InstitutionLifecycleTest` + 11 de
+    `InstitutionCreationTest`, sin regresión). REFACTOR: ninguno necesario.
 
 - [ ] 2.6 **`OrganizationErrorCodesTest` con seis códigos.** Crear
   `apps/api/app/src/test/java/com/confia/organization/domain/OrganizationErrorCodesTest.java`

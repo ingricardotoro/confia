@@ -11,9 +11,10 @@ import java.util.function.Supplier;
  * decision 5).
  *
  * <p>This PR (B1) constructs the minimal aggregate: {@link #id()}, {@link #legalName()}, the
- * optional {@link #tradeName()}, and {@link #isActive()}. {@code rtn}, {@code address}, {@code
- * defaultCurrency}, {@code locale} and {@code timezone} land in PR B2, which changes {@link
- * #create} to an eight-parameter signature (design.md, "Pronóstico de tamaño por corte").
+ * optional {@link #tradeName()}, {@link #isActive()} and the {@link #activate()}/{@link
+ * #deactivate()} transitions. {@code rtn}, {@code address}, {@code defaultCurrency}, {@code
+ * locale} and {@code timezone} land in PR B2, which changes {@link #create} to an
+ * eight-parameter signature (design.md, "Pronóstico de tamaño por corte").
  *
  * <p>Every mandatory argument (all but {@code tradeName}) rejects {@code null} with {@link
  * NullPointerException}: a null reference is a programming error, not a domain condition
@@ -89,5 +90,48 @@ public final class Institution {
 
     public boolean isActive() {
         return active;
+    }
+
+    /**
+     * Activates an inactive institution. Not idempotent on purpose: a caller that activates an
+     * already active institution has a defect, not a valid operation.
+     *
+     * @throws InstitutionStateException if this institution is already active
+     */
+    public void activate() {
+        if (active) {
+            throw InstitutionStateException.alreadyActive();
+        }
+        active = true;
+    }
+
+    /**
+     * Deactivates an active institution. Not idempotent on purpose: a caller that deactivates an
+     * already inactive institution has a defect, not a valid operation.
+     *
+     * @throws InstitutionStateException if this institution is already inactive
+     */
+    public void deactivate() {
+        if (!active) {
+            throw InstitutionStateException.alreadyInactive();
+        }
+        active = false;
+    }
+
+    /** Equality and hash code are by {@link #id()} alone: an entity, not a value object. */
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof Institution institution)) {
+            return false;
+        }
+        return id.equals(institution.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
     }
 }

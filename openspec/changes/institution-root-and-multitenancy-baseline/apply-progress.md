@@ -76,8 +76,9 @@ ADR-0020 or accept a red `productionCodeRespectsLayering`. Tasks 2.1–2.3b done
 | 2.2 Minimal `Institution` (id, legalName, tradeName, isActive) | Done | `43d1c01` |
 | 2.3 Close ADR-0018's common expiry (empty inventory, rename rule) | Done | `e2ac46e` |
 | 2.3b `application` ports (`InstitutionRepository`, `CurrentInstitutionProvider`), moved forward from task 4.1 | Done | `c940a22` |
-| 2.4 Apply ADR-0020 (`optionalLayer` for Infrastructure/Web) | Done | pending commit this batch |
-| 2.5–2.10 | Not started | — |
+| 2.4 Apply ADR-0020 (`optionalLayer` for Infrastructure/Web) | Done | `a26d685` |
+| 2.5 Activate/deactivate lifecycle, identity equality | Done | pending commit this batch |
+| 2.6–2.10 | Not started | — |
 
 ### TDD Cycle Evidence
 
@@ -88,6 +89,7 @@ ADR-0020 or accept a red `productionCodeRespectsLayering`. Tasks 2.1–2.3b done
 | 2.3 | N/A (this task closes a scheduled red, it does not add new behavior) | `EmptyShouldExceptionInventoryTest` + `SuppressionCitesAdrTest` green (9/9, count 0==0) | None expected/needed | `productionCodeRespectsLayering` run in isolation fails as predicted by design.md's probe outcome (b), naming `Application`, `Infrastructure` and `Web` as empty — one layer more than the probe's own sample tested (see Blocker, now resolved) |
 | 2.3b | N/A — interfaces only, no RED/GREEN cycle (explicitly documented in tasks.md, matching the task's own "sin ciclo ROJO/VERDE propio") | `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest -Dsurefire.failIfNoSpecifiedTests=false` → 11/11, no regression | None expected/needed | `productionCodeRespectsLayering` run in isolation now names only `Infrastructure` and `Web` as empty, no longer `Application` — confirms the two ports resolved the blocker before task 2.4 touches `optionalLayer` |
 | 2.4 | Compile error: `cannot find symbol method noProductionClassInLayer(JavaClasses,String) / location: class LayeredArchitectureTest` (2 occurrences), after adding the `OPTIONAL_LAYER` marker entries to `EmptyShouldExceptionInventoryTest` | `LayeredArchitectureTest`/`EmptyShouldExceptionInventoryTest`/`SuppressionCitesAdrTest` 13/13 green; `SuppressionCitesAdrTest` confirms 2==2 `.optionalLayer(` and 0==0 `.allowEmptyShould(` | None expected/needed | Expiry demonstrated: temporary `TempExpiryProbe` class in `organization.infrastructure` made `EmptyShouldExceptionInventoryTest` fail naming the exact `Infrastructure` entry; removed, `git status` clean |
+| 2.5 | `cannot find symbol method deactivate()/activate()` and `cannot find symbol class InstitutionStateException` (compile error) | 16/16 pass (`InstitutionLifecycleTest` 5/5 + `InstitutionCreationTest` 11/11, no regression) | None expected/needed | N/A (no branching logic beyond the state guard, already exercised by the four transition tests) |
 
 ### Work Unit Evidence (through task 2.3)
 

@@ -1,0 +1,82 @@
+package com.confia.organization.domain;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.confia.kernel.InstitutionId;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Activation, deactivation and identity equality of {@link Institution}
+ * (specs/organization/spec.md, requirement "Activación y desactivación de una institución", all
+ * four scenarios, and requirement "Jerarquía de errores de dominio del módulo `organization`",
+ * partial: {@link DomainException} inheritance).
+ *
+ * <p>Transitions are deliberately not idempotent (design.md, decision 5): a double state change is
+ * a caller defect, not a valid operation.
+ */
+class InstitutionLifecycleTest {
+
+    @Test
+    void deactivatingAnActiveInstitutionSucceedsWithoutModifyingOtherAttributes() {
+        Institution institution = anInstitution();
+
+        institution.deactivate();
+
+        assertThat(institution.isActive()).isFalse();
+        assertThat(institution.legalName()).isEqualTo("Instituto San Marcos");
+        assertThat(institution.tradeName()).isEqualTo("Colegio San Marcos");
+    }
+
+    @Test
+    void reactivatingAnInactiveInstitutionSucceeds() {
+        Institution institution = anInstitution();
+        institution.deactivate();
+
+        institution.activate();
+
+        assertThat(institution.isActive()).isTrue();
+    }
+
+    @Test
+    void activatingAnAlreadyActiveInstitutionFailsWithoutModifyingState() {
+        Institution institution = anInstitution();
+
+        assertThatThrownBy(institution::activate)
+                .isInstanceOf(InstitutionStateException.class)
+                .extracting(exception -> ((InstitutionStateException) exception).code())
+                .isEqualTo(InstitutionStateException.ALREADY_ACTIVE);
+        assertThat(institution.isActive()).isTrue();
+    }
+
+    @Test
+    void deactivatingAnAlreadyInactiveInstitutionFailsWithoutModifyingState() {
+        Institution institution = anInstitution();
+        institution.deactivate();
+
+        assertThatThrownBy(institution::deactivate)
+                .isInstanceOf(InstitutionStateException.class)
+                .extracting(exception -> ((InstitutionStateException) exception).code())
+                .isEqualTo(InstitutionStateException.ALREADY_INACTIVE);
+        assertThat(institution.isActive()).isFalse();
+    }
+
+    @Test
+    void twoInstitutionsWithTheSameIdAreEqualRegardlessOfOtherAttributes() {
+        InstitutionId id = anId();
+        Institution first = Institution.create(id, "Instituto San Marcos", "Colegio San Marcos");
+        Institution second = Institution.create(id, "Instituto Diferente", null);
+
+        assertThat(first).isEqualTo(second);
+        assertThat(first.hashCode()).isEqualTo(second.hashCode());
+    }
+
+    private static Institution anInstitution() {
+        return Institution.create(anId(), "Instituto San Marcos", "Colegio San Marcos");
+    }
+
+    private static InstitutionId anId() {
+        return new InstitutionId(UUID.randomUUID());
+    }
+}
