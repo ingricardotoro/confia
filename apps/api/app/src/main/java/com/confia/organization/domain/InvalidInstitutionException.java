@@ -17,6 +17,8 @@ public final class InvalidInstitutionException extends DomainException {
     public static final String TRADE_NAME_BLANK = "institution-trade-name-blank";
     public static final String TRADE_NAME_TOO_LONG = "institution-trade-name-too-long";
     public static final String RTN_INVALID = "institution-rtn-invalid";
+    public static final String ADDRESS_BLANK = "institution-address-blank";
+    public static final String ADDRESS_TOO_LONG = "institution-address-too-long";
 
     private InvalidInstitutionException(String code, String message) {
         super(code, message);
@@ -59,5 +61,16 @@ public final class InvalidInstitutionException extends DomainException {
         return new InvalidInstitutionException(RTN_INVALID,
                 "rtn must be between 1 and " + Institution.MAX_RTN_DIGITS
                         + " ASCII digits, with no separators");
+    }
+
+    /** {@code address} is empty, or made only of whitespace, after stripping border spaces. */
+    static InvalidInstitutionException addressBlank() {
+        return new InvalidInstitutionException(ADDRESS_BLANK, "address must not be blank");
+    }
+
+    /** {@code address} exceeds {@link Institution#MAX_ADDRESS_LENGTH} code points. */
+    static InvalidInstitutionException addressTooLong() {
+        return new InvalidInstitutionException(ADDRESS_TOO_LONG,
+                "address exceeds " + Institution.MAX_ADDRESS_LENGTH + " characters");
     }
 }

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 class InstitutionLifecycleTest {
 
     private static final String VALID_RTN = "08019012345678";
+    private static final String VALID_ADDRESS = "Colonia Palmira, Tegucigalpa";
 
     @Test
     void deactivatingAnActiveInstitutionSucceedsWithoutModifyingOtherAttributes() {
@@ -67,9 +68,10 @@ class InstitutionLifecycleTest {
     @Test
     void twoInstitutionsWithTheSameIdAreEqualRegardlessOfOtherAttributes() {
         InstitutionId id = anId();
-        Institution first =
-                Institution.create(id, "Instituto San Marcos", "Colegio San Marcos", VALID_RTN);
-        Institution second = Institution.create(id, "Instituto Diferente", null, VALID_RTN);
+        Institution first = Institution.create(id, "Instituto San Marcos", "Colegio San Marcos",
+                VALID_RTN, VALID_ADDRESS);
+        Institution second =
+                Institution.create(id, "Instituto Diferente", null, VALID_RTN, VALID_ADDRESS);
 
         assertThat(first).isEqualTo(second);
         assertThat(first.hashCode()).isEqualTo(second.hashCode());
@@ -100,7 +102,8 @@ class InstitutionLifecycleTest {
     }
 
     private static Institution anInstitution() {
-        return Institution.create(anId(), "Instituto San Marcos", "Colegio San Marcos", VALID_RTN);
+        return Institution.create(anId(), "Instituto San Marcos", "Colegio San Marcos", VALID_RTN,
+                VALID_ADDRESS);
     }
 
     private static InstitutionId anId() {

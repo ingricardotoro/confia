@@ -25,6 +25,7 @@ public final class Institution {
 
     public static final int MAX_NAME_LENGTH = 200;
     public static final int MAX_RTN_DIGITS = 20;
+    public static final int MAX_ADDRESS_LENGTH = 500;
 
     private static final Pattern RTN_PATTERN = Pattern.compile("^[0-9]{1," + MAX_RTN_DIGITS + "}$");
 
@@ -32,13 +33,16 @@ public final class Institution {
     private final String legalName;
     private final String tradeName;
     private final String rtn;
+    private final String address;
     private boolean active;
 
-    private Institution(InstitutionId id, String legalName, String tradeName, String rtn) {
+    private Institution(InstitutionId id, String legalName, String tradeName, String rtn,
+            String address) {
         this.id = id;
         this.legalName = legalName;
         this.tradeName = tradeName;
         this.rtn = rtn;
+        this.address = address;
         this.active = true;
     }
 
@@ -54,37 +58,46 @@ public final class Institution {
      * @param rtn the institution's tax identification number; never {@code null}, between 1 and
      *     {@value #MAX_RTN_DIGITS} ASCII digits, no separators (a technical guard, not a fiscal
      *     rule — the exact SAR format is deliberately not invented, design.md decision 7)
-     * @throws NullPointerException if {@code id}, {@code legalName} or {@code rtn} is {@code null}
-     * @throws InvalidInstitutionException if {@code legalName}, a non-null {@code tradeName} or
-     *     {@code rtn} violates its rule
+     * @param address the institution's postal address; never {@code null}, stripped of border
+     *     spaces, non-blank, at most {@value #MAX_ADDRESS_LENGTH} code points
+     * @throws NullPointerException if {@code id}, {@code legalName}, {@code rtn} or {@code address}
+     *     is {@code null}
+     * @throws InvalidInstitutionException if {@code legalName}, a non-null {@code tradeName},
+     *     {@code rtn} or {@code address} violates its rule
      */
     public static Institution create(InstitutionId id, String legalName, String tradeName,
-            String rtn) {
+            String rtn, String address) {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(legalName, "legalName");
         Objects.requireNonNull(rtn, "rtn");
+        Objects.requireNonNull(address, "address");
 
-        String normalizedLegalName = requireValidName(legalName,
+        String normalizedLegalName = requireValidText(legalName, MAX_NAME_LENGTH,
                 InvalidInstitutionException::legalNameBlank,
                 InvalidInstitutionException::legalNameTooLong);
         String normalizedTradeName = tradeName == null ? null
-                : requireValidName(tradeName, InvalidInstitutionException::tradeNameBlank,
+                : requireValidText(tradeName, MAX_NAME_LENGTH,
+                        InvalidInstitutionException::tradeNameBlank,
                         InvalidInstitutionException::tradeNameTooLong);
         if (!RTN_PATTERN.matcher(rtn).matches()) {
             throw InvalidInstitutionException.rtnInvalid();
         }
+        String normalizedAddress = requireValidText(address, MAX_ADDRESS_LENGTH,
+                InvalidInstitutionException::addressBlank,
+                InvalidInstitutionException::addressTooLong);
 
-        return new Institution(id, normalizedLegalName, normalizedTradeName, rtn);
+        return new Institution(id, normalizedLegalName, normalizedTradeName, rtn,
+                normalizedAddress);
     }
 
-    private static String requireValidName(String rawName,
+    private static String requireValidText(String rawText, int maxLength,
             Supplier<InvalidInstitutionException> blankError,
             Supplier<InvalidInstitutionException> tooLongError) {
-        String stripped = rawName.strip();
+        String stripped = rawText.strip();
         if (stripped.isEmpty()) {
             throw blankError.get();
         }
-        if (stripped.codePointCount(0, stripped.length()) > MAX_NAME_LENGTH) {
+        if (stripped.codePointCount(0, stripped.length()) > maxLength) {
             throw tooLongError.get();
         }
         return stripped;
@@ -104,6 +117,10 @@ public final class Institution {
 
     public String rtn() {
         return rtn;
+    }
+
+    public String address() {
+        return address;
     }
 
     public boolean isActive() {

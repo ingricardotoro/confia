@@ -555,7 +555,7 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
     dígitos, RTN nulo), `InstitutionLifecycleTest` 8/8 (sin regresión), `OrganizationErrorCodesTest`
     5/5 (sin cambios, catálogo sigue en seis). REFACTOR: ninguno necesario.
 
-- [ ] 3.2 **TDD — `address`.** ROJO: extender `InstitutionCreationTest` con el parámetro `address`:
+- [x] 3.2 **TDD — `address`.** ROJO: extender `InstitutionCreationTest` con el parámetro `address`:
   rechazo de `address` vacía o de solo espacios (`institution-address-blank`), aceptación con exactamente
   500 puntos de código y rechazo con 501 (`institution-address-too-long`). VERDE: extender
   `Institution.create(...)` con `address` (`strip()`, no vacío, máximo 500 puntos de código,
@@ -564,6 +564,18 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
   Especificación `organization`, requisito «Construcción de `Institution` y sus atributos de
   identidad obligatorios» (escenarios de `address`, completando el requisito iniciado en la tarea
   2.2)
+  - **Evidencia (2026-09-19):** ROJO observado: `./mvnw -B -pl app -am test
+    -Dtest=InstitutionCreationTest,InstitutionLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → errores de compilación, `create` de cuatro parámetros no aplica a las llamadas de cinco
+    parámetros y `cannot find symbol address()`. VERDE: tras añadir `address` (`strip()`, no vacío,
+    máximo 500 puntos de código, `MAX_ADDRESS_LENGTH = 500`) a `Institution.create(...)` y las
+    fábricas `addressBlank()`/`addressTooLong()` a `InvalidInstitutionException`, y actualizar las
+    llamadas existentes: `InstitutionCreationTest` 20/20 (5 nuevas: dirección vacía, dirección de
+    solo espacios, 500/501 puntos de código, dirección nula), `InstitutionLifecycleTest` 8/8 (sin
+    regresión), `OrganizationErrorCodesTest` 5/5 (sin cambios, catálogo sigue en seis). REFACTOR:
+    `requireValidName` se generalizó a `requireValidText(rawText, maxLength, blankError,
+    tooLongError)` para reutilizarse entre `legalName`/`tradeName` (200) y `address` (500), sin
+    cambiar ningún comportamiento observable.
 
 - [ ] 3.3 **TDD — `defaultCurrency`.** ROJO: extender `InstitutionCreationTest` con el parámetro
   `defaultCurrency` (`CurrencyCode` de `kernel`): un valor nulo lanza `NullPointerException`, no un
