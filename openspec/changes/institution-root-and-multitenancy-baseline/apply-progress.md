@@ -79,8 +79,9 @@ ADR-0020 or accept a red `productionCodeRespectsLayering`. Tasks 2.1–2.3b done
 | 2.4 Apply ADR-0020 (`optionalLayer` for Infrastructure/Web) | Done | `a26d685` |
 | 2.5 Activate/deactivate lifecycle, identity equality | Done | `0fe434e` |
 | 2.6 `OrganizationErrorCodesTest` (six codes) | Done | `545e546` |
-| 2.7 Domain quality gates (`PACKAGE` 95%, PIT adhesion) | Done | pending commit this batch |
-| 2.8–2.10 | Not started | — |
+| 2.7 Domain quality gates (`PACKAGE` 95%, PIT adhesion) | Done | `7eb560a` |
+| 2.8 Gate-failure demonstrations (not committed by design) | Done | pending commit this batch (docs only) |
+| 2.9–2.10 | Not started | — |
 
 ### TDD Cycle Evidence
 
@@ -94,6 +95,7 @@ ADR-0020 or accept a red `productionCodeRespectsLayering`. Tasks 2.1–2.3b done
 | 2.5 | `cannot find symbol method deactivate()/activate()` and `cannot find symbol class InstitutionStateException` (compile error) | 16/16 pass (`InstitutionLifecycleTest` 5/5 + `InstitutionCreationTest` 11/11, no regression) | None expected/needed | N/A (no branching logic beyond the state guard, already exercised by the four transition tests) |
 | 2.6 | N/A — catalog test over codes already implemented in tasks 2.2/2.5, mirrors `KernelErrorCodesTest`'s own pattern of no red when the catalog pre-exists | 5/5 pass immediately | None expected/needed | N/A (catalog assertion, no branching logic to neutralize) |
 | 2.7 | N/A (build-integrity wiring); first smoke run failed for real: `branches covered ratio is 0.85, but expected minimum is 0.95` on `organization.domain`, from untested `Institution.equals`/`hashCode` branches | `./mvnw -B -pl app -am verify -Pmutation-report` BUILD SUCCESS after closing the gap; PIT 32/32 mutations killed (100%, informational on this branch) | None expected/needed | Closed by adding the missing equality/hash edge-case tests, not by touching production logic or thresholds |
+| 2.8 | N/A (demonstration task, not a production behavior) | (a) `@Disabled` on `InstitutionLifecycleTest` → `PACKAGE` rule breaks (0.69/0.42 vs 0.95); reverted. (b) `-Dconfia.pit.mutationThreshold=101` → `-Pmutation-gate` breaks ("Mutation score of 100 is below threshold of 101"), `-Pmutation-report` stays green with the identical override | None expected/needed | No file left modified in either demonstration; (b) used the command-line threshold-override technique already established in `kernel-money-value-object` task 1.13, since directly weakening `Institution`'s validation breaks real tests before PIT even runs |
 
 ### Work Unit Evidence (through task 2.3)
 

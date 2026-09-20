@@ -451,13 +451,36 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
     sobre ese paquete, 32/32 muertas (100 %, informativo en esta rama), sin romper por
     `failWhenNoMutations=true`.
 
-- [ ] 2.8 **Demostración de que las puertas fallan** (sin comprometer): (a) comentar temporalmente
+- [x] 2.8 **Demostración de que las puertas fallan** (sin comprometer): (a) comentar temporalmente
   una aserción de `InstitutionCreationTest` u `OrganizationErrorCodesTest` y observar que la regla
   `PACKAGE` rompe `./mvnw verify` por debajo de 95 %; revertir. (b) debilitar temporalmente una
   aserción de `Institution` (por ejemplo, aceptar `legalName` en blanco) y observar que
   `-Pmutation-gate` rompe por debajo de 80 mientras `-Pmutation-report` termina en verde y solo
   informa; revertir. Registrar ambas evidencias observadas. — Capacidad `build-integrity`, mismo
   requisito (escenarios de umbral de cobertura y de selección de perfil de mutación)
+  - **Evidencia (2026-09-19):** (a) comentar una sola aserción, como en el precedente de
+    `kernel-money-value-object` (tarea 1.13), no sirve: el método compartido `requireValidName` que
+    valida `legalName` y `tradeName` sigue cubierto por la otra prueba. Se usó en su lugar
+    `@Disabled` temporal sobre toda la clase `InstitutionLifecycleTest` (nunca comprometido):
+    `./mvnw -B -pl app -am verify` → `BUILD FAILURE`,
+    `Rule violated for package com.confia.organization.domain: lines covered ratio is 0.69, but
+    expected minimum is 0.95` y `branches covered ratio is 0.42, but expected minimum is 0.95`
+    (además de la puerta `BUNDLE` global, que también rompió: 0.78/0.62 frente a 0.80). Se revirtió
+    quitando el `@Disabled` y el import de `org.junit.jupiter.api.Disabled`; `git status` quedó
+    limpio. (b) debilitar la validación real de `Institution` rompe las pruebas existentes en la
+    fase `test` antes de llegar a PIT (`rejectsALegalNameProvidedAsBlank` y
+    `rejectsATradeNameProvidedAsBlank` fallan), lo que no aísla la diferencia entre los dos
+    perfiles — mismo hallazgo que el precedente de `kernel-money-value-object` (tarea 1.13,
+    evidencia (a)). Se usó en su lugar la técnica de ese mismo precedente: sobrescribir el umbral
+    por línea de comandos sin tocar ningún archivo. Con la puntuación real de `organization.domain`
+    en 100 % (32/32, cerrado en la tarea 2.7): tras instalar `kernel` y el POM padre en el
+    repositorio Maven local (`./mvnw -B -pl kernel install -DskipTests` y `./mvnw -B -N install`,
+    necesarios para poder acotar la ejecución a `app` en solitario), `./mvnw -B -pl app verify
+    -Pmutation-gate -Dconfia.pit.mutationThreshold=101` → `BUILD FAILURE`,
+    «Mutation score of 100 is below threshold of 101»; `./mvnw -B -pl app verify -Pmutation-report
+    -Dconfia.pit.mutationThreshold=101` con el mismo umbral → `BUILD SUCCESS` (solo informa). Ningún
+    archivo de producción ni de prueba quedó modificado; `git status` limpio durante toda la
+    demostración.
 
 - [ ] 2.9 **Medir el diff real de PR B1** con `git diff --numstat <base-de-PR-A>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`
   (rama actual contra la base real de PR A, que puede ser `main` o el commit final de PR A si aún no
