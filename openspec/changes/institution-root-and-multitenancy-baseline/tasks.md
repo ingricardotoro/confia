@@ -532,7 +532,7 @@ Rama `...-domain-attributes`, base PR B1. La firma de `Institution.create(...)` 
 (pasa de tres a ocho parámetros); es aceptable porque el agregado no tiene consumidores fuera del
 módulo (`design.md`, «Pronóstico de tamaño por corte»).
 
-- [ ] 3.1 **TDD — `rtn`.** ROJO: extender `InstitutionCreationTest` con la nueva firma de
+- [x] 3.1 **TDD — `rtn`.** ROJO: extender `InstitutionCreationTest` con la nueva firma de
   `Institution.create(id, legalName, tradeName, rtn, ...)` (los parámetros siguientes se añaden en
   tareas posteriores de este mismo PR; usar valores válidos fijos para ellos mientras no tengan su
   propia validación): rechazo de `rtn` vacío, de `rtn` con guiones (`"0801-1990-12345"`), de `rtn` de
@@ -544,8 +544,18 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
   `InstitutionCreationTest` y `InstitutionLifecycleTest` para incluir el nuevo parámetro. REFACTOR:
   ninguno esperado. — Especificación `organization`, requisito «RTN presente y numérico, con el
   formato exacto pendiente» (ambos escenarios)
+  - **Evidencia (2026-09-19):** ROJO observado:
+    `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest,InstitutionLifecycleTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → errores de compilación, `create` de tres parámetros
+    no aplica a las llamadas de cuatro parámetros y `cannot find symbol RTN_INVALID`/`rtn()`. VERDE:
+    tras añadir `rtn` (`String`, `requireNonNull`, `RTN_PATTERN = ^[0-9]{1,20}$`,
+    `MAX_RTN_DIGITS = 20`) a `Institution.create(...)` y la fábrica `rtnInvalid()` a
+    `InvalidInstitutionException`, y actualizar las llamadas existentes:
+    `InstitutionCreationTest` 15/15 (4 nuevas: RTN vacío, RTN con guiones/21 dígitos, RTN de 1 y 20
+    dígitos, RTN nulo), `InstitutionLifecycleTest` 8/8 (sin regresión), `OrganizationErrorCodesTest`
+    5/5 (sin cambios, catálogo sigue en seis). REFACTOR: ninguno necesario.
 
-- [ ] 3.2 **TDD — `address`.** ROJO: extender `InstitutionCreationTest` con el parámetro `address`:
+- [x] 3.2 **TDD — `address`.** ROJO: extender `InstitutionCreationTest` con el parámetro `address`:
   rechazo de `address` vacía o de solo espacios (`institution-address-blank`), aceptación con exactamente
   500 puntos de código y rechazo con 501 (`institution-address-too-long`). VERDE: extender
   `Institution.create(...)` con `address` (`strip()`, no vacío, máximo 500 puntos de código,
@@ -554,24 +564,53 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
   Especificación `organization`, requisito «Construcción de `Institution` y sus atributos de
   identidad obligatorios» (escenarios de `address`, completando el requisito iniciado en la tarea
   2.2)
+  - **Evidencia (2026-09-19):** ROJO observado: `./mvnw -B -pl app -am test
+    -Dtest=InstitutionCreationTest,InstitutionLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → errores de compilación, `create` de cuatro parámetros no aplica a las llamadas de cinco
+    parámetros y `cannot find symbol address()`. VERDE: tras añadir `address` (`strip()`, no vacío,
+    máximo 500 puntos de código, `MAX_ADDRESS_LENGTH = 500`) a `Institution.create(...)` y las
+    fábricas `addressBlank()`/`addressTooLong()` a `InvalidInstitutionException`, y actualizar las
+    llamadas existentes: `InstitutionCreationTest` 20/20 (5 nuevas: dirección vacía, dirección de
+    solo espacios, 500/501 puntos de código, dirección nula), `InstitutionLifecycleTest` 8/8 (sin
+    regresión), `OrganizationErrorCodesTest` 5/5 (sin cambios, catálogo sigue en seis). REFACTOR:
+    `requireValidName` se generalizó a `requireValidText(rawText, maxLength, blankError,
+    tooLongError)` para reutilizarse entre `legalName`/`tradeName` (200) y `address` (500), sin
+    cambiar ningún comportamiento observable.
 
-- [ ] 3.3 **TDD — `defaultCurrency`.** ROJO: extender `InstitutionCreationTest` con el parámetro
+- [x] 3.3 **TDD — `defaultCurrency`.** ROJO: extender `InstitutionCreationTest` con el parámetro
   `defaultCurrency` (`CurrencyCode` de `kernel`): un valor nulo lanza `NullPointerException`, no un
   error de dominio; un valor `HNL` o `USD` se acepta. VERDE: extender `Institution.create(...)` con
   `defaultCurrency` (`requireNonNull`, sin validación de dominio adicional porque `CurrencyCode` ya
   es un conjunto cerrado). Actualizar llamadas existentes a `create(...)`. REFACTOR: ninguno
   esperado. — Especificación `organization`, requisito «Moneda por defecto, localización y huso
   horario válidos» (escenario «Moneda por defecto nula»)
+  - **Evidencia (2026-09-19):** ROJO observado: `./mvnw -B -pl app -am test
+    -Dtest=InstitutionCreationTest,InstitutionLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → errores de compilación, `create` de cinco parámetros no aplica a las llamadas de seis
+    parámetros y `cannot find symbol defaultCurrency()`. VERDE: tras añadir `defaultCurrency`
+    (`CurrencyCode`, `requireNonNull`, sin regla de dominio adicional) a `Institution.create(...)` y
+    actualizar las llamadas existentes: `InstitutionCreationTest` 22/22 (2 nuevas: moneda nula,
+    `HNL`/`USD` aceptadas), `InstitutionLifecycleTest` 8/8 (sin regresión), `OrganizationErrorCodesTest`
+    5/5 (sin cambios, catálogo sigue en seis). REFACTOR: ninguno necesario.
 
-- [ ] 3.4 **TDD — `locale`.** ROJO: extender `InstitutionCreationTest` con el parámetro `locale`
+- [x] 3.4 **TDD — `locale`.** ROJO: extender `InstitutionCreationTest` con el parámetro `locale`
   (`java.util.Locale`): `Locale.forLanguageTag("es-HN")` se acepta; `Locale.ROOT` (sin idioma) falla
   con `institution-locale-invalid`; un `locale` nulo lanza `NullPointerException`. VERDE: extender
   `Institution.create(...)` con `locale` (`requireNonNull`, rechaza idioma vacío) y añadir a
   `InvalidInstitutionException` la fábrica `localeInvalid()`. Actualizar llamadas existentes a
   `create(...)`. REFACTOR: ninguno esperado. — Especificación `organization`, mismo requisito
   (escenarios «Localización sin idioma»)
+  - **Evidencia (2026-09-19):** ROJO observado: `./mvnw -B -pl app -am test
+    -Dtest=InstitutionCreationTest,InstitutionLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → errores de compilación, `create` de seis parámetros no aplica a las llamadas de siete
+    parámetros y `cannot find symbol locale()`. VERDE: tras añadir `locale` (`java.util.Locale`,
+    `requireNonNull`, rechaza `getLanguage().isEmpty()`) a `Institution.create(...)` y la fábrica
+    `localeInvalid()` a `InvalidInstitutionException`, y actualizar las llamadas existentes:
+    `InstitutionCreationTest` 24/24 (2 nuevas: `Locale.ROOT` rechazado, `locale` nulo),
+    `InstitutionLifecycleTest` 8/8 (sin regresión), `OrganizationErrorCodesTest` 5/5 (sin cambios,
+    catálogo sigue en seis). REFACTOR: ninguno necesario.
 
-- [ ] 3.5 **TDD — `timezone`.** ROJO: extender `InstitutionCreationTest` con el parámetro `timezone`
+- [x] 3.5 **TDD — `timezone`.** ROJO: extender `InstitutionCreationTest` con el parámetro `timezone`
   (`java.time.ZoneId`): `ZoneId.of("America/Tegucigalpa")` se acepta; `ZoneOffset.ofHours(-6)`
   (desplazamiento fijo) falla con `institution-timezone-invalid`; un `timezone` nulo lanza
   `NullPointerException`. VERDE: extender `Institution.create(...)` con `timezone` (`requireNonNull`,
@@ -580,8 +619,18 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
   «Contratos e interfaces». Actualizar llamadas existentes a `create(...)`. REFACTOR: ninguno
   esperado. — Especificación `organization`, mismo requisito (escenarios «Huso horario reconocido» y
   «Huso horario de desplazamiento fijo»)
+  - **Evidencia (2026-09-19):** ROJO observado: `./mvnw -B -pl app -am test
+    -Dtest=InstitutionCreationTest,InstitutionLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → errores de compilación, `create` de siete parámetros no aplica a las llamadas de ocho
+    parámetros y `cannot find symbol timezone()`. VERDE: tras añadir `timezone` (`java.time.ZoneId`,
+    `requireNonNull`, rechaza instancias de `ZoneOffset`) a `Institution.create(...)` (firma final de
+    ocho parámetros, según `design.md` «Contratos e interfaces») y la fábrica `timezoneInvalid()` a
+    `InvalidInstitutionException`, y actualizar las llamadas existentes: `InstitutionCreationTest`
+    27/27 (3 nuevas: huso horario reconocido, desplazamiento fijo rechazado, huso horario nulo),
+    `InstitutionLifecycleTest` 8/8 (sin regresión), `OrganizationErrorCodesTest` 5/5 (sin cambios,
+    catálogo sigue en seis). REFACTOR: ninguno necesario.
 
-- [ ] 3.6 **TDD — nombre comercial opcional y sus límites.** ROJO: extender `InstitutionCreationTest`
+- [x] 3.6 **TDD — nombre comercial opcional y sus límites.** ROJO: extender `InstitutionCreationTest`
   (si no quedó cubierto en la tarea 2.2): construcción exitosa con `tradeName` nulo (`tradeName` en
   el resultado es nulo); rechazo de `tradeName` provisto como cadena de solo espacios
   (`institution-trade-name-blank`); rechazo de `tradeName` de 201 caracteres y aceptación de 200
@@ -590,8 +639,21 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
   fábricas `tradeNameBlank()`/`tradeNameTooLong()` de `InvalidInstitutionException` (si no se
   completaron en 2.2, completarlas aquí). REFACTOR: ninguno esperado. — Especificación
   `organization`, requisito «Nombre comercial opcional» (ambos escenarios)
+  - **Evidencia (2026-09-19):** ya completado en la tarea 2.2 de PR B1 (registrado allí como
+    desviación deliberada): `Institution.create(...)` valida `tradeName` con las mismas reglas que
+    `legalName` (`requireValidText`, nulo permitido) desde esa tarea, y
+    `InvalidInstitutionException.tradeNameBlank()`/`tradeNameTooLong()` ya existen. Los cuatro
+    escenarios de este requisito llevan cubiertos en `InstitutionCreationTest` desde PR B1
+    (`constructionSucceedsWithoutATradeName`, `rejectsATradeNameProvidedAsBlank`,
+    `acceptsATradeNameOfExactlyTwoHundredCodePoints`,
+    `rejectsATradeNameOfTwoHundredAndOneCodePoints`) y se mantuvieron intactos a través de las
+    tareas 3.1–3.5 (cada una solo añadió parámetros nuevos a las llamadas). Sin ROJO ni cambio de
+    producción en esta tarea: se verifica en lugar de rehacerse, según instruye el lanzamiento de
+    esta fase. VERDE de confirmación: `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → 27/27, incluidos los cuatro escenarios de
+    `tradeName`.
 
-- [ ] 3.7 **TDD — precedencia de invariantes.** ROJO: añadir a `InstitutionCreationTest` una prueba
+- [x] 3.7 **TDD — precedencia de invariantes.** ROJO: añadir a `InstitutionCreationTest` una prueba
   parametrizada que confirma el orden exacto de `design.md` («Flujo de datos»): primero
   `requireNonNull` de los siete argumentos obligatorios (todos salvo `tradeName`), luego las reglas
   de negocio en el orden `legalName` → `tradeName` (si no es nulo) → `rtn` → `address` → `locale` →
@@ -606,22 +668,51 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
   invariantes (orden de evaluación); no hay escenario propio en la especificación, pero está
   implícito en el requisito «Construcción de `Institution`...» al exigir «una sola excepción, la
   primera que aplica»
+  - **Evidencia (2026-09-19):** la implementación incremental de las tareas 3.1–3.5 ya coincidía
+    exactamente con el orden de `design.md` (`requireNonNull` de los siete obligatorios primero;
+    luego `legalName` → `tradeName` → `rtn` → `address` → `locale` → `timezone`), así que la prueba
+    parametrizada (`@ParameterizedTest`/`@MethodSource`, con los tres pares exactos del enunciado)
+    pasó en verde de inmediato: `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → 30/30 (3 nuevos casos). **No vacuidad (sin
+    comprometer):** se intercambió temporalmente el orden de las comprobaciones de `rtn` y
+    `timezone` en `Institution.create(...)`; al reejecutar solo la prueba parametrizada,
+    `onlyTheFirstApplicableInvariantThrowsWhenSeveralAttributesAreSimultaneouslyInvalid` falló
+    exactamente en el caso `rtn` inválido + `timezone` de desplazamiento fijo (1 de 3), recibiendo
+    `institution-timezone-invalid` en vez de `institution-rtn-invalid`; se revirtió el intercambio
+    (`git diff` del archivo de producción quedó vacío) y las 43 pruebas del módulo volvieron a
+    verde. REFACTOR: ninguno necesario — el orden de comprobaciones ya era legible sin extraerlo a
+    un método adicional.
 
-- [ ] 3.8 **`toString()` sin RTN ni dirección.** Extender `InstitutionLifecycleTest` con una
+- [x] 3.8 **`toString()` sin RTN ni dirección.** Extender `InstitutionLifecycleTest` con una
   aserción sobre `Institution.toString()` que confirma el formato `"Institution[id=..., tradeName=...]"`
   y la ausencia literal del `rtn` y de la `address` usados en el fixture de la prueba (ahora
   significativa, porque ambos atributos existen desde este PR). Ajustar `Institution.toString()` si
   no cumple el formato exacto. — `design.md`, decisión 5, «Razones puntuales» (mensajes técnicos que
   nunca repiten la entrada, `CLAUDE.md` regla 11); no hay escenario propio en la especificación
+  - **Evidencia (2026-09-19):** ROJO observado: `./mvnw -B -pl app -am test
+    -Dtest=InstitutionLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false` →
+    `toStringShowsIdAndTradeNameButNeverRtnOrAddress` falla, `expected:
+    "Institution[id=InstitutionId[value=...], tradeName=Colegio San Marcos]" but was:
+    "com.confia.organization.domain.Institution@..."` (`Object.toString()` por defecto). VERDE: tras
+    sobrescribir `Institution.toString()` con el formato exacto (`"Institution[id=" + id + ",
+    tradeName=" + tradeName + "]"`): `InstitutionCreationTest` 30/30 (sin regresión),
+    `InstitutionLifecycleTest` 9/9 (1 nueva), `OrganizationErrorCodesTest` 5/5 (sin cambios).
+    REFACTOR: ninguno necesario.
 
-- [ ] 3.9 **`OrganizationErrorCodesTest` a once códigos.** Extender el catálogo cerrado de la tarea
+- [x] 3.9 **`OrganizationErrorCodesTest` a once códigos.** Extender el catálogo cerrado de la tarea
   2.6 con `institution-rtn-invalid`, `institution-address-blank`, `institution-address-too-long`,
   `institution-locale-invalid`, `institution-timezone-invalid` (once códigos en total para el corte
   B). Confirmar formato, unicidad, prefijo y herencia de `DomainException` para los cinco nuevos. —
   Especificación `organization`, requisito «Catálogo de códigos del módulo: formato y ausencia de
   repetidos» (completa los once del corte B)
+  - **Evidencia (2026-09-19):** sin ciclo ROJO propio, igual que la tarea 2.6: los cinco códigos
+    nuevos ya son alcanzables desde producción desde las tareas 3.1–3.5. VERDE inmediato:
+    `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest,InstitutionLifecycleTest,
+    OrganizationErrorCodesTest -Dsurefire.failIfNoSpecifiedTests=false` → 44/44
+    (`OrganizationErrorCodesTest` 5/5, catálogo exacto de once códigos, sin repetidos, formato
+    kebab-case, prefijo `institution-`, herencia de `DomainException` para los cinco nuevos).
 
-- [ ] 3.10 **Medir el diff real de PR B2 y verificación final.** Medir con
+- [x] 3.10 **Medir el diff real de PR B2 y verificación final.** Medir con
   `git diff --numstat <base-de-PR-B1>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`. Si cabe
   en 800 líneas, continuar; **si supera 800, detener la aplicación y consultar al propietario** entre
   una subdivisión adicional o una excepción de tamaño. Si cabe: en checkout limpio, con `JAVA_HOME`
@@ -630,6 +721,35 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
   `...-domain-attributes` (apuntando a PR B1) y confirmar en la integración continua que el trabajo
   `backend` termina en verde. — P1 de la propuesta; capacidad `build-integrity`, ambos requisitos;
   criterios de éxito de la propuesta relativos a `Institution` inválida y al catálogo de códigos
+  - **Evidencia (2026-09-19):** base real confirmada con `git merge-base
+    change/institution-root-and-multitenancy-baseline-domain-attributes
+    change/institution-root-and-multitenancy-baseline-domain-gates` → `ac68c2b` (extremo de PR
+    B1-gates). `git diff --numstat ac68c2b...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'` →
+    5 archivos: `Institution.java` 100+/16-; `InvalidInstitutionException.java` 46+/0-;
+    `InstitutionCreationTest.java` 260+/17-; `InstitutionLifecycleTest.java` 36+/3-;
+    `OrganizationErrorCodesTest.java` 24+/7-. **Total: 466 adiciones + 43 eliminaciones = 509 líneas
+    de autor**, por encima del pronóstico de `design.md` para B2 (230–345, mismo patrón de
+    subestimación que en B1) pero muy por debajo de 800; se continúa sin consultar al propietario.
+    Árbol de trabajo limpio (`git status` sin cambios) antes de verificar.
+
+    **Verificación final:** `./mvnw -B verify -Pmutation-gate` en `apps/api`, con `JAVA_HOME` en
+    `C:/Program Files/Eclipse Adoptium/jdk-25.0.3.9-hotspot` y `MAVEN_OPTS` con el almacén de
+    confianza `Windows-ROOT`: **BUILD SUCCESS**. 176 pruebas en `kernel` + 89 en `app` (incluidas
+    30 de `InstitutionCreationTest`, 9 de `InstitutionLifecycleTest`, 5 de
+    `OrganizationErrorCodesTest`) = 265 en total, todas en verde. JaCoCo (`jacoco.xml` de `app`):
+    `com.confia.organization.domain` en líneas 75/75 = **100 %** y ramas 20/20 = **100 %** (regla
+    `PACKAGE` de 95 % cumplida con margen); `BUNDLE` global de `app` en líneas 110/114 = 96.5 % y
+    ramas 31/33 = 93.9 % (regla `BUNDLE` de 80 % cumplida). Ninguna regla de JaCoCo rompió la
+    construcción (sin mensajes `Rule violated`). PIT sobre `com.confia.organization.domain`: 49
+    mutaciones generadas, **49 muertas (100 %)**, cobertura de prueba 100 %, **cero
+    supervivientes** — cumple con margen el mínimo de 80 del perfil `mutation-gate`. El único
+    superviviente del build (`ConditionalsBoundaryMutator`, 22/24 muertas, 2 supervivientes, 99 %
+    de puntuación total) pertenece al módulo `kernel`, preexistente y ajeno a este cambio (mismo
+    99 % ya documentado en la evidencia de la tarea 2.10 de PR B1). **Pendiente fuera de mi
+    alcance en esta ejecución:** empujar la rama `...-domain-attributes` y confirmar el trabajo
+    `backend` en la integración continua — el lanzamiento de esta fase instruye explícitamente no
+    empujar ni abrir PR (lo hace el orquestador); queda como siguiente paso del orquestador antes
+    de dar PR B2 por cerrado en CI.
 
 ---
 

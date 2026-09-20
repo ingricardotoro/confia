@@ -14,12 +14,12 @@ import org.junit.jupiter.api.Test;
  * kebab-case format, at most 64 characters, no duplicates, every code prefixed with {@code
  * institution-}, and every exception that declares one is a {@link DomainException} subclass.
  *
- * <p>This PR (B1) closes six of the module's eventual thirteen codes: the four construction codes
- * from {@link InvalidInstitutionException} that are already reachable from production code in
- * this PR ({@code legalName} and {@code tradeName}), plus the two transition codes from {@link
- * InstitutionStateException}. {@code rtn}, {@code address}, {@code locale} and {@code timezone}
- * land in PR B2 (five more codes); {@code institution-not-found} and {@code institution-inactive}
- * land in PR C (the final two), each PR extending this same catalog.
+ * <p>PR B1 closed six of the module's eventual thirteen codes: the four construction codes from
+ * {@link InvalidInstitutionException} that were already reachable from production code in that PR
+ * ({@code legalName} and {@code tradeName}), plus the two transition codes from {@link
+ * InstitutionStateException}. This PR (B2) closes five more ({@code rtn}, {@code address}, {@code
+ * locale} and {@code timezone}), for eleven total; {@code institution-not-found} and {@code
+ * institution-inactive} land in PR C (the final two), extending this same catalog.
  */
 class OrganizationErrorCodesTest {
 
@@ -28,12 +28,17 @@ class OrganizationErrorCodesTest {
     private static final String MODULE_PREFIX = "institution-";
 
     @Test
-    void catalogHasExactlyTheSixCodesClosedInThisPullRequest() {
+    void catalogHasExactlyTheElevenCodesClosedInThisPullRequest() {
         assertThat(allOrganizationErrorCodes()).containsExactlyInAnyOrder(
                 "institution-legal-name-blank",
                 "institution-legal-name-too-long",
                 "institution-trade-name-blank",
                 "institution-trade-name-too-long",
+                "institution-rtn-invalid",
+                "institution-address-blank",
+                "institution-address-too-long",
+                "institution-locale-invalid",
+                "institution-timezone-invalid",
                 "institution-already-active",
                 "institution-already-inactive");
     }
@@ -71,6 +76,13 @@ class OrganizationErrorCodesTest {
         assertThat(InvalidInstitutionException.tradeNameBlank()).isInstanceOf(DomainException.class);
         assertThat(InvalidInstitutionException.tradeNameTooLong())
                 .isInstanceOf(DomainException.class);
+        assertThat(InvalidInstitutionException.rtnInvalid()).isInstanceOf(DomainException.class);
+        assertThat(InvalidInstitutionException.addressBlank()).isInstanceOf(DomainException.class);
+        assertThat(InvalidInstitutionException.addressTooLong())
+                .isInstanceOf(DomainException.class);
+        assertThat(InvalidInstitutionException.localeInvalid()).isInstanceOf(DomainException.class);
+        assertThat(InvalidInstitutionException.timezoneInvalid())
+                .isInstanceOf(DomainException.class);
         assertThat(InstitutionStateException.alreadyActive()).isInstanceOf(DomainException.class);
         assertThat(InstitutionStateException.alreadyInactive()).isInstanceOf(DomainException.class);
     }
@@ -81,6 +93,11 @@ class OrganizationErrorCodesTest {
                 InvalidInstitutionException.LEGAL_NAME_TOO_LONG,
                 InvalidInstitutionException.TRADE_NAME_BLANK,
                 InvalidInstitutionException.TRADE_NAME_TOO_LONG,
+                InvalidInstitutionException.RTN_INVALID,
+                InvalidInstitutionException.ADDRESS_BLANK,
+                InvalidInstitutionException.ADDRESS_TOO_LONG,
+                InvalidInstitutionException.LOCALE_INVALID,
+                InvalidInstitutionException.TIMEZONE_INVALID,
                 InstitutionStateException.ALREADY_ACTIVE,
                 InstitutionStateException.ALREADY_INACTIVE);
     }
