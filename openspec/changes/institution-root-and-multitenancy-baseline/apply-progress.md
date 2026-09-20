@@ -62,8 +62,89 @@ Push `change/institution-root-and-multitenancy-baseline` and confirm the `backen
 — explicitly deferred to the orchestrator per this phase's launch instructions (sdd-apply does not
 push or open PRs).
 
-## PR B1, PR B2, PR C
+## PR B1 — `InstitutionId`, `Institution` mínima, ciclo de ADR-0018/ADR-0020, puertas del `domain`
 
-Not started. Tasks 2.1–4.4 in `tasks.md` remain `[ ]`. Each PR's branch, base, and scope are
+Branch `change/institution-root-and-multitenancy-baseline-domain`, base PR A (`e3b9e84`).
+**Status: BLOCKED after task 2.3, on task 2.4.** Tasks 2.1–2.3 done and committed; 2.4–2.10 not
+started, waiting on an owner/orchestrator decision (see "Blocker" below).
+
+| Task | Status | Commit |
+|---|---|---|
+| 2.1 `InstitutionId` in kernel | Done | `32d5370` |
+| 2.2 Minimal `Institution` (id, legalName, tradeName, isActive) | Done | `43d1c01` |
+| 2.3 Close ADR-0018's common expiry (empty inventory, rename rule) | Done | `e2ac46e` |
+| 2.4 Apply ADR-0020 (`optionalLayer` for Infrastructure/Web) | **Blocked** | not committed |
+| 2.5–2.10 | Not started | — |
+
+### TDD Cycle Evidence
+
+| Task | RED | GREEN | REFACTOR | Non-vacuity / scheduled-red probe |
+|---|---|---|---|---|
+| 2.1 | `cannot find symbol class InstitutionId` (10 compile errors) | 4/4 tests pass | None expected/needed | N/A (record, no branching logic to neutralize) |
+| 2.2 | `cannot find symbol class Institution` / `InvalidInstitutionException` (compile errors) | 11/11 tests pass | None expected/needed | Full `./mvnw -B verify`: scheduled ADR-0018 red observed in `EmptyShouldExceptionInventoryTest`, exact message recorded in `tasks.md`; `LayeredArchitectureTest` still green (still carries `allowEmptyShould(true)`) |
+| 2.3 | N/A (this task closes a scheduled red, it does not add new behavior) | `EmptyShouldExceptionInventoryTest` + `SuppressionCitesAdrTest` green (9/9, count 0==0) | None expected/needed | `productionCodeRespectsLayering` run in isolation fails as predicted by design.md's probe outcome (b), naming `Application`, `Infrastructure` and `Web` as empty — one layer more than the probe's own sample tested (see Blocker) |
+
+### Work Unit Evidence (through task 2.3)
+
+| Evidence | Value |
+|---|---|
+| Focused test command and result | `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest,OrganizationErrorCodesTest -Dsurefire.failIfNoSpecifiedTests=false` → `InstitutionCreationTest` 11/11 pass; `OrganizationErrorCodesTest` does not exist yet (task 2.6) |
+| Runtime harness command/scenario and result | `./mvnw -B verify -Pmutation-report` in `apps/api` not yet run to completion for PR B1: blocked before task 2.7 wires the domain quality gates. Full `./mvnw -B verify` currently **fails** (`productionCodeRespectsLayering`), which is the expected pre-2.4 state |
+| Rollback boundary | Revert commits `32d5370`..`e2ac46e` (or the whole PR branch); `organization` module disappears, ADR-0018's exception returns with its original condition (which holds again), PR A stays intact and complete by itself |
+
+### Blocker found while attempting task 2.4 (not committed; reported instead of improvised)
+
+**What.** `design.md`'s P2 probe ("Sonda de P2") validated `optionalLayer("Infrastructure")` /
+`optionalLayer("Web")` against a synthetic sample where **both** `domain` and `application` already
+had production classes. ADR-0020 §2 codifies that finding and explicitly keeps `Domain` and
+`Application` **always mandatory** ("Domain y Application son siempre obligatorias"). In the real
+sequencing of this change, `application`'s only classes (`InstitutionRepository`,
+`CurrentInstitutionProvider`, `ResolveCurrentInstitution`) are assigned to **PR C, task 4.1** — they
+do not exist in PR B1 or PR B2. I implemented task 2.4's exact code (production/fixture rule split,
+`optionalLayer` on `Infrastructure` and `Web` only, per design.md's literal contract) in a scratch
+edit and ran `LayeredArchitectureTest` in isolation to confirm empirically before reporting:
+
+```
+Layer 'Application' is empty
+```
+
+`productionCodeRespectsLayering` still fails, because `Application` remains a mandatory `.layer(...)`
+(never `.optionalLayer(...)`) and has zero production classes until PR C. I reverted the scratch edit
+(`git checkout --`) so the tree stays at commit `e2ac46e`; nothing from this probe is committed.
+
+**Why this blocks, rather than something I should decide.** This is exactly the class of thing the
+launch instructions call a hard stop: "any contradiction between tasks/design/spec; any need to
+weaken a gate or add an unplanned exception." Two closed decisions collide:
+- P1 (proposal, owner-approved 2026-09-19): split delivery into PR B1 → PR B2 → PR C, with
+  `application`'s ports and use case explicitly scoped to PR C alone.
+- ADR-0020 (accepted 2026-09-19): `Application` is always mandatory in the layering rule, with no
+  optionality mechanism for it.
+
+Together they mean `./mvnw verify`'s `productionCodeRespectsLayering` **cannot pass** in PR B1 or PR
+B2 as currently scoped — task 2.10's and task 3.10's "confirm `productionCodeRespectsLayering`
+passes with `Infrastructure`/`Web` optional" cannot be satisfied, and pushing either branch would
+never turn the CI `backend` job green, contradicting both tasks' own final-verification step.
+
+**Not decided unilaterally (would each be an unplanned exception or a gate weakening):**
+1. Extending `optionalLayer` to `Application` too, mirroring Infrastructure/Web — directly
+   contradicts ADR-0020 §2's explicit text.
+2. Reviving `allowEmptyShould(true)` for the whole rule — exactly what ADR-0018 §2/§3 closed, and
+   would re-silence the now-real `Domain` layer too.
+3. Moving some `application`-layer stub into PR B1/B2 ahead of task 4.1 — contradicts the tasks.md
+   PR boundary and the proposal's explicit per-cut assignment.
+
+**Requesting a decision on one of:** (a) a new ADR amending or complementing ADR-0020 to also treat
+`Application` as optional until PR C, with its own expiry condition and inventory entry, cited
+alongside ADR-0020; (b) resequencing so PR B1 (or B2) includes a minimal, real `application`-layer
+class landing the layering rule's precondition earlier than task 4.1; (c) accepting that
+`./mvnw verify` — and therefore CI's `backend` job — stays red on the `...-domain` branch (and
+`...-domain-attributes`) until PR C merges, and adjusting tasks 2.10/3.10's success criteria
+accordingly; or another option the owner prefers. This is the same class of decision as the original
+P2 (elevated to an ADR, not buried in `design.md`), so it is reported rather than resolved here.
+
+## PR B2, PR C
+
+Not started. Tasks 3.1–4.4 in `tasks.md` remain `[ ]`. Each PR's branch, base, and scope are
 described in `tasks.md`'s section headers and `design.md`'s "Secuencia de implementación con TDD
-estricto".
+estricto". PR B2 and PR C both inherit the same blocker above until it is resolved, since both stay
+on top of PR B1's still-mandatory, still-empty `Application` layer.
