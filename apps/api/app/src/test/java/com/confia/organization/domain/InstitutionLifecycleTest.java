@@ -70,6 +70,30 @@ class InstitutionLifecycleTest {
 
         assertThat(first).isEqualTo(second);
         assertThat(first.hashCode()).isEqualTo(second.hashCode());
+        assertThat(first.hashCode()).isEqualTo(id.hashCode());
+    }
+
+    @Test
+    void anInstitutionIsEqualToItself() {
+        Institution institution = anInstitution();
+
+        assertThat(institution).isEqualTo(institution);
+    }
+
+    @Test
+    void anInstitutionIsNeverEqualToANonInstitutionOrToNull() {
+        Institution institution = anInstitution();
+
+        assertThat(institution).isNotEqualTo("not an institution");
+        assertThat(institution).isNotEqualTo(null);
+    }
+
+    @Test
+    void twoInstitutionsWithDifferentIdsAreNeverEqualEvenWithIdenticalOtherAttributes() {
+        Institution first = anInstitution();
+        Institution second = anInstitution();
+
+        assertThat(first).isNotEqualTo(second);
     }
 
     private static Institution anInstitution() {

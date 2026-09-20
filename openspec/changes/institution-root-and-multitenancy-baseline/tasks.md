@@ -401,7 +401,7 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
     -Dsurefire.failIfNoSpecifiedTests=false` → 16/16 (5 nuevas de `InstitutionLifecycleTest` + 11 de
     `InstitutionCreationTest`, sin regresión). REFACTOR: ninguno necesario.
 
-- [ ] 2.6 **`OrganizationErrorCodesTest` con seis códigos.** Crear
+- [x] 2.6 **`OrganizationErrorCodesTest` con seis códigos.** Crear
   `apps/api/app/src/test/java/com/confia/organization/domain/OrganizationErrorCodesTest.java`
   (espejo de `KernelErrorCodesTest`): catálogo cerrado de
   `institution-legal-name-blank`, `institution-legal-name-too-long`, `institution-trade-name-blank`,
@@ -411,8 +411,14 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   falla si dos excepciones comparten código o si un código incumple el formato. — Especificación
   `organization`, requisito «Catálogo de códigos del módulo: formato y ausencia de repetidos» (ambos
   escenarios, parcial: seis de los once códigos de este corte)
+  - **Evidencia (2026-09-19):** sin ciclo ROJO propio: los seis códigos ya existen en producción
+    desde las tareas 2.2 y 2.5 (espejo de `KernelErrorCodesTest`, que tampoco tiene rojo cuando el
+    catálogo ya existe). VERDE inmediato:
+    `./mvnw -B -pl app -am test -Dtest=OrganizationErrorCodesTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → 5/5 (catálogo exacto, sin repetidos, formato kebab-case y longitud máxima, prefijo
+    `institution-`, herencia de `DomainException`).
 
-- [ ] 2.7 **Puertas de calidad del `domain` en `app`.** En `apps/api/app/pom.xml`: si la tarea 1.5
+- [x] 2.7 **Puertas de calidad del `domain` en `app`.** En `apps/api/app/pom.xml`: si la tarea 1.5
   no declaró la regla `BUNDLE`, declararla ahora (`LINE`/`BRANCH` `COVEREDRATIO` 0.80) y actualizar
   el comentario de `coverage_threshold` en `openspec/config.yaml` en el mismo commit. Declarar la
   regla `PACKAGE` de `jacoco-check` con `<include>com.confia.*.domain</include>` y
@@ -426,28 +432,97 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   mínima del módulo `app`» (si aplica aquí) y «Cobertura y mutación del paquete `domain` de cada
   módulo de negocio» (ambos escenarios de cobertura, más los dos de mutación por selección de perfil,
   heredados del comportamiento ya probado en `kernel`)
+  - **Evidencia (2026-09-19):** tarea 1.5 ya había declarado `BUNDLE` (80 %) y el comentario de
+    `coverage_threshold`, así que solo se añadió la regla `PACKAGE` (95 % líneas/ramas sobre
+    `com.confia.*.domain` y `com.confia.*.domain.*`), la adhesión a `pitest-maven`
+    (`targetClasses`/`targetTests` = `com.confia.*.domain.*`, espejo exacto de `kernel/pom.xml`) y
+    `junit-platform-launcher` en alcance `test`. **Primer humo:**
+    `./mvnw -B -pl app -am verify -Pmutation-report` rompió por
+    `Rule violated for package com.confia.organization.domain: branches covered ratio is 0.85, but
+    expected minimum is 0.95` — cobertura real insuficiente (no una demostración deliberada de la
+    tarea 2.8), causada por tres ramas de `Institution.equals` sin ejercitar
+    (`this == other`, `!(other instanceof Institution)`, ids distintos) y por
+    `Institution.hashCode()` sin una aserción que distinga su valor de una constante. Se añadieron
+    a `InstitutionLifecycleTest` los casos faltantes (autoigualdad, no igual a un tipo distinto ni a
+    `null`, dos instituciones con `id` distinto nunca son iguales, y `hashCode()` igual al de `id()`)
+    sin tocar la aplicación ni sus reglas de negocio. **Humo final:**
+    `./mvnw -B -pl app -am verify -Pmutation-report` → BUILD SUCCESS; JaCoCo mide
+    `com.confia.organization.domain` (regla `PACKAGE` cumplida) y PIT genera y evalúa 32 mutaciones
+    sobre ese paquete, 32/32 muertas (100 %, informativo en esta rama), sin romper por
+    `failWhenNoMutations=true`.
 
-- [ ] 2.8 **Demostración de que las puertas fallan** (sin comprometer): (a) comentar temporalmente
+- [x] 2.8 **Demostración de que las puertas fallan** (sin comprometer): (a) comentar temporalmente
   una aserción de `InstitutionCreationTest` u `OrganizationErrorCodesTest` y observar que la regla
   `PACKAGE` rompe `./mvnw verify` por debajo de 95 %; revertir. (b) debilitar temporalmente una
   aserción de `Institution` (por ejemplo, aceptar `legalName` en blanco) y observar que
   `-Pmutation-gate` rompe por debajo de 80 mientras `-Pmutation-report` termina en verde y solo
   informa; revertir. Registrar ambas evidencias observadas. — Capacidad `build-integrity`, mismo
   requisito (escenarios de umbral de cobertura y de selección de perfil de mutación)
+  - **Evidencia (2026-09-19):** (a) comentar una sola aserción, como en el precedente de
+    `kernel-money-value-object` (tarea 1.13), no sirve: el método compartido `requireValidName` que
+    valida `legalName` y `tradeName` sigue cubierto por la otra prueba. Se usó en su lugar
+    `@Disabled` temporal sobre toda la clase `InstitutionLifecycleTest` (nunca comprometido):
+    `./mvnw -B -pl app -am verify` → `BUILD FAILURE`,
+    `Rule violated for package com.confia.organization.domain: lines covered ratio is 0.69, but
+    expected minimum is 0.95` y `branches covered ratio is 0.42, but expected minimum is 0.95`
+    (además de la puerta `BUNDLE` global, que también rompió: 0.78/0.62 frente a 0.80). Se revirtió
+    quitando el `@Disabled` y el import de `org.junit.jupiter.api.Disabled`; `git status` quedó
+    limpio. (b) debilitar la validación real de `Institution` rompe las pruebas existentes en la
+    fase `test` antes de llegar a PIT (`rejectsALegalNameProvidedAsBlank` y
+    `rejectsATradeNameProvidedAsBlank` fallan), lo que no aísla la diferencia entre los dos
+    perfiles — mismo hallazgo que el precedente de `kernel-money-value-object` (tarea 1.13,
+    evidencia (a)). Se usó en su lugar la técnica de ese mismo precedente: sobrescribir el umbral
+    por línea de comandos sin tocar ningún archivo. Con la puntuación real de `organization.domain`
+    en 100 % (32/32, cerrado en la tarea 2.7): tras instalar `kernel` y el POM padre en el
+    repositorio Maven local (`./mvnw -B -pl kernel install -DskipTests` y `./mvnw -B -N install`,
+    necesarios para poder acotar la ejecución a `app` en solitario), `./mvnw -B -pl app verify
+    -Pmutation-gate -Dconfia.pit.mutationThreshold=101` → `BUILD FAILURE`,
+    «Mutation score of 100 is below threshold of 101»; `./mvnw -B -pl app verify -Pmutation-report
+    -Dconfia.pit.mutationThreshold=101` con el mismo umbral → `BUILD SUCCESS` (solo informa). Ningún
+    archivo de producción ni de prueba quedó modificado; `git status` limpio durante toda la
+    demostración.
 
-- [ ] 2.9 **Medir el diff real de PR B1** con `git diff --numstat <base-de-PR-A>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`
+- [x] 2.9 **Medir el diff real de PR B1** con `git diff --numstat <base-de-PR-A>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`
   (rama actual contra la base real de PR A, que puede ser `main` o el commit final de PR A si aún no
   se fusionó). Si cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y consultar
   al propietario** entre una subdivisión adicional dentro de B1 o una excepción de tamaño; no
   decidirlo sin el propietario. — P1 de la propuesta; `design.md`, «Pronóstico de tamaño por corte»
+  - *Resultado (2026-09-19):* 933 líneas, por encima de 800. El propietario decidió partir PR B1 en
+    el commit `0fe434e`: **PR B1** (rama `...-domain`, 773 líneas: puertos, ADR-0020, `Institution`
+    con su ciclo de vida) y **PR B1-gates** (rama `...-domain-gates`, base PR B1, 160 líneas:
+    catálogo de códigos y puertas de calidad del `domain`). Las dos ramas verifican en verde por
+    separado; PR B2 pasa a tener base en PR B1-gates.
+  - **Medición (2026-09-19), sin decisión tomada — DETENIDO, se consulta al propietario:**
+    `git diff --numstat e3b9e84...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'` (base real de
+    PR A, commit `e3b9e84`, confirmado con `git merge-base`) →
+    16 archivos, **933 líneas de autor** (878 adiciones + 55 eliminaciones), desglose:
+    `apps/api/app/pom.xml` 49+/0-; `CurrentInstitutionProvider.java` 33+/0-;
+    `InstitutionRepository.java` 29+/0-; `Institution.java` 137+/0-;
+    `InstitutionStateException.java` 29+/0-; `InvalidInstitutionException.java` 50+/0-;
+    `organization/package-info.java` 19+/0-; `EmptyShouldExceptionInventoryTest.java` 48+/21-;
+    `LayeredArchitectureTest.java` 58+/30-; `SuppressionCitesAdrTest.java` 38+/3-;
+    `InstitutionCreationTest.java` 121+/0-; `InstitutionLifecycleTest.java` 106+/0-;
+    `OrganizationErrorCodesTest.java` 87+/0-; `InstitutionId.java` (kernel) 23+/0-;
+    `kernel/package-info.java` 1+/1-; `InstitutionIdTest.java` 50+/0-. **933 > 800**, así que esta
+    tarea se detiene exactamente como instruye su propio texto: no se decide aquí entre una
+    subdivisión adicional dentro de B1 o una excepción de tamaño (`size:exception`); se reporta al
+    propietario/orquestador. No se marca esta tarea como completada ni se continúa con la tarea
+    2.10 hasta recibir esa decisión (coincide con el punto de parada dura fijado explícitamente en
+    el lanzamiento de esta fase).
 
-- [ ] 2.10 **Verificación final de PR B1**: en checkout limpio, con `JAVA_HOME` en JDK 25, ejecutar
+- [x] 2.10 **Verificación final de PR B1**: en checkout limpio, con `JAVA_HOME` en JDK 25, ejecutar
   `./mvnw -B verify -Pmutation-gate` en `apps/api`. Confirmar cobertura de `organization.domain` ≥
   95 % (líneas y ramas) y puntuación de mutación ≥ 80. Confirmar que `productionCodeRespectsLayering`
   pasa con las capas `Infrastructure` y `Web` opcionales. Empujar la rama `...-domain` (apuntando a
   PR A) y confirmar en la integración continua que el trabajo `backend` termina en verde con
   `-Pmutation-report`. — Capacidad `build-integrity`, ambos requisitos nuevos; criterios de éxito de
   la propuesta relativos a cobertura, mutación y ADR-0018/ADR-0020
+  - *Evidencia (2026-09-19, `-Pmutation-gate`):* **PR B1** en `0fe434e`: `BUILD SUCCESS`, 176
+    pruebas de `kernel` y 61 de `app`, todas las reglas de JaCoCo cumplidas, PIT de `kernel`
+    176/178; corrida de integración continua `35486736639` en verde. **PR B1-gates** en `6eb311b`:
+    `BUILD SUCCESS`, 245 pruebas, JaCoCo `BUNDLE` 80 % y `PACKAGE` 95 % sobre
+    `organization.domain`, PIT de `organization.domain` 32/32 (100 %); corrida `35486736412` en
+    verde.
 
 ---
 

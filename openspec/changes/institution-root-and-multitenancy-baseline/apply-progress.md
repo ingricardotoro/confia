@@ -65,10 +65,12 @@ push or open PRs).
 ## PR B1 — `InstitutionId`, `Institution` mínima, ciclo de ADR-0018/ADR-0020, puertas del `domain`
 
 Branch `change/institution-root-and-multitenancy-baseline-domain`, base PR A (`e3b9e84`).
-**Status: resumed 2026-09-19, blocker resolved by the owner.** The owner decided to move the
-`application`-layer ports from task 4.1 (PR C) into this PR as task 2.3b, rather than amend
-ADR-0020 or accept a red `productionCodeRespectsLayering`. Tasks 2.1–2.3b done and committed;
-2.4–2.10 in progress.
+**Status: BLOCKED at task 2.9 on 2026-09-19, size overage — reported to the owner, not decided
+here.** The prior blocker (task 2.4 vs ADR-0020) was resolved by the owner moving the
+`application`-layer ports from task 4.1 (PR C) into this PR as task 2.3b. Tasks 2.1–2.8 done and
+committed; task 2.9's own measurement now exceeds the 800-line PR budget (933 lines), which is one
+of this apply batch's explicit hard stops. Task 2.10 has not started and must not start until the
+owner decides how to proceed (see "Blocker" below).
 
 | Task | Status | Commit |
 |---|---|---|
@@ -77,8 +79,12 @@ ADR-0020 or accept a red `productionCodeRespectsLayering`. Tasks 2.1–2.3b done
 | 2.3 Close ADR-0018's common expiry (empty inventory, rename rule) | Done | `e2ac46e` |
 | 2.3b `application` ports (`InstitutionRepository`, `CurrentInstitutionProvider`), moved forward from task 4.1 | Done | `c940a22` |
 | 2.4 Apply ADR-0020 (`optionalLayer` for Infrastructure/Web) | Done | `a26d685` |
-| 2.5 Activate/deactivate lifecycle, identity equality | Done | pending commit this batch |
-| 2.6–2.10 | Not started | — |
+| 2.5 Activate/deactivate lifecycle, identity equality | Done | `0fe434e` |
+| 2.6 `OrganizationErrorCodesTest` (six codes) | Done | `545e546` |
+| 2.7 Domain quality gates (`PACKAGE` 95%, PIT adhesion) | Done | `7eb560a` |
+| 2.8 Gate-failure demonstrations (not committed by design) | Done | `0d92ef7` |
+| 2.9 Measure real PR B1 diff | **Blocked — 933 > 800 lines** | not committed |
+| 2.10 | Not started (blocked by 2.9) | — |
 
 ### TDD Cycle Evidence
 
@@ -90,6 +96,9 @@ ADR-0020 or accept a red `productionCodeRespectsLayering`. Tasks 2.1–2.3b done
 | 2.3b | N/A — interfaces only, no RED/GREEN cycle (explicitly documented in tasks.md, matching the task's own "sin ciclo ROJO/VERDE propio") | `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest -Dsurefire.failIfNoSpecifiedTests=false` → 11/11, no regression | None expected/needed | `productionCodeRespectsLayering` run in isolation now names only `Infrastructure` and `Web` as empty, no longer `Application` — confirms the two ports resolved the blocker before task 2.4 touches `optionalLayer` |
 | 2.4 | Compile error: `cannot find symbol method noProductionClassInLayer(JavaClasses,String) / location: class LayeredArchitectureTest` (2 occurrences), after adding the `OPTIONAL_LAYER` marker entries to `EmptyShouldExceptionInventoryTest` | `LayeredArchitectureTest`/`EmptyShouldExceptionInventoryTest`/`SuppressionCitesAdrTest` 13/13 green; `SuppressionCitesAdrTest` confirms 2==2 `.optionalLayer(` and 0==0 `.allowEmptyShould(` | None expected/needed | Expiry demonstrated: temporary `TempExpiryProbe` class in `organization.infrastructure` made `EmptyShouldExceptionInventoryTest` fail naming the exact `Infrastructure` entry; removed, `git status` clean |
 | 2.5 | `cannot find symbol method deactivate()/activate()` and `cannot find symbol class InstitutionStateException` (compile error) | 16/16 pass (`InstitutionLifecycleTest` 5/5 + `InstitutionCreationTest` 11/11, no regression) | None expected/needed | N/A (no branching logic beyond the state guard, already exercised by the four transition tests) |
+| 2.6 | N/A — catalog test over codes already implemented in tasks 2.2/2.5, mirrors `KernelErrorCodesTest`'s own pattern of no red when the catalog pre-exists | 5/5 pass immediately | None expected/needed | N/A (catalog assertion, no branching logic to neutralize) |
+| 2.7 | N/A (build-integrity wiring); first smoke run failed for real: `branches covered ratio is 0.85, but expected minimum is 0.95` on `organization.domain`, from untested `Institution.equals`/`hashCode` branches | `./mvnw -B -pl app -am verify -Pmutation-report` BUILD SUCCESS after closing the gap; PIT 32/32 mutations killed (100%, informational on this branch) | None expected/needed | Closed by adding the missing equality/hash edge-case tests, not by touching production logic or thresholds |
+| 2.8 | N/A (demonstration task, not a production behavior) | (a) `@Disabled` on `InstitutionLifecycleTest` → `PACKAGE` rule breaks (0.69/0.42 vs 0.95); reverted. (b) `-Dconfia.pit.mutationThreshold=101` → `-Pmutation-gate` breaks ("Mutation score of 100 is below threshold of 101"), `-Pmutation-report` stays green with the identical override | None expected/needed | No file left modified in either demonstration; (b) used the command-line threshold-override technique already established in `kernel-money-value-object` task 1.13, since directly weakening `Institution`'s validation breaks real tests before PIT even runs |
 
 ### Work Unit Evidence (through task 2.3)
 
@@ -159,9 +168,52 @@ class landing the layering rule's precondition earlier than task 4.1; (c) accept
 accordingly; or another option the owner prefers. This is the same class of decision as the original
 P2 (elevated to an ADR, not buried in `design.md`), so it is reported rather than resolved here.
 
+### Blocker found at task 2.9 (not committed; reported instead of improvised)
+
+**What.** Task 2.9's own measurement, `git diff --numstat e3b9e84...HEAD -- .
+':(exclude)openspec' ':(exclude)docs/adr'` (base confirmed with `git merge-base
+change/institution-root-and-multitenancy-baseline-domain change/institution-root-and-multitenancy-baseline`
+→ `e3b9e84`), gives **933 authored lines** (878 additions + 55 deletions across 16 files — full
+per-file breakdown in `tasks.md`, task 2.9's own evidence). Task 2.9's text is explicit: "Si supera
+800, detener la aplicación y consultar al propietario entre una subdivisión adicional dentro de B1
+o una excepción de tamaño; no decidirlo sin el propietario." This apply batch's launch instructions
+independently name the same threshold as a hard stop.
+
+**Why this blocks, rather than something I should decide.** 933 exceeds the project's 800-line
+per-PR budget (`CLAUDE.md`, `docs/15-flujo-de-trabajo-git.md` §3, the P1 decision this change
+already made) by 133 lines — 17% over. It is inside `design.md`'s own pessimistic total for the
+whole of corte B (710–1045) but above the B1-specific sub-estimate the owner's P1 decision was
+based on (480–700), mainly because ADR-0020's cycle (tasks 2.3b and 2.4: two new ports plus the
+`LayeredArchitectureTest`/`EmptyShouldExceptionInventoryTest`/`SuppressionCitesAdrTest` rework) and
+`Institution`'s equals/hashCode edge-case tests (task 2.7's coverage-gap closure) were not fully
+accounted for in that sub-estimate at the time it was written.
+
+**Not decided unilaterally:**
+1. Accepting `933 > 800` as `size:exception` for this specific PR — the delivery strategy is
+   `auto-chain`/`stacked-to-main`, decided by the owner (P1), and unilaterally granting an exception
+   to it is exactly the kind of gate-widening this apply batch's hard stops forbid.
+2. Splitting PR B1 further (for example, isolating tasks 2.3b/2.4's ADR-0020 rework into its own
+   PR ahead of `InstitutionId`/`Institution`, or moving `InstitutionLifecycleTest`'s equals/hashCode
+   closure elsewhere) — changes the tasks.md PR boundary the owner already approved and would need
+   its own re-sequencing decision, not something to improvise mid-batch.
+3. Continuing into task 2.10 (final verification, push, CI confirmation) while the size question is
+   open — task 2.10's own text is gated on 2.9 "si cabe", so proceeding would silently treat the
+   overage as already resolved.
+
+**Requesting a decision on one of:** (a) accept `size:exception` for this PR B1 as currently
+scoped (933 lines), matching the precedent already used for PR A of `kernel-money-value-object`;
+(b) split PR B1 further, and specify where the new boundary falls (for example, ADR-0020's cycle as
+its own preliminary PR, or `InstitutionLifecycleTest`'s coverage-closure tests moved elsewhere);
+(c) another option the owner prefers. Diagnostic evidence for whichever path is chosen — full
+`./mvnw -B verify -Pmutation-gate` output, test counts, both JaCoCo rules and every PIT survivor —
+is included in this apply run's return summary regardless, so the owner has complete information
+without needing another apply pass just to gather it.
+
 ## PR B2, PR C
 
 Not started. Tasks 3.1–4.4 in `tasks.md` remain `[ ]`. Each PR's branch, base, and scope are
 described in `tasks.md`'s section headers and `design.md`'s "Secuencia de implementación con TDD
-estricto". PR B2 and PR C both inherit the same blocker above until it is resolved, since both stay
-on top of PR B1's still-mandatory, still-empty `Application` layer.
+estricto". The original ADR-0020-vs-`Application` blocker no longer applies to them (resolved by
+task 2.3b). PR B2 and PR C now wait instead on the task 2.9 size-overage decision above: PR B2's
+own base is PR B1's final commit, so its branch point is not yet fixed while PR B1's own scope
+(and therefore its final commit) is still open.
