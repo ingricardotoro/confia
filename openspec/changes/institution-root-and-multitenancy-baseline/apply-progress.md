@@ -270,3 +270,72 @@ Push `change/institution-root-and-multitenancy-baseline-domain-attributes` and c
 instructions (sdd-apply does not push or open PRs). PR C (tasks 4.1–4.4) is out of this batch's
 scope (PR B2 only, stop after 3.10, per this apply batch's explicit instruction) and remains
 `[ ]` in `tasks.md`.
+
+## PR C — Capa `application`: puertos y caso de uso
+
+Branch `change/institution-root-and-multitenancy-baseline-application`, base PR B2 (`a6c1bb7`).
+**Status: complete, all 4 tasks done (4.1–4.4). This is the final PR of the whole change.** The
+`InstitutionRepository` and `CurrentInstitutionProvider` ports were already delivered in PR B1
+(task 2.3b, owner decision 2026-09-19), so this batch's task 4.1 covered only the
+`ResolveCurrentInstitution` use case and its test doubles, exactly as this batch's launch
+instructions scoped it.
+
+| Task | Status | Commit |
+|---|---|---|
+| 4.1 `ResolveCurrentInstitution`, active case | Done | `890ceec` |
+| 4.2 `InstitutionNotFoundException`/`InstitutionInactiveException`, rejection paths, catalog to 13 codes | Done | `67ea727` |
+| 4.3 Real diff measurement | Done | `1a189c4` |
+| 4.4 Final verification and change closure review | Done | `1a189c4` |
+
+### TDD Cycle Evidence
+
+| Task | RED | GREEN | REFACTOR | Non-vacuity / notes |
+|---|---|---|---|---|
+| 4.1 | Compile errors: `cannot find symbol class ResolveCurrentInstitution` (4 occurrences) | `ResolveCurrentInstitutionTest` 5/5 (repository double register/lookup, fixed provider, use case happy path, two constructor null checks); full `app` test run 94/94, no regression | None needed | N/A (minimal implementation used `Optional::orElseThrow()` with no arguments, deliberately incomplete pending task 4.2's own red) |
+| 4.2 | Compile errors: `cannot find symbol class InstitutionNotFoundException` / `InstitutionInactiveException` (9 occurrences, from the two new test methods) | `ResolveCurrentInstitutionTest` 8/8 (+3: repository-double absence for two distinct ids without throwing, not-found rejection, inactive rejection); `OrganizationErrorCodesTest` 6/6 (+1: dedicated public-no-arg-constructor confirmation for both new exceptions) | None needed | N/A (both new exceptions are simple constructors with no branching to neutralize; behavior verified through the use case's own rejection tests instead) |
+| 4.3 | N/A (measurement, not behavior) | N/A | N/A | N/A |
+| 4.4 | N/A (verification, not behavior) | Full `./mvnw -B verify` and `./mvnw -B verify -Pmutation-report` both BUILD SUCCESS | N/A | N/A |
+
+### Work Unit Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command and result | `./mvnw -B -pl app -am test -Dtest=ResolveCurrentInstitutionTest,OrganizationErrorCodesTest -Dsurefire.failIfNoSpecifiedTests=false` → 8/8 + 6/6 = 14/14 pass |
+| Runtime harness command/scenario and result | `./mvnw -B verify -Pmutation-gate` in `apps/api` → BUILD SUCCESS; 176 kernel tests + 98 app tests = 274 total; JaCoCo `PACKAGE` on `com.confia.organization.domain` at 100% lines/branches (79/79, 20/20); JaCoCo `BUNDLE` on `app` green ("All coverage checks have been met"); PIT on `organization.domain` 49/49 mutations killed (100%, zero survivors, including the two new exception classes); `organization.application` (where `ResolveCurrentInstitution` lives) is fully covered by JaCoCo but correctly outside the `PACKAGE` rule's `<includes>` (`com.confia.*.domain`, `com.confia.*.domain.*`) and outside PIT's `targetClasses`/`targetTests`; kernel's pre-existing 2 survivors (`ConditionalsBoundaryMutator`, 99% score) untouched by this PR |
+| Rollback boundary | Revert commits `890ceec`, `67ea727`, `1a189c4` (or the whole PR branch); `organization` module loses its `application`-layer use case and its two resolution exceptions, returning to PR B2's state (ports exist from PR B1 but unused); no consumer outside the module is affected (no `web` layer exists yet) |
+
+### Real diff measurement (task 4.3)
+
+`git diff --numstat a6c1bb7...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'` (base confirmed
+with `git merge-base`, tip of PR B2) → 7 files, **300 authored lines** (292 additions + 8
+deletions): `ResolveCurrentInstitution.java` 46+/0-, `InstitutionInactiveException.java` 25+/0-,
+`InstitutionNotFoundException.java` 25+/0-, `FixedCurrentInstitutionProvider.java` 22+/0-,
+`InMemoryInstitutionRepository.java` 29+/0-, `ResolveCurrentInstitutionTest.java` 119+/0-,
+`OrganizationErrorCodesTest.java` 26+/8-. Slightly above design.md's 185–290 forecast for C (same
+mild under-estimation pattern as B1/B2, only 10 lines over the ceiling) but far under the 800-line
+budget — continued without consulting the owner, per this task's own instructions.
+
+### Success criteria review (task 4.4)
+
+All nine of `proposal.md`'s "Criterios de éxito" reviewed against the final reactor state; full
+per-criterion evidence recorded in `tasks.md` task 4.4. Summary: eight of nine fully verified
+locally in this apply run (ArchUnit rules, coverage/mutation gates, domain exception catalog,
+resolution use case rejections, D1's exploration.md note); the ninth (`./mvnw verify` green on
+remote CI with JDK 25) is verified locally but its remote confirmation depends on pushing the
+branch, explicitly out of `sdd-apply`'s scope.
+
+### Outstanding for this apply batch
+
+Push `change/institution-root-and-multitenancy-baseline-application` and confirm the `backend` CI
+job is green — explicitly deferred to the orchestrator per this phase's launch instructions
+(`sdd-apply` does not push or open PRs). This was also PR B1's and PR B2's outstanding item; all
+three branches (`...-domain`, `...-domain-gates`, `...-domain-attributes`) are already pushed and
+green per the launch prompt's chain-state note, so only this final `...-application` branch remains
+to push.
+
+## Whole-change status
+
+**Every task in `tasks.md` across all four pull requests (A, B1, B1-gates, B2, C) is now marked
+`[x]`.** This was the last apply batch of `institution-root-and-multitenancy-baseline`. Remaining
+work is entirely the orchestrator's: push `...-application`, confirm CI, and open/merge the final
+pull request in the `stacked-to-main` chain.

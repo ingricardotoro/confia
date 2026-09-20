@@ -44,6 +44,15 @@ class KernelErrorCodesTest {
     }
 
     @Test
+    void theKebabCasePatternRejectsAMalformedCode() {
+        // Without this, the format check above could pass against a pattern that accepts anything.
+        assertThat("Currency-Mismatch").doesNotMatch(KEBAB_CASE);
+        assertThat("currency_mismatch").doesNotMatch(KEBAB_CASE);
+        assertThat("currency--mismatch").doesNotMatch(KEBAB_CASE);
+        assertThat("-currency-mismatch").doesNotMatch(KEBAB_CASE);
+    }
+
+    @Test
     void everyExceptionThatDeclaresAKernelCodeIsADomainException() {
         assertThat(new CurrencyMismatchException(CurrencyCode.HNL, CurrencyCode.USD))
                 .isInstanceOf(DomainException.class);

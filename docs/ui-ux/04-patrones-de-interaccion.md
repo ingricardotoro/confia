@@ -818,6 +818,12 @@ admin.export.ready.action = "Descargar archivo"
 Formato objetivo: papel térmico de 80 mm y también media carta. Se usa una hoja de estilos de
 impresión, no una captura de pantalla.
 
+> **Los RTN de este ejemplo son ficticios y su longitud no está confirmada.** Aparecen con catorce y
+> con trece dígitos solo como ilustración de maqueta; no son normativos. El formato vigente del RTN
+> ante el SAR (longitud, máscara y posible dígito verificador) sigue **pendiente de validación**
+> según `docs/04-cumplimiento-fiscal-sar.md`, sección 1. Nadie debe deducir el formato real de esta
+> plantilla.
+
 ```
         INSTITUTO SAN JOSÉ
      RTN 08019012345678
