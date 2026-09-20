@@ -630,7 +630,7 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
     `InstitutionLifecycleTest` 8/8 (sin regresión), `OrganizationErrorCodesTest` 5/5 (sin cambios,
     catálogo sigue en seis). REFACTOR: ninguno necesario.
 
-- [ ] 3.6 **TDD — nombre comercial opcional y sus límites.** ROJO: extender `InstitutionCreationTest`
+- [x] 3.6 **TDD — nombre comercial opcional y sus límites.** ROJO: extender `InstitutionCreationTest`
   (si no quedó cubierto en la tarea 2.2): construcción exitosa con `tradeName` nulo (`tradeName` en
   el resultado es nulo); rechazo de `tradeName` provisto como cadena de solo espacios
   (`institution-trade-name-blank`); rechazo de `tradeName` de 201 caracteres y aceptación de 200
@@ -639,6 +639,19 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
   fábricas `tradeNameBlank()`/`tradeNameTooLong()` de `InvalidInstitutionException` (si no se
   completaron en 2.2, completarlas aquí). REFACTOR: ninguno esperado. — Especificación
   `organization`, requisito «Nombre comercial opcional» (ambos escenarios)
+  - **Evidencia (2026-09-19):** ya completado en la tarea 2.2 de PR B1 (registrado allí como
+    desviación deliberada): `Institution.create(...)` valida `tradeName` con las mismas reglas que
+    `legalName` (`requireValidText`, nulo permitido) desde esa tarea, y
+    `InvalidInstitutionException.tradeNameBlank()`/`tradeNameTooLong()` ya existen. Los cuatro
+    escenarios de este requisito llevan cubiertos en `InstitutionCreationTest` desde PR B1
+    (`constructionSucceedsWithoutATradeName`, `rejectsATradeNameProvidedAsBlank`,
+    `acceptsATradeNameOfExactlyTwoHundredCodePoints`,
+    `rejectsATradeNameOfTwoHundredAndOneCodePoints`) y se mantuvieron intactos a través de las
+    tareas 3.1–3.5 (cada una solo añadió parámetros nuevos a las llamadas). Sin ROJO ni cambio de
+    producción en esta tarea: se verifica en lugar de rehacerse, según instruye el lanzamiento de
+    esta fase. VERDE de confirmación: `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest
+    -Dsurefire.failIfNoSpecifiedTests=false` → 27/27, incluidos los cuatro escenarios de
+    `tradeName`.
 
 - [ ] 3.7 **TDD — precedencia de invariantes.** ROJO: añadir a `InstitutionCreationTest` una prueba
   parametrizada que confirma el orden exacto de `design.md` («Flujo de datos»): primero
