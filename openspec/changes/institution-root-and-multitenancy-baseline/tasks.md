@@ -401,7 +401,7 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
     -Dsurefire.failIfNoSpecifiedTests=false` → 16/16 (5 nuevas de `InstitutionLifecycleTest` + 11 de
     `InstitutionCreationTest`, sin regresión). REFACTOR: ninguno necesario.
 
-- [ ] 2.6 **`OrganizationErrorCodesTest` con seis códigos.** Crear
+- [x] 2.6 **`OrganizationErrorCodesTest` con seis códigos.** Crear
   `apps/api/app/src/test/java/com/confia/organization/domain/OrganizationErrorCodesTest.java`
   (espejo de `KernelErrorCodesTest`): catálogo cerrado de
   `institution-legal-name-blank`, `institution-legal-name-too-long`, `institution-trade-name-blank`,
@@ -411,6 +411,12 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   falla si dos excepciones comparten código o si un código incumple el formato. — Especificación
   `organization`, requisito «Catálogo de códigos del módulo: formato y ausencia de repetidos» (ambos
   escenarios, parcial: seis de los once códigos de este corte)
+  - **Evidencia (2026-09-19):** sin ciclo ROJO propio: los seis códigos ya existen en producción
+    desde las tareas 2.2 y 2.5 (espejo de `KernelErrorCodesTest`, que tampoco tiene rojo cuando el
+    catálogo ya existe). VERDE inmediato:
+    `./mvnw -B -pl app -am test -Dtest=OrganizationErrorCodesTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → 5/5 (catálogo exacto, sin repetidos, formato kebab-case y longitud máxima, prefijo
+    `institution-`, herencia de `DomainException`).
 
 - [ ] 2.7 **Puertas de calidad del `domain` en `app`.** En `apps/api/app/pom.xml`: si la tarea 1.5
   no declaró la regla `BUNDLE`, declararla ahora (`LINE`/`BRANCH` `COVEREDRATIO` 0.80) y actualizar
