@@ -292,7 +292,7 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
     en la tarea 2.4 no cerraría este rojo mientras `Application` siga vacía y obligatoria; se verifica
     en la tarea 2.4 antes de comprometer ese cambio.
 
-- [ ] 2.3b **Puertos de la capa `application` (adelantados desde la tarea 4.1, decisión del
+- [x] 2.3b **Puertos de la capa `application` (adelantados desde la tarea 4.1, decisión del
   propietario del 2026-09-19).** Crear
   `apps/api/app/src/main/java/com/confia/organization/application/InstitutionRepository.java`
   (`Optional<Institution> findById(InstitutionId id)`) y
@@ -307,6 +307,17 @@ A. El nombre debe empezar por `change/` para que `ci.yml` lo ejecute mientras ap
   con el caso de uso en la tarea 4.1. — Especificación `organization`, requisitos «Puerto de salida
   para cargar una institución por identificador» y «Puerto de salida para la institución de la
   solicitud en curso»; ADR-0009; ADR-0020 §2
+  - **Evidencia (2026-09-19):** sin ciclo ROJO/VERDE propio, como indica el motivo del adelanto: son
+    interfaces sin comportamiento (`InstitutionRepository.findById(InstitutionId)` devuelve
+    `Optional<Institution>`; `CurrentInstitutionProvider.currentInstitutionId()` devuelve
+    `InstitutionId`, con el Javadoc del contrato de ADR-0009 citando textualmente
+    «Implementación del aislamiento»). Compilación en verde:
+    `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest -Dsurefire.failIfNoSpecifiedTests=false`
+    → 11/11 (sin regresión). **Comprobación del motivo del adelanto:**
+    `productionCodeRespectsLayering` ejecutada de forma aislada ya no nombra `Application` como capa
+    vacía, solo `Layer 'Infrastructure' is empty` y `Layer 'Web' is empty` — confirma en código que
+    los dos puertos bastan para que `application` deje de estar vacía, antes de que la tarea 2.4
+    aplique `optionalLayer` a las otras dos.
 
 - [ ] 2.4 **Aplicación de ADR-0020 (opción A, ya aceptada): capas opcionales por marcador.** ROJO:
   en `apps/api/app/src/test/java/com/confia/architecture/SuppressionCitesAdrTest.java`, añadir el

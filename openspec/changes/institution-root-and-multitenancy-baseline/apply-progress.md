@@ -65,15 +65,18 @@ push or open PRs).
 ## PR B1 — `InstitutionId`, `Institution` mínima, ciclo de ADR-0018/ADR-0020, puertas del `domain`
 
 Branch `change/institution-root-and-multitenancy-baseline-domain`, base PR A (`e3b9e84`).
-**Status: BLOCKED after task 2.3, on task 2.4.** Tasks 2.1–2.3 done and committed; 2.4–2.10 not
-started, waiting on an owner/orchestrator decision (see "Blocker" below).
+**Status: resumed 2026-09-19, blocker resolved by the owner.** The owner decided to move the
+`application`-layer ports from task 4.1 (PR C) into this PR as task 2.3b, rather than amend
+ADR-0020 or accept a red `productionCodeRespectsLayering`. Tasks 2.1–2.3b done and committed;
+2.4–2.10 in progress.
 
 | Task | Status | Commit |
 |---|---|---|
 | 2.1 `InstitutionId` in kernel | Done | `32d5370` |
 | 2.2 Minimal `Institution` (id, legalName, tradeName, isActive) | Done | `43d1c01` |
 | 2.3 Close ADR-0018's common expiry (empty inventory, rename rule) | Done | `e2ac46e` |
-| 2.4 Apply ADR-0020 (`optionalLayer` for Infrastructure/Web) | **Blocked** | not committed |
+| 2.3b `application` ports (`InstitutionRepository`, `CurrentInstitutionProvider`), moved forward from task 4.1 | Done | pending commit this batch |
+| 2.4 Apply ADR-0020 (`optionalLayer` for Infrastructure/Web) | In progress | — |
 | 2.5–2.10 | Not started | — |
 
 ### TDD Cycle Evidence
@@ -82,7 +85,8 @@ started, waiting on an owner/orchestrator decision (see "Blocker" below).
 |---|---|---|---|---|
 | 2.1 | `cannot find symbol class InstitutionId` (10 compile errors) | 4/4 tests pass | None expected/needed | N/A (record, no branching logic to neutralize) |
 | 2.2 | `cannot find symbol class Institution` / `InvalidInstitutionException` (compile errors) | 11/11 tests pass | None expected/needed | Full `./mvnw -B verify`: scheduled ADR-0018 red observed in `EmptyShouldExceptionInventoryTest`, exact message recorded in `tasks.md`; `LayeredArchitectureTest` still green (still carries `allowEmptyShould(true)`) |
-| 2.3 | N/A (this task closes a scheduled red, it does not add new behavior) | `EmptyShouldExceptionInventoryTest` + `SuppressionCitesAdrTest` green (9/9, count 0==0) | None expected/needed | `productionCodeRespectsLayering` run in isolation fails as predicted by design.md's probe outcome (b), naming `Application`, `Infrastructure` and `Web` as empty — one layer more than the probe's own sample tested (see Blocker) |
+| 2.3 | N/A (this task closes a scheduled red, it does not add new behavior) | `EmptyShouldExceptionInventoryTest` + `SuppressionCitesAdrTest` green (9/9, count 0==0) | None expected/needed | `productionCodeRespectsLayering` run in isolation fails as predicted by design.md's probe outcome (b), naming `Application`, `Infrastructure` and `Web` as empty — one layer more than the probe's own sample tested (see Blocker, now resolved) |
+| 2.3b | N/A — interfaces only, no RED/GREEN cycle (explicitly documented in tasks.md, matching the task's own "sin ciclo ROJO/VERDE propio") | `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest -Dsurefire.failIfNoSpecifiedTests=false` → 11/11, no regression | None expected/needed | `productionCodeRespectsLayering` run in isolation now names only `Infrastructure` and `Web` as empty, no longer `Application` — confirms the two ports resolved the blocker before task 2.4 touches `optionalLayer` |
 
 ### Work Unit Evidence (through task 2.3)
 
@@ -92,7 +96,17 @@ started, waiting on an owner/orchestrator decision (see "Blocker" below).
 | Runtime harness command/scenario and result | `./mvnw -B verify -Pmutation-report` in `apps/api` not yet run to completion for PR B1: blocked before task 2.7 wires the domain quality gates. Full `./mvnw -B verify` currently **fails** (`productionCodeRespectsLayering`), which is the expected pre-2.4 state |
 | Rollback boundary | Revert commits `32d5370`..`e2ac46e` (or the whole PR branch); `organization` module disappears, ADR-0018's exception returns with its original condition (which holds again), PR A stays intact and complete by itself |
 
-### Blocker found while attempting task 2.4 (not committed; reported instead of improvised)
+### Blocker found while attempting task 2.4 — RESOLVED by the owner on 2026-09-19
+
+**Resolution.** The owner chose to move the `application`-layer ports (`InstitutionRepository`,
+`CurrentInstitutionProvider`) forward from task 4.1 (PR C) into this PR as new task 2.3b, rather
+than amend ADR-0020 or accept a red `productionCodeRespectsLayering` on PR B1/B2 (option (b) of the
+three requested below, closest in spirit — a minimal, real `application`-layer class landing the
+layering rule's precondition earlier than task 4.1). `tasks.md` now contains task 2.3b, completed
+above; task 4.1 in PR C is reduced to the `ResolveCurrentInstitution` use case, which reuses these
+same two ports without recreating them. The original blocker text is preserved below for record.
+
+### Original blocker report (kept for history; not re-litigated)
 
 **What.** `design.md`'s P2 probe ("Sonda de P2") validated `optionalLayer("Infrastructure")` /
 `optionalLayer("Web")` against a synthetic sample where **both** `domain` and `application` already
