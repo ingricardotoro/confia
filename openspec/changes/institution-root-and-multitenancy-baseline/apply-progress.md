@@ -209,11 +209,64 @@ its own preliminary PR, or `InstitutionLifecycleTest`'s coverage-closure tests m
 is included in this apply run's return summary regardless, so the owner has complete information
 without needing another apply pass just to gather it.
 
-## PR B2, PR C
+## PR B2 — Atributos restantes del agregado (`rtn`, `address`, `defaultCurrency`, `locale`, `timezone`)
 
-Not started. Tasks 3.1–4.4 in `tasks.md` remain `[ ]`. Each PR's branch, base, and scope are
-described in `tasks.md`'s section headers and `design.md`'s "Secuencia de implementación con TDD
-estricto". The original ADR-0020-vs-`Application` blocker no longer applies to them (resolved by
-task 2.3b). PR B2 and PR C now wait instead on the task 2.9 size-overage decision above: PR B2's
-own base is PR B1's final commit, so its branch point is not yet fixed while PR B1's own scope
-(and therefore its final commit) is still open.
+Branch `change/institution-root-and-multitenancy-baseline-domain-attributes`, base PR B1-gates
+(`ac68c2b`). **Status: complete, all 10 tasks done (3.1–3.10).** The owner's PR B1 split (task
+2.9's blocker) resolved cleanly before this batch started: PR B1 (`...-domain`, `InstitutionId`,
+`Institution` with lifecycle, application ports, ADR-0020) and PR B1-gates (`...-domain-gates`,
+six-code catalog + domain gates) are both pushed and green; this PR B2 builds on PR B1-gates.
+
+| Task | Status | Commit |
+|---|---|---|
+| 3.1 `rtn` attribute | Done | `8e980bd` |
+| 3.2 `address` attribute | Done | `0785bb1` |
+| 3.3 `defaultCurrency` attribute | Done | `9c33460` |
+| 3.4 `locale` attribute | Done | `e2c9f30` |
+| 3.5 `timezone` attribute (signature complete, 8 params) | Done | `6ef3a70` |
+| 3.6 `tradeName` validation (verified, already done in PR B1 task 2.2) | Done | `c58332d` |
+| 3.7 Invariant precedence test | Done | `dc88045` |
+| 3.8 `toString()` without rtn/address | Done | `f36e468` |
+| 3.9 `OrganizationErrorCodesTest` to eleven codes | Done | `6887422` |
+| 3.10 Real diff measurement + final verification | Done | not yet committed (docs-only, this save) |
+
+### TDD Cycle Evidence
+
+| Task | RED | GREEN | REFACTOR | Non-vacuity / notes |
+|---|---|---|---|---|
+| 3.1 | Compile errors: `create` of 3 params doesn't apply to 4-param calls; `cannot find symbol RTN_INVALID`/`rtn()` | `InstitutionCreationTest` 15/15, `InstitutionLifecycleTest` 8/8, `OrganizationErrorCodesTest` 5/5 | None needed | N/A |
+| 3.2 | Compile errors: `create` of 4 params doesn't apply to 5-param calls; `cannot find symbol address()` | `InstitutionCreationTest` 20/20, others unchanged | Generalized `requireValidName` → `requireValidText(rawText, maxLength, blankError, tooLongError)` for reuse across `legalName`/`tradeName`/`address` | N/A |
+| 3.3 | Compile errors: `create` of 5 params doesn't apply to 6-param calls; `cannot find symbol defaultCurrency()` | `InstitutionCreationTest` 22/22, others unchanged | None needed | N/A |
+| 3.4 | Compile errors: `create` of 6 params doesn't apply to 7-param calls; `cannot find symbol locale()` | `InstitutionCreationTest` 24/24, others unchanged | None needed | N/A |
+| 3.5 | Compile errors: `create` of 7 params doesn't apply to 8-param calls; `cannot find symbol timezone()` | `InstitutionCreationTest` 27/27, others unchanged; signature now the final 8 params | None needed | N/A |
+| 3.6 | N/A — already implemented in PR B1 task 2.2 (deliberate deviation recorded there) | `InstitutionCreationTest` 27/27 (verification run) | None needed | Verified instead of redone, per this batch's launch instructions |
+| 3.7 | N/A — precedence already matched design.md's order from incremental 3.1–3.5 construction, so the new parameterized test passed immediately (30/30) | 30/30 | None needed | **Non-vacuity probe**: temporarily swapped the `rtn`/`timezone` check order in `Institution.create()`; re-running only the precedence test failed exactly the rtn+timezone case (1/3, received `institution-timezone-invalid` instead of `institution-rtn-invalid`); reverted, `git diff` on the production file empty, 43/43 tests green again |
+| 3.8 | `toStringShowsIdAndTradeNameButNeverRtnOrAddress` failed: expected `"Institution[id=..., tradeName=...]"`, got default `Object.toString()` (`com.confia...Institution@...`) | `InstitutionLifecycleTest` 9/9, `InstitutionCreationTest` 30/30 (no regression) | None needed | N/A |
+| 3.9 | N/A — five new codes already reachable from production since 3.1–3.5 (mirrors PR B1 task 2.6's own no-red pattern) | `OrganizationErrorCodesTest` 5/5, 44/44 total | None needed | N/A |
+| 3.10 | N/A (measurement + verification, not behavior) | Full `./mvnw -B verify -Pmutation-gate` BUILD SUCCESS | N/A | N/A |
+
+### Work Unit Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command and result | `./mvnw -B -pl app -am test -Dtest=InstitutionCreationTest,InstitutionLifecycleTest,OrganizationErrorCodesTest -Dsurefire.failIfNoSpecifiedTests=false` → 44/44 pass (30 + 9 + 5) |
+| Runtime harness command/scenario and result | `./mvnw -B verify -Pmutation-gate` in `apps/api` → BUILD SUCCESS; 176 kernel tests + 89 app tests = 265 total; JaCoCo `PACKAGE` on `com.confia.organization.domain` at 100% lines/branches (75/75, 20/20); JaCoCo `BUNDLE` on `app` at 96.5% lines / 93.9% branches; PIT on `organization.domain` 49/49 mutations killed (100%, zero survivors); kernel's pre-existing 2 survivors (`ConditionalsBoundaryMutator`, 99% score) untouched by this PR |
+| Rollback boundary | Revert commits `8e980bd`..the final docs commit of this batch (or the whole PR branch); `Institution.create()` returns to PR B1's three-parameter signature (`id`, `legalName`, `tradeName`), `rtn`/`address`/`defaultCurrency`/`locale`/`timezone` disappear, no consumer outside the module is affected (design.md, "Pronóstico de tamaño por corte") |
+
+### Real diff measurement (task 3.10)
+
+`git diff --numstat ac68c2b...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'` (base confirmed
+with `git merge-base`, tip of PR B1-gates) → 5 files, **509 authored lines** (466 additions + 43
+deletions): `Institution.java` 100+/16-, `InvalidInstitutionException.java` 46+/0-,
+`InstitutionCreationTest.java` 260+/17-, `InstitutionLifecycleTest.java` 36+/3-,
+`OrganizationErrorCodesTest.java` 24+/7-. Above design.md's 230–345 forecast for B2 (same
+under-estimation pattern as B1) but far under the 800-line budget — continued without consulting
+the owner, per this task's own instructions.
+
+### Outstanding for this apply batch
+
+Push `change/institution-root-and-multitenancy-baseline-domain-attributes` and confirm the
+`backend` CI job is green — explicitly deferred to the orchestrator per this phase's launch
+instructions (sdd-apply does not push or open PRs). PR C (tasks 4.1–4.4) is out of this batch's
+scope (PR B2 only, stop after 3.10, per this apply batch's explicit instruction) and remains
+`[ ]` in `tasks.md`.

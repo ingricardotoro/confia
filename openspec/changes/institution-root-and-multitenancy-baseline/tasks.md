@@ -712,7 +712,7 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
     (`OrganizationErrorCodesTest` 5/5, catálogo exacto de once códigos, sin repetidos, formato
     kebab-case, prefijo `institution-`, herencia de `DomainException` para los cinco nuevos).
 
-- [ ] 3.10 **Medir el diff real de PR B2 y verificación final.** Medir con
+- [x] 3.10 **Medir el diff real de PR B2 y verificación final.** Medir con
   `git diff --numstat <base-de-PR-B1>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'`. Si cabe
   en 800 líneas, continuar; **si supera 800, detener la aplicación y consultar al propietario** entre
   una subdivisión adicional o una excepción de tamaño. Si cabe: en checkout limpio, con `JAVA_HOME`
@@ -721,6 +721,35 @@ módulo (`design.md`, «Pronóstico de tamaño por corte»).
   `...-domain-attributes` (apuntando a PR B1) y confirmar en la integración continua que el trabajo
   `backend` termina en verde. — P1 de la propuesta; capacidad `build-integrity`, ambos requisitos;
   criterios de éxito de la propuesta relativos a `Institution` inválida y al catálogo de códigos
+  - **Evidencia (2026-09-19):** base real confirmada con `git merge-base
+    change/institution-root-and-multitenancy-baseline-domain-attributes
+    change/institution-root-and-multitenancy-baseline-domain-gates` → `ac68c2b` (extremo de PR
+    B1-gates). `git diff --numstat ac68c2b...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'` →
+    5 archivos: `Institution.java` 100+/16-; `InvalidInstitutionException.java` 46+/0-;
+    `InstitutionCreationTest.java` 260+/17-; `InstitutionLifecycleTest.java` 36+/3-;
+    `OrganizationErrorCodesTest.java` 24+/7-. **Total: 466 adiciones + 43 eliminaciones = 509 líneas
+    de autor**, por encima del pronóstico de `design.md` para B2 (230–345, mismo patrón de
+    subestimación que en B1) pero muy por debajo de 800; se continúa sin consultar al propietario.
+    Árbol de trabajo limpio (`git status` sin cambios) antes de verificar.
+
+    **Verificación final:** `./mvnw -B verify -Pmutation-gate` en `apps/api`, con `JAVA_HOME` en
+    `C:/Program Files/Eclipse Adoptium/jdk-25.0.3.9-hotspot` y `MAVEN_OPTS` con el almacén de
+    confianza `Windows-ROOT`: **BUILD SUCCESS**. 176 pruebas en `kernel` + 89 en `app` (incluidas
+    30 de `InstitutionCreationTest`, 9 de `InstitutionLifecycleTest`, 5 de
+    `OrganizationErrorCodesTest`) = 265 en total, todas en verde. JaCoCo (`jacoco.xml` de `app`):
+    `com.confia.organization.domain` en líneas 75/75 = **100 %** y ramas 20/20 = **100 %** (regla
+    `PACKAGE` de 95 % cumplida con margen); `BUNDLE` global de `app` en líneas 110/114 = 96.5 % y
+    ramas 31/33 = 93.9 % (regla `BUNDLE` de 80 % cumplida). Ninguna regla de JaCoCo rompió la
+    construcción (sin mensajes `Rule violated`). PIT sobre `com.confia.organization.domain`: 49
+    mutaciones generadas, **49 muertas (100 %)**, cobertura de prueba 100 %, **cero
+    supervivientes** — cumple con margen el mínimo de 80 del perfil `mutation-gate`. El único
+    superviviente del build (`ConditionalsBoundaryMutator`, 22/24 muertas, 2 supervivientes, 99 %
+    de puntuación total) pertenece al módulo `kernel`, preexistente y ajeno a este cambio (mismo
+    99 % ya documentado en la evidencia de la tarea 2.10 de PR B1). **Pendiente fuera de mi
+    alcance en esta ejecución:** empujar la rama `...-domain-attributes` y confirmar el trabajo
+    `backend` en la integración continua — el lanzamiento de esta fase instruye explícitamente no
+    empujar ni abrir PR (lo hace el orquestador); queda como siguiente paso del orquestador antes
+    de dar PR B2 por cerrado en CI.
 
 ---
 
