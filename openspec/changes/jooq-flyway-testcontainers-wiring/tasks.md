@@ -165,7 +165,7 @@ prueba más pequeña posible (propuesta, «Enfoque», paso 1).
   propiedad. — Especificación `build-integrity`, requisito «Fuente única de la versión de PostgreSQL
   en la construcción» (ambos escenarios)
 
-- [ ] 1.7 **Complemento de generación de jOOQ y demostración deliberada de ruptura de compilación.**
+- [x] 1.7 **Complemento de generación de jOOQ y demostración deliberada de ruptura de compilación.**
   Cablear en `apps/api/app/pom.xml`, fase `generate-sources`, el mecanismo elegido en la tarea 1.1
   (ruta A o B de `design.md`, decisión 1): contenedor `postgres:18-alpine`, dos ubicaciones de
   Flyway (la real y `src/test/resources/db/codegen`), generador `org.jooq.meta.postgres.PostgresDatabase`

@@ -223,7 +223,45 @@ que no puede otorgar permisos sobre una tabla que todavía no existe cuando se e
       la propiedad filtrada en vez del literal de la tarea 1.5. `./mvnw -B -pl apps/api/app -am
       test -Dtest=PostgresImageSingleSourceTest,DatabasePipelineIT`: `Tests run: 4, Failures: 0,
       Errors: 0, Skipped: 0`.
-- [ ] 1.7
+- [x] 1.7 — Complemento de generación cableado en `apps/api/app/pom.xml` (fase `generate-sources`,
+      ruta A con la sobrescritura de dependencias de la tarea 1.1); `beforeMigrate__create_codegen_roles.sql`
+      creado. **Tres hallazgos reales durante esta tarea, documentados abajo.** Demostración
+      deliberada ejecutada con una migración y una consulta temporales (nunca comprometidas):
+      VERDE con `BUILD SUCCESS` y la clase `CodegenDemoTemp` generada; ROJO tras renombrar la
+      columna que la consulta referencia, con el mensaje exacto `cannot find symbol: variable
+      NAME, location: variable CODEGEN_DEMO_TEMP of type confia.generated.jooq.tables.CodegenDemoTemp`.
+      Migración y consulta temporales revertidas; `git status` limpio confirmado. Exclusión de
+      JaCoCo (`jacoco-report` y `jacoco-check`) con cita ADR-0021 a dos líneas de cada `<exclude>`;
+      verificado leyendo `jacoco.csv` con la tabla temporal presente: las cuatro clases generadas
+      compilan en `target/classes/confia/generated/jooq/**` pero no aparecen en el informe ni
+      afectan el umbral. `./mvnw -B -pl apps/api/app -am verify` en checkout limpio (`app/target`
+      borrado): `BUILD SUCCESS`, 101 pruebas unitarias + 2 `*IT.java`, cobertura en verde.
+
+  **Hallazgo 1 — las dos ubicaciones de Flyway deben ser `filesystem:`, no `classpath:`.**
+  `generate-sources` corre antes que `process-resources` copie `src/main/resources` a
+  `target/classes`, así que una ubicación `classpath:db/migration` escanea un directorio vacío o
+  desactualizado; Flyway lo reporta como "No migrations found" sin fallar. Corregido a
+  `filesystem:${project.basedir}/src/main/resources/db/migration,filesystem:${project.basedir}/src/test/resources/db/codegen`.
+
+  **Hallazgo 2 — las rutas `filesystem:` deben ser absolutas (`${project.basedir}`), no
+  relativas.** Un path relativo se resuelve contra el directorio de trabajo de la propia JVM de
+  Maven, que permanece fijo en el directorio desde el que se invocó `mvn` en TODO el reactor (no
+  cambia por módulo); al construir con `-pl app` desde `apps/api`, una ruta relativa como
+  `src/main/resources/db/migration` se resolvía como `apps/api/src/...` en vez de
+  `apps/api/app/src/...`, y Flyway registraba `Skipping filesystem location ... (not found)`.
+
+  **Hallazgo 3 — `apps/api/pom.xml` tenía `<append>false</append>` en `jacoco-prepare-agent`, roto
+  para cualquier módulo con Surefire y Failsafe en la misma construcción.** Surefire y Failsafe
+  corren en JVM bifurcadas separadas dentro del mismo `mvn verify`, cada una con el mismo agente;
+  con `append=false`, la que termina último trunca `jacoco.exec` a solo sus propios datos. Como
+  `app` no tenía ninguna clase `*IT.java` real antes de `DatabasePipelineIT` (tarea 1.4/1.5), este
+  defecto nunca se había disparado en todo el repositorio. Confirmado en vivo: con `append=false`,
+  `./mvnw -pl apps/api/app -am verify` reportaba `lines covered ratio is 0.00` para **cada** clase
+  de `app`, incluidas las que sí tienen pruebas unitarias reales (`Institution`, etc.), porque
+  Failsafe pisaba los datos de Surefire. Corregido a `append=true` (el valor por defecto de JaCoCo)
+  en `apps/api/pom.xml`, con el riesgo original que motivó `append=false` (datos obsoletos de una
+  construcción anterior más angosta) acotado a que la integración continua siempre parte de un
+  `actions/checkout` limpio (`.github/workflows/ci.yml`), nunca reutiliza un `target/` viejo.
 - [ ] 1.8
 - [ ] 1.9
 - [ ] 1.10

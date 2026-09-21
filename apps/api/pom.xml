@@ -187,9 +187,21 @@
                 <goal>prepare-agent</goal>
               </goals>
               <configuration>
-                <!-- Start from an empty jacoco.exec on every run: appending let leftover data from an
-                     earlier full run satisfy the gate for a narrower run (verify report W3). -->
-                <append>false</append>
+                <!-- append=true (JaCoCo's own default, restored here after task 1.7 found the
+                     original append=false broken): Surefire and Failsafe run in SEPARATE forked
+                     JVMs within the same "mvn verify", each carrying this same agent argLine. With
+                     append=false, whichever JVM's agent flushes LAST truncates jacoco.exec down to
+                     only its own data, silently discarding the other phase's coverage — confirmed
+                     with a real run once app/pom.xml gained its first *IT.java class
+                     (DatabasePipelineIT, task 1.4/1.5): every class' coverage read back as 0%
+                     despite passing unit tests. append=true lets both forks accumulate into one
+                     file, which is what the "coverage" row of docs/06 line 611 actually measures
+                     ("con los datos de las pruebas unitarias y de integración"). The narrower risk
+                     append=false was meant to prevent — stale data from an earlier, narrower `mvn
+                     test -Dtest=X` invocation polluting a later, broader `mvn verify` without an
+                     intervening `clean` — is real only when target/ is not cleaned first; CI always
+                     starts from a fresh actions/checkout (.github/workflows/ci.yml), so this file
+                     never predates the current build there. -->
               </configuration>
             </execution>
             <execution>
