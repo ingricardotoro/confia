@@ -167,9 +167,53 @@ no se eleva ningún ADR que reemplace ADR-0015 regla 2.
       apps/api/app -am validate`: `BUILD SUCCESS`, `dependencyConvergence` pasa a la primera —
       confirma que el BOM de Spring Boot 4.1.1 ya gestiona los nombres 2.x de Testcontainers, sin
       necesitar ninguna fijación en `dependencyManagement`.
-- [ ] 1.3
-- [ ] 1.4
-- [ ] 1.5
+
+## Hallazgo adicional durante la tarea 1.5 (no cubierto por la sonda S1)
+
+**Spring Boot 4.1 partió su antiguo jar monolítico `spring-boot-autoconfigure` en un módulo por
+funcionalidad.** Confirmado leyendo `spring-boot-autoconfigure-4.1.1.jar` completo: solo 258 clases
+en total, sin ningún paquete `jdbc`, `sql`, `flyway` ni `jooq`. La autoconfiguración de Flyway vive
+ahora en el artefacto separado `org.springframework.boot:spring-boot-flyway` (gestionado por el BOM,
+sin versión propia), que **no** llega transitivamente ni con `flyway-core` ni con
+`spring-boot-starter-jdbc`. Sin declararlo explícitamente, `FlywayAutoConfiguration` nunca se activa
+y `DatabasePipelineIT` falla con `relation "flyway_schema_history" does not exist` porque Flyway
+nunca corrió. **Añadido a `apps/api/app/pom.xml`** (tarea 1.5, ver evidencia abajo). jOOQ no tiene
+ningún módulo equivalente: sigue sin autoconfiguración alguna (hallazgo de la tarea 1.1, S1.6).
+
+**Consecuencia adicional para `DatabasePipelineIT` (ajuste de mi propia implementación de la tarea
+1.4, no del diseño):** con Flyway corriendo mas sin ninguna migración de negocio todavía (`V1` es
+tarea 2.2, en PR A2), Flyway crea `flyway_schema_history` pero con **cero filas** («Schema "public"
+is up to date. No migration necessary.», log real). La redacción literal de la tarea 1.4 («con al
+menos una fila») no es alcanzable dentro del alcance real de A1. Se implementó, en su lugar, una
+comprobación de **existencia de la tabla por catálogo** (`to_regclass('public.flyway_schema_history')`,
+que no exige ningún `GRANT` porque es una consulta de catálogo, no un acceso a la tabla), que sigue
+demostrando honestamente que Flyway corrió como `confia_owner`. La fila real llegará con la
+migración de A2, y el `GRANT SELECT` de `confia_admin_app` sobre `flyway_schema_history` también es
+parte de esa misma migración (`design.md`, decisión 6) — nunca del script de roles solo de prueba,
+que no puede otorgar permisos sobre una tabla que todavía no existe cuando se ejecuta.
+
+## Estado de tareas
+
+- [x] 1.1 — Sonda S1 completa, evidencia registrada arriba.
+- [x] 1.2 — `confia.postgres.image` y la versión del complemento de generación en
+      `apps/api/pom.xml`. `./mvnw -B -N validate`: `BUILD SUCCESS`.
+- [x] 1.3 — jOOQ, Flyway, el controlador PostgreSQL y Testcontainers 2.x añadidos a
+      `apps/api/app/pom.xml`. `./mvnw -B -pl apps/api/app -am validate`: `BUILD SUCCESS`,
+      `dependencyConvergence` pasa a la primera.
+- [x] 1.4/1.5 — **ROJO** (task 1.4): `DatabasePipelineIT.java` creado extendiendo
+      `com.confia.support.PostgresIntegrationTest`, que no existe todavía. `./mvnw -B -pl
+      apps/api/app -am test-compile`: `COMPILATION ERROR`, `cannot find symbol: class
+      PostgresIntegrationTest` en `DatabasePipelineIT.java:25`. **VERDE** (task 1.5): creados
+      `db/testing/create-test-roles.sql`, `PostgresIntegrationTest.java`,
+      `IntegrationTestApplication.java`, `application.yml`, `application-migrate.yml`; corregido el
+      comentario de `ConfiaApplication.MIGRATE`. Añadidas dos dependencias descubiertas como
+      necesarias durante esta tarea: `spring-boot-starter-jdbc` (sin la cual no hay
+      `DataSourceAutoConfiguration` ni `TransactionAwareDataSourceProxy`) y `spring-boot-flyway`
+      (ver hallazgo arriba). `./mvnw -B -pl apps/api/app -am test -Dtest=DatabasePipelineIT`:
+      `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0`. Contenedor `postgres:18-alpine` arrancado
+      con `withUsername("postgres")` (decisión 4), `withTmpFs` sobre `/var/lib/postgresql`
+      (corrección S1.5), rol de aplicación `confia_admin_app` verificado por `current_user`, cinco
+      roles verificados `rolsuper=false`/`rolbypassrls=false` contra `pg_roles`.
 - [ ] 1.6
 - [ ] 1.7
 - [ ] 1.8

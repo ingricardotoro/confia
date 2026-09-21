@@ -37,6 +37,14 @@
     <!-- Data access (ADR-0015): jOOQ open source, Flyway and the PostgreSQL JDBC driver. No
          version on any of the three: managed by the Spring Boot 4.1.1 BOM (jOOQ 3.21.7, Flyway
          12.4.0, org.postgresql:postgresql 42.7.13 — design.md section 2, evidence table). -->
+    <!-- DataSourceAutoConfiguration, FlywayAutoConfiguration and TransactionAwareDataSourceProxy
+         (task 1.5's explicit DSLContext bean, apply-progress.md S1.6) all live in spring-jdbc,
+         which nothing else in this module pulls in transitively: spring-boot-starter-web depends
+         on spring-web/spring-webmvc, not spring-jdbc. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.jooq</groupId>
       <artifactId>jooq</artifactId>
@@ -48,6 +56,16 @@
     <dependency>
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <!-- Spring Boot 4.x split its once-monolithic spring-boot-autoconfigure jar into one module
+         per feature (verified by inspecting spring-boot-autoconfigure-4.1.1.jar: 258 classes
+         total, none under org/springframework/boot/autoconfigure/{jdbc,flyway,jooq}). Flyway's
+         FlywayAutoConfiguration now lives in this separate artifact and is not pulled in
+         transitively by flyway-core or by spring-boot-starter-jdbc; jOOQ has no equivalent
+         module at all (apply-progress.md task 1.1/1.5, S1.6 and its follow-up). -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-flyway</artifactId>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>

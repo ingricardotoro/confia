@@ -123,7 +123,7 @@ prueba más pequeña posible (propuesta, «Enfoque», paso 1).
   silenciosa (`design.md` §7, «Riesgo de convergencia de dependencias»). — Áreas afectadas de la
   propuesta, fila `apps/api/app/pom.xml`
 
-- [ ] 1.4 **ROJO — humo de la tubería.** Crear
+- [x] 1.4 **ROJO — humo de la tubería.** Crear
   `apps/api/app/src/test/java/com/confia/support/DatabasePipelineIT.java`: afirma que el contenedor
   arranca, que Flyway dejó su historial (`flyway_schema_history` con al menos una fila), que la
   fuente de datos de la aplicación conecta como `confia_admin_app`, y que los cinco roles de
@@ -133,7 +133,7 @@ prueba más pequeña posible (propuesta, «Enfoque», paso 1).
   integración»); criterios de éxito «La aplicación se conecta con `confia_admin_app` y ningún rol es
   `SUPERUSER` ni tiene `BYPASSRLS`»
 
-- [ ] 1.5 **VERDE — tubería mínima.** Crear
+- [x] 1.5 **VERDE — tubería mínima.** Crear
   `apps/api/app/src/test/resources/db/testing/create-test-roles.sql` (los cinco roles con `LOGIN` y
   contraseña de prueba literal `test-only-not-a-secret`, `NOSUPERUSER NOBYPASSRLS NOCREATEDB
   NOCREATEROLE`, propiedad de la base y del esquema `public` transferida a `confia_owner`, montado
