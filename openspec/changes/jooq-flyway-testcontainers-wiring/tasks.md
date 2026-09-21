@@ -104,7 +104,7 @@ prueba más pequeña posible (propuesta, «Enfoque», paso 1).
   cambiar el diseño del adaptador. — `design.md` §10 (sonda S1, primer paso de la aplicación,
   bloqueante)
 
-- [ ] 1.2 **Cablear el POM padre.** En `apps/api/pom.xml`: declarar
+- [x] 1.2 **Cablear el POM padre.** En `apps/api/pom.xml`: declarar
   `<confia.postgres.image>postgres:18-alpine</confia.postgres.image>` como fuente única de la imagen
   (decisión 3); declarar la versión del complemento de generación de código elegido en 1.1 (el
   `pluginManagement` del BOM de Spring Boot no se hereda porque `apps/api/pom.xml` importa el BOM

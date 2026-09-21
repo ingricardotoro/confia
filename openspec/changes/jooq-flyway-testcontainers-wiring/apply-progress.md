@@ -155,7 +155,12 @@ no se eleva ningún ADR que reemplace ADR-0015 regla 2.
 ## Estado de tareas
 
 - [x] 1.1 — Sonda S1 completa, evidencia registrada arriba.
-- [ ] 1.2
+- [x] 1.2 — `confia.postgres.image` y la versión del complemento de generación declarados en
+      `apps/api/pom.xml` (propiedades + `pluginManagement`). `./mvnw -B -N validate`: `BUILD
+      SUCCESS`, las tres reglas del enforcer pasan. No se fijaron coordenadas 2.x de Testcontainers
+      en `dependencyManagement`: se confirmará en la tarea 1.3 si el BOM de Spring Boot 4.1.1 ya las
+      gestiona (evidencia de `design.md` sección 2 indica que sí, bajo los nombres nuevos
+      `testcontainers-postgresql`/`testcontainers-junit-jupiter`).
 - [ ] 1.3
 - [ ] 1.4
 - [ ] 1.5

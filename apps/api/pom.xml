@@ -44,6 +44,26 @@
     <maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
     <maven-failsafe-plugin.version>3.6.0</maven-failsafe-plugin.version>
 
+    <!--
+      Single source of truth for the PostgreSQL major version used across the build (ADR-0015 rule
+      1; design.md decision 3): both the jOOQ code-generation plugin (app/pom.xml, generate-sources)
+      and PostgresIntegrationTest read this same property, never a second literal.
+    -->
+    <confia.postgres.image>postgres:18-alpine</confia.postgres.image>
+
+    <!--
+      jOOQ code generation over a Testcontainers-managed PostgreSQL (ADR-0015 rule 2; design.md
+      decision 1, route A; S1 probe, apply-progress.md task 1.1). Version declared here because the
+      Spring Boot 4.1.1 BOM's own pluginManagement is never inherited: apps/api/pom.xml imports the
+      BOM as a <dependency> (scope import), not as a Maven <parent>, so pluginManagement entries in
+      an imported BOM never apply (design.md section 2). The plugin itself still pins its own
+      Testcontainers 1.19.1 and jOOQ 3.18.3 dependencies regardless of this version; app/pom.xml's
+      execution (task 1.7) overrides those inside <plugin><dependencies> to match the versions this
+      reactor actually uses everywhere else (S1 probe: 1.19.1 cannot reach Docker Desktop on this
+      machine, and 3.18.3 cannot introspect a PostgreSQL 18 catalog).
+    -->
+    <testcontainers-jooq-codegen-maven-plugin.version>0.0.4</testcontainers-jooq-codegen-maven-plugin.version>
+
     <!-- Java 25 support confirmed against release notes: jacoco.org/jacoco/trunk/doc/changes.html,
          "Release 0.8.14 (2025/10/11)", "JaCoCo now officially supports Java 25". -->
     <jacoco-maven-plugin.version>0.8.14</jacoco-maven-plugin.version>
@@ -139,6 +159,16 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
           <version>${maven-enforcer-plugin.version}</version>
+        </plugin>
+        <!--
+          jOOQ code generation plugin (ADR-0015 rule 2; design.md decision 1). Version only: each
+          module that generates code (today, only app) declares its own <configuration> and its own
+          <dependencies> override for the plugin's pinned Testcontainers/jOOQ versions (task 1.7).
+        -->
+        <plugin>
+          <groupId>org.testcontainers</groupId>
+          <artifactId>testcontainers-jooq-codegen-maven-plugin</artifactId>
+          <version>${testcontainers-jooq-codegen-maven-plugin.version}</version>
         </plugin>
         <!--
           Coverage gate (docs/06 §14.1). Version and generic executions managed here; each module
