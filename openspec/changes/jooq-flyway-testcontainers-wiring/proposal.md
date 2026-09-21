@@ -6,7 +6,7 @@
 - **Exploración:** `openspec/changes/jooq-flyway-testcontainers-wiring/exploration.md`
 - **Rama:** `change/jooq-flyway-testcontainers-wiring` (desde `main` 6963807)
 - **Estado:** aprobada por el propietario el 2026-09-20 (D5, `openspec/config.yaml`,
-  `rules.proposal`). D1, D3, D4 y D5 resueltas; D2 pendiente antes de aplicar.
+  `rules.proposal`). D1 a D5 resueltas.
   Cuatro decisiones ya resueltas el 2026-09-20; ver «Resolución del propietario». Quedan D1 a D4
 
 ## Intención
@@ -388,6 +388,14 @@ es un `git revert`.
 Decisiones ya tomadas. Se registran aquí y no se vuelven a preguntar.
 
 - **D5 (aprobación): aprobada**, con los tres valores por defecto que la acompañaban.
+- **D2 (forma de entrega): pull requests encadenados.** Los cortes A1 (contenedor y generación de
+  código), A2 (migración, adaptador y retirada de la excepción de ADR-0020 para `infrastructure`) y
+  A3 (reglas de ArchUnit y verificaciones de esquema) se entregan como pull requests encadenados
+  según `docs/15-flujo-de-trabajo-git.md` §3: cada uno apunta al anterior y se fusionan en orden
+  (`delivery_strategy: auto-chain`, `chain_strategy: stacked-to-main`). Al cerrar cada uno se mide
+  el diff real; si supera 800 líneas, la aplicación se detiene y decide el propietario. El motivo de
+  no usar una excepción de tamaño es que este cambio introduce mecanismos sin precedente en el
+  repositorio (migraciones, roles, generación de código), justo donde una revisión grande falla.
 - **D1 (`scheduled_tasks`): del cambio 9.** `docs/09-roadmap-y-fases.md` línea 126 la incluye en el
   entregable 12 y ADR-0016 no nombra ningún cambio, así que la tabla se crea con su ejecutor, no
   antes ni sin consumidor.
