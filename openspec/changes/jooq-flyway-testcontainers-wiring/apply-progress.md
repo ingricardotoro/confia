@@ -1,3 +1,155 @@
+# Apply progress: jooq-flyway-testcontainers-wiring — PR A1 and PR A2
+
+## PR A2 — corte A2: primera migración y adaptador (tasks 2.1–2.7)
+
+Scope: PR A2 only (tasks 2.1–2.7 of `tasks.md`). Branch
+`change/jooq-flyway-testcontainers-wiring-migration`, base PR A1
+(`change/jooq-flyway-testcontainers-wiring` @ `f98cbb5`).
+
+### Resolved discrepancy: `TransactionalPostgresIntegrationTest` (flagged at the end of PR A1)
+
+PR A1's own discrepancy note said the first real consumer would decide whether this variant is
+needed. It is: created in this PR (`apps/api/app/src/test/java/com/confia/support/TransactionalPostgresIntegrationTest.java`),
+a thin `@Transactional` subclass of `PostgresIntegrationTest`, matching design.md decision 7's
+description ("Añade `@Transactional`: la transacción de la prueba revierte al terminar"; used for
+"Ida y vuelta del adaptador, aislamiento, catálogo"). Verified empirically, not assumed: `mvn
+verify` confirms Spring Boot 4.1's separate `spring-boot-jdbc` artifact (pulled in transitively by
+`spring-boot-starter-jdbc`, already a dependency since PR A1) ships
+`DataSourceTransactionManagerAutoConfiguration` in its `AutoConfiguration.imports`, so a
+`PlatformTransactionManager` bean is available with no extra wiring the moment a `DataSource` bean
+exists — confirmed by `JooqInstitutionRepositoryIT` actually rolling back seeded rows between its
+eight test methods (no test observes another test's seeded row on the one container shared per
+JVM). `CommittingPostgresIntegrationTest` was **not** created: nothing in PR A2 needs a real
+commit or selective truncation (design.md assigns that variant to future trigger/concurrency/part-B
+work, not to this cut).
+
+### Task 2.1/2.2 sequencing note (literal task text vs. Java's whole-file compilation)
+
+Task 2.2's literal text says to run `JooqInstitutionRepositoryIT` "salvo los casos que dependen del
+adaptador... verde" immediately after creating only the migration, before `JooqInstitutionRepository`
+exists. That is not literally achievable: `JooqInstitutionRepositoryIT.java` (task 2.1) references
+`JooqInstitutionRepository` in every test method (even the schema-only duplicate-key rejection
+uses the same seeding helper, which calls the shared `withInstitutionContext`, but the class
+constructs `repository()` at the top and the file as a whole fails to compile — a single Java
+source file either compiles completely or not at all, so no subset of its methods can run — while
+that symbol is missing. The same constraint applied, unstated, to PR A1: task 1.4 (RED) and 1.5
+(GREEN) were never committed as two separate git commits (commit `89a2445` covers both) precisely
+because an intermediate non-compiling state was never pushed to history, only captured as RED
+evidence from a local, uncommitted compiler run.
+
+This PR follows the same precedent, extended one step further because the compile dependency spans
+three tasks instead of two: `JooqInstitutionRepositoryIT.java` was written in the working tree
+(task 2.1), `mvn test-compile` was run and failed with `cannot find symbol:
+JooqInstitutionRepository` — the literal RED evidence task 2.1 asks for — and then the migration
+(2.2), the adapter and package-info (2.3), and the ADR-0020 layering retirement (2.4) were all
+completed in the same working-tree pass before the **first** commit of this PR, so that commit
+never represents a broken intermediate state. Task 2.2's schema-level claim (the migration alone
+enforces the primary-key duplicate rejection, RLS, and the grants) was verified independently and
+for real, without waiting for the adapter: `./mvnw -B -pl app -am generate-sources` ran the new
+migration against a real, ephemeral `postgres:18-alpine` through the jOOQ code-generation plugin
+(the same container mechanism PR A1 already proved out) and returned `BUILD SUCCESS`, generating
+`OrganizationInstitution.java` with `pk=organization_institution_pkey` — direct, real-database
+confirmation that the table, its primary key, and the migration are syntactically and semantically
+valid before a single line of the adapter existed. The full `JooqInstitutionRepositoryIT` (all
+eight test methods, including the duplicate-key rejection against `organization_institution_pkey`)
+first became executable once task 2.3 landed, and passed 8/8 on the first run against the schema
+task 2.2 had already written — no schema fix was needed after the adapter was added, which is the
+real-world confirmation that task 2.2's DDL was already correct on its own. Tasks 2.1 through 2.5
+are committed together in one commit (`feat(api): create organization_institution with RLS and its
+jOOQ adapter`), for the same compilation-boundary reason PR A1 combined 1.4/1.5.
+
+### TDD Cycle Evidence
+
+| Task | RED | GREEN | REFACTOR |
+|---|---|---|---|
+| 2.1 | `mvn -pl app -am test-compile`: `COMPILATION ERROR`, `cannot find symbol: class JooqInstitutionRepository` in `JooqInstitutionRepositoryIT.java` (table `organization_institution` also did not exist at this point) | — (green only once 2.2+2.3 land, see below) | — |
+| 2.2 | Migration absent: `generate-sources` against the prior schema had no `organization_institution` table at all | `mvn -pl app -am generate-sources`: `BUILD SUCCESS`, real ephemeral `postgres:18-alpine` applied `V1__create_organization_institution.sql` and jOOQ generated `OrganizationInstitution.java` with `pk=organization_institution_pkey` — schema-level proof independent of the adapter (see note above) | n/a |
+| 2.3 | Same compile error as 2.1 persists until this task lands | `mvn -pl app -am test -Dtest=JooqInstitutionRepositoryIT -Dsurefire.failIfNoSpecifiedTests=false`: `Tests run: 4, Failures: 0, Errors: 0, Skipped: 0` (the four base scenarios: round trip, null trade name, unknown id, duplicate-key rejection) | n/a |
+| 2.4 | `LayeredArchitectureTest`/`EmptyShouldExceptionInventoryTest` already passed before this change because `Infrastructure` was still `optionalLayer(...)`; the retirement itself has no red state (removing an exception can never fail a rule that was already passing) — verified by running `./mvnw -B verify` immediately after the edit | `./mvnw -B verify`: full suite green, including `LayeredArchitectureTest` (2/2), `EmptyShouldExceptionInventoryTest` (1/1) and `SuppressionCitesAdrTest` (10/10, confirming its dynamic `optionalLayer(` count invariant cleared to exactly one without touching that file) | n/a |
+| 2.5 | New isolation test methods did not exist before this edit | `mvn -pl app -am test -Dtest=JooqInstitutionRepositoryIT -Dsurefire.failIfNoSpecifiedTests=false`: `Tests run: 8, Failures: 0, Errors: 0, Skipped: 0` (all eight methods, including the four isolation scenarios) on first run — the underlying `NULLIF(...)` policy was already correct from task 2.2, so no schema fix was needed between writing these tests and seeing them pass (see task 2.1/2.2 sequencing note above for why this does not represent literal red-before-green for these four methods specifically) | n/a |
+
+### Real RLS evidence (specs/organization/spec.md, "Aislamiento por fila de la tabla raíz según ADR-0009")
+
+All four scenarios observed against the real schema, in `JooqInstitutionRepositoryIT`, using a
+non-superuser `confia_admin_app` connection (never the container's own `postgres` bootstrap
+superuser, which would silently bypass `FORCE ROW LEVEL SECURITY` — design.md decision 4):
+
+- `aSessionCannotReadAnotherInstitutionsRow`: session context set to institution A, queries
+  institution B's real id — `Optional.empty()`, no exception, even though B's row physically
+  exists in the table.
+- `aSessionCanReadItsOwnRowEvenWhileAnotherInstitutionExists`: session context set to institution
+  A, queries A's own id while B's row also exists — returns exactly A's row.
+- `aSessionWithNoContextAtAllIsDeniedRatherThanErroring`: `reset app.institution_id` (clearing any
+  transaction-local override set earlier by seeding, since `set_config(..., true)` is
+  transaction-local, not statement-local — a genuine gap in the naive approach, documented in the
+  new `resetInstitutionContext` helper's Javadoc), then query — `Optional.empty()`, no cast error.
+- `aSessionWithAnEmptyContextIsDeniedRatherThanErroring`: `set_config('app.institution_id', '',
+  true)`, then query — `Optional.empty()`, no cast error. Confirms `NULLIF(current_setting(...),
+  '')` converts the empty-string case to `NULL` before the `::uuid` cast, exactly as design.md
+  decision 6 point 1 requires.
+
+`rejectsASecondRowWithTheSameIdentifier` additionally confirms the primary key itself (not RLS)
+rejects a duplicate: `org.jooq.exception.DataAccessException` with message containing
+`organization_institution_pkey`.
+
+### Task 2.6 — measured PR A2 diff
+
+`git diff --numstat change/jooq-flyway-testcontainers-wiring...HEAD -- . ':(exclude)openspec'
+':(exclude)docs/adr' ':(exclude)**/generated/**'` (base is PR A1's tip, `f98cbb5`):
+
+| File | + | − |
+|---|---|---|
+| `InstitutionRepository.java` (Javadoc update) | 3 | 1 |
+| `JooqInstitutionRepository.java` (new) | 69 | 0 |
+| `organization/infrastructure/package-info.java` (new) | 8 | 0 |
+| `V1__create_organization_institution.sql` (new) | 59 | 0 |
+| `EmptyShouldExceptionInventoryTest.java` | 8 | 12 |
+| `LayeredArchitectureTest.java` | 11 | 10 |
+| `JooqInstitutionRepositoryIT.java` (new) | 207 | 0 |
+| `TransactionalPostgresIntegrationTest.java` (new) | 36 | 0 |
+
+**Total: 401 additions + 23 deletions = 424 authored lines.** Well inside both the 800-line
+per-pull-request budget (`docs/15-flujo-de-trabajo-git.md` §3) and design.md §12's own forecast for
+A2 (405–695). No subdivision triggered; the design's own forecast said "A2 cabe siempre" and this
+confirms it.
+
+### Task 2.7 — final verification of PR A2
+
+With `app/target` and `kernel/target` deleted, `JAVA_HOME` on JDK 25, `MAVEN_OPTS` with
+`Windows-ROOT`, and Docker active: `./mvnw -B verify` in `apps/api`.
+
+- **`BUILD SUCCESS`**, total time **1 minute 41 seconds** (well under the 8-minute `*IT.java`
+  budget).
+- Kernel: 177 unit tests, 0 failures.
+- App unit tests (Surefire): 101 tests, 0 failures — includes `LayeredArchitectureTest` (2/2),
+  `EmptyShouldExceptionInventoryTest` (1/1), `SuppressionCitesAdrTest` (10/10, all passing with
+  `Infrastructure` now mandatory and its dynamic `optionalLayer(` count at exactly one).
+- App integration tests (Failsafe): 10 tests, 0 failures — `JooqInstitutionRepositoryIT` (8/8, in
+  21.7s) and `DatabasePipelineIT` (2/2, still green, confirming PR A1's smoke test is unaffected).
+- `git status --short`: clean after the commit. `git ls-files | grep confia/generated`: no
+  matches — no generated jOOQ code tracked.
+- JaCoCo: `Analyzed bundle 'CONFIA API' with 14 classes` (same count as PR A1; `jacoco.csv`
+  confirms `com.confia.organization.infrastructure,JooqInstitutionRepository` is now one of the
+  fourteen rows, itself exercised by the eight `*IT.java` tests), `confia/generated/**` still
+  absent from the report, all BUNDLE and PACKAGE (`domain`, 95%) coverage rules met.
+- **Not pushed**: per this session's explicit instruction, pushing `...-migration` and confirming
+  CI stays for the propietario, as in PR A1.
+
+### Estado de tareas (PR A2)
+
+- [x] 2.1 — RED evidence recorded above (compile error).
+- [x] 2.2 — migration created; schema-level GREEN evidence recorded above (real Testcontainers
+      run, independent of the adapter — see sequencing note).
+- [x] 2.3 — adapter, package-info and `InstitutionRepository` Javadoc created/updated; four base
+      scenarios GREEN (4/4).
+- [x] 2.4 — ADR-0020 retirement done in the same commit as the adapter; `SuppressionCitesAdrTest`
+      confirms no manual count edit was needed.
+- [x] 2.5 — isolation scenarios added; full suite GREEN (8/8).
+- [x] 2.6 — diff measured: 424 authored lines, inside budget.
+- [x] 2.7 — final clean-tree `mvn verify`: green, evidence recorded above.
+
+---
+
 # Apply progress: jooq-flyway-testcontainers-wiring — PR A1
 
 Scope: PR A1 only (tasks 1.1–1.10 of `tasks.md`). Branch
