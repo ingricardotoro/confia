@@ -262,6 +262,13 @@ que no puede otorgar permisos sobre una tabla que todavía no existe cuando se e
   en `apps/api/pom.xml`, con el riesgo original que motivó `append=false` (datos obsoletos de una
   construcción anterior más angosta) acotado a que la integración continua siempre parte de un
   `actions/checkout` limpio (`.github/workflows/ci.yml`), nunca reutiliza un `target/` viejo.
-- [ ] 1.8
+- [x] 1.8 — `apps/api/README.md` creado (requisito de Docker en la construcción, no solo en las
+      pruebas). `openspec/config.yaml`: nota de Docker junto a `test_command` de `apply`.
+      `.github/workflows/ci.yml`: `timeout-minutes: 15` en el trabajo `backend` (cubre toda la
+      construcción, no solo la suite de `*IT.java`), comentario de la dependencia real de Docker y
+      mención del presupuesto de 8 minutos. **Tiempo medido, no estimado**: `./mvnw -B verify`
+      completo en `apps/api` desde `target/` borrado: **1 minuto 31 segundos** (`kernel` 16.1s,
+      `app` 1:14 min); `DatabasePipelineIT`, la única clase que arranca un contenedor en esta PR:
+      **18.2 segundos**. `SuppressionCitesAdrTest` confirmado en verde tras estos cambios.
 - [ ] 1.9
 - [ ] 1.10

@@ -189,7 +189,7 @@ prueba más pequeña posible (propuesta, «Enfoque», paso 1).
   de Flyway» (los tres escenarios) y «Código generado de jOOQ excluido de cobertura y de mutación»
   (ambos escenarios)
 
-- [ ] 1.8 **Medir el tiempo de la suite y documentar el requisito de Docker.** Ejecutar
+- [x] 1.8 **Medir el tiempo de la suite y documentar el requisito de Docker.** Ejecutar
   `./mvnw -B verify` completo en `apps/api` y medir el tiempo real de la fase `integration-test`
   (Failsafe). Crear `apps/api/README.md` con el requisito de Docker en la construcción (ADR-0015
   regla 2) y qué falla sin él (`generate-sources`, antes de compilar nada); añadir la nota junto a
