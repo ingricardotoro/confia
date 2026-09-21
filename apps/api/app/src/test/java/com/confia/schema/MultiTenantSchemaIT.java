@@ -1,6 +1,7 @@
 package com.confia.schema;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.kernel.InstitutionId;
 import com.confia.support.TransactionalPostgresIntegrationTest;
@@ -12,6 +13,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.jooq.Record;
+import org.jooq.exception.DataAccessException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -122,6 +124,34 @@ class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
                 .startsWith("organization_");
     }
 
+    @Test
+    void theRtnColumnCommentDeclaresATechnicalGuardNotAFiscalRule() {
+        String comment = columnCommentOf(ROOT_TABLE, "rtn");
+
+        assertThat(comment)
+                .as("organization_institution.rtn's column comment, read from the real schema "
+                        + "with col_description, must declare the length limit as a technical "
+                        + "guard, not a fiscal rule (specs/organization/spec.md)")
+                .containsIgnoringCase("technical guard")
+                .containsIgnoringCase("not a fiscal rule");
+    }
+
+    @Test
+    void theDatabaseRejectsAnRtnLongerThanTheTechnicalGuardEvenBypassingTheDomain() {
+        InstitutionId id = new InstitutionId(UUID.randomUUID());
+        String tooLongRtn = "1".repeat(21);
+
+        // The column's own VARCHAR(20) length limit rejects this before Postgres even evaluates
+        // the organization_institution_rtn_digits CHECK constraint (real, observed behavior: the
+        // varchar length guard fires first) — still the same technical guard the spec requires,
+        // enforced at the schema level regardless of which mechanism reports it.
+        assertThatThrownBy(() -> seedMinimalInstitution(id, tooLongRtn))
+                .as("a direct SQL insert bypassing domain validation must still be rejected by "
+                        + "the column's own length guard")
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("value too long for type character varying(20)");
+    }
+
     /**
      * Seeds one minimal institution row by direct SQL, with the session's {@code
      * app.institution_id} set to {@code id} itself (design.md decision 6, point 2: {@code WITH
@@ -186,6 +216,21 @@ class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
                 """, tableName);
         return new RowSecurityFlags(row.get("relrowsecurity", Boolean.class),
                 row.get("relforcerowsecurity", Boolean.class));
+    }
+
+    /**
+     * The column comment of {@code tableName.columnName}, read from the real schema with {@code
+     * col_description} (task 3.5b): proof that the RTN guard is declared on the schema itself,
+     * not only in the migration file's own SQL comment, which never reaches the catalogue.
+     */
+    private String columnCommentOf(String tableName, String columnName) {
+        return dsl.fetchOne("""
+                select col_description(
+                    (quote_ident(?))::regclass::oid,
+                    (select attnum from pg_attribute
+                     where attrelid = (quote_ident(?))::regclass and attname = ?)
+                ) as comment
+                """, tableName, tableName, columnName).get("comment", String.class);
     }
 
     /** Number of {@code pg_policies} rows declared for one table. */
