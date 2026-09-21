@@ -86,7 +86,7 @@ Rama `change/jooq-flyway-testcontainers-wiring` (rama actual), base `main`. Sin 
 negocio: demuestra que la tubería de Testcontainers + Flyway + generación de jOOQ funciona con la
 prueba más pequeña posible (propuesta, «Enfoque», paso 1).
 
-- [ ] 1.1 **Ejecutar las partes restantes de la sonda S1 (bloqueante, `design.md` §10).** Antes de
+- [x] 1.1 **Ejecutar las partes restantes de la sonda S1 (bloqueante, `design.md` §10).** Antes de
   escribir cualquier archivo de producción del corte, verificar con evidencia real, fuera del árbol
   del repositorio o en archivos temporales que se borran: (a) que
   `org.testcontainers:testcontainers-jooq-codegen-maven-plugin:0.0.4` corre sobre JDK 25 y levanta
