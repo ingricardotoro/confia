@@ -114,7 +114,7 @@ prueba más pequeña posible (propuesta, «Enfoque», paso 1).
   `design.md`, decisiones 1 y 3; especificación `build-integrity`, requisito «Fuente única de la
   versión de PostgreSQL en la construcción»
 
-- [ ] 1.3 **Cablear `apps/api/app/pom.xml`.** Añadir las dependencias de jOOQ (sin versión, gestionada
+- [x] 1.3 **Cablear `apps/api/app/pom.xml`.** Añadir las dependencias de jOOQ (sin versión, gestionada
   por el BOM), Flyway, el controlador `org.postgresql:postgresql`, y las coordenadas 2.x de
   Testcontainers en alcance `test`. No declarar todavía el complemento de generación (tarea 1.7).
   Confirmar que `./mvnw -B -pl apps/api/app -am validate` resuelve sin romper

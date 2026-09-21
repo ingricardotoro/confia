@@ -161,6 +161,12 @@ no se eleva ningún ADR que reemplace ADR-0015 regla 2.
       en `dependencyManagement`: se confirmará en la tarea 1.3 si el BOM de Spring Boot 4.1.1 ya las
       gestiona (evidencia de `design.md` sección 2 indica que sí, bajo los nombres nuevos
       `testcontainers-postgresql`/`testcontainers-junit-jupiter`).
+- [x] 1.3 — jOOQ, Flyway (`flyway-core` + `flyway-database-postgresql`), el controlador
+      PostgreSQL y Testcontainers 2.x (`testcontainers-postgresql`, `testcontainers-junit-jupiter`,
+      alcance `test`) añadidos a `apps/api/app/pom.xml`, sin versión en ninguno. `./mvnw -B -pl
+      apps/api/app -am validate`: `BUILD SUCCESS`, `dependencyConvergence` pasa a la primera —
+      confirma que el BOM de Spring Boot 4.1.1 ya gestiona los nombres 2.x de Testcontainers, sin
+      necesitar ninguna fijación en `dependencyManagement`.
 - [ ] 1.3
 - [ ] 1.4
 - [ ] 1.5
