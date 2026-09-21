@@ -154,6 +154,10 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-failsafe-plugin</artifactId>
           <version>${maven-failsafe-plugin.version}</version>
+          <configuration>
+            <!-- Carries the integration-phase JaCoCo agent (jacoco-prepare-agent-integration). -->
+            <argLine>@{failsafeArgLine}</argLine>
+          </configuration>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -181,27 +185,55 @@
           <artifactId>jacoco-maven-plugin</artifactId>
           <version>${jacoco-maven-plugin.version}</version>
           <executions>
+            <!--
+              Unit and integration coverage are collected into SEPARATE files and merged before the
+              report (task 1.7 of this change found the earlier single-file setup broken in both
+              directions). Surefire and Failsafe fork their own JVMs within one `mvn verify`, each
+              carrying an agent: writing both to one file with append=false made whichever flushed
+              last truncate the other's data, and append=true let a stale file from an earlier,
+              narrower run satisfy the gate without an intervening `clean` (verify report W3 of
+              kernel-money-value-object). One file per phase, each truncated at the start of its own
+              run, then merged, has neither problem: the gate always measures exactly this build's
+              unit plus integration coverage, which is what docs/06 line 611 asks for.
+            -->
             <execution>
               <id>jacoco-prepare-agent</id>
               <goals>
                 <goal>prepare-agent</goal>
               </goals>
               <configuration>
-                <!-- append=true (JaCoCo's own default, restored here after task 1.7 found the
-                     original append=false broken): Surefire and Failsafe run in SEPARATE forked
-                     JVMs within the same "mvn verify", each carrying this same agent argLine. With
-                     append=false, whichever JVM's agent flushes LAST truncates jacoco.exec down to
-                     only its own data, silently discarding the other phase's coverage — confirmed
-                     with a real run once app/pom.xml gained its first *IT.java class
-                     (DatabasePipelineIT, task 1.4/1.5): every class' coverage read back as 0%
-                     despite passing unit tests. append=true lets both forks accumulate into one
-                     file, which is what the "coverage" row of docs/06 line 611 actually measures
-                     ("con los datos de las pruebas unitarias y de integración"). The narrower risk
-                     append=false was meant to prevent — stale data from an earlier, narrower `mvn
-                     test -Dtest=X` invocation polluting a later, broader `mvn verify` without an
-                     intervening `clean` — is real only when target/ is not cleaned first; CI always
-                     starts from a fresh actions/checkout (.github/workflows/ci.yml), so this file
-                     never predates the current build there. -->
+                <destFile>${project.build.directory}/jacoco-ut.exec</destFile>
+                <append>false</append>
+              </configuration>
+            </execution>
+            <execution>
+              <id>jacoco-prepare-agent-integration</id>
+              <goals>
+                <goal>prepare-agent-integration</goal>
+              </goals>
+              <configuration>
+                <destFile>${project.build.directory}/jacoco-it.exec</destFile>
+                <append>false</append>
+                <propertyName>failsafeArgLine</propertyName>
+              </configuration>
+            </execution>
+            <execution>
+              <id>jacoco-merge</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>merge</goal>
+              </goals>
+              <configuration>
+                <fileSets>
+                  <fileSet>
+                    <directory>${project.build.directory}</directory>
+                    <includes>
+                      <include>jacoco-ut.exec</include>
+                      <include>jacoco-it.exec</include>
+                    </includes>
+                  </fileSet>
+                </fileSets>
+                <destFile>${project.build.directory}/jacoco.exec</destFile>
               </configuration>
             </execution>
             <execution>
