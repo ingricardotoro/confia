@@ -5,13 +5,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.kernel.InstitutionId;
 import com.confia.support.TransactionalPostgresIntegrationTest;
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.jooq.Record;
 import org.jooq.exception.DataAccessException;
 import org.junit.jupiter.api.Test;
@@ -19,9 +22,10 @@ import org.junit.jupiter.api.Test;
 /**
  * Schema catalogue gates over the real PostgreSQL schema created in PR A2 (design.md decision 10,
  * points 1 to 4; specs/build-integrity/spec.md). Every assertion here queries {@code pg_catalog}
- * and {@code information_schema} directly, never a hand-maintained list of table names, so a new
- * table added later without the required invariant breaks this build without anyone having to
- * remember to extend this class.
+ * directly — never {@code information_schema}, whose views hide any table the connecting role
+ * holds no privilege on, and never a hand-maintained list of table names — so a new table added
+ * later without the required invariant breaks this build without anyone having to remember to
+ * extend this class.
  *
  * <p>Assertions are membership-based against ADR-0017's closed catalogue, never presence-based
  * (tasks.md task 3.5, point 1): only two of the four closed-catalogue tables exist today (
@@ -41,8 +45,7 @@ class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
     private static final Set<String> CLOSED_CATALOGUE_TABLES =
             Set.of("scheduled_tasks", "event_publication", "flyway_schema_history", ROOT_TABLE);
 
-    private static final Pattern MODULE_PREFIXED_TABLE_NAME =
-            Pattern.compile("^[a-z][a-z0-9]*_[a-z0-9_]+$");
+    private static final String BASE_PACKAGE_PREFIX = "com.confia.";
 
     @Test
     void everyBusinessTableHasInstitutionIdOrBelongsToTheClosedCatalogueByExactName() {
@@ -111,17 +114,45 @@ class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
 
     @Test
     void everyBusinessTableNameCarriesItsOwnerModulesPrefixExceptTheClosedCatalogue() {
+        Set<String> modules = productionModuleNames();
+        assertThat(modules)
+                .as("the module set is derived from real production packages, so it can never be "
+                        + "empty while this test runs at all")
+                .contains("organization");
+
         for (BaseTable table : baseTablesInPublicSchema()) {
             if (TECHNICAL_TABLES.contains(table.name())) {
                 continue;
             }
-            assertThat(MODULE_PREFIXED_TABLE_NAME.matcher(table.name()).matches())
-                    .as("business table %s must carry its owner module's '<módulo>_' prefix",
-                            table.name())
-                    .isTrue();
+            int separator = table.name().indexOf('_');
+            assertThat(separator)
+                    .as("business table %s must carry a '<módulo>_' prefix", table.name())
+                    .isPositive();
+            assertThat(modules)
+                    .as("business table %s must be prefixed with the name of a module that really "
+                            + "exists (ADR-0017); the root table is not exempted", table.name())
+                    .contains(table.name().substring(0, separator));
         }
-        assertThat(ROOT_TABLE).as("the root table is not exempted from the module prefix")
-                .startsWith("organization_");
+    }
+
+    /**
+     * Business module names read from the real production packages under {@code com.confia},
+     * never a hand-written list and never a shape-only regular expression. A regular expression
+     * such as {@code ^[a-z]+_[a-z_]+$} accepts {@code tmp_import} or {@code legacy_data}, which is
+     * precisely the kind of table this gate exists to reject: task 3.5 asks for the prefix of the
+     * table's <em>owner module</em>, so the prefix is checked against the modules that actually
+     * exist. The module of a class is the first package segment after {@code com.confia}, the same
+     * criterion {@code NoCrossModuleDomainImportsTest} uses, and test classes are excluded so the
+     * architecture fixtures never invent a module name.
+     */
+    private static Set<String> productionModuleNames() {
+        return new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages("com.confia").stream()
+                .map(JavaClass::getPackageName)
+                .filter(name -> name.startsWith(BASE_PACKAGE_PREFIX))
+                .map(name -> name.substring(BASE_PACKAGE_PREFIX.length()).split("\\.")[0])
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     @Test
@@ -187,17 +218,31 @@ class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
      * institution_id} as {@code NOT NULL} — queried from {@code information_schema}, never a
      * hand-maintained list (task 3.5, point 1).
      */
+    /**
+     * Every base table of the {@code public} schema, read from {@code pg_class} and {@code
+     * pg_attribute}, never from {@code information_schema}.
+     *
+     * <p>This distinction is the whole value of the gate. {@code information_schema} views are
+     * filtered by the privileges of the role running the query, so a table the connecting role
+     * holds no privilege on is simply invisible there. These tests connect as {@code
+     * confia_admin_app}, so a new table created with no {@code institution_id}, no row-level
+     * security and no {@code GRANT} would have passed every assertion in this class silently —
+     * exactly the table this gate exists to reject. Verified by adding such a table and observing
+     * that the gates only saw it once a {@code GRANT} was added. {@code pg_catalog} applies no
+     * such filter.
+     */
     private List<BaseTable> baseTablesInPublicSchema() {
         List<Record> rows = dsl.fetch("""
-                select t.table_name as table_name,
+                select c.relname as table_name,
                        exists (
-                           select 1 from information_schema.columns c
-                           where c.table_schema = 'public' and c.table_name = t.table_name
-                             and c.column_name = 'institution_id' and c.is_nullable = 'NO'
+                           select 1 from pg_attribute a
+                           where a.attrelid = c.oid and a.attname = 'institution_id'
+                             and a.attnum > 0 and not a.attisdropped and a.attnotnull
                        ) as has_institution_id
-                from information_schema.tables t
-                where t.table_schema = 'public' and t.table_type = 'BASE TABLE'
-                order by t.table_name
+                from pg_class c
+                join pg_namespace n on n.oid = c.relnamespace
+                where n.nspname = 'public' and c.relkind in ('r', 'p')
+                order by c.relname
                 """);
         List<BaseTable> tables = new ArrayList<>();
         for (Record row : rows) {
