@@ -599,3 +599,42 @@ primer consumidor real es `JooqInstitutionRepositoryIT` de la tarea 2.1 (PR A2),
 reversión automática deberá crear `TransactionalPostgresIntegrationTest` en ese mismo corte. Se
 reporta aquí en vez de decidirlo en silencio, tal como pide el resto de este documento para la
 discrepancia ya conocida entre `design.md` §5 y §11.
+
+
+## Defecto encontrado en la verificación del orquestador: `information_schema` filtra por privilegios
+
+`MultiTenantSchemaIT.baseTablesInPublicSchema()` leía `information_schema.tables` e
+`information_schema.columns`. Esas vistas están filtradas por los privilegios del rol que consulta.
+Las pruebas de integración conectan como `confia_admin_app`, de modo que una tabla creada sin
+`institution_id`, sin seguridad a nivel de fila y sin ningún `GRANT` resultaba **invisible** para
+tres de las cuatro puertas de catálogo y las pasaba todas en verde. Es exactamente la tabla que esas
+puertas existen para rechazar.
+
+Encontrado por control negativo, no por lectura del código:
+
+1. Migración temporal `V2__negative_control.sql` con una tabla `tmp_import`: las siete pruebas de la
+   clase pasaron en verde. La puerta no veía la tabla.
+2. Añadido `GRANT SELECT ON tmp_import TO confia_admin_app`: la puerta falló nombrando `tmp_import`.
+   Hipótesis confirmada.
+3. Consulta migrada a `pg_class` + `pg_namespace` + `pg_attribute` (`relkind in ('r','p')`,
+   `attnotnull`, `not attisdropped`).
+4. Retirado el `GRANT`: la puerta sigue viendo y rechazando `tmp_import`. Arreglo probado en ambas
+   direcciones.
+5. Migración de control eliminada.
+
+`rowSecurityFlagsOf`, `policyCountOn` y `uniqueIndexesInPublicSchema` ya consultaban `pg_catalog`,
+así que bastó corregir un único método del que dependían tres puertas.
+
+En el mismo commit (`44efce8`) se corrigieron dos defectos menores de la misma clase:
+
+- El regex del prefijo de módulo, `^[a-z][a-z0-9]*_[a-z0-9_]+$`, aceptaba cualquier prefijo:
+  `tmp_import` o `legacy_data` habrían pasado una puerta cuyo propósito declarado es nombrar el
+  módulo propietario de la tabla. Ahora el prefijo se contrasta contra los nombres de módulo
+  derivados de los paquetes de producción reales, el mismo criterio de
+  `NoCrossModuleDomainImportsTest`.
+- La misma prueba cerraba con `assertThat(ROOT_TABLE).startsWith("organization_")`, que compara una
+  constante de compilación contra un literal: no podía fallar jamás y se leía como una aserción de
+  esquema sin verificar nada. Eliminada; el bucle anterior ya evalúa la tabla real.
+
+**Regla general que deja este defecto:** una prueba de catálogo de esquema que corre con un rol de
+mínimo privilegio debe leer `pg_catalog`, nunca `information_schema`.

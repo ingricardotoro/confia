@@ -314,8 +314,18 @@ propuesta, punto 2).
 
 ## PR A3 — corte A3: reglas y puertas de esquema
 
-Rama `change/jooq-flyway-testcontainers-wiring-gates`, base PR A2. Cada regla en su propio commit;
-el conteo de `SuppressionCitesAdrTest` no se toca en este corte (`design.md`, decisión 9).
+**Dividido en dos pull requests encadenados**, decisión del propietario tomada al cerrar el corte.
+La medición final dio 813 líneas de código, trece por encima del máximo de ochocientas de
+`docs/15-flujo-de-trabajo-git.md` §3, que no contempla excepciones. El corte usa la costura que
+`design.md` §12 ya preveía:
+
+- **PR A3a**, rama `change/jooq-flyway-testcontainers-wiring-rules`, base PR A2: tareas 3.1 a 3.4,
+  las cuatro reglas ArchUnit R1–R4 con sus fixtures. 387 líneas de código.
+- **PR A3b**, rama `change/jooq-flyway-testcontainers-wiring-gates`, base PR A3a: tareas 3.5 a 3.9,
+  las puertas de catálogo de esquema y el cierre documental del cambio. 426 líneas de código.
+
+Cada regla en su propio commit; el conteo de `SuppressionCitesAdrTest` no se toca en este corte
+(`design.md`, decisión 9).
 
 - [x] 3.1 **ROJO/VERDE — regla R1, jOOQ confinado a `infrastructure`.** ROJO: crear
   `apps/api/app/src/test/java/com/confia/architecture/JooqConfinedToInfrastructureTest.java`
