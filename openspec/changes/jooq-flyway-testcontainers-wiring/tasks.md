@@ -153,7 +153,7 @@ prueba más pequeña posible (propuesta, «Enfoque», paso 1).
   `docs/03` §6.1 (cinco roles); `docs/05-configuracion-y-perfiles.md` §9 (Flyway solo en el perfil de
   migración)
 
-- [ ] 1.6 **ROJO/VERDE — fuente única de la versión de PostgreSQL.** ROJO: crear
+- [x] 1.6 **ROJO/VERDE — fuente única de la versión de PostgreSQL.** ROJO: crear
   `apps/api/app/src/test/resources/confia-build.properties` con
   `postgres.image=${confia.postgres.image}` filtrado por Maven (`<includes>` restringido a este
   archivo, para que ningún `${...}` de un script SQL se sustituya por accidente), y

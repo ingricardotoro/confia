@@ -214,7 +214,15 @@ que no puede otorgar permisos sobre una tabla que todavía no existe cuando se e
       con `withUsername("postgres")` (decisión 4), `withTmpFs` sobre `/var/lib/postgresql`
       (corrección S1.5), rol de aplicación `confia_admin_app` verificado por `current_user`, cinco
       roles verificados `rolsuper=false`/`rolbypassrls=false` contra `pg_roles`.
-- [ ] 1.6
+- [x] 1.6 — **ROJO**: `PostgresImageSingleSourceTest.java` creado, referencia
+      `PostgresIntegrationTest.postgresImage()`, que no existe. `./mvnw -B -pl apps/api/app -am
+      test-compile`: `COMPILATION ERROR`, `cannot find symbol: method postgresImage()`. **VERDE**:
+      `confia-build.properties` creado con `postgres.image=${confia.postgres.image}`; filtrado
+      cableado en `apps/api/app/pom.xml` con dos `<testResource>` (uno sin filtrar que excluye ese
+      archivo, otro que lo filtra en exclusiva); `PostgresIntegrationTest` refactorizado para leer
+      la propiedad filtrada en vez del literal de la tarea 1.5. `./mvnw -B -pl apps/api/app -am
+      test -Dtest=PostgresImageSingleSourceTest,DatabasePipelineIT`: `Tests run: 4, Failures: 0,
+      Errors: 0, Skipped: 0`.
 - [ ] 1.7
 - [ ] 1.8
 - [ ] 1.9

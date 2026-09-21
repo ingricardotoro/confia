@@ -114,6 +114,27 @@
   </dependencies>
 
   <build>
+    <!-- Single source of truth for the PostgreSQL image (ADR-0015 rule 1; design.md decision 3;
+         task 1.6). Filtering is restricted to confia-build.properties alone: a second, unfiltered
+         testResource excludes it explicitly so no ${...} placeholder in an SQL script under
+         src/test/resources (for example the beforeMigrate__ callback, task 1.7) is ever
+         substituted by accident. -->
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+        <filtering>false</filtering>
+        <excludes>
+          <exclude>confia-build.properties</exclude>
+        </excludes>
+      </testResource>
+      <testResource>
+        <directory>src/test/resources</directory>
+        <filtering>true</filtering>
+        <includes>
+          <include>confia-build.properties</include>
+        </includes>
+      </testResource>
+    </testResources>
     <plugins>
       <!-- Coverage gate for this module (design.md decision 9; task 1.1 measured 89.7% line and
            84.6% branch coverage on com.confia.bootstrap alone, both above 80%, so the BUNDLE rule

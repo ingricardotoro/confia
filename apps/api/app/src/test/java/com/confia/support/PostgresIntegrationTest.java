@@ -1,7 +1,11 @@
 package com.confia.support;
 
 import com.confia.kernel.InstitutionId;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.Map;
+import java.util.Properties;
 import org.jooq.DSLContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -41,11 +45,8 @@ public abstract class PostgresIntegrationTest {
 
     protected static final String TEST_PASSWORD = "test-only-not-a-secret";
 
-    // Hardcoded here for task 1.5's minimal green step; task 1.6 replaces this literal with the
-    // single source of truth read from the confia-build.properties resource filtered from
-    // ${confia.postgres.image} (design.md decision 3; PostgresImageSingleSourceTest).
     static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(DockerImageName.parse("postgres:18-alpine"))
+            new PostgreSQLContainer<>(DockerImageName.parse(postgresImage()))
                     .withDatabaseName("confia_test")
                     .withUsername("postgres")
                     .withPassword(TEST_PASSWORD)
@@ -80,6 +81,24 @@ public abstract class PostgresIntegrationTest {
 
     @Autowired
     protected DSLContext dsl;
+
+    /**
+     * Single source of truth for the PostgreSQL image (ADR-0015 rule 1; design.md decision 3;
+     * task 1.6): reads {@code confia-build.properties}, filtered by maven-resources-plugin from
+     * {@code apps/api/pom.xml}'s {@code confia.postgres.image} property — the same property the
+     * jOOQ code-generation plugin reads (task 1.7). {@link PostgresImageSingleSourceTest} is the
+     * executable proof that this value is real and not the unfiltered {@code "${...}"} literal.
+     */
+    static String postgresImage() {
+        Properties properties = new Properties();
+        try (InputStream in = PostgresIntegrationTest.class.getClassLoader()
+                .getResourceAsStream("confia-build.properties")) {
+            properties.load(in);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return properties.getProperty("postgres.image");
+    }
 
     /**
      * Sets the session-scoped institution context (docs/03-seguridad.md section 6.2) the same way
