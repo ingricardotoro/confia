@@ -288,3 +288,18 @@ que no puede otorgar permisos sobre una tabla que todavía no existe cuando se e
       instruyó explícitamente no empujar la rama ni abrir pull requests en esta sesión de
       aplicación; empujar `change/jooq-flyway-testcontainers-wiring` y confirmar el trabajo
       `backend` en verde en la integración continua queda para el propietario.
+
+## Discrepancia reportada, no aplicada en silencio: variantes de `PostgresIntegrationTest`
+
+`design.md` §5 (tabla de archivos, autoritativa por la nota de reconciliación de `tasks.md`) asigna
+la creación de `TransactionalPostgresIntegrationTest.java` y `CommittingPostgresIntegrationTest.java`
+a PR A1, y `proposal.md` punto de alcance 5 exige explícitamente "dos variantes" de
+`PostgresIntegrationTest`. **La redacción literal de la tarea 1.5 de `tasks.md`, sin embargo, no
+nombra ninguna de las dos clases** entre los archivos que crea, y ningún archivo de PR A1 las
+necesita: `DatabasePipelineIT` y `PostgresImageSingleSourceTest` no tocan ninguna fila de negocio
+que requiera revertirse ni confirmarse. Se siguió la redacción literal de `tasks.md` (la lista de
+tareas que gobierna esta aplicación) y **no se crearon** esas dos subclases en este corte. El
+primer consumidor real es `JooqInstitutionRepositoryIT` de la tarea 2.1 (PR A2), que si necesita
+reversión automática deberá crear `TransactionalPostgresIntegrationTest` en ese mismo corte. Se
+reporta aquí en vez de decidirlo en silencio, tal como pide el resto de este documento para la
+discrepancia ya conocida entre `design.md` §5 y §11.
