@@ -208,7 +208,9 @@ prueba más pequeña posible (propuesta, «Enfoque», paso 1).
   única y documentación); registrar la decisión que tome. — D2 de la propuesta; `design.md` §12,
   «Pronóstico de tamaño por corte»
 
-- [ ] 1.10 **Verificación final de PR A1.** En checkout limpio, con `JAVA_HOME` en JDK 25 y
+- [x] 1.10 **Verificación final de PR A1.** (verificación local completa; empujar la rama y
+  confirmar la integración continua quedan para el propietario — el orquestador instruyó
+  explícitamente no empujar ni abrir pull requests en esta sesión de aplicación) En checkout limpio, con `JAVA_HOME` en JDK 25 y
   `MAVEN_OPTS` con el almacén de confianza `Windows-ROOT`, ejecutar `./mvnw -B verify` en `apps/api`
   con Docker activo. Confirmar `DatabasePipelineIT` y `PostgresImageSingleSourceTest` en verde, que
   el paquete generado no aparece en el árbol de control de versiones, y que la cobertura de JaCoCo no

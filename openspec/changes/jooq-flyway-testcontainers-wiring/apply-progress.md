@@ -277,4 +277,14 @@ que no puede otorgar permisos sobre una tabla que todavía no existe cuando se e
       completo registrado en el propio comando; los archivos más grandes son
       `apps/api/app/pom.xml` (186), `apps/api/app/src/test/java/com/confia/support/PostgresIntegrationTest.java`
       (116) y `apps/api/app/src/test/java/com/confia/support/DatabasePipelineIT.java` (98).
-- [ ] 1.10
+- [x] 1.10 — **Verificación local completa.** Con `app/target` y `kernel/target` borrados,
+      `JAVA_HOME` en JDK 25, `MAVEN_OPTS` con `Windows-ROOT` y Docker activo: `./mvnw -B verify` en
+      `apps/api`: `BUILD SUCCESS`. `DatabasePipelineIT` y `PostgresImageSingleSourceTest` en
+      verde (2/2 cada una). `git status --short`: limpio; `git ls-files | grep confia/generated`:
+      ningún archivo generado bajo control de versiones; `git check-ignore -v` confirma que
+      `target/generated-sources/jooq/confia/generated/jooq/**` cae bajo la regla `target/` de
+      `.gitignore`. `jacoco.csv`: catorce filas (las clases reales de `app`), cero filas de
+      `confia.generated`, sin ninguna regla de cobertura violada. **No empujado**: el orquestador
+      instruyó explícitamente no empujar la rama ni abrir pull requests en esta sesión de
+      aplicación; empujar `change/jooq-flyway-testcontainers-wiring` y confirmar el trabajo
+      `backend` en verde en la integración continua queda para el propietario.
