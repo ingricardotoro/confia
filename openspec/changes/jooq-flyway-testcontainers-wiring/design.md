@@ -14,8 +14,10 @@
 
 Cambio 5 de F0, **parte A**. Implementa la propuesta aprobada el 2026-09-20 (D5), con D1
 (`scheduled_tasks` al cambio 9), D3 (paquete generado fuera de `com.confia`) y D4 (ninguna capacidad
-nueva) ya resueltas por el propietario. **D2 (forma de entrega) sigue pendiente y este diseño no la
-elige**; solo pronostica el tamaño por corte.
+nueva) ya resueltas por el propietario. **D2 también está resuelta: pull requests encadenados
+(`auto-chain`, `stacked-to-main`) con los cortes A1, A2 y A3**; este diseño confirma que A2 cabe
+siempre y aporta las subdivisiones A1a/A1b y A3a/A3b/A3c para cuando un corte roce o supere 800
+líneas.
 
 La especificación se escribe en paralelo. Donde este diseño propone un dato que la especificación
 fija (nombres de columna, textos de error, criterios exactos de una puerta), **prevalece la
@@ -758,7 +760,8 @@ reconciliarse, igual que en el cambio 4):
     **A3c** = puertas de esquema (≈180–300). A3c puede fusionarse con A2 si A2 se queda corto.
 - **Tareas:** entre 13 y 16, igual que pronosticó la propuesta; toca o supera el límite de quince por
   cambio de `openspec/changes/README.md`.
-- **Este diseño no elige la forma de entrega: D2 es del propietario.**
+- **Forma de entrega (D2, ya resuelta):** cortes A1, A2 y A3 encadenados, cada uno medido al
+  cerrar; si uno supera 800 líneas se aplica su subdivisión y decide el propietario.
 
 ---
 
@@ -801,10 +804,10 @@ Si alguna confirmación obliga a apartarse de lo decidido, se eleva a un ADR y n
 
 ## 15. Preguntas abiertas
 
-- [ ] **D2, forma de entrega** (propietario): un pull request con `size:exception`, o los cortes A1,
-      A2 y A3 encadenados, con las subdivisiones ya identificadas en la sección 12 y la excepción de
-      «quince tareas por pull request» que el cambio 4 sentó como precedente.
-- [ ] **ADR-0021** (propietario): aceptarlo antes de que el corte A1 escriba la exclusión de JaCoCo
+- [x] **D2, forma de entrega**: resuelta el 2026-09-20 — cortes A1, A2 y A3 encadenados. Queda por
+      confirmar con el propietario, cuando la fase de tareas mida el reparto real, si hace falta de
+      nuevo la excepción de «quince tareas por pull request» que el cambio 4 sentó como precedente.
+- [x] **ADR-0021**: aceptado por el propietario el 2026-09-20, antes de que el corte A1 escriba la exclusión de JaCoCo
       que lo cita. Sin aceptación, la cita apunta a un ADR en estado Propuesto: el escáner pasa
       (solo exige que el archivo exista), pero la decisión no sería vinculante.
 - [ ] **Sonda S1 no ejecutada en diseño**: esta fase no tuvo herramienta de ejecución de procesos.

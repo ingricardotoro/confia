@@ -6,8 +6,8 @@
 - **Exploración:** `openspec/changes/jooq-flyway-testcontainers-wiring/exploration.md`
 - **Rama:** `change/jooq-flyway-testcontainers-wiring` (desde `main` 6963807)
 - **Estado:** aprobada por el propietario el 2026-09-20 (D5, `openspec/config.yaml`,
-  `rules.proposal`). D1 a D5 resueltas.
-  Cuatro decisiones ya resueltas el 2026-09-20; ver «Resolución del propietario». Quedan D1 a D4
+  `rules.proposal`). Las cinco decisiones (D1 a D5) quedaron resueltas el 2026-09-20; ver
+  «Resolución del propietario»
 
 ## Intención
 
