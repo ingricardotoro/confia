@@ -317,7 +317,7 @@ propuesta, punto 2).
 Rama `change/jooq-flyway-testcontainers-wiring-gates`, base PR A2. Cada regla en su propio commit;
 el conteo de `SuppressionCitesAdrTest` no se toca en este corte (`design.md`, decisión 9).
 
-- [ ] 3.1 **ROJO/VERDE — regla R1, jOOQ confinado a `infrastructure`.** ROJO: crear
+- [x] 3.1 **ROJO/VERDE — regla R1, jOOQ confinado a `infrastructure`.** ROJO: crear
   `apps/api/app/src/test/java/com/confia/architecture/JooqConfinedToInfrastructureTest.java`
   (prohíbe que una clase fuera de `..infrastructure..` dependa de `org.jooq..` o de
   `confia.generated..`) y el fixture
@@ -328,7 +328,7 @@ el conteo de `SuppressionCitesAdrTest` no se toca en este corte (`design.md`, de
   Especificación `build-integrity`, requisito «jOOQ y el paquete generado confinados a
   `infrastructure`» (ambos escenarios)
 
-- [ ] 3.2 **ROJO/VERDE — regla R2, propiedad de tablas por prefijo de módulo.** ROJO: crear
+- [x] 3.2 **ROJO/VERDE — regla R2, propiedad de tablas por prefijo de módulo.** ROJO: crear
   `apps/api/app/src/test/java/com/confia/architecture/TableOwnershipByModuleTest.java` (prohíbe que
   una clase de `com.confia.<módulo>..` dependa de un tipo generado cuyo nombre simple no empiece por
   `<Módulo>`, extrayendo el módulo con el mismo criterio que `NoCrossModuleDomainImportsTest`) y el
@@ -341,7 +341,7 @@ el conteo de `SuppressionCitesAdrTest` no se toca en este corte (`design.md`, de
   `build-integrity`, requisito «Propiedad de tablas generadas por prefijo de módulo» (ambos
   escenarios)
 
-- [ ] 3.3 **ROJO/VERDE — regla R3, transacciones confinadas (guarda preventiva).** ROJO: crear
+- [x] 3.3 **ROJO/VERDE — regla R3, transacciones confinadas (guarda preventiva).** ROJO: crear
   `apps/api/app/src/test/java/com/confia/architecture/TransactionsOnlyInSharedSecurityTest.java`
   (prohíbe `@Transactional`, `TransactionTemplate` y `PlatformTransactionManager` fuera de
   `com.confia.shared.security..`, que todavía no existe) y el fixture
@@ -353,7 +353,7 @@ el conteo de `SuppressionCitesAdrTest` no se toca en este corte (`design.md`, de
   `build-integrity`, requisito «Transacciones confinadas al componente único de `shared/security`
   (guarda preventiva)» (ambos escenarios)
 
-- [ ] 3.4 **ROJO/VERDE — regla R4, SQL plano prohibido fuera de la lista aprobada.** ROJO: crear
+- [x] 3.4 **ROJO/VERDE — regla R4, SQL plano prohibido fuera de la lista aprobada.** ROJO: crear
   `apps/api/app/src/test/java/com/confia/architecture/NoUnapprovedPlainSqlTest.java` (prohíbe, por
   firma exacta, `DSL.field(String)`, `DSL.table(String)`, `DSL.condition(String)`, `DSL.sql(String)`,
   `DSLContext.fetch(String)`, `execute(String)`, `resultQuery(String)` y sus variantes con
@@ -365,7 +365,7 @@ el conteo de `SuppressionCitesAdrTest` no se toca en este corte (`design.md`, de
   Especificación `build-integrity`, requisito «Prohibición del SQL plano de jOOQ fuera de la lista
   aprobada» (ambos escenarios)
 
-- [ ] 3.5 **ROJO/VERDE — puertas de catálogo de esquema, `MultiTenantSchemaIT`.** Crear
+- [x] 3.5 **ROJO/VERDE — puertas de catálogo de esquema, `MultiTenantSchemaIT`.** Crear
   `apps/api/app/src/test/java/com/confia/schema/MultiTenantSchemaIT.java` sobre el catálogo real de
   PostgreSQL con cuatro afirmaciones: (1) toda tabla base de `public` lleva `institution_id NOT
   NULL`, o pertenece por **nombre exacto** al catálogo cerrado de cuatro nombres de ADR-0017
@@ -387,7 +387,7 @@ el conteo de `SuppressionCitesAdrTest` no se toca en este corte (`design.md`, de
   única de una tabla de negocio incluye el discriminador de institución» (ambos escenarios) y
   «Nombres de tabla con el prefijo de su módulo, salvo el catálogo cerrado» (los tres escenarios)
 
-- [ ] 3.5b **ROJO/VERDE — la guarda técnica del RTN, verificada contra el esquema real.** En
+- [x] 3.5b **ROJO/VERDE — la guarda técnica del RTN, verificada contra el esquema real.** En
   `MultiTenantSchemaIT` (misma clase de aserciones de catálogo), añadir dos escenarios que hoy no
   tienen prueba en ningún corte: (1) el comentario de la columna `organization_institution.rtn`,
   leído con `col_description` sobre el catálogo real, declara explícitamente que su límite de
@@ -400,7 +400,7 @@ el conteo de `SuppressionCitesAdrTest` no se toca en este corte (`design.md`, de
   solo lectura. — Especificación `organization`, requisito «La longitud de la columna del RTN es una
   guarda técnica, no una regla fiscal» (los tres escenarios)
 
-- [ ] 3.6 **ROJO/VERDE — `RolePrivilegeMatrixIT`.** Crear
+- [x] 3.6 **ROJO/VERDE — `RolePrivilegeMatrixIT`.** Crear
   `apps/api/app/src/test/java/com/confia/schema/RolePrivilegeMatrixIT.java` con: (5) para los cinco
   roles de `docs/03` §6.1, `rolsuper = false` y `rolbypassrls = false` (refuerzo de catálogo,
   complementario al chequeo ya hecho en `DatabasePipelineIT` de A1); (6) matriz de privilegios con
@@ -411,7 +411,7 @@ el conteo de `SuppressionCitesAdrTest` no se toca en este corte (`design.md`, de
   hay requisito exclusivo en la especificación para esta clase; trazado a `design.md`, decisión 10,
   puntos 5 y 6, y a los criterios de éxito de la propuesta sobre privilegios de rol
 
-- [ ] 3.7 **Medición final del tiempo de la suite y cierre documental.** Ejecutar `./mvnw -B verify`
+- [x] 3.7 **Medición final del tiempo de la suite y cierre documental.** Ejecutar `./mvnw -B verify`
   completo en `apps/api` y medir de nuevo el tiempo de la fase `integration-test` con la suite
   `*IT.java` completa (`DatabasePipelineIT`, `JooqInstitutionRepositoryIT`, `MultiTenantSchemaIT`,
   `RolePrivilegeMatrixIT`). Actualizar `apps/api/README.md` y la nota de
@@ -420,14 +420,14 @@ el conteo de `SuppressionCitesAdrTest` no se toca en este corte (`design.md`, de
   `*IT.java` con Testcontainers dentro del presupuesto de 8 minutos» (escenario «Suite dentro del
   presupuesto», medición final)
 
-- [ ] 3.8 **Medir el diff real de PR A3** con
+- [x] 3.8 **Medir el diff real de PR A3** con
   `git diff --numstat <base-de-PR-A2>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   Si cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y consultar al
   propietario**, con la subdivisión ya identificada en `design.md` §12: **A3a** (R1 y R3 con sus
   fixtures), **A3b** (R2 y R4 con sus fixtures), **A3c** (puertas de esquema, fusionable con A2 si A2
   quedó corto). — D2 de la propuesta; `design.md` §12, «Pronóstico de tamaño por corte»
 
-- [ ] 3.9 **Verificación final de PR A3 y del cambio completo.** En checkout limpio, con `JAVA_HOME`
+- [x] 3.9 **Verificación final de PR A3 y del cambio completo.** En checkout limpio, con `JAVA_HOME`
   en JDK 25, `MAVEN_OPTS` con el almacén `Windows-ROOT` y Docker activo, ejecutar `./mvnw -B verify`
   en `apps/api`. Confirmar: las cuatro reglas R1–R4 en verde sobre producción y rechazando sus
   fixtures; `MultiTenantSchemaIT` y `RolePrivilegeMatrixIT` en verde; el inventario de ADR-0020 con
