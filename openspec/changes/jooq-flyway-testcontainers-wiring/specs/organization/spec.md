@@ -138,9 +138,9 @@ técnica, como defensa adicional independiente de la validación que ya aplica e
 - **CUANDO** se ejecuta esa inserción contra el esquema real
 - **ENTONCES** la base de datos rechaza la fila por violar la restricción de longitud de la columna
 
-#### Escenario: Un RTN de longitud válida se almacena sin alteración
+#### Escenario: Un RTN de longitud válida se reconstruye sin alteración
 
-- **DADO** una `Institution` válida con RTN de 14 dígitos
-- **CUANDO** se persiste a través del adaptador
-- **ENTONCES** la fila almacenada conserva el RTN como la misma secuencia exacta de 14 dígitos, sin
-  relleno ni truncamiento
+- **DADO** una fila sembrada por la prueba en `organization_institution` con un RTN de 14 dígitos
+- **CUANDO** el adaptador de solo lectura reconstruye esa institución contra el esquema real
+- **ENTONCES** el RTN reconstruido es la misma secuencia exacta de 14 dígitos, sin relleno ni
+  truncamiento
