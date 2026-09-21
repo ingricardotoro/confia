@@ -41,26 +41,30 @@ ese cambio es este mismo, y la implementación ya existe.)
 ### Requisito: Contrato observable del adaptador jOOQ de `InstitutionRepository` contra la base real
 
 El adaptador jOOQ de `InstitutionRepository`, ubicado en `com.confia.organization.infrastructure`,
-DEBE almacenar y recuperar una `Institution` en la tabla `organization_institution` conservando
-fielmente cada atributo, incluidos el RTN como la secuencia exacta de dígitos almacenada (sin
-normalización adicional) y la moneda por defecto. El adaptador DEBE devolver una ausencia de
-resultado, nunca una excepción, cuando se consulta un `InstitutionId` para el que no existe fila.
-La base de datos DEBE rechazar la inserción de dos filas con el mismo identificador de institución,
-porque la clave primaria de la tabla es ese identificador.
+DEBE reconstruir una `Institution` fiel a la fila almacenada en `organization_institution`,
+conservando cada atributo, incluidos el RTN como la secuencia exacta de dígitos almacenada (sin
+normalización adicional) y la moneda por defecto. El adaptador **es de solo lectura en este cambio**:
+el puerto `InstitutionRepository` solo declara `findById`, y una operación de escritura sin
+consumidor en producción llegaría con la administración de instituciones (cambio 7), no aquí; la
+siembra de filas en las pruebas es responsabilidad explícita de la prueba, con instrucciones SQL
+directas. El adaptador DEBE devolver una ausencia de resultado, nunca una excepción, cuando se
+consulta un `InstitutionId` para el que no existe fila. La base de datos DEBE rechazar la inserción
+de dos filas con el mismo identificador de institución, porque la clave primaria de la tabla es ese
+identificador.
 
-#### Escenario: Ida y vuelta fiel de cada atributo contra la base real
+#### Escenario: Reconstrucción fiel de cada atributo contra la base real
 
-- **DADO** una `Institution` válida con `tradeName` presente, RTN de 14 dígitos y moneda `HNL`,
-  persistida a través del adaptador contra el esquema real
-- **CUANDO** se recupera esa misma institución por su `InstitutionId` a través del mismo adaptador
-- **ENTONCES** cada atributo recuperado es igual al original, incluidos el RTN como la misma
+- **DADO** una fila sembrada por la prueba en `organization_institution` con `tradeName` presente,
+  RTN de 14 dígitos y moneda `HNL`
+- **CUANDO** el adaptador consulta esa institución por su `InstitutionId` contra el esquema real
+- **ENTONCES** cada atributo reconstruido es igual al almacenado, incluidos el RTN como la misma
   secuencia exacta de dígitos y la moneda `HNL`
 
-#### Escenario: Ida y vuelta con nombre comercial ausente
+#### Escenario: Reconstrucción con nombre comercial ausente
 
-- **DADO** una `Institution` válida con `tradeName` nulo, persistida a través del adaptador
-- **CUANDO** se recupera esa institución por su `InstitutionId`
-- **ENTONCES** el `tradeName` recuperado sigue siendo nulo, sin convertirse en cadena vacía
+- **DADO** una fila sembrada por la prueba con `trade_name` nulo
+- **CUANDO** el adaptador consulta esa institución por su `InstitutionId`
+- **ENTONCES** el `tradeName` reconstruido sigue siendo nulo, sin convertirse en cadena vacía
 
 #### Escenario: Ausencia de resultado para un identificador desconocido en la base real
 
@@ -70,10 +74,11 @@ porque la clave primaria de la tabla es ese identificador.
 
 #### Escenario: Rechazo de una fila duplicada con el mismo identificador
 
-- **DADO** una `Institution` ya persistida bajo un `InstitutionId` determinado
-- **CUANDO** se intenta insertar otra fila en `organization_institution` con el mismo identificador
-- **ENTONCES** la base de datos rechaza la inserción por violación de la clave primaria, y el
-  adaptador propaga ese rechazo sin ocultarlo como una ausencia de resultado
+- **DADO** una fila ya sembrada bajo un `InstitutionId` determinado
+- **CUANDO** la prueba intenta insertar otra fila en `organization_institution` con el mismo
+  identificador
+- **ENTONCES** la base de datos rechaza la inserción por violación de la clave primaria; la garantía
+  vive en el esquema, no en el código de la aplicación
 
 ### Requisito: Aislamiento por fila de la tabla raíz según ADR-0009
 
