@@ -200,7 +200,7 @@ prueba más pequeña posible (propuesta, «Enfoque», paso 1).
   presupuesto de 8 minutos» (escenario «Suite dentro del presupuesto»); propuesta, riesgo «`./mvnw
   verify` pasa a exigir Docker...»
 
-- [ ] 1.9 **Medir el diff real de PR A1** con
+- [x] 1.9 **Medir el diff real de PR A1** con
   `git diff --numstat main...change/jooq-flyway-testcontainers-wiring -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   Si el total cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y consultar al
   propietario**, con la subdivisión ya identificada en `design.md` §12: **A1a** (dependencias,

@@ -270,5 +270,11 @@ que no puede otorgar permisos sobre una tabla que todavía no existe cuando se e
       completo en `apps/api` desde `target/` borrado: **1 minuto 31 segundos** (`kernel` 16.1s,
       `app` 1:14 min); `DatabasePipelineIT`, la única clase que arranca un contenedor en esta PR:
       **18.2 segundos**. `SuppressionCitesAdrTest` confirmado en verde tras estos cambios.
-- [ ] 1.9
+- [x] 1.9 — `git diff --numstat main...change/jooq-flyway-testcontainers-wiring -- . ':(exclude)openspec'
+      ':(exclude)docs/adr' ':(exclude)**/generated/**'`: **727 líneas de autor** (adiciones más
+      eliminaciones), medidas después de la tarea 1.8. Cabe en el presupuesto de 800 líneas de
+      `docs/15-flujo-de-trabajo-git.md` §3; no se activa ninguna subdivisión (A1a/A1b). Desglose
+      completo registrado en el propio comando; los archivos más grandes son
+      `apps/api/app/pom.xml` (186), `apps/api/app/src/test/java/com/confia/support/PostgresIntegrationTest.java`
+      (116) y `apps/api/app/src/test/java/com/confia/support/DatabasePipelineIT.java` (98).
 - [ ] 1.10
