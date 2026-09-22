@@ -1323,3 +1323,105 @@ explicit instruction), and because the delivery boundary for this cut is not yet
 other task in this cut (4.1-4.6) is complete, with the `./mvnw -B verify` evidence above standing
 as real, honest, local proof that the code itself is correct and ready, independent of how the
 diff eventually gets sliced for review.
+
+---
+
+## PR B3b — corte B3 (parte 2): verificador de cadena y pruebas de manipulación
+
+Branch `change/audit-log-and-transaction-runner-verifier`, base PR B3a (its tip, `c9f5f0d`, is this
+session's starting `HEAD`). Closes F0 exit criterion 3.
+
+## Task 5.1 — Sondas S3 and S9
+
+**S3, run against a scratch `postgres:18-alpine` container started outside the repository tree
+(`docker run -d --name confia-s3-probe ...`, removed afterward), never against
+`SharedPostgresContainer`.** A minimal `s3_probe` table with a `BEFORE UPDATE` trigger that always
+`RAISE EXCEPTION`s stands in for `shared_audit_log`'s own `shared_audit_is_append_only()` trigger —
+same mechanism (a non-`ENABLE ALWAYS` `BEFORE UPDATE` row trigger that rejects unconditionally), so
+the probe's result transfers directly.
+
+1. Baseline: `UPDATE s3_probe SET val = 'blocked?' WHERE id = 1` as `postgres` with the default
+   `session_replication_role` → `ERROR: update rejected by trigger` (the trigger fires normally).
+2. `SET session_replication_role = 'replica'; UPDATE s3_probe SET val = 'manipulated' WHERE id = 1;`
+   → `UPDATE 1`, and `SELECT val FROM s3_probe WHERE id = 1` reads back `manipulated`. The trigger
+   did **not** fire.
+3. `SET session_replication_role = 'origin';` then the same `UPDATE` again → `ERROR: update
+   rejected by trigger`. The trigger is back.
+
+**Confirmed exactly as `design.md` decision 10 and §10 predict**: `session_replication_role =
+'replica'` as `postgres` (superuser) disables the row trigger for that session only, and resetting
+to `'origin'` restores it — no `ALTER TABLE ... DISABLE TRIGGER` fallback needed. Probe container
+removed with `docker rm -f confia-s3-probe` immediately after.
+
+**S9**: cleaned `apps/api/app/target` (OneDrive retention, no `mvn clean`) and re-ran
+`./mvnw -B -pl app -am generate-sources` against the real schema (`V1`-`V3` migrations, including
+`shared_audit_log.source_ip INET`) — `BUILD SUCCESS`, `SharedAuditLog.java` regenerated. The
+generated field:
+
+```
+public final TableField<SharedAuditLogRecord, Object> SOURCE_IP = createField(DSL.name("source_ip"),
+    DefaultDataType.getDefaultDataType("\"pg_catalog\".\"inet\""), this, "");
+```
+
+is `Object`, marked `@Deprecated` ("Unknown data type... it may have been excluded from code
+generation"), **not `String`**. Per `design.md` §10 (sonda S9) and task 5.1's own instruction, added
+a `<forcedType>` to `VARCHAR` for `inet` columns in `apps/api/app/pom.xml`'s jOOQ generator
+`<database>` block (task detail below, task 5.3). Regenerated: `SOURCE_IP` is now
+`TableField<SharedAuditLogRecord, String>`.
+
+## Task 5.2 — RED: `AuditChainVerifierIT`
+
+Created `AuditChainVerifierIT.java` (four scenarios: intact chain, `SUPERUSER` manipulation without
+recalculation identified exactly, institution isolation, and the `actor_label`/`user_agent`/
+`trace_id` parameterized scenario — the 27th scenario noted in the reconciliation Javadoc) and its
+support class `AuditLogSuperuserTamper.java` (shared by the not-yet-written
+`AuditChainKnownLimitIT`, task 5.4).
+
+**RED, observed**: `./mvnw -B -pl app -am test -Dtest=AuditChainVerifierIT
+-Dsurefire.failIfNoSpecifiedTests=false`:
+
+```
+[ERROR] COMPILATION ERROR :
+[ERROR] .../AuditChainVerifierIT.java:[7,40] package com.confia.shared.infrastructure does not exist
+[ERROR] .../AuditChainVerifierIT.java:[36,13] cannot find symbol
+[ERROR]   symbol:   class AuditChainVerifier
+[ERROR] .../AuditChainVerifierIT.java:[37,20] cannot find symbol
+[ERROR]   symbol:   class DefaultAuditChainVerifier
+[ERROR] .../AuditChainVerifierIT.java:[37,71] cannot find symbol
+[ERROR]   symbol:   class JooqAuditLogReader
+[ERROR] .../AuditChainVerifierIT.java:[48,9] cannot find symbol
+[ERROR]   symbol:   class AuditChainVerification
+```
+
+Fails exactly as task 5.2 predicts: none of `AuditChainVerifier`, `AuditChainVerification`,
+`DefaultAuditChainVerifier`, `JooqAuditLogReader` or the `com.confia.shared.infrastructure` package
+exist yet. Committed as `7a080ea`.
+
+## Task 5.3 — VERDE: port, adapter and verifier
+
+Created `AuditRowSnapshot.java` (JDK types only), `AuditLogReader.java` (port),
+`com.confia.shared.infrastructure.JooqAuditLogReader.java` (the single jOOQ adapter, module `shared`
+so its generated-table dependency on `SharedAuditLog`/`SharedAuditLogRecord` satisfies R2's `Shared`
+prefix) plus its `package-info.java`; `AuditChainVerifier.java`, `AuditChainVerification.java`
+(`sealed`, `Empty`/`Intact`/`Diverged`, four-cause `Divergence` enum exactly matching design.md
+decision 11's contract) and `DefaultAuditChainVerifier.java` (walk with `running` advancing on the
+*stored* `row_hash`, stops at the first divergence, distinguishes `MISSING_GENESIS` /
+`GENESIS_PREV_HASH_MISMATCH` / `PREV_HASH_MISMATCH` / `ROW_HASH_MISMATCH`); `package-info.java` for
+`com.confia.shared.audit`.
+
+**GREEN, observed, first attempt, no rework needed**:
+`./mvnw -B -pl app -am test -Dtest=AuditChainVerifierIT -Dsurefire.failIfNoSpecifiedTests=false`:
+
+```
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 28.96 s -- in com.confia.shared.audit.AuditChainVerifierIT
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+
+Six tests: the three plain `@Test` methods plus the three-valued `@ParameterizedTest`
+(`actor_label`/`user_agent`/`trace_id`). Confirms the verifier reports `Intact` on a real,
+untouched chain; identifies the exact `(institution_id, id)` of a row altered directly with
+`SUPERUSER` and `session_replication_role = 'replica'` (S3), without recalculation; never sees a
+manipulation confined to a different institution; and detects a divergence from altering *only*
+`actor_label`, `user_agent` or `trace_id` — the 27th scenario the reconciliation note above
+documents.
