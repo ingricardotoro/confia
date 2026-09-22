@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
 import net.jqwik.api.Arbitraries;
+import org.flywaydb.core.Flyway;
 import net.jqwik.api.Arbitrary;
 import net.jqwik.api.Combinators;
 import net.jqwik.api.ForAll;
@@ -55,6 +56,26 @@ import tools.jackson.databind.node.StringNode;
 class CanonicalSerializationCrossCheckIT {
 
     private static final DataSource DATA_SOURCE = SharedPostgresContainer.dataSourceFor("confia_admin_app");
+
+    static {
+        // Every other *IT.java class applies migrations by extending PostgresIntegrationTest,
+        // whose @DynamicPropertySource re-enables Flyway (disabled by default in
+        // application.yml) and points it at confia_owner once Spring builds that test's context
+        // (PostgresIntegrationTest#datasource). This class deliberately never does that — probe
+        // S8 (apply-progress.md, task 4.1) confirmed jqwik's TestEngine never processes JUnit
+        // Jupiter extensions, so a jqwik @Property class cannot extend a @SpringBootTest base and
+        // rely on its context to have migrated the schema first. Running the exact same Flyway
+        // migration explicitly here, against SharedPostgresContainer.dataSourceFor("confia_owner")
+        // (no raw password needed), makes this class self-sufficient and correctly runnable in
+        // isolation, instead of silently depending on some other *IT class happening to run first
+        // in the same JVM and migrate the shared container as a side effect. Idempotent: Flyway
+        // takes its own lock and is a no-op if another *IT class already migrated this container.
+        Flyway.configure()
+                .dataSource(SharedPostgresContainer.dataSourceFor("confia_owner"))
+                .locations("classpath:db/migration")
+                .load()
+                .migrate();
+    }
 
     /**
      * The exact function the {@code shared_audit_log_chain()} trigger calls
@@ -185,7 +206,10 @@ class CanonicalSerializationCrossCheckIT {
                 case '\t' -> builder.append("\\t");
                 default -> {
                     if (c < 0x20) {
-                        builder.append(String.format("\\u%04x", (int) c));
+                        // See CanonicalAuditRowSerializer#canonString: never write a literal
+                        // backslash immediately followed by 'u' in source (javac's unicode-escape
+                        // prescan, JLS 3.3, intercepts it before tokenization).
+                        builder.append('\\').append('u').append(String.format("%04x", (int) c));
                     } else {
                         builder.append(c);
                     }
