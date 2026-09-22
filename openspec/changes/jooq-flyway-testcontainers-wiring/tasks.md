@@ -387,6 +387,19 @@ el conteo de `SuppressionCitesAdrTest` no se toca en este corte (`design.md`, de
   única de una tabla de negocio incluye el discriminador de institución» (ambos escenarios) y
   «Nombres de tabla con el prefijo de su módulo, salvo el catálogo cerrado» (los tres escenarios)
 
+- [ ] 3.5b **ROJO/VERDE — la guarda técnica del RTN, verificada contra el esquema real.** En
+  `MultiTenantSchemaIT` (misma clase de aserciones de catálogo), añadir dos escenarios que hoy no
+  tienen prueba en ningún corte: (1) el comentario de la columna `organization_institution.rtn`,
+  leído con `col_description` sobre el catálogo real, declara explícitamente que su límite de
+  longitud es una guarda técnica y **no** una regla fiscal; (2) una inserción directa por SQL con un
+  RTN de más de 20 caracteres, sin pasar por la validación del dominio, es rechazada por la base de
+  datos. Ambas deben fallar si el comentario o la restricción desaparecen de la migración de A2.
+  El tercer escenario del requisito ya está cubierto en dirección de lectura por
+  `JooqInstitutionRepositoryIT.reconstructsEveryAttributeFromTheRealSchema`; su redacción se
+  corrigió en `specs/organization/spec.md` para la dirección de lectura, porque el adaptador es de
+  solo lectura. — Especificación `organization`, requisito «La longitud de la columna del RTN es una
+  guarda técnica, no una regla fiscal» (los tres escenarios)
+
 - [ ] 3.6 **ROJO/VERDE — `RolePrivilegeMatrixIT`.** Crear
   `apps/api/app/src/test/java/com/confia/schema/RolePrivilegeMatrixIT.java` con: (5) para los cinco
   roles de `docs/03` §6.1, `rolsuper = false` y `rolbypassrls = false` (refuerzo de catálogo,
