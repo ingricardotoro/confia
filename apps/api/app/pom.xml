@@ -98,6 +98,15 @@
       <version>${archunit.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- Property-based cross-check between the canonical serializer's PL/pgSQL and Java
+         implementations (design.md decision 6; task 1.1, sonda S13). Version managed by the
+         parent's dependencyManagement (apps/api/pom.xml), same as kernel/pom.xml already declares
+         it: no version pinned here. -->
+    <dependency>
+      <groupId>net.jqwik</groupId>
+      <artifactId>jqwik</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.springframework.modulith</groupId>
       <artifactId>spring-modulith-core</artifactId>

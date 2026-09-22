@@ -98,7 +98,7 @@ Rama `change/audit-log-and-transaction-runner` (rama actual), base `main`. Crea 
 producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pueda crear
 `shared_audit_log` (ver dependencia arriba).
 
-- [ ] 1.1 **Ejecutar las sondas S7, S10, S12 y S13 (bloqueante, `design.md` §10 y §11 paso 1) y
+- [x] 1.1 **Ejecutar las sondas S7, S10, S12 y S13 (bloqueante, `design.md` §10 y §11 paso 1) y
   declarar `net.jqwik:jqwik` en `apps/api/app/pom.xml`.** Ninguna requiere Docker: ArchUnit, Spring
   Modulith y el enforcer de Maven no tocan PostgreSQL. (a) **S13**: añadir `net.jqwik:jqwik` de
   alcance `test` a `apps/api/app/pom.xml` (hoy solo lo declara `kernel/pom.xml`; el POM padre lo
