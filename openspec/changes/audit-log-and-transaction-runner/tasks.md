@@ -505,7 +505,7 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
   cruzada a la función SQL. Ejecutar `CanonicalSerializationCrossCheckIT` con las once familias:
   verde. — `design.md`, decisión 6 completa (6.1 a 6.4) y §6.3
 
-- [ ] 4.4 **ROJO — divergencia deliberada.** No requiere Docker (comparación pura entre dos
+- [x] 4.4 **ROJO — divergencia deliberada.** No requiere Docker (comparación pura entre dos
   implementaciones Java, sin llamada a PostgreSQL). Crear
   `.../test/java/com/confia/shared/audit/fixture/Utf16OrderingCanonicalAuditRowSerializer.java`
   (implementa deliberadamente el orden de claves por `String.compareTo`, el orden UTF-16, en vez de
@@ -517,7 +517,7 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
   `audit-trail`, requisito «Reproducibilidad de la serialización canónica entre PL/pgSQL y Java»
   (escenario «Una divergencia introducida a propósito hace fallar la prueba de propiedades»)
 
-- [ ] 4.5 **VERDE — el fixture de orden UTF-16.** No requiere Docker. Completar
+- [x] 4.5 **VERDE — el fixture de orden UTF-16.** No requiere Docker. Completar
   `Utf16OrderingCanonicalAuditRowSerializer` para que compile y produzca un resultado distinto de
   `CanonicalAuditRowSerializer` exactamente sobre el par de claves determinista. Ejecutar
   `CanonicalSerializationDivergenceTest`: verde, con el mensaje de fallo del fixture mostrando la

@@ -1131,3 +1131,54 @@ SQL function and `CanonicalAuditRowSerializer`. The narrow run's own `jacoco-mav
 failure ("Coverage checks have not been met") is the same already-documented artifact of running
 `-Dtest=none` against an incomplete test set that PR B1's task 1.3 first recorded — not a real gate
 failure, resolved by the full `./mvnw -B verify` in task 4.7.
+
+## Task 4.4 — RED: `CanonicalSerializationDivergenceTest`
+
+Created `apps/api/app/src/test/java/com/confia/shared/audit/CanonicalSerializationDivergenceTest.java`:
+compares `CanonicalAuditRowSerializer` (correct) against
+`com.confia.shared.audit.fixture.Utf16OrderingCanonicalAuditRowSerializer` (not yet created) over an
+`ObjectNode` carrying design.md §6.5's own deterministic key pair — `"Ｚ"` (`U+FF3A`, 3 UTF-8
+bytes starting `0xEF`) and `"😀"` (`U+1F600`, a UTF-16 surrogate pair, 4 UTF-8 bytes
+starting `0xF0`) — asserting both the canonical JSON text and the full `rowHash` differ between the
+two implementations on that exact input.
+
+**RED, observed**: `./mvnw -B -pl app -am test-compile`, exit 1:
+
+```
+[ERROR] .../CanonicalSerializationDivergenceTest.java:[5,39] package com.confia.shared.audit.fixture
+does not exist
+[ERROR] .../CanonicalSerializationDivergenceTest.java:[31,66] cannot find symbol
+[ERROR]   symbol:   class Utf16OrderingCanonicalAuditRowSerializer
+```
+
+Fails exactly as task 4.4 predicts: the fixture package and class do not exist yet. Committed as
+`f5000e8`.
+
+## Task 4.5 — VERDE: `Utf16OrderingCanonicalAuditRowSerializer`
+
+Created `apps/api/app/src/test/java/com/confia/shared/audit/fixture/Utf16OrderingCanonicalAuditRowSerializer.java`:
+extends `CanonicalAuditRowSerializer`, overriding only `compareObjectKeys` to
+`a.compareTo(b)` (`String`'s own UTF-16 code-unit order) instead of the production unsigned-UTF-8-
+byte comparator. No other method is touched — the fixture is deliberately the smallest possible
+diff from the correct implementation, so the *only* thing under test is the key-ordering deviation
+itself.
+
+**GREEN, observed, first attempt, no implementation change needed**:
+`./mvnw -B -pl app -am test -Dtest=CanonicalSerializationDivergenceTest
+-Dsurefire.failIfNoSpecifiedTests=false`:
+
+```
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.997 s -- in com.confia.shared.audit.CanonicalSerializationDivergenceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+
+Confirms the property-based cross-check can genuinely fail: manually, `"Ｚ"`'s UTF-8 encoding
+(`EF BC BA`) sorts before `"😀"`'s (`F0 9F 98 80`) by unsigned byte comparison (`0xEF` <
+`0xF0`), while `String.compareTo` compares the first UTF-16 code unit of each (`0xD83D` <
+`0xFF3A`), ordering the same pair the opposite way — so the two implementations produce different
+canonical JSON text and, downstream, different `row_hash` values on the identical input. This
+satisfies both detention rules explicitly named in the orchestrator's brief: the fixture makes the
+property fail on a real, deliberately introduced divergence (not an untested no-op), and the
+comparison exercises `CanonicalAuditRowSerializer#rowHash`, the exact same composition the cross-
+check property calls, never a convenience reimplementation.
