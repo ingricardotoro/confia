@@ -383,14 +383,29 @@ porque cerrarlas sin escribir una línea de PL/pgSQL sería inventar.
   normalización de números, codificación de `NULL`, `JSONB` anidado y marcas de tiempo con zona. La
   duplicación entre PL/pgSQL y Java es **el riesgo técnico principal del cambio**; se mitiga con la
   prueba cruzada de jqwik, no con disciplina.
-- **P2. La clave primaria de la bitácora contra la puerta de índices únicos.** Verificado:
+- **P2. RESUELTA junto con P3 (propietario, 2026-09-21): clave primaria compuesta
+  `(institution_id, id)`.** Queda para el diseño únicamente la forma exacta de generar el
+  componente secuencial por institución. Contexto original, que se conserva porque explica por qué:
   `MultiTenantSchemaIT.everyUniqueIndexOfABusinessTableIncludesTheInstitutionDiscriminator` (líneas
   84–95) exige que todo índice único de una tabla de negocio distinta de la raíz incluya
   `institution_id`. El DDL de `docs/03` §12.1 declara `id BIGSERIAL PRIMARY KEY`, cuyo índice único
   contiene solo `id`: **tal cual está escrito, rompe una puerta que la parte A ya entregó en verde**.
   El diseño debe resolverlo, y la salida obvia —clave primaria compuesta `(institution_id, id)`— está
   acoplada a P3.
-- **P3. ¿La cadena es global o por institución?** `docs/03` §12.4 habla de «verificación completa
+- **P3. RESUELTA (propietario, 2026-09-21): una cadena por institución.** Cada institución tiene su
+  propio registro génesis y su propia cadena; el verificador corre con el contexto de cada una y
+  recalcula la suya. Se descartaron las dos variantes de cadena global: crear un sexto rol con
+  `BYPASSRLS` contradice `docs/03` línea 632 —«ese detalle es crítico»— y crearía la única llave
+  capaz de leer los datos de todas las instituciones; y verificar como propietario del esquema
+  exigiría quitar `FORCE ROW LEVEL SECURITY` de la bitácora, que es justo el atributo que impide el
+  verde falso en las pruebas de aislamiento.
+
+  **Consecuencias que este cambio DEBE asumir:** `docs/03-seguridad.md` §12.4 se actualiza, porque su
+  redacción en singular deja de ser cierta; y el cambio 11 anclará una cadena por institución, no un
+  solo valor, lo que debe quedar escrito donde ese cambio lo encuentre.
+
+  Contexto original, que se conserva porque explica por qué existía la tensión:
+  `docs/03` §12.4 habla de «verificación completa
   desde el registro génesis», en singular, lo que sugiere una cadena única. Pero la tabla lleva
   política de fila por institución y **ningún rol del sistema tiene `BYPASSRLS`** (`docs/03` §6.1),
   así que un verificador que corra con contexto de una institución no puede ver las filas de las
