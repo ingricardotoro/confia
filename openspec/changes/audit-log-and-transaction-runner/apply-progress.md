@@ -1366,4 +1366,33 @@ public final TableField<SharedAuditLogRecord, Object> SOURCE_IP = createField(DS
 is `Object`, marked `@Deprecated` ("Unknown data type... it may have been excluded from code
 generation"), **not `String`**. Per `design.md` §10 (sonda S9) and task 5.1's own instruction, added
 a `<forcedType>` to `VARCHAR` for `inet` columns in `apps/api/app/pom.xml`'s jOOQ generator
-`<database>` block (task detail below, task 5.3).
+`<database>` block (task detail below, task 5.3). Regenerated: `SOURCE_IP` is now
+`TableField<SharedAuditLogRecord, String>`.
+
+## Task 5.2 — RED: `AuditChainVerifierIT`
+
+Created `AuditChainVerifierIT.java` (four scenarios: intact chain, `SUPERUSER` manipulation without
+recalculation identified exactly, institution isolation, and the `actor_label`/`user_agent`/
+`trace_id` parameterized scenario — the 27th scenario noted in the reconciliation Javadoc) and its
+support class `AuditLogSuperuserTamper.java` (shared by the not-yet-written
+`AuditChainKnownLimitIT`, task 5.4).
+
+**RED, observed**: `./mvnw -B -pl app -am test -Dtest=AuditChainVerifierIT
+-Dsurefire.failIfNoSpecifiedTests=false`:
+
+```
+[ERROR] COMPILATION ERROR :
+[ERROR] .../AuditChainVerifierIT.java:[7,40] package com.confia.shared.infrastructure does not exist
+[ERROR] .../AuditChainVerifierIT.java:[36,13] cannot find symbol
+[ERROR]   symbol:   class AuditChainVerifier
+[ERROR] .../AuditChainVerifierIT.java:[37,20] cannot find symbol
+[ERROR]   symbol:   class DefaultAuditChainVerifier
+[ERROR] .../AuditChainVerifierIT.java:[37,71] cannot find symbol
+[ERROR]   symbol:   class JooqAuditLogReader
+[ERROR] .../AuditChainVerifierIT.java:[48,9] cannot find symbol
+[ERROR]   symbol:   class AuditChainVerification
+```
+
+Fails exactly as task 5.2 predicts: none of `AuditChainVerifier`, `AuditChainVerification`,
+`DefaultAuditChainVerifier`, `JooqAuditLogReader` or the `com.confia.shared.infrastructure` package
+exist yet. Committed as `d00c17a`'s successor (see task 5.3's commit below for the compiled state).
