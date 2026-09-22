@@ -94,6 +94,46 @@ S9, S10, S11, S12, S13— se ejecutan como tarea explícita dentro del corte que
 
 ## PR B1 — corte B1: componente transaccional único y base de confirmación real
 
+> **Dividido en B1a y B1b por el orquestador el 2026-09-21**, bajo la estrategia de entrega `auto`
+> que el propietario eligió en la preflight de sesión. La tarea 1.11 midió **1 015 líneas** de
+> código, por encima del máximo de ochocientas de `docs/15-flujo-de-trabajo-git.md` §3 y también del
+> extremo alto del propio pronóstico de `design.md` §12. La aplicación se detuvo ahí, como estaba
+> instruido, sin decidir el corte por su cuenta.
+>
+> El punto de corte se eligió midiendo los seis límites de commit candidatos, no estimando:
+>
+> | Corte tras | B1a | B1b |
+> |---|---|---|
+> | tarea 1.3 | 365 | 666 |
+> | tarea 1.4 | 510 | 521 |
+> | **tarea 1.5** | **610** | **421** |
+> | tarea 1.6 | 797 | 252 |
+> | tarea 1.7 | 864 | 151 |
+> | tarea 1.8 | 957 | 58 |
+>
+> Se eligió **tras la tarea 1.5**, commit `beb395a`. Los de 1.6 en adelante dejan a B1a rozando el
+> presupuesto sin margen; el de 1.3 desbalancea. Y la costura tiene sentido propio: **B1a** entrega
+> el componente transaccional y las dos clases base de prueba; **B1b** entrega el reintento acotado
+> y la mitad positiva de la regla R3.
+>
+> - **PR B1a**, rama `change/audit-log-and-transaction-runner-component`, base `main`: tareas 1.1 a
+>   1.5. 610 líneas de código.
+> - **PR B1b**, rama `change/audit-log-and-transaction-runner`, base PR B1a: tareas 1.6 a 1.12.
+>   421 líneas de código.
+>
+> Ninguna tarea se separa de sus propias pruebas, y ningún commit hubo que reescribir: cada tarea ya
+> era un commit independiente, así que partir fue elegir un punto de rama entre los que ya existían.
+>
+> **Verificación del corte.** `docs/15` §3 exige que cada unidad de una cadena compile y pase sus
+> pruebas sola. B1a se verificó en `beb395a` con `./mvnw -B verify`: **BUILD SUCCESS**, cobertura
+> cumplida en ambos módulos. La primera corrida de esa verificación había fallado con cobertura
+> **0,00 en todo el paquete**, que es el agente de JaCoCo sin instrumentar y no código sin cubrir;
+> no se reprodujo en una segunda corrida limpia. Coincide con la interferencia del servidor de
+> lenguaje de VS Code sobre `target/test-classes` que la aplicación documentó en su informe, y con
+> la retención de directorios de OneDrive. Es ruido del entorno local: la integración continua corre
+> en `ubuntu-latest`, sin ninguno de los dos.
+
+
 Rama `change/audit-log-and-transaction-runner` (rama actual), base `main`. Crea la primera clase de
 producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pueda crear
 `shared_audit_log` (ver dependencia arriba).
