@@ -227,7 +227,7 @@ Rama `change/jooq-flyway-testcontainers-wiring-migration`, base PR A1 (el nombre
 ADR-0020 en el mismo commit que crea la primera clase de `infrastructure` (plan de reversión de la
 propuesta, punto 2).
 
-- [ ] 2.1 **ROJO — ida y vuelta, ausencia y duplicado.** Crear
+- [x] 2.1 **ROJO — ida y vuelta, ausencia y duplicado.** Crear
   `apps/api/app/src/test/java/com/confia/organization/infrastructure/JooqInstitutionRepositoryIT.java`
   con: reconstrucción fiel de cada atributo de una fila sembrada por SQL directo (`tradeName`
   presente, RTN de 14 dígitos, moneda `HNL`); reconstrucción con `trade_name` nulo (nunca cadena
@@ -237,7 +237,7 @@ propuesta, punto 2).
   `JooqInstitutionRepository`. — Especificación `organization`, requisito «Contrato observable del
   adaptador jOOQ de `InstitutionRepository` contra la base real» (los cuatro escenarios)
 
-- [ ] 2.2 **VERDE — migración `V1__create_organization_institution.sql`.** Crear
+- [x] 2.2 **VERDE — migración `V1__create_organization_institution.sql`.** Crear
   `apps/api/app/src/main/resources/db/migration/V1__create_organization_institution.sql` con la
   tabla (`id UUID PRIMARY KEY`, `legal_name`, `trade_name`, `rtn`, `address`, `default_currency`,
   `locale`, `timezone`, `is_active`), las comprobaciones de RTN (`^[0-9]{1,20}$`) y de moneda
@@ -253,7 +253,7 @@ propuesta, punto 2).
   `organization`, requisitos «Contrato observable...» (escenario de duplicado) y «La longitud de la
   columna del RTN es una guarda técnica, no una regla fiscal» (los tres escenarios)
 
-- [ ] 2.3 **VERDE — adaptador jOOQ de solo lectura.** Crear
+- [x] 2.3 **VERDE — adaptador jOOQ de solo lectura.** Crear
   `apps/api/app/src/main/java/com/confia/organization/infrastructure/JooqInstitutionRepository.java`
   (`final`, constructor explícito con `DSLContext`, sin anotación de Spring, implementa únicamente
   `findById` del puerto existente, sin abrir transacciones ni fijar contexto de sesión, sin exponer
@@ -269,7 +269,7 @@ propuesta, punto 2).
   `organization`, requisito «Puerto de salida para cargar una institución por identificador»
   (MODIFIED)
 
-- [ ] 2.4 **Commit único de ADR-0020: cierre del rojo programado.** En el mismo commit que crea
+- [x] 2.4 **Commit único de ADR-0020: cierre del rojo programado.** En el mismo commit que crea
   `JooqInstitutionRepository` (o inmediatamente adyacente, antes de continuar): en
   `apps/api/app/src/test/java/com/confia/architecture/LayeredArchitectureTest.java`, cambiar
   `.optionalLayer("Infrastructure")` por `.layer("Infrastructure")`, retirar las dos líneas de
@@ -284,7 +284,7 @@ propuesta, punto 2).
   especificación `build-integrity`, requisito «`infrastructure` deja de ser una capa opcional en la
   verificación de capas» (ambos escenarios); ADR-0020, alcance punto 3
 
-- [ ] 2.5 **ROJO/VERDE — aislamiento con dos instituciones, contexto ausente y contexto vacío.**
+- [x] 2.5 **ROJO/VERDE — aislamiento con dos instituciones, contexto ausente y contexto vacío.**
   Extender `JooqInstitutionRepositoryIT` con el ayudante `withInstitutionContext(InstitutionId,
   Runnable)` de `PostgresIntegrationTest` (parámetro vinculado, `SELECT set_config('app.institution_id',
   ?, true)`, nunca interpolado): sembrar dos instituciones y confirmar que una sesión con el contexto
@@ -295,14 +295,14 @@ propuesta, punto 2).
   Especificación `organization`, requisito «Aislamiento por fila de la tabla raíz según ADR-0009»
   (los cuatro escenarios)
 
-- [ ] 2.6 **Medir el diff real de PR A2** con
+- [x] 2.6 **Medir el diff real de PR A2** con
   `git diff --numstat <base-de-PR-A1>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   Si cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y consultar al
   propietario** entre una subdivisión adicional (separar las pruebas de aislamiento del resto del
   adaptador, `design.md` §12) o una excepción de tamaño; no decidirlo sin el propietario. — D2 de la
   propuesta; `design.md` §12, «Pronóstico de tamaño por corte»
 
-- [ ] 2.7 **Verificación final de PR A2.** En checkout limpio, ejecutar `./mvnw -B verify` en
+- [x] 2.7 **Verificación final de PR A2.** En checkout limpio, ejecutar `./mvnw -B verify` en
   `apps/api` con JDK 25 y Docker activo. Confirmar `JooqInstitutionRepositoryIT` en verde completa
   (ida y vuelta, ausencia, duplicado, aislamiento, contexto ausente y vacío), y que
   `LayeredArchitectureTest`/`EmptyShouldExceptionInventoryTest`/`SuppressionCitesAdrTest` pasan con

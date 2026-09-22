@@ -29,23 +29,19 @@ class EmptyShouldExceptionInventoryTest {
     }
 
     /**
-     * Package-visible for {@link SuppressionCitesAdrTest}'s count check. Two entries, both
+     * Package-visible for {@link SuppressionCitesAdrTest}'s count check. One remaining entry,
      * {@link Marker#OPTIONAL_LAYER} (ADR-0020 §2): {@code organization} has no production class
-     * yet in an {@code infrastructure} package (change 5 adds the first jOOQ adapter) or in a
-     * {@code web} package (the first business controller adds one). ADR-0018's own
-     * {@code allowEmptyShould(true)} exception on
-     * {@code LayeredArchitectureTest.productionCodeRespectsLayeringYet} expired the moment {@code
+     * yet in a {@code web} package (the first business controller adds one). The
+     * {@code Infrastructure} entry that used to sit alongside this one retired together with
+     * {@code optionalLayer("Infrastructure")} itself in PR A2, F0 change 5, the moment {@link
+     * com.confia.organization.infrastructure.JooqInstitutionRepository} became this codebase's
+     * first production class in an {@code infrastructure} package (ADR-0020, alcance punto 3;
+     * design.md decision 11). ADR-0018's own {@code allowEmptyShould(true)} exception on {@code
+     * LayeredArchitectureTest.productionCodeRespectsLayeringYet} expired the moment {@code
      * organization.domain} added its first production class (change 4); the mechanism itself
      * stays in place for whichever future exception needs it.
      */
     static final List<ExpiringException> EXCEPTIONS = List.of(
-            new ExpiringException(Marker.OPTIONAL_LAYER,
-                    "LayeredArchitectureTest.productionLayeringRule, layer Infrastructure",
-                    "ADR-0020",
-                    "no production class resides in an infrastructure package yet (change 5 adds "
-                            + "the first jOOQ adapter)",
-                    classes -> LayeredArchitectureTest.noProductionClassInLayer(classes,
-                            "infrastructure")),
             new ExpiringException(Marker.OPTIONAL_LAYER,
                     "LayeredArchitectureTest.productionLayeringRule, layer Web", "ADR-0020",
                     "no production class resides in a web package yet (the first business "
