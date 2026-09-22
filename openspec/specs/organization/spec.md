@@ -23,11 +23,6 @@ Fuentes de verdad: `docs/02-modelo-de-dominio.md` §2.2 y §3.1, `docs/adr/ADR-0
 Estos puntos están deliberadamente fuera de esta especificación; se listan para que no se
 confundan con un olvido:
 
-- **Persistencia real.** No existe en este cambio ninguna tabla `organization_institution`,
-  ninguna migración de Flyway ni ningún repositorio jOOQ. Por decisión del propietario (D1 de la
-  propuesta), esa tabla y su repositorio son responsabilidad de la primera migración del cambio 5.
-  El puerto `InstitutionRepository` de esta especificación solo describe el contrato que ese
-  cambio implementará.
 - **Administración de instituciones.** No hay alta, edición, conmutador ni endpoint de
   instituciones. ADR-0009, punto 5, difiere esa funcionalidad hasta que exista una segunda
   institución real.
@@ -286,7 +281,8 @@ La capa `application` de `organization` DEBE declarar el puerto de salida `Insti
 con una operación que carga una `Institution` a partir de su `InstitutionId` y que devuelve una
 ausencia de resultado (no una excepción) cuando no existe ninguna institución con ese
 identificador. Este puerto NO DEBE depender de jOOQ, de un tipo de PostgreSQL ni de ningún otro
-detalle de infraestructura; su implementación real es responsabilidad del cambio 5.
+detalle de infraestructura. Su implementación real es el adaptador jOOQ de
+`organization.infrastructure` que el cambio 5 entregó, contra la tabla `organization_institution`.
 
 #### Escenario: Carga con dobles en memoria
 
@@ -350,3 +346,110 @@ de error de dominio `institution-inactive`.
   falso
 - **CUANDO** se ejecuta el caso de uso de resolución
 - **ENTONCES** el caso de uso falla con el código de error de dominio `institution-inactive`
+
+### Requisito: Contrato observable del adaptador jOOQ de `InstitutionRepository` contra la base real
+
+El adaptador jOOQ de `InstitutionRepository`, ubicado en `com.confia.organization.infrastructure`,
+DEBE reconstruir una `Institution` fiel a la fila almacenada en `organization_institution`,
+conservando cada atributo, incluidos el RTN como la secuencia exacta de dígitos almacenada (sin
+normalización adicional) y la moneda por defecto. El adaptador **es de solo lectura en este cambio**:
+el puerto `InstitutionRepository` solo declara `findById`, y una operación de escritura sin
+consumidor en producción llegaría con la administración de instituciones (cambio 7), no aquí; la
+siembra de filas en las pruebas es responsabilidad explícita de la prueba, con instrucciones SQL
+directas. El adaptador DEBE devolver una ausencia de resultado, nunca una excepción, cuando se
+consulta un `InstitutionId` para el que no existe fila. La base de datos DEBE rechazar la inserción
+de dos filas con el mismo identificador de institución, porque la clave primaria de la tabla es ese
+identificador.
+
+#### Escenario: Reconstrucción fiel de cada atributo contra la base real
+
+- **DADO** una fila sembrada por la prueba en `organization_institution` con `tradeName` presente,
+  RTN de 14 dígitos y moneda `HNL`
+- **CUANDO** el adaptador consulta esa institución por su `InstitutionId` contra el esquema real
+- **ENTONCES** cada atributo reconstruido es igual al almacenado, incluidos el RTN como la misma
+  secuencia exacta de dígitos y la moneda `HNL`
+
+#### Escenario: Reconstrucción con nombre comercial ausente
+
+- **DADO** una fila sembrada por la prueba con `trade_name` nulo
+- **CUANDO** el adaptador consulta esa institución por su `InstitutionId`
+- **ENTONCES** el `tradeName` reconstruido sigue siendo nulo, sin convertirse en cadena vacía
+
+#### Escenario: Ausencia de resultado para un identificador desconocido en la base real
+
+- **DADO** la tabla `organization_institution` sin ninguna fila para un `InstitutionId` dado
+- **CUANDO** el adaptador consulta ese identificador contra el esquema real
+- **ENTONCES** el adaptador devuelve una ausencia de resultado, sin lanzar ninguna excepción
+
+#### Escenario: Rechazo de una fila duplicada con el mismo identificador
+
+- **DADO** una fila ya sembrada bajo un `InstitutionId` determinado
+- **CUANDO** la prueba intenta insertar otra fila en `organization_institution` con el mismo
+  identificador
+- **ENTONCES** la base de datos rechaza la inserción por violación de la clave primaria; la garantía
+  vive en el esquema, no en el código de la aplicación
+
+### Requisito: Aislamiento por fila de la tabla raíz según ADR-0009
+
+La tabla `organization_institution` DEBE tener `ENABLE ROW LEVEL SECURITY` y
+`FORCE ROW LEVEL SECURITY`, con una política que filtra por
+`id = current_setting('app.institution_id', true)::uuid` (ADR-0009, «Implementación del
+aislamiento»; ADR-0017, regla 1). Una sesión cuyo contexto de institución no coincide con el
+identificador de una fila NO DEBE poder leer esa fila. Una sesión sin contexto de institución
+establecido, o con contexto vacío, DEBE recibir cero filas de la política en lugar de un error de
+conversión.
+
+#### Escenario: Una institución no puede leer la fila de otra
+
+- **DADO** dos instituciones sembradas, cada una en su propia fila de `organization_institution`
+- **CUANDO** una sesión con el contexto de la primera institución consulta la fila de la segunda
+- **ENTONCES** la consulta devuelve cero filas, aunque la fila exista físicamente en la tabla
+
+#### Escenario: Contexto de sesión ausente deniega en vez de fallar
+
+- **DADO** una sesión sin `app.institution_id` establecido en absoluto
+- **CUANDO** esa sesión consulta `organization_institution`
+- **ENTONCES** la política deniega devolviendo cero filas, sin lanzar un error de conversión a
+  `uuid`
+
+#### Escenario: Contexto de sesión vacío deniega en vez de fallar
+
+- **DADO** una sesión con `app.institution_id` establecido como cadena vacía
+- **CUANDO** esa sesión consulta `organization_institution`
+- **ENTONCES** la política deniega devolviendo cero filas, sin lanzar un error de conversión a
+  `uuid`
+
+#### Escenario: Una institución sí puede leer su propia fila
+
+- **DADO** una institución sembrada con su fila en `organization_institution`
+- **CUANDO** una sesión con el contexto de esa misma institución consulta su propia fila
+- **ENTONCES** la consulta devuelve exactamente esa fila
+
+### Requisito: La longitud de la columna del RTN es una guarda técnica, no una regla fiscal
+
+La columna del RTN en `organization_institution` DEBE declarar, en un comentario de columna, que su
+límite de longitud es una guarda técnica heredada del dominio (de 1 a 20 dígitos) y no una regla
+fiscal, mientras `docs/04-cumplimiento-fiscal-sar.md` §1 mantenga el formato del RTN como pendiente
+de validación. La columna DEBE rechazar, a nivel de base de datos, un valor que exceda esa longitud
+técnica, como defensa adicional independiente de la validación que ya aplica el dominio.
+
+#### Escenario: El comentario de columna declara la guarda técnica
+
+- **DADO** la migración que crea `organization_institution`
+- **CUANDO** se inspecciona el comentario de la columna del RTN en el esquema real
+- **ENTONCES** el comentario declara explícitamente que el límite es una guarda técnica y no una
+  regla fiscal
+
+#### Escenario: La base de datos rechaza un RTN que excede la guarda técnica
+
+- **DADO** un intento de insertar directamente una fila en `organization_institution` con un valor
+  de RTN de más de 20 caracteres, sin pasar por la validación del dominio
+- **CUANDO** se ejecuta esa inserción contra el esquema real
+- **ENTONCES** la base de datos rechaza la fila por violar la restricción de longitud de la columna
+
+#### Escenario: Un RTN de longitud válida se reconstruye sin alteración
+
+- **DADO** una fila sembrada por la prueba en `organization_institution` con un RTN de 14 dígitos
+- **CUANDO** el adaptador de solo lectura reconstruye esa institución contra el esquema real
+- **ENTONCES** el RTN reconstruido es la misma secuencia exacta de 14 dígitos, sin relleno ni
+  truncamiento

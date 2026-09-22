@@ -133,6 +133,21 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    mismo cambio que introduzca Renovate**, nunca antes, y esa fila de `docs/03` sección 13 debe
    ampliarse para nombrar explícitamente las imágenes de construcción y prueba, no solo las de los
    Dockerfiles.
+   **Pendientes heredados del cambio 5 parte A (verificación SDD del 2026-09-21):** tres
+   requisitos de `build-integrity` descansan hoy en disciplina humana y no en una puerta
+   automática, y deben cerrarse con una. (a) El presupuesto de ocho minutos de la suite `*IT.java`
+   se mide y se documenta, pero no se exige: `timeout-minutes: 15` cubre el trabajo `backend`
+   entero, así que una suite de integración de diez minutos terminaría en verde. (b) La prueba de
+   fuente única de la versión de PostgreSQL compara `PostgresIntegrationTest` contra
+   `confia-build.properties`, pero no contra el otro consumidor de esa propiedad: si
+   `apps/api/app/pom.xml` sustituyera `${confia.postgres.image}` por un literal divergente, ninguna
+   prueba fallaría. Conviene afirmar además contra `POSTGRES.getDockerImageName()`. (c) Nada impide
+   nombrar `*Test` a una clase que necesita contenedor, y por lo tanto ejecutarla en Surefire sin
+   Docker; el riesgo no es teórico, porque `PostgresImageSingleSourceTest` ya vive en el mismo
+   paquete `support`. Falta también un fixture de violación en la capa `infrastructure` para el
+   escenario de dependencia inválida. El informe completo, con la trazabilidad de los cuarenta y
+   tres escenarios, queda en
+   `openspec/changes/archive/2026-09-21-jooq-flyway-testcontainers-wiring/verify-report.md`.
 9. Respaldo en dos niveles según ADR-0014: respaldo automático de RDS con restauración a un punto en el tiempo dentro de AWS, más respaldo lógico nocturno cifrado y copia fuera de sitio en un proveedor distinto de AWS (brecha B10).
 10. Sistema de diseño base en `packages/ui` con tokens, átomos y verificación de accesibilidad automatizada.
 11. Semilla de datos ficticios para desarrollo y capacitación.
