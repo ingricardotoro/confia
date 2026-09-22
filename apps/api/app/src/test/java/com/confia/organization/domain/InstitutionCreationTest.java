@@ -29,6 +29,13 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 class InstitutionCreationTest {
 
+    /**
+     * An arbitrary digit sequence inside the 1-to-20 technical guard, never a claim about the real
+     * SAR format, which stays pending validation with the institution's accountant
+     * (docs/04-cumplimiento-fiscal-sar.md section 1). Its length carries no meaning here: {@code
+     * acceptsRtnOfOneAndTwentyDigits} exercises both ends of the guard precisely so no single
+     * fixture reads as the format.
+     */
     private static final String VALID_RTN = "08019012345678";
     private static final String VALID_ADDRESS = "Colonia Palmira, Tegucigalpa";
     private static final CurrencyCode VALID_CURRENCY = CurrencyCode.HNL;
@@ -174,6 +181,8 @@ class InstitutionCreationTest {
                 .extracting(exception -> ((InvalidInstitutionException) exception).code())
                 .isEqualTo(InvalidInstitutionException.RTN_INVALID);
 
+        // Fourteen is an arbitrary count between the guard's two ends, asserted just above and
+        // below, not a statement about how many digits a real Honduran RTN carries.
         String fourteenDigits = "1".repeat(14);
         Institution institution = Institution.create(anId(), "Instituto San Marcos",
                 "Colegio San Marcos", fourteenDigits, VALID_ADDRESS, VALID_CURRENCY, VALID_LOCALE,

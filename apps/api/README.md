@@ -50,3 +50,12 @@ database in this pull request): the full `./mvnw -B verify` reactor build (`kern
 tests, architecture tests, jOOQ generation, and the integration-test suite) took **1 minute 31
 seconds**; `DatabasePipelineIT` itself, which owns the only container start in this suite, ran in
 **18.2 seconds**. Both are far inside the 8-minute budget.
+
+**Final measurement, PR A3, with the complete `*IT.java` suite** (`DatabasePipelineIT`,
+`JooqInstitutionRepositoryIT`, `MultiTenantSchemaIT`, `RolePrivilegeMatrixIT` — 21 integration test
+methods total, one shared container per JVM per design.md decision 7): from a clean `app/target`
+and `kernel/target`, the full `./mvnw -B verify` reactor build took **2 minutes 4 seconds** total
+(`kernel` 12.8 s, `app` 1 minute 49 seconds, including jOOQ code generation against its own
+ephemeral container). The Failsafe `integration-test` phase itself — container start plus all four
+`*IT.java` classes — ran in about **30 seconds**. Both remain far inside the 8-minute budget, with
+no sign of approaching it as the suite has grown from 2 to 21 test methods across this change.

@@ -1,3 +1,147 @@
+# Apply progress: jooq-flyway-testcontainers-wiring — PR A1, PR A2 and PR A3
+
+## PR A3 — corte A3: reglas y puertas de esquema (tasks 3.1–3.9)
+
+Scope: PR A3 only (tasks 3.1–3.9 of `tasks.md`). Branch
+`change/jooq-flyway-testcontainers-wiring-gates`, base PR A2
+(`change/jooq-flyway-testcontainers-wiring-migration` @ `c23740b`). All four ArchUnit rules, the
+schema catalogue gates, and the role privilege matrix are new in this PR; no production code
+outside test sources changed.
+
+### TDD Cycle Evidence
+
+Each rule/gate followed the same RED technique as PR A2's compile-error RED (task 2.1 precedent):
+the test class was written first, referencing a `RULE` constant, helper method, or record type
+that did not yet exist, producing a real `cannot find symbol` compilation failure — never invented
+evidence. GREEN was then observed by adding the missing implementation and re-running the same
+test.
+
+| Task | RED | GREEN |
+|---|---|---|
+| 3.1 (R1) | `mvn test-compile`: `cannot find symbol: variable RULE` in `JooqConfinedToInfrastructureTest.java` | `mvn test -Dtest=JooqConfinedToInfrastructureTest`: `Tests run: 2, Failures: 0` |
+| 3.2 (R2) | Same technique, `TableOwnershipByModuleTest.java`: `cannot find symbol: variable RULE` | `Tests run: 2, Failures: 0` |
+| 3.3 (R3) | Same technique, `TransactionsOnlyInSharedSecurityTest.java`: `cannot find symbol: variable RULE` | First implementation attempt (`noClasses().that().resideOutsideOfPackage(...).should(customCondition)`) compiled but the fixture-rejection test failed with `Expecting code to raise a throwable` — the custom `ArchCondition` never fired under that combinator. Rewritten to `classes().should(condition)` with the "outside shared.security" check done inside the condition itself (same pattern as `NoCrossModuleDomainImportsTest`, R1): `Tests run: 2, Failures: 0` |
+| 3.4 (R4) | Same technique, `NoUnapprovedPlainSqlTest.java`: `cannot find symbol: variable RULE` | `Tests run: 2, Failures: 0` |
+| 3.5 | `mvn test-compile` on the whole tree: 17 `cannot find symbol` errors in `MultiTenantSchemaIT.java` (missing `BaseTable`, `RowSecurityFlags`, `UniqueIndex` records and every helper method) | `mvn verify -Dit.test=MultiTenantSchemaIT -Dtest=none`: `Tests run: 5, Failures: 0` (JaCoCo's own `jacoco-check` goal failed on this narrow run because Surefire was skipped with `-Dtest=none`, leaving unit-test coverage data out of the merged report — expected and resolved by the full `verify` in task 3.9, not a real gate failure) |
+| 3.5b | `mvn test-compile`: `cannot find symbol: method columnCommentOf(...)` | First run: `theDatabaseRejectsAnRtnLongerThanTheTechnicalGuardEvenBypassingTheDomain` failed — assertion expected the message to name the `organization_institution_rtn_digits` CHECK constraint, but the real rejection is PostgreSQL's `VARCHAR(20)` length guard firing first (`ERROR: value too long for type character varying(20)`), before the CHECK constraint is even evaluated. Assertion corrected to match the real message: `Tests run: 7, Failures: 0` |
+| 3.6 | `mvn test-compile`: 15 `cannot find symbol` errors in `RolePrivilegeMatrixIT.java` (missing `RoleAttributes` record and both helper methods) | `mvn verify -Dit.test=RolePrivilegeMatrixIT -Dtest=none`: `Tests run: 4, Failures: 0` |
+
+### Task 3.3 deviation: design.md's raw sketch vs. the working implementation
+
+`design.md` §6 sketches R3 as `noClasses().that().resideOutsideOfPackage(...).should(customCondition)`.
+That combination compiled and the production-code test passed, but the fixture-rejection test
+failed with no violation ever reported — ArchUnit's `noClasses()...should(ArchCondition)` did not
+fire the custom condition's `violated(...)` events the way `that().resideOutsideOfPackage(...)`
+combined with a custom `ArchCondition` apparently expects (not fully root-caused; empirically
+reproducible and empirically fixed). The working implementation instead follows this codebase's own
+proven pattern from `NoCrossModuleDomainImportsTest` (R1 predecessor, change 2): `classes().should(condition)`
+with the "outside shared.security" package check performed inside the condition itself. `design.md`
+explicitly marks its R1–R4 sketches as "esbozo; la firma exacta la fija la implementación" (§6), so
+this is an anticipated implementation-level deviation, not a design contradiction — reported here
+for transparency rather than silently adopted.
+
+### Task 3.9 — one anomalous timing run, not reproducible
+
+The first clean-tree `./mvnw -B verify` run for task 3.9 measured `JooqInstitutionRepositoryIT`
+alone at **448.1 seconds** (vs. 20–27 seconds in every other run of this same class in this PR and
+in PR A2), pushing that single run's total to **9 minutes 13 seconds** — over the 8-minute budget.
+No warning, retry, connection error, or GC log appeared between the class's Spring context startup
+and the final `Tests run: 8` line; nothing in the log explains the stall. Re-running
+`JooqInstitutionRepositoryIT` alone immediately after (`mvn verify -Dit.test=JooqInstitutionRepositoryIT
+-Dtest=none`) completed in 22.98 seconds — no reproduction. A second full clean-tree `./mvnw -B
+verify` completed in **2 minutes 2 seconds** total, with `JooqInstitutionRepositoryIT` at 20.58
+seconds — matching every other measurement in this change. Treated as a one-off local
+Windows/Docker Desktop resource-contention stall (this machine's `generate-sources` phase runs its
+own ephemeral container shortly before the `*IT.java` suite starts its own), not a regression
+introduced by this PR's changes; `design.md` §13 already designates CI (`ubuntu-latest`) as the
+source of truth over local Windows/WSL2 divergence. Reported here rather than silently discarded,
+per this PR's own transparency standard — if this recurs in CI, it needs real investigation, not a
+retry loop.
+
+### Task 3.8 — measured PR A3 diff
+
+`git diff --numstat change/jooq-flyway-testcontainers-wiring-migration...HEAD -- . ':(exclude)openspec'
+':(exclude)docs/adr' ':(exclude)**/generated/**'` (base is PR A2's tip, `c23740b`):
+
+| File | + | − |
+|---|---|---|
+| `apps/api/README.md` | 9 | 0 |
+| `JooqConfinedToInfrastructureTest.java` (new) | 34 | 0 |
+| `NoUnapprovedPlainSqlTest.java` (new) | 91 | 0 |
+| `TableOwnershipByModuleTest.java` (new) | 102 | 0 |
+| `TransactionsOnlyInSharedSecurityTest.java` (new) | 79 | 0 |
+| `fixture/billing/infrastructure/BadForeignTableUser.java` (new) | 19 | 0 |
+| `fixture/jooq/application/BadJooqUser.java` (new) | 17 | 0 |
+| `fixture/jooq/infrastructure/BadPlainSqlRepository.java` (new) | 26 | 0 |
+| `fixture/transactions/BadTransactionalRepository.java` (new) | 19 | 0 |
+| `MultiTenantSchemaIT.java` (new) | 288 | 0 |
+| `RolePrivilegeMatrixIT.java` (new) | 84 | 0 |
+
+**Total: 768 additions + 0 deletions = 768 authored lines.** Inside the 800-line-per-pull-request
+budget (`docs/15-flujo-de-trabajo-git.md` §3), but with only 32 lines of margin — the tightest of
+the three chained PRs in this change (A1: 727/800; A2: 424/800; A3: 768/800), consistent with
+`design.md` §12's own forecast that A1 and A3 "caben en su rango bajo y rozan o superan 800 en el
+alto" (540–880 forecast for A3). No subdivision triggered (A3a/A3b/A3c), but this is close enough
+to the ceiling that any additional work in this PR would very likely have required one.
+
+### Task 3.9 — final verification of PR A3 and of the complete change
+
+Second (reproducible) clean-tree run, `app/target` and `kernel/target` deleted, `JAVA_HOME` on JDK
+25, `MAVEN_OPTS` with `Windows-ROOT`, Docker active: `./mvnw -B verify` in `apps/api`.
+
+- **`BUILD SUCCESS`**, total time **2 minutes 2 seconds** (`kernel` 16.4 s, `app` 1 minute 43
+  seconds). See the note above for the one anomalous 9:13 min run that did not reproduce.
+- Kernel: 177 unit tests, 0 failures.
+- App unit tests (Surefire): **109 tests**, 0 failures — includes all four new ArchUnit rules
+  (`JooqConfinedToInfrastructureTest` 2/2, `TableOwnershipByModuleTest` 2/2,
+  `TransactionsOnlyInSharedSecurityTest` 2/2, `NoUnapprovedPlainSqlTest` 2/2),
+  `LayeredArchitectureTest` (2/2), `EmptyShouldExceptionInventoryTest` (1/1), and
+  `SuppressionCitesAdrTest` (10/10, confirming the `optionalLayer(` count invariant is still
+  exactly one after this PR added no new occurrences).
+- App integration tests (Failsafe): **21 tests**, 0 failures —
+  `JooqInstitutionRepositoryIT` (8/8, 20.58 s), `MultiTenantSchemaIT` (7/7, 0.46 s),
+  `RolePrivilegeMatrixIT` (4/4, 0.14 s), `DatabasePipelineIT` (2/2, 0.05 s).
+- `git status --short`: clean after the last commit. `git ls-files | grep confia/generated`: no
+  matches — no generated jOOQ code tracked.
+- JaCoCo: `Analyzed bundle 'confia-api' with 14 classes` (same count as PR A2 — none of this PR's
+  new classes are production classes; all four rule tests and both schema `*IT.java` classes are
+  test-only), `confia/generated/**` still absent, all coverage rules met (`All coverage checks have
+  been met`).
+- `SuppressionCitesAdrTest`'s dynamic `optionalLayer(` count: unchanged at exactly one (`design.md`
+  decision 9's explicit instruction not to touch this file in this cut was followed — it was not
+  edited).
+- **Not pushed**: per this session's explicit instruction, pushing `...-gates` and confirming CI
+  stays for the propietario, as in PR A1 and PR A2.
+
+### Estado de tareas (PR A3)
+
+- [x] 3.1 — R1 (jOOQ confined to infrastructure): RED/GREEN evidence above; rejects `BadJooqUser`
+      by name, passes over the real `JooqInstitutionRepository`.
+- [x] 3.2 — R2 (table ownership by module prefix): RED/GREEN evidence above; rejects
+      `BadForeignTableUser` by name, passes over the real adapter (only uses its own module's
+      generated table type).
+- [x] 3.3 — R3 (transactions confined, preventive guard): RED/GREEN evidence above, including the
+      design.md-sketch deviation reported above; rejects `BadTransactionalRepository` by name.
+- [x] 3.4 — R4 (no unapproved plain SQL): RED/GREEN evidence above; rejects `BadPlainSqlRepository`
+      by name; approved list confirmed empty and immutable.
+- [x] 3.5 — `MultiTenantSchemaIT` created with all four catalogue points plus the module-prefix
+      requirement; membership-based (not presence-based) for the closed catalogue, confirmed by an
+      explicit assertion that only two of the four names exist today.
+- [x] 3.5b — RTN technical-guard scenarios added to `MultiTenantSchemaIT`; real-schema evidence
+      recorded above, including the corrected assertion (varchar length guard, not the named CHECK
+      constraint, is what actually fires first).
+- [x] 3.6 — `RolePrivilegeMatrixIT` created with both role-attribute reinforcement and the full
+      privilege matrix from the A2 migration.
+- [x] 3.7 — Suite time measured and documented in `apps/api/README.md`; no update needed in
+      `openspec/changes/foundations-plan/exploration.md`'s change-5 division note (no prior timing
+      claim there to update).
+- [x] 3.8 — diff measured: 768 authored lines, inside the 800-line budget with 32 lines of margin;
+      no subdivision triggered.
+- [x] 3.9 — final clean-tree `mvn verify`: green, evidence recorded above, including the honest
+      report of one non-reproducible anomalous timing run.
+
+---
+
 # Apply progress: jooq-flyway-testcontainers-wiring — PR A1 and PR A2
 
 ## PR A2 — corte A2: primera migración y adaptador (tasks 2.1–2.7)
@@ -455,3 +599,42 @@ primer consumidor real es `JooqInstitutionRepositoryIT` de la tarea 2.1 (PR A2),
 reversión automática deberá crear `TransactionalPostgresIntegrationTest` en ese mismo corte. Se
 reporta aquí en vez de decidirlo en silencio, tal como pide el resto de este documento para la
 discrepancia ya conocida entre `design.md` §5 y §11.
+
+
+## Defecto encontrado en la verificación del orquestador: `information_schema` filtra por privilegios
+
+`MultiTenantSchemaIT.baseTablesInPublicSchema()` leía `information_schema.tables` e
+`information_schema.columns`. Esas vistas están filtradas por los privilegios del rol que consulta.
+Las pruebas de integración conectan como `confia_admin_app`, de modo que una tabla creada sin
+`institution_id`, sin seguridad a nivel de fila y sin ningún `GRANT` resultaba **invisible** para
+tres de las cuatro puertas de catálogo y las pasaba todas en verde. Es exactamente la tabla que esas
+puertas existen para rechazar.
+
+Encontrado por control negativo, no por lectura del código:
+
+1. Migración temporal `V2__negative_control.sql` con una tabla `tmp_import`: las siete pruebas de la
+   clase pasaron en verde. La puerta no veía la tabla.
+2. Añadido `GRANT SELECT ON tmp_import TO confia_admin_app`: la puerta falló nombrando `tmp_import`.
+   Hipótesis confirmada.
+3. Consulta migrada a `pg_class` + `pg_namespace` + `pg_attribute` (`relkind in ('r','p')`,
+   `attnotnull`, `not attisdropped`).
+4. Retirado el `GRANT`: la puerta sigue viendo y rechazando `tmp_import`. Arreglo probado en ambas
+   direcciones.
+5. Migración de control eliminada.
+
+`rowSecurityFlagsOf`, `policyCountOn` y `uniqueIndexesInPublicSchema` ya consultaban `pg_catalog`,
+así que bastó corregir un único método del que dependían tres puertas.
+
+En el mismo commit (`44efce8`) se corrigieron dos defectos menores de la misma clase:
+
+- El regex del prefijo de módulo, `^[a-z][a-z0-9]*_[a-z0-9_]+$`, aceptaba cualquier prefijo:
+  `tmp_import` o `legacy_data` habrían pasado una puerta cuyo propósito declarado es nombrar el
+  módulo propietario de la tabla. Ahora el prefijo se contrasta contra los nombres de módulo
+  derivados de los paquetes de producción reales, el mismo criterio de
+  `NoCrossModuleDomainImportsTest`.
+- La misma prueba cerraba con `assertThat(ROOT_TABLE).startsWith("organization_")`, que compara una
+  constante de compilación contra un literal: no podía fallar jamás y se leía como una aserción de
+  esquema sin verificar nada. Eliminada; el bucle anterior ya evalúa la tabla real.
+
+**Regla general que deja este defecto:** una prueba de catálogo de esquema que corre con un rol de
+mínimo privilegio debe leer `pg_catalog`, nunca `information_schema`.
