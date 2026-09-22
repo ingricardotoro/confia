@@ -1211,3 +1211,115 @@ forecast range ("Si cabe en 800 líneas, continuar... Si lo hubiera [excedido 80
 aplicación"); 795 < 800, so **apply continues into task 4.7 without consulting the owner**, per
 that literal instruction. No remaining task in this cut (4.7) adds production or test code, so this
 measurement is final for PR B3a.
+
+**This measurement was revised by task 4.7 below — see "HARD STOP" there.** Task 4.7's own clean
+`./mvnw -B verify` run surfaced a real JaCoCo coverage-gate failure that required one more test
+file, pushing the real total past 800.
+
+## Task 4.7 — Final verification of PR B3a — HARD STOP, real diff now exceeds 800 lines
+
+In checkout, cleaned `apps/api/app/target`, `apps/api/kernel/target` and the reactor `target`
+first (OneDrive directory-retention interference the brief warns about — no `mvn clean`), then ran
+`./mvnw -B verify` with `JAVA_HOME` on JDK 25 and `MAVEN_OPTS` on the `Windows-ROOT` trust store.
+
+**First attempt: `BUILD FAILURE`, and it is real, not the narrow-run `0.00` artifact.** Every test
+passed (`Tests run: 177` kernel, `114` app unit, `47` app `*IT.java`, all `Failures: 0, Errors: 0`),
+but `jacoco:0.8.14:check` on `confia-api` reported:
+
+```
+[WARNING] Rule violated for package com.confia.shared.audit: lines covered ratio is 0.92, but expected minimum is 0.95
+[WARNING] Rule violated for package com.confia.shared.audit: branches covered ratio is 0.94, but expected minimum is 0.95
+```
+
+Genuinely below the 95% `PACKAGE` rule task 1.9 (PR B1) established for `com.confia.shared.audit`
+— confirmed via the HTML report (`target/site/jacoco/com.confia.shared.audit/*.java.html`), not
+assumed: `CanonicalAuditRow#toString()` was never covered at all (AssertJ's
+`.as(String, Object...)` formats its description lazily, only when an assertion actually fails —
+and every property try passed, so the message was never rendered);
+`CanonicalAuditRowSerializer#canonString`'s `'\b'`/`'\f'` switch cases were never hit (the cross-
+check's text generator produces plenty of C0 control characters, but never literally `U+0008` or
+`U+000C`); and the `IllegalArgumentException`/`catch (NoSuchAlgorithmException)` defensive branches
+were never exercised by design (no generated input reaches them). **Not a bug in the
+canonicalization logic** — every one of the 47 `*IT.java` methods, including the cross-check's 100
+real tries, passed; this is a real gap in the separate "Unitaria" test layer design.md §7's own
+test-strategy table names ("Serialización canónica sobre casos límite escritos a mano ... JUnit y
+AssertJ, sin contenedor") but that no task in 4.2-4.7 explicitly listed as its own step.
+
+**Fixed, not worked around**: created
+`apps/api/app/src/test/java/com/confia/shared/audit/CanonicalAuditRowSerializerTest.java` (3 hand-
+written unit cases, no Docker): backspace/form-feed produce their RFC 8785 short escape form; an
+unsupported JSON node type (`MissingNode`, reachable through normal Jackson API, not synthetic)
+raises the intended `IllegalArgumentException`; `CanonicalAuditRow#toString()` includes every
+field. **The threshold was never lowered and no test was skipped to pass** — the gate stayed at
+95%, and the gap was closed with real coverage of real branches, per the orchestrator's own explicit
+instruction ("Nunca se baja un umbral ni se omite una prueba para pasar en local").
+
+**Second attempt, same clean-checkout discipline**: `BUILD SUCCESS`.
+
+```
+[INFO] Tests run: 177, Failures: 0, Errors: 0, Skipped: 0        (kernel)
+[INFO] Tests run: 114, Failures: 0, Errors: 0, Skipped: 0        (app unit tests, Surefire)
+[INFO] Tests run: 47, Failures: 0, Errors: 0, Skipped: 0         (app *IT.java, Failsafe)
+[INFO] All coverage checks have been met.
+[INFO] BUILD SUCCESS
+[INFO] Total time:  02:33 min
+```
+
+`com.confia.shared.audit` (`target/site/jacoco/jacoco.csv`): lines 103/105 covered (98.1%),
+branches 54/54 covered (100%) — only the two `catch (NoSuchAlgorithmException)` lines remain
+uncovered, genuinely unreachable (SHA-256 is a mandatory algorithm on every JDK; this is a
+defensive guard, not dead-code padding). `CanonicalSerializationCrossCheckIT` (1/1, its own 100
+generated tries all green — same property, re-run fresh, not reused from task 4.3's earlier
+evidence) and `CanonicalSerializationDivergenceTest` (1/1 — the test that proves the property
+*can* fail is itself green, exactly task 4.7's own success criterion) both confirmed. Every
+inherited `*IT.java` from PR B1/B2a/B2b remained green, unaffected by this cut. Total reactor time
+02:33 min, comfortably inside the 8-minute budget (no fresh phase-boundary timing was captured for
+this run specifically — tasks 1.10/3.5 already measured that budget with headroom to spare, and
+this run's own total wall time confirms nothing regressed).
+
+**HARD STOP — the real measured diff of this branch, as it stands after the coverage fix, is 845
+authored lines, past the 800-line-per-pull-request budget** (`docs/15-flujo-de-trabajo-git.md` §3;
+`docs/15`'s value is what actually governs, per the note already recorded at the top of this PR's
+section and in `design.md` §15 open question 4). Task 4.6's own 795-line measurement was correct
+*at the time it ran*; the coverage gate task 4.7 uncovered afterward required 50 more real,
+necessary lines (`CanonicalAuditRowSerializerTest.java`) that cannot be trimmed to fit — the
+orchestrator's own instruction is explicit that the budget "constrains how work is sliced, never
+the code itself," and forbids deleting tests or comments to reach the number.
+
+**Per the orchestrator's explicit hard-stop rule 1 ("Si el diff de 4.6 supera 800 líneas, detente y
+reporta puntos de corte candidatos medidos"), apply STOPS here** — the split decision is the
+owner's, not mine to make. Real, measured commit-boundary candidates
+(`git diff --numstat <base>...<sha> -- . ':(exclude)openspec' ':(exclude)docs/adr'
+':(exclude)**/generated/**'`, summed):
+
+| Candidate boundary | Cumulative authored lines | Contents |
+|---|---|---|
+| `69842d7` (task 4.2, RED) | 362 | `CanonicalSerializationCrossCheckIT` (RED version) |
+| `105b9ce` (task 4.3, GREEN) | 711 | + `CanonicalAuditRow`, `CanonicalAuditRowSerializer`, cross-check fixed to the real Jackson 3/jqwik API |
+| **+ `39a721c` (coverage fix)** | **761** | + `CanonicalAuditRowSerializerTest` (closes the JaCoCo gate `CanonicalAuditRow`/`CanonicalAuditRowSerializer` themselves create) |
+| `5990d0c` (tasks 4.4-4.5) | 795 (or 845 with the coverage fix folded in here instead) | + `CanonicalSerializationDivergenceTest`, `Utf16OrderingCanonicalAuditRowSerializer` |
+
+**Two candidate splits, both real and measured, neither decided here:**
+
+- **Split A — `B3a-serializer` (761 lines) then `B3a-divergence-fixture` (84 lines)**, the
+  coverage-completing unit test folded into the first slice since it exercises
+  `CanonicalAuditRow`/`CanonicalAuditRowSerializer` methods that exist since task 4.3, not the
+  divergence fixture. `B3a-serializer` is independently shippable: canonical serialization in Java,
+  proven correct by 100 real cross-check tries against the actual engine, with its own unit-level
+  edge cases. `B3a-divergence-fixture`, based on `B3a-serializer`, adds only the proof that the
+  property can fail. Rollback boundary for each matches the established pattern from PR B1's own
+  B1a/B1b split: reverting the second slice leaves the first complete and green on its own.
+- **Split B — `size:exception`**: 845 is 45 lines (5.6%) over budget, entirely explained by one
+  necessary coverage-gate unit test file that has no independently meaningful second half to split
+  into (splitting `CanonicalAuditRowSerializerTest.java`'s 50 lines into its own PR would produce a
+  trailing slice with no code of its own, only tests of already-shipped code — an awkward unit by
+  the same "no code from its own tests" constraint `design.md` §12 already applies to every other
+  split in this change).
+
+**Not decided here, per the orchestrator's own instruction that splitting is the owner's call.**
+Task 4.7's checkbox stays **unchecked** — both for the same reason PR B1's task 1.12, PR B2a's task
+2.7, and PR B2b's task 3.7 already left theirs unchecked (no push performed this session, by
+explicit instruction), and because the delivery boundary for this cut is not yet resolved. Every
+other task in this cut (4.1-4.6) is complete, with the `./mvnw -B verify` evidence above standing
+as real, honest, local proof that the code itself is correct and ready, independent of how the
+diff eventually gets sliced for review.
