@@ -1052,3 +1052,82 @@ bugs the cross-check exists to catch).
 Fails exactly as task 4.2 predicts — every remaining error is `cannot find symbol` for
 `CanonicalAuditRow`/`CanonicalAuditRowSerializer`, none of the Jackson 3 or jqwik API usage itself,
 confirming the rewrite against the real API was correct. Committed as `69842d7`.
+
+## Task 4.3 — VERDE: `CanonicalAuditRow` and `CanonicalAuditRowSerializer`
+
+Created `apps/api/app/src/main/java/com/confia/shared/audit/CanonicalAuditRow.java` (record, the 18
+signed fields of design.md §6.2 plus `prevHash`, exact field order matching
+`shared_audit_row_preimage`; `before_value`/`after_value` typed `tools.jackson.databind.JsonNode` so
+a Java `null` reference means SQL `NULL` and a present `NullNode` means the JSON `null` literal —
+the two are different bytes on the wire, D5) and
+`apps/api/app/src/main/java/com/confia/shared/audit/CanonicalAuditRowSerializer.java`
+(`preimage`/`rowHash`/`canonicalJson`, plus one `private static` `canon*` method per column type
+from design.md §6.3, and `writeField` implementing `F(v)` from §6.2). Object-key ordering
+(`compareObjectKeys`) is a `protected`, overridable instance method specifically so the task
+4.4/4.5 divergence fixture can substitute the wrong comparator without duplicating the class —
+production code never overrides it.
+
+**Two genuine compile-time findings, neither anticipated by `design.md` or by any earlier probe,
+both now fixed and documented so the next reader does not rediscover them the hard way:**
+
+1. **Jackson 3, not Jackson 2** (already reported under task 4.2's RED entry above; the same
+   `tools.jackson.databind.*` API is used here in production code).
+2. **`javac`'s unicode-escape prescan (JLS §3.3) rejects a literal backslash immediately followed
+   by `u` anywhere in the raw source file — including inside comments, and even when the
+   surrounding text is clearly not meant as an escape.** Two places tripped it: a Javadoc line
+   describing the `\u00xx` escape PostgreSQL's `to_json` produces (fixed by switching to `U+0020`-style
+   prose, matching design.md's own notation, instead of a literal backslash-`u` token), and the
+   runtime code building that same escape for characters below `U+0020`
+   (`String.format("\\u%04x", ...)` — the *two* consecutive backslashes are still scanned left to
+   right and the second one, followed by `u`, is "eligible" per the JLS algorithm and fails once
+   `%04x`'s `%` turns out not to be a hex digit). Fixed by building the four characters
+   `'\\'`/`'u'`/`hex digits` as separate `StringBuilder.append` calls, so no two characters in the
+   *raw source* are ever backslash-immediately-followed-by-`u` — the runtime *value* still produces
+   a correct `\u00XX`-shaped escape. Applied identically in both `CanonicalAuditRowSerializer#canonString`
+   and the test harness's own `jsonTextString` (`CanonicalSerializationCrossCheckIT`, written in
+   task 4.2, needed the same fix here since it only surfaced once `main`/`test` compiled together).
+
+**A third genuine finding, discovered only once the code actually ran against real PostgreSQL, not
+predicted by any earlier task or probe:** the first real run failed every try with
+`function shared_audit_row_hash(...) does not exist`. Every other `*IT.java` class in this codebase
+applies Flyway migrations by extending `PostgresIntegrationTest`, whose `@DynamicPropertySource`
+re-enables Flyway (off by default in `application.yml`) and points it at `confia_owner` once Spring
+builds that test's context. `CanonicalSerializationCrossCheckIT` deliberately never does that (probe
+S8, task 4.1) — so when run in isolation, with no other `*IT` class sharing the JVM to migrate the
+container as a side effect first, the schema was genuinely never migrated. This is a real test-
+isolation gap the design didn't name (decision 6/14 name the *connection* route, not how the schema
+gets there), not a bug in the canonicalization logic itself. **Fixed, not worked around**: added a
+static initializer that runs the exact same Flyway migration explicitly
+(`Flyway.configure().dataSource(SharedPostgresContainer.dataSourceFor("confia_owner")).locations
+("classpath:db/migration").load().migrate()` — no raw password needed, reusing the already-public
+`dataSourceFor` method instead of reaching for `PostgresIntegrationTest.TEST_PASSWORD`, which is
+`protected` and not visible from this package). Idempotent by Flyway's own design, so this is safe
+regardless of whether another `*IT` class already migrated the same shared container first; makes
+this class genuinely self-sufficient and correctly re-runnable in isolation, which the "corridas
+estrechas mientras iteras" instruction for this session required in practice, not just in principle.
+
+**GREEN, observed, first real attempt against real PostgreSQL — no implementation bug needed
+fixing after this point**: `./mvnw -B -pl app -am verify -Dit.test=CanonicalSerializationCrossCheckIT
+-Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dfailsafe.failIfNoSpecifiedTests=false`:
+
+```
+08:25:20.153 [main] INFO org.flywaydb.core.internal.command.DbMigrate -- Successfully applied 3
+migrations to schema "public", now at version v3 (execution time 00:00.204s)
+...
+tries = 100                   | # of calls to property
+checks = 100                  | # of not rejected calls
+generation = RANDOMIZED       | parameters are randomly generated
+edge-cases#mode = MIXIN       | edge cases are mixed in
+edge-cases#total = 100        | # of all combined edge cases
+edge-cases#tried = 15         | # of edge cases tried in current run
+seed = 4550454797719962823    | random seed to reproduce generated values
+
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 20.82 s -- in com.confia.shared.audit.CanonicalSerializationCrossCheckIT
+```
+
+All 100 generated tries — including 15 edge cases and every one of the D1-D11 families the
+generator branches on — produced byte-identical `row_hash` between the real `shared_audit_row_hash`
+SQL function and `CanonicalAuditRowSerializer`. The narrow run's own `jacoco-maven-plugin:check`
+failure ("Coverage checks have not been met") is the same already-documented artifact of running
+`-Dtest=none` against an incomplete test set that PR B1's task 1.3 first recorded — not a real gate
+failure, resolved by the full `./mvnw -B verify` in task 4.7.

@@ -494,7 +494,7 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
   PL/pgSQL y Java» (escenario «Ambas implementaciones producen el mismo hash sobre entradas
   generadas»)
 
-- [ ] 4.3 **VERDE — serialización canónica en Java.** Requiere Docker (ejecuta 4.2). Crear
+- [x] 4.3 **VERDE — serialización canónica en Java.** Requiere Docker (ejecuta 4.2). Crear
   `.../main/java/com/confia/shared/audit/CanonicalAuditRow.java` (record con los 18 campos firmados)
   y `.../main/java/com/confia/shared/audit/CanonicalAuditRowSerializer.java` (`preimage`/`rowHash`,
   Jackson con `USE_BIG_DECIMAL_FOR_FLOATS`/`USE_BIG_INTEGER_FOR_INTS` nunca `double`, claves
