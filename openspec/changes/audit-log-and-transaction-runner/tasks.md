@@ -482,7 +482,7 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
   rutas quedan ya diseñadas en `design.md` decisión 6 y decisión 14. — `design.md` §10 (sonda S8) y
   §11, paso 18
 
-- [ ] 4.2 **ROJO — prueba cruzada de la serialización canónica.** Requiere Docker. Crear
+- [x] 4.2 **ROJO — prueba cruzada de la serialización canónica.** Requiere Docker. Crear
   `.../test/java/com/confia/shared/audit/CanonicalSerializationCrossCheckIT.java`: propiedad jqwik,
   sin `@SpringBootTest` (según el resultado de 4.1), que genera entradas para las once familias de
   divergencia de `design.md` §6.5 (D1-D11: escala y magnitud de números, texto no ASCII, control y
