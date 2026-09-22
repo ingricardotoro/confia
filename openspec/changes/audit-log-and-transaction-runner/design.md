@@ -2,7 +2,7 @@
 
 Cambio 5 de F0, **parte B**. Implementa la propuesta aprobada
 (`openspec/changes/audit-log-and-transaction-runner/proposal.md`) y las dos especificaciones delta
-ya escritas: `specs/audit-trail/spec.md` (10 requisitos, 26 escenarios) y
+ya escritas: `specs/audit-trail/spec.md` (10 requisitos, 27 escenarios) y
 `specs/build-integrity/spec.md` (4 requisitos, 15 escenarios). **Las especificaciones son el
 contrato**: donde este diseño proponga un dato que la especificación fija, prevalece la
 especificación y las tablas de aquí se alinean antes de la fase de tareas. La sección 7 traza los
@@ -1166,7 +1166,7 @@ classes().should(beNamedWithIntegrationSuffixWhenItNeedsAContainer())
 
 ### 7.1 Trazabilidad: los 41 escenarios y su prueba
 
-**`audit-trail` (26 escenarios)**
+**`audit-trail` (27 escenarios)**
 
 | Requisito | Escenario | Prueba | Corte |
 |---|---|---|---|
@@ -1188,6 +1188,7 @@ classes().should(beNamedWithIntegrationSuffixWhenItNeedsAContainer())
 | Verificador | Cadena íntegra reporta integridad | `AuditChainVerifierIT` | B3 |
 | | Fila alterada con `SUPERUSER` identificada con exactitud | `AuditChainVerifierIT` | B3 |
 | | El verificador de una institución no ve las de otra | `AuditChainVerifierIT` | B3 |
+| | Alterar solo `actor_label` rompe la cadena | `AuditChainVerifierIT` | B3b |
 | Reproducibilidad | Mismo hash sobre entradas generadas | `CanonicalSerializationCrossCheckIT` | B3 |
 | | Divergencia deliberada hace fallar la propiedad | `CanonicalSerializationDivergenceTest` | B3 |
 | Límite sin ancla | Manipulación sin recálculo es detectada | `AuditChainVerifierIT` | B3 |
@@ -1290,7 +1291,8 @@ de la base de la sonda: `en_US.utf8`.
 |---|---|---|
 | **S6** | **PASA. El cambio no está bloqueado por entorno.** | `sha256('abc')` devuelve el vector conocido `ba7816bf…15ad` y `pg_proc.prolang = 12`, es decir función interna: **no hace falta `pgcrypto`**, que `confia_owner` no podría crear. `int8send(1::bigint)` da `0000000000000001`, ocho bytes en orden de red. `convert_to('ñ','UTF8')` da `c3b1` |
 | **S1** | **PASA, coincide con la regla de 6.4** | `to_json` escapa `"` como `\"`; la barra invertida como `\` (verificado con `chr(92)`, salida de 6 caracteres, el colapso inicial era del intérprete de comandos); los controles como `
-	`; el resto de C0 como ``, ``, en minúsculas; **no** escapa `/` ni el texto no ASCII (`ñ😀` viaja literal) |
+
+	`; el resto de C0 como ``, ``, en minúsculas; **no** escapa `/` ni el texto no ASCII (`ñ😀` viaja literal) |
 | **S2** | **PASA** | `numeric::text` nunca usó notación exponencial: `1e30` sale como `1000000000000000000000000000000` y `0.00000000001` sin exponente, incluso viniendo de `jsonb`. `trim_scale` retira ceros finales (`1.2300` → `1.23`, `100.000` → `100`), también sobre valores extraídos de `jsonb` |
 | **S4** | **PASA de forma concluyente** | Rama de inserción y rama de actualización devuelven 1, 2 y 3 sin huecos. En concurrencia real: la sesión 1 obtuvo el id 4 dentro de una transacción abierta y **la sesión 2 quedó bloqueada 4 407 ms** hasta la confirmación, tras lo cual obtuvo el id 5. El `ON CONFLICT ... DO UPDATE ... RETURNING` **sí** toma el bloqueo por institución. No se conmuta a `pg_advisory_xact_lock` |
 
