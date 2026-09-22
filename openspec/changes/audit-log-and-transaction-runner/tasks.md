@@ -209,7 +209,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   ninguna clase que use la API de transacciones» y «El componente transaccional único satisface la
   aserción positiva»)
 
-- [ ] 1.9 **`junit-platform.properties` de `app` y regla `PACKAGE` de JaCoCo para
+- [x] 1.9 **`junit-platform.properties` de `app` y regla `PACKAGE` de JaCoCo para
   `com.confia.shared.audit`.** No requiere Docker (configuración de construcción). Crear
   `apps/api/app/src/test/resources/junit-platform.properties` con `jqwik.database` y
   `jqwik.tries.default` fijados por debajo del valor de `kernel`, acorde al presupuesto de 8 minutos

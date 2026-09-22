@@ -287,3 +287,41 @@ guard" over an empty `shared.security` package — that package has real product
 
 All three green: the negative rule against real production code, its fixture-rejection half, and
 the new positive assertion.
+
+## Task 1.9 — `junit-platform.properties` and the `PACKAGE` JaCoCo rule for `com.confia.shared.audit`
+
+Created `apps/api/app/src/test/resources/junit-platform.properties`: `jqwik.database` points inside
+`target/` (git-ignored, same pattern as kernel), `jqwik.tries.default=100` — lower than kernel's
+1000, because this module's future property test round-trips to real PostgreSQL on every try,
+unlike kernel's pure in-memory properties. No extra `testResources` filtering configuration needed:
+the existing unfiltered pass over `src/test/resources` (app/pom.xml, task 1.6 of the previous
+change) already copies this file as-is.
+
+Added the `PACKAGE` JaCoCo rule for `com.confia.shared.audit` (95% line+branch) next to the existing
+`domain`-packages rule, `<includes>` only, no `<excludes>` — confirmed clean by probe S10
+(apply-progress.md task 1.1).
+
+**Reconciliation note resolved, not a discrepancy after all.** The task text flagged a real risk:
+`com.confia.shared.audit` has no class yet in this PR (its first class lands in PR B3a), so this
+rule is declared two cuts before it has anything to measure, and `design.md` §5 does not call that
+gap out. The task said to report it as a discrepancy **only if** the empty rule failed the build
+instead of passing vacuously. **It did not fail**: the full `./mvnw -B verify` below is `BUILD
+SUCCESS` with this rule active and zero classes in the package it targets — JaCoCo's `PACKAGE`
+element rule simply has nothing to check and passes, exactly like the file removed the concern is
+`SuppressionCitesAdrTest`'s pass on the same PR earlier. No discrepancy to report.
+
+**Observed**: `./mvnw -B verify` in `apps/api`:
+
+```
+[INFO] Tests run: 177, Failures: 0, Errors: 0, Skipped: 0        (kernel)
+[INFO] Tests run: 110, Failures: 0, Errors: 0, Skipped: 0        (app unit tests, Surefire)
+[INFO] Tests run: 28, Failures: 0, Errors: 0, Skipped: 0         (app *IT.java, Failsafe)
+[INFO] BUILD SUCCESS
+[INFO] Total time:  02:19 min
+```
+
+Also confirmed: no stray `apps/api/app/.jqwik-database` file appeared after this run (the
+housekeeping nuisance noted in task 1.1 is resolved by this task's own configuration, as expected —
+`jqwik.database` now points inside `target/`), and the properties file is genuinely on the test
+classpath (`target/test-classes/junit-platform.properties`, contents verified byte-for-byte equal
+to the source).
