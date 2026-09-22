@@ -129,11 +129,19 @@ qué se hizo para contener, y qué todavía no se sabe.
 
 Es la primera pregunta, porque determina si se puede confiar en el resto de la investigación.
 
+Reconciled against the real schema (`shared_audit_log`, task 2.2's V2 migration): the chain is one
+per institution, not global, so the previous row is the one with the same `institution_id` and
+`id - 1`, and the columns are `prev_hash`/`row_hash`, never `previous_id`/`previous_hash`/
+`record_hash` — those three never existed in any shipped schema. Executed manually against this
+cut's schema to confirm it runs without an unknown-column error.
+
 ```sql
 SELECT count(*) AS eslabones_rotos
-  FROM audit_log a
-  JOIN audit_log p ON p.id = a.previous_id
- WHERE a.previous_hash <> p.record_hash;
+  FROM shared_audit_log a
+  JOIN shared_audit_log p
+    ON p.institution_id = a.institution_id
+   AND p.id = a.id - 1
+ WHERE a.prev_hash <> p.row_hash;
 ```
 
 Un resultado distinto de cero significa manipulación de la bitácora, lo que eleva el incidente a S1
@@ -143,8 +151,8 @@ de forma automática.
 
 ```sql
 -- Accesos exitosos desde direcciones no habituales
-SELECT actor_id, ip_address, user_agent, min(occurred_at), max(occurred_at), count(*)
-  FROM audit_log
+SELECT actor_id, source_ip, user_agent, min(occurred_at), max(occurred_at), count(*)
+  FROM shared_audit_log
  WHERE action = 'AUTH_SUCCESS'
    AND occurred_at >= now() - interval '30 days'
  GROUP BY 1,2,3
@@ -152,7 +160,7 @@ SELECT actor_id, ip_address, user_agent, min(occurred_at), max(occurred_at), cou
 
 -- Exportaciones y lecturas masivas
 SELECT actor_id, action, entity_type, count(*), min(occurred_at), max(occurred_at)
-  FROM audit_log
+  FROM shared_audit_log
  WHERE action IN ('EXPORT','BULK_READ','REPORT_GENERATE')
    AND occurred_at >= now() - interval '30 days'
  GROUP BY 1,2,3
@@ -160,7 +168,7 @@ HAVING count(*) > 50
  ORDER BY count(*) DESC;
 
 -- Cambios financieros o de permisos
-SELECT * FROM audit_log
+SELECT * FROM shared_audit_log
  WHERE action IN ('LEDGER_ADJUST','PAYMENT_REVERSE','INVOICE_VOID','ROLE_CHANGE','PERMISSION_GRANT')
    AND occurred_at >= now() - interval '30 days'
  ORDER BY occurred_at DESC;

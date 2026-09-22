@@ -126,7 +126,7 @@ pero sin reverso registrado, produce faltante.
 
 ```sql
 SELECT occurred_at, actor_id, action, entity_type, entity_id
-  FROM audit_log
+  FROM shared_audit_log
  WHERE occurred_at BETWEEN '<opened_at>' AND now()
    AND actor_id = '<cashier_id>'
  ORDER BY occurred_at;

@@ -109,7 +109,7 @@ Es mucho menos grave: la caché se reconstruye. Ver más abajo.
 ### 5. Revisar la bitácora de auditoría
 
 ```sql
-SELECT * FROM audit_log
+SELECT * FROM shared_audit_log
  WHERE entity_id IN ( /* ids del paso 1 */ )
     OR request_id IN (
         SELECT request_id FROM ledger_transactions WHERE id IN ( /* ids */ )

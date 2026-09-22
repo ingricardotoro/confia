@@ -187,11 +187,16 @@ el punto de restauración elegido no sirve. Elige un punto anterior y repite.
 
 ### 4. La cadena de auditoría está íntegra
 
+Una cadena por institución, no global (`prev_hash`/`row_hash`, nunca `previous_id`/`previous_hash`/
+`record_hash` — reconciliado contra el esquema real de `shared_audit_log`, task 2.2):
+
 ```sql
 SELECT count(*) AS eslabones_rotos
-  FROM audit_log a
-  JOIN audit_log p ON p.id = a.previous_id
- WHERE a.previous_hash <> p.record_hash;
+  FROM shared_audit_log a
+  JOIN shared_audit_log p
+    ON p.institution_id = a.institution_id
+   AND p.id = a.id - 1
+ WHERE a.prev_hash <> p.row_hash;
 ```
 
 Debe devolver cero.

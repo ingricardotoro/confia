@@ -225,6 +225,10 @@ programador.
 | `confia_portal_app` | Proceso `confia-api-portal` | `SELECT` sobre la vista mínima de estado de cuenta, estudiantes vinculados y documentos propios. `INSERT` sobre intenciones de pago y solicitudes. **Sin acceso alguno** a `users`, `roles`, rangos CAI, `cashbox_*`, `audit_log`, ni a las tablas de asientos en escritura. |
 | `confia_readonly` | Reportes y réplica de lectura | Solo `SELECT`. |
 
+> Nota editorial (2026-09-21): la tabla de bitácora de auditoría se llamó `audit_log` en esta
+> decisión; el nombre vigente, fijado en F0 cambio 5 parte B, es `shared_audit_log`
+> (`docs/03-seguridad.md` sección 12). El cuerpo de la decisión no se reescribe.
+
 Ningún rol de aplicación es `SUPERUSER` ni tiene `BYPASSRLS`. Ninguno puede otorgarse permisos a sí
 mismo. La revocación es explícita: se parte de `REVOKE ALL` sobre el esquema y se concede lo mínimo,
 tabla por tabla.

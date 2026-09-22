@@ -29,8 +29,8 @@ insignificante frente al costo de no poder reconstruir qué pasó.
 ## 2. Estructura del registro de auditoría
 
 ```sql
-CREATE TABLE audit_log (
-    id               BIGSERIAL     PRIMARY KEY,
+CREATE TABLE shared_audit_log (
+    id               BIGINT        NOT NULL,      -- asignado por el disparador, no BIGSERIAL
     institution_id   UUID          NOT NULL,
     occurred_at      TIMESTAMPTZ   NOT NULL DEFAULT clock_timestamp(),
     actor_id         UUID,                        -- NULL para actor de sistema
@@ -50,16 +50,17 @@ CREATE TABLE audit_log (
     approver_id      UUID,                        -- segregación de funciones
     prev_hash        BYTEA         NOT NULL,
     row_hash         BYTEA         NOT NULL,
-    CONSTRAINT audit_log_outcome_chk
+    CONSTRAINT shared_audit_log_pk PRIMARY KEY (institution_id, id),
+    CONSTRAINT shared_audit_log_outcome_chk
         CHECK (outcome IN ('success', 'denied', 'error')),
-    CONSTRAINT audit_log_actor_kind_chk
+    CONSTRAINT shared_audit_log_actor_kind_chk
         CHECK (actor_kind IN ('staff', 'guardian', 'system'))
 );
 
-CREATE INDEX audit_log_entity_idx     ON audit_log (entity_type, entity_id, occurred_at DESC);
-CREATE INDEX audit_log_actor_idx      ON audit_log (actor_id, occurred_at DESC);
-CREATE INDEX audit_log_action_idx     ON audit_log (action, occurred_at DESC);
-CREATE INDEX audit_log_request_idx    ON audit_log (request_id);
+CREATE INDEX shared_audit_log_entity_idx     ON shared_audit_log (entity_type, entity_id, occurred_at DESC);
+CREATE INDEX shared_audit_log_actor_idx      ON shared_audit_log (actor_id, occurred_at DESC);
+CREATE INDEX shared_audit_log_action_idx     ON shared_audit_log (action, occurred_at DESC);
+CREATE INDEX shared_audit_log_request_idx    ON shared_audit_log (request_id);
 ```
 
 Cada fila identifica: quién (`actor_id`, `actor_kind`, `actor_label`), desde dónde (`source_ip`,
@@ -119,7 +120,7 @@ valor enmascarado o un hash cuando haga falta comparar), nunca el valor sensible
 lados.
 
 ```java
-// WRONG: previous and new values end up in clear text in audit_log
+// WRONG: previous and new values end up in clear text in shared_audit_log
 audit.append(new AuditEntry("guardian.update", guardian, updated));
 
 // CORRECT: the audit event redacts before persisting
@@ -132,30 +133,31 @@ Dos barreras independientes, ninguna suficiente por sí sola:
 
 ```sql
 -- Denegación de partida
-REVOKE ALL ON audit_log FROM PUBLIC;
+REVOKE ALL ON shared_audit_log FROM PUBLIC;
 
--- La aplicación solo puede insertar y leer
-GRANT SELECT, INSERT ON audit_log TO confia_admin_app;
-GRANT USAGE, SELECT   ON SEQUENCE audit_log_id_seq TO confia_admin_app;
+-- La aplicación solo puede insertar y leer; sin secuencia que conceder, el id lo asigna el
+-- disparador de encadenamiento sobre shared_audit_chain_head (docs/03-seguridad.md sección 12.1)
+GRANT SELECT, INSERT ON shared_audit_log TO confia_admin_app;
+GRANT SELECT          ON shared_audit_log TO confia_readonly;
 
 -- El portal no tiene acceso alguno: no se emite ningún GRANT para confia_portal_app
 
 -- Segunda barrera: un disparador que rechaza a nivel de motor,
 -- incluso para el propietario del esquema.
-CREATE OR REPLACE FUNCTION audit_log_is_append_only()
+CREATE OR REPLACE FUNCTION shared_audit_is_append_only()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
     RAISE EXCEPTION
-        'audit_log es de solo inserción: % rechazado', TG_OP
+        '% es de solo inserción: % rechazado', TG_TABLE_NAME, TG_OP
         USING ERRCODE = 'insufficient_privilege';
 END;
 $$;
 
-CREATE TRIGGER audit_log_no_update  BEFORE UPDATE   ON audit_log FOR EACH ROW      EXECUTE FUNCTION audit_log_is_append_only();
-CREATE TRIGGER audit_log_no_delete  BEFORE DELETE   ON audit_log FOR EACH ROW      EXECUTE FUNCTION audit_log_is_append_only();
-CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log FOR EACH STATEMENT EXECUTE FUNCTION audit_log_is_append_only();
+CREATE TRIGGER shared_audit_log_no_update  BEFORE UPDATE   ON shared_audit_log FOR EACH ROW      EXECUTE FUNCTION shared_audit_is_append_only();
+CREATE TRIGGER shared_audit_log_no_delete  BEFORE DELETE   ON shared_audit_log FOR EACH ROW      EXECUTE FUNCTION shared_audit_is_append_only();
+CREATE TRIGGER shared_audit_log_no_truncate BEFORE TRUNCATE ON shared_audit_log FOR EACH STATEMENT EXECUTE FUNCTION shared_audit_is_append_only();
 ```
 
 Esto aplica al rol de aplicación **y ningún rol de aplicación tiene el atributo `BYPASSRLS`**. Ver
@@ -215,7 +217,7 @@ try {
 
 Son dos sistemas distintos, con propósitos distintos, y no se sustituyen entre sí:
 
-| | Bitácora de auditoría (`audit_log`) | Logs de aplicación (registro estructurado de Spring Boot) |
+| | Bitácora de auditoría (`shared_audit_log`) | Logs de aplicación (registro estructurado de Spring Boot) |
 |---|---|---|
 | Propósito | Evidencia legal y contable de una acción sensible | Diagnóstico operativo y depuración |
 | Mutabilidad | Solo inserción, encadenada por hash, verificada | Rotables, pueden purgarse por retención |
@@ -228,7 +230,7 @@ Son dos sistemas distintos, con propósitos distintos, y no se sustituyen entre 
 **No registres una acción sensible solo en los logs de aplicación pensando que "ya queda
 registrado".**
 Un log de aplicación se rota, se puede desactivar por nivel de severidad y no está encadenado ni
-protegido contra edición. Solo `audit_log` cumple el estándar de evidencia que este sistema
+protegido contra edición. Solo `shared_audit_log` cumple el estándar de evidencia que este sistema
 necesita.
 
 ## 8. Antes de dar por terminado
@@ -239,8 +241,8 @@ necesita.
 - [ ] Ningún campo sensible (contraseña, token, documento de identidad, dato completo de un menor)
       queda en claro en `before_value` ni en `after_value`.
 - [ ] El rol de aplicación que escribe la auditoría no tiene `UPDATE`, `DELETE` ni `TRUNCATE` sobre
-      `audit_log`, verificado por prueba de integración.
+      `shared_audit_log`, verificado por prueba de integración.
 - [ ] Si la acción exige segregación de funciones, `approver_id` se registra y difiere del actor
       que inició la operación.
 - [ ] Existe prueba de integración que confirma que un intento de `UPDATE` o `DELETE` sobre
-      `audit_log` con el rol de aplicación es rechazado por el motor.
+      `shared_audit_log` con el rol de aplicación es rechazado por el motor.

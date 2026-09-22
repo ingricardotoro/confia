@@ -101,9 +101,9 @@ disco y de respaldo, que ya es obligatorio para toda la base de datos.
 | Baja por incobrable | Financiero | **Alta** | Indirecto | `write_off` | Disco |
 | Bitácora de envío de notificaciones | Comunicaciones | Media | No | `notification_log.recipient_hash` | Destinatario almacenado como hash, no en claro |
 | Preferencias y consentimiento de comunicación | Comunicaciones | Baja | No | `notification_preference` | Disco |
-| Dirección IP y agente de usuario | Técnico y de seguridad | Media | No | `audit_log.source_ip_hash`, `user_agent`, logs de nginx | IP almacenada como hash en auditoría |
-| Identificador de solicitud y de traza | Técnico | Baja | No | Logs, `audit_log` | Disco |
-| Bitácora de auditoría de acciones | Trazabilidad | **Alta** por acumulación | Indirecto | `audit_log` | Disco. De solo inserción, encadenada por hash |
+| Dirección IP y agente de usuario | Técnico y de seguridad | Media | No | `shared_audit_log.source_ip`, `shared_audit_log.user_agent`, logs de nginx | IP almacenada **en claro**, no hasheada: una IP hasheada no permite investigar un incidente por rango de red, que es la única razón por la que se conserva. Las salvaguardas son el acceso restringido por rol, el aislamiento por institución y el plazo de conservación, no la ofuscación del dato |
+| Identificador de solicitud y de traza | Técnico | Baja | No | Logs, `shared_audit_log` | Disco |
+| Bitácora de auditoría de acciones | Trazabilidad | **Alta** por acumulación | Indirecto | `shared_audit_log` | Disco. De solo inserción, encadenada por hash |
 | Solicitudes de documentos y su motivo | Académico y administrativo | Media | **Sí** | `document_request` | Disco |
 | Referencia de pago bancario | Financiero | Media | No | `payment.reference`, `bank_transaction.reference` | Disco |
 
@@ -133,7 +133,7 @@ arquitectura, no una omisión.
 | Generación de cargos, cobro y control de cartera | Cargos, pagos, saldo, becas aplicadas | **Ejecución de contrato** | Es el núcleo del sistema |
 | Emisión de documentos fiscales | Nombre, RTN, importe, concepto | **Obligación legal** (régimen SAR) | El titular no puede oponerse a un dato exigido por la ley fiscal |
 | Conservación de documentación contable y fiscal | Documentos fiscales, asientos del libro mayor | **Obligación legal** | Prevalece sobre la solicitud de supresión. Ver sección 5.4 |
-| Bitácora de auditoría de acciones | Actor, acción, entidad, IP hasheada, momento | **Interés legítimo** de la institución en prevenir y detectar fraude, más **obligación legal** de control interno financiero | El interés legítimo se documenta con la evaluación de la sección 4.1 |
+| Bitácora de auditoría de acciones | Actor, acción, entidad, IP en claro, momento | **Interés legítimo** de la institución en prevenir y detectar fraude, más **obligación legal** de control interno financiero | El interés legítimo se documenta con la evaluación de la sección 4.1 |
 | Notificaciones de cobro y de estado de cuenta | Correo, teléfono, saldo | **Ejecución de contrato** | Notificar una deuda es parte de la relación contractual, no es publicidad |
 | Comunicaciones informativas no relacionadas con el cobro | Correo, teléfono | **Consentimiento** | Requiere consentimiento separado y revocable. Ver sección 8 |
 | Seguridad del sistema, límite de tasa y detección de abuso | IP, agente de usuario, intentos fallidos | **Interés legítimo** | Retención corta y datos minimizados |
@@ -151,10 +151,15 @@ bitácora de auditoría, que es la de mayor impacto:
 2. **Necesidad.** No existe forma menos intrusiva de lograrlo. Sin registro de actor, acción y
    momento, la institución no puede sostener una acusación ni un empleado honesto puede sostener su
    defensa.
-3. **Equilibrio.** El impacto sobre el titular es bajo: se registran identificadores internos, la
-   IP se almacena hasheada, el acceso a la bitácora está restringido al rol de Auditor y de Super
-   Administrador, y la bitácora no se usa para ninguna finalidad distinta del control interno y la
-   respuesta a incidentes. El beneficio para el conjunto de las familias, incluida la protección
+3. **Equilibrio.** El impacto sobre el titular es bajo: se registran identificadores internos y la
+   dirección IP en claro. **La IP no se hashea a propósito**, por decisión del propietario del
+   2026-09-22: hasheada no permitiría investigar un incidente por rango de red, que es la única
+   finalidad para la que se conserva, de modo que el dato ofuscado tendría el mismo coste de
+   privacidad y ningún valor. El equilibrio no descansa entonces en ofuscar el dato, sino en
+   limitar quién lo ve y cuánto tiempo existe: el acceso a la bitácora está restringido al rol de
+   Auditor y de Super Administrador, la política de fila la limita a la propia institución, rige el
+   plazo de conservación de la sección 8, y la bitácora no se usa para ninguna finalidad distinta
+   del control interno y la respuesta a incidentes. El beneficio para el conjunto de las familias, incluida la protección
    de su dinero, supera ese impacto.
 
 ---
@@ -307,7 +312,7 @@ identidad, actor que la atendió, momento de resolución, resultado y evidencia 
 | Datos de identificación del estudiante sin historial financiero, matrícula no concretada | **12 meses** desde la última interacción | Minimización. No hay obligación que justifique más | **Eliminación** |
 | Matrícula y vínculo académico | **5 años** desde el egreso o retiro **(por confirmar)** | Prescripción de reclamaciones y necesidad de emitir constancias posteriores | Anonimización, conservando el dato agregado de egreso |
 | Documento de identidad cifrado del estudiante y del encargado | Igual al período fiscal aplicable | Obligación legal, es dato del documento fiscal | **Eliminación del valor cifrado**, conservando el registro sin él |
-| Bitácora de auditoría (`audit_log`) | **7 años** **(por confirmar)** | Evidencia de control interno financiero y defensa ante reclamaciones | Anonimización del actor si el actor es un titular, conservando la cadena de hash intacta. **Nunca se borran filas**: romper la cadena destruiría el valor probatorio de todo el registro |
+| Bitácora de auditoría (`shared_audit_log`) | **7 años** **(por confirmar)** | Evidencia de control interno financiero y defensa ante reclamaciones | Anonimización del actor si el actor es un titular, conservando la cadena de hash intacta. **Nunca se borran filas**: romper la cadena destruiría el valor probatorio de todo el registro |
 | Bitácora de envío de notificaciones (`notification_log`) | **24 meses** | Prueba de que se notificó antes de aplicar un recargo, más un margen para reclamaciones | **Eliminación** |
 | Consentimientos y revocaciones de comunicación | **3 años** desde la revocación | Prueba de que la baja se respetó | Eliminación, conservando el hash del destinatario en la lista de supresión |
 | Lista de supresión de destinatarios (baja de comunicaciones) | **Permanente**, en forma de hash | Es la única forma de garantizar que una baja se respeta para siempre | Ninguna. Contiene hash, no el contacto en claro |
