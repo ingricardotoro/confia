@@ -161,7 +161,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   `MultiTenantSchemaIT`, `RolePrivilegeMatrixIT`, `PostgresImageSingleSourceIT`). — `design.md`,
   decisión 14 (resuelve la trampa del fixture negativo permanente de B4, sonda S11)
 
-- [ ] 1.5 **VERDE — `CommittingPostgresIntegrationTest`.** Requiere Docker. Crear
+- [x] 1.5 **VERDE — `CommittingPostgresIntegrationTest`.** Requiere Docker. Crear
   `.../test/java/com/confia/support/CommittingPostgresIntegrationTest.java`: sin `@Transactional`
   (nada se revierte solo); `@AfterEach` que trunca, como `confia_owner`, el conjunto de tablas base de
   `public` que **no** tienen disparador `BEFORE TRUNCATE`, derivado del catálogo

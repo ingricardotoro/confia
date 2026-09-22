@@ -136,3 +136,30 @@ and `PostgresImageSingleSourceTest` (part A) all pass unchanged, alongside the n
 `TransactionRunnerContextIT` (4/4). No `PostgresImageSingleSourceIT` rename needed: that class
 never extends `PostgresIntegrationTest`, so it is out of scope for the future `*IT` naming rule
 (B4) and unaffected by this refactor.
+
+## Task 1.5 — VERDE: `CommittingPostgresIntegrationTest`
+
+Created `apps/api/app/src/test/java/com/confia/support/CommittingPostgresIntegrationTest.java`: no
+`@Transactional`; `transactionRunner()` exposes the real production `TransactionRunner` built over
+the test context's own `DataSource`/`PlatformTransactionManager`; `@AfterEach
+truncateCommittedBusinessTables()` derives the table set from `pg_class`/`pg_trigger` (tables with
+no `BEFORE TRUNCATE` trigger), connects as `confia_owner` (the only role with `TRUNCATE`), and
+truncates. Javadoc explains why `withInstitutionContext` cannot seed rows for a subclass of this
+class (same reasoning as `TransactionRunnerContextIT`'s own Javadoc, task 1.2). No RED test is
+written for this task in this PR — `tasks.md` explicitly assigns the contract test
+(`CommittingBaseContractIT`, proving the derived set *excludes* the future audit tables) to PR B2a
+task 2.4, once those tables exist; `design.md` §11 step 5's "Rojo: ... con su prueba de contrato"
+is satisfied by that later class, not duplicated here.
+
+**Verified before relying on it**, with a temporary, uncommitted probe
+(`ProbeCommittingSmokeTest`, deleted immediately after, `git status` confirmed clean): seeded one
+row through `transactionRunner()`, confirmed it visible on a *separate* raw connection (real commit,
+not a transaction-local artifact), called `truncateCommittedBusinessTables()` directly, and
+confirmed the row was gone. `./mvnw -B -pl app -am test -Dtest=ProbeCommittingSmokeTest
+-Dsurefire.failIfNoSpecifiedTests=false`: `Tests run: 1, Failures: 0`. This is deliberately *not*
+the task's persisted evidence (the class has no dedicated test file in this PR by design) — it is
+due diligence before task 1.6 builds `TransactionRunnerRetryIT` on top of this base class, so a
+broken foundation would not surface as a confusing failure two tasks later.
+
+`./mvnw -B -pl app -am test-compile`: `BUILD SUCCESS` (nothing in the app module extends this class
+yet within this PR's permanent test sources; task 1.6 is its first real consumer).
