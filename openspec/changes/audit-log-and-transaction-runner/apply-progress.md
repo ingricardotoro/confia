@@ -1182,3 +1182,32 @@ satisfies both detention rules explicitly named in the orchestrator's brief: the
 property fail on a real, deliberately introduced divergence (not an untested no-op), and the
 comparison exercises `CanonicalAuditRowSerializer#rowHash`, the exact same composition the cross-
 check property calls, never a convenience reimplementation.
+
+## Task 4.6 — Measure the real diff of PR B3a
+
+Confirmed first that `change/audit-log-and-transaction-runner-chain` (PR B2b, tip `a2f4cab`) is
+exactly `git merge-base change/audit-log-and-transaction-runner-chain HEAD` — the correct base for
+this measurement, not merely assumed.
+
+`git diff --numstat change/audit-log-and-transaction-runner-chain...HEAD -- .
+':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`:
+
+| File | + | − |
+|---|---|---|
+| `CanonicalAuditRow.java` (new) | 61 | 0 |
+| `CanonicalAuditRowSerializer.java` (new) | 264 | 0 |
+| `CanonicalSerializationCrossCheckIT.java` (new) | 386 | 0 |
+| `CanonicalSerializationDivergenceTest.java` (new) | 62 | 0 |
+| `Utf16OrderingCanonicalAuditRowSerializer.java` (new) | 22 | 0 |
+
+**Total: 795 additions + 0 deletions = 795 authored lines.** Within the 800-line-per-pull-request
+budget (`docs/15-flujo-de-trabajo-git.md` §3) — but only 5 lines of margin — and **notably above**
+`design.md` §12's own forecast for B3a (380-610): 795 sits 185 lines past the forecast's high end.
+**Reported honestly, not silently absorbed**: this is consistent with every previously measured cut
+in this same change family landing at or above its forecast's high end (PR B1's 1015 against a
+340-560/245-415 split forecast; PR B2a's 719 against 530-890; both already noted in this same
+file). The task's own literal stop condition is exceeding **800** lines, not exceeding the
+forecast range ("Si cabe en 800 líneas, continuar... Si lo hubiera [excedido 800], detener la
+aplicación"); 795 < 800, so **apply continues into task 4.7 without consulting the owner**, per
+that literal instruction. No remaining task in this cut (4.7) adds production or test code, so this
+measurement is final for PR B3a.

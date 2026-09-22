@@ -523,7 +523,7 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
   `CanonicalSerializationDivergenceTest`: verde, con el mensaje de fallo del fixture mostrando la
   entrada generada que produjo hashes distintos. — Mismo requisito y escenario que 4.4
 
-- [ ] 4.6 **Medir el diff real de PR B3a** con
+- [x] 4.6 **Medir el diff real de PR B3a** con
   `git diff --numstat <base-de-PR-B2b>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar; el pronóstico de `design.md` §12 (380-610) no
   anticipa exceso. Si lo hubiera, detener la aplicación y consultar al propietario. — `design.md`
