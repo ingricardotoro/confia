@@ -124,8 +124,16 @@ bloqueantes de `docs/10-analisis-de-brechas.md`.
 | `notifications` | Notificación multicanal con plantillas versionadas y bitácora de entrega | F6 |
 | `portal` | Capa de servicio del portal de encargados, como dominio de identidad y proceso separado | F8 |
 
-La bitácora de auditoría inmutable (`shared/audit`) y la infraestructura de idempotencia
-(`shared/security`) se construyen en F0 como fundación transversal, no como capacidad propia.
+La infraestructura de idempotencia y el componente transaccional único (`shared/security`) se
+construyen en F0 como fundación transversal, sin capacidad propia: su contrato observable vive en
+`build-integrity`.
+
+La **bitácora de auditoría inmutable** sí recibe capacidad propia, `audit-trail`, por decisión del
+propietario del 2026-09-21. Se construye igualmente en F0 como fundación transversal, pero lo que
+promete —trazabilidad con valor probatorio y el límite declarado de ese control mientras no exista
+ancla externa— es un comportamiento de tiempo de ejecución que debe poder encontrarse por sí solo,
+no una puerta de construcción. Sigue el precedente de `money`, capacidad técnica publicada y
+ausente de la tabla anterior, que recoge solo capacidades de negocio.
 
 ---
 
