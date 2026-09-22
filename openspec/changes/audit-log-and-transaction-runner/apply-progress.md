@@ -103,3 +103,36 @@ reactor still reports `BUILD FAILURE` on this narrow run, from `jacoco-maven-plu
 Surefire with `-Dtest=none` that the archived `jooq-flyway-testcontainers-wiring/apply-progress.md`
 task 3.5 recorded for PR A3: the BUNDLE coverage ratio is computed over an incomplete set of
 executed tests, not a real gate failure. Resolved by the full `./mvnw -B verify` in task 1.12.
+
+## Task 1.4 — REFACTOR: lazy container holder
+
+Created `apps/api/app/src/test/java/com/confia/support/SharedPostgresContainer.java`: the container
+moves out of `PostgresIntegrationTest`'s static block into a lazily-initialized, double-checked-lock
+holder (`instance()`), with `jdbcUrl()`, `connectionAs(String role)` and `dataSourceFor(String
+role)` as the three entry points design.md decision 14 names. `newContainer()` reproduces the exact
+same container configuration the static block used to build (same image via
+`PostgresIntegrationTest.postgresImage()`, same username/password, same `fsync=off
+synchronous_commit=off max_connections=200`, same `tmpfs` mount, same test-roles classpath mapping),
+so this is a pure move, not a behavior change.
+
+`PostgresIntegrationTest` no longer declares `POSTGRES` or a static block; its
+`@DynamicPropertySource` now calls `SharedPostgresContainer::jdbcUrl` instead of `POSTGRES::getJdbcUrl`.
+`withInstitutionContext`'s Javadoc gained the paragraph the task requires, declaring explicitly that
+it only works inside a test transaction and pointing at `TransactionRunner` for confirmed-row needs.
+
+**GREEN, observed** (full reactor, not a narrow run — this task explicitly requires `./mvnw -B
+verify` to stay green, including every part A test): `./mvnw -B verify` in `apps/api`:
+
+```
+[INFO] Tests run: 177, Failures: 0, Errors: 0, Skipped: 0        (kernel)
+[INFO] Tests run: 109, Failures: 0, Errors: 0, Skipped: 0        (app unit tests, Surefire)
+[INFO] Tests run: 26, Failures: 0, Errors: 0, Skipped: 0         (app *IT.java, Failsafe)
+[INFO] BUILD SUCCESS
+[INFO] Total time:  02:23 min
+```
+
+`DatabasePipelineIT`, `JooqInstitutionRepositoryIT`, `MultiTenantSchemaIT`, `RolePrivilegeMatrixIT`
+and `PostgresImageSingleSourceTest` (part A) all pass unchanged, alongside the new
+`TransactionRunnerContextIT` (4/4). No `PostgresImageSingleSourceIT` rename needed: that class
+never extends `PostgresIntegrationTest`, so it is out of scope for the future `*IT` naming rule
+(B4) and unaffected by this refactor.

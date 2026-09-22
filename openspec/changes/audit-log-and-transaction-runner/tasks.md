@@ -149,7 +149,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   `build-integrity`, requisito «Transacciones confinadas al componente único de `shared/security`»
   (implementación de base para su mitad positiva, tarea 1.8)
 
-- [ ] 1.4 **REFACTOR — contenedor a titular perezoso.** Requiere Docker. Crear
+- [x] 1.4 **REFACTOR — contenedor a titular perezoso.** Requiere Docker. Crear
   `.../test/java/com/confia/support/SharedPostgresContainer.java` (arranque perezoso en la primera
   llamada a `instance()`, con `jdbcUrl()`, `connectionAs(String role)` y `dataSourceFor(String
   role)`); modificar `.../test/java/com/confia/support/PostgresIntegrationTest.java` para delegar el
