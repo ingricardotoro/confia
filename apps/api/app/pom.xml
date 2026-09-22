@@ -219,6 +219,37 @@
                     </limit>
                   </limits>
                 </rule>
+                <!-- 95% line+branch coverage on the canonical serialization package (design.md
+                     decision 12; task 1.9). Pure, high-proof-value logic that does not encode with
+                     com.confia.*.domain (it deliberately lives outside every layer, decision 1), so
+                     it needs its own explicit rule rather than piggybacking on the one above.
+                     com.confia.shared.audit carries no class yet in this PR — its first class
+                     (CanonicalAuditRowSerializer) lands in PR B3a — so this rule is declared two
+                     cuts ahead of having anything to measure (design.md §5 does not flag that gap;
+                     task 1.9's own text calls it out for whoever reads this next: if an empty
+                     PACKAGE rule ever fails the build instead of passing vacuously, that is a
+                     discrepancy with the design to report, not a threshold to relax or a rule to
+                     move). Uses only <includes>, never <excludes> (probe S10,
+                     apply-progress.md task 1.1): SuppressionCitesAdrTest's uncited-exclusion
+                     scanner only matches <exclude>, so this rule needs no ADR citation. -->
+                <rule>
+                  <element>PACKAGE</element>
+                  <includes>
+                    <include>com.confia.shared.audit</include>
+                  </includes>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.95</minimum>
+                    </limit>
+                    <limit>
+                      <counter>BRANCH</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.95</minimum>
+                    </limit>
+                  </limits>
+                </rule>
               </rules>
             </configuration>
           </execution>

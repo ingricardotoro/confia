@@ -58,6 +58,21 @@ public abstract class CommittingPostgresIntegrationTest extends PostgresIntegrat
         return transactionRunner;
     }
 
+    /**
+     * The pooled {@link DataSource} backing {@link #transactionRunner()}, for a subclass that needs
+     * its own, independent {@link TransactionRunner} instances — for example one per thread in a
+     * genuine concurrency scenario ({@link com.confia.shared.security.TransactionRunnerRetryIT},
+     * design.md §7.2: "dos hilos, cada uno con su propio TransactionRunner y su propia conexión").
+     */
+    protected DataSource dataSource() {
+        return dataSource;
+    }
+
+    /** See {@link #dataSource()}. */
+    protected PlatformTransactionManager transactionManager() {
+        return transactionManager;
+    }
+
     @AfterEach
     void truncateCommittedBusinessTables() throws SQLException {
         List<String> tables = tablesWithoutABeforeTruncateTrigger();

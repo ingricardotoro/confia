@@ -51,7 +51,7 @@ tests, architecture tests, jOOQ generation, and the integration-test suite) took
 seconds**; `DatabasePipelineIT` itself, which owns the only container start in this suite, ran in
 **18.2 seconds**. Both are far inside the 8-minute budget.
 
-**Final measurement, PR A3, with the complete `*IT.java` suite** (`DatabasePipelineIT`,
+**Measurement, PR A3, with the complete `*IT.java` suite of change 4** (`DatabasePipelineIT`,
 `JooqInstitutionRepositoryIT`, `MultiTenantSchemaIT`, `RolePrivilegeMatrixIT` — 21 integration test
 methods total, one shared container per JVM per design.md decision 7): from a clean `app/target`
 and `kernel/target`, the full `./mvnw -B verify` reactor build took **2 minutes 4 seconds** total
@@ -59,3 +59,17 @@ and `kernel/target`, the full `./mvnw -B verify` reactor build took **2 minutes 
 ephemeral container). The Failsafe `integration-test` phase itself — container start plus all four
 `*IT.java` classes — ran in about **30 seconds**. Both remain far inside the 8-minute budget, with
 no sign of approaching it as the suite has grown from 2 to 21 test methods across this change.
+
+**Measurement, PR B1 (change 5, part B), with `TransactionRunnerContextIT` and
+`TransactionRunnerRetryIT` added** (design.md §11, step 8 and §13). From a clean `app/target` and
+`kernel/target`, per-line timestamped to isolate the Failsafe phase precisely rather than reading it
+off the reactor's own per-module summary: the `failsafe:integration-test` goal for `confia-api`
+(container reuse across the whole suite; container start already paid by `DatabasePipelineIT`, the
+first class to run) took **39.5 seconds** for all six `*IT.java` classes now in the suite
+(`DatabasePipelineIT`, `JooqInstitutionRepositoryIT`, `MultiTenantSchemaIT`, `RolePrivilegeMatrixIT`,
+`TransactionRunnerContextIT`, `TransactionRunnerRetryIT` — 28 integration test methods total). The
+full reactor build (`kernel` + `app`, unit tests, architecture tests, jOOQ generation, and the
+integration-test suite) took **2 minutes 26 seconds** total, `confia-api` alone **2 minutes 6
+seconds**. Both remain far inside the 8-minute (480-second) budget: the Failsafe phase itself uses
+about 8% of it, even with `TransactionRunnerRetryIT`'s own concurrency scenario (a real `CyclicBarrier`
+synchronization and a genuine PostgreSQL `SERIALIZABLE` write conflict) included.

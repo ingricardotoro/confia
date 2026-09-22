@@ -163,3 +163,243 @@ broken foundation would not surface as a confusing failure two tasks later.
 
 `./mvnw -B -pl app -am test-compile`: `BUILD SUCCESS` (nothing in the app module extends this class
 yet within this PR's permanent test sources; task 1.6 is its first real consumer).
+
+## Task 1.6 — RED: `TransactionRunnerRetryIT`
+
+Created `apps/api/app/src/test/java/com/confia/shared/security/TransactionRunnerRetryIT.java`,
+extending `CommittingPostgresIntegrationTest`. Added `dataSource()`/`transactionManager()`
+protected accessors to that base class so this test can build one independent `TransactionRunner`
+per thread, matching design.md §7.2's "dos hilos, cada uno con su propio TransactionRunner y su
+propia conexión".
+
+Two scenarios, neither depending on wall-clock timing (design.md §7.2):
+
+- **Deterministic exhaustion** (`retryExhaustsAndPropagatesTheOriginalErrorDeterministically`): a
+  use case that runs `do $$ begin raise exception using errcode = '40001'; end $$;` on every single
+  attempt, no concurrency. Asserts the propagated exception carries SQLState `40001` (or is a
+  `ConcurrencyFailureException`), and — the assertion that actually distinguishes "retried and gave
+  up" from "never retried" — that the body ran **exactly 4 times** (1 initial attempt + design.md
+  decision 2's bounded 3 retries).
+- **Real success within the limit** (`retrySucceedsWithinTheBoundedLimitOnARealSerializationConflict`):
+  two independent `TransactionRunner`s, `SERIALIZABLE`, both updating the very same committed row,
+  synchronized with a `CyclicBarrier` awaited only on each thread's **first** attempt
+  (`AtomicBoolean.compareAndSet`) — never on a retry, which would deadlock waiting for a party that
+  already finished. Asserts both futures complete without the caller ever seeing an exception.
+
+**RED, observed**: `./mvnw -B -pl app -am test -Dtest=TransactionRunnerRetryIT
+-Dsurefire.failIfNoSpecifiedTests=false`, exit 1, `Tests run: 2, Failures: 1, Errors: 1`:
+
+```
+retrySucceedsWithinTheBoundedLimitOnARealSerializationConflict -- ERROR!
+java.util.concurrent.ExecutionException: org.jooq.exception.DataAccessException: SQL [update organization_institution set legal_name = ? where id = ?]; ERROR: could not serialize access due to concurrent update
+Caused by: org.postgresql.util.PSQLException: ERROR: could not serialize access due to concurrent update
+
+retryExhaustsAndPropagatesTheOriginalErrorDeterministically -- FAILURE!
+[exactly the initial attempt plus the bounded number of retries, no more and no fewer]
+  expected: 4
+  but was: 1
+```
+
+Both failures are genuine and for the right reason: the success scenario shows PostgreSQL really
+did raise a `SERIALIZABLE` write conflict (proving the concurrency setup is real, not a fabrication)
+and `TransactionRunner`, having no retry logic yet, propagated it straight to the caller instead of
+retrying; the exhaustion scenario shows the body ran exactly once instead of four times, confirming
+no retry happened there either.
+
+## Task 1.7 — GREEN: the bounded retry in `TransactionRunner`
+
+Implemented the retry loop in both `execute` methods (retry lives in the `IsolationLevel`-explicit
+overload; the single-arg overload delegates to it, so both share one implementation): on a
+`RuntimeException`, `isRetryable(e)` checks first for `org.springframework.dao.
+ConcurrencyFailureException`, then walks the cause chain for a `java.sql.SQLException` with
+`SQLState` `40001` or `40P01` — needed because jOOQ wraps the underlying `SQLException` in its own
+`org.jooq.exception.DataAccessException`, never translated through Spring's hierarchy. Retries up
+to `maxRetries` (3) times, backing off `backoffBase * attempt` plus bounded jitter
+(`ThreadLocalRandom`) between attempts, via `Thread.sleep` — never used as a synchronization
+mechanism in any test, per design.md decision 2. Each retry opens a genuinely new transaction
+(a fresh `template.execute(...)` call), so the security context is reapplied fresh every attempt.
+
+**Two real bugs found and fixed while turning this green, both in the test, not in
+`TransactionRunner`:**
+1. The success scenario's final assertion queried the row through `dsl` with no institution context
+   active, so the root table's row-level-security policy denied by default (V1 migration) and the
+   query returned zero rows instead of the updated one — an `IndexOutOfBoundsException`, not a
+   `TransactionRunner` defect. Fixed by reading the final state through a raw `postgres` (superuser)
+   connection via `SharedPostgresContainer.connectionAs("postgres")`, which bypasses row-level
+   security, exactly like the fixture's own seeding helper does elsewhere in this PR.
+2. That fix initially missed the `com.confia.support.SharedPostgresContainer` import (a real
+   `cannot find symbol` compile error, caught and fixed immediately).
+
+**Environment interference encountered and resolved, unrelated to any of the above bugs.** Two
+separate real Maven runs failed with `El proceso no tiene acceso al archivo porque está siendo
+utilizado por otro proceso` on `target/test-classes/.../ResolveCurrentInstitutionTest.class`
+(OneDrive sync holding a file handle — the exact class of failure this PR's brief already warns
+about) and, once that cleared, two further runs failed with a **different** symptom: Surefire ran a
+`.class` file that literally contained the bytes `Unresolved compilation problems: ` — traced with
+`grep -a` directly against the compiled class file — meaning VS Code's Java language server
+(`redhat.java` extension, ECJ-based) was recompiling the same source tree into the same
+`target/test-classes` directory Maven uses and racing Maven's own `javac` output between
+`test-compile` and `test`. Resolved by stopping the two `redhat.java` JRE processes for the
+remainder of this session (`Stop-Process`, PIDs identified via `Get-Process java`) and clearing
+`target/` again before the next run; the editor extension restarts this language server on its own
+when the user next interacts with it, so nothing here is a permanent change to the user's
+environment. Neither of these two interferences is a code defect.
+
+**GREEN, observed** (stable across three separate runs, no flakiness in the concurrency scenario):
+`./mvnw -B -pl app -am test -Dtest=TransactionRunnerRetryIT -Dsurefire.failIfNoSpecifiedTests=false`:
+
+```
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 26.19 s -- in com.confia.shared.security.TransactionRunnerRetryIT
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+(repeated twice more: 26.49 s and 25.73 s, both `Tests run: 2, Failures: 0, Errors: 0`)
+
+## Task 1.8 — R3 positive half
+
+Extended `TransactionsOnlyInSharedSecurityTest` with a third test,
+`sharedSecurityContainsAtLeastOneProductionClassThatUsesTheTransactionApi()`, asserting over
+`productionClasses()` filtered to `com.confia.shared.security` that at least one class uses the
+transaction API. Extracted the shared criterion into one static `usesTransactionApi(JavaClass)`
+method, called by both the existing negative `ArchCondition` and the new positive assertion, so the
+two halves cannot diverge on what "uses the transaction API" means (task 1.8's own requirement).
+This is a refactor of the negative rule's internals (its violation messages are now one unified
+string instead of three separate per-branch strings), not a behavior change — its own fixture
+rejection test still passes with the same message fragment (`"BadTransactionalRepository"`).
+
+Task text says this half "falla al ejecutarse antes de la tarea 1.3" — not applicable here since
+task 1.3 already ran (`TransactionRunner` exists since this PR's third commit); confirmed instead,
+per the task's own instruction, that the assertion is independent of the negative rule's rejection
+and shares its criterion (done above), then ran it directly as ROJO/VERDE combined.
+
+Also corrected `BadTransactionalRepository`'s Javadoc (no longer describes itself as a "preventive
+guard" over an empty `shared.security` package — that package has real production code since task
+1.3).
+
+**Observed**: `./mvnw -B -pl app -am test -Dtest=TransactionsOnlyInSharedSecurityTest
+-Dsurefire.failIfNoSpecifiedTests=false`:
+
+```
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 11.15 s -- in com.confia.architecture.TransactionsOnlyInSharedSecurityTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+
+All three green: the negative rule against real production code, its fixture-rejection half, and
+the new positive assertion.
+
+## Task 1.9 — `junit-platform.properties` and the `PACKAGE` JaCoCo rule for `com.confia.shared.audit`
+
+Created `apps/api/app/src/test/resources/junit-platform.properties`: `jqwik.database` points inside
+`target/` (git-ignored, same pattern as kernel), `jqwik.tries.default=100` — lower than kernel's
+1000, because this module's future property test round-trips to real PostgreSQL on every try,
+unlike kernel's pure in-memory properties. No extra `testResources` filtering configuration needed:
+the existing unfiltered pass over `src/test/resources` (app/pom.xml, task 1.6 of the previous
+change) already copies this file as-is.
+
+Added the `PACKAGE` JaCoCo rule for `com.confia.shared.audit` (95% line+branch) next to the existing
+`domain`-packages rule, `<includes>` only, no `<excludes>` — confirmed clean by probe S10
+(apply-progress.md task 1.1).
+
+**Reconciliation note resolved, not a discrepancy after all.** The task text flagged a real risk:
+`com.confia.shared.audit` has no class yet in this PR (its first class lands in PR B3a), so this
+rule is declared two cuts before it has anything to measure, and `design.md` §5 does not call that
+gap out. The task said to report it as a discrepancy **only if** the empty rule failed the build
+instead of passing vacuously. **It did not fail**: the full `./mvnw -B verify` below is `BUILD
+SUCCESS` with this rule active and zero classes in the package it targets — JaCoCo's `PACKAGE`
+element rule simply has nothing to check and passes, exactly like the file removed the concern is
+`SuppressionCitesAdrTest`'s pass on the same PR earlier. No discrepancy to report.
+
+**Observed**: `./mvnw -B verify` in `apps/api`:
+
+```
+[INFO] Tests run: 177, Failures: 0, Errors: 0, Skipped: 0        (kernel)
+[INFO] Tests run: 110, Failures: 0, Errors: 0, Skipped: 0        (app unit tests, Surefire)
+[INFO] Tests run: 28, Failures: 0, Errors: 0, Skipped: 0         (app *IT.java, Failsafe)
+[INFO] BUILD SUCCESS
+[INFO] Total time:  02:19 min
+```
+
+Also confirmed: no stray `apps/api/app/.jqwik-database` file appeared after this run (the
+housekeeping nuisance noted in task 1.1 is resolved by this task's own configuration, as expected —
+`jqwik.database` now points inside `target/`), and the properties file is genuinely on the test
+classpath (`target/test-classes/junit-platform.properties`, contents verified byte-for-byte equal
+to the source).
+
+## Task 1.10 — Measure the `*IT.java` suite time
+
+Measured, not estimated, with a dedicated clean run (`app/target` and `kernel/target` removed
+first). Reading the real Failsafe phase boundary off the reactor's own per-module summary line is
+imprecise (it bundles compile, jOOQ generation and unit tests together), so this run piped
+`./mvnw -B verify`'s output through a per-line `date +%s.%N` timestamp wrapper to isolate the exact
+`[INFO] --- failsafe:3.6.0:integration-test (default) @ confia-api ---` → `[INFO] ---
+failsafe:3.6.0:verify (default) @ confia-api ---` boundary precisely:
+
+```
+1790052127.329823100 [INFO] --- failsafe:3.6.0:integration-test (default) @ confia-api ---
+1790052166.840512800 [INFO] --- failsafe:3.6.0:verify (default) @ confia-api ---
+```
+
+**Failsafe `integration-test` phase for `confia-api`: 39.5107 seconds**, all six `*IT.java` classes
+included (`DatabasePipelineIT`, `JooqInstitutionRepositoryIT`, `MultiTenantSchemaIT`,
+`RolePrivilegeMatrixIT` from earlier changes, plus this PR's `TransactionRunnerContextIT` and
+`TransactionRunnerRetryIT`), 28 integration test methods, 0 failures. Reactor: `confia-api` module
+`SUCCESS [02:06 min]`, `Total time: 02:26 min`. Recorded in `apps/api/README.md`, "Integration test
+suite budget" — both are far inside the 8-minute (480 s) budget; the Failsafe phase itself uses
+about 8% of it, including `TransactionRunnerRetryIT`'s real `CyclicBarrier`-synchronized
+`SERIALIZABLE` conflict scenario.
+
+## Task 1.11 — Measure the real diff of PR B1 — HARD STOP, exceeds 800 lines
+
+`git diff --numstat main...change/audit-log-and-transaction-runner -- . ':(exclude)openspec'
+':(exclude)docs/adr' ':(exclude)**/generated/**'`:
+
+| File | + | − |
+|---|---|---|
+| `apps/api/README.md` | 15 | 1 |
+| `apps/api/app/pom.xml` | 40 | 0 |
+| `IsolationLevel.java` (new) | 11 | 0 |
+| `SecurityContext.java` (new) | 24 | 0 |
+| `TransactionRunner.java` (new) | 181 | 0 |
+| `package-info.java` (new, `shared.security`) | 16 | 0 |
+| `TransactionsOnlyInSharedSecurityTest.java` | 59 | 22 |
+| `BadTransactionalRepository.java` | 6 | 6 |
+| `TransactionRunnerContextIT.java` (new) | 182 | 0 |
+| `TransactionRunnerRetryIT.java` (new) | 181 | 0 |
+| `CommittingPostgresIntegrationTest.java` (new) | 115 | 0 |
+| `PostgresIntegrationTest.java` | 22 | 26 |
+| `SharedPostgresContainer.java` (new) | 97 | 0 |
+| `junit-platform.properties` (new) | 11 | 0 |
+
+**Total: 960 additions + 55 deletions = 1 015 authored lines.**
+
+**This exceeds both the project's 800-line-per-pull-request budget
+(`docs/15-flujo-de-trabajo-git.md` §3) and design.md §12's own high-end forecast for B1 (975).**
+Per this task's own instruction and the orchestrator's explicit hard-stop rule 1 ("Si el diff de la
+tarea 1.11 supera 800 líneas de código, detente y repórtalo. Partir el corte es decisión del
+propietario"), **apply STOPS here.** Task 1.12 (final verification and push) is intentionally not
+started.
+
+**The contingency subdivision design.md §12 already names, for the owner to choose from (not
+decided here):**
+
+- **B1a** ≈ 340–560 authored lines: `TransactionRunner` and its three types (`SecurityContext`,
+  `IsolationLevel`), `TransactionRunnerContextIT`, and R3's positive half — tasks 1.1 (probes +
+  jqwik dependency), 1.2, 1.3, 1.8.
+- **B1b** ≈ 245–415 authored lines: the lazy container holder, `CommittingPostgresIntegrationTest`,
+  `TransactionRunnerRetryIT`, `junit-platform.properties` and the JaCoCo `PACKAGE` rule — tasks 1.4,
+  1.5, 1.6, 1.7, 1.9.
+- Neither subdivision separates code from its own tests (design.md §12's explicit constraint on any
+  split).
+
+The real measured total (1 015) is noticeably above even the combined high end of B1a+B1b's
+forecast (560+415=975), consistent with this PR's own precedent: every measured PR in this change
+family so far has landed at or above its forecast's high end (PR A1 replaced by A2/A3 in the
+archived change; `design.md` §12 itself already flagged B1 as one of the two cuts, along with B3,
+that its own high-end estimate could not clear).
+
+**Nothing here is reverted.** All nine completed tasks (1.1–1.10) remain committed, individually,
+on `change/audit-log-and-transaction-runner`; every commit is a real, independently-revertable
+`git` commit with its own RED/GREEN evidence. Splitting into B1a/B1b, if the owner chooses that
+path, is a matter of choosing where a new branch point falls among these already-existing commits —
+no code needs to be rewritten to make the split possible.

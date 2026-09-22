@@ -94,6 +94,46 @@ S9, S10, S11, S12, S13— se ejecutan como tarea explícita dentro del corte que
 
 ## PR B1 — corte B1: componente transaccional único y base de confirmación real
 
+> **Dividido en B1a y B1b por el orquestador el 2026-09-21**, bajo la estrategia de entrega `auto`
+> que el propietario eligió en la preflight de sesión. La tarea 1.11 midió **1 015 líneas** de
+> código, por encima del máximo de ochocientas de `docs/15-flujo-de-trabajo-git.md` §3 y también del
+> extremo alto del propio pronóstico de `design.md` §12. La aplicación se detuvo ahí, como estaba
+> instruido, sin decidir el corte por su cuenta.
+>
+> El punto de corte se eligió midiendo los seis límites de commit candidatos, no estimando:
+>
+> | Corte tras | B1a | B1b |
+> |---|---|---|
+> | tarea 1.3 | 365 | 666 |
+> | tarea 1.4 | 510 | 521 |
+> | **tarea 1.5** | **610** | **421** |
+> | tarea 1.6 | 797 | 252 |
+> | tarea 1.7 | 864 | 151 |
+> | tarea 1.8 | 957 | 58 |
+>
+> Se eligió **tras la tarea 1.5**, commit `beb395a`. Los de 1.6 en adelante dejan a B1a rozando el
+> presupuesto sin margen; el de 1.3 desbalancea. Y la costura tiene sentido propio: **B1a** entrega
+> el componente transaccional y las dos clases base de prueba; **B1b** entrega el reintento acotado
+> y la mitad positiva de la regla R3.
+>
+> - **PR B1a**, rama `change/audit-log-and-transaction-runner-component`, base `main`: tareas 1.1 a
+>   1.5. 610 líneas de código.
+> - **PR B1b**, rama `change/audit-log-and-transaction-runner`, base PR B1a: tareas 1.6 a 1.12.
+>   421 líneas de código.
+>
+> Ninguna tarea se separa de sus propias pruebas, y ningún commit hubo que reescribir: cada tarea ya
+> era un commit independiente, así que partir fue elegir un punto de rama entre los que ya existían.
+>
+> **Verificación del corte.** `docs/15` §3 exige que cada unidad de una cadena compile y pase sus
+> pruebas sola. B1a se verificó en `beb395a` con `./mvnw -B verify`: **BUILD SUCCESS**, cobertura
+> cumplida en ambos módulos. La primera corrida de esa verificación había fallado con cobertura
+> **0,00 en todo el paquete**, que es el agente de JaCoCo sin instrumentar y no código sin cubrir;
+> no se reprodujo en una segunda corrida limpia. Coincide con la interferencia del servidor de
+> lenguaje de VS Code sobre `target/test-classes` que la aplicación documentó en su informe, y con
+> la retención de directorios de OneDrive. Es ruido del entorno local: la integración continua corre
+> en `ubuntu-latest`, sin ninguno de los dos.
+
+
 Rama `change/audit-log-and-transaction-runner` (rama actual), base `main`. Crea la primera clase de
 producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pueda crear
 `shared_audit_log` (ver dependencia arriba).
@@ -175,7 +215,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   — `design.md`, decisión 9 (piezas 1 y 2 del contrato; la pieza 3 —aislar en vez de limpiar— se
   demuestra en B2a)
 
-- [ ] 1.6 **ROJO — reintento acotado.** Requiere Docker. Crear
+- [x] 1.6 **ROJO — reintento acotado.** Requiere Docker. Crear
   `.../test/java/com/confia/shared/security/TransactionRunnerRetryIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`: primero el **agotamiento determinista** — un cuerpo que ejecuta
   `DO $$ BEGIN RAISE EXCEPTION USING ERRCODE = '40001'; END $$;` en cada intento, sin concurrencia,
@@ -188,7 +228,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   (escenarios «El reintento tiene éxito dentro del límite acotado» y «El reintento se agota y el
   error se propaga»)
 
-- [ ] 1.7 **VERDE — el reintento acotado en `TransactionRunner`.** Requiere Docker. Implementar el
+- [x] 1.7 **VERDE — el reintento acotado en `TransactionRunner`.** Requiere Docker. Implementar el
   límite de reintentos (tres, con retroceso — `docs/adr/ADR-0010-idempotencia-y-concurrencia-financiera.md`
   líneas 203-205) ante `org.springframework.dao.ConcurrencyFailureException` **o** `SQLState` `40001`
   (`serialization_failure`) / `40P01` (`deadlock_detected`); retroceso `base * intento` con fracción
@@ -196,7 +236,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   `TransactionRunnerRetryIT` completa: verde. — `design.md`, decisión 2 («Detección del error de
   serialización» y «Retroceso»); especificación `build-integrity`, mismo requisito que 1.6
 
-- [ ] 1.8 **ROJO/VERDE — R3, mitad positiva.** No requiere Docker (ArchUnit puro). ROJO: extender
+- [x] 1.8 **ROJO/VERDE — R3, mitad positiva.** No requiere Docker (ArchUnit puro). ROJO: extender
   `.../test/java/com/confia/architecture/TransactionsOnlyInSharedSecurityTest.java` con un tercer
   método que afirma, sobre `productionClasses()` filtradas por `com.confia.shared.security`, que al
   menos una existe y usa la API de transacciones — falla si se ejecuta antes de la tarea 1.3 (no
@@ -209,7 +249,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   ninguna clase que use la API de transacciones» y «El componente transaccional único satisface la
   aserción positiva»)
 
-- [ ] 1.9 **`junit-platform.properties` de `app` y regla `PACKAGE` de JaCoCo para
+- [x] 1.9 **`junit-platform.properties` de `app` y regla `PACKAGE` de JaCoCo para
   `com.confia.shared.audit`.** No requiere Docker (configuración de construcción). Crear
   `apps/api/app/src/test/resources/junit-platform.properties` con `jqwik.database` y
   `jqwik.tries.default` fijados por debajo del valor de `kernel`, acorde al presupuesto de 8 minutos
@@ -223,14 +263,14 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   mueve la regla a otro corte sin consultar. Ejecutar `./mvnw -B verify`: verde. — Especificación
   `build-integrity`, sin requisito propio (trazado a `design.md`, decisión 12)
 
-- [ ] 1.10 **Medir el tiempo de la suite `*IT.java`.** Requiere Docker. Ejecutar `./mvnw -B verify`
+- [x] 1.10 **Medir el tiempo de la suite `*IT.java`.** Requiere Docker. Ejecutar `./mvnw -B verify`
   completo en `apps/api` y medir el tiempo real de la fase `integration-test` (Failsafe), con las
   pruebas de confirmación real y de concurrencia de este corte incluidas. Registrar el tiempo medido,
   no estimado, en `apply-progress.md` y en `apps/api/README.md`. — Especificación `build-integrity`,
   requisito heredado de la parte A «Pruebas `*IT.java` con Testcontainers dentro del presupuesto de 8
   minutos»; `design.md` §11, paso 8 y §13
 
-- [ ] 1.11 **Medir el diff real de PR B1** con
+- [x] 1.11 **Medir el diff real de PR B1** con
   `git diff --numstat main...change/audit-log-and-transaction-runner -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y
   consultar al propietario**, con la subdivisión de contingencia ya identificada en `design.md` §12:
