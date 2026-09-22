@@ -1501,3 +1501,105 @@ failing, then removed/reverted and re-confirmed green — never assumed:
 Final state after every revert: `git status --short` shows only the new, real
 `AuditScopeExclusionInventoryTest.java` — confirmed with a fresh, full re-run of the class:
 `Tests run: 4, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`.
+
+## Task 5.6 — Measure the real diff of PR B3b — HARD STOP, then a real coverage gap, then a clean split
+
+Confirmed first that `change/audit-log-and-transaction-runner-canonical-serializer` (PR B3a-ii,
+tip `c9f5f0d`) is exactly `git merge-base ... HEAD` — the correct base.
+
+**First measurement**, before running a full `./mvnw -B verify`:
+`git diff --numstat change/audit-log-and-transaction-runner-canonical-serializer...HEAD -- .
+':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'` summed to **915 authored
+lines** across tasks 5.1-5.5 — already past the 800-line-per-pull-request budget
+(`docs/15-flujo-de-trabajo-git.md` §3), and well past `design.md` §12's own forecast (400-660).
+
+**Before reporting the stop, ran a full `./mvnw -B verify`** (the orchestrator's own lesson from
+PR B3a: a clean local pass is what actually decides whether a candidate split is real, not the
+diff count alone). It surfaced a genuine `jacoco:0.8.14:check` failure — the same class of gap PR
+B3a hit:
+
+```
+[WARNING] Rule violated for package com.confia.shared.audit: lines covered ratio is 0.93, but expected minimum is 0.95
+[WARNING] Rule violated for package com.confia.shared.audit: branches covered ratio is 0.90, but expected minimum is 0.95
+[INFO] BUILD FAILURE
+```
+
+Confirmed via `target/site/jacoco/jacoco.csv`, not assumed: `AuditChainVerification.Empty` (0/6
+instructions, 0/1 methods covered — never constructed) and `DefaultAuditChainVerifier` (46/271
+instructions missed, 6 branches missed) — `AuditChainVerifierIT` and `AuditChainKnownLimitIT`
+never leave an institution with zero rows and never manipulate `prev_hash` directly, so
+`MISSING_GENESIS`, `GENESIS_PREV_HASH_MISMATCH` and `PREV_HASH_MISMATCH` were never exercised —
+real gaps in the walk's own branch logic, not accessor triviality this time.
+
+**Fixed, not worked around**: widened `DefaultAuditChainVerifier#walk` from `private` to
+package-private (Javadoc explains why) and added `DefaultAuditChainVerifierTest.java` — a pure,
+Docker-free unit test against a fake in-memory `AuditLogReader`, exercising every branch
+(`Empty`, `MISSING_GENESIS`, `GENESIS_PREV_HASH_MISMATCH`, `PREV_HASH_MISMATCH`,
+`ROW_HASH_MISMATCH`, `Intact` with a JSON payload) directly, without the real `TransactionRunner`'s
+database connection (a harmless, never-invoked `TransactionRunner`/`DataSource` pair satisfies the
+constructor's non-null contract only). Re-ran the full `./mvnw -B verify`: **BUILD SUCCESS**.
+`jacoco.csv` confirmed **98.8% lines (167/169), 100% branches (74/74)** for
+`com.confia.shared.audit` — the only two lines still missed are the already-documented,
+genuinely-unreachable `catch (NoSuchAlgorithmException)` in `CanonicalAuditRowSerializer` from PR
+B3a. **The threshold was never lowered and no test was skipped.**
+
+**Re-measured after the coverage fix**: **1 122 authored lines total** — confirming the hard stop.
+
+**Per the orchestrator's explicit hard-stop rule 1, apply stops here.** Measured, real commit-
+boundary candidates (cumulative diff from the same base):
+
+| Commit | Cumulative lines | Contents |
+|---|---|---|
+| `d00c17a` (5.1) | 9 | probes S3/S9, `pom.xml` `forcedType` |
+| `7a080ea` (5.2, RED) | 215 | `AuditChainVerifierIT`, `AuditLogSuperuserTamper` |
+| `2677af6` (5.3, GREEN) | 549 | port, adapter, verifier, `AuditChainVerification` |
+| coverage fix | 756 | `DefaultAuditChainVerifierTest`, `walk` widened |
+| 5.4 (`AuditChainKnownLimitIT`) | 921 | the declared control limit |
+| 5.5 (inventories) | 1 122 | the two named-destination exclusion inventories |
+
+**The coverage-fix commit could not stay where it was created (after 5.4 and 5.5) and still
+produce a valid split**: at the original `2677af6` boundary alone, `com.confia.shared.audit` was
+*already* below the 95% gate (neither `AuditChainKnownLimitIT` nor
+`AuditScopeExclusionInventoryTest` exercise any of the missing branches — `AuditChainKnownLimitIT`
+only re-confirms the same `Intact` branch `AuditChainVerifierIT` already covers, and the inventory
+test never touches `DefaultAuditChainVerifier` at all). A split at `2677af6` alone would have
+produced a first PR that fails its own coverage gate — precisely the trap PR B3a's own stop
+warned about. **Since this branch was never pushed** (no push performed this session, matching
+every prior cut), the coverage-fix commit was reordered with `git cherry-pick` onto a temporary
+branch built from `2677af6`, confirmed byte-identical to the pre-reorder tree (`git diff
+reorder-tmp change/audit-log-and-transaction-runner-verifier` — zero output, both with and without
+the `openspec` exclusion), and the real branch was moved onto it. No commit content was rewritten,
+only reordered — the same technique PR B3a-i/B3a-ii used.
+
+**Both candidates verified to pass `./mvnw -B verify` on their own, not assumed:**
+
+- **Candidate 1 — `B3b-verifier`, commit `07c6cdf`, 756 lines.** Checked out in an isolated `git
+  worktree` (`../confia-candidate-07c6cdf`, sibling of this repository) so the main working tree
+  was never disturbed. `./mvnw -B verify`: **BUILD SUCCESS**, `Total time: 03:31 min`, 120 unit
+  tests + 53 `*IT.java` tests, all green, including `AuditChainVerifierIT`'s six scenarios. This
+  slice alone already satisfies **F0 exit criterion 3** end to end: real `SUPERUSER` manipulation,
+  identified by exact `(institution_id, id)`. Worktree removed after the run
+  (`git worktree remove --force`).
+- **Candidate 2 — `B3b-limit-and-inventories`, commits `c2e17e1` + `a9ab257` (base `B3b-verifier`),
+  366 lines.** No new production code — only `AuditChainKnownLimitIT` and
+  `AuditScopeExclusionInventoryTest`. Its own standalone `verify` run is the full `./mvnw -B
+  verify` already executed above at current `HEAD` (byte-identical tree to this candidate's tip):
+  **BUILD SUCCESS**.
+
+**Split, not decided here, per the orchestrator's own instruction that splitting is the owner's
+call:**
+
+- **`B3b-verifier`** (rama `change/audit-log-and-transaction-runner-verifier`, base PR B3a-ii,
+  tip `07c6cdf`): the verifier's port, adapter, sealed result type, walk algorithm, its RED/GREEN
+  `AuditChainVerifierIT` (including the `SUPERUSER` manipulation and the `actor_label`/
+  `user_agent`/`trace_id` scenario), and its own passing 95% coverage gate. Independently
+  shippable and already closes F0 exit criterion 3.
+- **`B3b-limit-and-inventories`** (new branch based on `B3b-verifier`'s tip): the declared,
+  accepted control limit (`AuditChainKnownLimitIT`, with its own negative control already
+  recorded above) and the two named-destination exclusion inventories (task 5.5). Rollback
+  boundary matches the established pattern: reverting this slice leaves `B3b-verifier` complete
+  and green on its own.
+
+Task 5.7's own final verification, below, runs against the full, undivided `HEAD` — the same tree
+either split option converges to — so its evidence covers both candidates regardless of which the
+owner picks.

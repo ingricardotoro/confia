@@ -658,7 +658,7 @@ de F0.
   bitácora limitado a la institución, sin filtro por `audit:read`» (escenario «Ningún endpoint
   expone la bitácora con el permiso `audit:read`»)
 
-- [ ] 5.6 **Medir el diff real de PR B3b** con
+- [x] 5.6 **Medir el diff real de PR B3b** con
   `git diff --numstat <base-de-PR-B3a>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar; el pronóstico de `design.md` §12 (400-660) no
   anticipa exceso. Si lo hubiera, detener la aplicación y consultar al propietario. — `design.md`
