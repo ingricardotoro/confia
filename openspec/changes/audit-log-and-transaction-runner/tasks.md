@@ -467,7 +467,41 @@ Rama `change/audit-log-and-transaction-runner-chain`, base PR B2a.
 
 ---
 
-## PR B3a — corte B3 (parte 1): serialización canónica en Java y su prueba cruzada
+## PR B3a
+
+> **Dividido en B3a-i y B3a-ii por el orquestador el 2026-09-22**, bajo la estrategia de entrega
+> `auto`. La medicion final dio **845 lineas**, cuarenta y cinco por encima del maximo de
+> ochocientas de `docs/15-flujo-de-trabajo-git.md` seccion 3. La aplicacion se detuvo sin decidir el
+> corte, como estaba instruido.
+>
+> **El corte no pudo hacerse en un limite de commit existente.** La prueba de cobertura que cierra
+> la puerta de `com.confia.shared.audit` se escribio al final, cuando la verificacion completa
+> revelo la brecha, pero la cubre desde la primera clase. Comprobado ejecutando la verificacion en
+> los puntos candidatos: en `570fd14` (711 lineas) y en `5990d0c` (795) la construccion **falla**
+> con `lines covered ratio is 0.92, but expected minimum is 0.95`. Dejar esa prueba en el segundo
+> pull request producia un primero que no pasa sus propias pruebas, que es justo lo que `docs/15`
+> seccion 3 prohibe.
+>
+> La solucion fue **adelantar ese commit**, no relajar la puerta ni encoger nada. Como la rama no
+> estaba empujada, se reordeno limpiamente con `cherry-pick` mas `rebase --onto`; ningun commit
+> hubo que reescribir en su contenido.
+>
+> - **PR B3a-i**, rama `change/audit-log-and-transaction-runner-serializer`, base PR B2b: tareas
+>   4.1 a 4.3 mas la prueba de cobertura. **761 lineas.** Verificado solo: `BUILD SUCCESS`.
+> - **PR B3a-ii**, rama `change/audit-log-and-transaction-runner-canonical-serializer`, base
+>   PR B3a-i: tareas 4.4 a 4.7, el fixture de divergencia. **84 lineas.** Verificado solo:
+>   `BUILD SUCCESS`.
+>
+> Las mediciones de 795 y 845 que aparecen mas abajo en las tareas 4.6 y 4.7 corresponden al corte
+> sin dividir y se conservan como registro historico.
+>
+> **Control negativo del orquestador.** La prueba de divergencia demuestra Java contra Java: que el
+> comparador equivocado produce distinto hash. Para comprobar que la **prueba cruzada** puede fallar
+> de verdad contra la base, se apunto temporalmente `CanonicalSerializationCrossCheckIT` al
+> serializador divergente: la propiedad **fallo contra PostgreSQL real**, y jqwik redujo el
+> contraejemplo en 75 pasos hasta la muestra minima. Restaurado despues; arbol limpio.
+
+ — corte B3 (parte 1): serialización canónica en Java y su prueba cruzada
 
 Rama `change/audit-log-and-transaction-runner-canonical-serializer`, base PR B2b. `design.md` §12
 planifica B3 dividido desde el principio, porque su rango medio ya supera el presupuesto de 800.
@@ -505,7 +539,7 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
   cruzada a la función SQL. Ejecutar `CanonicalSerializationCrossCheckIT` con las once familias:
   verde. — `design.md`, decisión 6 completa (6.1 a 6.4) y §6.3
 
-- [ ] 4.4 **ROJO — divergencia deliberada.** No requiere Docker (comparación pura entre dos
+- [x] 4.4 **ROJO — divergencia deliberada.** No requiere Docker (comparación pura entre dos
   implementaciones Java, sin llamada a PostgreSQL). Crear
   `.../test/java/com/confia/shared/audit/fixture/Utf16OrderingCanonicalAuditRowSerializer.java`
   (implementa deliberadamente el orden de claves por `String.compareTo`, el orden UTF-16, en vez de
@@ -517,13 +551,13 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
   `audit-trail`, requisito «Reproducibilidad de la serialización canónica entre PL/pgSQL y Java»
   (escenario «Una divergencia introducida a propósito hace fallar la prueba de propiedades»)
 
-- [ ] 4.5 **VERDE — el fixture de orden UTF-16.** No requiere Docker. Completar
+- [x] 4.5 **VERDE — el fixture de orden UTF-16.** No requiere Docker. Completar
   `Utf16OrderingCanonicalAuditRowSerializer` para que compile y produzca un resultado distinto de
   `CanonicalAuditRowSerializer` exactamente sobre el par de claves determinista. Ejecutar
   `CanonicalSerializationDivergenceTest`: verde, con el mensaje de fallo del fixture mostrando la
   entrada generada que produjo hashes distintos. — Mismo requisito y escenario que 4.4
 
-- [ ] 4.6 **Medir el diff real de PR B3a** con
+- [x] 4.6 **Medir el diff real de PR B3a** con
   `git diff --numstat <base-de-PR-B2b>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar; el pronóstico de `design.md` §12 (380-610) no
   anticipa exceso. Si lo hubiera, detener la aplicación y consultar al propietario. — `design.md`
