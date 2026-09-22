@@ -54,7 +54,16 @@ public final class DefaultAuditChainVerifier implements AuditChainVerifier {
         return transactionRunner.execute(context, () -> walk(institutionId));
     }
 
-    private AuditChainVerification walk(InstitutionId institutionId) {
+    /**
+     * Package-private, not {@code private}: {@link DefaultAuditChainVerifierTest} calls this
+     * directly, against a fake {@link AuditLogReader}, to exercise the walk's branch logic
+     * (genesis-missing, genesis {@code prev_hash} mismatch, non-genesis {@code prev_hash} mismatch,
+     * {@code row_hash} mismatch, empty and intact) without needing the real {@link
+     * TransactionRunner}'s database connection — the same reasoning {@code
+     * CommittingPostgresIntegrationTest#tablesWithoutABeforeTruncateTrigger} already documents for
+     * package-visible test access to a real implementation instead of a duplicated one.
+     */
+    AuditChainVerification walk(InstitutionId institutionId) {
         byte[] running = GENESIS_PREV_HASH;
         long verifiedRows = 0;
         long afterId = 0;
