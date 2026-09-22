@@ -12,6 +12,13 @@ clave primaria de la tabla DEBE ser compuesta, `(institution_id, id)`, porque ni
 PostgreSQL tiene el atributo `BYPASSRLS` (`docs/03-seguridad.md` §6.1) y un verificador que corre
 con el contexto de una institución no puede leer ni recalcular una cadena global.
 
+El conjunto de campos firmados DEBE incluir **`actor_label`, `user_agent` y `trace_id`**, además de
+los que enumera `docs/03-seguridad.md` §12.1, por decisión del propietario del 2026-09-21. Un campo
+que no entra a la preimagen puede alterarse sin que el verificador lo detecte, y `actor_label` es la
+etiqueta legible de quién ejecutó la acción: a la vez el campo que un atacante querría cambiar y el
+primero que leería un auditor externo. Ningún campo de la fila que tenga valor probatorio DEBE
+quedar fuera de la preimagen.
+
 #### Escenario: Primera fila de una institución es su registro génesis
 
 - **DADO** que una institución no tiene todavía ninguna fila en `shared_audit_log`
@@ -181,6 +188,15 @@ rutina DEBE identificar con exactitud esa primera fila divergente, por su `insti
 - **CUANDO** se invoca el verificador con el contexto de la primera institución
 - **ENTONCES** solo recalcula y compara las filas de la primera institución, y una alteración en
   una fila de la segunda institución no aparece en su resultado
+
+#### Escenario: Alterar la etiqueta legible del actor rompe la cadena
+
+- **DADO** una fila confirmada de la bitácora cuya cadena el verificador reporta íntegra
+- **CUANDO** un actor con acceso administrativo al motor cambia únicamente el valor de
+  `actor_label` de esa fila, sin tocar ningún otro campo y sin recalcular la cadena
+- **ENTONCES** el verificador reporta divergencia e identifica esa fila exacta, porque
+  `actor_label` entra a la preimagen del hash; el mismo escenario sobre `user_agent` y sobre
+  `trace_id` DEBE producir el mismo resultado
 
 ### Requisito: Reproducibilidad de la serialización canónica entre PL/pgSQL y Java
 

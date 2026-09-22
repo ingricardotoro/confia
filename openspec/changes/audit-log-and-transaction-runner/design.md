@@ -287,7 +287,7 @@ encadenamiento que `docs/03` §12.1 ya ordena, escrita donde el motor la puede i
 | Objeto | Volatilidad | Privilegio | Qué hace |
 |---|---|---|---|
 | `shared_audit_canonical_json(jsonb) → text` | `STABLE` | invocador | Forma canónica recursiva de un valor JSON (decisión 6) |
-| `shared_audit_row_preimage(...) → bytea` y `shared_audit_row_hash(prev_hash bytea, ...) → bytea` | `STABLE` | invocador | Preimagen canónica y su SHA-256 sobre los 15 campos de `docs/03` §12.1 |
+| `shared_audit_row_preimage(...) → bytea` y `shared_audit_row_hash(prev_hash bytea, ...) → bytea` | `STABLE` | invocador | Preimagen canónica y su SHA-256 sobre los 18 campos firmados (los 15 de `docs/03` §12.1 más `actor_label`, `user_agent` y `trace_id`, decisión del propietario del 2026-09-21) |
 | `shared_audit_log_chain()` | disparador | **`SECURITY DEFINER`**, con `SET search_path = pg_catalog, public` | Asigna `NEW.id`, resuelve `NEW.prev_hash`, calcula `NEW.row_hash` |
 
 **Por qué el cálculo se expone como función pura invocable.** Porque la prueba cruzada con jqwik
@@ -380,7 +380,8 @@ lleva su longitud:
 preimage = utf8("confia.audit.v1")            -- etiqueta de versión de formato, sin prefijo
         || prev_hash                           -- 32 bytes crudos
         || F(id) || F(institution_id) || F(occurred_at) || F(actor_id) || F(actor_kind)
-        || F(source_ip) || F(request_id) || F(action) || F(entity_type) || F(entity_id)
+        || F(actor_label) || F(source_ip) || F(user_agent) || F(request_id) || F(trace_id)
+        || F(action) || F(entity_type) || F(entity_id)
         || F(outcome) || F(before_value) || F(after_value) || F(reason) || F(approver_id)
 
 row_hash = sha256(preimage)
@@ -398,7 +399,7 @@ F(v) = 0x01 || int8_be(byte_length(canon(v))) || utf8(canon(v))   en otro caso
 
 Tres propiedades que esta forma compra, y que motivan elegirla:
 
-1. **No hay orden de claves que acordar en el nivel exterior.** La lista de 15 campos es fija y está
+1. **No hay orden de claves que acordar en el nivel exterior.** La lista de 18 campos es fija y está
    escrita en las dos implementaciones, una debajo de otra. Una divergencia de orden no es un error
    sutil de comparador: es una línea distinta, visible en una revisión de diez segundos.
 2. **`NULL`, cadena vacía y ausencia son tres cosas distintas por construcción.** El marcador
@@ -1050,7 +1051,7 @@ siendo uno por JVM, sin `withReuse(true)`, con `fsync=off`, `synchronous_commit=
 | `.../main/resources/db/migration/V3__chain_shared_audit_log.sql` | Crear | `shared_audit_canonical_json`, `shared_audit_row_preimage`, `shared_audit_row_hash`, `shared_audit_log_chain()` y el disparador `BEFORE INSERT`; restricción única anti-bifurcación (decisiones 4, 5, 6) | B2b |
 | `.../test/java/com/confia/shared/audit/AuditChainTriggerIT.java` | Crear | Génesis con 32 ceros, encadenamiento, dos instituciones independientes, el disparador sobrescribe lo que pase el llamador, inserción SQL directa también encadena | B2b |
 | `.../test/java/com/confia/shared/audit/AuditChainConcurrencyIT.java` | Crear | Dos transacciones confirmadas que insertan a la vez, sincronizadas de forma determinista, encadenan sin bifurcación | B2b |
-| `.../main/java/com/confia/shared/audit/CanonicalAuditRow.java` | Crear | Los 15 campos que entran al hash | B3 |
+| `.../main/java/com/confia/shared/audit/CanonicalAuditRow.java` | Crear | Los 18 campos que entran al hash | B3 |
 | `.../main/java/com/confia/shared/audit/CanonicalAuditRowSerializer.java` | Crear | Preimagen canónica y SHA-256 en Java (decisión 6) | B3 |
 | `.../main/java/com/confia/shared/audit/AuditChainVerifier.java`, `AuditChainVerification.java` | Crear | Contrato público del verificador (decisión 11) | B3 |
 | `.../main/java/com/confia/shared/audit/AuditLogReader.java`, `AuditRowSnapshot.java` | Crear | Puerto de lectura y su registro, solo con tipos del JDK | B3 |
@@ -1112,7 +1113,7 @@ Definido en la decisión 11. El cambio 9 solo necesita construir un `Transaction
 ```java
 package com.confia.shared.audit;
 
-/** Los 15 campos de docs/03 §12.1 que entran al hash, y solo esos. */
+/** Los 18 campos firmados: los 15 de docs/03 §12.1 mas actor_label, user_agent y trace_id. */
 public record CanonicalAuditRow(long id, UUID institutionId, Instant occurredAt, UUID actorId,
                                 String actorKind, String sourceIp, UUID requestId, String action,
                                 String entityType, String entityId, String outcome,
@@ -1450,7 +1451,17 @@ Si alguna confirmación obliga a apartarse de lo decidido, se eleva a un ADR y n
 
 ## 15. Preguntas abiertas
 
-- [ ] **1. `actor_label`, `user_agent` y `trace_id` no entran al hash.** Es lo que `docs/03` §12.1
+- [x] **1. `actor_label`, `user_agent` y `trace_id` SÍ entran al hash. RESUELTA por el propietario
+      el 2026-09-21: se incluyen los tres.** La preimagen pasa de 15 a 18 campos, en el orden de
+      columnas de `docs/03` §12.1. `actor_label` es la etiqueta legible de quién ejecutó la acción:
+      es a la vez el campo que un atacante querría cambiar y el primero que leería un auditor
+      externo, así que dejarlo fuera del hash vaciaba de sentido la parte del control que más se
+      consulta. **Consecuencias que este cambio DEBE asumir:** se actualiza la lista de campos
+      firmados de `docs/03` §12.1, y el delta de `audit-trail` y la decisión 6.2 de este diseño ya
+      quedan ajustados, todo antes del corte B2b. El generador de jqwik suma las familias de
+      divergencia de los tres campos nuevos.
+
+      Contexto original, que se conserva porque explica la decisión: Es lo que `docs/03` §12.1
       declara y este diseño no lo amplía, porque ampliar el conjunto firmado es una decisión sobre el
       alcance del control y no una elección de implementación. La consecuencia es real y conviene que
       el propietario la vea escrita: **un actor con acceso al motor puede cambiar la etiqueta legible
