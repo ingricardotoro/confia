@@ -230,7 +230,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   requisito heredado de la parte A «Pruebas `*IT.java` con Testcontainers dentro del presupuesto de 8
   minutos»; `design.md` §11, paso 8 y §13
 
-- [ ] 1.11 **Medir el diff real de PR B1** con
+- [x] 1.11 **Medir el diff real de PR B1** con
   `git diff --numstat main...change/audit-log-and-transaction-runner -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y
   consultar al propietario**, con la subdivisión de contingencia ya identificada en `design.md` §12:

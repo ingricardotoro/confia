@@ -348,3 +348,58 @@ included (`DatabasePipelineIT`, `JooqInstitutionRepositoryIT`, `MultiTenantSchem
 suite budget" — both are far inside the 8-minute (480 s) budget; the Failsafe phase itself uses
 about 8% of it, including `TransactionRunnerRetryIT`'s real `CyclicBarrier`-synchronized
 `SERIALIZABLE` conflict scenario.
+
+## Task 1.11 — Measure the real diff of PR B1 — HARD STOP, exceeds 800 lines
+
+`git diff --numstat main...change/audit-log-and-transaction-runner -- . ':(exclude)openspec'
+':(exclude)docs/adr' ':(exclude)**/generated/**'`:
+
+| File | + | − |
+|---|---|---|
+| `apps/api/README.md` | 15 | 1 |
+| `apps/api/app/pom.xml` | 40 | 0 |
+| `IsolationLevel.java` (new) | 11 | 0 |
+| `SecurityContext.java` (new) | 24 | 0 |
+| `TransactionRunner.java` (new) | 181 | 0 |
+| `package-info.java` (new, `shared.security`) | 16 | 0 |
+| `TransactionsOnlyInSharedSecurityTest.java` | 59 | 22 |
+| `BadTransactionalRepository.java` | 6 | 6 |
+| `TransactionRunnerContextIT.java` (new) | 182 | 0 |
+| `TransactionRunnerRetryIT.java` (new) | 181 | 0 |
+| `CommittingPostgresIntegrationTest.java` (new) | 115 | 0 |
+| `PostgresIntegrationTest.java` | 22 | 26 |
+| `SharedPostgresContainer.java` (new) | 97 | 0 |
+| `junit-platform.properties` (new) | 11 | 0 |
+
+**Total: 960 additions + 55 deletions = 1 015 authored lines.**
+
+**This exceeds both the project's 800-line-per-pull-request budget
+(`docs/15-flujo-de-trabajo-git.md` §3) and design.md §12's own high-end forecast for B1 (975).**
+Per this task's own instruction and the orchestrator's explicit hard-stop rule 1 ("Si el diff de la
+tarea 1.11 supera 800 líneas de código, detente y repórtalo. Partir el corte es decisión del
+propietario"), **apply STOPS here.** Task 1.12 (final verification and push) is intentionally not
+started.
+
+**The contingency subdivision design.md §12 already names, for the owner to choose from (not
+decided here):**
+
+- **B1a** ≈ 340–560 authored lines: `TransactionRunner` and its three types (`SecurityContext`,
+  `IsolationLevel`), `TransactionRunnerContextIT`, and R3's positive half — tasks 1.1 (probes +
+  jqwik dependency), 1.2, 1.3, 1.8.
+- **B1b** ≈ 245–415 authored lines: the lazy container holder, `CommittingPostgresIntegrationTest`,
+  `TransactionRunnerRetryIT`, `junit-platform.properties` and the JaCoCo `PACKAGE` rule — tasks 1.4,
+  1.5, 1.6, 1.7, 1.9.
+- Neither subdivision separates code from its own tests (design.md §12's explicit constraint on any
+  split).
+
+The real measured total (1 015) is noticeably above even the combined high end of B1a+B1b's
+forecast (560+415=975), consistent with this PR's own precedent: every measured PR in this change
+family so far has landed at or above its forecast's high end (PR A1 replaced by A2/A3 in the
+archived change; `design.md` §12 itself already flagged B1 as one of the two cuts, along with B3,
+that its own high-end estimate could not clear).
+
+**Nothing here is reverted.** All nine completed tasks (1.1–1.10) remain committed, individually,
+on `change/audit-log-and-transaction-runner`; every commit is a real, independently-revertable
+`git` commit with its own RED/GREEN evidence. Splitting into B1a/B1b, if the owner chooses that
+path, is a matter of choosing where a new branch point falls among these already-existing commits —
+no code needs to be rewritten to make the split possible.
