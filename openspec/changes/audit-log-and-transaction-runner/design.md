@@ -1282,6 +1282,33 @@ Esta fase no tuvo herramienta de ejecución de procesos. Cada sonda se ejecuta f
 repositorio o en archivos temporales que se borran, y **su resultado se registra en el informe de
 aplicación**, como hizo la sonda S1 de la parte A.
 
+**Resultados de las sondas ejecutadas por el orquestador el 2026-09-21**, contra un contenedor
+`postgres:18-alpine` levantado fuera del árbol del repositorio y detenido al terminar. Intercalación
+de la base de la sonda: `en_US.utf8`.
+
+| # | Resultado | Detalle observado |
+|---|---|---|
+| **S6** | **PASA. El cambio no está bloqueado por entorno.** | `sha256('abc')` devuelve el vector conocido `ba7816bf…15ad` y `pg_proc.prolang = 12`, es decir función interna: **no hace falta `pgcrypto`**, que `confia_owner` no podría crear. `int8send(1::bigint)` da `0000000000000001`, ocho bytes en orden de red. `convert_to('ñ','UTF8')` da `c3b1` |
+| **S1** | **PASA, coincide con la regla de 6.4** | `to_json` escapa `"` como `\"`; la barra invertida como `\` (verificado con `chr(92)`, salida de 6 caracteres, el colapso inicial era del intérprete de comandos); los controles como `
+	`; el resto de C0 como ``, ``, en minúsculas; **no** escapa `/` ni el texto no ASCII (`ñ😀` viaja literal) |
+| **S2** | **PASA** | `numeric::text` nunca usó notación exponencial: `1e30` sale como `1000000000000000000000000000000` y `0.00000000001` sin exponente, incluso viniendo de `jsonb`. `trim_scale` retira ceros finales (`1.2300` → `1.23`, `100.000` → `100`), también sobre valores extraídos de `jsonb` |
+| **S4** | **PASA de forma concluyente** | Rama de inserción y rama de actualización devuelven 1, 2 y 3 sin huecos. En concurrencia real: la sesión 1 obtuvo el id 4 dentro de una transacción abierta y **la sesión 2 quedó bloqueada 4 407 ms** hasta la confirmación, tras lo cual obtuvo el id 5. El `ON CONFLICT ... DO UPDATE ... RETURNING` **sí** toma el bloqueo por institución. No se conmuta a `pg_advisory_xact_lock` |
+
+**Hallazgo adicional sobre el orden de claves, que refuerza la decisión del diseño.** Con una muestra
+deliberadamente discriminante (`a`, `A`, `_b`, `B`), `ORDER BY k` y
+`ORDER BY convert_to(k,'UTF8')` devolvieron **el mismo resultado**, `A,B,_b,a`, que es exactamente el
+orden de bytes. Es decir: en esta imagen, la intercalación declarada `en_US.utf8` se comporta como
+`C`, probablemente porque Alpine no trae los datos de configuración regional completos.
+
+Eso **no desmiente la regla del diseño, la justifica más**: una prueba local que usara `ORDER BY k`
+pasaría en verde aquí y podría ordenar distinto en una imagen con datos de configuración regional
+completos. Es la misma familia de defecto que esta entrega ya encontró tres veces —verde por la razón
+equivocada—, así que `ORDER BY convert_to(k,'UTF8')` se mantiene como obligatorio y **la prueba
+cruzada no debe apoyarse en que ambos coincidan**.
+
+Quedan sin ejecutar S3, S5, S7, S8, S9, S10, S11, S12 y S13, que dependen de código o de esquema que
+este cambio todavía no ha escrito; se ejecutan en el corte que las bloquea, como indica la columna.
+
 | # | Pregunta | Criterio de éxito | Bloquea |
 |---|---|---|---|
 | **S1** | ¿`to_json(texto)::text` en PostgreSQL 18 produce `\"`, `\\`, `\b`, `\f`, `\n`, `\r`, `\t` y `\u00xx` en minúsculas para el resto de C0, sin escapar `/` ni el texto no ASCII? | Coincide con la regla de 6.4. Si no, el escape se escribe a mano en PL/pgSQL y la regla del diseño no cambia | B2b |
