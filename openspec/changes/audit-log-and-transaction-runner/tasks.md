@@ -574,12 +574,43 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
 
 ---
 
-## PR B3b — corte B3 (parte 2): verificador de cadena y pruebas de manipulación
+## PR B3b
+
+> **Dividido en B3b-i y B3b-ii por el orquestador el 2026-09-22**, bajo la estrategia `auto`. La
+> medicion final dio **1 122 lineas**, muy por encima del maximo de ochocientas de `docs/15` seccion
+> 3 y tambien del pronostico de `design.md` seccion 12 (400-660). La aplicacion se detuvo sin decidir
+> el corte.
+>
+> Puntos candidatos medidos por el orquestador:
+>
+> | Corte tras | primero | segundo |
+> |---|---|---|
+> | el verificador (`2677af6`) | 549 | 575 |
+> | **la prueba de cobertura (`07c6cdf`)** | **756** | **366** |
+> | el limite conocido (`c2e17e1`) | 921 | 201 |
+>
+> Se eligio **tras la prueba de cobertura**. El corte en `2677af6` esta mas equilibrado, pero es
+> exactamente el error que el corte B3a ya nos costo: en ese punto `com.confia.shared.audit` esta por
+> debajo del 95 por ciento y la construccion **falla su propia puerta**, porque ni el limite conocido
+> ni los inventarios tocan las ramas que faltan. `07c6cdf` es el unico punto de la historia real
+> donde la primera mitad pasa sola.
+>
+> - **PR B3b-i**, rama `change/audit-log-and-transaction-runner-verifier-core`, base PR B3a-ii:
+>   tareas 5.1 a 5.3 mas la prueba de cobertura. **756 lineas.** Verificado solo: `BUILD SUCCESS`.
+>   **Ya satisface el criterio de salida 3 de F0 de extremo a extremo.**
+> - **PR B3b-ii**, rama `change/audit-log-and-transaction-runner-verifier`, base PR B3b-i: tareas
+>   5.4 a 5.7, el limite conocido y los dos inventarios. **366 lineas.** Verificado solo:
+>   `BUILD SUCCESS` con puerta de mutacion.
+>
+> La medicion de 1 122 que aparece mas abajo en la tarea 5.6 corresponde al corte sin dividir y se
+> conserva como registro historico.
+
+ — corte B3 (parte 2): verificador de cadena y pruebas de manipulación
 
 Rama `change/audit-log-and-transaction-runner-verifier`, base PR B3a. Cierra el criterio de salida 3
 de F0.
 
-- [ ] 5.1 **Ejecutar las sondas S3 y S9 (bloqueantes, `design.md` §10 y §11 paso 18).** Requiere
+- [x] 5.1 **Ejecutar las sondas S3 y S9 (bloqueantes, `design.md` §10 y §11 paso 18).** Requiere
   Docker. **S3**: conectado como `postgres` (superusuario del contenedor), ejecutar
   `SET session_replication_role = 'replica'`, intentar un `UPDATE` sobre una fila de
   `shared_audit_log` y confirmar que pasa; volver a `'origin'` y confirmar que el `UPDATE` vuelve a
@@ -590,7 +621,7 @@ de F0.
   `String`, añadir un `<forcedType>` a `VARCHAR` en `apps/api/app/pom.xml`. Registrar ambos resultados
   en `apply-progress.md`. — `design.md` §10 (sondas S3, S9) y §11, paso 18
 
-- [ ] 5.2 **ROJO — verificador de cadena.** Requiere Docker. Crear
+- [x] 5.2 **ROJO — verificador de cadena.** Requiere Docker. Crear
   `.../test/java/com/confia/shared/audit/AuditChainVerifierIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`: cadena íntegra reporta integridad sin identificar ninguna
   fila; una fila intermedia alterada directamente con `SUPERUSER` vía
@@ -619,7 +650,7 @@ de F0.
   que quien archive el cambio actualice `design.md` §7.1 y su encabezado antes de escribir el
   informe de verificación
 
-- [ ] 5.3 **VERDE — puerto, adaptador y verificador.** Requiere Docker (ejecuta 5.2). Crear
+- [x] 5.3 **VERDE — puerto, adaptador y verificador.** Requiere Docker (ejecuta 5.2). Crear
   `.../main/java/com/confia/shared/audit/AuditLogReader.java` (puerto) y `AuditRowSnapshot.java`
   (registro con tipos del JDK únicamente: `before_value`/`after_value` como `String`, `occurred_at`
   como `Instant`, nunca `org.jooq.JSONB`); `.../main/java/com/confia/shared/infrastructure/JooqAuditLogReader.java`
@@ -632,7 +663,7 @@ de F0.
   `package-info.java` de `com.confia.shared.audit`. Ejecutar `AuditChainVerifierIT`: verde. —
   `design.md`, decisión 11 completa; §4 («Verificación de una cadena»)
 
-- [ ] 5.4 **ROJO/VERDE — el límite conocido, ejecutable.** Requiere Docker. ROJO: crear
+- [x] 5.4 **ROJO/VERDE — el límite conocido, ejecutable.** Requiere Docker. ROJO: crear
   `.../test/java/com/confia/shared/audit/AuditChainKnownLimitIT.java`: con acceso `SUPERUSER`, altera
   un campo de una fila intermedia y **además** recalcula `row_hash` de esa fila y de todas las
   posteriores hasta la última llamando a `shared_audit_row_hash(...)`, dejando la cadena
@@ -643,7 +674,7 @@ de F0.
   control mientras no exista ancla externa» (escenario «Manipulación con recálculo completo de la
   cadena no es detectada — límite conocido»)
 
-- [ ] 5.5 **ROJO/VERDE — los dos inventarios de las exclusiones con destino nombrado.** No requiere
+- [x] 5.5 **ROJO/VERDE — los dos inventarios de las exclusiones con destino nombrado.** No requiere
   Docker (inventario estático sobre el árbol de clases, sin conexión a PostgreSQL). ROJO: crear las
   dos pruebas de inventario —pueden vivir en `AuditChainVerifierIT` o en una clase de prueba propia
   sin contenedor— que afirman (a) ninguna clase de producción bajo `com.confia` depende de un tipo de
@@ -658,7 +689,7 @@ de F0.
   bitácora limitado a la institución, sin filtro por `audit:read`» (escenario «Ningún endpoint
   expone la bitácora con el permiso `audit:read`»)
 
-- [ ] 5.6 **Medir el diff real de PR B3b** con
+- [x] 5.6 **Medir el diff real de PR B3b** con
   `git diff --numstat <base-de-PR-B3a>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar; el pronóstico de `design.md` §12 (400-660) no
   anticipa exceso. Si lo hubiera, detener la aplicación y consultar al propietario. — `design.md`
