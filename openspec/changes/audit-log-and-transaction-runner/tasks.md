@@ -223,7 +223,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   mueve la regla a otro corte sin consultar. Ejecutar `./mvnw -B verify`: verde. — Especificación
   `build-integrity`, sin requisito propio (trazado a `design.md`, decisión 12)
 
-- [ ] 1.10 **Medir el tiempo de la suite `*IT.java`.** Requiere Docker. Ejecutar `./mvnw -B verify`
+- [x] 1.10 **Medir el tiempo de la suite `*IT.java`.** Requiere Docker. Ejecutar `./mvnw -B verify`
   completo en `apps/api` y medir el tiempo real de la fase `integration-test` (Failsafe), con las
   pruebas de confirmación real y de concurrencia de este corte incluidas. Registrar el tiempo medido,
   no estimado, en `apply-progress.md` y en `apps/api/README.md`. — Especificación `build-integrity`,

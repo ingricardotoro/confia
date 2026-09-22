@@ -325,3 +325,26 @@ housekeeping nuisance noted in task 1.1 is resolved by this task's own configura
 `jqwik.database` now points inside `target/`), and the properties file is genuinely on the test
 classpath (`target/test-classes/junit-platform.properties`, contents verified byte-for-byte equal
 to the source).
+
+## Task 1.10 — Measure the `*IT.java` suite time
+
+Measured, not estimated, with a dedicated clean run (`app/target` and `kernel/target` removed
+first). Reading the real Failsafe phase boundary off the reactor's own per-module summary line is
+imprecise (it bundles compile, jOOQ generation and unit tests together), so this run piped
+`./mvnw -B verify`'s output through a per-line `date +%s.%N` timestamp wrapper to isolate the exact
+`[INFO] --- failsafe:3.6.0:integration-test (default) @ confia-api ---` → `[INFO] ---
+failsafe:3.6.0:verify (default) @ confia-api ---` boundary precisely:
+
+```
+1790052127.329823100 [INFO] --- failsafe:3.6.0:integration-test (default) @ confia-api ---
+1790052166.840512800 [INFO] --- failsafe:3.6.0:verify (default) @ confia-api ---
+```
+
+**Failsafe `integration-test` phase for `confia-api`: 39.5107 seconds**, all six `*IT.java` classes
+included (`DatabasePipelineIT`, `JooqInstitutionRepositoryIT`, `MultiTenantSchemaIT`,
+`RolePrivilegeMatrixIT` from earlier changes, plus this PR's `TransactionRunnerContextIT` and
+`TransactionRunnerRetryIT`), 28 integration test methods, 0 failures. Reactor: `confia-api` module
+`SUCCESS [02:06 min]`, `Total time: 02:26 min`. Recorded in `apps/api/README.md`, "Integration test
+suite budget" — both are far inside the 8-minute (480 s) budget; the Failsafe phase itself uses
+about 8% of it, including `TransactionRunnerRetryIT`'s real `CyclicBarrier`-synchronized
+`SERIALIZABLE` conflict scenario.
