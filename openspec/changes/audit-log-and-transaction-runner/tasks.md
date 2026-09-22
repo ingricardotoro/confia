@@ -710,7 +710,7 @@ de F0.
 
 Rama `change/audit-log-and-transaction-runner-it-naming`, base PR B3b.
 
-- [ ] 6.1 **Ejecutar la sonda S11 (bloqueante, `design.md` §10 y §11 paso 23).** No requiere Docker
+- [x] 6.1 **Ejecutar la sonda S11 (bloqueante, `design.md` §10 y §11 paso 23).** No requiere Docker
   estrictamente: el objetivo de la sonda es precisamente confirmar que, con el contenedor ya en un
   titular perezoso (tarea 1.4), cargar una clase `*Test` sin métodos de prueba **no** intenta
   arrancar ningún contenedor, con Docker disponible o no. Ejecutar Surefire sobre un fixture temporal
@@ -721,7 +721,7 @@ Rama `change/audit-log-and-transaction-runner-it-naming`, base PR B3b.
   propia cita de ADR — reportar la discrepancia antes de continuar. — `design.md` §10 (sonda S11) y
   §11, paso 23
 
-- [ ] 6.2 **ROJO — regla de nomenclatura `*IT`, mitad de rechazo.** No requiere Docker (ArchUnit
+- [x] 6.2 **ROJO — regla de nomenclatura `*IT`, mitad de rechazo.** No requiere Docker (ArchUnit
   puro; el fixture no ejecuta ningún método de prueba real, según la tarea 6.1). Crear
   `.../test/java/com/confia/architecture/IntegrationTestNamingTest.java` (importa solo clases de
   prueba con `ImportOption.Predefined.ONLY_INCLUDE_TESTS`; rechaza toda clase asignable a
@@ -733,7 +733,7 @@ Rama `change/audit-log-and-transaction-runner-it-naming`, base PR B3b.
   Especificación `build-integrity`, requisito «Nomenclatura obligatoria `*IT`...» (escenario
   «Fixture permanente nombrado con el sufijo `Test` en vez de `IT`»)
 
-- [ ] 6.3 **VERDE — la regla y su mitad de producción.** No requiere Docker. Implementar
+- [x] 6.3 **VERDE — la regla y su mitad de producción.** No requiere Docker. Implementar
   `IntegrationTestNamingTest` para que rechace `BadlyNamedContainerTest` nombrando la clase y el
   sufijo esperado (`ArchitectureTestSupport.assertRuleRejects(...)`, patrón de dos mitades). Añadir
   la mitad de producción: la regla no falla sobre las subclases reales del árbol
@@ -745,7 +745,7 @@ Rama `change/audit-log-and-transaction-runner-it-naming`, base PR B3b.
   y no uno vacío. — Especificación `build-integrity`, mismo requisito (escenario «Las subclases
   reales están todas nombradas con el sufijo `IT`»)
 
-- [ ] 6.4 **Cierre documental de `docs/09-roadmap-y-fases.md` y medición final del tiempo de la
+- [x] 6.4 **Cierre documental de `docs/09-roadmap-y-fases.md` y medición final del tiempo de la
   suite.** Requiere Docker (para la medición). Actualizar el criterio de salida 3 de F0 a cerrado, y
   el estado de las deudas W1 (medido y reportado en cada corte, sigue sin exigirse), W2 (sin tocar,
   diferida) y W3 (cerrada por este corte). Ejecutar `./mvnw -B verify` completo en `apps/api` con la
@@ -755,13 +755,13 @@ Rama `change/audit-log-and-transaction-runner-it-naming`, base PR B3b.
   presupuesto de 8 minutos» (medición final); `docs/09-roadmap-y-fases.md`, criterio de salida 3 y
   estado de W1-W3
 
-- [ ] 6.5 **Medir el diff real de PR B4** con
+- [x] 6.5 **Medir el diff real de PR B4** con
   `git diff --numstat <base-de-PR-B3b>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. El pronóstico de `design.md` §12 (110-200) no anticipa exceso; si lo hubiera,
   detener la aplicación y consultar al propietario antes de fusionar con PR B3b o PR B1 como el
   diseño contempla. — `design.md` §12, «Pronóstico de tamaño por corte»
 
-- [ ] 6.6 **Verificación final de PR B4 y del cambio completo.** Requiere Docker. En checkout limpio,
+- [x] 6.6 **Verificación final de PR B4 y del cambio completo.** Requiere Docker. En checkout limpio,
   con `JAVA_HOME` en JDK 25, `MAVEN_OPTS` con el almacén `Windows-ROOT` y Docker activo, ejecutar
   `./mvnw -B verify` en `apps/api`. Confirmar: las cuatro reglas de ArchUnit de la parte A y las
   nuevas de esta parte en verde; `IntegrationTestNamingTest` rechazando su fixture y pasando sobre el
