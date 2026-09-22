@@ -175,7 +175,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   — `design.md`, decisión 9 (piezas 1 y 2 del contrato; la pieza 3 —aislar en vez de limpiar— se
   demuestra en B2a)
 
-- [ ] 1.6 **ROJO — reintento acotado.** Requiere Docker. Crear
+- [x] 1.6 **ROJO — reintento acotado.** Requiere Docker. Crear
   `.../test/java/com/confia/shared/security/TransactionRunnerRetryIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`: primero el **agotamiento determinista** — un cuerpo que ejecuta
   `DO $$ BEGIN RAISE EXCEPTION USING ERRCODE = '40001'; END $$;` en cada intento, sin concurrencia,

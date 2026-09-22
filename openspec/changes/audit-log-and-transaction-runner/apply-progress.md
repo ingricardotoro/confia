@@ -163,3 +163,45 @@ broken foundation would not surface as a confusing failure two tasks later.
 
 `./mvnw -B -pl app -am test-compile`: `BUILD SUCCESS` (nothing in the app module extends this class
 yet within this PR's permanent test sources; task 1.6 is its first real consumer).
+
+## Task 1.6 — RED: `TransactionRunnerRetryIT`
+
+Created `apps/api/app/src/test/java/com/confia/shared/security/TransactionRunnerRetryIT.java`,
+extending `CommittingPostgresIntegrationTest`. Added `dataSource()`/`transactionManager()`
+protected accessors to that base class so this test can build one independent `TransactionRunner`
+per thread, matching design.md §7.2's "dos hilos, cada uno con su propio TransactionRunner y su
+propia conexión".
+
+Two scenarios, neither depending on wall-clock timing (design.md §7.2):
+
+- **Deterministic exhaustion** (`retryExhaustsAndPropagatesTheOriginalErrorDeterministically`): a
+  use case that runs `do $$ begin raise exception using errcode = '40001'; end $$;` on every single
+  attempt, no concurrency. Asserts the propagated exception carries SQLState `40001` (or is a
+  `ConcurrencyFailureException`), and — the assertion that actually distinguishes "retried and gave
+  up" from "never retried" — that the body ran **exactly 4 times** (1 initial attempt + design.md
+  decision 2's bounded 3 retries).
+- **Real success within the limit** (`retrySucceedsWithinTheBoundedLimitOnARealSerializationConflict`):
+  two independent `TransactionRunner`s, `SERIALIZABLE`, both updating the very same committed row,
+  synchronized with a `CyclicBarrier` awaited only on each thread's **first** attempt
+  (`AtomicBoolean.compareAndSet`) — never on a retry, which would deadlock waiting for a party that
+  already finished. Asserts both futures complete without the caller ever seeing an exception.
+
+**RED, observed**: `./mvnw -B -pl app -am test -Dtest=TransactionRunnerRetryIT
+-Dsurefire.failIfNoSpecifiedTests=false`, exit 1, `Tests run: 2, Failures: 1, Errors: 1`:
+
+```
+retrySucceedsWithinTheBoundedLimitOnARealSerializationConflict -- ERROR!
+java.util.concurrent.ExecutionException: org.jooq.exception.DataAccessException: SQL [update organization_institution set legal_name = ? where id = ?]; ERROR: could not serialize access due to concurrent update
+Caused by: org.postgresql.util.PSQLException: ERROR: could not serialize access due to concurrent update
+
+retryExhaustsAndPropagatesTheOriginalErrorDeterministically -- FAILURE!
+[exactly the initial attempt plus the bounded number of retries, no more and no fewer]
+  expected: 4
+  but was: 1
+```
+
+Both failures are genuine and for the right reason: the success scenario shows PostgreSQL really
+did raise a `SERIALIZABLE` write conflict (proving the concurrency setup is real, not a fabrication)
+and `TransactionRunner`, having no retry logic yet, propagated it straight to the caller instead of
+retrying; the exhaustion scenario shows the body ran exactly once instead of four times, confirming
+no retry happened there either.
