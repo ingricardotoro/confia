@@ -17,6 +17,13 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
     private static final List<String> FIVE_ROLES = List.of("confia_owner", "confia_admin_app",
             "confia_portal_app", "confia_readonly", "confia_backup");
 
+    /** Both tables PR B2a's V2 migration creates (design.md decisions 3 and 7). */
+    private static final List<String> AUDIT_TABLES =
+            List.of("shared_audit_log", "shared_audit_chain_head");
+
+    private static final List<String> ALL_PRIVILEGES =
+            List.of("SELECT", "INSERT", "UPDATE", "DELETE");
+
     @Test
     void noneOfTheFiveRolesIsSuperuserOrHasBypassRls() {
         for (String role : FIVE_ROLES) {
@@ -63,6 +70,74 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
                 .isFalse();
         assertThat(hasTablePrivilege("confia_readonly", "organization_institution", "DELETE"))
                 .isFalse();
+    }
+
+    /**
+     * {@code confia_owner} conserves every privilege on both audit tables by definition — it is
+     * never subject to {@code GRANT}/{@code REVOKE}. This is deliberately not a defect: the
+     * append-only trigger, not this matrix, is what rejects the owner's {@code UPDATE}/{@code
+     * DELETE}/{@code TRUNCATE}, proven by a separate test ({@code AuditLogAppendOnlyIT}, design.md
+     * decision 8).
+     */
+    @Test
+    void confiaOwnerRetainsAllPrivilegesOnBothAuditTablesByDefinition() {
+        for (String table : AUDIT_TABLES) {
+            for (String privilege : ALL_PRIVILEGES) {
+                assertThat(hasTablePrivilege("confia_owner", table, privilege))
+                        .as("confia_owner must retain %s on %s by definition", privilege, table)
+                        .isTrue();
+            }
+        }
+    }
+
+    @Test
+    void confiaAdminAppCanSelectAndInsertOnSharedAuditLogButHasNoPrivilegeOnTheChainHead() {
+        assertThat(hasTablePrivilege("confia_admin_app", "shared_audit_log", "SELECT")).isTrue();
+        assertThat(hasTablePrivilege("confia_admin_app", "shared_audit_log", "INSERT")).isTrue();
+        assertThat(hasTablePrivilege("confia_admin_app", "shared_audit_log", "UPDATE")).isFalse();
+        assertThat(hasTablePrivilege("confia_admin_app", "shared_audit_log", "DELETE")).isFalse();
+
+        for (String privilege : ALL_PRIVILEGES) {
+            assertThat(hasTablePrivilege("confia_admin_app", "shared_audit_chain_head", privilege))
+                    .as("confia_admin_app must have no privilege at all on "
+                            + "shared_audit_chain_head; only the future SECURITY DEFINER trigger "
+                            + "writes it (design.md decision 3)")
+                    .isFalse();
+        }
+    }
+
+    @Test
+    void confiaPortalAppHasNoPrivilegeOnEitherAuditTable() {
+        for (String table : AUDIT_TABLES) {
+            for (String privilege : ALL_PRIVILEGES) {
+                assertThat(hasTablePrivilege("confia_portal_app", table, privilege))
+                        .as("confia_portal_app must have no privilege on %s", table).isFalse();
+            }
+        }
+    }
+
+    @Test
+    void confiaReadonlyOnlySelectsSharedAuditLogAndHasNoPrivilegeOnTheChainHead() {
+        assertThat(hasTablePrivilege("confia_readonly", "shared_audit_log", "SELECT")).isTrue();
+        assertThat(hasTablePrivilege("confia_readonly", "shared_audit_log", "INSERT")).isFalse();
+        assertThat(hasTablePrivilege("confia_readonly", "shared_audit_log", "UPDATE")).isFalse();
+        assertThat(hasTablePrivilege("confia_readonly", "shared_audit_log", "DELETE")).isFalse();
+
+        for (String privilege : ALL_PRIVILEGES) {
+            assertThat(hasTablePrivilege("confia_readonly", "shared_audit_chain_head", privilege))
+                    .isFalse();
+        }
+    }
+
+    /** {@code confia_backup} reads through {@code pg_read_all_data}, which never bypasses RLS. */
+    @Test
+    void confiaBackupCanOnlySelectBothAuditTablesThroughPgReadAllData() {
+        for (String table : AUDIT_TABLES) {
+            assertThat(hasTablePrivilege("confia_backup", table, "SELECT")).isTrue();
+            assertThat(hasTablePrivilege("confia_backup", table, "INSERT")).isFalse();
+            assertThat(hasTablePrivilege("confia_backup", table, "UPDATE")).isFalse();
+            assertThat(hasTablePrivilege("confia_backup", table, "DELETE")).isFalse();
+        }
     }
 
     /** {@code pg_roles.rolsuper} and {@code rolbypassrls} for one role, read from the catalogue. */
