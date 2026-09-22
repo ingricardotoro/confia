@@ -1,7 +1,11 @@
-# Apply progress: audit-log-and-transaction-runner — PR B1
+# Apply progress: audit-log-and-transaction-runner — PR B1 and PR B2a
 
-Scope: PR B1 only (tasks 1.1-1.12 of `tasks.md`). Branch `change/audit-log-and-transaction-runner`
-(current), base `main`. Creates the first production class under `com.confia.shared.*`.
+Scope: PR B1 (tasks 1.1-1.12, this section) and PR B2a (tasks 2.1-2.7, its own section below).
+PR B1 was split into PR B1a (`change/audit-log-and-transaction-runner-component`, tasks 1.1-1.5)
+and PR B1b (`change/audit-log-and-transaction-runner`, tasks 1.6-1.12) after task 1.11 measured
+1015 authored lines — see the note block at the top of `tasks.md`'s PR B1 section for the measured
+split evidence. PR B2a runs on `change/audit-log-and-transaction-runner-audit-table`, base PR B1b,
+HEAD `76deb80` at the start of this section's work.
 
 ## Task 1.1 — Probes S7, S10, S12, S13; declare jqwik in `app`
 
@@ -403,3 +407,255 @@ on `change/audit-log-and-transaction-runner`; every commit is a real, independen
 `git` commit with its own RED/GREEN evidence. Splitting into B1a/B1b, if the owner chooses that
 path, is a matter of choosing where a new branch point falls among these already-existing commits —
 no code needs to be rewritten to make the split possible.
+
+---
+
+# PR B2a — tables, permissions and append-only
+
+Scope: tasks 2.1-2.7. Branch `change/audit-log-and-transaction-runner-audit-table`, base PR B1b
+(`change/audit-log-and-transaction-runner`, tip `76deb80`). No probes were re-run for this section:
+S1, S2, S4, S6 (design phase) and S7, S10, S12, S13 (PR B1) already ran and are recorded above and
+in `design.md` §10; PR B2a's own task list names no new probe (the next probes, S3/S5/S9, belong to
+PR B2b/B3b).
+
+## Task 2.1 — RED: `RolePrivilegeMatrixIT`, `AuditLogAppendOnlyIT`, `AuditLogRowSecurityIT`
+
+Created, in one step, per the task's own instruction (all three fail for the same reason — the
+tables do not exist yet):
+
+- Extended `RolePrivilegeMatrixIT` with five new test methods covering all five roles
+  (`docs/03-seguridad.md` §6.1) against both `shared_audit_log` and `shared_audit_chain_head`:
+  `confia_owner` retains every privilege on both tables by definition (design.md decision 8 — the
+  append-only trigger, not the privilege matrix, is what rejects the owner); `confia_admin_app` gets
+  exactly `SELECT`/`INSERT` on `shared_audit_log` and nothing on `shared_audit_chain_head`;
+  `confia_portal_app` gets nothing on either; `confia_readonly` gets only `SELECT` on
+  `shared_audit_log` and nothing on `shared_audit_chain_head`; `confia_backup` gets `SELECT` only on
+  both, through `pg_read_all_data` (never `INSERT`/`UPDATE`/`DELETE`).
+- Created `apps/api/app/src/test/java/com/confia/shared/audit/AuditLogAppendOnlyIT.java`:
+  `confia_admin_app` can `SELECT` and `INSERT` but `UPDATE`/`DELETE`/`TRUNCATE` are all rejected
+  (via ordinary `GRANT`/`REVOKE`, since the role was never granted those privileges at all); and,
+  the case the orchestrator's own review explicitly asked to see proven rather than assumed,
+  **`confia_owner` — the schema owner, who is exempt from `GRANT`/`REVOKE` entirely — has `UPDATE`,
+  `DELETE` **and** `TRUNCATE`, all three, rejected by the append-only trigger**, asserted against
+  the real `SQLSTATE 42501` (`insufficient_privilege`) on a raw connection opened with
+  `SharedPostgresContainer.connectionAs("confia_owner")`.
+- Created `apps/api/app/src/test/java/com/confia/shared/audit/AuditLogRowSecurityIT.java`: one
+  institution cannot read another's rows; an absent session context denies returning zero rows
+  (no context ever set at all); an empty-string context also denies returning zero rows, with no
+  `::uuid` conversion error — exercised on one explicit, uncommitted raw connection so the local
+  `set_config(..., true)` setting survives from the `SET` statement to the following `SELECT`.
+
+**RED, observed**: `./mvnw -B -pl app -am test -Dtest=RolePrivilegeMatrixIT,AuditLogAppendOnlyIT,AuditLogRowSecurityIT -Dsurefire.failIfNoSpecifiedTests=false`, exit 1:
+
+```
+Tests run: 14, Failures: 0, Errors: 10, Skipped: 0
+```
+
+All ten new test methods failed with the same real cause, confirmed in the stack traces:
+
+```
+org.jooq.exception.DataAccessException: SQL [...]; ERROR: relation "shared_audit_log" does not exist
+Caused by: org.postgresql.util.PSQLException: ERROR: relation "shared_audit_log" does not exist
+```
+
+The four pre-existing `organization_institution` tests in `RolePrivilegeMatrixIT` kept passing
+(9 tests run in that class, 5 new failing, 4 old green) — confirming the failure is isolated to the
+new assertions and not a fixture-wide breakage.
+
+## Task 2.2 — GREEN: `V2__create_shared_audit_log.sql`
+
+Created `apps/api/app/src/main/resources/db/migration/V2__create_shared_audit_log.sql` with both
+tables from design.md decisions 3, 4, 7 and 8:
+
+- `shared_audit_chain_head` (`institution_id` primary key, `next_id >= 2` check, forced row-level
+  security with the same institution-isolation policy shape as V1).
+- `shared_audit_log`: composite primary key `(institution_id, id)`, anti-fork unique constraint
+  `(institution_id, prev_hash)`, the two hash-length checks (32 bytes), the four indexes with
+  `institution_id` leading each one, forced row-level security with the `NULLIF(..., '')` pattern
+  and an explicit `WITH CHECK`. **No chaining trigger** — `id`, `prev_hash` and `row_hash` stay
+  `NOT NULL` but unpopulated by any trigger in this cut, exactly as task 2.2 specifies; PR B2b's
+  `shared_audit_log_chain()` (`design.md` decision 5) is what fills them.
+- `shared_audit_is_append_only()` plus the five triggers: `BEFORE UPDATE`/`DELETE`/`TRUNCATE` reject
+  on `shared_audit_log`; `BEFORE DELETE`/`TRUNCATE` reject on `shared_audit_chain_head`, with
+  `BEFORE UPDATE` deliberately left unguarded there (the future chaining trigger needs it).
+- `REVOKE ALL ... FROM PUBLIC` on both tables, then `GRANT SELECT, INSERT` to `confia_admin_app` and
+  `GRANT SELECT` to `confia_readonly` on `shared_audit_log` only — no `GRANT` at all on
+  `shared_audit_chain_head` for any application role (design.md decision 5: only the future
+  `SECURITY DEFINER` trigger writes it).
+
+**GREEN, observed**: `./mvnw -B -pl app -am test -Dtest=RolePrivilegeMatrixIT,AuditLogAppendOnlyIT,AuditLogRowSecurityIT,MultiTenantSchemaIT -Dsurefire.failIfNoSpecifiedTests=false`:
+
+```
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0  -- MultiTenantSchemaIT
+Tests run: 9, Failures: 0, Errors: 0, Skipped: 0  -- RolePrivilegeMatrixIT
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0  -- AuditLogAppendOnlyIT
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0  -- AuditLogRowSecurityIT
+Tests run: 21, Failures: 0, Errors: 0, Skipped: 0
+```
+
+All 21 green, `MultiTenantSchemaIT` included — folding task 2.3's confirmation into the same run
+(see below).
+
+## Task 2.3 — `MultiTenantSchemaIT` passes unmodified
+
+Confirmed by the very same run above: `MultiTenantSchemaIT` is **7/7 green with zero changes to the
+file**, exactly `design.md` §2's verified prediction ("¿La clave primaria compuesta obliga a tocar
+`MultiTenantSchemaIT`? Verificado: no"). No discrepancy to report. In particular:
+
+- `everyUniqueIndexOfABusinessTableIncludesTheInstitutionDiscriminator` passes because every unique
+  index on both new tables — the composite primary key, the anti-fork unique constraint, and
+  `shared_audit_chain_head`'s single-column primary key — includes `institution_id`.
+- `everyBusinessTableNameCarriesItsOwnerModulesPrefixExceptTheClosedCatalogue` passes because both
+  table names split on their first `_` to `shared`, and `com.confia.shared.security` already exists
+  as real production code since PR B1 — the exact mechanical dependency `tasks.md`'s header note
+  describes.
+
+No production code or test file was touched for this task; it is a verification-only task.
+
+## Task 2.4 — ROJO/VERDE: `CommittingBaseContractIT`
+
+Widened `CommittingPostgresIntegrationTest.tablesWithoutABeforeTruncateTrigger()` from `private` to
+package-private, so the contract test asserts directly on the real derivation instead of duplicating
+the catalog query (Javadoc added explaining why). Created
+`apps/api/app/src/test/java/com/confia/support/CommittingBaseContractIT.java` with two methods: one
+confirms the derived set excludes both `shared_audit_log` and `shared_audit_chain_head` (and, by
+membership rather than only absence, that the loop ran over real catalog rows — it still contains
+`organization_institution`); the other confirms
+`truncateCommittedBusinessTables()` itself never throws, even though both audit tables are silently
+skipped.
+
+No RED was separately captured for this task: the task text itself says this is expected to already
+be GREEN, because task 1.5's implementation already derives the truncation set from the catalog
+(`pg_trigger`'s `TRUNCATE` bit), which automatically excludes any table that gained a `BEFORE
+TRUNCATE` trigger — both audit tables did, in task 2.2, one task earlier. Confirmed, not invented:
+
+**GREEN, observed**: `./mvnw -B -pl app -am test -Dtest=CommittingBaseContractIT -Dsurefire.failIfNoSpecifiedTests=false`:
+
+```
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+```
+
+No production code change was needed — the query in `tablesWithoutABeforeTruncateTrigger()` already
+behaved correctly; only its visibility changed.
+
+## Task 2.5 — Documentation reconciliation
+
+Applied `proposal.md`'s "Deriva del nombre de la tabla" table across nine files:
+
+- `docs/03-seguridad.md`: renamed in §6.1 (twice) and §6.3; rewrote §12.1's DDL block (composite
+  primary key `(institution_id, id)`, no `BIGSERIAL`, `id`/`prev_hash`/`row_hash` now documented as
+  disparador-assigned, the four indexes now lead with `institution_id`), added a short paragraph
+  explaining why there is no `BIGSERIAL`; rewrote the "cadena" language throughout §12.1, "Ancla
+  externa" and §12.4 to be explicitly **per-institution**, not global (design.md decision 3);
+  rewrote §12.3's grant block (no `GRANT ... ON SEQUENCE`, `GRANT SELECT` added for
+  `confia_readonly`, function/trigger names renamed to the real `shared_audit_*` ones, the trigger
+  message parameterized with `TG_TABLE_NAME` matching the real migration); renamed the checklist
+  entries and the periodic-verification summary table.
+- `docs/07-observabilidad-y-operaciones.md`, `docs/08-datos-privacidad-y-retencion.md`: mechanical
+  rename (table and column-qualified references). **Flagging, not silently fixing**: docs/08 line
+  104 refers to a column `audit_log.source_ip_hash` that never existed in any shipped schema (the
+  real column is `source_ip INET`, stored unhashed per design.md decision 7 and the `build-integrity`
+  preimage table) — renamed the table qualifier only and left the column name and the "IP
+  almacenada como hash" claim untouched, since task 2.5's own scope for this file is "nombre de la
+  tabla y de sus columnas" (a rename), not a resolution of a pre-existing, unrelated semantic
+  inconsistency about whether the IP is hashed. **Reporting this as a discrepancy for the
+  orchestrator/owner to resolve, not inventing a `source_ip_hash` column or silently rewriting the
+  claim.**
+- `.claude/skills/confia-audit-logging/SKILL.md`, `.claude/agents/confia-database.md`: renamed the
+  table throughout the DDL and examples. Also corrected the append-only function name (the
+  mechanical rename alone would have produced `shared_audit_log_is_append_only`, which does not
+  match the real migration's `shared_audit_is_append_only`) and the sequence `GRANT` line (removed,
+  since there is no sequence — replaced with the real `confia_readonly` `GRANT SELECT`), and the
+  `id` column's type (`BIGINT`, not `BIGSERIAL`, with the real composite primary key constraint
+  added) — needed for the examples to stay consistent with the real shipped schema, not merely
+  scope creep.
+- `docs/runbooks/descuadre-de-libro-mayor.md`, `docs/runbooks/cierre-de-caja-con-diferencia.md`:
+  pure mechanical rename — both queries only ever referenced real, still-existing columns
+  (`entity_id`, `request_id`, `occurred_at`, `actor_id`, `action`, `entity_type`), so no
+  reconciliation beyond the table name was needed.
+- `docs/runbooks/incidente-de-seguridad.md`, `docs/runbooks/restauracion-de-respaldo.md`: **real
+  reconciliation, not just a rename.** Both runbooks' chain-integrity query joined
+  `audit_log a JOIN audit_log p ON p.id = a.previous_id WHERE a.previous_hash <> p.record_hash` —
+  `previous_id`, `previous_hash` and `record_hash` never existed in any schema this change or its
+  predecessor ever shipped (the real columns are `id`, `prev_hash`, `row_hash`), and the join
+  assumed one global chain, which design.md decision 3 explicitly rejects in favor of one chain per
+  institution. Rewrote both to
+  `shared_audit_log a JOIN shared_audit_log p ON p.institution_id = a.institution_id AND p.id = a.id - 1 WHERE a.prev_hash <> p.row_hash`,
+  and `ip_address` → `source_ip` in `incidente-de-seguridad.md`'s reconstruction queries (the real
+  column name). **Executed manually** against this cut's real schema with a temporary, uncommitted
+  probe test (`ProbeRunbookQueryTest`, deleted immediately after — never committed, `git status`
+  confirmed clean before continuing) to confirm the reconciled query runs without an
+  unknown-column error:
+
+  ```
+  Tests run: 1, Failures: 0, Errors: 0, Skipped: 0 -- ProbeRunbookQueryTest
+  ```
+
+- `docs/adr/ADR-0003-separacion-admin-portal.md`: added the one-line dated editorial note
+  `proposal.md` D2 describes ("Nota editorial (2026-09-21): ... el nombre vigente ... es
+  `shared_audit_log`"), directly under the role table at line 225. The decision body itself — the
+  table row that still literally reads `audit_log` — was deliberately **not** rewritten, per D2's
+  own instruction ("sin reescribir el cuerpo de una decisión ya tomada").
+
+**Confirmed by text search** (`grep -rln '\baudit_log\b' docs .claude openspec/specs apps`, minus
+`openspec/changes/archive/`): the only remaining occurrence outside the archive is
+`docs/adr/ADR-0003-separacion-admin-portal.md` itself — its own historical decision body, left
+unrewritten by design, exactly the task's exit criterion.
+
+## Task 2.6 — Measure the real diff of PR B2a
+
+`git diff --numstat change/audit-log-and-transaction-runner...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`:
+
+| File | + | − |
+|---|---|---|
+| `.claude/agents/confia-database.md` | 4 | 4 |
+| `.claude/skills/confia-audit-logging/SKILL.md` | 24 | 22 |
+| `V2__create_shared_audit_log.sql` (new) | 122 | 0 |
+| `RolePrivilegeMatrixIT.java` | 75 | 0 |
+| `AuditLogAppendOnlyIT.java` (new) | 153 | 0 |
+| `AuditLogRowSecurityIT.java` (new) | 105 | 0 |
+| `CommittingBaseContractIT.java` (new) | 39 | 0 |
+| `CommittingPostgresIntegrationTest.java` | 6 | 1 |
+| `docs/03-seguridad.md` | 60 | 45 |
+| `docs/07-observabilidad-y-operaciones.md` | 7 | 7 |
+| `docs/08-datos-privacidad-y-retencion.md` | 4 | 4 |
+| `docs/runbooks/cierre-de-caja-con-diferencia.md` | 1 | 1 |
+| `docs/runbooks/descuadre-de-libro-mayor.md` | 1 | 1 |
+| `docs/runbooks/incidente-de-seguridad.md` | 15 | 7 |
+| `docs/runbooks/restauracion-de-respaldo.md` | 8 | 3 |
+
+**Total: 624 additions + 95 deletions = 719 authored lines.** Within the 800-line-per-pull-request
+budget (`docs/15-flujo-de-trabajo-git.md` §3) and within `design.md` §12's own forecast for B2a
+(530-890) — near the middle of the range, not at its high end. **No stop needed; apply continues
+into task 2.7 without consulting the owner.**
+
+## Task 2.7 — Final verification of PR B2a
+
+Cleaned `apps/api/app/target`, `apps/api/kernel/target` and `apps/api/target` first (OneDrive
+directory-retention interference the brief warns about), then ran `./mvnw -B verify` in `apps/api`
+with `JAVA_HOME` on JDK 25 and `MAVEN_OPTS` on the `Windows-ROOT` trust store, without `clean`:
+
+```
+CONFIA Kernel: Tests run: 177, Failures: 0, Errors: 0, Skipped: 0
+CONFIA API (Surefire, unit): Tests run: 110, Failures: 0, Errors: 0, Skipped: 0
+CONFIA API (Failsafe, *IT.java): Tests run: 40, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+Total time: 02:24 min
+```
+
+Confirmed individually within that run: `RolePrivilegeMatrixIT` (9/9), `AuditLogAppendOnlyIT`
+(2/2), `AuditLogRowSecurityIT` (3/3) and `CommittingBaseContractIT` (2/2) all green;
+`MultiTenantSchemaIT` (7/7) green and unmodified; the part A suite (`DatabasePipelineIT`,
+`JooqInstitutionRepositoryIT`, `PostgresImageSingleSourceTest`) and PR B1's own
+(`TransactionRunnerContextIT`, `TransactionRunnerRetryIT`, `TransactionsOnlyInSharedSecurityTest`)
+all still green, unaffected by this cut. No `0.00` coverage artifact this run (single clean run
+sufficed). No coverage-gate failure: the JaCoCo `PACKAGE` rule for `com.confia.shared.audit` (task
+1.9) still passes vacuously — this cut adds no class to that package (the first one is PR B3a).
+
+**Not performed, by explicit orchestrator instruction for this session ("No empujes la rama ni
+abras pull requests")**: pushing `change/audit-log-and-transaction-runner-audit-table` and
+confirming the `backend` CI job. Task 2.7's checkbox in `tasks.md` is left **unchecked** for this
+reason alone — matching the same convention PR B1's own task 1.12 already established in this same
+file, whose checkbox is also unchecked pending a push this session did not perform either. Every
+other task in this cut (2.1-2.6) is marked complete, with the local, real `./mvnw -B verify`
+evidence above standing in place of the CI confirmation until the owner authorizes the push.

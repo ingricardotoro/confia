@@ -295,7 +295,7 @@ Rama `change/audit-log-and-transaction-runner-audit-table`, base PR B1. **Depend
 haya creado `com.confia.shared.security` con producción real** (ver dependencia mecánica al inicio
 del documento): sin esa clase, la migración de este corte rompe la puerta de prefijo de módulo.
 
-- [ ] 2.1 **ROJO — permisos, solo inserción y seguridad de fila.** Requiere Docker. Crear en un solo
+- [x] 2.1 **ROJO — permisos, solo inserción y seguridad de fila.** Requiere Docker. Crear en un solo
   paso, porque las tres fallan por la misma causa —las tablas no existen—: extender
   `.../test/java/com/confia/schema/RolePrivilegeMatrixIT.java` con las filas de `shared_audit_log` y
   `shared_audit_chain_head` para los cinco roles de `docs/03-seguridad.md` §6.1; crear
@@ -314,7 +314,7 @@ del documento): sin esa clase, la migración de este corte rompe la puerta de pr
   privilegios cubre `shared_audit_log` para los cinco roles» y «Rechazo de `UPDATE` y `DELETE` al
   propietario del esquema, caso nuevo del patrón»)
 
-- [ ] 2.2 **VERDE — `V2__create_shared_audit_log.sql`.** Requiere Docker. Crear
+- [x] 2.2 **VERDE — `V2__create_shared_audit_log.sql`.** Requiere Docker. Crear
   `apps/api/app/src/main/resources/db/migration/V2__create_shared_audit_log.sql` con las dos tablas
   de `design.md` decisión 3 y decisión 7 (`shared_audit_log` e `shared_audit_chain_head`, sin
   encadenamiento todavía: `id`, `prev_hash` y `row_hash` como columnas `NOT NULL` que esta migración
@@ -331,7 +331,7 @@ del documento): sin esa clase, la migración de este corte rompe la puerta de pr
   2.1 que no dependen del encadenamiento: verde. — `design.md`, decisiones 3, 4 (solo el DDL de la
   cabecera, no la asignación en disparador), 7 y 8
 
-- [ ] 2.3 **Comprobar que `MultiTenantSchemaIT` pasa sin modificarse.** Requiere Docker. Ejecutar
+- [x] 2.3 **Comprobar que `MultiTenantSchemaIT` pasa sin modificarse.** Requiere Docker. Ejecutar
   `MultiTenantSchemaIT` completa contra el esquema con las dos tablas nuevas. Si pasa sin tocar el
   archivo, continuar: es la consecuencia verificada en `design.md` §2 («¿La clave primaria compuesta
   obliga a tocar `MultiTenantSchemaIT`? Verificado: no»). **Si no pasara, es una discrepancia con
@@ -340,7 +340,7 @@ del documento): sin esa clase, la migración de este corte rompe la puerta de pr
   `shared_audit_log`» (escenario «Las puertas genéricas de esquema pasan sobre `shared_audit_log`
   sin lista de exclusión»)
 
-- [ ] 2.4 **ROJO/VERDE — `CommittingBaseContractIT`, la pieza 3 de la decisión 9.** Requiere Docker.
+- [x] 2.4 **ROJO/VERDE — `CommittingBaseContractIT`, la pieza 3 de la decisión 9.** Requiere Docker.
   ROJO: crear `.../test/java/com/confia/support/CommittingBaseContractIT.java` que afirma que el
   conjunto de tablas derivado del catálogo en `CommittingPostgresIntegrationTest.truncateCommittedBusinessTables()`
   **excluye** por sí solo, sin lista escrita a mano, a `shared_audit_log` y `shared_audit_chain_head`
@@ -351,7 +351,7 @@ del documento): sin esa clase, la migración de este corte rompe la puerta de pr
   requisito exclusivo en la especificación; trazado a `design.md`, decisión 9, pieza 3 («el problema
   real, y su resolución»)
 
-- [ ] 2.5 **Corrección documental completa del nombre de la tabla y reconciliación de runbooks.**
+- [x] 2.5 **Corrección documental completa del nombre de la tabla y reconciliación de runbooks.**
   No requiere Docker. Aplicar la tabla de `proposal.md`, «Deriva del nombre de la tabla»: corregir
   `audit_log` → `shared_audit_log` en `docs/03-seguridad.md` (§6.1, §6.3, §12.1 con clave primaria
   compuesta y sin `BIGSERIAL`, §12.3 sin el `GRANT` de secuencia y con `confia_readonly`, §12.4 en
@@ -371,7 +371,7 @@ del documento): sin esa clase, la migración de este corte rompe la puerta de pr
   nombre de la tabla»; criterios de éxito de la propuesta sobre la búsqueda de `audit_log` y sobre
   las consultas de los runbooks
 
-- [ ] 2.6 **Medir el diff real de PR B2a** con
+- [x] 2.6 **Medir el diff real de PR B2a** con
   `git diff --numstat <base-de-PR-B1>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y
   consultar al propietario**, con la subdivisión de contingencia ya identificada en `design.md` §12:
