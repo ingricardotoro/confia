@@ -188,7 +188,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   (escenarios «El reintento tiene éxito dentro del límite acotado» y «El reintento se agota y el
   error se propaga»)
 
-- [ ] 1.7 **VERDE — el reintento acotado en `TransactionRunner`.** Requiere Docker. Implementar el
+- [x] 1.7 **VERDE — el reintento acotado en `TransactionRunner`.** Requiere Docker. Implementar el
   límite de reintentos (tres, con retroceso — `docs/adr/ADR-0010-idempotencia-y-concurrencia-financiera.md`
   líneas 203-205) ante `org.springframework.dao.ConcurrencyFailureException` **o** `SQLState` `40001`
   (`serialization_failure`) / `40P01` (`deadlock_detected`); retroceso `base * intento` con fracción

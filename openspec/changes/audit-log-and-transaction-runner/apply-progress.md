@@ -205,3 +205,52 @@ did raise a `SERIALIZABLE` write conflict (proving the concurrency setup is real
 and `TransactionRunner`, having no retry logic yet, propagated it straight to the caller instead of
 retrying; the exhaustion scenario shows the body ran exactly once instead of four times, confirming
 no retry happened there either.
+
+## Task 1.7 — GREEN: the bounded retry in `TransactionRunner`
+
+Implemented the retry loop in both `execute` methods (retry lives in the `IsolationLevel`-explicit
+overload; the single-arg overload delegates to it, so both share one implementation): on a
+`RuntimeException`, `isRetryable(e)` checks first for `org.springframework.dao.
+ConcurrencyFailureException`, then walks the cause chain for a `java.sql.SQLException` with
+`SQLState` `40001` or `40P01` — needed because jOOQ wraps the underlying `SQLException` in its own
+`org.jooq.exception.DataAccessException`, never translated through Spring's hierarchy. Retries up
+to `maxRetries` (3) times, backing off `backoffBase * attempt` plus bounded jitter
+(`ThreadLocalRandom`) between attempts, via `Thread.sleep` — never used as a synchronization
+mechanism in any test, per design.md decision 2. Each retry opens a genuinely new transaction
+(a fresh `template.execute(...)` call), so the security context is reapplied fresh every attempt.
+
+**Two real bugs found and fixed while turning this green, both in the test, not in
+`TransactionRunner`:**
+1. The success scenario's final assertion queried the row through `dsl` with no institution context
+   active, so the root table's row-level-security policy denied by default (V1 migration) and the
+   query returned zero rows instead of the updated one — an `IndexOutOfBoundsException`, not a
+   `TransactionRunner` defect. Fixed by reading the final state through a raw `postgres` (superuser)
+   connection via `SharedPostgresContainer.connectionAs("postgres")`, which bypasses row-level
+   security, exactly like the fixture's own seeding helper does elsewhere in this PR.
+2. That fix initially missed the `com.confia.support.SharedPostgresContainer` import (a real
+   `cannot find symbol` compile error, caught and fixed immediately).
+
+**Environment interference encountered and resolved, unrelated to any of the above bugs.** Two
+separate real Maven runs failed with `El proceso no tiene acceso al archivo porque está siendo
+utilizado por otro proceso` on `target/test-classes/.../ResolveCurrentInstitutionTest.class`
+(OneDrive sync holding a file handle — the exact class of failure this PR's brief already warns
+about) and, once that cleared, two further runs failed with a **different** symptom: Surefire ran a
+`.class` file that literally contained the bytes `Unresolved compilation problems: ` — traced with
+`grep -a` directly against the compiled class file — meaning VS Code's Java language server
+(`redhat.java` extension, ECJ-based) was recompiling the same source tree into the same
+`target/test-classes` directory Maven uses and racing Maven's own `javac` output between
+`test-compile` and `test`. Resolved by stopping the two `redhat.java` JRE processes for the
+remainder of this session (`Stop-Process`, PIDs identified via `Get-Process java`) and clearing
+`target/` again before the next run; the editor extension restarts this language server on its own
+when the user next interacts with it, so nothing here is a permanent change to the user's
+environment. Neither of these two interferences is a code defect.
+
+**GREEN, observed** (stable across three separate runs, no flakiness in the concurrency scenario):
+`./mvnw -B -pl app -am test -Dtest=TransactionRunnerRetryIT -Dsurefire.failIfNoSpecifiedTests=false`:
+
+```
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 26.19 s -- in com.confia.shared.security.TransactionRunnerRetryIT
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+(repeated twice more: 26.49 s and 25.73 s, both `Tests run: 2, Failures: 0, Errors: 0`)

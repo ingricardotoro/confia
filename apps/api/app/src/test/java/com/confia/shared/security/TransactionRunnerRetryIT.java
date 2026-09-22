@@ -1,12 +1,11 @@
 package com.confia.shared.security;
 
-import static confia.generated.jooq.tables.OrganizationInstitution.ORGANIZATION_INSTITUTION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.support.CommittingPostgresIntegrationTest;
+import com.confia.support.SharedPostgresContainer;
 import java.sql.SQLException;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
@@ -98,14 +97,24 @@ class TransactionRunnerRetryIT extends CommittingPostgresIntegrationTest {
             executor.shutdownNow();
         }
 
-        List<String> finalNames = dsl.selectFrom(ORGANIZATION_INSTITUTION)
-                .where(ORGANIZATION_INSTITUTION.ID.eq(sharedInstitutionId))
-                .fetch(ORGANIZATION_INSTITUTION.LEGAL_NAME);
-        assertThat(finalNames)
+        // Read back as the superuser, bypassing row-level security entirely: no TransactionRunner
+        // context is active here, and the row's own institution_id context would otherwise deny
+        // this query by default (V1 migration's policy).
+        String finalName;
+        try (var connection = SharedPostgresContainer.connectionAs("postgres");
+                var statement = connection.prepareStatement(
+                        "select legal_name from organization_institution where id = ?")) {
+            statement.setObject(1, sharedInstitutionId);
+            try (var resultSet = statement.executeQuery()) {
+                assertThat(resultSet.next()).as("the seeded row must still exist").isTrue();
+                finalName = resultSet.getString(1);
+            }
+        }
+        assertThat(finalName)
                 .as("the row survives with exactly one of the two updates applied — proof both "
-                        + "transactions really committed against the same row, one after the other")
-                .containsExactlyInAnyOrder(finalNames.get(0))
-                .allMatch(name -> name.equals("Updated by A") || name.equals("Updated by B"));
+                        + "transactions really committed against the same row, one after the other, "
+                        + "instead of one of them silently losing its update")
+                .isIn("Updated by A", "Updated by B");
     }
 
     /**
