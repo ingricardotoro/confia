@@ -472,7 +472,7 @@ Rama `change/audit-log-and-transaction-runner-chain`, base PR B2a.
 Rama `change/audit-log-and-transaction-runner-canonical-serializer`, base PR B2b. `design.md` §12
 planifica B3 dividido desde el principio, porque su rango medio ya supera el presupuesto de 800.
 
-- [ ] 4.1 **Ejecutar la sonda S8 (bloqueante, `design.md` §10 y §11 paso 18).** Requiere Docker
+- [x] 4.1 **Ejecutar la sonda S8 (bloqueante, `design.md` §10 y §11 paso 18).** Requiere Docker
   (llamada JDBC directa a `shared_audit_row_hash` sobre el contenedor real, sin `@SpringBootTest`).
   Confirmar si una clase `@Property` de jqwik corre bajo Failsafe en este reactor y si jqwik ignora
   las extensiones de JUnit Jupiter (es decir, no puede extender una clase anotada
@@ -482,7 +482,7 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
   rutas quedan ya diseñadas en `design.md` decisión 6 y decisión 14. — `design.md` §10 (sonda S8) y
   §11, paso 18
 
-- [ ] 4.2 **ROJO — prueba cruzada de la serialización canónica.** Requiere Docker. Crear
+- [x] 4.2 **ROJO — prueba cruzada de la serialización canónica.** Requiere Docker. Crear
   `.../test/java/com/confia/shared/audit/CanonicalSerializationCrossCheckIT.java`: propiedad jqwik,
   sin `@SpringBootTest` (según el resultado de 4.1), que genera entradas para las once familias de
   divergencia de `design.md` §6.5 (D1-D11: escala y magnitud de números, texto no ASCII, control y
@@ -494,7 +494,7 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
   PL/pgSQL y Java» (escenario «Ambas implementaciones producen el mismo hash sobre entradas
   generadas»)
 
-- [ ] 4.3 **VERDE — serialización canónica en Java.** Requiere Docker (ejecuta 4.2). Crear
+- [x] 4.3 **VERDE — serialización canónica en Java.** Requiere Docker (ejecuta 4.2). Crear
   `.../main/java/com/confia/shared/audit/CanonicalAuditRow.java` (record con los 18 campos firmados)
   y `.../main/java/com/confia/shared/audit/CanonicalAuditRowSerializer.java` (`preimage`/`rowHash`,
   Jackson con `USE_BIG_DECIMAL_FOR_FLOATS`/`USE_BIG_INTEGER_FOR_INTS` nunca `double`, claves
