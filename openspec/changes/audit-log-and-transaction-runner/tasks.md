@@ -138,7 +138,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   escenarios: contexto antes de la consulta, ningún contexto sobrevive, `READ COMMITTED` real,
   `SERIALIZABLE` real)
 
-- [ ] 1.3 **VERDE — el componente transaccional único.** Requiere Docker (ejecuta 1.2). Crear
+- [x] 1.3 **VERDE — el componente transaccional único.** Requiere Docker (ejecuta 1.2). Crear
   `.../main/java/com/confia/shared/security/TransactionRunner.java` (constructor explícito sobre
   `PlatformTransactionManager` y `DataSource`, sin anotación de Spring; `execute` con
   `TransactionTemplate`, nivel `READ_COMMITTED` por defecto; `SELECT set_config(...) x4` como primera

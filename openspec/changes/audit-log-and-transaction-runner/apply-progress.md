@@ -68,3 +68,38 @@ the ordering to be real.
 
 Fails exactly as task 1.2 predicts: no `TransactionRunner`, `IsolationLevel` or `SecurityContext`
 exist yet.
+
+## Task 1.3 — GREEN: `TransactionRunner`, `SecurityContext`, `IsolationLevel`
+
+Created:
+- `apps/api/app/src/main/java/com/confia/shared/security/SecurityContext.java` — record of the
+  four session parameters, non-null fields (never `null`, matching V1's `NULLIF(..., '')` pattern
+  for "absent").
+- `apps/api/app/src/main/java/com/confia/shared/security/IsolationLevel.java` — `READ_COMMITTED` /
+  `SERIALIZABLE`.
+- `apps/api/app/src/main/java/com/confia/shared/security/TransactionRunner.java` — two constructors
+  matching design.md §6.1's contract exactly; `execute(context, useCase)` and `execute(context,
+  isolation, useCase)`, each opening one `TransactionTemplate`-managed transaction and issuing the
+  four `set_config(..., true)` calls as the first statement over the connection bound by {@code
+  DataSourceUtils.getConnection(dataSource)}, with bound parameters, never string interpolation.
+  **Deliberately no retry loop yet** — `maxRetries`/`backoffBase` are accepted and stored but not
+  consulted, exactly matching design.md §11 step 3 vs. steps 6-7 (retry is `TransactionRunnerRetryIT`'s
+  own RED/GREEN cycle, tasks 1.6/1.7). This is a conscious TDD-discipline choice, not an oversight:
+  implementing retry now would be adding production code no currently-red test demands.
+- `apps/api/app/src/main/java/com/confia/shared/security/package-info.java` — cites ADR-0015 rule 7
+  verbatim and explains why this package carries no layer segment.
+
+**GREEN, observed**: `./mvnw -B -pl app -am verify -Dit.test=TransactionRunnerContextIT -Dtest=none
+-Dsurefire.failIfNoSpecifiedTests=false -Dfailsafe.failIfNoSpecifiedTests=false`:
+
+```
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 25.34 s -- in com.confia.shared.security.TransactionRunnerContextIT
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+```
+
+All four scenarios pass, including the connection-reuse and order-sensitive ones. The overall Maven
+reactor still reports `BUILD FAILURE` on this narrow run, from `jacoco-maven-plugin:check`
+("Coverage checks have not been met") — exactly the same, already-documented artifact of skipping
+Surefire with `-Dtest=none` that the archived `jooq-flyway-testcontainers-wiring/apply-progress.md`
+task 3.5 recorded for PR A3: the BUNDLE coverage ratio is computed over an incomplete set of
+executed tests, not a real gate failure. Resolved by the full `./mvnw -B verify` in task 1.12.
