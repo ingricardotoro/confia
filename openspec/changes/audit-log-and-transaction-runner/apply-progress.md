@@ -254,3 +254,36 @@ environment. Neither of these two interferences is a code defect.
 [INFO] BUILD SUCCESS
 ```
 (repeated twice more: 26.49 s and 25.73 s, both `Tests run: 2, Failures: 0, Errors: 0`)
+
+## Task 1.8 — R3 positive half
+
+Extended `TransactionsOnlyInSharedSecurityTest` with a third test,
+`sharedSecurityContainsAtLeastOneProductionClassThatUsesTheTransactionApi()`, asserting over
+`productionClasses()` filtered to `com.confia.shared.security` that at least one class uses the
+transaction API. Extracted the shared criterion into one static `usesTransactionApi(JavaClass)`
+method, called by both the existing negative `ArchCondition` and the new positive assertion, so the
+two halves cannot diverge on what "uses the transaction API" means (task 1.8's own requirement).
+This is a refactor of the negative rule's internals (its violation messages are now one unified
+string instead of three separate per-branch strings), not a behavior change — its own fixture
+rejection test still passes with the same message fragment (`"BadTransactionalRepository"`).
+
+Task text says this half "falla al ejecutarse antes de la tarea 1.3" — not applicable here since
+task 1.3 already ran (`TransactionRunner` exists since this PR's third commit); confirmed instead,
+per the task's own instruction, that the assertion is independent of the negative rule's rejection
+and shares its criterion (done above), then ran it directly as ROJO/VERDE combined.
+
+Also corrected `BadTransactionalRepository`'s Javadoc (no longer describes itself as a "preventive
+guard" over an empty `shared.security` package — that package has real production code since task
+1.3).
+
+**Observed**: `./mvnw -B -pl app -am test -Dtest=TransactionsOnlyInSharedSecurityTest
+-Dsurefire.failIfNoSpecifiedTests=false`:
+
+```
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 11.15 s -- in com.confia.architecture.TransactionsOnlyInSharedSecurityTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+
+All three green: the negative rule against real production code, its fixture-rejection half, and
+the new positive assertion.

@@ -196,7 +196,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   `TransactionRunnerRetryIT` completa: verde. — `design.md`, decisión 2 («Detección del error de
   serialización» y «Retroceso»); especificación `build-integrity`, mismo requisito que 1.6
 
-- [ ] 1.8 **ROJO/VERDE — R3, mitad positiva.** No requiere Docker (ArchUnit puro). ROJO: extender
+- [x] 1.8 **ROJO/VERDE — R3, mitad positiva.** No requiere Docker (ArchUnit puro). ROJO: extender
   `.../test/java/com/confia/architecture/TransactionsOnlyInSharedSecurityTest.java` con un tercer
   método que afirma, sobre `productionClasses()` filtradas por `com.confia.shared.security`, que al
   menos una existe y usa la API de transacciones — falla si se ejecuta antes de la tarea 1.3 (no
