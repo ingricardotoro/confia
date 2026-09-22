@@ -92,7 +92,12 @@ public abstract class CommittingPostgresIntegrationTest extends PostgresIntegrat
         }
     }
 
-    private List<String> tablesWithoutABeforeTruncateTrigger() throws SQLException {
+    /**
+     * Package-private, not {@code private}: {@code CommittingBaseContractIT} (task 2.4, design.md
+     * decision 9, piece 3) asserts directly on this derivation's own output, rather than duplicating
+     * the catalog query, so the contract test exercises the real implementation.
+     */
+    List<String> tablesWithoutABeforeTruncateTrigger() throws SQLException {
         List<String> names = new ArrayList<>();
         try (Connection connection = SharedPostgresContainer.connectionAs("confia_owner");
                 PreparedStatement statement = connection.prepareStatement("""
