@@ -120,6 +120,19 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    es una regla fiscal**; debe decirlo su propia especificación para no crear una segunda verdad
    implícita mientras `docs/04-cumplimiento-fiscal-sar.md` sección 1 siga marcando el formato como
    pendiente de validación con la contadora.
+   **Pendiente heredado del cambio 5 parte A (auditoría de seguridad del 2026-09-21):** la imagen
+   `postgres:18-alpine`, declarada una sola vez en la propiedad `confia.postgres.image` de
+   `apps/api/pom.xml`, dejó de ser material exclusivo de prueba: la generación de código de jOOQ la
+   ejecuta en cada `mvn verify`, incluida la puerta de fusión. Es una etiqueta móvil en una
+   dependencia real de construcción. La fila «Imágenes base fijadas por digest» de
+   `docs/03-seguridad.md` sección 13 no la alcanza literalmente, porque esa fila cubre las imágenes
+   base de nuestros Dockerfiles y se verifica con Hadolint, que nunca ve una propiedad de Maven;
+   pero el riesgo de cadena de suministro es el mismo. **No se fijó el dígest todavía a propósito:**
+   sin un mecanismo de actualización automática, un dígest fijo congela la imagen y acumula
+   vulnerabilidades conocidas en silencio, que es el riesgo inverso. Debe fijarse por dígest **en el
+   mismo cambio que introduzca Renovate**, nunca antes, y esa fila de `docs/03` sección 13 debe
+   ampliarse para nombrar explícitamente las imágenes de construcción y prueba, no solo las de los
+   Dockerfiles.
 9. Respaldo en dos niveles según ADR-0014: respaldo automático de RDS con restauración a un punto en el tiempo dentro de AWS, más respaldo lógico nocturno cifrado y copia fuera de sitio en un proveedor distinto de AWS (brecha B10).
 10. Sistema de diseño base en `packages/ui` con tokens, átomos y verificación de accesibilidad automatizada.
 11. Semilla de datos ficticios para desarrollo y capacitación.
