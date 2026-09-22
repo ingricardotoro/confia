@@ -380,7 +380,7 @@ lo es, porque esa reversión no es posible con medios razonables.
 | Fecha de nacimiento | **Generalización** al año de nacimiento, y a la cohorte de edad en los reportes | Distribución por edad y cohorte |
 | Dirección | **Generalización** al municipio o al departamento | Distribución geográfica de la matrícula |
 | Correo y teléfono | **Eliminación**, conservando un hash con sal en la lista de supresión | Capacidad de respetar una baja para siempre, sin conservar el contacto |
-| Dirección IP en auditoría | **Hash con sal secreta** desde el momento de la escritura, nunca en claro | Correlación de acciones de una misma sesión, sin identificar la conexión |
+| Dirección IP en auditoría | **Ninguna: se conserva en claro** mientras la fila exista, por decisión del propietario del 2026-09-22 (sección 4.1). Hasheada no permitiría investigar un incidente por rango de red, que es su única finalidad. Desaparece con la fila al vencer el plazo de conservación | Investigación de incidentes por origen y por rango de red |
 | Destinatario de notificación | **Hash** desde el origen (`notification_log.recipient_hash`) | Conteo de envíos, tasa de entrega y de rebote por canal |
 | Importes, fechas, conceptos y estados financieros | **Se preservan íntegros** | Toda la contabilidad histórica: recaudación por período, cartera, morosidad por grado y modalidad, comportamiento de pago agregado |
 | Vínculo con la cuenta del libro mayor | **Seudonimización**: la cuenta conserva su identificador, el titular se anonimiza | Los asientos siguen cuadrando y los reportes contables históricos siguen siendo correctos |
@@ -740,7 +740,10 @@ Ninguna casilla se marca por criterio: cada una exige el artefacto o la prueba e
 - [ ] La lista de redacción del registro estructurado del backend cubre todos los campos personales del inventario, verificado
       por prueba.
 - [ ] Los respaldos salen del host cifrados y la llave de restauración está custodiada aparte.
-- [ ] La IP se almacena hasheada en la bitácora de auditoría, nunca en claro.
+- [ ] La IP de la bitácora de auditoría se conserva **en claro** por decisión documentada del
+      propietario (2026-09-22, sección 4.1), y sus salvaguardas reales están en pie: acceso
+      restringido por rol, política de fila por institución verificada por prueba, y plazo de
+      conservación aplicado.
 - [ ] El destinatario de notificación se almacena como hash.
 
 ### Derechos del titular

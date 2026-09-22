@@ -144,8 +144,13 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    prueba fallaría. Conviene afirmar además contra `POSTGRES.getDockerImageName()`. (c) Nada impide
    nombrar `*Test` a una clase que necesita contenedor, y por lo tanto ejecutarla en Surefire sin
    Docker; el riesgo no es teórico, porque `PostgresImageSingleSourceTest` ya vive en el mismo
-   paquete `support`. Falta también un fixture de violación en la capa `infrastructure` para el
-   escenario de dependencia inválida. El informe completo, con la trazabilidad de los cuarenta y
+   paquete `support`. **El punto (c) quedó CERRADO por la parte B del cambio 5, corte B4**
+   (`IntegrationTestNamingTest`): toda subclase concreta de `PostgresIntegrationTest`, y toda clase
+   que llame a `SharedPostgresContainer` y declare un método de prueba propio, debe terminar en
+   `*IT`. Los puntos **(a) y (b) siguen abiertos**: el presupuesto de ocho minutos se sigue midiendo
+   sin exigirse, y la prueba de fuente única sigue sin cubrir al segundo consumidor de
+   `confia.postgres.image`. Falta también un fixture de violación en la capa `infrastructure` para
+   el escenario de dependencia inválida. El informe completo, con la trazabilidad de los cuarenta y
    tres escenarios, queda en
    `openspec/changes/archive/2026-09-21-jooq-flyway-testcontainers-wiring/verify-report.md`.
 9. Respaldo en dos niveles según ADR-0014: respaldo automático de RDS con restauración a un punto en el tiempo dentro de AWS, más respaldo lógico nocturno cifrado y copia fuera de sitio en un proveedor distinto de AWS (brecha B10).
@@ -157,7 +162,14 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
 
 - [ ] Un intento de importar el `domain` de otro módulo rompe la construcción en integración continua.
 - [ ] Un usuario sin permiso recibe 403 y el intento queda en `AuditLog`.
-- [ ] El verificador de cadena de auditoría detecta una manipulación inyectada en una prueba.
+- [x] El verificador de cadena de auditoría detecta una manipulación inyectada en una prueba.
+      **Cerrado por la parte B del cambio 5, corte B3b-i**, con
+      `AuditChainVerifierIT.aRowAlteredDirectlyWithSuperuserWithoutRecalculatingIsIdentifiedExactly`:
+      una conexión `SUPERUSER` real desactiva el disparador por sesión con
+      `session_replication_role`, altera una fila confirmada, restaura el disparador, y el
+      recorrido de producción identifica el `(institution_id, id)` exacto. Su simétrica,
+      `AuditChainKnownLimitIT`, declara el límite aceptado: una manipulación que recalcula la
+      cadena entera **no** se detecta mientras no exista el ancla externa del cambio 11.
 - [ ] Dos solicitudes con la misma clave de idempotencia producen un solo efecto y la misma respuesta.
 - [ ] Una tarea programada dentro de una transacción revertida no existe, y solo el proceso `confia-worker` ejecuta tareas.
 - [ ] **Un respaldo se restaura en un entorno limpio y el acta de simulacro está firmada.**

@@ -1603,3 +1603,60 @@ call:**
 Task 5.7's own final verification, below, runs against the full, undivided `HEAD` — the same tree
 either split option converges to — so its evidence covers both candidates regardless of which the
 owner picks.
+
+
+## PR B4 — corte B4: regla de nomenclatura `*IT` y cierre del cambio
+
+Aplicado por el orquestador tras un corte por inactividad del agente delegado. El agente dejo sin
+comprometer la regla y su fixture, ambos ya escritos y correctos; el orquestador los verifico, les
+aplico un control negativo propio y los comprometio.
+
+### Tarea 6.1 — sonda S11
+Resultado registrado en el Javadoc de `BadlyNamedContainerTest`: con el contenedor tras el titular
+perezoso de `SharedPostgresContainer`, Surefire seleccionando por patron de nombre una subclase de
+`PostgresIntegrationTest` **sin ningun metodo de prueba**, y la plataforma JUnit cargandola para
+buscar metodos, **no produce descriptor y no arranca ningun contenedor**. No hizo falta excluir el
+fixture de Surefire, asi que no hay ninguna exclusion que citar a un ADR.
+
+### Tareas 6.2 y 6.3 — la regla
+`IntegrationTestNamingTest` dispara sobre dos condiciones: una subclase **concreta** de
+`PostgresIntegrationTest`, o una clase que **llama** a `SharedPostgresContainer` y declara ademas un
+metodo de prueba propio. La segunda es deliberadamente mas estrecha que «cualquier clase que dependa
+del contenedor», porque `AuditLogSuperuserTamper`, entregado en B3b, es un ayudante permanente sin
+metodo de prueba que ni Surefire ni Failsafe seleccionarian jamas. `design.md` marca estos esquemas
+como esbozos cuya firma exacta fija la implementacion; el estrechamiento queda escrito en el Javadoc
+de la propia regla.
+
+**La mitad de produccion no puede pasar sobre conjunto vacio:** afirma primero que la regla evalua al
+menos una clase real del arbol. **La mitad de rechazo** nombra el fixture, con el helper compartido
+que ademas exige que el mensaje no contenga «failed to check any classes» ni «is empty».
+
+**Control negativo del orquestador.** Se renombro el fixture a `BadlyNamedContainerIT` y se volvio a
+correr: la prueba de rechazo **fallo**, como debe. La regla se fija de verdad en el sufijo y no en
+algo incidental. Restaurado; arbol limpio.
+
+### Tarea 6.4 — cierre documental
+- `docs/09-roadmap-y-fases.md`: **criterio de salida 3 de F0 marcado como cerrado**, citando la
+  prueba concreta que lo demuestra y su simetrica que declara el limite aceptado.
+- De las tres deudas heredadas de la parte A, **solo se declara cerrada la tercera** (nomenclatura
+  `*IT`). Las otras dos —el presupuesto de ocho minutos sin exigir, y la fuente unica sin cubrir al
+  segundo consumidor— quedan escritas como **abiertas**.
+- La reconciliacion de `design.md` §7.1 que el corte B3b reporto ya estaba aplicada: el conteo dice
+  27 escenarios y la fila del escenario de `actor_label` esta en la tabla de trazabilidad.
+
+### Tarea 6.5 — diff medido
+198 lineas de codigo, dentro del presupuesto de 800 y del pronostico de `design.md` §12 (100-200).
+
+### Tarea 6.6 — verificacion final del cambio completo
+`./mvnw -B verify -Pmutation-gate` en arbol limpio, con JDK 25, almacen `Windows-ROOT` y Docker
+activo: **BUILD SUCCESS**.
+
+| Suite | Pruebas | Fallos |
+|---|---|---|
+| Kernel | 177 | 0 |
+| App, unitarias | 126 | 0 |
+| App, integracion (14 clases `*IT`) | 54 | 0 |
+
+Suma de tiempos de las clases de integracion: **67,9 s**, frente al presupuesto de 480 s de
+`build-integrity`. PIT: kernel 176/178 mutantes muertos (99%), app 49/49 (100%). Cobertura cumplida
+en ambos modulos.
