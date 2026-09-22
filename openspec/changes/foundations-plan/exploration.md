@@ -55,6 +55,15 @@ nivel de fila sobre su propia clave primaria, ADR-0009 y ADR-0017; prefijo segú
 repositorio jOOQ pasan al cambio 5, y esa migración es la primera del cambio 5. Si el cambio 5 se
 divide, la división asigna ambas cosas de forma explícita a una de sus partes.
 
+**Nota (2026-09-20, división del cambio 5).** El propietario confirmó la división prevista en el
+párrafo anterior. El cambio 5 se ejecuta como dos cambios SDD secuenciales: la **parte A**,
+`jooq-flyway-testcontainers-wiring` (Flyway, generación de código de jOOQ, Testcontainers, roles de
+PostgreSQL por script de inicialización solo de prueba, migración de `organization_institution` y su
+adaptador jOOQ), primero; y la **parte B**, `audit-log-and-transaction-runner` (componente
+transaccional único y bitácora de auditoría encadenada por hash), después, porque depende de la
+parte A. La migración de `organization_institution` y su repositorio jOOQ, asignados al cambio 5 por
+la nota anterior, quedan asignados de forma explícita a la **parte A**.
+
 **Hallazgo.** `docs/09-roadmap-y-fases.md` §3 no incluye el módulo `organization` en F0, pero
 ADR-0009 exige `institution_id NOT NULL` desde la primera migración y ADR-0017 asigna la tabla raíz
 de institución a ese módulo. Se recomienda incorporar el cambio 4, con la entidad raíz mínima, al

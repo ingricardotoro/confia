@@ -15,7 +15,7 @@ import org.springframework.context.ConfigurableApplicationContext;
  *      admin   ──&gt; AdminApplication    (web)
  *      portal  ──&gt; PortalApplication   (web)
  *      worker  ──&gt; WorkerApplication   (no HTTP)
- *      migrate ──&gt; recognized, no behavior yet (change 5)
+ *      migrate ──&gt; recognized, no behavior yet (change 11)
  *      other   ──&gt; aborts, non-zero exit code
  * </pre>
  */
@@ -62,7 +62,9 @@ public final class ConfiaApplication {
                     new SpringApplicationBuilder(WorkerApplication.class)
                             .web(WebApplicationType.NONE)
                             .run(args));
-            // Recognized only: applying Flyway migrations and exiting arrives with change 5.
+            // Recognized only: applying Flyway migrations and exiting arrives with change 11
+            // (design.md decision 12 of jooq-flyway-testcontainers-wiring — no deployed
+            // environment or Compose invokes this profile before then).
             case MIGRATE -> LaunchOutcome.exit(0);
         };
     }

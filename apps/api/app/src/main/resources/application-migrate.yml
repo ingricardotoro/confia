@@ -1,0 +1,8 @@
+# APP_PROFILE=migrate (docs/05-infraestructura-y-despliegue.md): applies pending Flyway migrations
+# and exits. Configuration only for this change: ConfiaApplication.MIGRATE still just recognizes
+# the profile and exits with code 0 (design.md decision 12); the actual executor that reads this
+# profile, runs Flyway and exits is change 11's responsibility.
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration

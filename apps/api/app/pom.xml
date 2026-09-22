@@ -34,9 +34,62 @@
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
 
+    <!-- Data access (ADR-0015): jOOQ open source, Flyway and the PostgreSQL JDBC driver. No
+         version on any of the three: managed by the Spring Boot 4.1.1 BOM (jOOQ 3.21.7, Flyway
+         12.4.0, org.postgresql:postgresql 42.7.13 — design.md section 2, evidence table). -->
+    <!-- DataSourceAutoConfiguration, FlywayAutoConfiguration and TransactionAwareDataSourceProxy
+         (task 1.5's explicit DSLContext bean, apply-progress.md S1.6) all live in spring-jdbc,
+         which nothing else in this module pulls in transitively: spring-boot-starter-web depends
+         on spring-web/spring-webmvc, not spring-jdbc. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.jooq</groupId>
+      <artifactId>jooq</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <!-- Spring Boot 4.x split its once-monolithic spring-boot-autoconfigure jar into one module
+         per feature (verified by inspecting spring-boot-autoconfigure-4.1.1.jar: 258 classes
+         total, none under org/springframework/boot/autoconfigure/{jdbc,flyway,jooq}). Flyway's
+         FlywayAutoConfiguration now lives in this separate artifact and is not pulled in
+         transitively by flyway-core or by spring-boot-starter-jdbc; jOOQ has no equivalent
+         module at all (apply-progress.md task 1.1/1.5, S1.6 and its follow-up). -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-flyway</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Testcontainers 2.x (design.md decision 3): the module names changed from the 1.x line
+         (postgresql, junit-jupiter) to testcontainers-postgresql and testcontainers-junit-jupiter;
+         both are managed by the Spring Boot 4.1.1 BOM under their new names (design.md section 2
+         evidence table; confirmed again by task 1.3's dependencyConvergence run: no version needed
+         here). -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -61,6 +114,30 @@
   </dependencies>
 
   <build>
+    <!-- Single source of truth for the PostgreSQL image (ADR-0015 rule 1; design.md decision 3;
+         task 1.6). Filtering is restricted to confia-build.properties alone. Declared as two
+         passes over the SAME directory, in order, rather than an <excludes> on the first pass:
+         SuppressionCitesAdrTest's JaCoCo-class-exclusion pattern matches ANY <exclude>...</exclude>
+         with no colon, anywhere under apps/api, and would misidentify a plain
+         maven-resources-plugin exclude as an uncited JaCoCo suppression (confirmed by a real run,
+         apply-progress.md task 1.7). The first pass copies everything under src/test/resources
+         unfiltered, including the raw confia-build.properties; the second pass, restricted by
+         <includes> to that one file, reprocesses it filtered and overwrites the raw copy — so no
+         other file (in particular no ${...} in an SQL script such as the beforeMigrate__ callback)
+         is ever touched by filtering. -->
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+        <filtering>false</filtering>
+      </testResource>
+      <testResource>
+        <directory>src/test/resources</directory>
+        <filtering>true</filtering>
+        <includes>
+          <include>confia-build.properties</include>
+        </includes>
+      </testResource>
+    </testResources>
     <plugins>
       <!-- Coverage gate for this module (design.md decision 9; task 1.1 measured 89.7% line and
            84.6% branch coverage on com.confia.bootstrap alone, both above 80%, so the BUNDLE rule
@@ -72,12 +149,28 @@
         <artifactId>jacoco-maven-plugin</artifactId>
         <executions>
           <execution>
+            <id>jacoco-report</id>
+            <configuration>
+              <!-- ADR-0021 "Cumplimiento y verificación" point 3: the generated jOOQ package
+                   never has an author or a test of its own; excluded here so this report only
+                   measures code a person actually wrote. -->
+              <excludes>
+                <exclude>confia/generated/**</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+          <execution>
             <id>jacoco-check</id>
             <phase>verify</phase>
             <goals>
               <goal>check</goal>
             </goals>
             <configuration>
+              <!-- ADR-0021 "Cumplimiento y verificación" point 3: same exclusion, applied to the
+                   coverage gate itself, not only to the report above. -->
+              <excludes>
+                <exclude>confia/generated/**</exclude>
+              </excludes>
               <rules>
                 <rule>
                   <element>BUNDLE</element>
@@ -121,6 +214,99 @@
             </configuration>
           </execution>
         </executions>
+      </plugin>
+
+      <!-- jOOQ code generation over a Testcontainers-managed PostgreSQL, generate-sources phase
+           (ADR-0015 rule 2; design.md decision 1, route A). Version comes from the parent's
+           pluginManagement (task 1.2); this execution overrides the plugin's OWN pinned
+           dependencies. Without this override the plugin uses Testcontainers 1.19.1, which cannot
+           reach Docker Desktop on this machine, and jOOQ 3.18.3, which cannot introspect a
+           PostgreSQL 18 catalog (getRelations/getPrimaryKey fails with "Field (key_seq) is not
+           contained in Row"); both were confirmed with a real run outside the repository tree
+           (apply-progress.md task 1.1, S1.3). No skip flag exists for this execution: ADR-0008
+           forbids disabling a gate with a flag, and a skipped generation would silently reopen the
+           exact drift ADR-0015 rule 2 exists to prevent. -->
+      <plugin>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-jooq-codegen-maven-plugin</artifactId>
+        <dependencies>
+          <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>2.0.5</version>
+          </dependency>
+          <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <version>2.0.5</version>
+          </dependency>
+          <dependency>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq-codegen</artifactId>
+            <version>3.21.7</version>
+          </dependency>
+          <dependency>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq-meta</artifactId>
+            <version>3.21.7</version>
+          </dependency>
+        </dependencies>
+        <executions>
+          <execution>
+            <id>generate-jooq-sources</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <database>
+            <type>POSTGRES</type>
+            <containerImage>${confia.postgres.image}</containerImage>
+          </database>
+          <!-- Two Flyway locations (design.md decision 5): the real migrations, applied exactly
+               as they would be in production, and a generation-only location whose
+               beforeMigrate__ callback creates the five roles as NOLOGIN, with no password, only
+               so GRANT statements in the real migrations have a role to name. Verified with a real
+               two-location run outside the repository tree (apply-progress.md task 1.1, S1.4).
+               Both locations are "filesystem:", never "classpath:": generate-sources runs before
+               process-resources copies src/main/resources into target/classes, so a
+               "classpath:db/migration" location would scan an empty or stale directory and Flyway
+               would silently apply nothing (confirmed with a real "No migrations found" run,
+               apply-progress.md task 1.7). Both paths are absolute, anchored on
+               ${project.basedir}: a relative "filesystem:" path resolves against the JVM's own
+               working directory, which stays wherever `mvn` was launched from across every module
+               in a reactor build, not this module's own basedir (also confirmed with a real
+               "Skipping filesystem location ... (not found)" run when building from apps/api with
+               "-pl app", task 1.7). -->
+          <flyway>
+            <locations>filesystem:${project.basedir}/src/main/resources/db/migration,filesystem:${project.basedir}/src/test/resources/db/codegen</locations>
+          </flyway>
+          <jooq>
+            <generator>
+              <database>
+                <name>org.jooq.meta.postgres.PostgresDatabase</name>
+                <inputSchema>public</inputSchema>
+                <excludes>flyway_schema_history</excludes>
+              </database>
+              <generate>
+                <!-- No Tables/Keys/Indexes umbrella classes: every reference to a table names its
+                     own generated type, which is what makes the table-ownership-by-module rule
+                     (task 3.2) verifiable at all (ADR-0021, decision 2, point 2). -->
+                <globalObjectReferences>false</globalObjectReferences>
+              </generate>
+              <target>
+                <!-- Outside com.confia on purpose (ADR-0021, decision D3): ArchUnit's and Spring
+                     Modulith's own "com.confia" import never reaches this package, so neither
+                     needs a per-case exception for generated code. Never committed: target/ is
+                     already git-ignored. -->
+                <packageName>confia.generated.jooq</packageName>
+                <directory>target/generated-sources/jooq</directory>
+              </target>
+            </generator>
+          </jooq>
+        </configuration>
       </plugin>
 
       <!-- Mutation adhesion (design.md decision 9): app opts in by declaring this plugin with its

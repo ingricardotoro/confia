@@ -35,7 +35,11 @@ rules:
       - Money arithmetic only through com.confia.kernel.Money; business money rules live in the
         domain package of the owning module; never double/float for money
     tdd: true
-    test_command: "./mvnw verify" # in apps/api, JDK 25
+    # in apps/api, JDK 25 — requires Docker since jooq-flyway-testcontainers-wiring PR A1: app's
+    # generate-sources phase generates jOOQ code from Flyway migrations against a temporary
+    # postgres:18-alpine container (ADR-0015 rule 2), so the build fails before compiling anything
+    # without Docker running. See apps/api/README.md.
+    test_command: "./mvnw verify"
   verify:
     test_command: "./mvnw verify" # add -Pmutation-report to include PIT
     build_command: "./mvnw verify"

@@ -30,6 +30,14 @@ jobs:
   backend:
     name: backend verify
     runs-on: ubuntu-latest
+    # Docker is a real build dependency since jooq-flyway-testcontainers-wiring PR A1, not only a
+    # test dependency: app's generate-sources phase generates jOOQ code against a temporary
+    # postgres:18-alpine container before anything compiles (ADR-0015 rule 2). ubuntu-latest ships
+    # Docker preinstalled, so no extra setup step is needed. Budget: the measured Testcontainers
+    # *IT.java suite is well under the 8-minute limit of docs/06-estrategia-de-testing.md (PR A1:
+    # 18.2s for DatabasePipelineIT, the suite's only container start; apps/api/README.md); this
+    # timeout covers the whole job, including dependency downloads and every other phase.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
