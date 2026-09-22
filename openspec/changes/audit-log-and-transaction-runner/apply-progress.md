@@ -24,3 +24,47 @@ to make this moot going forward by fixing `jqwik.database` explicitly.
 
 **No discrepancy to report for this task**: all four probes confirm the design as written, with no
 supression, no exception, and no deferral needed.
+
+## Task 1.2 — RED: `TransactionRunnerContextIT`
+
+Created `apps/api/app/src/test/java/com/confia/shared/security/TransactionRunnerContextIT.java`,
+extending the bare `PostgresIntegrationTest` (never `TransactionalPostgresIntegrationTest`: the
+class-level `@Transactional` variant would make `TransactionRunner`'s `TransactionTemplate`
+(default propagation `REQUIRED`) join the outer test transaction instead of opening a genuinely
+separate one, which would defeat the two-separate-transactions scenario). Institutions are seeded
+through a raw JDBC `Connection` with an explicit transaction, never through
+`withInstitutionContext` — that helper's own Javadoc (design.md decision 9, point 1) documents it
+only works inside a test transaction, and this class deliberately has none.
+
+Four test methods, covering the four scenarios of the "Contexto de sesión, nivel de aislamiento y
+reintento acotado" requirement that do not involve retry:
+
+- `contextIsSetBeforeTheFirstQueryOfTheUseCase`
+- `noContextSurvivesOnAReusedPoolConnection` (pins `spring.datasource.hikari.maximum-pool-size=1`
+  via a class `@DynamicPropertySource` so connection reuse is guaranteed, not hoped for, and
+  asserts `pg_backend_pid()` equality between the two transactions to prove it)
+- `defaultIsolationIsReadCommittedInTheRealTransaction`
+- `explicitSerializableIsAppliedInTheRealTransaction`
+
+**Order-sensitivity of the first scenario, verified structurally, not just asserted.**
+`organization_institution`'s row-level-security policy (V1 migration) denies by default: if the
+four `set_config` calls ran after the query instead of before it, the query returns zero rows
+rather than exactly institution A's row, so `containsExactly(institutionA)` fails. There is no way
+to make this test pass by writing the assertion loosely; the RLS deny-by-default behavior forces
+the ordering to be real.
+
+**RED, observed**: `./mvnw -B -pl app -am test-compile`, exit 1:
+
+```
+[ERROR] .../TransactionRunnerContextIT.java:[74,9] cannot find symbol
+[ERROR]   symbol:   class TransactionRunner
+[ERROR]   location: class com.confia.shared.security.TransactionRunnerContextIT
+... (repeated for every call site, plus:)
+[ERROR] .../TransactionRunnerContextIT.java:[128,73] cannot find symbol
+[ERROR]   symbol:   variable IsolationLevel
+[ERROR] .../TransactionRunnerContextIT.java:[143,20] cannot find symbol
+[ERROR]   symbol:   class SecurityContext
+```
+
+Fails exactly as task 1.2 predicts: no `TransactionRunner`, `IsolationLevel` or `SecurityContext`
+exist yet.

@@ -123,7 +123,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   propuesta, «Fuera de alcance» no aplica aquí (jqwik es dependencia de este corte, verificada
   ausente en `app` por `design.md` §2)
 
-- [ ] 1.2 **ROJO — contexto de sesión y aislamiento del componente transaccional.** Requiere Docker
+- [x] 1.2 **ROJO — contexto de sesión y aislamiento del componente transaccional.** Requiere Docker
   (Testcontainers, PostgreSQL real). Crear
   `apps/api/app/src/test/java/com/confia/shared/security/TransactionRunnerContextIT.java`: afirma que
   los cuatro `set_config('app.actor_id', ..., true)`, `set_config('app.actor_kind', ..., true)`,
