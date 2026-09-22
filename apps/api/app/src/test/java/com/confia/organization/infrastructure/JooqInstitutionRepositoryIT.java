@@ -82,6 +82,28 @@ class JooqInstitutionRepositoryIT extends TransactionalPostgresIntegrationTest {
         assertThat(found.orElseThrow().tradeName()).isNull();
     }
 
+    /**
+     * The inactive branch of the adapter's row-to-aggregate conversion, which the scenario
+     * "Reconstrucción fiel de cada atributo contra la base real" covers by asking for <em>every</em>
+     * attribute. Without this test the branch is measurably unexercised: JaCoCo reported
+     * {@code BRANCH_MISSED=1} for {@link JooqInstitutionRepository}, its only uncovered branch and
+     * the only one in the single production class this change adds. {@code Institution.create}
+     * always returns an active aggregate, so a stored {@code is_active = false} only survives the
+     * round trip if the adapter deactivates it explicitly.
+     */
+    @Test
+    void reconstructsAnInactiveRowAsAnInactiveInstitution() {
+        InstitutionId id = new InstitutionId(UUID.randomUUID());
+        seedRow(id, "Instituto Cerrado", null, "08011999444001", "Dirección", "HNL", "es-HN",
+                "America/Tegucigalpa");
+        deactivateRow(id);
+
+        Optional<Institution> found = findByIdWithContext(id, id);
+
+        assertThat(found).isPresent();
+        assertThat(found.orElseThrow().isActive()).isFalse();
+    }
+
     @Test
     void returnsAnEmptyOptionalForAnUnknownIdentifierWithoutThrowing() {
         InstitutionId unknownId = new InstitutionId(UUID.randomUUID());
@@ -190,6 +212,17 @@ class JooqInstitutionRepositoryIT extends TransactionalPostgresIntegrationTest {
         AtomicReference<Optional<Institution>> result = new AtomicReference<>();
         withInstitutionContext(contextId, () -> result.set(repository().findById(queryId)));
         return result.get();
+    }
+
+    /**
+     * Flips one seeded row to {@code is_active = false} by direct SQL, under that institution's own
+     * session context: with {@code FORCE ROW LEVEL SECURITY} the policy constrains the owner's
+     * {@code UPDATE} too, not only its {@code INSERT}. The adapter is read-only, so a test that
+     * needs an inactive row has to write it itself.
+     */
+    private void deactivateRow(InstitutionId id) {
+        withInstitutionContext(id, () -> dsl.execute(
+                "update organization_institution set is_active = false where id = ?", id.value()));
     }
 
     /**

@@ -626,11 +626,18 @@ public abstract class PostgresIntegrationTest {
             // PostgreSQL 18, the same major version as every other environment (ADR-0015).
             new PostgreSQLContainer<>(DockerImageName.parse("postgres:18-alpine"))
                     .withDatabaseName("confia_test")
-                    .withUsername("confia_owner")
+                    // NEVER name this user confia_owner. The official image makes whatever
+                    // POSTGRES_USER it receives a real superuser, with BYPASSRLS, and a superuser
+                    // silently bypasses FORCE ROW LEVEL SECURITY: every isolation test would pass
+                    // for the wrong reason. The five real, non-superuser roles come from the
+                    // test-only init script.
+                    .withUsername("postgres")
                     .withPassword("test-only-not-a-secret")
                     .withCommand("postgres", "-c", "fsync=off", "-c", "synchronous_commit=off",
                             "-c", "max_connections=200")
-                    .withTmpFs(Map.of("/var/lib/postgresql/data", "rw,noexec,nosuid,size=1024m"));
+                    // /var/lib/postgresql, not .../data: postgres:18-alpine refuses to start with
+                    // a mount at the pre-18 path (docker-library/postgres#1259).
+                    .withTmpFs(Map.of("/var/lib/postgresql", "rw,size=1024m"));
 
     static {
         POSTGRES.start();
@@ -640,9 +647,11 @@ public abstract class PostgresIntegrationTest {
     static void datasource(DynamicPropertyRegistry registry) {
         // Flyway migrates as the schema owner. In deployed processes only APP_PROFILE=migrate
         // runs Flyway (docs/05-infraestructura-y-despliegue.md, section 9).
+        // Explicitly confia_owner, never POSTGRES::getUsername: the container's bootstrap
+        // user is a superuser and must not own the schema these tests exercise.
         registry.add("spring.flyway.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.flyway.user", POSTGRES::getUsername);
-        registry.add("spring.flyway.password", POSTGRES::getPassword);
+        registry.add("spring.flyway.user", () -> "confia_owner");
+        registry.add("spring.flyway.password", () -> "test-only-not-a-secret");
 
         // The application connects with its least privilege role, never as the owner.
         // Application roles are created by a test only init script, never by a Flyway
@@ -653,6 +662,15 @@ public abstract class PostgresIntegrationTest {
     }
 }
 ```
+
+> **Por qué el usuario de arranque del contenedor importa.** Este ejemplo llevaba
+> `.withUsername("confia_owner")` hasta que el cambio 5 de F0 lo corrigió. La imagen oficial de
+> PostgreSQL convierte en **superusuario con `BYPASSRLS`** a cualquier usuario que reciba como
+> `POSTGRES_USER`, y un superusuario omite en silencio `FORCE ROW LEVEL SECURITY`. Con aquel
+> ejemplo, toda prueba de aislamiento entre instituciones habría pasado sin ejercitar la política:
+> verde por la razón equivocada, que es peor que rojo. El arranque ocurre como `postgres`, los
+> cinco roles reales los crea un script de inicialización exclusivo de pruebas, y la aplicación
+> conecta con `confia_admin_app`, que no es superusuario ni tiene `BYPASSRLS`.
 
 Base de datos limpia por prueba (sección 6): las clases que no prueban concurrencia ni el
 comportamiento de la propia transacción se anotan con `@Transactional` de Spring en la prueba, que
