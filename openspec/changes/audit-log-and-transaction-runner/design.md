@@ -1296,6 +1296,26 @@ de la base de la sonda: `en_US.utf8`.
 | **S2** | **PASA** | `numeric::text` nunca usó notación exponencial: `1e30` sale como `1000000000000000000000000000000` y `0.00000000001` sin exponente, incluso viniendo de `jsonb`. `trim_scale` retira ceros finales (`1.2300` → `1.23`, `100.000` → `100`), también sobre valores extraídos de `jsonb` |
 | **S4** | **PASA de forma concluyente** | Rama de inserción y rama de actualización devuelven 1, 2 y 3 sin huecos. En concurrencia real: la sesión 1 obtuvo el id 4 dentro de una transacción abierta y **la sesión 2 quedó bloqueada 4 407 ms** hasta la confirmación, tras lo cual obtuvo el id 5. El `ON CONFLICT ... DO UPDATE ... RETURNING` **sí** toma el bloqueo por institución. No se conmuta a `pg_advisory_xact_lock` |
 
+**S5, ejecutada por el orquestador el 2026-09-22, antes del corte B2b: PASA, y demuestra más de lo
+que pedía su criterio de éxito.** Montada contra `postgres:18-alpine` con los roles reales
+(`confia_owner` propietario, `confia_admin_app` invocador, ninguno `SUPERUSER` ni `BYPASSRLS`), una
+tabla `chain_head` con `ENABLE` y `FORCE ROW LEVEL SECURITY`, y un disparador `SECURITY DEFINER`
+propiedad de `confia_owner` con `SET search_path`:
+
+1. **El disparador sí escribe la cabecera sin que el invocador tenga privilegios.** Se verificó
+   primero que `confia_admin_app` no tiene `SELECT`, `INSERT`, `UPDATE` ni `DELETE` sobre
+   `chain_head` —literalmente «NINGUNO»— y aun así sus dos inserciones recibieron los
+   identificadores 1 y 2. No hace falta conceder privilegios sobre la cabecera al rol de aplicación.
+2. **La política sigue aplicándose al propietario, que es lo que importa de verdad.** Insertar una
+   fila cuya institución **no** coincide con el contexto de sesión fue rechazado con
+   `new row violates row-level security policy for table "chain_head"`, lanzado desde dentro del
+   propio disparador. `FORCE ROW LEVEL SECURITY` ata también al propietario, así que
+   `SECURITY DEFINER` **no** abre una puerta trasera para escribir la cadena de otra institución.
+   El fallo además es ruidoso, no silencioso.
+
+No se necesita el respaldo previsto en el diseño (la cabecera sin seguridad a nivel de fila, con el
+aislamiento garantizado solo por el disparador).
+
 **Hallazgo adicional sobre el orden de claves, que refuerza la decisión del diseño.** Con una muestra
 deliberadamente discriminante (`a`, `A`, `_b`, `B`), `ORDER BY k` y
 `ORDER BY convert_to(k,'UTF8')` devolvieron **el mismo resultado**, `A,B,_b,a`, que es exactamente el

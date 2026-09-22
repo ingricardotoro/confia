@@ -659,3 +659,240 @@ reason alone — matching the same convention PR B1's own task 1.12 already esta
 file, whose checkbox is also unchecked pending a push this session did not perform either. Every
 other task in this cut (2.1-2.6) is marked complete, with the local, real `./mvnw -B verify`
 evidence above standing in place of the CI confirmation until the owner authorizes the push.
+
+---
+
+# PR B2b — hash chaining in the engine
+
+Scope: tasks 3.1-3.7. Branch `change/audit-log-and-transaction-runner-chain` (current branch), base
+PR B2a (`change/audit-log-and-transaction-runner-audit-table`, tip `e6b409c` — confirmed the exact
+merge-base of this branch and HEAD before measuring task 3.6's diff).
+
+## Task 3.1 — Probe S5 (already run by the orchestrator, not repeated here)
+
+**Not re-executed in this section**, per the orchestrator's own explicit instruction: probe S5 ran
+on 2026-09-22, before this cut started, against the real PR B2a schema shape, and its full result is
+recorded in `design.md` §10 (committed `e9a0dff`, "docs(sdd): run probe S5 before slice B2b"), not
+duplicated here. Summary of that already-recorded result, for this section's own completeness:
+
+- **PASS, and demonstrating more than its own success criterion asked.** A temporary
+  `SECURITY DEFINER` trigger, owned by `confia_owner`, wrote a `chain_head` table with `ENABLE`/
+  `FORCE ROW LEVEL SECURITY` active, invoked by `confia_admin_app` with **no** privilege at all on
+  that table (verified `SELECT`/`INSERT`/`UPDATE`/`DELETE` all absent) — two inserts still received
+  ids 1 and 2. **No privilege grant on the chain-state table is needed for the application role**,
+  confirming `V3`'s own design (task 3.3 below): no `GRANT` on `shared_audit_chain_head` for
+  `confia_admin_app` anywhere in this migration.
+- **The policy still binds the owner.** Inserting a row for an institution that does not match the
+  session context was rejected from inside the trigger itself with `new row violates row-level
+  security policy`. `FORCE ROW LEVEL SECURITY` is not defeated by `SECURITY DEFINER`. The
+  `pg_advisory_xact_lock` fallback design.md decision 4 kept in reserve is **not needed** and was not
+  used anywhere in this cut's `V3` migration.
+
+This section's task list ("PR B2b" tasks) marks task 3.1 complete on the strength of that
+already-recorded, already-passed probe — no separate `apply-progress.md` entry was written for it at
+the time because the probe ran as a design-phase gate before this apply session started, and
+`design.md` §10 is its permanent record.
+
+## Task 3.2 — RED: `AuditChainTriggerIT`
+
+Created `apps/api/app/src/test/java/com/confia/shared/audit/AuditChainTriggerIT.java`, extending
+`CommittingPostgresIntegrationTest`, with five methods covering every scenario of the two
+`audit-trail` requirements this cut closes ("Cadena de hash por institución con registro génesis" and
+"El encadenamiento se calcula en el disparador del motor, no en la aplicación"):
+
+- `firstRowOfAnInstitutionIsItsGenesisRecord` — a fresh institution's first row gets `prev_hash` of
+  exactly 32 zero bytes.
+- `secondRowChainsWithThePreviousRowOfTheSameInstitution` — the second row's `prev_hash` equals the
+  first row's `row_hash`, exactly (not "is non-null", the orchestrator's own explicit demand).
+- `twoInstitutionsMaintainIndependentChains` — institution B's genesis is unaffected by institution
+  A's chain, and institution A's second row chains only against A's own first row.
+- `theTriggerOverwritesWhateverTheCallerPassedForIdPrevHashAndRowHash` — inserts with deliberately
+  false `id` (`999`), `prev_hash` and `row_hash`, and asserts all three are replaced by the trigger's
+  own computed values, not merely "some value present" (the orchestrator's own explicit demand: "Si
+  solo comprueba que hay algún valor, no prueba nada").
+- `aDirectSqlInsertOutsideAnyUseCaseIsAlsoChained` — inserts through a raw JDBC
+  `PreparedStatement` on a connection opened directly via `SharedPostgresContainer.connectionAs
+  ("confia_admin_app")`, with no `TransactionRunner`, no jOOQ `DSLContext`, and no `dsl.execute` call
+  anywhere in the path — the closest this test suite can get to "no Java use case involved" while
+  still respecting row-level security (the session context is still set on the same connection,
+  since the policy demands it regardless of who inserts) — and confirms the trigger still assigns a
+  consecutive `id` and a real `prev_hash`.
+
+**RED, observed**: `./mvnw -B -pl app -am test -Dtest=AuditChainTriggerIT
+-Dsurefire.failIfNoSpecifiedTests=false`, exit 1, `Tests run: 5, Failures: 1, Errors: 4`:
+
+```
+AuditChainTriggerIT.firstRowOfAnInstitutionIsItsGenesisRecord: ERROR
+  ERROR: null value in column "id" of relation "shared_audit_log" violates not-null constraint
+AuditChainTriggerIT.secondRowChainsWithThePreviousRowOfTheSameInstitution: ERROR
+  ERROR: null value in column "id" of relation "shared_audit_log" violates not-null constraint
+AuditChainTriggerIT.twoInstitutionsMaintainIndependentChains: ERROR
+  ERROR: null value in column "id" of relation "shared_audit_log" violates not-null constraint
+AuditChainTriggerIT.aDirectSqlInsertOutsideAnyUseCaseIsAlsoChained: ERROR
+  ERROR: null value in column "id" of relation "shared_audit_log" violates not-null constraint
+AuditChainTriggerIT.theTriggerOverwritesWhateverTheCallerPassedForIdPrevHashAndRowHash: FAILURE
+  expected: 1L
+   but was: 999L
+```
+
+All five fail for exactly the reason task 3.2 predicts: the four tests that omit `id`/`prev_hash`/
+`row_hash` fail with the real not-null constraint from `V2`'s schema (no trigger populates them yet);
+the "overwrites" test does not error at all — it stores the caller's fake `999` verbatim, because
+there is genuinely no trigger to overwrite it, which is the exact failure this test exists to force
+before `V3` exists.
+
+## Task 3.3 — GREEN: `V3__chain_shared_audit_log.sql`
+
+Created `apps/api/app/src/main/resources/db/migration/V3__chain_shared_audit_log.sql` with the four
+objects design.md decisions 4, 5 and 6 name:
+
+- `shared_audit_canonical_json(jsonb) → text` — recursive `plpgsql`, `STABLE`, invoker rights.
+  Object keys ordered by `convert_to(k, 'UTF8')`, **never `ORDER BY k`** — the exact point sonda S5's
+  additional finding (design.md §10) warned against relying on in a test, honored here in production
+  code, not only in a test.
+- `shared_audit_row_preimage(...) → bytea` — the 18-field preimage of design.md §6.2, in the fixed
+  order written there (the 15 of `docs/03-seguridad.md` §12.1 plus `actor_label`, `user_agent` and
+  `trace_id`, per open question 1 of `design.md` §15, resolved 2026-09-21). `occurred_at` encoded as
+  microseconds since the Unix epoch via `EXTRACT(EPOCH FROM (... - TIMESTAMPTZ '1970-01-01
+  00:00:00+00')) * 1000000`, never `::text` (which would depend on session `TimeZone`/`DateStyle`).
+- `shared_audit_row_hash(prev_hash, ...) → bytea` — `sha256(shared_audit_row_preimage(...))`, both
+  `STABLE` with invoker rights, so the future jqwik cross-check (PR B3a) can call exactly this
+  function directly, once per generated input, without ever inserting a row.
+- `shared_audit_log_chain()` — the `BEFORE INSERT FOR EACH ROW` trigger, `SECURITY DEFINER` with
+  `SET search_path = pg_catalog, public`, implicitly owned by `confia_owner` (the role this very
+  migration runs as via Flyway — no separate `ALTER FUNCTION ... OWNER TO` statement was needed).
+  Assigns `NEW.id` with the exact `INSERT ... ON CONFLICT DO UPDATE ... RETURNING next_id - 1`
+  statement of design.md decision 4, reads the previous row's `row_hash` for the same institution
+  (safe only because the statement above already holds that institution's row lock), and always
+  overwrites `NEW.prev_hash`/`NEW.row_hash`, ignoring whatever the caller supplied.
+
+**One small implementation detail beyond the four named objects, reported for transparency, not a
+deviation from the design's intent.** A fifth, private helper function,
+`shared_audit_field_bytes(text) → bytea`, factors out `F(v)` (design.md §6.2: `0x00` for an absent
+field, else `0x01 || int8send(byte length) || UTF-8 bytes`) into one place, called eighteen times by
+`shared_audit_row_preimage` instead of writing the same three-line encoding eighteen times inline.
+Design.md decision 5 names exactly three SQL objects ("tres objetos de base de datos"); this is a
+fourth, but it is not a fourth *named contract* — nothing outside `shared_audit_row_preimage` calls
+it, it has no independent behavior of its own beyond the one encoding rule already specified, and
+inlining it eighteen times would have made the eighteen field lines harder to audit against
+design.md's own field-order table, not easier. Flagging this here rather than silently going beyond
+"tres objetos" without a note.
+
+**GREEN, observed**: `./mvnw -B -pl app -am test -Dtest=AuditChainTriggerIT
+-Dsurefire.failIfNoSpecifiedTests=false`:
+
+```
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 23.50 s -- in com.confia.shared.audit.AuditChainTriggerIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+
+All five scenarios pass, including the exact-value assertions on `prev_hash` chaining and the
+overwrite assertions (`stored.id()` is `1L`, not the fake `999L`; `stored.prevHash()` is the 32
+zero-byte genesis value, not the fake bytes; `stored.rowHash()` differs from the fake bytes).
+
+## Task 3.4 — ROJO/VERDE: `AuditChainConcurrencyIT`
+
+Created `apps/api/app/src/test/java/com/confia/shared/audit/AuditChainConcurrencyIT.java`, extending
+`CommittingPostgresIntegrationTest`. Two independent `TransactionRunner` instances (built directly
+over `dataSource()`/`transactionManager()`, the same pattern
+`TransactionRunnerRetryIT` already established for genuine two-connection concurrency), each running
+on its own thread, synchronized with a `CyclicBarrier` awaited as the very first statement inside the
+transactional callback — after the transaction has genuinely opened, before either inserts — so both
+threads are provably racing for the same institution's row lock, not merely sequential code that
+happens to pass. Default `READ COMMITTED` isolation is used deliberately, **not**
+`SERIALIZABLE`: design.md §7.2 and sonda S4 (design.md §10, 4407 ms of real measured blocking) both
+establish that `shared_audit_chain_head`'s row lock, not a `SERIALIZABLE` predicate conflict, is what
+serializes the two writers here — an ordinary blocking wait, not a retryable failure.
+
+No RED was captured as a separate step for this task, per the task's own text ("Falla si el corte
+anterior no toma el bloqueo por institución (ya verificado por la sonda S4)") — the mechanism this
+test exercises was already verified correct by probe S4 before `V3` was even written, so this task is
+confirmation, not discovery, exactly like task 2.4's own ROJO/VERDE combined into one VERDE.
+
+**GREEN, observed, three separate runs (checked for flakiness in a genuine concurrency scenario, not
+assumed stable from one green run)**:
+
+```
+Run 1: Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 23.66 s
+Run 2: Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 23.73 s
+Run 3: Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 22.39 s
+```
+
+All three green, no changes to production code beyond `V3` itself (task 3.3) — confirming the task's
+own prediction that no additional fix would be needed unless S4 or S5 had required the
+`pg_advisory_xact_lock` fallback, which neither did.
+
+## Task 3.5 — Measure the `*IT.java` suite time
+
+Measured, not estimated, with a dedicated clean run (`app/target`, `kernel/target` and the reactor
+`target` removed first), per-line timestamped exactly like task 1.10's own methodology, to isolate
+the real Failsafe `integration-test` → `verify` boundary for the `confia-api` module precisely:
+
+```
+1790081001.283842600 [INFO] --- failsafe:3.6.0:integration-test (default) @ confia-api ---
+1790081037.976492200 [INFO] --- failsafe:3.6.0:verify (default) @ confia-api ---
+```
+
+**Failsafe `integration-test` phase for `confia-api`: 36.6926 seconds**, with all `*IT.java` classes
+included, `AuditChainTriggerIT` and `AuditChainConcurrencyIT` among them — **46 integration test
+methods total** (40 from PR B2a plus this cut's 5 + 1), 0 failures. Reactor: `confia-api` module
+`SUCCESS [01:59 min]`, total reactor time `02:19 min`. Both far inside the 8-minute (480 s) budget —
+the Failsafe phase itself uses about 7.6% of it, including `AuditChainConcurrencyIT`'s real
+two-connection, `CyclicBarrier`-synchronized row-lock contention scenario. No `0.00` coverage
+artifact this run (single clean run sufficed, same as PR B2a's own task 2.7).
+
+## Task 3.6 — Measure the real diff of PR B2b
+
+Confirmed first that `change/audit-log-and-transaction-runner-audit-table` (tip `e6b409c`) is exactly
+`git merge-base change/audit-log-and-transaction-runner-audit-table HEAD` — the correct base for this
+measurement, not merely assumed.
+
+`git diff --numstat change/audit-log-and-transaction-runner-audit-table...HEAD -- .
+':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`:
+
+| File | + | − |
+|---|---|---|
+| `V3__chain_shared_audit_log.sql` (new) | 238 | 0 |
+| `AuditChainTriggerIT.java` (new) | 179 | 0 |
+| `AuditChainConcurrencyIT.java` (new) | 126 | 0 |
+
+**Total: 543 additions + 0 deletions = 543 authored lines.** Within the 800-line-per-pull-request
+budget (`docs/15-flujo-de-trabajo-git.md` §3) and within `design.md` §12's own forecast for B2b
+(390-640) — comfortably inside the range, not near either edge. **No stop needed; apply continues
+into task 3.7 without consulting the owner.**
+
+## Task 3.7 — Final verification of PR B2b
+
+The clean-checkout `./mvnw -B verify` run captured for task 3.5's measurement (`app/target`,
+`kernel/target` and the reactor `target` all removed beforehand, `JAVA_HOME` on JDK 25,
+`MAVEN_OPTS` on the `Windows-ROOT` trust store) is this task's own verification evidence — the same
+single clean run serves both, exactly as PR B2a's own task 2.7 reused task 2.6's diff-measurement
+context rather than running an unnecessary second clean build:
+
+```
+CONFIA Kernel: (part of the 46 tests run, reactor SUCCESS [ 16.860 s])
+CONFIA API (Surefire + Failsafe combined reactor report): Tests run: 46, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+Total time: 02:19 min
+```
+
+Confirmed individually within that run: `AuditChainTriggerIT` (5/5) and `AuditChainConcurrencyIT`
+(1/1) both green — the genesis record, the two-institution independence, the caller-value overwrite,
+the direct-SQL-insert chaining, and the absence of a fork under real two-connection concurrency, all
+exercised. The full suite inherited from PR B1/B2a (`TransactionRunnerContextIT`,
+`TransactionRunnerRetryIT`, `RolePrivilegeMatrixIT`, `AuditLogAppendOnlyIT`, `AuditLogRowSecurityIT`,
+`CommittingBaseContractIT`, `MultiTenantSchemaIT`, `DatabasePipelineIT`,
+`JooqInstitutionRepositoryIT`) remained green, unaffected by this cut. No coverage-gate failure: "All
+coverage checks have been met" — the `com.confia.shared.audit` `PACKAGE` JaCoCo rule (task 1.9) now
+has real classes to measure for the first time (this cut's own SQL functions are not JaCoCo-tracked,
+being PL/pgSQL, but the package still holds no Java class yet either — that is PR B3a's own first
+delivery — so the rule continues to pass vacuously, exactly as task 1.9 already documented it would
+until then).
+
+**Not performed, by the same explicit orchestrator instruction as PR B1's task 1.12 and PR B2a's task
+2.7 ("No empujes ni abras pull requests")**: pushing `change/audit-log-and-transaction-runner-chain`
+and confirming the `backend` CI job. Task 3.7's checkbox in `tasks.md` is left **unchecked** for this
+reason alone. Every other task in this cut (3.1-3.6) is marked complete, with the local, real
+`./mvnw -B verify` evidence above standing in place of the CI confirmation until the owner authorizes
+the push.

@@ -394,7 +394,7 @@ del documento): sin esa clase, la migración de este corte rompe la puerta de pr
 
 Rama `change/audit-log-and-transaction-runner-chain`, base PR B2a.
 
-- [ ] 3.1 **Ejecutar la sonda S5 (bloqueante, `design.md` §10 y §11 paso 13; S1, S2, S4 y S6 ya
+- [x] 3.1 **Ejecutar la sonda S5 (bloqueante, `design.md` §10 y §11 paso 13; S1, S2, S4 y S6 ya
   pasaron el 2026-09-21 y no se repiten).** Requiere Docker. Contra el esquema de PR B2a, crear
   temporalmente un disparador `SECURITY DEFINER` de prueba, propiedad de `confia_owner`, que escriba
   `shared_audit_chain_head` con `FORCE ROW LEVEL SECURITY` activa, e invocarlo conectado como
@@ -405,7 +405,7 @@ Rama `change/audit-log-and-transaction-runner-chain`, base PR B2a.
   `design.md` decisión 4 ya deja diseñado (`pg_advisory_xact_lock`) y reportar la discrepancia. —
   `design.md` §10 (sonda S5) y §11, paso 13
 
-- [ ] 3.2 **ROJO — encadenamiento por hash.** Requiere Docker. Crear
+- [x] 3.2 **ROJO — encadenamiento por hash.** Requiere Docker. Crear
   `.../test/java/com/confia/shared/audit/AuditChainTriggerIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`: primera fila de una institución nace con `prev_hash` de 32
   bytes de ceros (registro génesis); segunda fila encadena con el `row_hash` de la anterior de la
@@ -418,7 +418,7 @@ Rama `change/audit-log-and-transaction-runner-chain`, base PR B2a.
   cadenas independientes») y «El encadenamiento se calcula en el disparador del motor, no en la
   aplicación» (ambos escenarios)
 
-- [ ] 3.3 **VERDE — `V3__chain_shared_audit_log.sql`.** Requiere Docker. Crear
+- [x] 3.3 **VERDE — `V3__chain_shared_audit_log.sql`.** Requiere Docker. Crear
   `apps/api/app/src/main/resources/db/migration/V3__chain_shared_audit_log.sql` con
   `shared_audit_canonical_json(jsonb) → text` (STABLE, invocador; JSON canónico recursivo de
   `design.md` §6.4, claves ordenadas por `convert_to(k, 'UTF8')`, nunca `ORDER BY k`),
@@ -433,7 +433,7 @@ Rama `change/audit-log-and-transaction-runner-chain`, base PR B2a.
   lo que el llamador haya pasado). Ejecutar `AuditChainTriggerIT`: verde. — `design.md`, decisiones
   4, 5 y 6 completas
 
-- [ ] 3.4 **ROJO/VERDE — concurrencia del disparador.** Requiere Docker. ROJO: crear
+- [x] 3.4 **ROJO/VERDE — concurrencia del disparador.** Requiere Docker. ROJO: crear
   `.../test/java/com/confia/shared/audit/AuditChainConcurrencyIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`: dos hilos, cada uno con su propio `TransactionRunner` y su
   propia conexión, sincronizados con `CyclicBarrier` justo después de abrir la transacción y antes de
@@ -446,12 +446,12 @@ Rama `change/audit-log-and-transaction-runner-chain`, base PR B2a.
   «Inserciones concurrentes de dos transacciones confirmadas encadenan sin condición de carrera»);
   `design.md` §7.2 («Concurrencia del disparador»)
 
-- [ ] 3.5 **Medir el tiempo de la suite `*IT.java`.** Requiere Docker. Ejecutar `./mvnw -B verify`
+- [x] 3.5 **Medir el tiempo de la suite `*IT.java`.** Requiere Docker. Ejecutar `./mvnw -B verify`
   completo en `apps/api` y medir de nuevo el tiempo de la fase `integration-test`, con
   `AuditChainTriggerIT` y `AuditChainConcurrencyIT` incluidas. Registrar el tiempo medido en
   `apply-progress.md`. — `design.md` §11, paso 17; §13
 
-- [ ] 3.6 **Medir el diff real de PR B2b** con
+- [x] 3.6 **Medir el diff real de PR B2b** con
   `git diff --numstat <base-de-PR-B2a>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar; el pronóstico de `design.md` §12 (390-640) no
   anticipa exceso, pero si lo hubiera, detener la aplicación y consultar al propietario antes de
