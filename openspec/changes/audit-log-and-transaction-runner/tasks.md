@@ -472,7 +472,7 @@ Rama `change/audit-log-and-transaction-runner-chain`, base PR B2a.
 Rama `change/audit-log-and-transaction-runner-canonical-serializer`, base PR B2b. `design.md` §12
 planifica B3 dividido desde el principio, porque su rango medio ya supera el presupuesto de 800.
 
-- [ ] 4.1 **Ejecutar la sonda S8 (bloqueante, `design.md` §10 y §11 paso 18).** Requiere Docker
+- [x] 4.1 **Ejecutar la sonda S8 (bloqueante, `design.md` §10 y §11 paso 18).** Requiere Docker
   (llamada JDBC directa a `shared_audit_row_hash` sobre el contenedor real, sin `@SpringBootTest`).
   Confirmar si una clase `@Property` de jqwik corre bajo Failsafe en este reactor y si jqwik ignora
   las extensiones de JUnit Jupiter (es decir, no puede extender una clase anotada
