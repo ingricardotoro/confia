@@ -1395,4 +1395,33 @@ support class `AuditLogSuperuserTamper.java` (shared by the not-yet-written
 
 Fails exactly as task 5.2 predicts: none of `AuditChainVerifier`, `AuditChainVerification`,
 `DefaultAuditChainVerifier`, `JooqAuditLogReader` or the `com.confia.shared.infrastructure` package
-exist yet. Committed as `d00c17a`'s successor (see task 5.3's commit below for the compiled state).
+exist yet. Committed as `7a080ea`.
+
+## Task 5.3 — VERDE: port, adapter and verifier
+
+Created `AuditRowSnapshot.java` (JDK types only), `AuditLogReader.java` (port),
+`com.confia.shared.infrastructure.JooqAuditLogReader.java` (the single jOOQ adapter, module `shared`
+so its generated-table dependency on `SharedAuditLog`/`SharedAuditLogRecord` satisfies R2's `Shared`
+prefix) plus its `package-info.java`; `AuditChainVerifier.java`, `AuditChainVerification.java`
+(`sealed`, `Empty`/`Intact`/`Diverged`, four-cause `Divergence` enum exactly matching design.md
+decision 11's contract) and `DefaultAuditChainVerifier.java` (walk with `running` advancing on the
+*stored* `row_hash`, stops at the first divergence, distinguishes `MISSING_GENESIS` /
+`GENESIS_PREV_HASH_MISMATCH` / `PREV_HASH_MISMATCH` / `ROW_HASH_MISMATCH`); `package-info.java` for
+`com.confia.shared.audit`.
+
+**GREEN, observed, first attempt, no rework needed**:
+`./mvnw -B -pl app -am test -Dtest=AuditChainVerifierIT -Dsurefire.failIfNoSpecifiedTests=false`:
+
+```
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 28.96 s -- in com.confia.shared.audit.AuditChainVerifierIT
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+
+Six tests: the three plain `@Test` methods plus the three-valued `@ParameterizedTest`
+(`actor_label`/`user_agent`/`trace_id`). Confirms the verifier reports `Intact` on a real,
+untouched chain; identifies the exact `(institution_id, id)` of a row altered directly with
+`SUPERUSER` and `session_replication_role = 'replica'` (S3), without recalculation; never sees a
+manipulation confined to a different institution; and detects a divergence from altering *only*
+`actor_label`, `user_agent` or `trace_id` — the 27th scenario the reconciliation note above
+documents.
