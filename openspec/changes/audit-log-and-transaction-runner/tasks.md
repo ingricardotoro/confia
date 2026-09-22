@@ -574,7 +574,38 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
 
 ---
 
-## PR B3b — corte B3 (parte 2): verificador de cadena y pruebas de manipulación
+## PR B3b
+
+> **Dividido en B3b-i y B3b-ii por el orquestador el 2026-09-22**, bajo la estrategia `auto`. La
+> medicion final dio **1 122 lineas**, muy por encima del maximo de ochocientas de `docs/15` seccion
+> 3 y tambien del pronostico de `design.md` seccion 12 (400-660). La aplicacion se detuvo sin decidir
+> el corte.
+>
+> Puntos candidatos medidos por el orquestador:
+>
+> | Corte tras | primero | segundo |
+> |---|---|---|
+> | el verificador (`2677af6`) | 549 | 575 |
+> | **la prueba de cobertura (`07c6cdf`)** | **756** | **366** |
+> | el limite conocido (`c2e17e1`) | 921 | 201 |
+>
+> Se eligio **tras la prueba de cobertura**. El corte en `2677af6` esta mas equilibrado, pero es
+> exactamente el error que el corte B3a ya nos costo: en ese punto `com.confia.shared.audit` esta por
+> debajo del 95 por ciento y la construccion **falla su propia puerta**, porque ni el limite conocido
+> ni los inventarios tocan las ramas que faltan. `07c6cdf` es el unico punto de la historia real
+> donde la primera mitad pasa sola.
+>
+> - **PR B3b-i**, rama `change/audit-log-and-transaction-runner-verifier-core`, base PR B3a-ii:
+>   tareas 5.1 a 5.3 mas la prueba de cobertura. **756 lineas.** Verificado solo: `BUILD SUCCESS`.
+>   **Ya satisface el criterio de salida 3 de F0 de extremo a extremo.**
+> - **PR B3b-ii**, rama `change/audit-log-and-transaction-runner-verifier`, base PR B3b-i: tareas
+>   5.4 a 5.7, el limite conocido y los dos inventarios. **366 lineas.** Verificado solo:
+>   `BUILD SUCCESS` con puerta de mutacion.
+>
+> La medicion de 1 122 que aparece mas abajo en la tarea 5.6 corresponde al corte sin dividir y se
+> conserva como registro historico.
+
+ — corte B3 (parte 2): verificador de cadena y pruebas de manipulación
 
 Rama `change/audit-log-and-transaction-runner-verifier`, base PR B3a. Cierra el criterio de salida 3
 de F0.
