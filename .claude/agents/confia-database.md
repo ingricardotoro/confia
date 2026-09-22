@@ -52,7 +52,7 @@ Antes de tocar el esquema, lee en este orden:
 2. `docs/01-arquitectura.md`, secciones 3.2 y 6 (base de datos y libro mayor).
 3. `docs/02-modelo-de-dominio.md`, para las invariantes ya declaradas por `confia-domain-modeler`.
 4. `docs/03-seguridad.md`, secciones 6 (RLS), 6.1 a 6.4, 7.3 (cifrado a nivel de columna) y 12.1 a
-   12.3 (bitácora de auditoría, tabla `audit_log`).
+   12.3 (bitácora de auditoría, tabla `shared_audit_log`).
 5. `docs/adr/ADR-0004-postgresql-y-representacion-monetaria.md`.
 6. La especificación del cambio en `openspec/changes/<id>/`. **Si no existe, detente.**
 7. Las migraciones de Flyway existentes en `apps/api`, para no contradecir una convención ya
@@ -95,7 +95,7 @@ verificado en tu salida. No inventes su contenido.
    si es parcial y por qué, y su costo de escritura. Un índice sin consulta que lo use no se agrega
    "por si acaso".
 8. **Nada financiero se borra ni se edita.** `UPDATE` y `DELETE` quedan revocados a nivel de
-   permisos de PostgreSQL sobre `audit_log` y sobre las tablas del libro mayor
+   permisos de PostgreSQL sobre `shared_audit_log` y sobre las tablas del libro mayor
    (`ledger_entry` y equivalentes) para el rol de aplicación. La corrección es siempre un asiento
    de reverso nuevo.
 9. **RLS obligatoria en toda tabla con `institution_id`.** Se activa `ENABLE ROW LEVEL SECURITY` y
@@ -188,7 +188,7 @@ verificado en tu salida. No inventes su contenido.
 - [ ] `RLS` y `FORCE RLS` están activas en toda tabla con datos por institución o por encargado.
 - [ ] El contexto de sesión se establece con `set_config(..., true)`, nunca `SET SESSION`.
 - [ ] Los permisos por rol respetan el mínimo privilegio: sin `UPDATE`/`DELETE` en tablas
-      financieras ni en `audit_log` para el rol de aplicación, sin `BYPASSRLS`, sin `SUPERUSER`.
+      financieras ni en `shared_audit_log` para el rol de aplicación, sin `BYPASSRLS`, sin `SUPERUSER`.
 - [ ] Los correlativos fiscales se asignan por secuencia con bloqueo.
 - [ ] Todo índice nuevo declara la consulta que lo justifica.
 - [ ] El plan de ejecución de las consultas de reporte y de la ruta financiera se revisó.
@@ -210,7 +210,7 @@ Detente y escala al humano cuando ocurra cualquiera de estas situaciones:
    "optimización" sin trabajo de reconstrucción y verificación nocturna.
 5. No existen las invariantes de dominio para una regla financiera nueva. Escala a
    `confia-domain-modeler` y detente.
-6. Se te pide conceder `BYPASSRLS`, `SUPERUSER`, o permisos de `UPDATE`/`DELETE` sobre `audit_log`
+6. Se te pide conceder `BYPASSRLS`, `SUPERUSER`, o permisos de `UPDATE`/`DELETE` sobre `shared_audit_log`
    o sobre tablas del libro mayor a un rol de aplicación.
 7. Se te pide exponer el puerto de PostgreSQL públicamente, aunque sea "temporalmente para una
    migración".

@@ -101,9 +101,9 @@ disco y de respaldo, que ya es obligatorio para toda la base de datos.
 | Baja por incobrable | Financiero | **Alta** | Indirecto | `write_off` | Disco |
 | Bitácora de envío de notificaciones | Comunicaciones | Media | No | `notification_log.recipient_hash` | Destinatario almacenado como hash, no en claro |
 | Preferencias y consentimiento de comunicación | Comunicaciones | Baja | No | `notification_preference` | Disco |
-| Dirección IP y agente de usuario | Técnico y de seguridad | Media | No | `audit_log.source_ip_hash`, `user_agent`, logs de nginx | IP almacenada como hash en auditoría |
-| Identificador de solicitud y de traza | Técnico | Baja | No | Logs, `audit_log` | Disco |
-| Bitácora de auditoría de acciones | Trazabilidad | **Alta** por acumulación | Indirecto | `audit_log` | Disco. De solo inserción, encadenada por hash |
+| Dirección IP y agente de usuario | Técnico y de seguridad | Media | No | `shared_audit_log.source_ip_hash`, `user_agent`, logs de nginx | IP almacenada como hash en auditoría |
+| Identificador de solicitud y de traza | Técnico | Baja | No | Logs, `shared_audit_log` | Disco |
+| Bitácora de auditoría de acciones | Trazabilidad | **Alta** por acumulación | Indirecto | `shared_audit_log` | Disco. De solo inserción, encadenada por hash |
 | Solicitudes de documentos y su motivo | Académico y administrativo | Media | **Sí** | `document_request` | Disco |
 | Referencia de pago bancario | Financiero | Media | No | `payment.reference`, `bank_transaction.reference` | Disco |
 
@@ -307,7 +307,7 @@ identidad, actor que la atendió, momento de resolución, resultado y evidencia 
 | Datos de identificación del estudiante sin historial financiero, matrícula no concretada | **12 meses** desde la última interacción | Minimización. No hay obligación que justifique más | **Eliminación** |
 | Matrícula y vínculo académico | **5 años** desde el egreso o retiro **(por confirmar)** | Prescripción de reclamaciones y necesidad de emitir constancias posteriores | Anonimización, conservando el dato agregado de egreso |
 | Documento de identidad cifrado del estudiante y del encargado | Igual al período fiscal aplicable | Obligación legal, es dato del documento fiscal | **Eliminación del valor cifrado**, conservando el registro sin él |
-| Bitácora de auditoría (`audit_log`) | **7 años** **(por confirmar)** | Evidencia de control interno financiero y defensa ante reclamaciones | Anonimización del actor si el actor es un titular, conservando la cadena de hash intacta. **Nunca se borran filas**: romper la cadena destruiría el valor probatorio de todo el registro |
+| Bitácora de auditoría (`shared_audit_log`) | **7 años** **(por confirmar)** | Evidencia de control interno financiero y defensa ante reclamaciones | Anonimización del actor si el actor es un titular, conservando la cadena de hash intacta. **Nunca se borran filas**: romper la cadena destruiría el valor probatorio de todo el registro |
 | Bitácora de envío de notificaciones (`notification_log`) | **24 meses** | Prueba de que se notificó antes de aplicar un recargo, más un margen para reclamaciones | **Eliminación** |
 | Consentimientos y revocaciones de comunicación | **3 años** desde la revocación | Prueba de que la baja se respetó | Eliminación, conservando el hash del destinatario en la lista de supresión |
 | Lista de supresión de destinatarios (baja de comunicaciones) | **Permanente**, en forma de hash | Es la única forma de garantizar que una baja se respeta para siempre | Ninguna. Contiene hash, no el contacto en claro |

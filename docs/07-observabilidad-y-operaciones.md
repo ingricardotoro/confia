@@ -86,7 +86,7 @@ evita un componente más que mantener.
 4. **Todo log lleva el contexto de solicitud** de forma automática, no manual. Ver sección 3.
 5. **El log no sustituye a la bitácora de auditoría.** Los logs se rotan y se pierden; la
    auditoría es una tabla de solo inserción encadenada por hash. Ver `docs/03-seguridad.md`
-   sección 12. Si un auditor externo puede preguntarlo, va a `audit_log`, no al log.
+   sección 12. Si un auditor externo puede preguntarlo, va a `shared_audit_log`, no al log.
 
 ```java
 // WRONG: information inside the message, impossible to filter, and it carries personal data
@@ -243,7 +243,7 @@ nocturno que verificó la integridad. Eso exige que los tres compartan identific
 
 | Campo | Origen | Alcance | Uso |
 |---|---|---|---|
-| `requestId` | Generado en el borde como UUIDv7 si el cliente no lo envía | Una solicitud HTTP | Correlación de logs y auditoría. Se persiste en `audit_log.request_id` |
+| `requestId` | Generado en el borde como UUIDv7 si el cliente no lo envía | Una solicitud HTTP | Correlación de logs y auditoría. Se persiste en `shared_audit_log.request_id` |
 | `correlationId` | Igual al `requestId` de la solicitud que originó la cadena | Toda la cadena, incluidos trabajos derivados y trabajos de trabajos | Reconstrucción del flujo completo de negocio |
 | `traceId` y `spanId` | OpenTelemetry, propagados con la cabecera `traceparent` (W3C Trace Context) | Traza distribuida | Análisis de latencia |
 | `jobId` | db-scheduler: nombre e instancia de la tarea (ADR-0016) | Ejecución de una tarea | Diagnóstico de tareas atascadas o fallidas |
@@ -304,7 +304,7 @@ class RequestContextFilter extends OncePerRequestFilter {
 
 El mismo contexto alimenta el `set_config('app.request_id', ...)` del middleware transaccional
 descrito en `docs/03-seguridad.md` sección 6.2, de modo que el `request_id` termina persistido en
-`audit_log` sin que ningún caso de uso tenga que pasarlo a mano.
+`shared_audit_log` sin que ningún caso de uso tenga que pasarlo a mano.
 
 ### 3.3 Propagación hacia los trabajos en segundo plano
 
@@ -391,7 +391,7 @@ pregunta "¿de dónde salió este cargo?" sin depender de logs que ya se rotaron
   `payment.allocate`, `invoicing.assign_sequence`, `cashbox.close_session`,
   `charges.generate_period`.
 
-Regla de correlación: el `trace_id` se copia en `audit_log.trace_id`, columna ya prevista en
+Regla de correlación: el `trace_id` se copia en `shared_audit_log.trace_id`, columna ya prevista en
 `docs/03-seguridad.md` sección 12.1.
 
 ---
@@ -819,11 +819,11 @@ docker compose ps --format 'table {{.Service}}\t{{.Status}}\t{{.Health}}'
 | Métricas de alta resolución | 15 días a 15 segundos | - | Diagnóstico de incidentes recientes |
 | Métricas agregadas | - | 13 meses a 5 minutos | Comparación interanual del mismo mes de matrícula |
 | Trazas | 7 días | - | Su valor es diagnóstico inmediato. Conservarlas más tiempo no aporta y sí cuesta |
-| Bitácora de auditoría (`audit_log`) | **No se rota. Permanece en la base de datos** | Copia periódica a almacenamiento de objetos con bloqueo de objeto | Es evidencia, no log. Ver documento 08 para su período de conservación |
+| Bitácora de auditoría (`shared_audit_log`) | **No se rota. Permanece en la base de datos** | Copia periódica a almacenamiento de objetos con bloqueo de objeto | Es evidencia, no log. Ver documento 08 para su período de conservación |
 | Registros de incidente | Permanentes en el repositorio de documentación | - | Aprendizaje institucional |
 
 Los logs y trazas **no** son el sistema de registro financiero. La retención corta es aceptable
-precisamente porque la evidencia vive en `audit_log` y en el libro mayor, ambos inmutables.
+precisamente porque la evidencia vive en `shared_audit_log` y en el libro mayor, ambos inmutables.
 
 ### 10.2 Costo estimado
 
@@ -948,7 +948,7 @@ docker compose exec postgres psql -U confia_owner -d confia -c "
 - [ ] Los tres servicios emiten logs JSON a `stdout`, sin escritura a archivo dentro del contenedor.
 - [ ] La prueba de redacción del registro estructurado pasa y cubre todos los campos de la sección 2.3.
 - [ ] Ninguna ruta registra el cuerpo completo de solicitud o respuesta en producción.
-- [ ] Toda solicitud devuelve la cabecera `X-Request-Id` y el mismo valor aparece en `audit_log`.
+- [ ] Toda solicitud devuelve la cabecera `X-Request-Id` y el mismo valor aparece en `shared_audit_log`.
 - [ ] Una tarea de db-scheduler programada desde una petición HTTP comparte `correlationId` con
       ella, verificado por prueba de integración (ADR-0016).
 - [ ] Las métricas de tareas en segundo plano se calculan sobre la tabla de tareas y las alertas

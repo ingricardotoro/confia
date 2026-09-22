@@ -624,8 +624,8 @@ de datos de un menor. Con un solo desarrollador, no es opcional.
 | Rol | Uso | Privilegios |
 |---|---|---|
 | `confia_owner` | Migraciones. No lo usa la aplicación en ejecución | Propietario del esquema. `BYPASSRLS` no se concede |
-| `confia_admin_app` | Proceso `confia-api-admin` | `SELECT`, `INSERT` en todas las tablas de negocio. `UPDATE` solo en tablas no financieras. Sin `DELETE` en ninguna tabla de negocio. Sobre las tablas técnicas, exactamente los privilegios de ADR-0017: `SELECT`, `INSERT`, `UPDATE` y `DELETE` en `scheduled_tasks` (db-scheduler toma, reprograma y retira tareas, ADR-0016) y en `event_publication` (Spring Modulith borra las publicaciones completadas), y solo `SELECT` en `flyway_schema_history`, para la comprobación de salud de migraciones aplicadas. Sin `UPDATE` ni `DELETE` en `audit_log` ni `ledger_entry`. También lo usa `confia-worker` |
-| `confia_portal_app` | Proceso `confia-api-portal` | `SELECT` sobre una lista corta y explícita de tablas. `INSERT` solo en `document_request`, `payment_intent` y `notification_preference`. Sobre las tablas técnicas, exactamente los privilegios de ADR-0017: `INSERT` en `scheduled_tasks`, más `SELECT` solo si el cliente de programación lo exige (validado en F0); ningún privilegio sobre `event_publication`, porque el portal no usa el registro de eventos; `SELECT` en `flyway_schema_history`, para la comprobación de salud. Ningún `UPDATE` ni `DELETE` en ninguna tabla. Sin acceso alguno a `user`, `role`, `cai_range`, `cashbox_session` ni `audit_log` |
+| `confia_admin_app` | Proceso `confia-api-admin` | `SELECT`, `INSERT` en todas las tablas de negocio. `UPDATE` solo en tablas no financieras. Sin `DELETE` en ninguna tabla de negocio. Sobre las tablas técnicas, exactamente los privilegios de ADR-0017: `SELECT`, `INSERT`, `UPDATE` y `DELETE` en `scheduled_tasks` (db-scheduler toma, reprograma y retira tareas, ADR-0016) y en `event_publication` (Spring Modulith borra las publicaciones completadas), y solo `SELECT` en `flyway_schema_history`, para la comprobación de salud de migraciones aplicadas. Sin `UPDATE` ni `DELETE` en `shared_audit_log` ni `ledger_entry`. También lo usa `confia-worker` |
+| `confia_portal_app` | Proceso `confia-api-portal` | `SELECT` sobre una lista corta y explícita de tablas. `INSERT` solo en `document_request`, `payment_intent` y `notification_preference`. Sobre las tablas técnicas, exactamente los privilegios de ADR-0017: `INSERT` en `scheduled_tasks`, más `SELECT` solo si el cliente de programación lo exige (validado en F0); ningún privilegio sobre `event_publication`, porque el portal no usa el registro de eventos; `SELECT` en `flyway_schema_history`, para la comprobación de salud. Ningún `UPDATE` ni `DELETE` en ninguna tabla. Sin acceso alguno a `user`, `role`, `cai_range`, `cashbox_session` ni `shared_audit_log` |
 | `confia_readonly` | Reportes pesados y réplica de lectura desde fase dos | Solo `SELECT`, con RLS activa. Ningún acceso a las tablas técnicas de ADR-0017 |
 | `confia_backup` | Trabajo de respaldo | `pg_read_all_data` |
 
@@ -708,7 +708,7 @@ Tablas con política obligatoria y su criterio:
 | `document_request` | Institución, y el propio solicitante si es encargado | Todos |
 | `notification_log` | Institución, y el propio destinatario si es encargado | Todos |
 | `cashbox_session` | Institución, y el propio cajero salvo rol supervisor | Personal |
-| `audit_log` | Institución | Personal con permiso `audit:read` |
+| `shared_audit_log` | Institución | Personal con permiso `audit:read` |
 
 ### 6.4 Cómo se prueba
 
@@ -1304,8 +1304,8 @@ administrador puede editar no prueba nada, y en una disputa financiera la prueba
 ### 12.1 Diseño de la tabla
 
 ```sql
-CREATE TABLE audit_log (
-    id               BIGSERIAL     PRIMARY KEY,
+CREATE TABLE shared_audit_log (
+    id               BIGINT        NOT NULL,      -- asignado por el disparador de encadenamiento
     institution_id   UUID          NOT NULL,
     occurred_at      TIMESTAMPTZ   NOT NULL DEFAULT clock_timestamp(),
     actor_id         UUID,                        -- NULL para actor de sistema
@@ -1323,22 +1323,32 @@ CREATE TABLE audit_log (
     after_value      JSONB,
     reason           TEXT,                        -- obligatorio en anulación y ajuste
     approver_id      UUID,                        -- segregación de funciones
-    prev_hash        BYTEA         NOT NULL,
-    row_hash         BYTEA         NOT NULL,
-    CONSTRAINT audit_log_outcome_chk
+    prev_hash        BYTEA         NOT NULL,      -- asignado por el disparador de encadenamiento
+    row_hash         BYTEA         NOT NULL,      -- asignado por el disparador de encadenamiento
+    CONSTRAINT shared_audit_log_pk PRIMARY KEY (institution_id, id),
+    CONSTRAINT shared_audit_log_prev_hash_uq UNIQUE (institution_id, prev_hash),
+    CONSTRAINT shared_audit_log_outcome_chk
         CHECK (outcome IN ('success', 'denied', 'error')),
-    CONSTRAINT audit_log_actor_kind_chk
+    CONSTRAINT shared_audit_log_actor_kind_chk
         CHECK (actor_kind IN ('staff', 'guardian', 'system'))
 );
 
-CREATE INDEX audit_log_entity_idx     ON audit_log (entity_type, entity_id, occurred_at DESC);
-CREATE INDEX audit_log_actor_idx      ON audit_log (actor_id, occurred_at DESC);
-CREATE INDEX audit_log_action_idx     ON audit_log (action, occurred_at DESC);
-CREATE INDEX audit_log_request_idx    ON audit_log (request_id);
+CREATE INDEX shared_audit_log_entity_idx  ON shared_audit_log (institution_id, entity_type, entity_id, occurred_at DESC);
+CREATE INDEX shared_audit_log_actor_idx   ON shared_audit_log (institution_id, actor_id, occurred_at DESC);
+CREATE INDEX shared_audit_log_action_idx  ON shared_audit_log (institution_id, action, occurred_at DESC);
+CREATE INDEX shared_audit_log_request_idx ON shared_audit_log (institution_id, request_id);
 ```
 
-**Encadenamiento por hash.** Cada fila incluye el hash de la anterior, formando una cadena. Alterar
-o eliminar cualquier fila rompe la cadena a partir de ese punto y la verificación lo detecta.
+**Sin `BIGSERIAL`.** La clave primaria es compuesta, `(institution_id, id)`: ningún rol de
+PostgreSQL tiene el atributo `BYPASSRLS`, así que un verificador que corre con el contexto de una
+institución no puede leer ni recalcular una cadena global. `id` no lo asigna una secuencia, sino un
+contador por institución que el propio disparador de encadenamiento mantiene en la tabla
+`shared_audit_chain_head`, que también sirve como punto de serialización para dos escritores
+concurrentes de la misma institución.
+
+**Encadenamiento por hash, uno por institución.** Cada fila incluye el hash de la anterior **de su
+misma institución**, formando una cadena independiente por institución. Alterar o eliminar
+cualquier fila rompe esa cadena a partir de ese punto y la verificación lo detecta.
 
 ```
 row_hash = SHA256(
@@ -1350,14 +1360,16 @@ row_hash = SHA256(
 ```
 
 La serialización canónica ordena las claves y normaliza los números, para que el hash sea
-reproducible. La cadena se inicia con un registro génesis cuyo `prev_hash` son 32 bytes de ceros.
-El cálculo del hash y la inserción ocurren en un disparador `BEFORE INSERT` de PostgreSQL, no en la
-aplicación: así una escritura por cualquier vía queda encadenada.
+reproducible. **Cada institución inicia su propia cadena** con su propio registro génesis, cuyo
+`prev_hash` son 32 bytes de ceros; las cadenas de instituciones distintas son independientes entre
+sí. El cálculo del hash y la inserción ocurren en un disparador `BEFORE INSERT` de PostgreSQL, no en
+la aplicación: así una escritura por cualquier vía queda encadenada.
 
-**Ancla externa.** Cada hora, un trabajo publica el `row_hash` de la última fila y su `id` en un
-almacenamiento de objetos con bloqueo de objeto en modo de cumplimiento. Un atacante que
-recalculara toda la cadena dentro de la base de datos no puede alterar el ancla ya publicada, y la
-divergencia queda demostrada. Sin este paso, la cadena solo protege contra manipulación torpe.
+**Ancla externa.** Cada hora, un trabajo publica el `row_hash` de la última fila de cada institución
+y su `id` en un almacenamiento de objetos con bloqueo de objeto en modo de cumplimiento. Un
+atacante que recalculara toda la cadena de una institución dentro de la base de datos no puede
+alterar el ancla ya publicada, y la divergencia queda demostrada. Sin este paso, cada cadena solo
+protege contra manipulación torpe.
 
 ### 12.2 Eventos de auditoría obligatorios
 
@@ -1378,39 +1390,40 @@ Regla práctica: si la respuesta a "¿un auditor externo preguntaría por esto?"
 
 ```sql
 -- Denegación de partida
-REVOKE ALL ON audit_log FROM PUBLIC;
+REVOKE ALL ON shared_audit_log FROM PUBLIC;
 
--- La aplicación solo puede insertar y leer
-GRANT SELECT, INSERT ON audit_log TO confia_admin_app;
-GRANT USAGE, SELECT   ON SEQUENCE audit_log_id_seq TO confia_admin_app;
+-- La aplicación solo puede insertar y leer; sin secuencia que conceder, el id lo asigna el
+-- disparador de encadenamiento sobre shared_audit_chain_head (sección 12.1)
+GRANT SELECT, INSERT ON shared_audit_log TO confia_admin_app;
+GRANT SELECT          ON shared_audit_log TO confia_readonly;
 
 -- El portal no tiene acceso alguno
 -- (no se emite ningún GRANT para confia_portal_app)
 
 -- Segunda barrera: un disparador que rechaza a nivel de motor,
 -- incluso para el propietario del esquema.
-CREATE OR REPLACE FUNCTION audit_log_is_append_only()
+CREATE OR REPLACE FUNCTION shared_audit_is_append_only()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
     RAISE EXCEPTION
-        'audit_log es de solo inserción: % rechazado', TG_OP
+        '% es de solo inserción: % rechazado', TG_TABLE_NAME, TG_OP
         USING ERRCODE = 'insufficient_privilege';
 END;
 $$;
 
-CREATE TRIGGER audit_log_no_update
-    BEFORE UPDATE ON audit_log
-    FOR EACH ROW EXECUTE FUNCTION audit_log_is_append_only();
+CREATE TRIGGER shared_audit_log_no_update
+    BEFORE UPDATE ON shared_audit_log
+    FOR EACH ROW EXECUTE FUNCTION shared_audit_is_append_only();
 
-CREATE TRIGGER audit_log_no_delete
-    BEFORE DELETE ON audit_log
-    FOR EACH ROW EXECUTE FUNCTION audit_log_is_append_only();
+CREATE TRIGGER shared_audit_log_no_delete
+    BEFORE DELETE ON shared_audit_log
+    FOR EACH ROW EXECUTE FUNCTION shared_audit_is_append_only();
 
-CREATE TRIGGER audit_log_no_truncate
-    BEFORE TRUNCATE ON audit_log
-    FOR EACH STATEMENT EXECUTE FUNCTION audit_log_is_append_only();
+CREATE TRIGGER shared_audit_log_no_truncate
+    BEFORE TRUNCATE ON shared_audit_log
+    FOR EACH STATEMENT EXECUTE FUNCTION shared_audit_is_append_only();
 ```
 
 Nota honesta sobre el límite del control: un `SUPERUSER` de PostgreSQL puede deshabilitar el
@@ -1419,11 +1432,13 @@ escritura. El objetivo alcanzable no es hacer la manipulación imposible, sino h
 
 ### 12.4 Verificación periódica de la cadena
 
-- **Diaria:** un trabajo verifica la cadena completa del último mes, recalculando cada `row_hash`.
-  Se registra la métrica `confia_audit_chain_verified_rows` y el resultado.
-- **Semanal:** verificación completa desde el registro génesis.
-- **Horaria:** comparación del último `row_hash` contra la última ancla publicada.
-- Una discrepancia genera **alerta de severidad S1** y dispara
+- **Diaria:** un trabajo verifica, **por cada institución**, la cadena completa del último mes,
+  recalculando cada `row_hash`. Se registra la métrica `confia_audit_chain_verified_rows` y el
+  resultado.
+- **Semanal:** verificación completa de cada cadena desde su propio registro génesis.
+- **Horaria:** comparación del último `row_hash` de cada institución contra su última ancla
+  publicada.
+- Una discrepancia en cualquier cadena genera **alerta de severidad S1** y dispara
   `docs/runbooks/incidente-de-seguridad.md`. No se intenta reparar la cadena: se preserva la
   evidencia.
 
@@ -1799,8 +1814,8 @@ Una casilla sin evidencia no está marcada.
 
 - [ ] RLS habilitada y forzada en todas las tablas con `institution_id`. Evidencia: la consulta de inventario de 6.4 devuelve cero filas
 - [ ] Ningún rol de aplicación tiene `BYPASSRLS` ni es `SUPERUSER`. Evidencia: consulta a `pg_roles`
-- [ ] El rol del portal no puede leer `user`, `role`, `cai_range`, `cashbox_session` ni `audit_log`. Evidencia: prueba de permisos
-- [ ] `audit_log` rechaza `UPDATE`, `DELETE` y `TRUNCATE` para el rol de aplicación. Evidencia: prueba de integración
+- [ ] El rol del portal no puede leer `user`, `role`, `cai_range`, `cashbox_session` ni `shared_audit_log`. Evidencia: prueba de permisos
+- [ ] `shared_audit_log` rechaza `UPDATE`, `DELETE` y `TRUNCATE` para el rol de aplicación, incluso para `confia_owner`, el propietario del esquema. Evidencia: prueba de integración
 - [ ] PostgreSQL no responde en el puerto 5432 desde fuera de la red privada. Evidencia: salida de `nmap` desde una IP externa
 - [ ] Conexión con `sslmode=verify-full`. Evidencia: cadena de conexión revisada
 - [ ] `statement_timeout` configurado por rol
@@ -1899,7 +1914,7 @@ Una casilla sin evidencia no está marcada.
 | Análisis dinámico con OWASP ZAP | Nocturno en preproducción, y antes de cada versión | Línea base automatizada | Integración continua | Reporte archivado |
 | Escaneo de dependencias y contenedores | Cada corrida de integración continua | Código e imágenes | Integración continua | Reporte de Trivy y osv-scanner |
 | Escaneo de secretos sobre el historial completo | Semanal | Todo el repositorio | Integración continua | Reporte enviado aunque esté vacío |
-| Verificación de la cadena de auditoría | Diaria (último mes), semanal (completa), horaria (contra ancla) | `audit_log` | Trabajo programado | Métrica y alerta |
+| Verificación de la cadena de auditoría | Diaria (último mes), semanal (completa), horaria (contra ancla) | `shared_audit_log` | Trabajo programado | Métrica y alerta |
 | Prueba de las puertas de calidad | Mensual | La rama con violaciones deliberadas debe ser rechazada por todas las puertas | Integración continua | Reporte de la corrida |
 | Revisión de la lista ASVS | Al cierre de cada fase | Requisitos afectados por la fase | Desarrollador | `docs/seguridad/asvs-nivel-2.md` actualizado |
 | Revisión de este documento | Semestral, o ante cambio arquitectónico | Completo | Desarrollador | Nueva versión con registro de cambios |
