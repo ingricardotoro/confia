@@ -329,6 +329,15 @@
                 <name>org.jooq.meta.postgres.PostgresDatabase</name>
                 <inputSchema>public</inputSchema>
                 <excludes>flyway_schema_history</excludes>
+                <!-- jOOQ 3.21 has no built-in mapping for PostgreSQL's inet: without this, the
+                     generated field type is the deprecated, unusable Object (sonda S9, task 5.1;
+                     design.md §10). shared_audit_log.source_ip is the only inet column today. -->
+                <forcedTypes>
+                  <forcedType>
+                    <name>VARCHAR</name>
+                    <includeTypes>inet</includeTypes>
+                  </forcedType>
+                </forcedTypes>
               </database>
               <generate>
                 <!-- No Tables/Keys/Indexes umbrella classes: every reference to a table names its

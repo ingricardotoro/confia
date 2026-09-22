@@ -1323,3 +1323,47 @@ explicit instruction), and because the delivery boundary for this cut is not yet
 other task in this cut (4.1-4.6) is complete, with the `./mvnw -B verify` evidence above standing
 as real, honest, local proof that the code itself is correct and ready, independent of how the
 diff eventually gets sliced for review.
+
+---
+
+## PR B3b — corte B3 (parte 2): verificador de cadena y pruebas de manipulación
+
+Branch `change/audit-log-and-transaction-runner-verifier`, base PR B3a (its tip, `c9f5f0d`, is this
+session's starting `HEAD`). Closes F0 exit criterion 3.
+
+## Task 5.1 — Sondas S3 and S9
+
+**S3, run against a scratch `postgres:18-alpine` container started outside the repository tree
+(`docker run -d --name confia-s3-probe ...`, removed afterward), never against
+`SharedPostgresContainer`.** A minimal `s3_probe` table with a `BEFORE UPDATE` trigger that always
+`RAISE EXCEPTION`s stands in for `shared_audit_log`'s own `shared_audit_is_append_only()` trigger —
+same mechanism (a non-`ENABLE ALWAYS` `BEFORE UPDATE` row trigger that rejects unconditionally), so
+the probe's result transfers directly.
+
+1. Baseline: `UPDATE s3_probe SET val = 'blocked?' WHERE id = 1` as `postgres` with the default
+   `session_replication_role` → `ERROR: update rejected by trigger` (the trigger fires normally).
+2. `SET session_replication_role = 'replica'; UPDATE s3_probe SET val = 'manipulated' WHERE id = 1;`
+   → `UPDATE 1`, and `SELECT val FROM s3_probe WHERE id = 1` reads back `manipulated`. The trigger
+   did **not** fire.
+3. `SET session_replication_role = 'origin';` then the same `UPDATE` again → `ERROR: update
+   rejected by trigger`. The trigger is back.
+
+**Confirmed exactly as `design.md` decision 10 and §10 predict**: `session_replication_role =
+'replica'` as `postgres` (superuser) disables the row trigger for that session only, and resetting
+to `'origin'` restores it — no `ALTER TABLE ... DISABLE TRIGGER` fallback needed. Probe container
+removed with `docker rm -f confia-s3-probe` immediately after.
+
+**S9**: cleaned `apps/api/app/target` (OneDrive retention, no `mvn clean`) and re-ran
+`./mvnw -B -pl app -am generate-sources` against the real schema (`V1`-`V3` migrations, including
+`shared_audit_log.source_ip INET`) — `BUILD SUCCESS`, `SharedAuditLog.java` regenerated. The
+generated field:
+
+```
+public final TableField<SharedAuditLogRecord, Object> SOURCE_IP = createField(DSL.name("source_ip"),
+    DefaultDataType.getDefaultDataType("\"pg_catalog\".\"inet\""), this, "");
+```
+
+is `Object`, marked `@Deprecated` ("Unknown data type... it may have been excluded from code
+generation"), **not `String`**. Per `design.md` §10 (sonda S9) and task 5.1's own instruction, added
+a `<forcedType>` to `VARCHAR` for `inet` columns in `apps/api/app/pom.xml`'s jOOQ generator
+`<database>` block (task detail below, task 5.3).
