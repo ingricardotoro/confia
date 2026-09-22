@@ -1425,3 +1425,41 @@ untouched chain; identifies the exact `(institution_id, id)` of a row altered di
 manipulation confined to a different institution; and detects a divergence from altering *only*
 `actor_label`, `user_agent` or `trace_id` — the 27th scenario the reconciliation note above
 documents.
+
+## Task 5.4 — ROJO/VERDE: the known limit, executable
+
+Extended `AuditLogSuperuserTamper.java` with `tamperAndRecalculateWholeChainFrom` (tampers one
+field as before, then cascades `shared_audit_row_hash(...)` — the real PL/pgSQL function the
+chaining trigger itself calls — forward from the tampered row through every later row, feeding
+each freshly recalculated `row_hash` into the next row's `prev_hash`). Created
+`AuditChainKnownLimitIT.java`: four rows seeded, the second tampered (`reason`) and the whole chain
+from that point recalculated, then asserts the verifier reports `Intact`.
+
+**GREEN, first attempt, no production change required** — task 5.4's own predicted outcome, since
+the verifier already existed from task 5.3 (design.md: "es, por diseño, el mismo recorrido de
+`DefaultAuditChainVerifier` que ya pasa con recálculo completo"):
+
+```
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 28.51 s -- in com.confia.shared.audit.AuditChainKnownLimitIT
+[INFO] BUILD SUCCESS
+```
+
+**Negative control, per the task brief's explicit requirement ("el segundo escenario del límite
+conocido debe recalcular la cadena entera... si solo altera una fila sin recalcular, no está
+probando el límite").** Temporarily commented out the `recalculateChainFrom(...)` call inside
+`tamperAndRecalculateWholeChainFrom` (so it degenerates into exactly the *first* scenario: tamper
+without recalculation) and re-ran the same test:
+
+```
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 26.30 s <<< FAILURE!
+java.lang.AssertionError:
+  Diverged[institutionId=InstitutionId[value=5c8f3259-...], verifiedRows=1, firstDivergentId=2,
+  divergence=ROW_HASH_MISMATCH, ...]
+[INFO] BUILD FAILURE
+```
+
+Confirms the test genuinely exercises the recalculation path: without it, the verifier correctly
+reports `Diverged` at `firstDivergentId=2`, the exact tampered row — the same identification
+mechanism task 5.2's first scenario already proved. Restored the real
+`recalculateChainFrom(...)` call (`diff --stat` after restore: `92 insertions(+), 0 deletions(-)`,
+i.e. the file is back to its pre-control state) and re-ran: green again, confirmed above.

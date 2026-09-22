@@ -3,6 +3,7 @@ package com.confia.shared.audit;
 import com.confia.support.SharedPostgresContainer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Set;
@@ -55,6 +56,97 @@ final class AuditLogSuperuserTamper {
                 update.executeUpdate();
             } finally {
                 setReplicationRole(connection, "origin");
+            }
+        }
+    }
+
+    /**
+     * design.md decision 10's "límite conocido" scenario: same disabled-trigger manipulation as
+     * {@link #tamperFieldWithoutRecalculating}, but afterward recalculates {@code row_hash} — and,
+     * since a row's hash feeds the next row's {@code prev_hash}, cascades that recalculation
+     * forward through every following row up to the last, using {@code shared_audit_row_hash(...)},
+     * the exact same PL/pgSQL function the chaining trigger itself calls (design.md decision 10:
+     * "un actor con acceso administrativo tiene esa función igual que la tiene la prueba"). The
+     * result is a chain that is, by design, internally consistent again — the declared, accepted
+     * limit of this control until cambio 11's external anchor exists.
+     */
+    static void tamperAndRecalculateWholeChainFrom(UUID institutionId, long tamperedId,
+            String column, String value) throws SQLException {
+        requireTamperableColumn(column);
+        try (Connection connection = SharedPostgresContainer.connectionAs("postgres")) {
+            setReplicationRole(connection, "replica");
+            try {
+                try (PreparedStatement update = connection.prepareStatement(
+                        "update shared_audit_log set " + column
+                                + " = ? where institution_id = ? and id = ?")) {
+                    update.setString(1, value);
+                    update.setObject(2, institutionId);
+                    update.setLong(3, tamperedId);
+                    update.executeUpdate();
+                }
+                recalculateChainFrom(connection, institutionId, tamperedId);
+            } finally {
+                setReplicationRole(connection, "origin");
+            }
+        }
+    }
+
+    /**
+     * Cascades {@code shared_audit_row_hash(...)} forward from {@code fromId}'s own, untouched
+     * {@code prev_hash} through every subsequent row, feeding each row's freshly recalculated
+     * {@code row_hash} into the next row's {@code prev_hash} — exactly what a real chain recompute
+     * does. Stops the moment {@code UPDATE ... RETURNING} matches no more rows (the last row of the
+     * institution).
+     */
+    private static void recalculateChainFrom(Connection connection, UUID institutionId, long fromId)
+            throws SQLException {
+        byte[] prevHash = fetchPrevHash(connection, institutionId, fromId);
+        long id = fromId;
+        while (true) {
+            byte[] recalculatedRowHash = recalculateOneRow(connection, institutionId, id, prevHash);
+            if (recalculatedRowHash == null) {
+                return;
+            }
+            prevHash = recalculatedRowHash;
+            id++;
+        }
+    }
+
+    private static byte[] fetchPrevHash(Connection connection, UUID institutionId, long id)
+            throws SQLException {
+        try (PreparedStatement select = connection.prepareStatement(
+                "select prev_hash from shared_audit_log where institution_id = ? and id = ?")) {
+            select.setObject(1, institutionId);
+            select.setLong(2, id);
+            try (ResultSet resultSet = select.executeQuery()) {
+                if (!resultSet.next()) {
+                    throw new IllegalStateException(
+                            "no row id=" + id + " for institution " + institutionId);
+                }
+                return resultSet.getBytes("prev_hash");
+            }
+        }
+    }
+
+    /** {@code null} once {@code id} is past the institution's last row. */
+    private static byte[] recalculateOneRow(Connection connection, UUID institutionId, long id,
+            byte[] prevHash) throws SQLException {
+        try (PreparedStatement update = connection.prepareStatement("""
+                update shared_audit_log
+                   set prev_hash = ?,
+                       row_hash = shared_audit_row_hash(?, id, institution_id, occurred_at,
+                           actor_id, actor_kind, actor_label, source_ip, user_agent, request_id,
+                           trace_id, action, entity_type, entity_id, outcome, before_value,
+                           after_value, reason, approver_id)
+                 where institution_id = ? and id = ?
+                returning row_hash
+                """)) {
+            update.setBytes(1, prevHash);
+            update.setBytes(2, prevHash);
+            update.setObject(3, institutionId);
+            update.setLong(4, id);
+            try (ResultSet resultSet = update.executeQuery()) {
+                return resultSet.next() ? resultSet.getBytes("row_hash") : null;
             }
         }
     }
