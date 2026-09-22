@@ -1463,3 +1463,41 @@ reports `Diverged` at `firstDivergentId=2`, the exact tampered row — the same 
 mechanism task 5.2's first scenario already proved. Restored the real
 `recalculateChainFrom(...)` call (`diff --stat` after restore: `92 insertions(+), 0 deletions(-)`,
 i.e. the file is back to its pre-control state) and re-ran: green again, confirmed above.
+
+## Task 5.5 — ROJO/VERDE: the two exclusion inventories with a named destination
+
+Created `AuditScopeExclusionInventoryTest.java` (no Docker, `ClassFileImporter` over the compiled
+class tree plus a static read of `db/migration/*.sql` — never a live connection). Four `@Test`
+methods, one pair per inventory the task names: (a) no production class depends on a
+task-scheduling type and no `@Scheduled` method exists, plus `scheduled_tasks` does not appear in
+any delivered migration's SQL text; (b) no `..web..` class depends on `com.confia.shared.audit`,
+plus no Spring MVC mapping annotation (`@RequestMapping`/`@GetMapping`/etc — the same annotations
+springdoc itself reads to build the OpenAPI document) anywhere in production code names a path
+containing `audit`.
+
+**GREEN, first attempt**: `./mvnw -B -pl app -am test -Dtest=AuditScopeExclusionInventoryTest
+-Dsurefire.failIfNoSpecifiedTests=false`: `Tests run: 4, Failures: 0, Errors: 0, Skipped: 0`,
+12.47 s (no Docker — confirmed by wall time alone, an order of magnitude faster than any `*IT`).
+
+**Four negative controls, per the task brief's explicit requirement ("los dos inventarios de la
+tarea 5.5 deben poder fallar... asegúrate de que el conjunto sobre el que iteran no está
+vacío").** Each was a real, temporary production-source (or migration-text) fixture, run, observed
+failing, then removed/reverted and re-confirmed green — never assumed:
+
+1. **Scheduling dependency + `@Scheduled`**: added a scratch class
+   `com.confia.shared.audit.probe.ScratchScheduledProbe` with a `@Scheduled` method. `./mvnw -B -pl
+   app -am test -Dtest="AuditScopeExclusionInventoryTest#noProductionClassDependsOnATaskSchedulingTypeAndNoScheduledMethodExists"`:
+   `Tests run: 1, Failures: 1`. Removed the scratch package.
+2. **`..web..` → `shared.audit` dependency, and OpenAPI route naming**: added a scratch
+   `@RestController` `com.confia.bootstrap.web.probe.ScratchAuditWebProbe`, constructor-injecting
+   `AuditChainVerifier` and exposing `@GetMapping("/admin/shared_audit_log")`. Ran both tests
+   together: `Tests run: 2, Failures: 2` — both caught it independently. Removed the scratch
+   package (and the now-empty parent `bootstrap/web` directory it created).
+3. **`scheduled_tasks` SQL text scan**: appended one SQL comment line containing `scheduled_tasks`
+   to the end of `V3__chain_shared_audit_log.sql`. `Tests run: 1, Failures: 1`. Reverted with `git
+   checkout -- V3__chain_shared_audit_log.sql` (`git diff --stat` before revert confirmed exactly
+   `1 insertion(+)`; `git status` after showed the file clean).
+
+Final state after every revert: `git status --short` shows only the new, real
+`AuditScopeExclusionInventoryTest.java` — confirmed with a fresh, full re-run of the class:
+`Tests run: 4, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`.

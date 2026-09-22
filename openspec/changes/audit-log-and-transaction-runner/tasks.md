@@ -579,7 +579,7 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
 Rama `change/audit-log-and-transaction-runner-verifier`, base PR B3a. Cierra el criterio de salida 3
 de F0.
 
-- [ ] 5.1 **Ejecutar las sondas S3 y S9 (bloqueantes, `design.md` §10 y §11 paso 18).** Requiere
+- [x] 5.1 **Ejecutar las sondas S3 y S9 (bloqueantes, `design.md` §10 y §11 paso 18).** Requiere
   Docker. **S3**: conectado como `postgres` (superusuario del contenedor), ejecutar
   `SET session_replication_role = 'replica'`, intentar un `UPDATE` sobre una fila de
   `shared_audit_log` y confirmar que pasa; volver a `'origin'` y confirmar que el `UPDATE` vuelve a
@@ -590,7 +590,7 @@ de F0.
   `String`, añadir un `<forcedType>` a `VARCHAR` en `apps/api/app/pom.xml`. Registrar ambos resultados
   en `apply-progress.md`. — `design.md` §10 (sondas S3, S9) y §11, paso 18
 
-- [ ] 5.2 **ROJO — verificador de cadena.** Requiere Docker. Crear
+- [x] 5.2 **ROJO — verificador de cadena.** Requiere Docker. Crear
   `.../test/java/com/confia/shared/audit/AuditChainVerifierIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`: cadena íntegra reporta integridad sin identificar ninguna
   fila; una fila intermedia alterada directamente con `SUPERUSER` vía
@@ -619,7 +619,7 @@ de F0.
   que quien archive el cambio actualice `design.md` §7.1 y su encabezado antes de escribir el
   informe de verificación
 
-- [ ] 5.3 **VERDE — puerto, adaptador y verificador.** Requiere Docker (ejecuta 5.2). Crear
+- [x] 5.3 **VERDE — puerto, adaptador y verificador.** Requiere Docker (ejecuta 5.2). Crear
   `.../main/java/com/confia/shared/audit/AuditLogReader.java` (puerto) y `AuditRowSnapshot.java`
   (registro con tipos del JDK únicamente: `before_value`/`after_value` como `String`, `occurred_at`
   como `Instant`, nunca `org.jooq.JSONB`); `.../main/java/com/confia/shared/infrastructure/JooqAuditLogReader.java`
@@ -632,7 +632,7 @@ de F0.
   `package-info.java` de `com.confia.shared.audit`. Ejecutar `AuditChainVerifierIT`: verde. —
   `design.md`, decisión 11 completa; §4 («Verificación de una cadena»)
 
-- [ ] 5.4 **ROJO/VERDE — el límite conocido, ejecutable.** Requiere Docker. ROJO: crear
+- [x] 5.4 **ROJO/VERDE — el límite conocido, ejecutable.** Requiere Docker. ROJO: crear
   `.../test/java/com/confia/shared/audit/AuditChainKnownLimitIT.java`: con acceso `SUPERUSER`, altera
   un campo de una fila intermedia y **además** recalcula `row_hash` de esa fila y de todas las
   posteriores hasta la última llamando a `shared_audit_row_hash(...)`, dejando la cadena
@@ -643,7 +643,7 @@ de F0.
   control mientras no exista ancla externa» (escenario «Manipulación con recálculo completo de la
   cadena no es detectada — límite conocido»)
 
-- [ ] 5.5 **ROJO/VERDE — los dos inventarios de las exclusiones con destino nombrado.** No requiere
+- [x] 5.5 **ROJO/VERDE — los dos inventarios de las exclusiones con destino nombrado.** No requiere
   Docker (inventario estático sobre el árbol de clases, sin conexión a PostgreSQL). ROJO: crear las
   dos pruebas de inventario —pueden vivir en `AuditChainVerifierIT` o en una clase de prueba propia
   sin contenedor— que afirman (a) ninguna clase de producción bajo `com.confia` depende de un tipo de
