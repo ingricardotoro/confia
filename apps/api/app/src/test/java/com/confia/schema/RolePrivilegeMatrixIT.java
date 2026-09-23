@@ -3,6 +3,10 @@ package com.confia.schema;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.confia.support.PostgresIntegrationTest;
+import com.confia.support.SharedPostgresContainer;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -146,6 +150,51 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
                 role);
         return new RoleAttributes(row.get("rolsuper", Boolean.class),
                 row.get("rolbypassrls", Boolean.class));
+    }
+
+    /**
+     * The scenario "{@code PUBLIC} no tiene ningún privilegio de partida"
+     * (specs/audit-trail/spec.md, requirement "Permisos de acceso a {@code shared_audit_log} por
+     * rol de base de datos"), which had no test until the SDD verification of this change found it
+     * missing.
+     *
+     * <p>Asserting that {@code confia_portal_app} holds nothing does <b>not</b> cover this: that is
+     * one named role with no {@code GRANT} of its own. {@code PUBLIC} is the pseudo-role every
+     * other role inherits from, so a privilege granted to it would reach roles this matrix never
+     * names — including ones created years from now. Both halves of the scenario are checked here:
+     * the pseudo-role itself, which is what {@code REVOKE ALL ... FROM PUBLIC} acts on, and a
+     * freshly created role that is none of the five, which is what the scenario's premise says.
+     */
+    @Test
+    void publicAndAnyRoleOutsideTheFiveInheritNoPrivilegeOnEitherAuditTable() throws SQLException {
+        for (String table : AUDIT_TABLES) {
+            for (String privilege : ALL_PRIVILEGES) {
+                assertThat(hasTablePrivilege("public", table, privilege))
+                        .as("PUBLIC must hold no %s on %s: REVOKE ALL ... FROM PUBLIC is what "
+                                + "keeps every present and future role from inheriting it",
+                                privilege, table)
+                        .isFalse();
+            }
+        }
+
+        String scratchRole = "probe_role_outside_the_five";
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres");
+                Statement statement = superuser.createStatement()) {
+            statement.execute("drop role if exists " + scratchRole);
+            statement.execute("create role " + scratchRole + " nosuperuser nobypassrls");
+            try {
+                for (String table : AUDIT_TABLES) {
+                    for (String privilege : ALL_PRIVILEGES) {
+                        assertThat(hasTablePrivilege(scratchRole, table, privilege))
+                                .as("a role that is none of the five must inherit no %s on %s",
+                                        privilege, table)
+                                .isFalse();
+                    }
+                }
+            } finally {
+                statement.execute("drop role if exists " + scratchRole);
+            }
+        }
     }
 
     /** {@code has_table_privilege(role, table, privilege)}, evaluated by PostgreSQL itself. */

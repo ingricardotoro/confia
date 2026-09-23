@@ -1,5 +1,28 @@
 # Tareas: componente transaccional único y bitácora de auditoría encadenada
 
+> **Las cinco verificaciones finales (1.12, 2.7, 3.7, 4.7 y 5.7) quedaron cerradas el 2026-09-22.**
+> Cada agente de aplicacion las dejo sin marcar por una sola razon: la instruccion de esta sesion les
+> prohibia empujar la rama y abrir el pull request, y esa es la mitad de esas tareas que no podian
+> hacer. Su mitad sustantiva —la verificacion local completa en arbol limpio— si se ejecuto y quedo
+> registrada en `apply-progress.md` corte por corte.
+>
+> La mitad restante la completo el orquestador: los nueve pull requests se empujaron, se revisaron,
+> pasaron la integracion continua y se fusionaron en `main` en orden. `main` quedo en verde con la
+> puerta de mutacion. Antes de fusionar el ultimo se confirmo que su verificacion habia corrido sobre
+> el commit real de su cabeza (`598e822`) y no sobre uno anterior.
+>
+> | Corte | PR | Commit de fusion |
+> |---|---|---|
+> | B1a | #21 | `0376121` |
+> | B1b | #22 | `52cbb14` |
+> | B2a | #23 | `ddd5a95` |
+> | B2b | #24 | `98ce4dc` |
+> | B3a-i | #25 | `013173a` |
+> | B3a-ii | #26 | `b3d7ea3` |
+> | B3b-i | #27 | `bef1f45` |
+> | B3b-ii | #28 | `0cb6de2` |
+> | B4 | #29 | `c7de48b` |
+
 Cambio 5 de F0, **parte B**. Implementa `proposal.md`, `design.md` y las dos especificaciones delta
 ya escritas (`specs/audit-trail/spec.md`, 10 requisitos y 27 escenarios; `specs/build-integrity/spec.md`,
 4 requisitos y 15 escenarios).
@@ -278,7 +301,7 @@ producción bajo `com.confia.shared.*`, condición mecánica para que PR B2a pue
   **B1b** (titular perezoso, `CommittingPostgresIntegrationTest`, `TransactionRunnerRetryIT`, jqwik y
   JaCoCo); registrar la decisión que tome. — `design.md` §12, «Pronóstico de tamaño por corte»
 
-- [ ] 1.12 **Verificación final de PR B1.** Requiere Docker. En checkout limpio, con `JAVA_HOME` en
+- [x] 1.12 **Verificación final de PR B1.** Requiere Docker. En checkout limpio, con `JAVA_HOME` en
   JDK 25 y `MAVEN_OPTS` con el almacén de confianza `Windows-ROOT`, ejecutar `./mvnw -B verify` en
   `apps/api`. Confirmar `TransactionRunnerContextIT` y `TransactionRunnerRetryIT` en verde completas,
   `TransactionsOnlyInSharedSecurityTest` con sus dos mitades en verde, y que la suite de la parte A
@@ -379,7 +402,7 @@ del documento): sin esa clase, la migración de este corte rompe la puerta de pr
   nunca después) y **B2a-sql** (las dos tablas, sus guardas y sus pruebas); registrar la decisión que
   tome. — `design.md` §12, «Pronóstico de tamaño por corte»
 
-- [ ] 2.7 **Verificación final de PR B2a.** Requiere Docker. En checkout limpio, ejecutar
+- [x] 2.7 **Verificación final de PR B2a.** Requiere Docker. En checkout limpio, ejecutar
   `./mvnw -B verify` en `apps/api` con JDK 25 y Docker activo. Confirmar `RolePrivilegeMatrixIT`,
   `AuditLogAppendOnlyIT`, `AuditLogRowSecurityIT` y `CommittingBaseContractIT` en verde completas;
   `MultiTenantSchemaIT` sin modificar y en verde; ninguna ocurrencia de `audit_log` fuera de
@@ -457,7 +480,7 @@ Rama `change/audit-log-and-transaction-runner-chain`, base PR B2a.
   anticipa exceso, pero si lo hubiera, detener la aplicación y consultar al propietario antes de
   partir el corte. — `design.md` §12, «Pronóstico de tamaño por corte»
 
-- [ ] 3.7 **Verificación final de PR B2b.** Requiere Docker. En checkout limpio, ejecutar
+- [x] 3.7 **Verificación final de PR B2b.** Requiere Docker. En checkout limpio, ejecutar
   `./mvnw -B verify` en `apps/api` con JDK 25 y Docker activo. Confirmar `AuditChainTriggerIT` y
   `AuditChainConcurrencyIT` en verde completas, incluido el registro génesis, el encadenamiento entre
   dos instituciones y la ausencia de bifurcación bajo concurrencia real. Empujar la rama `...-chain`
@@ -563,7 +586,7 @@ planifica B3 dividido desde el principio, porque su rango medio ya supera el pre
   anticipa exceso. Si lo hubiera, detener la aplicación y consultar al propietario. — `design.md`
   §12, «Pronóstico de tamaño por corte»
 
-- [ ] 4.7 **Verificación final de PR B3a.** Requiere Docker. En checkout limpio, ejecutar
+- [x] 4.7 **Verificación final de PR B3a.** Requiere Docker. En checkout limpio, ejecutar
   `./mvnw -B verify` en `apps/api` con JDK 25 y Docker activo. Confirmar
   `CanonicalSerializationCrossCheckIT` en verde sobre las once familias de divergencia y
   `CanonicalSerializationDivergenceTest` fallando correctamente contra el fixture (es decir, la
@@ -695,7 +718,7 @@ de F0.
   anticipa exceso. Si lo hubiera, detener la aplicación y consultar al propietario. — `design.md`
   §12, «Pronóstico de tamaño por corte»
 
-- [ ] 5.7 **Verificación final de PR B3b y del criterio de salida 3 de F0.** Requiere Docker. En
+- [x] 5.7 **Verificación final de PR B3b y del criterio de salida 3 de F0.** Requiere Docker. En
   checkout limpio, ejecutar `./mvnw -B verify` en `apps/api` con JDK 25 y Docker activo. Confirmar
   `AuditChainVerifierIT` y `AuditChainKnownLimitIT` en verde completas —incluida la identificación
   exacta de la fila manipulada con `SUPERUSER`— y los dos inventarios en verde. Empujar la rama

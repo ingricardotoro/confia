@@ -129,7 +129,7 @@ construyen en F0 como fundación transversal, sin capacidad propia: su contrato 
 `build-integrity`.
 
 La **bitácora de auditoría inmutable** sí recibe capacidad propia, `audit-trail`, por decisión del
-propietario del 2026-09-21. Se construye igualmente en F0 como fundación transversal, pero lo que
+propietario del 2026-09-21, **publicada el 2026-09-22** con 10 requisitos y 27 escenarios. Se construye igualmente en F0 como fundación transversal, pero lo que
 promete —trazabilidad con valor probatorio y el límite declarado de ese control mientras no exista
 ancla externa— es un comportamiento de tiempo de ejecución que debe poder encontrarse por sí solo,
 no una puerta de construcción. Sigue el precedente de `money`, capacidad técnica publicada y
