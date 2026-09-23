@@ -197,7 +197,7 @@ Rama `change/idempotency-key-infrastructure-store`, base PR C1. Ver la sección 
 reportada arriba: esta partición reagrupa el contenido de `design.md` §12 para que cada mitad compile
 por sí sola.
 
-- [ ] 2.1 **Ejecutar las sondas S4 y S6 (bloqueantes, `design.md` §10 y §11 paso 5).** Requiere
+- [x] 2.1 **Ejecutar las sondas S4 y S6 (bloqueantes, `design.md` §10 y §11 paso 5).** Requiere
   Docker. **S4**: con el cableado real de `IntegrationTestApplication`, provocar `23505` y `55P03`
   contra `shared_idempotency_key` y confirmar por depuración o registro temporal qué excepción llega
   realmente al punto donde vivirá el adaptador (se espera

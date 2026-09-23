@@ -140,9 +140,63 @@ recorded above and is real.
 
 ## Status
 
-7/7 tasks of PR C1 complete (1.1-1.7). Ready for `sdd-archive` review of this cut, or for a fresh
-`sdd-apply` batch to start PR C2a-1 (branch `change/idempotency-key-infrastructure-store`, base PR
-C1) once the maintainer wants to continue the chain.
+7/7 tasks of PR C1 complete (1.1-1.7). PR C2a-1 in progress (branch
+`change/idempotency-key-infrastructure-store`, base PR C1).
+
+## PR C2a-1 — port, signed types, exceptions and jOOQ adapter (branch `change/idempotency-key-infrastructure-store`, base PR C1)
+
+### Task 2.1 — Sondas S4 and S6 (blocking)
+
+**S6, already run by the orchestrator 2026-09-23 (design.md, final section "Sonda S6"): PASS.**
+Confirmed again by reading the generated sources present in `target/generated-sources/jooq` from
+the PR C1 run: the class is `confia.generated.jooq.tables.SharedIdempotencyKey`
+(`SHARED_IDEMPOTENCY_KEY` reference), `response_body JSONB` generates as `org.jooq.JSONB`,
+`status`/`endpoint`/`idempotency_key`/`request_hash` (all `TEXT` with `CHECK`) generate as
+`String`, and `created_at`/`completed_at`/`expires_at` generate as `OffsetDateTime`. No
+`forcedType` needed. R2 is satisfied: the adapter can live in `com.confia.shared.infrastructure`.
+
+**S4, executed now, measured (not read).** Temporary probe `ProbeS4IT` (deleted after this
+recording, not a deliverable), extending `CommittingPostgresIntegrationTest`, run with
+`./mvnw -B -pl app -am test -Dtest=ProbeS4IT -Dsurefire.failIfNoSpecifiedTests=false`
+(`/tmp/confia-logs/s4-probe.log`). Two real scenarios against `shared_idempotency_key` through the
+real `IntegrationTestApplication`/`TransactionRunner` wiring, no adapter yet (the adapter does not
+exist; the probe issues the same jOOQ `insertInto` shape the adapter will use):
+
+- **`55P03` (wait exhaustion)**: two independent `TransactionRunner`s, thread A inserts and holds
+  the transaction open past a `CyclicBarrier`, thread B sets `lock_timeout` to `100ms` and attempts
+  the same primary key. Measured: top-level `org.jooq.exception.DataAccessException`, cause `org.postgresql.util.PSQLException`
+  with `getSQLState()` = `"55P03"`, message `"canceling statement due to lock timeout"`. Matches the
+  design's prediction exactly. Supplier invocation count for thread B: **1** — confirms
+  `TransactionRunner.isRetryable(...)` did not retry (measured by a counter, not by reading the
+  type, per the launch prompt's instruction).
+- **`23505` (duplicate key, sequential)**: first transaction commits an insert; a second,
+  independent transaction inserts the same primary key. Measured: top-level
+  **`org.jooq.exception.IntegrityConstraintViolationException`**, cause `org.postgresql.util.PSQLException`
+  with `getSQLState()` = `"23505"`, message `"duplicate key value violates unique constraint
+  \"shared_idempotency_key_pk\""`. Supplier invocation count: **1** — not retried.
+
+**Discrepancy found and reported, not blocking (hard-stop 3, informational).** design.md section 2
+predicted, by reading, that both outcomes arrive as plain `org.jooq.exception.DataAccessException`
+wrapping the raw `SQLException`, because Spring Boot 4.1 ships no jOOQ autoconfiguration. Measured
+reality is more specific for the duplicate-key case: jOOQ's **own** internal exception translation
+(unrelated to Spring's `org.springframework.dao` hierarchy — confirmed by inspecting
+`jooq-3.18.3.jar` with `javap`) already turns `23505` into
+`org.jooq.exception.IntegrityConstraintViolationException`, a direct subclass of
+`org.jooq.exception.DataAccessException` (itself `extends RuntimeException`, not
+`ConcurrencyFailureException` — **hard-stop 4 does NOT trigger**, confirmed by class inspection: it
+carries no relation whatsoever to Spring's `ConcurrencyFailureException`). Both measured exceptions
+are `RuntimeException`s carrying the real `SQLException` in their cause chain, so `translate(...)`
+as designed in section 6.3 — walking the cause chain for `SQLException.getSQLState()` — works
+unchanged regardless of which of the two top-level jOOQ types wraps it. **No design change
+required**; recorded here because "no se afirma como comprobado lo que no se comprobó" and the
+measured type differs from the predicted one, even though the consequence for the adaptor's
+`translate(...)` method is nil.
+
+**Consequence for task 2.4/2.5**: `translate(...)` must never branch on the top-level exception
+type (`DataAccessException` vs `IntegrityConstraintViolationException`) — only on the `SQLState`
+found by walking `getCause()`, exactly as design.md section 6.3 already specifies. This measured
+result confirms that requirement is not just prudent but necessary, since jOOQ itself already uses
+two different top-level types for the two outcomes this change must treat uniformly by code.
 
 ## TDD Cycle Evidence
 
