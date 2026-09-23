@@ -120,7 +120,7 @@ nunca solo en Engram. **Nunca se inventa evidencia de ROJO.**
 
 Rama `change/idempotency-key-infrastructure` (rama actual), base `main`.
 
-- [ ] 1.1 **ROJO — permisos y privilegios reales.** Requiere Docker. Extender
+- [x] 1.1 **ROJO — permisos y privilegios reales.** Requiere Docker. Extender
   `.../test/java/com/confia/schema/RolePrivilegeMatrixIT.java` con las filas de
   `shared_idempotency_key` para los cinco roles de `docs/03-seguridad.md` §6.1, incluida la fila de
   `PUBLIC` (debe quedar sin ningún privilegio tras el `REVOKE ALL`) y la de un rol ajeno al esquema.
@@ -132,7 +132,7 @@ Rama `change/idempotency-key-infrastructure` (rama actual), base `main`.
   `shared_idempotency_key` por rol de base de datos» (los tres escenarios) y «Ausencia de acceso del
   portal a `shared_idempotency_key` (brecha con destino: F3/F4)» (su escenario)
 
-- [ ] 1.2 **VERDE — `V4__create_shared_idempotency_key.sql`.** Requiere Docker. Crear
+- [x] 1.2 **VERDE — `V4__create_shared_idempotency_key.sql`.** Requiere Docker. Crear
   `apps/api/app/src/main/resources/db/migration/V4__create_shared_idempotency_key.sql` con la tabla
   completa de `design.md` decisión 2 (clave primaria natural compuesta
   `(institution_id, endpoint, idempotency_key)`, las restricciones `CHECK` de `status`,
@@ -149,7 +149,7 @@ Rama `change/idempotency-key-infrastructure` (rama actual), base `main`.
   `design.md`, decisiones 2 y 3; especificación `build-integrity`, requisito «Tabla
   `shared_idempotency_key`, clave primaria natural y seguridad de fila forzada» (ambos escenarios)
 
-- [ ] 1.3 **Comprobar que `MultiTenantSchemaIT` pasa sin modificarse.** Requiere Docker. Ejecutar
+- [x] 1.3 **Comprobar que `MultiTenantSchemaIT` pasa sin modificarse.** Requiere Docker. Ejecutar
   `MultiTenantSchemaIT` completa contra el esquema con `V4` aplicada. Si pasa sin tocar el archivo,
   continuar: es la consecuencia verificada en `design.md` §2 («¿`shared_idempotency_key` rompe alguna
   puerta genérica? Verificado por lectura: no») y §7.1. **Si no pasara, es una discrepancia con este
@@ -158,7 +158,7 @@ Rama `change/idempotency-key-infrastructure` (rama actual), base `main`.
   esquema pasan sobre `shared_idempotency_key` sin lista de exclusión» y «La clave primaria compuesta
   actúa como discriminador de institución sin necesitar la excepción de la tabla raíz»)
 
-- [ ] 1.4 **Comprobar que `AuditScopeExclusionInventoryTest` sigue en verde tras el texto nuevo de
+- [x] 1.4 **Comprobar que `AuditScopeExclusionInventoryTest` sigue en verde tras el texto nuevo de
   `V4`.** No requiere Docker (inventario estático sobre el texto real de las migraciones, sin conexión
   a PostgreSQL). Ejecutar
   `AuditScopeExclusionInventoryTest.scheduledTasksDoesNotAppearInTheDeliveredSchemasMigrations` y
@@ -166,12 +166,12 @@ Rama `change/idempotency-key-infrastructure` (rama actual), base `main`.
   que la tarea 1.2 ya evitó al escribir el comentario; si esta prueba fallara, revisar el texto exacto
   de `V4` antes de tocar la prueba, nunca relajar su aserción. — `design.md` §2 y §14, punto 3
 
-- [ ] 1.5 **Medir el tiempo de la suite `*IT.java`.** Requiere Docker. Ejecutar `./mvnw -B verify`
+- [x] 1.5 **Medir el tiempo de la suite `*IT.java`.** Requiere Docker. Ejecutar `./mvnw -B verify`
   completo en `apps/api` y medir el tiempo real de la fase `integration-test` (Failsafe), con
   `IdempotencyKeyPrivilegeIT` incluida. Registrar el tiempo medido, no estimado, en
   `apply-progress.md`. — `design.md` §11, paso 4; §13
 
-- [ ] 1.6 **Medir el diff real de PR C1** con
+- [x] 1.6 **Medir el diff real de PR C1** con
   `git diff --numstat main...change/idempotency-key-infrastructure -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y
   reportar los puntos de corte candidatos medidos** (no estimados) entre los commits de este corte,
@@ -181,7 +181,7 @@ Rama `change/idempotency-key-infrastructure` (rama actual), base `main`.
   de cobertura por no cumplir esto. No decidir el corte: reportarlo. — `design.md` §12, «Pronóstico de
   tamaño por corte»
 
-- [ ] 1.7 **Verificación final de PR C1.** Requiere Docker. En checkout limpio, con `JAVA_HOME` en
+- [x] 1.7 **Verificación final de PR C1.** Requiere Docker. En checkout limpio, con `JAVA_HOME` en
   JDK 25 y `MAVEN_OPTS` con el almacén de confianza `Windows-ROOT`, ejecutar `./mvnw -B verify` en
   `apps/api`. Confirmar `RolePrivilegeMatrixIT` e `IdempotencyKeyPrivilegeIT` en verde completas,
   `MultiTenantSchemaIT` sin modificar y en verde, y `AuditScopeExclusionInventoryTest` en verde.
