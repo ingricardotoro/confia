@@ -82,7 +82,23 @@ Conclusiones que el diseño debe asumir:
    - Una tercera vía es conservar la atomicidad y acotar la espera con `lock_timeout`, convirtiendo
      el bloqueo indefinido en un error tratable.
 
-Esta decisión cambia el comportamiento observable, así que **es del propietario**, no del diseño.
+**RESUELTA por el propietario el 2026-09-22: atomicidad con espera acotada.** El marcador y el
+efecto viven en la misma transacción, como dice ADR-0010, y la espera se acota con un `lock_timeout`
+explícito. La segunda solicitud espera un tiempo limitado y, si se agota, recibe un error tratable
+que la capa web traduce a 409.
+
+Se descartó confirmar el marcador primero: daría el 409 instantáneo que narra el ADR, pero rompe la
+atomicidad, y una caída entre marcador y efecto dejaría un marcador «en curso» huérfano que nadie
+completaría. El mecanismo de reconciliación que eso exige no existe todavía: db-scheduler llega con
+el cambio 9, que además depende de este.
+
+Se descartó también dejar el bloqueo sin límite: garantiza un solo efecto sin código adicional, pero
+una primera solicitud lenta o colgada retiene a todos sus reintentos ocupando hilos, que es como se
+agota un pool de conexiones bajo carga.
+
+**Queda para el diseño**, no para el propietario: el valor concreto del `lock_timeout`, dónde se fija
+—por sesión, por transacción o por sentencia—, y la traducción exacta del error de tiempo agotado al
+código de estado y al cuerpo de respuesta.
 
 ## 4. Relación con el componente transaccional
 
