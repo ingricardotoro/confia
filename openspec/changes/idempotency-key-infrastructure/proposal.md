@@ -570,6 +570,26 @@ entonces, una migración aplicada no se edita.
 El modo de ejecución es automático: estas decisiones quedan registradas en lugar de preguntarse en
 conversación. El orquestador las presenta.
 
+> **Las cuatro decisiones quedaron resueltas el 2026-09-22.** Se conservan abajo con su
+> razonamiento original, porque explican por qué se decidió así.
+>
+> - **D1: sí, nota editorial fechada.** Decisión del orquestador, por el precedente del cambio 5. Con
+>   el matiz que esta propuesta señala y que se adopta: la nota **remite**, pero lo que **obliga** es
+>   el requisito con escenario ejecutable del delta. La corrección de concurrencia no es editorial,
+>   porque una sonda refutó lo que el ADR narraba.
+> - **D2: no se registra el bean, y se corrige el Javadoc.** Decisión del propietario. Registrarlo
+>   arrastraría a F0 la fuente de datos de producción, su pool y su configuración por perfil, para un
+>   componente cuyo único consumidor en esta fase sería una prueba; los tres puntos de entrada
+>   excluyen `DataSourceAutoConfiguration` con una condición de retirada escrita. El Javadoc pasa a
+>   nombrar al dueño real en vez de a «el primer cambio que lo consuma».
+> - **D3: sí, la cabecera obligatoria se difiere al cambio 7.** Decisión del orquestador. Es donde
+>   nace la capa web; `docs/09` se actualiza para que la mitad diferida del entregable 6 no caduque
+>   en silencio.
+> - **D4: propuesta aprobada** por el propietario, con D2 resuelta.
+>
+> **Estrategia de entrega: `auto-chain`**, no `single-pr`. Ver la sección correspondiente de
+> `exploration.md`.
+
 - **D1. Nota editorial fechada sobre ADR-0010, sin reescribir su cuerpo.** Recomendación: sí, por el
   precedente del cambio 5 (decisión D2 sobre ADR-0003). Alternativa: no tocar ningún ADR, con lo que
   el registro histórico conserva un esquema que rompe dos puertas y una narrativa de concurrencia
