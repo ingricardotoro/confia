@@ -146,3 +146,21 @@ Sí, con cinco decisiones explícitas pendientes: el nombre y la forma de la cla
 mecanismo real de concurrencia para el caso «en curso», el sustrato de demostración del criterio de
 salida 4, la exclusión explícita de W1 y W2, y la forma exacta de la API de `TransactionRunner` para
 envolver marcador y efecto en una sola transacción.
+
+
+## Estrategia de entrega: `auto-chain`
+
+El bloque de preflight de sesión proyecta `single-pr`, y el orquestador arrastró en sus encargos la
+palabra «auto», que **no pertenece** al dominio válido de cuatro valores (`ask-on-risk`,
+`auto-chain`, `single-pr`, `exception-ok`). La fase de propuesta lo detectó y, con buen criterio, no
+lo registró en ningún artefacto ni lo asignó al valor más cercano por su cuenta.
+
+**El valor correcto es `auto-chain`.** En la preflight de esta sesión el propietario eligió, para la
+estrategia de pull requests, la opción descrita literalmente como «parto en pull requests encadenados
+por mi cuenta al llegar al presupuesto, sin consultarte cada vez». Eso es `auto-chain`, no
+`single-pr`. El `single-pr` del bloque proviene del registro caducado de `sdd-init` del 2026-09-15,
+la misma fuente obsoleta que ya obligó a corregir tres fases del cambio anterior.
+
+El pronóstico de dos o tres pull requests encadenados de esta propuesta es coherente con
+`auto-chain`, y con `docs/15-flujo-de-trabajo-git.md` §3, que impone el corte a las ochocientas
+líneas con independencia de cualquier token de estrategia.
