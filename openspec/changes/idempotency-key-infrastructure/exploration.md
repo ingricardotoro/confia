@@ -56,7 +56,33 @@ ADR-0010 dice que el marcador se inserta «dentro de la misma transacción» que
 primera transacción resuelva, no falla de inmediato. Si eso es así, la solicitud concurrente quedaría
 esperando en el hilo HTTP en vez de recibir el 409 inmediato que narra el ADR.
 
-**Necesita sonda dedicada antes de implementar.** Es el riesgo técnico principal del cambio.
+**Sonda ejecutada por el orquestador el 2026-09-22 contra `postgres:18-alpine`: la tensión es real,
+y el cuadro completo es más preciso que la sospecha.**
+
+Tabla con clave primaria natural compuesta, dos sesiones, misma clave:
+
+| Caso | Qué le pasa a la segunda solicitud |
+|---|---|
+| La primera **confirma** | Se bloquea **5 847 ms** esperándola, y entonces **falla** por clave duplicada |
+| La primera **revierte** | Se bloquea **4 658 ms**, y entonces **inserta con éxito** |
+| `lock_timeout` por defecto | **0**, es decir, sin límite de espera |
+
+Conclusiones que el diseño debe asumir:
+
+1. **El 409 inmediato que narra ADR-0010 no ocurre por sí solo.** La segunda solicitud espera tanto
+   como tarde la primera, en el hilo HTTP. Con `lock_timeout` a cero, espera indefinidamente.
+2. El bloqueo **sí** da la garantía de un solo efecto, que es lo esencial: la segunda nunca duplica.
+3. Hay una bifurcación real de diseño, con costes opuestos:
+   - **Marcador y efecto en la misma transacción**, como dice el ADR: atómico por construcción, pero
+     imposible responder rápido a la solicitud concurrente, y una primera solicitud lenta retiene a
+     todas sus reintentos.
+   - **Marcador confirmado primero, en su propia transacción corta**: permite responder de inmediato,
+     pero marcador y efecto dejan de ser atómicos y hace falta que la transición de estado sobreviva
+     a una caída entre ambos.
+   - Una tercera vía es conservar la atomicidad y acotar la espera con `lock_timeout`, convirtiendo
+     el bloqueo indefinido en un error tratable.
+
+Esta decisión cambia el comportamiento observable, así que **es del propietario**, no del diseño.
 
 ## 4. Relación con el componente transaccional
 
