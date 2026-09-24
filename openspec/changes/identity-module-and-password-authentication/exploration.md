@@ -1,15 +1,24 @@
 # Exploración: autenticación del personal, MFA y sesiones
 
 - **Cambio original:** `staff-authentication-mfa-sessions` (cambio 7 de F0)
-- **Dividido el 2026-09-24 en:** `staff-identity-password-and-mfa` (parte A, esta carpeta) y
-  `session-tokens-and-web-layer` (parte B)
+- **Dividido el 2026-09-24, en dos pasos, en tres cambios secuenciales:**
+  1. `identity-module-and-password-authentication` — esta carpeta
+  2. `mfa-totp-and-password-recovery`
+  3. `session-tokens-and-web-layer`
 - **Fase:** explorar
 - **Fecha:** 2026-09-24
 - **Estado:** exploración terminada, división aprobada por el propietario, pendiente de propuesta
 
-> **Alcance de este documento.** Esta exploración se hizo sobre el cambio 7 completo, antes de la
-> división, y por eso describe las dos partes. Es la exploración compartida: la parte B la referencia
-> desde su propia carpeta en vez de repetirla, como hizo la parte B del cambio 5.
+> **Alcance de este documento.** Esta exploración se hizo sobre el cambio 7 completo, antes de
+> cualquier división, y por eso describe la superficie entera. Es la exploración compartida de los
+> tres cambios: los dos siguientes la referencian desde su propia carpeta en vez de repetirla, como
+> hizo la parte B del cambio 5.
+>
+> **Por qué dos pasos.** El propietario aprobó primero el corte entre identidad y sesión, que la
+> exploración recomendaba. La propuesta resultante pronosticó de 14 a 16 tareas contra el límite de
+> quince de `openspec/changes/README.md`, y el propietario aprobó entonces el segundo corte, donde
+> entra el cifrado de columna. La regla del repositorio pide exactamente eso: partir **antes** de
+> continuar a diseño, no descubrirlo en la fase de tareas.
 
 > **Nota de persistencia y dos correcciones del orquestador.** El agente de exploración no dispuso de
 > herramienta de escritura de archivos, así que entregó el contenido íntegro y el orquestador lo

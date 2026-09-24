@@ -90,6 +90,28 @@ decisiones que la exploración dejó abiertas, solo el mecanismo de cifrado del 
 la parte A; el dueño de la guarda de arranque de RBAC, la exigencia de `Idempotency-Key` en endpoints
 que no mueven dinero y el alcance del registro de la fuente de datos son de la parte B.
 
+**Nota (2026-09-24, segundo corte: la parte A se parte a su vez).** La propuesta de la parte A
+pronosticó de **14 a 16 tareas** contra el límite de quince de `openspec/changes/README.md`, y de
+2 400 a 4 000 líneas, con el historial de subestimación de este repositorio sin descontar. La regla de
+tamaño pide partir **antes de continuar a diseño**, así que el propietario aprobó el segundo corte en
+vez de esperar a la fase de tareas. El cambio 7 se ejecuta como **tres** cambios SDD secuenciales:
+
+1. `identity-module-and-password-authentication` — módulo `identity`, esquema, migración con
+   seguridad de fila y privilegios, autenticación con contraseña con Argon2id, bloqueo por intentos
+   fallidos con retroceso, asientos de auditoría de identidad y prevención de enumeración.
+2. `mfa-totp-and-password-recovery` — cifrado de columna con sobre de llaves y su ADR, TOTP,
+   inscripción del segundo factor, códigos de recuperación, y recuperación de contraseña con token de
+   un solo uso.
+3. `session-tokens-and-web-layer` — sin cambios respecto a la parte B descrita arriba.
+
+El corte entre 1 y 2 está donde **entra el cifrado de columna**: el primero no cifra nada, solo
+hashea, y por eso no necesita el sobre de llaves, la tabla `shared_data_key` ni el ADR nuevo. Esas
+tres cosas, y el delta de redacción sobre el requisito publicado de MFA, pasan íntegras al cambio 2.
+La contradicción entre los dos modelos de bloqueo y la del escenario del sexto intento se quedan en
+el cambio 1, que es su dueño. La carpeta `staff-identity-password-and-mfa` pasó a llamarse
+`identity-module-and-password-authentication`; no hubo nunca una carpeta con el nombre de la parte A
+publicada.
+
 **Hallazgo.** `docs/09-roadmap-y-fases.md` §3 no incluye el módulo `organization` en F0, pero
 ADR-0009 exige `institution_id NOT NULL` desde la primera migración y ADR-0017 asigna la tabla raíz
 de institución a ese módulo. Se recomienda incorporar el cambio 4, con la entidad raíz mínima, al
