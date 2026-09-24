@@ -16,14 +16,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * {@link IdempotentExecutor} without concurrency (design.md, decisions 1, 6 and 7; PR C2b): the
- * four sequential paths a single caller can exercise inside one transaction — a new key, the
- * atomicity of the marker and its business effect, the replay of an already-completed key, and the
- * rejection of a different payload under the same key. The bounded {@code lock_timeout} and its
- * three {@code SQLState} outcomes under real concurrency are C2c's own {@code
- * IdempotentExecutorConcurrencyIT}, once {@code set_config('lock_timeout', ...)} becomes the first
- * statement of the transaction (design.md, decision 4; tasks.md, task 5.3) — this class does not
- * bind it yet.
+ * {@link IdempotentExecutor} without real concurrency (design.md, decisions 1, 6 and 7): the four
+ * sequential paths a single caller can exercise inside one transaction — a new key, the atomicity of
+ * the marker and its business effect, the replay of an already-completed key, and the rejection of a
+ * different payload under the same key. The bounded {@code lock_timeout} and its three {@code
+ * SQLState} outcomes under real concurrency, plus the non-retry proof, live in {@link
+ * IdempotentExecutorConcurrencyIT} (design.md, decision 4; tasks.md, tasks 5.2-5.4).
  */
 class IdempotentExecutorIT extends CommittingPostgresIntegrationTest {
 
@@ -38,7 +36,7 @@ class IdempotentExecutorIT extends CommittingPostgresIntegrationTest {
 
     private IdempotentExecutor executor() {
         return new IdempotentExecutor(transactionRunner(), store(), new RequestPayloadHasher(),
-                FIXED_CLOCK);
+                FIXED_CLOCK, dataSource());
     }
 
     @Test
