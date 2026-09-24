@@ -431,11 +431,11 @@ porque van a ser criterio de revisión de cada pull request.
 
 ## Decisiones que requieren aprobación explícita del propietario
 
-Numeradas para que se respondan de una en una. **D1 y D2 quedaron resueltas por el propietario el
-2026-09-24**, y con D2 se absorbió D3; las tres se conservan con su número y su resolución escrita,
-en vez de borrarlas, para que las referencias ya hechas sigan siendo localizables. **Ninguna decisión
-bloquea ya la especificación.** Quedan pendientes D4, D5 y D6, que pueden resolverse durante la fase
-de especificación si el propietario lo prefiere.
+**Las seis quedaron resueltas por el propietario el 2026-09-24, y la propuesta está aprobada.** Se
+conservan con su número, su recomendación original y su resolución escrita, en vez de reducirlas a un
+«aprobado». **D2 se decidió en contra de lo que esta propuesta recomendaba**, y ahí el motivo importa
+más que el resultado: quien lea esto dentro de seis meses necesita saber por qué se apartó del
+requisito publicado, no solo que se apartó. D3 no se decidió: quedó **absorbida** por D2.
 
 **Dos decisiones de la propuesta anterior no aparecen en esta lista, y se registran aquí como
 resueltas para que la referencia no se pierda:**
@@ -525,7 +525,8 @@ resueltas para que la referencia no se pierda:**
   redacción sobre el requisito de MFA, pertenece íntegra a `mfa-totp-and-password-recovery` y no se
   pide aquí.)
 
-- **D4 (antes D5). La institución previa a la autenticación proviene de configuración del servidor,
+- **D4 (antes D5). APROBADA POR EL PROPIETARIO EL 2026-09-24. La institución previa a la
+  autenticación proviene de configuración del servidor,
   nunca de la solicitud.** Esta es una costura que hay que fijar ahora. Toda tabla `identity_*` lleva
   política de fila sobre `app.institution_id`, y una política que recibe `NULL` **deniega**
   (`docs/03` §6.2, regla 4). Pero el inicio de sesión ocurre **antes** de que exista token, y
@@ -548,15 +549,17 @@ resueltas para que la referencia no se pierda:**
   efectivo de una sola institución**», y el punto 5 solo como corolario útil: si no existe conmutador
   de institución en ninguna interfaz, no hay nada en la petición que pudiera portarla legítimamente.
 
-- **D5 (antes D6, con alcance recortado a lo que toca este cambio). Cuatro exclusiones pese a estar
+- **D5 (antes D6, con alcance recortado a lo que toca este cambio). APROBADA POR EL PROPIETARIO EL
+  2026-09-24. Cuatro exclusiones pese a estar
   en `docs/03`.** Recomendación: excluir, con los destinos de «Fuera de alcance»: listas de
   contraseñas comprometidas y rehash transparente —**cambio 8** o un cambio de identidad
   posterior—, calibración de Argon2id —**cambio 11**—, y extremo a extremo con Playwright del flujo
   de autenticación con contraseña —F1 o posterior—. Ninguno está en los ocho requisitos publicados de
   `identity`, así que excluirlos no rompe ningún contrato publicado.
 
-- **D6 (antes D8). Aprobación de la propuesta completa** antes de especificar, diseñar y planificar
-  tareas (`openspec/config.yaml`, `rules.proposal`).
+- **D6 (antes D8). APROBADA POR EL PROPIETARIO EL 2026-09-24. Aprobación de la propuesta completa**
+  antes de especificar, diseñar y planificar tareas (`openspec/config.yaml`, `rules.proposal`).
+  **Las seis decisiones quedaron resueltas y la propuesta pasa a la fase de especificación.**
 
 **No forman parte de estas decisiones**, por estar ya fijadas: la división del cambio 7 en tres
 cambios SDD secuenciales, aprobada por el propietario el 2026-09-24 en dos pasos; el reparto de la
