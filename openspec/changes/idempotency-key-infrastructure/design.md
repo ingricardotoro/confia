@@ -1196,3 +1196,25 @@ cambio 5, donde hizo falta un `forcedType`. Aquí no hace falta ninguno.
 
 **S4 sigue pendiente** y es tarea del corte C2a-1: necesita el cableado Java que ese mismo corte
 construye, así que no tiene sentido adelantarla como sonda aislada.
+
+
+## Sonda S3, ejecutada por el orquestador el 2026-09-23, antes del corte C2b
+
+**PASA. El enfoque principal de la decisión 7 se sostiene y el respaldo no hace falta.**
+
+Montaje contra `postgres:18-alpine`: una fila con `status = 'IN_PROGRESS'`. La sesión 1 abre
+transacción, toma `SELECT ... FOR UPDATE` sobre esa fila, duerme cinco segundos, la actualiza a
+`COMPLETED` con `expires_at` renovado, y confirma. La sesión 2 intenta el mismo
+`SELECT ... FOR UPDATE` un segundo después.
+
+Resultado: la sesión 2 **se bloquea 4 354 ms** y, al desbloquearse, lee **`COMPLETED`** — la versión
+confirmada más reciente, no la instantánea con la que empezó su transacción.
+
+Es la reevaluación de `READ COMMITTED` comportándose como el diseño necesitaba: la lectura previa
+bloqueada ve el estado nuevo, así que el componente puede decidir sobre datos actuales sin releer ni
+reintentar. **No se conmuta** al respaldo previsto —`UPDATE` con el predicado de estado en su
+cláusula y cero filas actualizadas como señal de derrota—.
+
+Queda en pie lo que esta sonda **no** demuestra: que la fila exista. Si la primera transacción
+hubiera insertado y revertido, la segunda no encontraría fila que bloquear, y ese camino lo cubre la
+sonda S1 ya ejecutada, donde la inserción de la segunda tiene éxito tras la reversión.
