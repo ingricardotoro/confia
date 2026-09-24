@@ -431,11 +431,11 @@ porque van a ser criterio de revisión de cada pull request.
 
 ## Decisiones que requieren aprobación explícita del propietario
 
-Numeradas para que se respondan de una en una. **D1 bloquea la especificación.** **D2 quedó resuelta
-por el propietario el 2026-09-24** y con ella se absorbió D3; ambas se conservan con su número y su
-resolución escrita, en vez de borrarlas, para que las referencias ya hechas sigan siendo
-localizables. Las demás pueden resolverse durante la fase de especificación si el propietario lo
-prefiere.
+Numeradas para que se respondan de una en una. **D1 y D2 quedaron resueltas por el propietario el
+2026-09-24**, y con D2 se absorbió D3; las tres se conservan con su número y su resolución escrita,
+en vez de borrarlas, para que las referencias ya hechas sigan siendo localizables. **Ninguna decisión
+bloquea ya la especificación.** Quedan pendientes D4, D5 y D6, que pueden resolverse durante la fase
+de especificación si el propietario lo prefiere.
 
 **Dos decisiones de la propuesta anterior no aparecen en esta lista, y se registran aquí como
 resueltas para que la referencia no se pierda:**
@@ -450,24 +450,31 @@ resueltas para que la referencia no se pierda:**
 
 ---
 
-- **D1 (antes D2). El estado del retroceso vive en PostgreSQL, no en Redis. PENDIENTE, y la decisión
-  D2 la volvió más incómoda, no menos.**
+- **D1 (antes D2). El estado del retroceso vive en PostgreSQL, no en Redis. APROBADA POR EL
+  PROPIETARIO EL 2026-09-24**, con la incomodidad de abajo planteada de forma explícita antes de
+  decidir.
 
-  Recomendación: PostgreSQL, por la sección «1» de arriba. El argumento decisivo no es la ausencia de
-  Redis sino la **atomicidad**: la regla 14 de `CLAUDE.md` y `docs/03` §12.2 exigen auditar cada
+  El argumento decisivo no es la ausencia de Redis sino la **atomicidad**: la regla 14 de `CLAUDE.md` y `docs/03` §12.2 exigen auditar cada
   ciclo de retroceso, y registrar el fallo, calcular el retardo y escribir el asiento en **una sola
   transacción** de `TransactionRunner` solo es posible con el estado en el mismo motor.
 
-  **La incomodidad, dicha sin rodeos.** El propietario acaba de decidir en D2 que §4.4 gobierna sobre
-  el requisito publicado, y **§4.4 dice literalmente «con estado en Redis»**. Aprobar PostgreSQL es,
-  por tanto, apartarse de una frase de la misma sección que se acaba de declarar autoritativa. Esta
-  propuesta no presenta eso como si no existiera. Lo que D2 resolvió fue el **modelo** —retardo
-  contra bloqueo, umbral y progresión—, que es lo que estaba en conflicto con el requisito publicado;
-  **dónde vive el estado es una decisión separada** y sigue abierta.
+  **La incomodidad, dicha sin rodeos, porque se planteó antes de decidir y no después.** En D2 se
+  decidió que §4.4 gobierna sobre el requisito publicado, y **§4.4 dice literalmente «con estado en
+  Redis»**. Aprobar PostgreSQL es, por tanto, apartarse de una frase de la misma sección que se acaba
+  de declarar autoritativa. Esta propuesta no lo presenta como si no existiera. Lo que D2 resolvió
+  fue el **modelo** —retardo contra bloqueo, umbral y progresión—, que era lo que estaba en conflicto
+  con el requisito publicado; **dónde vive el estado era una decisión separada**, y se resolvió por
+  separado.
 
-  **Alternativa:** introducir aquí la primera dependencia de Redis del proyecto, sin
+  **Alternativa descartada:** introducir aquí la primera dependencia de Redis del proyecto, sin
   aprovisionamiento, sin Compose y sin un segundo consumidor —el cambio 11 sigue sin archivar—,
-  aceptando además que el retroceso y su asiento de auditoría dejen de ser atómicos.
+  aceptando además que el retroceso y su asiento de auditoría dejen de ser atómicos, y volviendo este
+  cambio dependiente del 11 con la reordenación que eso implica.
+
+  **Consecuencia documental:** `docs/03` §4.4 recibe una nota editorial fechada que registra que el
+  estado por cuenta vive en PostgreSQL y por qué, sin reescribir el cuerpo de la sección. La
+  dimensión por IP, que esa misma sección describe, sigue apuntando a Redis y sigue siendo del
+  cambio 11 para el aprovisionamiento.
 
   En cualquiera de las dos, la dimensión por IP de §4.4 queda fuera de este cambio con dueño
   nombrado: el control en `session-tokens-and-web-layer`, porque una dirección IP solo existe en el
@@ -526,12 +533,20 @@ resueltas para que la referencia no se pierda:**
   parámetro del cliente**. El puerto `CurrentInstitutionProvider` no resuelve esto: su Javadoc dice
   que el comportamiento sin sesión autenticada «is that adaptor's own decision», y su adaptador real
   es de `session-tokens-and-web-layer`. **Recomendación:** la institución previa a la autenticación
-  proviene de la configuración del proceso —despliegue de una sola institución, ADR-0009 punto 5—,
-  nunca del cuerpo, la cabecera ni la consulta; este cambio recibe esa institución en el
+  proviene de la configuración del proceso, nunca del cuerpo, la cabecera ni la consulta; este cambio
+  recibe esa institución en el
   `SecurityContext` que le pasa su llamador y **escribe el contrato como requisito con escenario**,
   para que `session-tokens-and-web-layer` lo materialice sin reinventarlo. **Alternativa
   descartada:** una consulta global sin contexto de institución, imposible sin `BYPASSRLS`, que
   ningún rol tiene ni tendrá (`create-test-roles.sql`, líneas 11–15, `NOBYPASSRLS` en los cinco).
+
+  **Precisión de cita, verificada contra el ADR.** Una versión anterior de esta propuesta apoyaba la
+  recomendación en «ADR-0009 punto 5». El punto 5 no dice eso: dice que **la funcionalidad de
+  administración de instituciones no se construye ahora** —sin pantalla de alta, sin conmutador de
+  institución en la interfaz, sin facturación por inquilino—. Lo que sostiene la recomendación es la
+  **decisión de cabecera** del ADR, «se adopta la opción D en el modelo de datos, **con despliegue
+  efectivo de una sola institución**», y el punto 5 solo como corolario útil: si no existe conmutador
+  de institución en ninguna interfaz, no hay nada en la petición que pudiera portarla legítimamente.
 
 - **D5 (antes D6, con alcance recortado a lo que toca este cambio). Cuatro exclusiones pese a estar
   en `docs/03`.** Recomendación: excluir, con los destinos de «Fuera de alcance»: listas de
