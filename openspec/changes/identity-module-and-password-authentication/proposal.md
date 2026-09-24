@@ -180,11 +180,14 @@ hexagonal ya vigente, así que dividir la capacidad en dos no tendría dónde ap
 
 - **`identity`**: delta con `## ADDED Requirements` para el comportamiento nuevo que este cambio
   entrega sin token ni segundo factor —resultado tipado de autenticación con sus dos desenlaces,
-  verificación Argon2id contra hash señuelo, estado de bloqueo persistente en PostgreSQL, y las
-  exclusiones con destino nombrado— y `## MODIFIED Requirements` sobre el requisito publicado de
-  bloqueo, para el escenario del sexto intento (**D3**) y, si **D2** elige la alternativa, para la
-  progresión misma. El requisito de MFA obligatoria **no se toca en este delta**: sigue publicado tal
-  como está y lo modifica `mfa-totp-and-password-recovery`.
+  verificación Argon2id contra hash señuelo, estado del retroceso persistente, y las exclusiones con
+  destino nombrado— y `## MODIFIED Requirements` sobre el requisito publicado de bloqueo. Ese delta
+  es más profundo de lo que esta propuesta anticipaba, porque **D2** se resolvió por §4.4: cambian el
+  **título** del requisito —deja de ser un bloqueo y pasa a ser un retardo—, su enunciado, el umbral
+  (del quinto fallo al tercero), la progresión (`2^(n-3)` con tope de 900 segundos), la expiración
+  del contador a los 30 minutos, y **sus dos escenarios completos**. El requisito de MFA obligatoria
+  **no se toca en este delta**: sigue publicado tal como está y lo modifica
+  `mfa-totp-and-password-recovery`.
 - **`build-integrity`**: delta con `## MODIFIED Requirements` sobre el requisito «Aislamiento del
   `domain` entre módulos», para incorporar el escenario diferido W2 que este cambio cierra, y
   retirar la nota de diferimiento de las líneas 26–32.
@@ -197,8 +200,8 @@ hexagonal ya vigente, así que dividir la capacidad en dos no tendría dónde ap
 | 2 | Autenticación con contraseña | Contraseña incorrecta | **Completo**: error genérico, ningún artefacto de sesión, intento fallido registrado | — |
 | 3 | MFA obligatoria | Cajero con MFA configurada | **No toca** | `mfa-totp-and-password-recovery` (mecanismo) y `session-tokens-and-web-layer` (token) |
 | 4 | MFA obligatoria | Rol administrativo sin MFA configurada | **No toca** | Ídem |
-| 5 | Bloqueo por intentos fallidos | Primer bloqueo tras cinco fallos | **Completo**, con **D2** resuelta | — |
-| 6 | Bloqueo por intentos fallidos | Segundo ciclo con retroceso mayor | **Completo**, incluida la auditoría de cada ciclo con su duración | — |
+| 5 | Bloqueo por intentos fallidos | Primer bloqueo tras cinco fallos | **Reescrito por el delta**, no cubierto tal como está publicado: con §4.4 gobernando no hay bloqueo al quinto fallo ni sexto intento rechazado por bloqueo activo. El escenario pasa a describir el retardo desde el tercer fallo | — |
+| 6 | Bloqueo por intentos fallidos | Segundo ciclo con retroceso mayor | **Reescrito por el delta**: la progresión pasa a ser `2^(n-3)` con tope de 900 segundos, y se conserva la obligación de auditar cada ciclo con su duración | — |
 | 7 | Rotación de token de refresco | Renovación normal | **No toca** | `session-tokens-and-web-layer` |
 | 8 | Rotación de token de refresco | Reuso de token invalidado | **No toca** | `session-tokens-and-web-layer` |
 | 9 | Separación entre dominios de identidad | Token de encargado a API administrativa | **No toca** | `session-tokens-and-web-layer` |
@@ -251,7 +254,11 @@ una dirección IP solo existe en el borde HTTP y aquí no hay petición. **Dueñ
 el cambio 11.** Se escribe como requisito con escenario ejecutable, cierto hoy y falso el día que ese
 cambio lo cierre.
 
-**Esta recomendación no decide el modelo de bloqueo**, que es otra cosa y está en **D2**.
+**Esta recomendación no decide el modelo de bloqueo**, que es otra cosa y quedó resuelta en **D2** el
+2026-09-24: gobierna el retardo de §4.4. Las dos son independientes, y conviene no confundirlas: D2
+fijó **qué** control se aplica, y esta sección propone **dónde vive su estado**. Que §4.4 sea ahora la
+fuente autoritativa del modelo no arrastra consigo su frase sobre Redis; ver la incomodidad
+declarada en **D1**.
 
 ### 2. La costura con los cambios siguientes: qué devuelve el caso de uso cuando no existe segundo factor en ninguna forma
 
@@ -424,8 +431,11 @@ porque van a ser criterio de revisión de cada pull request.
 
 ## Decisiones que requieren aprobación explícita del propietario
 
-Numeradas para que se respondan de una en una. **D1 y D2 bloquean la especificación**; las demás
-pueden resolverse durante la fase de especificación si el propietario lo prefiere.
+Numeradas para que se respondan de una en una. **D1 bloquea la especificación.** **D2 quedó resuelta
+por el propietario el 2026-09-24** y con ella se absorbió D3; ambas se conservan con su número y su
+resolución escrita, en vez de borrarlas, para que las referencias ya hechas sigan siendo
+localizables. Las demás pueden resolverse durante la fase de especificación si el propietario lo
+prefiere.
 
 **Dos decisiones de la propuesta anterior no aparecen en esta lista, y se registran aquí como
 resueltas para que la referencia no se pierda:**
@@ -440,41 +450,73 @@ resueltas para que la referencia no se pierda:**
 
 ---
 
-- **D1 (antes D2). El estado del bloqueo por intentos fallidos vive en PostgreSQL, no en Redis.**
-  Recomendación: sí, por la sección «1» de arriba. Implica que `docs/03` §4.4 recibe una nota
-  editorial fechada y que la dimensión por IP queda fuera con dueño nombrado —control en
-  `session-tokens-and-web-layer`, aprovisionamiento en el cambio 11—. **Alternativa descartada:**
-  introducir aquí la primera dependencia de Redis del proyecto, sin aprovisionamiento, sin Compose y
-  sin un segundo consumidor, rompiendo además la atomicidad entre el bloqueo y su asiento de
-  auditoría.
+- **D1 (antes D2). El estado del retroceso vive en PostgreSQL, no en Redis. PENDIENTE, y la decisión
+  D2 la volvió más incómoda, no menos.**
 
-- **D2 (antes D3). Qué modelo de bloqueo gobierna, porque hoy hay dos y no son el mismo.** Esta
-  propuesta no la resuelve sola porque cambia un parámetro de seguridad. Los dos modelos, ambos
-  citados literalmente:
-  - `openspec/specs/identity/spec.md`, requisito publicado: bloqueo **tras cinco intentos fallidos
-    consecutivos**, un minuto el primer ciclo, cinco minutos el segundo.
+  Recomendación: PostgreSQL, por la sección «1» de arriba. El argumento decisivo no es la ausencia de
+  Redis sino la **atomicidad**: la regla 14 de `CLAUDE.md` y `docs/03` §12.2 exigen auditar cada
+  ciclo de retroceso, y registrar el fallo, calcular el retardo y escribir el asiento en **una sola
+  transacción** de `TransactionRunner` solo es posible con el estado en el mismo motor.
+
+  **La incomodidad, dicha sin rodeos.** El propietario acaba de decidir en D2 que §4.4 gobierna sobre
+  el requisito publicado, y **§4.4 dice literalmente «con estado en Redis»**. Aprobar PostgreSQL es,
+  por tanto, apartarse de una frase de la misma sección que se acaba de declarar autoritativa. Esta
+  propuesta no presenta eso como si no existiera. Lo que D2 resolvió fue el **modelo** —retardo
+  contra bloqueo, umbral y progresión—, que es lo que estaba en conflicto con el requisito publicado;
+  **dónde vive el estado es una decisión separada** y sigue abierta.
+
+  **Alternativa:** introducir aquí la primera dependencia de Redis del proyecto, sin
+  aprovisionamiento, sin Compose y sin un segundo consumidor —el cambio 11 sigue sin archivar—,
+  aceptando además que el retroceso y su asiento de auditoría dejen de ser atómicos.
+
+  En cualquiera de las dos, la dimensión por IP de §4.4 queda fuera de este cambio con dueño
+  nombrado: el control en `session-tokens-and-web-layer`, porque una dirección IP solo existe en el
+  borde HTTP, y el aprovisionamiento en el cambio 11.
+
+- **D2 (antes D3). Qué modelo de bloqueo gobierna. RESUELTA POR EL PROPIETARIO EL 2026-09-24:
+  gobierna `docs/03-seguridad.md` §4.4, con delta explícito sobre el requisito publicado.**
+
+  Los dos modelos que estaban en conflicto, citados literalmente:
+  - `openspec/specs/identity/spec.md`, requisito publicado: **bloqueo** tras cinco intentos fallidos
+    consecutivos, un minuto el primer ciclo, cinco minutos el segundo, «que crece exponencialmente en
+    cada ciclo adicional» **sin tope declarado**.
   - `docs/03-seguridad.md` §4.4: **retardo** de `2^(n-3)` segundos **a partir del intento fallido
     3**, con tope de 900 segundos y contador que expira a los 30 minutos sin intentos.
 
   Difieren en el umbral (3 frente a 5), en la naturaleza del control (un retardo antes de responder
-  frente a un bloqueo de la cuenta) y en la progresión. **Recomendación: gobierna la especificación
-  publicada**, porque es el contrato aprobado, sus dos escenarios son exactos y verificables, y un
-  cambio SDD no reescribe en silencio un requisito publicado; `docs/03` §4.4 recibe una nota
-  editorial fechada que remite a él, con el precedente de la decisión D2 del cambio 5 sobre ADR-0003
-  y de la nota del cambio 6 sobre ADR-0010. **Alternativa:** que gobierne §4.4, lo que exige un
-  `## MODIFIED Requirements` sobre el requisito publicado con sus dos escenarios reescritos. El
-  retardo uniforme de §4.4 aplicado también a cuentas inexistentes **se conserva en ambos casos**,
-  porque pertenece a la prevención de enumeración de §4.6 y no al modelo de bloqueo.
+  frente a un bloqueo de la cuenta) y en la progresión. La propuesta recomendaba que gobernara la
+  especificación publicada, por ser el contrato aprobado. **El propietario decidió lo contrario, y
+  por tres razones de fondo que pesan más que el argumento de proceso:**
+
+  1. **El retardo es a prueba de enumeración por construcción.** Un retardo se aplica igual a una
+     cuenta inexistente; un bloqueo no, porque no se puede bloquear lo que no existe. §4.6 exige
+     precisamente aplicar el retardo también a cuentas inexistentes. El modelo de bloqueo **crea** la
+     contradicción que la antigua D3 tenía que administrar; el de retardo la **disuelve**.
+  2. **El requisito publicado no declara tope.** Un crecimiento exponencial sin techo es un vector de
+     denegación de servicio. §4.4 lo capa en 900 segundos.
+  3. **§4.4 dice explícitamente por qué rechazó el bloqueo**, y el razonamiento está escrito y es
+     correcto: «es un vector de denegación de servicio contra usuarios legítimos, porque cualquiera
+     que conozca un correo puede bloquear esa cuenta».
+
+  **Consecuencia para la especificación.** Esto exige un `## MODIFIED Requirements` sobre el
+  requisito publicado, no una nota editorial: cambian su título —deja de ser un bloqueo—, su
+  enunciado y sus dos escenarios. Cambiar un requisito publicado con un delta explícito es el
+  mecanismo que SDD tiene para esto; lo que no se admite es reescribirlo en silencio.
 
 - **D3 (antes la segunda mitad de D4). Delta de redacción sobre el escenario «Primer bloqueo tras
-  cinco fallos».** Recomendación: sí. Dice que el sexto intento con la contraseña correcta «es
-  rechazado por bloqueo activo, no por credenciales inválidas». Leído como comportamiento observable
-  por el cliente, **contradice** la prohibición de enumeración de §4.6, que exige un único mensaje
-  «Credenciales inválidas» y el mismo `401`: distinguir el bloqueo revela que la cuenta existe. El
-  delta debe aclarar que la distinción es **interna y auditada**, nunca observable por el cliente, y
-  que `session-tokens-and-web-layer` mapea ambos desenlaces a la misma respuesta. (La primera mitad
-  de la antigua D4, el delta de redacción sobre el requisito de MFA, pertenece íntegra a
-  `mfa-totp-and-password-recovery` y no se pide aquí.)
+  cinco fallos». ABSORBIDA POR D2, ya no es una decisión independiente.**
+
+  Decía que el sexto intento con la contraseña correcta «es rechazado por bloqueo activo, no por
+  credenciales inválidas», lo que, leído como comportamiento observable, contradice la prohibición de
+  enumeración de §4.6. **Con el modelo de retardo de §4.4 no hay sexto intento rechazado por bloqueo
+  activo, porque no hay bloqueo**: el escenario desaparece en vez de tener que ocultarse. Queda
+  cubierta por el `## MODIFIED Requirements` que D2 obliga a escribir.
+
+  Sobrevive una sola obligación suya, y debe conservarse explícitamente en el delta: **el motivo del
+  rechazo es interno y auditado, nunca observable por el cliente**, y `session-tokens-and-web-layer`
+  mapea todos los rechazos a la misma respuesta. (La primera mitad de la antigua D4, el delta de
+  redacción sobre el requisito de MFA, pertenece íntegra a `mfa-totp-and-password-recovery` y no se
+  pide aquí.)
 
 - **D4 (antes D5). La institución previa a la autenticación proviene de configuración del servidor,
   nunca de la solicitud.** Esta es una costura que hay que fijar ahora. Toda tabla `identity_*` lleva
