@@ -324,7 +324,7 @@ Rama `change/idempotency-key-infrastructure-hasher`, base PR C2a-1.
 
 Rama `change/idempotency-key-infrastructure-executor`, base PR C2a-2.
 
-- [ ] 4.1 **Ejecutar la sonda S3 (bloqueante, `design.md` §10 y §11 paso 9).** Requiere Docker. Con
+- [x] 4.1 **Ejecutar la sonda S3 (bloqueante, `design.md` §10 y §11 paso 9).** Requiere Docker. Con
   una fila `COMPLETED` sembrada y una segunda sesión bloqueada en `SELECT ... FOR UPDATE` sobre esa
   fila mientras una primera transacción la actualiza y confirma, confirmar que la segunda, al
   desbloquearse bajo `READ COMMITTED`, relee la versión confirmada más reciente (no la instantánea que
@@ -335,7 +335,7 @@ Rama `change/idempotency-key-infrastructure-executor`, base PR C2a-2.
   filas actualizadas como señal de que otra transacción ganó, resuelta por el mismo camino de
   repetición; reportar la desviación. — `design.md` §10 (sonda S3) y §11, paso 9
 
-- [ ] 4.2 **ROJO — el componente sin concurrencia.** Requiere Docker. Crear
+- [x] 4.2 **ROJO — el componente sin concurrencia.** Requiere Docker. Crear
   `.../test/java/com/confia/shared/security/IdempotentExecutorIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`, en este orden: (a) clave nueva, el caso de uso se ejecuta y el
   marcador queda `COMPLETED` con la respuesta, resultado `Executed`; (b) el caso de uso falla de forma
@@ -350,7 +350,7 @@ Rama `change/idempotency-key-infrastructure-executor`, base PR C2a-2.
   útil distinta...» (los dos escenarios) y «Respuesta reproducible ante clave completada, sin
   reejecutar el caso de uso» (su escenario)
 
-- [ ] 4.3 **VERDE — `IdempotentExecutor`.** Requiere Docker (ejecuta 4.2). Crear
+- [x] 4.3 **VERDE — `IdempotentExecutor`.** Requiere Docker (ejecuta 4.2). Crear
   `.../main/java/com/confia/shared/security/IdempotentExecutor.java`: clase `final`, constructor
   explícito sobre `TransactionRunner`, `IdempotencyRecordStore`, `RequestPayloadHasher` y `Clock` (más
   la sobrecarga con `lockWait`/`retention` explícitos, por defecto 250 ms y 24 h), **sin anotación de
@@ -364,13 +364,13 @@ Rama `change/idempotency-key-infrastructure-executor`, base PR C2a-2.
   `design.md`, decisiones 1, 6 y 7 (sin la rama de `SELECT ... FOR UPDATE` bajo concurrencia real
   todavía, que es C2c)
 
-- [ ] 4.4 **Medir el diff real de PR C2b** con
+- [x] 4.4 **Medir el diff real de PR C2b** con
   `git diff --numstat <base-de-PR-C2a-2>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar; el pronóstico de `design.md` §12 (370-580) no
   anticipa exceso. Si lo hubiera, detener la aplicación y reportar los puntos de corte candidatos
   medidos, verificando cada mitad por separado con `./mvnw -B verify`. — `design.md` §12
 
-- [ ] 4.5 **Verificación final de PR C2b.** Requiere Docker. En checkout limpio, ejecutar
+- [x] 4.5 **Verificación final de PR C2b.** Requiere Docker. En checkout limpio, ejecutar
   `./mvnw -B verify` en `apps/api` con JDK 25 y Docker activo. Confirmar `IdempotentExecutorIT` en
   verde completa, las cuatro rutas (clave nueva, efecto que falla revierte, repetición, carga
   distinta). Empujar la rama `...-executor` (apuntando a PR C2a-2) y confirmar en la integración

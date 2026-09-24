@@ -526,9 +526,178 @@ is real.
 | 3.3 | `8a5b8e9` | `feat(shared): add sealed idempotent outcome result type` |
 | 3.4-3.5 | (no commit — verification-only tasks; evidence recorded above) |
 
+## PR C2b — the component without concurrency (branch `change/idempotency-key-infrastructure-executor`, base PR C2a-2)
+
+### Task 4.1 — Sonda S3 (blocking)
+
+**Already run by the orchestrator on 2026-09-23, before this batch started, and recorded in
+`design.md`'s final section ("Sonda S3, ejecutada por el orquestador el 2026-09-23, antes del corte
+C2b"), commit `47342cb`. Not repeated here, per this batch's explicit launch instructions.**
+
+What it measured, taken as given: a blocked `SELECT ... FOR UPDATE` waits for the first transaction
+and, on unblocking, reads the most recently committed version (`COMPLETED`, after a measured 4354 ms
+wait) — never the snapshot it started with. This is `READ COMMITTED` re-evaluation working as
+decision 7 needs it. **Direct consequence for this batch**: decision 7's primary approach holds, and
+the designed fallback (an `UPDATE` with the state predicate in its own clause and zero rows updated
+as the losing signal) is not used — `IdempotentExecutor` below never implements that fallback path.
+
+### Task 4.2 — RED: the component without concurrency
+
+Created `IdempotentExecutorIT.java` in `com.confia.shared.security`, extending
+`CommittingPostgresIntegrationTest`, with the four scenarios in the task's own order: (a) a new key
+executes the use case and completes the marker in the same transaction, outcome `Executed`; (b) a use
+case that fails deterministically after the marker is written — the whole transaction rolls back,
+zero marker rows survive, and a later request with the same key is treated as new; (c) same key, same
+hash, on an already-completed key — the exact stored response is returned, the use case records zero
+new invocations, outcome `Replayed`; (d) same key, different hash — rejected with
+`IdempotencyPayloadMismatchException` without invoking the use case at all, verified by an invocation
+counter at zero, not only by the exception type.
+
+**Observed RED** (`/tmp/confia-logs/task4.2-red.log`, command
+`./mvnw -B -pl app -am test -Dtest=IdempotentExecutorIT -Dsurefire.failIfNoSpecifiedTests=false`):
+
+```
+[ERROR] COMPILATION ERROR :
+[ERROR] .../IdempotentExecutorIT.java:[39,13] cannot find symbol
+[ERROR]   symbol:   class IdempotentExecutor
+[ERROR] .../IdempotentExecutorIT.java:[40,20] cannot find symbol
+[ERROR]   symbol:   class IdempotentExecutor
+BUILD FAILURE
+```
+
+Exact failure reason: `IdempotentExecutor` does not exist yet, exactly as the task predicted. Real
+RED, not invented.
+
+### Task 4.3 — GREEN: `IdempotentExecutor`
+
+Created `IdempotentExecutor` in `com.confia.shared.security`: `final` class, explicit constructor
+over `TransactionRunner`, `IdempotencyRecordStore`, `RequestPayloadHasher` and `Clock` (plus the
+overload with explicit `lockWait`/`retention`, defaults 250 ms / 24 h), no Spring annotation, no
+transaction of its own — every write goes through `TransactionRunner.execute(...)` (R3 by
+composition). The hash is computed once, outside any transaction, over the caller's `JsonNode`
+payload. Inside the single `execute(...)` invocation: `lockExisting` first; absent → `insertInProgress`
++ use case + `complete`, `Executed`; expired → `restartExpired` (never `DELETE`+`INSERT`) + use case +
+`complete`, `Executed`; hash mismatch → `IdempotencyPayloadMismatchException` **before** the use case
+runs; `COMPLETED` → `Replayed`, reconstructing the stored `IdempotentResponse` from the record's
+`responseBody` text with the same `JsonMapper` pattern `DefaultAuditChainVerifier` uses; otherwise
+(confirmed `IN_PROGRESS` from another transaction) → the defensive `IdempotencyConflictException(MARKER_IN_PROGRESS)`.
+
+**Deliberately not implemented in this cut, per the task's own scope and confirmed against task
+5.3's text** (which says "Modificar `IdempotentExecutor`..." for both pieces, meaning neither exists
+yet): no `set_config('lock_timeout', ...)` statement as the first statement of the transaction, and no
+`catch (IdempotencyMarkerAlreadyExists)` branch that opens a second, read-only transaction (T3) to
+replay a marker a concurrent transaction just committed. Both are C2c's own addition (design.md,
+decision 4; tasks.md, task 5.3) — `lockWait` is accepted and stored by the constructor for that later
+use, but nothing in this class's logic consults it yet. Documented explicitly in the class Javadoc so
+a later reader does not mistake either omission for an oversight.
+
+**Observed GREEN** (`/tmp/confia-logs/task4.3-green.log`,
+`./mvnw -B -pl app -am test -Dtest=IdempotentExecutorIT -Dsurefire.failIfNoSpecifiedTests=false`):
+`Tests run: 4, Failures: 0, Errors: 0` → `BUILD SUCCESS`.
+
+**Architecture gates re-verified in isolation** (`/tmp/confia-logs/task4-arch-check.log`):
+`JooqConfinedToInfrastructureTest`, `NoUnapprovedPlainSqlTest`, `TransactionsOnlyInSharedSecurityTest`,
+`NoCyclesTest`, `TableOwnershipByModuleTest`, `SpringModulithVerificationTest`,
+`LayeredArchitectureTest` — all green (15 tests total across the focused run) with
+`IdempotentExecutor` present. Confirms R3 holds: the new class opens no transaction of its own, and
+its package carries no layer segment.
+
+### Task 4.4 — measured diff
+
+```
+git diff --numstat 8a5b8e9...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'
+157   0  apps/api/app/src/main/java/com/confia/shared/security/IdempotentExecutor.java
+160   0  apps/api/app/src/test/java/com/confia/shared/security/IdempotentExecutorIT.java
+```
+
+**Total: 317 authored lines** (all additions, no deletions), measured from PR C2a-2's last code
+commit (`8a5b8e9`) to `HEAD`. Well inside the 800-line budget
+(`docs/15-flujo-de-trabajo-git.md` §3) and inside `design.md` §12's own 370-580 forecast band for
+C2b (below its lower bound, which the task's own text says is not anticipated as a problem — only an
+excess over 800 would require a stop). No split needed; no candidate split points to report.
+
+### Task 4.5 — final verification of PR C2b
+
+Full `./mvnw -B verify` in `apps/api`, clean working tree, `JAVA_HOME` on JDK 25, `MAVEN_OPTS` with
+`Windows-ROOT`, Docker active, `target/` directories removed by hand first (OneDrive lock issue)
+(`/tmp/confia-logs/task4.5-verify.log`):
+
+- `IdempotentExecutorIT`: `Tests run: 4, Failures: 0, Errors: 0` — complete green: new key, the
+  failing-effect atomicity scenario, replay without re-execution, and payload-mismatch rejection.
+- `JooqIdempotencyRecordStoreIT` (6), `IdempotencyErrorCodesTest` (7), `RequestPayloadHasherTest` (5),
+  `RolePrivilegeMatrixIT` (16), `IdempotencyKeyPrivilegeIT` (2), `MultiTenantSchemaIT` (7),
+  `AuditScopeExclusionInventoryTest` (4) — all still green, unaffected by this slice.
+- Every architecture gate green: `JooqConfinedToInfrastructureTest`, `LayeredArchitectureTest`,
+  `NoCyclesTest`, `NoUnapprovedPlainSqlTest`, `SpringModulithVerificationTest`,
+  `TableOwnershipByModuleTest`, `TransactionsOnlyInSharedSecurityTest`, and every other architecture
+  test in the module.
+- Overall: `Tests run: 138` (unit, surefire phase) + `Tests run: 73` (integration, failsafe phase) —
+  all green. `jacoco:check` → "All coverage checks have been met." (both the kernel module and the
+  API module, unit+integration merged report).
+- Total measured build time: **03:32 min**. Comfortably inside the 8-minute budget
+  (`design.md` §13); no W1 escalation needed at this cut.
+- `BUILD SUCCESS`.
+
+**Same deliberate scope boundary as every previous cut of this change**: not pushed, no PR opened,
+per this run's explicit instructions ("No empujes ni abras pull requests"). All locally-verifiable
+evidence above is real.
+
+### Hard-stop checks (none triggered, PR C2b)
+
+1. Diff (task 4.4): 317 lines, far under 800 — no stop.
+2. No ArchUnit exception added, no gate weakened, no privilege changed. R3 (transactions confined to
+   `shared/security`) holds by composition: `IdempotentExecutor` opens no transaction of its own.
+3. One discrepancy in the tasks list already reported by the tasks phase itself (`design.md` §11 vs
+   §12) and resolved there before this batch started; no new contradiction found between tasks,
+   design, spec, and ADR for this slice.
+4. `IdempotentExecutor` never opens its own transaction — confirmed both by code (delegates entirely
+   to `TransactionRunner.execute(...)`) and by `TransactionsOnlyInSharedSecurityTest` staying green
+   with the new class present (task 4.3). Hard-stop 3 does not trigger.
+
+### Three things requested to be proven, not assumed (PR C2b)
+
+- **Atomicity demonstrated with a real failure, not only the happy path**: task 4.2's scenario (b)
+  makes the use case throw *after* the marker row is written, then asserts with a fresh, independent
+  read (`store().lockExisting(...)` inside its own transaction) that **zero** rows survive for that
+  key — not that two writes merely happened to both succeed together.
+- **Payload-mismatch rejection counted, not just typed**: task 4.2's scenario (d) asserts
+  `invocations[0] == 0` on an `int[]` counter incremented inside the use case `Supplier`, in addition
+  to asserting the thrown type is `IdempotencyPayloadMismatchException` — the requirement is that the
+  effect never ran, and a counter is what actually proves that, not the exception class alone.
+- **Replay proven not to re-execute, not merely to return the same value by coincidence**: task 4.2's
+  scenario (c) has the *second* call's use case return a deliberately different response
+  (`responseStatus = 500`, a different body) than the first call's stored response, and asserts the
+  returned response is the *first* call's stored value while the invocation counter stays at `1`. If
+  the use case had run a second time and its second-call value had been asserted, the test would have
+  passed without ever forcing a real replay to happen — this shape is chosen specifically to rule
+  that out.
+
+### TDD Cycle Evidence (PR C2b)
+
+| Task | RED observed | GREEN observed | REFACTOR |
+|---|---|---|---|
+| 4.2/4.3 | Yes — compile failure, `IdempotentExecutor` missing (task4.2-red.log) | Yes — 4/4 tests, BUILD SUCCESS (task4.3-green.log) | None needed; the class matched design.md decision 6's flow (this cut's subset) on first pass |
+
+### Work Unit Evidence (PR C2b)
+
+| Evidence | Value |
+|---|---|
+| Focused test command and result | `./mvnw -B -pl app -am test -Dtest=IdempotentExecutorIT -Dsurefire.failIfNoSpecifiedTests=false` → 4/4 green |
+| Runtime harness command/result | `./mvnw -B verify` (apps/api) → BUILD SUCCESS, 138 unit + 73 integration tests green, JaCoCo bundle check met, 03:32 min total |
+| Rollback boundary | Revert this PR's two commits (`4261fa3` feat, `5287d9c` test) individually reverts to PR C2a-2's state; no other file touched. Per `design.md` §9 point 3, PR C1 and PR C2a-1 remain non-severable from this PR once it exists, unchanged from prior cuts |
+
+### Commits (PR C2b)
+
+| Task | SHA | Message |
+|---|---|---|
+| 4.1 | (no commit — already run by the orchestrator, commit `47342cb`, before this batch) | — |
+| 4.2 | `5287d9c` | `test(shared): add RED IdempotentExecutorIT for the sequential-only paths` |
+| 4.3 | `4261fa3` | `feat(shared): add IdempotentExecutor without concurrency` |
+| 4.4-4.5 | (no commit — verification-only tasks; evidence recorded above) |
+
 ## Status
 
 7/7 tasks of PR C1 complete (1.1-1.7). 7/7 tasks of PR C2a-1 complete (2.1-2.7). 5/5 tasks of PR
-C2a-2 complete (3.1-3.5). Ready for a fresh `sdd-apply` batch to start PR C2b (branch
-`change/idempotency-key-infrastructure-executor`, base PR C2a-2) once the maintainer wants to
-continue the chain.
+C2a-2 complete (3.1-3.5). 5/5 tasks of PR C2b complete (4.1-4.5). Ready for a fresh `sdd-apply` batch
+to start PR C2c (branch `change/idempotency-key-infrastructure-concurrency`, base PR C2b) once the
+maintainer wants to continue the chain.
