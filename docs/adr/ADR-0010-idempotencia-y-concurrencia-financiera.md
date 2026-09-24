@@ -269,6 +269,32 @@ Un hueco en el correlativo solo es admisible si corresponde a una anulación reg
 Ninguna de estas garantías se puede verificar con dobles de prueba. Todas exigen PostgreSQL real,
 que es la razón de la decisión tomada en ADR-0008.
 
+## Nota editorial (2026-09-23, cambio 6 — `idempotency-key-infrastructure`)
+
+Esta nota **remite**, no reescribe el cuerpo de la decisión (D1 de la propuesta del cambio 6). Lo que
+obliga es el requisito con escenario ejecutable de `specs/build-integrity/spec.md`, no este párrafo.
+El esquema SQL de la sección «Esquema» y su narrativa difieren en tres puntos de lo que el cambio 6
+entregó, cada uno con una razón nombrada en `design.md` (decisión 2, decisión 5):
+
+1. **Nombre de la tabla y prefijo de módulo.** El esquema anterior propone `idempotency_keys`, sin
+   prefijo de módulo. La tabla entregada es `shared_idempotency_key`, porque
+   `TableOwnershipByModuleTest` deriva el prefijo esperado del paquete Java que posee el adaptador
+   (`com.confia.shared.infrastructure` → módulo `shared` → tipo generado `SharedIdempotencyKey`), y
+   un nombre sin ese prefijo habría roto esa puerta ya entregada y en verde.
+2. **Clave primaria.** El esquema anterior usa un identificador sustituto (`id UUID PRIMARY KEY`) con
+   `UNIQUE (endpoint, idempotency_key)`, sin `institution_id`. La tabla entregada usa una clave
+   primaria natural compuesta `(institution_id, endpoint, idempotency_key)`, porque
+   `pgcrypto` no está disponible (sonda del cambio 5) y `MultiTenantSchemaIT` exige que el índice
+   único de cada tabla de negocio contenga el discriminador de institución.
+3. **Narrativa de colisión inmediata.** El texto bajo el esquema dice que la restricción única hace
+   que «la segunda choque contra la restricción en lugar de ejecutarse», sin mencionar espera
+   alguna. La sonda S1, ejecutada el 2026-09-22 contra `postgres:18-alpine` fuera del árbol del
+   repositorio, **refuta esa narrativa**: con `lock_timeout` acotado, la segunda transacción
+   **espera** hasta el límite fijado (~250 ms medidos) antes de fallar con `SQLState 55P03`, en vez
+   de chocar de inmediato contra el índice. Es la base del requisito «Espera acotada ante escritura
+   concurrente del marcador, con salidas distinguibles por `SQLState`» de
+   `specs/build-integrity/spec.md`.
+
 ## Referencias
 
 - `docs/01-arquitectura.md`, sección 6
