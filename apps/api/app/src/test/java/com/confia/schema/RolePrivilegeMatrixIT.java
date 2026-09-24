@@ -25,6 +25,9 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
     private static final List<String> AUDIT_TABLES =
             List.of("shared_audit_log", "shared_audit_chain_head");
 
+    /** Table PR C1's V4 migration creates (idempotency-key-infrastructure design.md decision 2). */
+    private static final String IDEMPOTENCY_TABLE = "shared_idempotency_key";
+
     private static final List<String> ALL_PRIVILEGES =
             List.of("SELECT", "INSERT", "UPDATE", "DELETE");
 
@@ -190,6 +193,94 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
                                         privilege, table)
                                 .isFalse();
                     }
+                }
+            } finally {
+                statement.execute("drop role if exists " + scratchRole);
+            }
+        }
+    }
+
+    /**
+     * The five roles against {@code shared_idempotency_key}
+     * (idempotency-key-infrastructure design.md decision 3; specs/build-integrity/spec.md,
+     * requirement "Permisos de acceso a {@code shared_idempotency_key} por rol de base de datos"):
+     * {@code confia_admin_app} gets exactly {@code SELECT}, {@code INSERT} and {@code UPDATE}
+     * (never {@code DELETE} — non-financial table, so {@code UPDATE} is the rule, not an
+     * exception); {@code confia_portal_app} gets nothing at all; {@code confia_readonly} gets only
+     * {@code SELECT}; {@code confia_backup} reads through {@code pg_read_all_data}; {@code
+     * confia_owner} retains all four by definition, not subject to {@code GRANT}/{@code REVOKE}.
+     */
+    @Test
+    void confiaAdminAppCanSelectInsertAndUpdateButNeverDeleteOnTheIdempotencyKeyTable() {
+        assertThat(hasTablePrivilege("confia_admin_app", IDEMPOTENCY_TABLE, "SELECT")).isTrue();
+        assertThat(hasTablePrivilege("confia_admin_app", IDEMPOTENCY_TABLE, "INSERT")).isTrue();
+        assertThat(hasTablePrivilege("confia_admin_app", IDEMPOTENCY_TABLE, "UPDATE")).isTrue();
+        assertThat(hasTablePrivilege("confia_admin_app", IDEMPOTENCY_TABLE, "DELETE")).isFalse();
+    }
+
+    @Test
+    void confiaPortalAppHasNoPrivilegeOnTheIdempotencyKeyTable() {
+        for (String privilege : ALL_PRIVILEGES) {
+            assertThat(hasTablePrivilege("confia_portal_app", IDEMPOTENCY_TABLE, privilege))
+                    .as("confia_portal_app must have no privilege at all on %s "
+                            + "(brecha con destino: F3/F4)", IDEMPOTENCY_TABLE)
+                    .isFalse();
+        }
+    }
+
+    @Test
+    void confiaReadonlyOnlySelectsTheIdempotencyKeyTable() {
+        assertThat(hasTablePrivilege("confia_readonly", IDEMPOTENCY_TABLE, "SELECT")).isTrue();
+        assertThat(hasTablePrivilege("confia_readonly", IDEMPOTENCY_TABLE, "INSERT")).isFalse();
+        assertThat(hasTablePrivilege("confia_readonly", IDEMPOTENCY_TABLE, "UPDATE")).isFalse();
+        assertThat(hasTablePrivilege("confia_readonly", IDEMPOTENCY_TABLE, "DELETE")).isFalse();
+    }
+
+    /** {@code confia_backup} reads through {@code pg_read_all_data}, which never bypasses RLS. */
+    @Test
+    void confiaBackupCanOnlySelectTheIdempotencyKeyTableThroughPgReadAllData() {
+        assertThat(hasTablePrivilege("confia_backup", IDEMPOTENCY_TABLE, "SELECT")).isTrue();
+        assertThat(hasTablePrivilege("confia_backup", IDEMPOTENCY_TABLE, "INSERT")).isFalse();
+        assertThat(hasTablePrivilege("confia_backup", IDEMPOTENCY_TABLE, "UPDATE")).isFalse();
+        assertThat(hasTablePrivilege("confia_backup", IDEMPOTENCY_TABLE, "DELETE")).isFalse();
+    }
+
+    /** {@code confia_owner} is not subject to {@code GRANT}/{@code REVOKE}: retains all four. */
+    @Test
+    void confiaOwnerRetainsAllPrivilegesOnTheIdempotencyKeyTableByDefinition() {
+        for (String privilege : ALL_PRIVILEGES) {
+            assertThat(hasTablePrivilege("confia_owner", IDEMPOTENCY_TABLE, privilege))
+                    .as("confia_owner must retain %s on %s by definition", privilege,
+                            IDEMPOTENCY_TABLE)
+                    .isTrue();
+        }
+    }
+
+    /**
+     * {@code PUBLIC} and a role outside the five (design.md decision 3's {@code REVOKE ALL ...
+     * FROM PUBLIC}; same discipline {@code publicAndAnyRoleOutsideTheFiveInheritNoPrivilegeOnEitherAuditTable}
+     * already applies to the audit tables — {@code confia_portal_app} holding nothing does not
+     * cover {@code PUBLIC}, the pseudo-role every other role, present or future, inherits from).
+     */
+    @Test
+    void publicAndAnyRoleOutsideTheFiveInheritNoPrivilegeOnTheIdempotencyKeyTable()
+            throws SQLException {
+        for (String privilege : ALL_PRIVILEGES) {
+            assertThat(hasTablePrivilege("public", IDEMPOTENCY_TABLE, privilege))
+                    .as("PUBLIC must hold no %s on %s", privilege, IDEMPOTENCY_TABLE).isFalse();
+        }
+
+        String scratchRole = "probe_role_outside_the_five_idempotency";
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres");
+                Statement statement = superuser.createStatement()) {
+            statement.execute("drop role if exists " + scratchRole);
+            statement.execute("create role " + scratchRole + " nosuperuser nobypassrls");
+            try {
+                for (String privilege : ALL_PRIVILEGES) {
+                    assertThat(hasTablePrivilege(scratchRole, IDEMPOTENCY_TABLE, privilege))
+                            .as("a role that is none of the five must inherit no %s on %s",
+                                    privilege, IDEMPOTENCY_TABLE)
+                            .isFalse();
                 }
             } finally {
                 statement.execute("drop role if exists " + scratchRole);
