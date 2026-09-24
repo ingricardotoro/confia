@@ -383,7 +383,7 @@ Rama `change/idempotency-key-infrastructure-executor`, base PR C2a-2.
 
 Rama `change/idempotency-key-infrastructure-concurrency`, base PR C2b.
 
-- [ ] 5.1 **Ejecutar la sonda S5 (bloqueante, `design.md` §10 y §11 paso 12; S1 y S2 ya se ejecutaron
+- [x] 5.1 **Ejecutar la sonda S5 (bloqueante, `design.md` §10 y §11 paso 12; S1 y S2 ya se ejecutaron
   el 2026-09-22 y no se repiten).** Requiere Docker. Confirmar que
   `set_config('lock_timeout', ?, true)` con parámetro vinculado se aplica sin error desde
   `confia_admin_app`, y que `SHOW lock_timeout` devuelve `0` en la transacción siguiente sobre la
@@ -392,7 +392,7 @@ Rama `change/idempotency-key-infrastructure-concurrency`, base PR C2b.
   aprovisionamiento de roles, que no pertenece a este cambio, y se reporta al propietario en vez de
   conceder un privilegio nuevo por cuenta propia. — `design.md` §10 (sonda S5) y §11, paso 12
 
-- [ ] 5.2 **ROJO — las tres salidas de la solicitud concurrente.** Requiere Docker. Crear
+- [x] 5.2 **ROJO — las tres salidas de la solicitud concurrente.** Requiere Docker. Crear
   `.../test/java/com/confia/shared/security/IdempotentExecutorConcurrencyIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`: dos hilos, cada uno con su propio `TransactionRunner`, su propia
   conexión y su propio `IdempotentExecutor`, sincronizados con `CyclicBarrier` justo después de que la
@@ -409,7 +409,7 @@ Rama `change/idempotency-key-infrastructure-concurrency`, base PR C2b.
   `lock_timeout` todavía. — Especificación `build-integrity`, requisito «Espera acotada ante escritura
   concurrente del marcador, con salidas distinguibles por `SQLState`» (los tres primeros escenarios)
 
-- [ ] 5.3 **VERDE — `lock_timeout` local a la transacción y la segunda transacción de repetición.**
+- [x] 5.3 **VERDE — `lock_timeout` local a la transacción y la segunda transacción de repetición.**
   Requiere Docker (ejecuta 5.2). Modificar `IdempotentExecutor` para que, como primera sentencia del
   cuerpo que pasa a `TransactionRunner.execute(...)`, ejecute
   `select set_config('lock_timeout', ?, true)` con el valor del constructor sobre la conexión JDBC
@@ -420,7 +420,7 @@ Rama `change/idempotency-key-infrastructure-concurrency`, base PR C2b.
   `IdempotentExecutorConcurrencyIT` con sus tres escenarios: verde. — `design.md`, decisión 4 completa
   y decisión 6 («Cuántas transacciones abre cada camino»)
 
-- [ ] 5.4 **ROJO/VERDE — el no reintento en las dos salidas.** Requiere Docker. Extender
+- [x] 5.4 **ROJO/VERDE — el no reintento en las dos salidas.** Requiere Docker. Extender
   `IdempotentExecutorConcurrencyIT` con un contador de invocaciones del cuerpo transaccional (no del
   caso de uso: lo que hay que contar es cuántas veces `TransactionRunner` reintenta la operación) y
   afirmar **exactamente una** ejecución tanto en el agotamiento de espera como en el choque por clave
@@ -432,18 +432,18 @@ Rama `change/idempotency-key-infrastructure-concurrency`, base PR C2b.
   concurrente del marcador...» (escenario «El reintento acotado no reintenta el agotamiento de espera
   ni el choque por clave duplicada»)
 
-- [ ] 5.5 **Medir el tiempo de la suite `*IT.java`.** Requiere Docker. Ejecutar `./mvnw -B verify`
+- [x] 5.5 **Medir el tiempo de la suite `*IT.java`.** Requiere Docker. Ejecutar `./mvnw -B verify`
   completo en `apps/api` y medir de nuevo el tiempo de la fase `integration-test`, con
   `IdempotentExecutorConcurrencyIT` incluida: es el corte que más lo empeora, por las esperas reales de
   diseño. Registrar el tiempo medido en `apply-progress.md`. — `design.md` §11, paso 16; §13
 
-- [ ] 5.6 **Medir el diff real de PR C2c** con
+- [x] 5.6 **Medir el diff real de PR C2c** con
   `git diff --numstat <base-de-PR-C2b>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar; el pronóstico de `design.md` §12 (300-500) no
   anticipa exceso. Si lo hubiera, detener la aplicación y reportar los puntos de corte candidatos
   medidos, verificando cada mitad por separado con `./mvnw -B verify`. — `design.md` §12
 
-- [ ] 5.7 **Verificación final de PR C2c.** Requiere Docker. En checkout limpio, ejecutar
+- [x] 5.7 **Verificación final de PR C2c.** Requiere Docker. En checkout limpio, ejecutar
   `./mvnw -B verify` en `apps/api` con JDK 25 y Docker activo. Confirmar `IdempotentExecutorConcurrencyIT`
   en verde completa: las tres salidas distinguibles por `SQLState`, el no reintento demostrado por
   contador, y que ninguna prueba depende de un margen de reloj. Empujar la rama `...-concurrency`

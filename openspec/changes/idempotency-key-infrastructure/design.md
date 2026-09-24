@@ -1218,3 +1218,29 @@ cláusula y cero filas actualizadas como señal de derrota—.
 Queda en pie lo que esta sonda **no** demuestra: que la fila exista. Si la primera transacción
 hubiera insertado y revertido, la segunda no encontraría fila que bloquear, y ese camino lo cubre la
 sonda S1 ya ejecutada, donde la inserción de la segunda tiene éxito tras la reversión.
+
+
+## Sonda S5, ejecutada por el orquestador el 2026-09-23, antes del corte C2c
+
+**PASA en sus dos mitades.** Contra `postgres:18-alpine`, con un rol `confia_admin_app` real creado
+`NOSUPERUSER NOBYPASSRLS`, conectando como ese rol:
+
+| Comprobación | Resultado |
+|---|---|
+| Valor de partida de `lock_timeout` | `0` |
+| ¿Puede el rol de aplicación fijarlo con `set_config(..., true)`? | **Sí**, devuelve `250ms` |
+| Valor dentro de la transacción | `250ms` |
+| **Valor en la transacción siguiente, misma conexión** | **`0`** |
+
+La primera mitad descarta el riesgo previsto: no hace falta elevar nada al aprovisionamiento de
+roles, porque `lock_timeout` es un parámetro que el propio usuario puede ajustar, y este rol no
+necesita ningún privilegio nuevo.
+
+**La segunda mitad es la que más importa.** El valor **no sobrevive a la confirmación**. Si lo
+hiciera, una transacción posterior sobre esa misma conexión del pool heredaría un límite que nadie
+le puso, y fallaría por espera agotada en una operación ajena a la idempotencia. Es exactamente el
+defecto que `SET SESSION` habría causado con el contexto de institución, y que
+`TransactionRunnerContextIT` ya prueba para aquel caso fijando el pool a una sola conexión.
+
+Queda una consecuencia para la fase de aplicación: la prueba equivalente para `lock_timeout` debe
+fijar el pool a una sola conexión igual que aquella, o no estaría ejercitando reutilización.

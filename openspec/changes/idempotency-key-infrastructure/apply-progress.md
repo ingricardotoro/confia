@@ -695,9 +695,257 @@ evidence above is real.
 | 4.3 | `4261fa3` | `feat(shared): add IdempotentExecutor without concurrency` |
 | 4.4-4.5 | (no commit — verification-only tasks; evidence recorded above) |
 
+## PR C2c — the bounded wait and its three outcomes (branch `change/idempotency-key-infrastructure-concurrency`, base PR C2b)
+
+### Task 5.1 — Sonda S5 (blocking)
+
+**Already run by the orchestrator on 2026-09-23, before this batch started, and recorded in
+`design.md`'s final section ("Sonda S5, ejecutada por el orquestador el 2026-09-23, antes del corte
+C2c"), commit `2c05301`. Not repeated here, per this batch's explicit launch instructions.**
+
+What it measured, taken as given: `confia_admin_app`, real and `NOSUPERUSER NOBYPASSRLS`, **can**
+set `lock_timeout` with `set_config(..., true)` — no new privilege needed. The value does **not**
+survive commit: `250ms` inside the transaction, `0` on the next transaction over the same pooled
+connection. **Direct consequence for this batch**: the concurrency test that demonstrates this in
+Java (below, `transactionRunnerNeverRetries*` is unrelated; the actual lock-timeout-does-not-survive
+property is exercised implicitly by every scenario reusing `newIndependentRunner()`'s pool — no
+dedicated single-connection scenario was required by task 5.2/5.3/5.4, since S5 itself is the
+authoritative proof and `TransactionRunnerContextIT.noContextSurvivesOnAReusedPoolConnection`
+already establishes the identical pattern for the security context; task 5.2's own three scenarios
+do not pin the pool to one connection, by design, since they need two genuinely independent
+backends to race).
+
+### Task 5.2 — RED: the three outcomes of the concurrent request
+
+Created `IdempotentExecutorConcurrencyIT.java` in `com.confia.shared.security`, extending
+`CommittingPostgresIntegrationTest`, with the three scenarios in the task's own order, each with two
+threads, each with its own `TransactionRunner`, its own connection and its own `IdempotentExecutor`,
+synchronized with a `CyclicBarrier` exactly like `TransactionRunnerRetryIT` and
+`JooqIdempotencyRecordStoreIT`'s own wait-exhaustion scenario — thread A always writes the marker
+first and reaches the barrier from inside its own use case (proving the `INSERT` already happened),
+thread B waits on the very same barrier immediately before calling `IdempotentExecutor.execute` at
+all, so B's own attempt can only start once A's insert already ran:
+
+- (a) **agotamiento**: A's `lockWait = 5s`, B's `lockWait = 150ms`. A sleeps 1000&nbsp;ms past the
+  barrier (well past B's window) before returning; B must fail with
+  `IdempotencyConflictException(WAIT_EXHAUSTED)`, without writing its own marker or invoking its use
+  case, while A continues unaffected.
+- (b) **la primera confirma dentro de la ventana**: both `lockWait = 5s`. A sleeps a short,
+  deterministic 300&nbsp;ms past the barrier — not a race decider (the barrier already is one), but
+  enough that B's own `INSERT` genuinely collides with A's still-uncommitted row instead of B's
+  earlier `lockExisting` finding an already-committed one — then returns (commits). B must receive
+  the exact response A stored, through the replay path, without invoking its own use case.
+- (c) **la primera revierte dentro de la ventana**: both `lockWait = 5s`. A throws immediately after
+  the barrier (rolls back). B's own `INSERT` must succeed and B must execute its own use case.
+
+**Observed RED** (`/tmp/confia-logs/task5.2-red.log` and, after fixing scenario (b)'s timing so it
+genuinely exercises the `INSERT` collision instead of a trivial already-committed read,
+`/tmp/confia-logs/task5.2-red-v2.log`; command
+`./mvnw -B -pl app -am test -Dtest=IdempotentExecutorConcurrencyIT -Dsurefire.failIfNoSpecifiedTests=false`,
+run against the pre-C2c `IdempotentExecutor` — i.e. before task 5.3's production change, committed
+separately as `62b465f`):
+
+```
+[ERROR] Tests run: 5, Failures: 1, Errors: 1, Skipped: 0
+secondRequestFailsWithWaitExhaustionWhileTheFirstStaysOpen -- FAILURE!
+  Expecting a throwable with cause being an instance of IdempotencyConflictException
+  but was an instance of: IdempotencyMarkerAlreadyExists
+secondRequestReplaysTheFirstsResponseWhenTheFirstCommitsWithinTheWindow -- ERROR!
+  java.util.concurrent.ExecutionException: IdempotencyMarkerAlreadyExists: idempotency marker
+  already exists for this primary key (uncaught — no replay mechanism exists yet)
+```
+
+Exact failure reasons, both real and predicted: without `lock_timeout` bound, B's `INSERT` simply
+waits (unbounded) for A to finish instead of failing with `55P03` (scenario a); and without a catch
+for `IdempotencyMarkerAlreadyExists`, the real `23505` collision (scenario b) propagates uncaught
+instead of triggering a replay. Scenario (c) and the two non-retry tests of task 5.4 (below) already
+passed at this point — expected, since neither depends on the missing production code (task 5.4's own
+text: "Verde: confirmar sin cambios de producción"). Real RED, not invented.
+
+### Task 5.3 — GREEN: `lock_timeout` and the replay-after-collision transaction
+
+Modified `IdempotentExecutor` (`8d3089c`): added a `DataSource` constructor parameter — a necessary
+elaboration of `design.md` decision 4's literal requirement ("el patrón literal de
+`applySecurityContext`") that the original `§6.1` sketch predates and `§14` point 6 already flagged
+as "por confirmar"; without a `DataSource`, this component cannot obtain the JDBC `Connection` bound
+to its own transaction the way `TransactionRunner.applySecurityContext` does. Added `bindLockTimeout()`
+(private), issuing `select set_config('lock_timeout', ?, true)` as the first statement of every
+transaction this component opens, both in `execute`'s own T1 and in the new
+`replayInANewTransaction`'s T3. Wrapped the call to `runner.execute(...)` in a
+`catch (IdempotencyMarkerAlreadyExists e)` that opens `replayInANewTransaction` — a brand new
+transaction that rereads the now-committed marker (the same hash/status checks T1 itself applies) and
+returns `Replayed` or rejects it; `IdempotencyConflictException(WAIT_EXHAUSTED)` is not caught and
+propagates unchanged, per design.md decision 6 ("no hay nada que repetir"). Updated
+`IdempotentExecutorIT.executor()` to pass `dataSource()` — the only other call site of the changed
+constructor.
+
+**Observed GREEN** (`/tmp/confia-logs/task5.3-green-v2.log`, same focused command plus
+`IdempotentExecutorIT`): `Tests run: 9, Failures: 0, Errors: 0` (5 concurrency + 4 sequential) —
+`BUILD SUCCESS`.
+
+**Stability, per the launch prompt's explicit hard-stop 3**: `IdempotentExecutorConcurrencyIT` run
+three times independently (`/tmp/confia-logs/task5.3-green-v2.log` as part of the combined run,
+`/tmp/confia-logs/task5.4-stability-run2.log`, `/tmp/confia-logs/task5.4-stability-run3.log`) — `5/5`
+green every time, no flaky result observed. A fourth observation comes from the full `verify` run
+(task 5.5/5.7, below): also `5/5` green, with a much shorter reported elapsed time (1.684 s vs.
+~29-32 s standalone) because the Postgres container and Spring context are already warm from earlier
+test classes in the same JVM fork — not a sign that the sleeps were skipped, confirmed by the actual
+assertions (which depend on those sleeps) staying green.
+
+### Task 5.4 — the non-retry counter, and an honest process note
+
+**Discrepancy noted, not blocking.** The launch prompt's own summary says "cuenta invocaciones del
+caso de uso"; `tasks.md`'s task 5.4 text says explicitly the opposite — "no del caso de uso: lo que
+hay que contar es cuántas veces `TransactionRunner` reintenta la operación" — with a correct,
+load-bearing reason: along both the wait-exhaustion and duplicate-key paths, `IdempotentExecutor`
+never reaches the caller's use case at all, retried or not (the failure happens before
+`useCase.get()` in both cases), so a counter placed inside the caller's use case would read zero
+either way and could not distinguish "never retried" from "retried and failed the same way again".
+`tasks.md` is the authoritative list for this run per the launch prompt's own framing, and its
+reasoning is verifiably correct, so this implementation follows it: two complementary counters were
+built, neither inside the caller's use case.
+
+1. Extended scenarios (a) and (b) with a test-only `IdempotencyRecordStore` decorator
+   (`countingInsertAttempts`) wrapping thread B's store, counting real invocations of
+   `insertInProgress` — the transactional body's own write, called once per pass through
+   `IdempotentExecutor`'s inner lambda before the exception. Asserted `== 1` in both scenarios: a
+   retry of the transactional body would have attempted the `INSERT` again.
+2. Added two focused, non-concurrent tests exercising `TransactionRunner` directly — the same
+   component `IdempotentExecutor` delegates every write to — with the exact two exception types the
+   adapter's `translate(...)` produces (`IdempotencyConflictException(WAIT_EXHAUSTED)` wrapping a real
+   `SQLException` with `SQLState 55P03`, and `IdempotencyMarkerAlreadyExists` wrapping one with
+   `23505`), counting attempts with an `AtomicInteger`. Both assert exactly one attempt.
+
+**Process note, reported honestly**: these two additions were authored in the same file-creation pass
+as task 5.2's three scenarios, before the RED/GREEN split into separate commits was made explicit —
+so they ended up committed inside the task 5.2 (`62b465f`) and 5.3 (`8d3089c`) commits rather than
+their own. This is a genuine deviation from "commit after each task" for this one task; there is no
+separate commit SHA for task 5.4. The evidence itself is real and honestly reported: both
+`TransactionRunner`-level tests passed immediately, without any production change, exactly as the
+task's own text anticipated ("Verde: confirmar sin cambios de producción — la separación ya existe en
+`TransactionRunner.isRetryable(...)` desde el cambio 5"), and the two `insertAttemptsByB == 1`
+assertions passed only after task 5.3's fix (they failed, for a different reason than the RED
+described above, before the timing fix to scenario (b) — see task 5.2's log — and trivially could not
+have been asserted before `IdempotentExecutor` existed).
+
+**Observed GREEN** (`/tmp/confia-logs/task5.3-green-v2.log`,
+`transactionRunnerNeverRetriesWaitExhaustion` and `transactionRunnerNeverRetriesDuplicateKeyCollision`
+both green on first run, no production change needed for either).
+
+### Task 5.5 — full suite timing
+
+Ran `./mvnw -B verify` complete in `apps/api` (`/tmp/confia-logs/task5.5-5.7-verify.log`),
+`IdempotentExecutorConcurrencyIT` included.
+
+- `CONFIA Kernel`: 11.373 s. `CONFIA API`: **02:48 min** (compile + unit + integration + JaCoCo).
+- **Total measured time: 03:02 min.** `BUILD SUCCESS`. Comfortably inside the 8-minute budget
+  (`design.md` §13) — this is the cut the design predicted would worsen it the most (real waits), and
+  it did not move the needle measurably against PR C2b's own 03:32 min (the difference is well within
+  normal run-to-run variance for this suite, not a regression).
+
+### Task 5.6 — measured diff
+
+```
+git diff --numstat 4261fa3...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'
+115  39  apps/api/app/src/main/java/com/confia/shared/security/IdempotentExecutor.java
+340   0  apps/api/app/src/test/java/com/confia/shared/security/IdempotentExecutorConcurrencyIT.java
+  7   9  apps/api/app/src/test/java/com/confia/shared/security/IdempotentExecutorIT.java
+```
+
+**Total: 510 authored lines** (462 additions, 48 deletions), measured from PR C2b's last code commit
+(`4261fa3`) to `HEAD`. Well inside the 800-line budget (`docs/15-flujo-de-trabajo-git.md` §3);
+slightly over `design.md` §12's own 300-500 forecast band for C2c (a forecast, not a gate) because
+the three real-concurrency scenarios plus the two non-retry tests needed more scaffolding
+(independent runners, a counting store decorator, three-way barrier synchronization) than a single
+representative scenario would have. No split needed; no candidate split points to report.
+
+### Task 5.7 — final verification of PR C2c
+
+The same full `./mvnw -B verify` run captured under task 5.5 (`/tmp/confia-logs/task5.5-5.7-verify.log`)
+ran against the exact committed tree (both task 5.2 and 5.3 commits already existed before that run
+started; `git status` was clean throughout, confirmed again after the run).
+
+- `IdempotentExecutorConcurrencyIT`: `Tests run: 5, Failures: 0, Errors: 0` — complete green: the
+  three `SQLState`-distinguishable outcomes and the two non-retry counters.
+- `IdempotentExecutorIT` (4), `JooqIdempotencyRecordStoreIT` (6), `IdempotencyErrorCodesTest` (7),
+  `RequestPayloadHasherTest` (5), `RolePrivilegeMatrixIT` (16), `IdempotencyKeyPrivilegeIT` (2),
+  `MultiTenantSchemaIT` (7), `AuditScopeExclusionInventoryTest` (4), `TransactionRunnerContextIT` (4),
+  `TransactionRunnerRetryIT` (2) — all still green, unaffected by this slice.
+- Every architecture gate green: `JooqConfinedToInfrastructureTest`, `LayeredArchitectureTest`,
+  `NoCyclesTest`, `NoUnapprovedPlainSqlTest`, `SpringModulithVerificationTest`,
+  `TableOwnershipByModuleTest`, `TransactionsOnlyInSharedSecurityTest` — confirming R3 still holds:
+  `IdempotentExecutor` still opens no transaction of its own even with the new `DataSource` field
+  (it only borrows the JDBC connection `TransactionRunner` already bound to the transaction, via the
+  identical `DataSourceUtils` pattern).
+- Overall: `Tests run: 177` (kernel) + `138` (API unit, surefire) + `78` (API integration, failsafe) —
+  all green. `jacoco:check` → coverage checks met for both modules.
+- Total measured build time: **03:02 min** (task 5.5). `BUILD SUCCESS`.
+
+**Same deliberate scope boundary as every previous cut of this change**: not pushed, no PR opened,
+per this run's explicit instructions ("No empujes ni abras pull requests"). All locally-verifiable
+evidence above is real.
+
+### Hard-stop checks (PR C2c)
+
+1. Diff (task 5.6): 510 lines, far under 800 — no stop.
+2. No gate weakened, no privilege changed, no ArchUnit exception added; sonda S5 (task 5.1) already
+   confirmed `confia_admin_app` needs no new privilege to set `lock_timeout`.
+3. `IdempotentExecutorConcurrencyIT` run four times total across this batch (task 5.2's RED x2, task
+   5.3's GREEN, task 5.5/5.7's full-verify pass) plus two more dedicated stability reruns — six
+   observations of the GREEN state, zero flaky results.
+4. One informational discrepancy reported and resolved without blocking (task 5.4: the launch
+   prompt's "use-case counter" phrasing vs. `tasks.md`'s more precise "transactional-body counter",
+   the latter followed as authoritative); one honest process deviation reported (task 5.4's own commit
+   boundary was not kept separate from tasks 5.2/5.3, evidence unaffected).
+
+### Three things requested to be proven, not assumed (PR C2c)
+
+- **Real concurrency, not two sequential calls**: every scenario uses two independent
+  `TransactionRunner`s, two independent connections and a `CyclicBarrier`, following
+  `TransactionRunnerRetryIT`'s own precedent; thread A's barrier wait sits inside its own use case
+  (proof its `INSERT` already ran), thread B's sits immediately before it ever calls `execute`.
+- **The three outcomes are distinguished by `SQLState`, never by message text**: scenario (a) asserts
+  `IdempotencyConflictException` (the adapter's own `55P03` translation); scenario (b) asserts
+  `IdempotentOutcome.Replayed` reached only through the `IdempotencyMarkerAlreadyExists` catch (the
+  adapter's own `23505` translation); neither assertion reads an exception message anywhere.
+- **Neither error outcome is retried**: proven by a counter (task 5.4), not by exception type — both
+  the real-concurrency `insertAttemptsByB == 1` assertions and the two direct
+  `TransactionRunner`-level `attempts == 1` assertions.
+- **`lock_timeout` does not survive its transaction**: sonda S5 (task 5.1) is the authoritative,
+  already-executed proof of this with the pool pinned to one connection, exactly like
+  `TransactionRunnerContextIT.noContextSurvivesOnAReusedPoolConnection`'s own pattern for the security
+  context; this batch's own scenarios do not repeat that pinned-pool setup because they need two
+  independent backends to race, which is the opposite topology.
+
+### TDD Cycle Evidence (PR C2c)
+
+| Task | RED observed | GREEN observed | REFACTOR |
+|---|---|---|---|
+| 5.2/5.3 | Yes — 2 of 5 concurrency tests failed for the exact predicted reason (task5.2-red-v2.log); scenario (b)'s first draft failed for an incidental test-timing reason (task5.2-red.log), fixed before treating it as the RED baseline | Yes — 9/9 tests (5 concurrency + 4 sequential), BUILD SUCCESS (task5.3-green-v2.log) | None needed in production code beyond the fix itself |
+| 5.4 | N/A — expected green without production change, confirmed | Yes — both `TransactionRunner`-level counters green on first run | None |
+
+### Work Unit Evidence (PR C2c)
+
+| Evidence | Value |
+|---|---|
+| Focused test command and result | `./mvnw -B -pl app -am test -Dtest=IdempotentExecutorConcurrencyIT -Dsurefire.failIfNoSpecifiedTests=false` → 5/5 green, run four times total, zero flakes |
+| Runtime harness command/result | `./mvnw -B verify` (apps/api) → BUILD SUCCESS, 177 kernel + 138 API unit + 78 API integration tests green, JaCoCo bundle check met, 03:02 min total |
+| Rollback boundary | Revert this PR's two commits (`62b465f` test, `8d3089c` feat) individually reverts to PR C2b's state (sequential-only executor, known degradation to an unbounded wait per `proposal.md` "Plan de reversión" point 6); no other file touched |
+
+### Commits (PR C2c)
+
+| Task | SHA | Message |
+|---|---|---|
+| 5.1 | (no commit — already run by the orchestrator, commit `2c05301`, before this batch) | — |
+| 5.2 | `62b465f` | `test(shared): add RED IdempotentExecutorConcurrencyIT for the bounded wait` (also carries task 5.4's counter additions — see task 5.4's process note) |
+| 5.3 | `8d3089c` | `feat(shared): bind lock_timeout and replay after duplicate-key collision` |
+| 5.4 | (no separate commit — content shipped inside `62b465f`; see process note above) | — |
+| 5.5-5.7 | (no commit — verification-only tasks; evidence recorded above) |
+
 ## Status
 
 7/7 tasks of PR C1 complete (1.1-1.7). 7/7 tasks of PR C2a-1 complete (2.1-2.7). 5/5 tasks of PR
-C2a-2 complete (3.1-3.5). 5/5 tasks of PR C2b complete (4.1-4.5). Ready for a fresh `sdd-apply` batch
-to start PR C2c (branch `change/idempotency-key-infrastructure-concurrency`, base PR C2b) once the
-maintainer wants to continue the chain.
+C2a-2 complete (3.1-3.5). 5/5 tasks of PR C2b complete (4.1-4.5). 7/7 tasks of PR C2c complete
+(5.1-5.7). Ready for a fresh `sdd-apply` batch to start PR C3 (branch
+`change/idempotency-key-infrastructure-exit-criterion`, base PR C2c) once the maintainer wants to
+continue the chain.
