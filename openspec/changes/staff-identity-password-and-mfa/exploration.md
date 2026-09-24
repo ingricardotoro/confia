@@ -1,9 +1,15 @@
 # Exploración: autenticación del personal, MFA y sesiones
 
-- **Cambio:** `staff-authentication-mfa-sessions`
+- **Cambio original:** `staff-authentication-mfa-sessions` (cambio 7 de F0)
+- **Dividido el 2026-09-24 en:** `staff-identity-password-and-mfa` (parte A, esta carpeta) y
+  `session-tokens-and-web-layer` (parte B)
 - **Fase:** explorar
 - **Fecha:** 2026-09-24
-- **Estado:** exploración terminada, pendiente de propuesta
+- **Estado:** exploración terminada, división aprobada por el propietario, pendiente de propuesta
+
+> **Alcance de este documento.** Esta exploración se hizo sobre el cambio 7 completo, antes de la
+> división, y por eso describe las dos partes. Es la exploración compartida: la parte B la referencia
+> desde su propia carpeta en vez de repetirla, como hizo la parte B del cambio 5.
 
 > **Nota de persistencia y dos correcciones del orquestador.** El agente de exploración no dispuso de
 > herramienta de escritura de archivos, así que entregó el contenido íntegro y el orquestador lo

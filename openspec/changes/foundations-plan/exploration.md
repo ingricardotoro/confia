@@ -64,6 +64,31 @@ transaccional único y bitácora de auditoría encadenada por hash), después, p
 parte A. La migración de `organization_institution` y su repositorio jOOQ, asignados al cambio 5 por
 la nota anterior, quedan asignados de forma explícita a la **parte A**.
 
+**Nota (2026-09-24, división del cambio 7).** El propietario aprobó dividir el cambio 7 en dos
+cambios SDD secuenciales. La exploración compartida vive en
+`openspec/changes/staff-identity-password-and-mfa/exploration.md` y documenta la evidencia que
+motiva el corte: el cambio 7 trae a la vez el primer `DataSource` de producción, la primera capa
+`web` del sistema con sus reglas de ArchUnit, MFA con cifrado de columna sin mecanismo disponible
+(`pgcrypto` está confirmado ausente), JWT con EdDSA y JWKS, rotación de refresco con concurrencia
+real, el adaptador de ADR-0009, el cableado HTTP de la idempotencia, CSRF, CSP, Problem Details,
+springdoc y la primera dependencia de Redis. La estimación de 12 a 13 tareas de la tabla anterior es
+previa a casi toda esa evidencia.
+
+- **Parte A**, `staff-identity-password-and-mfa`: módulo `identity`, esquema, migración y
+  privilegios, autenticación con contraseña, MFA con su mecanismo de cifrado, bloqueo por intentos
+  fallidos con retroceso, recuperación de contraseña y prevención de enumeración. **Sin capa web**,
+  demostrado con pruebas de integración contra el caso de uso.
+- **Parte B**, `session-tokens-and-web-layer`: JWT y JWKS, rotación de token de refresco con
+  detección de reutilización, adaptador real de `CurrentInstitutionProvider` con su prueba de
+  ADR-0009, registro de la fuente de datos de producción, el primer controlador y la capa web
+  completa, la mecánica genérica de RBAC con su guarda de arranque, y el cableado HTTP de la
+  idempotencia que el cambio 6 difirió.
+
+Hay identidad sin capa web, pero no hay sesión sin identidad: el orden es A y después B. De las cinco
+decisiones que la exploración dejó abiertas, solo el mecanismo de cifrado del secreto MFA pertenece a
+la parte A; el dueño de la guarda de arranque de RBAC, la exigencia de `Idempotency-Key` en endpoints
+que no mueven dinero y el alcance del registro de la fuente de datos son de la parte B.
+
 **Hallazgo.** `docs/09-roadmap-y-fases.md` §3 no incluye el módulo `organization` en F0, pero
 ADR-0009 exige `institution_id NOT NULL` desde la primera migración y ADR-0017 asigna la tabla raíz
 de institución a ese módulo. Se recomienda incorporar el cambio 4, con la entidad raíz mínima, al
