@@ -188,9 +188,23 @@ hexagonal ya vigente, así que dividir la capacidad en dos no tendría dónde ap
   del contador a los 30 minutos, y **sus dos escenarios completos**. El requisito de MFA obligatoria
   **no se toca en este delta**: sigue publicado tal como está y lo modifica
   `mfa-totp-and-password-recovery`.
-- **`build-integrity`**: delta con `## MODIFIED Requirements` sobre el requisito «Aislamiento del
-  `domain` entre módulos», para incorporar el escenario diferido W2 que este cambio cierra, y
-  retirar la nota de diferimiento de las líneas 26–32.
+- **`build-integrity`**: delta con `## MODIFIED Requirements` sobre el requisito **«Frontera de
+  dominio entre módulos de negocio»** (`openspec/specs/build-integrity/spec.md`, línea 15), para
+  incorporar el escenario diferido W2 «Cada módulo usa solo su propio dominio» que este cambio
+  cierra, y retirar la nota de diferimiento de las líneas 26–32. Su premisa —dos módulos de negocio
+  existentes— se cumple por primera vez con `identity` junto a `organization`: hasta hoy la regla se
+  verificaba de forma vacía, porque con un solo módulo «ninguno importa el `domain` del otro» es
+  cierto por no haber otro.
+
+  > **Dos correcciones verificadas por el orquestador, leyendo el archivo.** Una versión anterior de
+  > esta propuesta llamaba a ese requisito «Aislamiento del `domain` entre módulos»; **no existe con
+  > ese nombre**, y un `## MODIFIED Requirements` que no nombre el requisito exactamente como está
+  > publicado no se puede fusionar al archivar. Además, la nota de diferimiento nombra como dueño a
+  > `staff-authentication-mfa-sessions`, que se dividió en tres cambios el 2026-09-24; el que crea el
+  > segundo módulo de negocio es **este**. El delta debe dejar constancia de esa correspondencia.
+
+  Este delta también incorpora la migración `V5` con su tabla, su seguridad de fila habilitada y
+  forzada y sus privilegios, siguiendo el precedente literal del delta del cambio 6 para `V4`.
 
 ### Cobertura de los dieciséis escenarios publicados de `identity`, uno a uno
 
