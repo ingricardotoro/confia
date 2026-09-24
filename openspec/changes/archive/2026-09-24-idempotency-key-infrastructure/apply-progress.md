@@ -1252,3 +1252,32 @@ A); W2, the `PostgresImageSingleSourceTest` gap against `apps/api/app/pom.xml`'s
 criterion 4 and nothing else that was open before it.
 
 Ready for `sdd-archive` once the maintainer decides to close this change.
+
+## Nota de archivado: la verificación SDD quedó incompleta
+
+**El archivado se hizo sin informe de verificación completo, y conviene que quede dicho.** La fase
+de verificación se lanzó el 2026-09-24 y cayó a mitad por el límite de sesión de la cuenta, no por
+ningún hallazgo. Alcanzó a confirmar dos cosas antes de detenerse:
+
+- Bajo `specs/` de este cambio solo existe `build-integrity`, sin directorio de capacidad nueva, y
+  `openspec/specs` no tenía diferencias todavía. **La decisión de no crear capacidad nueva se
+  sostuvo.**
+- Estaba verificando la atomicidad del adaptador y la regla de composición del ejecutor cuando se
+  cortó.
+
+Lo que **sí** está verificado, por otras vías y con evidencia:
+
+- **La revisión previa a la fusión**, con dos revisores independientes. El de reglas no negociables
+  aprobó sin bloqueantes tras ejecutar las seis reglas ArchUnit contra el código real y verificar el
+  vector de oro del hash por su cuenta. El auditor de seguridad encontró **un bloqueante real** —la
+  ausencia de prueba de aislamiento entre instituciones— que se corrigió en `311b918`, con su
+  escenario añadido a la especificación y un control negativo que demuestra que la prueba falla si
+  la política se debilita.
+- **`main` en verde con la puerta de mutación**, confirmado tras fusionar los seis pull requests.
+- **Las seis sondas del cambio**, ejecutadas y registradas: S1, S2, S3, S5 y S6 por el orquestador,
+  S4 dentro del corte C2a-1.
+
+Lo que **no** se hizo: el recorrido escenario por escenario de los 21 escenarios contra su método de
+prueba concreto, que es lo que la verificación SDD aporta por encima de una revisión. Queda como
+deuda de este archivado. Si una fase posterior lo necesita, la especificación publicada y las clases
+de prueba están todas en `main`.
