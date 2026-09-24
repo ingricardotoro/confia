@@ -209,7 +209,7 @@ por sí sola.
   `design.md` decisión 1). Registrar ambos resultados exactos en `apply-progress.md`. — `design.md`
   §10 (sondas S4, S6) y §11, paso 5
 
-- [ ] 2.2 **ROJO — catálogo de códigos de error.** No requiere Docker (JUnit puro, sin contenedor).
+- [x] 2.2 **ROJO — catálogo de códigos de error.** No requiere Docker (JUnit puro, sin contenedor).
   Crear `.../test/java/com/confia/shared/security/IdempotencyErrorCodesTest.java`: afirma que
   `IdempotencyConflictException` y `IdempotencyPayloadMismatchException` son subclases de
   `com.confia.kernel.DomainException`, que sus códigos (`idempotency-conflict`,
@@ -219,7 +219,7 @@ por sí sola.
   compilar porque ninguna de las dos excepciones existe. — `design.md`, decisión 9 («Los códigos
   nuevos siguen la convención del catálogo por módulo»)
 
-- [ ] 2.3 **VERDE — las dos excepciones del contrato.** No requiere Docker. Crear
+- [x] 2.3 **VERDE — las dos excepciones del contrato.** No requiere Docker. Crear
   `.../main/java/com/confia/shared/security/IdempotencyConflictException.java` (extiende
   `DomainException`, código `idempotency-conflict`, con un motivo `WAIT_EXHAUSTED`/
   `MARKER_IN_PROGRESS` en enumeración) y
@@ -227,7 +227,7 @@ por sí sola.
   `DomainException`, código `idempotency-payload-mismatch`). Ejecutar `IdempotencyErrorCodesTest`:
   verde. — `design.md`, decisión 9, tabla de excepciones
 
-- [ ] 2.4 **ROJO — puerto, tipos que firma y adaptador jOOQ con traducción de `SQLState`.** Requiere
+- [x] 2.4 **ROJO — puerto, tipos que firma y adaptador jOOQ con traducción de `SQLState`.** Requiere
   Docker (ejecuta 2.1). Crear
   `.../main/java/com/confia/shared/security/IdempotencyKey.java` y
   `.../main/java/com/confia/shared/security/IdempotentResponse.java` (records de `design.md` §6.1);
@@ -244,7 +244,7 @@ por sí sola.
   concurrente del marcador, con salidas distinguibles por `SQLState`» (fundamento de la traducción, sin
   concurrencia real todavía — esa parte es C2c)
 
-- [ ] 2.5 **VERDE — `JooqIdempotencyRecordStore`.** Requiere Docker (ejecuta 2.4). Crear
+- [x] 2.5 **VERDE — `JooqIdempotencyRecordStore`.** Requiere Docker (ejecuta 2.4). Crear
   `.../main/java/com/confia/shared/infrastructure/JooqIdempotencyRecordStore.java` (único adaptador
   nuevo que toca `org.jooq..` y `confia.generated..`, R1): implementa los cuatro métodos del puerto
   sobre el tipo generado `SharedIdempotencyKey`, y el método privado `translate(...)` de `design.md`
@@ -255,14 +255,14 @@ por sí sola.
   excepciones de jOOQ (`design.md` decisión 5). Ejecutar `JooqIdempotencyRecordStoreIT`: verde. —
   `design.md`, decisión 5 completa
 
-- [ ] 2.6 **Medir el diff real de PR C2a-1** con
+- [x] 2.6 **Medir el diff real de PR C2a-1** con
   `git diff --numstat <base-de-PR-C1>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar. **Si supera 800, detener la aplicación y
   reportar los puntos de corte candidatos medidos, verificando cada mitad por separado con
   `./mvnw -B verify`**, sin separar nunca el puerto o el adaptador de su propia prueba de integración
   ni de las excepciones que necesita para compilar. — `design.md` §12
 
-- [ ] 2.7 **Verificación final de PR C2a-1.** Requiere Docker. En checkout limpio, ejecutar
+- [x] 2.7 **Verificación final de PR C2a-1.** Requiere Docker. En checkout limpio, ejecutar
   `./mvnw -B verify` en `apps/api` con JDK 25 y Docker activo. Confirmar `IdempotencyErrorCodesTest` y
   `JooqIdempotencyRecordStoreIT` en verde completas, incluidas las dos traducciones de `SQLState` por
   código. Empujar la rama `...-store` (apuntando a PR C1) y confirmar en la integración continua que

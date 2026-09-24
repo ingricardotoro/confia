@@ -118,14 +118,14 @@ task was not executed as a deliberate scope boundary of this run, not a failure 
 locally-verifiable evidence (full `./mvnw -B verify`, clean tree, every named test green) is
 recorded above and is real.
 
-## Hard-stop checks (none triggered)
+### Hard-stop checks (none triggered, PR C1)
 
 1. Diff (task 1.6): 323 lines, far under 800 — no stop.
 2. No gate weakened, no role given more than `docs/03` §6.1 allows.
 3. No contradiction found between tasks/design/specs/ADR-0010 for this cut.
 4. `MultiTenantSchemaIT` passed **unmodified** — no discrepancy to report.
 
-## Three explicit verifications requested by the launch prompt
+### Three explicit verifications requested by the launch prompt (PR C1)
 
 - **Migration inventory trap**: `V4`'s comments name "change 9" and the spec requirement, never the
   scheduler table's literal name; `AuditScopeExclusionInventoryTest` stayed green (task 1.4).
@@ -138,10 +138,29 @@ recorded above and is real.
   `org.jooq.exception.DataAccessException`), matching `docs/03` §6.1's non-financial-table rule
   exactly — `shared_idempotency_key` carries no amount or currency column.
 
-## Status
+### TDD Cycle Evidence (PR C1)
 
-7/7 tasks of PR C1 complete (1.1-1.7). PR C2a-1 in progress (branch
-`change/idempotency-key-infrastructure-store`, base PR C1).
+| Task | RED observed | GREEN observed | REFACTOR |
+|---|---|---|---|
+| 1.1/1.2 | Yes — `relation "shared_idempotency_key" does not exist` (task1.1-red.log) | Yes — 18/18 tests, BUILD SUCCESS (task1.2-green.log) | None needed; migration and tests matched design on first pass |
+
+### Work Unit Evidence (PR C1)
+
+| Evidence | Value |
+|---|---|
+| Focused test command and result | `./mvnw -B -pl app -am test -Dtest=RolePrivilegeMatrixIT,IdempotencyKeyPrivilegeIT -Dsurefire.failIfNoSpecifiedTests=false` → 18/18 green |
+| Runtime harness command/result | `./mvnw -B verify` (apps/api) → BUILD SUCCESS, 63 integration tests green, JaCoCo bundle check met, 03:11 min total |
+| Rollback boundary | Revert this PR's two commits (`c78be2f`, `48500b5`); no Java consumer exists yet, so no other code depends on `shared_idempotency_key`. Per `design.md` §9 point 3 this PR cannot be reverted independently once PR C2a-1 exists and compiles against the generated jOOQ type |
+
+### Commits (PR C1)
+
+| Task | SHA | Message |
+|---|---|---|
+| 1.1 | `c78be2f` | `test(schema): add RED privilege gates for shared_idempotency_key` |
+| 1.2 | `48500b5` | `feat(schema): create shared_idempotency_key table` |
+| 1.3-1.7 | (no commit — verification-only tasks; evidence recorded above) |
+
+---
 
 ## PR C2a-1 — port, signed types, exceptions and jOOQ adapter (branch `change/idempotency-key-infrastructure-store`, base PR C1)
 
@@ -164,16 +183,17 @@ exist; the probe issues the same jOOQ `insertInto` shape the adapter will use):
 
 - **`55P03` (wait exhaustion)**: two independent `TransactionRunner`s, thread A inserts and holds
   the transaction open past a `CyclicBarrier`, thread B sets `lock_timeout` to `100ms` and attempts
-  the same primary key. Measured: top-level `org.jooq.exception.DataAccessException`, cause `org.postgresql.util.PSQLException`
-  with `getSQLState()` = `"55P03"`, message `"canceling statement due to lock timeout"`. Matches the
-  design's prediction exactly. Supplier invocation count for thread B: **1** — confirms
-  `TransactionRunner.isRetryable(...)` did not retry (measured by a counter, not by reading the
-  type, per the launch prompt's instruction).
+  the same primary key. Measured: top-level `org.jooq.exception.DataAccessException`, cause
+  `org.postgresql.util.PSQLException` with `getSQLState()` = `"55P03"`, message `"canceling
+  statement due to lock timeout"`. Matches the design's prediction exactly. Supplier invocation
+  count for thread B: **1** — confirms `TransactionRunner.isRetryable(...)` did not retry (measured
+  by a counter, not by reading the type, per the launch prompt's instruction).
 - **`23505` (duplicate key, sequential)**: first transaction commits an insert; a second,
   independent transaction inserts the same primary key. Measured: top-level
-  **`org.jooq.exception.IntegrityConstraintViolationException`**, cause `org.postgresql.util.PSQLException`
-  with `getSQLState()` = `"23505"`, message `"duplicate key value violates unique constraint
-  \"shared_idempotency_key_pk\""`. Supplier invocation count: **1** — not retried.
+  **`org.jooq.exception.IntegrityConstraintViolationException`**, cause
+  `org.postgresql.util.PSQLException` with `getSQLState()` = `"23505"`, message `"duplicate key
+  value violates unique constraint \"shared_idempotency_key_pk\""`. Supplier invocation count:
+  **1** — not retried.
 
 **Discrepancy found and reported, not blocking (hard-stop 3, informational).** design.md section 2
 predicted, by reading, that both outcomes arrive as plain `org.jooq.exception.DataAccessException`
@@ -189,7 +209,7 @@ are `RuntimeException`s carrying the real `SQLException` in their cause chain, s
 as designed in section 6.3 — walking the cause chain for `SQLException.getSQLState()` — works
 unchanged regardless of which of the two top-level jOOQ types wraps it. **No design change
 required**; recorded here because "no se afirma como comprobado lo que no se comprobó" and the
-measured type differs from the predicted one, even though the consequence for the adaptor's
+measured type differs from the predicted one, even though the consequence for the adapter's
 `translate(...)` method is nil.
 
 **Consequence for task 2.4/2.5**: `translate(...)` must never branch on the top-level exception
@@ -198,24 +218,171 @@ found by walking `getCause()`, exactly as design.md section 6.3 already specifie
 result confirms that requirement is not just prudent but necessary, since jOOQ itself already uses
 two different top-level types for the two outcomes this change must treat uniformly by code.
 
-## TDD Cycle Evidence
+### Task 2.2 — RED: error-code catalog
+
+Created `IdempotencyErrorCodesTest.java` in `com.confia.shared.security`, mirroring
+`OrganizationErrorCodesTest`/`KernelErrorCodesTest`'s pattern: kebab-case format, ≤64 characters, no
+duplicates, both codes prefixed `idempotency-`, both exceptions asserted as `DomainException`
+subclasses, and a dedicated test that both `Reason` values of the conflict exception share one code.
+
+**Observed RED** (`/tmp/confia-logs/task2.2-red.log`,
+`./mvnw -B -pl app -am test -Dtest=IdempotencyErrorCodesTest -Dsurefire.failIfNoSpecifiedTests=false`):
+compilation failure — `cannot find symbol: class IdempotencyConflictException`,
+`cannot find symbol: class IdempotencyPayloadMismatchException`. Exactly as predicted (neither
+exception exists yet).
+
+### Task 2.3 — GREEN: the two exceptions
+
+Created `IdempotencyConflictException` (extends `DomainException`, code `idempotency-conflict`,
+`Reason` enum with `WAIT_EXHAUSTED`/`MARKER_IN_PROGRESS`, an optional `cause` constructor for the
+adapter's translated `SQLException`) and `IdempotencyPayloadMismatchException` (extends
+`DomainException`, code `idempotency-payload-mismatch`).
+
+**Observed GREEN** (`/tmp/confia-logs/task2.3-green.log`, same focused command):
+`Tests run: 7, Failures: 0, Errors: 0` → `BUILD SUCCESS`.
+
+### Task 2.4 — RED: port, signed types and the adapter IT
+
+Created the port's own signed types in `com.confia.shared.security`: `IdempotencyKey` (record,
+`endpoint`/`value`, non-null compact constructor), `IdempotentResponse` (record, `responseStatus`/
+`responseBody` as `tools.jackson.databind.JsonNode`, non-null body), `IdempotencyRecord` (record,
+JDK-only fields mirroring `AuditRowSnapshot`'s pattern — `responseBody` as raw `String` jsonb text),
+the `IdempotencyRecordStore` port interface (four methods: `lockExisting`, `insertInProgress`,
+`restartExpired`, `complete`), and `IdempotencyMarkerAlreadyExists` (plain `RuntimeException`, not a
+`DomainException` — it never crosses this component's own boundary, so it carries no stable
+web-facing code; documented explicitly in its Javadoc).
+
+Created `JooqIdempotencyRecordStoreIT.java` in `com.confia.shared.infrastructure`, extending
+`CommittingPostgresIntegrationTest`, with six scenarios: `insertInProgress` visible through
+`lockExisting`; `lockExisting` absent for an unknown key; `complete` stores the response and marks
+`COMPLETED`; `restartExpired` reuses the row without changing `created_at`; the `23505` translation
+(sequential, real duplicate insert) to `IdempotencyMarkerAlreadyExists`; the `55P03` translation
+(two independent `TransactionRunner`s, `CyclicBarrier`-synchronized, `lock_timeout` set directly on
+the second transaction to isolate the adapter's own translation from the future executor's
+ownership of that statement) to `IdempotencyConflictException(WAIT_EXHAUSTED)`, with an invocation
+counter proving no retry.
+
+**Observed RED** (`/tmp/confia-logs/task2.4-red.log`,
+`./mvnw -B -pl app -am test -Dtest=JooqIdempotencyRecordStoreIT -Dsurefire.failIfNoSpecifiedTests=false`):
+compilation failure — `cannot find symbol: class JooqIdempotencyRecordStore`, exactly as predicted
+(the port and its signed types compiled cleanly; only the adapter was missing).
+
+### Task 2.5 — GREEN: `JooqIdempotencyRecordStore`
+
+Created the single jOOQ adapter in `com.confia.shared.infrastructure`, implementing all four port
+methods over `confia.generated.jooq.tables.SharedIdempotencyKey`, with a private `translate(...)`
+walking the cause chain by `SQLState` only (never message text), matching `TransactionRunner`'s own
+pattern. Neither `IdempotencyMarkerAlreadyExists` nor `IdempotencyConflictException` extends
+Spring's `ConcurrencyFailureException` (verified by inspection: both extend plain
+`RuntimeException`/`DomainException`).
+
+**Observed GREEN** (`/tmp/confia-logs/task2.5-green.log`, same focused command):
+`Tests run: 6, Failures: 0, Errors: 0` → `BUILD SUCCESS`.
+
+**Architecture gates re-verified in isolation** (`/tmp/confia-logs/task2-arch-check.log`):
+`JooqConfinedToInfrastructureTest`, `NoUnapprovedPlainSqlTest`, `TransactionsOnlyInSharedSecurityTest`,
+`NoCyclesTest`, `TableOwnershipByModuleTest`, `SpringModulithVerificationTest`,
+`LayeredArchitectureTest` — all green (28 tests total across the focused run) with the new classes
+present. Confirms R1, R2, R3 and the module-slice rules hold for the new adapter and port.
+
+### Task 2.6 — measured diff
+
+```
+git diff --numstat 48500b5...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'
+158  0  apps/api/app/src/main/java/com/confia/shared/infrastructure/JooqIdempotencyRecordStore.java
+55   0  apps/api/app/src/main/java/com/confia/shared/security/IdempotencyConflictException.java
+18   0  apps/api/app/src/main/java/com/confia/shared/security/IdempotencyKey.java
+17   0  apps/api/app/src/main/java/com/confia/shared/security/IdempotencyMarkerAlreadyExists.java
+19   0  apps/api/app/src/main/java/com/confia/shared/security/IdempotencyPayloadMismatchException.java
+19   0  apps/api/app/src/main/java/com/confia/shared/security/IdempotencyRecord.java
+37   0  apps/api/app/src/main/java/com/confia/shared/security/IdempotencyRecordStore.java
+18   0  apps/api/app/src/main/java/com/confia/shared/security/IdempotentResponse.java
+252  0  apps/api/app/src/test/java/com/confia/shared/infrastructure/JooqIdempotencyRecordStoreIT.java
+96   0  apps/api/app/src/test/java/com/confia/shared/security/IdempotencyErrorCodesTest.java
+```
+
+**Total: 689 authored lines** (all additions, no deletions), measured from PR C1's last code commit
+(`48500b5`) to `HEAD`. Well inside the 800-line budget (`docs/15-flujo-de-trabajo-git.md` §3) and
+inside `design.md` §12's own 590-970 forecast for the whole of C2a (C2a-1 alone at 689, leaving
+C2a-2 comfortably inside the remainder). No split needed; no candidate split points to report.
+
+### Task 2.7 — final verification of PR C2a-1
+
+Full `./mvnw -B verify` in `apps/api`, clean tree, `JAVA_HOME` on JDK 25, `MAVEN_OPTS` with
+`Windows-ROOT`, Docker active (`/tmp/confia-logs/task2.7-verify.log`):
+
+- `IdempotencyErrorCodesTest`: `Tests run: 7, Failures: 0, Errors: 0` — complete green.
+- `JooqIdempotencyRecordStoreIT`: `Tests run: 6, Failures: 0, Errors: 0` — complete green, both
+  `SQLState` translations included.
+- Every architecture gate green: `JooqConfinedToInfrastructureTest`, `NoUnapprovedPlainSqlTest`,
+  `TransactionsOnlyInSharedSecurityTest`, `NoCyclesTest`, `TableOwnershipByModuleTest`,
+  `SpringModulithVerificationTest`, `LayeredArchitectureTest`, and every other architecture test in
+  the module.
+- `RolePrivilegeMatrixIT` (16), `IdempotencyKeyPrivilegeIT` (2), `MultiTenantSchemaIT` (7) — still
+  green, unaffected by this slice.
+- Overall: `Tests run: 133` (unit, surefire phase) + `Tests run: 69` (integration, failsafe phase) —
+  all green. `jacoco:check` → "All coverage checks have been met" (both the surefire-only and the
+  merged unit+integration report).
+- Total measured build time: **03:02 min** (`CONFIA API` module `02:47 min` + `CONFIA Kernel`
+  compile). Comfortably inside the 8-minute budget; no W1 escalation needed at this cut.
+- `BUILD SUCCESS`.
+
+**Deviation, reported honestly, same as PR C1**: the task also asks to push
+`change/idempotency-key-infrastructure-store` and confirm the `backend` CI job. The orchestrator's
+launch instructions for this run are explicit and take precedence: *"No empujes ni abras pull
+requests."* Not executed as a deliberate scope boundary, not a failure or an oversight. All
+locally-verifiable evidence above is real.
+
+### Hard-stop checks (none triggered, PR C2a-1)
+
+1. Diff (task 2.6): 689 lines, under 800 — no stop.
+2. No gate weakened, no ArchUnit exception added, no role given more than `docs/03` §6.1 allows.
+3. One informational discrepancy found and reported (task 2.1, S4 vs design.md section 2's
+   by-reading prediction) — not blocking, no design change required.
+4. S4 did **not** reveal a Spring `ConcurrencyFailureException` reaching the adapter's boundary —
+   the wrapper of decision 5 stays a precaution, as designed, not an upgraded necessity.
+
+### Three things requested to be proven, not assumed (PR C2a-1)
+
+- **`SQLState` discrimination is by code in the cause chain, never by message text**:
+  `translate(...)` only inspects `SQLException.getSQLState()` walking `getCause()`; `S4`'s measured
+  result (two different top-level jOOQ types for the same underlying codes) is itself proof this
+  discipline is load-bearing, not incidental.
+- **S4 counts invocations**: both `ProbeS4IT` and `JooqIdempotencyRecordStoreIT`'s wait-exhaustion
+  scenario use an invocation counter, not a type assertion, to prove no retry occurred.
+- **The adapter opens no transaction**: `JooqIdempotencyRecordStore` has no
+  `PlatformTransactionManager`, no `TransactionTemplate`, no `@Transactional` — every method
+  participates in whatever transaction the caller's `DSLContext` is already bound to, confirmed by
+  `TransactionsOnlyInSharedSecurityTest` staying green with the adapter present (task 2.5).
+
+### TDD Cycle Evidence (PR C2a-1)
 
 | Task | RED observed | GREEN observed | REFACTOR |
 |---|---|---|---|
-| 1.1/1.2 | Yes — `relation "shared_idempotency_key" does not exist` (task1.1-red.log) | Yes — 18/18 tests, BUILD SUCCESS (task1.2-green.log) | None needed; migration and tests matched design on first pass |
+| 2.2/2.3 | Yes — compile failure, both exceptions missing (task2.2-red.log) | Yes — 7/7 tests, BUILD SUCCESS (task2.3-green.log) | None needed |
+| 2.4/2.5 | Yes — compile failure, only the adapter missing (task2.4-red.log) | Yes — 6/6 tests, BUILD SUCCESS (task2.5-green.log) | None needed |
 
-## Work Unit Evidence (PR C1)
+### Work Unit Evidence (PR C2a-1)
 
 | Evidence | Value |
 |---|---|
-| Focused test command and result | `./mvnw -B -pl app -am test -Dtest=RolePrivilegeMatrixIT,IdempotencyKeyPrivilegeIT -Dsurefire.failIfNoSpecifiedTests=false` → 18/18 green |
-| Runtime harness command/result | `./mvnw -B verify` (apps/api) → BUILD SUCCESS, 63 integration tests green, JaCoCo bundle check met, 03:11 min total |
-| Rollback boundary | Revert this PR's two commits (`c78be2f`, `48500b5`); no Java consumer exists yet, so no other code depends on `shared_idempotency_key`. Per `design.md` §9 point 3 this PR cannot be reverted independently once PR C2a-1 exists and compiles against the generated jOOQ type |
+| Focused test command and result | `./mvnw -B -pl app -am test -Dtest=IdempotencyErrorCodesTest,JooqIdempotencyRecordStoreIT -Dsurefire.failIfNoSpecifiedTests=false` → 13/13 green |
+| Runtime harness command/result | `./mvnw -B verify` (apps/api) → BUILD SUCCESS, 133 unit + 69 integration tests green, JaCoCo bundle check met, 03:02 min total |
+| Rollback boundary | Revert this PR's five commits (`5119fd7` docs, `a281175` test, `235e5d7` feat, `ee9f42a` test, `c172c55` feat) individually reverts to PR C1's state. Per `design.md` §9 point 3, PR C1 cannot be reverted independently of this PR once this PR exists — the adapter compiles against the generated jOOQ type from `V4` |
 
-## Commits
+### Commits (PR C2a-1)
 
 | Task | SHA | Message |
 |---|---|---|
-| 1.1 | `c78be2f` | `test(schema): add RED privilege gates for shared_idempotency_key` |
-| 1.2 | `48500b5` | `feat(schema): create shared_idempotency_key table` |
-| 1.3-1.7 | (no commit — verification-only tasks; evidence recorded above) |
+| 2.1 | `5119fd7` | `docs(sdd): run probe S4 and reconfirm S6 for slice C2a-1` |
+| 2.2 | `a281175` | `test(shared): add RED error-code catalog gate for idempotency exceptions` |
+| 2.3 | `235e5d7` | `feat(shared): add idempotency conflict and payload-mismatch exceptions` |
+| 2.4 | `ee9f42a` | `test(shared): add RED port, signed types and jOOQ adapter IT` |
+| 2.5 | `c172c55` | `feat(shared): add jOOQ adapter for shared_idempotency_key` |
+| 2.6-2.7 | (no commit — verification-only tasks; evidence recorded above) |
+
+## Status
+
+7/7 tasks of PR C1 complete (1.1-1.7). 7/7 tasks of PR C2a-1 complete (2.1-2.7). Ready for a fresh
+`sdd-apply` batch to start PR C2a-2 (branch `change/idempotency-key-infrastructure-hasher`, base PR
+C2a-1) once the maintainer wants to continue the chain.
