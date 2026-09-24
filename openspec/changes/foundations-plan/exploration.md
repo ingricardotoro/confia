@@ -69,8 +69,9 @@ cambios SDD secuenciales. La exploración compartida vive en
 `openspec/changes/staff-identity-password-and-mfa/exploration.md` y documenta la evidencia que
 motiva el corte: el cambio 7 trae a la vez el primer `DataSource` de producción, la primera capa
 `web` del sistema con sus reglas de ArchUnit, MFA con cifrado de columna sin mecanismo disponible
-(`pgcrypto` está confirmado ausente), JWT con EdDSA y JWKS, rotación de refresco con concurrencia
-real, el adaptador de ADR-0009, el cableado HTTP de la idempotencia, CSRF, CSP, Problem Details,
+(la ruta de `pgcrypto` está cerrada por privilegios), JWT con EdDSA y JWKS, rotación de refresco con
+concurrencia real, el adaptador de ADR-0009, el cableado HTTP de la idempotencia, CSRF, CSP,
+Problem Details,
 springdoc y la primera dependencia de Redis. La estimación de 12 a 13 tareas de la tabla anterior es
 previa a casi toda esa evidencia.
 

@@ -115,10 +115,20 @@ con su propia guarda o la sustituye por la prueba real de cabecera obligatoria.
 reutilización por contador.
 
 **Sin resolver:** el secreto TOTP debe ir cifrado a nivel de columna en reposo. No existe en el
-árbol ningún mecanismo de cifrado de columna ni de sobre de llaves, y **`pgcrypto` está confirmado
-no disponible** desde la sonda S6 del cambio 5. Eso descarta la ruta nativa de PostgreSQL y obliga a
-cifrado en la aplicación, que **no está decidido en ningún documento**. Es una decisión de
-arquitectura, no un detalle de implementación.
+árbol ningún mecanismo de cifrado de columna ni de sobre de llaves, y la ruta nativa de PostgreSQL
+está cerrada **por privilegios**: `CREATE EXTENSION pgcrypto` desde una migración de Flyway fallaría,
+porque Flyway migra como `confia_owner`, que no es `SUPERUSER` (`create-test-roles.sql:11`), y
+`pgcrypto` no es una extensión de confianza. Eso empuja hacia cifrado en la aplicación, que **no está
+decidido en ningún documento**. Es una decisión de arquitectura, no un detalle de implementación.
+
+> **Corrección 3 del orquestador (2026-09-24).** El encargo de exploración afirmaba que «`pgcrypto`
+> está confirmado no disponible» en la imagen `postgres:18-alpine`, citando la sonda S6 del cambio 5.
+> Verificado contra el diseño archivado de la parte B del cambio 5, **S6 no probó eso**: probó que
+> `sha256(bytea)` es función interna (`pg_proc.prolang = 12`) y que por tanto `pgcrypto` no hacía
+> falta allí. **Nadie ha comprobado si los archivos de la extensión vienen en la imagen.** El hecho
+> verificado es el de privilegios, y es el que se cita arriba. La diferencia no es cosmética: deja
+> abierta la alternativa de crear la extensión fuera de Flyway con un rol privilegiado, que la
+> propuesta debe evaluar y rechazar con motivo en vez de darla por imposible.
 
 ### Sesiones y tokens de refresco: decidido, con concurrencia real
 
@@ -203,8 +213,8 @@ sin HTTP» y «sesión y exposición HTTP».
 
 ## Riesgos
 
-1. **El secreto MFA no tiene mecanismo de cifrado decidido**, y `pgcrypto` está confirmado no
-   disponible. Decisión de arquitectura pendiente.
+1. **El secreto MFA no tiene mecanismo de cifrado decidido**, y la ruta de `pgcrypto` está cerrada
+   por privilegios desde una migración de Flyway. Decisión de arquitectura pendiente.
 2. La interacción entre el `lock_timeout` y el bloqueo de la cadena de auditoría no está probada.
    Queda abierta **más allá de este cambio**, con dueño en F3 o F4.
 3. **La guarda de arranque de RBAC no tiene dueño claro** entre el 7 y el 8. Sin resolverlo, alguno
