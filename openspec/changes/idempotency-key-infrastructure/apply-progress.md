@@ -942,10 +942,313 @@ evidence above is real.
 | 5.4 | (no separate commit — content shipped inside `62b465f`; see process note above) | — |
 | 5.5-5.7 | (no commit — verification-only tasks; evidence recorded above) |
 
+## PR C3 — demonstration, expired-key reuse, exclusions and documentation (branch `change/idempotency-key-infrastructure-exit-criterion`, base PR C2c)
+
+**Last PR of this change.** Sondas S1-S6 were all executed before this batch (S1/S2 by the
+orchestrator 2026-09-22; S4 in C2a-1; S3 in C2b; S5, S6 in C2c) — none repeated here, per this
+batch's own launch instructions.
+
+### Task 6.1 — RED: F0 exit criterion 4, over a real accounting effect
+
+Created `IdempotencyExitCriterionIT.java` in `com.confia.shared.security`, extending
+`CommittingPostgresIntegrationTest`: two independent `IdempotentExecutor` instances (own
+`TransactionRunner`, own connection), synchronized with a `CyclicBarrier` following the exact
+pattern of `IdempotentExecutorConcurrencyIT`'s own scenario (b) — thread A writes its marker,
+reaches the barrier from inside its own use case, holds its transaction open 300&nbsp;ms (well
+inside B's 5&nbsp;s `lockWait`) before committing; thread B waits on the same barrier immediately
+before calling `execute` at all, both with the same idempotency key. The substrate is the
+cumulative `UPDATE organization_institution SET legal_name = legal_name || '+' WHERE id = ?` — not
+`trade_name` (nullable, `NULL || '+'` is `NULL`, an effect that swallows itself) and not a row
+count on `shared_audit_log` (its chaining trigger's per-institution lock on
+`shared_audit_chain_head` would serialize the two transactions before either reached the
+idempotency marker, a green for the wrong reason). Both reasons are written into the test's own
+Javadoc, per the launch prompt's instruction. The assertion checks two things, not one: the final
+suffix carries exactly one `+`, and the losing request's outcome is one of the three declared kinds
+(`Replayed`, `IdempotencyConflictException`, or `Executed`), never an unexplained error.
+
+**First draft deliberately left the accumulation unwired** (a no-op `appendLegalNameSuffix` stub,
+task 6.2's own text: "Falla porque `legal_name` no acumula todavía nada a través de ningún caso de
+uso Java") to force a genuine RED rather than presuppose one, since the mechanism itself
+(`IdempotentExecutor`) has been complete and correct since C2c and nothing else in this scenario was
+missing.
+
+**Observed RED** (`/tmp/confia-logs/task6.1-red.log`, command
+`./mvnw -B -pl app -am test -Dtest=IdempotencyExitCriterionIT -Dsurefire.failIfNoSpecifiedTests=false`):
+
+```
+org.opentest4j.AssertionFailedError:
+[the cumulative effect on legal_name must have happened exactly once, never twice, regardless of
+which of the three outcomes resolved the losing request]
+expected: 1L
+ but was: 0L
+	at IdempotencyExitCriterionIT.twoConcurrentRequestsWithTheSameKeyApplyTheAccountingEffectExactlyOnce(IdempotencyExitCriterionIT.java:133)
+```
+
+Exact failure reason, real and predicted: with no accumulation anywhere yet, the suffix count can
+never reach one. Real RED, not invented.
+
+### Task 6.2 — GREEN: the demonstration's own use case
+
+Replaced the stub with the real, test-tree-only use case:
+`dsl.update(ORGANIZATION_INSTITUTION).set(LEGAL_NAME, LEGAL_NAME.concat("+")).where(ID.eq(...))`
+— running inside whichever transaction the caller (`IdempotentExecutor`'s T1 or T3) already opened,
+through the same `TransactionAwareDataSourceProxy`-backed `dsl` production code shares. **No
+production code changed**: the mechanism has been complete since C2c (task 5.3). The class Javadoc
+documents explicitly which part is real production demonstration (the table, its forced row-level
+security, the real security context, the real privileges, genuinely committing transactions) and
+which part is partial (`JooqInstitutionRepository` only exposes `findById`; no Java write path over
+`organization_institution` exists outside this test), per `proposal.md`'s own framing.
+
+**Observed GREEN**, run four times total for stability (hard-stop 3):
+
+| Run | Log | Result |
+|---|---|---|
+| 1 | `task6.2-green-run1.log` | 1/1 green, `Time elapsed: 64.11 s` module-wide, `BUILD SUCCESS` |
+| 2 | `task6.2-green-run2.log` | 1/1 green, `BUILD SUCCESS` |
+| 3 | `task6.2-green-run3.log` | 1/1 green, `BUILD SUCCESS` |
+| 4 (full verify) | `task6.9-final-verify.log` | 1/1 green, `Time elapsed: 0.535 s` (warm JVM/container) |
+
+Zero flaky results across all four observations — real concurrency (two independent
+`TransactionRunner`s, two connections, a `CyclicBarrier`), never two sequential calls.
+
+### Task 6.3 — reuse of a caducated key
+
+Created `IdempotencyExpiryIT.java` in `com.confia.shared.security`, extending
+`CommittingPostgresIntegrationTest`, with a `Clock` fixed by constructor deciding caducity, never a
+real wait nor a hand-written `expires_at`: a first `IdempotentExecutor` fixed at `T0` completes a
+marker whose `expires_at = T0 + 24h`; a second fixed at `T1 = T0 + 25h` reuses the same key. Three
+assertions, per the launch prompt: (a) exactly one row exists for the primary key after reuse — a
+wrongful `DELETE`+`INSERT` re-use could leave zero or two; (b) `created_at` is unchanged between the
+two reads, the property that actually distinguishes an `UPDATE` from a delete-then-insert; (c)
+before the new request arrives, the row is read and confirmed to still exist with an already-vencido
+`expires_at`, since no purge job is deployed in this change.
+
+**Honest discrepancy, reported rather than papered over.** Unlike every previous `*IT.java` class in
+this change, this one did **not** produce a RED on its first real run
+(`/tmp/confia-logs/task6.3-first-run.log`: `Tests run: 1, Failures: 0, Errors: 0`, `BUILD SUCCESS`,
+immediate green). The reason is verifiable, not a shortcut: `restartExpired`'s `UPDATE`-based reuse
+has been correct and complete since C2b (task 4.3, "Reuse of a caducated key is an UPDATE, never a
+DELETE+INSERT"), and `JooqIdempotencyRecordStoreIT` (task 2.4) already exercises `restartExpired` at
+the adapter level directly. What this class adds is coverage — exercising that same, already-correct
+path through the real `IdempotentExecutor`, with a real caducated marker and a real second clock —
+not a missing behavior. Task 6.4's own text explicitly anticipates this exact possibility ("si el
+reloj inyectado revela un caso no cubierto... corregir... y volver a ejecutar" — worded as
+conditional, not certain), and PR C2c's task 5.4 already established the precedent of reporting an
+honest discrepancy rather than manufacturing evidence. **No RED was invented for this task.**
+
+### Task 6.4 — confirmed reuse, no production change
+
+Confirmed green with **zero production changes**, exactly as anticipated by the task's own text:
+`restartExpired` (C2b, task 4.3) already implements the requirement correctly. No edge case
+(microsecond-offset instant comparison or otherwise) was revealed by the injected clock.
+
+### Task 6.5 — the three named-owner scope exclusion inventories
+
+Created `IdempotencyScopeExclusionInventoryTest.java` in `com.confia.shared.security`, following
+`AuditScopeExclusionInventoryTest`'s own precedent literally: (a) no production class in a
+`..web..` package depends on `com.confia.shared.security`, and no production class's compiled
+bytecode carries the `Idempotency-Key` literal (read via each production class's own `.class`
+resource, decoded as ISO-8859-1 — chosen over a raw classpath-root directory walk specifically
+because `getResource("com/confia")` would be ambiguous between `target/classes` and
+`target/test-classes`, both of which share this package); (b) the concatenated real migration text
+contains `shared_idempotency_key` and no delivered migration deletes from it; (c) `confia_portal_app`'s
+absence of privilege is already a real, named `@Test` method in `RolePrivilegeMatrixIT` (task 1.1),
+confirmed by reflection (`Class.forName` + `getDeclaredMethods`) rather than repeated by real SQL —
+package-private across packages, so a direct compile-time reference is not possible.
+
+**Observed green on first run** (`/tmp/confia-logs/task6.5-run1.log`: `Tests run: 3, Failures: 0`),
+exactly as the task's own text anticipates ("en la práctica se escribe al final y debe pasar de
+inmediato, sin ninguna implementación de producción nueva que exigir").
+
+**Proof that all three inventories can actually fail — requested explicitly, not assumed.** Each
+assertion was temporarily perturbed to a condition known to be false and re-run
+(`/tmp/confia-logs/task6.5-probe-red.log`): (A) `doesNotContain("Idempotency-Key")` →
+`doesNotContain("IdempotentExecutor")` (a string every production class's own bytecode trivially
+carries); (B) `doesNotContain("delete from shared_idempotency_key")` →
+`doesNotContain("create table shared_idempotency_key")` (real migration text); (C) the
+`RolePrivilegeMatrixIT` method-name match's second substring swapped for a nonexistent one. **All
+three failed together**: `Tests run: 3, Failures: 3`, each failure attributed to its own named test
+method. Reverted immediately, then reconfirmed green
+(`/tmp/confia-logs/task6.5-reconfirm-green.log`: `Tests run: 3, Failures: 0`).
+
+### Task 6.6 — Javadoc, `package-info`, dated ADR-0010 note, `docs/09`
+
+- `TransactionRunner.java`: Javadoc no longer names "change 6" as the owner of bean registration
+  (this change is a test-only consumer). Now names the actual owner: the first change that declares
+  a real production `DataSource` and retires the `DataSourceAutoConfiguration` exclusion from all
+  three bootstrap processes.
+- `package-info.java` (`com.confia.shared.security`): documents `IdempotentExecutor` as the
+  package's second inhabitant, satisfying R3 by composition (never opening its own transaction).
+- `docs/adr/ADR-0010-idempotencia-y-concurrencia-financiera.md`: added a dated editorial note
+  (2026-09-23) covering exactly the three discrepancies the launch prompt named — table name/module
+  prefix, primary key with institution discriminator, and the immediate-collision narrative refuted
+  by sonda S1 (2026-09-22) — without rewriting the ADR's body. The note remits to the spec's
+  executable requirement, per the launch prompt's own instruction not to treat the note as the
+  binding artifact.
+- `docs/09-roadmap-y-fases.md`: entregable 6 rewritten to name what change 6 delivered (marker,
+  bounded wait, atomicity, reproducible response) versus what remains explicitly deferred to change
+  7 (the mandatory `Idempotency-Key` header, its `400` rejection, `Idempotent-Replay`, and the
+  `200`/`409`/`422` translation). Exit criterion 4 checked `[x]`, citing the real test and both
+  halves closed (single effect, same response). **W1 and W2, inherited from change 5 part A, are
+  untouched and remain open** — not referenced anywhere in this batch's edits, their destination
+  stays change 11 per the launch prompt's explicit instruction not to declare them closed.
+- `apps/api/README.md`: added a new dated measurement entry (PR C3, change 6's final cut) — the
+  prior entry was change 5 part B (PR B1) and had not been updated across this entire change's six
+  pull requests; task 6.7 conditions the update on whether "cambia alguna afirmación anterior sobre
+  el presupuesto de 8 minutos", and the suite has grown substantially (80 integration tests, two
+  real bounded-wait concurrency scenarios) since that last entry, so it changes.
+
+Compiled clean after the two production-file Javadoc edits (`/tmp/confia-logs/task6.6-compile.log`,
+`BUILD SUCCESS`) before committing.
+
+### Task 6.7 — full-suite timing, complete change
+
+Ran `./mvnw -B verify` complete in `apps/api` (`/tmp/confia-logs/task6.7-6.9-verify.log`), with the
+full `*IT.java` suite of the entire change (C1 through C3).
+
+- **Total measured time: 04:28 min** (`kernel` 27.7 s, `app` 3 min 53 s). `BUILD SUCCESS`.
+  Comfortably inside the 8-minute (480-second) budget — under 56% of it. Wall-clock bracket (start
+  `2026-09-24T04:36:17Z`, end `2026-09-24T04:41:03Z`) confirms no discrepancy with Maven's own
+  reported total.
+- Recorded in `apps/api/README.md` (task 6.6) as the newest dated entry.
+
+### Task 6.8 — measured diff of PR C3
+
+```
+git diff --numstat 8d3089c...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'
+16    0  apps/api/README.md
+ 6    1  apps/api/app/src/main/java/com/confia/shared/security/TransactionRunner.java
+ 7    0  apps/api/app/src/main/java/com/confia/shared/security/package-info.java
+228   0  apps/api/app/src/test/java/com/confia/shared/security/IdempotencyExitCriterionIT.java
+116   0  apps/api/app/src/test/java/com/confia/shared/security/IdempotencyExpiryIT.java
+196   0  apps/api/app/src/test/java/com/confia/shared/security/IdempotencyScopeExclusionInventoryTest.java
+19    2  docs/09-roadmap-y-fases.md
+```
+
+**Total: 591 authored lines** (588 additions, 3 deletions), measured from PR C2c's last code commit
+(`8d3089c`) to `HEAD`, excluding `openspec/`, `docs/adr/` and generated code. Well inside the
+800-line budget (`docs/15-flujo-de-trabajo-git.md` §3) and inside `design.md` §12's own 400-670
+forecast band for C3. No split needed; no candidate split points to report.
+
+### Task 6.9 — final verification of PR C3 and the complete change
+
+Full `./mvnw -B verify` in `apps/api`, on the exact clean, committed tree (`git status` clean before
+and after), `JAVA_HOME` on JDK 25, `MAVEN_OPTS` with `Windows-ROOT`, Docker active
+(`/tmp/confia-logs/task6.9-final-verify.log`):
+
+- `IdempotencyExitCriterionIT` (1), `IdempotencyExpiryIT` (1), `IdempotencyScopeExclusionInventoryTest`
+  (3) — complete green, all new to this cut.
+- `IdempotencyKeyPrivilegeIT` (2), `JooqIdempotencyRecordStoreIT` (6), `IdempotencyErrorCodesTest`
+  (7), `RequestPayloadHasherTest` (5), `IdempotentExecutorIT` (4), `IdempotentExecutorConcurrencyIT`
+  (5), `RolePrivilegeMatrixIT` (16), `MultiTenantSchemaIT` (7), `AuditScopeExclusionInventoryTest`
+  (part of the 141-test unit run), `TransactionRunnerContextIT` (4), `TransactionRunnerRetryIT` (2)
+  — all still green, unaffected by this slice.
+- Every architecture gate green: `JooqConfinedToInfrastructureTest`, `LayeredArchitectureTest`,
+  `NoCyclesTest`, `NoUnapprovedPlainSqlTest`, `SpringModulithVerificationTest`,
+  `TableOwnershipByModuleTest`, `TransactionsOnlyInSharedSecurityTest`,
+  `NoTechnicalLayerPackageNamesTest`, `SuppressionCitesAdrTest`, `IntegrationTestNamingTest`, and
+  every other architecture test in the module — confirming R1, R2, R3 and R4 all still hold, no
+  ArchUnit exception added.
+- Overall: `Tests run: 177` (kernel) + `141` (API unit, surefire) + `80` (API integration, failsafe)
+  — all green. `jacoco:check` → "All coverage checks have been met" (both modules).
+- Total measured build time this run: **03:25 min**. `BUILD SUCCESS`.
+- **The 19 escenarios of `specs/build-integrity/spec.md` are all traced**: `design.md` §7.1 already
+  mapped every one to its test; C3 closes the last four — the exit-criterion scenario
+  (`IdempotencyExitCriterionIT`), the expired-key-reuse scenario and its purge-absence reinforcement
+  (`IdempotencyExpiryIT`), and the three brecha scenarios (`IdempotencyScopeExclusionInventoryTest`,
+  reinforcing what `RolePrivilegeMatrixIT` already covers for the F3/F4 brecha).
+- No class in layer `web` requires the idempotency header: confirmed both by
+  `IdempotencyScopeExclusionInventoryTest`'s own inventory and by the simple fact that no production
+  `web` package exists yet in this reactor.
+- The `*IT.java` suite is measured and reported (task 6.7); **W1 stays open, not compared against a
+  now-exigible threshold** — no CI gate enforces the 8-minute budget, exactly as `docs/09`'s
+  still-open point (a) describes, untouched by this batch.
+
+**Same deliberate scope boundary as every previous cut of this change**: not pushed, no PR opened,
+per this run's explicit instructions ("No empujes ni abras pull requests"). All locally-verifiable
+evidence above is real.
+
+### Hard-stop checks (PR C3)
+
+1. Diff (task 6.8): 591 lines, far under 800 — no stop.
+2. No gate weakened, no ArchUnit exception added, no privilege changed; all six sondas were already
+   executed in prior cuts and not repeated, per this batch's own launch instructions.
+3. `IdempotencyExitCriterionIT` — the one genuine concurrency test of this cut — run four times
+   total (1 RED + 3 GREEN, all logged above), zero flaky results.
+4. One honest discrepancy reported, not resolved by inventing evidence: task 6.3
+   (`IdempotencyExpiryIT`) produced no RED on its first real run, because the mechanism under test
+   (`restartExpired`) has been correct since C2b and this class adds coverage, not a missing
+   behavior — task 6.4's own text anticipates exactly this possibility. No contradiction found
+   between tasks, design, spec and ADR for this slice beyond the one already reported and resolved
+   by the tasks phase itself (design.md §11 vs §12, resolved before C2a-1 started).
+
+### Four things requested to be proven, not assumed (PR C3)
+
+- **Real concurrency, the accounting effect verified by final value, not "no error"**:
+  `IdempotencyExitCriterionIT` uses two independent `TransactionRunner`s, two connections and a
+  `CyclicBarrier` (never sequential calls), and asserts the exact count of `+` characters in the
+  final `legal_name` — a sequential execution would trivially also produce one `+`, but the test's
+  own barrier-synchronized, real-collision shape (B's `INSERT` genuinely races A's still-open
+  transaction) is what makes the assertion meaningful, matching
+  `IdempotentExecutorConcurrencyIT`'s own established real-race pattern rather than inventing a new
+  one.
+- **The three inventories can fail**: each was perturbed to a known-false condition and observed to
+  fail, all three together, before being reverted (task 6.5, above) — the same discipline change 5
+  applied to its own inventories, now explicitly re-demonstrated rather than assumed transferable.
+- **Expired-key reuse never leaves more than one row**: `IdempotencyExpiryIT` counts rows for the
+  exact primary key via a direct `SELECT count(*)`, not merely trusting the primary-key constraint
+  to make the assertion trivially true — the count would also have correctly caught a bug that
+  produced zero rows (a momentary or permanent loss) had `restartExpired` used `DELETE`+`INSERT`
+  instead of `UPDATE`.
+- **No debt silently marked closed**: `docs/09-roadmap-y-fases.md`'s edits in this batch touch only
+  entregable 6 and exit criterion 4. W1 (8-minute budget not yet CI-enforced) and W2 (the
+  postgres-image single-source test not covering `apps/api/app/pom.xml`'s own literal) — both
+  inherited from change 5 part A — are untouched, still open, still destined for change 11.
+
+### TDD Cycle Evidence (PR C3)
+
+| Task | RED observed | GREEN observed | REFACTOR |
+|---|---|---|---|
+| 6.1/6.2 | Yes — real assertion failure, `expected 1L but was 0L` (task6.1-red.log) | Yes — 1/1 test, run 4 times total, zero flakes (task6.2-green-run1/2/3.log, task6.9-final-verify.log) | None needed |
+| 6.3/6.4 | **No — honest discrepancy, not invented.** First real run was already green (task6.3-first-run.log); the mechanism (`restartExpired`) has been correct since C2b, and this task adds coverage of an already-correct path, not new behavior. Task 6.4's own text conditions correction on "si revela un caso no cubierto", which it did not | Yes — 1/1 test green from the first real run | None — no production change was needed or made |
+| 6.5 | N/A by task's own design ("debe pasar de inmediato") — compensated with an explicit fail-then-revert probe of all three assertions (task6.5-probe-red.log) instead of a compile-failure RED | Yes — 3/3 tests green both before and after the probe (task6.5-run1.log, task6.5-reconfirm-green.log) | None |
+
+### Work Unit Evidence (PR C3)
+
+| Evidence | Value |
+|---|---|
+| Focused test command and result | `./mvnw -B -pl app -am test -Dtest=IdempotencyExitCriterionIT,IdempotencyExpiryIT,IdempotencyScopeExclusionInventoryTest -Dsurefire.failIfNoSpecifiedTests=false` → 5/5 green (not run as one combined focused command in this batch; each class's own individual focused run is logged above and all three appear green together in the full verify runs, task6.7-6.9-verify.log and task6.9-final-verify.log) |
+| Runtime harness command/result | `./mvnw -B verify` (apps/api) → BUILD SUCCESS, 177 kernel + 141 API unit + 80 API integration tests green, JaCoCo bundle check met on both modules, 03:25 min total (final run, task6.9-final-verify.log) |
+| Rollback boundary | Revert this PR's six commits (`ac04933` test, `95f47f2` test, `ee83a23` test, `190c93e` test, `2a4448e` docs, `9755b4b` docs) individually reverts to PR C2c's state (`8d3089c`): the whole mechanism (table, port, adapter, hasher, executor, bounded wait) stays intact and tested, only the exit-criterion demonstration, the expiry test, the three inventories and the documentation closure are removed. Per `design.md` §9 point 3, PR C1 and every prior cut in the chain remain non-severable from this PR once it exists, unchanged from every prior cut's own note |
+
+### Commits (PR C3)
+
+| Task | SHA | Message |
+|---|---|---|
+| 6.1 | `ac04933` | `test(shared): add RED IdempotencyExitCriterionIT for F0 exit criterion 4` |
+| 6.2 | `95f47f2` | `test(shared): wire the real cumulative UPDATE for the exit-criterion demonstration` |
+| 6.3-6.4 | `ee83a23` | `test(shared): add IdempotencyExpiryIT for the reuse-by-update requirement` |
+| 6.5 | `190c93e` | `test(shared): add the three named-owner scope exclusion inventories` |
+| 6.6 | `2a4448e` | `docs(sdd): close F0 exit criterion 4 and correct inherited documentation` |
+| 6.7 | `9755b4b` | `docs(api): record the full-suite timing measurement for change 6's final cut` |
+| 6.8-6.9 | (no commit — verification-only tasks; evidence recorded above) |
+
 ## Status
 
 7/7 tasks of PR C1 complete (1.1-1.7). 7/7 tasks of PR C2a-1 complete (2.1-2.7). 5/5 tasks of PR
 C2a-2 complete (3.1-3.5). 5/5 tasks of PR C2b complete (4.1-4.5). 7/7 tasks of PR C2c complete
-(5.1-5.7). Ready for a fresh `sdd-apply` batch to start PR C3 (branch
-`change/idempotency-key-infrastructure-exit-criterion`, base PR C2c) once the maintainer wants to
-continue the chain.
+(5.1-5.7). **9/9 tasks of PR C3 complete (6.1-6.9). All 40 tasks of this change are complete.**
+
+**F0 exit criterion 4 is demonstrated**, by `IdempotencyExitCriterionIT`: dual real concurrency,
+real PostgreSQL, a real production-shaped cumulative accounting effect, exactly one effect and one
+of the three declared outcomes for the loser, run four times with zero flakes.
+
+**Open debts, honestly carried forward, not closed by this change**: the mandatory `Idempotency-Key`
+HTTP header (destination: change 7); physical purge of caducated keys (destination: change 9); the
+portal's first financial-write privilege on this table (destination: F3 or F4); W1, the 8-minute
+`*IT.java` budget measured but not CI-enforced (destination: change 11, inherited from change 5 part
+A); W2, the `PostgresImageSingleSourceTest` gap against `apps/api/app/pom.xml`'s own literal
+(destination: change 11, inherited from change 5 part A). This change closes exactly F0 exit
+criterion 4 and nothing else that was open before it.
+
+Ready for `sdd-archive` once the maintainer decides to close this change.

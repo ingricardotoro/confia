@@ -456,7 +456,7 @@ Rama `change/idempotency-key-infrastructure-concurrency`, base PR C2b.
 
 Rama `change/idempotency-key-infrastructure-exit-criterion`, base PR C2c.
 
-- [ ] 6.1 **ROJO — criterio de salida 4 de F0, sobre efecto contable.** Requiere Docker. Crear
+- [x] 6.1 **ROJO — criterio de salida 4 de F0, sobre efecto contable.** Requiere Docker. Crear
   `.../test/java/com/confia/shared/security/IdempotencyExitCriterionIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`: dos hilos con la misma clave de idempotencia, sincronizados con
   `CyclicBarrier`, cada uno invocando a través del componente un caso de uso real que aplica
@@ -478,7 +478,7 @@ Rama `change/idempotency-key-infrastructure-exit-criterion`, base PR C2c.
   `findById`). — Especificación `build-integrity`, requisito «Criterio de salida 4 de F0...» (su
   escenario)
 
-- [ ] 6.2 **VERDE — el caso de uso de la demostración.** Requiere Docker (ejecuta 6.1). Escribir, en
+- [x] 6.2 **VERDE — el caso de uso de la demostración.** Requiere Docker (ejecuta 6.1). Escribir, en
   el propio árbol de prueba, el caso de uso mínimo que ejecuta la actualización acumulativa a través
   del `IdempotentExecutor` de producción y del `TransactionRunner` de producción reales contra
   PostgreSQL real, sin ningún cambio en el código de producción del componente —el mecanismo ya está
@@ -488,7 +488,7 @@ Rama `change/idempotency-key-infrastructure-exit-criterion`, base PR C2c.
   camino de escritura en Java sobre `organization_institution` fuera de esta prueba). — `design.md`,
   decisión 10 completa
 
-- [ ] 6.3 **ROJO — reutilización de clave caducada.** Requiere Docker. Crear
+- [x] 6.3 **ROJO — reutilización de clave caducada.** Requiere Docker. Crear
   `.../test/java/com/confia/shared/security/IdempotencyExpiryIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`: con un `Clock` fijo por constructor (nunca una espera real ni una
   fila escrita a mano con un `expires_at` del pasado), sembrar una clave `COMPLETED` con `expires_at`
@@ -504,13 +504,13 @@ Rama `change/idempotency-key-infrastructure-exit-criterion`, base PR C2c.
   existente» (su escenario) y «Ausencia de purga física de claves caducadas (brecha con destino: cambio
   9)» (su escenario)
 
-- [ ] 6.4 **VERDE — confirmar la reutilización de clave caducada.** Requiere Docker (ejecuta 6.3).
+- [x] 6.4 **VERDE — confirmar la reutilización de clave caducada.** Requiere Docker (ejecuta 6.3).
   Confirmar `IdempotencyExpiryIT` en verde sin cambios de producción adicionales —`restartExpired` ya
   existe desde C2b (tarea 4.3) y usa `UPDATE`, nunca `DELETE`+`INSERT`—; si el reloj inyectado revela
   un caso no cubierto (por ejemplo, comparación de instantes con desfase de un microsegundo), corregir
   `IdempotentExecutor` y volver a ejecutar. — Mismo requisito y escenario que 6.3
 
-- [ ] 6.5 **ROJO/VERDE — los tres inventarios de exclusión con destino nombrado.** No requiere Docker
+- [x] 6.5 **ROJO/VERDE — los tres inventarios de exclusión con destino nombrado.** No requiere Docker
   (inventario estático sobre el árbol de clases compilado y sobre el texto real de las migraciones,
   siguiendo el patrón de `AuditScopeExclusionInventoryTest`; la evidencia de la fila caducada que
   sigue existiendo ya se demostró en 6.3 con Docker). Crear
@@ -530,7 +530,7 @@ Rama `change/idempotency-key-infrastructure-exit-criterion`, base PR C2c.
   (brecha con destino: cambio 7)» (su escenario) y «Ausencia de purga física de claves caducadas...»
   (su escenario, reforzado)
 
-- [ ] 6.6 **Javadoc de `TransactionRunner`, `package-info`, nota fechada de ADR-0010 y `docs/09`.** No
+- [x] 6.6 **Javadoc de `TransactionRunner`, `package-info`, nota fechada de ADR-0010 y `docs/09`.** No
   requiere Docker. Modificar
   `.../main/java/com/confia/shared/security/TransactionRunner.java` para que su Javadoc nombre al dueño
   real del registro del bean —el primer cambio que declare una fuente de datos de producción y retire
@@ -549,19 +549,19 @@ Rama `change/idempotency-key-infrastructure-exit-criterion`, base PR C2c.
   diferida al cambio 7, nombrada explícitamente (`design.md` decisión 12, punto 3). — `design.md`,
   decisión 12 completa
 
-- [ ] 6.7 **Medición final del tiempo de la suite `*IT.java` del cambio completo.** Requiere Docker.
+- [x] 6.7 **Medición final del tiempo de la suite `*IT.java` del cambio completo.** Requiere Docker.
   Ejecutar `./mvnw -B verify` completo en `apps/api` con la suite `*IT.java` final de este cambio
   (todos los cortes C1 a C3) y medir el tiempo real de `integration-test`. Registrar el tiempo medido en
   `apply-progress.md` y actualizar `apps/api/README.md` si cambia alguna afirmación anterior sobre el
   presupuesto de 8 minutos. — `design.md` §11, paso 20; §13
 
-- [ ] 6.8 **Medir el diff real de PR C3** con
+- [x] 6.8 **Medir el diff real de PR C3** con
   `git diff --numstat <base-de-PR-C2c>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar; el pronóstico de `design.md` §12 (400-670) no
   anticipa exceso. Si lo hubiera, detener la aplicación y reportar los puntos de corte candidatos
   medidos, verificando cada mitad por separado con `./mvnw -B verify`. — `design.md` §12
 
-- [ ] 6.9 **Verificación final de PR C3 y del cambio completo.** Requiere Docker. En checkout limpio,
+- [x] 6.9 **Verificación final de PR C3 y del cambio completo.** Requiere Docker. En checkout limpio,
   con `JAVA_HOME` en JDK 25, `MAVEN_OPTS` con el almacén `Windows-ROOT` y Docker activo, ejecutar
   `./mvnw -B verify` en `apps/api`. Confirmar: `IdempotencyExitCriterionIT`,
   `IdempotencyScopeExclusionInventoryTest` en verde completas; el criterio de salida 4 de F0 satisfecho
