@@ -381,8 +381,154 @@ locally-verifiable evidence above is real.
 | 2.5 | `c172c55` | `feat(shared): add jOOQ adapter for shared_idempotency_key` |
 | 2.6-2.7 | (no commit — verification-only tasks; evidence recorded above) |
 
+## PR C2a-2 — canonicalized payload hash and result type (branch `change/idempotency-key-infrastructure-hasher`, base PR C2a-1)
+
+### Task 3.1 — RED: canonicalized payload hash
+
+Created `RequestPayloadHasherTest` with five cases: a golden vector fixed as a literal hex string
+never produced by calling the class under test (derived independently with
+`printf '%s' 'confia.idempotency.v1{"a":2,"b":1}' | openssl dgst -sha256`, outside the JVM, outside
+`RequestPayloadHasher`); two payloads with the same keys in a different textual order producing the
+same hash; a JSON null literal (`NullNode.instance`, not a Java `null`) hashing without throwing;
+a Java `null` payload rejected with `NullPointerException`; and a general hex-format shape check.
+
+**Observed RED** (`/tmp/confia-logs/task3.1-red.log`, command
+`./mvnw -B -pl app -am test -Dtest=RequestPayloadHasherTest -Dsurefire.failIfNoSpecifiedTests=false`):
+
+```
+[ERROR] COMPILATION ERROR :
+[ERROR] .../RequestPayloadHasherTest.java:[48,19] cannot find symbol
+[ERROR]   symbol:   class RequestPayloadHasher
+[ERROR] .../RequestPayloadHasherTest.java:[48,53] cannot find symbol
+[ERROR]   symbol:   class RequestPayloadHasher
+BUILD FAILURE
+```
+
+Exact failure reason: `RequestPayloadHasher` does not exist yet, exactly as the task predicted.
+Real RED, not invented.
+
+### Task 3.2 — GREEN: `RequestPayloadHasher`
+
+Created `RequestPayloadHasher.hash(JsonNode)`:
+`hex(sha256(utf8(FORMAT_VERSION) || utf8(canonicalJson(payload))))`, `FORMAT_VERSION =
+"confia.idempotency.v1"`, delegating canonicalization to
+`CanonicalAuditRowSerializer.canonicalJson(JsonNode)` — no second canonicalization written. Javadoc
+on both classes cross-references the other, per the task.
+
+**Observed GREEN** (`/tmp/confia-logs/task3.2-green.log`): `Tests run: 5, Failures: 0, Errors: 0` —
+`RequestPayloadHasherTest` complete green, `BUILD SUCCESS`.
+
+**Proof that the golden vector can actually fail (requested explicitly, not assumed).** The
+danger named by the orchestrator's instructions is a golden test that computes its own expected
+value with the same production code it exercises, which would pass trivially forever. To rule
+that out for real: `CanonicalAuditRowSerializer.compareObjectKeys`'s `return comparison;` was
+temporarily flipped to `return -comparison;` (reversing key order — a stand-in for a silent
+canonicalization change), the suite was re-run, reverted, and re-run again:
+
+- **Perturbed** (`/tmp/confia-logs/task3.2-golden-proof-red.log`): `Tests run: 5, Failures: 1,
+  Errors: 0` — `sameGoldenPayloadAlwaysProducesTheSameFixedHash` fails (the hard-coded literal no
+  longer matches); `twoPayloadsWithTheSameKeysInADifferentOrderProduceTheSameHash` still passes,
+  because order-invariance holds under *any* consistent comparator — exactly the discriminating
+  behavior decision 8's mitigation 2 asks for: only the literal-value test catches the silent
+  change, not the invariant test.
+- **Reverted**: `git diff --stat` on the file showed no difference from the committed version
+  before re-running.
+- **Re-confirmed GREEN** (`/tmp/confia-logs/task3.2-green-reconfirm.log`): `Tests run: 5, Failures:
+  0, Errors: 0`, `BUILD SUCCESS`.
+
+### Task 3.3 — the sealed result type
+
+Created `IdempotentOutcome` (`sealed interface` with `Executed`/`Replayed` records, design.md
+§6.1), with no test of its own per the task — `IdempotentExecutorIT` (PR C2b) is its first
+consumer. Compile-checked with `./mvnw -B -pl app -am test-compile`
+(`/tmp/confia-logs/task3.3-compile.log`): `BUILD SUCCESS`.
+
+### Task 3.4 — measured diff of PR C2a-2
+
+`git diff --numstat 92a551c...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr'
+':(exclude)**/generated/**'` (base is PR C2a-1's closing commit):
+
+```
+23   0  apps/api/app/src/main/java/com/confia/shared/security/IdempotentOutcome.java
+66   0  apps/api/app/src/main/java/com/confia/shared/security/RequestPayloadHasher.java
+86   0  apps/api/app/src/test/java/com/confia/shared/security/RequestPayloadHasherTest.java
+```
+
+**Total: 175 authored lines** (all additions, no deletions). Well inside the 800-line budget and
+inside `design.md` §12's own 590-970 forecast for the whole of C2a (C2a-1 measured 689 in the
+previous batch; 689 + 175 = 864, slightly over that forecast's raw sum, but each half was
+independently well inside its own 800-line PR budget, which is the number that actually governs
+delivery — no split needed, no candidate split points to report).
+
+### Task 3.5 — final verification of PR C2a-2
+
+Full `./mvnw -B verify` in `apps/api`, clean working tree, `JAVA_HOME` on JDK 25, `MAVEN_OPTS` with
+`Windows-ROOT`, Docker active (`/tmp/confia-logs/task3.5-verify.log`):
+
+- `RequestPayloadHasherTest`: `Tests run: 5, Failures: 0, Errors: 0` — complete green, including
+  the golden vector.
+- Every architecture gate green (`NoCyclesTest`, `LayeredArchitectureTest`,
+  `JooqConfinedToInfrastructureTest`, `TransactionsOnlyInSharedSecurityTest`,
+  `TableOwnershipByModuleTest`, `SpringModulithVerificationTest`, and the rest) — in particular
+  `NoCyclesTest` and `LayeredArchitectureTest` stayed green with `RequestPayloadHasher` depending on
+  `com.confia.shared.audit.CanonicalAuditRowSerializer`, confirming design.md's by-reading
+  prediction that the two packages share the `shared` slice for `NoCyclesTest` and carry no layer
+  segment for `LayeredArchitectureTest` — no cycle, no violation, no suppression needed.
+- `IdempotencyErrorCodesTest`, `JooqIdempotencyRecordStoreIT`, `RolePrivilegeMatrixIT`,
+  `IdempotencyKeyPrivilegeIT`, `MultiTenantSchemaIT` — all still green, unaffected by this slice.
+- Overall: `Tests run: 138` (unit, surefire) + `Tests run: 69` (integration, failsafe) — all green.
+  `jacoco:check` → "All coverage checks have been met" (both reports).
+- Total measured build time: **03:20 min**. Comfortably inside the 8-minute budget.
+- `BUILD SUCCESS`.
+
+**Same deliberate scope boundary as PR C1 and PR C2a-1**: not pushed, no PR opened, per this run's
+explicit instructions ("No empujes ni abras pull requests"). All locally-verifiable evidence above
+is real.
+
+### Hard-stop checks (none triggered, PR C2a-2)
+
+1. Diff (task 3.4): 175 lines, under 800 — no stop.
+2. No gate weakened, no ArchUnit exception added, no privilege changed.
+3. Reusing `CanonicalAuditRowSerializer` from `shared.security` did **not** break `NoCyclesTest`,
+   `LayeredArchitectureTest`, or any other dependency rule — confirmed by running the real suite,
+   not only by reading design.md's prediction.
+4. No contradiction found between tasks, design, spec, and ADR for this slice.
+
+### Two things requested to be proven, not assumed (PR C2a-2)
+
+- **The golden vector can fail**: demonstrated above by temporarily reversing the key-order
+  comparator, observing `sameGoldenPayloadAlwaysProducesTheSameFixedHash` turn red while the
+  order-invariance test stayed green, then reverting cleanly.
+- **Key order does not change the hash**: `twoPayloadsWithTheSameKeysInADifferentOrderProduceTheSameHash`
+  hashes `{"b":1,"a":2}` and `{"a":2,"b":1}` (same keys, reversed textual order) and asserts equal
+  output — green in every run above, including the perturbed one.
+
+### TDD Cycle Evidence (PR C2a-2)
+
+| Task | RED observed | GREEN observed | REFACTOR |
+|---|---|---|---|
+| 3.1/3.2 | Yes — compile failure, `RequestPayloadHasher` missing (task3.1-red.log) | Yes — 5/5 tests, BUILD SUCCESS (task3.2-green.log), plus proven-breakable golden vector (task3.2-golden-proof-red.log, reverted, task3.2-green-reconfirm.log) | None needed |
+
+### Work Unit Evidence (PR C2a-2)
+
+| Evidence | Value |
+|---|---|
+| Focused test command and result | `./mvnw -B -pl app -am test -Dtest=RequestPayloadHasherTest -Dsurefire.failIfNoSpecifiedTests=false` → 5/5 green |
+| Runtime harness command/result | `./mvnw -B verify` (apps/api) → BUILD SUCCESS, 138 unit + 69 integration tests green, JaCoCo bundle check met, 03:20 min total |
+| Rollback boundary | Revert this PR's three commits (`9d84608` test, `75be2a6` feat, `8a5b8e9` feat) individually reverts to PR C2a-1's state; no other file touched |
+
+### Commits (PR C2a-2)
+
+| Task | SHA | Message |
+|---|---|---|
+| 3.1 | `9d84608` | `test(shared): add RED hasher test with independent golden vector` |
+| 3.2 | `75be2a6` | `feat(shared): add canonicalized request payload hasher` |
+| 3.3 | `8a5b8e9` | `feat(shared): add sealed idempotent outcome result type` |
+| 3.4-3.5 | (no commit — verification-only tasks; evidence recorded above) |
+
 ## Status
 
-7/7 tasks of PR C1 complete (1.1-1.7). 7/7 tasks of PR C2a-1 complete (2.1-2.7). Ready for a fresh
-`sdd-apply` batch to start PR C2a-2 (branch `change/idempotency-key-infrastructure-hasher`, base PR
-C2a-1) once the maintainer wants to continue the chain.
+7/7 tasks of PR C1 complete (1.1-1.7). 7/7 tasks of PR C2a-1 complete (2.1-2.7). 5/5 tasks of PR
+C2a-2 complete (3.1-3.5). Ready for a fresh `sdd-apply` batch to start PR C2b (branch
+`change/idempotency-key-infrastructure-executor`, base PR C2a-2) once the maintainer wants to
+continue the chain.

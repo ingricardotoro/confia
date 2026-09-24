@@ -276,7 +276,7 @@ por sí sola.
 
 Rama `change/idempotency-key-infrastructure-hasher`, base PR C2a-1.
 
-- [ ] 3.1 **ROJO — hash de la carga canonicalizada.** No requiere Docker (comparación pura en Java,
+- [x] 3.1 **ROJO — hash de la carga canonicalizada.** No requiere Docker (comparación pura en Java,
   sin contenedor). Crear
   `.../test/java/com/confia/shared/security/RequestPayloadHasherTest.java`: dos cargas con las mismas
   claves en distinto orden producen el mismo hash; un vector de oro fija el hash exacto de una carga
@@ -288,7 +288,7 @@ Rama `change/idempotency-key-infrastructure-hasher`, base PR C2a-1.
   distinta, comparada por hash canonicalizado» (fundamento del hash; los escenarios de rechazo en sí
   se prueban en C2b, `IdempotentExecutorIT`)
 
-- [ ] 3.2 **VERDE — `RequestPayloadHasher`.** No requiere Docker. Crear
+- [x] 3.2 **VERDE — `RequestPayloadHasher`.** No requiere Docker. Crear
   `.../main/java/com/confia/shared/security/RequestPayloadHasher.java`:
   `hex(sha256(utf8(FORMAT_VERSION) || utf8(canonicalJson(payload))))`, con
   `FORMAT_VERSION = "confia.idempotency.v1"`, delegando la canonicalización en
@@ -297,21 +297,21 @@ Rama `change/idempotency-key-infrastructure-hasher`, base PR C2a-1.
   la que depende, para que quien lea cualquiera de las dos encuentre la otra. Ejecutar
   `RequestPayloadHasherTest`: verde. — `design.md`, decisión 8 completa; §6.4
 
-- [ ] 3.3 **Crear el tipo de resultado sellado.** No requiere Docker. Crear
+- [x] 3.3 **Crear el tipo de resultado sellado.** No requiere Docker. Crear
   `.../main/java/com/confia/shared/security/IdempotentOutcome.java` (`sealed interface` con
   `Executed`/`Replayed`, `design.md` §6.1). Sin prueba propia en este corte: ningún tipo de C2a-1 lo
   consume todavía; lo ejercitará `IdempotentExecutorIT` en C2b, que es donde se prueba que el
   resultado distingue ejecución de repetición. Se declara escrito y sin implementación pendiente. —
   `design.md`, decisión 9
 
-- [ ] 3.4 **Medir el diff real de PR C2a-2** con
+- [x] 3.4 **Medir el diff real de PR C2a-2** con
   `git diff --numstat <base-de-PR-C2a-1>...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`.
   No requiere Docker. Si cabe en 800 líneas, continuar; el rango de `design.md` §12 para toda C2a
   (590-970 repartido entre las dos mitades) no anticipa exceso en esta mitad. Si lo hubiera, detener
   la aplicación y reportar los puntos de corte candidatos medidos, verificando cada mitad por separado
   con `./mvnw -B verify`. — `design.md` §12
 
-- [ ] 3.5 **Verificación final de PR C2a-2.** Requiere Docker (para correr la suite completa, aunque
+- [x] 3.5 **Verificación final de PR C2a-2.** Requiere Docker (para correr la suite completa, aunque
   las pruebas propias del corte no lo requieran). En checkout limpio, ejecutar `./mvnw -B verify` en
   `apps/api`. Confirmar `RequestPayloadHasherTest` en verde completa, incluido el vector de oro.
   Empujar la rama `...-hasher` (apuntando a PR C2a-1) y confirmar en la integración continua que el
