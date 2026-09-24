@@ -73,3 +73,19 @@ integration-test suite) took **2 minutes 26 seconds** total, `confia-api` alone 
 seconds**. Both remain far inside the 8-minute (480-second) budget: the Failsafe phase itself uses
 about 8% of it, even with `TransactionRunnerRetryIT`'s own concurrency scenario (a real `CyclicBarrier`
 synchronization and a genuine PostgreSQL `SERIALIZABLE` write conflict) included.
+
+**Measurement, PR C3 (change 6, `idempotency-key-infrastructure`, final cut), with the complete
+`*IT.java` suite of the whole change** (`IdempotencyKeyPrivilegeIT`, `JooqIdempotencyRecordStoreIT`,
+`IdempotentExecutorIT`, `IdempotentExecutorConcurrencyIT`, `IdempotencyExitCriterionIT`,
+`IdempotencyExpiryIT` added across PR C1 through PR C3, on top of every class already listed above —
+80 integration test methods total for `confia-api`, plus the kernel and API unit suites). From an
+already-built tree (no `mvn clean`; OneDrive locks `target/` directories against Maven's own clean
+goal on Windows, so removed by hand instead when needed), the full `./mvnw -B verify` reactor build
+took **4 minutes 28 seconds** total (`kernel` 28 seconds, `app` 3 minutes 53 seconds, including jOOQ
+code generation). Comfortably inside the 8-minute budget — under 56% of it — even with two real
+bounded-wait concurrency scenarios now in the suite
+(`IdempotentExecutorConcurrencyIT`'s three `lock_timeout` outcomes and
+`IdempotencyExitCriterionIT`'s own two-thread race over the same idempotency key), each paying a
+real, deterministic `CyclicBarrier`-synchronized wait by design rather than a wall-clock guess. No W1
+escalation needed at this cut (`docs/09-roadmap-y-fases.md`, entregable 8's still-open point (a): the
+8-minute budget continues to be measured and documented, not yet enforced by a CI gate).

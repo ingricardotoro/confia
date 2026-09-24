@@ -34,6 +34,24 @@ conceder ningún privilegio explícito.
   clave primaria, sin necesitar entrar en la lista cerrada de excepciones que hoy solo contiene a
   la tabla raíz
 
+#### Escenario: Una institución no lee ni bloquea la clave de otra
+
+- **DADO** dos instituciones, y una clave de idempotencia con el mismo endpoint y el mismo valor
+  literal, ejecutada y completada por la primera
+- **CUANDO** la segunda, con su propio contexto de sesión y el rol `confia_admin_app`, intenta
+  bloquear esa clave y además cuenta las filas de la tabla sin predicado alguno
+- **ENTONCES** el bloqueo no encuentra fila y el conteo directo devuelve cero, aunque la fila exista
+  físicamente; y la primera institución sigue viendo la suya, de modo que una política que lo
+  ocultara todo a todos no satisfaría el escenario
+
+#### Escenario: Dos instituciones pueden sostener el mismo valor de clave de forma independiente
+
+- **DADO** dos instituciones y un mismo valor literal de clave de idempotencia sobre el mismo
+  endpoint
+- **CUANDO** cada una ejecuta su propia solicitud con ese valor
+- **ENTONCES** ambas ejecutan y ninguna repite la respuesta de la otra, porque la clave está acotada
+  a su institución por la primera columna de la clave primaria compuesta
+
 ### Requisito: Permisos de acceso a `shared_idempotency_key` por rol de base de datos
 
 El sistema DEBE conceder sobre `shared_idempotency_key`, exactamente y sin uno más ni uno menos

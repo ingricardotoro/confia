@@ -103,7 +103,12 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    que el identificador sigue viniendo solo del token.
 4. **Matriz de autorización** documentada y verificada por pruebas: qué rol puede hacer qué operación (brecha A7).
 5. Bitácora de auditoría de solo inserción, encadenada por hash, sin permiso de actualización ni borrado para el rol de aplicación (brecha B6).
-6. Infraestructura de idempotencia: cabecera obligatoria, índice único, respuesta reproducible (brecha B7).
+6. Infraestructura de idempotencia: marcador con clave primaria natural, espera acotada
+   distinguible por `SQLState`, atomicidad marcador-efecto y respuesta reproducible, entregados por
+   el cambio 6 (`idempotency-key-infrastructure`). **Queda diferida explícitamente al cambio 7**
+   (`staff-authentication-mfa-sessions`, que trae el primer endpoint) la mitad de superficie HTTP:
+   la cabecera `Idempotency-Key` obligatoria en el borde, su rechazo con `400`, la cabecera
+   `Idempotent-Replay` y la traducción de las salidas del componente a `200`/`409`/`422` (brecha B7).
 7. Logs estructurados con redacción por lista de campos, métricas, trazas con OpenTelemetry.
 8. Contenedores, entorno de preproducción, canalización de integración y despliegue continuo.
    **Pendiente heredado del cambio 1 (hallazgo W9):** el escaneo de dependencias **analiza los
@@ -170,7 +175,19 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
       recorrido de producción identifica el `(institution_id, id)` exacto. Su simétrica,
       `AuditChainKnownLimitIT`, declara el límite aceptado: una manipulación que recalcula la
       cadena entera **no** se detecta mientras no exista el ancla externa del cambio 11.
-- [ ] Dos solicitudes con la misma clave de idempotencia producen un solo efecto y la misma respuesta.
+- [x] Dos solicitudes con la misma clave de idempotencia producen un solo efecto y la misma respuesta.
+      **Cerrado por el cambio 6 (`idempotency-key-infrastructure`), corte C3**, con
+      `IdempotencyExitCriterionIT.twoConcurrentRequestsWithTheSameKeyApplyTheAccountingEffectExactlyOnce`:
+      dos hilos reales, sincronizados con `CyclicBarrier`, invocan el componente con la misma clave
+      sobre un efecto contable de producción real (`UPDATE organization_institution SET legal_name
+      = legal_name || '+' ...`, nunca una actualización a valor fijo); el sufijo final lleva
+      exactamente un `+`, nunca dos, y el desenlace de la solicitud perdedora es uno de los tres
+      declarados —`Replayed`, `IdempotencyConflictException` o `Executed`—, nunca un error
+      inexplicado. **Las dos mitades del criterio quedan cerradas**: un solo efecto contable (la
+      prueba anterior) y la misma respuesta ante repetición (`IdempotentExecutorIT`,
+      `IdempotentExecutorConcurrencyIT`). La mitad de cabecera HTTP obligatoria del entregable 6
+      (brecha B7) sigue diferida al cambio 7, que trae el primer endpoint; no se declara cerrada
+      aquí.
 - [ ] Una tarea programada dentro de una transacción revertida no existe, y solo el proceso `confia-worker` ejecuta tareas.
 - [ ] **Un respaldo se restaura en un entorno limpio y el acta de simulacro está firmada.**
 - [ ] OpenAPI 3.1 se genera y publica como artefacto versionado.
