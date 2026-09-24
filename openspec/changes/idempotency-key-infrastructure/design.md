@@ -1175,3 +1175,24 @@ Queda en pie el aviso del diseño sobre el reintento: `55P03` no está hoy en `i
 si algún día apareciera un traductor de excepciones de jOOQ podría convertirse en
 `ConcurrencyFailureException` y volverse reintentable. El contador de invocaciones es lo único que
 lo probaría.
+
+
+## Sonda S6, ejecutada por el orquestador el 2026-09-23
+
+**PASA, y coincide exactamente con lo que este diseño predijo.** Inspeccionados los tipos que jOOQ
+generó de verdad desde `V4`, tras una corrida completa de `generate-sources`:
+
+| Columna | Tipo generado |
+|---|---|
+| `institution_id UUID` | `TableField<SharedIdempotencyKeyRecord, UUID>` |
+| `endpoint`, `idempotency_key`, `request_hash`, `status` (`TEXT`, con `CHECK`) | `String` |
+| `response_body JSONB` | **`org.jooq.JSONB`** |
+| `created_at`, `completed_at`, `expires_at` | `OffsetDateTime` |
+
+La clase se llama **`SharedIdempotencyKey`**, que es lo que la regla R2 exige para que el adaptador
+pueda vivir en `com.confia.shared.infrastructure` sin excepción. No aparece ningún
+`TableField<..., Object>` deprecado, a diferencia de lo que ocurrió con la columna `inet` en el
+cambio 5, donde hizo falta un `forcedType`. Aquí no hace falta ninguno.
+
+**S4 sigue pendiente** y es tarea del corte C2a-1: necesita el cableado Java que ese mismo corte
+construye, así que no tiene sentido adelantarla como sonda aislada.
