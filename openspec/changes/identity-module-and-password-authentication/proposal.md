@@ -289,7 +289,13 @@ dos de esos cuatro casos no tendrían ni productor ni consumidor en este cambio.
 | Desenlace | Qué significa | Qué lleva |
 |---|---|---|
 | `Authenticated` | Contraseña correcta | Identificador de usuario e institución |
-| `Rejected` | Credenciales incorrectas, cuenta inexistente, o bloqueo vigente | Un motivo **interno** que la auditoría registra y que el cliente nunca verá distinto |
+| `Rejected` | Credenciales incorrectas o cuenta inexistente | Un motivo **interno** que la auditoría registra y que el cliente nunca verá distinto |
+
+> **Corrección posterior a D2.** Esta tabla decía «o bloqueo vigente» como tercera causa de
+> `Rejected`. Con el modelo de retardo que el propietario aprobó, **eso es falso**: el retroceso
+> demora la respuesta y no la deniega, así que una contraseña correcta durante el retroceso se
+> retarda y **entra**. Un retardo que rechaza sería un bloqueo con otro nombre, precisamente lo que
+> D2 eliminó. Las causas de `Rejected` son dos.
 
 **Ninguna de las dos variantes lleva un campo de alcance de autorización.** La propuesta anterior le
 daba a `Authenticated` un alcance `FULL` explícito, porque necesitaba distinguirlo de un alcance
@@ -789,10 +795,14 @@ Ninguno se declara cerrado sin que una prueba lo sostenga.
       tiene ninguno** sobre la cuenta de personal.
 - [ ] Una prueba de contexto ausente demuestra que, sin `app.institution_id`, una consulta sobre la
       tabla de identidad devuelve **cero filas**, no un error de permiso.
-- [ ] Cinco intentos fallidos consecutivos producen el bloqueo, y el intento siguiente con la
-      contraseña correcta se rechaza por bloqueo vigente, con la progresión que resuelva **D2**.
-- [ ] Cada ciclo de bloqueo queda en `shared_audit_log` **con su duración**, como pide el escenario
-      publicado.
+- [ ] Tres intentos fallidos consecutivos producen un retardo de 1 segundo antes de responder, y la
+      progresión `2^(n-3)` queda capada en 900 segundos, según el modelo de §4.4 que **D2** aprobó.
+- [ ] El intento siguiente con la contraseña correcta **se retarda y tiene éxito**: el retroceso
+      demora la respuesta y no la deniega. Este criterio es el que distingue el modelo aprobado del
+      bloqueo que se descartó, y su ausencia sería la señal de que el bloqueo volvió por la puerta
+      de atrás.
+- [ ] Cada ciclo de retroceso queda en `shared_audit_log` **con su duración**, obligación que
+      sobrevive del escenario publicado aunque su modelo haya cambiado.
 - [ ] Una prueba de integración demuestra que el efecto y su asiento de auditoría se escriben **dentro
       de la misma transacción**: si el efecto falla, el asiento no sobrevive.
 - [ ] La autenticación de una cuenta inexistente ejecuta la verificación señuelo, verificado por
