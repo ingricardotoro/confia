@@ -159,15 +159,20 @@ class IdempotencyExitCriterionIT extends CommittingPostgresIntegrationTest {
     }
 
     /**
-     * Deliberately not yet the real cumulative {@code UPDATE organization_institution SET
-     * legal_name = legal_name || '+' WHERE id = ?} — task 6.2 wires that. This stub does nothing to
-     * {@code legal_name}, which is exactly why this test must observe RED here: with no accumulation
-     * anywhere, the losing suffix count can never reach one.
+     * The minimal production-shaped use case this demonstration needs (design.md, decision 10;
+     * task 6.2): a real cumulative {@code UPDATE} against real PostgreSQL, through the {@code dsl}
+     * this test class already shares with production code — the same {@code
+     * TransactionAwareDataSourceProxy}-backed data source {@link IdempotentExecutor} and {@link
+     * TransactionRunner} participate in, so this statement runs inside whichever transaction the
+     * caller (T1 or T3) already opened, never a transaction of its own. No production code changes
+     * for this: the mechanism has been complete since C2c (task 5.3); only the caller's use case is
+     * new, and it lives in this test tree, not in {@code main}.
      */
     private void appendLegalNameSuffix(InstitutionId institutionId) {
-        // TODO(task 6.2): wire the real cumulative UPDATE through dsl, participating in the caller's
-        // already-open transaction (the same TransactionAwareDataSourceProxy pattern
-        // JooqInstitutionRepository and IdempotentExecutorIT's own use cases already rely on).
+        dsl.update(ORGANIZATION_INSTITUTION)
+                .set(ORGANIZATION_INSTITUTION.LEGAL_NAME, ORGANIZATION_INSTITUTION.LEGAL_NAME.concat("+"))
+                .where(ORGANIZATION_INSTITUTION.ID.eq(institutionId.value()))
+                .execute();
     }
 
     private InstitutionId seedInstitution() {
