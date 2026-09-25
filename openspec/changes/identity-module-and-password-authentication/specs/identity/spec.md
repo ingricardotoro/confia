@@ -48,11 +48,24 @@ modo que la ejecución de esa verificación no dependa de si la cuenta existe.
 
 ### Requisito: Estado del retroceso persistido en PostgreSQL, con atomicidad de efecto y auditoría
 
-El sistema DEBE persistir el estado del retroceso por cuenta —contador de intentos fallidos
-consecutivos y marca de tiempo del último intento— en PostgreSQL, y DEBE registrar el intento
-fallido, calcular el retardo resultante y escribir el asiento de auditoría correspondiente dentro
-de una única transacción. Si esa transacción no confirma, ninguno de esos tres efectos DEBE
-sobrevivir.
+El sistema DEBE persistir el estado del retroceso en PostgreSQL —contador de intentos fallidos
+consecutivos y marca de tiempo del último intento—, indexado por una **huella con llave del
+identificador presentado** y no por la cuenta, de modo que exista también para identificadores que
+no corresponden a ninguna cuenta. El camino del retroceso DEBE ser el mismo para una cuenta
+existente y para un identificador inexistente: la misma escritura, el mismo bloqueo y el mismo
+número de asientos de auditoría, para que la uniformidad que exige `docs/03-seguridad.md` §4.6 sea
+una propiedad estructural y no una promesa. El sistema DEBE registrar el intento fallido, calcular
+el retardo resultante y escribir el asiento de auditoría correspondiente dentro de una única
+transacción. Si esa transacción no confirma, ninguno de esos tres efectos DEBE sobrevivir.
+
+#### Escenario: El estado del retroceso existe para un identificador sin cuenta
+
+- **DADO** que `nadie.registrado@colegio.edu.hn` no corresponde a ninguna cuenta
+- **CUANDO** se presentan dos intentos fallidos consecutivos contra ese identificador
+- **ENTONCES** el estado del retroceso conserva el contador en dos para ese identificador, sin que
+  exista ninguna fila de cuenta a la que asociarlo
+- **Y** el identificador no aparece en claro en ese estado, sino como huella con llave, de modo que
+  quien consulte esa tabla no aprenda qué identificadores se intentaron
 
 #### Escenario: El efecto y su asiento de auditoría se confirman o revierten juntos
 
@@ -119,6 +132,30 @@ en claro, el hash Argon2id resultante, ni la pimienta de Argon2id.
 - **ENTONCES** ninguno de esos mensajes contiene la contraseña en claro, el hash Argon2id calculado
   ni la pimienta
 - **Y** eso se verifica por inspección del texto producido, no por confianza en el diseño
+
+### Requisito: El retardo se calcula dentro de la transacción y se materializa fuera de ella
+
+El caso de uso de autenticación DEBE calcular la duración del retardo exigible y devolverla junto al
+desenlace, y DEBE confirmar su transacción antes de devolverla. El sistema NO DEBE materializar la
+espera mientras mantiene abierta una transacción de base de datos, una conexión del grupo o un
+bloqueo de fila, ni reteniendo un hilo de plataforma. El número de respuestas retardadas simultáneas
+DEBE estar acotado, y al alcanzar ese límite el sistema DEBE responder con un error de capacidad
+uniforme decidido antes de procesar el intento, y NO DEBE acortar el retardo.
+
+#### Escenario: La duración exigible se devuelve y la transacción ya confirmó
+
+- **DADO** la cuenta `carlos.ramirez@colegio.edu.hn` con tres intentos fallidos consecutivos
+  registrados a las 13:00:00 del 2026-03-10
+- **CUANDO** se invoca el caso de uso con la contraseña correcta a las 13:00:05 del mismo día
+- **ENTONCES** devuelve el desenlace `Authenticated` junto con una duración exigible de 2 segundos
+- **Y** el contador de fallos ya está limpio y el ciclo ya está auditado en el momento en que
+  devuelve, sin que ninguna espera haya ocurrido todavía
+
+#### Escenario: Ninguna clase del módulo de identidad espera
+
+- **DADO** el árbol de clases de producción de `com.confia.identity`
+- **CUANDO** se inspecciona si alguna invoca una primitiva de espera del hilo
+- **ENTONCES** ninguna lo hace, y la construcción falla si alguna lo hiciera
 
 ### Requisito: Ausencia de la dimensión por dirección IP del retroceso exponencial (brecha con destino: `session-tokens-and-web-layer` y cambio 11)
 
