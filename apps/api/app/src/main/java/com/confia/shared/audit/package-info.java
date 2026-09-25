@@ -13,5 +13,13 @@
  * depend on this package's ports without a layering violation, while jOOQ itself stays confined to
  * {@code infrastructure} (ADR-0015 rule 4, R1; design.md decision 11, "Dónde vive, contra las
  * reglas de dependencia").
+ *
+ * <p><b>{@code @NamedInterface} (ADR-0022).</b> Like {@link com.confia.shared.security},
+ * {@code identity-module-and-password-authentication} (PR C3) needs {@code identity.application}
+ * to consume {@link com.confia.shared.audit.AuditLogWriter} across the module boundary Spring
+ * Modulith enforces (design.md, decision 12). Declared here, in this same PR, alongside {@code
+ * shared.security}'s own annotation, so both of the two packages {@code identity} needs are named
+ * API from the same commit that elevates the decision to ADR-0022.
  */
+@org.springframework.modulith.NamedInterface
 package com.confia.shared.audit;
