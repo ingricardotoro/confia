@@ -1374,13 +1374,28 @@ el cuerpo de la sección**:
 > `confia_admin_app`, sin `DELETE`; `SELECT` para `confia_readonly`; y **ningún privilegio** para
 > `confia_portal_app`.
 
-### Ajuste 5 — `docs/03-seguridad.md` §4.1. **Solo si el propietario lo aprueba**
+### Ajuste 5 — `docs/03-seguridad.md` §4.1. **AUTORIZADO POR EL PROPIETARIO EL 2026-09-24**
 
-La propuesta no sancionó nota editorial sobre §4.1, y este diseño no la escribe sin permiso. Queda
-como pregunta abierta 2: §4.1 dice que Argon2id se adopta «integrada con el codificador de
-contraseñas de Spring Security», y este cambio no trae Spring Security en ninguna forma (decisión 6).
-La integración con `PasswordEncoder` es trivial el día que `session-tokens-and-web-layer` traiga la
-cadena de filtros, porque el puerto `PasswordHasher` tiene exactamente esa forma.
+La propuesta no sancionaba nota editorial sobre §4.1, y este diseño no la escribió sin permiso. El
+propietario la autorizó de forma explícita, así que **entra en la fase de tareas** junto a las notas
+ya sancionadas sobre §4.4 y §6.1.
+
+Motivo: §4.1 dice que Argon2id se adopta «integrada con el codificador de contraseñas de Spring
+Security», y este cambio no trae Spring Security en ninguna forma (decisión 6). La nota, fechada y
+**sin reescribir el cuerpo de la sección**, debe dejar constancia de tres cosas:
+
+1. Este cambio implementa Argon2id **sin** Spring Security, sobre Bouncy Castle directo, porque la
+   cadena de filtros pertenece a `session-tokens-and-web-layer` y traerla aquí adelantaría trabajo de
+   otro cambio.
+2. La exigencia sustantiva de §4.1 —la pimienta de 32 bytes fuera de la base, aplicada como `secret`
+   de Argon2id— **se cumple**, y es precisamente lo que empuja a Bouncy Castle directo.
+3. La integración con `PasswordEncoder` sigue siendo trivial el día que llegue la cadena de filtros,
+   porque el puerto `PasswordHasher` tiene exactamente esa forma. La nota no renuncia a la
+   integración: registra que llega con el cambio que trae el marco.
+
+Queda sujeta al resultado de la sonda **S2**: si S2 desmintiera lo que la propuesta anotó y el
+codificador de Spring sí admitiera un secreto, la decisión 6 se reevalúa y esta nota se reescribe
+antes de entregarla.
 
 ---
 
@@ -1393,8 +1408,9 @@ cadena de filtros, porque el puerto `PasswordHasher` tiene exactamente esa forma
       Recomendación: que ese cambio fije un techo explícito, lo documente y lo audite como tal, en vez
       de descubrirlo cuando un balanceador cierre la conexión en producción. **No bloquea este
       cambio.**
-- [ ] **2. Nota editorial sobre §4.1 y Spring Security** (ajuste 5). Requiere autorización del
-      propietario, porque la propuesta solo sancionó notas sobre §4.4 y §6.1.
+- [x] **2. Nota editorial sobre §4.1 y Spring Security** (ajuste 5). **Autorizada por el propietario
+      el 2026-09-24.** Deja de ser pregunta abierta y entra en la fase de tareas, junto a las notas
+      ya sancionadas sobre §4.4 y §6.1. Su redacción queda sujeta al resultado de la sonda **S2**.
 - [ ] **3. `actor_id` en `NULL` para un actor no identificado.** El comentario de columna de §12.1
       dice «`NULL` para actor de sistema»; este cambio lo usa además para «actor no identificado».
       Recomendación: ampliar ese comentario en una pasada documental posterior, no en este cambio, que
