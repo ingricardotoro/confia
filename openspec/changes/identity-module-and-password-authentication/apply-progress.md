@@ -241,3 +241,63 @@ hace pasar la puerta), ya corregido reagrupando los commits antes de que nada se
 
 No se empuja la rama ni se abre pull request: lo hace el orquestador, según la instrucción explícita
 de esta sesión.
+
+---
+
+## Revisión previa a la fusión — hallazgo bloqueante y su corrección
+
+### El hallazgo
+
+La auditoría de seguridad encontró que `IdentityRowSecurityIT` probaba la política de fila **solo
+sobre `identity_staff_account`**. `identity_login_backoff` aparecía **cero veces** en el archivo.
+
+Confirmado por el orquestador por tres vías independientes antes de aceptar el trabajo:
+
+1. `grep` sobre el archivo de prueba: cero ocurrencias de `identity_login_backoff`.
+2. El delta de este mismo cambio, `specs/build-integrity/spec.md`, dice «cada tabla nueva de
+   identidad» y «cada una de las dos» (líneas 40, 49 y 66).
+3. `CLAUDE.md`, línea 157: «Toda política de seguridad a nivel de fila necesita una prueba de
+   integración que demuestre que un usuario no puede leer datos de otro». Sin excepción por tabla.
+
+**Es la misma clase de defecto que bloqueó el cambio 6**, donde faltaba el aislamiento de
+`shared_idempotency_key`. El patrón se repite: la prueba de aislamiento se escribe para la tabla que
+da nombre al cambio, y la segunda hereda solo el supuesto de que una política idéntica se comporta
+igual. Aquí con un agravante: la tabla olvidada es **la más sensible de las dos**, porque guarda una
+huella por identificador *presentado*, incluidos los que no corresponden a ninguna cuenta.
+
+### La corrección
+
+Tres pruebas nuevas en `IdentityRowSecurityIT`, más el ayudante `assertRejected` parametrizado por
+tabla. **Las dos instituciones usan deliberadamente la misma huella**: la clave primaria compuesta
+`(institution_id, identifier_hash)` les permite convivir, así que lo único que puede separarlas es la
+política. Con contra-aserción de que la institución B sigue viendo la suya, para que la prueba no
+pase por haberlo ocultado todo a todos.
+
+**Defecto encontrado en la propia corrección, antes de commitear.** El mensaje de la aserción
+afirmaba que la huella era compartida, pero a la institución B se le había asignado una distinta.
+Habría pasado por la razón equivocada.
+
+### Verificación
+
+`./mvnw -B verify` desde `apps/api`: **BUILD SUCCESS**, **94** pruebas de integración —eran 91, así
+que las tres nuevas corrieron—, «All coverage checks have been met», 4:41 min.
+
+### Control negativo, que es lo que demuestra que la prueba sirve
+
+Que una prueba pase no demuestra que detecte nada. Se sustituyó temporalmente la política de
+`identity_login_backoff` por `USING (true) WITH CHECK (true)` —una política que **existe pero no
+aísla**, que es exactamente lo que ocurriría con un predicado mal escrito y todas las puertas de
+catálogo en verde— y se volvió a ejecutar la clase:
+
+```
+Tests run: 6, Failures: 2, Errors: 0
+  oneInstitutionCannotReadAnotherInstitutionsLoginBackoff:134
+  anAbsentInstitutionContextReturnsZeroBackoffRowsNotAPermissionError:155
+```
+
+Las dos pruebas que dependen de la política **fallan**. La tercera,
+`confiaPortalAppIsRejectedOnAllFourOperationsOnLoginBackoff`, sigue pasando **y debe seguir
+pasando**: comprueba privilegios, no la política, y neutralizar la política no concede ningún
+privilegio. Eso no es un hueco, es la separación correcta entre las dos garantías.
+
+La migración se restauró con `git checkout` y se verificó que la política volvió a su forma original.
