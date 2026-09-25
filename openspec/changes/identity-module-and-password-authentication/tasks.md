@@ -139,7 +139,7 @@ las primeras clases de producción bajo `com.confia.identity.*` antes de que `V5
 `identity_*` sin romper la puerta de prefijo de módulo — la misma dependencia mecánica que ató B1
 antes de B2a en el cambio 5B.
 
-- [ ] 1.1 **Sondas S1 y S1b (bloqueantes de C1, `design.md` §10).** No requiere Docker (ArchUnit y
+- [x] 1.1 **Sondas S1 y S1b (bloqueantes de C1, `design.md` §10).** No requiere Docker (ArchUnit y
   Spring Modulith no tocan PostgreSQL). **S1**: crear temporalmente una clase de producción mínima en
   `com.confia.identity.application` que importe `com.confia.shared.security.TransactionRunner`,
   ejecutar `./mvnw -B -pl app test -Dtest=SpringModulithVerificationTest` desde `apps/api` y observar
@@ -167,8 +167,11 @@ antes de B2a en el cambio 5B.
   Añadir `@NamedInterface` a `.../shared/security/package-info.java` y
   `.../shared/audit/package-info.java`, elevar la decisión a
   `docs/adr/ADR-0022-interfaz-nombrada-del-modulo-shared.md`, y declarar las anotaciones de Spring
-  Modulith en alcance de **compilación** en `apps/api/app/pom.xml` (hoy `spring-modulith-core` es de
-  alcance `test`). Ejecutar `NoCrossModuleDomainImportsTest` y `SpringModulithVerificationTest`:
+  Modulith en alcance de **compilación** en `apps/api/app/pom.xml` — concretamente
+  **`spring-modulith-api`**, y **no** `spring-modulith-core`; ver la corrección de S1b en
+  `apply-progress.md`, porque `spring-modulith-core` arrastra ArchUnit, que es solo de pruebas, y
+  promoverlo la pondría en el camino de clases de producción. `spring-modulith-core` se queda en
+  alcance `test`. Ejecutar `NoCrossModuleDomainImportsTest` y `SpringModulithVerificationTest`:
   verde. Commit convencional (`feat`) sobre `com.confia.identity` y (`build`) sobre el POM y el ADR. —
   Especificación `build-integrity`, requisito «Frontera de dominio entre módulos de negocio»
   (escenarios «Importación cruzada de dominio», sin cambio, y «Cada módulo usa solo su propio
