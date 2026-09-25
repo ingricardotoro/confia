@@ -19,5 +19,15 @@
  * own, delegating every write to {@link com.confia.shared.security.TransactionRunner#execute}, the
  * same single transactional component {@code TransactionsOnlyInSharedSecurityTest} already confines
  * to this package.
+ *
+ * <p><b>{@code @NamedInterface} (ADR-0022).</b> {@code identity-module-and-password-authentication}
+ * is the first change with a production class in one business module — {@code identity} — that
+ * imports a class from another module's nested package, here {@link
+ * com.confia.shared.security.TransactionRunner}. Spring Modulith's {@code
+ * ApplicationModules.verify()} treats every direct sub-package of {@code com.confia} as its own
+ * module and rejects a cross-module import of a non-API internal package (sonda S1, design.md,
+ * decision 12): this annotation is what makes this package that API, narrowly, without opening the
+ * whole {@code shared} module.
  */
+@org.springframework.modulith.NamedInterface
 package com.confia.shared.security;

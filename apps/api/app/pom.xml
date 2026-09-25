@@ -107,6 +107,21 @@
       <artifactId>jqwik</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- @NamedInterface (ADR-0022; design.md decision 12) is org.springframework.modulith.
+         NamedInterface, which lives in spring-modulith-api, NOT in spring-modulith-core (S1b probe,
+         apply-progress.md): a same-simple-name org.springframework.modulith.core.NamedInterface
+         exists too, but it is a model class, not the annotation. Declared at compile scope, with no
+         explicit <scope> element, because two production package-info.java files
+         (com.confia.shared.security, com.confia.shared.audit) carry the annotation and must compile
+         with it on the classpath. spring-modulith-api does not depend on ArchUnit, unlike
+         spring-modulith-core below, so promoting only this artifact never puts a test-only library
+         in front of production classes (sonda S6 confirms dependencyConvergence stays green). -->
+    <dependency>
+      <groupId>org.springframework.modulith</groupId>
+      <artifactId>spring-modulith-api</artifactId>
+    </dependency>
+    <!-- ApplicationModules.verify() itself (SpringModulithVerificationTest) stays test-scoped: it
+         pulls in ArchUnit transitively, which has no business on the production classpath. -->
     <dependency>
       <groupId>org.springframework.modulith</groupId>
       <artifactId>spring-modulith-core</artifactId>

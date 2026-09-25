@@ -64,6 +64,54 @@ transaccional único y bitácora de auditoría encadenada por hash), después, p
 parte A. La migración de `organization_institution` y su repositorio jOOQ, asignados al cambio 5 por
 la nota anterior, quedan asignados de forma explícita a la **parte A**.
 
+**Nota (2026-09-24, división del cambio 7).** El propietario aprobó dividir el cambio 7 en dos
+cambios SDD secuenciales. La exploración compartida vive en
+`openspec/changes/staff-identity-password-and-mfa/exploration.md` y documenta la evidencia que
+motiva el corte: el cambio 7 trae a la vez el primer `DataSource` de producción, la primera capa
+`web` del sistema con sus reglas de ArchUnit, MFA con cifrado de columna sin mecanismo disponible
+(la ruta de `pgcrypto` está cerrada por privilegios), JWT con EdDSA y JWKS, rotación de refresco con
+concurrencia real, el adaptador de ADR-0009, el cableado HTTP de la idempotencia, CSRF, CSP,
+Problem Details,
+springdoc y la primera dependencia de Redis. La estimación de 12 a 13 tareas de la tabla anterior es
+previa a casi toda esa evidencia.
+
+- **Parte A**, `staff-identity-password-and-mfa`: módulo `identity`, esquema, migración y
+  privilegios, autenticación con contraseña, MFA con su mecanismo de cifrado, bloqueo por intentos
+  fallidos con retroceso, recuperación de contraseña y prevención de enumeración. **Sin capa web**,
+  demostrado con pruebas de integración contra el caso de uso.
+- **Parte B**, `session-tokens-and-web-layer`: JWT y JWKS, rotación de token de refresco con
+  detección de reutilización, adaptador real de `CurrentInstitutionProvider` con su prueba de
+  ADR-0009, registro de la fuente de datos de producción, el primer controlador y la capa web
+  completa, la mecánica genérica de RBAC con su guarda de arranque, y el cableado HTTP de la
+  idempotencia que el cambio 6 difirió.
+
+Hay identidad sin capa web, pero no hay sesión sin identidad: el orden es A y después B. De las cinco
+decisiones que la exploración dejó abiertas, solo el mecanismo de cifrado del secreto MFA pertenece a
+la parte A; el dueño de la guarda de arranque de RBAC, la exigencia de `Idempotency-Key` en endpoints
+que no mueven dinero y el alcance del registro de la fuente de datos son de la parte B.
+
+**Nota (2026-09-24, segundo corte: la parte A se parte a su vez).** La propuesta de la parte A
+pronosticó de **14 a 16 tareas** contra el límite de quince de `openspec/changes/README.md`, y de
+2 400 a 4 000 líneas, con el historial de subestimación de este repositorio sin descontar. La regla de
+tamaño pide partir **antes de continuar a diseño**, así que el propietario aprobó el segundo corte en
+vez de esperar a la fase de tareas. El cambio 7 se ejecuta como **tres** cambios SDD secuenciales:
+
+1. `identity-module-and-password-authentication` — módulo `identity`, esquema, migración con
+   seguridad de fila y privilegios, autenticación con contraseña con Argon2id, bloqueo por intentos
+   fallidos con retroceso, asientos de auditoría de identidad y prevención de enumeración.
+2. `mfa-totp-and-password-recovery` — cifrado de columna con sobre de llaves y su ADR, TOTP,
+   inscripción del segundo factor, códigos de recuperación, y recuperación de contraseña con token de
+   un solo uso.
+3. `session-tokens-and-web-layer` — sin cambios respecto a la parte B descrita arriba.
+
+El corte entre 1 y 2 está donde **entra el cifrado de columna**: el primero no cifra nada, solo
+hashea, y por eso no necesita el sobre de llaves, la tabla `shared_data_key` ni el ADR nuevo. Esas
+tres cosas, y el delta de redacción sobre el requisito publicado de MFA, pasan íntegras al cambio 2.
+La contradicción entre los dos modelos de bloqueo y la del escenario del sexto intento se quedan en
+el cambio 1, que es su dueño. La carpeta `staff-identity-password-and-mfa` pasó a llamarse
+`identity-module-and-password-authentication`; no hubo nunca una carpeta con el nombre de la parte A
+publicada.
+
 **Hallazgo.** `docs/09-roadmap-y-fases.md` §3 no incluye el módulo `organization` en F0, pero
 ADR-0009 exige `institution_id NOT NULL` desde la primera migración y ADR-0017 asigna la tabla raíz
 de institución a ese módulo. Se recomienda incorporar el cambio 4, con la entidad raíz mínima, al

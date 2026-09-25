@@ -4,12 +4,16 @@ import static com.confia.architecture.ArchitectureTestSupport.assertRuleRejects;
 import static com.confia.architecture.ArchitectureTestSupport.fixtureClasses;
 import static com.confia.architecture.ArchitectureTestSupport.productionClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -35,8 +39,32 @@ class NoCrossModuleDomainImportsTest {
                     + "(ADR-0002); use a public use case or a domain event instead");
 
     @Test
-    void productionCodeHasNoCrossModuleDomainImportYet() {
+    void everyModuleUsesOnlyItsOwnDomain() {
         RULE.check(productionClasses());
+    }
+
+    /**
+     * Non-vacuity guard (design.md, decision 13): the scenario "Cada módulo usa solo su propio
+     * dominio" (specs/build-integrity/spec.md) stops being a vacuous truth only once at least two
+     * distinct business modules' {@code domain} packages exist in production code at the same
+     * time. Before this change, {@code organization.domain} was the only one, so
+     * {@link #everyModuleUsesOnlyItsOwnDomain()} passed for lack of a second domain to cross into,
+     * not because the rule was demonstrated. If a future change ever deleted every class of a
+     * second module's domain, this test would fail instead of silently passing again.
+     */
+    @Test
+    void atLeastTwoDistinctModuleDomainsExistInProductionCode() {
+        JavaClasses classes = productionClasses();
+        Set<String> domainModules = classes.stream()
+                .map(NoCrossModuleDomainImportsTest::domainModuleOf)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toUnmodifiableSet());
+
+        assertThat(domainModules)
+                .as("production code must contain at least two distinct modules' domain packages "
+                        + "for this rule's positive half to be anything other than vacuously true")
+                .hasSizeGreaterThanOrEqualTo(2);
     }
 
     @Test
