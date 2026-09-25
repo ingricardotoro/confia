@@ -105,10 +105,10 @@ que aquí no hace falta invocar.
 
 | Unit | Goal | Likely PR | Focused test command | Runtime harness | Rollback boundary |
 |------|------|-----------|----------------------|-----------------|-------------------|
-| C1 | Módulo `identity`, interfaces nombradas de `shared`, ADR-0022, migración `V5` con sus dos tablas, política de fila y privilegios | PR C1 (`change/staff-authentication-mfa-sessions`, rama actual, base `main`) | `./mvnw -B -pl apps/api/app -am test -Dtest=NoCrossModuleDomainImportsTest,SpringModulithVerificationTest,RolePrivilegeMatrixIT,IdentityRowSecurityIT -Dsurefire.failIfNoSpecifiedTests=false` | `./mvnw -B verify` en `apps/api`, JDK 25, Docker activo | Revertir el pull request completo; sin ningún consumidor de aplicación todavía. **No se revierte por separado de PR C2** una vez que C2 exista: `design.md` §1.1 ata mecánicamente el módulo a la migración |
-| C2 | Contraseña, señuelo y regla del retroceso: `BackoffPolicy`, códec `$argon2id$`, adaptador Bouncy Castle, objetos de valor con redacción, guarda de ArchUnit de ninguna espera | PR C2 (`change/staff-authentication-mfa-sessions-backoff-and-password`, base PR C1) | `./mvnw -B -pl apps/api/app -am test -Dtest=BackoffPolicyTest,Argon2PhcCodecTest,Argon2ProfileTest,NoBlockingWaitInIdentityTest -Dsurefire.failIfNoSpecifiedTests=false` | `./mvnw -B verify` en `apps/api`, JDK 25, Docker activo | Revertir PR C2 sin fusionar deja PR C1 completo por sí solo (esquema y puertas de módulo, sin lógica de contraseña) |
-| C3a | Caso de uso completo, puerto y adaptador de escritura de auditoría, sobre dobles de prueba | PR C3a (`change/staff-authentication-mfa-sessions-use-case`, base PR C2) | `./mvnw -B -pl apps/api/app -am test -Dtest=JooqAuditLogWriterIT,AuthenticateWithPasswordTest,AuthenticationResultTest -Dsurefire.failIfNoSpecifiedTests=false` | `./mvnw -B verify` en `apps/api`, JDK 25, Docker activo | Revertir PR C3a sin fusionar deja PR C2 completo por sí solo (mecanismo de contraseña y retroceso probado en dominio, sin caso de uso ni auditoría) |
-| C3b | Adaptadores jOOQ reales, atomicidad, concurrencia, institución del proceso, inventarios de exclusión, medición de tiempo y notas editoriales | PR C3b (`change/staff-authentication-mfa-sessions-adapters`, base PR C3a) | `./mvnw -B -pl apps/api/app -am test -Dtest=AuthenticateWithPasswordIT,LoginBackoffAtomicityIT,LoginBackoffConcurrencyIT,LoginInstitutionIT,IdentitySecretRedactionIT,IdentityScopeExclusionInventoryTest,LoginTimingReportIT -Dsurefire.failIfNoSpecifiedTests=false` | `./mvnw -B verify` en `apps/api`, JDK 25, Docker activo | Revertir PR C3b sin fusionar deja PR C3a completo por sí solo (caso de uso probado con dobles, sin demostración real contra PostgreSQL) |
+| C1 | Módulo `identity`, interfaces nombradas de `shared`, ADR-0022, migración `V5` con sus dos tablas, política de fila y privilegios | PR C1a (`change/identity-module-and-password-authentication-module`) y PR C1b (`-schema`), base `main` en cadena | `./mvnw -B -pl apps/api/app -am test -Dtest=NoCrossModuleDomainImportsTest,SpringModulithVerificationTest,RolePrivilegeMatrixIT,IdentityRowSecurityIT -Dsurefire.failIfNoSpecifiedTests=false` | `./mvnw -B verify` en `apps/api`, JDK 25, Docker activo | Revertir el pull request completo; sin ningún consumidor de aplicación todavía. **No se revierte por separado de PR C2** una vez que C2 exista: `design.md` §1.1 ata mecánicamente el módulo a la migración |
+| C2 | Contraseña, señuelo y regla del retroceso: `BackoffPolicy`, códec `$argon2id$`, adaptador Bouncy Castle, objetos de valor con redacción, guarda de ArchUnit de ninguna espera | PR C2 (`change/identity-module-and-password-authentication-backoff-and-password`, base PR C1) | `./mvnw -B -pl apps/api/app -am test -Dtest=BackoffPolicyTest,Argon2PhcCodecTest,Argon2ProfileTest,NoBlockingWaitInIdentityTest -Dsurefire.failIfNoSpecifiedTests=false` | `./mvnw -B verify` en `apps/api`, JDK 25, Docker activo | Revertir PR C2 sin fusionar deja PR C1 completo por sí solo (esquema y puertas de módulo, sin lógica de contraseña) |
+| C3a | Caso de uso completo, puerto y adaptador de escritura de auditoría, sobre dobles de prueba | PR C3a (`change/identity-module-and-password-authentication-use-case`, base PR C2) | `./mvnw -B -pl apps/api/app -am test -Dtest=JooqAuditLogWriterIT,AuthenticateWithPasswordTest,AuthenticationResultTest -Dsurefire.failIfNoSpecifiedTests=false` | `./mvnw -B verify` en `apps/api`, JDK 25, Docker activo | Revertir PR C3a sin fusionar deja PR C2 completo por sí solo (mecanismo de contraseña y retroceso probado en dominio, sin caso de uso ni auditoría) |
+| C3b | Adaptadores jOOQ reales, atomicidad, concurrencia, institución del proceso, inventarios de exclusión, medición de tiempo y notas editoriales | PR C3b (`change/identity-module-and-password-authentication-adapters`, base PR C3a) | `./mvnw -B -pl apps/api/app -am test -Dtest=AuthenticateWithPasswordIT,LoginBackoffAtomicityIT,LoginBackoffConcurrencyIT,LoginInstitutionIT,IdentitySecretRedactionIT,IdentityScopeExclusionInventoryTest,LoginTimingReportIT -Dsurefire.failIfNoSpecifiedTests=false` | `./mvnw -B verify` en `apps/api`, JDK 25, Docker activo | Revertir PR C3b sin fusionar deja PR C3a completo por sí solo (caso de uso probado con dobles, sin demostración real contra PostgreSQL) |
 
 Ejecutor de todas las tareas: `./mvnw -B verify` en `apps/api`, con `JAVA_HOME` apuntando a JDK 25 y
 `MAVEN_OPTS="-Djavax.net.ssl.trustStoreType=Windows-ROOT"` (`design.md` §13; **esta variable nunca se
@@ -134,7 +134,31 @@ de trabajo en la rama del corte.
 
 ## PR C1 — corte C1: módulo, esquema y puertas
 
-Rama `change/staff-authentication-mfa-sessions` (rama actual), base `main`. `design.md` §1.1: crea
+> **Partido en dos el 2026-09-24, tras medir el diff real: 906 líneas contra el presupuesto de 800.**
+> La regla operativa de este documento pedía exactamente esto —medir y partir **antes** de abrir el
+> pull request—, y por una vez el corte cayó en una frontera de commit que ya existía, así que no
+> hubo que reordenar nada con `cherry-pick` como le tocó al cambio 5.
+>
+> | Pull request | Rama | Commits | Contenido | Líneas |
+> |---|---|---|---|---|
+> | **C1a** | `change/identity-module-and-password-authentication-module` | `1389a0b`, `a4fdc5c` | módulo `identity`, tipo sellado, `LoginIdentifier`, guarda de no vacuidad de W2, interfaces nombradas de `shared`, ADR-0022, POM | **522** |
+> | **C1b** | `change/identity-module-and-password-authentication-schema` | `459016d` | migración `V5` con sus dos tablas, `IdentityRowSecurityIT`, `RolePrivilegeMatrixIT` extendida | **384** |
+>
+> La separación es real y no cosmética: C1a no toca el esquema y C1b no toca el módulo. Cada uno se
+> verifica por separado con `./mvnw -B verify` antes de empujarse.
+>
+> **Las ramas se renombraron al identificador del cambio.** `change/staff-authentication-mfa-sessions`
+> quedó obsoleta cuando el cambio 7 se dividió en tres, y `CLAUDE.md` pide que la rama lleve el
+> identificador del cambio SDD. Nunca se empujó al remoto, así que el renombrado no costó nada. Las
+> ramas de los cortes siguientes pasan a ser
+> `change/identity-module-and-password-authentication-backoff-and-password`, `-use-case` y
+> `-adapters`.
+>
+> `apply-progress.md` documenta las tareas 1.2 y 1.3 juntas y viaja con **C1b**, porque su evidencia
+> de S8 y del esquema pertenece a ese corte; C1a lleva la de las sondas S1 y S1b en `961ab61`.
+
+Rama `change/identity-module-and-password-authentication-module` (C1a) y
+`change/identity-module-and-password-authentication-schema` (C1b), ambas con base `main` en cadena. `design.md` §1.1: crea
 las primeras clases de producción bajo `com.confia.identity.*` antes de que `V5` pueda nombrar
 `identity_*` sin romper la puerta de prefijo de módulo — la misma dependencia mecánica que ató B1
 antes de B2a en el cambio 5B.
@@ -196,7 +220,7 @@ antes de B2a en el cambio 5B.
   Ejecutar las pruebas de la mitad ROJO: verde. Comprobar que `MultiTenantSchemaIT` pasa **sin
   modificarse** (si no pasara, se reporta la discrepancia, no se relaja la puerta). Medir el tiempo de
   la suite `*IT.java` y registrarlo en `apply-progress.md`. Medir el diff real de PR C1 con
-  `git diff --numstat main...change/staff-authentication-mfa-sessions -- . ':(exclude)openspec'
+  `git diff --numstat main...HEAD -- . ':(exclude)openspec'
   ':(exclude)docs/adr' ':(exclude)**/generated/**'`; si supera 800 líneas, **detener la aplicación y
   reportar los puntos de corte candidatos medidos**, verificando cada mitad con `./mvnw -B verify`
   antes de proponerla. Verificación final en checkout limpio con `./mvnw -B verify`; empujar la rama y
@@ -209,7 +233,7 @@ antes de B2a en el cambio 5B.
 
 ## PR C2 — corte C2: contraseña, señuelo y regla del retroceso
 
-Rama `change/staff-authentication-mfa-sessions-backoff-and-password`, base PR C1.
+Rama `change/identity-module-and-password-authentication-backoff-and-password`, base PR C1.
 
 - [ ] 2.1 **Sondas S2, S6 y S7 (bloqueantes de C2, `design.md` §10).** No requiere Docker (lectura de
   jars y `enforcer:enforce`, sin PostgreSQL). **S2**: descargar `spring-security-crypto` y
@@ -280,7 +304,7 @@ Rama `change/staff-authentication-mfa-sessions-backoff-and-password`, base PR C1
 
 ## PR C3a — corte C3 (parte 1): caso de uso, con dobles, y el escritor de auditoría
 
-Rama `change/staff-authentication-mfa-sessions-use-case`, base PR C2. **Depende de la sonda S1
+Rama `change/identity-module-and-password-authentication-use-case`, base PR C2. **Depende de la sonda S1
 (tarea 1.1) para poder importar `TransactionRunner`**, ya resuelta en C1.
 
 - [ ] 3.1 **ROJO/VERDE — puerto y adaptador de escritura de auditoría, primer escritor de producción
@@ -333,7 +357,7 @@ Rama `change/staff-authentication-mfa-sessions-use-case`, base PR C2. **Depende 
 
 ## PR C3b — corte C3 (parte 2): adaptadores reales, atomicidad, concurrencia y cierre
 
-Rama `change/staff-authentication-mfa-sessions-adapters`, base PR C3a.
+Rama `change/identity-module-and-password-authentication-adapters`, base PR C3a.
 
 - [ ] 4.1 **Sondas S3 y S4 (bloqueantes de C3b, `design.md` §10), y ROJO/VERDE de los adaptadores jOOQ
   con el caso de uso completo contra PostgreSQL real.** Requiere Docker. **S4**: ejecutar
