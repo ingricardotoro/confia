@@ -1029,9 +1029,17 @@ public interface AuditLogWriter {
 | Medición | Diferencia de medianas entre cuenta existente e inexistente | **Medida y reportada**, nunca puerta (decisión 7) |
 | Rendimiento | Tiempo de la suite `*IT` | **Medido y reportado** al cerrar cada corte |
 
-### 7.1 Trazabilidad: los 27 escenarios y su prueba
+### 7.1 Trazabilidad: los 31 escenarios y su prueba
 
-**`identity` (20 escenarios)**
+> **Corrección del orquestador (2026-09-24), encontrada por la fase de tareas.** Esta tabla decía
+> «27 escenarios», con 20 de `identity` y 7 de `build-integrity`. Estaba desfasada respecto a los
+> **ajustes 1 y 2 de la sección 15 de este mismo diseño**, que ya se aplicaron a los deltas y
+> añadieron tres escenarios que la tabla nunca absorbió; y el recuento de `build-integrity` ya era
+> uno menos que sus propias filas. Verificado contando los encabezados `#### Escenario:` de cada
+> delta: **23 en `identity` y 8 en `build-integrity`, 31 en total.** Las tres filas nuevas van
+> marcadas abajo.
+
+**`identity` (23 escenarios)**
 
 | Requisito | Escenario | Prueba | Corte |
 |---|---|---|---|
@@ -1040,6 +1048,7 @@ public interface AuditLogWriter {
 | Verificación señuelo | El señuelo se ejecuta ante cuenta inexistente | `AuthenticateWithPasswordTest` con doble contador del puerto | C3 |
 | Estado en PostgreSQL | Efecto y asiento se confirman o revierten juntos | `LoginBackoffAtomicityIT` sobre `CommittingPostgresIntegrationTest` | C3 |
 | | Dos intentos fallidos concurrentes no pierden escrituras | `LoginBackoffConcurrencyIT` con `CyclicBarrier` | C3 |
+| | **El estado del retroceso existe para un identificador sin cuenta** (ajuste 1) | `LoginBackoffIT`: contador en dos sin fila de cuenta, y el identificador solo como huella con llave | C3 |
 | Institución del proceso | Se resuelve de la configuración, nunca de la solicitud | `LoginInstitutionIT`: dos instituciones con el mismo correo; y la guarda de cierre con contexto ajeno | C3 |
 | Puerto de auditoría | Primer escritor de producción de `shared_audit_log` | `JooqAuditLogWriterIT`: la fila queda encadenada y el adaptador no calcula hashes | C3 |
 | Sin secretos observables | Ningún registro ni excepción expone contraseña, hash o pimienta | `IdentitySecretRedactionIT` + inventario de registro | C2/C3 |
@@ -1055,8 +1064,10 @@ public interface AuditLogWriter {
 | | El retardo se aplica también a cuenta inexistente | `AuthenticateWithPasswordIT`: mismo `requiredDelay` y mismo número de asientos | C3 |
 | | El motivo del rechazo es interno | `AuthenticateWithPasswordIT` + `AuthenticationResultTest` | C3 |
 | | Contraseña correcta durante el retroceso **tiene éxito** tras el retardo | `AuthenticateWithPasswordIT`: `Authenticated` con `requiredDelay = PT2S` | C3 |
+| **Frontera del retardo** (ajuste 2) | **La duración exigible se devuelve y la transacción ya confirmó** | `AuthenticateWithPasswordIT`: `requiredDelay = PT2S`, contador ya limpio y ciclo ya auditado al devolver | C3 |
+| | **Ninguna clase del módulo de identidad espera** | `NoBlockingWaitInIdentityTest` de ArchUnit, con fixture de violación (decisión 10, punto 4) | C2 |
 
-**`build-integrity` (7 escenarios)**
+**`build-integrity` (8 escenarios)**
 
 | Requisito | Escenario | Prueba | Corte |
 |---|---|---|---|
