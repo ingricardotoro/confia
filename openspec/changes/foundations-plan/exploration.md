@@ -102,7 +102,40 @@ vez de esperar a la fase de tareas. El cambio 7 se ejecuta como **tres** cambios
 2. `mfa-totp-and-password-recovery` — cifrado de columna con sobre de llaves y su ADR, TOTP,
    inscripción del segundo factor, códigos de recuperación, y recuperación de contraseña con token de
    un solo uso.
-3. `session-tokens-and-web-layer` — sin cambios respecto a la parte B descrita arriba.
+3. `session-tokens-and-web-layer` — sin cambios respecto a la parte B descrita arriba, **más la
+   condición de aceptación del 2026-09-25 que se describe abajo**.
+
+**Condición dura de aceptación de `session-tokens-and-web-layer` (2026-09-25, del informe de
+seguridad previo a la fusión del corte C1 de `identity-module-and-password-authentication`).**
+
+La tabla `identity_login_backoff`, ya fusionada en `main`, se indexa por una huella con llave del
+identificador **presentado** y **no** por la cuenta, y acepta filas para identificadores que no
+corresponden a ninguna cuenta. Eso es deliberado y correcto: es lo que hace que el camino del
+retroceso sea idéntico para una cuenta que existe y para un correo inventado, y por tanto lo que
+convierte la uniformidad que exige `docs/03-seguridad.md` §4.6 en una propiedad estructural en vez de
+una promesa.
+
+El precio es que **un ataque distribuido contra identificadores aleatorios hace crecer esa tabla sin
+cota**. Hoy no es explotable, porque no existe ningún endpoint que escriba en ella. Deja de no serlo
+exactamente cuando `session-tokens-and-web-layer` entregue el primer endpoint de inicio de sesión.
+
+Por eso:
+
+> **`session-tokens-and-web-layer` NO DEBE fusionar un endpoint de inicio de sesión que escriba en
+> `identity_login_backoff` sin que el control por dirección IP de `docs/03-seguridad.md` §4.4 —o un
+> tope funcional equivalente— exista, esté probado y esté operativo.**
+
+Se escribe aquí, como condición de aceptación de ese cambio, y no como «pregunta abierta» del diseño
+del cambio anterior, por un motivo concreto: **una pregunta abierta no bloquea nada**. La mitigación
+que el diseño citaba —«la cota real es el control por IP, que ya tiene dueño»— es una secuencia de
+trabajo razonable, pero no es una mitigación cerrada mientras ese control no exista en ningún commit
+fusionado.
+
+Queda además pendiente, con dueño y fase por asignar **antes de F1**: la purga de
+`identity_login_backoff`. Sus filas no caducan físicamente —el contador expira a los 30 minutos, pero
+la fila permanece—, y el corte C1 no entregó índice ni trabajo de purga, siguiendo el precedente del
+cambio 6 de no enviar un índice sin consumidor. El dueño propuesto es el cambio que introduzca
+trabajo de mantenimiento programado con `db-scheduler` (ADR-0016).
 
 El corte entre 1 y 2 está donde **entra el cifrado de columna**: el primero no cifra nada, solo
 hashea, y por eso no necesita el sobre de llaves, la tabla `shared_data_key` ni el ADR nuevo. Esas
