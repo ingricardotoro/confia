@@ -23,8 +23,14 @@ de `specs/identity/spec.md` da **23**. Los tres que la tabla de diseño no traza
 Esta lista traza los 23, no los 20 de la tabla envejecida: el primero queda cubierto en la tarea 4.1
 (mismo camino de código que el resto del retroceso sobre identificador inexistente); los dos
 últimos, en las tareas 3.2 y 2.3 respectivamente (el segundo es exactamente la regla de ArchUnit de
-la decisión 1). Quien archive este cambio debe actualizar `design.md` §7.1 para que deje de
-contradecir al delta que ya fusionó.
+la decisión 1).
+
+> **Ya corregido (2026-09-24, commit `eae1f2e`).** El orquestador verificó la discrepancia contando
+> los encabezados de los archivos de delta y actualizó `design.md` §7.1 en el mismo commit que
+> incorporó esta lista: la tabla traza ahora **31 escenarios**, 23 de `identity` y 8 de
+> `build-integrity`, con las tres filas que faltaban marcadas y con el recuento de `build-integrity`
+> corregido, que ya iba uno corto de sus propias filas. No queda trabajo pendiente para quien
+> archive.
 
 ## Nota sobre la ubicación de `LoginIdentifier`, no fijada por el diseño
 
@@ -176,7 +182,7 @@ antes de B2a en el cambio 5B.
   reporta** y se sigue el respaldo de `design.md` decisión 12 (`@ApplicationModule(type = OPEN)`),
   nunca se relaja `SpringModulithVerificationTest`. — `design.md` §10 (S1, S1b) y §11, paso 1
 
-- [ ] 1.2 **ROJO/VERDE — módulo `identity`, guarda de no vacuidad de W2, y las interfaces nombradas de
+- [x] 1.2 **ROJO/VERDE — módulo `identity`, guarda de no vacuidad de W2, y las interfaces nombradas de
   `shared`.** No requiere Docker. ROJO: extender
   `.../test/java/com/confia/architecture/NoCrossModuleDomainImportsTest.java` con la aserción de no
   vacuidad (`productionClasses()` contiene clases de al menos dos módulos de dominio distintos) y
@@ -201,7 +207,7 @@ antes de B2a en el cambio 5B.
   (escenarios «Importación cruzada de dominio», sin cambio, y «Cada módulo usa solo su propio
   dominio»); `design.md`, decisiones 10, 12 y 13
 
-- [ ] 1.3 **ROJO/VERDE — esquema `V5`, sonda S8, y las puertas de esquema extendidas.** Requiere
+- [x] 1.3 **ROJO/VERDE — esquema `V5`, sonda S8, y las puertas de esquema extendidas.** Requiere
   Docker. ROJO: extender
   `.../test/java/com/confia/schema/RolePrivilegeMatrixIT.java` con las filas de
   `identity_staff_account` e `identity_login_backoff` para los cinco roles, y crear
