@@ -272,9 +272,17 @@ Rama `change/identity-module-and-password-authentication-backoff-and-password`, 
   `.../identity/domain/PlainPassword.java` y `StoredPasswordHash.java` (`toString()` redactado,
   `PlainPassword` rechaza cadena vacía y acota a 1024 caracteres, con NFKC aplicado antes de hashear);
   `.../identity/domain/IdentifierFingerprint.java` (huella hexadecimal de 64 caracteres);
-  `.../identity/infrastructure/Argon2PhcCodec.java`, `Argon2Pepper.java` (`toString()` redactado, 32
-  bytes exactos desde `confia.identity.login-institution-id`... variable de entorno propia, falla al
-  construirse si falta o mide otro tamaño) y `BouncyCastleArgon2PasswordHasher.java` sobre
+  > **Corrección del 2026-09-25, reportada por quien aplicó la tarea.** Esta línea decía «32 bytes
+  > exactos desde `confia.identity.login-institution-id`... variable de entorno propia». Es una cita
+  > cruzada equivocada: esa clave es la de `LoginInstitutionProvider` (`design.md` §11, línea 723) y
+  > lleva **un identificador de institución**, no un secreto de 32 bytes. La tarea 4.3 la usa bien,
+  > para `ConfiguredLoginInstitutionProvider`. Gobierna la decisión 6 del diseño: en este corte la
+  > pimienta **llega por constructor**, y `Argon2Pepper` solo valida su tamaño; el cableado real al
+  > gestor de secretos es del cambio 11.
+
+  `.../identity/infrastructure/Argon2PhcCodec.java`, `Argon2Pepper.java` (`toString()` redactado, **32
+  bytes exactos, recibidos por constructor**, falla al construirse si mide otro tamaño) y
+  `BouncyCastleArgon2PasswordHasher.java` sobre
   `org.bouncycastle:bcprov-jdk18on`; `.../identity/infrastructure/HmacLoginIdentifierFingerprinter.java`
   con la subllave `HMAC-SHA-256(pimienta, "confia.identity.login-identifier.v1")`. Ejecutar las tres
   pruebas de la mitad ROJO: verde. Commit convencional (`feat`) sobre `BackoffPolicy` y otro sobre
