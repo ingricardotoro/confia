@@ -107,6 +107,26 @@ class Argon2PhcCodecTest {
                 .doesNotContain(malformedButHashShaped);
     }
 
+    /**
+     * Base64 rejects a bad segment with its own {@link IllegalArgumentException}, which the decoder's
+     * {@code catch} of {@code NumberFormatException | IndexOutOfBoundsException} does not cover, so a
+     * hash whose parameters parse but whose salt does not decode escapes with the library's message
+     * instead of this codec's. Found by the pre-merge security audit.
+     */
+    @Test
+    void decodeReportsAnUndecodableSaltWithItsOwnMessage() {
+        String validParametersBadSalt = "$argon2id$v=19$m=19456,t=3,p=1$not!valid!base64$dGFn";
+
+        org.assertj.core.api.Assertions
+                .assertThatThrownBy(() -> Argon2PhcCodec.decode(validParametersBadSalt))
+                .isInstanceOf(IllegalArgumentException.class)
+                .extracting(Throwable::getMessage, org.assertj.core.api.InstanceOfAssertFactories.STRING)
+                .as("every malformed hash must leave this codec through the same message, so that "
+                        + "the redaction proven above cannot be bypassed by a segment that happens "
+                        + "to fail in Base64 rather than in a number")
+                .contains("$-separated segments");
+    }
+
     private static byte[] repeat(byte b, int length) {
         byte[] bytes = new byte[length];
         java.util.Arrays.fill(bytes, b);

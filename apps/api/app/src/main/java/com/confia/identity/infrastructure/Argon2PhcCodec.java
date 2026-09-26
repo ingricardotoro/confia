@@ -81,18 +81,27 @@ public final class Argon2PhcCodec {
         int parallelism;
         byte[] salt;
         byte[] tag;
+        // Hoisted out of the try below on purpose. This check throws the codec's own
+        // IllegalArgumentException, and the catch now covers that type as well — leaving the check
+        // inside would make the catch swallow its own throw and re-wrap it in itself.
+        String[] paramParts = parts[3].split(",", -1);
+        if (paramParts.length != 3) {
+            throw new IllegalArgumentException(malformed(parts.length));
+        }
         try {
             version = Integer.parseInt(parts[2].substring("v=".length()));
-            String[] paramParts = parts[3].split(",", -1);
-            if (paramParts.length != 3) {
-                throw new IllegalArgumentException(malformed(parts.length));
-            }
             memoryCostKib = Integer.parseInt(paramParts[0].substring("m=".length()));
             timeCost = Integer.parseInt(paramParts[1].substring("t=".length()));
             parallelism = Integer.parseInt(paramParts[2].substring("p=".length()));
             salt = Base64.getDecoder().decode(parts[4]);
             tag = Base64.getDecoder().decode(parts[5]);
-        } catch (NumberFormatException | IndexOutOfBoundsException e) {
+        } catch (IllegalArgumentException | IndexOutOfBoundsException e) {
+            // IllegalArgumentException covers NumberFormatException, which extends it, and also
+            // Base64's own rejection of an undecodable segment. Before the pre-merge security audit
+            // this catch named NumberFormatException instead, so a salt that failed to decode left
+            // this codec carrying Base64's message ("Illegal base64 character 21") rather than the
+            // codec's. That message happens not to leak the hash, but a second exit from a method
+            // whose whole purpose here is one redacted exit is a gap, not a detail.
             throw new IllegalArgumentException(malformed(parts.length), e);
         }
         return new DecodedArgon2Hash(version, memoryCostKib, timeCost, parallelism, salt, tag);
