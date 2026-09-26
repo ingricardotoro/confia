@@ -42,6 +42,21 @@ class StoredPasswordHashTest {
     }
 
     @Test
+    void twoDifferentHashesAreNotEqual() {
+        String otherPhc = "$argon2id$v=19$m=19456,t=3,p=1$b3RoZXJzYWx0$b3RoZXJ0YWc";
+
+        assertThat(new StoredPasswordHash(VALID_PHC)).isNotEqualTo(new StoredPasswordHash(otherPhc));
+    }
+
+    @Test
+    void isNeverEqualToNullOrAnUnrelatedType() {
+        StoredPasswordHash hash = new StoredPasswordHash(VALID_PHC);
+
+        assertThat(hash).isNotEqualTo(null);
+        assertThat(hash).isNotEqualTo(VALID_PHC);
+    }
+
+    @Test
     void toStringNeverContainsTheStoredHash() {
         StoredPasswordHash hash = new StoredPasswordHash(VALID_PHC);
 

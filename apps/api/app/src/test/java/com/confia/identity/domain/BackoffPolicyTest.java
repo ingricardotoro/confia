@@ -1,6 +1,7 @@
 package com.confia.identity.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -106,6 +107,11 @@ class BackoffPolicyTest {
 
         BackoffState afterThisSuccess = policy.afterSuccess(fourthAttemptAt);
         assertThat(afterThisSuccess.consecutiveFailures()).isZero();
+    }
+
+    @Test
+    void delayForRejectsAnAttemptOrdinalBelowOne() {
+        assertThatThrownBy(() -> policy.delayFor(0)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Property(tries = TRIES)

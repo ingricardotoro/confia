@@ -59,7 +59,9 @@ public final class BackoffPolicy {
      * 2^(attemptOrdinal - FIRST_DELAYED_ATTEMPT)} seconds, capped at {@link #CAP}. The exponent is
      * bounded to avoid an overflowing shift for a pathologically large ordinal: any exponent of 10
      * or more already yields 1024 seconds, past the 900-second cap, so nothing above that bound
-     * ever needs to be computed exactly.
+     * ever needs to be computed exactly — and, for the same reason, no exponent below that bound
+     * (at most 2^9 = 512 seconds) can ever reach {@link #CAP} either, so there is no second,
+     * separate cap check to perform once the {@code exponent >= 10} guard above has passed.
      */
     public Duration delayFor(int attemptOrdinal) {
         if (attemptOrdinal < 1) {
@@ -73,8 +75,7 @@ public final class BackoffPolicy {
         if (exponent >= 10) {
             return CAP;
         }
-        Duration uncapped = Duration.ofSeconds(1L << exponent);
-        return uncapped.compareTo(CAP) > 0 ? CAP : uncapped;
+        return Duration.ofSeconds(1L << exponent);
     }
 
     /** The state to persist after a failed attempt at ordinal {@code attemptOrdinal}. */

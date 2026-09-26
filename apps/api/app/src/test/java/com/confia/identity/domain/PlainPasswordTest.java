@@ -66,6 +66,19 @@ class PlainPasswordTest {
     }
 
     @Test
+    void twoDifferentPasswordsAreNotEqual() {
+        assertThat(PlainPassword.of("Segura#2026")).isNotEqualTo(PlainPassword.of("Otra#clave"));
+    }
+
+    @Test
+    void isNeverEqualToNullOrAnUnrelatedType() {
+        PlainPassword password = PlainPassword.of("Segura#2026");
+
+        assertThat(password).isNotEqualTo(null);
+        assertThat(password).isNotEqualTo("Segura#2026");
+    }
+
+    @Test
     void toStringNeverContainsTheClearTextPassword() {
         PlainPassword password = PlainPassword.of("Segura#2026");
 
