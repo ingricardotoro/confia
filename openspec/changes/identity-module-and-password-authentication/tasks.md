@@ -256,7 +256,7 @@ Rama `change/identity-module-and-password-authentication-backoff-and-password`, 
   continuar con la tarea 2.2 — no se implementa el respaldo en silencio. — `design.md` §10 (S2, S6) y
   §11, paso 7
 
-- [ ] 2.2 **ROJO/VERDE — `BackoffPolicy`, el códec `$argon2id$` (sonda S7), y los objetos de valor
+- [x] 2.2 **ROJO/VERDE — `BackoffPolicy`, el códec `$argon2id$` (sonda S7), y los objetos de valor
   restantes.** No requiere Docker (JUnit, AssertJ y jqwik puros, sin contenedor). ROJO: crear
   `.../test/java/com/confia/identity/domain/BackoffPolicyTest.java` con los cuatro escenarios del
   delta (retardo desde el tercer fallo, progresión con tope de 900 s, expiración del contador a los
@@ -284,7 +284,7 @@ Rama `change/identity-module-and-password-authentication-backoff-and-password`, 
   «Ausencia de verificación contra contraseñas comprometidas...» (escenario «El hash almacenado no se
   recalcula», fundamento); `design.md` §11, pasos 8-10
 
-- [ ] 2.3 **ROJO/VERDE — el hash señuelo, y la regla de ArchUnit de ninguna espera (cubre el escenario
+- [x] 2.3 **ROJO/VERDE — el hash señuelo, y la regla de ArchUnit de ninguna espera (cubre el escenario
   «Ninguna clase del módulo de identidad espera»).** No requiere Docker. ROJO: crear
   `.../test/java/com/confia/architecture/NoBlockingWaitInIdentityTest.java` con su fixture permanente
   de rechazo bajo `.../architecture/fixture/identity/` (una clase que invoca `Thread.sleep` dentro de

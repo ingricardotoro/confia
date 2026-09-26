@@ -399,3 +399,255 @@ Castle con `./mvnw -B -pl app dependency:tree -Dincludes=org.bouncycastle`:
 
 **Sin ninguna dependencia transitiva** —ninguna línea indentada bajo la suya—, así que declararla en
 alcance de compilación añade exactamente un artefacto y nada más.
+
+## Tarea 2.2 — `BackoffPolicy`, el códec `$argon2id$` (sonda S7) y los objetos de valor restantes
+
+Ejecutado por este agente, sobre la sonda S6 ya cerrada.
+
+### Discrepancia encontrada y reportada: la clave de entorno de la pimienta
+
+El texto de la tarea 2.2 pide `Argon2Pepper.java` «32 bytes exactos desde
+`confia.identity.login-institution-id`... variable de entorno propia». Esa clave exacta —
+`confia.identity.login-institution-id`— es, palabra por palabra, la clave canónica que `design.md`
+§11 fija para `LoginInstitutionProvider` (decisión 11: el identificador de institución, un UUID, no
+un secreto de 32 bytes). Es una cita cruzada equivocada de esta lista de tareas, de la misma familia
+que las ocho ya corregidas antes de este corte, y no una instrucción que se pueda seguir literalmente
+sin introducir una confusión real entre dos configuraciones de naturaleza distinta.
+
+`design.md`, decisión 6, ya resuelve cómo debe entregarse la pimienta en este corte, con más
+precisión que la tarea: «Entrega de la pimienta... **aquí llega por constructor**, como
+`TransactionRunner` y `JooqInstitutionRepository` reciben lo suyo [...] El cableado real desde el
+gestor de secretos es del cambio 11». Es decir: `Argon2Pepper` no lee ninguna variable de entorno por
+sí misma en este corte; solo valida que el valor Base64 que reciba su constructor decodifique a
+exactamente 32 bytes, y falla si no. Qué variable de entorno concreta alimenta ese constructor —y
+cómo se lee— es cableado de una capa superior (una futura clase de arranque o del cambio 11), fuera
+del alcance de `Argon2Pepper` y de esta tarea. Se sigue la redacción de `design.md`, más precisa y sin
+la cita cruzada, y se deja registrada aquí para que quien lea después no la redescubra distinta.
+
+### ROJO — `BackoffState`/`BackoffPolicy`
+
+`BackoffPolicyTest` y `BackoffStateTest`, ejecutados antes de crear las clases de producción:
+
+```
+[ERROR] .../BackoffPolicyTest.java:[32,46] cannot find symbol: class BackoffPolicy
+[ERROR] .../BackoffPolicyTest.java:[40,9] cannot find symbol: class BackoffState
+[ERROR] .../BackoffStateTest.java:[21,9] cannot find symbol: class BackoffState
+```//fallo real de compilación, no fingido; el archivo completo con las 4 escenarios del delta y las
+tres propiedades jqwik (monotonía, tope, cero bajo el umbral) ya estaba escrito en ese momento.
+
+VERDE: `BackoffState` y `BackoffPolicy` creados según `design.md` §6.3. `./mvnw -B -pl app test
+-Dtest=BackoffPolicyTest,BackoffStateTest`: **12 pruebas, 0 fallos** (5 + 3 jqwik + 4). Commit
+`12897c7`.
+
+### ROJO — objetos de valor y mecanismo Argon2id
+
+`PlainPasswordTest`, `StoredPasswordHashTest`, `IdentifierFingerprintTest`, `Argon2ProfileTest`,
+`Argon2PhcCodecTest`, `Argon2PepperTest`, `HmacLoginIdentifierFingerprinterTest` y
+`BouncyCastleArgon2PasswordHasherTest` escritos antes de sus clases de producción; `./mvnw -B -pl app
+test -Dtest=PlainPasswordTest,StoredPasswordHashTest,IdentifierFingerprintTest` falla con:
+
+```
+[ERROR] .../PlainPasswordTest.java:[17,9] cannot find symbol: class PlainPassword
+[ERROR] .../StoredPasswordHashTest.java: cannot find symbol: class StoredPasswordHash
+[ERROR] .../IdentifierFingerprintTest.java:[21,9] cannot find symbol: class IdentifierFingerprint
+```
+
+y de igual forma para `Argon2ProfileTest`, `Argon2PhcCodecTest`, `Argon2PepperTest`,
+`HmacLoginIdentifierFingerprinterTest` y `BouncyCastleArgon2PasswordHasherTest` contra
+`Argon2Profile`, `Argon2PhcCodec`, `DecodedArgon2Hash`, `Argon2Pepper`,
+`HmacLoginIdentifierFingerprinter` y `BouncyCastleArgon2PasswordHasher`, ninguna de las cuales
+existía todavía (100 errores de compilación en total, registrados en la sesión).
+
+**Un fallo real durante el ROJO→VERDE, no fingido.** La primera versión de
+`PlainPasswordTest.appliesNfkcNormalizationBeforeAnythingElse` usaba U+FE64 («SMALL EQUALS SIGN»)
+como forma de compatibilidad, asumiendo que normaliza a `=` bajo NFKC. Al ejecutar, AssertJ mostró que
+las dos instancias NO eran iguales — la asunción sobre ese carácter concreto era incorrecta. Se
+sustituyó por U+FF11 (dígito `1` de ancho completo), el ejemplo estándar y verificado de
+normalización de compatibilidad, y la prueba pasó. Se deja registrado en vez de silenciarlo: es
+exactamente la disciplina que este corte pide para el vector de RFC 9106 más abajo — no ajustar la
+prueba a lo que salga, sino corregir la prueba solo cuando la propia prueba (no la implementación)
+resulta estar mal fundamentada, y decirlo.
+
+VERDE: las nueve clases de producción creadas (`PlainPassword`, `StoredPasswordHash`,
+`IdentifierFingerprint` en `domain`; `Argon2Profile`, `Argon2PhcCodec`, `DecodedArgon2Hash`,
+`Argon2Pepper`, `BouncyCastleArgon2PasswordHasher`, `HmacLoginIdentifierFingerprinter` en
+`infrastructure`). `./mvnw -B -pl app test -Dtest=Argon2ProfileTest,Argon2PhcCodecTest,
+Argon2PepperTest,HmacLoginIdentifierFingerprinterTest,BouncyCastleArgon2PasswordHasherTest`: **31
+pruebas, 0 fallos**. Conjunto completo de dominio + infraestructura de identidad (`com.confia.identity.**`):
+**90 pruebas, 0 fallos**. Commit `250c718`.
+
+### Sonda S7 — el vector de prueba de Argon2id de RFC 9106 §5.3, reproducido byte a byte
+
+**Cómo se verificó, con honestidad sobre el límite.** Este entorno no tiene acceso a la red para
+descargar el RFC. El vector —contraseña de 32 bytes `0x01`, sal de 16 bytes `0x02`, secreto de 8
+bytes `0x03`, datos asociados de 12 bytes `0x04`, `m=32` KiB, `t=3`, `p=4`, `tagLength=32`, y la
+etiqueta esperada `0d640df58d78766c08c037a34a8b53c9d01ef0452d75b65eb52520e96b01e659`— se transcribió
+de memoria de entrenamiento de este agente, no de una consulta en vivo al RFC. Se declaró por
+adelantado, en el propio comentario de la prueba, que si Bouncy Castle no reproducía ese valor exacto
+se reportaría en vez de ajustar la prueba al resultado que saliera.
+
+**Resultado: `Argon2PhcCodecTest.reproducesTheRfc9106Argon2idTestVectorByteForByteIncludingTheSecret`
+pasó al primer intento**, comparando la etiqueta producida por `Argon2PhcCodec.rawHash(...)` —que
+invoca `Argon2Parameters.Builder.withSecret(...)` de Bouncy Castle directamente— contra esa cadena
+hexadecimal, byte a byte. Una segunda prueba,
+`omittingTheSecretProducesADifferentTagThanTheVectorExpects`, confirma además que sin `secret` la
+etiqueta producida **no** coincide con el vector: la pimienta se aplica de verdad, no se ignora en
+silencio. Esto satisface la sonda S7 y cierra, con evidencia y no con promesa, la razón de ser de esta
+prueba (`design.md`, decisión 6).
+
+## Tarea 2.3 — regla de ArchUnit de ninguna espera, y el señuelo calculado en el constructor
+
+### ROJO/VERDE — `NoBlockingWaitInIdentityTest`
+
+A diferencia de las reglas de dominio, esta regla de ArchUnit vive dentro del propio archivo de
+prueba (el mismo patrón que `NoStandardStreamAccessTest`, `NoUnapprovedPlainSqlTest` y
+`TransactionsOnlyInSharedSecurityTest` ya establecen en este repositorio): no hay una clase de
+producción separada que «no exista todavía». El ROJO real de esta pieza es, por tanto, el mismo que
+pide el texto de la tarea («falla porque la regla no existe»): antes de este commit, ni el archivo de
+prueba ni su fixture permanente (`BadBlockingWaitInIdentity`, bajo
+`architecture/fixture/identity/`) existían en absoluto. Se escribieron ambos completos —la regla, el
+fixture, y las dos aserciones— y se ejecutaron por primera vez juntos:
+
+```
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 -- in com.confia.architecture.NoBlockingWaitInIdentityTest
+```
+
+Las dos aserciones pasaron al primer intento: el código de producción de `com.confia.identity..`
+(en ese momento, el de la tarea 2.2) no invoca ninguna primitiva de espera, y el fixture permanente
+—que sí invoca `Thread.sleep`— es rechazado con el mensaje esperado (verificado con
+`assertRuleRejects`, que exige que el mensaje no sea ruido de conjunto vacío y que sí contenga
+`BadBlockingWaitInIdentity` y `Thread.sleep`). No se fabricó un rojo funcional donde no lo había: se
+documenta este límite en vez de inventar un fallo que nunca ocurrió, siguiendo la misma disciplina de
+honestidad que el resto de este documento.
+
+### ROJO/VERDE — el señuelo calculado en el constructor
+
+ROJO: `BouncyCastleArgon2PasswordHasherDecoyTest`, escrita contra un método `decoyHash()` y un tipo
+`Argon2RawHasher` que todavía no existían:
+
+```
+[ERROR] .../BouncyCastleArgon2PasswordHasherDecoyTest.java:[29,9] cannot find symbol: class Argon2RawHasher
+[ERROR] .../BouncyCastleArgon2PasswordHasherDecoyTest.java:[49,48] cannot find symbol: method decoyHash()
+```
+
+VERDE: se añadió la interfaz de prueba `Argon2RawHasher` (una costura empaquetada, no un puerto) y se
+modificó el constructor de `BouncyCastleArgon2PasswordHasher` para construir `decoyHash` una sola vez,
+hasheando `DECOY_LABEL` con una sal constante de 16 bytes (`design.md`, decisión 7). Dos pruebas
+prueban lo que el delta pide: un doble contador de invocaciones confirma que el cómputo subyacente se
+ejecuta **exactamente una vez** en la construcción (y no de nuevo al usar `hash(...)` para una
+contraseña real, ni al leer `decoyHash()` otra vez); y dos instancias construidas con perfiles
+distintos producen señuelos distintos, lo que demuestra que el señuelo se calcula con los parámetros
+vigentes y no es un literal congelado. `./mvnw -B -pl app test
+-Dtest=BouncyCastleArgon2PasswordHasherDecoyTest`: **3 pruebas, 0 fallos**. Commit `033df40`, junto a
+la regla de ArchUnit.
+
+## Hallazgo de cierre — cobertura de rama de `identity.domain` por debajo del 95 %
+
+`./mvnw -B verify` completo (primera ejecución tras cerrar la tarea 2.3) terminó con:
+
+```
+[WARNING] Rule violated for package com.confia.identity.domain: branches covered ratio is 0.81, but expected minimum is 0.95
+[ERROR] BUILD FAILURE
+```
+
+El reporte de JaCoCo señaló dos causas reales, no cosméticas:
+
+1. **`BackoffPolicy.delayFor`, guarda de `attemptOrdinal < 1` nunca ejercida** (0 de 2 ramas
+   cubiertas): ninguna prueba invocaba `delayFor` con un ordinal inválido. Se añadió
+   `delayForRejectsAnAttemptOrdinalBelowOne`.
+2. **Una rama muerta de verdad, no una prueba faltante**: `return uncapped.compareTo(CAP) > 0 ? CAP
+   : uncapped;`, tras la guarda `if (exponent >= 10) return CAP;`, nunca puede tomar la rama
+   verdadera —con `exponent` entre 0 y 9, `uncapped` vale como máximo `2^9 = 512` segundos, siempre
+   por debajo de los 900 del tope—. Escribir una prueba para ese camino habría sido imposible sin
+   falsear la aserción; se simplificó el código a `return Duration.ofSeconds(1L << exponent);`,
+   eliminando la comparación inalcanzable en vez de fingir cubrirla.
+3. **`PlainPassword.equals` y `StoredPasswordHash.equals`**, con 2 de 4 ramas sin cubrir cada una: solo
+   se probaba el camino `instanceof` verdadero con valores iguales. Se añadieron los casos
+   `equals(null)`, `equals(tipo no relacionado)` y `equals(mismo tipo, valor distinto)` a ambas
+   suites.
+
+Commit `f41df00` (`fix`), con las cuatro correcciones. Verificación tras el arreglo: `./mvnw -B -pl app
+test -Dtest="com.confia.identity.domain.**"` en verde (64 pruebas), y `./mvnw -B verify` completo
+descrito abajo.
+
+## Verificación final de este corte
+
+`./mvnw -B verify` desde `apps/api`, checkout limpio de esta rama, `JAVA_HOME` en JDK 25,
+`MAVEN_OPTS` con el almacén `Windows-ROOT`, Docker activo:
+
+```
+[INFO] All coverage checks have been met.
+[INFO] CONFIA API Parent .................................. SUCCESS
+[INFO] CONFIA Kernel ...................................... SUCCESS [ 17.152 s]
+[INFO] CONFIA API ......................................... SUCCESS [04:50 min]
+[INFO] BUILD SUCCESS
+[INFO] Total time:  05:11 min
+```
+
+**177** pruebas unitarias de `kernel` + **242** de `app` (unitarias) + **94** de `app` (`*IT.java`,
+suite completa de integración), **0 fallos** en las tres. Muy por debajo del presupuesto de 8 minutos
+de `design.md` §13. PIT (mutación) **no se ejecutó** en este `verify` local: `apps/api/pom.xml` fija
+`confia.pit.phase=none` por defecto a propósito («nunca activa en un `./mvnw verify` plano») y solo
+corre bajo el perfil `mutation-gate` en integración continua sobre `main` — comportamiento ya
+documentado en `design.md` §13 y verificado aquí por lectura del POM, no supuesto.
+
+## Diff real de PR C2, y el hallazgo de cierre que exige partir el corte
+
+`git diff --numstat main...HEAD -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`
+(`main` es exactamente la punta de PR C1 — `git merge-base HEAD main` = `8d9c1ae`, el commit de la
+fusión de C1b — así que este diff mide solo lo de este corte):
+
+**1 765 líneas de cambio efectivo (1 765 adiciones, 0 borrados).**
+
+Esto **supera el presupuesto de 800 líneas por pull request** que la sección de estrategia de entrega
+de `tasks.md` fija para este repositorio (no el de 400 del preámbulo de la sesión). Siguiendo la regla
+operativa de la tarea 2.3 («si supera 800, detener y reportar los puntos de corte candidatos
+medidos»), **se detiene aquí la decisión de partir el corte**: no se reescribe el historial de esta
+rama ni se crean ramas nuevas sin autorización explícita, siguiendo el mismo patrón que la partición
+de PR C1 en C1a/C1b, que el propio `apply-progress.md` registra como ejecutada por el orquestador, no
+por quien aplicó las tareas.
+
+### Medición por commit
+
+| Commit | Contenido | Líneas |
+|---|---|---|
+| `bb857c5` | Sonda S2 (documental, tarea 2.1) | 0 |
+| `9d35d32` | Declaración de `bcprov-jdk18on` en los dos POM (tarea 2.1) | 32 |
+| `12897c7` | `BackoffState` + `BackoffPolicy` (tarea 2.2, primera mitad) | 321 |
+| `250c718` | Objetos de valor + Argon2id + huella (tarea 2.2, segunda mitad) | **1 114** |
+| `033df40` | Regla de ArchUnit + señuelo calculado (tarea 2.3) | 273 |
+| `f41df00` | Corrección de cobertura de rama (hallazgo de cierre) | 41 |
+
+**El commit `250c718`, por sí solo, ya supera las 800 líneas.** Ningún corte en los límites de commit
+existentes deja todas las mitades por debajo del presupuesto: agrupar `bb857c5+9d35d32+12897c7`
+(353) y `033df40+f41df00` (314) sí calza, pero `250c718` (1 114) necesita partirse él mismo por
+concepto, no solo reagruparse.
+
+### Puntos de corte candidatos dentro de `250c718`, medidos por archivo
+
+| Grupo candidato | Contenido | Líneas |
+|---|---|---|
+| A — objetos de valor de dominio | `PlainPassword`, `StoredPasswordHash`, `IdentifierFingerprint` + sus pruebas | 342 |
+| B — mecanismo Argon2id | `Argon2Profile`, `Argon2PhcCodec`, `DecodedArgon2Hash`, `Argon2Pepper` + sus pruebas (incluye el vector de RFC 9106) | 466 |
+| C — adaptadores | `BouncyCastleArgon2PasswordHasher`, `HmacLoginIdentifierFingerprinter` + sus pruebas | 306 |
+
+Los grupos A y B son mutuamente independientes (ninguno importa del otro); el grupo C depende de
+ambos (el señuelo del hasher usa `PlainPassword`, y el hasher entero usa `Argon2Profile`/`Argon2Pepper`/
+`Argon2PhcCodec`). Una cadena posible de cinco pull requests, cada uno por debajo de 800 líneas:
+
+1. Tarea 2.1 + `BackoffPolicy`/`BackoffState` — 353 líneas
+2. Objetos de valor de dominio (grupo A) — 342 líneas
+3. Mecanismo Argon2id (grupo B) — 466 líneas
+4. Adaptadores (grupo C, base 2+3) — 306 líneas
+5. Regla de ArchUnit + señuelo + corrección de cobertura (base 4) — 314 líneas
+
+**No se ejecutó esta partición**: requeriría reordenar o dividir el commit `250c718` (`cherry-pick` o
+un nuevo árbol de ramas), la misma cirugía de historial que el cambio 5 tuvo que hacer para su corte
+A3 y que esta lista reserva explícitamente para quien gestiona la cadena de pull requests, no para
+quien aplica las tareas de TDD. Se deja la medición completa y los puntos de corte candidatos, ya
+verificados en conjunto por el `./mvnw -B verify` de arriba (que cubre el código de los cinco grupos
+tal como existe hoy en un único árbol de trabajo), para que quien abra los pull requests decida y
+ejecute la partición.
+
+No se empuja la rama ni se abre pull request: lo hace el orquestador, según la instrucción explícita
+de esta sesión.
