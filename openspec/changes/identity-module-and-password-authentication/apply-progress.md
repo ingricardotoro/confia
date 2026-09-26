@@ -651,3 +651,99 @@ ejecute la partición.
 
 No se empuja la rama ni se abre pull request: lo hace el orquestador, según la instrucción explícita
 de esta sesión.
+
+---
+
+## Revisión previa a la fusión del corte C2 — un bloqueante, encontrado dos veces
+
+### El hallazgo, corroborado de forma independiente
+
+El orquestador y el auditor de seguridad lo encontraron **por separado**, señalando el mismo archivo y
+las mismas líneas: `Argon2PhcCodec.decode` interpolaba la cadena PHC completa —con la sal y la etiqueta
+de Argon2id— en tres mensajes de excepción.
+
+Choca con el requisito que **este mismo corte escribió**, que nombra las dos cosas de forma explícita:
+«El sistema NO DEBE hacer observable, en ningún **mensaje de excepción** … **el hash Argon2id
+resultante**».
+
+**Por qué ocurre justo ahí.** Ese códec es el único punto donde un hash almacenado existe como
+`String` desnudo, fuera de `StoredPasswordHash` y su `toString()` redactado, de modo que es el único
+punto donde esa protección se puede evadir por accidente y no por decisión.
+
+**Por qué es alcanzable hoy**, y este es el análisis del auditor: el constructor de
+`StoredPasswordHash` solo exige el prefijo `$argon2id$`, no la estructura PHC completa. Un valor que
+pase esa comprobación superficial y falle la profunda —fila corrupta, columna truncada, error de
+codificación de un cambio posterior— hace que `matches()`, que es público, lance con el hash dentro.
+
+**Impacto, también del auditor.** Un hash Argon2id filtrado no es «solo» un hash: sin la pimienta
+nadie forja una contraseña con él, pero si la pimienta se filtrara en un incidente separado, el hash
+es exactamente el material para un ataque de diccionario fuera de línea. Lo que se debilita es la
+defensa en profundidad que la pimienta compra.
+
+### Por qué la prueba existente no podía cazarlo
+
+`decodeRejectsAStringThatIsNotAWellFormedPhcHash` llamaba a `decode("not-a-hash")` —una entrada que
+no contiene nada sensible—, así que un mensaje que repitiera su entrada la satisfacía. Es la misma
+forma que el bloqueante del corte C1: la prueba existe y **nunca alcanza el caso peligroso**.
+
+### La corrección, y el control negativo que demuestra que sirve
+
+El mensaje lleva ahora la **forma** del fallo —el número de segmentos separados por `$`— y no el
+valor. La prueba nueva, `decodeNeverPutsTheHashItRejectedIntoTheExceptionMessage`, pasa una entrada
+**con forma de hash almacenado** y segmentos reconocibles de sal y etiqueta.
+
+Control negativo, restaurando la interpolación:
+
+```
+decodeNeverPutsTheHashItRejectedIntoTheExceptionMessage  → FALLA
+decodeRejectsAStringThatIsNotAWellFormedPhcHash         → sigue pasando
+```
+
+La segunda línea es la prueba de que la vieja nunca lo habría visto.
+
+### Una sugerencia del auditor, resuelta en la misma pasada
+
+`Base64` rechaza un segmento ilegible con su propia `IllegalArgumentException`, que el `catch` no
+cubría. Comprobado con una prueba antes de corregir: el mensaje que escapaba era
+`"Illegal base64 character 21"`. No filtra el hash, pero una segunda salida de un método cuyo
+propósito aquí es tener **una sola** salida redactada es un hueco.
+
+**Trampa que el auditor no señaló y que apareció al corregir:** la comprobación del número de
+parámetros lanza la `IllegalArgumentException` propia del códec **dentro** del `try`. Ampliar el
+`catch` a ese tipo sin mover esa comprobación habría hecho que el `catch` atrapara su propio lanzamiento
+y lo envolviera en sí mismo. La comprobación se movió arriba del `try`, y eso es estructural, no
+cosmético.
+
+### Verificación tras las dos correcciones
+
+`./mvnw -B verify`: **BUILD SUCCESS**, cobertura cumplida en los dos niveles, 4 min 47 s.
+
+### Lo que el auditor verificó y está correcto
+
+- La pimienta **llega al generador en el camino de producción**, no solo en la prueba del vector: hay
+  una prueba que construye dos instancias reales con pimientas distintas y demuestra que una no
+  verifica el hash de la otra.
+- La huella del identificador **resiste un ataque de diccionario sobre correos**, con separación de
+  dominio correcta: `HMAC(pimienta, "confia.identity.login-identifier.v1")` y después
+  `HMAC(subllave, identificador)`.
+- Los parámetros de Argon2id coinciden con la tabla de §4.1 y su Javadoc los declara **piso**, no
+  valor calibrado.
+- El señuelo se **calcula** con los parámetros vigentes y cuesta estructuralmente lo mismo que una
+  verificación real.
+- `SecureRandom` para la sal; ningún secreto en el repositorio; `bcprov-jdk18on` 1.86 sin transitivas,
+  con las tres reglas del enforcer en verde.
+- `DecodedArgon2Hash` es un `record` sin `toString()` propio **y es correcto**: sus campos sensibles
+  son `byte[]`, y el `toString()` generado imprime la identidad del arreglo, nunca su contenido.
+
+### Lo que el auditor declaró NO haber verificado
+
+Los cuatro CVE de `bcprov-jdk18on` y que 1.86 esté por encima de todos los umbrales de arreglo: su
+entorno no tiene red ni Trivy instalado. **Los verificó el orquestador** contra la base de avisos de
+GitHub antes de subir la versión, y queda constancia de quién comprobó qué.
+
+### Sugerencia trasladada al corte siguiente
+
+`BouncyCastleArgon2PasswordHasher` ejecuta un Argon2id completo en su constructor, para el señuelo. Si
+el cableado de Spring lo instanciara **por solicitud** en vez de como singleton, cada instanciación
+pagaría ese costo: un vector de agotamiento de recursos barato de evitar. No es un defecto de este
+código, que no controla su propio ciclo de vida. **Dueño: el corte C3a, al registrar el bean.**
