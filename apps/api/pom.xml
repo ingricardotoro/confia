@@ -80,7 +80,15 @@
          compiles against these same three Bouncy Castle classes anyway and declares the dependency
          nowhere, so going through Spring would cost two artifacts instead of one and still not
          reach the pepper. Not managed by the Spring Boot BOM. -->
-    <bcprov-jdk18on.version>1.81</bcprov-jdk18on.version>
+    <!-- 1.86, and not the 1.81 this dependency first arrived as. The dependency-vulnerability gate
+         (docs/03-seguridad.md; build-integrity "Vulnerabilidad alta o crítica rompe la construcción")
+         rejected 1.81 with three findings: CVE-2025-14813 and CVE-2026-8763 critical, CVE-2026-13506
+         high. The advisory database gives 1.85 as the first release patching all four known high and
+         critical advisories for this artifact — the fourth being CVE-2026-5598, patched in 1.84 —
+         and Trivy's own table left CVE-2026-13506's fixed version blank, so the version was chosen
+         from the advisories rather than from that table. 1.86 is the latest release and is above
+         every one of those thresholds. -->
+    <bcprov-jdk18on.version>1.86</bcprov-jdk18on.version>
 
     <!-- confia.pit.phase=none: PIT never runs on a plain ./mvnw verify with no profile active
          (design.md, decision 9). The mutation-report and mutation-gate profiles below rebind it to
