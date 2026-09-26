@@ -73,6 +73,14 @@
          compile/runtime/provided/system, so this does not need an exclusion there). Not managed by
          the Spring Boot BOM. -->
     <jqwik.version>1.10.1</jqwik.version>
+    <!-- bcprov-jdk18on (design.md decision 6; sonda S2, apply-progress.md): Argon2id via Bouncy
+         Castle directly, compile-scoped in app/pom.xml, because Argon2Parameters.Builder is the
+         only one of the two candidate APIs that exposes withSecret(byte[]) — confirmed by javap
+         against both spring-security-crypto 7.0.0 and bcprov-jdk18on 1.81. Spring's own encoder
+         compiles against these same three Bouncy Castle classes anyway and declares the dependency
+         nowhere, so going through Spring would cost two artifacts instead of one and still not
+         reach the pepper. Not managed by the Spring Boot BOM. -->
+    <bcprov-jdk18on.version>1.81</bcprov-jdk18on.version>
 
     <!-- confia.pit.phase=none: PIT never runs on a plain ./mvnw verify with no profile active
          (design.md, decision 9). The mutation-report and mutation-gate profiles below rebind it to
@@ -130,6 +138,17 @@
         <artifactId>jqwik</artifactId>
         <version>${jqwik.version}</version>
         <scope>test</scope>
+      </dependency>
+      <!--
+        bcprov-jdk18on (design.md decision 6, sonda S2): Argon2id with the pepper applied as
+        Argon2Parameters.Builder#withSecret(byte[]), which spring-security-crypto's
+        Argon2PasswordEncoder does not expose. Compile scope in app/pom.xml: this dependency is a
+        production dependency of com.confia.identity.infrastructure, not a test-only tool.
+      -->
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk18on</artifactId>
+        <version>${bcprov-jdk18on.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

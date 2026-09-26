@@ -366,3 +366,36 @@ verificar**. Verificado ahora, y es más contundente:
 Es decir, la ruta por Spring **cuesta estrictamente más** —dos artefactos en vez de uno— **y entrega
 estrictamente menos**: sigue sin poder aplicar la pimienta como `secret`. La decisión 6 se mantiene,
 y la nota editorial sobre §4.1 que el propietario autorizó el 2026-09-24 no necesita reescribirse.
+
+## Tarea 2.2 — Sonda S6, ejecutada por el orquestador tras declarar Bouncy Castle
+
+El agente de implementación alcanzó a declarar la dependencia en los dos POM y cayó por un fallo de
+red antes de ejecutar la sonda. El orquestador la ejecutó y corrigió una palabra en español que se
+había colado en un comentario técnico de `apps/api/pom.xml`, que va en inglés.
+
+**Comando, y la corrección que el corte C1 ya había dejado aprendida.** La tarea pedía
+`./mvnw -B -pl app enforcer:enforce`, que **no ejecuta las reglas reales**: invocar el objetivo desde
+la línea de órdenes usa la ejecución `default-cli`, que no hereda la configuración de
+`enforce-build-integrity` ligada a la fase `validate`. El comando correcto es `./mvnw -B -pl app
+validate`.
+
+### Resultado: PASA
+
+```
+[INFO] --- enforcer:3.6.3:enforce (enforce-build-integrity) @ confia-api ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] Rule 1: org.apache.maven.enforcer.rules.dependency.DependencyConvergence passed
+[INFO] Rule 2: org.apache.maven.enforcer.rules.dependency.BannedDependencies passed
+[INFO] BUILD SUCCESS
+```
+
+**Comprobación adicional, por el precedente de S1b.** En C1 se descubrió que `spring-modulith-core`
+habría arrastrado ArchUnit al camino de producción, así que aquí se verificó lo mismo para Bouncy
+Castle con `./mvnw -B -pl app dependency:tree -Dincludes=org.bouncycastle`:
+
+```
+\- org.bouncycastle:bcprov-jdk18on:jar:1.81:compile
+```
+
+**Sin ninguna dependencia transitiva** —ninguna línea indentada bajo la suya—, así que declararla en
+alcance de compilación añade exactamente un artefacto y nada más.
