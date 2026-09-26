@@ -73,7 +73,7 @@ public final class Argon2PhcCodec {
         String[] parts = phc.split("\\$", -1);
         if (parts.length != 6 || !parts[0].isEmpty() || !ARGON2ID_SEGMENT.equals(parts[1])
                 || !parts[2].startsWith("v=")) {
-            throw new IllegalArgumentException("not a well-formed $argon2id$ hash: " + phc);
+            throw new IllegalArgumentException(malformed(parts.length));
         }
         int version;
         int memoryCostKib;
@@ -85,7 +85,7 @@ public final class Argon2PhcCodec {
             version = Integer.parseInt(parts[2].substring("v=".length()));
             String[] paramParts = parts[3].split(",", -1);
             if (paramParts.length != 3) {
-                throw new IllegalArgumentException("not a well-formed $argon2id$ hash: " + phc);
+                throw new IllegalArgumentException(malformed(parts.length));
             }
             memoryCostKib = Integer.parseInt(paramParts[0].substring("m=".length()));
             timeCost = Integer.parseInt(paramParts[1].substring("t=".length()));
@@ -93,8 +93,28 @@ public final class Argon2PhcCodec {
             salt = Base64.getDecoder().decode(parts[4]);
             tag = Base64.getDecoder().decode(parts[5]);
         } catch (NumberFormatException | IndexOutOfBoundsException e) {
-            throw new IllegalArgumentException("not a well-formed $argon2id$ hash: " + phc, e);
+            throw new IllegalArgumentException(malformed(parts.length), e);
         }
         return new DecodedArgon2Hash(version, memoryCostKib, timeCost, parallelism, salt, tag);
+    }
+
+    /**
+     * The message for a hash this codec cannot parse, carrying the <em>shape</em> of the failure and
+     * never the value.
+     *
+     * <p>This used to interpolate the PHC string itself, which put the Argon2id salt and tag into an
+     * exception message — and from there into a stack trace, a log, and possibly a response body.
+     * The delta's own requirement "Ningún secreto de este módulo es observable en registros,
+     * excepciones ni pruebas" names both the exception message and the resulting Argon2id hash
+     * explicitly, so the interpolation violated the very requirement this slice wrote.
+     *
+     * <p>This boundary is the one place where a stored hash exists as a bare {@link String}, outside
+     * {@code StoredPasswordHash} and its redacted {@code toString()}, so it is the one place where
+     * that protection can be bypassed by accident. The segment count is enough to diagnose the two
+     * realistic causes — a truncated column and a value that is not a PHC string at all — without
+     * naming what was in it.
+     */
+    private static String malformed(int segmentCount) {
+        return "not a well-formed $argon2id$ hash: " + segmentCount + " $-separated segments";
     }
 }

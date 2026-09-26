@@ -82,6 +82,31 @@ class Argon2PhcCodecTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    /**
+     * The case the previous test could not reach. {@code "not-a-hash"} carries nothing secret, so a
+     * message that echoed its input passed that assertion while still leaking a real hash in
+     * production. This input is shaped like a stored hash and carries recognizable salt and tag
+     * segments, so the assertion fails if any of them reaches the message.
+     */
+    @Test
+    void decodeNeverPutsTheHashItRejectedIntoTheExceptionMessage() {
+        String recognizableSalt = "c2FsdHNhbHRzYWx0c2FsdA";
+        String recognizableTag = "dGFndGFndGFndGFndGFndGFndGFndGFndGFn";
+        String malformedButHashShaped =
+                "$argon2id$v=19$m=19456,t=3$" + recognizableSalt + "$" + recognizableTag;
+
+        org.assertj.core.api.Assertions
+                .assertThatThrownBy(() -> Argon2PhcCodec.decode(malformedButHashShaped))
+                .isInstanceOf(IllegalArgumentException.class)
+                .extracting(Throwable::getMessage, org.assertj.core.api.InstanceOfAssertFactories.STRING)
+                .as("the delta requires that no exception message expose the resulting Argon2id "
+                        + "hash, and this boundary is where a stored hash exists as a bare String, "
+                        + "outside StoredPasswordHash and its redacted toString()")
+                .doesNotContain(recognizableSalt)
+                .doesNotContain(recognizableTag)
+                .doesNotContain(malformedButHashShaped);
+    }
+
     private static byte[] repeat(byte b, int length) {
         byte[] bytes = new byte[length];
         java.util.Arrays.fill(bytes, b);
