@@ -1119,3 +1119,60 @@ la propiedad de sistema real a través del constructor sin argumentos).
 
 Faltan, de la tarea 4.1: `AuthenticateWithPasswordIT` (el caso de uso completo contra PostgreSQL
 real, con los siete escenarios de retardo). Las tareas 4.2, 4.3 y 4.4 siguen sin empezar.
+
+## Tarea 4.1 (parte 2) — `AuthenticateWithPasswordIT`, cierre de la tarea 4.1
+
+Commit `0917494`. Seis pruebas, cada una construye su propio `AuthenticateWithPassword` con un
+`Clock.fixed` distinto por intento (nunca reutiliza el mismo reloj entre intentos consecutivos),
+siempre a través de `execute(...)` — nunca de `runWithinTransaction` directamente, que es lo que
+distingue esta prueba de la unitaria con dobles de C3a: aquí sí se cruza `TransactionRunner.execute`
+de verdad, con Argon2id real (perfil piso, pimienta de prueba de 32 bytes en cero, declarada no
+secreta) y los tres adaptadores jOOQ/configuración de esta misma tarea.
+
+**ROJO real, observado apartando los dos adaptadores de repositorio y retroceso** (el mismo `mv` que
+ya sirvió para las dos piezas anteriores, aplicado ahora contra este archivo): `./mvnw -B -pl app
+test -Dtest=AuthenticateWithPasswordIT`: **fallo real de compilación**, `cannot find symbol` sobre
+`JooqStaffAccountRepository` y `JooqLoginBackoffStore`, `BUILD FAILURE`. Se restauraron ambos
+archivos.
+
+**VERDE, con un fallo real encontrado ejecutando, no una prueba mal escrita desde el principio.** La
+primera ejecución completa dio **5 pruebas verdes y 1 fallo real**:
+
+```
+Expecting actual:
+  "{"delaySeconds": 1, "consecutiveFailures": 3}"
+to contain:
+  ""delaySeconds":1"
+```
+
+No es un defecto de `AuthenticateWithPassword` (que escribe exactamente
+`{"consecutiveFailures":3,"delaySeconds":1}`, sin espacios y en ese orden): es que la columna
+`after_value` es `jsonb`, y PostgreSQL **reserializa** el texto a su propio orden de claves y
+espaciado al leerlo de vuelta — el texto que el adaptador escribe y el que la lectura devuelve no
+son la misma cadena, aunque representen el mismo documento. La aserción original comparaba una
+subcadena literal, frágil ante exactamente esa reserialización. Se corrigió analizando el JSON con
+`tools.jackson.databind.json.JsonMapper` (ya presente en el árbol,
+`IdempotentExecutorConcurrencyIT`) y afirmando sobre los campos estructurados
+(`delaySeconds`, `consecutiveFailures`), nunca sobre el texto exacto. `./mvnw -B -pl app test
+-Dtest=AuthenticateWithPasswordIT`: **6 pruebas, 0 fallos**, 38.71 s.
+
+Lo que las seis pruebas demuestran, con PostgreSQL real y sin dormir nunca:
+
+1. El retardo se activa en el tercer fallo consecutivo (1 s), con exactamente 4 asientos de
+   auditoría (3 `login.failed` + 1 `backoff_applied`), y el ciclo lleva su duración en `after_value`.
+2. La progresión se limita a 900 s (nunca a los 1024 s que la fórmula sin tope daría en el fallo 13).
+3. El contador expira a los 30 minutos: un fallo a los 31 minutos es ordinal 1, sin retardo.
+4. Un inicio de sesión exitoso limpia el contador: el fallo inmediatamente posterior es ordinal 1.
+5. El retardo y el número de asientos de auditoría son **idénticos** entre una cuenta existente y un
+   identificador inexistente en su tercer fallo (1 s, 4 asientos cada una), y el motivo interno
+   difiere entre sí (`INVALID_PASSWORD` frente a `ACCOUNT_NOT_FOUND`) sin que eso afecte ni el
+   retardo ni el conteo — la propiedad estructural de la decisión 3.
+6. Una contraseña correcta durante el retroceso (contador en tres) autentica con éxito tras un
+   retardo de 2 s —el ejemplo exacto de `design.md` §4— y limpia el contador.
+
+### Tarea 4.1: COMPLETA
+
+Los tres adaptadores, sus tres pruebas de adaptador y `AuthenticateWithPasswordIT` están commiteados
+y verificados en verde por separado. Sigue faltando: 4.2 (atomicidad y concurrencia), 4.3
+(institución, redacción, inventarios de exclusión) y 4.4 (medición de tiempo, notas editoriales,
+cierre).
