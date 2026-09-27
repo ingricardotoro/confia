@@ -1176,3 +1176,53 @@ Los tres adaptadores, sus tres pruebas de adaptador y `AuthenticateWithPasswordI
 y verificados en verde por separado. Sigue faltando: 4.2 (atomicidad y concurrencia), 4.3
 (institución, redacción, inventarios de exclusión) y 4.4 (medición de tiempo, notas editoriales,
 cierre).
+
+## Tarea 4.2 — atomicidad y concurrencia del retroceso
+
+Commit `d8377fa`. Dos clases nuevas, ninguna con cambio de producción — exactamente lo que la propia
+tarea 4.2 anticipa («debería pasar sin cambios de producción, dado que 4.1 ya la entrega»).
+
+### `LoginBackoffAtomicityIT`
+
+Invoca `AuthenticateWithPassword.runWithinTransaction(...)` directamente (visible desde el mismo
+paquete `com.confia.identity.application`, el mismo acceso que ya usa `AuthenticateWithPasswordTest`
+de C3a) dentro de `transactionRunner().execute(...)`, y lanza una `IllegalStateException`
+determinista **después** de que `runWithinTransaction` devuelve pero **antes** de que la lambda
+termine — de modo que la transacción entera revierte, incluidos los efectos que
+`runWithinTransaction` ya escribió dentro de ella. Dos pruebas:
+
+1. **La reversión determinista no deja nada**: cero filas en `identity_login_backoff` (ni siquiera
+   la fila `(0, now)` que el propio reclamo crea) y cero filas en `shared_audit_log` para la huella
+   de ese identificador.
+2. **El control positivo**, siguiendo la misma disciplina que el control negativo de
+   `IdentityRowSecurityIT`: sin lanzar nada, el mismo intento sí confirma exactamente una fila de
+   retroceso y un asiento de auditoría. Sin este control, la prueba 1 pasaría igual si **toda**
+   transacción de este entorno revirtiera siempre, por la razón equivocada.
+
+**Nota honesta sobre la disciplina de ROJO en esta tarea.** No se capturó un ROJO propio para estas
+dos pruebas: la propia tarea 4.2 anticipa que deben pasar **sin cambio de producción**, porque la
+frontera transaccional que demuestran ya la entregó la tarea 4.1 (el cuerpo completo de
+`runWithinTransaction` dentro de una única invocación de `TransactionRunner.execute`). Un ROJO aquí
+solo aparecería si esa frontera estuviera incompleta — que es exactamente lo que estas pruebas
+existen para descartar, no para provocar. `./mvnw -B -pl app test -Dtest=LoginBackoffAtomicityIT`:
+**2 pruebas, 0 fallos**, 45.81 s (dos verificaciones Argon2id reales).
+
+### `LoginBackoffConcurrencyIT`
+
+Dos instancias independientes de `TransactionRunner` (cada una con su propio `PlatformTransactionManager`
+compartido pero su propia conexión, el mismo patrón de `TransactionRunnerRetryIT` e
+`IdempotentExecutorConcurrencyIT`), sincronizadas con un `CyclicBarrier` de dos partes, esperado
+dentro de la lambda de `TransactionRunner.execute(...)` **justo después de abrir la transacción y
+antes de invocar `runWithinTransaction`** — nunca una espera por reloj. Cuenta con un fallo previo
+ya registrado (contador en uno) y dos intentos fallidos concurrentes contra la misma cuenta.
+
+La aserción que de verdad distingue «se serializó correctamente» de «se perdió una escritura»: el
+conjunto `{delayA, delayB}` debe ser exactamente `{0 s, 1 s}` —quien pierde la carrera ve el estado
+previo (ordinal 2, sin retardo) y quien la gana ve el estado ya avanzado por el otro (ordinal 3, 1
+segundo)—; si una escritura se hubiera perdido, ambos verían el mismo ordinal y el mismo retardo. El
+contador final, leído con un tercer `claim()` de solo lectura (la sentencia es idempotente: el
+`SET` de la decisión 5 nunca cambia el valor, así que un `claim()` sin `save()` posterior no
+corrompe el estado), confirma **tres** fallos: el previo más los dos concurrentes, ninguno perdido.
+`./mvnw -B -pl app test -Dtest=LoginBackoffConcurrencyIT`: **1 prueba, 0 fallos**, 1.496 s.
+
+### Tarea 4.2: COMPLETA
