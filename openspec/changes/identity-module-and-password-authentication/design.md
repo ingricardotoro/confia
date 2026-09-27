@@ -1426,11 +1426,24 @@ antes de entregarla.
       dice «`NULL` para actor de sistema»; este cambio lo usa además para «actor no identificado».
       Recomendación: ampliar ese comentario en una pasada documental posterior, no en este cambio, que
       ya lleva dos notas editoriales.
-- [ ] **4. Purga de `identity_login_backoff`.** Las filas de identificadores inexistentes no
-      caducan físicamente: el contador expira a los 30 minutos, pero la fila permanece. No se entrega
-      índice ni trabajo de purga, siguiendo el precedente del cambio 6. Dueño propuesto: el cambio que
-      introduzca trabajo de mantenimiento programado, con `db-scheduler` (ADR-0016). Si el propietario
-      prefiere cerrarlo antes, se escribe como requisito con escenario en el delta.
-- [ ] **5. Estrategia de entrega de la sesión** (sección 12). El pronóstico no cabe en `single-pr`.
-      Requiere que el orquestador actualice a `auto-chain` antes de la fase de tareas, o una excepción
-      de tamaño explícita del propietario.
+- [x] **4. Purga y crecimiento de `identity_login_backoff`. TRASLADADA EL 2026-09-25, y deja de
+      ser una pregunta abierta de este diseño.** Las filas de identificadores inexistentes no caducan
+      físicamente: el contador expira a los 30 minutos, pero la fila permanece. No se entrega índice
+      ni trabajo de purga, siguiendo el precedente del cambio 6 de no enviar un índice sin consumidor.
+
+      El informe de seguridad previo a la fusión del corte C1 señaló que la mitigación que este
+      diseño citaba —«la cota real es el control por IP, que ya tiene dueño»— es una secuencia de
+      trabajo razonable pero **no una mitigación cerrada**, porque ese control no existe en ningún
+      commit fusionado. Y una pregunta abierta de un diseño **no bloquea nada**.
+
+      Por eso se reescribió como **condición dura de aceptación de `session-tokens-and-web-layer`**,
+      en `openspec/changes/foundations-plan/exploration.md`, nota del 2026-09-25: ese cambio no debe
+      fusionar un endpoint de inicio de sesión que escriba en esta tabla sin el control por dirección
+      IP de `docs/03-seguridad.md` §4.4 —o un tope equivalente— existente, probado y operativo. La
+      purga en sí sigue con dueño propuesto en el cambio que introduzca trabajo de mantenimiento
+      programado con `db-scheduler` (ADR-0016), a asignar antes de F1.
+- [x] **5. Estrategia de entrega de la sesión** (sección 12). **RESUELTA POR EL ORQUESTADOR EL
+      2026-09-24:** `auto-chain` con cadena `stacked-to-main`, presupuesto de 800 líneas por pull
+      request (`docs/15-flujo-de-trabajo-git.md` §3). No hizo falta excepción de tamaño: el total de
+      2 445 a 3 985 líneas es del cambio completo, no de un corte. Ver `tasks.md`, sección
+      «Estrategia de entrega».
