@@ -256,7 +256,7 @@ Rama `change/identity-module-and-password-authentication-backoff-and-password`, 
   continuar con la tarea 2.2 — no se implementa el respaldo en silencio. — `design.md` §10 (S2, S6) y
   §11, paso 7
 
-- [ ] 2.2 **ROJO/VERDE — `BackoffPolicy`, el códec `$argon2id$` (sonda S7), y los objetos de valor
+- [x] 2.2 **ROJO/VERDE — `BackoffPolicy`, el códec `$argon2id$` (sonda S7), y los objetos de valor
   restantes.** No requiere Docker (JUnit, AssertJ y jqwik puros, sin contenedor). ROJO: crear
   `.../test/java/com/confia/identity/domain/BackoffPolicyTest.java` con los cuatro escenarios del
   delta (retardo desde el tercer fallo, progresión con tope de 900 s, expiración del contador a los
@@ -272,9 +272,17 @@ Rama `change/identity-module-and-password-authentication-backoff-and-password`, 
   `.../identity/domain/PlainPassword.java` y `StoredPasswordHash.java` (`toString()` redactado,
   `PlainPassword` rechaza cadena vacía y acota a 1024 caracteres, con NFKC aplicado antes de hashear);
   `.../identity/domain/IdentifierFingerprint.java` (huella hexadecimal de 64 caracteres);
-  `.../identity/infrastructure/Argon2PhcCodec.java`, `Argon2Pepper.java` (`toString()` redactado, 32
-  bytes exactos desde `confia.identity.login-institution-id`... variable de entorno propia, falla al
-  construirse si falta o mide otro tamaño) y `BouncyCastleArgon2PasswordHasher.java` sobre
+  > **Corrección del 2026-09-25, reportada por quien aplicó la tarea.** Esta línea decía «32 bytes
+  > exactos desde `confia.identity.login-institution-id`... variable de entorno propia». Es una cita
+  > cruzada equivocada: esa clave es la de `LoginInstitutionProvider` (`design.md` §11, línea 723) y
+  > lleva **un identificador de institución**, no un secreto de 32 bytes. La tarea 4.3 la usa bien,
+  > para `ConfiguredLoginInstitutionProvider`. Gobierna la decisión 6 del diseño: en este corte la
+  > pimienta **llega por constructor**, y `Argon2Pepper` solo valida su tamaño; el cableado real al
+  > gestor de secretos es del cambio 11.
+
+  `.../identity/infrastructure/Argon2PhcCodec.java`, `Argon2Pepper.java` (`toString()` redactado, **32
+  bytes exactos, recibidos por constructor**, falla al construirse si mide otro tamaño) y
+  `BouncyCastleArgon2PasswordHasher.java` sobre
   `org.bouncycastle:bcprov-jdk18on`; `.../identity/infrastructure/HmacLoginIdentifierFingerprinter.java`
   con la subllave `HMAC-SHA-256(pimienta, "confia.identity.login-identifier.v1")`. Ejecutar las tres
   pruebas de la mitad ROJO: verde. Commit convencional (`feat`) sobre `BackoffPolicy` y otro sobre
@@ -284,7 +292,7 @@ Rama `change/identity-module-and-password-authentication-backoff-and-password`, 
   «Ausencia de verificación contra contraseñas comprometidas...» (escenario «El hash almacenado no se
   recalcula», fundamento); `design.md` §11, pasos 8-10
 
-- [ ] 2.3 **ROJO/VERDE — el hash señuelo, y la regla de ArchUnit de ninguna espera (cubre el escenario
+- [x] 2.3 **ROJO/VERDE — el hash señuelo, y la regla de ArchUnit de ninguna espera (cubre el escenario
   «Ninguna clase del módulo de identidad espera»).** No requiere Docker. ROJO: crear
   `.../test/java/com/confia/architecture/NoBlockingWaitInIdentityTest.java` con su fixture permanente
   de rechazo bajo `.../architecture/fixture/identity/` (una clase que invoca `Thread.sleep` dentro de
