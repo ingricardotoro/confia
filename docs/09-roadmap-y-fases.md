@@ -101,6 +101,19 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    un texto enorme no llegue entero al dominio; y el traductor de errores a Problem Details debe
    confirmar, antes de exponer la diferencia entre `institution-not-found` e `institution-inactive`,
    que el identificador sigue viniendo solo del token.
+   **Pendientes heredados del cambio 7 (`identity-module-and-password-authentication`, tres mitades
+   diferidas explícitamente).** Este cambio entrega el módulo `identity`, el esquema de sus dos
+   tablas, el mecanismo de contraseña con Argon2id, la regla de retroceso exponencial por cuenta y
+   el caso de uso completo de autenticación, con sus adaptadores jOOQ reales contra PostgreSQL. Deja
+   tres mitades con dueño nombrado, ninguna de ellas oculta: (a) **MFA con TOTP, recuperación segura
+   de contraseña y cifrado a nivel de columna** son del cambio `mfa-totp-and-password-recovery`, que
+   además edita la cláusula `permits` de `AuthenticationResult` para añadir sus propios desenlaces;
+   (b) **sesiones, tokens, la capa web y quien de verdad materializa `AuthenticationDecision.requiredDelay()`**
+   —la cabecera `Idempotency-Key` obligatoria sobre este endpoint incluida— son de
+   `session-tokens-and-web-layer`; (c) **la dimensión por dirección IP del retroceso exponencial**,
+   con su aprovisionamiento sobre Redis, es del cambio 11 (`containerization-and-cicd-pipeline`). El
+   estado del retroceso **por cuenta** vive en PostgreSQL, no en Redis (docs/03-seguridad.md §4.4,
+   nota editorial del 2026-09-24): la dimensión por IP es la única que sigue apuntando a Redis.
 4. **Matriz de autorización** documentada y verificada por pruebas: qué rol puede hacer qué operación (brecha A7).
 5. Bitácora de auditoría de solo inserción, encadenada por hash, sin permiso de actualización ni borrado para el rol de aplicación (brecha B6).
 6. Infraestructura de idempotencia: marcador con clave primaria natural, espera acotada
