@@ -997,3 +997,65 @@ así se decide.
 
 No se empuja la rama ni se abre pull request: como en los cortes anteriores, es decisión de quien
 gestiona la cadena.
+
+---
+
+# Corte C3b — adaptadores reales, atomicidad y cierre
+
+Rama `change/identity-module-and-password-authentication-adapters`, base el corte C3a (#45).
+
+## Sondas S4 y S3, ejecutadas por el orquestador antes de delegar
+
+**Sin evidencia de ROJO propia:** son sondas de comportamiento de herramienta y de motor, no pruebas
+del delta.
+
+### S4 — ¿jOOQ genera `IdentityStaffAccount` e `IdentityLoginBackoff`?
+
+**PASA.** Los nombres generados bajo `target/generated-sources`, junto a los de las tablas anteriores:
+
+```
+IdentityLoginBackoff.java        IdentityStaffAccount.java
+IdentityLoginBackoffRecord.java  IdentityStaffAccountRecord.java
+OrganizationInstitution.java     SharedAuditChainHead.java
+SharedAuditLog.java              SharedIdempotencyKey.java
+```
+
+Los dos empiezan por `Identity`, como el diseño esperaba, así que los adaptadores pueden nombrarlos
+sin sorpresas.
+
+### S3 — ¿el reclamo del retroceso devuelve los valores previos y toma el bloqueo de fila?
+
+**PASA en sus dos mitades.** Ejecutada contra un `postgres:18-alpine` desechable, fuera del árbol del
+repositorio, con una tabla mínima equivalente a `identity_login_backoff` y una fila sembrada con
+`consecutive_failures = 7` y `last_attempt_at = 2026-01-01`.
+
+**Mitad 1, ¿devuelve los valores previos?** La sentencia
+
+```sql
+insert into backoff (institution_id, identifier_hash, consecutive_failures, last_attempt_at)
+values (..., 1, now())
+on conflict (institution_id, identifier_hash) do update
+  set consecutive_failures = backoff.consecutive_failures
+returning consecutive_failures, last_attempt_at;
+```
+
+devolvió `7 | 2026-01-01 00:00:00+00`, es decir **los valores previos y no los que el `insert`
+proponía**. Eso es lo que permite leer el estado del retroceso y reclamar la fila en **una sola ida y
+vuelta**, sin un `SELECT ... FOR UPDATE` previo.
+
+**Mitad 2, ¿toma bloqueo de fila?** Sesión 1 ejecutó el reclamo dentro de una transacción abierta y se
+quedó en `pg_sleep`. Sesión 2 ejecutó el mismo reclamo con `lock_timeout = 2500ms`:
+
+```
+ERROR:  canceling statement due to lock timeout
+CONTEXT:  while inserting index tuple (0,3) in relation "backoff"
+```
+
+Es `SQLState 55P03`, y el contexto revela el mecanismo exacto: el bloqueo ocurre **al insertar la
+tupla del índice único**, que es como `ON CONFLICT` detecta el conflicto. **Dos reclamos concurrentes
+sobre la misma fila quedan serializados**, que es lo que la prueba de concurrencia del delta necesita
+demostrar y lo que impide perder un fallo de autenticación.
+
+**Consecuencia para la tarea 4.1:** el respaldo que el diseño preveía —un `INSERT ... ON CONFLICT DO
+NOTHING` seguido de `SELECT ... FOR UPDATE`, a costa de una sentencia más— **no hace falta**. La
+sentencia única basta.
