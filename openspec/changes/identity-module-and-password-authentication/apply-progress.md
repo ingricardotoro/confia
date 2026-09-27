@@ -1059,3 +1059,51 @@ demostrar y lo que impide perder un fallo de autenticación.
 **Consecuencia para la tarea 4.1:** el respaldo que el diseño preveía —un `INSERT ... ON CONFLICT DO
 NOTHING` seguido de `SELECT ... FOR UPDATE`, a costa de una sentencia más— **no hace falta**. La
 sentencia única basta.
+
+## Tarea 4.1 (parte 1) — los tres adaptadores jOOQ/configuración, con su ROJO/VERDE
+
+Commiteados pieza por pieza, en verde, siguiendo la instrucción explícita de esta sesión tras un
+atasco del agente anterior (van ocho caídas en la sesión completa; nada sobrevive salvo lo
+commiteado).
+
+### `JooqStaffAccountRepository` — commit `ee207e4`
+
+`findBy(...)` sobre `IDENTITY_STAFF_ACCOUNT`, filtrando por `institution_id` y `email` normalizado.
+La seguridad de fila (decisión 4) es lo que de verdad acota el resultado a una institución; el
+predicado explícito de la consulta es una capa sobre esa política, no un sustituto. `./mvnw -B -pl
+app test -Dtest=JooqStaffAccountRepositoryIT`: **3 pruebas, 0 fallos** (cuenta propia encontrada;
+cero filas para la cuenta de otra institución, por la política de fila, no por el predicado; cero
+filas para un identificador no registrado).
+
+### `JooqLoginBackoffStore` — commit `e0f4673`
+
+`claim(...)` es exactamente la sentencia única de la decisión 5 —`INSERT ... ON CONFLICT
+(institution_id, identifier_hash) DO UPDATE SET consecutive_failures =
+identity_login_backoff.consecutive_failures RETURNING consecutive_failures, last_attempt_at`—, sin
+el respaldo de `SELECT ... FOR UPDATE` que S3 ya descartó. `save(...)` es la actualización simple de
+cierre. `./mvnw -B -pl app test -Dtest=JooqLoginBackoffStoreIT`: **3 pruebas, 0 fallos**,
+confirmando en código lo que S3 ya había confirmado por sonda: el reclamo crea la fila cuando no
+existe, y devuelve el estado **previo**, nunca los valores que la propia sentencia propone.
+
+### `ConfiguredLoginInstitutionProvider` — commit `6796489`
+
+Lee `confia.identity.login-institution-id` de una propiedad de sistema de la JVM (precedente:
+`com.confia.bootstrap.AppProfile` lee `APP_PROFILE` de una variable de entorno; aquí es una
+propiedad de sistema, no una variable de entorno, porque design.md decisión 11 fija la clave en
+forma de propiedad con puntos y guiones, no en mayúsculas con guion bajo). Falla en el constructor,
+nunca en el primer uso, si el valor falta, está en blanco o no es un UUID válido.
+
+**ROJO real, observado apartando la clase de producción, no fingido.** Se movió
+`ConfiguredLoginInstitutionProvider.java` fuera del árbol de compilación (`mv` a un directorio
+temporal fuera del repositorio) y se ejecutó `./mvnw -B -pl app test
+-Dtest=ConfiguredLoginInstitutionProviderTest`: **fallo real de compilación**, ocho errores `cannot
+find symbol` sobre la clase y la variable `ConfiguredLoginInstitutionProvider`, `BUILD FAILURE`. Se
+restauró el archivo y se repitió: `./mvnw -B -pl app test
+-Dtest=ConfiguredLoginInstitutionProviderTest`: **6 pruebas, 0 fallos** (resuelve el UUID
+configurado, tolera espacios en los extremos, falla ante valor ausente/en blanco/no UUID, y lee de
+la propiedad de sistema real a través del constructor sin argumentos).
+
+### Estado
+
+Faltan, de la tarea 4.1: `AuthenticateWithPasswordIT` (el caso de uso completo contra PostgreSQL
+real, con los siete escenarios de retardo). Las tareas 4.2, 4.3 y 4.4 siguen sin empezar.
