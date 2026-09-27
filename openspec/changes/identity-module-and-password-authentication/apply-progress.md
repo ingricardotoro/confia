@@ -1226,3 +1226,88 @@ corrompe el estado), confirma **tres** fallos: el previo más los dos concurrent
 `./mvnw -B -pl app test -Dtest=LoginBackoffConcurrencyIT`: **1 prueba, 0 fallos**, 1.496 s.
 
 ### Tarea 4.2: COMPLETA
+
+## Tarea 4.3 — institución del proceso, ausencia de secretos observables, inventarios de exclusión
+
+### `LoginInstitutionIT` — commit `7481ecc`
+
+Usa el adaptador real `ConfiguredLoginInstitutionProvider` (nunca una lambda de prueba, a
+diferencia de `AuthenticateWithPasswordIT`, cuyo foco es el retroceso). Tres pruebas: dos
+instituciones con el mismo correo resuelven cada una su propia cuenta y nunca la ajena, ni siquiera
+con la contraseña de la otra institución; el proveedor siempre resuelve el id configurado por el
+proceso —y `AuthenticationCommand` no tiene ningún campo de institución en absoluto, así que «una
+solicitud que declare una institución distinta en su cuerpo» es estructuralmente imposible de
+construir, la forma más fuerte que design.md decisión 11 puede tomar—; y la guarda de cierre falla
+con `IllegalStateException` ante un contexto ajeno, nunca `Rejected`. `./mvnw -B -pl app test
+-Dtest=LoginInstitutionIT`: **3 pruebas, 0 fallos**, 41.88 s.
+
+### `IdentitySecretRedactionIT` — commit `eac44d8`
+
+Intento real con la contraseña literal `Segura#2026` del escenario del delta. Recoge
+`AuthenticationDecision`/`AuthenticationResult` (`toString()`), el mensaje de una excepción forzada
+(la guarda de cierre ante institución ajena), el `toString()` de `PlainPassword`, `StoredPasswordHash`
+y `Argon2Pepper`, el hash señuelo, y las filas escritas en `shared_audit_log` — y afirma que ninguno
+contiene la contraseña, el hash calculado ni la pimienta.
+
+**Decisión de diseño de la propia prueba, siguiendo la instrucción literal de la tarea.** Un
+`assertThat(textoRecogido).doesNotContain(secreto)` ingenuo, si fallara, imprimiría el mensaje de
+fallo por omisión de AssertJ —«Expecting actual: `<todo el texto recogido>` not to contain:
+`<el secreto>`»—, que pondría el secreto exacto que esta prueba existe para mantener fuera
+**dentro del propio reporte de la prueba**. `assertSecretNeverLeaked(...)` compara con
+`String.contains` y, si encuentra el secreto, falla con un mensaje que nombra solo la descripción y
+la longitud del secreto, nunca su valor ni el texto donde apareció.
+
+**Control negativo, ejecutado y revertido antes de este commit.** Se quitó temporalmente la
+redacción de `PlainPassword.toString()` (`"PlainPassword[" + value + "]"` en vez de
+`"PlainPassword[REDACTED]"`) y se ejecutó de nuevo: **falló**, con exactamente el mensaje seguro
+esperado (`produced text unexpectedly contains the clear-text password (11 characters); the value
+itself is deliberately withheld from this failure message`), sin el valor real en la salida. Se
+restauró el archivo (`cp` desde una copia de respaldo) y `git status --short` confirmó cero
+diferencias contra lo commiteado. `./mvnw -B -pl app test -Dtest=IdentitySecretRedactionIT`: **1
+prueba, 0 fallos**, 33.06 s (con la redacción real restaurada).
+
+### `IdentityScopeExclusionInventoryTest` — commit `5ea3703`
+
+**Sin Docker**, corrigiendo un primer diseño que sí lo necesitaba. La primera versión invocaba
+`AuthenticateWithPassword.runWithinTransaction(...)` directamente con dobles de prueba (el mismo
+patrón de `AuthenticateWithPasswordTest`), pero esa clase vive en el paquete
+`com.confia.identity.application` y este archivo, por instrucción explícita de la tarea, vive en
+`com.confia.identity` — un paquete **distinto** en Java, así que `runWithinTransaction` (alcance de
+paquete) no es accesible desde aquí. `./mvnw -B -pl app test
+-Dtest=IdentityScopeExclusionInventoryTest` con ese primer diseño: **fallo real de compilación**,
+`is not public in ... AuthenticateWithPassword; cannot be accessed from outside package`. Se
+rediseñó la primera prueba para usar `BackoffPolicy` directamente —dominio puro, sin I/O—: diez
+intentos simulados «desde la misma IP», repartidos por turno entre cinco cuentas, afirmando que el
+ordinal de cada cuenta depende solo de sus propios fallos previos, nunca de los otros nueve intentos
+contra las otras cuatro cuentas. Sin este rediseño no habría manera de escribir esta prueba sin
+Docker y sin violar el encapsulamiento de paquete.
+
+**Discrepancia encontrada y corregida en la propia prueba, antes de commitear.** Una primera versión
+adicional comprobaba, por reflexión, que ningún parámetro de los cinco puertos de aplicación llevara
+«ip» en su nombre (`Parameter.getName()`). Se descubrió que el POM **no declara la bandera del
+compilador `-parameters`**, así que en tiempo de ejecución esos nombres son sintéticos (`arg0`,
+`arg1`...), no los nombres reales del código fuente — la aserción habría pasado siempre,
+detectara o no un parámetro real de IP, exactamente el tipo de prueba «verde por la razón
+equivocada» que este repositorio ya pagó varias veces. Se eliminó esa comprobación en vez de
+dejarla como ceremonia sin poder de discriminación real; el componente de registro de
+`AuthenticationCommand` sí es fiable sin esa bandera (los nombres de componente de un `record` viven
+en el atributo `Record` del propio `.class`, no en la reflexión de parámetros de método), y esa
+comprobación se conservó.
+
+Cinco pruebas: ausencia de dimensión IP (con la corrección de arriba), ninguna dependencia de
+biblioteca cliente de red (`java.net.http`, `okhttp3`, Apache HttpComponents — ninguna verificación
+contra contraseñas comprometidas), los parámetros de Argon2id son el piso declarado y no una fábrica
+calibrada, ninguna prueba de Playwright existe todavía (recorriendo `apps/` de verdad, con la misma
+disciplina de `findAncestorContaining` que `SuppressionCitesAdrTest` ya usa), y ninguna clase de
+`com.confia.identity..` depende de `slf4j`, `java.util.logging` ni Commons Logging. `./mvnw -B -pl
+app test -Dtest=IdentityScopeExclusionInventoryTest`: **5 pruebas, 0 fallos**, 10.99 s — sin
+contenedor, como exige la tarea.
+
+**Sin control negativo para las dos comprobaciones de ArchUnit** (red y registro): a diferencia de
+`IdentitySecretRedactionIT`, no se introdujo temporalmente una dependencia real de `slf4j` o de un
+cliente HTTP para confirmar que la regla la habría rechazado. Se declara la limitación en vez de
+omitirla: las dos reglas siguen el mismo patrón ya probado en `AuditScopeExclusionInventoryTest`
+(que tampoco lleva control negativo propio), pero no hay evidencia ejecutada de que rechacen una
+violación real en este módulo.
+
+### Tarea 4.3: COMPLETA

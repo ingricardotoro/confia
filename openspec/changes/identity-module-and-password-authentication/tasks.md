@@ -419,7 +419,7 @@ Rama `change/identity-module-and-password-authentication-adapters`, base PR C3a.
   de auditoría se confirman o revierten juntos» y «Dos intentos fallidos concurrentes... no pierden
   ninguna escritura»); `design.md` §11, paso 17; decisión 9 completa
 
-- [ ] 4.3 **ROJO/VERDE — institución del proceso, ausencia de secretos observables, y los inventarios
+- [x] 4.3 **ROJO/VERDE — institución del proceso, ausencia de secretos observables, y los inventarios
   de exclusión con destino nombrado.** Requiere Docker para `LoginInstitutionIT` y
   `LoginTimingReportIT`; no lo requiere para `IdentityScopeExclusionInventoryTest` (inventario estático
   sobre el árbol de clases y el texto de las migraciones). ROJO: crear
