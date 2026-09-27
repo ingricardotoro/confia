@@ -1085,6 +1085,18 @@ cierre. `./mvnw -B -pl app test -Dtest=JooqLoginBackoffStoreIT`: **3 pruebas, 0 
 confirmando en código lo que S3 ya había confirmado por sonda: el reclamo crea la fila cuando no
 existe, y devuelve el estado **previo**, nunca los valores que la propia sentencia propone.
 
+**Corrección honesta, hecha después de commitear ambas piezas.** La primera ejecución de
+`JooqStaffAccountRepositoryIT` y `JooqLoginBackoffStoreIT` se hizo ya con las dos clases de
+producción en el árbol (verde directo), sin capturar su ROJO real por separado — un hueco de
+disciplina frente a lo que esta misma lista exige. Se corrigió apartando `mv` de
+`JooqStaffAccountRepository.java` y `JooqLoginBackoffStore.java` a un directorio fuera del
+repositorio y ejecutando `./mvnw -B -pl app test
+-Dtest=JooqStaffAccountRepositoryIT,JooqLoginBackoffStoreIT`: **fallo real de compilación**, cuatro
+errores `cannot find symbol` sobre las dos clases, `BUILD FAILURE`. Se restauraron ambos archivos
+con `mv` y `git status --short` confirmó el árbol sin diferencias (ya estaban commiteados
+exactamente así). El verde ya registrado arriba sigue siendo válido sin re-ejecutar: ningún archivo
+cambió entre una ejecución y la otra.
+
 ### `ConfiguredLoginInstitutionProvider` — commit `6796489`
 
 Lee `confia.identity.login-institution-id` de una propiedad de sistema de la JVM (precedente:
