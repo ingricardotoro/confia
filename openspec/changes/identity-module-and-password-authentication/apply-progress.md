@@ -1311,3 +1311,127 @@ omitirla: las dos reglas siguen el mismo patrón ya probado en `AuditScopeExclus
 violación real en este módulo.
 
 ### Tarea 4.3: COMPLETA
+
+## Tarea 4.4 — medición de tiempo, notas editoriales, cierre de `docs/09`, verificación final
+
+**Sin evidencia de ROJO propia**, como la propia tarea anticipa: son notas editoriales y una
+medición, no comportamiento nuevo.
+
+### `LoginTimingReportIT` — commit `f9a6642`
+
+25 intentos reales contra la cuenta `carlos.ramirez@colegio.edu.hn` y 25 contra
+`nadie.registrado@colegio.edu.hn`, con Argon2id real (perfil piso) y el caso de uso completo contra
+PostgreSQL real. **Medido y reportado, nunca convertido en puerta** (design.md, decisión 7; §7.2):
+
+```
+LoginTimingReportIT (informational, never a gate): median existing-account attempt = 170.55 ms,
+median nonexistent-identifier attempt = 176.06 ms, difference = 5.51 ms, n = 25 each
+```
+
+5.51 ms de diferencia entre medianas, muy por debajo de los 50 ms que `docs/03-seguridad.md` §4.6
+cita como umbral de la puerta real —que es de `session-tokens-and-web-layer`, sobre respuestas
+HTTP, no de este cambio—. `./mvnw -B -pl app test -Dtest=LoginTimingReportIT`: **1 prueba, 0
+fallos**, 37.76 s.
+
+### Notas editoriales de `docs/03-seguridad.md` — commit `3a2df58`
+
+Las tres, fechadas 2026-09-24, con la redacción exacta de `design.md` §15, sin reescribir el cuerpo
+de ninguna sección:
+
+- **Ajuste 3, en §4.4**: el estado del retroceso por cuenta vive en PostgreSQL, no en Redis; el
+  retardo se calcula y se exige dentro de la transacción y se materializa en el borde; no es un
+  limitador de tasa.
+- **Ajuste 4, en §6.1**: `identity_staff_account` es la tabla que esa sección llama `user`;
+  `identity_login_backoff` recibe el mismo trato, sin privilegio para `confia_portal_app`.
+- **Ajuste 5, en §4.1, autorizado por el propietario el 2026-09-24**: Argon2id sin Spring Security,
+  sobre Bouncy Castle directo, porque la cadena de filtros es de `session-tokens-and-web-layer`; la
+  pimienta de 32 bytes aplicada como `secret` sí se cumple.
+
+### `docs/09-roadmap-y-fases.md` — commit `429348d`
+
+Nota en el entregable 3 (F0), nombrando las tres mitades diferidas de este cambio:
+`mfa-totp-and-password-recovery` (MFA, recuperación de contraseña, cifrado de columna),
+`session-tokens-and-web-layer` (sesiones, capa web, quien materializa `requiredDelay`, la cabecera
+`Idempotency-Key` sobre este endpoint) y el cambio 11 (la dimensión por IP del retroceso, sobre
+Redis).
+
+### `apps/api/README.md` — commit `c4470b6`
+
+Medición final de la suite `*IT.java` completa del cambio, registrada abajo y en el README con el
+mismo formato que las mediciones anteriores.
+
+### Verificación final del cambio completo
+
+Limpieza manual de `app/target/{site,classes,test-classes}` y de los dos `jacoco-{ut,it}.exec`
+(bloqueo de OneDrive sobre `clean`, ya documentado), y `./mvnw -B verify` sin `clean`:
+
+```
+[INFO] All coverage checks have been met.
+[INFO] CONFIA API Parent .................................. SUCCESS [  2.481 s]
+[INFO] CONFIA Kernel ...................................... SUCCESS [ 15.144 s]
+[INFO] CONFIA API ......................................... SUCCESS [04:06 min]
+[INFO] BUILD SUCCESS
+[INFO] Total time:  04:25 min
+```
+
+**177** pruebas unitarias de `kernel`, **267** pruebas unitarias de `app` (frente a las 256 de PR
+C3a: +11, exactamente `ConfiguredLoginInstitutionProviderTest` (6) e
+`IdentityScopeExclusionInventoryTest` (5), ninguna de las cuales toca PostgreSQL), **115** pruebas de
+integración de `app` (`*IT.java`, frente a las 95 de PR C3a: +20, exactamente la suma de cada clase
+`*IT` nueva de este corte: 3+3+6+2+1+3+1+1), **0 fallos** en las tres. Muy por debajo del presupuesto
+de 8 minutos (4:25 min, bajo el 55 %), incluso siendo el primer corte cuya suite de integración paga
+decenas de verificaciones Argon2id reales por ejecución.
+
+### Trazabilidad de los 23 escenarios de `identity` y los 8 de `build-integrity`
+
+Confirmados según esta lista (no según la tabla envejecida de `design.md` §7.1, ya corregida por el
+orquestador el 2026-09-24 a 31 escenarios): cada tarea de este corte (4.1 a 4.4) cita en su propio
+texto los requisitos y escenarios exactos que cierra, y las pruebas de este corte —`AuthenticateWithPasswordIT`,
+`LoginBackoffAtomicityIT`, `LoginBackoffConcurrencyIT`, `LoginInstitutionIT`,
+`IdentitySecretRedactionIT`, `IdentityScopeExclusionInventoryTest` y `LoginTimingReportIT`— cubren
+los escenarios de `identity` que dependían de PostgreSQL real y del caso de uso completo, que las
+pruebas unitarias con dobles de PR C3a no podían demostrar. Los 8 de `build-integrity` ya quedaron
+cerrados en PR C1 (design.md §7.1, tabla ya corregida).
+
+### Diff real de PR C3b, y los puntos de corte candidatos medidos y verificados
+
+`git diff --numstat change/identity-module-and-password-authentication-use-case...HEAD -- .
+':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`:
+
+**1 692 líneas de cambio efectivo (1 692 adiciones, 0 borrados), en 16 archivos.**
+
+Supera el presupuesto de 800 líneas por pull request que la propia estrategia de entrega de
+`tasks.md` fija para este repositorio. Siguiendo la regla operativa ya aplicada en PR C1, PR C2 y PR
+C3a («si supera 800 líneas, detener la aplicación y reportar los puntos de corte candidatos medidos,
+verificando cada mitad con `./mvnw -B verify` antes de proponerla»): **se detiene aquí la aplicación,
+sin empujar la rama ni abrir pull request.**
+
+**A diferencia de PR C2 y PR C3a, esta vez los puntos de corte candidatos coinciden exactamente con
+límites de commit ya existentes: no hace falta ninguna cirugía de historial (`cherry-pick` ni árbol
+de ramas nuevo).** Los commits de este corte ya siguen, sin planearlo por eso, el límite de cada una
+de las cuatro tareas:
+
+| Grupo candidato | Tarea | Commits (rango) | Contenido | Líneas | `./mvnw -B verify` aislado |
+|---|---|---|---|---|---|
+| **C3b-1** | 4.1 | `ee207e4`..`0917494` | Los tres adaptadores jOOQ/configuración, sus tres pruebas de adaptador, y `AuthenticateWithPasswordIT` | **717** | **Verde**, verificado dejando la rama en `0917494`: `BUILD SUCCESS`, 3:31 min, cobertura cumplida |
+| **C3b-2** | 4.2 + 4.3 | `d8377fa`..`5ea3703` | Atomicidad, concurrencia, institución del proceso, redacción de secretos, inventarios de exclusión | **786** | **Verde**, verificado dejando la rama en `5ea3703` (acumulado sobre C3b-1): `BUILD SUCCESS`, 3:59 min, cobertura cumplida |
+| **C3b-3** | 4.4 | `f9a6642`..`c4470b6` | Medición de tiempo, tres notas editoriales, `docs/09`, medición del README | **189** | Ya verificado como parte del `./mvnw -B verify` final de arriba (HEAD) |
+
+**717 + 786 + 189 = 1 692.** Las tres mitades quedan por debajo de 800 líneas cada una. Si se
+prefiere una cadena de cuatro en vez de tres (separando 4.2 de 4.3, cada una con su propio pull
+request), los cuatro grupos —717, 278, 508 y 189— también quedan cada uno muy por debajo de 800; se
+deja la partición en tres por defecto porque ya es la mínima que cumple el presupuesto sin fragmentar
+de más, pero ambas particiones son válidas y ninguna requiere reordenar commits.
+
+**No se empuja la rama ni se abre pull request**: como en los tres cortes anteriores de este mismo
+cambio, es decisión de quien gestiona la cadena de pull requests, no de quien aplica las tareas de
+TDD.
+
+### Cambio `identity-module-and-password-authentication`: PR C3b COMPLETO
+
+Las cuatro tareas de este corte (4.1, 4.2, 4.3, 4.4) están commiteadas, documentadas y verificadas en
+verde, pieza por pieza, según la disciplina de commit-por-verde que esta sesión exigió tras el
+atasco del agente anterior. El cambio completo (`identity-module-and-password-authentication`,
+cambio 7 de F0) queda con sus cuatro cortes (C1, C2, C3a, C3b) aplicados; la fusión a `main` de cada
+uno y la partición final de PR C3b en pull requests reales siguen siendo decisión del orquestador o
+de quien gestiona la cadena.
