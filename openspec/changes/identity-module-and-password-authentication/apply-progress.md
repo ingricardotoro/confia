@@ -1,7 +1,8 @@
 # Progreso de aplicación: `identity-module-and-password-authentication`
 
-- **Corte en curso:** PR C1 — tareas 1.1, 1.2 y 1.3 completas (las tres de PR C1). Pendiente de
-  revisión y de que el orquestador empuje la rama y abra el pull request; esta sesión no lo hace.
+- **Cortes cerrados:** PR C1, entregado en dos pull requests (#38 y #39, fusionados en `main` el
+  2026-09-25 tras medir 906 líneas y partirlo).
+- **Corte en curso:** PR C2.
 - **Entorno:** JDK 25 (Temurin 25.0.3+9), Maven 3.9.16, Docker disponible.
   `JAVA_HOME` del sistema apunta al **JDK 21**, así que toda invocación de Maven se hace exportando
   `JAVA_HOME` al JDK 25 en la propia orden. `MAVEN_OPTS="-Djavax.net.ssl.trustStoreType=Windows-ROOT"`
@@ -301,3 +302,100 @@ pasando**: comprueba privilegios, no la política, y neutralizar la política no
 privilegio. Eso no es un hueco, es la separación correcta entre las dos garantías.
 
 La migración se restauró con `git checkout` y se verificó que la política volvió a su forma original.
+
+---
+
+# Corte C2 — contraseña, señuelo y regla del retroceso
+
+Rama `change/identity-module-and-password-authentication-backoff-and-password`, base `main` con C1
+ya fusionado.
+
+## Tarea 2.1 — Sonda S2
+
+Ejecutada por el orquestador antes de delegar. **Sin evidencia de ROJO propia:** es una sonda de
+comportamiento de biblioteca, no una prueba del delta.
+
+**Pregunta:** ¿expone `Argon2PasswordEncoder` de `spring-security-crypto` un parámetro de secreto, y
+lo expone `Argon2Parameters.Builder` de Bouncy Castle con `withSecret(...)`?
+
+**Versiones inspeccionadas**, porque el proyecto no declara ninguna de las dos y no hay propiedad
+gestionada que resolver —`help:evaluate` sobre `spring-security.version` y `bouncycastle.version`
+devuelve «null object or invalid expression»—: `spring-security-crypto` **7.0.0** (la línea que
+acompaña a Spring Boot 4.1) y `bcprov-jdk18on` **1.81**.
+
+### Resultado: PASA. Se confirma lo que la propuesta anotaba, y con un argumento más fuerte
+
+`javap` sobre `org.springframework.security.crypto.argon2.Argon2PasswordEncoder`:
+
+```
+public Argon2PasswordEncoder(int, int, int, int, int);
+public static Argon2PasswordEncoder defaultsForSpringSecurity_v5_2();
+public static Argon2PasswordEncoder defaultsForSpringSecurity_v5_8();
+```
+
+Un único constructor de cinco enteros —longitud de sal, longitud de hash, paralelismo, memoria e
+iteraciones— y **ningún parámetro de secreto**, ni constructor alternativo, ni método de ajuste.
+
+`javap` sobre `org.bouncycastle.crypto.params.Argon2Parameters$Builder`:
+
+```
+public Builder withSecret(byte[]);
+public Builder withAdditional(byte[]);
+public Builder withSalt(byte[]);
+public Builder withMemoryAsKB(int);
+public Builder withIterations(int);
+public Builder withParallelism(int);
+```
+
+**`withSecret(byte[])` existe**, que es exactamente lo que `docs/03-seguridad.md` §4.1 exige para
+aplicar la pimienta como `secret` de Argon2id.
+
+### Hallazgo adicional, que refuerza la decisión 6 más de lo que el diseño argumentaba
+
+El diseño daba como segunda razón que «añadir `spring-security-crypto` no ahorra la dependencia
+criptográfica, porque su propio soporte de Argon2 se apoya en Bouncy Castle», y lo daba **sin
+verificar**. Verificado ahora, y es más contundente:
+
+- `javap -c` sobre `Argon2PasswordEncoder` muestra que compila contra
+  `org/bouncycastle/crypto/generators/Argon2BytesGenerator`,
+  `org/bouncycastle/crypto/params/Argon2Parameters` y `Argon2Parameters$Builder` — **las mismas tres
+  clases que usaríamos directamente**.
+- Su POM **no declara Bouncy Castle** en absoluto, así que es una dependencia opcional: quien quiera
+  usar el codificador de Spring **tiene que añadir `bcprov` por su cuenta de todos modos**.
+
+Es decir, la ruta por Spring **cuesta estrictamente más** —dos artefactos en vez de uno— **y entrega
+estrictamente menos**: sigue sin poder aplicar la pimienta como `secret`. La decisión 6 se mantiene,
+y la nota editorial sobre §4.1 que el propietario autorizó el 2026-09-24 no necesita reescribirse.
+
+## Tarea 2.2 — Sonda S6, ejecutada por el orquestador tras declarar Bouncy Castle
+
+El agente de implementación alcanzó a declarar la dependencia en los dos POM y cayó por un fallo de
+red antes de ejecutar la sonda. El orquestador la ejecutó y corrigió una palabra en español que se
+había colado en un comentario técnico de `apps/api/pom.xml`, que va en inglés.
+
+**Comando, y la corrección que el corte C1 ya había dejado aprendida.** La tarea pedía
+`./mvnw -B -pl app enforcer:enforce`, que **no ejecuta las reglas reales**: invocar el objetivo desde
+la línea de órdenes usa la ejecución `default-cli`, que no hereda la configuración de
+`enforce-build-integrity` ligada a la fase `validate`. El comando correcto es `./mvnw -B -pl app
+validate`.
+
+### Resultado: PASA
+
+```
+[INFO] --- enforcer:3.6.3:enforce (enforce-build-integrity) @ confia-api ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] Rule 1: org.apache.maven.enforcer.rules.dependency.DependencyConvergence passed
+[INFO] Rule 2: org.apache.maven.enforcer.rules.dependency.BannedDependencies passed
+[INFO] BUILD SUCCESS
+```
+
+**Comprobación adicional, por el precedente de S1b.** En C1 se descubrió que `spring-modulith-core`
+habría arrastrado ArchUnit al camino de producción, así que aquí se verificó lo mismo para Bouncy
+Castle con `./mvnw -B -pl app dependency:tree -Dincludes=org.bouncycastle`:
+
+```
+\- org.bouncycastle:bcprov-jdk18on:jar:1.81:compile
+```
+
+**Sin ninguna dependencia transitiva** —ninguna línea indentada bajo la suya—, así que declararla en
+alcance de compilación añade exactamente un artefacto y nada más.

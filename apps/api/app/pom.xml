@@ -107,6 +107,19 @@
       <artifactId>jqwik</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Argon2id over Bouncy Castle directly (design.md decision 6; sonda S2,
+         apply-progress.md task 2.1): spring-security-crypto's Argon2PasswordEncoder has a single
+         five-int constructor and no secret parameter, confirmed with javap, while
+         org.bouncycastle.crypto.params.Argon2Parameters$Builder exposes withSecret(byte[]), which
+         docs/03-seguridad.md §4.1 requires to apply the pepper. Compile scope: consumed by
+         production classes under com.confia.identity.infrastructure
+         (BouncyCastleArgon2PasswordHasher, Argon2PhcCodec). Version managed in the parent's
+         dependencyManagement (apps/api/pom.xml). Not in maven-enforcer-plugin's banned-dependency
+         list (apps/api/pom.xml bannedDependencies). -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+    </dependency>
     <!-- @NamedInterface (ADR-0022; design.md decision 12) is org.springframework.modulith.
          NamedInterface, which lives in spring-modulith-api, NOT in spring-modulith-core (S1b probe,
          apply-progress.md): a same-simple-name org.springframework.modulith.core.NamedInterface
