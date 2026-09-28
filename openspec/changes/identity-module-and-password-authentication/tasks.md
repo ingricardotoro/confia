@@ -402,7 +402,7 @@ Rama `change/identity-module-and-password-authentication-adapters`, base PR C3a.
   un identificador sin cuenta», ver la nota de discrepancia arriba); `design.md` §10 (S3, S4) y §11,
   paso 16
 
-- [ ] 4.2 **ROJO/VERDE — atomicidad y concurrencia del retroceso.** Requiere Docker. ROJO: crear
+- [x] 4.2 **ROJO/VERDE — atomicidad y concurrencia del retroceso.** Requiere Docker. ROJO: crear
   `.../test/java/com/confia/identity/application/LoginBackoffAtomicityIT.java` sobre
   `CommittingPostgresIntegrationTest` (una transacción que falla de forma determinista antes de
   confirmar no deja avanzar el contador ni un asiento nuevo) y
@@ -419,7 +419,7 @@ Rama `change/identity-module-and-password-authentication-adapters`, base PR C3a.
   de auditoría se confirman o revierten juntos» y «Dos intentos fallidos concurrentes... no pierden
   ninguna escritura»); `design.md` §11, paso 17; decisión 9 completa
 
-- [ ] 4.3 **ROJO/VERDE — institución del proceso, ausencia de secretos observables, y los inventarios
+- [x] 4.3 **ROJO/VERDE — institución del proceso, ausencia de secretos observables, y los inventarios
   de exclusión con destino nombrado.** Requiere Docker para `LoginInstitutionIT` y
   `LoginTimingReportIT`; no lo requiere para `IdentityScopeExclusionInventoryTest` (inventario estático
   sobre el árbol de clases y el texto de las migraciones). ROJO: crear
