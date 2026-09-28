@@ -241,7 +241,13 @@ antes de B2a en el cambio 5B.
 
 Rama `change/identity-module-and-password-authentication-backoff-and-password`, base PR C1.
 
-- [ ] 2.1 **Sondas S2, S6 y S7 (bloqueantes de C2, `design.md` §10).** No requiere Docker (lectura de
+> **Casilla marcada al archivar (2026-09-27).** El trabajo estaba hecho y registrado en
+> `apply-progress.md` —S2 con `javap` sobre `spring-security-crypto` 7.0.0 y `bcprov-jdk18on` 1.81,
+> S6 con `./mvnw -B -pl app validate`, y S7 absorbida por la propia tarea 2.2 porque el vector de
+> RFC 9106 §5.3 **es** `Argon2PhcCodecTest`—, pero la casilla quedó sin marcar. El olvido fue del
+> orquestador, que ejecutó las sondas; no hay trabajo pendiente detrás.
+
+- [x] 2.1 **Sondas S2, S6 y S7 (bloqueantes de C2, `design.md` §10).** No requiere Docker (lectura de
   jars y `enforcer:enforce`, sin PostgreSQL). **S2**: descargar `spring-security-crypto` y
   `bcprov-jdk18on` al repositorio local y ejecutar `javap -classpath <jar>
   org.springframework.security.crypto.argon2.Argon2PasswordEncoder` y `javap -classpath <jar>
