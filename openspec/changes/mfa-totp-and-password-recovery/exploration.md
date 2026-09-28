@@ -83,6 +83,18 @@ del roadmap el cambio 8 **depende de este**, no al revés. Es decir: **este camb
 su propio dueño formal todavía no ha creado.**
 
 Ni la exploración original, ni la propuesta, ni el informe de archivado de la parte 1 lo detectaron.
+Hay tres caminos honestos, y las tres opciones **se usan** en este cambio, así que ninguna es el
+trabajo «preparado para» que el propietario ya rechazó cuatro veces:
+
+- **(a)** Este cambio añade una columna mínima explícita —por ejemplo `mfa_required BOOLEAN NOT NULL`
+  en `identity_staff_account`, decidida por quien crea la cuenta— sin modelar rol ni permiso, y
+  declara como brecha nombrada que la derivación real desde el permiso del rol es del cambio 8.
+- **(b)** La exigencia de MFA es función únicamente de si la cuenta **ya tiene** un secreto TOTP
+  inscrito, sin distinguir por rol, y los dos escenarios publicados se reescriben para que dejen de
+  mencionar `cashier` y `administrator` como disparadores.
+- **(c)** Este cambio no toca la obligatoriedad en absoluto: entrega el mecanismo de inscripción y
+  verificación, y el escenario completo queda como brecha hasta el cambio 8.
+
 > **RESUELTA POR EL PROPIETARIO EL 2026-09-27: opción (a).** Este cambio añade la columna mínima, y
 > **el argumento decisivo fue de secuencia, no de modelado.** El cambio 3 —el que emite tokens— llega
 > **antes** del cambio 8. Con (c), entre uno y otro habría una ventana en la que el sistema emite
@@ -103,18 +115,6 @@ Ni la exploración original, ni la propuesta, ni el informe de archivado de la p
 > eliminar la doble fuente. Se escribe como obligación del cambio 8, y no como «pregunta abierta»,
 > por la misma razón que la condición de aceptación del crecimiento de `identity_login_backoff`: una
 > pregunta abierta no obliga a nadie.
-
-Hay tres caminos honestos, y las tres opciones **se usan** en este cambio, así que ninguna es el
-trabajo «preparado para» que el propietario ya rechazó cuatro veces:
-
-- **(a)** Este cambio añade una columna mínima explícita —por ejemplo `mfa_required BOOLEAN NOT NULL`
-  en `identity_staff_account`, decidida por quien crea la cuenta— sin modelar rol ni permiso, y
-  declara como brecha nombrada que la derivación real desde el permiso del rol es del cambio 8.
-- **(b)** La exigencia de MFA es función únicamente de si la cuenta **ya tiene** un secreto TOTP
-  inscrito, sin distinguir por rol, y los dos escenarios publicados se reescriben para que dejen de
-  mencionar `cashier` y `administrator` como disparadores.
-- **(c)** Este cambio no toca la obligatoriedad en absoluto: entrega el mecanismo de inscripción y
-  verificación, y el escenario completo queda como brecha hasta el cambio 8.
 
 ### 1.5 Qué se reutiliza del módulo existente
 
