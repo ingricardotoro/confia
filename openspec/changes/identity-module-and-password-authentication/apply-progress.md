@@ -747,3 +747,253 @@ GitHub antes de subir la versión, y queda constancia de quién comprobó qué.
 el cableado de Spring lo instanciara **por solicitud** en vez de como singleton, cada instanciación
 pagaría ese costo: un vector de agotamiento de recursos barato de evitar. No es un defecto de este
 código, que no controla su propio ciclo de vida. **Dueño: el corte C3a, al registrar el bean.**
+
+---
+
+# Corte C3a — caso de uso, con dobles, y el escritor de auditoría
+
+Rama `change/identity-module-and-password-authentication-use-case`, base PR C2 (rama
+`change/identity-module-and-password-authentication-backoff-and-password`, ya fusionada según el
+estado del árbol al recibir este corte; el punto de comparación real usado para medir el diff es
+`change/identity-module-and-password-authentication-decoy-and-wait-rule`, la punta exacta que la
+propia sesión indicó).
+
+**Nota de traspaso, sin resolver en este corte tampoco.** La sugerencia de arriba sigue sin dueño:
+este corte **no registra ningún bean de Spring** (fuera de alcance explícito de la sesión), así que
+`BouncyCastleArgon2PasswordHasher` sigue sin tener quien decida su ciclo de vida. Se traslada, otra
+vez, al corte que sí cablee configuración de Spring — **C3b como muy pronto**, y probablemente el
+cambio que introduzca la capa web real (`session-tokens-and-web-layer`) si C3b tampoco registra
+beans.
+
+## Tarea 3.1 — puerto y adaptador de escritura de auditoría
+
+### ROJO observado
+
+`JooqAuditLogWriterIT` escrito completo antes de crear ninguna clase de producción.
+`./mvnw -B -pl app test -Dtest=JooqAuditLogWriterIT -Dsurefire.failIfNoSpecifiedTests=false`: **8
+errores de compilación reales**, todos `cannot find symbol` sobre `AuditEntry`, `AuditLogWriter` y
+`JooqAuditLogWriter`, que en ese momento no existían. `[INFO] 8 errors`, `BUILD FAILURE`. No se
+fingió ningún rojo: es un fallo de compilación real, registrado tal cual.
+
+### VERDE, con dos correcciones encontradas ejecutando, no leyendo
+
+Se crearon `AuditEntry` (registro con las dieciséis columnas insertables, sin campo para `id`,
+`occurred_at`, `prev_hash` ni `row_hash`, que es justo lo que hace estructuralmente imposible que el
+adaptador los fije) y `AuditLogWriter` en `com.confia.shared.audit`, y `JooqAuditLogWriter` en
+`com.confia.shared.infrastructure`, construido con `.set()` explícito por columna (`design.md` §14,
+punto 5).
+
+**Corrección 1, encontrada al ejecutar, no al leer.** La primera ejecución falló con
+`PSQLException: column "source_ip" is of type inet but expression is of type character varying`.
+Leyendo el código generado (`target/generated-sources/.../SharedAuditLog.java`) se confirma que jOOQ
+de código abierto no tiene mapeo nativo para `inet`: el propio `pom.xml` del módulo ya fuerza esa
+columna a `VARCHAR` (comentario propio: «jOOQ 3.21 has no built-in mapping for PostgreSQL's inet»,
+decisión que viene del cambio 5B, sonda S9). Ningún escritor anterior había topado con esto porque
+este cambio es **el primero que escribe** en `shared_audit_log`. Se resolvió con una plantilla de
+jOOQ parametrizada — `DSL.field("cast({0} as inet)", String.class, DSL.val(sourceIp))` — nunca
+concatenación de cadenas (`CLAUDE.md`, regla 12): el único valor variable es el parámetro enlazado, y
+en todo este cambio `sourceIp` es siempre `null`.
+
+**Corrección 2, también encontrada al ejecutar.** La primera versión de la prueba leía las filas
+escritas con un `dsl.selectFrom(...)` fuera de cualquier transacción con contexto fijado, y el
+resultado fue `Expected size: 2 but was: 0`: la seguridad de fila de `shared_audit_log` (V2) oculta
+todo sin `app.institution_id` fijado, exactamente el mismo patrón que `AuditChainTriggerIT` ya
+documentaba. Se corrigió leyendo también dentro de `transactionRunner().execute(...)`, con el mismo
+contexto de seguridad.
+
+`./mvnw -B -pl app test -Dtest=JooqAuditLogWriterIT`: **1 prueba, 0 fallos**, verde. La prueba
+inserta dos filas en dos transacciones separadas y confirma que la primera encadena contra el génesis
+(32 bytes en cero) y la segunda contra el `row_hash` de la primera — el disparador de `V3`
+encadenando de verdad, no un valor fijado a mano. Commit `92bdce2`.
+
+### Hallazgo de la revisión de regresión, no de la prueba de la propia tarea
+
+Al correr después la regresión más amplia de `com.confia.identity.**` y `com.confia.architecture.**`
+(ver más abajo, ya con la tarea 3.2 completa), `NoUnapprovedPlainSqlTest` rechazó
+`JooqAuditLogWriter` por llamar a `DSL.field(String, ...)`, un punto de entrada de SQL plano fuera de
+la lista aprobada (`ADR-0015` regla 9), que hasta este corte era un conjunto vacío e inmutable. **Es
+un defecto real de la tarea 3.1**, no descubierto porque la ejecución acotada de esa tarea
+(`-Dtest=JooqAuditLogWriterIT`) nunca ejercita esa regla de ArchUnit. Se corrigió añadiendo
+`com.confia.shared.infrastructure.JooqAuditLogWriter` a la lista aprobada, con la justificación que
+la propia regla exige por escrito: una plantilla con un solo parámetro enlazado, nunca concatenación,
+sobre una columna que este cambio entero escribe siempre en `null`. Commit `854ff0b` (`fix`).
+Verificado de nuevo: `./mvnw -B -pl app test -Dtest="com.confia.identity.**,com.confia.architecture.**"`:
+**161 pruebas, 0 fallos.**
+
+## Tarea 3.2 — el caso de uso `AuthenticateWithPassword`
+
+### Discrepancia encontrada y resuelta: la forma exacta de `PasswordHasher` no basta con dos métodos
+
+`design.md` §6.1 muestra `PasswordHasher` con solo `matches(...)` y `hash(...)`. Pero el propio
+Javadoc de `BouncyCastleArgon2PasswordHasher.decoyHash()` —escrito en el corte C2— dice literalmente
+que «su uso de producción... es cableado de capa de aplicación que llega en PR C3a». La verificación
+de uniformidad de coste contra una cuenta inexistente (`specs/identity/spec.md`, «Verificación
+Argon2id contra un hash señuelo...») necesita el **mismo** valor señuelo por instancia que ese
+adaptador ya construye una sola vez, en su constructor, bajo su perfil y su pimienta vigentes; el
+caso de uso no puede inventarlo ni recalcularlo sin arruinar exactamente la propiedad que el señuelo
+compra. Se añadió `StoredPasswordHash decoyHash()` a `PasswordHasher`, y `BouncyCastleArgon2PasswordHasher`
+pasó a `implements PasswordHasher`, con su método `decoyHash()` ampliado de alcance de paquete a
+público con `@Override`. `HmacLoginIdentifierFingerprinter` pasó a `implements
+LoginIdentifierFingerprinter` de la misma forma. Se documenta aquí como una precisión sobre el
+esbozo literal de §6.1, no como una desviación en silencio: la propia base de código de C2 ya la
+anticipaba con esas palabras exactas.
+
+### Discrepancia encontrada y resuelta: `AuthenticateWithPassword` no puede depender de
+`TransactionRunner` de forma que la tarea siga siendo «unitaria, con dobles, sin PostgreSQL»
+
+El diagrama de flujo de `design.md` §4 dibuja `TransactionRunner.execute(...)` dentro de la propia
+caja de `AuthenticateWithPassword`, y el precedente literal del árbol (`IdempotentExecutor`, en
+`shared.security`) confirma que un caso de uso que abre su propia transacción **solo se prueba con
+`*IT.java` reales**, nunca con una prueba unitaria — `TransactionRunner` es una clase `final` que
+necesita un `PlatformTransactionManager` y un `DataSource` de verdad para ejecutar
+`applySecurityContext`. La tarea, sin embargo, pide explícitamente una prueba unitaria con dobles de
+los cinco puertos, sin PostgreSQL. Se resolvió aislando el cuerpo completo de la decisión 9 —los
+siete pasos dentro de la caja de `TransactionRunner.execute(...)`— en un método de alcance de paquete,
+`runWithinTransaction(...)`, que `AuthenticateWithPasswordTest` invoca directamente, sin pasar nunca
+por `execute()` ni por una transacción real. `execute()` sigue siendo el único punto de producción
+que llama a `runWithinTransaction(...)`, y solo lo hace desde dentro de la transacción que
+`TransactionRunner` ya abrió. La única prueba que sí pasa por `execute()`
+(`aMismatchedInstitutionFailsLoudlyAndNeverReturnsRejected`) construye un `TransactionRunner` real
+con un `PlatformTransactionManager` y un `DataSource` de relleno que lanzan
+`UnsupportedOperationException` en cada método: la guarda de cierre falla **antes** de que
+`transactionRunner.execute(...)` se invoque, así que esos dobles nunca se ejercitan de verdad, y si
+algún día lo fueran, la prueba fallaría de forma ruidosa en vez de dar un verde falso. Se documenta
+aquí porque es una decisión estructural real sobre `AuthenticateWithPassword`, no un detalle de la
+prueba.
+
+### La etiqueta del actor para cuenta inexistente: ya resuelta por el diseño, no una decisión de este
+agente
+
+El encargo pedía resolverla «sin filtrar el correo... y si el diseño no la fija, decirlo y proponer».
+**El diseño ya la fija**, con todas las letras, en la decisión 8: «la constante `unknown-account`
+cuando no [existe la cuenta]». No es una brecha abierta: es una lectura completa de `design.md` que
+el encargo no había citado. Se siguió literalmente, sin inventar ni reabrir la decisión.
+
+### ROJO observado, con la disciplina exacta que la sesión pidió
+
+`AuthenticateWithPasswordTest.java` y `AuthenticationResultTest.java` se escribieron completos antes
+de crear ninguna de las ocho clases de producción de `identity.application`. Para observar un ROJO
+honesto sin haber escrito antes, por error de secuencia, el código de producción correspondiente
+(un desliz de este agente, corregido antes de reportar nada), se apartaron temporalmente con
+`git stash push -u` los ocho archivos nuevos de `identity.application` y las dos clases de
+`identity.infrastructure` ya modificadas (`BouncyCastleArgon2PasswordHasher`,
+`HmacLoginIdentifierFingerprinter`), dejando solo las pruebas nuevas y `StaffAccount`/`StaffAccountTest`
+ya actualizados. `./mvnw -B -pl app test -Dtest=AuthenticateWithPasswordTest,AuthenticationResultTest`:
+fallo real de compilación, con estos símbolos exactos, entre otros:
+
+```
+[ERROR] .../AuthenticateWithPasswordTest.java:[195,13] cannot find symbol
+  symbol:   class AuthenticateWithPassword
+[ERROR] .../AuthenticateWithPasswordTest.java:[316,70] cannot find symbol
+  symbol:   class StaffAccountRepository
+[ERROR] .../AuthenticateWithPasswordTest.java:[333,65] cannot find symbol
+  symbol:   class LoginBackoffStore
+[ERROR] .../AuthenticateWithPasswordTest.java:[355,62] cannot find symbol
+  symbol:   class PasswordHasher
+[ERROR] .../AuthenticateWithPasswordTest.java:[81,9] cannot find symbol
+  symbol:   class AuthenticationDecision
+[ERROR] .../AuthenticateWithPasswordTest.java:[82,21] cannot find symbol
+  symbol:   class AuthenticationCommand
+```
+
+Confirma exactamente lo que la tarea predice: «Fallan porque `AuthenticateWithPassword`,
+`AuthenticationCommand`, `AuthenticationDecision` y los cinco puertos no existen». (El registro
+también mostró errores de compilación en archivos ajenos a este corte —`IdempotencyExitCriterionIT`,
+`TransactionRunnerContextIT`, sobre constantes de tablas generadas—, causados por que `generate-sources`
+no se había vuelto a ejecutar tras el `stash`; desaparecieron solos al restaurar el árbol, y no son
+parte del rojo real de esta tarea.) `git stash pop` restauró los ocho archivos exactamente como
+estaban.
+
+### VERDE
+
+Se crearon `AuthenticationCommand`, `AuthenticationDecision` (con el Javadoc del contrato de seis
+puntos), los cinco puertos, y `AuthenticateWithPassword` con su guarda de cierre (falla con
+`IllegalStateException`, nunca `Rejected`, si la institución del contexto no coincide con la del
+proveedor). `StaffAccount` ganó el campo `passwordHash` que su propio Javadoc de C1 dejaba pendiente
+para este corte; `StaffAccountTest` se actualizó a los cuatro componentes.
+`./mvnw -B -pl app test -Dtest=AuthenticateWithPasswordTest,AuthenticationResultTest,StaffAccountTest,BouncyCastleArgon2PasswordHasherDecoyTest`:
+**19 pruebas, 0 fallos**. Commit `4b4aabd`.
+
+Siete pruebas en `AuthenticateWithPasswordTest`: contraseña correcta con retroceso vigente produce
+`Authenticated` con `requiredDelay = PT2S` (el ejemplo exacto de `design.md` §4, tres fallos a las
+12:00:00, intento correcto a las 12:00:10) y sin `hash(...)` invocado; contraseña incorrecta produce
+`Rejected(INVALID_PASSWORD)`; cuenta inexistente produce `Rejected(ACCOUNT_NOT_FOUND)`; los dos
+motivos son distintos entre sí; el señuelo se verifica exactamente una vez, con el hash señuelo del
+doble, cuando la cuenta no existe; el hash almacenado nunca se recalcula en el camino de éxito; y la
+guarda de cierre falla con `IllegalStateException` ante una institución no coincidente, sin tocar
+nunca el `TransactionRunner` de relleno. `AuthenticationResultTest`: cuatro pruebas de reflexión,
+confirmando que `Authenticated` declara exactamente `userId` e `institutionId`, que `Rejected`
+declara exactamente `reason`, y que ninguno de los dos declara un campo cuyo nombre contenga
+`scope`, `permission`, `role`, `claim`, `grant` ni `authorit`.
+
+## Hallazgo de la regresión más amplia (no de ninguna tarea individual)
+
+`./mvnw -B -pl app test -Dtest="com.confia.identity.**,com.confia.architecture.**"` — ejecutada por
+disciplina propia, no porque la tarea 3.2 la pidiera explícitamente — encontró el hallazgo de
+`NoUnapprovedPlainSqlTest` ya descrito arriba, en código de la tarea 3.1. Tras corregirlo:
+**161 pruebas, 0 fallos.**
+
+## Verificación final de este corte
+
+`./mvnw -B verify` desde `apps/api`, `JAVA_HOME` en JDK 25, `MAVEN_OPTS` con el almacén
+`Windows-ROOT`, Docker activo, tras borrar a mano `app/target/{site,classes,test-classes}` y los
+`jacoco-{ut,it}.exec` (el bloqueo de OneDrive sobre `clean` ya documentado en cortes anteriores):
+
+```
+[INFO] All coverage checks have been met.
+[INFO] CONFIA Kernel ...................................... SUCCESS [ 12.482 s]
+[INFO] CONFIA API ......................................... SUCCESS [03:54 min]
+[INFO] BUILD SUCCESS
+[INFO] Total time:  04:08 min
+```
+
+**177** pruebas unitarias de `kernel`, **256** de `app` (unitarias, frente a las 242 de C2: +14 de
+este corte), **95** de `app` (`*IT.java`, frente a las 94 de C2: +1, `JooqAuditLogWriterIT`), **0
+fallos** en las tres. La suite `*IT.java` sumó **≈165 s** de tiempo propio dentro de los 3:54 min del
+módulo `app`, muy por debajo del presupuesto de 8 minutos de `design.md` §13.
+
+## Diff real de PR C3a, y por qué este corte se detiene aquí sin abrir pull request
+
+`git diff --numstat change/identity-module-and-password-authentication-decoy-and-wait-rule...HEAD --
+. ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'` (esa rama es la punta exacta
+de PR C2 que la propia sesión señaló como base de comparación):
+
+**1 155 líneas de cambio efectivo (1 122 adiciones, 33 borrados).**
+
+Supera el presupuesto de 800 líneas por pull request que `tasks.md` fija para este repositorio.
+Siguiendo la regla operativa de la tarea 3.2 («si supera 800, detener y reportar los puntos de corte
+candidatos medidos, verificando cada mitad con `./mvnw -B verify` antes de proponerla»): **se detiene
+aquí la aplicación, sin empujar la rama ni abrir pull request**, exactamente como ya se hizo al cerrar
+PR C2.
+
+### Medición por archivo, agrupada en los tres puntos de corte candidatos
+
+| Grupo candidato | Contenido | Líneas |
+|---|---|---|
+| **A — escritor de auditoría (tarea 3.1 completa)** | `AuditEntry`, `AuditLogWriter`, `JooqAuditLogWriter`, `JooqAuditLogWriterIT`, la aprobación de `NoUnapprovedPlainSqlTest` | **247** |
+| **B — los cinco puertos y su cableado de infraestructura** | `AuthenticationCommand`, `AuthenticationDecision`, `StaffAccountRepository`, `LoginBackoffStore`, `PasswordHasher`, `LoginIdentifierFingerprinter`, `LoginInstitutionProvider`, `StaffAccount` (+campo), `BouncyCastleArgon2PasswordHasher` y `HmacLoginIdentifierFingerprinter` (+`implements`) | **224** |
+| **C — el caso de uso y su prueba** | `AuthenticateWithPassword`, `AuthenticateWithPasswordTest`, `AuthenticationResultTest`, `StaffAccountTest` (+campo) | **684** |
+
+**247 + 224 + 684 = 1 155.** Las tres mitades quedan por debajo de 800 líneas cada una — a diferencia
+de PR C2, donde ninguna partición de commits existente lograba bajar las tres mitades del umbral—.
+Los grupos B y C son los que exigirían cirugía de historial: hoy viven en un único commit
+(`4b4aabd`), y separarlos en dos requeriría `cherry-pick` o un árbol de ramas nuevo — la misma
+cirugía que esta lista reserva explícitamente para quien gestiona la cadena de pull requests, no para
+quien aplica las tareas de TDD (precedente idéntico al de PR C2, sección de arriba). El grupo A ya
+vive en sus propios dos commits (`92bdce2`, `854ff0b`) y podría separarse sin tocar el historial, si
+así se decide.
+
+**No se ejecutó ninguna partición**: se deja la medición completa, ya verificada en conjunto por el
+`./mvnw -B verify` de arriba (que cubre el código de los tres grupos tal como existe hoy en un único
+árbol de trabajo), para que quien abra los pull requests decida y ejecute la partición exacta.
+
+### Commits de este corte, en orden
+
+1. `92bdce2` — `feat(shared): add audit log writer port and jOOQ adapter` (tarea 3.1, grupo A)
+2. `4b4aabd` — `feat(identity): add AuthenticateWithPassword use case and its five ports` (tarea 3.2,
+   grupos B y C juntos)
+3. `854ff0b` — `fix(identity): approve JooqAuditLogWriter's single inet cast template` (hallazgo de la
+   regresión, sobre código del grupo A)
+
+No se empuja la rama ni se abre pull request: como en los cortes anteriores, es decisión de quien
+gestiona la cadena.

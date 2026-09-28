@@ -321,7 +321,7 @@ Rama `change/identity-module-and-password-authentication-backoff-and-password`, 
 Rama `change/identity-module-and-password-authentication-use-case`, base PR C2. **Depende de la sonda S1
 (tarea 1.1) para poder importar `TransactionRunner`**, ya resuelta en C1.
 
-- [ ] 3.1 **ROJO/VERDE — puerto y adaptador de escritura de auditoría, primer escritor de producción
+- [x] 3.1 **ROJO/VERDE — puerto y adaptador de escritura de auditoría, primer escritor de producción
   de `shared_audit_log`.** Requiere Docker. ROJO: crear
   `.../test/java/com/confia/shared/infrastructure/JooqAuditLogWriterIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`: inserta una fila con `AuditLogWriter.append(...)` sin fijar
@@ -337,7 +337,7 @@ Rama `change/identity-module-and-password-authentication-use-case`, base PR C2. 
   requisito «Puerto y adaptador de escritura de la bitácora de auditoría» (su escenario); `design.md`
   §11, paso 14; §14, punto 5 («por confirmar»: `.set()` explícito, no registro completo)
 
-- [ ] 3.2 **ROJO/VERDE — el caso de uso `AuthenticateWithPassword`, con dobles de los cinco puertos.**
+- [x] 3.2 **ROJO/VERDE — el caso de uso `AuthenticateWithPassword`, con dobles de los cinco puertos.**
   No requiere Docker (unitaria con dobles, sin PostgreSQL). ROJO: crear
   `.../test/java/com/confia/identity/application/AuthenticateWithPasswordTest.java` con dobles de
   `StaffAccountRepository`, `LoginBackoffStore`, `PasswordHasher`, `LoginIdentifierFingerprinter` y
