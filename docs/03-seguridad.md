@@ -318,6 +318,18 @@ los vigentes, se recalcula el hash con los parámetros nuevos dentro de la misma
 `$argon2id$` y declara los parámetros vigentes. Prueba de rendimiento en integración continua que
 falla si la verificación baja de 100 milisegundos (parámetros demasiado débiles).
 
+> **Nota editorial, 2026-09-24 (`identity-module-and-password-authentication`), autorizada por el
+> propietario el 2026-09-24.** Este cambio implementa Argon2id **sin** Spring Security, sobre Bouncy
+> Castle directo, porque la cadena de filtros pertenece a `session-tokens-and-web-layer` y traerla
+> aquí adelantaría trabajo de otro cambio. La exigencia sustantiva de este mismo apartado —la
+> pimienta de 32 bytes fuera de la base, aplicada como `secret` de Argon2id— **se cumple**, y es
+> precisamente lo que empuja a Bouncy Castle directo: `Argon2PasswordEncoder` de
+> `spring-security-crypto` no expone ningún parámetro de secreto (verificado con `javap`, sonda S2),
+> mientras que `Argon2Parameters.Builder` de Bouncy Castle sí lo hace con `withSecret(...)`. La
+> integración con `PasswordEncoder` sigue siendo trivial el día que llegue la cadena de filtros,
+> porque el puerto `PasswordHasher` tiene exactamente esa forma. Esta nota no renuncia a la
+> integración: registra que llega con el cambio que trae el marco.
+
 ### 4.2 Política de contraseñas alineada a NIST SP 800-63B
 
 | Regla | Valor | Razón |
@@ -403,6 +415,23 @@ Un inicio de sesión exitoso limpia el contador de la cuenta pero no el de la IP
 
 **Cómo se comprueba.** Prueba de integración que ejecuta la secuencia de intentos y verifica los
 retardos y el bloqueo por IP contra múltiples cuentas.
+
+> **Nota editorial, 2026-09-24 (`identity-module-and-password-authentication`).** El estado del
+> retroceso **por cuenta** vive en PostgreSQL y no en Redis, por atomicidad con la bitácora de
+> auditoría (propuesta D1, aprobada). La dimensión por dirección IP de esta misma sección sigue
+> apuntando a Redis, con el control en `session-tokens-and-web-layer` y el aprovisionamiento en el
+> cambio 11.
+>
+> Sobre «el retardo se aplica antes de responder»: el retardo se **calcula y se exige** dentro de la
+> transacción del caso de uso, y se **materializa** en el borde HTTP una vez confirmada esa
+> transacción. Nunca se espera reteniendo una transacción, una conexión del grupo, un bloqueo de fila
+> ni un hilo de plataforma: hacerlo convertiría este control en un amplificador de denegación de
+> servicio, que es justo lo que esta sección existe para evitar.
+>
+> Y una precisión sobre su alcance: el retardo por cuenta **no es un limitador de tasa**. Un atacante
+> que cierra la conexión no espera nada. Lo que este control da es uniformidad de tiempo frente a la
+> enumeración, penalización del atacante secuencial y rastro auditable. La cota de tasa la pone la
+> dimensión por IP.
 
 ### 4.5 Sesiones y tokens
 
@@ -631,6 +660,13 @@ de datos de un menor. Con un solo desarrollador, no es opcional.
 
 Ninguno de estos roles es `SUPERUSER` y ninguno tiene el atributo `BYPASSRLS`. Ese detalle es
 crítico: un rol con `BYPASSRLS` anula silenciosamente todas las políticas.
+
+> **Nota editorial, 2026-09-24 (`identity-module-and-password-authentication`).** La tabla que esta
+> sección llama `user` se entrega como `identity_staff_account`, con el prefijo de módulo que exige
+> la regla 3 de ADR-0015. La tabla `identity_login_backoff`, que esta sección no nombra por ser
+> posterior, recibe el mismo trato que `user`: `SELECT`, `INSERT` y `UPDATE` para
+> `confia_admin_app`, sin `DELETE`; `SELECT` para `confia_readonly`; y **ningún privilegio** para
+> `confia_portal_app`.
 
 ### 6.2 Contexto de sesión seguro
 

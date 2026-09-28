@@ -448,7 +448,7 @@ Rama `change/identity-module-and-password-authentication-adapters`, base PR C3a.
   extremo a extremo con Playwright...» (los tres escenarios de brecha); `design.md` §11, paso 18;
   decisión 14 completa
 
-- [ ] 4.4 **Medición de tiempo, notas editoriales de los ajustes 3, 4 y 5, cierre de `docs/09`, y
+- [x] 4.4 **Medición de tiempo, notas editoriales de los ajustes 3, 4 y 5, cierre de `docs/09`, y
   verificación final del cambio completo.** Requiere Docker para la medición de tiempo; no lo requiere
   para las notas documentales. Sin evidencia de ROJO propia: son notas editoriales y una medición, no
   comportamiento nuevo — se dice así en vez de fingir un rojo. Crear

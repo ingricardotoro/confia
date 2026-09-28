@@ -89,3 +89,21 @@ bounded-wait concurrency scenarios now in the suite
 real, deterministic `CyclicBarrier`-synchronized wait by design rather than a wall-clock guess. No W1
 escalation needed at this cut (`docs/09-roadmap-y-fases.md`, entregable 8's still-open point (a): the
 8-minute budget continues to be measured and documented, not yet enforced by a CI gate).
+
+**Measurement, PR C3b (change 7, `identity-module-and-password-authentication`, final cut), with
+the complete `*IT.java` suite of the whole change.** Manual cleanup of `app/target/{site,classes,
+test-classes}` and both `jacoco-{ut,it}.exec` files (OneDrive still locks `target/` against
+Maven's own `clean` goal on Windows), then `./mvnw -B verify` without `clean`: full reactor build
+**4 minutes 25 seconds** total (`kernel` 15.1 s, `app` 4 minutes 6 seconds, including jOOQ code
+generation against its own ephemeral container). **177** unit tests in `kernel`, **267** unit tests
+in `app` (Surefire — up from 256 at PR C3a: +11, `ConfiguredLoginInstitutionProviderTest` and
+`IdentityScopeExclusionInventoryTest`, neither touches PostgreSQL so neither needs the `*IT` suffix
+or Failsafe), **115** integration tests in `app` (Failsafe `*IT.java` — up from 95 at PR C3a: +20,
+exactly the sum of every `*IT` class this cut adds: `JooqStaffAccountRepositoryIT`,
+`JooqLoginBackoffStoreIT`, `AuthenticateWithPasswordIT`, `LoginBackoffAtomicityIT`,
+`LoginBackoffConcurrencyIT`, `LoginInstitutionIT`, `IdentitySecretRedactionIT` and
+`LoginTimingReportIT`), **0 failures** in either. Comfortably inside the 8-minute budget — well
+under 55% of it — even though this is the first change whose integration suite pays dozens of real
+Argon2id computations per run (`AuthenticateWithPasswordIT`, `LoginInstitutionIT`,
+`IdentitySecretRedactionIT` and `LoginTimingReportIT`'s own 50-attempt timing sample), each costing
+hundreds of milliseconds by design (docs/03-seguridad.md §4.1). No W1 escalation needed.
