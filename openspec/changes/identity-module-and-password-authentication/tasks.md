@@ -373,7 +373,7 @@ Rama `change/identity-module-and-password-authentication-use-case`, base PR C2. 
 
 Rama `change/identity-module-and-password-authentication-adapters`, base PR C3a.
 
-- [ ] 4.1 **Sondas S3 y S4 (bloqueantes de C3b, `design.md` §10), y ROJO/VERDE de los adaptadores jOOQ
+- [x] 4.1 **Sondas S3 y S4 (bloqueantes de C3b, `design.md` §10), y ROJO/VERDE de los adaptadores jOOQ
   con el caso de uso completo contra PostgreSQL real.** Requiere Docker. **S4**: ejecutar
   `./mvnw -B -pl app generate-sources` con `V5` ya aplicada y confirmar en `target/generated-sources`
   que los tipos generados se llaman `IdentityStaffAccount` e `IdentityLoginBackoff` (si no, R2 rompe

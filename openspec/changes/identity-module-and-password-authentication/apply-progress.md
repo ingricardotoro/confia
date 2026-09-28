@@ -997,3 +997,182 @@ así se decide.
 
 No se empuja la rama ni se abre pull request: como en los cortes anteriores, es decisión de quien
 gestiona la cadena.
+
+---
+
+# Corte C3b — adaptadores reales, atomicidad y cierre
+
+Rama `change/identity-module-and-password-authentication-adapters`, base el corte C3a (#45).
+
+## Sondas S4 y S3, ejecutadas por el orquestador antes de delegar
+
+**Sin evidencia de ROJO propia:** son sondas de comportamiento de herramienta y de motor, no pruebas
+del delta.
+
+### S4 — ¿jOOQ genera `IdentityStaffAccount` e `IdentityLoginBackoff`?
+
+**PASA.** Los nombres generados bajo `target/generated-sources`, junto a los de las tablas anteriores:
+
+```
+IdentityLoginBackoff.java        IdentityStaffAccount.java
+IdentityLoginBackoffRecord.java  IdentityStaffAccountRecord.java
+OrganizationInstitution.java     SharedAuditChainHead.java
+SharedAuditLog.java              SharedIdempotencyKey.java
+```
+
+Los dos empiezan por `Identity`, como el diseño esperaba, así que los adaptadores pueden nombrarlos
+sin sorpresas.
+
+### S3 — ¿el reclamo del retroceso devuelve los valores previos y toma el bloqueo de fila?
+
+**PASA en sus dos mitades.** Ejecutada contra un `postgres:18-alpine` desechable, fuera del árbol del
+repositorio, con una tabla mínima equivalente a `identity_login_backoff` y una fila sembrada con
+`consecutive_failures = 7` y `last_attempt_at = 2026-01-01`.
+
+**Mitad 1, ¿devuelve los valores previos?** La sentencia
+
+```sql
+insert into backoff (institution_id, identifier_hash, consecutive_failures, last_attempt_at)
+values (..., 1, now())
+on conflict (institution_id, identifier_hash) do update
+  set consecutive_failures = backoff.consecutive_failures
+returning consecutive_failures, last_attempt_at;
+```
+
+devolvió `7 | 2026-01-01 00:00:00+00`, es decir **los valores previos y no los que el `insert`
+proponía**. Eso es lo que permite leer el estado del retroceso y reclamar la fila en **una sola ida y
+vuelta**, sin un `SELECT ... FOR UPDATE` previo.
+
+**Mitad 2, ¿toma bloqueo de fila?** Sesión 1 ejecutó el reclamo dentro de una transacción abierta y se
+quedó en `pg_sleep`. Sesión 2 ejecutó el mismo reclamo con `lock_timeout = 2500ms`:
+
+```
+ERROR:  canceling statement due to lock timeout
+CONTEXT:  while inserting index tuple (0,3) in relation "backoff"
+```
+
+Es `SQLState 55P03`, y el contexto revela el mecanismo exacto: el bloqueo ocurre **al insertar la
+tupla del índice único**, que es como `ON CONFLICT` detecta el conflicto. **Dos reclamos concurrentes
+sobre la misma fila quedan serializados**, que es lo que la prueba de concurrencia del delta necesita
+demostrar y lo que impide perder un fallo de autenticación.
+
+**Consecuencia para la tarea 4.1:** el respaldo que el diseño preveía —un `INSERT ... ON CONFLICT DO
+NOTHING` seguido de `SELECT ... FOR UPDATE`, a costa de una sentencia más— **no hace falta**. La
+sentencia única basta.
+
+## Tarea 4.1 (parte 1) — los tres adaptadores jOOQ/configuración, con su ROJO/VERDE
+
+Commiteados pieza por pieza, en verde, siguiendo la instrucción explícita de esta sesión tras un
+atasco del agente anterior (van ocho caídas en la sesión completa; nada sobrevive salvo lo
+commiteado).
+
+### `JooqStaffAccountRepository` — commit `ee207e4`
+
+`findBy(...)` sobre `IDENTITY_STAFF_ACCOUNT`, filtrando por `institution_id` y `email` normalizado.
+La seguridad de fila (decisión 4) es lo que de verdad acota el resultado a una institución; el
+predicado explícito de la consulta es una capa sobre esa política, no un sustituto. `./mvnw -B -pl
+app test -Dtest=JooqStaffAccountRepositoryIT`: **3 pruebas, 0 fallos** (cuenta propia encontrada;
+cero filas para la cuenta de otra institución, por la política de fila, no por el predicado; cero
+filas para un identificador no registrado).
+
+### `JooqLoginBackoffStore` — commit `e0f4673`
+
+`claim(...)` es exactamente la sentencia única de la decisión 5 —`INSERT ... ON CONFLICT
+(institution_id, identifier_hash) DO UPDATE SET consecutive_failures =
+identity_login_backoff.consecutive_failures RETURNING consecutive_failures, last_attempt_at`—, sin
+el respaldo de `SELECT ... FOR UPDATE` que S3 ya descartó. `save(...)` es la actualización simple de
+cierre. `./mvnw -B -pl app test -Dtest=JooqLoginBackoffStoreIT`: **3 pruebas, 0 fallos**,
+confirmando en código lo que S3 ya había confirmado por sonda: el reclamo crea la fila cuando no
+existe, y devuelve el estado **previo**, nunca los valores que la propia sentencia propone.
+
+**Corrección honesta, hecha después de commitear ambas piezas.** La primera ejecución de
+`JooqStaffAccountRepositoryIT` y `JooqLoginBackoffStoreIT` se hizo ya con las dos clases de
+producción en el árbol (verde directo), sin capturar su ROJO real por separado — un hueco de
+disciplina frente a lo que esta misma lista exige. Se corrigió apartando `mv` de
+`JooqStaffAccountRepository.java` y `JooqLoginBackoffStore.java` a un directorio fuera del
+repositorio y ejecutando `./mvnw -B -pl app test
+-Dtest=JooqStaffAccountRepositoryIT,JooqLoginBackoffStoreIT`: **fallo real de compilación**, cuatro
+errores `cannot find symbol` sobre las dos clases, `BUILD FAILURE`. Se restauraron ambos archivos
+con `mv` y `git status --short` confirmó el árbol sin diferencias (ya estaban commiteados
+exactamente así). El verde ya registrado arriba sigue siendo válido sin re-ejecutar: ningún archivo
+cambió entre una ejecución y la otra.
+
+### `ConfiguredLoginInstitutionProvider` — commit `6796489`
+
+Lee `confia.identity.login-institution-id` de una propiedad de sistema de la JVM (precedente:
+`com.confia.bootstrap.AppProfile` lee `APP_PROFILE` de una variable de entorno; aquí es una
+propiedad de sistema, no una variable de entorno, porque design.md decisión 11 fija la clave en
+forma de propiedad con puntos y guiones, no en mayúsculas con guion bajo). Falla en el constructor,
+nunca en el primer uso, si el valor falta, está en blanco o no es un UUID válido.
+
+**ROJO real, observado apartando la clase de producción, no fingido.** Se movió
+`ConfiguredLoginInstitutionProvider.java` fuera del árbol de compilación (`mv` a un directorio
+temporal fuera del repositorio) y se ejecutó `./mvnw -B -pl app test
+-Dtest=ConfiguredLoginInstitutionProviderTest`: **fallo real de compilación**, ocho errores `cannot
+find symbol` sobre la clase y la variable `ConfiguredLoginInstitutionProvider`, `BUILD FAILURE`. Se
+restauró el archivo y se repitió: `./mvnw -B -pl app test
+-Dtest=ConfiguredLoginInstitutionProviderTest`: **6 pruebas, 0 fallos** (resuelve el UUID
+configurado, tolera espacios en los extremos, falla ante valor ausente/en blanco/no UUID, y lee de
+la propiedad de sistema real a través del constructor sin argumentos).
+
+### Estado
+
+Faltan, de la tarea 4.1: `AuthenticateWithPasswordIT` (el caso de uso completo contra PostgreSQL
+real, con los siete escenarios de retardo). Las tareas 4.2, 4.3 y 4.4 siguen sin empezar.
+
+## Tarea 4.1 (parte 2) — `AuthenticateWithPasswordIT`, cierre de la tarea 4.1
+
+Commit `0917494`. Seis pruebas, cada una construye su propio `AuthenticateWithPassword` con un
+`Clock.fixed` distinto por intento (nunca reutiliza el mismo reloj entre intentos consecutivos),
+siempre a través de `execute(...)` — nunca de `runWithinTransaction` directamente, que es lo que
+distingue esta prueba de la unitaria con dobles de C3a: aquí sí se cruza `TransactionRunner.execute`
+de verdad, con Argon2id real (perfil piso, pimienta de prueba de 32 bytes en cero, declarada no
+secreta) y los tres adaptadores jOOQ/configuración de esta misma tarea.
+
+**ROJO real, observado apartando los dos adaptadores de repositorio y retroceso** (el mismo `mv` que
+ya sirvió para las dos piezas anteriores, aplicado ahora contra este archivo): `./mvnw -B -pl app
+test -Dtest=AuthenticateWithPasswordIT`: **fallo real de compilación**, `cannot find symbol` sobre
+`JooqStaffAccountRepository` y `JooqLoginBackoffStore`, `BUILD FAILURE`. Se restauraron ambos
+archivos.
+
+**VERDE, con un fallo real encontrado ejecutando, no una prueba mal escrita desde el principio.** La
+primera ejecución completa dio **5 pruebas verdes y 1 fallo real**:
+
+```
+Expecting actual:
+  "{"delaySeconds": 1, "consecutiveFailures": 3}"
+to contain:
+  ""delaySeconds":1"
+```
+
+No es un defecto de `AuthenticateWithPassword` (que escribe exactamente
+`{"consecutiveFailures":3,"delaySeconds":1}`, sin espacios y en ese orden): es que la columna
+`after_value` es `jsonb`, y PostgreSQL **reserializa** el texto a su propio orden de claves y
+espaciado al leerlo de vuelta — el texto que el adaptador escribe y el que la lectura devuelve no
+son la misma cadena, aunque representen el mismo documento. La aserción original comparaba una
+subcadena literal, frágil ante exactamente esa reserialización. Se corrigió analizando el JSON con
+`tools.jackson.databind.json.JsonMapper` (ya presente en el árbol,
+`IdempotentExecutorConcurrencyIT`) y afirmando sobre los campos estructurados
+(`delaySeconds`, `consecutiveFailures`), nunca sobre el texto exacto. `./mvnw -B -pl app test
+-Dtest=AuthenticateWithPasswordIT`: **6 pruebas, 0 fallos**, 38.71 s.
+
+Lo que las seis pruebas demuestran, con PostgreSQL real y sin dormir nunca:
+
+1. El retardo se activa en el tercer fallo consecutivo (1 s), con exactamente 4 asientos de
+   auditoría (3 `login.failed` + 1 `backoff_applied`), y el ciclo lleva su duración en `after_value`.
+2. La progresión se limita a 900 s (nunca a los 1024 s que la fórmula sin tope daría en el fallo 13).
+3. El contador expira a los 30 minutos: un fallo a los 31 minutos es ordinal 1, sin retardo.
+4. Un inicio de sesión exitoso limpia el contador: el fallo inmediatamente posterior es ordinal 1.
+5. El retardo y el número de asientos de auditoría son **idénticos** entre una cuenta existente y un
+   identificador inexistente en su tercer fallo (1 s, 4 asientos cada una), y el motivo interno
+   difiere entre sí (`INVALID_PASSWORD` frente a `ACCOUNT_NOT_FOUND`) sin que eso afecte ni el
+   retardo ni el conteo — la propiedad estructural de la decisión 3.
+6. Una contraseña correcta durante el retroceso (contador en tres) autentica con éxito tras un
+   retardo de 2 s —el ejemplo exacto de `design.md` §4— y limpia el contador.
+
+### Tarea 4.1: COMPLETA
+
+Los tres adaptadores, sus tres pruebas de adaptador y `AuthenticateWithPasswordIT` están commiteados
+y verificados en verde por separado. Sigue faltando: 4.2 (atomicidad y concurrencia), 4.3
+(institución, redacción, inventarios de exclusión) y 4.4 (medición de tiempo, notas editoriales,
+cierre).
