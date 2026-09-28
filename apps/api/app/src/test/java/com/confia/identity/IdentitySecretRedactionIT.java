@@ -89,6 +89,12 @@ class IdentitySecretRedactionIT extends CommittingPostgresIntegrationTest {
                 .append(decision)
                 .append(decision.result())
                 .append(guardExceptionMessage)
+                // The command itself, which this class built twice above and never looked at until
+                // the pre-merge security audit pointed it out. It is a record carrying the password
+                // in a bare String, so its compiler-generated toString() printed the password in
+                // clear — and this test, the one written to catch exactly that, handled the leaking
+                // object without ever collecting its text.
+                .append(new AuthenticationCommand(identifier.value(), PASSWORD_LITERAL))
                 .append(plainPassword)
                 .append(storedHash)
                 .append(pepper)
