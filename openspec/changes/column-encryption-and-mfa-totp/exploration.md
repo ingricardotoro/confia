@@ -1,12 +1,26 @@
 # Exploración: MFA con TOTP y recuperación de contraseña
 
-- **Cambio:** `mfa-totp-and-password-recovery`
-- **Segunda de las tres partes** del cambio 7 de F0. La primera,
-  `identity-module-and-password-authentication`, se archivó el 2026-09-27; la tercera,
-  `session-tokens-and-web-layer`, sigue pendiente.
+- **Cambio original:** `mfa-totp-and-password-recovery`
+- **Partido el 2026-09-27 en:** `column-encryption-and-mfa-totp` (esta carpeta) y
+  `password-recovery-token`
+- El cambio 7 de F0 se ejecuta por tanto como **cuatro** cambios secuenciales:
+  1. `identity-module-and-password-authentication` — **archivado el 2026-09-27**
+  2. `column-encryption-and-mfa-totp` — esta carpeta
+  3. `password-recovery-token`
+  4. `session-tokens-and-web-layer`
 - **Fase:** explorar
 - **Fecha:** 2026-09-27
-- **Estado:** exploración terminada, pendiente de propuesta
+- **Estado:** exploración terminada, división aprobada por el propietario, pendiente de propuesta
+
+> **Alcance de este documento.** Esta exploración se hizo sobre `mfa-totp-and-password-recovery`
+> completo, antes del corte, y por eso describe las dos mitades. Es la exploración compartida:
+> `password-recovery-token` la referencia desde su propia carpeta en vez de repetirla, como ya hicieron
+> la parte B del cambio 5 y las tres partes del cambio 7.
+>
+> **Por qué se partió.** La propuesta pronosticó **12 a 17 tareas solo para la primera mitad**, contra
+> el límite de quince, y más si se aprueba añadir los dos controles que `docs/03` documenta sin
+> requisito publicado. El corte cae donde la recuperación de contraseña deja de depender de todo lo
+> demás: no cifra ninguna columna, no usa TOTP, y su token se almacena hasheado y no cifrado.
 
 > **Nota de persistencia.** El agente de exploración no dispuso de herramienta de escritura de
 > archivos, así que entregó el informe íntegro y el orquestador lo transcribió, como en los tres

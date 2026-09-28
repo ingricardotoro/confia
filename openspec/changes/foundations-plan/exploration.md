@@ -101,7 +101,7 @@ vez de esperar a la fase de tareas. El cambio 7 se ejecuta como **tres** cambios
    fallidos con retroceso, asientos de auditoría de identidad y prevención de enumeración.
 2. `mfa-totp-and-password-recovery` — cifrado de columna con sobre de llaves y su ADR, TOTP,
    inscripción del segundo factor, códigos de recuperación, y recuperación de contraseña con token de
-   un solo uso.
+   un solo uso. **Partido a su vez el 2026-09-27; ver la nota del tercer corte, abajo.**
 3. `session-tokens-and-web-layer` — sin cambios respecto a la parte B descrita arriba, **más la
    condición de aceptación del 2026-09-25 que se describe abajo**.
 
@@ -136,6 +136,40 @@ Queda además pendiente, con dueño y fase por asignar **antes de F1**: la purga
 la fila permanece—, y el corte C1 no entregó índice ni trabajo de purga, siguiendo el precedente del
 cambio 6 de no enviar un índice sin consumidor. El dueño propuesto es el cambio que introduzca
 trabajo de mantenimiento programado con `db-scheduler` (ADR-0016).
+
+**Nota (2026-09-27, tercer corte: la parte 2 se parte a su vez).** La propuesta de
+`mfa-totp-and-password-recovery` pronosticó **12 a 17 tareas solo para su primera mitad**, contra el
+límite de quince de `openspec/changes/README.md`, y más aún si se aprueba añadir los dos controles que
+`docs/03-seguridad.md` documenta sin requisito publicado. El propietario aprobó el tercer corte. El
+cambio 7 se ejecuta ahora como **cuatro** cambios SDD secuenciales:
+
+1. `identity-module-and-password-authentication` — **archivado el 2026-09-27.**
+2. `column-encryption-and-mfa-totp` — sobre de llaves con su ADR-0023, cifrado a nivel de columna,
+   TOTP con inscripción y verificación, códigos de recuperación, la columna que decide si una cuenta
+   exige segundo factor, y la corrección del `switch` no exhaustivo que la parte 1 dejó pendiente.
+3. `password-recovery-token` — recuperación de contraseña con token de un solo uso y de corta vida,
+   con su concurrencia propia y la respuesta uniforme que exige la prohibición de enumeración.
+4. `session-tokens-and-web-layer` — sin cambios respecto a lo descrito arriba.
+
+**El corte entre 2 y 3 está en que la recuperación de contraseña no depende de nada de lo anterior:**
+no cifra ninguna columna, no usa TOTP, y su token se almacena hasheado, no cifrado. Es una tabla y un
+flujo propios. En cambio el sobre de llaves **sí** debe entregarse junto con su único consumidor real
+de esta secuencia, el secreto TOTP: entregarlo aislado sería infraestructura sin uso, patrón que este
+repositorio ya rechazó al negarse a enviar un índice sin consumidor en el cambio 6.
+
+**Obligación que `column-encryption-and-mfa-totp` impone al cambio 8** (2026-09-27, de la decisión del
+propietario sobre cómo se sabe que una cuenta exige MFA). Ese cambio añade una columna mínima a
+`identity_staff_account` porque **no existe ningún concepto de rol ni de permiso en el árbol**, y el
+requisito publicado de MFA presupone uno. El argumento fue de secuencia: el cambio 4 de esta lista
+emite tokens y llega **antes** del cambio 8, así que diferir la obligatoriedad dejaría una ventana en
+la que el sistema entrega sesiones completas a usuarios con permisos financieros sin exigir segundo
+factor. El costo es que esa columna **duplica** algo que el cambio 8 poseerá, y un rol que gane un
+permiso financiero sin que la columna se actualice deja el control silenciosamente desactivado. Por
+eso:
+
+> **El cambio 8 (`rbac-permission-matrix-and-audit-integration`) DEBE derivar
+> `identity_staff_account.mfa_required` del permiso del rol y eliminar la doble fuente**, como parte de
+> su propio alcance y no como mejora posterior.
 
 El corte entre 1 y 2 está donde **entra el cifrado de columna**: el primero no cifra nada, solo
 hashea, y por eso no necesita el sobre de llaves, la tabla `shared_data_key` ni el ADR nuevo. Esas
