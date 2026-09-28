@@ -83,6 +83,27 @@ del roadmap el cambio 8 **depende de este**, no al revés. Es decir: **este camb
 su propio dueño formal todavía no ha creado.**
 
 Ni la exploración original, ni la propuesta, ni el informe de archivado de la parte 1 lo detectaron.
+> **RESUELTA POR EL PROPIETARIO EL 2026-09-27: opción (a).** Este cambio añade la columna mínima, y
+> **el argumento decisivo fue de secuencia, no de modelado.** El cambio 3 —el que emite tokens— llega
+> **antes** del cambio 8. Con (c), entre uno y otro habría una ventana en la que el sistema emite
+> sesiones completas a usuarios con permisos financieros **sin ninguna exigencia de segundo factor**,
+> porque nada sabría que hace falta. La opción (a) es la única que permite al cambio 3 exigir MFA
+> desde el primer día en que emite tokens.
+>
+> La opción (b) se descartó porque **invierte la propiedad de seguridad**: el requisito existe para que
+> un usuario privilegiado **no pueda** saltarse el segundo factor, y bajo (b) quien nunca se inscribe
+> nunca se lo piden, de modo que el control pasa a ser opcional a conveniencia de quien lo evita.
+> Además vuelve inexpresable el segundo escenario publicado, el de la sesión restringida para una
+> cuenta que **no** tiene MFA configurada.
+>
+> **El costo aceptado, dicho en voz alta:** la columna es un **duplicado desnormalizado** de algo que
+> el cambio 8 va a poseer. Si un rol gana un permiso financiero y la columna no se actualiza, el
+> control queda silenciosamente desactivado para esa cuenta. La propuesta debe escribir ese riesgo y
+> **el cambio 8 asume por requisito** la obligación de derivar esa columna del permiso del rol y
+> eliminar la doble fuente. Se escribe como obligación del cambio 8, y no como «pregunta abierta»,
+> por la misma razón que la condición de aceptación del crecimiento de `identity_login_backoff`: una
+> pregunta abierta no obliga a nadie.
+
 Hay tres caminos honestos, y las tres opciones **se usan** en este cambio, así que ninguna es el
 trabajo «preparado para» que el propietario ya rechazó cuatro veces:
 
@@ -266,8 +287,11 @@ nuevos**, declarando en la misma propuesta que el primero es **usado** por el se
 
 1. **¿Se divide este cambio en dos** —cifrado y TOTP, por un lado; recuperación de contraseña, por
    otro— **o se mantiene como uno solo?**
-2. **¿Cómo determina este cambio si una cuenta necesita MFA obligatoria**, dado que no existe ningún
-   dato de rol ni de permiso? Las tres opciones honestas están en §1.4.
+2. **RESUELTA EL 2026-09-27: opción (a).** ¿Cómo determina este cambio si una cuenta necesita MFA
+   obligatoria, dado que no existe ningún dato de rol ni de permiso? Se añade la columna mínima, por
+   el argumento de secuencia que §1.4 recoge: es la única opción que permite al cambio 3 exigir MFA
+   desde el primer día en que emite tokens. Queda pendiente de escribir en la propuesta el riesgo de
+   deriva y la obligación que este cambio impone al cambio 8.
 3. **¿Dónde vive el motor de cifrado puro** — `kernel`, `identity.infrastructure`, o un paquete de
    `shared` con su propia interfaz nombrada? Importa porque otros módulos futuros necesitarán la misma
    primitiva.
