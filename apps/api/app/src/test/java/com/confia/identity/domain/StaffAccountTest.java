@@ -16,31 +16,41 @@ class StaffAccountTest {
     private static final StaffAccountId ID = new StaffAccountId(UUID.randomUUID());
     private static final InstitutionId INSTITUTION_ID = new InstitutionId(UUID.randomUUID());
     private static final LoginIdentifier IDENTIFIER = LoginIdentifier.of("maria.lopez@colegio.edu.hn");
+    private static final StoredPasswordHash PASSWORD_HASH =
+            new StoredPasswordHash("$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$dGFn");
 
     @Test
-    void exposesItsThreeComponents() {
-        StaffAccount account = new StaffAccount(ID, INSTITUTION_ID, IDENTIFIER);
+    void exposesItsFourComponents() {
+        StaffAccount account = new StaffAccount(ID, INSTITUTION_ID, IDENTIFIER, PASSWORD_HASH);
 
         assertThat(account.id()).isEqualTo(ID);
         assertThat(account.institutionId()).isEqualTo(INSTITUTION_ID);
         assertThat(account.identifier()).isEqualTo(IDENTIFIER);
+        assertThat(account.passwordHash()).isEqualTo(PASSWORD_HASH);
     }
 
     @Test
     void rejectsANullId() {
-        assertThatThrownBy(() -> new StaffAccount(null, INSTITUTION_ID, IDENTIFIER))
+        assertThatThrownBy(
+                () -> new StaffAccount(null, INSTITUTION_ID, IDENTIFIER, PASSWORD_HASH))
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     void rejectsANullInstitutionId() {
-        assertThatThrownBy(() -> new StaffAccount(ID, null, IDENTIFIER))
+        assertThatThrownBy(() -> new StaffAccount(ID, null, IDENTIFIER, PASSWORD_HASH))
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     void rejectsANullIdentifier() {
-        assertThatThrownBy(() -> new StaffAccount(ID, INSTITUTION_ID, null))
+        assertThatThrownBy(() -> new StaffAccount(ID, INSTITUTION_ID, null, PASSWORD_HASH))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void rejectsANullPasswordHash() {
+        assertThatThrownBy(() -> new StaffAccount(ID, INSTITUTION_ID, IDENTIFIER, null))
                 .isInstanceOf(NullPointerException.class);
     }
 }

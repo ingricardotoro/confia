@@ -1,5 +1,6 @@
 package com.confia.identity.infrastructure;
 
+import com.confia.identity.application.LoginIdentifierFingerprinter;
 import com.confia.identity.domain.IdentifierFingerprint;
 import com.confia.identity.domain.LoginIdentifier;
 import java.nio.charset.StandardCharsets;
@@ -17,11 +18,10 @@ import javax.crypto.spec.SecretKeySpec;
  * Reusing the pepper directly for two unrelated primitives — password hashing and identifier
  * fingerprinting — is a cheap mistake this domain separation exists to rule out.
  *
- * <p>Matches the eventual shape of the {@code LoginIdentifierFingerprinter} port
- * {@code identity.application} declares in PR C3a without implementing it yet — that port does not
- * exist until that later cut (design.md §11, paso 15).
+ * <p>Implements the {@link LoginIdentifierFingerprinter} port {@code identity.application}
+ * declares in this same cut (design.md §11, paso 15).
  */
-public final class HmacLoginIdentifierFingerprinter {
+public final class HmacLoginIdentifierFingerprinter implements LoginIdentifierFingerprinter {
 
     static final String DOMAIN_SEPARATION_LABEL = "confia.identity.login-identifier.v1";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
@@ -34,6 +34,7 @@ public final class HmacLoginIdentifierFingerprinter {
                 DOMAIN_SEPARATION_LABEL.getBytes(StandardCharsets.UTF_8));
     }
 
+    @Override
     public IdentifierFingerprint fingerprintOf(LoginIdentifier identifier) {
         Objects.requireNonNull(identifier, "identifier");
         byte[] digest = hmac(subkey, identifier.value().getBytes(StandardCharsets.UTF_8));

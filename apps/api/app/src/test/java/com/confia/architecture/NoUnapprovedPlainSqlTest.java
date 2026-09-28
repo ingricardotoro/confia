@@ -29,11 +29,26 @@ import org.junit.jupiter.api.Test;
  * DSL.field(String)} (design.md decision 9, rule R4). Every listed method also has an overload
  * that appends bind values ({@code Object...}, {@code QueryPart...}); those variants still start
  * with a {@code String} first parameter, so the same first-parameter check catches them too.
+ *
+ * <p><b>First report, {@code identity-module-and-password-authentication} task 3.1.</b> {@link
+ * com.confia.shared.infrastructure.JooqAuditLogWriter} calls {@code DSL.field("cast({0} as
+ * inet)", String.class, DSL.val(sourceIp))} to write {@code shared_audit_log.source_ip}: jOOQ's
+ * open-source code generator has no native {@code INET} binding (this repository's own {@code
+ * forcedTypes} config falls back to {@code VARCHAR}, apps/api/app/pom.xml), so PostgreSQL refuses
+ * to assign a plain {@code VARCHAR}-typed bind parameter to that column without an explicit cast.
+ * The bind value is a single {@code Object} argument through jOOQ's own template substitution
+ * ({@code {0}}), never string concatenation of anything a caller controls (CLAUDE.md regla 12):
+ * {@code sourceIp} is always {@code null} in this whole change (design.md, decision 8), and the
+ * template text itself is a fixed literal.
  */
 class NoUnapprovedPlainSqlTest {
 
-    /** Empty and immutable today: no plain-SQL report exists yet in this part of the change. */
-    private static final Set<String> APPROVED_PLAIN_SQL_CALLERS = Set.of();
+    /**
+     * One entry, added and justified above (task 3.1): {@code JooqAuditLogWriter}'s single {@code
+     * cast(... as inet)} template for a PostgreSQL type jOOQ does not model.
+     */
+    private static final Set<String> APPROVED_PLAIN_SQL_CALLERS =
+            Set.of("com.confia.shared.infrastructure.JooqAuditLogWriter");
 
     private static final String DSL_TYPE = "org.jooq.impl.DSL";
     private static final Set<String> FORBIDDEN_DSL_STATIC_METHODS =
