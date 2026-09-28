@@ -955,11 +955,21 @@ filas de las cuatro tablas. Verde: `V6`, `AesGcmCipher`, `EncryptedColumnValue`,
 `DataEncryptionKeyRepository` + adaptador, `ColumnEncryptionService`, ADR-0023.
 
 **C2** — `TotpAlgorithm` contra los seis vectores derivados (con `005924` explícito). Rojo/verde de
-`TotpVerificationPolicy`, `EnrollTotpSecondFactor`, `VerifyTotpCode`,
-`TotpVerificationBackoffStore` + adaptador.
+`TotpVerificationPolicy`, `VerifyTotpCode`, `TotpVerificationBackoffStore` + adaptador.
 
-**C3** — `RecoveryCodeHasher` + adaptador reutilizando `Argon2Profile`/`Argon2PhcCodec`. `Consume
-RecoveryCode`, aviso de códigos bajos.
+> **Corrección del 2026-09-28, encontrada por la fase de tareas.** Esta línea incluía
+> `EnrollTotpSecondFactor` en **C2**, y **no puede estar ahí**: la inscripción genera los diez códigos
+> de recuperación, que necesitan `RecoveryCodeHasher`, y este mismo diseño asigna ese hasher a **C3**.
+> Construir la inscripción en C2 obligaría a dejarla a medias y volver a ella, o a adelantar el hasher
+> rompiendo el corte.
+>
+> `EnrollTotpSecondFactor` se construye **entero en C3**. En C2, las pruebas de verificación siembran
+> la credencial TOTP directamente por su repositorio, sin pasar por un caso de uso de inscripción que
+> todavía no podría existir completo. La lista de tareas ya está escrita así.
+
+**C3** — `RecoveryCodeHasher` + adaptador reutilizando `Argon2Profile`/`Argon2PhcCodec`.
+`EnrollTotpSecondFactor` completo (ver la corrección de C2), `ConsumeRecoveryCode`, aviso de códigos
+bajos.
 
 **C4** — Edición de `AuthenticationResult` y de `AuthenticateWithPassword`. Sonda S3 en cuanto exista
 el `switch` real. Fixture de compilación fallida y su gemelo de control positivo.
