@@ -304,6 +304,34 @@ No se toca `build-integrity`: ninguna regla de arquitectura nueva se introduce �
 
 ## Decisiones que requieren aprobación explícita del propietario
 
+> **Estado al 2026-09-28.**
+>
+> **D7 y D8: APROBADAS POR EL PROPIETARIO.** Los dos controles de `docs/03` §4.3 —el límite de tasa de
+> verificación de código TOTP y el aviso al quedar con menos de tres códigos de recuperación— se
+> **añaden como requisitos** de la capacidad `identity`, no se declaran brecha.
+>
+> **La consecuencia de tamaño, dicha sin suavizar.** Con las dos aprobadas, el pronóstico queda en
+> **12 a 17 tareas** contra el límite de **quince** de `openspec/changes/README.md`, y el historial de
+> subestimación de este repositorio es de 1,5× a 3× sin descontar, así que la expectativa realista se
+> acerca al extremo alto. Sin ellas habría quedado en 10 a 14, con margen cómodo.
+>
+> Es decir: **este cambio se acepta a sabiendas de que puede superar el límite de tareas del propio
+> repositorio.** La regla de tamaño diría partirlo, y **no hay dónde**: esa herramienta ya se usó dos
+> veces sobre el cambio 7 —el segundo corte del 2026-09-24 y el tercero del 2026-09-27— y el corte que
+> quedaba, separar la recuperación de contraseña, es exactamente el que produjo esta carpeta. La
+> mitigación es la que ya usó la parte 1: **cortes de pull request encadenados dentro de este mismo
+> cambio SDD**, con el presupuesto de 800 líneas por corte.
+>
+> Si la fase de tareas confirma un total por encima de quince, eso **no** es una sorpresa que obligue a
+> replanificar: está previsto aquí, con su mitigación nombrada y su motivo escrito.
+>
+> **D1 a D6: recomendadas por esta propuesta y no objetadas por el propietario**, que las recibió
+> resumidas con su recomendación al aprobar D7 y D8. Se marcan así —recomendadas y no objetadas— y no
+> como aprobación explícita, porque no la hubo por separado. Si alguna se revisa antes de especificar,
+> el lugar es aquí.
+
+
+
 Renumeradas de forma continua desde D1, para responderlas de una en una. Cada una indica a qué
 número correspondía en la propuesta anterior (antes del tercer corte), para que el informe ya escrito
 siga siendo rastreable.
