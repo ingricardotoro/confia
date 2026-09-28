@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.identity.domain.IdentifierFingerprint;
 import com.confia.identity.domain.LoginIdentifier;
+import com.confia.identity.domain.StoredPasswordHash;
+import com.confia.identity.domain.PlainPassword;
 import com.confia.identity.infrastructure.Argon2Pepper;
 import com.confia.identity.infrastructure.Argon2Profile;
 import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
@@ -89,6 +91,57 @@ class LoginBackoffAtomicityIT extends CommittingPostgresIntegrationTest {
 
         assertThat(countBackoffRows(institutionId, fingerprint)).isEqualTo(1);
         assertThat(countAuditRows(institutionId, fingerprint.value())).isEqualTo(1);
+    }
+
+    /**
+     * The same rollback, on the branch the two tests above never reach. Both of them present an
+     * identifier with no account, so the use case takes the decoy path: the repository returns
+     * empty, no stored hash is read, and {@code actorId} stays null. A real account exercises the
+     * other branch — a row read from {@code identity_staff_account}, a verification against its
+     * actual hash, a non-null actor — and nothing here demonstrated that a deterministic failure on
+     * <em>that</em> path also leaves no trace.
+     *
+     * <p>Found by the pre-merge security audit as a coverage gap rather than a mechanism one: the
+     * write is the same shape on both branches, same rows and same lock order, so the guarantee was
+     * argued from symmetry. Decision 9 states atomicity as a property of the single transaction
+     * without distinguishing the two, and a property worth stating is worth demonstrating.
+     */
+    @Test
+    void aDeterministicFailureAlsoLeavesNoTraceWhenTheAccountReallyExists() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        LoginIdentifier identifier = LoginIdentifier.of("carlos.ramirez@colegio.edu.hn");
+        IdentifierFingerprint fingerprint = FINGERPRINTER.fingerprintOf(identifier);
+        seedStaffAccount(institutionId, identifier, "PasswordReal#2026");
+        AuthenticateWithPassword useCase = useCase(institutionId, "2026-03-10T13:00:00Z");
+        SecurityContext context = contextOf(institutionId);
+
+        assertThatThrownBy(() -> transactionRunner().execute(context, () -> {
+            useCase.runWithinTransaction(institutionId, context.requestId(),
+                    new AuthenticationCommand(identifier.value(), "PasswordEquivocada#2026"));
+            throw new IllegalStateException(
+                    "deterministic failure on the real-account branch, after the three effects");
+        }))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(countBackoffRows(institutionId, fingerprint))
+                .as("the account exists and its stored hash was read, yet the backoff row must not "
+                        + "survive the rollback either")
+                .isZero();
+        assertThat(countAuditRows(institutionId, fingerprint.value()))
+                .as("nor may the login.failed entry survive, even with a non-null actor id on it")
+                .isZero();
+    }
+
+    private void seedStaffAccount(InstitutionId institutionId, LoginIdentifier identifier,
+            String password) {
+        StoredPasswordHash hash = HASHER.hash(PlainPassword.of(password));
+        transactionRunner().execute(contextOf(institutionId), () -> {
+            dsl.execute("""
+                    insert into identity_staff_account (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
+                    """, institutionId.value(), UUID.randomUUID(), identifier.value(), hash.value());
+            return null;
+        });
     }
 
     private AuthenticateWithPassword useCase(InstitutionId institutionId, String instant) {
