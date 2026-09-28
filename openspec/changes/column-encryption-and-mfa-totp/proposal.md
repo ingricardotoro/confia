@@ -325,10 +325,15 @@ No se toca `build-integrity`: ninguna regla de arquitectura nueva se introduce �
 > Si la fase de tareas confirma un total por encima de quince, eso **no** es una sorpresa que obligue a
 > replanificar: está previsto aquí, con su mitigación nombrada y su motivo escrito.
 >
-> **D1 a D6: recomendadas por esta propuesta y no objetadas por el propietario**, que las recibió
-> resumidas con su recomendación al aprobar D7 y D8. Se marcan así —recomendadas y no objetadas— y no
-> como aprobación explícita, porque no la hubo por separado. Si alguna se revisa antes de especificar,
-> el lugar es aquí.
+> **D1 a D6: APROBADAS el 2026-09-28**, al aprobar el propietario la propuesta completa
+> (`openspec/config.yaml`, `rules.proposal`: «Product owner approves the proposal before
+> specs/design/tasks proceed»). Antes de esa aprobación estuvieron registradas aquí como «recomendadas
+> y no objetadas», porque se habían presentado como recomendaciones junto a la única pregunta que
+> entonces estaba abierta, y no hubo aprobación separada de cada una. Quedan aprobadas con el
+> documento que las contiene.
+>
+> **La propuesta completa queda aprobada, y con ella las ocho decisiones.** Pasa a la fase de
+> especificación.
 
 
 
