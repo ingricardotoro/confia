@@ -1,34 +1,47 @@
-# Propuesta: MFA con TOTP y recuperación de contraseña
+# Propuesta: Cifrado de columna y MFA con TOTP
 
-- **Cambio:** `mfa-totp-and-password-recovery` — **segunda de tres partes** en que se dividió el
-  cambio 7 de F0 (`docs/09-roadmap-y-fases.md` §3)
-- **Exploración:** `openspec/changes/mfa-totp-and-password-recovery/exploration.md`, con una de sus
-  nueve decisiones (§8, punto 2) ya resuelta por el propietario el 2026-09-27
+- **Cambio:** `column-encryption-and-mfa-totp` — **segundo de cuatro** cambios secuenciales en que
+  se ejecuta el cambio 7 de F0 (`docs/09-roadmap-y-fases.md` §3)
+- **Historia de la carpeta.** Nació como la segunda de **tres** partes (`mfa-totp-and-password-
+  recovery`) el 2026-09-24. El propietario la partió a su vez el **2026-09-27**, porque su propia
+  propuesta anterior pronosticó **12 a 17 tareas solo para la mitad que no es recuperación de
+  contraseña**, contra el límite de quince de `openspec/changes/README.md`. Esta carpeta se renombró
+  a `column-encryption-and-mfa-totp` y conserva esa mitad; la otra mitad nace como cambio nuevo,
+  `password-recovery-token`. Esta reescritura recorta el alcance de la propuesta en consecuencia.
+  Ver `exploration.md` (cabecera) y `openspec/changes/foundations-plan/exploration.md` (nota del
+  2026-09-27, «tercer corte») para la justificación completa del corte.
+- **Exploración:** `openspec/changes/column-encryption-and-mfa-totp/exploration.md` — compartida con
+  `password-recovery-token`, hecha antes del tercer corte. Una de sus nueve decisiones (§8, punto 2)
+  ya está resuelta por el propietario desde el 2026-09-27.
 - **Depende de:** `identity-module-and-password-authentication`, archivado el 2026-09-27
-  (`openspec/changes/archive/2026-09-27-identity-module-and-password-authentication/`)
-- **Cambio siguiente de la secuencia:** `session-tokens-and-web-layer` — JWT, JWKS, capa `web`,
-  RBAC genérico y quien materializa `AuthenticationDecision.requiredDelay()`. Depende de este cambio
-  y del anterior.
-- **Rama:** `change/mfa-totp-and-password-recovery`
+  (`openspec/changes/archive/2026-09-27-identity-module-and-password-authentication/`).
+- **Siguiente cambio de esta secuencia:** `password-recovery-token` (tercero de cuatro). **No
+  depende técnicamente de nada que este cambio entregue** — no cifra ninguna columna, no usa TOTP, y
+  su token se almacena hasheado, no cifrado —; la secuencia entre ambos es solo de origen (nacieron
+  de partir el mismo cambio), no de dependencia funcional.
+- **Cuarto y último cambio de esta secuencia:** `session-tokens-and-web-layer` — JWT, JWKS, capa
+  `web`, RBAC genérico, y quien materializa `AuthenticationDecision.requiredDelay()`. Depende de este
+  cambio (los cuatro desenlaces tipados) y de `password-recovery-token` (la traducción HTTP de su
+  respuesta uniforme).
+- **Rama:** `change/mfa-totp-and-password-recovery` (nombre heredado de antes del tercer corte; no
+  se renombra en este documento porque renombrar una rama en curso no es una decisión de esta fase).
 - **Estado:** pendiente de aprobación del propietario (`openspec/config.yaml`, `rules.proposal`)
 
 ## Intención
 
-El módulo `identity` que la parte 1 entregó autentica con contraseña y audita, pero deja tres cosas
-sin resolver que este cambio existe para cerrar, y una cuarta que no es de este cambio pero que este
+El módulo `identity` que la parte 1 entregó autentica con contraseña y audita, pero deja pendientes
+dos cosas que este cambio existe para cerrar, y una tercera que no es de este cambio pero que este
 cambio **tiene la obligación de no dejar peor**.
 
 1. **El requisito publicado «MFA obligatoria para roles con escritura financiera o de configuración»
    sigue sin ningún mecanismo detrás.** `identity_staff_account` tiene hoy cinco columnas —
    `institution_id`, `id`, `email`, `password_hash`, `created_at` — y ninguna dice si una cuenta
    necesita segundo factor. Este cambio entrega TOTP (RFC 6238), la inscripción del segundo factor,
-   los códigos de recuperación, y la columna mínima que decide cuándo exigirlo.
+   los códigos de recuperación de MFA, y la columna mínima que decide cuándo exigirlo.
 2. **El secreto TOTP debe cifrarse a nivel de columna** (`docs/03-seguridad.md` §7.3), y hoy no
    existe en el árbol ningún mecanismo de cifrado de columna ni de sobre de llaves. Este cambio es el
    primero que necesita uno, y por tanto el que debe construirlo.
-3. **La recuperación de contraseña con token de un solo uso** está publicada
-   (`openspec/specs/identity/spec.md`, líneas 191-234) y no tiene ningún caso de uso detrás.
-4. **El tipo sellado `AuthenticationResult` promete, en su propio Javadoc, una protección del
+3. **El tipo sellado `AuthenticationResult` promete, en su propio Javadoc, una protección del
    compilador que no existe todavía**, y este cambio es quien la construye o la deja sin construir
    para siempre. Su Javadoc dice que añadir un desenlace nuevo obliga «a cada `switch` existente» a
    manejarlo, pero **verificado en el árbol** (`AuthenticateWithPassword.java:155` y `:175`), los dos
@@ -42,12 +55,18 @@ cambio **tiene la obligación de no dejar peor**.
    y verificado** con cobertura de dominio del 95 % y mutación del 80 %. Se declara así, sin
    disimularlo como una simple extensión.
 
-**Por qué ahora, y no en `session-tokens-and-web-layer`.** El cambio 3 —el que emite tokens— llega
-**antes** que el cambio 8 (matriz de roles y permisos) en la cadena de dependencias del roadmap. Si
-este cambio no entrega ya una señal de qué cuentas necesitan MFA, existiría una ventana en la que el
-sistema emitiría sesiones completas a usuarios con permisos financieros sin exigir nunca un segundo
-factor, porque nada sabría que hace falta. Esa es la razón, ya resuelta por el propietario, que se
-explica en detalle más abajo.
+**La recuperación de contraseña queda fuera de esta propuesta.** Está publicada
+(`openspec/specs/identity/spec.md`, líneas 191-234) y sigue sin ningún caso de uso detrás, pero es
+responsabilidad de `password-recovery-token`, el tercer cambio de esta secuencia, precisamente
+porque no depende de nada de lo que este cambio entrega. Ver «Fuera de alcance».
+
+**Por qué la columna `mfa_required` entra ahora, y no en `session-tokens-and-web-layer`.** El cuarto
+cambio de esta secuencia —el que emite tokens— llega **antes** que el cambio 8
+(`rbac-permission-matrix-and-audit-integration`, matriz de roles y permisos) en la cadena de
+dependencias del roadmap. Si este cambio no entrega ya una señal de qué cuentas necesitan MFA,
+existiría una ventana en la que el sistema emitiría sesiones completas a usuarios con permisos
+financieros sin exigir nunca un segundo factor, porque nada sabría que hace falta. Esa es la razón,
+ya resuelta por el propietario, que se explica en detalle más abajo.
 
 ## Alcance
 
@@ -60,60 +79,73 @@ explica en detalle más abajo.
 2. **TOTP** (RFC 6238, SHA-1, 6 dígitos, periodo de 30 segundos, ventana ±1, ya decidido en la
    exploración compartida): inscripción del segundo factor, verificación con prevención de
    reutilización por contador, y el secreto cifrado con el sobre de llaves del punto 1.
-3. **Diez códigos de recuperación de un solo uso**, hasheados con Argon2id, con su propio puerto de
-   verificación (decisión D6 más abajo).
+3. **Diez códigos de recuperación de MFA, de un solo uso**, hasheados con Argon2id, con su propio
+   puerto de verificación (decisión D5 más abajo). **Distintos del token de recuperación de
+   contraseña** de `password-recovery-token`: estos códigos sustituyen un código TOTP cuando el
+   usuario perdió su dispositivo, no restablecen una contraseña.
 4. **Columna mínima `mfa_required`** en `identity_staff_account`, decidida por quien crea la cuenta,
    sin modelar rol ni permiso — decisión ya resuelta por el propietario, ver más abajo.
 5. **Edición de `AuthenticationResult`**: se añaden los desenlaces `SecondFactorRequired` y
    `SecondFactorEnrollmentRequired` a la cláusula `permits`, y los dos `instanceof` de
    `AuthenticateWithPassword` se convierten en un `switch` exhaustivo sin `default`. Ver la sección
    «La costura con la parte 1».
-6. **Recuperación de contraseña con token de un solo uso**, tal como ya la publica
-   `openspec/specs/identity/spec.md` (líneas 191-212): sin delta de redacción, solo implementación —
-   caso de uso, tabla propia, concurrencia sobre el mismo token, respuesta `202` uniforme a nivel de
-   caso de uso (la traducción HTTP exacta la hace `session-tokens-and-web-layer`, igual que con el
-   `401` de contraseña incorrecta en la parte 1).
-7. **Delta de redacción sobre «MFA obligatoria para roles con escritura financiera o de
+6. **Delta de redacción sobre «MFA obligatoria para roles con escritura financiera o de
    configuración»** y sobre «Resultado tipado de la autenticación con dos desenlaces» (pasa a
    cuatro). Ver la sección dedicada.
-8. **Notas editoriales fechadas** sobre `docs/03-seguridad.md` §4.1 (ya tiene una de la parte 1;
+7. **Notas editoriales fechadas** sobre `docs/03-seguridad.md` §4.1 (ya tiene una de la parte 1;
    esta añade la suya propia sobre §4.3 y §7.3) y actualización de `docs/09-roadmap-y-fases.md`.
-9. Sujeto a **D5** más abajo: límite de tasa sobre la verificación de código TOTP (`docs/03` §4.3) y
-   la señal de aviso al quedar con menos de tres códigos de recuperación.
+8. Sujeto a **D7** y **D8** más abajo: límite de tasa sobre la verificación de código TOTP (`docs/03`
+   §4.3) y la señal de aviso al quedar con menos de tres códigos de recuperación.
 
 ### Fuera de alcance
 
 Cada exclusión lleva destino nombrado, dentro de bloques `### Requisito:` en el delta cuando el
 destino es un cambio futuro identificado, siguiendo la disciplina que la parte 1 aplicó.
 
-**De `session-tokens-and-web-layer`** (sin cambios respecto a como la parte 1 ya lo dejó escrito):
+**De `password-recovery-token`** (tercer cambio de esta secuencia, íntegro): la recuperación de
+contraseña con su token de un solo uso y de corta vida, su tabla propia, su concurrencia sobre el
+mismo token, y la respuesta uniforme (`202` a nivel de caso de uso) que exige la prohibición de
+enumeración. **El requisito publicado «Recuperación de contraseña con token de un solo uso y de
+corta vida» (líneas 191-212 de `openspec/specs/identity/spec.md`) y los dos escenarios de
+recuperación del requisito «Prohibición de enumeración de usuarios» (líneas 220-234) son de ese
+cambio, no de este.** Este cambio no crea ningún delta sobre ninguno de los dos: los deja
+exactamente como la parte 1 los publicó, sin tocar una línea, para que `password-recovery-token` los
+resuelva sin arrastrar nada de aquí. **El corte, dicho sin rodeos: la recuperación de contraseña no
+cifra ninguna columna, no usa TOTP, y su token se almacena hasheado y no cifrado — no depende de
+nada de lo que entrega este cambio.**
+
+**De `session-tokens-and-web-layer`** (cuarto y último de esta secuencia; sin cambios respecto a
+como la parte 1 ya lo dejó escrito):
 
 - JWT, JWKS, la capa `web`, Spring Security, y **quien de verdad materializa**
   `AuthenticationDecision.requiredDelay()` fuera de la transacción.
 - La dimensión por dirección IP del retroceso exponencial (`docs/03` §4.4), con aprovisionamiento de
-  Redis en el cambio 11.
+  Redis en el cambio 11 (`containerization-and-cicd-pipeline`).
 - La cabecera `Idempotency-Key` obligatoria sobre el primer endpoint.
 - RBAC genérico y `CurrentInstitutionProvider` real.
 
-**Del cambio 8** (matriz de roles y permisos): **la derivación real de `mfa_required` desde el
-permiso del rol**, que este cambio no puede construir porque el dato de rol no existe todavía. Se
-escribe como obligación con dueño en la sección de la decisión resuelta, no como pregunta abierta.
+**Del cambio 8** (`rbac-permission-matrix-and-audit-integration`, matriz de roles y permisos): **la
+derivación real de `mfa_required` desde el permiso del rol**, que este cambio no puede construir
+porque el dato de rol no existe todavía. Se escribe como obligación con dueño en la sección de la
+decisión resuelta, no como pregunta abierta.
 
-**Del cambio 9** (`db-scheduler`, trabajos en segundo plano): **la ejecución real de la rotación
-anual de la llave de datos**, con recifrado progresivo por lotes. Este cambio entrega el esquema que
-la hace posible — la columna de estado `active`/`retired`, usada desde el primer día para decidir con
-qué llave se cifra cada valor nuevo — pero no el trabajo que recifra. Es la misma clase de brecha que
-la parte 1 ya declaró para la purga de `identity_login_backoff`.
+**Del cambio 9** (`background-jobs-with-db-scheduler`, trabajos en segundo plano): **la ejecución
+real de la rotación anual de la llave de datos**, con recifrado progresivo por lotes. Este cambio
+entrega el esquema que la hace posible — la columna de estado `active`/`retired`, usada desde el
+primer día para decidir con qué llave se cifra cada valor nuevo — pero no el trabajo que recifra. Es
+la misma clase de brecha que la parte 1 ya declaró para la purga de `identity_login_backoff`.
 
 **Sin destino todavía identificado en el roadmap:** el envío real de la notificación de correo al
-quedar con menos de tres códigos de recuperación (`docs/03` §4.3), condicionado a **D5**. Ningún
+quedar con menos de tres códigos de recuperación (`docs/03` §4.3), condicionado a **D8**. Ningún
 cambio de esta secuencia entrega un adaptador de envío de correo — la parte 1 ya lo señaló para la
-recuperación de contraseña —, así que este cambio, si D5 aprueba la señal, entrega únicamente el
+recuperación de contraseña —, así que este cambio, si D8 aprueba la señal, entrega únicamente el
 **dato calculado y auditado**, nunca el correo.
 
 **Nada «preparado para» un cambio futuro.** La tabla de llaves de datos, la de credencial TOTP y la
-de códigos de recuperación se usan las tres dentro de este mismo cambio; ninguna es infraestructura
-sin consumidor.
+de códigos de recuperación de MFA se usan las tres dentro de este mismo cambio; ninguna es
+infraestructura sin consumidor. En particular, **este cambio no crea ninguna tabla, columna ni
+puerto para la recuperación de contraseña** — ni siquiera un esquema vacío o un nombre reservado:
+esa tabla nace íntegra en `password-recovery-token`.
 
 ## Las decisiones ya resueltas, con su evidencia
 
@@ -126,11 +158,11 @@ roles y permisos es del cambio 8, que **depende de este cambio**, no al revés.
 
 **Decisión: columna `mfa_required BOOLEAN NOT NULL` en `identity_staff_account`, decidida por quien
 crea la cuenta, sin modelar rol ni permiso.** El argumento decisivo fue de **secuencia, no de
-modelado**: el cambio 3 emite tokens y llega antes que el cambio 8; con cualquier alternativa que no
-fuera esta, existiría una ventana entre ambos en la que el sistema emitiría sesiones completas a
-usuarios con permisos financieros sin ninguna exigencia de segundo factor, porque nada sabría que
-hace falta. Esta es la única opción que permite al cambio 3 exigir MFA desde el primer día en que
-emite tokens.
+modelado**: el cuarto cambio de esta secuencia emite tokens y llega **antes** que el cambio 8; con
+cualquier alternativa que no fuera esta, existiría una ventana entre ambos en la que el sistema
+emitiría sesiones completas a usuarios con permisos financieros sin ninguna exigencia de segundo
+factor, porque nada sabría que hace falta. Esta es la única opción que permite al cuarto cambio de
+esta secuencia exigir MFA desde el primer día en que emite tokens.
 
 Se descartó la alternativa de que la exigencia dependiera solo de si la cuenta **ya tiene** un
 secreto TOTP inscrito (sin distinguir por rol): invierte la propiedad de seguridad, porque el
@@ -138,7 +170,8 @@ requisito existe para que un usuario privilegiado **no pueda** evitar el segundo
 alternativa quien nunca se inscribe nunca se lo piden. También vuelve inexpresable el segundo
 escenario publicado, el de la sesión restringida para una cuenta sin MFA configurada. Se descartó
 también no tocar la obligatoriedad en este cambio: eso dejaría el escenario completo como brecha
-hasta el cambio 8, y el cambio 3 seguiría sin ninguna señal en su ventana propia.
+hasta el cambio 8, y el cuarto cambio de esta secuencia seguiría sin ninguna señal en su ventana
+propia.
 
 **El costo aceptado, dicho en voz alta.** La columna es un **duplicado desnormalizado** de algo que
 el cambio 8 va a poseer: el permiso de escritura financiera o de configuración de un rol. Si un rol
@@ -150,13 +183,13 @@ pregunta abierta** — por la misma razón que la condición de aceptación del 
 `identity_login_backoff` en `openspec/changes/foundations-plan/exploration.md`: una pregunta abierta
 no obliga a nadie.
 
-> **El cambio 8 (matriz de roles y permisos) DEBE derivar `identity_staff_account.mfa_required` del
-> permiso de escritura financiera o de configuración del rol de la cuenta, y eliminar la doble
-> fuente**, antes de considerar cerrado el requisito publicado «MFA obligatoria para roles con
-> escritura financiera o de configuración». Mientras esa derivación no exista, un cambio de rol que
-> otorgue un permiso financiero sin tocar esta columna deja el control desactivado en silencio para
-> esa cuenta, y **eso es exactamente lo que el cambio 8 debe cerrar**, no una advertencia que pueda
-> ignorarse.
+> **El cambio 8 (`rbac-permission-matrix-and-audit-integration`) DEBE derivar
+> `identity_staff_account.mfa_required` del permiso de escritura financiera o de configuración del
+> rol de la cuenta, y eliminar la doble fuente**, antes de considerar cerrado el requisito publicado
+> «MFA obligatoria para roles con escritura financiera o de configuración». Mientras esa derivación
+> no exista, un cambio de rol que otorgue un permiso financiero sin tocar esta columna deja el
+> control desactivado en silencio para esa cuenta, y **eso es exactamente lo que el cambio 8 debe
+> cerrar**, no una advertencia que pueda ignorarse.
 
 **El delta de redacción que esta decisión exige**, sobre los dos escenarios publicados de «MFA
 obligatoria...» (líneas 47-65 de `openspec/specs/identity/spec.md`):
@@ -171,11 +204,11 @@ obligatoria...» (líneas 47-65 de `openspec/specs/identity/spec.md`):
   ningún token, así que el delta debe terminar los dos escenarios en el desenlace tipado que este
   cambio sí produce — `SecondFactorRequired` en el primer caso, `SecondFactorEnrollmentRequired` en
   el segundo —, dejando escrito en el propio requisito que la traducción de ese desenlace a un token
-  de sesión, completo o restringido, es responsabilidad del cambio siguiente. El requisito publicado
-  «Resultado tipado de la autenticación con dos desenlaces» (líneas 257-283) necesita el mismo
-  tratamiento: su título y su cuerpo dicen literalmente «dos desenlaces», y este cambio entrega
-  cuatro. Los dos delta se escriben juntos en la fase de especificación, porque describen la misma
-  costura desde dos ángulos.
+  de sesión, completo o restringido, es responsabilidad del cuarto cambio de esta secuencia. El
+  requisito publicado «Resultado tipado de la autenticación con dos desenlaces» (líneas 257-283)
+  necesita el mismo tratamiento: su título y su cuerpo dicen literalmente «dos desenlaces», y este
+  cambio entrega cuatro. Los dos delta se escriben juntos en la fase de especificación, porque
+  describen la misma costura desde dos ángulos.
 
 ### El catálogo cerrado de ADR-0017 no admite la tabla de llaves — confirmado por lectura, no es una decisión
 
@@ -242,8 +275,8 @@ Ninguna de las tres ramas nuevas modifica el estado del retroceso como si fuera 
 ### Nuevas
 
 **Ninguna.** Delta puro sobre `identity`, siguiendo el mismo razonamiento que la parte 1: TOTP,
-cifrado y recuperación de contraseña son comportamiento del mismo módulo hexagonal, no una capacidad
-separada.
+cifrado y códigos de recuperación de MFA son comportamiento del mismo módulo hexagonal, no una
+capacidad separada.
 
 ### Modificadas
 
@@ -254,13 +287,16 @@ separada.
   - `## MODIFIED Requirements` sobre «Resultado tipado de la autenticación con dos desenlaces» (pasa
     a cuatro, con `SecondFactorRequired` y `SecondFactorEnrollmentRequired`).
   - `## ADDED Requirements` para: inscripción y verificación TOTP con prevención de reutilización;
-    códigos de recuperación de un solo uso; cifrado a nivel de columna del secreto TOTP con sobre de
-    llaves y su estado `active`/`retired`; implementación completa de recuperación de contraseña
-    (sin delta de redacción, el requisito ya publicado se satisface); y, sujeto a **D5**, límite de
-    tasa de verificación TOTP y señal de aviso de códigos de recuperación bajos.
+    códigos de recuperación de MFA de un solo uso; cifrado a nivel de columna del secreto TOTP con
+    sobre de llaves y su estado `active`/`retired`; y, sujeto a **D7** y **D8**, límite de tasa de
+    verificación TOTP y señal de aviso de códigos de recuperación de MFA bajos.
   - `## ADDED Requirements` de ausencia con destino nombrado: ejecución real de la rotación de la
     llave de datos (cambio 9); derivación de `mfa_required` desde el permiso del rol (cambio 8, ya
     escrita arriba como obligación).
+  - **Ningún delta** sobre «Recuperación de contraseña con token de un solo uso y de corta vida» ni
+    sobre los dos escenarios de recuperación de «Prohibición de enumeración de usuarios»: quedan
+    exactamente como la parte 1 los publicó, para que `password-recovery-token` los resuelva sin
+    heredar nada de este cambio.
 
 No se toca `build-integrity`: ninguna regla de arquitectura nueva se introduce — el paquete
 `com.confia.shared.crypto` sigue el patrón de `@NamedInterface` que ADR-0022 ya estableció y que
@@ -268,10 +304,20 @@ No se toca `build-integrity`: ninguna regla de arquitectura nueva se introduce �
 
 ## Decisiones que requieren aprobación explícita del propietario
 
-Numeradas para responderlas de una en una. Las tres primeras traen una recomendación con muy poco
-margen de alternativa real; las últimas cinco son decisiones de diseño genuinas.
+Renumeradas de forma continua desde D1, para responderlas de una en una. Cada una indica a qué
+número correspondía en la propuesta anterior (antes del tercer corte), para que el informe ya escrito
+siga siendo rastreable.
 
-- **D1. ¿Cómo llega la llave maestra (KEK) al proceso?**
+**Decisión retirada de esta lista, no relocalizada: la antigua D3** («¿se divide este cambio en dos
+—cifrado y TOTP por un lado, recuperación de contraseña por otro— o se mantiene como uno solo?»).
+**Queda resuelta, no pendiente**: el propietario aprobó dividir el 2026-09-27, y esa división es
+exactamente el tercer corte que dio origen a esta reescritura — la «parte cifrado y TOTP» de aquella
+D3 es esta carpeta completa, y la «parte recuperación de contraseña» es `password-recovery-token`. No
+hay ninguna otra decisión numerada de la propuesta anterior que tratara específicamente sobre la
+recuperación de contraseña: las ocho decisiones originales son todas de cifrado, TOTP o códigos de
+recuperación de MFA, y las siete que siguen vigentes permanecen íntegras en este cambio.
+
+- **D1 — antes D1. ¿Cómo llega la llave maestra (KEK) al proceso?**
 
   **Recomendación: el precedente literal de `Argon2Pepper`, sin variación.** Objeto de valor con
   `toString()` redactado, construido desde configuración del proceso (variable de entorno, contenido
@@ -281,8 +327,8 @@ margen de alternativa real; las últimas cinco son decisiones de diseño genuina
   que ya lo es para la pimienta. No hace falta inventar ningún mecanismo nuevo: es la misma pregunta
   que `Argon2Pepper` ya respondió, aplicada a un secreto distinto.
 
-- **D2. ¿Se declara explícitamente que la ejecución real de la rotación de la llave de datos es una
-  brecha, en vez de construir algo parcial ahora?**
+- **D2 — antes D2. ¿Se declara explícitamente que la ejecución real de la rotación de la llave de
+  datos es una brecha, en vez de construir algo parcial ahora?**
 
   **Recomendación: sí.** `docs/03` §7.3 pide rotación anual con recifrado progresivo **en trabajo por
   lotes**, y eso es exactamente lo que `db-scheduler` existe para hacer (ADR-0016) — que todavía no
@@ -292,28 +338,8 @@ margen de alternativa real; las últimas cinco son decisiones de diseño genuina
   que la parte 1 ya declaró para la purga de `identity_login_backoff`, con el mismo dueño futuro:
   el cambio que introduzca mantenimiento programado.
 
-- **D3. ¿Se divide este cambio en dos cambios SDD secuenciales — cifrado y TOTP por un lado,
-  recuperación de contraseña por otro — o se mantiene como uno solo?**
-
-  **Recomendación: dividir**, en `2a` (sobre de llaves con su ADR-0023, TOTP completo, edición del
-  tipo sellado) y `2b` (recuperación de contraseña). El motivo del corte: la recuperación de
-  contraseña **no depende del cifrado de columna ni de TOTP en absoluto** — es una tabla y un flujo
-  propios —, mientras que el sobre de llaves debe entregarse **junto con** su único consumidor real
-  de este cambio, el secreto TOTP, no aislado. Entregarlo solo sería infraestructura sin uso, el
-  patrón que el propietario ya rechazó cuatro veces. Se descartó dividir en tres, aislando el sobre
-  de llaves de TOTP, por esa misma razón.
-
-  El pronóstico de tamaño (más abajo) muestra por qué esto no es prudencia excesiva: `2a` por sí sola
-  ya se estima entre 13 y 16 tareas, con riesgo real de superar el límite de quince, y este cambio
-  tiene más piezas nuevas que la parte 1, que ya necesitó cuatro cortes y nueve pull requests contra
-  un pronóstico de 12 a 13 tareas. Si se aprueba, el paso mecánico siguiente es idéntico al que ya
-  ocurrió una vez el 2026-09-24: bifurcar esta carpeta en dos cambios SDD secuenciales antes de la
-  fase de especificación, con `2a` conservando este nombre de cambio y rama, y `2b` naciendo como
-  cambio nuevo — el mismo mecanismo por el que `mfa-totp-and-password-recovery` nació de partir la
-  mitad de identidad.
-
-- **D4. ¿Dónde vive el motor de cifrado puro** — una función de bytes a bytes, sin acceso a base de
-  datos —, y dónde vive la gestión de la tabla de llaves?
+- **D3 — antes D4. ¿Dónde vive el motor de cifrado puro** — una función de bytes a bytes, sin acceso
+  a base de datos —, y dónde vive la gestión de la tabla de llaves?
 
   **Recomendación: el motor puro en `com.confia.kernel`; la gestión de la tabla de llaves en un
   paquete nuevo `com.confia.shared.crypto`, expuesto con `@NamedInterface` siguiendo el patrón que
@@ -337,7 +363,7 @@ margen de alternativa real; las últimas cinco son decisiones de diseño genuina
   `shared.security` y `shared.audit`, evita que cada módulo futuro redescubra la misma sonda que
   `identity.application` ya tuvo que resolver para consumir `TransactionRunner`.
 
-- **D5. ¿Se escribe el ADR-0023 para el sobre de llaves, con qué alcance exacto?**
+- **D4 — antes D5. ¿Se escribe el ADR-0023 para el sobre de llaves, con qué alcance exacto?**
 
   **Recomendación: sí, y su alcance es exactamente:** (a) el algoritmo y formato de sobre —
   AES-256-GCM, vector de inicialización de 96 bits, etiqueta de 128 bits, datos autenticados
@@ -345,19 +371,19 @@ margen de alternativa real; las últimas cinco son decisiones de diseño genuina
   `docs/03` §7.3 ya los fija, sin margen de reinterpretación; (b) el esquema de la tabla de llaves de
   datos, con su estado `active`/`retired` y su aislamiento por institución; (c) la fuente de la llave
   maestra, por el precedente de **D1**; (d) la ubicación del motor puro y del puerto de gestión de
-  llaves, por la decisión de **D4**. Queda **fuera** de su alcance, y se declara así dentro del
+  llaves, por la decisión de **D3**. Queda **fuera** de su alcance, y se declara así dentro del
   propio ADR: la ejecución de la rotación (**D2**, brecha con dueño en el cambio 9) y la mitad de
-  búsqueda determinista por HMAC (**D7**, siguiente punto).
+  búsqueda determinista por HMAC (**D6**, más abajo).
 
   Merece ADR por la misma razón que la mereció ADR-0022: es una decisión que otros módulos futuros
   van a necesitar igual, y decidirla sin ADR obliga a cada módulo siguiente a redescubrirla. **Los
   ADR van del 0001 al 0022 sin huecos** (verificado por listado de `docs/adr/`), así que el siguiente
   número libre es **0023**. La propuesta archivada de la parte 1 había anticipado que este cifrado
   ocuparía el 0022, pero ese número lo consumió una decisión distinta durante la implementación de
-  esa parte — la interfaz nombrada del módulo `shared`, que **D4** reutiliza sin reabrir.
+  esa parte — la interfaz nombrada del módulo `shared`, que **D3** reutiliza sin reabrir.
 
-- **D6. ¿Se reutiliza `PasswordHasher` para los códigos de recuperación, o se declara un puerto
-  nuevo sobre las mismas primitivas?**
+- **D5 — antes D6. ¿Se reutiliza `PasswordHasher` para los códigos de recuperación de MFA, o se
+  declara un puerto nuevo sobre las mismas primitivas?**
 
   **Recomendación: puerto nuevo.** `PasswordHasher` está tipado sobre `PlainPassword` y
   `StoredPasswordHash`, dos nombres atados semánticamente a «contraseña». Forzarlos a significar
@@ -367,10 +393,12 @@ margen de alternativa real; las últimas cinco son decisiones de diseño genuina
   — detrás de un puerto propio (`RecoveryCodeHasher`, con sus propios objetos de valor
   `PlainRecoveryCode` y `StoredRecoveryCodeHash`, ambos con `toString()` redactado siguiendo el
   mismo patrón que `PlainPassword`). Esto evita reabrir `PasswordHasher`, que es contrato ya
-  verificado con cobertura y mutación en verde.
+  verificado con cobertura y mutación en verde. **Este puerto es exclusivo de los códigos de
+  recuperación de MFA; el token de recuperación de contraseña de `password-recovery-token` es un
+  mecanismo distinto, con su propia decisión de hasheo en su propia propuesta.**
 
-- **D7. ¿Se entrega la mitad de búsqueda determinista por HMAC de `docs/03` §7.3, o se declara sin
-  consumidor?**
+- **D6 — antes D7. ¿Se entrega la mitad de búsqueda determinista por HMAC de `docs/03` §7.3, o se
+  declara sin consumidor?**
 
   **Recomendación: se declara sin consumidor, no se construye.** El secreto TOTP nunca se busca por
   valor — se lee siempre por cuenta, con la misma clave primaria que ya resuelve la fila —, así que
@@ -380,40 +408,48 @@ margen de alternativa real; las últimas cinco son decisiones de diseño genuina
   general para cuando un módulo futuro lo necesite de verdad — por ejemplo, buscar un estudiante por
   su documento nacional cifrado —, sin que este cambio lo implemente sin uso.
 
-- **D8. ¿Se añaden como requisitos los dos controles de `docs/03` sin requisito publicado — límite
-  de tasa de verificación TOTP (§4.3, 5 intentos por 15 minutos con retroceso posterior) y aviso al
-  quedar con menos de tres códigos de recuperación — o se declaran brecha con destino nombrado?**
+- **D7 — antes la primera mitad de D8. ¿Se añade como requisito el límite de tasa de verificación
+  TOTP (`docs/03` §4.3, 5 intentos por 15 minutos con retroceso posterior), o se declara brecha con
+  destino nombrado?**
 
-  **Recomendación: se añaden los dos, con alcance recortado, reutilizando la arquitectura que la
-  parte 1 ya probó.**
+  **Recomendación: se añade, reutilizando la arquitectura que la parte 1 ya probó.** La verificación
+  de un código TOTP ocurre siempre contra una cuenta ya identificada por contraseña — a diferencia
+  del inicio de sesión, aquí no hay caso de cuenta inexistente que proteger de enumeración —, así que
+  el mismo patrón de `identity_login_backoff` —contador en PostgreSQL, calculado en el dominio con
+  reloj inyectado, probado sin esperar— se aplica de forma directa, con la cuenta como clave en vez
+  de la huella del identificador presentado. Es el control emparejado con el propio mecanismo que
+  este cambio construye; dejarlo fuera sería entregar TOTP sin el control que `docs/03` §4.3 llama
+  «regla dura» junto a él.
 
-  Para el límite de tasa: la verificación de un código TOTP ocurre siempre contra una cuenta ya
-  identificada por contraseña — a diferencia del inicio de sesión, aquí no hay caso de cuenta
-  inexistente que proteger de enumeración —, así que el mismo patrón de `identity_login_backoff`
-  —contador en PostgreSQL, calculado en el dominio con reloj inyectado, probado sin esperar— se
-  aplica de forma directa, con la cuenta como clave en vez de la huella del identificador presentado.
-  Es el control emparejado con el propio mecanismo que este cambio construye; dejarlo fuera sería
-  entregar TOTP sin el control que `docs/03` §4.3 llama «regla dura» junto a él.
+  **Reevaluación de costo contra el pronóstico nuevo, dicha sin rodeos.** Con la recuperación de
+  contraseña ya fuera de esta carpeta, el pronóstico de este cambio (más abajo) sigue siendo
+  exactamente el que antes era solo la mitad «2a»: **12 a 17 tareas**, con riesgo real de superar el
+  límite de quince — la salida de la recuperación de contraseña no lo alivia, porque nunca fue parte
+  de ese bloque. Añadir este control mantiene la recomendación sin cambios respecto a la propuesta
+  anterior, porque el argumento no dependía del tamaño de la otra mitad: el control está emparejado
+  con TOTP, y `docs/03` §4.3 lo trata como regla dura, no como mejora. El costo del riesgo de tamaño
+  se sigue absorbiendo con cortes de pull request encadenados dentro de este mismo cambio, nunca con
+  otra división de cambio SDD — ver «Pronóstico de cortes y tamaño».
 
-  Para el aviso de códigos bajos: se entrega **solo el dato calculado y auditado** — cuántos códigos
-  de recuperación sin usar quedan tras consumir uno, con la señal de «por debajo de tres» — nunca el
-  envío del correo, porque ningún cambio de esta secuencia tiene un adaptador de envío. El destino
-  del envío real queda **sin identificar en el roadmap actual**, dicho así en vez de inventando un
-  dueño.
+- **D8 — antes la segunda mitad de D8. ¿Se añade como requisito el aviso al quedar con menos de tres
+  códigos de recuperación de MFA, o se declara brecha con destino nombrado?**
 
-  **El costo de esta recomendación, declarado sin rodeos:** añade alcance a un cambio cuyo
-  pronóstico de `2a` ya roza el límite de quince tareas. Si al llegar a la fase de tareas el total
-  no cabe, el corte adicional natural es exactamente el que la exploración ya nombra: separar el
-  límite de tasa TOTP en su propio corte de pull request encadenado dentro de `2a`, nunca en un
-  cambio SDD nuevo — mismo patrón que ya usó la parte 1 para sus tres cortes internos.
+  **Recomendación: se añade, pero solo el dato calculado y auditado.** Se entrega **solo** cuántos
+  códigos de recuperación de MFA sin usar quedan tras consumir uno, con la señal de «por debajo de
+  tres» — nunca el envío del correo, porque ningún cambio de esta secuencia tiene un adaptador de
+  envío. El destino del envío real queda **sin identificar en el roadmap actual**, dicho así en vez
+  de inventando un dueño. Se mantiene la recomendación de la propuesta anterior sin cambios: los
+  códigos de recuperación de MFA son de este cambio, así que su aviso de agotamiento también lo es, y
+  el argumento de costo es idéntico al de **D7** — el riesgo de tamaño no lo crea este control, y se
+  absorbe de la misma forma.
 
 ## Cobertura de los 19 requisitos publicados de `identity`
 
 | Requisito | Este cambio | Lo que falta y su dueño |
 |---|---|---|
-| MFA obligatoria... | **Con delta de redacción (D2 de la exploración, ya resuelta), luego completo** en la mitad que no es HTTP | `session-tokens-and-web-layer` traduce el desenlace a token completo o restringido |
-| Recuperación de contraseña... | **Completo**, sin delta | — |
-| Prohibición de enumeración (mitad de recuperación) | **Completo** a nivel de caso de uso | `session-tokens-and-web-layer` entrega el `202` HTTP |
+| MFA obligatoria... | **Con delta de redacción (decisión resuelta arriba), luego completo** en la mitad que no es HTTP | `session-tokens-and-web-layer` (cuarto de esta secuencia) traduce el desenlace a token completo o restringido |
+| Recuperación de contraseña... | **No tocado por este cambio** | `password-recovery-token` (tercero de esta secuencia) lo implementa completo, sin delta de redacción |
+| Prohibición de enumeración (mitad de recuperación) | **No tocado por este cambio** | `password-recovery-token` lo cierra a nivel de caso de uso; `session-tokens-and-web-layer` entrega el `202` HTTP |
 | Resultado tipado con dos desenlaces | **Con delta de redacción**, pasa a cuatro | — |
 | Los demás 15 requisitos (contraseña, retroceso, rotación de refresco, separación de dominios, autorización por permisos, atomicidad, redacción de secretos) | **No toca** — ya cerrados por la parte 1, o de un cambio posterior | Ver la tabla equivalente de la propuesta archivada de la parte 1 |
 
@@ -421,11 +457,12 @@ margen de alternativa real; las últimas cinco son decisiones de diseño genuina
 
 **Migraciones.** Una migración nueva (`V6`, siguiendo la numeración secuencial de Flyway), con al
 menos: la columna `mfa_required` sobre `identity_staff_account`; la tabla de llaves de datos; la
-tabla de credencial TOTP por cuenta; la tabla de códigos de recuperación; la tabla de token de
-recuperación de contraseña; y, si **D8** se aprueba, la tabla de retroceso de verificación TOTP. Los
-nombres exactos se fijan en diseño, con el precedente literal de `identity_staff_account` e
-`identity_login_backoff`: prefijo de módulo, `institution_id NOT NULL`, seguridad de fila habilitada
-y forzada, sin excepción alguna del catálogo cerrado de ADR-0017.
+tabla de credencial TOTP por cuenta; la tabla de códigos de recuperación de MFA; y, si **D7** se
+aprueba, la tabla de retroceso de verificación TOTP. **Ninguna tabla de recuperación de contraseña**:
+esa migración es de `password-recovery-token`. Los nombres exactos se fijan en diseño, con el
+precedente literal de `identity_staff_account` e `identity_login_backoff`: prefijo de módulo,
+`institution_id NOT NULL`, seguridad de fila habilitada y forzada, sin excepción alguna del catálogo
+cerrado de ADR-0017.
 
 **Privilegios.** Mismo patrón que `V5`: `REVOKE ALL FROM PUBLIC` antes de todo `GRANT`;
 `confia_admin_app` con `SELECT`, `INSERT`, `UPDATE` y sin `DELETE`; `confia_readonly` con `SELECT`;
@@ -433,9 +470,10 @@ y forzada, sin excepción alguna del catálogo cerrado de ADR-0017.
 `RolePrivilegeMatrixIT` con las filas nuevas.
 
 **Auditoría.** Eventos nuevos sobre la primera fila de `docs/03` §12.2 que la parte 1 no produjo:
-inscripción de MFA, verificación de código TOTP (éxito y fallo), uso de código de recuperación,
-solicitud y consumo de token de recuperación de contraseña. Cada uno dentro de la misma transacción
-que su efecto, siguiendo el patrón ya establecido por `AuditLogWriter`.
+inscripción de MFA, verificación de código TOTP (éxito y fallo), uso de código de recuperación de
+MFA. **La solicitud y el consumo del token de recuperación de contraseña no son de este cambio**:
+son eventos de `password-recovery-token`. Cada evento de este cambio se escribe dentro de la misma
+transacción que su efecto, siguiendo el patrón ya establecido por `AuditLogWriter`.
 
 ## Restricciones que este cambio no puede violar
 
@@ -445,17 +483,18 @@ que su efecto, siguiendo el patrón ya establecido por `AuditLogWriter`.
    de excepción, y —el más instructivo— `AuthenticationCommand`, un `record` de Java, filtrando la
    contraseña por su `toString()` **generado automáticamente por el lenguaje**, no escrito por
    nadie. En este cambio los secretos nuevos son el secreto TOTP en claro, los códigos de
-   recuperación en claro, la llave maestra y las llaves de datos. Ninguno de esos valores puede
-   viajar en un `record` sin `toString()` redactado explícito: cada objeto de valor que los cargue
-   es una clase final con un `toString()` sobreescrito, nunca un `record` sin más, exactamente como
-   `PlainPassword` y `Argon2Pepper` ya lo hacen. La verificación lo comprueba por inspección del
+   recuperación de MFA en claro, la llave maestra y las llaves de datos. Ninguno de esos valores
+   puede viajar en un `record` sin `toString()` redactado explícito: cada objeto de valor que los
+   cargue es una clase final con un `toString()` sobreescrito, nunca un `record` sin más, exactamente
+   como `PlainPassword` y `Argon2Pepper` ya lo hacen. La verificación lo comprueba por inspección del
    texto producido, nunca por confianza en el diseño.
 2. **Regla 14: toda acción sensible se audita.** Inscripción y baja de MFA, uso de código de
-   recuperación, verificación TOTP fallida, solicitud y consumo de recuperación de contraseña.
+   recuperación de MFA, verificación TOTP fallida.
 3. **Reglas de dependencia y de capas.** `domain` sin framework; jOOQ confinado a
    `infrastructure`; ningún módulo importa el `domain` de otro; `kernel` sin dependencias fuera del
-   JDK (relevante para **D4**).
-4. **Ninguna columna, tabla ni interfaz sin consumidor en este mismo cambio.**
+   JDK (relevante para **D3**).
+4. **Ninguna columna, tabla ni interfaz sin consumidor en este mismo cambio.** En particular, ninguna
+   preparada «para cuando llegue» `password-recovery-token`.
 5. **TDD estricto**, ejecutor `./mvnw verify` en `apps/api`, rojo observado y registrado antes de
    cada verde.
 
@@ -463,11 +502,11 @@ que su efecto, siguiendo el patrón ya establecido por `AuditLogWriter`.
 
 | Riesgo | Probabilidad | Mitigación |
 |---|---|---|
-| Un secreto nuevo —TOTP, código de recuperación, llave maestra, llave de datos— termina en un log, una excepción o un `toString()` generado por un `record` | **Alta si no se diseña**, con precedente exacto de los tres hallazgos de la parte 1 | Restricción 1, con envoltorios de valor explícitos y verificación por inspección |
-| El pronóstico de `2a` (13-16 tareas) supera el límite de quince, agravado si **D8** añade el límite de tasa TOTP | **Alta, ya visible en el pronóstico** | **D3** recomienda dividir en `2a`/`2b`; si `2a` sigue sobrando, corte de pull request encadenado dentro de `2a`, no cambio SDD nuevo |
+| Un secreto nuevo —TOTP, código de recuperación de MFA, llave maestra, llave de datos— termina en un log, una excepción o un `toString()` generado por un `record` | **Alta si no se diseña**, con precedente exacto de los tres hallazgos de la parte 1 | Restricción 1, con envoltorios de valor explícitos y verificación por inspección |
+| El pronóstico (12-17 tareas) supera el límite de quince, agravado si **D7**/**D8** añaden sus dos controles | **Alta, ya visible en el pronóstico, y ya no queda margen de dividir en otro cambio SDD** | Absorber el exceso con cortes de pull request encadenados dentro de este mismo cambio, ver «Pronóstico de cortes y tamaño» |
 | La columna `mfa_required` queda desactualizada cuando un rol gana un permiso financiero, porque es un duplicado desnormalizado | Media, aceptada y declarada | Obligación con dueño impuesta al cambio 8, escrita arriba |
 | El `switch` exhaustivo se implementa mal y dos ramas nuevas colapsan al mismo comportamiento | Baja, por construcción | El compilador rechaza cualquier `switch` que no cubra los cuatro casos; sin `default` que oculte un caso olvidado |
-| Historial de subestimación: la parte 1 pronosticó 12-13 tareas y necesitó 12 tareas mas cuatro cortes y nueve pull requests, todos sobre el presupuesto de 800 líneas | Alta, declarada sin descontar | Pronóstico de esta propuesta ya asume 1,5x a 3x sobre el inventario bruto, ver más abajo |
+| Historial de subestimación: la parte 1 pronosticó 12-13 tareas y necesitó 12 tareas más cuatro cortes y nueve pull requests, todos sobre el presupuesto de ochocientas líneas | Alta, declarada sin descontar | Pronóstico de esta propuesta ya asume el mismo factor de 1,5x a 3x, ver más abajo |
 | Una dependencia nueva (`spring-modulith-api` ya la trajo la parte 1; ninguna adicional se anticipa para AES-256-GCM, que es JDK puro) entra sin la revisión de `docs/03` §2.6 | Baja | Ninguna dependencia nueva prevista; si el diseño la introduce, sigue el mismo trato que Bouncy Castle recibió en la parte 1 |
 
 ## Plan de reversión
@@ -475,14 +514,18 @@ que su efecto, siguiendo el patrón ya establecido por `AuditLogWriter`.
 Igual de barata que en la parte 1: **no existe ningún entorno desplegado ni dato real**. La base
 vive solo en contenedores efímeros de prueba.
 
-1. Revertir el commit de fusión del corte afectado, o cerrar su pull request.
-2. Si `2a` y `2b` son cambios SDD separados (**D3**), cada uno se revierte de forma independiente:
-   `2b` no depende del esquema de `2a`.
-3. Dentro de `2a`, la edición de `AuthenticationResult` no se revierte sola si algún corte posterior
-   ya la consume; se revierte el corte completo que la introdujo.
-4. Ninguna nota editorial de `docs/03` ni de `docs/09` arrastra código.
-5. Una puerta que bloquee por error no se desactiva con una bandera (ADR-0008): se revierte el commit
+1. Revertir el commit de fusión del corte de pull request afectado, o cerrar su pull request. Este
+   cambio ya no tiene una sub-división en cambios SDD (esa división es ahora la frontera entre esta
+   carpeta y `password-recovery-token`, no algo interno a esta carpeta), así que cada corte se
+   revierte de forma independiente dentro de la misma cadena de pull requests, en orden inverso al
+   de fusión.
+2. La edición de `AuthenticationResult` no se revierte sola si algún corte posterior ya la consume;
+   se revierte el corte completo que la introdujo.
+3. Ninguna nota editorial de `docs/03` ni de `docs/09` arrastra código.
+4. Una puerta que bloquee por error no se desactiva con una bandera (ADR-0008): se revierte el commit
    que la introdujo.
+5. `password-recovery-token` no depende del esquema de este cambio, así que revertir este cambio no
+   arrastra nada de aquel, y viceversa.
 
 ## Dependencias
 
@@ -490,38 +533,57 @@ vive solo en contenedores efímeros de prueba.
   tablas, `AuthenticationResult`, `AuthenticateWithPassword`, `PasswordHasher`, `Argon2Pepper`,
   `Argon2RawHasher`, `Argon2Profile`, `TransactionRunner`, `AuditLogWriter` y el patrón
   `@NamedInterface` de ADR-0022.
-- **Dependen de este cambio:** `session-tokens-and-web-layer`, que traduce los cuatro desenlaces a
-  tokens completos o restringidos; y, a través de la secuencia completa, el cambio 8, que además
-  hereda la obligación de derivar `mfa_required` del permiso del rol.
+- **No depende de este cambio:** `password-recovery-token` (tercero de esta secuencia) — comparte
+  origen con este cambio, pero ninguna dependencia técnica; puede diseñarse y aplicarse sin esperar a
+  que este cambio se fusione, aunque el roadmap lo ordene después por convención de secuencia.
+- **Dependen de este cambio:** `session-tokens-and-web-layer` (cuarto de esta secuencia), que traduce
+  los cuatro desenlaces a tokens completos o restringidos; y, a través de la secuencia completa, el
+  cambio 8, que además hereda la obligación de derivar `mfa_required` del permiso del rol.
 
 ## Pronóstico de cortes y tamaño
 
-Sin reutilizar el pronóstico de la parte 1 por proporción: es un pronóstico nuevo sobre este alcance,
-con el historial de subestimación de 1,5× a 3× de este repositorio declarado y **no** descontado.
+Sin reutilizar el pronóstico de la propuesta anterior por proporción: es el mismo pronóstico que ya
+existía para la mitad que no era recuperación de contraseña, porque sacar esa mitad de esta carpeta
+no cambia el tamaño de lo que queda. Se conserva íntegro el historial de subestimación de 1,5× a 3×
+de este repositorio, declarado y **no** descontado.
 
-| Sub-cambio | Bloque de trabajo | Tareas estimadas |
-|---|---|---|
-| **2a** | ADR-0023, motor de cifrado en `kernel`, puerto y adaptador de llaves en `shared.crypto`, migración de la tabla de llaves | 3 a 4 |
-| **2a** | TOTP: inscripción, verificación con vector RFC 6238, prevención de reutilización, secreto cifrado | 3 a 4 |
-| **2a** | Códigos de recuperación con su puerto propio | 2 a 3 |
-| **2a** | Edición de `AuthenticationResult` y `AuthenticateWithPassword` (switch exhaustivo), columna `mfa_required`, delta de redacción de los dos requisitos publicados | 2 a 3 |
-| **2a**, sujeto a **D8** | Límite de tasa de verificación TOTP y señal de aviso de códigos bajos | 2 a 3 |
-| **2a total** | | **12 a 17** |
-| **2b** | Recuperación de contraseña: token de un solo uso, tabla propia, concurrencia, respuesta uniforme | 6 a 8 |
+| Bloque de trabajo | Tareas estimadas |
+|---|---|
+| ADR-0023, motor de cifrado en `kernel`, puerto y adaptador de llaves en `shared.crypto`, migración de la tabla de llaves | 3 a 4 |
+| TOTP: inscripción, verificación con vector RFC 6238, prevención de reutilización, secreto cifrado | 3 a 4 |
+| Códigos de recuperación de MFA con su puerto propio | 2 a 3 |
+| Edición de `AuthenticationResult` y `AuthenticateWithPassword` (switch exhaustivo), columna `mfa_required`, delta de redacción de los dos requisitos publicados | 2 a 3 |
+| Sujeto a **D7**/**D8**: límite de tasa de verificación TOTP y señal de aviso de códigos de MFA bajos | 2 a 3 |
+| **Total** | **12 a 17** |
 
-**`2a` roza o supera el límite de quince tareas de `openspec/changes/README.md`, incluso antes de
-contar el margen de subestimación histórico.** Es la evidencia central detrás de **D3**. Si el
-propietario no aprueba **D8**, `2a` baja a 10-14 tareas y el margen mejora, pero el control de
-verificación TOTP quedaría entregado sin su límite de tasa emparejado.
+**Esto sigue rozando o superando el límite de quince tareas de `openspec/changes/README.md`, incluso
+antes de contar el margen de subestimación histórico — sacar la recuperación de contraseña de esta
+carpeta no lo resuelve, porque esa mitad nunca aportó tareas a este bloque.** En el extremo bajo (12)
+el cambio queda con margen razonable; en el extremo alto (17) lo supera; con el historial de
+subestimación de este repositorio sin descontar, la expectativa realista se acerca más al extremo
+alto que al bajo. Si el propietario no aprueba **D7** ni **D8**, el total baja a 10-14 y el margen
+mejora, pero los dos controles de `docs/03` §4.3 quedarían entregados como brecha en vez de cerrados.
 
-**Sobre el presupuesto de líneas por pull request.** El corte de la sesión declara una política de
-revisión de 400 líneas cambiadas; `CLAUDE.md` y `docs/15-flujo-de-trabajo-git.md` §3 fijan
-**ochocientas**, con nota explícita de que **antes eran cuatrocientas** y el propietario elevó el
-número el 2026-09-18. Esta propuesta usa las ochocientas del repositorio, no las cuatrocientas de la
-heurística de la sesión, siguiendo el mismo razonamiento que la propuesta archivada de la parte 1 ya
-escribió para el mismo aparente conflicto. Con `2a` en 12-17 tareas y piezas nuevas de cifrado, TOTP
-y códigos de recuperación, se anticipa **entrega en pull requests encadenados**, no en uno solo; la
-estrategia de sesión `single-pr` no sirve para este cambio, igual que no sirvió para la parte 1.
+**No hay más margen que ganar dividiendo este cambio en otro cambio SDD**: esa herramienta ya se usó
+tres veces sobre el mismo cambio 7 (el segundo corte del 2026-09-24 y el tercero del 2026-09-27), y
+el corte que queda —separar la recuperación de contraseña— es exactamente el que ya se ejecutó para
+producir esta carpeta. Si la fase de tareas confirma que el total supera quince, la mitigación es la
+misma que ya usó la parte 1: **cortes de pull request encadenados dentro de este mismo cambio SDD**,
+uno por bloque de trabajo natural de la tabla de arriba — por ejemplo cinco cortes (`C1` sobre de
+llaves y motor de cifrado, `C2` TOTP, `C3` códigos de recuperación de MFA, `C4` edición de
+`AuthenticationResult` y columna `mfa_required`, `C5` límite de tasa y aviso de códigos bajos si D7 y
+D8 se aprueban) —, cada uno apuntando al anterior y no a `main`, siguiendo `docs/15-flujo-de-trabajo-
+git.md` §3.
+
+**Sobre el presupuesto de líneas por pull request.** `docs/15-flujo-de-trabajo-git.md` §3 fija
+**ochocientas líneas de cambio efectivo** por pull request, con una nota explícita de precisión: el
+propietario del producto fijó esa cifra el **2026-09-18**, y **antes eran cuatrocientas**. Es decir,
+las cuatrocientas líneas no son una invención de ninguna herramienta de este flujo de trabajo: **eran
+el valor anterior de este mismo repositorio**, ya reemplazado. Gobiernan las ochocientas. Esta
+propuesta las usa, siguiendo el mismo razonamiento que la propuesta archivada de la parte 1 ya
+escribió para el mismo aparente conflicto entre el valor histórico y el vigente. Con 12-17 tareas y
+piezas nuevas de cifrado, TOTP y códigos de recuperación de MFA, se anticipa **entrega en pull
+requests encadenados**, no en uno solo.
 
 ## Criterios de éxito
 
@@ -536,14 +598,14 @@ estrategia de sesión `single-pr` no sirve para este cambio, igual que no sirvi�
       prueba de integración confirma que la columna no contiene el secreto en claro.
 - [ ] Un valor cifrado con los datos autenticados adicionales de una fila falla al descifrarse con
       los de otra fila.
-- [ ] Diez códigos de recuperación se generan, se muestran una vez, y usar uno lo invalida sin
+- [ ] Diez códigos de recuperación de MFA se generan, se muestran una vez, y usar uno lo invalida sin
       afectar a los nueve restantes.
-- [ ] La recuperación de contraseña cumple sus dos escenarios publicados sin ningún delta de
-      redacción: ventana de treinta minutos, invalidación por token más reciente.
-- [ ] Ningún secreto de este cambio —TOTP, código de recuperación, llave maestra, llave de datos—
-      aparece en un registro, una excepción, un `toString()` ni la salida de una prueba fallida,
-      verificado por inspección del texto producido.
+- [ ] Ningún secreto de este cambio —TOTP, código de recuperación de MFA, llave maestra, llave de
+      datos— aparece en un registro, una excepción, un `toString()` ni la salida de una prueba
+      fallida, verificado por inspección del texto producido.
 - [ ] `docs/09-roadmap-y-fases.md` y `docs/03-seguridad.md` (§4.1, §4.3, §7.3) llevan sus notas
       editoriales fechadas, con el cuerpo de cada sección sin reescribir.
 - [ ] La cobertura de los paquetes `domain` de este cambio alcanza el 95 % con JaCoCo y el 80 de
       mutación con PIT.
+- [ ] Ninguna tabla, columna ni puerto de recuperación de contraseña existe en el árbol al cerrar
+      este cambio.
