@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestReporter;
 
 /**
  * Measures and reports — never gates — the timing difference between an existing-account attempt
@@ -45,7 +46,7 @@ class LoginTimingReportIT extends CommittingPostgresIntegrationTest {
     private static final String NONEXISTENT_EMAIL = "nadie.registrado@colegio.edu.hn";
 
     @Test
-    void measuresAndReportsTheMedianTimingDifferenceWithoutGatingOnIt() {
+    void measuresAndReportsTheMedianTimingDifferenceWithoutGatingOnIt(TestReporter reporter) {
         InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
         Argon2Pepper pepper = Argon2Pepper.fromBase64(Base64.getEncoder().encodeToString(new byte[32]));
         BouncyCastleArgon2PasswordHasher hasher =
@@ -81,11 +82,18 @@ class LoginTimingReportIT extends CommittingPostgresIntegrationTest {
         double medianNonexistentMs = medianMillis(nonexistentNanos);
         double differenceMs = Math.abs(medianExistingMs - medianNonexistentMs);
 
-        System.out.printf(
-                "LoginTimingReportIT (informational, never a gate): median existing-account "
-                        + "attempt = %.2f ms, median nonexistent-identifier attempt = %.2f ms, "
-                        + "difference = %.2f ms, n = %d each%n",
-                medianExistingMs, medianNonexistentMs, differenceMs, SAMPLE_SIZE);
+        // JUnit's own reporting channel, not System.out. docs/03-seguridad.md section 6 forbids
+        // System.out, System.err and printStackTrace in apps/api without scoping the prohibition to
+        // production code, and NoStandardStreamAccessTest only checks productionClasses(), so the
+        // automated gate would not have caught this one. The pre-merge security audit did, and it
+        // was right to: today the line prints only durations, but the precedent it would set is
+        // that a measuring test may reach for System.out, and the next measurement might not be
+        // as harmless.
+        reporter.publishEntry("loginTimingReport", String.format(
+                "informational, never a gate: median existing-account attempt = %.2f ms, "
+                        + "median nonexistent-identifier attempt = %.2f ms, difference = %.2f ms, "
+                        + "n = %d each",
+                medianExistingMs, medianNonexistentMs, differenceMs, SAMPLE_SIZE));
 
         // The mechanism is proven elsewhere (see this class's own Javadoc); these two assertions
         // only confirm the sample itself is real, never that the difference stays under any bound
