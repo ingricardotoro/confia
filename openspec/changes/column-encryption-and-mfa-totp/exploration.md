@@ -322,3 +322,51 @@ nuevos**, declarando en la misma propuesta que el primero es **usado** por el se
 9. **¿Se declara explícitamente que la ejecución de la rotación de la llave de datos es una brecha**
    con destino en el cambio que introduzca mantenimiento programado, en vez de construir algo parcial
    ahora?
+
+---
+
+## Apéndice: los vectores de prueba de RFC 6238, verificados contra la fuente
+
+Añadido por el orquestador el 2026-09-28, **después** de que la fase de especificación se negara —con
+razón— a citar un vector que no podía verificar. El precedente pesa: en la parte 1 el vector de
+RFC 9106 se transcribió de memoria y solo se sostuvo porque se comprobó después contra
+`rfc-editor.org`. Un número que nadie puede verificar no pertenece a un requisito.
+
+**Fuente:** RFC 6238, apéndice B, obtenido de `rfc-editor.org`.
+
+**Secreto compartido**, el mismo para todas las variantes: la cadena ASCII `12345678901234567890`.
+
+| Tiempo (s) | `T` (hexadecimal) | TOTP SHA-1, **ocho** dígitos |
+|---|---|---|
+| 59 | `0000000000000001` | `94287082` |
+| 1111111109 | `00000000023523EC` | `07081804` |
+| 1111111111 | `00000000023523ED` | `14050471` |
+| 1234567890 | `000000000273EF07` | `89005924` |
+| 2000000000 | `0000000003F940AA` | `69279037` |
+| 20000000000 | `0000000027BC86AA` | `65353130` |
+
+### El detalle que hay que cuidar: el RFC publica ocho dígitos y este proyecto usa seis
+
+`docs/03-seguridad.md` §4.3 fija **seis** dígitos. El apéndice B del RFC tabula **ocho**. Los valores de
+seis dígitos son los **últimos seis** de cada valor de ocho, y eso **no es una suposición**: se sigue de
+la definición de HOTP, donde el dígito final se obtiene por `Snum mod 10^dígitos`. Como `10^6` divide a
+`10^8`, se cumple que `(Snum mod 10^8) mod 10^6 = Snum mod 10^6`, de modo que truncar el valor de ocho a
+sus últimos seis da exactamente el valor de seis.
+
+Por tanto, derivados por esa identidad y **no citados del RFC**:
+
+| Tiempo (s) | TOTP SHA-1, seis dígitos |
+|---|---|
+| 59 | `287082` |
+| 1111111109 | `081804` |
+| 1111111111 | `050471` |
+| 1234567890 | `005924` |
+| 2000000000 | `279037` |
+| 20000000000 | `353130` |
+
+**Dos avisos para el diseño y las tareas.** Primero: el valor de `1234567890` empieza por dos ceros,
+`005924`. Una implementación que devuelva un entero en vez de una cadena con relleno a la izquierda
+**pasaría comparando 5924** y fallaría en producción contra cualquier aplicación de autenticación real;
+es un caso límite que merece su propia aserción. Segundo: los valores de seis dígitos están **derivados**
+por la identidad de arriba, no transcritos, así que la prueba debe afirmar el valor de **ocho** dígitos
+del RFC cuando el códec lo permita, o confirmar la derivación por ejecución antes de fiarse de ella.
