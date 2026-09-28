@@ -171,7 +171,7 @@ de 1.1-1.3 ya se acerca a 800 líneas — decidir con la medición de la propia 
   explícitamente con `ON CONSTRAINT`, revisando la decisión 3 hacia una restricción `EXCLUDE`) y
   reportar la desviación antes de escribir la migración. — `design.md` §9 (S1, S5)
 
-- [ ] 1.2 **ROJO/VERDE — migración `V6`, sonda S2, y extensión de las puertas de esquema
+- [x] 1.2 **ROJO/VERDE — migración `V6`, sonda S2, y extensión de las puertas de esquema
   genéricas.** Requiere Docker. ROJO: extender
   `.../test/java/com/confia/schema/RolePrivilegeMatrixIT.java` con las filas de las cuatro tablas
   nuevas (`shared_data_encryption_key`, `identity_mfa_totp_credential`,
