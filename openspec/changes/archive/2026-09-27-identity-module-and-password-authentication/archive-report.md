@@ -91,9 +91,27 @@ W2 **se retiró**, con el escenario «Cada módulo usa solo su propio dominio» 
   pagaría ese costo en cada instanciación, que es un vector de agotamiento de recursos barato de
   evitar.
 - **El tipo sellado `AuthenticationResult`** tiene dos desenlaces, y
-  `mfa-totp-and-password-recovery` tendrá que **modificar** su cláusula `permits` —no extenderla
-  desde fuera—. Es aceptable porque el compilador rompe la construcción hasta que cada `switch` cubra
-  los casos nuevos.
+  `mfa-totp-and-password-recovery` tendrá que **modificar** su cláusula `permits`, no extenderla desde
+  fuera.
+
+  > **Corrección del 2026-09-27, antes de fusionar este informe.** La versión anterior de este párrafo
+  > decía que la modificación «es aceptable porque el compilador rompe la construcción hasta que cada
+  > `switch` cubra los casos nuevos». **Eso no es cierto hoy, y lo escribió el orquestador.** La
+  > exploración de `mfa-totp-and-password-recovery` fue a comprobarlo y encontró que en código de
+  > producción **no existe ningún `switch` exhaustivo** sobre este tipo: los dos únicos consumidores
+  > son `result instanceof Authenticated` en `AuthenticateWithPassword.java:155` y `:175`, verificado
+  > por `grep`.
+  >
+  > Un `instanceof` **no fuerza exhaustividad**. Añadir `SecondFactorRequired` al `permits` sin tocar
+  > esas dos líneas compila sin una advertencia y trata el desenlace nuevo como si **no** estuviera
+  > autenticado, es decir como un fallo, en los dos sitios donde importa: el que decide el estado del
+  > retroceso (línea 155) y el que decide qué se audita (línea 175). Un segundo factor pendiente
+  > contaría como intento fallido y avanzaría el contador.
+  >
+  > La red de seguridad que este párrafo prometía es **aspiracional, no construida**. Convertir esos
+  > dos `instanceof` en un `switch` exhaustivo sin `default` es trabajo de
+  > `mfa-totp-and-password-recovery`, y hasta que ocurra la garantía no existe. El Javadoc de
+  > `AuthenticationResult` arrastra la misma imprecisión y debe corregirse en ese cambio.
 
 ## Verificación final
 
