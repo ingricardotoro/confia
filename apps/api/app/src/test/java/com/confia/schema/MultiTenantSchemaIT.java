@@ -155,6 +155,49 @@ class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
+    /**
+     * {@code mfa_required} is fixed at account creation, with no role data backing it
+     * (column-encryption-and-mfa-totp design.md decision 3, point 1; specs/identity/spec.md,
+     * "La columna se fija al crear la cuenta, sin ningún dato de rol que la respalde"). Two staff
+     * accounts, seeded with the column set explicitly to {@code true} and to {@code false}, round
+     * trip to exactly the value each one was given — there is no {@code DEFAULT} and no derivation
+     * from any permission concept, which does not exist yet in this tree.
+     */
+    @Test
+    void mfaRequiredIsFixedAtAccountCreationWithNoRoleDataBackingIt() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        UUID requiredAccountId = UUID.randomUUID();
+        UUID notRequiredAccountId = UUID.randomUUID();
+
+        withInstitutionContext(institutionId, () -> {
+            dsl.execute("""
+                    insert into identity_staff_account
+                        (institution_id, id, email, password_hash, mfa_required)
+                    values (?, ?, ?, ?, true)
+                    """, institutionId.value(), requiredAccountId, "mfa.required@colegio.edu.hn",
+                    PLACEHOLDER_PASSWORD_HASH);
+            dsl.execute("""
+                    insert into identity_staff_account
+                        (institution_id, id, email, password_hash, mfa_required)
+                    values (?, ?, ?, ?, false)
+                    """, institutionId.value(), notRequiredAccountId,
+                    "mfa.not-required@colegio.edu.hn", PLACEHOLDER_PASSWORD_HASH);
+        });
+
+        withInstitutionContext(institutionId, () -> {
+            assertThat(mfaRequiredOf(requiredAccountId)).isTrue();
+            assertThat(mfaRequiredOf(notRequiredAccountId)).isFalse();
+        });
+    }
+
+    private static final String PLACEHOLDER_PASSWORD_HASH =
+            "$argon2id$v=19$m=19456,t=3,p=1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNoaGFzaGhhc2g";
+
+    private boolean mfaRequiredOf(UUID accountId) {
+        return dsl.fetchOne("select mfa_required from identity_staff_account where id = ?",
+                accountId).get("mfa_required", Boolean.class);
+    }
+
     @Test
     void theRtnColumnCommentDeclaresATechnicalGuardNotAFiscalRule() {
         String comment = columnCommentOf(ROOT_TABLE, "rtn");
