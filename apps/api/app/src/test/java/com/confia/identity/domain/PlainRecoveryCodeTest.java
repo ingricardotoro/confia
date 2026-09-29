@@ -70,4 +70,22 @@ class PlainRecoveryCodeTest {
                         + "prints into a log")
                 .doesNotContain(TEN_CHARACTERS);
     }
+
+    /**
+     * Equality is what makes "ten distinct codes" a checkable claim, and it is the only branch of
+     * this class the cut's own tests never walked. It is deliberately <b>not</b> how a presented
+     * code is authenticated: {@code ConsumeRecoveryCode} compares through
+     * {@code RecoveryCodeHasher.matches(...)}, Argon2id, never through this method — a
+     * {@code String.equals} on a secret would cut at the first differing character.
+     */
+    @Test
+    void equalityIsByValueAndNeverHoldsAgainstNullOrAnUnrelatedType() {
+        PlainRecoveryCode code = PlainRecoveryCode.of("ABCDEFGHJK");
+
+        assertThat(code).isEqualTo(PlainRecoveryCode.of("ABCDEFGHJK"));
+        assertThat(code.hashCode()).isEqualTo(PlainRecoveryCode.of("ABCDEFGHJK").hashCode());
+        assertThat(code).isNotEqualTo(PlainRecoveryCode.of("KJHGFEDCBA"));
+        assertThat(code).isNotEqualTo(null);
+        assertThat(code).isNotEqualTo("ABCDEFGHJK");
+    }
 }

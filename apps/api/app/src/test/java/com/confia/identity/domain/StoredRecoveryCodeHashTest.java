@@ -32,6 +32,31 @@ class StoredRecoveryCodeHashTest {
                 .isInstanceOf(NullPointerException.class);
     }
 
+    @Test
+    void twoEqualHashesAreEqualAndShareTheSameHashCode() {
+        assertThat(new StoredRecoveryCodeHash(STORED_HASH))
+                .isEqualTo(new StoredRecoveryCodeHash(STORED_HASH));
+        assertThat(new StoredRecoveryCodeHash(STORED_HASH).hashCode())
+                .isEqualTo(new StoredRecoveryCodeHash(STORED_HASH).hashCode());
+    }
+
+    @Test
+    void twoDifferentHashesAreNotEqual() {
+        String otherHash =
+                "$argon2id$v=19$m=19456,t=3,p=1$b3RoZXJzYWx0$b3RoZXJ0YWc";
+
+        assertThat(new StoredRecoveryCodeHash(STORED_HASH))
+                .isNotEqualTo(new StoredRecoveryCodeHash(otherHash));
+    }
+
+    @Test
+    void isNeverEqualToNullOrAnUnrelatedType() {
+        StoredRecoveryCodeHash hash = new StoredRecoveryCodeHash(STORED_HASH);
+
+        assertThat(hash).isNotEqualTo(null);
+        assertThat(hash).isNotEqualTo(STORED_HASH);
+    }
+
     /**
      * The redaction, collected as text rather than merely constructed (specs/identity/spec.md,
      * "eso se verifica por inspección del texto producido, nunca por confianza en el diseño").
