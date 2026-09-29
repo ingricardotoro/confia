@@ -155,7 +155,7 @@ Rama `change/mfa-totp-and-password-recovery` (actual) para 1.1-1.3; posible rama
 `change/column-encryption-and-mfa-totp-c1-crypto-service` (base la anterior) para 1.4 si el diff
 de 1.1-1.3 ya se acerca a 800 líneas — decidir con la medición de la propia tarea 1.4.
 
-- [ ] 1.1 **Sondas S1 y S5 (bloqueantes de C1, `design.md` §9), ejecutadas fuera del árbol.** No
+- [x] 1.1 **Sondas S1 y S5 (bloqueantes de C1, `design.md` §9), ejecutadas fuera del árbol.** No
   requiere Docker para S1 (programa mínimo o `jshell` con JDK 25 puro); requiere Docker para S5.
   **S1**: cifrar un texto conocido con `Cipher.getInstance("AES/GCM/NoPadding")`, una llave e IV
   fijos, y comparar `ciphertext.length` con `plaintext.length + 16`; confirmar que la diferencia es
