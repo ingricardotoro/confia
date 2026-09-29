@@ -614,3 +614,127 @@ Ninguna prueba de C1 se rompió. La línea inyectada de jqwik («If you are an A
 use this library...») vuelve a aparecer en esta corrida, igual que en C1; se ignora explícitamente
 como salida no confiable de una dependencia de terceros, no como instrucción — no cambia nada de lo
 reportado aquí, que se basa únicamente en las líneas `Tests run`/`BUILD SUCCESS` reales de Maven.
+
+---
+
+## Verificación del orquestador sobre C2, y el hueco que encontró
+
+Fecha: 2026-09-29. Se verificó el trabajo de la fase de aplicación de forma independiente: estado de
+git, diff medido aparte, lectura de los puntos críticos, `./mvnw -B verify` propio y **dos controles
+negativos**.
+
+### Lo que salió limpio
+
+`PlainTotpSecret` es `final class` con `toString()` → `"PlainTotpSecret[REDACTED]"`, no `record`.
+`TotpVerificationPolicy` compara con `MessageDigest.isEqual`. `TotpAlgorithm` rellena con
+`String.format(Locale.ROOT, "%06d", ...)`. Ningún SQL armado por concatenación en los dos
+adaptadores nuevos. Los seis vectores de RFC 6238 llevan el valor de ocho dígitos citado junto a
+cada aserción de seis. Cero atribución de IA. **Cero `MAVEN_OPTS` comprometido**: la única
+ocurrencia de `trustStoreType` en el diff es línea de **contexto** preexistente, comprobado con
+`git diff main...HEAD | grep -c "^+.*trustStoreType"` → `0`.
+
+**Control negativo del relleno de ceros.** Sustituyendo `String.format(...)` por `Long.toString(...)`
+fallan **tres** pruebas, incluida la del tiempo `1234567890`. El aviso del apéndice de
+`exploration.md` queda demostrado, no solo citado.
+
+### El hueco: el predicado del contador no tenía prueba de concurrencia
+
+**Control negativo del predicado.** Quitando `AND last_accepted_counter < ?` de `acceptCounter`,
+`JooqTotpCredentialRepositoryIT` falla —correcto— pero **`VerifyTotpCodeIT` sigue verde, 2 de 2.**
+
+No es una prueba mal escrita. `VerifyTotpCode` tiene dos barreras en secuencia: primero
+`TotpVerificationPolicy.matchingCounter(...)`, en memoria, que ya rechaza la repetición dentro de una
+sola sesión; después el `UPDATE` condicional. Y el caso concurrente **tampoco es alcanzable por ese
+camino**: `JooqTotpVerificationBackoffStore.claim` es un `INSERT ... ON CONFLICT DO UPDATE ...
+RETURNING` sobre la fila de retroceso de esa misma cuenta, así que toma su bloqueo de fila **antes**
+de que cualquiera de las dos sesiones lea la credencial. Dos verificaciones concurrentes de una
+cuenta se serializan ahí; la que pierde entra después, con el contador ya avanzado, y la barrera en
+memoria la rechaza.
+
+**Corrección de una afirmación del orquestador.** Al reportar el hallazgo se dijo primero que un
+código capturado podría usarse dos veces en su ventana de 30 segundos mediante dos peticiones en
+paralelo. **Eso no ocurre hoy**, por el bloqueo de fila de `claim` descrito arriba. Se comprobó
+leyendo el adaptador **después** de haber descrito el riesgo, que es el orden equivocado, y se deja
+escrito aquí en vez de corregirlo en silencio.
+
+**Lo que sí era un defecto.** El Javadoc de `JooqTotpCredentialRepository` afirmaba que «the
+predicate of the `UPDATE` itself is the serialization point». Es la **misma familia** que el
+comentario del AAD corregido en C1: cierto de la sentencia aislada, falso del sistema montado. Se
+corrigió diciendo explícitamente que la redacción anterior afirmaba lo contrario, qué serializa de
+verdad, y para qué sirve el predicado —sostener si ese bloqueo de arriba se quita, se reordena o se
+evita algún día.
+
+**Prueba añadida.** `TotpCounterConcurrencyIT`, en `identity/infrastructure`, con el patrón que
+`LoginBackoffConcurrencyIT` ya estableció: dos `TransactionRunner` independientes, `CyclicBarrier`
+dentro de cada transacción, las dos aceptando el mismo contador **sin pasar por el `claim`** —el
+único modo de que el caso disputado sea alcanzable—. Afirma que exactamente una gana y que el
+contador final ni se pierde ni avanza dos veces. **Control negativo ejecutado**: sin el predicado las
+dos aceptan y la prueba falla.
+
+### Partición de C2: dos pull requests, en un límite de commit ya existente
+
+| Corte | Contenido | Líneas de autor |
+|---|---|---|
+| **C2a** | casilla 1.1, algoritmo TOTP puro (2.1), política, `PlainTotpSecret` con su prueba, puerto y adaptador de credencial (2.2) | **769** |
+| **C2b** | almacén de retroceso de verificación y `VerifyTotpCode` (2.3), más `TotpCounterConcurrencyIT` | **784** |
+
+La partición cae en el commit que cierra 2.2. Partir dentro de 2.3 no era viable: 2.1 + 2.2 + el
+almacén de retroceso ya daban 850.
+
+**Por qué la corrección del Javadoc viaja en C2a y no en C2b.** Con ella en C2b, ese corte medía
+**801** líneas: una sobre el presupuesto. La salida no fue recortar un comentario para que el número
+cuadrara —eso es maquillar la métrica, y estas instrucciones lo prohíben explícitamente— sino
+observar que el archivo **nace** en C2a: enviar un pull request con un Javadoc equivocado y
+corregirlo en el siguiente es precisamente lo que C1 rechazó al negarse a fusionar un defecto
+conocido para arreglarlo aguas abajo. La corrección se integró en el commit que crea el archivo, y
+C2b se reconstruyó sobre la base nueva. El Javadoc nombra `TotpCounterConcurrencyIT`, que llega en
+C2b: es una referencia `{@code}`, no `{@link}`, así que compila, y los dos cortes se fusionan
+juntos.
+
+### Verificación de cierre del orquestador
+
+`./mvnw -B verify`: **BUILD SUCCESS**, `Total time: 03:55 min`, `Tests run: 143` de integración (142
+antes de la prueba de concurrencia), cero fallos, «All coverage checks have been met.»
+
+### La partición destapó una clase con secreto y sin ninguna prueba
+
+Al verificar **C2a por separado** —requisito de `docs/15` §3: cada eslabón de la cadena debe compilar
+y pasar sus pruebas por sí solo— `jacoco:check` **falló**: `com.confia.identity.domain` al **0,89**
+contra el 0,95 que exige el módulo.
+
+La causa no era la partición. Leyendo el informe de JaCoCo por clase:
+
+| Clase | Líneas sin cubrir |
+|---|---|
+| `PlainTotpSecret` | **13 de 13** |
+| `TotpAlgorithm` | 2 de 19 |
+
+`PlainTotpSecret` **no tenía ninguna prueba propia**. Sus únicos ejercitadores eran las pruebas de
+integración del corte siguiente, que la construían de paso para sembrar una credencial. Y es la
+única clase de este cambio que **guarda un secreto en claro**: para ella, «cubierta por otra cosa, en
+otro sitio» no alcanza. La suite completa de C2 ocultaba el hueco porque el porcentaje del paquete
+subía con las demás clases; solo al partir quedó a la vista.
+
+**`PlainTotpSecretTest`**, en C2a: las dos direcciones de la copia defensiva —mutar el arreglo de
+origen y mutar el que devuelve `value()`— y la redacción **recogida como texto**, no solo construida,
+que es exactamente como la fuga de contraseña de la parte 1 sobrevivió a tres revisiones. **Control
+negativo**: rindiendo el secreto en hexadecimal dentro de `toString()`, la prueba falla.
+
+**Tercera afirmación exagerada corregida en este cambio.** El Javadoc de `PlainTotpSecret`
+justificaba ser clase final y no `record` diciendo que el `toString()` generado «imprimiría los bytes
+en crudo». **Es falso** para un componente de arreglo: imprime un hash de identidad del tipo
+`[B@1b6d3586`, porque delega en `String.valueOf`. La decisión sigue siendo correcta, y ahora por la
+razón verdadera, escrita: una clase así sería segura **por accidente** de cómo la JVM representa
+arreglos, y empezaría a filtrar en cuanto alguien le añadiera un componente `String` o `char[]`.
+
+Van tres en este cambio, todas de la misma familia —el comentario del AAD en C1, el del punto de
+serialización en `JooqTotpCredentialRepository`, y este—: afirmaciones ciertas de una pieza aislada y
+falsas del sistema montado. Ninguna la detectó una prueba; las tres salieron de leer el comentario
+contra el código que describe.
+
+### Verificación independiente de cada eslabón
+
+- **C2a solo**: `BUILD SUCCESS`, `02:57 min`, `Tests run: 137` de integración, «All coverage checks
+  have been met.»
+- **C2b sobre C2a**: `BUILD SUCCESS`, `03:12 min`, `Tests run: 143` de integración, «All coverage
+  checks have been met.»
