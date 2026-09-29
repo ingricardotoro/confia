@@ -8,8 +8,16 @@ import java.util.Objects;
  * verificación del segundo factor TOTP...", "un secreto TOTP de 20 bytes aleatorios"). {@code
  * toString()} is deliberately redacted (CLAUDE.md, regla 11; column-encryption-and-mfa-totp
  * design.md, decision 9): this is exactly "el secreto TOTP en claro" the redaction requirement
- * names, so this is a plain final class with an explicit override, never a {@code record} — whose
- * generated {@code toString()} would print the raw bytes verbatim.
+ * names.
+ *
+ * <p><b>A final class with an explicit override, never a {@code record}</b> — but not for the
+ * reason an earlier version of this Javadoc gave. A record's generated {@code toString()} would
+ * <em>not</em> print these bytes verbatim: for an array component it prints an identity hash such
+ * as {@code [B@1b6d3586}, because it delegates to {@code String.valueOf}. The real reason is that
+ * such a class would be safe only by accident of how the JVM renders arrays, and would start
+ * leaking the moment someone added a {@code String} or {@code char[]} component — which is how
+ * {@code AuthenticationCommand} leaked a password through three reviews in part 1. Here the
+ * redaction is stated, not inherited from an implementation detail.
  */
 public final class PlainTotpSecret {
 
