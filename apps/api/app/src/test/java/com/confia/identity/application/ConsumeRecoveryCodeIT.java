@@ -11,8 +11,11 @@ import com.confia.identity.infrastructure.JooqRecoveryCodeRepository;
 import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.kernel.AesGcmCipher;
 import com.confia.kernel.InstitutionId;
+import com.confia.shared.audit.AuditLogReader;
+import com.confia.shared.audit.AuditRowSnapshot;
 import com.confia.shared.crypto.ColumnEncryptionMasterKey;
 import com.confia.shared.crypto.ColumnEncryptionService;
+import com.confia.shared.infrastructure.JooqAuditLogReader;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.shared.infrastructure.JooqDataEncryptionKeyRepository;
 import com.confia.shared.security.SecurityContext;
@@ -25,6 +28,8 @@ import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * {@link ConsumeRecoveryCode} end to end, against a real PostgreSQL
@@ -38,6 +43,7 @@ class ConsumeRecoveryCodeIT extends CommittingPostgresIntegrationTest {
     private static final String PLACEHOLDER_PASSWORD_HASH =
             "$argon2id$v=19$m=19456,t=3,p=1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNoaGFzaGhhc2g";
     private static final Instant NOW = Instant.parse("2026-10-05T08:00:00Z");
+    private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
 
     private final ColumnEncryptionMasterKey masterKey = randomMasterKey();
     private final Argon2Pepper pepper =
@@ -87,6 +93,89 @@ class ConsumeRecoveryCodeIT extends CommittingPostgresIntegrationTest {
         assertThat(second.accepted())
                 .as("a code already used must be rejected on a second attempt")
                 .isFalse();
+    }
+
+    /**
+     * specs/identity/spec.md, "Aviso al quedar con menos de tres códigos de recuperación de MFA
+     * sin usar", escenario "Consumir el octavo código deja el aviso activado": seven of ten codes
+     * already used, using the eighth leaves two unused and audits the low-codes signal with that
+     * count (column-encryption-and-mfa-totp design.md, §4.3, decision D8).
+     */
+    @Test
+    void consumingTheEighthCodeAuditsTheLowSignalWithoutSendingAnyEmail() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
+        transactionRunner().execute(contextOf(institutionId), () -> {
+            seedAccount(institutionId, accountId);
+            return null;
+        });
+        List<PlainRecoveryCode> codes = enroll(institutionId, accountId).recoveryCodes();
+
+        for (int i = 0; i < 7; i++) {
+            ConsumeRecoveryCodeDecision decision = consume(institutionId, accountId, codes.get(i));
+            assertThat(decision.accepted()).isTrue();
+        }
+        ConsumeRecoveryCodeDecision eighth = consume(institutionId, accountId, codes.get(7));
+        assertThat(eighth.accepted()).isTrue();
+
+        List<AuditRowSnapshot> auditRows = auditRowsFor(institutionId, accountId);
+        List<AuditRowSnapshot> lowSignalRows = auditRows.stream()
+                .filter(row -> row.action().equals("identity.mfa.recovery_codes.low"))
+                .toList();
+        assertThat(lowSignalRows).hasSize(1);
+        JsonNode afterValue = JSON_MAPPER.readTree(lowSignalRows.getFirst().afterValue());
+        assertThat(afterValue.get("remainingUnusedCodes").asInt()).isEqualTo(2);
+
+        assertThat(auditRows)
+                .as("no adapter of any kind sends a real notification in this change (specs/"
+                        + "identity/spec.md, \"Ausencia de envío real del aviso...\") — the audit "
+                        + "trail this use case produces never carries an action naming a "
+                        + "notification, email or delivery attempt, which is the observable proxy "
+                        + "for that absence: any real sender would, by CLAUDE.md regla 14, also "
+                        + "audit its own action")
+                .noneMatch(row -> row.action().contains("notif") || row.action().contains("email")
+                        || row.action().contains("mail") || row.action().contains("sent"));
+    }
+
+    /**
+     * specs/identity/spec.md, escenario "Quedar con exactamente tres códigos no activa el aviso":
+     * six of ten codes already used, using the seventh leaves exactly three unused — the threshold
+     * requires falling strictly below three, so no signal is audited.
+     */
+    @Test
+    void consumingTheSeventhCodeLeavesExactlyThreeAndDoesNotAuditTheLowSignal() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
+        transactionRunner().execute(contextOf(institutionId), () -> {
+            seedAccount(institutionId, accountId);
+            return null;
+        });
+        List<PlainRecoveryCode> codes = enroll(institutionId, accountId).recoveryCodes();
+
+        for (int i = 0; i < 6; i++) {
+            ConsumeRecoveryCodeDecision decision = consume(institutionId, accountId, codes.get(i));
+            assertThat(decision.accepted()).isTrue();
+        }
+        ConsumeRecoveryCodeDecision seventh = consume(institutionId, accountId, codes.get(6));
+        assertThat(seventh.accepted()).isTrue();
+
+        List<AuditRowSnapshot> lowSignalRows = auditRowsFor(institutionId, accountId).stream()
+                .filter(row -> row.action().equals("identity.mfa.recovery_codes.low"))
+                .toList();
+        assertThat(lowSignalRows)
+                .as("the threshold requires falling strictly below three, not reaching exactly "
+                        + "three")
+                .isEmpty();
+    }
+
+    private List<AuditRowSnapshot> auditRowsFor(InstitutionId institutionId,
+            StaffAccountId accountId) {
+        AuditLogReader reader = new JooqAuditLogReader(dsl);
+        return transactionRunner()
+                .execute(contextOf(institutionId), () -> reader.pageOf(institutionId, 0, 100))
+                .stream()
+                .filter(row -> row.entityId().equals(accountId.value().toString()))
+                .toList();
     }
 
     private EnrollTotpSecondFactorResult enroll(InstitutionId institutionId, StaffAccountId accountId) {

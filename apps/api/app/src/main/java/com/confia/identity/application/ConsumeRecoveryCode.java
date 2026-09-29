@@ -34,9 +34,16 @@ import java.util.UUID;
  */
 public final class ConsumeRecoveryCode {
 
+    /** specs/identity/spec.md, "Aviso al quedar con menos de tres códigos de recuperación de MFA
+     * sin usar": the signal fires when the remaining unused count falls strictly BELOW three, not
+     * when it reaches three (design.md, §4.3, decision D8; escenario "Quedar con exactamente tres
+     * códigos no activa el aviso"). */
+    private static final long LOW_RECOVERY_CODE_THRESHOLD = 3;
+
     private static final String ACTOR_KIND_STAFF = "staff";
     private static final String ENTITY_TYPE = "identity.mfa_recovery_code";
     private static final String ACTION_USED = "identity.mfa.recovery_code.used";
+    private static final String ACTION_LOW = "identity.mfa.recovery_codes.low";
     private static final String OUTCOME_SUCCESS = "success";
     private static final String OUTCOME_DENIED = "denied";
 
@@ -84,6 +91,14 @@ public final class ConsumeRecoveryCode {
         UUID auditRequestId = requestId.isBlank() ? UUID.randomUUID() : UUID.fromString(requestId);
         auditLogWriter.append(usedEntry(institutionId, accountId, auditRequestId, accepted));
 
+        if (accepted) {
+            long remaining = recoveryCodes.countUnusedByAccountId(institutionId, accountId);
+            if (remaining < LOW_RECOVERY_CODE_THRESHOLD) {
+                auditLogWriter.append(
+                        lowCodesEntry(institutionId, accountId, auditRequestId, remaining));
+            }
+        }
+
         return new ConsumeRecoveryCodeDecision(accepted);
     }
 
@@ -97,5 +112,17 @@ public final class ConsumeRecoveryCode {
         return new AuditEntry(institutionId.value(), accountId.value(), ACTOR_KIND_STAFF,
                 accountId.value().toString(), null, null, requestId, null, ACTION_USED,
                 ENTITY_TYPE, accountId.value().toString(), outcome, null, null, null, null);
+    }
+
+    /** Design.md, §4.3 step 7: the low-recovery-codes signal, calculated and audited only — this
+     * change delivers no email or notification adapter of any kind (specs/identity/spec.md,
+     * "Ausencia de envío real del aviso..."). */
+    private static AuditEntry lowCodesEntry(InstitutionId institutionId, StaffAccountId accountId,
+            UUID requestId, long remainingUnusedCodes) {
+        String afterValue = "{\"remainingUnusedCodes\":" + remainingUnusedCodes + "}";
+        return new AuditEntry(institutionId.value(), accountId.value(), ACTOR_KIND_STAFF,
+                accountId.value().toString(), null, null, requestId, null, ACTION_LOW,
+                ENTITY_TYPE, accountId.value().toString(), OUTCOME_SUCCESS, null, afterValue, null,
+                null);
     }
 }
