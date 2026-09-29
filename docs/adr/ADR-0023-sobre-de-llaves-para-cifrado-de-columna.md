@@ -29,6 +29,14 @@ real o búsqueda determinista sobre un valor cifrado.
    `<tabla>|<columna>|<institution_id>:<row_id>` — lo que hace que copiar un valor cifrado de una
    fila a otra falle al descifrar por fallo de autenticación de GCM (`AeadIntegrityException`,
    `com.confia.kernel`).
+
+   **La DEK envuelta lleva la misma propiedad, no una etiqueta fija.** Su AAD es
+   `shared_data_encryption_key.wrapped_key|<institution_id>|<id>`. La revisión previa a la fusión de
+   este cambio encontró una constante única compartida por toda fila de toda institución, con lo cual
+   un `wrapped_key` copiado de la fila de una institución a la de otra se desenvolvía sin protestar
+   bajo la misma KEK. Dejar la raíz de la jerarquía de llaves sin la barrera que ya tienen sus hojas
+   no es una asimetría defendible: el sobre protege exactamente aquello cuya movilidad entre filas el
+   AAD existe para impedir.
 2. **Esquema de la tabla de llaves.** `shared_data_encryption_key`
    (`institution_id, id, status, wrapped_key, created_at`), con como mucho una llave `active` por
    institución (índice único parcial `... WHERE status = 'active'`), seguridad de fila forzada, y
@@ -137,9 +145,9 @@ la fila exacta.
 ## Cumplimiento y verificación
 
 1. **`ColumnEncryptionIT`.** El valor almacenado empieza por `v1:`, nunca contiene el secreto en
-   claro, y falla al descifrar con el AAD de otra fila (`AeadIntegrityException`); dos
-   inscripciones concurrentes de la primera DEK de una institución terminan con exactamente una
-   fila activa.
+   claro, y falla al descifrar con el AAD de otra fila (`AeadIntegrityException`); una DEK envuelta
+   trasplantada a la fila de otra institución falla al desenvolverse; dos inscripciones concurrentes
+   de la primera DEK de una institución terminan con exactamente una fila activa.
 2. **`DataEncryptionKeyRowSecurityIT`.** Una institución no lee la llave de datos de otra; sin
    contexto de institución, la consulta devuelve cero filas, nunca un error de permiso.
 3. **`RolePrivilegeMatrixIT`, `MultiTenantSchemaIT`.** La matriz de privilegios y las puertas

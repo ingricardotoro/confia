@@ -98,6 +98,50 @@ class ColumnEncryptionIT extends CommittingPostgresIntegrationTest {
     }
 
     /**
+     * The same property as the test above, one level up: for the <b>envelope</b> that protects every
+     * DEK, not for a business column value. The pre-merge security audit of this slice found the
+     * wrapped key's additional authenticated data was a single fixed label, shared by every row of
+     * every institution, so this transplant used to succeed — the root of the key hierarchy lacked
+     * the barrier its own leaves already had.
+     *
+     * <p>The row is planted by raw SQL on purpose: no production path can move a {@code wrapped_key}
+     * between institutions, and the point is precisely what happens when something outside those
+     * paths does.
+     */
+    @Test
+    void aWrappedKeyTransplantedIntoAnotherInstitutionsRowFailsToUnwrap() {
+        ColumnEncryptionMasterKey masterKey = randomMasterKey();
+        InstitutionId institutionA = new InstitutionId(UUID.randomUUID());
+        InstitutionId institutionB = new InstitutionId(UUID.randomUUID());
+
+        String wrappedKeyOfA = transactionRunner().execute(contextOf(institutionA), () -> {
+            repositoryFor(masterKey).findActiveOrCreate(institutionA);
+            return dsl.fetchOne("select wrapped_key as w from shared_data_encryption_key "
+                            + "where institution_id = ?", institutionA.value())
+                    .get("w", String.class);
+        });
+
+        UUID transplantedId = transactionRunner().execute(contextOf(institutionB), () -> {
+            UUID id = UUID.randomUUID();
+            dsl.execute("""
+                    insert into shared_data_encryption_key
+                        (institution_id, id, status, wrapped_key)
+                    values (?, ?, 'active', ?)
+                    """, institutionB.value(), id, wrappedKeyOfA);
+            return id;
+        });
+
+        assertThatThrownBy(() -> transactionRunner().execute(contextOf(institutionB),
+                () -> repositoryFor(masterKey)
+                        .findById(institutionB, new DataEncryptionKeyId(transplantedId))))
+                .as("institution B must not unwrap institution A's data encryption key, although "
+                        + "the KEK is the same and the ciphertext is byte-identical: the additional "
+                        + "authenticated data is the only barrier between the two envelopes")
+                .isInstanceOf(IllegalStateException.class)
+                .hasCauseInstanceOf(AeadIntegrityException.class);
+    }
+
+    /**
      * Two concurrent first enrollments of the same institution, synchronized with a {@link
      * CyclicBarrier} right after each opens its own transaction and before either calls
      * {@code DataEncryptionKeyRepository.findActiveOrCreate} — the same placement {@code
@@ -168,9 +212,11 @@ class ColumnEncryptionIT extends CommittingPostgresIntegrationTest {
     }
 
     private ColumnEncryptionService serviceFor(ColumnEncryptionMasterKey masterKey) {
-        return new ColumnEncryptionService(
-                new JooqDataEncryptionKeyRepository(dsl, new AesGcmCipher(), masterKey),
-                new AesGcmCipher());
+        return new ColumnEncryptionService(repositoryFor(masterKey), new AesGcmCipher());
+    }
+
+    private JooqDataEncryptionKeyRepository repositoryFor(ColumnEncryptionMasterKey masterKey) {
+        return new JooqDataEncryptionKeyRepository(dsl, new AesGcmCipher(), masterKey);
     }
 
     private static ColumnEncryptionMasterKey randomMasterKey() {

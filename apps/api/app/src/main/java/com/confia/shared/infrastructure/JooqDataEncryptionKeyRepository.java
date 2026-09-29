@@ -10,6 +10,7 @@ import com.confia.shared.crypto.DataEncryptionKeyId;
 import com.confia.shared.crypto.DataEncryptionKeyMaterial;
 import com.confia.shared.crypto.DataEncryptionKeyRepository;
 import confia.generated.jooq.tables.records.SharedDataEncryptionKeyRecord;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Base64;
@@ -51,11 +52,10 @@ import org.jooq.DSLContext;
  */
 public final class JooqDataEncryptionKeyRepository implements DataEncryptionKeyRepository {
 
-    /** Never part of the stored {@code wrapped_key} format (design.md decision 3, point 3): this
-     * table's own {@code (institution_id, id)} row already ties the wrapping to one institution
-     * and one key, so the additional authenticated data need only be a fixed, stable label. */
-    private static final byte[] WRAPPED_KEY_AAD =
-            "shared_data_encryption_key.wrapped_key".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    /** Label of the additional authenticated data, never part of the stored {@code wrapped_key}
+     * itself (design.md decision 3, point 3, which fixes the three-part format and says nothing
+     * about the AAD). */
+    private static final String WRAPPED_KEY_AAD_LABEL = "shared_data_encryption_key.wrapped_key";
 
     private static final int TAG_LENGTH_BYTES = AesGcmCipher.TAG_LENGTH_BITS / 8;
 
@@ -92,7 +92,8 @@ public final class JooqDataEncryptionKeyRepository implements DataEncryptionKeyR
                 .set(SHARED_DATA_ENCRYPTION_KEY.INSTITUTION_ID, institutionId.value())
                 .set(SHARED_DATA_ENCRYPTION_KEY.ID, candidateId)
                 .set(SHARED_DATA_ENCRYPTION_KEY.STATUS, "active")
-                .set(SHARED_DATA_ENCRYPTION_KEY.WRAPPED_KEY, wrap(rawKey))
+                .set(SHARED_DATA_ENCRYPTION_KEY.WRAPPED_KEY,
+                        wrap(rawKey, institutionId.value(), candidateId))
                 .onConflict(SHARED_DATA_ENCRYPTION_KEY.INSTITUTION_ID)
                 .where(SHARED_DATA_ENCRYPTION_KEY.STATUS.eq("active"))
                 .doNothing()
@@ -123,17 +124,35 @@ public final class JooqDataEncryptionKeyRepository implements DataEncryptionKeyR
 
     private DataEncryptionKeyMaterial toMaterial(SharedDataEncryptionKeyRecord record) {
         return new DataEncryptionKeyMaterial(new DataEncryptionKeyId(record.getId()),
-                unwrap(record.getWrappedKey()));
+                unwrap(record.getWrappedKey(), record.getInstitutionId(), record.getId()));
+    }
+
+    /**
+     * {@code <label>|<institution_id>|<id>}, the envelope's counterpart of the per-row additional
+     * authenticated data {@code ColumnEncryptionService} already builds for column values
+     * (ADR-0023, scope item 1; {@code docs/03-seguridad.md} §7.3).
+     *
+     * <p><b>Why it is bound to the row and not a fixed label.</b> The pre-merge security audit of
+     * this slice found this value was one constant shared by every row of every institution, so a
+     * {@code wrapped_key} copied out of one institution's row and into another's unwrapped without
+     * complaint under the same KEK — the exact transplant the AAD exists to defeat, and the one
+     * property the change already demanded of every business column. Leaving the root of the key
+     * hierarchy without the barrier its own leaves have is not a defensible asymmetry.
+     */
+    private static byte[] wrappedKeyAad(UUID institutionId, UUID keyId) {
+        return (WRAPPED_KEY_AAD_LABEL + "|" + institutionId + "|" + keyId)
+                .getBytes(StandardCharsets.UTF_8);
     }
 
     /** {@code <iv_b64>:<ciphertext_b64>:<tag_b64>}, exactly the three-part shape {@code V6}'s own
      * {@code shared_data_encryption_key_wrapped_chk} enforces (design.md, decision 3, point 3) —
      * never the five-part {@code v1:<id_dek>:...} column format: there is only one KEK configured
      * in this change, so a wrapped key needs no key identifier of its own. */
-    private String wrap(byte[] rawKey) {
+    private String wrap(byte[] rawKey, UUID institutionId, UUID keyId) {
         byte[] iv = new byte[AesGcmCipher.IV_LENGTH_BYTES];
         random.nextBytes(iv);
-        byte[] ciphertextWithTag = cipher.encrypt(masterKey.value(), iv, WRAPPED_KEY_AAD, rawKey);
+        byte[] ciphertextWithTag = cipher.encrypt(masterKey.value(), iv,
+                wrappedKeyAad(institutionId, keyId), rawKey);
         int splitIndex = ciphertextWithTag.length - TAG_LENGTH_BYTES;
         Base64.Encoder encoder = Base64.getEncoder();
         return encoder.encodeToString(iv) + ":"
@@ -142,7 +161,7 @@ public final class JooqDataEncryptionKeyRepository implements DataEncryptionKeyR
                         Arrays.copyOfRange(ciphertextWithTag, splitIndex, ciphertextWithTag.length));
     }
 
-    private byte[] unwrap(String wrappedKey) {
+    private byte[] unwrap(String wrappedKey, UUID institutionId, UUID keyId) {
         String[] parts = wrappedKey.split(":", -1);
         if (parts.length != 3) {
             // Never logs wrappedKey itself (CLAUDE.md regla 11): it is KEK-encrypted, not
@@ -159,7 +178,8 @@ public final class JooqDataEncryptionKeyRepository implements DataEncryptionKeyR
         System.arraycopy(ciphertext, 0, ciphertextWithTag, 0, ciphertext.length);
         System.arraycopy(tag, 0, ciphertextWithTag, ciphertext.length, tag.length);
         try {
-            return cipher.decrypt(masterKey.value(), iv, WRAPPED_KEY_AAD, ciphertextWithTag);
+            return cipher.decrypt(masterKey.value(), iv, wrappedKeyAad(institutionId, keyId),
+                    ciphertextWithTag);
         } catch (AeadIntegrityException e) {
             throw new IllegalStateException("failed to unwrap a stored data encryption key", e);
         }
