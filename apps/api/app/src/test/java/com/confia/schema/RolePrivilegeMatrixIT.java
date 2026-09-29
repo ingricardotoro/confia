@@ -38,6 +38,18 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
     private static final List<String> IDENTITY_TABLES =
             List.of("identity_staff_account", "identity_login_backoff");
 
+    /**
+     * The four tables PR C1's {@code V6} migration creates
+     * (column-encryption-and-mfa-totp design.md decisions 1 and 3): the data-encryption-key
+     * envelope table (owned by {@code com.confia.shared.crypto}) and the three identity MFA
+     * tables (TOTP credential, recovery code, TOTP verification backoff). All four share the
+     * exact privilege shape of {@code identity_login_backoff} above — non-financial tables, so
+     * {@code UPDATE} for {@code confia_admin_app} is the rule, never {@code DELETE}.
+     */
+    private static final List<String> CRYPTO_MFA_TABLES =
+            List.of("shared_data_encryption_key", "identity_mfa_totp_credential",
+                    "identity_mfa_recovery_code", "identity_mfa_totp_backoff");
+
     private static final List<String> ALL_PRIVILEGES =
             List.of("SELECT", "INSERT", "UPDATE", "DELETE");
 
@@ -388,6 +400,108 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
             statement.execute("create role " + scratchRole + " nosuperuser nobypassrls");
             try {
                 for (String table : IDENTITY_TABLES) {
+                    for (String privilege : ALL_PRIVILEGES) {
+                        assertThat(hasTablePrivilege(scratchRole, table, privilege))
+                                .as("a role that is none of the five must inherit no %s on %s",
+                                        privilege, table)
+                                .isFalse();
+                    }
+                }
+            } finally {
+                statement.execute("drop role if exists " + scratchRole);
+            }
+        }
+    }
+
+    /**
+     * The five roles against all four crypto/MFA tables (column-encryption-and-mfa-totp design.md
+     * decisions 1 and 3; specs/build-integrity/spec.md, requirements "Tablas nuevas de cifrado de
+     * columna y MFA..." and "Permisos de acceso a las tablas nuevas de cifrado de columna y
+     * MFA... por rol de base de datos"): {@code confia_admin_app} gets exactly {@code SELECT},
+     * {@code INSERT} and {@code UPDATE} (never {@code DELETE}); {@code confia_portal_app} gets
+     * nothing at all on any of the four; {@code confia_readonly} gets only {@code SELECT}; {@code
+     * confia_backup} reads through {@code pg_read_all_data}; {@code confia_owner} retains all four
+     * by definition.
+     */
+    @Test
+    void confiaAdminAppCanSelectInsertAndUpdateButNeverDeleteOnAllFourCryptoMfaTables() {
+        for (String table : CRYPTO_MFA_TABLES) {
+            assertThat(hasTablePrivilege("confia_admin_app", table, "SELECT")).isTrue();
+            assertThat(hasTablePrivilege("confia_admin_app", table, "INSERT")).isTrue();
+            assertThat(hasTablePrivilege("confia_admin_app", table, "UPDATE")).isTrue();
+            assertThat(hasTablePrivilege("confia_admin_app", table, "DELETE"))
+                    .as("confia_admin_app must never have DELETE on %s: retiring a DEK or "
+                            + "invalidating a recovery code is an UPDATE, never a row deletion",
+                            table)
+                    .isFalse();
+        }
+    }
+
+    @Test
+    void confiaPortalAppHasNoPrivilegeOnAnyCryptoMfaTable() {
+        for (String table : CRYPTO_MFA_TABLES) {
+            for (String privilege : ALL_PRIVILEGES) {
+                assertThat(hasTablePrivilege("confia_portal_app", table, privilege))
+                        .as("confia_portal_app must have no privilege at all on %s", table)
+                        .isFalse();
+            }
+        }
+    }
+
+    @Test
+    void confiaReadonlyOnlySelectsAllFourCryptoMfaTables() {
+        for (String table : CRYPTO_MFA_TABLES) {
+            assertThat(hasTablePrivilege("confia_readonly", table, "SELECT")).isTrue();
+            assertThat(hasTablePrivilege("confia_readonly", table, "INSERT")).isFalse();
+            assertThat(hasTablePrivilege("confia_readonly", table, "UPDATE")).isFalse();
+            assertThat(hasTablePrivilege("confia_readonly", table, "DELETE")).isFalse();
+        }
+    }
+
+    /** {@code confia_backup} reads through {@code pg_read_all_data}, which never bypasses RLS. */
+    @Test
+    void confiaBackupCanOnlySelectAllFourCryptoMfaTablesThroughPgReadAllData() {
+        for (String table : CRYPTO_MFA_TABLES) {
+            assertThat(hasTablePrivilege("confia_backup", table, "SELECT")).isTrue();
+            assertThat(hasTablePrivilege("confia_backup", table, "INSERT")).isFalse();
+            assertThat(hasTablePrivilege("confia_backup", table, "UPDATE")).isFalse();
+            assertThat(hasTablePrivilege("confia_backup", table, "DELETE")).isFalse();
+        }
+    }
+
+    /** {@code confia_owner} is not subject to {@code GRANT}/{@code REVOKE}: retains all four. */
+    @Test
+    void confiaOwnerRetainsAllPrivilegesOnAllFourCryptoMfaTablesByDefinition() {
+        for (String table : CRYPTO_MFA_TABLES) {
+            for (String privilege : ALL_PRIVILEGES) {
+                assertThat(hasTablePrivilege("confia_owner", table, privilege))
+                        .as("confia_owner must retain %s on %s by definition", privilege, table)
+                        .isTrue();
+            }
+        }
+    }
+
+    /**
+     * {@code PUBLIC} and a role outside the five (design.md decision 3's {@code REVOKE ALL ...
+     * FROM PUBLIC}); same discipline the audit, idempotency-key and identity tables already apply
+     * above.
+     */
+    @Test
+    void publicAndAnyRoleOutsideTheFiveInheritNoPrivilegeOnAnyCryptoMfaTable() throws SQLException {
+        for (String table : CRYPTO_MFA_TABLES) {
+            for (String privilege : ALL_PRIVILEGES) {
+                assertThat(hasTablePrivilege("public", table, privilege))
+                        .as("PUBLIC must hold no %s on %s", privilege, table).isFalse();
+            }
+        }
+
+        String scratchRole = "probe_role_outside_the_five_crypto_mfa";
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres");
+                Statement statement = superuser.createStatement()) {
+            statement.execute("drop role if exists " + scratchRole);
+            statement.execute("create role " + scratchRole + " nosuperuser nobypassrls");
+            try {
+                for (String table : CRYPTO_MFA_TABLES) {
                     for (String privilege : ALL_PRIVILEGES) {
                         assertThat(hasTablePrivilege(scratchRole, table, privilege))
                                 .as("a role that is none of the five must inherit no %s on %s",

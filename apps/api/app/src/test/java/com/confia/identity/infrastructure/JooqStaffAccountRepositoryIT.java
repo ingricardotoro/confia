@@ -77,8 +77,9 @@ class JooqStaffAccountRepositoryIT extends CommittingPostgresIntegrationTest {
             LoginIdentifier identifier) {
         transactionRunner().execute(contextOf(institutionId), () -> {
             dsl.execute("""
-                    insert into identity_staff_account (institution_id, id, email, password_hash)
-                    values (?, ?, ?, ?)
+                    insert into identity_staff_account
+                        (institution_id, id, email, password_hash, mfa_required)
+                    values (?, ?, ?, ?, false)
                     """, institutionId.value(), accountId.value(), identifier.value(),
                     PLACEHOLDER_PASSWORD_HASH);
             return null;
