@@ -267,7 +267,7 @@ de 1.1-1.3 ya se acerca a 800 líneas — decidir con la medición de la propia 
 
 Rama `change/column-encryption-and-mfa-totp-c2-totp`, base C1.
 
-- [ ] 2.1 **ROJO/VERDE — `TotpAlgorithm` y `TotpCode` contra los seis vectores de RFC 6238
+- [x] 2.1 **ROJO/VERDE — `TotpAlgorithm` y `TotpCode` contra los seis vectores de RFC 6238
   derivados.** No requiere Docker (JUnit y AssertJ puros). ROJO: crear
   `.../test/java/com/confia/identity/domain/TotpAlgorithmTest.java` con los seis vectores del
   apéndice de `exploration.md` (secreto compartido ASCII `12345678901234567890`, SHA-1), **citando
@@ -286,7 +286,7 @@ Rama `change/column-encryption-and-mfa-totp-c2-totp`, base C1.
   Ejecutar ambas suites: verde. Commit convencional (`feat`) sobre el algoritmo puro. —
   `exploration.md`, apéndice (los dos avisos); `design.md` decisión 7
 
-- [ ] 2.2 **ROJO/VERDE — `TotpVerificationPolicy`, `PlainTotpSecret`, y el puerto/adaptador de
+- [x] 2.2 **ROJO/VERDE — `TotpVerificationPolicy`, `PlainTotpSecret`, y el puerto/adaptador de
   credencial TOTP.** Requiere Docker para la mitad del adaptador; no lo requiere para la política
   (unitaria pura). ROJO: crear
   `.../test/java/com/confia/identity/domain/TotpVerificationPolicyTest.java` (un código dentro de
@@ -309,7 +309,7 @@ Rama `change/column-encryption-and-mfa-totp-c2-totp`, base C1.
   completos se prueban en 2.3, sobre `VerifyTotpCode`); `design.md` decisiones 5 (AAD por fila,
   reutilizado aquí) y 7
 
-- [ ] 2.3 **ROJO/VERDE — `TotpVerificationBackoffStore` (D7), y `VerifyTotpCode` completo con
+- [x] 2.3 **ROJO/VERDE — `TotpVerificationBackoffStore` (D7), y `VerifyTotpCode` completo con
   límite de tasa.** Requiere Docker. ROJO: crear
   `.../test/java/com/confia/identity/infrastructure/JooqTotpVerificationBackoffStoreIT.java` (el
   `claim(...)` de `design.md` decisión 8 reproduce el `INSERT ... ON CONFLICT DO UPDATE ...
