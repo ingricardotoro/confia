@@ -39,6 +39,28 @@ dígitos, periodo de 30 segundos y ventana de tolerancia de ±1 periodo (`docs/0
 ningún código cuyo contador sea menor o igual al último aceptado, aunque el código en sí sea
 matemáticamente válido para ese contador.
 
+El sistema DEBE devolver el secreto generado al llamador de la inscripción, **una única vez y en el
+retorno de esa llamada**, codificado en base32 según RFC 4648 sin relleno, que es la forma que toda
+aplicación de autenticación acepta como entrada manual. Sin esa devolución ninguna aplicación puede
+aprender el secreto, y el segundo factor queda inscrito en la base pero imposible de activar en la
+práctica. NO DEBE existir ninguna consulta posterior que recupere el secreto en claro: igual que los
+códigos de recuperación, después de ese retorno solo persiste su forma cifrada.
+
+La construcción del identificador URI `otpauth://` y su representación como código QR quedan
+**fuera** de este requisito: exigen un emisor y una etiqueta por institución, que son información del
+módulo de organización, y pertenecen al cambio que construya la pantalla de inscripción.
+
+#### Escenario: La inscripción devuelve el secreto en base32 una única vez
+
+- **DADO** que la cuenta `sofia.mejia@colegio.edu.hn` no tiene todavía segundo factor inscrito
+- **CUANDO** se inscribe su segundo factor
+- **ENTONCES** el retorno de esa llamada incluye el secreto TOTP codificado en base32 según RFC 4648,
+  sin relleno, de 32 caracteres para los 20 bytes del secreto
+- **Y** ese secreto en base32 corresponde exactamente al mismo secreto que quedó cifrado en la
+  credencial almacenada, no a uno distinto
+- **Y** ninguna consulta posterior a `identity_mfa_totp_credential` puede recuperar el secreto en
+  claro
+
 #### Escenario: Un código válido dentro de la ventana de tolerancia se acepta
 
 - **DADO** el secreto TOTP inscrito para `sofia.mejia@colegio.edu.hn` y el instante

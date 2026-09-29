@@ -361,7 +361,7 @@ Rama `change/column-encryption-and-mfa-totp-c3-recovery-codes`, base C2.
   (`feat`) sobre el puerto y el adaptador. — `design.md` decisión 5 (D5) completa; nota de §10 de
   `docs/03-seguridad.md` §4.3 (redactada en la tarea 5.2)
 
-- [x] 3.2 **ROJO/VERDE — `RecoveryCodeRepository`, y `EnrollTotpSecondFactor` completo (secreto
+- [ ] 3.2 **ROJO/VERDE — `RecoveryCodeRepository`, y `EnrollTotpSecondFactor` completo (secreto
   TOTP + diez códigos de recuperación, un solo evento de auditoría).** Requiere Docker. ROJO:
   crear `.../test/java/com/confia/identity/application/EnrollTotpSecondFactorIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`: inscribir el segundo factor de una cuenta genera un secreto
@@ -389,6 +389,27 @@ Rama `change/column-encryption-and-mfa-totp-c3-recovery-codes`, base C2.
   (`feat`) sobre el puerto/adaptador de códigos, (`feat`) sobre `EnrollTotpSecondFactor` y (`feat`)
   sobre `ConsumeRecoveryCode`. — Especificación `identity`, requisitos «Diez códigos de
   recuperación de MFA...» (los dos escenarios); `design.md` §4.1, §4.3
+
+  > **Reabierta el 2026-09-29, tras la verificación del corte.** Su alcance original quedó cumplido
+  > y verificado en verde, pero el propio `design.md` §4.1 que esta tarea seguía al pie de la letra
+  > tenía un hueco: la inscripción **no devolvía el secreto TOTP**, que solo existía en claro dentro
+  > de una variable local. Ninguna aplicación de autenticación podía aprenderlo, así que el segundo
+  > factor quedaba inscrito en la base e imposible de activar. Se corrigieron el requisito publicado
+  > y §4.1, y esta tarea es la dueña del código afectado.
+  >
+  > **Se reabre en vez de abrirse como tarea nueva** porque `tasks.md` ya está en el límite de quince
+  > de `openspec/changes/README.md`, y porque el entregable que cambia —`EnrollTotpSecondFactor` y su
+  > resultado— es exactamente el de esta tarea.
+  >
+  > **Trabajo añadido.** ROJO: extender `PlainTotpSecretTest` con los vectores de RFC 4648
+  > (`""`, `"f"`, `"fo"`, `"foo"`, `"foob"`, `"fooba"`, `"foobar"`, más el secreto compartido de
+  > RFC 6238, que da 32 caracteres sin relleno) y `EnrollTotpSecondFactorIT` con la aserción de que
+  > el secreto devuelto en base32 corresponde **exactamente** al que quedó cifrado en la credencial,
+  > no a uno distinto. VERDE: añadir `PlainTotpSecret.base32()` (RFC 4648 sin relleno, sin
+  > dependencia nueva) y el componente `PlainTotpSecret` a `EnrollTotpSecondFactorResult` — **el
+  > secreto viaja como el objeto ya redactado, nunca como `String`**, para que el `toString()`
+  > generado del `record` siga sin filtrar nada. — Especificación `identity`, escenario «La
+  > inscripción devuelve el secreto en base32 una única vez»; `design.md` §4.1 corregida
 
 - [x] 3.3 **ROJO/VERDE — aviso al quedar con menos de tres códigos de recuperación (D8).** Requiere
   Docker (ejecuta sobre `ConsumeRecoveryCode` de 3.2). ROJO: extender
