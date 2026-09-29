@@ -202,7 +202,7 @@ de 1.1-1.3 ya se acerca a 800 líneas — decidir con la medición de la propia 
   `mfa_required`...» (escenario «La columna se fija al crear la cuenta...»); `design.md` §9 (sonda
   S2) y decisiones 1, 3
 
-- [ ] 1.3 **ROJO/VERDE — el motor de cifrado puro en `kernel`.** No requiere Docker (JUnit y
+- [x] 1.3 **ROJO/VERDE — el motor de cifrado puro en `kernel`.** No requiere Docker (JUnit y
   AssertJ puros, sin contenedor). ROJO: crear
   `.../kernel/src/test/java/com/confia/kernel/AesGcmCipherTest.java` (cifra y descifra de ida y
   vuelta con llave de 32 bytes e IV de 12 bytes; un dato adicional autenticado distinto en el

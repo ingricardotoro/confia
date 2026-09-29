@@ -146,3 +146,48 @@ independiente.
 - `d515cef` — `feat(schema): add mfa_required column and the four crypto/MFA tables in V6`
 - `bdd5de5` — `test(schema): extend RolePrivilegeMatrixIT and MultiTenantSchemaIT for V6`
 - `6731b3a` — `fix(test): seed mfa_required explicitly in every pre-existing identity_staff_account insert`
+
+---
+
+## Tarea 1.3 — motor de cifrado puro en `kernel`
+
+### ROJO observado (real, ejecutado)
+
+`./mvnw -B -pl kernel test` con `AesGcmCipherTest.java` y `EncryptedColumnValueTest.java` ya
+escritas y `AesGcmCipher`, `AeadIntegrityException` y `EncryptedColumnValue` todavía sin crear:
+`BUILD FAILURE`, error de compilación real, doce errores «cannot find symbol», por ejemplo:
+
+```
+[ERROR] .../AesGcmCipherTest.java:[17,19] cannot find symbol
+  symbol:   class AesGcmCipher
+[ERROR] .../AesGcmCipherTest.java:[20,65] cannot find symbol
+  symbol:   class AeadIntegrityException
+[ERROR] .../EncryptedColumnValueTest.java:[23,9] cannot find symbol
+  symbol:   class EncryptedColumnValue
+```
+
+Una migración no puede observar rojo de esta misma forma (es SQL, no código que compile o no); este
+rojo sí es el real de una prueba: fallo de compilación, no un rojo inventado o parafraseado.
+
+### VERDE (real, ejecutado)
+
+Con las tres clases creadas, `./mvnw -B -pl kernel test`: `BUILD SUCCESS`,
+`Tests run: 186, Failures: 0, Errors: 0` para todo el módulo `kernel` (sin ninguna otra suite
+rota), con `AesGcmCipherTest` (5 pruebas) y `EncryptedColumnValueTest` (4 pruebas) en verde.
+
+### Decisión no explícita en `design.md`: `AeadIntegrityException` no extiende `DomainException`
+
+`design.md` decisión 5 fija el tipo `AeadIntegrityException` como el lanzado por
+`AesGcmCipher.decrypt(...)`, pero no dice si extiende `DomainException`. Se decidió que **no**:
+`KernelErrorCodesTest` declara un catálogo cerrado y explícito de exactamente ocho códigos
+("estos ocho códigos son definitivos... cambiar uno exige actualizar design.md y
+specs/money/spec.md en el mismo commit"), y ninguno de los dos artefactos citados por esa prueba
+pertenece a este cambio. Añadir un noveno código violaría esa prueba tal como está escrita, y
+forzar la actualización de `specs/money/spec.md` por un fallo de cifrado no tiene sentido. Se
+reporta como discrepancia de redacción de `design.md` (no bloqueante): `AeadIntegrityException`
+es una excepción comprobada (`Exception`, no `RuntimeException`, coincidiendo con la firma
+`throws AeadIntegrityException` del propio `design.md`), sin código de dominio.
+
+### Commits
+
+- `57bb023` — `feat(kernel): add the pure AES-256-GCM cipher and the encrypted column value codec`
