@@ -313,3 +313,110 @@ detalle de porcentaje exacto en la salida estándar de Maven, confirmado solo co
 re-inspeccionado en el XML por no ser necesario para esta fase (los paquetes `.domain.` de este
 corte no cambiaron; el código nuevo vive en `kernel` y en `shared.crypto`/`shared.infrastructure`,
 ninguno de los dos sujeto a la puerta de 95 % que solo mide `com.confia.*.domain.*`).
+
+---
+
+## Revisión previa a la fusión de C1, y el corte en tres
+
+Fecha: 2026-09-28. La revisión de seguridad de este corte reportó **un hallazgo bloqueante, dos
+importantes y una sugerencia**. Los dos primeros se corrigieron antes de fusionar; el tercero ya
+tenía dueño declarado.
+
+### Hallazgo bloqueante: tres de las cuatro tablas nuevas sin prueba de aislamiento con datos reales
+
+`RolePrivilegeMatrixIT` y `MultiTenantSchemaIT` ya demostraban **por catálogo** que las cuatro
+políticas y los cuatro juegos de privilegios existen. Ninguna aserción de catálogo demuestra que una
+cadena de política idéntica se comporte igual sobre cuatro tablas distintas, y solo
+`shared_data_encryption_key` tenía la lectura real de dos instituciones. `identity_mfa_totp_credential`,
+`identity_mfa_recovery_code` e `identity_mfa_totp_backoff` no tenían ninguna.
+
+Es el mismo patrón por tercer cambio consecutivo —el cambio 6 sobre `shared_idempotency_key`, la
+parte 1 sobre `identity_login_backoff`— y siempre con la misma forma: la prueba de aislamiento se
+escribe para la tabla que da nombre al cambio, y las demás no heredan nada más que la suposición.
+`CLAUDE.md` no admite excepción, y `docs/03-seguridad.md` §6.4 tampoco.
+
+**Corrección.** `MfaTableRowSecurityIT` cubre las tres tablas restantes, parametrizada porque la
+propiedad es idéntica y solo cambia el texto de la sentencia. Cada cadena SQL es un literal que
+lleva su propio descriptor de tabla: ninguna se arma concatenando un nombre de tabla, de modo que la
+regla 12 se respeta también en las pruebas.
+
+**Control negativo ejecutado.** Con las tres políticas nuevas debilitadas a `USING (true)`, las
+**seis** pruebas nuevas fallan y las **dos** de la cuarta tabla, intacta, siguen pasando. Es la
+única evidencia que distingue una prueba que detecta de una que pasa.
+
+### Hallazgo importante: el AAD de la DEK envuelta era una etiqueta fija
+
+`JooqDataEncryptionKeyRepository` usaba una constante única —`shared_data_encryption_key.wrapped_key`—
+como datos adicionales autenticados para **toda fila de toda institución**, mientras
+`ColumnEncryptionService` ya construía un AAD por fila para los valores de columna de negocio. La
+consecuencia es concreta: copiar un `wrapped_key` de la fila de una institución a la de otra se
+desenvolvía **sin protestar** bajo la misma KEK. Es exactamente el trasplante que el AAD existe para
+impedir, y la propiedad que este mismo cambio ya exigía de cada columna que protege. El comentario
+que justificaba la constante afirmaba que la fila `(institution_id, id)` ya ataba el envoltorio por sí
+sola, y nada en el valor almacenado lo hacía cierto.
+
+Dejar la **raíz** de la jerarquía de llaves sin la barrera que ya tienen sus **hojas** no es una
+asimetría defendible: el sobre protege precisamente aquello cuya movilidad entre filas el AAD existe
+para impedir.
+
+**Corrección.** El AAD es ahora `shared_data_encryption_key.wrapped_key|<institution_id>|<id>`,
+construido de los dos lados desde la fila que guarda el valor. `ColumnEncryptionIT` gana la
+contraparte del sobre para la prueba de identificador de fila que ya tenía para valores de columna.
+ADR-0023 lo declara en su punto 1 de alcance y en su lista de verificación, donde antes solo hablaba
+del formato de columna.
+
+**Control negativo ejecutado.** Con la etiqueta devuelta a constante fija, la prueba nueva no
+encuentra **ninguna** excepción y las otras tres de la clase siguen pasando.
+
+### Hallazgo importante diferido, con dueño
+
+No hay todavía prueba de redacción sobre `ColumnEncryptionMasterKey` ni `DataEncryptionKeyMaterial`.
+Las dos son clases `final` con `toString()` redactado, verificado por lectura, pero **verificado por
+lectura no es verificado por prueba** —y la parte 1 ya demostró que esa diferencia importa: la fuga
+del `record` `AuthenticationCommand` sobrevivió a tres revisiones porque la declaración se leía
+correcta. Dueño: **corte C5**, tarea del barrido de redacción, que ya existe en `tasks.md`.
+
+### Partición real de C1: tres pull requests, no dos
+
+La medición de la tarea 1.4 proponía dos cortes de 669 y 759 líneas de autor. Las dos correcciones
+añaden 94 líneas a la mitad del sobre de llaves y 139 a la del esquema, con lo que **las dos se
+pasarían de las 800** del presupuesto vigente (`docs/15-flujo-de-trabajo-git.md` §3). Se rebalanceó
+en tres, y `DataEncryptionKeyRowSecurityIT` se movió al tercero:
+
+| Corte | Contenido | Líneas de autor |
+|---|---|---|
+| **C1a** | migración `V6`, extensión de las dos puertas genéricas de esquema, motor de cifrado puro en `kernel` | **669** |
+| **C1b** | puerto, servicio y adaptador jOOQ de `shared.crypto`, `ColumnEncryptionIT`, corrección del AAD del sobre, ADR-0023 | **729** |
+| **C1c** | las cuatro pruebas de aislamiento de fila con datos reales | **244** |
+
+Medición: `git diff --numstat <base>..<punta> -- . ':(exclude)openspec' ':(exclude)docs'`, añadidas
+más eliminadas, la misma fórmula de la tarea 1.4. Es el diff **acumulado** de cada corte contra su
+propia base, que es lo que el revisor ve en el pull request, no la suma de los diffs de sus commits:
+esa suma cuenta dos veces cada línea que un commit posterior vuelve a tocar, y para C1b da 757 en vez
+de 729 precisamente porque la corrección del AAD reescribe líneas que el primer commit del corte
+había añadido.
+
+**Por qué las cuatro pruebas de aislamiento van juntas y no cada una con su tabla.** La regla de
+`docs/15` §3 dice que las pruebas no se separan de su código, y la política de fila de las cuatro
+tablas la crea `V6`, en C1a, no el código Java de C1b. Ninguna de las cuatro prueba una clase de
+C1b: prueban la migración. Mantenerlas en una sola unidad revisable es lo que convierte «falta una»
+en algo que se ve **contando**, en vez de recordando —que es justamente lo que falló tres veces
+seguidas.
+
+### Verificación tras las correcciones: `./mvnw -B verify`
+
+Sobre la punta de la cadena (C1c): **BUILD SUCCESS**, `Total time: 03:32 min`. `Tests run: 135` de
+integración (antes 128: seis pruebas nuevas de aislamiento más la del trasplante del sobre), **261**
+unitarias de `app` y **179** de `kernel`, cero fallos. `jacoco:check`: «All coverage checks have been
+met.» Los ficheros `jacoco-*.exec` y los directorios `site` se borraron a mano antes de la corrida,
+por el defecto conocido de `mvn clean` con los bloqueos de OneDrive sobre `target/`.
+
+### Commits de las correcciones
+
+- `3cba8b1` — `fix(shared): bind the wrapped-key AAD to its own institution and key row`
+- `057b646` — `test(schema): prove row isolation with real data on all four tables of V6`
+
+Los cuatro commits anteriores de C1b se reconstruyeron sobre la misma base para sacar
+`DataEncryptionKeyRowSecurityIT` de ese corte, conservando mensaje, autor y fecha de cada uno; el
+segundo cambió de título porque ya no añade la prueba de aislamiento: `9b2939d`, `48dfbf3`,
+`81c71e0`, `770d82d`.
