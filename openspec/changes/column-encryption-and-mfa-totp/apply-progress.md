@@ -191,3 +191,125 @@ es una excepción comprobada (`Exception`, no `RuntimeException`, coincidiendo c
 ### Commits
 
 - `57bb023` — `feat(kernel): add the pure AES-256-GCM cipher and the encrypted column value codec`
+
+---
+
+## Tarea 1.4 — puerto y servicio de `shared.crypto`, adaptador jOOQ, ADR-0023
+
+### ROJO observado (real, ejecutado)
+
+`./mvnw -B -pl app -am test -Dtest=DataEncryptionKeyRowSecurityIT,ColumnEncryptionIT
+-Dsurefire.failIfNoSpecifiedTests=false`, con las dos clases de prueba ya escritas y ninguna clase
+de `com.confia.shared.crypto` ni `JooqDataEncryptionKeyRepository` todavía creadas: `BUILD FAILURE`,
+error de compilación real, catorce errores «cannot find symbol» (`ColumnEncryptionMasterKey`,
+`ColumnEncryptionService`, `JooqDataEncryptionKeyRepository`).
+
+### VERDE (real, ejecutado)
+
+Con las seis clases de producción creadas (`package-info`, `DataEncryptionKeyId`,
+`DataEncryptionKeyMaterial`, `ColumnEncryptionMasterKey`, `DataEncryptionKeyRepository`,
+`ColumnEncryptionService`, `JooqDataEncryptionKeyRepository`), la misma orden: `BUILD SUCCESS`,
+`Tests run: 5, Failures: 0, Errors: 0` (`DataEncryptionKeyRowSecurityIT`: 2 pruebas,
+`ColumnEncryptionIT`: 3 pruebas), **en el primer intento**, sin ninguna corrección posterior de
+producción.
+
+### Puertas de arquitectura, verificadas explícitamente
+
+`./mvnw -B -pl app -am test -Dtest=SpringModulithVerificationTest,LayeredArchitectureTest,
+TableOwnershipByModuleTest,NoUnapprovedPlainSqlTest,NoCrossModuleDomainImportsTest,
+TransactionsOnlyInSharedSecurityTest`: `BUILD SUCCESS`, `Tests run: 14, Failures: 0, Errors: 0`.
+Confirma en concreto: `com.confia.shared.crypto` con `@NamedInterface` no rompe la verificación de
+módulos de Spring Modulith; `JooqDataEncryptionKeyRepository` en `shared.infrastructure` conserva
+el prefijo `Shared` que `TableOwnershipByModuleTest` exige; el adaptador no llama ningún punto de
+entrada de SQL plano de jOOQ (`NoUnapprovedPlainSqlTest` sigue con la única entrada aprobada de la
+parte 1, **no se añadió ninguna**).
+
+### Discrepancia no bloqueante: el formato de `wrapped_key` exige exactamente tres partes, y la
+### primera redacción del adaptador escribía solo dos
+
+Al escribir `JooqDataEncryptionKeyRepository.wrap(...)`, la primera versión concatenaba
+`ciphertextWithTag` completo como una sola parte base64 (`<iv_b64>:<ciphertextWithTag_b64>`, dos
+partes), que **no** habría satisfecho `shared_data_encryption_key_wrapped_chk` de `V6`
+(`^[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$`, tres partes exactas) — se habría detectado
+recién en tiempo de ejecución contra PostgreSQL real, no en compilación. Se corrigió antes de
+ejecutar la mitad VERDE, partiendo también la etiqueta de 16 bytes como su propia tercera parte
+(`<iv_b64>:<ciphertext_b64>:<tag_b64>`), exactamente como el propio comentario de la decisión 3,
+punto 3, especifica. Se reporta porque nadie lo pidió explícitamente verificar contra el `CHECK`
+real antes de ejecutar — el ROJO/VERDE de esta tarea no lo habría cazado si el `CHECK` no existiera
+en la migración, así que la coincidencia fue deliberada, no accidental.
+
+### Sonda S2 (tarea 1.2), reconfirmada sin cambios en 1.4
+
+No se repitió: los cuatro nombres de tabla generados por jOOQ ya se confirmaron en la tarea 1.2 y
+`V6` no cambió durante 1.4.
+
+### PIT sobre `kernel` (no exigido por un `./mvnw verify` simple; ejecutado explícitamente por esta
+### fase para verificar `AesGcmCipher`/`EncryptedColumnValue` antes de cerrar C1)
+
+`./mvnw -B -pl kernel -Pmutation-report verify` (perfil explícito; `confia.pit.phase=none` por
+defecto en un `verify` simple, para no forzar la descarga de PIT en cada corrida local —
+`apps/api/pom.xml`, ya establecido en la parte 1): `BUILD SUCCESS`,
+`Line Coverage (for mutated classes only): 229/233 (98%)`,
+`Generated 194 mutations Killed 192 (99%)`. Inspeccionado `kernel/target/pit-reports/mutations.xml`
+directamente: **las diecinueve mutaciones de `AesGcmCipher.java` y `EncryptedColumnValue.java` están
+todas `status='KILLED'`, sin ninguna `SURVIVED`** — cobertura de mutación del 100% para el código
+nuevo de esta tarea. Los dos únicos mutantes `SURVIVED` del módulo completo (`Money.requireBoundedScale`,
+`Percentage.requireBoundedScale`, línea de frontera de condicional) son preexistentes de la parte 1
+del cambio 5, ajenos a este cambio, y muy por encima del umbral de 80 en cualquier caso
+(191/194 = 98,4 %).
+
+### Diff medido, y el corte que la tarea 1.4 exige reportar
+
+`git diff --numstat cd432cc -- . ':(exclude)openspec' ':(exclude)docs/adr' ':(exclude)**/generated/**'`
+(`cd432cc` es el commit anterior a esta fase — el de la tarea 1.1, ya aplicada por el orquestador —
+sobre esta misma rama, `change/mfa-totp-and-password-recovery`, que continúa sin renombrarse):
+
+| Punto de medición | Líneas de autor (añadidas + eliminadas) |
+|---|---|
+| Tras cerrar 1.2 y 1.3 (migración `V6`, extensión de las dos puertas genéricas, nueve inserciones corregidas, motor de cifrado puro en `kernel`) | **669** |
+| Tras cerrar 1.4 además (puerto/servicio/adaptador de `shared.crypto`, dos clases de prueba de integración) | **1 428** — **supera las 800 líneas** |
+| Solo 1.4 (delta sobre la fila anterior) | **759** |
+
+**Se detiene aquí, tal como exige la tarea, y se reporta el punto de corte candidato en vez de
+decidirlo en silencio.** El propio `design.md` (Suggested Work Units, corte C1) ya anticipó
+exactamente este corte como «probable»: **PR C1a** (tareas 1.2+1.3: migración, puertas de esquema,
+motor de cifrado — 669 líneas) y **PR C1b** (tarea 1.4: puerto/servicio/adaptador de llaves, ADR —
+759 líneas de código más el propio ADR, excluido de esta medición por instrucción explícita). Los
+dos quedan **por debajo** de las 800 líneas del presupuesto vigente del propietario si se entregan
+como dos pull requests encadenados (`C1b` con base `C1a`), en vez de uno solo de 1 428.
+
+**Verificación de cada mitad, con el alcance real disponible en esta fase.** Se verificó cada mitad
+por su propio conjunto de pruebas antes de continuar a la siguiente, en el orden real de ejecución
+de esta sesión: 1.2+1.3 en verde (`Tests run: 36` del esquema + `Tests run: 186` de `kernel`, ambos
+`BUILD SUCCESS`, antes de que existiera ningún archivo de 1.4) y 1.4 en verde por separado
+(`Tests run: 5`, `BUILD SUCCESS`, más las seis puertas de arquitectura). El `./mvnw -B verify`
+completo de cierre (más abajo) confirma además que **el árbol acumulado hasta el final de C1**
+—la forma que tendría `C1b` en la cabeza de su propia rama— pasa entero. **No se ejecutó** un
+`checkout` separado al commit `9c1ecf9` (fin de 1.2+1.3) para correr `./mvnw -B verify` completo
+ahí también: el encargo de esta fase fija explícitamente «no cambies de rama», y un `checkout`
+independiente a un commit anterior de la misma rama, aunque no mueve la rama en sí, no pareció
+la lectura más segura de esa restricción dado el estado del anfitrión (memoria ajustada, nueve
+agentes caídos ya en esta sesión). Se declara la limitación en vez de afirmar una verificación que
+no se ejecutó: quien decida la partición real en dos ramas de PR puede repetir
+`./mvnw -B verify` en la base de `C1a` con una confianza razonable, dado que sus pruebas ya se
+observaron en verde de forma aislada dentro de esta misma sesión, antes de que 1.4 tocara ningún
+archivo.
+
+### Commits
+
+- `75019b8` — `feat(shared): add the key-envelope port, service and jOOQ adapter`
+- `83813dd` — `test(shared): add row-security and column-encryption integration tests`
+- `4164d15` — `docs(adr): add ADR-0023 for the column-encryption key envelope`
+
+### Verificación final de C1: `./mvnw -B verify`
+
+`BUILD SUCCESS`, `Total time: 04:09 min`. Suite `*IT.java` (fase `failsafe`, un único contenedor
+`postgres:18-alpine` compartido por toda la sesión de pruebas de la JVM): `Tests run: 128, Failures:
+0, Errors: 0, Skipped: 0` — suma de los tiempos individuales reportados por cada clase, **68,45
+segundos** de ejecución real de prueba (el resto del intervalo de reloj de pared de la fase,
+aproximadamente entre las 18:18:45 y las 18:19:52, es arranque de Spring Boot y del propio
+contenedor, no tiempo de prueba). `jacoco:check`: «All coverage checks have been met.» — sin
+detalle de porcentaje exacto en la salida estándar de Maven, confirmado solo como paso, no
+re-inspeccionado en el XML por no ser necesario para esta fase (los paquetes `.domain.` de este
+corte no cambiaron; el código nuevo vive en `kernel` y en `shared.crypto`/`shared.infrastructure`,
+ninguno de los dos sujeto a la puerta de 95 % que solo mide `com.confia.*.domain.*`).

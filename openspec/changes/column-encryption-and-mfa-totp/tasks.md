@@ -220,7 +220,7 @@ de 1.1-1.3 ya se acerca a 800 líneas — decidir con la medición de la propia 
   sobre el motor puro. — `design.md` decisión 5; ADR-0023 (alcance (a), aún sin redactar — lo hace
   la tarea 1.4)
 
-- [ ] 1.4 **ROJO/VERDE — puerto y servicio de `shared.crypto`, adaptador jOOQ, creación perezosa de
+- [x] 1.4 **ROJO/VERDE — puerto y servicio de `shared.crypto`, adaptador jOOQ, creación perezosa de
   la DEK (decisión 4), y ADR-0023.** Requiere Docker. ROJO: crear
   `.../test/java/com/confia/schema/DataEncryptionKeyRowSecurityIT.java` (dos instituciones, cada
   una con al menos una DEK activa; la segunda, con su propio contexto de sesión y
