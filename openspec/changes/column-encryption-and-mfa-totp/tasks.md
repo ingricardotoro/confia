@@ -344,7 +344,7 @@ Rama `change/column-encryption-and-mfa-totp-c2-totp`, base C1.
 
 Rama `change/column-encryption-and-mfa-totp-c3-recovery-codes`, base C2.
 
-- [ ] 3.1 **ROJO/VERDE — `RecoveryCodeHasher` (D5) y sus objetos de valor.** No requiere Docker
+- [x] 3.1 **ROJO/VERDE — `RecoveryCodeHasher` (D5) y sus objetos de valor.** No requiere Docker
   (JUnit, AssertJ y Bouncy Castle puros, sin contenedor). ROJO: crear
   `.../test/java/com/confia/identity/infrastructure/BouncyCastleRecoveryCodeHasherTest.java`: un
   código de recuperación de MFA se hashea y verifica de ida y vuelta con el mismo perfil Argon2id
@@ -361,7 +361,7 @@ Rama `change/column-encryption-and-mfa-totp-c3-recovery-codes`, base C2.
   (`feat`) sobre el puerto y el adaptador. — `design.md` decisión 5 (D5) completa; nota de §10 de
   `docs/03-seguridad.md` §4.3 (redactada en la tarea 5.2)
 
-- [ ] 3.2 **ROJO/VERDE — `RecoveryCodeRepository`, y `EnrollTotpSecondFactor` completo (secreto
+- [x] 3.2 **ROJO/VERDE — `RecoveryCodeRepository`, y `EnrollTotpSecondFactor` completo (secreto
   TOTP + diez códigos de recuperación, un solo evento de auditoría).** Requiere Docker. ROJO:
   crear `.../test/java/com/confia/identity/application/EnrollTotpSecondFactorIT.java`, extendiendo
   `CommittingPostgresIntegrationTest`: inscribir el segundo factor de una cuenta genera un secreto
@@ -390,7 +390,7 @@ Rama `change/column-encryption-and-mfa-totp-c3-recovery-codes`, base C2.
   sobre `ConsumeRecoveryCode`. — Especificación `identity`, requisitos «Diez códigos de
   recuperación de MFA...» (los dos escenarios); `design.md` §4.1, §4.3
 
-- [ ] 3.3 **ROJO/VERDE — aviso al quedar con menos de tres códigos de recuperación (D8).** Requiere
+- [x] 3.3 **ROJO/VERDE — aviso al quedar con menos de tres códigos de recuperación (D8).** Requiere
   Docker (ejecuta sobre `ConsumeRecoveryCode` de 3.2). ROJO: extender
   `ConsumeRecoveryCodeIT` con: una cuenta con diez códigos, siete ya usados, que al usar el octavo
   dispara la señal de aviso auditada con el conteo de dos restantes (cubre «Consumir el octavo
