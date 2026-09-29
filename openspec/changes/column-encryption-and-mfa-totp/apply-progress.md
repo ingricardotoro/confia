@@ -966,3 +966,131 @@ cambia nada de lo reportado aquí, que se basa únicamente en las líneas
    antes de que la tarea 3.3 lo necesitara, por ser parte natural del contrato de lectura del
    repositorio — no ejercitado por ninguna prueba hasta 3.3. Documentado aquí en vez de justificarlo
    como si hubiera tenido una prueba propia en 3.2.
+
+---
+
+## Verificación del orquestador sobre C3, y la brecha que encontró
+
+Fecha: 2026-09-29. Verificación independiente del trabajo de la fase de aplicación: estado de git,
+diff medido aparte, lectura de los puntos críticos, `./mvnw -B verify` propio y **tres controles
+negativos**.
+
+### Lo que salió limpio
+
+`PlainRecoveryCode` y `StoredRecoveryCodeHash` son `final class` con `toString()` redactado —y en la
+primera es obligatorio y no preferencia, porque carga un `String` y un `record` sí lo imprimiría
+verbatim—. Ningún SQL armado por concatenación en `JooqRecoveryCodeRepository`. Ningún `DELETE`: un
+código consumido se marca con `used_at`. Cero atribución de IA y cero `MAVEN_OPTS` añadido.
+
+**Control negativo de la redacción.** Rindiendo el código dentro de `toString()`, falla
+`PlainRecoveryCodeTest.toStringIsRedactedAndCarriesNoRenderingOfTheCode`.
+
+**Control negativo del umbral del aviso.** Cambiando `remaining < 3` por `remaining <= 3` fallan
+**las dos** pruebas de frontera de `ConsumeRecoveryCodeIT`, una de ellas con el mensaje exacto: «the
+threshold requires falling strictly below three, not reaching exactly three». La frontera que la
+especificación distingue con un escenario propio está genuinamente protegida.
+
+### BRECHA: la inscripción no entregaba el secreto TOTP
+
+`EnrollTotpSecondFactor` generaba el secreto con `SecureRandom`, lo cifraba, lo guardaba y devolvía
+**solo los diez códigos de recuperación**. El secreto en claro existía únicamente en una variable
+local que muere al terminar la transacción.
+
+**No era defecto de implementación.** `design.md` §4.1 decía literalmente «devuelve los diez códigos
+EN CLARO» y no nombraba el secreto; el código seguía el diagrama al pie de la letra. Se comprobó
+además que **no hay ninguna mención** de `qr`, `otpauth`, `authenticator` ni «aplicación de
+autenticación» en `specs/identity/spec.md` ni en `docs/03-seguridad.md`. El requisito exigía «generar
+un secreto TOTP de 20 bytes aleatorios» y sus escenarios arrancaban desde «el secreto TOTP
+**inscrito**», dando por hecho que la aplicación del usuario ya lo tenía.
+
+**Consecuencia concreta:** ninguna persona podía inscribir jamás su aplicación de autenticación. El
+mecanismo de verificación quedaba completo, probado, correcto — y sin forma de llegar a usarse.
+
+**Decisión del propietario, 2026-09-29: base32 ahora, `otpauth://` después.** El identificador URI
+exige un emisor y una etiqueta por institución, que son información del módulo de organización y una
+decisión de producto; pertenecen al cambio que construya la pantalla de inscripción.
+
+**Orden de la corrección.** Requisito publicado → `design.md` §4.1 → `tasks.md` → código. `CLAUDE.md`
+no admite implementar sin especificación aprobada, y esto cambiaba un requisito publicado. La tarea
+3.2 se **reabrió** en vez de crear una decimosexta, porque `tasks.md` ya está en el límite de quince
+y el entregable que cambia es exactamente el suyo.
+
+**Implementación.** `Base32`, códec de paquete —**no público**: su único llamador es
+`PlainTotpSecret.base32()`, y un codificador público en el paquete de dominio invitaría a rendir
+otros secretos, sin llevar redacción propia—. Probado contra **los siete vectores de RFC 4648 §10**,
+verificados computacionalmente antes de transcribirlos. El secreto viaja en
+`EnrollTotpSecondFactorResult` **como `PlainTotpSecret`, nunca como `String`**: así el `record`
+sigue sin filtrar por su `toString()` generado, que sí habría impreso una cadena verbatim.
+
+**Control negativo del secreto devuelto.** Haciendo que el caso de uso devuelva un
+`PlainTotpSecret.generate(...)` recién creado en vez del que almacenó, falla **solo** la prueba nueva
+y las otras cuatro siguen verdes. Comprobar longitud y alfabeto habría pasado con cualquier secreto
+de veinte bytes; lo que sostiene la prueba es que el base32 entregado codifique **los mismos bytes**
+que el texto cifrado almacenado descifra.
+
+### Partición de C3: tres pull requests
+
+Con la corrección, el corte mide **1 519** líneas de autor y la partición en dos deja de caber —la
+segunda mitad daría 917—. Tres cortes, todos en límites de commit ya existentes, sin reescribir
+historia:
+
+| Corte | Contenido | Líneas de autor |
+|---|---|---|
+| **C3a** | `RecoveryCodeHasher` y su adaptador Argon2id, `PlainRecoveryCode` y `StoredRecoveryCodeHash` con sus pruebas, puerto y adaptador de `RecoveryCodeRepository` **con su prueba de integración** | **783** |
+| **C3b** | `EnrollTotpSecondFactor`, `ConsumeRecoveryCode` y el aviso de códigos bajos | **703** |
+| **C3c** | requisito y diseño corregidos, y la devolución del secreto en base32 | **201** |
+
+El tercero no es un sobrante: es exactamente «lo que encontró verificar este corte», y se lee mejor
+junto que repartido.
+
+### Verificación de cierre del orquestador
+
+`./mvnw -B verify`: **BUILD SUCCESS**, `Total time: 03:31 min`, `Tests run: 152` de integración
+(151 antes de la prueba del secreto devuelto), cero fallos, «All coverage checks have been met.»
+
+### Verificar C3a por separado destapó tres huecos más
+
+`docs/15` §3 exige que **cada eslabón de una cadena** compile y pase sus pruebas por sí solo. Al
+hacerlo con C3a, `jacoco:check` **falló**: `com.confia.identity.domain` al **0,94** en líneas y al
+**0,89 en ramas**, contra el 0,95 exigido. El informe por clase, no el promedio del paquete:
+
+| Clase | Sin cubrir en C3a |
+|---|---|
+| `RecoveryCodeRow` | **4 de 4 líneas — cero cobertura** |
+| `StoredRecoveryCodeHash` | 4 de 6 ramas |
+| `PlainRecoveryCode` | 2 de 8 ramas |
+
+Tirando del primero apareció el hueco de fondo: **`JooqRecoveryCodeRepository` era el único
+adaptador jOOQ del módulo de identidad sin prueba de integración propia.** `JooqLoginBackoffStoreIT`,
+`JooqStaffAccountRepositoryIT`, `JooqTotpCredentialRepositoryIT` y `JooqTotpVerificationBackoffStoreIT`
+la tienen; este se ejercitaba solo de rebote, desde casos de uso que viven en C3b, lo que además
+dejaba `RecoveryCodeRow` sin construir nunca.
+
+Importa por un método concreto. `markUsed` lleva `AND used_at IS NULL`: eso es lo que hace que un
+código de recuperación sea de un solo uso, y devolver cero filas es cómo el llamador se entera de que
+una consumición concurrente ya ganó. Es **el mismo predicado** que en C2 resultó indistinguible de un
+`UPDATE` normal desde una prueba de caso de uso en una sola sesión. `JooqRecoveryCodeRepositoryIT`
+lleva esa aserción como la de más peso, y cubre los cuatro métodos del puerto.
+
+`PlainRecoveryCode` no tenía prueba de igualdad —su única rama sin recorrer—. La prueba nueva deja
+dicho que la igualdad **no** es como se autentica un código presentado: se verificó leyendo
+`ConsumeRecoveryCode`, que compara con `RecoveryCodeHasher.matches(...)`, Argon2id, nunca con
+`String.equals`, que cortaría en el primer carácter distinto. La cobertura de `StoredRecoveryCodeHash`
+se movió al corte donde **nace** la clase, en vez de quedarse en el último.
+
+### El patrón, dicho en voz alta
+
+Verificar el eslabón por separado encontró algo en **tres cortes consecutivos**: en C2 una clase con
+secreto y cero pruebas (`PlainTotpSecret`); en C3a un adaptador sin prueba de integración y dos ramas
+de igualdad sin recorrer. En los tres casos la suite completa pasaba en verde.
+
+Lo que lo hace funcionar no es correr más pruebas, sino correrlas sobre **menos código**: el mismo
+umbral del 95 % es mucho más exigente sobre un corte de 700 líneas que sobre el árbol entero. Partir
+para respetar el presupuesto de revisión resultó ser, de paso, el mejor detector de cobertura falsa
+de este proyecto.
+
+### Verificación independiente de los tres eslabones
+
+- **C3a solo**: `BUILD SUCCESS`, `02:46 min`, `Tests run: 146` de integración, cobertura cumplida.
+- **C3b sobre C3a**: `BUILD SUCCESS`, `03:17 min`, `Tests run: 154`, cobertura cumplida.
+- **C3c sobre C3b**: `BUILD SUCCESS`, `03:12 min`, `Tests run: 155`, cobertura cumplida.
