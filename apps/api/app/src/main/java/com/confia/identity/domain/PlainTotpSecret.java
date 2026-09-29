@@ -58,6 +58,20 @@ public final class PlainTotpSecret {
         return value.clone();
     }
 
+    /**
+     * The secret rendered for a human to transcribe into an authenticator app: base32 as RFC 4648
+     * defines it, which is what those apps accept as manual entry (specs/identity/spec.md, escenario
+     * "La inscripción devuelve el secreto en base32 una única vez"). Always exactly 32 characters
+     * with no padding, because {@value #LENGTH_BYTES} bytes is a multiple of five.
+     *
+     * <p><b>This is the one method that hands the secret out legibly</b>, and it exists because
+     * without it no authenticator app could ever learn the secret. It is called once, in the return
+     * of enrollment; nothing reads the secret in clear afterwards.
+     */
+    public String base32() {
+        return Base32.encode(value);
+    }
+
     /** Redacted deliberately: {@code value} is the clear-text TOTP secret itself. */
     @Override
     public String toString() {

@@ -3,6 +3,7 @@ package com.confia.identity.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.confia.identity.domain.PlainRecoveryCode;
+import com.confia.identity.domain.PlainTotpSecret;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.infrastructure.Argon2Pepper;
 import com.confia.identity.infrastructure.Argon2Profile;
@@ -89,6 +90,55 @@ class EnrollTotpSecondFactorIT extends CommittingPostgresIntegrationTest {
                 throw new IllegalStateException("stored TOTP secret failed AEAD verification", e);
             }
             assertThat(decrypted).hasSize(20);
+            return null;
+        });
+    }
+
+    /**
+     * The escenario publicado "La inscripción devuelve el secreto en base32 una única vez": without
+     * this return no authenticator app can ever learn the secret, and the second factor is enrolled
+     * yet impossible to activate.
+     *
+     * <p>Asserting the length and alphabet alone would pass for <em>any</em> 20 random bytes, so the
+     * assertion that carries the weight is the last one: the base32 handed to the caller must encode
+     * the very bytes that the stored ciphertext decrypts to. A use case that returned a freshly
+     * generated secret while storing a different one would satisfy every other check here and leave
+     * every future code rejected.
+     */
+    @Test
+    void theReturnedBase32SecretIsTheSameSecretThatWasStoredEncrypted() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
+        transactionRunner().execute(contextOf(institutionId), () -> {
+            seedAccount(institutionId, accountId);
+            return null;
+        });
+
+        EnrollTotpSecondFactorResult result = enroll(institutionId, accountId);
+
+        assertThat(result.secret().base32())
+                .as("20 bytes is a multiple of five, so RFC 4648 needs no padding here")
+                .hasSize(32)
+                .matches("[A-Z2-7]{32}");
+
+        transactionRunner().execute(contextOf(institutionId), () -> {
+            String encryptedSecret = dsl.fetchOne("""
+                    select encrypted_secret from identity_mfa_totp_credential
+                    where institution_id = ? and account_id = ?
+                    """, institutionId.value(), accountId.value())
+                    .get("encrypted_secret", String.class);
+            byte[] decrypted;
+            try {
+                decrypted = encryptionService().decrypt("identity_mfa_totp_credential",
+                        "encrypted_secret", institutionId,
+                        institutionId.value() + ":" + accountId.value(), encryptedSecret);
+            } catch (AeadIntegrityException e) {
+                throw new IllegalStateException("stored TOTP secret failed AEAD verification", e);
+            }
+            assertThat(PlainTotpSecret.of(decrypted).base32())
+                    .as("the secret handed to the caller must be the one that was stored, not "
+                            + "another one generated alongside it")
+                    .isEqualTo(result.secret().base32());
             return null;
         });
     }

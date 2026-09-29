@@ -1,6 +1,7 @@
 package com.confia.identity.application;
 
 import com.confia.identity.domain.PlainRecoveryCode;
+import com.confia.identity.domain.PlainTotpSecret;
 import java.util.List;
 import java.util.Objects;
 
@@ -11,14 +12,24 @@ import java.util.Objects;
  * plain record: each element is a {@link PlainRecoveryCode}, already redacted on its own {@code
  * toString()}, so this wrapper's generated {@code toString()} never prints a code verbatim.
  *
- * <p>Deliberately carries no field for the TOTP secret itself: design.md §4.1's own flow returns
- * only the ten codes, not the secret, to this call's caller. Provisioning UI (a QR code, or the
- * secret typed manually) is out of scope for this cut — it belongs to whichever change first
- * builds the enrollment screen, not to this use case.
+ * <p><b>Carries the TOTP secret as {@link PlainTotpSecret}, never as a {@link String}.</b> An
+ * earlier version of this class carried no secret at all, following design.md §4.1's own flow — and
+ * that was the gap the verification of this cut found: the clear-text secret lived only in a local
+ * variable of the use case, so no authenticator app could ever learn it and the second factor was
+ * enrolled yet impossible to activate. The secret now travels here, and it travels as the redacted
+ * value object precisely so this record stays safe: a {@code String} component would be printed
+ * verbatim by the generated {@code toString()}, while {@link PlainTotpSecret} redacts its own. The
+ * caller renders it with {@link PlainTotpSecret#base32()}.
+ *
+ * <p>The {@code otpauth://} URI and its QR rendering stay out of scope on purpose: they need a
+ * per-institution issuer and label, which is organization-module information and a product
+ * decision, and they belong to the change that builds the enrollment screen.
  */
-public record EnrollTotpSecondFactorResult(List<PlainRecoveryCode> recoveryCodes) {
+public record EnrollTotpSecondFactorResult(PlainTotpSecret secret,
+        List<PlainRecoveryCode> recoveryCodes) {
 
     public EnrollTotpSecondFactorResult {
+        Objects.requireNonNull(secret, "secret");
         Objects.requireNonNull(recoveryCodes, "recoveryCodes");
         recoveryCodes = List.copyOf(recoveryCodes);
     }
