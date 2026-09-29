@@ -738,3 +738,359 @@ contra el código que describe.
   have been met.»
 - **C2b sobre C2a**: `BUILD SUCCESS`, `03:12 min`, `Tests run: 143` de integración, «All coverage
   checks have been met.»
+
+---
+
+## Corte C3 — códigos de recuperación de MFA (D5, D8), `EnrollTotpSecondFactor` completo
+
+Rama `change/column-encryption-and-mfa-totp-c3-recovery-codes`, base `main` (C2 ya fusionado por
+sus dos pull requests, C2a y C2b). Las tres tareas se aplicaron literalmente como las escribe
+`tasks.md` — cada mitad ROJO se observó ejecutando la orden real de Maven antes de escribir la
+producción correspondiente, nunca parafraseada.
+
+### Tarea 3.1 — `RecoveryCodeHasher` (D5) y sus objetos de valor
+
+**ROJO observado (real, ejecutado).** Con las cuatro clases de producción ya escritas y las tres
+pruebas ya escritas, se movieron temporalmente fuera del árbol de compilación
+(`PlainRecoveryCode.java`, `StoredRecoveryCodeHash.java`, `RecoveryCodeHasher.java`,
+`BouncyCastleRecoveryCodeHasher.java`) para observar el rojo real de
+`./mvnw -B -pl app -am test-compile`: `BUILD FAILURE`, fallo real de compilación, veinte errores
+«cannot find symbol» sobre los cuatro símbolos, todos originados en
+`BouncyCastleRecoveryCodeHasherTest.java` (las dos pruebas de dominio referencian los mismos
+símbolos que declaran, así que su propio fallo de compilación ya está implícito en el de la
+prueba de infraestructura que los consume). Restauradas las cuatro clases antes de continuar a
+VERDE.
+
+**VERDE (real, ejecutado).** `./mvnw -B -pl app -am test
+-Dtest=PlainRecoveryCodeTest,StoredRecoveryCodeHashTest,BouncyCastleRecoveryCodeHasherTest
+-Dsurefire.failIfNoSpecifiedTests=false`: `BUILD SUCCESS`, `Tests run: 13, Failures: 0, Errors: 0`
+(`PlainRecoveryCodeTest`: 5 pruebas, `StoredRecoveryCodeHashTest`: 3 pruebas antes de la corrección
+de cobertura de cierre — ver más abajo —, `BouncyCastleRecoveryCodeHasherTest`: 5 pruebas).
+
+**Lección A y B de C2 aplicadas desde el inicio, no como corrección posterior.** `PlainRecoveryCode`
+y `StoredRecoveryCodeHash` recibieron su propia prueba de dominio en esta misma tarea, nunca dejadas
+para ejercitarse solo de paso por una prueba de integración de una tarea posterior —el hueco exacto
+que `PlainTotpSecret` dejó en C2 (13 de 13 líneas sin cubrir)—. La prueba de redacción de las dos
+recoge `toString()` como texto y afirma explícitamente que el valor en claro (o el hash) no
+sobrevive en él, nunca solo construye el objeto que filtraría.
+
+**Decisión de esta fase, no fijada por `design.md`: el alfabeto de los diez caracteres.**
+`design.md` fija la longitud (diez caracteres) pero no el alfabeto. Se eligió un alfabeto de
+treinta y dos símbolos —letras mayúsculas y dígitos, excluyendo `I`, `L`, `O`, `0` y `1`— por ser
+los caracteres que más se confunden entre sí al escribirse o leerse a mano, ya que estos códigos se
+muestran una vez y se transcriben después. Documentado en el Javadoc de `PlainRecoveryCode`, no
+inventado sin dejar rastro.
+
+**Decisión de esta fase: sin señuelo (`decoy`) para `BouncyCastleRecoveryCodeHasher`.** A diferencia
+de `BouncyCastleArgon2PasswordHasher`, este adaptador no construye un hash señuelo: un código de
+recuperación solo se verifica después de que la cuenta ya se autenticó con contraseña y, normalmente,
+ya es conocida (`SecondFactorRequired`) — no hay ningún oráculo de "¿existe esta cuenta?" que proteger
+aquí, y ningún escenario publicado lo exige.
+
+**Commit:** `08e2894` — `feat(identity): add the recovery code hasher port and Argon2id adapter`
+
+### Tarea 3.2 — `RecoveryCodeRepository`, `EnrollTotpSecondFactor` completo, `ConsumeRecoveryCode`
+
+**ROJO observado (real, ejecutado).** Con `EnrollTotpSecondFactorIT.java` y
+`ConsumeRecoveryCodeIT.java` ya escritas y `JooqRecoveryCodeRepository`, `EnrollTotpSecondFactor(Result)`
+y `ConsumeRecoveryCode(Decision)` todavía sin crear (movidas temporalmente fuera del árbol):
+`./mvnw -B -pl app -am test-compile`: `BUILD FAILURE`, fallo real de compilación, diecinueve
+errores «cannot find symbol» sobre los cinco símbolos que las dos pruebas nombran. Restauradas las
+siete clases antes de continuar a VERDE.
+
+**Discrepancia encontrada y corregida durante ROJO, antes de aceptar la prueba.** La primera
+redacción de ambas clases de prueba llamaba a `seedAccount(...)` como una sentencia suelta, fuera de
+`transactionRunner().execute(...)` — exactamente el error que la propia Javadoc de
+`CommittingPostgresIntegrationTest` advierte por su nombre: sin una transacción real que fije
+`app.institution_id` como primera sentencia, el `INSERT` en `identity_staff_account` viola su propia
+política de fila (`ERROR: new row violates row-level security policy`). Corregido envolviendo cada
+llamada a `seedAccount(...)` en `transactionRunner().execute(contextOf(institutionId), () -> {...})`,
+el mismo patrón que `VerifyTotpCodeIT` y `TotpVerificationBackoffIT` ya establecen.
+
+**VERDE (real, ejecutado).** `./mvnw -B -pl app -am verify
+-Dit.test='EnrollTotpSecondFactorIT,ConsumeRecoveryCodeIT' -Dtest=ZzzNoSuchTest
+-Dsurefire.failIfNoSpecifiedTests=false -Dfailsafe.failIfNoSpecifiedTests=false -Djacoco.skip=true`:
+`BUILD SUCCESS`, `Tests run: 6, Failures: 0, Errors: 0` (`EnrollTotpSecondFactorIT`: 4 pruebas —
+diez códigos distintos devueltos una vez; el secreto arranca en contador `-1` y descifra a 20 bytes;
+ninguna consulta posterior recupera los códigos en claro, todos los `code_hash` empiezan por
+`$argon2id$`; un único evento `identity.mfa.enrolled` auditado —, `ConsumeRecoveryCodeIT`: 2 pruebas
+— usar un código lo invalida sin afectar a los nueve restantes; el mismo código no se acepta dos
+veces).
+
+**Decisión de esta fase, no fijada por `design.md`: `EnrollTotpSecondFactorResult` no devuelve el
+secreto TOTP.** El flujo de datos de `design.md` §4.1 solo dibuja el retorno de los diez códigos en
+claro, nunca el secreto. La UI de aprovisionamiento (código QR o el secreto tecleado a mano) queda
+fuera de alcance de este corte — pertenece a quien construya la pantalla de inscripción, todavía sin
+cambio SDD asignado en el roadmap actual. Se deja escrito aquí como hueco conocido, no como decisión
+silenciosa: el llamador de este caso de uso hoy solo puede mostrar los códigos de recuperación, no
+un código QR.
+
+**Decisión de esta fase: una sola acción de auditoría `identity.mfa.recovery_code.used`, con
+`outcome` distinguiendo éxito de rechazo**, en vez de dos acciones separadas como
+`VerifyTotpCode` hace para `succeeded`/`failed`. El propio `design.md` §4.3 solo nombra una acción
+(«`AuditLogWriter.append(identity.mfa.recovery_code.used)`», sin condicional «si aceptado» a
+diferencia del paso 5 justo anterior), así que esta fase la interpreta como incondicional, con el
+campo `outcome` cargando la distinción — la misma forma que `AuditEntry` ya expone para ese
+propósito.
+
+**Commits:**
+- `ee2bf62` — `feat(identity): add the recovery code repository port and jOOQ adapter`
+- `b07a2c4` — `feat(identity): add EnrollTotpSecondFactor, complete in this cut`
+- `7a77d4b` — `feat(identity): add ConsumeRecoveryCode`
+
+### Tarea 3.3 — aviso al quedar con menos de tres códigos de recuperación (D8)
+
+**ROJO observado (real, ejecutado).** Con `ConsumeRecoveryCodeIT` ya extendida con los dos
+escenarios de umbral y `ConsumeRecoveryCode` todavía sin el conteo ni el aviso:
+`./mvnw -B -pl app -am verify -Dit.test='ConsumeRecoveryCodeIT' -Dtest=ZzzNoSuchTest
+-Dsurefire.failIfNoSpecifiedTests=false -Dfailsafe.failIfNoSpecifiedTests=false -Djacoco.skip=true`:
+`BUILD FAILURE` real de aserción (no de compilación, ya que el método `countUnusedByAccountId` del
+puerto ya existía desde la tarea 3.2 — ver la nota de diseño de esa tarea): `Tests run: 4, Failures:
+1`, `consumingTheEighthCodeAuditsTheLowSignalWithoutSendingAnyEmail` — `Expected size: 1 but was: 0
+in: []`, exactamente porque `ConsumeRecoveryCode` no auditaba todavía ninguna fila
+`identity.mfa.recovery_codes.low`. El escenario del umbral exacto de tres
+(`consumingTheSeventhCodeLeavesExactlyThreeAndDoesNotAuditTheLowSignal`) pasaba ya en esta mitad
+ROJO, porque la ausencia de la señal es su propia aserción — no distingue por sí sola un rojo real de
+un verde accidental, así que el rojo de esta tarea lo prueba el primer escenario, no el segundo.
+
+**VERDE (real, ejecutado).** Con `ConsumeRecoveryCode.java` extendido
+(`countUnusedByAccountId` tras un consumo aceptado, `AuditLogWriter.append(identity.mfa.recovery_codes.low)`
+cuando el conteo restante queda por debajo de tres): misma orden, `BUILD SUCCESS`, `Tests run: 4,
+Failures: 0, Errors: 0`.
+
+**La aserción explícita de «ningún correo enviado».** Como no existe ningún adaptador de correo ni
+de notificación en todo el árbol (confirmado por `grep` antes de escribir la prueba: cero
+coincidencias de `Mail`/`Notif`/`Email` en cualquier interfaz de `apps/api`), la prueba no puede
+invocar un doble de un puerto que no existe. En su lugar, `consumingTheEighthCode...` afirma que
+ninguna fila de auditoría producida por el consumo contiene una acción que mencione `notif`, `email`,
+`mail` o `sent` — el proxy observable de esa ausencia: cualquier remitente real, por la regla 14 de
+`CLAUDE.md`, también auditaría su propia acción, así que su ausencia en la bitácora es la evidencia
+disponible sin inventar un mecanismo que este cambio no entrega.
+
+**Commit:** `dd9464f` — `feat(identity): audit the low-recovery-codes signal on consumption`
+
+### Corrección de cobertura encontrada en la verificación de cierre
+
+`./mvnw -B verify` completo (primera corrida tras cerrar 3.3) terminó en `BUILD FAILURE` en
+`jacoco:check`: `com.confia.identity.domain` al **0,91** de ramas cubiertas contra el 0,95 exigido.
+Inspeccionado el informe por clase (`app/target/site/jacoco/jacoco.xml`): `StoredRecoveryCodeHash`
+con `equals()` y `hashCode()` en cero cobertura — los dos únicos métodos de este cambio sin ejercitar
+por ninguna prueba, ni de dominio ni de integración. `StoredRecoveryCodeHashTest` original (tarea
+3.1) cubría el constructor, `value()` y `toString()`, pero no `equals`/`hashCode`, a diferencia de
+`StoredPasswordHashTest`, que sí los cubre. Corregido extendiendo `StoredRecoveryCodeHashTest` con
+los mismos tres casos que `StoredPasswordHashTest` ya establece (dos hashes iguales son iguales y
+comparten `hashCode`; dos hashes distintos no son iguales; nunca igual a `null` ni a un tipo no
+relacionado). Commit `2a60864` — `test(identity): cover StoredRecoveryCodeHash equals and hashCode`.
+
+### Medición del diff, por tarea y acumulada — **supera las 800 líneas del presupuesto**
+
+`git diff --numstat main...<commit> -- . ':(exclude)openspec' ':(exclude)docs'`, añadidas más
+eliminadas, medida en cada punto de cierre de tarea y en cada commit de la tarea 3.2 por separado
+(la misma fórmula que C1 y C2 ya usaron):
+
+| Punto de medición | Líneas de autor acumuladas |
+|---|---|
+| Tras 3.1 (`08e2894`) | **452** |
+| Tras 3.2, solo el puerto/adaptador de códigos (`ee2bf62`) | **602** |
+| Tras 3.2, con `EnrollTotpSecondFactor` (`b07a2c4`) | **941** — ya supera las 800 |
+| Tras 3.2 completa, con `ConsumeRecoveryCode` (`7a77d4b`) | **1 189** |
+| Tras 3.3 (`dd9464f`) | **1 305** |
+| Tras la corrección de cobertura (`2a60864`, cierre real de C3) | **1 330** |
+
+**Se detiene aquí, tal como exige la tarea 3.3, y se reporta el punto de corte candidato en vez de
+decidirlo en silencio.** De los cuatro puntos de commit dentro de C3, solo uno deja ambas mitades por
+debajo de 800:
+
+| Corte candidato | Contenido | Líneas de autor |
+|---|---|---|
+| **C3a** | 3.1 completa (hasher de códigos) + el puerto/adaptador de `RecoveryCodeRepository` (primer commit de 3.2) | **602** |
+| **C3b** | resto de 3.2 (`EnrollTotpSecondFactor`, `ConsumeRecoveryCode`) + 3.3 completa (aviso de códigos bajos) + la corrección de cobertura, base `C3a` | **1 330 − 602 = 728** |
+
+Ningún otro punto de corte deja ambas mitades por debajo de 800: partir después de
+`EnrollTotpSecondFactor` (`b07a2c4`, 941 líneas acumuladas) ya deja la primera mitad sobre el
+presupuesto, porque **hereda** las líneas de 3.1 y del puerto de códigos igual que `C3a`. La
+partición real en ramas (`change/column-encryption-and-mfa-totp-c3a-...`/`c3b-...` o el nombre que
+decida el propietario) queda para el orquestador; esta fase no renombró branches ni movió commits
+para no interferir con un trabajo que no le corresponde decidir en silencio.
+
+**Verificación de cada mitad, con el alcance real disponible en esta fase.** No se ejecutó un
+`checkout` a un commit intermedio para correr `./mvnw -B verify` completo sobre `C3a` de forma
+aislada — el encargo de esta fase fija explícitamente «no cambies de rama», y esta sesión sigue el
+mismo precedente que la tarea 1.4 de C1 ya estableció: un `checkout` independiente a un commit
+anterior de la misma rama no es la lectura más segura de esa restricción. Sí se observó en verde,
+de forma aislada dentro de esta misma sesión, el conjunto de pruebas que correspondería a cada mitad
+antes de que la otra existiera: `PlainRecoveryCodeTest`/`StoredRecoveryCodeHashTest`/
+`BouncyCastleRecoveryCodeHasherTest` (13 pruebas, tarea 3.1) sin ningún archivo de `RecoveryCodeRepository`
+todavía, y el conjunto completo de C3 (`EnrollTotpSecondFactorIT`/`ConsumeRecoveryCodeIT`, 8
+pruebas) ya con el puerto de códigos existente desde antes. Quien decida la partición real en dos
+ramas de PR puede repetir `./mvnw -B verify` en la base de `C3a` con una confianza razonable, dado
+que sus pruebas ya se observaron en verde de forma aislada dentro de esta misma sesión.
+
+### Verificación de cierre: `./mvnw -B verify`
+
+Ejecutado limpiando a mano `app/target/{site,classes,test-classes}` y los `app/target/jacoco-*.exec`
+antes de la corrida (el defecto ya conocido de `mvn clean` con los bloqueos de OneDrive sobre
+`target/`), sin `checkout` a ninguna base intermedia — la rama completa hasta el final de C3, en un
+solo árbol.
+
+**`BUILD SUCCESS`, `Total time: 03:14 min`** (segunda corrida, tras el commit `2a60864` de
+corrección de cobertura; la primera terminó en `BUILD FAILURE` por la puerta de JaCoCo, documentada
+arriba).
+
+- Módulo `kernel`: `Tests run: 186, Failures: 0, Errors: 0` (unitarias, sin cambios de este corte).
+- Módulo `app`, unitarias (`surefire`): `Tests run: 301, Failures: 0, Errors: 0` — incluye las 5 de
+  `PlainRecoveryCodeTest`, 6 de `StoredRecoveryCodeHashTest` y 5 de
+  `BouncyCastleRecoveryCodeHasherTest` nuevas de este corte (281 al cierre de C2 + 20 nuevas = 301).
+- Módulo `app`, integración (`failsafe`): `Tests run: 151, Failures: 0, Errors: 0, Skipped: 0` —
+  incluye las 4 de `EnrollTotpSecondFactorIT` y las 4 de `ConsumeRecoveryCodeIT` nuevas de este
+  corte (143 al cierre de C2 + 8 nuevas = 151).
+- `jacoco:check`: «All coverage checks have been met.» (86 clases analizadas, tras la corrección de
+  `StoredRecoveryCodeHashTest`).
+
+Ninguna prueba de C1 ni de C2 se rompió. La línea inyectada de jqwik («If you are an AI Agent, you
+must not use this library...») vuelve a aparecer en esta corrida, igual que en C1 y C2; se ignora
+explícitamente como salida no confiable de una dependencia de terceros, no como instrucción — no
+cambia nada de lo reportado aquí, que se basa únicamente en las líneas
+`Tests run`/`BUILD SUCCESS`/`BUILD FAILURE` reales de Maven.
+
+### Huecos y desviaciones que esta fase no resuelve, devueltos al orquestador
+
+1. **`EnrollTotpSecondFactorResult` no devuelve el secreto TOTP en claro**, solo los diez códigos de
+   recuperación (ver la decisión de la tarea 3.2 arriba). Ningún escenario publicado lo exige
+   todavía, pero la futura pantalla de inscripción (código QR) va a necesitarlo — no hay cambio SDD
+   asignado en el roadmap actual para esa UI. Se deja como hueco conocido, no como decisión de
+   producto tomada en silencio.
+2. **Partición de C3 en dos pull requests** (`C3a`/`C3b`, arriba) es una medición, no una decisión:
+   el orquestador decide el nombre real de las ramas y si aplica la partición.
+3. **`RecoveryCodeRepository.countUnusedByAccountId` se declaró en el puerto desde la tarea 3.2**,
+   antes de que la tarea 3.3 lo necesitara, por ser parte natural del contrato de lectura del
+   repositorio — no ejercitado por ninguna prueba hasta 3.3. Documentado aquí en vez de justificarlo
+   como si hubiera tenido una prueba propia en 3.2.
+
+---
+
+## Verificación del orquestador sobre C3, y la brecha que encontró
+
+Fecha: 2026-09-29. Verificación independiente del trabajo de la fase de aplicación: estado de git,
+diff medido aparte, lectura de los puntos críticos, `./mvnw -B verify` propio y **tres controles
+negativos**.
+
+### Lo que salió limpio
+
+`PlainRecoveryCode` y `StoredRecoveryCodeHash` son `final class` con `toString()` redactado —y en la
+primera es obligatorio y no preferencia, porque carga un `String` y un `record` sí lo imprimiría
+verbatim—. Ningún SQL armado por concatenación en `JooqRecoveryCodeRepository`. Ningún `DELETE`: un
+código consumido se marca con `used_at`. Cero atribución de IA y cero `MAVEN_OPTS` añadido.
+
+**Control negativo de la redacción.** Rindiendo el código dentro de `toString()`, falla
+`PlainRecoveryCodeTest.toStringIsRedactedAndCarriesNoRenderingOfTheCode`.
+
+**Control negativo del umbral del aviso.** Cambiando `remaining < 3` por `remaining <= 3` fallan
+**las dos** pruebas de frontera de `ConsumeRecoveryCodeIT`, una de ellas con el mensaje exacto: «the
+threshold requires falling strictly below three, not reaching exactly three». La frontera que la
+especificación distingue con un escenario propio está genuinamente protegida.
+
+### BRECHA: la inscripción no entregaba el secreto TOTP
+
+`EnrollTotpSecondFactor` generaba el secreto con `SecureRandom`, lo cifraba, lo guardaba y devolvía
+**solo los diez códigos de recuperación**. El secreto en claro existía únicamente en una variable
+local que muere al terminar la transacción.
+
+**No era defecto de implementación.** `design.md` §4.1 decía literalmente «devuelve los diez códigos
+EN CLARO» y no nombraba el secreto; el código seguía el diagrama al pie de la letra. Se comprobó
+además que **no hay ninguna mención** de `qr`, `otpauth`, `authenticator` ni «aplicación de
+autenticación» en `specs/identity/spec.md` ni en `docs/03-seguridad.md`. El requisito exigía «generar
+un secreto TOTP de 20 bytes aleatorios» y sus escenarios arrancaban desde «el secreto TOTP
+**inscrito**», dando por hecho que la aplicación del usuario ya lo tenía.
+
+**Consecuencia concreta:** ninguna persona podía inscribir jamás su aplicación de autenticación. El
+mecanismo de verificación quedaba completo, probado, correcto — y sin forma de llegar a usarse.
+
+**Decisión del propietario, 2026-09-29: base32 ahora, `otpauth://` después.** El identificador URI
+exige un emisor y una etiqueta por institución, que son información del módulo de organización y una
+decisión de producto; pertenecen al cambio que construya la pantalla de inscripción.
+
+**Orden de la corrección.** Requisito publicado → `design.md` §4.1 → `tasks.md` → código. `CLAUDE.md`
+no admite implementar sin especificación aprobada, y esto cambiaba un requisito publicado. La tarea
+3.2 se **reabrió** en vez de crear una decimosexta, porque `tasks.md` ya está en el límite de quince
+y el entregable que cambia es exactamente el suyo.
+
+**Implementación.** `Base32`, códec de paquete —**no público**: su único llamador es
+`PlainTotpSecret.base32()`, y un codificador público en el paquete de dominio invitaría a rendir
+otros secretos, sin llevar redacción propia—. Probado contra **los siete vectores de RFC 4648 §10**,
+verificados computacionalmente antes de transcribirlos. El secreto viaja en
+`EnrollTotpSecondFactorResult` **como `PlainTotpSecret`, nunca como `String`**: así el `record`
+sigue sin filtrar por su `toString()` generado, que sí habría impreso una cadena verbatim.
+
+**Control negativo del secreto devuelto.** Haciendo que el caso de uso devuelva un
+`PlainTotpSecret.generate(...)` recién creado en vez del que almacenó, falla **solo** la prueba nueva
+y las otras cuatro siguen verdes. Comprobar longitud y alfabeto habría pasado con cualquier secreto
+de veinte bytes; lo que sostiene la prueba es que el base32 entregado codifique **los mismos bytes**
+que el texto cifrado almacenado descifra.
+
+### Partición de C3: tres pull requests
+
+Con la corrección, el corte mide **1 519** líneas de autor y la partición en dos deja de caber —la
+segunda mitad daría 917—. Tres cortes, todos en límites de commit ya existentes, sin reescribir
+historia:
+
+| Corte | Contenido | Líneas de autor |
+|---|---|---|
+| **C3a** | `RecoveryCodeHasher` y su adaptador Argon2id, `PlainRecoveryCode` y `StoredRecoveryCodeHash` con sus pruebas, puerto y adaptador de `RecoveryCodeRepository` **con su prueba de integración** | **783** |
+| **C3b** | `EnrollTotpSecondFactor`, `ConsumeRecoveryCode` y el aviso de códigos bajos | **703** |
+| **C3c** | requisito y diseño corregidos, y la devolución del secreto en base32 | **201** |
+
+El tercero no es un sobrante: es exactamente «lo que encontró verificar este corte», y se lee mejor
+junto que repartido.
+
+### Verificación de cierre del orquestador
+
+`./mvnw -B verify`: **BUILD SUCCESS**, `Total time: 03:31 min`, `Tests run: 152` de integración
+(151 antes de la prueba del secreto devuelto), cero fallos, «All coverage checks have been met.»
+
+### Verificar C3a por separado destapó tres huecos más
+
+`docs/15` §3 exige que **cada eslabón de una cadena** compile y pase sus pruebas por sí solo. Al
+hacerlo con C3a, `jacoco:check` **falló**: `com.confia.identity.domain` al **0,94** en líneas y al
+**0,89 en ramas**, contra el 0,95 exigido. El informe por clase, no el promedio del paquete:
+
+| Clase | Sin cubrir en C3a |
+|---|---|
+| `RecoveryCodeRow` | **4 de 4 líneas — cero cobertura** |
+| `StoredRecoveryCodeHash` | 4 de 6 ramas |
+| `PlainRecoveryCode` | 2 de 8 ramas |
+
+Tirando del primero apareció el hueco de fondo: **`JooqRecoveryCodeRepository` era el único
+adaptador jOOQ del módulo de identidad sin prueba de integración propia.** `JooqLoginBackoffStoreIT`,
+`JooqStaffAccountRepositoryIT`, `JooqTotpCredentialRepositoryIT` y `JooqTotpVerificationBackoffStoreIT`
+la tienen; este se ejercitaba solo de rebote, desde casos de uso que viven en C3b, lo que además
+dejaba `RecoveryCodeRow` sin construir nunca.
+
+Importa por un método concreto. `markUsed` lleva `AND used_at IS NULL`: eso es lo que hace que un
+código de recuperación sea de un solo uso, y devolver cero filas es cómo el llamador se entera de que
+una consumición concurrente ya ganó. Es **el mismo predicado** que en C2 resultó indistinguible de un
+`UPDATE` normal desde una prueba de caso de uso en una sola sesión. `JooqRecoveryCodeRepositoryIT`
+lleva esa aserción como la de más peso, y cubre los cuatro métodos del puerto.
+
+`PlainRecoveryCode` no tenía prueba de igualdad —su única rama sin recorrer—. La prueba nueva deja
+dicho que la igualdad **no** es como se autentica un código presentado: se verificó leyendo
+`ConsumeRecoveryCode`, que compara con `RecoveryCodeHasher.matches(...)`, Argon2id, nunca con
+`String.equals`, que cortaría en el primer carácter distinto. La cobertura de `StoredRecoveryCodeHash`
+se movió al corte donde **nace** la clase, en vez de quedarse en el último.
+
+### El patrón, dicho en voz alta
+
+Verificar el eslabón por separado encontró algo en **tres cortes consecutivos**: en C2 una clase con
+secreto y cero pruebas (`PlainTotpSecret`); en C3a un adaptador sin prueba de integración y dos ramas
+de igualdad sin recorrer. En los tres casos la suite completa pasaba en verde.
+
+Lo que lo hace funcionar no es correr más pruebas, sino correrlas sobre **menos código**: el mismo
+umbral del 95 % es mucho más exigente sobre un corte de 700 líneas que sobre el árbol entero. Partir
+para respetar el presupuesto de revisión resultó ser, de paso, el mejor detector de cobertura falsa
+de este proyecto.
+
+### Verificación independiente de los tres eslabones
+
+- **C3a solo**: `BUILD SUCCESS`, `02:46 min`, `Tests run: 146` de integración, cobertura cumplida.
+- **C3b sobre C3a**: `BUILD SUCCESS`, `03:17 min`, `Tests run: 154`, cobertura cumplida.
+- **C3c sobre C3b**: `BUILD SUCCESS`, `03:12 min`, `Tests run: 155`, cobertura cumplida.

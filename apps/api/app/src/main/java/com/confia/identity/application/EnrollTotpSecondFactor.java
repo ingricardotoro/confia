@@ -106,7 +106,7 @@ public final class EnrollTotpSecondFactor {
         UUID auditRequestId = requestId.isBlank() ? UUID.randomUUID() : UUID.fromString(requestId);
         auditLogWriter.append(enrolledEntry(institutionId, accountId, auditRequestId));
 
-        return new EnrollTotpSecondFactorResult(plainCodes);
+        return new EnrollTotpSecondFactorResult(secret, plainCodes);
     }
 
     /** {@code institutionId:accountId} (design.md, decision 5): the credential row's own composite

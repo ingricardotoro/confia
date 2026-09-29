@@ -768,9 +768,27 @@ señalada aquí para que no se olvide, con la cita exacta de las líneas afectad
    └─────────────────────────────────────────────────────────────────┘
              │  commit
              ▼
-        devuelve los diez códigos EN CLARO, una única vez — nunca se
-        vuelven a poder leer tras este retorno
+        devuelve los diez códigos EN CLARO y el secreto TOTP en base32,
+        una única vez — nunca se vuelven a poder leer tras este retorno
 ```
+
+**Corrección del 2026-09-29, durante la implementación del corte C3.** La versión anterior de este
+flujo devolvía **solo** los diez códigos de recuperación. La verificación del corte encontró la
+consecuencia: el secreto TOTP en claro existía únicamente en una variable local que muere al
+terminar la transacción, así que **ninguna aplicación de autenticación podía aprenderlo jamás**. El
+mecanismo de verificación quedaba completo y sin forma de llegar a usarse. No era un defecto de
+implementación —el código seguía este diagrama al pie de la letra— sino un hueco de esta sección y
+del requisito publicado, que tampoco mencionaba QR, `otpauth://` ni aplicación de autenticación.
+
+El retorno lleva ahora el `PlainTotpSecret`, no una cadena suelta: esa clase ya redacta su
+`toString()`, de modo que `EnrollTotpSecondFactorResult` sigue pudiendo ser un `record` sin filtrar
+nada por su `toString()` generado —un componente `String` sí lo habría filtrado verbatim—. El
+llamador obtiene la forma transcribible con `PlainTotpSecret.base32()`, RFC 4648 sin relleno: 32
+caracteres exactos para 20 bytes.
+
+Decisión del propietario, 2026-09-29: **base32 ahora, `otpauth://` después**. El identificador URI
+exige un emisor y una etiqueta por institución, que son información del módulo de organización y una
+decisión de producto; pertenecen al cambio que construya la pantalla de inscripción, no a este.
 
 ### 4.2 Verificación de un código TOTP tras `SecondFactorRequired`
 
