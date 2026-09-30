@@ -240,3 +240,20 @@ Además, una corrección fechada de la frase «no usa TOTP» en `foundations-pla
 5. **Retención.** Para cumplir la eliminación automática de `docs/08`, ¿se concede `DELETE` sobre la
    tabla de tokens al rol del trabajador, como excepción documentada al patrón de «ningún `DELETE`»,
    o se acepta retener las filas vencidas hasta decidir la purga en el cambio 9?
+
+## 7. Respuestas del propietario (2026-09-30)
+
+1. **Entrega del enlace:** aprobada la opción H1-B. La solicitud solo programa la emisión, y el token
+   se genera y se envía en el trabajador. El adaptador de correo lo trae **un cambio propio en F0**,
+   posterior al cambio 9, que servirá también al aviso de códigos de recuperación bajos.
+2. **MFA en el restablecimiento:** rige §4.7, y este cambio depende de la parte 2. Una cuenta con
+   `mfa_required = true` **sin** secreto inscrito puede restablecer solo con el enlace; en el
+   siguiente inicio de sesión recibe `SecondFactorEnrollmentRequired`, así que la inscripción se
+   exige de todos modos. Riesgo aceptado: quien controle el buzón de esa cuenta obtiene la
+   contraseña.
+3. **Contraseña nueva:** se exige ya el rango de 12 a 128 caracteres de §4.2. La lista de
+   contraseñas comprometidas va a un cambio propio.
+4. **Sesiones:** la revocación por restablecimiento es condición dura de aceptación de
+   `session-tokens-and-web-layer` (H6-a).
+5. **Retención:** las filas vencidas se retienen, sin conceder `DELETE`, hasta decidir la purga en
+   el cambio 9.
