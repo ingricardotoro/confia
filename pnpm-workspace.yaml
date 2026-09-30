@@ -1,0 +1,43 @@
+packages:
+  - apps/*
+  - packages/*
+  - tooling
+
+# frontend-monorepo-and-contracts-pipeline, design.md decision 6. pnpm 12 reads these settings only
+# from this file: it keeps nothing but auth and registry keys from .npmrc, so an engine-strict line
+# there would be ignored without a word.
+
+# Fail the install on any Node version outside the root package.json engines range (>=24 <25).
+engineStrict: true
+
+# No dependency runs install scripts. pnpm denies them by default; strictDepBuilds turns an
+# unapproved build into a failed install instead of a warning. A dependency that genuinely needs
+# one is added to allowBuilds, with its reason in the pull request. (onlyBuiltDependencies, which
+# the design named, was replaced by allowBuilds in pnpm 11 and has been ignored since.)
+strictDepBuilds: true
+allowBuilds:
+  # Denied, not approved: esbuild's postinstall only double-checks the platform binary, which it
+  # already receives as an optional per-platform package. An explicit false keeps strictDepBuilds
+  # from failing the install while still running nothing.
+  esbuild: false
+
+# The one place each tool's version is written (task 2.1). Packages depend on "catalog:", never on
+# a version of their own. TypeScript stays on 6.0.x, not 7: typescript-eslint 8.71 declares
+# typescript >=4.8.4 <6.1.0.
+catalog:
+  "@eslint/js": 10.0.1
+  "@types/node": 24.19.0
+  dependency-cruiser: 18.4.0
+  eslint: 10.11.0
+  orval: 8.38.0
+  typescript: 6.0.3
+  typescript-eslint: 8.71.0
+  vitest: 5.0.2
+  zod: 4.6.5
+
+# Transitive versions forced past a known vulnerability, each with its advisory. Remove an entry once
+# the dependency that pulls it in ships the fixed version on its own.
+overrides:
+  # orval > @scalar/json-magic > undici 7.29.0: GHSA-w293-vg96-wgc3 (TLS certificate validation
+  # bypass) and GHSA-rfgv-xxqx-mfg5 (denial of service), both high, both fixed in 7.29.1.
+  "undici@<7.29.1": 7.30.0

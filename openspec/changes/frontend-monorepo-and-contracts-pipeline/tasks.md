@@ -70,7 +70,7 @@ ejecutarse en local si hay Node 24.
 
 ## Corte 3b — monorepo, configuración compartida y contratos
 
-- [ ] 2.1 **Espacio de trabajo pnpm y Turborepo (decisión 6).** `package.json` raíz con
+- [x] 2.1 **Espacio de trabajo pnpm y Turborepo (decisión 6).** `package.json` raíz con
   `packageManager` exacto y `engines.node` `>=24 <25`; `.npmrc` con `engine-strict=true`; `.nvmrc`
   con `24`; `pnpm-workspace.yaml` con `apps/*`, `packages/*` y `onlyBuiltDependencies` vacío;
   `turbo.json` con `generate`, `lint`, `typecheck`, `test` y `build`, donde las tres últimas
@@ -80,19 +80,19 @@ ejecutarse en local si hay Node 24.
   archivo de bloqueo, `pnpm install --frozen-lockfile` falla. — Requisito «Versión única de Node y
   de pnpm», sus dos escenarios
 
-- [ ] 2.2 **`packages/config` (decisión 7).** `tsconfig.base.json` con `strict`,
+- [x] 2.2 **`packages/config` (decisión 7).** `tsconfig.base.json` con `strict`,
   `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` y `verbatimModuleSyntax`; configuración
   plana de ESLint con `typescript-eslint` estricto con tipos; configuración base de Vitest. Una
   prueba de humo del paquete en verde con `pnpm turbo run lint typecheck test`.
 
-- [ ] 2.3 **Sonda S3 y `packages/contracts` (decisión 7).** S3 primero: orval genera tipos y
+- [x] 2.3 **Sonda S3 y `packages/contracts` (decisión 7).** S3 primero: orval genera tipos y
   esquemas Zod de `Money` y `ProblemDetail` desde un documento sin operaciones. **Si no puede, se
   detiene y se consulta.** Luego `orval.config.ts` con dos salidas, `src/generated/admin/` y
   `src/generated/portal/`, cuyas entradas de Turborepo son los dos archivos de `apps/api/openapi/`;
   `src/generated/` en `.gitignore`; `exports` con solo `./admin` y `./portal`.
   `apps/api/package.json` con el guion `verify` que delega en `./mvnw -B verify` (decisión 5).
 
-- [ ] 2.4 **ROJO/VERDE: pruebas de `packages/contracts`.** Tres pruebas con sufijo `*.test.ts`, nunca
+- [x] 2.4 **ROJO/VERDE: pruebas de `packages/contracts`.** Tres pruebas con sufijo `*.test.ts`, nunca
   `*.spec.ts` (decisión 9):
   - una prueba de tipos (`vitest --typecheck`) que afirma que `amount` y `currency` son `string`;
   - una prueba de ejecución que valida un importe correcto con el esquema Zod y rechaza el mismo
@@ -102,14 +102,14 @@ ejecutarse en local si hay Node 24.
   `pnpm turbo run typecheck`; restaurarla vuelve a verde. — Requisito «Los contratos del frontend se
   generan…», sus tres escenarios
 
-- [ ] 2.5 **Node 24 en `docs/05` y medición del corte.** Cambiar las dos menciones de Node 22 de
+- [x] 2.5 **Node 24 en `docs/05` y medición del corte.** Cambiar las dos menciones de Node 22 de
   `docs/05-infraestructura-y-despliegue.md` con una nota fechada; el dígest sigue diferido al cambio
   que traiga Renovate (decisión 11). Confirmar que `IdentityScopeExclusionInventoryTest` sigue en
   verde. Medir el diff del corte; **si pasa de 800, se detiene y se consulta** con la división 3b1/3b2.
 
 ## Corte 3c — reglas de dependencia e integración continua
 
-- [ ] 3.1 **ROJO/VERDE: reglas de dependencia (decisión 8).** ROJO: una prueba de Vitest ejecuta
+- [x] 3.1 **ROJO/VERDE: reglas de dependencia (decisión 8).** ROJO: una prueba de Vitest ejecuta
   `dependency-cruiser` sobre `tooling/dependency-fixtures/` y afirma que las cuatro reglas
   (`packages-never-import-apps`, `apps-never-import-other-apps`,
   `contracts-only-through-public-entry` y `portal-never-imports-admin-contracts`) aparecen violadas
@@ -118,14 +118,14 @@ ejecutarse en local si hay Node 24.
   prueba ejecuta el análisis sobre el árbol real y afirma cero violaciones y **más de cero módulos
   analizados**. — Requisito «Reglas de dependencia del frontend», sus tres escenarios
 
-- [ ] 3.2 **Trabajo `frontend verify` (decisión 10).** `pnpm/action-setup` y `actions/setup-node`
+- [x] 3.2 **Trabajo `frontend verify` (decisión 10).** `pnpm/action-setup` y `actions/setup-node`
   fijados por SHA, Node leído de `.nvmrc`, caché de pnpm, `pnpm install --frozen-lockfile` y
   `pnpm turbo run lint typecheck test build --filter=!@confia/api`. **Demostración registrada, en una
   rama desechable:** un error de tipos hace fallar el trabajo y el resultado es visible en el remoto.
   — Requisito «La integración continua verifica el monorepo…», escenario «Empuje con un error de
   tipos»
 
-- [ ] 3.3 **Sonda S4 y escaneo de pnpm, más la medición final.** S4 y el paso de Trivy sobre
+- [x] 3.3 **Sonda S4 y escaneo de pnpm, más la medición final.** S4 y el paso de Trivy sobre
   `pnpm-lock.yaml` en `security scanning`, con la misma severidad y el mismo `exit-code` que el de
   Maven; actualizar el comentario del paso. **Demostración registrada, en una rama desechable:** una
   dependencia con una vulnerabilidad crítica conocida rompe el escaneo y lo nombra. Luego:
