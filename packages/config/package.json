@@ -5,7 +5,10 @@
   "type": "module",
   "exports": {
     "./tsconfig.base.json": "./tsconfig.base.json",
-    "./eslint": "./eslint.js",
+    "./eslint": {
+      "types": "./eslint.d.ts",
+      "default": "./eslint.js"
+    },
     "./vitest": "./vitest.js"
   },
   "scripts": {
