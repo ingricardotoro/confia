@@ -84,6 +84,11 @@ No lleva sufijo `*IT` porque no necesita contenedor: los dos contextos excluyen 
 `spring-boot-maven-plugin` dentro de `verify`. Añade un proceso, un puerto y tiempo, para obtener
 lo mismo que un contexto simulado.
 
+> **Nota de aplicación, 2026-09-30.** Las dos pruebas viven en `com.confia.bootstrap` (test), no en
+> `com.confia.architecture`: los puntos de entrada son de paquete y no se ven desde otro paquete.
+> Además, la demostración de la instantánea alterada quedó como prueba permanente, en lugar de un
+> empuje roto y revertido.
+
 ### Decisión 3 — Swagger UI y el endpoint, apagados por defecto
 
 `application.yml` fija `springdoc.api-docs.enabled: false` y `springdoc.swagger-ui.enabled: false`.
@@ -142,6 +147,13 @@ la instantánea solo puede cambiar en un PR cuyo trabajo de backend compruebe qu
   `test` y `build` dependen de `^generate`.
 - `pnpm-lock.yaml` comprometido; la integración continua instala con `--frozen-lockfile`.
 
+> **Nota de aplicación, 2026-09-30.** Dos ajustes de esta decisión no funcionan en pnpm 12.
+> `onlyBuiltDependencies` fue reemplazado por `allowBuilds` en pnpm 11 y desde entonces se ignora sin
+> aviso: se usa `strictDepBuilds: true` con `allowBuilds`, y esbuild queda denegado de forma
+> explícita. `engine-strict` en `.npmrc` también se ignoraría, porque pnpm 12 solo lee de ese archivo
+> credenciales y registros: `engineStrict: true` va en `pnpm-workspace.yaml` y no hay `.npmrc`. Las
+> versiones viven en el `catalog:` del mismo archivo.
+
 ### Decisión 7 — `packages/config` y `packages/contracts`
 
 - **`packages/config`:** `tsconfig.base.json` estricto (`strict`, `noUncheckedIndexedAccess`,
@@ -154,6 +166,11 @@ la instantánea solo puede cambiar en un PR cuyo trabajo de backend compruebe qu
   - una prueba de tipos (`vitest --typecheck`) que afirma que `amount` y `currency` son `string`;
   - una prueba de ejecución que valida un importe correcto con el esquema Zod y rechaza el mismo
     importe con `amount` numérico.
+
+> **Nota de aplicación, 2026-09-30.** `exports` apunta a `src/admin.ts` y `src/portal.ts`, dos
+> módulos escritos a mano que solo reexportan lo generado. Así un consumidor nunca depende de la forma
+> de los archivos que produce orval. La sonda S3 confirmó que orval genera los esquemas de los
+> componentes con `output.schemas` de tipo `zod`, aunque no haya operaciones.
 
 ### Decisión 8 — Reglas de dependencia, cada una con su violación deliberada permanente
 
@@ -186,6 +203,12 @@ salvo `apps/api/package.json`, así que la prueba sigue siendo cierta.
   comentario que decía que pnpm llegaba después.
 - **Artefacto:** el trabajo del backend sube `apps/api/app/target/openapi/` junto a los informes de
   cobertura.
+
+> **Nota de aplicación, 2026-09-30.** La sonda S4 encontró que Trivy solo lee las dependencias de
+> **producción** de un archivo de bloqueo de pnpm (15 de 270 paquetes; su `--include-dev-deps` no
+> admite pnpm). La puerta pasó a ser `pnpm audit --audit-level high` sobre el árbol entero, con un
+> `pnpm audit` previo que informa sin bloquear. Trivy se queda como segunda fuente. Esa auditoría
+> encontró enseguida dos avisos altos reales en `undici`, corregidos con un `overrides`.
 
 ### Decisión 11 — `docs/05` pasa a Node 24
 
