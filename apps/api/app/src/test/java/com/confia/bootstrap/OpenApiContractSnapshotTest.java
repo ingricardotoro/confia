@@ -216,9 +216,10 @@ class OpenApiContractSnapshotTest {
         return (Map<String, Object>) value;
     }
 
-    private static List<?> asList(Object value) {
+    @SuppressWarnings("unchecked")
+    private static List<Object> asList(Object value) {
         assertThat(value).isInstanceOf(List.class);
-        return (List<?>) value;
+        return (List<Object>) value;
     }
 
     private static String fileNameOf(String appProfile) {
