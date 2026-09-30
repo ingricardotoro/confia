@@ -3,6 +3,9 @@ package com.confia.identity.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -10,6 +13,7 @@ import org.junit.jupiter.api.Test;
  * specs/identity/spec.md, "Solo SHA-256"): the only form of a reset token that is ever stored or
  * looked up. The accepted shape is exactly the one {@code identity_password_reset_token_hash_chk}
  * enforces, and neither its {@code toString()} nor a rejection message ever carries the value.
+ * {@link PasswordResetTokenHash#of} is the only way the reset derives one from a presented token.
  */
 class PasswordResetTokenHashTest {
 
@@ -63,6 +67,30 @@ class PasswordResetTokenHashTest {
                 .doesNotContain(SIXTY_FOUR_HEX)
                 .doesNotContain("0123456789")
                 .isEqualTo("PasswordResetTokenHash[REDACTED]");
+    }
+
+    /**
+     * {@code of(token)} is SHA-256 over the ASCII bytes of the base64url text, as lowercase hex
+     * (design.md, section 0: the reading fixed for "SHA-256 del token"). The expected value is
+     * computed here independently with {@link MessageDigest} and {@link HexFormat}.
+     */
+    @Test
+    void ofComputesTheSha256OfTheAsciiTextOfTheToken() throws Exception {
+        String text = "q9Zb2X-kP3r_Tm7Wv1cH8eN4sLd0fGyJ5uAiO6pRtQE";
+        String expected = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest(text.getBytes(StandardCharsets.US_ASCII)));
+
+        PasswordResetTokenHash hash = PasswordResetTokenHash.of(PlainPasswordResetToken.of(text));
+
+        assertThat(hash.value()).isEqualTo(expected).hasSize(64);
+    }
+
+    @Test
+    void theHashOfTheSameTokenIsStableAndTwoTokensHashDifferently() {
+        PlainPasswordResetToken token = PlainPasswordResetToken.of("A".repeat(43));
+
+        assertThat(PasswordResetTokenHash.of(token)).isEqualTo(PasswordResetTokenHash.of(token))
+                .isNotEqualTo(PasswordResetTokenHash.of(PlainPasswordResetToken.of("B".repeat(43))));
     }
 
     @Test
