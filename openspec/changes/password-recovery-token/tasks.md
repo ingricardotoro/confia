@@ -163,7 +163,7 @@ cambio 15, `process-entry-point-isolation`.
 
 Rama `change/password-recovery-token-c1-schema`, con base en `main`.
 
-- [ ] 1.1 **Sondas S1 y S2, y migración `V7` con sus puertas de esquema (ROJO/VERDE).** Requiere
+- [x] 1.1 **Sondas S1 y S2, y migración `V7` con sus puertas de esquema (ROJO/VERDE).** Requiere
   Docker.
   - **Sonda S1** (`design.md` §9), antes de escribir la migración:
     1. `docker run --rm -d --name prt-s1 -e POSTGRES_PASSWORD=probe postgres:18-alpine`.
@@ -203,7 +203,7 @@ Rama `change/password-recovery-token-c1-schema`, con base en `main`.
   - **Commits:** `feat` para la migración y `test` para las puertas.
   - **Escenarios:** `build-integrity`, los siete (B1-B7). **Diseño:** decisión 1, sondas S1 y S2.
 
-- [ ] 1.2 **Puerto y adaptador jOOQ del token (ROJO/VERDE).** Requiere Docker.
+- [x] 1.2 **Puerto y adaptador jOOQ del token (ROJO/VERDE).** Requiere Docker.
   - **ROJO:**
     - `.../identity/domain/PasswordResetTokenHashTest.java`: solo acepta 64 caracteres
       hexadecimales en minúscula; `toString()` no contiene el valor; el mensaje de la excepción no
@@ -232,7 +232,7 @@ Rama `change/password-recovery-token-c1-schema`, con base en `main`.
   - **Escenarios:** `identity`, «Un token vencido sigue almacenado» (I31) y «Los tokens usados y
     superados también se conservan» (I32). **Diseño:** decisiones 1, 4 y 5.
 
-- [ ] 1.3 **Bloqueo y reescritura del hash de la cuenta (ROJO/VERDE).** Requiere Docker.
+- [x] 1.3 **Bloqueo y reescritura del hash de la cuenta (ROJO/VERDE).** Requiere Docker.
   - **ROJO:** extender `JooqStaffAccountRepositoryIT`:
     - `lockById` devuelve la cuenta, y una segunda sesión que intenta el mismo `lockById` queda
       esperando hasta que la primera confirma. Se sincroniza con `CyclicBarrier` y se observa con

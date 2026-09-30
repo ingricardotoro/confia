@@ -332,6 +332,20 @@ class AuthenticateWithPasswordTest {
             }
             return Optional.of(account);
         }
+
+        /** Login never locks an account: only the password reset of change 7, part 3, does. */
+        @Override
+        public Optional<StaffAccount> lockById(InstitutionId institutionId,
+                StaffAccountId accountId) {
+            throw new UnsupportedOperationException("login never locks an account");
+        }
+
+        /** Login never rewrites a stored hash (scenario "El inicio de sesión no recalcula"). */
+        @Override
+        public boolean replacePasswordHash(InstitutionId institutionId, StaffAccountId accountId,
+                StoredPasswordHash newHash) {
+            throw new UnsupportedOperationException("login never rewrites a password hash");
+        }
     }
 
     /** Every existing scenario in this class seeds {@code mfaRequired = false}, so {@link

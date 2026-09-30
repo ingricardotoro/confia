@@ -48,4 +48,32 @@ public final class JooqStaffAccountRepository implements StaffAccountRepository 
                         new StoredPasswordHash(record.getPasswordHash()),
                         record.getMfaRequired()));
     }
+
+    /**
+     * {@code SELECT ... FOR UPDATE} on the account row, the pattern of {@code
+     * JooqIdempotencyRecordStore.lockExisting}: under the forced row policy, a row of another
+     * institution is invisible and so is neither returned nor locked.
+     */
+    @Override
+    public Optional<StaffAccount> lockById(InstitutionId institutionId, StaffAccountId accountId) {
+        return dsl.selectFrom(IDENTITY_STAFF_ACCOUNT)
+                .where(IDENTITY_STAFF_ACCOUNT.INSTITUTION_ID.eq(institutionId.value()))
+                .and(IDENTITY_STAFF_ACCOUNT.ID.eq(accountId.value()))
+                .forUpdate()
+                .fetchOptional(record -> new StaffAccount(accountId, institutionId,
+                        new LoginIdentifier(record.getEmail()),
+                        new StoredPasswordHash(record.getPasswordHash()),
+                        record.getMfaRequired()));
+    }
+
+    @Override
+    public boolean replacePasswordHash(InstitutionId institutionId, StaffAccountId accountId,
+            StoredPasswordHash newHash) {
+        int updatedRows = dsl.update(IDENTITY_STAFF_ACCOUNT)
+                .set(IDENTITY_STAFF_ACCOUNT.PASSWORD_HASH, newHash.value())
+                .where(IDENTITY_STAFF_ACCOUNT.INSTITUTION_ID.eq(institutionId.value()))
+                .and(IDENTITY_STAFF_ACCOUNT.ID.eq(accountId.value()))
+                .execute();
+        return updatedRows > 0;
+    }
 }
