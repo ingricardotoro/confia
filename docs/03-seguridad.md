@@ -403,6 +403,13 @@ Prueba de integración que reutiliza un código ya consumido y espera rechazo.
 > cumple con el **mismo perfil, el mismo códec PHC y el mismo hasher de bajo nivel**, pero detrás de
 > un puerto propio, `RecoveryCodeHasher`, y no reutilizando `PasswordHasher`.
 
+> **Nota editorial, 2026-09-30 (`column-encryption-and-mfa-totp`), decidida por el propietario.** La
+> línea «5 intentos por cada 15 minutos por usuario, con retroceso exponencial posterior» no es la
+> regla que se entrega. La verificación del código TOTP reutiliza **la misma regla de retroceso que
+> el inicio de sesión** (§4.4): los dos primeros fallos consecutivos no llevan retardo; desde el
+> tercero, 2^(n−3) segundos con tope de 900; y el contador se reinicia tras 30 minutos sin intentos.
+> Es más estricta en los primeros intentos, y evita mantener dos políticas de retroceso distintas.
+
 ### 4.4 Bloqueo con retroceso exponencial
 
 No se usa bloqueo permanente de cuenta: es un vector de denegación de servicio contra usuarios

@@ -599,7 +599,7 @@ Rama `change/column-encryption-and-mfa-totp-c5-redaction-and-docs`, base C4.
 
 ---
 
-## Trazabilidad de los 28 escenarios, contada contra los archivos de delta
+## Trazabilidad de los 29 escenarios, contada contra los archivos de delta
 
 > **Corrección del 2026-09-30, encontrada por el barrido final de la tarea 5.2.** Esta tabla y el
 > resto de esta lista contaban **21** escenarios de `identity` y **27** en total. El delta tiene hoy
@@ -608,7 +608,7 @@ Rama `change/column-encryption-and-mfa-totp-c5-redaction-and-docs`, base C4.
 > ni esta tabla. Se añade abajo con su prueba. Las menciones a 27 en las tareas se dejan como se
 > escribieron: son el registro de lo que se planificó, no el conteo vigente.
 
-**`identity` (22 escenarios, `specs/identity/spec.md`)**
+**`identity` (23 escenarios, `specs/identity/spec.md`; el 23.º se añadió el 2026-09-30 al resolver CRITICAL-1 de `verify-report.md`)**
 
 | Requisito | Escenario | Tarea | Prueba |
 |---|---|---|---|
@@ -617,6 +617,7 @@ Rama `change/column-encryption-and-mfa-totp-c5-redaction-and-docs`, base C4.
 | TOTP RFC 6238 | Código válido en ventana ±1 se acepta | 2.3 | `VerifyTotpCodeIT` |
 | | Código ya aceptado no se reutiliza | 2.3 | `VerifyTotpCodeIT` |
 | Límite de tasa TOTP | Sexto intento activa retroceso | 2.3 | `TotpVerificationBackoffIT` |
+| | Retroceso desde el tercer fallo, contador de 30 minutos (añadido tras la verificación) | — | `TotpVerificationBackoffIT.backoffStartsAtTheThirdFailureAndItsCounterLivesThirtyMinutesNotFifteen` |
 | Inscripción TOTP | Devuelve el secreto en base32 una única vez (añadido en C3c) | 3.2 | `EnrollTotpSecondFactorIT.theReturnedBase32SecretIsTheSameSecretThatWasStoredEncrypted` |
 | 10 códigos de recuperación | Se generan y se muestran una vez | 3.2 | `EnrollTotpSecondFactorIT` |
 | | Usar uno no afecta a los otros nueve | 3.2 | `ConsumeRecoveryCodeIT` |
