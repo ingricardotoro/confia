@@ -1,6 +1,6 @@
 # Progreso de aplicación: `password-recovery-token`
 
-- **Corte en curso:** C3. C1a, C1b y C2 fusionados en `main` (#68, #69 y #70).
+- **Corte en curso:** C4. C1a a C3b fusionados en `main` (#68 a #72).
 - **Entorno:** OpenJDK 25.0.4 (paquete de Ubuntu 24.04), Maven Wrapper del repositorio, Docker 29.3.1
   con `postgres:18-alpine`. El `JAVA_HOME` del sistema apunta al JDK 21, así que toda invocación de
   Maven exporta `JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64` en la propia orden.
@@ -464,3 +464,147 @@ I7.
   pull requests encadenados, sin cambiar ninguna tarea:
   - **C3a** `change/password-recovery-token-c3a-request`: tarea 3.1, 576 líneas.
   - **C3b** `change/password-recovery-token-c3b-issuance`, sobre C3a: tareas 3.2 y 3.3, 758 líneas.
+
+---
+
+## Tarea 4.1 — `ResetPasswordWithToken` sin segundo factor activo
+
+### ROJO
+
+`ResetPasswordWithTokenTest` (7), `ResetPasswordWithTokenIT` (13) y la base abstracta
+`PasswordResetIntegrationTest`: `test-compile` falla con 172 errores `cannot find symbol` sobre
+`ResetPasswordWithToken`, `ResetPasswordCommand`, `SecondFactorProof`, `ResetPasswordDecision` y
+`ResetOutcome`.
+
+### VERDE
+
+- `SecondFactorProof`: sellado, con `None`, `Totp(TotpCode)` y `RecoveryCode(PlainRecoveryCode)`.
+- `ResetPasswordCommand`: clase final redactada, sin campo de institución.
+- `ResetOutcome`: sellado, con exactamente `Completed`, `TokenRejected`,
+  `PasswordRejected(reason)`, `SecondFactorMissing` y `SecondFactorRejected`.
+- `ResetPasswordDecision(outcome, requiredDelay)`.
+- `ResetPasswordWithToken`: guarda de institución y, en una transacción, los pasos 1 a 4 y 6 a 9 de
+  la decisión 7. Un token mal formado se trata como inexistente, sin repetir su texto. La rama de
+  MFA activa devuelve por ahora `SecondFactorMissing` ante cualquier prueba; se completa en 4.2.
+
+```
+ResetPasswordWithTokenTest   tests=7  failures=0 errors=0
+ResetPasswordWithTokenIT     tests=13 failures=0 errors=0
+```
+
+`PasswordResetIntegrationTest` es abstracta, así que la regla de nombres `*IT` no la alcanza. Obtiene
+cada token vivo de la emisión real y comprueba cada contraseña con el inicio de sesión real.
+
+La primera ejecución falló en `aCompletedResetOnlyConsumesChangesTheHashAndAuditsWithoutNotifyingAnyone`:
+la prueba suponía que `JooqAuditLogReader.pageOf` devolvía los asientos del más nuevo al más viejo,
+pero los ordena por `id` ascendente. Se corrigió la prueba.
+
+### Control negativo
+
+Con `lockById` llamado antes de comprobar la longitud falla
+`aPasswordOfTheWrongLengthNeitherLocksNorSpendsASecondFactorAttempt`. Se restauró.
+
+### Escenarios
+
+I11, I12, I15 (parte de integración), I16 (literales), I17, I18, I19, I23 (primera mitad), I28, I34,
+I35, I36, I37, I38 e I43.
+
+---
+
+## Tarea 4.2 — Composición del segundo factor y contador TOTP compartido
+
+### ROJO
+
+`ResetPasswordWithSecondFactorIT` (3) y `PasswordResetTotpBackoffSharingIT` (2) contra el caso de uso
+de 4.1, cuya rama de MFA activa respondía `SecondFactorMissing` ante cualquier prueba: **fallan las
+cinco** por comportamiento, no por compilación.
+
+### VERDE
+
+El paso 5 de la decisión 7: con MFA activa, `None` da `SecondFactorMissing`; `Totp` llama a
+`VerifyTotpCode.runWithinTransaction` y `RecoveryCode` a `ConsumeRecoveryCode.runWithinTransaction`,
+nunca a sus `execute`. Un rechazo se **devuelve** (`SecondFactorRejected`, con el retardo exigible de
+la verificación TOTP), así que `TransactionRunner` confirma el avance del contador y los asientos. El
+asiento `completed` lleva `{"secondFactor":"totp"|"recovery-code"|"none"}`.
+
+```
+ResetPasswordWithSecondFactorIT     tests=3  failures=0 errors=0
+PasswordResetTotpBackoffSharingIT   tests=2  failures=0 errors=0
+ResetPasswordWithTokenIT            tests=13 failures=0 errors=0   (sin cambios)
+```
+
+`PasswordResetTotpBackoffSharingIT` cita en su Javadoc `BackoffPolicy.FIRST_DELAYED_ATTEMPT = 3`,
+`CAP = 900 s`, `COUNTER_WINDOW = 30 min` y la clave `(institution_id, account_id)` de
+`identity_mfa_totp_backoff`. Los fallos de 09:01 y 09:02 por el inicio de sesión y el de 09:03 por el
+restablecimiento dan 1 s; el de 09:04 por el inicio de sesión, 2 s; el de 09:35 por el
+restablecimiento, 0 s. Tras un rechazo a las 14:02, `consecutive_failures` vale 1, existe el asiento
+`identity.mfa.totp_verification.failed` y el token completa a las 14:03.
+
+### Desviación de la tarea
+
+Los casos con MFA activa van en una clase propia, `ResetPasswordWithSecondFactorIT`, en vez de
+ampliar `ResetPasswordWithTokenIT`. Así cada una puede ir en su propio pull request sin partir un
+archivo.
+
+### Control negativo
+
+Con una variante local que **lanza** `IllegalStateException` ante un código TOTP incorrecto, fallan
+las dos pruebas de `PasswordResetTotpBackoffSharingIT`: la excepción escapa del restablecimiento y la
+transacción se revierte, avance del contador incluido. La variante se descartó sin comprometerla y el
+archivo se comprobó byte a byte contra la versión en verde.
+
+### Escenarios
+
+I9, I10, I13, I14 e I46.
+
+---
+
+## Tarea 4.3 — Atomicidad y concurrencia del restablecimiento
+
+### Pruebas
+
+- `PasswordResetAtomicityIT` (1): un `AuditLogWriter` que lanza en el asiento `completed`, que el
+  caso de uso escribe después de consumir el token y reescribir el hash. Un espía sobre el
+  repositorio de tokens confirma que el consumo **sí ocurrió** antes del fallo (`[true]`), así que el
+  verde no puede venir de un fallo prematuro. Tras la reversión, el token sigue vivo, la contraseña
+  anterior autentica y no queda ningún asiento de restablecimiento.
+- `PasswordResetConcurrencyIT`, mitad de restablecimiento (1): dos restablecimientos con el mismo
+  token y contraseñas distintas, liberados a la vez, dan un `Completed` y un `TokenRejected`; solo
+  autentica la contraseña del ganador y hay un único asiento `completed`. La clase pasa a extender
+  `PasswordResetIntegrationTest`, sin sus ayudantes duplicados.
+
+```
+PasswordResetAtomicityIT     tests=1 failures=0 errors=0
+PasswordResetConcurrencyIT   tests=3 failures=0 errors=0
+```
+
+**Sin rojo propio**, igual que en 3.3: las dos pruebas pasaron en su primera ejecución, porque el
+orden de la decisión 7 (una sola transacción, consumo condicional antes de Argon2id) ya quedó
+implementado en 4.1, y la tarea pedía en verde solo «lo que las pruebas exijan».
+
+### Control negativo
+
+Con el caso de uso ignorando el resultado de `consume` falla
+`twoConcurrentResetsWithTheSameTokenProduceExactlyOneChange`: los dos restablecimientos cambian la
+contraseña. Se restauró y se comprobó byte a byte.
+
+### Escenarios
+
+I8 e I20.
+
+---
+
+## Cierre de C4
+
+- **`./mvnw -B clean verify`:** `BUILD SUCCESS` en 2 min 41 s. 186 pruebas del núcleo, 393
+  unitarias y 223 de integración.
+- **Diff medido** contra `main`, sin `openspec` ni código generado: **1667 líneas**. La tarea 4.1
+  sola midió 1182 al cerrarse, así que el corte se parte en tres pull requests encadenados, sin
+  cambiar ninguna tarea de nivel superior:
+  - **C4a** `change/password-recovery-token-c4a-reset-core`: los tipos y el caso de uso de 4.1 con
+    su prueba unitaria, 714 líneas. `clean verify` propio: 186, 393 y 203 pruebas.
+  - **C4b** `change/password-recovery-token-c4b-reset-integration`, sobre C4a: la base
+    `PasswordResetIntegrationTest` y `ResetPasswordWithTokenIT`, 468 líneas. `clean verify` propio:
+    186, 393 y 216 pruebas.
+  - **C4c** `change/password-recovery-token-c4c-second-factor`, sobre C4b: 4.2 y 4.3, y este
+    registro, 497 líneas. Su árbol es idéntico al de la rama en la que se aplicó el corte completo.

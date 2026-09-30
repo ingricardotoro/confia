@@ -3,6 +3,7 @@ package com.confia.identity.application;
 import com.confia.identity.application.ResetOutcome.Completed;
 import com.confia.identity.application.ResetOutcome.PasswordRejected;
 import com.confia.identity.application.ResetOutcome.SecondFactorMissing;
+import com.confia.identity.application.ResetOutcome.SecondFactorRejected;
 import com.confia.identity.application.ResetOutcome.TokenRejected;
 import com.confia.identity.domain.PasswordResetRejectionReason;
 import com.confia.identity.domain.PasswordResetTokenHash;
@@ -57,6 +58,9 @@ public final class ResetPasswordWithToken {
     private static final String ACTOR_KIND_STAFF = "staff";
     private static final String OUTCOME_SUCCESS = "success";
     private static final String OUTCOME_DENIED = "denied";
+    private static final String SECOND_FACTOR_NONE = "none";
+    private static final String SECOND_FACTOR_TOTP = "totp";
+    private static final String SECOND_FACTOR_RECOVERY_CODE = "recovery-code";
 
     private final TransactionRunner transactionRunner;
     private final LoginInstitutionProvider institutionProvider;
@@ -151,11 +155,40 @@ public final class ResetPasswordWithToken {
             return decision(new TokenRejected());
         }
 
-        // 5. The second factor, only when MFA is active; the same expression as login.
+        // 5. The second factor, only when MFA is active; the same expression as login. The part 2
+        // verifiers run through runWithinTransaction, never execute, so they share this
+        // transaction, and their rejection is returned: their backoff and audit entry commit.
+        String secondFactorUsed = SECOND_FACTOR_NONE;
+        Duration requiredDelay = Duration.ZERO;
         if (mfaActive(institutionId, account.get())) {
-            auditLogWriter.append(accountRejection(institutionId, auditRequestId, row,
-                    PasswordResetRejectionReason.SECOND_FACTOR_MISSING));
-            return decision(new SecondFactorMissing());
+            switch (command.secondFactor()) {
+                case SecondFactorProof.None none -> {
+                    auditLogWriter.append(accountRejection(institutionId, auditRequestId, row,
+                            PasswordResetRejectionReason.SECOND_FACTOR_MISSING));
+                    return decision(new SecondFactorMissing());
+                }
+                case SecondFactorProof.Totp totp -> {
+                    VerifyTotpCodeDecision verified = verifyTotp.runWithinTransaction(
+                            institutionId, row.accountId(), requestId, totp.code());
+                    if (!verified.accepted()) {
+                        auditLogWriter.append(accountRejection(institutionId, auditRequestId, row,
+                                PasswordResetRejectionReason.SECOND_FACTOR_INVALID));
+                        return new ResetPasswordDecision(new SecondFactorRejected(),
+                                verified.requiredDelay());
+                    }
+                    secondFactorUsed = SECOND_FACTOR_TOTP;
+                    requiredDelay = verified.requiredDelay();
+                }
+                case SecondFactorProof.RecoveryCode recoveryCode -> {
+                    if (!consumeRecoveryCode.runWithinTransaction(institutionId, row.accountId(),
+                            requestId, recoveryCode.code()).accepted()) {
+                        auditLogWriter.append(accountRejection(institutionId, auditRequestId, row,
+                                PasswordResetRejectionReason.SECOND_FACTOR_INVALID));
+                        return decision(new SecondFactorRejected());
+                    }
+                    secondFactorUsed = SECOND_FACTOR_RECOVERY_CODE;
+                }
+            }
         }
 
         // 6. Consume: the conditional update decides the winner of a race.
@@ -172,8 +205,8 @@ public final class ResetPasswordWithToken {
                 ACTOR_KIND_STAFF, row.accountId().value().toString(), null, null, auditRequestId,
                 null, ACTION_COMPLETED, STAFF_ACCOUNT_ENTITY_TYPE,
                 row.accountId().value().toString(), OUTCOME_SUCCESS, null,
-                "{\"secondFactor\":\"none\"}", null, null));
-        return decision(new Completed());
+                "{\"secondFactor\":\"" + secondFactorUsed + "\"}", null, null));
+        return new ResetPasswordDecision(new Completed(), requiredDelay);
     }
 
     private boolean mfaActive(InstitutionId institutionId, StaffAccount account) {

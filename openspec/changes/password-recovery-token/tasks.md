@@ -389,7 +389,7 @@ Rama `change/password-recovery-token-c4-reset`, con base en C3. Requiere Docker.
 mayor riesgo de tamaño, así que se mide al cerrar 4.1: si ya se acerca a 800 líneas, 4.2 y 4.3 van
 en `...-c4b-second-factor`, con base en la anterior.
 
-- [ ] 4.1 **`ResetPasswordWithToken` sin segundo factor activo (ROJO/VERDE).**
+- [x] 4.1 **`ResetPasswordWithToken` sin segundo factor activo (ROJO/VERDE).**
   - **ROJO:**
     - `ResetPasswordWithTokenTest`, con dobles:
       - orden de la decisión 7: un token inexistente no llama a `lockById` ni a `PasswordHasher`;
@@ -427,7 +427,7 @@ en `...-c4b-second-factor`, con base en la anterior.
   - **Escenarios:** I11, I12, I15 (parte de integración), I17, I18, I19, I23 (primera mitad), I28,
     I34, I35, I36, I37, I38 e I43. **Diseño:** decisiones 7, 8 y 9.
 
-- [ ] 4.2 **Composición del segundo factor y contador TOTP compartido (ROJO/VERDE).**
+- [x] 4.2 **Composición del segundo factor y contador TOTP compartido (ROJO/VERDE).**
   - **ROJO:**
     - `ResetPasswordWithTokenIT`, con MFA activa:
       - sin código da `SecondFactorMissing`, el token sigue vivo y la contraseña no cambia; con un
@@ -456,7 +456,7 @@ en `...-c4b-second-factor`, con base en la anterior.
     comprometerla.
   - **Escenarios:** I9, I10, I13, I14 e I46. **Diseño:** decisión 7.
 
-- [ ] 4.3 **Atomicidad y concurrencia del restablecimiento (ROJO/VERDE).**
+- [x] 4.3 **Atomicidad y concurrencia del restablecimiento (ROJO/VERDE).**
   - **ROJO:**
     - `PasswordResetAtomicityIT`: con un `PasswordResetTokenRepository` que delega y un
       `AuditLogWriter` que falla de forma determinista en el asiento `completed`, después de
