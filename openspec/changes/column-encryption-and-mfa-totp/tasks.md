@@ -442,7 +442,7 @@ archivado y verificado de la parte 1** (`AuthenticationResult.java`, `Authentica
 tal como `proposal.md` («La costura con la parte 1») declara explícitamente que es seguro y
 necesario.
 
-- [ ] 4.1 **ROJO/VERDE — edición de `AuthenticationResult` y `switch` exhaustivo en
+- [x] 4.1 **ROJO/VERDE — edición de `AuthenticationResult` y `switch` exhaustivo en
   `AuthenticateWithPassword`, con lectura de `mfa_required` y del estado de inscripción TOTP.**
   Requiere Docker para la mitad de integración; no lo requiere para la reflexión de
   `AuthenticationResultTest`. ROJO: extender
@@ -474,7 +474,7 @@ necesario.
   `proposal.md`, «La costura con la parte 1» y «Cómo se determina...»; `design.md` §9 (sonda S4,
   no bloqueante)
 
-- [ ] 4.2 **Sonda S3 (bloqueante, en cuanto exista el `switch` real de 4.1) y ROJO/VERDE — el
+- [x] 4.2 **Sonda S3 (bloqueante, en cuanto exista el `switch` real de 4.1) y ROJO/VERDE — el
   fixture de compilación fallida con su gemelo de control positivo.** No requiere Docker
   (`javax.tools.JavaCompiler` en memoria, sin PostgreSQL). ROJO: crear
   `.../test/java/com/confia/architecture/ExhaustiveAuthenticationResultSwitchCompilationTest.java`
@@ -498,7 +498,7 @@ necesario.
   requisito «Exhaustividad forzada por el compilador...» (escenario «Un desenlace no manejado rompe
   la compilación...»); `design.md` decisión 6 completa, §9 (sonda S3)
 
-- [ ] 4.3 **ROJO/VERDE — `AuthenticateWithPasswordIT` extendido con los cuatro desenlaces
+- [x] 4.3 **ROJO/VERDE — `AuthenticateWithPasswordIT` extendido con los cuatro desenlaces
   completos, y cierre de este corte.** Requiere Docker. ROJO: extender
   `.../test/java/com/confia/identity/application/AuthenticateWithPasswordIT.java` (ya existente de
   la parte 1) con: una cuenta `mfa_required = true` con secreto TOTP ya inscrito produce

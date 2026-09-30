@@ -5,10 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.confia.identity.domain.AuthenticationResult.Authenticated;
 import com.confia.identity.domain.AuthenticationResult.Rejected;
 import com.confia.identity.domain.AuthenticationResult.RejectionReason;
+import com.confia.identity.domain.AuthenticationResult.SecondFactorEnrollmentRequired;
+import com.confia.identity.domain.AuthenticationResult.SecondFactorRequired;
 import com.confia.identity.domain.BackoffState;
 import com.confia.identity.domain.IdentifierFingerprint;
 import com.confia.identity.domain.LoginIdentifier;
 import com.confia.identity.domain.PlainPassword;
+import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.StoredPasswordHash;
 import com.confia.identity.infrastructure.Argon2Pepper;
 import com.confia.identity.infrastructure.Argon2Profile;
@@ -47,6 +50,17 @@ import tools.jackson.databind.json.JsonMapper;
  * <p><b>Never sleeps</b> (design.md §7.2): every scenario constructs its own {@link
  * AuthenticateWithPassword} with a fresh {@link Clock#fixed}, one per attempt, and asserts the
  * {@link Duration} the use case computes and returns — never a wait it lived through.
+ *
+ * <p><b>The second-factor scenarios (column-encryption-and-mfa-totp, C4, task 4.3).</b> {@link
+ * #mfaRequiredAccountWithEnrolledTotpProducesSecondFactorRequiredWithoutAdvancingBackoffOrAuditingFailure}
+ * and {@link
+ * #mfaRequiredAccountWithoutAnyEnrolledSecretProducesSecondFactorEnrollmentRequired} seed the TOTP
+ * credential directly through {@link JooqTotpCredentialRepository}, exactly the way {@code
+ * VerifyTotpCodeIT} already does (C2's own discrepancy resolution) — never through {@code
+ * EnrollTotpSecondFactor}, whose own seam is unrelated to what these two scenarios test. The
+ * dummy {@code v1:}-prefixed value satisfies {@code identity_mfa_totp_credential_secret_chk}
+ * without needing a real {@code ColumnEncryptionService}: {@link AuthenticateWithPassword} only
+ * ever checks whether a row exists, never decrypts it.
  */
 class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
 
@@ -54,6 +68,8 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
     private static final String NONEXISTENT_EMAIL = "nadie.registrado@colegio.edu.hn";
     private static final String CORRECT_PASSWORD_RAW = "Correcta#2026-C3b";
     private static final String WRONG_PASSWORD_RAW = "incorrecta";
+    private static final String DUMMY_ENCRYPTED_TOTP_SECRET =
+            "v1:00000000-0000-0000-0000-000000000000:aXY=:Y2lwaGVy:dGFn";
 
     private static final Argon2Pepper PEPPER =
             Argon2Pepper.fromBase64(Base64.getEncoder().encodeToString(new byte[32]));
@@ -213,6 +229,88 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
                 .isEqualTo(Duration.ZERO);
     }
 
+    /**
+     * specs/identity/spec.md, "MFA obligatoria para cuentas marcadas con mfa_required", escenario
+     * "Cuenta con mfa_required en true y secreto TOTP ya inscrito"; "Exhaustividad forzada por el
+     * compilador...", escenario "SecondFactorRequired no avanza el contador de retroceso ni se
+     * audita como fallo".
+     */
+    @Test
+    void mfaRequiredAccountWithEnrolledTotpProducesSecondFactorRequiredWithoutAdvancingBackoffOrAuditingFailure() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        LoginIdentifier identifier = LoginIdentifier.of(EXISTING_EMAIL);
+        StaffAccountId accountId = seedStaffAccount(institutionId, identifier, true);
+        seedTotpCredential(institutionId, accountId);
+
+        AuthenticationDecision decision = attempt(institutionId, identifier.value(),
+                CORRECT_PASSWORD_RAW, "2026-03-10T13:00:00Z");
+
+        assertThat(decision.result()).isInstanceOf(SecondFactorRequired.class);
+        assertThat(((SecondFactorRequired) decision.result()).userId()).isEqualTo(accountId);
+        assertThat(((SecondFactorRequired) decision.result()).institutionId()).isEqualTo(institutionId);
+        assertThat(decision.requiredDelay())
+                .as("a correct password with a pending second factor owes no anti-brute-force delay")
+                .isEqualTo(Duration.ZERO);
+
+        List<AuditRowSnapshot> auditRows = auditRowsFor(institutionId, fingerprintOf(identifier));
+        assertThat(auditRows)
+                .as("a pending second factor is never audited as a failed attempt, and never "
+                        + "triggers the backoff cycle")
+                .noneMatch(row -> row.action().equals("identity.login.failed"))
+                .noneMatch(row -> row.action().equals("identity.login.backoff_applied"));
+
+        AuthenticationDecision nextWrongAttempt = attempt(institutionId, identifier.value(),
+                WRONG_PASSWORD_RAW, "2026-03-10T13:00:10Z");
+        assertThat(nextWrongAttempt.requiredDelay())
+                .as("the backoff counter never advanced from the pending second factor above: this "
+                        + "wrong password is ordinal 1 of a fresh cycle, still no delay")
+                .isEqualTo(Duration.ZERO);
+    }
+
+    /**
+     * specs/identity/spec.md, "MFA obligatoria para cuentas marcadas con mfa_required", escenario
+     * "Cuenta con mfa_required en true sin ningún secreto TOTP inscrito".
+     */
+    @Test
+    void mfaRequiredAccountWithoutAnyEnrolledSecretProducesSecondFactorEnrollmentRequired() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        LoginIdentifier identifier = LoginIdentifier.of(EXISTING_EMAIL);
+        StaffAccountId accountId = seedStaffAccount(institutionId, identifier, true);
+
+        AuthenticationDecision decision = attempt(institutionId, identifier.value(),
+                CORRECT_PASSWORD_RAW, "2026-03-10T13:30:00Z");
+
+        assertThat(decision.result()).isInstanceOf(SecondFactorEnrollmentRequired.class);
+        assertThat(((SecondFactorEnrollmentRequired) decision.result()).userId()).isEqualTo(accountId);
+        assertThat(decision.requiredDelay()).isEqualTo(Duration.ZERO);
+
+        List<AuditRowSnapshot> auditRows = auditRowsFor(institutionId, fingerprintOf(identifier));
+        assertThat(auditRows)
+                .as("pending enrollment is not a failed attempt either")
+                .noneMatch(row -> row.action().equals("identity.login.failed"));
+    }
+
+    /**
+     * specs/identity/spec.md, "Resultado tipado de la autenticación con cuatro desenlaces",
+     * escenario "Contraseña correcta produce el desenlace Authenticated sin campo de alcance" —
+     * regression, unchanged from part 1; and "Columna mfa_required...", escenario "Este cambio no
+     * deriva mfa_required de ningún permiso todavía": a hypothetical account whose future role
+     * would, once the cambio 8 derivation exists, include a financial-write permission is still
+     * persisted here with {@code mfa_required = false}, exactly as whoever created it decided, with
+     * no correction from any permission concept — because none exists yet in this tree.
+     */
+    @Test
+    void mfaRequiredFalseStillProducesAuthenticatedWithNoDerivationFromAnyFuturePermission() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        LoginIdentifier identifier = LoginIdentifier.of(EXISTING_EMAIL);
+        seedStaffAccount(institutionId, identifier, false);
+
+        AuthenticationDecision decision = attempt(institutionId, identifier.value(),
+                CORRECT_PASSWORD_RAW, "2026-03-10T13:45:00Z");
+
+        assertThat(decision.result()).isInstanceOf(Authenticated.class);
+    }
+
     private AuthenticationDecision attempt(InstitutionId institutionId, String presentedIdentifier,
             String presentedPassword, String instant) {
         AuthenticateWithPassword useCase = new AuthenticateWithPassword(transactionRunner(),
@@ -224,14 +322,41 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
         return useCase.execute(context, new AuthenticationCommand(presentedIdentifier, presentedPassword));
     }
 
-    private void seedStaffAccount(InstitutionId institutionId, LoginIdentifier identifier) {
+    private StaffAccountId seedStaffAccount(InstitutionId institutionId, LoginIdentifier identifier) {
+        return seedStaffAccount(institutionId, identifier, false);
+    }
+
+    /**
+     * {@code mfaRequired} lets task 4.3's own scenarios seed an account with {@code mfa_required =
+     * true} — returning the generated {@link StaffAccountId} lets those same scenarios seed a
+     * matching {@code identity_mfa_totp_credential} row for it through {@link #seedTotpCredential}.
+     */
+    private StaffAccountId seedStaffAccount(InstitutionId institutionId, LoginIdentifier identifier,
+            boolean mfaRequired) {
+        StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
         StoredPasswordHash hash = HASHER.hash(PlainPassword.of(CORRECT_PASSWORD_RAW));
         transactionRunner().execute(contextOf(institutionId), () -> {
             dsl.execute("""
                     insert into identity_staff_account
                         (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, false)
-                    """, institutionId.value(), UUID.randomUUID(), identifier.value(), hash.value());
+                    values (?, ?, ?, ?, ?)
+                    """, institutionId.value(), accountId.value(), identifier.value(), hash.value(),
+                    mfaRequired);
+            return null;
+        });
+        return accountId;
+    }
+
+    /**
+     * Seeds a TOTP credential row directly through {@link JooqTotpCredentialRepository}, never
+     * through {@code EnrollTotpSecondFactor} — the same seeding discipline {@code VerifyTotpCodeIT}
+     * already established in C2. The dummy {@code v1:}-prefixed value is never decrypted here:
+     * {@link AuthenticateWithPassword} only checks whether the row exists.
+     */
+    private void seedTotpCredential(InstitutionId institutionId, StaffAccountId accountId) {
+        transactionRunner().execute(contextOf(institutionId), () -> {
+            new JooqTotpCredentialRepository(dsl)
+                    .insert(institutionId, accountId, DUMMY_ENCRYPTED_TOTP_SECRET);
             return null;
         });
     }
