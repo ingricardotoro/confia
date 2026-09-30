@@ -1,6 +1,7 @@
 package com.confia.bootstrap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 
 import com.confia.shared.web.openapi.ContractSchemas;
@@ -18,6 +19,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.json.JsonMapper;
@@ -48,14 +50,71 @@ class OpenApiContractSnapshotTest {
     @ParameterizedTest
     @ValueSource(strings = {"admin", "portal"})
     void eachProcessPublishesExactlyItsApprovedSnapshot(String appProfile) throws IOException {
-        String generated = normalizedDocumentOf(appProfile);
-        Path snapshot = SNAPSHOT_DIRECTORY.resolve(fileNameOf(appProfile));
-        Files.createDirectories(GENERATED_DIRECTORY);
-        Files.writeString(GENERATED_DIRECTORY.resolve(fileNameOf(appProfile)), generated,
-                StandardCharsets.UTF_8);
+        verifyAgainstSnapshot(appProfile, normalizedDocumentOf(appProfile), SNAPSHOT_DIRECTORY,
+                GENERATED_DIRECTORY, Boolean.getBoolean(UPDATE_PROPERTY));
+    }
 
-        if (Boolean.getBoolean(UPDATE_PROPERTY)) {
-            Files.createDirectories(SNAPSHOT_DIRECTORY);
+    /**
+     * The negative control of the gate above (ADR-0018: a check that never fails protects nothing;
+     * task 1.4's mandatory demonstration, kept as a permanent test instead of a one-off run). The
+     * same comparison, over a copy of the approved snapshot altered by hand in a temporary
+     * directory: it must fail naming the document and the first JSON path that differs, and it
+     * must leave the altered snapshot exactly as it found it.
+     */
+    @Test
+    void aSnapshotAlteredByHandFailsNamingTheFirstDifferenceAndIsLeftUntouched(
+            @TempDir Path temporary) throws IOException {
+        String generated = Files.readString(SNAPSHOT_DIRECTORY.resolve(fileNameOf("admin")),
+                StandardCharsets.UTF_8);
+        String altered = generated.replace("\"CONFIA admin API\"", "\"Tampered title\"");
+        assertThat(altered).as("the alteration must actually change the snapshot")
+                .isNotEqualTo(generated);
+        Path snapshotDirectory = Files.createDirectories(temporary.resolve("openapi"));
+        Path snapshot = snapshotDirectory.resolve(fileNameOf("admin"));
+        Files.writeString(snapshot, altered, StandardCharsets.UTF_8);
+
+        assertThatThrownBy(() -> verifyAgainstSnapshot("admin", generated, snapshotDirectory,
+                temporary.resolve("generated"), false))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("the admin OpenAPI document differs")
+                .hasMessageContaining("first at $.info.title");
+        assertThat(Files.readString(snapshot, StandardCharsets.UTF_8))
+                .as("the comparison must never rewrite the snapshot")
+                .isEqualTo(altered);
+    }
+
+    /** Updating a snapshot rewrites it and still fails, so the flag can never pass silently. */
+    @Test
+    void theUpdateFlagRewritesTheSnapshotAndStillFails(@TempDir Path temporary)
+            throws IOException {
+        String generated = Files.readString(SNAPSHOT_DIRECTORY.resolve(fileNameOf("admin")),
+                StandardCharsets.UTF_8);
+        Path snapshotDirectory = Files.createDirectories(temporary.resolve("openapi"));
+        Path snapshot = snapshotDirectory.resolve(fileNameOf("admin"));
+        Files.writeString(snapshot, "{}\n", StandardCharsets.UTF_8);
+
+        assertThatThrownBy(() -> verifyAgainstSnapshot("admin", generated, snapshotDirectory,
+                temporary.resolve("generated"), true))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("was rewritten because -D" + UPDATE_PROPERTY + "=true");
+        assertThat(Files.readString(snapshot, StandardCharsets.UTF_8)).isEqualTo(generated);
+    }
+
+    /**
+     * The gate itself. Always writes the generated document to {@code generatedDirectory}; with
+     * {@code update}, rewrites the snapshot and fails; without a snapshot, fails printing the
+     * generated document so it can be reviewed and committed; otherwise compares byte for byte and,
+     * on a difference, fails naming only the first JSON path that differs.
+     */
+    private static void verifyAgainstSnapshot(String appProfile, String generated,
+            Path snapshotDirectory, Path generatedDirectory, boolean update) throws IOException {
+        Path snapshot = snapshotDirectory.resolve(fileNameOf(appProfile));
+        Path generatedFile = generatedDirectory.resolve(fileNameOf(appProfile));
+        Files.createDirectories(generatedDirectory);
+        Files.writeString(generatedFile, generated, StandardCharsets.UTF_8);
+
+        if (update) {
+            Files.createDirectories(snapshotDirectory);
             Files.writeString(snapshot, generated, StandardCharsets.UTF_8);
             fail("%s was rewritten because -D%s=true is set; review the diff, commit it and run "
                     + "again without the property", snapshot, UPDATE_PROPERTY);
@@ -71,8 +130,8 @@ class OpenApiContractSnapshotTest {
             fail("the %s OpenAPI document differs from its approved snapshot %s, first at %s. The "
                     + "generated document is in %s; if the change is intended, update the "
                     + "snapshot with -D%s=true and commit it", appProfile, snapshot,
-                    firstDifference(parse(approved), parse(generated), "$"),
-                    GENERATED_DIRECTORY.resolve(fileNameOf(appProfile)), UPDATE_PROPERTY);
+                    firstDifference(parse(approved), parse(generated), "$"), generatedFile,
+                    UPDATE_PROPERTY);
         }
     }
 

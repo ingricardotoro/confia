@@ -5,21 +5,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.net.http.HttpResponse;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Specs/build-integrity, requirement "Swagger UI y el endpoint del OpenAPI solo en local y
  * preproducción" (frontend-monorepo-and-contracts-pipeline, design.md decision 3; task 1.2). Both
  * web processes, through their real entry points: the document and Swagger UI answer with the
- * {@code local} profile and with no other, including {@code prod} and a profile that exists
- * nowhere, which is what a typo in {@code SPRING_PROFILES_ACTIVE} would produce.
+ * {@code local} and {@code preprod} profiles and with no other, including {@code prod} and a
+ * profile that exists nowhere, which is what a typo in {@code SPRING_PROFILES_ACTIVE} would
+ * produce.
  */
 class OpenApiExposureByProfileTest {
 
     @ParameterizedTest
-    @ValueSource(strings = {"admin", "portal"})
-    void theDocumentAndSwaggerUiAnswerOnTheLocalProfile(String appProfile) {
-        try (OpenApiProcess process = OpenApiProcess.start(appProfile, "local")) {
+    @CsvSource({"admin, local", "portal, local", "admin, preprod", "portal, preprod"})
+    void theDocumentAndSwaggerUiAnswerOnTheLocalAndPreprodProfiles(String appProfile,
+            String springProfile) {
+        try (OpenApiProcess process = OpenApiProcess.start(appProfile, springProfile)) {
             HttpResponse<String> document = process.get(OpenApiProcess.API_DOCS_PATH);
             assertThat(document.statusCode()).isEqualTo(200);
             assertThat(document.body())
