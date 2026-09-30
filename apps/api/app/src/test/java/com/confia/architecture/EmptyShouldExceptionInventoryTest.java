@@ -29,24 +29,21 @@ class EmptyShouldExceptionInventoryTest {
     }
 
     /**
-     * Package-visible for {@link SuppressionCitesAdrTest}'s count check. One remaining entry,
-     * {@link Marker#OPTIONAL_LAYER} (ADR-0020 §2): {@code organization} has no production class
-     * yet in a {@code web} package (the first business controller adds one). The
-     * {@code Infrastructure} entry that used to sit alongside this one retired together with
-     * {@code optionalLayer("Infrastructure")} itself in PR A2, F0 change 5, the moment {@link
-     * com.confia.organization.infrastructure.JooqInstitutionRepository} became this codebase's
-     * first production class in an {@code infrastructure} package (ADR-0020, alcance punto 3;
-     * design.md decision 11). ADR-0018's own {@code allowEmptyShould(true)} exception on {@code
+     * Package-visible for {@link SuppressionCitesAdrTest}'s count check. <b>Empty today</b>: no
+     * exception is in force. The last one, {@link Marker#OPTIONAL_LAYER} on {@code
+     * LayeredArchitectureTest.productionLayeringRule}, layer {@code Web} (ADR-0020 §2), expired in F0
+     * change 3 (frontend-monorepo-and-contracts-pipeline, task 1.3), when {@link
+     * com.confia.shared.web.openapi.ContractSchemas} became the first production class in a {@code
+     * web} package; it was retired together with {@code optionalLayer("Web")} itself, by the owner's
+     * decision of 2026-09-30. Before it, the {@code Infrastructure} entry retired in PR A2, F0
+     * change 5, when {@link com.confia.organization.infrastructure.JooqInstitutionRepository} became
+     * the first production class in an {@code infrastructure} package (ADR-0020, alcance punto 3),
+     * and ADR-0018's own {@code allowEmptyShould(true)} exception on {@code
      * LayeredArchitectureTest.productionCodeRespectsLayeringYet} expired the moment {@code
-     * organization.domain} added its first production class (change 4); the mechanism itself
-     * stays in place for whichever future exception needs it.
+     * organization.domain} added its first production class (change 4). The mechanism itself stays
+     * in place for whichever future exception needs it.
      */
-    static final List<ExpiringException> EXCEPTIONS = List.of(
-            new ExpiringException(Marker.OPTIONAL_LAYER,
-                    "LayeredArchitectureTest.productionLayeringRule, layer Web", "ADR-0020",
-                    "no production class resides in a web package yet (the first business "
-                            + "controller adds one)",
-                    classes -> LayeredArchitectureTest.noProductionClassInLayer(classes, "web")));
+    static final List<ExpiringException> EXCEPTIONS = List.of();
 
     @Test
     void everyExceptionsConditionStillHolds() {

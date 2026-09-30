@@ -50,14 +50,15 @@ class LayeredArchitectureTest {
      * first production class in an {@code infrastructure} package (ADR-0020, alcance punto 3;
      * design.md decision 11): the entry that used to declare that exception, and the {@code
      * optionalLayer("Infrastructure")} call itself, are both retired in this same commit. {@code
-     * Web} is declared {@code optionalLayer(...)} still, because {@code organization} has no
-     * business use case exposed there yet (proposal, "Dentro de alcance", point 4). {@code Domain}
-     * and {@code Application} stay always mandatory, per ADR-0020 §2, point 2: a class that
+     * Domain} and {@code Application} stay always mandatory, per ADR-0020 §2, point 2: a class that
      * accidentally stops landing in one of those two must still fail the build.
      *
-     * <p>{@code optionalLayer("Web")} is declared and caducates in {@link
-     * EmptyShouldExceptionInventoryTest#EXCEPTIONS} and counted by {@link
-     * SuppressionCitesAdrTest}.
+     * <p>{@code Web} became mandatory in F0 change 3 (frontend-monorepo-and-contracts-pipeline,
+     * task 1.3), the moment {@link com.confia.shared.web.openapi.ContractSchemas} became this
+     * codebase's first production class in a {@code web} package. Its ADR-0020 exception, the
+     * {@code optionalLayer} call and its inventory entry were retired in the same commit, by the
+     * owner's decision of 2026-09-30, following ADR-0018's expiry procedure. No layer is optional
+     * any more.
      */
     private static ArchRule productionLayeringRule() {
         return constrained(layeredArchitecture()
@@ -65,9 +66,7 @@ class LayeredArchitectureTest {
                 .layer("Domain").definedBy("..domain..")
                 .layer("Application").definedBy("..application..")
                 .layer("Infrastructure").definedBy("..infrastructure..")
-                // ADR-0020: optional while no production class resides in a web package (the
-                // first business controller adds one).
-                .optionalLayer("Web").definedBy("..web.."));
+                .layer("Web").definedBy("..web.."));
     }
 
     /**
