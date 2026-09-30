@@ -1,6 +1,6 @@
 # Progreso de aplicación: `frontend-monorepo-and-contracts-pipeline`
 
-- **Corte en curso:** 3b completo (tareas 2.1 a 2.5 en verde); 3a fusionado en el PR #64; siguiente, 3c
+- **Corte en curso:** 3c completo (tareas 3.1 a 3.3 en verde); 3a y 3b fusionados en los PR #64 y #65. Las trece tareas están cerradas
 - **Entorno:** sesión remota sin Docker ni JDK 25. Todo el corte 3a se verificó en la integración
   continua de la rama `change/frontend-monorepo-and-contracts-pipeline`, que parte de un checkout
   limpio con JDK 25 y Docker. Cada evidencia de abajo nombra la ejecución de la que sale.
@@ -179,3 +179,74 @@ Restaurada la instantánea, todo vuelve a verde.
 - `pnpm turbo run lint typecheck test build --filter=!@confia/api`: **7 de 7 tareas en verde**.
 - **Diff del corte**, sin `pnpm-lock.yaml` (generado, 2 651 líneas) ni `openspec/`: **+389 −4** en 25
   archivos. Por debajo de 800; no hizo falta la división 3b1/3b2.
+
+---
+
+## Corte 3c — reglas de dependencia, integración continua y escaneo
+
+### Tarea 3.1 — Reglas de dependencia
+
+`.dependency-cruiser.cjs` declara cuatro reglas, y cada una tiene su violación deliberada permanente
+en `tooling/dependency-fixtures/`, cuyas rutas imitan `apps/` y `packages/`:
+`packages-never-import-apps`, `apps-never-import-other-apps`, `contracts-only-through-public-entry` y
+`portal-never-imports-admin-contracts`.
+
+El paquete nuevo `@confia/tooling` ejecuta dependency-cruiser sobre los dos árboles:
+- sobre las violaciones deliberadas, cada regla aparece violada, exactamente una vez;
+- sobre el árbol real, **cero violaciones en 19 módulos analizados**, con la aserción de más de cero.
+
+ESLint repite las dos reglas de contratos (`contractImportRestrictions`), con tres pruebas: rechaza un
+archivo generado importado directamente, rechaza el contrato administrativo en el portal y solo
+allí, y acepta los puntos de entrada públicos.
+
+### Tarea 3.2 — Trabajo `frontend verify`
+
+- `pnpm/action-setup` v6.1.0 (`ea17c68`, el commit detrás de la etiqueta anotada) y
+  `actions/setup-node` v7.0.0 (`8207627`), fijados por SHA, con Node leído de `.nvmrc`.
+- Ejecución 223: `Tasks: 10 successful, 10 total`, con `Cached: 0 cached` (se ejecutó todo, nada vino
+  de caché).
+- **Demostración registrada:** el commit `e5de67b` introdujo un error de tipos deliberado. En la
+  ejecución 224, `frontend verify` falló con `error TS2322: Type 'string' is not assignable to type
+  'number'` en `@confia/contracts#typecheck`. `aaf92d2` lo revierte.
+
+### Tarea 3.3 — Sonda S4 y escaneo de pnpm: el diseño no bastaba
+
+**S4 encontró que el escaneo del diseño no escaneaba casi nada.** Con Trivy v0.70.0, la versión que
+usa la acción fijada, descargada con su suma verificada, `trivy fs pnpm-lock.yaml` devolvió «Not
+scanned» y código 0. La causa: Trivy solo lee las dependencias **de producción** de un archivo de
+bloqueo de pnpm, y su `--include-dev-deps` admite «npm, yarn, gradle», no pnpm. Veía 15 de los 270
+paquetes del espacio de trabajo y ninguna herramienta de construcción. Tal como estaba diseñado, el
+paso habría pasado siempre en verde.
+
+**La puerta es `pnpm audit --audit-level high`**, que lee el árbol entero. Trivy se queda como
+segunda fuente, con su propia base de datos, y el comentario del paso dice qué cubre y qué no. Un
+paso previo `pnpm audit`, que no bloquea, muestra en el registro toda severidad baja o moderada.
+
+**Demostración real, no fabricada:** la primera ejecución de `pnpm audit --audit-level high` sobre
+este espacio de trabajo falló con código 1. Encontró dos vulnerabilidades altas en `undici` 7.29.0,
+arrastrado por `orval > @scalar/json-magic`:
+- GHSA-w293-vg96-wgc3, salto de la validación de certificados TLS;
+- GHSA-rfgv-xxqx-mfg5, denegación de servicio.
+
+Las diez observaciones del árbol (2 altas, 5 moderadas y 3 bajas) eran todas de `undici`. Un
+`overrides` documentado en `pnpm-workspace.yaml` fuerza 7.30.0. Después: «No known vulnerabilities
+found» en todos los niveles, en local y en la ejecución 223.
+
+**Escenario «Solo severidad baja», dicho con precisión:** hoy no hay ninguna observación baja con la
+que demostrarlo en vivo. Se apoya en la semántica documentada de `--audit-level high`, que solo sale
+con código distinto de cero en severidad alta o crítica, y en el paso de informe, que las mostraría.
+
+### Barrido final de trazabilidad
+
+Los 18 escenarios del delta, contados de nuevo contra `specs/build-integrity/spec.md`:
+
+| Escenarios | Cómo se verifican |
+|---|---|
+| 1 a 7 | Pruebas de backend (`OpenApiContractSnapshotTest`, `OpenApiExposureByProfileTest`), en verde en CI |
+| 8 a 13 | Pruebas de `@confia/contracts` y `@confia/tooling`, en verde en CI |
+| 14 (versión de Node) y 15 (archivo de bloqueo) | Demostraciones de la tarea 2.1 |
+| 16 (error de tipos) | Ejecución 224 |
+| 17 (vulnerabilidad alta o crítica) | La observación real de `undici` |
+| 18 (solo severidad baja) | Apoyado en la semántica documentada, según se dice arriba |
+
+**Diff del corte 3c**, sin `pnpm-lock.yaml` ni `openspec/`: **+329 −9**, por debajo de 800.

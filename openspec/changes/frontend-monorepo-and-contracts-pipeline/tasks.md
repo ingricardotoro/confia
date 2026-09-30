@@ -109,7 +109,7 @@ ejecutarse en local si hay Node 24.
 
 ## Corte 3c — reglas de dependencia e integración continua
 
-- [ ] 3.1 **ROJO/VERDE: reglas de dependencia (decisión 8).** ROJO: una prueba de Vitest ejecuta
+- [x] 3.1 **ROJO/VERDE: reglas de dependencia (decisión 8).** ROJO: una prueba de Vitest ejecuta
   `dependency-cruiser` sobre `tooling/dependency-fixtures/` y afirma que las cuatro reglas
   (`packages-never-import-apps`, `apps-never-import-other-apps`,
   `contracts-only-through-public-entry` y `portal-never-imports-admin-contracts`) aparecen violadas
@@ -118,14 +118,14 @@ ejecutarse en local si hay Node 24.
   prueba ejecuta el análisis sobre el árbol real y afirma cero violaciones y **más de cero módulos
   analizados**. — Requisito «Reglas de dependencia del frontend», sus tres escenarios
 
-- [ ] 3.2 **Trabajo `frontend verify` (decisión 10).** `pnpm/action-setup` y `actions/setup-node`
+- [x] 3.2 **Trabajo `frontend verify` (decisión 10).** `pnpm/action-setup` y `actions/setup-node`
   fijados por SHA, Node leído de `.nvmrc`, caché de pnpm, `pnpm install --frozen-lockfile` y
   `pnpm turbo run lint typecheck test build --filter=!@confia/api`. **Demostración registrada, en una
   rama desechable:** un error de tipos hace fallar el trabajo y el resultado es visible en el remoto.
   — Requisito «La integración continua verifica el monorepo…», escenario «Empuje con un error de
   tipos»
 
-- [ ] 3.3 **Sonda S4 y escaneo de pnpm, más la medición final.** S4 y el paso de Trivy sobre
+- [x] 3.3 **Sonda S4 y escaneo de pnpm, más la medición final.** S4 y el paso de Trivy sobre
   `pnpm-lock.yaml` en `security scanning`, con la misma severidad y el mismo `exit-code` que el de
   Maven; actualizar el comentario del paso. **Demostración registrada, en una rama desechable:** una
   dependencia con una vulnerabilidad crítica conocida rompe el escaneo y lo nombra. Luego:
