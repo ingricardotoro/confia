@@ -358,3 +358,109 @@ Con el asiento escrito solo cuando la cuenta existe, falla
 ### Escenarios
 
 I1, I2, I26, I29, I30, I39 e I40.
+
+---
+
+## Tarea 3.2 — `IssuePasswordResetToken` con el puerto de envío
+
+### ROJO
+
+`IssuePasswordResetTokenTest` (1) e `IssuePasswordResetTokenIT` (7): `test-compile` falla con 28
+errores `cannot find symbol`.
+
+### VERDE
+
+- `PasswordResetLinkSender`: `send(InstitutionId, StaffAccountId, PlainPasswordResetToken)`, único
+  lugar por donde sale el token en claro. Sin adaptador de producción.
+- `IssuePasswordResetTokenDecision`: `ISSUED`, `SKIPPED` y `ACCOUNT_NOT_FOUND`, sin el token.
+- `IssuePasswordResetToken`: dentro de la transacción, `lockById`, conteo en la ventana, omisión
+  auditada con `{"reason":"rate-limit","issuedInWindow":n}`, o `supersedeOpen`, `insert` con
+  `policy.expiresAt(now)` y asiento `issued` con el id de la fila, el vencimiento y
+  `supersededCount`, nunca el hash. **El envío ocurre después de `TransactionRunner.execute`.**
+
+```
+IssuePasswordResetTokenTest   tests=1 failures=0 errors=0
+IssuePasswordResetTokenIT     tests=7 failures=0 errors=0
+```
+
+La primera ejecución falló en la aserción sobre `after_value`: `shared_audit_log` lo guarda como
+JSONB y lo devuelve con espacios normalizados (`"supersededCount": 0`). Las aserciones ahora leen el
+JSON en vez de comparar texto.
+
+### Desviación de la tarea
+
+La tarea pedía comprobar con dobles, en `IssuePasswordResetTokenTest`, que el envío ocurre después de
+confirmar y nunca tras una reversión. `TransactionRunner` necesita una conexión real para aplicar el
+contexto de seguridad, así que esa comprobación vive en `IssuePasswordResetTokenIT`:
+
+- el doble de envío lee la fila del token **desde otro hilo**, en una transacción propia, y exige
+  verla ya confirmada;
+- un escritor de auditoría que lanza fuerza la reversión, y después el doble no recibió nada y la
+  tabla está vacía.
+
+### Control negativo
+
+Con el envío movido dentro de la transacción, la primera versión de la prueba de «después de
+confirmar» **siguió pasando**: el doble leía desde el mismo hilo, y `TransactionRunner` se unía a la
+transacción aún abierta (`PROPAGATION_REQUIRED`) y veía la fila sin confirmar. Solo falló la prueba
+de reversión. Se corrigió la prueba para leer desde otro hilo y se repitió el control: fallan las dos
+(`theLinkIsSentOnlyAfterTheIssuingTransactionCommitted` y
+`aRolledBackIssuanceSendsNothingAndLeavesNoToken`). El caso de uso se restauró.
+
+### Escenarios
+
+I3, I4, I5, I6 e I41.
+
+---
+
+## Tarea 3.3 — Sonda S3 y concurrencia de emisión
+
+### Sonda S3
+
+**PASA.** Contenedor `postgres:18-alpine` propio con una tabla de cuentas y otra de tokens. La
+sesión A toma `SELECT … FOR UPDATE` sobre la cuenta, inserta un token y duerme 3 s antes de
+confirmar; la sesión B toma el mismo bloqueo y cuenta:
+
+```
+B esperó 2,11 s por el bloqueo
+locked|1
+count|1
+```
+
+Bajo `READ COMMITTED`, el conteo de B ve el token que A confirmó mientras B esperaba. No hace falta
+el respaldo `SERIALIZABLE`.
+
+### Prueba
+
+`PasswordResetConcurrencyIT`, mitad de emisión (2 pruebas):
+
+- dos emisiones para la misma cuenta, liberadas a la vez por un `CyclicBarrier`, terminan las dos en
+  `ISSUED`, con exactamente un token abierto y el otro superado;
+- **control negativo**: con un `lockById` que no bloquea y una barrera que retiene a las dos
+  emisiones justo antes de insertar, cuando ambas ya contaron y superaron, una emisión termina en
+  `ISSUED` y la otra lanza una excepción cuyo `SQLState` es **`23505`**, el de la sonda S1. La emisión
+  fallida no envió nada y queda un solo token abierto.
+
+```
+PasswordResetConcurrencyIT   tests=2 failures=0 errors=0
+```
+
+**Sin rojo propio.** Las dos pruebas pasaron en su primera ejecución: el orden de la decisión 2
+(bloquear la cuenta antes de contar, superar e insertar) ya quedó implementado en la tarea 3.2, y la
+tarea 3.3 pedía en verde solo «lo que la prueba exija». La segunda prueba es el control negativo:
+demuestra que el índice parcial es una red real y que el bloqueo es lo que evita que salte.
+
+### Escenarios
+
+I7.
+
+---
+
+## Cierre de C3
+
+- **`./mvnw -B clean verify`:** `BUILD SUCCESS` en 2 min 11 s. 186 pruebas del núcleo, 386
+  unitarias y 203 de integración.
+- **Diff medido** contra `main`, sin `openspec` ni código generado: **1334 líneas**. Se parte en dos
+  pull requests encadenados, sin cambiar ninguna tarea:
+  - **C3a** `change/password-recovery-token-c3a-request`: tarea 3.1, 576 líneas.
+  - **C3b** `change/password-recovery-token-c3b-issuance`, sobre C3a: tareas 3.2 y 3.3, 758 líneas.

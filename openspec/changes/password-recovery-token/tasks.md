@@ -318,7 +318,7 @@ Docker, salvo la verificación final completa.
 
 Rama `change/password-recovery-token-c3-request-and-issuance`, con base en C2. Requiere Docker.
 
-- [ ] 3.1 **`RequestPasswordReset` con el puerto de programación (ROJO/VERDE).**
+- [x] 3.1 **`RequestPasswordReset` con el puerto de programación (ROJO/VERDE).**
   - **ROJO:**
     - `RequestPasswordResetTest`, con dobles:
       - la guarda lanza `IllegalStateException` si la institución del contexto difiere de
@@ -342,7 +342,7 @@ Rama `change/password-recovery-token-c3-request-and-issuance`, con base en C2. R
     decisión 9.
   - **Escenarios:** I1, I2, I26, I29, I30, I39 e I40. **Diseño:** decisiones 6 y 9.
 
-- [ ] 3.2 **`IssuePasswordResetToken` con el puerto de envío (ROJO/VERDE).**
+- [x] 3.2 **`IssuePasswordResetToken` con el puerto de envío (ROJO/VERDE).**
   - **ROJO:**
     - `IssuePasswordResetTokenTest`, con dobles: el doble de envío se invoca después de que la
       transacción confirma y nunca si se revierte.
@@ -360,7 +360,7 @@ Rama `change/password-recovery-token-c3-request-and-issuance`, con base en C2. R
     `PasswordResetLinkSender`. El envío ocurre fuera de `TransactionRunner.execute`.
   - **Escenarios:** I3, I4, I5, I6 e I41. **Diseño:** decisiones 5, 6 y 9.
 
-- [ ] 3.3 **Sonda S3 y concurrencia de emisión (ROJO/VERDE).**
+- [x] 3.3 **Sonda S3 y concurrencia de emisión (ROJO/VERDE).**
   - **Sonda S3** (`design.md` §9):
     1. Con el contenedor de S1 y una `identity_staff_account` mínima, en la sesión A:
        `BEGIN; SELECT … FOR UPDATE; INSERT token;`.
