@@ -81,6 +81,71 @@ class TotpVerificationBackoffIT extends CommittingPostgresIntegrationTest {
         assertThat(afterValue.get("consecutiveFailures").asInt()).isEqualTo(6);
     }
 
+    /**
+     * The escenario "El retroceso de la verificación TOTP empieza en el tercer fallo y su contador
+     * vive 30 minutos" (verify-report.md, CRITICAL-1, resolved by option a). The sixth-attempt
+     * scenario above cannot tell "delay from the third failure" from "delay from the sixth", nor a
+     * 30-minute window from a 15-minute one; this one can, on both counts:
+     *
+     * <ul>
+     *   <li>the second failure carries no delay and the third carries exactly one second, so a
+     *       policy that allowed five free attempts fails on the third;
+     *   <li>a fourth attempt sixteen minutes after the third is still the same cycle (two seconds),
+     *       so a 15-minute window fails here;
+     *   <li>an attempt thirty-one minutes after that one starts a fresh cycle, with no delay.
+     * </ul>
+     *
+     * <p>Each step also reads the persisted counter directly instead of inferring it from the delay,
+     * the lesson of the blind assertion C4 found.
+     */
+    @Test
+    void backoffStartsAtTheThirdFailureAndItsCounterLivesThirtyMinutesNotFifteen() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
+        seedCredential(institutionId, accountId);
+
+        VerifyTotpCodeDecision first =
+                verify(institutionId, accountId, WRONG_CODE, "2026-10-05T09:00:00Z");
+        VerifyTotpCodeDecision second =
+                verify(institutionId, accountId, WRONG_CODE, "2026-10-05T09:01:00Z");
+        assertThat(first.requiredDelay()).isEqualTo(Duration.ZERO);
+        assertThat(second.requiredDelay())
+                .as("the second consecutive failure is still free")
+                .isEqualTo(Duration.ZERO);
+        assertThat(persistedConsecutiveFailures(institutionId, accountId)).isEqualTo(2);
+
+        VerifyTotpCodeDecision third =
+                verify(institutionId, accountId, WRONG_CODE, "2026-10-05T09:02:00Z");
+        assertThat(third.requiredDelay())
+                .as("the delay starts at the third failure, not after five free attempts")
+                .isEqualTo(Duration.ofSeconds(1));
+        assertThat(persistedConsecutiveFailures(institutionId, accountId)).isEqualTo(3);
+
+        VerifyTotpCodeDecision sixteenMinutesLater =
+                verify(institutionId, accountId, WRONG_CODE, "2026-10-05T09:18:00Z");
+        assertThat(sixteenMinutesLater.requiredDelay())
+                .as("sixteen minutes after the last attempt the cycle is still alive: the counter "
+                        + "window is thirty minutes, not fifteen")
+                .isEqualTo(Duration.ofSeconds(2));
+        assertThat(persistedConsecutiveFailures(institutionId, accountId)).isEqualTo(4);
+
+        VerifyTotpCodeDecision thirtyOneMinutesLater =
+                verify(institutionId, accountId, WRONG_CODE, "2026-10-05T09:49:00Z");
+        assertThat(thirtyOneMinutesLater.requiredDelay())
+                .as("thirty-one minutes without an attempt starts a fresh cycle")
+                .isEqualTo(Duration.ZERO);
+        assertThat(persistedConsecutiveFailures(institutionId, accountId)).isEqualTo(1);
+    }
+
+    private int persistedConsecutiveFailures(InstitutionId institutionId,
+            StaffAccountId accountId) {
+        return transactionRunner().execute(contextOf(institutionId), () -> dsl.fetchOne("""
+                select consecutive_failures from identity_mfa_totp_backoff
+                where institution_id = ? and account_id = ?
+                """, institutionId.value(), accountId.value())
+                .get("consecutive_failures", Integer.class));
+    }
+
     private VerifyTotpCodeDecision verify(InstitutionId institutionId, StaffAccountId accountId,
             TotpCode code, String instant) {
         VerifyTotpCode useCase = new VerifyTotpCode(transactionRunner(),

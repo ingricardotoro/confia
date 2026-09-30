@@ -161,7 +161,7 @@ la fila exacta.
 - ADR-0009: aislamiento multi-institución
 - ADR-0015: acceso a datos con jOOQ, reglas 3, 4 y 7
 - ADR-0022: interfaz nombrada de Spring Modulith para paquetes de `shared`
-- `openspec/changes/column-encryption-and-mfa-totp/proposal.md`, decisiones D1, D2, D3, D4, D6
-- `openspec/changes/column-encryption-and-mfa-totp/design.md`, decisiones 1, 2, 3, 4, 5
-- `openspec/changes/column-encryption-and-mfa-totp/apply-progress.md`, sondas S1 y S5
+- `openspec/changes/archive/2026-09-30-column-encryption-and-mfa-totp/proposal.md`, decisiones D1, D2, D3, D4, D6
+- `openspec/changes/archive/2026-09-30-column-encryption-and-mfa-totp/design.md`, decisiones 1, 2, 3, 4, 5
+- `openspec/changes/archive/2026-09-30-column-encryption-and-mfa-totp/apply-progress.md`, sondas S1 y S5
 - `docs/03-seguridad.md` §7.3

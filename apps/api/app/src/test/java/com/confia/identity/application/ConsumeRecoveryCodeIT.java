@@ -158,6 +158,15 @@ class ConsumeRecoveryCodeIT extends CommittingPostgresIntegrationTest {
         }
         ConsumeRecoveryCodeDecision seventh = consume(institutionId, accountId, codes.get(6));
         assertThat(seventh.accepted()).isTrue();
+        long stillUnused = transactionRunner().execute(contextOf(institutionId), () -> dsl
+                .fetchOne("""
+                        select count(*) as c from identity_mfa_recovery_code
+                        where institution_id = ? and account_id = ? and used_at is null
+                        """, institutionId.value(), accountId.value())
+                .get("c", Long.class));
+        assertThat(stillUnused)
+                .as("the scenario's first THEN: exactly three codes remain unused")
+                .isEqualTo(3L);
 
         List<AuditRowSnapshot> lowSignalRows = auditRowsFor(institutionId, accountId).stream()
                 .filter(row -> row.action().equals("identity.mfa.recovery_codes.low"))

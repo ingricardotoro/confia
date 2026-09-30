@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.kernel.AeadIntegrityException;
 import com.confia.kernel.AesGcmCipher;
+import com.confia.kernel.EncryptedColumnValue;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.infrastructure.JooqDataEncryptionKeyRepository;
 import com.confia.shared.security.SecurityContext;
@@ -197,6 +198,63 @@ class ColumnEncryptionIT extends CommittingPostgresIntegrationTest {
         } catch (Exception e) {
             throw new IllegalStateException("both sides of the race must reach the barrier", e);
         }
+    }
+
+    /**
+     * The behavioral half of the escenario publicado "Ninguna DEK retirada se recifra
+     * automáticamente" (specs/identity/spec.md, requirement "Ausencia de ejecución real de la
+     * rotación de la llave de datos..."): a value encrypted under a key that is later marked
+     * {@code retired} keeps decrypting, because {@code retired} forbids encrypting new values with
+     * that key, never reading old ones; and the next new value goes under a fresh active key. The
+     * absence half — no scheduled job re-encrypts anything — is a static inventory in {@code
+     * IdentityScopeExclusionInventoryTest}, which needs no container.
+     *
+     * <p>The key is retired by raw SQL because this change ships no retirement operation: rotation
+     * is change 9's, and so is whatever will mark a key {@code retired} in production.
+     */
+    @Test
+    void aValueEncryptedUnderARetiredKeyStillDecryptsAndNewValuesUseAFreshActiveKey() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        UUID accountId = UUID.randomUUID();
+        byte[] plaintext = "a TOTP secret stored before rotation".getBytes(StandardCharsets.UTF_8);
+        ColumnEncryptionService service = serviceFor(randomMasterKey());
+
+        String storedUnderOldKey = transactionRunner().execute(contextOf(institutionId), () -> {
+            String value = service.encryptForNewValue(TABLE, COLUMN, institutionId,
+                    rowIdOf(institutionId, accountId), plaintext);
+            seedAccountAndCredential(institutionId, accountId, value);
+            return value;
+        });
+        String oldKeyId = EncryptedColumnValue.parse(storedUnderOldKey).dekId();
+
+        int retired = transactionRunner().execute(contextOf(institutionId), () -> dsl.execute("""
+                update shared_data_encryption_key set status = 'retired'
+                where institution_id = ? and id = ?
+                """, institutionId.value(), UUID.fromString(oldKeyId)));
+        assertThat(retired).as("exactly the key the value names is retired").isEqualTo(1);
+
+        String storedValueAfterRetirement = transactionRunner().execute(contextOf(institutionId),
+                () -> dsl.fetchOne("""
+                        select encrypted_secret from identity_mfa_totp_credential
+                        where institution_id = ? and account_id = ?
+                        """, institutionId.value(), accountId)
+                        .get("encrypted_secret", String.class));
+        byte[] decrypted = transactionRunner().execute(contextOf(institutionId),
+                () -> decryptOrFail(service, institutionId, rowIdOf(institutionId, accountId),
+                        storedValueAfterRetirement));
+        String newValue = transactionRunner().execute(contextOf(institutionId),
+                () -> service.encryptForNewValue(TABLE, COLUMN, institutionId,
+                        rowIdOf(institutionId, UUID.randomUUID()), plaintext));
+
+        assertThat(storedValueAfterRetirement)
+                .as("nothing re-encrypted the stored value when its key was retired")
+                .isEqualTo(storedUnderOldKey);
+        assertThat(decrypted)
+                .as("retired forbids encrypting with the key, never decrypting with it")
+                .isEqualTo(plaintext);
+        assertThat(EncryptedColumnValue.parse(newValue).dekId())
+                .as("a new value is encrypted under a fresh active key, never the retired one")
+                .isNotEqualTo(oldKeyId);
     }
 
     /** Unwraps the checked {@link AeadIntegrityException} into an unchecked one for callers inside

@@ -1,11 +1,14 @@
 package com.confia.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.identity.application.AuthenticationCommand;
 import com.confia.identity.domain.BackoffPolicy;
 import com.confia.identity.domain.BackoffState;
 import com.confia.identity.infrastructure.Argon2Profile;
+import com.confia.shared.crypto.ColumnEncryptionService;
+import com.confia.shared.crypto.DataEncryptionKeyRepository;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -22,16 +25,19 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * Four non-empty-set exclusions, following {@code AuditScopeExclusionInventoryTest}'s own
+ * Five non-empty-set exclusions, following {@code AuditScopeExclusionInventoryTest}'s own
  * discipline (specs/identity/spec.md, requirements "Ausencia de la dimensión por dirección IP...",
  * "Ausencia de verificación contra contraseñas comprometidas...", "Ausencia de calibración de
- * Argon2id en servidor real" and "Ausencia de prueba de extremo a extremo con Playwright...") plus
+ * Argon2id en servidor real", "Ausencia de prueba de extremo a extremo con Playwright..." and, from
+ * column-encryption-and-mfa-totp, "Ausencia de ejecución real de la rotación de la llave de
+ * datos...") plus
  * one more inventory task 4.3 names alongside them: no class of {@code com.confia.identity..}
  * depends on any logging framework. Each exclusion iterates a demonstrably non-empty base set
  * first, so an absence assertion can never pass by accident over an empty collection.
@@ -171,6 +177,58 @@ class IdentityScopeExclusionInventoryTest {
                         .isFalse();
             }
         }
+    }
+
+    /**
+     * The absence half of the escenario publicado "Ninguna DEK retirada se recifra
+     * automáticamente" (specs/identity/spec.md, requirement "Ausencia de ejecución real de la
+     * rotación de la llave de datos (brecha con destino: cambio 9)"; column-encryption-and-mfa-totp
+     * task 5.2). No job can re-encrypt anything yet because nothing can run a job: db-scheduler
+     * (ADR-0016) is not even on the classpath, no production class depends on any scheduling API,
+     * and the key-management surface offers no rotation operation to schedule. The behavioral half
+     * — a retired key keeps decrypting — needs PostgreSQL, so it lives in {@code
+     * ColumnEncryptionIT}, never in this container-free class. This test stops being true the day
+     * change 9 delivers the rotation job, which is exactly when it should fail.
+     */
+    @Test
+    void noScheduledJobReencryptsARetiredDataEncryptionKeyYet() {
+        assertThatThrownBy(() -> Class.forName("com.github.kagkarlsson.scheduler.Scheduler"))
+                .as("db-scheduler, the only permitted job runner (ADR-0016), is not on the "
+                        + "classpath yet: it arrives with change 9")
+                .isInstanceOf(ClassNotFoundException.class);
+
+        JavaClasses classes = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages("com.confia");
+        assertThat(classes.stream().map(JavaClass::getFullName).toList())
+                .as("the scanned com.confia production class tree must be real and populated")
+                .isNotEmpty();
+        Set<String> forbiddenSchedulingPackagePrefixes =
+                Set.of("com.github.kagkarlsson.", "org.springframework.scheduling.");
+        for (JavaClass javaClass : classes) {
+            for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
+                String targetPackage = dependency.getTargetClass().getPackageName() + ".";
+                assertThat(forbiddenSchedulingPackagePrefixes.stream()
+                        .anyMatch(targetPackage::startsWith))
+                        .as("%s must not depend on a scheduling API (%s): no job of any kind "
+                                        + "exists in this change",
+                                javaClass.getFullName(), dependency.getTargetClass().getFullName())
+                        .isFalse();
+            }
+        }
+
+        Set<String> keyManagementMethodNames = Arrays.stream(
+                        new Class<?>[] {ColumnEncryptionService.class,
+                                DataEncryptionKeyRepository.class})
+                .flatMap(type -> Arrays.stream(type.getDeclaredMethods()))
+                .map(method -> method.getName().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        assertThat(keyManagementMethodNames)
+                .as("the key-management surface must be real and non-empty")
+                .contains("encryptfornewvalue", "decrypt", "findactiveorcreate", "findbyid")
+                .as("and it offers no operation a rotation job could call")
+                .noneMatch(name -> name.contains("reencrypt") || name.contains("rotate")
+                        || name.contains("retire"));
     }
 
     /**

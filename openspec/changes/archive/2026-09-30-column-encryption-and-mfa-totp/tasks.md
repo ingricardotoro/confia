@@ -532,7 +532,7 @@ necesario.
 
 Rama `change/column-encryption-and-mfa-totp-c5-redaction-and-docs`, base C4.
 
-- [ ] 5.1 **ROJO/VERDE — extensión de `IdentitySecretRedactionIT` con los cinco secretos nuevos, y
+- [x] 5.1 **ROJO/VERDE — extensión de `IdentitySecretRedactionIT` con los cinco secretos nuevos, y
   el control negativo de la propia herramienta de barrido.** Requiere Docker. ROJO: extender
   `.../test/java/com/confia/identity/IdentitySecretRedactionIT.java` (ya existente de la parte 1)
   para recoger, sobre una inscripción TOTP real completa (secreto, cifrado con KEK/DEK, diez
@@ -556,7 +556,7 @@ Rama `change/column-encryption-and-mfa-totp-c5-redaction-and-docs`, base C4.
   `identity`, requisito «Ningún secreto nuevo de este cambio es observable...» (su escenario);
   `design.md` decisión 9 completa
 
-- [ ] 5.2 **Notas editoriales fechadas, corrección de `docs/09`, barrido final de trazabilidad de
+- [x] 5.2 **Notas editoriales fechadas, corrección de `docs/09`, barrido final de trazabilidad de
   los 27 escenarios, y verificación final del cambio completo.** Requiere Docker para la
   verificación final y para extender `IdentityScopeExclusionInventoryTest`; no lo requiere para las
   notas documentales. Sin evidencia de ROJO propia para las notas: son ediciones de texto, no
@@ -599,9 +599,16 @@ Rama `change/column-encryption-and-mfa-totp-c5-redaction-and-docs`, base C4.
 
 ---
 
-## Trazabilidad de los 27 escenarios, contada contra los archivos de delta
+## Trazabilidad de los 29 escenarios, contada contra los archivos de delta
 
-**`identity` (21 escenarios, `specs/identity/spec.md`)**
+> **Corrección del 2026-09-30, encontrada por el barrido final de la tarea 5.2.** Esta tabla y el
+> resto de esta lista contaban **21** escenarios de `identity` y **27** en total. El delta tiene hoy
+> **22**: el escenario «La inscripción devuelve el secreto en base32 una única vez» se añadió el
+> 2026-09-29, durante el corte C3c, al cerrar el hueco de inscripción, y nadie actualizó el conteo
+> ni esta tabla. Se añade abajo con su prueba. Las menciones a 27 en las tareas se dejan como se
+> escribieron: son el registro de lo que se planificó, no el conteo vigente.
+
+**`identity` (23 escenarios, `specs/identity/spec.md`; el 23.º se añadió el 2026-09-30 al resolver CRITICAL-1 de `verify-report.md`)**
 
 | Requisito | Escenario | Tarea | Prueba |
 |---|---|---|---|
@@ -610,6 +617,8 @@ Rama `change/column-encryption-and-mfa-totp-c5-redaction-and-docs`, base C4.
 | TOTP RFC 6238 | Código válido en ventana ±1 se acepta | 2.3 | `VerifyTotpCodeIT` |
 | | Código ya aceptado no se reutiliza | 2.3 | `VerifyTotpCodeIT` |
 | Límite de tasa TOTP | Sexto intento activa retroceso | 2.3 | `TotpVerificationBackoffIT` |
+| | Retroceso desde el tercer fallo, contador de 30 minutos (añadido tras la verificación) | — | `TotpVerificationBackoffIT.backoffStartsAtTheThirdFailureAndItsCounterLivesThirtyMinutesNotFifteen` |
+| Inscripción TOTP | Devuelve el secreto en base32 una única vez (añadido en C3c) | 3.2 | `EnrollTotpSecondFactorIT.theReturnedBase32SecretIsTheSameSecretThatWasStoredEncrypted` |
 | 10 códigos de recuperación | Se generan y se muestran una vez | 3.2 | `EnrollTotpSecondFactorIT` |
 | | Usar uno no afecta a los otros nueve | 3.2 | `ConsumeRecoveryCodeIT` |
 | Aviso de códigos bajos | Octavo código deja el aviso activo | 3.3 | `ConsumeRecoveryCodeIT` |
@@ -619,7 +628,7 @@ Rama `change/column-encryption-and-mfa-totp-c5-redaction-and-docs`, base C4.
 | Exhaustividad del compilador | Desenlace no manejado rompe la compilación | 4.2 | `ExhaustiveAuthenticationResultSwitchCompilationTest` |
 | | `SecondFactorRequired` no avanza retroceso ni audita fallo | 4.3 | `AuthenticateWithPasswordIT` |
 | Ningún secreto observable | Los cinco secretos nuevos, no observables | 5.1 | `IdentitySecretRedactionIT` + control negativo |
-| Ausencia de rotación real | Ninguna DEK retirada se recifra | 5.2 | `IdentityScopeExclusionInventoryTest` |
+| Ausencia de rotación real | Ninguna DEK retirada se recifra | 5.2 | `IdentityScopeExclusionInventoryTest` (ausencia) + `ColumnEncryptionIT` (la DEK retirada sigue descifrando) |
 | Ausencia de envío del aviso | Se audita, no se envía correo | 3.3 | `ConsumeRecoveryCodeIT` |
 | MFA obligatoria (modificado) | Secreto inscrito → `SecondFactorRequired` | 4.3 | `AuthenticateWithPasswordIT` |
 | | Sin secreto → `SecondFactorEnrollmentRequired` | 4.3 | `AuthenticateWithPasswordIT` |

@@ -670,6 +670,14 @@ sin nueva constante, y una prueba explícita (`TotpVerificationBackoffIT`) confi
 en la misma ventana de 15 minutos aplicando el ciclo de retroceso, con su duración auditada
 (`identity.mfa.totp_verification.backoff_applied`).
 
+> **Corrección del 2026-09-30, encontrada por la verificación del cambio (`verify-report.md`,
+> CRITICAL-1).** La premisa de esta decisión era falsa. `BackoffPolicy` no codifica «5 intentos por
+> 15 minutos»: `FIRST_DELAYED_ATTEMPT = 3` y `COUNTER_WINDOW` es de 30 minutos, así que el retardo
+> empieza en el tercer fallo. El escenario del sexto intento no podía detectarlo, porque el sexto
+> lleva retardo con cualquiera de las dos reglas. La reutilización se mantiene, que era lo que D7
+> pretendía; lo que cambia es el texto del requisito, que el propietario decidió alinear con el
+> comportamiento real (opción a), más un escenario nuevo que sí distingue las dos reglas.
+
 ### Decisión 9 — Los cuatro secretos: clases finales redactadas, y su control negativo
 
 **Los cuatro objetos de valor**, todos clases finales con `toString()` sobrescrito explícito, nunca

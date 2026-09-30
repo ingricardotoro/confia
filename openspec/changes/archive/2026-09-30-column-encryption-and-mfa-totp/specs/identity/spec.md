@@ -80,21 +80,48 @@ módulo de organización, y pertenecen al cambio que construya la pantalla de in
 
 ### Requisito: Límite de tasa sobre la verificación de código TOTP
 
-El sistema DEBE limitar la verificación de un código TOTP a 5 intentos por cada 15 minutos por
-cuenta, con retroceso exponencial posterior una vez agotado ese límite (`docs/03-seguridad.md`
-§4.3), reutilizando el mismo patrón del retroceso por contraseña —contador en PostgreSQL, calculado
-en el dominio con reloj inyectado, probado sin esperar—, pero con la cuenta como clave en vez de la
-huella del identificador presentado, porque la verificación de un código TOTP ocurre siempre contra
-una cuenta ya identificada por contraseña, a diferencia del inicio de sesión.
+El sistema DEBE limitar la verificación de un código TOTP con **la misma regla de retroceso
+exponencial que el inicio de sesión con contraseña**, sin una política propia: los dos primeros
+fallos consecutivos no llevan retardo; desde el tercero, el retardo es de 2^(n−3) segundos para el
+fallo n, con un tope de 900 segundos; y el contador se reinicia cuando pasan más de 30 minutos sin
+ningún intento. Reutiliza además el mismo patrón —contador en PostgreSQL, calculado en el dominio
+con reloj inyectado, probado sin esperar—, pero con la cuenta como clave en vez de la huella del
+identificador presentado, porque la verificación de un código TOTP ocurre siempre contra una cuenta
+ya identificada por contraseña, a diferencia del inicio de sesión. El retardo demora la respuesta,
+nunca la deniega: el caso de uso devuelve el retardo exigido y el llamador DEBE respetarlo antes de
+responder, igual que en el inicio de sesión.
+
+> **Corrección del 2026-09-30, decidida por el propietario tras la verificación del cambio
+> (`verify-report.md`, CRITICAL-1, opción a).** Este requisito decía «5 intentos por cada 15
+> minutos, con retroceso exponencial posterior una vez agotado ese límite», copiando
+> `docs/03-seguridad.md` §4.3. La decisión 8 de `design.md` reutilizó `BackoffPolicy` afirmando que
+> esos eran sus umbrales, y no lo eran: la política empieza a retrasar en el tercer fallo y su
+> contador vive 30 minutos. El propietario aceptó el comportamiento real, más estricto en los
+> primeros intentos, y el texto pasa a describir lo que el código hace. El escenario del sexto
+> intento se conserva porque sigue siendo cierto, con un solo ajuste: decía «aplica el retroceso
+> antes de evaluar ese código», y el código evalúa el código y devuelve el retardo que el llamador
+> debe respetar antes de responder, que es el contrato de la parte 1. El escenario nuevo es el que
+> distingue la regla real de la anterior.
 
 #### Escenario: El sexto intento de verificación TOTP en la misma ventana de 15 minutos activa el retroceso
 
 - **DADO** la cuenta `sofia.mejia@colegio.edu.hn` con cinco intentos fallidos de verificación TOTP
   entre las 09:00:00 y las 09:10:00 del 2026-10-05
 - **CUANDO** presenta un sexto código, correcto o incorrecto, a las 09:12:00 del mismo día
-- **ENTONCES** el sistema aplica el retroceso exponencial antes de evaluar ese código, en vez de
-  evaluarlo de inmediato
+- **ENTONCES** el sistema exige un retardo antes de responder a ese código, en vez de responder de
+  inmediato
 - **Y** registra el ciclo de retroceso en la bitácora de auditoría con su duración
+
+#### Escenario: El retroceso empieza en el tercer fallo y su contador vive 30 minutos
+
+- **DADO** la cuenta `sofia.mejia@colegio.edu.hn` sin intentos previos de verificación TOTP
+- **CUANDO** presenta códigos incorrectos a las 09:00, 09:01 y 09:02 del 2026-10-05, otro a las
+  09:18 y otro a las 09:49
+- **ENTONCES** los dos primeros no llevan retardo y el tercero lleva un segundo
+- **Y** el de las 09:18, dieciséis minutos después del anterior, sigue en el mismo ciclo y lleva dos
+  segundos
+- **Y** el de las 09:49, treinta y un minutos después del anterior, empieza un ciclo nuevo sin
+  retardo
 
 ### Requisito: Diez códigos de recuperación de MFA de un solo uso, hasheados con Argon2id
 

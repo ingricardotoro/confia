@@ -105,12 +105,15 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    diferidas explícitamente).** Este cambio entrega el módulo `identity`, el esquema de sus dos
    tablas, el mecanismo de contraseña con Argon2id, la regla de retroceso exponencial por cuenta y
    el caso de uso completo de autenticación, con sus adaptadores jOOQ reales contra PostgreSQL. Deja
-   tres mitades con dueño nombrado, ninguna de ellas oculta: (a) **MFA con TOTP, recuperación segura
-   de contraseña y cifrado a nivel de columna** son del cambio `mfa-totp-and-password-recovery`, que
-   además edita la cláusula `permits` de `AuthenticationResult` para añadir sus propios desenlaces;
+   tres mitades con dueño nombrado, ninguna de ellas oculta: (a) **MFA con TOTP y cifrado a nivel
+   de columna** son del cambio `column-encryption-and-mfa-totp`, que además edita la cláusula
+   `permits` de `AuthenticationResult` para añadir sus propios desenlaces, y **la recuperación segura
+   de contraseña** es del cambio `password-recovery-token`, el tercero de la secuencia (corrección
+   del 2026-09-30: hasta esa fecha este texto nombraba las dos cosas como un único cambio,
+   `mfa-totp-and-password-recovery`, que nunca llegó a existir con ese nombre);
    (b) **sesiones, tokens, la capa web y quien de verdad materializa `AuthenticationDecision.requiredDelay()`**
    —la cabecera `Idempotency-Key` obligatoria sobre este endpoint incluida— son de
-   `session-tokens-and-web-layer`; (c) **la dimensión por dirección IP del retroceso exponencial**,
+   `session-tokens-and-web-layer`, el cuarto de la secuencia; (c) **la dimensión por dirección IP del retroceso exponencial**,
    con su aprovisionamiento sobre Redis, es del cambio 11 (`containerization-and-cicd-pipeline`). El
    estado del retroceso **por cuenta** vive en PostgreSQL, no en Redis (docs/03-seguridad.md §4.4,
    nota editorial del 2026-09-24): la dimensión por IP es la única que sigue apuntando a Redis.
