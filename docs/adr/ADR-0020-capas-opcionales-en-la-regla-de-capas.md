@@ -99,6 +99,15 @@ Alcance exacto:
 4. **Prohibido** `withOptionalLayers(true)` en cualquier archivo de `apps/api`.
 5. ADR-0018 sigue vigente sin cambios para `allowEmptyShould(true)`.
 
+> **Nota, 2026-09-30 (`frontend-monorepo-and-contracts-pipeline`).** Las dos capas opcionales ya
+> vencieron. `Infrastructure` venció en el cambio 5 con `JooqInstitutionRepository`. `Web` vence con
+> `com.confia.shared.web.openapi.ContractSchemas`, la primera clase de producción en un paquete con el
+> segmento `web`: no es un controlador de negocio, pero es código de la capa web (define el contrato
+> HTTP), y la condición del punto 3 es la presencia de la clase, no su tipo. Se sustituyó
+> `optionalLayer("Web")` por `layer("Web")` y se retiró su entrada del inventario en el mismo
+> commit, por decisión del propietario. Ninguna capa es opcional desde entonces; el mecanismo de este
+> ADR queda disponible para un caso futuro que lo justifique.
+
 ## Consecuencias
 
 **Positivas:**

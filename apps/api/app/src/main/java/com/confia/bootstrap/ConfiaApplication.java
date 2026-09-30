@@ -1,5 +1,6 @@
 package com.confia.bootstrap;
 
+import com.confia.shared.web.openapi.ProcessApiInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.WebApplicationType;
@@ -22,6 +23,11 @@ import org.springframework.context.ConfigurableApplicationContext;
 public final class ConfiaApplication {
 
     private static final Logger LOG = LoggerFactory.getLogger(ConfiaApplication.class);
+
+    /** Titles of the two OpenAPI documents, one per web process (frontend-monorepo-and-
+     * contracts-pipeline, design.md decision 1). */
+    static final String ADMIN_API_TITLE = "CONFIA admin API";
+    static final String PORTAL_API_TITLE = "CONFIA portal API";
 
     private ConfiaApplication() {
     }
@@ -55,9 +61,13 @@ public final class ConfiaApplication {
 
         return switch (profile) {
             case ADMIN -> LaunchOutcome.running(
-                    new SpringApplicationBuilder(AdminApplication.class).run(args));
+                    new SpringApplicationBuilder(AdminApplication.class)
+                            .properties(ProcessApiInfo.TITLE_PROPERTY + "=" + ADMIN_API_TITLE)
+                            .run(args));
             case PORTAL -> LaunchOutcome.running(
-                    new SpringApplicationBuilder(PortalApplication.class).run(args));
+                    new SpringApplicationBuilder(PortalApplication.class)
+                            .properties(ProcessApiInfo.TITLE_PROPERTY + "=" + PORTAL_API_TITLE)
+                            .run(args));
             case WORKER -> LaunchOutcome.running(
                     new SpringApplicationBuilder(WorkerApplication.class)
                             .web(WebApplicationType.NONE)

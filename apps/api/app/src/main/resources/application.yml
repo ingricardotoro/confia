@@ -14,3 +14,14 @@ spring:
     # dropped, so the intended dialect stays discoverable next to the rest of the datasource
     # configuration; nothing currently reads it.
     sql-dialect: POSTGRES
+
+# OpenAPI (docs/01-arquitectura.md §7; frontend-monorepo-and-contracts-pipeline, design.md decision
+# 3). Off by default: only application-local.yml and application-preprod.yml turn the document
+# endpoint and Swagger UI on, so a new profile or a typo in SPRING_PROFILES_ACTIVE leaves them
+# closed rather than open. The document is OpenAPI 3.1 regardless of profile.
+springdoc:
+  api-docs:
+    enabled: false
+    version: openapi_3_1
+  swagger-ui:
+    enabled: false

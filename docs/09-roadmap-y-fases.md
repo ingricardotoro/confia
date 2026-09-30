@@ -206,7 +206,14 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
       aquí.
 - [ ] Una tarea programada dentro de una transacción revertida no existe, y solo el proceso `confia-worker` ejecuta tareas.
 - [ ] **Un respaldo se restaura en un entorno limpio y el acta de simulacro está firmada.**
-- [ ] OpenAPI 3.1 se genera y publica como artefacto versionado.
+- [x] OpenAPI 3.1 se genera y publica como artefacto versionado.
+      **Cerrado por el cambio 3 (`frontend-monorepo-and-contracts-pipeline`), corte 3a**, con
+      `OpenApiContractSnapshotTest`: cada proceso web publica su propio documento OpenAPI 3.1,
+      generado desde su punto de entrada real, y cada `./mvnw verify` lo compara byte a byte con la
+      instantánea aprobada en `apps/api/openapi/` (versionada con el código). Una diferencia no
+      declarada rompe la construcción, y la integración continua adjunta el documento generado a
+      cada ejecución como artefacto. `OpenApiExposureByProfileTest` demuestra que el documento y
+      Swagger UI solo responden con los perfiles `local` y `preprod`.
 - [ ] La verificación de accesibilidad no reporta violaciones críticas en las pantallas existentes.
 
 **Riesgos:** sobredimensionar la infraestructura y consumir semanas en configuración que no
