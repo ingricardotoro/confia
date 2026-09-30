@@ -556,7 +556,7 @@ Rama `change/column-encryption-and-mfa-totp-c5-redaction-and-docs`, base C4.
   `identity`, requisito «Ningún secreto nuevo de este cambio es observable...» (su escenario);
   `design.md` decisión 9 completa
 
-- [ ] 5.2 **Notas editoriales fechadas, corrección de `docs/09`, barrido final de trazabilidad de
+- [x] 5.2 **Notas editoriales fechadas, corrección de `docs/09`, barrido final de trazabilidad de
   los 27 escenarios, y verificación final del cambio completo.** Requiere Docker para la
   verificación final y para extender `IdentityScopeExclusionInventoryTest`; no lo requiere para las
   notas documentales. Sin evidencia de ROJO propia para las notas: son ediciones de texto, no

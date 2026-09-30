@@ -1,6 +1,7 @@
 # Progreso de aplicación: `column-encryption-and-mfa-totp`
 
-- **Corte en curso:** C5 (tarea 5.1 en verde; queda la 5.2). C1, C2, C3 y C4 ya fusionados.
+- **Corte en curso:** C5 completo (tareas 5.1 y 5.2 en verde). Las quince tareas están cerradas; el
+  cambio queda listo para `/sdd-verify`.
 - **Entorno:** JDK 25 (Temurin 25.0.3+9), Maven 3.9.16, Docker disponible.
   El `JAVA_HOME` del sistema apunta al **JDK 21**, así que toda invocación de Maven exporta
   `JAVA_HOME` al 25 en la propia orden. `MAVEN_OPTS="-Djavax.net.ssl.trustStoreType=Windows-ROOT"` es
@@ -1561,3 +1562,80 @@ y 3.1, y así fue. La capacidad de fallar del barrido la demuestra el control ne
 - Integración: `Tests run: 160` (158 de C4 más los dos nuevos). Unitarias de `app`: `324`.
   `jacoco:check` cumplido.
 - Sin cambios de producción.
+
+---
+
+## C5 — Tarea 5.2: notas editoriales, rotación ausente, trazabilidad y verificación final
+
+Fecha: 2026-09-30. PR: `ingricardotoro/confia#61`. Mismo entorno que la 5.1: sin Docker ni JDK 25
+en la sesión, así que la integración continua es la primera ejecución.
+
+### Discrepancia de la tarea con las reglas del propio repositorio
+
+La tarea pedía extender `IdentityScopeExclusionInventoryTest` con una afirmación que necesita
+PostgreSQL (una DEK retirada que sigue descifrando). Esa clase es, por diseño, un inventario sin
+contenedor, y `IntegrationTestNamingTest` rechaza cualquier `*Test` que use uno. **Se partió el
+escenario en sus dos mitades**, cada una donde puede vivir:
+
+- **Ausencia**, en `IdentityScopeExclusionInventoryTest.noScheduledJobReencryptsARetiredDataEncryptionKeyYet`:
+  db-scheduler no está en el classpath (`ClassNotFoundException`), ninguna clase de producción de
+  `com.confia` depende de una API de programación (`com.github.kagkarlsson.`,
+  `org.springframework.scheduling.`), y la superficie de gestión de llaves no ofrece ninguna
+  operación de rotar, retirar ni recifrar. Cada comprobación recorre antes un conjunto no vacío.
+- **Comportamiento**, en `ColumnEncryptionIT.aValueEncryptedUnderARetiredKeyStillDecryptsAndNewValuesUseAFreshActiveKey`:
+  un valor cifrado con una llave que después se marca `retired` queda intacto, sigue descifrando, y
+  el siguiente valor nuevo se cifra con una llave activa nueva. La llave se retira por SQL crudo
+  porque este cambio no entrega ninguna operación de retiro.
+
+Sin ROJO sobre producción, igual que prevé la tarea: el requisito es una ausencia declarada.
+
+### Notas y correcciones documentales
+
+- `docs/03-seguridad.md`: nota de §4.3 (`user_mfa` → las tres tablas de MFA de `identity`, y
+  `RecoveryCodeHasher` en lugar de `PasswordHasher`), nota de §7.3 (`data_key` →
+  `shared_data_encryption_key`, y el recifrado por lotes pendiente del cambio 9) y adenda de §6.1
+  (privilegios de las cuatro tablas).
+- `docs/09-roadmap-y-fases.md`: deja de nombrar `mfa-totp-and-password-recovery` como un cambio
+  único; nombra `column-encryption-and-mfa-totp`, `password-recovery-token` y
+  `session-tokens-and-web-layer`.
+
+### Barrido final de trazabilidad: 28 escenarios, no 27
+
+Recontados contra los archivos de delta: `identity` tiene **22** escenarios, no 21. El que faltaba
+en la tabla, «La inscripción devuelve el secreto en base32 una única vez», se añadió el 2026-09-29
+en el corte C3c y nunca se trazó. Está cubierto por
+`EnrollTotpSecondFactorIT.theReturnedBase32SecretIsTheSameSecretThatWasStoredEncrypted`. Cada una
+de las trece clases de prueba de la tabla existe y contiene el método del escenario que se le
+asigna. **Los 28 escenarios quedan cubiertos por una prueba real en verde.** La tabla de
+`tasks.md` se corrigió con una nota fechada.
+
+### Diff de C5, medido
+
+`git diff --numstat` excluyendo `openspec`, `docs/adr` y el código generado:
+
+| PR | Archivo | + | − |
+|---|---|---|---|
+| #60 (5.1) | `IdentitySecretRedactionIT.java` | 277 | 0 |
+| #60 (5.1) | `LeakingMfaSecretFixture.java` | 16 | 0 |
+| #61 (5.2) | `IdentityScopeExclusionInventoryTest.java` | 60 | 2 |
+| #61 (5.2) | `ColumnEncryptionIT.java` | 58 | 0 |
+| #61 (5.2) | `docs/03-seguridad.md` | 21 | 0 |
+| #61 (5.2) | `docs/09-roadmap-y-fases.md` | 7 | 4 |
+
+Ninguno de los dos PR se acerca a las ochocientas líneas. Sin cambios de producción en C5.
+
+### Verificación final
+
+**Hecha en la integración continua, no en local**, y así se dice. La ejecución del PR #61 sobre
+`ee73595` equivale a lo que la tarea pedía del checkout limpio: checkout nuevo, JDK 25, Docker y
+`./mvnw --batch-mode verify -Pmutation-report`.
+
+- `BUILD SUCCESS`, `02:39 min`. `IdentityScopeExclusionInventoryTest`: `Tests run: 6`.
+  `ColumnEncryptionIT`: `Tests run: 5`.
+- Unitarias de `app`: `325`. Integración: `161`. Unitarias de `kernel`: `186`. Cero fallos.
+- `jacoco:check` cumplido en `kernel` y `app`.
+- PIT en `kernel`: 194 mutaciones, **99 %** eliminadas. PIT en los paquetes `domain` de `app`: 201
+  mutaciones, **94 %** eliminadas; umbral de 80.
+- En ramas y PR, la puerta de mutación solo informa; bloquea en `main`. La ejecución de `main` tras
+  la fusión del #60 (`b740922`) pasó con la puerta activa.
+- `security scanning`: en verde.
