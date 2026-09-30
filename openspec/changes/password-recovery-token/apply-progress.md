@@ -410,3 +410,57 @@ de reversión. Se corrigió la prueba para leer desde otro hilo y se repitió el
 ### Escenarios
 
 I3, I4, I5, I6 e I41.
+
+---
+
+## Tarea 3.3 — Sonda S3 y concurrencia de emisión
+
+### Sonda S3
+
+**PASA.** Contenedor `postgres:18-alpine` propio con una tabla de cuentas y otra de tokens. La
+sesión A toma `SELECT … FOR UPDATE` sobre la cuenta, inserta un token y duerme 3 s antes de
+confirmar; la sesión B toma el mismo bloqueo y cuenta:
+
+```
+B esperó 2,11 s por el bloqueo
+locked|1
+count|1
+```
+
+Bajo `READ COMMITTED`, el conteo de B ve el token que A confirmó mientras B esperaba. No hace falta
+el respaldo `SERIALIZABLE`.
+
+### Prueba
+
+`PasswordResetConcurrencyIT`, mitad de emisión (2 pruebas):
+
+- dos emisiones para la misma cuenta, liberadas a la vez por un `CyclicBarrier`, terminan las dos en
+  `ISSUED`, con exactamente un token abierto y el otro superado;
+- **control negativo**: con un `lockById` que no bloquea y una barrera que retiene a las dos
+  emisiones justo antes de insertar, cuando ambas ya contaron y superaron, una emisión termina en
+  `ISSUED` y la otra lanza una excepción cuyo `SQLState` es **`23505`**, el de la sonda S1. La emisión
+  fallida no envió nada y queda un solo token abierto.
+
+```
+PasswordResetConcurrencyIT   tests=2 failures=0 errors=0
+```
+
+**Sin rojo propio.** Las dos pruebas pasaron en su primera ejecución: el orden de la decisión 2
+(bloquear la cuenta antes de contar, superar e insertar) ya quedó implementado en la tarea 3.2, y la
+tarea 3.3 pedía en verde solo «lo que la prueba exija». La segunda prueba es el control negativo:
+demuestra que el índice parcial es una red real y que el bloqueo es lo que evita que salte.
+
+### Escenarios
+
+I7.
+
+---
+
+## Cierre de C3
+
+- **`./mvnw -B clean verify`:** `BUILD SUCCESS` en 2 min 11 s. 186 pruebas del núcleo, 386
+  unitarias y 203 de integración.
+- **Diff medido** contra `main`, sin `openspec` ni código generado: **1334 líneas**. Se parte en dos
+  pull requests encadenados, sin cambiar ninguna tarea:
+  - **C3a** `change/password-recovery-token-c3a-request`: tarea 3.1, 576 líneas.
+  - **C3b** `change/password-recovery-token-c3b-issuance`, sobre C3a: tareas 3.2 y 3.3, 758 líneas.
