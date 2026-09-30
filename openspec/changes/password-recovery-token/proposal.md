@@ -11,7 +11,8 @@
   condiciones duras de aceptación (sección «Dependencias»)
 - **Exploración:** `openspec/changes/password-recovery-token/exploration.md`, con las cinco
   respuestas del propietario del 2026-09-30 en su sección 7
-- **Estado:** pendiente de aprobación del propietario (`openspec/config.yaml`, `rules.proposal`)
+- **Estado:** aprobada por el propietario del producto el 2026-09-30, con las respuestas de la ronda de
+  preguntas registradas al final
 
 ## Intención
 
