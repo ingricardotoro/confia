@@ -42,8 +42,8 @@ y el propietario eligió retirar la excepción (2026-09-30). En un solo commit: 
 pasa a `layer("Web")`, el inventario queda vacío y ADR-0020 recibe una nota fechada. Spring Modulith
 aceptó el paquete nuevo con su `@NamedInterface` a la primera.
 
-**Desviación del diseño, dicha aquí.** El diseño ponía el título en un `@Bean` por proceso. Los
-tres puntos de entrada comparten el paquete `com.confia.bootstrap` y cada uno lo escanea, así que
+**Decisión de aplicación que el diseño no preveía.** El diseño no decía cómo se distinguen los dos
+documentos; la forma obvia, un `@Bean` por proceso, no sirve. Los tres puntos de entrada comparten el paquete `com.confia.bootstrap` y cada uno lo escanea, así que
 un bean declarado en uno podría acabar en los contextos de los otros. Por eso el título lo fija el
 lanzador (`ConfiaApplication.launch`) con una propiedad. **Riesgo más amplio, fuera de este
 cambio:** ese mismo escaneo cruzado podría hacer que el contexto del portal cargue la configuración
