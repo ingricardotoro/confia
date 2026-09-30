@@ -132,3 +132,58 @@ La última muestra que `final_chk` es una segunda red bajo el predicado. El adap
 - **Discrepancia 1 de `tasks.md` aplicada:** los dos tipos de dominio nacen aquí y no en C2. La fábrica
   `PasswordResetTokenHash.of(token)` llega en la tarea 2.2.
 - **Escenarios cubiertos:** I31 e I32.
+
+---
+
+## Tarea 1.3 — Bloqueo y reescritura del hash de la cuenta
+
+### ROJO
+
+`JooqStaffAccountRepositoryIT` con cinco pruebas nuevas, y el doble `FakeStaffAccountRepository` de
+`AuthenticateWithPasswordTest` con los dos métodos nuevos: `test-compile` falla porque ninguno de los
+dos métodos existe en el puerto (`method does not override or implement a method from a supertype`,
+`cannot find symbol`).
+
+### VERDE
+
+- `StaffAccountRepository` gana `lockById` y `replacePasswordHash`. `findBy` no cambia.
+- `JooqStaffAccountRepository.lockById` es `SELECT ... FOR UPDATE` (`.forUpdate()`, el patrón de
+  `JooqIdempotencyRecordStore.lockExisting`); `replacePasswordHash` es un `UPDATE` que devuelve si
+  afectó una fila.
+- El doble de `AuthenticateWithPasswordTest` lanza `UnsupportedOperationException` en los dos: el
+  inicio de sesión nunca bloquea una cuenta ni reescribe su hash, y si alguna vez lo hiciera, esas
+  pruebas fallarían.
+
+```
+AuthenticateWithPasswordTest   tests=7 failures=0 errors=0
+JooqStaffAccountRepositoryIT   tests=8 failures=0 errors=0
+```
+
+**Cómo se observa la espera sin reloj.** Un hilo toma `lockById` y queda retenido con un
+`CountDownLatch`; la segunda transacción fija `set local lock_timeout = '500ms'` y llama a
+`lockById`. Solo puede fallar con `55P03` (lock_not_available) si tuvo que esperar. Al liberar la
+primera, la misma llamada devuelve la cuenta.
+
+### Control negativo
+
+Sin `.forUpdate()` en `lockById` falla exactamente
+`aSecondLockByIdOnTheSameAccountWaitsUntilTheFirstTransactionEnds`, y ninguna otra. El adaptador se
+restauró.
+
+### Escenarios
+
+Ninguno directo; es la base de I7, I8 e I20 (tareas 3.3 y 4.3).
+
+---
+
+## Cierre de C1
+
+- **`./mvnw -B clean verify`:** `BUILD SUCCESS` en 2 min 46 s. 186 pruebas del núcleo, 350 unitarias
+  (343 de la línea base más 7) y 188 de integración (162 más 26).
+- **Diff medido** con `git diff --numstat origin/main -- . ':(exclude)openspec' ':(exclude)**/generated/**'`:
+  **1119 líneas**, por encima de las 800 de `docs/15-flujo-de-trabajo-git.md` §3. El corte se parte en
+  dos pull requests encadenados, sin cambiar ninguna tarea de nivel superior:
+  - **C1a** `change/password-recovery-token-c1a-schema`: tarea 1.1 (`V7` y sus puertas de esquema),
+    unas 380 líneas, más las 7 de `docs/09` que traen los artefactos SDD ya aprobados.
+  - **C1b** `change/password-recovery-token-c1b-token-repository`, sobre C1a: tareas 1.2 y 1.3, unas
+    740 líneas.
