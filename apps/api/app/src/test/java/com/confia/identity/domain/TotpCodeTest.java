@@ -28,6 +28,28 @@ class TotpCodeTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    /**
+     * password-recovery-token design.md decision 13: a malformed code presented next to a reset
+     * token must not end up in an exception message, so the message states the rule only.
+     */
+    @Test
+    void theRejectionMessageNeverCarriesThePresentedValue() {
+        assertThatThrownBy(() -> new TotpCode("12a456"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("a TOTP code must be exactly 6 digits")
+                .hasMessageNotContaining("12a456");
+    }
+
+    /** Decision 13: the record's generated {@code toString()} would print the six digits. */
+    @Test
+    void toStringNeverCarriesTheCode() {
+        TotpCode code = new TotpCode("005924");
+
+        org.assertj.core.api.Assertions.assertThat(code.toString())
+                .doesNotContain("005924")
+                .isEqualTo("TotpCode[REDACTED]");
+    }
+
     @Test
     void acceptsAWellFormedSixDigitCode() {
         TotpCode code = new TotpCode("005924");

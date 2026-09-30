@@ -7,7 +7,8 @@ import java.util.Objects;
  * caller for verification (column-encryption-and-mfa-totp design.md, decision 7;
  * docs/03-seguridad.md §4.3). Exactly six ASCII digits, zero-padded — never fewer, never more,
  * never a numeric type: {@link TotpAlgorithm#generate} already produces the zero-padded form, so
- * this constructor rejects anything else instead of re-padding it.
+ * this constructor rejects anything else instead of re-padding it. Neither its rejection message nor
+ * its {@code toString()} carries the value.
  */
 public record TotpCode(String value) {
 
@@ -16,8 +17,17 @@ public record TotpCode(String value) {
     public TotpCode {
         Objects.requireNonNull(value, "value");
         if (!value.matches(SIX_DIGITS_PATTERN)) {
-            throw new IllegalArgumentException(
-                    "a TOTP code must be exactly 6 digits, was " + value);
+            throw new IllegalArgumentException("a TOTP code must be exactly 6 digits");
         }
+    }
+
+    /**
+     * Redacted deliberately (password-recovery-token design.md decision 13): a presented code travels
+     * next to a password-reset token, and the record's generated {@code toString()} would print the
+     * six digits. {@code equals} and {@code hashCode} stay the record's own.
+     */
+    @Override
+    public String toString() {
+        return "TotpCode[REDACTED]";
     }
 }

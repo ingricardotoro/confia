@@ -1,6 +1,6 @@
 # Progreso de aplicación: `password-recovery-token`
 
-- **Corte en curso:** C1.
+- **Corte en curso:** C2, sobre C1b.
 - **Entorno:** OpenJDK 25.0.4 (paquete de Ubuntu 24.04), Maven Wrapper del repositorio, Docker 29.3.1
   con `postgres:18-alpine`. El `JAVA_HOME` del sistema apunta al JDK 21, así que toda invocación de
   Maven exporta `JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64` en la propia orden.
@@ -187,3 +187,131 @@ Ninguno directo; es la base de I7, I8 e I20 (tareas 3.3 y 4.3).
     unas 380 líneas, más las 7 de `docs/09` que traen los artefactos SDD ya aprobados.
   - **C1b** `change/password-recovery-token-c1b-token-repository`, sobre C1a: tareas 1.2 y 1.3, unas
     740 líneas.
+
+---
+
+## Tarea 2.1 — Sonda S4 y la regla de 12 a 128 caracteres
+
+### Sonda S4
+
+**PASA.** La primera ejecución en `jshell`, con los emoji escritos como escapes `\uD83C…` por la
+entrada estándar, dio `17 17` y `18 18`: la consola de `jshell` no conserva los surrogados que
+recibe por la entrada, así que esa lectura no vale. Repetida con un archivo Java en UTF-8 que lleva
+los **literales copiados byte a byte del delta** (`specs/identity/spec.md`, línea 232):
+
+```
+casa azul🌋🌊    11 puntos de código, 13 unidades UTF-16, NFKC no lo cambia
+casa azul 🌋🌊   12 puntos de código, 14 unidades UTF-16, NFKC no lo cambia
+```
+
+El escenario aprobado no necesita ajuste.
+
+### ROJO
+
+`StaffPasswordLengthPolicyTest` (8 casos y 2 propiedades de jqwik): `test-compile` falla con 46
+errores `cannot find symbol`.
+
+### VERDE
+
+`StaffPasswordLengthPolicy` con `MIN_CODE_POINTS = 12`, `MAX_CODE_POINTS = 128`, NFKC y
+`codePointCount`. Devuelve `Accepted(PlainPassword)`, `TooShort` o `TooLong`, sin lanzar salvo con
+`null`.
+
+```
+StaffPasswordLengthPolicyTest   tests=10 failures=0 errors=0
+```
+
+La primera versión de la propiedad «todo valor de 12 a 128 es aceptado» se agotó (100 intentos, 92
+descartes) porque un solo generador de 0 a 140 puntos de código producía pocos casos dentro del
+rango. Se separaron los generadores: de 12 a 128 para esa propiedad y de 0 a 140 para la de rechazo.
+
+### Control negativo
+
+Contando con `length()` (unidades UTF-16) en vez de `codePointCount` fallan
+`theScenarioLiteralsAreCountedInCodePointsNotUtf16Units` y la propiedad de rechazo. Se restauró.
+
+### Escenarios
+
+I15 (parte unitaria) e I16.
+
+---
+
+## Tarea 2.2 — Token en claro, fábrica del hash, política del token y motivos
+
+### ROJO
+
+`PlainPasswordResetTokenTest` (8), `PasswordResetTokenPolicyTest` (9) y dos casos nuevos en
+`PasswordResetTokenHashTest`: `test-compile` falla con 72 errores `cannot find symbol`.
+
+### VERDE
+
+- `PlainPasswordResetToken`: clase final redactada; `generate(SecureRandom)` produce 32 bytes en 43
+  caracteres base64url sin relleno; `of` exige exactamente ese alfabeto y esa longitud, sin repetir
+  el valor en el mensaje.
+- `PasswordResetTokenHash.of(token)`: SHA-256 de los bytes ASCII del texto, en hexadecimal
+  minúscula. La prueba calcula el valor esperado por su cuenta con `MessageDigest` y `HexFormat`.
+- `PasswordResetTokenPolicy`: `VALIDITY = 30 min`, `ISSUANCE_WINDOW = 60 min`,
+  `MAX_ISSUANCES_PER_WINDOW = 3`, `expiresAt`, `issuanceWindowStart` (inicio exclusivo, el mismo
+  predicado `issued_at > since` del adaptador), `allowsAnotherIssuance` y `rejectionReasonOf` con el
+  orden usado, superado, vencido.
+- `PasswordResetRejectionReason`: los ocho motivos de la decisión 9, cada uno con su código de
+  auditoría.
+
+```
+PlainPasswordResetTokenTest    tests=8 failures=0 errors=0
+PasswordResetTokenHashTest     tests=9 failures=0 errors=0
+PasswordResetTokenPolicyTest   tests=9 failures=0 errors=0
+```
+
+La prueba de `generate` usa `SHA1PRNG` sembrado antes de su primer uso, que es determinista, y
+comprueba además que los 32 bytes son exactamente los que entrega el `SecureRandom` recibido.
+
+### Control negativo
+
+Con el vencimiento evaluado primero y con borde no estricto (`now.isAfter(expiresAt)`) fallan tres
+pruebas: el borde de 10:30:00, la precedencia de superado sobre vencido y la de usado sobre vencido.
+Se restauró.
+
+### Escenarios
+
+I4, I6 e I37, en su parte unitaria.
+
+---
+
+## Tarea 2.3 — `TotpCode` sin fuga (decisión 13)
+
+### ROJO
+
+- `TotpCodeTest`, dos casos nuevos contra el código de `main`:
+  `theRejectionMessageNeverCarriesThePresentedValue` (el mensaje de `new TotpCode("12a456")` lo
+  contenía: `"… was 12a456"`) y `toStringNeverCarriesTheCode` (el `record` imprimía
+  `TotpCode[value=005924]`). `Tests run: 6, Failures: 2`.
+- `IdentitySecretRedactionIT`: el barrido de TOTP guarda el código presentado en una variable y
+  revisa, en un texto propio, su `toString()`, la decisión rechazada y el mensaje de un código mal
+  formado. Falla con «produced text unexpectedly contains a presented TOTP code (6 characters)», sin
+  repetir el valor.
+
+El barrido del código usa su propio texto y no el texto completo de las filas: seis dígitos son lo
+bastante cortos como para aparecer por azar en una marca de tiempo o en un identificador.
+
+### VERDE
+
+El mensaje pasa a `"a TOTP code must be exactly 6 digits"` y `toString()` devuelve
+`TotpCode[REDACTED]`. El patrón, `equals` y `hashCode` no cambian; ninguna prueba ni código dependía
+del mensaje anterior.
+
+```
+TotpCodeTest                 tests=6 failures=0 errors=0
+IdentitySecretRedactionIT    tests=3 failures=0 errors=0
+VerifyTotpCodeIT             tests=2 failures=0 errors=0   (sin tocar)
+TotpVerificationBackoffIT    tests=2 failures=0 errors=0   (sin tocar)
+```
+
+---
+
+## Cierre de C2
+
+- **`./mvnw -B clean verify`:** `BUILD SUCCESS` en 2 min 13 s. 186 pruebas del núcleo, 381
+  unitarias y 188 de integración.
+- **Diff medido** contra C1b, sin `openspec` ni código generado: **685 líneas**, dentro de las 800.
+  Un solo pull request.
