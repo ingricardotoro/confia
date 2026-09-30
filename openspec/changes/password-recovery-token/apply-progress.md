@@ -233,3 +233,45 @@ Contando con `length()` (unidades UTF-16) en vez de `codePointCount` fallan
 ### Escenarios
 
 I15 (parte unitaria) e I16.
+
+---
+
+## Tarea 2.2 — Token en claro, fábrica del hash, política del token y motivos
+
+### ROJO
+
+`PlainPasswordResetTokenTest` (8), `PasswordResetTokenPolicyTest` (9) y dos casos nuevos en
+`PasswordResetTokenHashTest`: `test-compile` falla con 72 errores `cannot find symbol`.
+
+### VERDE
+
+- `PlainPasswordResetToken`: clase final redactada; `generate(SecureRandom)` produce 32 bytes en 43
+  caracteres base64url sin relleno; `of` exige exactamente ese alfabeto y esa longitud, sin repetir
+  el valor en el mensaje.
+- `PasswordResetTokenHash.of(token)`: SHA-256 de los bytes ASCII del texto, en hexadecimal
+  minúscula. La prueba calcula el valor esperado por su cuenta con `MessageDigest` y `HexFormat`.
+- `PasswordResetTokenPolicy`: `VALIDITY = 30 min`, `ISSUANCE_WINDOW = 60 min`,
+  `MAX_ISSUANCES_PER_WINDOW = 3`, `expiresAt`, `issuanceWindowStart` (inicio exclusivo, el mismo
+  predicado `issued_at > since` del adaptador), `allowsAnotherIssuance` y `rejectionReasonOf` con el
+  orden usado, superado, vencido.
+- `PasswordResetRejectionReason`: los ocho motivos de la decisión 9, cada uno con su código de
+  auditoría.
+
+```
+PlainPasswordResetTokenTest    tests=8 failures=0 errors=0
+PasswordResetTokenHashTest     tests=9 failures=0 errors=0
+PasswordResetTokenPolicyTest   tests=9 failures=0 errors=0
+```
+
+La prueba de `generate` usa `SHA1PRNG` sembrado antes de su primer uso, que es determinista, y
+comprueba además que los 32 bytes son exactamente los que entrega el `SecureRandom` recibido.
+
+### Control negativo
+
+Con el vencimiento evaluado primero y con borde no estricto (`now.isAfter(expiresAt)`) fallan tres
+pruebas: el borde de 10:30:00, la precedencia de superado sobre vencido y la de usado sobre vencido.
+Se restauró.
+
+### Escenarios
+
+I4, I6 e I37, en su parte unitaria.

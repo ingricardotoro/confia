@@ -1,5 +1,9 @@
 package com.confia.identity.domain;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -12,7 +16,7 @@ import java.util.regex.Pattern;
  * <p><b>A final class with a redacted {@code toString()}, never a {@code record}</b>: the delta
  * forbids the hash from being observable, and a record would print it verbatim. The rejection
  * message states the rule and never the received value, which may be a token pasted where its hash
- * belongs. Computing the hash from a token arrives with the token class itself (task 2.2).
+ * belongs.
  */
 public final class PasswordResetTokenHash {
 
@@ -31,6 +35,21 @@ public final class PasswordResetTokenHash {
                     "a password-reset token hash must be exactly 64 lowercase hex characters");
         }
         this.value = value;
+    }
+
+    /**
+     * SHA-256 over the ASCII bytes of the token's base64url text, as 64 lowercase hex characters
+     * (design.md decision 3). A pure JDK function with no secret, so it lives in the domain.
+     */
+    public static PasswordResetTokenHash of(PlainPasswordResetToken token) {
+        Objects.requireNonNull(token, "token");
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(token.value().getBytes(StandardCharsets.US_ASCII));
+            return new PasswordResetTokenHash(HexFormat.of().formatHex(digest));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("every Java platform must support SHA-256", e);
+        }
     }
 
     public String value() {
