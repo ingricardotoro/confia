@@ -358,3 +358,55 @@ Con el asiento escrito solo cuando la cuenta existe, falla
 ### Escenarios
 
 I1, I2, I26, I29, I30, I39 e I40.
+
+---
+
+## Tarea 3.2 — `IssuePasswordResetToken` con el puerto de envío
+
+### ROJO
+
+`IssuePasswordResetTokenTest` (1) e `IssuePasswordResetTokenIT` (7): `test-compile` falla con 28
+errores `cannot find symbol`.
+
+### VERDE
+
+- `PasswordResetLinkSender`: `send(InstitutionId, StaffAccountId, PlainPasswordResetToken)`, único
+  lugar por donde sale el token en claro. Sin adaptador de producción.
+- `IssuePasswordResetTokenDecision`: `ISSUED`, `SKIPPED` y `ACCOUNT_NOT_FOUND`, sin el token.
+- `IssuePasswordResetToken`: dentro de la transacción, `lockById`, conteo en la ventana, omisión
+  auditada con `{"reason":"rate-limit","issuedInWindow":n}`, o `supersedeOpen`, `insert` con
+  `policy.expiresAt(now)` y asiento `issued` con el id de la fila, el vencimiento y
+  `supersededCount`, nunca el hash. **El envío ocurre después de `TransactionRunner.execute`.**
+
+```
+IssuePasswordResetTokenTest   tests=1 failures=0 errors=0
+IssuePasswordResetTokenIT     tests=7 failures=0 errors=0
+```
+
+La primera ejecución falló en la aserción sobre `after_value`: `shared_audit_log` lo guarda como
+JSONB y lo devuelve con espacios normalizados (`"supersededCount": 0`). Las aserciones ahora leen el
+JSON en vez de comparar texto.
+
+### Desviación de la tarea
+
+La tarea pedía comprobar con dobles, en `IssuePasswordResetTokenTest`, que el envío ocurre después de
+confirmar y nunca tras una reversión. `TransactionRunner` necesita una conexión real para aplicar el
+contexto de seguridad, así que esa comprobación vive en `IssuePasswordResetTokenIT`:
+
+- el doble de envío lee la fila del token **desde otro hilo**, en una transacción propia, y exige
+  verla ya confirmada;
+- un escritor de auditoría que lanza fuerza la reversión, y después el doble no recibió nada y la
+  tabla está vacía.
+
+### Control negativo
+
+Con el envío movido dentro de la transacción, la primera versión de la prueba de «después de
+confirmar» **siguió pasando**: el doble leía desde el mismo hilo, y `TransactionRunner` se unía a la
+transacción aún abierta (`PROPAGATION_REQUIRED`) y veía la fila sin confirmar. Solo falló la prueba
+de reversión. Se corrigió la prueba para leer desde otro hilo y se repitió el control: fallan las dos
+(`theLinkIsSentOnlyAfterTheIssuingTransactionCommitted` y
+`aRolledBackIssuanceSendsNothingAndLeavesNoToken`). El caso de uso se restauró.
+
+### Escenarios
+
+I3, I4, I5, I6 e I41.
