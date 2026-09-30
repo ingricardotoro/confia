@@ -1,0 +1,26 @@
+package com.confia.architecture.fixture.exhaustiveswitch;
+
+import com.confia.identity.domain.AuthenticationResult;
+import com.confia.identity.domain.AuthenticationResult.Authenticated;
+import com.confia.identity.domain.AuthenticationResult.Rejected;
+import com.confia.identity.domain.AuthenticationResult.SecondFactorEnrollmentRequired;
+
+/**
+ * Deliberately non-exhaustive fixture (column-encryption-and-mfa-totp design.md, decision 6): the
+ * real four-outcome {@code AuthenticationResult}, switched over with the {@code
+ * SecondFactorRequired} branch removed. Kept as a {@code .txt} resource, never as a real {@code
+ * .java} file in this tree, so Maven never compiles it as part of the ordinary build — {@code
+ * ExhaustiveAuthenticationResultSwitchCompilationTest} compiles this text in memory instead
+ * (specs/identity/spec.md, requirement "Exhaustividad forzada por el compilador...", escenario "Un
+ * desenlace no manejado rompe la compilación, no el comportamiento en producción").
+ */
+public final class NonExhaustiveSwitchFixture {
+
+    public static String describe(AuthenticationResult result) {
+        return switch (result) {
+            case Authenticated authenticated -> "authenticated";
+            case Rejected rejected -> "rejected";
+            case SecondFactorEnrollmentRequired enrollmentRequired -> "enrollment-required";
+        };
+    }
+}

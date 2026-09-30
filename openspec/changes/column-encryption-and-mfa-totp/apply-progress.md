@@ -1094,3 +1094,65 @@ de este proyecto.
 - **C3a solo**: `BUILD SUCCESS`, `02:46 min`, `Tests run: 146` de integración, cobertura cumplida.
 - **C3b sobre C3a**: `BUILD SUCCESS`, `03:17 min`, `Tests run: 154`, cobertura cumplida.
 - **C3c sobre C3b**: `BUILD SUCCESS`, `03:12 min`, `Tests run: 155`, cobertura cumplida.
+
+---
+
+## Sondas S3 y S4 del corte C4, ejecutadas por el orquestador antes de delegar
+
+Fecha: 2026-09-29. Las dos se ejecutaron **fuera del árbol del proyecto**, antes de escribir código,
+igual que S1 y S5 en C1 — donde saber el resultado por adelantado evitó escribir un respaldo que no
+hacía falta.
+
+### S3 (bloqueante): el diagnóstico real de `javac` ante un `switch` no exhaustivo
+
+**La aserción que la tarea 4.2 prescribe no puede pasar.** La tarea manda «confirmar que la
+compilación del recurso no exhaustivo falla con algún diagnóstico `ERROR` que contiene la palabra
+"exhaustive"». El texto real de `javac 25.0.3` **no contiene esa palabra**:
+
+| Forma | Diagnóstico literal |
+|---|---|
+| `switch` como **expresión** | `error: the switch expression does not cover all possible input values` |
+| `switch` como **sentencia** | `error: the switch statement does not cover all possible input values` |
+
+La subcadena estable entre las dos formas es **`does not cover all possible input values`**, y es
+sobre ella que debe afirmar la prueba. La propia tarea lo previó: «Si el texto exacto difiriera,
+ajustar la aserción a lo que `javac` realmente produce en JDK 25 — **nunca** relajarla a solo "falla
+sin más"». Se ajusta, no se relaja.
+
+**Control positivo comprobado en la misma sonda:** el `switch` completo sobre el mismo tipo sellado
+compila con `-Xlint:all` **sin una sola advertencia**, así que el gemelo positivo del fixture tiene
+un resultado limpio que afirmar y no un «compila con avisos».
+
+**Riesgo de localización descartado.** Este anfitrión corre en `es_MX` —Maven imprime «INFORMACIÓN»
+y fechas en español—, así que un mensaje de compilador localizado habría hecho la aserción frágil
+entre local e integración continua. Se forzó `-J-Duser.language=es -J-Duser.country=ES` y
+`javac` devolvió **inglés igualmente**: Temurin 25 no localiza los mensajes del compilador. No hace
+falta fijar el locale, aunque leer el diagnóstico con `Locale.ROOT` sigue siendo barato como seguro
+ante otra distribución de JDK en integración continua.
+
+### S4 (no bloqueante): ArchUnit sí modela el `instanceof`
+
+`./mvnw -B -pl app dependency:tree -Dincludes=com.tngtech.archunit` fija las versiones efectivas:
+los envoltorios `archunit-junit5*` en **1.5.0**, y el artefacto núcleo `archunit` en **1.4.2**, que
+llega por `spring-modulith-core:2.1.1`. La asimetría **no es un hallazgo nuevo**: está declarada y
+justificada en `apps/api/pom.xml` como W6 de `verify-report.md`, con su motivo escrito —el jar de
+1.5.0 nunca se descargó en esta máquina por una brecha de almacén de confianza PKIX de Windows, y
+1.4.2 es la versión contra la que ha corrido todo el módulo desde el inicio.
+
+**Existe un equivalente a `INSTANCEOF`, y es preciso.** Inspeccionado con `javap` sobre el jar
+cacheado:
+
+- `JavaClass.getInstanceofChecks()` → `Set<InstanceofCheck>`, y también
+  `getInstanceofChecksWithTypeOfSelf()`.
+- `InstanceofCheck` expone `getRawType()` (el tipo contra el que se comprueba), `getOwner()` (la
+  unidad de código), `getLineNumber()` y `getSourceCodeLocation()`.
+
+Es decir: **una regla de regresión de refuerzo es viable y útil.** Podría prohibir cualquier
+`instanceof` contra `AuthenticationResult` o sus subtipos permitidos bajo `com.confia.identity..`,
+que es exactamente la regresión que se quiere impedir: que alguien vuelva a cambiar el `switch`
+exhaustivo por un `instanceof` y el compilador deje de avisar de un desenlace nuevo sin manejar.
+
+**No sustituye al mecanismo principal de 4.2**, y si se construye necesita **control negativo con
+fixture** —el árbol ya tiene `ArchitectureTestSupport.assertRuleRejects(...)` y
+`architecture/fixture/` para eso—. Una regla de arquitectura sin control negativo es la clase de
+comprobación que no puede fallar, y en la parte 1 ya se eliminó una por ese motivo.

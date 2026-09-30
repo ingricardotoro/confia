@@ -13,6 +13,7 @@ import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
 import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
+import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.shared.security.SecurityContext;
@@ -147,8 +148,9 @@ class LoginBackoffAtomicityIT extends CommittingPostgresIntegrationTest {
 
     private AuthenticateWithPassword useCase(InstitutionId institutionId, String instant) {
         return new AuthenticateWithPassword(transactionRunner(), () -> institutionId,
-                new JooqStaffAccountRepository(dsl), new JooqLoginBackoffStore(dsl), HASHER,
-                FINGERPRINTER, new JooqAuditLogWriter(dsl), fixedClock(instant));
+                new JooqStaffAccountRepository(dsl), new JooqTotpCredentialRepository(dsl),
+                new JooqLoginBackoffStore(dsl), HASHER, FINGERPRINTER, new JooqAuditLogWriter(dsl),
+                fixedClock(instant));
     }
 
     private long countBackoffRows(InstitutionId institutionId, IdentifierFingerprint fingerprint) {

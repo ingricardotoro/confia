@@ -15,6 +15,7 @@ import com.confia.identity.infrastructure.ConfiguredLoginInstitutionProvider;
 import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
+import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.shared.security.SecurityContext;
@@ -101,7 +102,8 @@ class LoginInstitutionIT extends CommittingPostgresIntegrationTest {
         try {
             AuthenticateWithPassword useCase = new AuthenticateWithPassword(transactionRunner(),
                     new ConfiguredLoginInstitutionProvider(), new JooqStaffAccountRepository(dsl),
-                    new JooqLoginBackoffStore(dsl), HASHER, FINGERPRINTER, new JooqAuditLogWriter(dsl),
+                    new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), HASHER,
+                    FINGERPRINTER, new JooqAuditLogWriter(dsl),
                     fixedClock("2026-03-10T15:00:00Z"));
             SecurityContext mismatchedContext = new SecurityContext("", "system",
                     requested.value().toString(), UUID.randomUUID().toString());
@@ -122,7 +124,8 @@ class LoginInstitutionIT extends CommittingPostgresIntegrationTest {
         try {
             AuthenticateWithPassword useCase = new AuthenticateWithPassword(transactionRunner(),
                     new ConfiguredLoginInstitutionProvider(), new JooqStaffAccountRepository(dsl),
-                    new JooqLoginBackoffStore(dsl), HASHER, FINGERPRINTER, new JooqAuditLogWriter(dsl),
+                    new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), HASHER,
+                    FINGERPRINTER, new JooqAuditLogWriter(dsl),
                     fixedClock("2026-03-10T15:00:00Z"));
             SecurityContext context = new SecurityContext("", "system",
                     institutionId.value().toString(), UUID.randomUUID().toString());

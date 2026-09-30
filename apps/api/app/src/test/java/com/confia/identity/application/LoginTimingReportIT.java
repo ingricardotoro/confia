@@ -11,6 +11,7 @@ import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
 import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
+import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.shared.security.SecurityContext;
@@ -58,8 +59,8 @@ class LoginTimingReportIT extends CommittingPostgresIntegrationTest {
 
         AuthenticateWithPassword useCase = new AuthenticateWithPassword(transactionRunner(),
                 () -> institutionId, new JooqStaffAccountRepository(dsl),
-                new JooqLoginBackoffStore(dsl), hasher, fingerprinter, new JooqAuditLogWriter(dsl),
-                Clock.systemUTC());
+                new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), hasher,
+                fingerprinter, new JooqAuditLogWriter(dsl), Clock.systemUTC());
         SecurityContext context = contextOf(institutionId);
 
         List<Long> existingAccountNanos = new ArrayList<>(SAMPLE_SIZE);

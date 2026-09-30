@@ -16,6 +16,7 @@ import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
 import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
+import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditLogReader;
 import com.confia.shared.audit.AuditRowSnapshot;
@@ -216,8 +217,8 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
             String presentedPassword, String instant) {
         AuthenticateWithPassword useCase = new AuthenticateWithPassword(transactionRunner(),
                 () -> institutionId, new JooqStaffAccountRepository(dsl),
-                new JooqLoginBackoffStore(dsl), HASHER, FINGERPRINTER, new JooqAuditLogWriter(dsl),
-                fixedClock(instant));
+                new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), HASHER,
+                FINGERPRINTER, new JooqAuditLogWriter(dsl), fixedClock(instant));
         SecurityContext context = new SecurityContext("", "system", institutionId.value().toString(),
                 UUID.randomUUID().toString());
         return useCase.execute(context, new AuthenticationCommand(presentedIdentifier, presentedPassword));
