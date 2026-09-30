@@ -195,6 +195,172 @@ class IdentityRowSecurityIT extends CommittingPostgresIntegrationTest {
     }
 
     /**
+     * The password-reset token table of {@code V7} (password-recovery-token design.md decision 1;
+     * specs/build-integrity/spec.md, scenario "Una institución no lee los tokens de otra"). The
+     * hash is deliberately the same in both institutions: {@code identity_password_reset_token_hash_uq}
+     * is per institution, so only the policy keeps the two rows apart.
+     */
+    @Test
+    void oneInstitutionCannotReadAnotherInstitutionsPasswordResetToken() {
+        UUID institutionA = UUID.randomUUID();
+        UUID institutionB = UUID.randomUUID();
+        String sharedHash = someTokenHash();
+        insertOnePasswordResetToken(institutionA, sharedHash);
+        insertOnePasswordResetToken(institutionB, sharedHash);
+
+        assertThat(countVisiblePasswordResetTokens(institutionB, institutionA))
+                .as("institution B must see none of institution A's tokens, although the row "
+                        + "physically exists")
+                .isZero();
+        assertThat(countVisiblePasswordResetTokens(institutionB, institutionB))
+                .as("institution B must still see its own token: a policy that hid everything "
+                        + "from everyone would satisfy the assertion above for the wrong reason")
+                .isEqualTo(1L);
+    }
+
+    /** Scenario "Sin contexto de institución, la consulta devuelve cero filas, no un error de permiso". */
+    @Test
+    void anAbsentInstitutionContextReturnsZeroPasswordResetTokensNotAPermissionError() {
+        insertOnePasswordResetToken(UUID.randomUUID(), someTokenHash());
+
+        long directCount = transactionRunner().execute(contextWithNoInstitution(),
+                () -> dsl.fetchOne("select count(*) as c from identity_password_reset_token")
+                        .get("c", Number.class).longValue());
+
+        assertThat(directCount)
+                .as("with no app.institution_id set, the token policy must deny by returning zero "
+                        + "rows, never by raising a permission error")
+                .isZero();
+    }
+
+    /**
+     * Scenario "{@code confia_admin_app} puede leer, insertar y actualizar, pero no borrar", with
+     * real statements rather than {@code has_table_privilege}: the three operations the use cases
+     * need succeed, and {@code DELETE} is refused with {@code 42501} even for the row the same
+     * transaction just inserted.
+     */
+    @Test
+    void confiaAdminAppCanSelectInsertAndUpdateAPasswordResetTokenButNeverDeleteIt()
+            throws SQLException {
+        UUID institutionId = UUID.randomUUID();
+        UUID accountId = UUID.randomUUID();
+        UUID tokenId = UUID.randomUUID();
+
+        try (Connection connection = SharedPostgresContainer.connectionAs("confia_admin_app")) {
+            connection.setAutoCommit(false);
+            setInstitutionContext(connection, institutionId);
+            execute(connection, """
+                    insert into identity_staff_account
+                        (institution_id, id, email, password_hash, mfa_required)
+                    values (?, ?, ?, ?, false)
+                    """, institutionId, accountId, "admin.token@colegio.edu.hn",
+                    PLACEHOLDER_PASSWORD_HASH);
+
+            assertThat(execute(connection, PASSWORD_RESET_TOKEN_INSERT, institutionId, tokenId,
+                    accountId, someTokenHash())).isEqualTo(1);
+            assertThat(execute(connection, """
+                    update identity_password_reset_token set consumed_at = now()
+                    where institution_id = ? and id = ?
+                    """, institutionId, tokenId)).isEqualTo(1);
+            try (PreparedStatement select = connection.prepareStatement(
+                    "select count(*) from identity_password_reset_token where institution_id = ?")) {
+                select.setObject(1, institutionId);
+                try (var rows = select.executeQuery()) {
+                    rows.next();
+                    assertThat(rows.getLong(1)).isEqualTo(1L);
+                }
+            }
+
+            assertRejected(connection, "identity_password_reset_token",
+                    "delete from identity_password_reset_token where institution_id = ? and id = ?",
+                    institutionId, tokenId);
+            connection.rollback();
+        }
+    }
+
+    /** Scenario "{@code confia_portal_app} no tiene ningún privilegio sobre la tabla nueva". */
+    @Test
+    void confiaPortalAppIsRejectedOnAllFourOperationsOnPasswordResetTokens() throws SQLException {
+        UUID institutionId = UUID.randomUUID();
+        UUID tokenId = UUID.randomUUID();
+
+        try (Connection connection = SharedPostgresContainer.connectionAs("confia_portal_app")) {
+            connection.setAutoCommit(false);
+
+            setInstitutionContext(connection, institutionId);
+            assertRejected(connection, "identity_password_reset_token",
+                    "select count(*) from identity_password_reset_token where institution_id = ?",
+                    institutionId);
+            connection.rollback();
+
+            setInstitutionContext(connection, institutionId);
+            assertRejected(connection, "identity_password_reset_token",
+                    PASSWORD_RESET_TOKEN_INSERT, institutionId, tokenId, UUID.randomUUID(),
+                    someTokenHash());
+            connection.rollback();
+
+            setInstitutionContext(connection, institutionId);
+            assertRejected(connection, "identity_password_reset_token", """
+                    update identity_password_reset_token set consumed_at = now()
+                    where institution_id = ? and id = ?
+                    """, institutionId, tokenId);
+            connection.rollback();
+
+            setInstitutionContext(connection, institutionId);
+            assertRejected(connection, "identity_password_reset_token",
+                    "delete from identity_password_reset_token where institution_id = ? and id = ?",
+                    institutionId, tokenId);
+            connection.rollback();
+        }
+    }
+
+    private static final String PASSWORD_RESET_TOKEN_INSERT = """
+            insert into identity_password_reset_token
+                (institution_id, id, account_id, token_hash, issued_at, expires_at)
+            values (?, ?, ?, ?, now(), now() + interval '30 minutes')
+            """;
+
+    /** 64 lowercase hex characters: all {@code identity_password_reset_token_hash_chk} enforces. */
+    private static String someTokenHash() {
+        return (UUID.randomUUID().toString() + UUID.randomUUID()).replace("-", "");
+    }
+
+    private void insertOnePasswordResetToken(UUID institutionId, String tokenHash) {
+        UUID accountId = UUID.randomUUID();
+        transactionRunner().execute(contextOf(institutionId), () -> {
+            dsl.execute("""
+                    insert into identity_staff_account
+                        (institution_id, id, email, password_hash, mfa_required)
+                    values (?, ?, ?, ?, false)
+                    """, institutionId, accountId, "token." + accountId + "@colegio.edu.hn",
+                    PLACEHOLDER_PASSWORD_HASH);
+            dsl.execute(PASSWORD_RESET_TOKEN_INSERT, institutionId, UUID.randomUUID(), accountId,
+                    tokenHash);
+            return null;
+        });
+    }
+
+    private long countVisiblePasswordResetTokens(UUID contextInstitutionId,
+            UUID queryInstitutionId) {
+        return transactionRunner().execute(contextOf(contextInstitutionId),
+                () -> dsl.fetchOne(
+                                "select count(*) as c from identity_password_reset_token "
+                                        + "where institution_id = ?",
+                                queryInstitutionId)
+                        .get("c", Number.class).longValue());
+    }
+
+    private static int execute(Connection connection, String sql, Object... params)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            for (int i = 0; i < params.length; i++) {
+                statement.setObject(i + 1, params[i]);
+            }
+            return statement.executeUpdate();
+        }
+    }
+
+    /**
      * A syntactically valid stand-in for the keyed fingerprint: 64 lowercase hex characters, which
      * is all {@code identity_login_backoff_hash_chk} enforces. It is deliberately not a real
      * fingerprint of anything — the pepper that derives one does not exist until PR C2 — and it must
@@ -260,7 +426,7 @@ class IdentityRowSecurityIT extends CommittingPostgresIntegrationTest {
                 statement.setObject(i + 1, params[i]);
             }
             assertThatThrownBy(statement::execute)
-                    .as("confia_portal_app must have no privilege on %s", table)
+                    .as("the role must have no privilege for this statement on %s", table)
                     .isInstanceOf(SQLException.class)
                     .extracting(thrown -> ((SQLException) thrown).getSQLState())
                     .isEqualTo(INSUFFICIENT_PRIVILEGE);

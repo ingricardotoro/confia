@@ -50,6 +50,15 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
             List.of("shared_data_encryption_key", "identity_mfa_totp_credential",
                     "identity_mfa_recovery_code", "identity_mfa_totp_backoff");
 
+    /**
+     * The table PR C1's {@code V7} migration creates (password-recovery-token design.md decision
+     * 1; specs/build-integrity/spec.md, requirement "Permisos de acceso a la tabla de tokens de
+     * recuperación por rol de base de datos"): same privilege shape as the tables above —
+     * {@code UPDATE} marks a token consumed or superseded, and no role deletes, because expired
+     * rows are retained until change 9 decides the purge (owner, 2026-09-30).
+     */
+    private static final String PASSWORD_RESET_TOKEN_TABLE = "identity_password_reset_token";
+
     private static final List<String> ALL_PRIVILEGES =
             List.of("SELECT", "INSERT", "UPDATE", "DELETE");
 
@@ -508,6 +517,102 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
                                         privilege, table)
                                 .isFalse();
                     }
+                }
+            } finally {
+                statement.execute("drop role if exists " + scratchRole);
+            }
+        }
+    }
+
+    /**
+     * The five roles against the password-reset token table, exactly and without one more or one
+     * less (scenario "La matriz de privilegios cubre la tabla nueva para los cinco roles").
+     * {@code IdentityRowSecurityIT} runs the real statements behind the same grants.
+     */
+    @Test
+    void confiaAdminAppCanSelectInsertAndUpdateButNeverDeleteOnThePasswordResetTokenTable() {
+        assertThat(hasTablePrivilege("confia_admin_app", PASSWORD_RESET_TOKEN_TABLE, "SELECT"))
+                .isTrue();
+        assertThat(hasTablePrivilege("confia_admin_app", PASSWORD_RESET_TOKEN_TABLE, "INSERT"))
+                .isTrue();
+        assertThat(hasTablePrivilege("confia_admin_app", PASSWORD_RESET_TOKEN_TABLE, "UPDATE"))
+                .isTrue();
+        assertThat(hasTablePrivilege("confia_admin_app", PASSWORD_RESET_TOKEN_TABLE, "DELETE"))
+                .as("confia_admin_app must never have DELETE on %s: consuming or superseding a "
+                        + "token is an UPDATE, and expired rows are retained until change 9",
+                        PASSWORD_RESET_TOKEN_TABLE)
+                .isFalse();
+    }
+
+    @Test
+    void confiaPortalAppHasNoPrivilegeOnThePasswordResetTokenTable() {
+        for (String privilege : ALL_PRIVILEGES) {
+            assertThat(hasTablePrivilege("confia_portal_app", PASSWORD_RESET_TOKEN_TABLE,
+                    privilege))
+                    .as("confia_portal_app must have no privilege at all on %s: staff data",
+                            PASSWORD_RESET_TOKEN_TABLE)
+                    .isFalse();
+        }
+    }
+
+    @Test
+    void confiaReadonlyOnlySelectsThePasswordResetTokenTable() {
+        assertThat(hasTablePrivilege("confia_readonly", PASSWORD_RESET_TOKEN_TABLE, "SELECT"))
+                .isTrue();
+        assertThat(hasTablePrivilege("confia_readonly", PASSWORD_RESET_TOKEN_TABLE, "INSERT"))
+                .isFalse();
+        assertThat(hasTablePrivilege("confia_readonly", PASSWORD_RESET_TOKEN_TABLE, "UPDATE"))
+                .isFalse();
+        assertThat(hasTablePrivilege("confia_readonly", PASSWORD_RESET_TOKEN_TABLE, "DELETE"))
+                .isFalse();
+    }
+
+    /** {@code confia_backup} reads through {@code pg_read_all_data}, which never bypasses RLS. */
+    @Test
+    void confiaBackupCanOnlySelectThePasswordResetTokenTableThroughPgReadAllData() {
+        assertThat(hasTablePrivilege("confia_backup", PASSWORD_RESET_TOKEN_TABLE, "SELECT"))
+                .isTrue();
+        assertThat(hasTablePrivilege("confia_backup", PASSWORD_RESET_TOKEN_TABLE, "INSERT"))
+                .isFalse();
+        assertThat(hasTablePrivilege("confia_backup", PASSWORD_RESET_TOKEN_TABLE, "UPDATE"))
+                .isFalse();
+        assertThat(hasTablePrivilege("confia_backup", PASSWORD_RESET_TOKEN_TABLE, "DELETE"))
+                .isFalse();
+    }
+
+    /** {@code confia_owner} is not subject to {@code GRANT}/{@code REVOKE}: retains all four. */
+    @Test
+    void confiaOwnerRetainsAllPrivilegesOnThePasswordResetTokenTableByDefinition() {
+        for (String privilege : ALL_PRIVILEGES) {
+            assertThat(hasTablePrivilege("confia_owner", PASSWORD_RESET_TOKEN_TABLE, privilege))
+                    .as("confia_owner must retain %s on %s by definition", privilege,
+                            PASSWORD_RESET_TOKEN_TABLE)
+                    .isTrue();
+        }
+    }
+
+    /** {@code PUBLIC} and a role outside the five: {@code V7} revokes before it grants. */
+    @Test
+    void publicAndAnyRoleOutsideTheFiveInheritNoPrivilegeOnThePasswordResetTokenTable()
+            throws SQLException {
+        for (String privilege : ALL_PRIVILEGES) {
+            assertThat(hasTablePrivilege("public", PASSWORD_RESET_TOKEN_TABLE, privilege))
+                    .as("PUBLIC must hold no %s on %s", privilege, PASSWORD_RESET_TOKEN_TABLE)
+                    .isFalse();
+        }
+
+        String scratchRole = "probe_role_outside_the_five_password_reset";
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres");
+                Statement statement = superuser.createStatement()) {
+            statement.execute("drop role if exists " + scratchRole);
+            statement.execute("create role " + scratchRole + " nosuperuser nobypassrls");
+            try {
+                for (String privilege : ALL_PRIVILEGES) {
+                    assertThat(hasTablePrivilege(scratchRole, PASSWORD_RESET_TOKEN_TABLE,
+                            privilege))
+                            .as("a role that is none of the five must inherit no %s on %s",
+                                    privilege, PASSWORD_RESET_TOKEN_TABLE)
+                            .isFalse();
                 }
             } finally {
                 statement.execute("drop role if exists " + scratchRole);
