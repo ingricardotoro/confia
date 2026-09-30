@@ -598,3 +598,13 @@ I8 e I20.
 
 - **`./mvnw -B clean verify`:** `BUILD SUCCESS` en 2 min 41 s. 186 pruebas del núcleo, 393
   unitarias y 223 de integración.
+- **Diff medido** contra `main`, sin `openspec` ni código generado: **1667 líneas**. La tarea 4.1
+  sola midió 1182 al cerrarse, así que el corte se parte en tres pull requests encadenados, sin
+  cambiar ninguna tarea de nivel superior:
+  - **C4a** `change/password-recovery-token-c4a-reset-core`: los tipos y el caso de uso de 4.1 con
+    su prueba unitaria, 714 líneas. `clean verify` propio: 186, 393 y 203 pruebas.
+  - **C4b** `change/password-recovery-token-c4b-reset-integration`, sobre C4a: la base
+    `PasswordResetIntegrationTest` y `ResetPasswordWithTokenIT`, 468 líneas. `clean verify` propio:
+    186, 393 y 216 pruebas.
+  - **C4c** `change/password-recovery-token-c4c-second-factor`, sobre C4b: 4.2 y 4.3, y este
+    registro, 497 líneas. Su árbol es idéntico al de la rama en la que se aplicó el corte completo.
