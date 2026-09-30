@@ -350,3 +350,15 @@ pull request encadenados bajo el presupuesto de ochocientas líneas (`docs/15-fl
 3. **Nombre del cambio de correo.** ¿Qué identificador y qué número recibe en
    `foundations-plan/exploration.md` y en `docs/09`, para que los requisitos de ausencia lo nombren
    literalmente?
+
+**Respuestas del propietario (2026-09-30):**
+
+1. Se confirma: la regla del restablecimiento es la misma que la del inicio de sesión. Una cuenta con
+   `mfa_required = false` no presenta segundo factor al restablecer, aunque tenga un secreto
+   inscrito.
+2. Se acepta el riesgo de que los códigos de recuperación de MFA no tengan retroceso, acotado por el
+   límite por IP que exige la parte 4. No se añade retroceso en este cambio.
+3. El cambio de correo se llama `transactional-email-adapter` y recibe el número **14 de F0**, el
+   siguiente libre tras los trece de `foundations-plan/exploration.md`. Va después del cambio 9 y
+   sirve también al aviso de códigos de recuperación bajos. Los requisitos de ausencia lo nombran
+   literalmente.
