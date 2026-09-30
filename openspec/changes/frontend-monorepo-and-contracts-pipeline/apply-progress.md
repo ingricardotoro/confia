@@ -249,4 +249,4 @@ Los 18 escenarios del delta, contados de nuevo contra `specs/build-integrity/spe
 | 17 (vulnerabilidad alta o crítica) | La observación real de `undici` |
 | 18 (solo severidad baja) | Apoyado en la semántica documentada, según se dice arriba |
 
-**Diff del corte 3c**, sin `pnpm-lock.yaml` ni `openspec/`: **+329 −9**, por debajo de 800.
+**Diff del corte 3c**, sin `pnpm-lock.yaml` ni `openspec/`: **+326 −9**, por debajo de 800.
