@@ -88,3 +88,47 @@ RolePrivilegeMatrixIT.confiaAdminAppCanSelectInsertAndUpdateButNeverDeleteOnTheP
   superado, así el rechazo no puede venir de la llave foránea, de la política de fila ni del índice
   parcial.
 - **Escenarios cubiertos:** B1 a B7.
+
+---
+
+## Tarea 1.2 — Puerto y adaptador jOOQ del token
+
+### ROJO
+
+`PasswordResetTokenHashTest` (7 pruebas) y `JooqPasswordResetTokenRepositoryIT` (10) antes de que
+existan los tipos: `./mvnw -B -q -pl app -am test-compile` falla con 80 errores `cannot find symbol`
+sobre `PasswordResetTokenHash`, `PasswordResetTokenRow`, `PasswordResetTokenRepository` y
+`JooqPasswordResetTokenRepository`.
+
+### VERDE
+
+- `PasswordResetTokenHash`: clase final, constructor desde el hexadecimal, `toString()` redactado y
+  mensaje de rechazo sin el valor recibido.
+- `PasswordResetTokenRow`: `record` sin secretos; `consumedAt` y `supersededAt` nulos mientras el
+  token está abierto.
+- El puerto `PasswordResetTokenRepository`, con los cinco métodos de la decisión 5.
+- `JooqPasswordResetTokenRepository`: `consume` es un único `UPDATE` condicional sobre
+  `consumed_at IS NULL`, `superseded_at IS NULL` y `expires_at > now`.
+
+```
+PasswordResetTokenHashTest           tests=7  failures=0 errors=0
+JooqPasswordResetTokenRepositoryIT   tests=10 failures=0 errors=0
+```
+
+### Control negativo
+
+Sin las condiciones `superseded_at IS NULL` y `expires_at > now` en `consume` fallan tres pruebas:
+
+```
+anExpiredTokenIsStillStoredTwoHoursAfterItWasIssued
+consumeRefusesATokenExactlyAtItsExpiryButAcceptsItOneSecondBefore
+consumeRefusesASupersededToken    (rechazado entonces por identity_password_reset_token_final_chk)
+```
+
+La última muestra que `final_chk` es una segunda red bajo el predicado. El adaptador se restauró.
+
+### Notas
+
+- **Discrepancia 1 de `tasks.md` aplicada:** los dos tipos de dominio nacen aquí y no en C2. La fábrica
+  `PasswordResetTokenHash.of(token)` llega en la tarea 2.2.
+- **Escenarios cubiertos:** I31 e I32.
