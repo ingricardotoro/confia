@@ -4,6 +4,8 @@ import com.confia.identity.domain.AuthenticationResult;
 import com.confia.identity.domain.AuthenticationResult.Authenticated;
 import com.confia.identity.domain.AuthenticationResult.Rejected;
 import com.confia.identity.domain.AuthenticationResult.RejectionReason;
+import com.confia.identity.domain.AuthenticationResult.SecondFactorEnrollmentRequired;
+import com.confia.identity.domain.AuthenticationResult.SecondFactorRequired;
 import com.confia.identity.domain.BackoffPolicy;
 import com.confia.identity.domain.BackoffState;
 import com.confia.identity.domain.IdentifierFingerprint;
@@ -54,6 +56,20 @@ import java.util.UUID;
  * method's only production caller in this whole change is the decoy {@link
  * com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher} builds at its own
  * construction.
+ *
+ * <p><b>The second-factor seam (column-encryption-and-mfa-totp, C4).</b> Once the presented
+ * password matches, and only then, this class reads {@code mfa_required} off the resolved {@link
+ * StaffAccount} and, when it is {@code true}, whether {@link #totpCredentials} already has a
+ * secret enrolled for that account (proposal.md, "Cómo se determina qué cuenta necesita segundo
+ * factor"): {@code false} still produces {@link Authenticated}, unchanged from part 1; {@code
+ * true} with a secret enrolled produces {@link SecondFactorRequired}; {@code true} with none
+ * produces {@link SecondFactorEnrollmentRequired}. A wrong password is decided first and never
+ * reaches this reading, so a wrong password never discloses whether an account requires a second
+ * factor. Both {@link #decideBackoffState} and {@link #auditOutcomeOf} are exhaustive {@code
+ * switch} expressions with no {@code default} over {@link AuthenticationResult}'s four outcomes
+ * (design.md, decision 6): the two production points the part 1 Javadoc of {@link
+ * AuthenticationResult} used to describe as {@code instanceof Authenticated}, corrected in this
+ * same commit.
  */
 public final class AuthenticateWithPassword {
 
@@ -63,6 +79,10 @@ public final class AuthenticateWithPassword {
     private static final String LOGIN_BACKOFF_ENTITY_TYPE = "identity.login_backoff";
     private static final String ACTION_LOGIN_SUCCEEDED = "identity.login.succeeded";
     private static final String ACTION_LOGIN_FAILED = "identity.login.failed";
+    private static final String ACTION_LOGIN_SECOND_FACTOR_REQUIRED =
+            "identity.login.second_factor_required";
+    private static final String ACTION_LOGIN_SECOND_FACTOR_ENROLLMENT_REQUIRED =
+            "identity.login.second_factor_enrollment_required";
     private static final String ACTION_BACKOFF_APPLIED = "identity.login.backoff_applied";
     private static final String OUTCOME_SUCCESS = "success";
     private static final String OUTCOME_DENIED = "denied";
@@ -70,6 +90,7 @@ public final class AuthenticateWithPassword {
     private final TransactionRunner transactionRunner;
     private final LoginInstitutionProvider institutionProvider;
     private final StaffAccountRepository accounts;
+    private final TotpCredentialRepository totpCredentials;
     private final LoginBackoffStore backoffStore;
     private final PasswordHasher passwordHasher;
     private final LoginIdentifierFingerprinter fingerprinter;
@@ -79,11 +100,13 @@ public final class AuthenticateWithPassword {
 
     public AuthenticateWithPassword(TransactionRunner transactionRunner,
             LoginInstitutionProvider institutionProvider, StaffAccountRepository accounts,
-            LoginBackoffStore backoffStore, PasswordHasher passwordHasher,
-            LoginIdentifierFingerprinter fingerprinter, AuditLogWriter auditLogWriter, Clock clock) {
+            TotpCredentialRepository totpCredentials, LoginBackoffStore backoffStore,
+            PasswordHasher passwordHasher, LoginIdentifierFingerprinter fingerprinter,
+            AuditLogWriter auditLogWriter, Clock clock) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.institutionProvider = Objects.requireNonNull(institutionProvider, "institutionProvider");
         this.accounts = Objects.requireNonNull(accounts, "accounts");
+        this.totpCredentials = Objects.requireNonNull(totpCredentials, "totpCredentials");
         this.backoffStore = Objects.requireNonNull(backoffStore, "backoffStore");
         this.passwordHasher = Objects.requireNonNull(passwordHasher, "passwordHasher");
         this.fingerprinter = Objects.requireNonNull(fingerprinter, "fingerprinter");
@@ -140,7 +163,7 @@ public final class AuthenticateWithPassword {
             actorId = staffAccount.id().value();
             actorLabel = identifier.value();
             result = credentialsMatch
-                    ? new Authenticated(staffAccount.id(), institutionId)
+                    ? outcomeForValidCredentials(staffAccount, institutionId)
                     : new Rejected(RejectionReason.INVALID_PASSWORD);
         } else {
             // Uniform-cost verification against the decoy, whether or not the presented password
@@ -152,9 +175,7 @@ public final class AuthenticateWithPassword {
             result = new Rejected(RejectionReason.ACCOUNT_NOT_FOUND);
         }
 
-        BackoffState newState = result instanceof Authenticated
-                ? backoffPolicy.afterSuccess(now)
-                : backoffPolicy.afterFailure(attemptOrdinal, now);
+        BackoffState newState = decideBackoffState(result, attemptOrdinal, now);
         backoffStore.save(institutionId, fingerprint, newState);
 
         UUID auditRequestId = requestId.isBlank() ? UUID.randomUUID() : UUID.fromString(requestId);
@@ -168,17 +189,74 @@ public final class AuthenticateWithPassword {
         return new AuthenticationDecision(result, requiredDelay);
     }
 
-    /** Design.md, decision 8: the login-succeeded or login-failed audit row. */
+    /**
+     * Design.md, decision (proposal.md, "Cómo se determina qué cuenta necesita segundo factor"):
+     * inserted after the password already matched, and never before — a wrong password is decided
+     * in {@link #runWithinTransaction} before this method is ever called, so it never discloses
+     * whether an account requires a second factor.
+     */
+    private AuthenticationResult outcomeForValidCredentials(StaffAccount staffAccount,
+            InstitutionId institutionId) {
+        if (!staffAccount.mfaRequired()) {
+            return new Authenticated(staffAccount.id(), institutionId);
+        }
+        boolean secretAlreadyEnrolled =
+                totpCredentials.findByAccountId(institutionId, staffAccount.id()).isPresent();
+        return secretAlreadyEnrolled
+                ? new SecondFactorRequired(staffAccount.id(), institutionId)
+                : new SecondFactorEnrollmentRequired(staffAccount.id(), institutionId);
+    }
+
+    /**
+     * The first of the two exhaustive {@code switch} expressions design.md decision 6 requires,
+     * with no {@code default}: only {@link Rejected} is a failed attempt for backoff purposes.
+     * Neither {@link SecondFactorRequired} nor {@link SecondFactorEnrollmentRequired} advances the
+     * counter — the credential itself was correct (specs/identity/spec.md, "{@code
+     * SecondFactorRequired} no avanza el contador de retroceso ni se audita como fallo").
+     */
+    private BackoffState decideBackoffState(AuthenticationResult result, int attemptOrdinal,
+            Instant now) {
+        return switch (result) {
+            case Authenticated authenticated -> backoffPolicy.afterSuccess(now);
+            case SecondFactorRequired secondFactorRequired -> backoffPolicy.afterSuccess(now);
+            case SecondFactorEnrollmentRequired secondFactorEnrollmentRequired ->
+                    backoffPolicy.afterSuccess(now);
+            case Rejected rejected -> backoffPolicy.afterFailure(attemptOrdinal, now);
+        };
+    }
+
+    /** Design.md, decision 8: the login-succeeded, login-failed or pending-second-factor audit row. */
     private static AuditEntry outcomeEntry(InstitutionId institutionId, UUID actorId,
             String actorLabel, IdentifierFingerprint fingerprint, UUID requestId,
             AuthenticationResult result) {
-        boolean authenticated = result instanceof Authenticated;
-        String action = authenticated ? ACTION_LOGIN_SUCCEEDED : ACTION_LOGIN_FAILED;
-        String outcome = authenticated ? OUTCOME_SUCCESS : OUTCOME_DENIED;
-        String afterValue = authenticated ? null : rejectionReasonJson(((Rejected) result).reason());
+        AuditOutcome auditOutcome = auditOutcomeOf(result);
         return new AuditEntry(institutionId.value(), actorId, ACTOR_KIND_STAFF, actorLabel, null,
-                null, requestId, null, action, STAFF_ACCOUNT_ENTITY_TYPE, fingerprint.value(),
-                outcome, null, afterValue, null, null);
+                null, requestId, null, auditOutcome.action(), STAFF_ACCOUNT_ENTITY_TYPE,
+                fingerprint.value(), auditOutcome.outcome(), null, auditOutcome.afterValue(), null,
+                null);
+    }
+
+    /**
+     * The second of the two exhaustive {@code switch} expressions design.md decision 6 requires,
+     * with no {@code default}. Only {@link Rejected} is audited as a failure: the other three
+     * outcomes all follow from a correct password, and each gets its own action name so the audit
+     * trail distinguishes a completed login from one still pending a second factor.
+     */
+    private static AuditOutcome auditOutcomeOf(AuthenticationResult result) {
+        return switch (result) {
+            case Authenticated authenticated ->
+                    new AuditOutcome(ACTION_LOGIN_SUCCEEDED, OUTCOME_SUCCESS, null);
+            case SecondFactorRequired secondFactorRequired ->
+                    new AuditOutcome(ACTION_LOGIN_SECOND_FACTOR_REQUIRED, OUTCOME_SUCCESS, null);
+            case SecondFactorEnrollmentRequired secondFactorEnrollmentRequired -> new AuditOutcome(
+                    ACTION_LOGIN_SECOND_FACTOR_ENROLLMENT_REQUIRED, OUTCOME_SUCCESS, null);
+            case Rejected rejected -> new AuditOutcome(ACTION_LOGIN_FAILED, OUTCOME_DENIED,
+                    rejectionReasonJson(rejected.reason()));
+        };
+    }
+
+    /** The three fields {@link #outcomeEntry} needs, computed together by {@link #auditOutcomeOf}. */
+    private record AuditOutcome(String action, String outcome, String afterValue) {
     }
 
     /** Design.md, decision 8: the backoff-cycle audit row, written only when {@code requiredDelay > 0}. */

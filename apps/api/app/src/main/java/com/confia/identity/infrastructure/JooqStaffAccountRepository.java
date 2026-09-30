@@ -45,6 +45,7 @@ public final class JooqStaffAccountRepository implements StaffAccountRepository 
                 .and(IDENTITY_STAFF_ACCOUNT.EMAIL.eq(identifier.value()))
                 .fetchOptional(record -> new StaffAccount(new StaffAccountId(record.getId()),
                         institutionId, identifier,
-                        new StoredPasswordHash(record.getPasswordHash())));
+                        new StoredPasswordHash(record.getPasswordHash()),
+                        record.getMfaRequired()));
     }
 }

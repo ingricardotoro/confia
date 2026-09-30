@@ -15,6 +15,7 @@ import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
 import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
+import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditLogReader;
 import com.confia.shared.audit.AuditRowSnapshot;
@@ -66,7 +67,8 @@ class IdentitySecretRedactionIT extends CommittingPostgresIntegrationTest {
 
         AuthenticateWithPassword useCase = new AuthenticateWithPassword(transactionRunner(),
                 () -> institutionId, new JooqStaffAccountRepository(dsl),
-                new JooqLoginBackoffStore(dsl), hasher, fingerprinter, new JooqAuditLogWriter(dsl),
+                new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), hasher,
+                fingerprinter, new JooqAuditLogWriter(dsl),
                 Clock.fixed(Instant.parse("2026-03-10T16:00:00Z"), ZoneOffset.UTC));
 
         AuthenticationDecision decision = useCase.execute(contextOf(institutionId),

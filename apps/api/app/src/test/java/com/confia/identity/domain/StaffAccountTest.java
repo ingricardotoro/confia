@@ -20,37 +20,39 @@ class StaffAccountTest {
             new StoredPasswordHash("$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$dGFn");
 
     @Test
-    void exposesItsFourComponents() {
-        StaffAccount account = new StaffAccount(ID, INSTITUTION_ID, IDENTIFIER, PASSWORD_HASH);
+    void exposesItsFiveComponents() {
+        StaffAccount account = new StaffAccount(ID, INSTITUTION_ID, IDENTIFIER, PASSWORD_HASH,
+                true);
 
         assertThat(account.id()).isEqualTo(ID);
         assertThat(account.institutionId()).isEqualTo(INSTITUTION_ID);
         assertThat(account.identifier()).isEqualTo(IDENTIFIER);
         assertThat(account.passwordHash()).isEqualTo(PASSWORD_HASH);
+        assertThat(account.mfaRequired()).isTrue();
     }
 
     @Test
     void rejectsANullId() {
         assertThatThrownBy(
-                () -> new StaffAccount(null, INSTITUTION_ID, IDENTIFIER, PASSWORD_HASH))
+                () -> new StaffAccount(null, INSTITUTION_ID, IDENTIFIER, PASSWORD_HASH, false))
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     void rejectsANullInstitutionId() {
-        assertThatThrownBy(() -> new StaffAccount(ID, null, IDENTIFIER, PASSWORD_HASH))
+        assertThatThrownBy(() -> new StaffAccount(ID, null, IDENTIFIER, PASSWORD_HASH, false))
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     void rejectsANullIdentifier() {
-        assertThatThrownBy(() -> new StaffAccount(ID, INSTITUTION_ID, null, PASSWORD_HASH))
+        assertThatThrownBy(() -> new StaffAccount(ID, INSTITUTION_ID, null, PASSWORD_HASH, false))
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     void rejectsANullPasswordHash() {
-        assertThatThrownBy(() -> new StaffAccount(ID, INSTITUTION_ID, IDENTIFIER, null))
+        assertThatThrownBy(() -> new StaffAccount(ID, INSTITUTION_ID, IDENTIFIER, null, false))
                 .isInstanceOf(NullPointerException.class);
     }
 }

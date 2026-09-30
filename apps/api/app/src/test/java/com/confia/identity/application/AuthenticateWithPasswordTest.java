@@ -13,6 +13,7 @@ import com.confia.identity.domain.PlainPassword;
 import com.confia.identity.domain.StaffAccount;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.StoredPasswordHash;
+import com.confia.identity.domain.TotpCredential;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
 import com.confia.shared.audit.AuditLogWriter;
@@ -177,7 +178,8 @@ class AuthenticateWithPasswordTest {
         InstitutionId configured = new InstitutionId(UUID.randomUUID());
         InstitutionId requested = new InstitutionId(UUID.randomUUID());
         AuthenticateWithPassword useCase = new AuthenticateWithPassword(unusedTransactionRunner(),
-                () -> configured, new FakeStaffAccountRepository(), new FakeLoginBackoffStore(),
+                () -> configured, new FakeStaffAccountRepository(),
+                new FakeTotpCredentialRepository(), new FakeLoginBackoffStore(),
                 new FakePasswordHasher(CORRECT_PASSWORD, STORED_HASH, DECOY_HASH),
                 AuthenticateWithPasswordTest::deterministicFingerprint, new FakeAuditLogWriter(),
                 fixedClock("2026-03-10T11:00:00Z"));
@@ -210,13 +212,15 @@ class AuthenticateWithPasswordTest {
             FakeLoginBackoffStore backoffStore, FakePasswordHasher passwordHasher,
             FakeAuditLogWriter auditLogWriter, Clock clock) {
         return new AuthenticateWithPassword(unusedTransactionRunner(), () -> INSTITUTION_ID, accounts,
-                backoffStore, passwordHasher, AuthenticateWithPasswordTest::deterministicFingerprint,
-                auditLogWriter, clock);
+                new FakeTotpCredentialRepository(), backoffStore, passwordHasher,
+                AuthenticateWithPasswordTest::deterministicFingerprint, auditLogWriter, clock);
     }
 
+    /** {@code mfaRequired = false}, unchanged from part 1: every existing scenario in this class
+     * authenticates without any second factor. */
     private static StaffAccount accountOf(LoginIdentifier identifier) {
         return new StaffAccount(new StaffAccountId(UUID.randomUUID()), INSTITUTION_ID, identifier,
-                STORED_HASH);
+                STORED_HASH, false);
     }
 
     private static IdentifierFingerprint fingerprintOf(LoginIdentifier identifier) {
@@ -327,6 +331,29 @@ class AuthenticateWithPasswordTest {
                 return Optional.empty();
             }
             return Optional.of(account);
+        }
+    }
+
+    /** Every existing scenario in this class seeds {@code mfaRequired = false}, so {@link
+     * AuthenticateWithPassword} never calls {@link #findByAccountId}: it always returns empty,
+     * never exercised. */
+    private static final class FakeTotpCredentialRepository implements TotpCredentialRepository {
+        @Override
+        public void insert(InstitutionId institutionId, StaffAccountId accountId,
+                String encryptedSecret) {
+            throw new UnsupportedOperationException("not exercised by this unit test");
+        }
+
+        @Override
+        public Optional<TotpCredential> findByAccountId(InstitutionId institutionId,
+                StaffAccountId accountId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean acceptCounter(InstitutionId institutionId, StaffAccountId accountId,
+                long candidateCounter) {
+            throw new UnsupportedOperationException("not exercised by this unit test");
         }
     }
 
