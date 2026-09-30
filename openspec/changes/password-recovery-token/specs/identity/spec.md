@@ -1,5 +1,7 @@
 # Delta para Identidad
 
+- **Estado:** aprobado por el propietario del producto el 2026-09-30
+
 > Cambio `password-recovery-token`, tercera de las cuatro partes del cambio 7 de F0. Propuesta
 > aprobada por el propietario el 2026-09-30. En los escenarios, las etiquetas `PRT-...` nombran
 > tokens concretos para poder seguirlos; no describen su formato, que es de 32 bytes aleatorios

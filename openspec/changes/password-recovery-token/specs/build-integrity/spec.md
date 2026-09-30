@@ -1,5 +1,7 @@
 # Delta para Integridad de la construcción
 
+- **Estado:** aprobado por el propietario del producto el 2026-09-30
+
 > Cambio `password-recovery-token`. Sigue el precedente de las partes 1 y 2 del cambio 7: el esquema,
 > la seguridad de fila y los privilegios de una tabla nueva se especifican en esta capacidad. No se
 > añade ninguna regla de arquitectura.
