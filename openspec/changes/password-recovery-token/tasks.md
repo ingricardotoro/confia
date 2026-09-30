@@ -255,7 +255,7 @@ Rama `change/password-recovery-token-c1-schema`, con base en `main`.
 Rama `change/password-recovery-token-c2-domain`, con base en C1. Ninguna tarea de C2 requiere
 Docker, salvo la verificación final completa.
 
-- [ ] 2.1 **Sonda S4 y la regla de 12 a 128 caracteres (ROJO/VERDE).**
+- [x] 2.1 **Sonda S4 y la regla de 12 a 128 caracteres (ROJO/VERDE).**
   - **Sonda S4** (`design.md` §9), en `jshell`: normalizar con NFKC `"casa azul🌋🌊"`
     y `"casa azul 🌋🌊"`, e imprimir `codePointCount` y `length()`.
     **Éxito:** `11 13` y `12 14`. **Respaldo:** detener y avisar al propietario antes de seguir,
@@ -272,7 +272,7 @@ Docker, salvo la verificación final completa.
   - **Escenarios:** «Los bordes de 12 y 128 caracteres» (I15, parte unitaria) y «La longitud se
     cuenta en caracteres, no en unidades de codificación» (I16). **Diseño:** decisión 8, sonda S4.
 
-- [ ] 2.2 **Token en claro, fábrica del hash, política del token y motivos (ROJO/VERDE).**
+- [x] 2.2 **Token en claro, fábrica del hash, política del token y motivos (ROJO/VERDE).**
   - **ROJO:**
     - `PlainPasswordResetTokenTest`:
       - `generate` con un `SecureRandom` semilla fija da 43 caracteres base64url sin relleno, que
@@ -296,7 +296,7 @@ Docker, salvo la verificación final completa.
     ventana es de sesenta minutos móviles» (I6, parte unitaria) y «El borde de los treinta minutos
     es estricto» (I37, parte unitaria). **Diseño:** decisiones 3 y 4.
 
-- [ ] 2.3 **`TotpCode` sin fuga (ROJO/VERDE).** Requiere Docker para `IdentitySecretRedactionIT`.
+- [x] 2.3 **`TotpCode` sin fuga (ROJO/VERDE).** Requiere Docker para `IdentitySecretRedactionIT`.
   - **ROJO:**
     - `TotpCodeTest` gana dos casos que deben fallar contra el código actual:
       - el mensaje de `new TotpCode("12a456")` no contiene `12a456`. Hoy lo contiene: `TotpCode.java`

@@ -275,3 +275,43 @@ Se restauró.
 ### Escenarios
 
 I4, I6 e I37, en su parte unitaria.
+
+---
+
+## Tarea 2.3 — `TotpCode` sin fuga (decisión 13)
+
+### ROJO
+
+- `TotpCodeTest`, dos casos nuevos contra el código de `main`:
+  `theRejectionMessageNeverCarriesThePresentedValue` (el mensaje de `new TotpCode("12a456")` lo
+  contenía: `"… was 12a456"`) y `toStringNeverCarriesTheCode` (el `record` imprimía
+  `TotpCode[value=005924]`). `Tests run: 6, Failures: 2`.
+- `IdentitySecretRedactionIT`: el barrido de TOTP guarda el código presentado en una variable y
+  revisa, en un texto propio, su `toString()`, la decisión rechazada y el mensaje de un código mal
+  formado. Falla con «produced text unexpectedly contains a presented TOTP code (6 characters)», sin
+  repetir el valor.
+
+El barrido del código usa su propio texto y no el texto completo de las filas: seis dígitos son lo
+bastante cortos como para aparecer por azar en una marca de tiempo o en un identificador.
+
+### VERDE
+
+El mensaje pasa a `"a TOTP code must be exactly 6 digits"` y `toString()` devuelve
+`TotpCode[REDACTED]`. El patrón, `equals` y `hashCode` no cambian; ninguna prueba ni código dependía
+del mensaje anterior.
+
+```
+TotpCodeTest                 tests=6 failures=0 errors=0
+IdentitySecretRedactionIT    tests=3 failures=0 errors=0
+VerifyTotpCodeIT             tests=2 failures=0 errors=0   (sin tocar)
+TotpVerificationBackoffIT    tests=2 failures=0 errors=0   (sin tocar)
+```
+
+---
+
+## Cierre de C2
+
+- **`./mvnw -B clean verify`:** `BUILD SUCCESS` en 2 min 13 s. 186 pruebas del núcleo, 381
+  unitarias y 188 de integración.
+- **Diff medido** contra C1b, sin `openspec` ni código generado: **685 líneas**, dentro de las 800.
+  Un solo pull request.
