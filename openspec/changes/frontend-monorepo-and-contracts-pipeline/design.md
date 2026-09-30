@@ -3,7 +3,7 @@
 - **Cambio:** `frontend-monorepo-and-contracts-pipeline`
 - **Fase:** diseñar
 - **Fecha:** 2026-09-30
-- **Estado:** pendiente de aprobación del propietario
+- **Estado:** aprobado por el propietario del producto el 2026-09-30
 - **Entradas aprobadas:** `proposal.md` (2026-09-30, con las cuatro recomendaciones) y
   `specs/build-integrity/spec.md` (2026-09-30)
 
