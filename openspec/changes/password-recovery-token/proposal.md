@@ -174,7 +174,10 @@ destino» de las partes 1 y 2):
 | Purga de tokens vencidos | Cambio 9 |
 | Restablecimiento administrativo | Cambio 8 y `session-tokens-and-web-layer` |
 
-No se toca `build-integrity`: no entra ninguna regla de arquitectura nueva.
+`build-integrity` recibe un delta solo por la tabla nueva: su seguridad de fila y sus privilegios por
+rol, igual que la parte 2. No entra ninguna regla de arquitectura nueva. (Corregido el 2026-09-30, al
+redactar la especificación: la primera versión de esta propuesta decía que no se tocaba
+`build-integrity`.)
 
 ## Enfoque
 
