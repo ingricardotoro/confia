@@ -4,7 +4,8 @@
 - **Fase del roadmap:** F0, cambio 3 de 13 (exploración `foundations-plan`, aprobada el 2026-09-15)
 - **Depende de:** cambio 1 (`maven-workspace-and-ci-skeleton`, archivado el 2026-09-17)
 - **Exploración:** `exploration.md` de este mismo cambio
-- **Estado:** pendiente de aprobación del propietario del producto
+- **Estado:** aprobada por el propietario del producto el 2026-09-30, con las cuatro
+  recomendaciones de la ronda de preguntas
 
 ## Intención
 
@@ -170,4 +171,7 @@ de springdoc se puede quitar sin efecto sobre ningún módulo, porque no existe 
 4. **¿Se compromete `packages/contracts`?** (exploración, H6). **Recomendación:** no; se ignora en
    Git y lo regenera Turborepo. La instantánea del OpenAPI es lo que se revisa.
 
-**Supuestos registrados mientras no haya respuesta:** las cuatro recomendaciones.
+**Respuesta del propietario (2026-09-30):** aprobadas las cuatro recomendaciones. Dos documentos
+OpenAPI con dos espacios de nombres en `packages/contracts`; Node 24, con `docs/05` actualizado en
+este cambio; el esqueleto de `apps/admin-web` y `apps/portal-web` pasa al cambio 13, que debe
+recogerlo en su propia propuesta; y `packages/contracts` no se compromete.
