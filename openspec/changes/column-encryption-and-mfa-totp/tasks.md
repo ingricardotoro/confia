@@ -619,7 +619,7 @@ Rama `change/column-encryption-and-mfa-totp-c5-redaction-and-docs`, base C4.
 | Exhaustividad del compilador | Desenlace no manejado rompe la compilación | 4.2 | `ExhaustiveAuthenticationResultSwitchCompilationTest` |
 | | `SecondFactorRequired` no avanza retroceso ni audita fallo | 4.3 | `AuthenticateWithPasswordIT` |
 | Ningún secreto observable | Los cinco secretos nuevos, no observables | 5.1 | `IdentitySecretRedactionIT` + control negativo |
-| Ausencia de rotación real | Ninguna DEK retirada se recifra | 5.2 | `IdentityScopeExclusionInventoryTest` |
+| Ausencia de rotación real | Ninguna DEK retirada se recifra | 5.2 | `IdentityScopeExclusionInventoryTest` (ausencia) + `ColumnEncryptionIT` (la DEK retirada sigue descifrando) |
 | Ausencia de envío del aviso | Se audita, no se envía correo | 3.3 | `ConsumeRecoveryCodeIT` |
 | MFA obligatoria (modificado) | Secreto inscrito → `SecondFactorRequired` | 4.3 | `AuthenticateWithPasswordIT` |
 | | Sin secreto → `SecondFactorEnrollmentRequired` | 4.3 | `AuthenticateWithPasswordIT` |

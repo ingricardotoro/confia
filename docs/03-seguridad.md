@@ -395,6 +395,14 @@ Especificación técnica:
 **Cómo se comprueba.** Prueba de extremo a extremo del flujo completo de inicio de sesión con MFA.
 Prueba de integración que reutiliza un código ya consumido y espera rechazo.
 
+> **Nota editorial, 2026-09-28 (`column-encryption-and-mfa-totp`).** La tabla que esta sección
+> llama `user_mfa` se entrega como `identity_mfa_totp_credential`, con el prefijo de módulo que
+> exige la regla 3 de ADR-0015. Los códigos de recuperación viven en una tabla separada,
+> `identity_mfa_recovery_code`, y el límite de tasa de la verificación en
+> `identity_mfa_totp_backoff`. La frase «almacenados con el mismo Argon2id que las contraseñas» se
+> cumple con el **mismo perfil, el mismo códec PHC y el mismo hasher de bajo nivel**, pero detrás de
+> un puerto propio, `RecoveryCodeHasher`, y no reutilizando `PasswordHasher`.
+
 ### 4.4 Bloqueo con retroceso exponencial
 
 No se usa bloqueo permanente de cuenta: es un vector de denegación de servicio contra usuarios
@@ -667,6 +675,12 @@ crítico: un rol con `BYPASSRLS` anula silenciosamente todas las políticas.
 > posterior, recibe el mismo trato que `user`: `SELECT`, `INSERT` y `UPDATE` para
 > `confia_admin_app`, sin `DELETE`; `SELECT` para `confia_readonly`; y **ningún privilegio** para
 > `confia_portal_app`.
+>
+> **Adenda, 2026-09-28 (`column-encryption-and-mfa-totp`).** Las cuatro tablas de ese cambio,
+> `shared_data_encryption_key`, `identity_mfa_totp_credential`, `identity_mfa_recovery_code` e
+> `identity_mfa_totp_backoff`, reciben el mismo trato que `identity_login_backoff`: `SELECT`,
+> `INSERT` y `UPDATE` para `confia_admin_app`, sin `DELETE`; `SELECT` para `confia_readonly`; y
+> **ningún privilegio** para `confia_portal_app`.
 
 ### 6.2 Contexto de sesión seguro
 
@@ -935,6 +949,13 @@ Llave maestra (KEK)              en gestor de secretos, nunca en la base de dato
 | Llave de HMAC de búsqueda | Gestor de secretos | Junto con la DEK | Su rotación exige recalcular las columnas de búsqueda |
 | Llave de firma JWT | Gestor de secretos | Semestral | Dos claves activas durante la ventana |
 | Llave age de respaldo | Custodia física y gestor de secretos | Anual | Se prueba con una restauración antes de retirar la anterior |
+
+> **Nota editorial, 2026-09-28 (`column-encryption-and-mfa-totp`).** La tabla que esta sección
+> llama `data_key` se entrega como `shared_data_encryption_key`, con el prefijo de módulo que exige
+> la regla 3 de ADR-0015. Su gestión vive en `com.confia.shared.crypto` (ADR-0023), no en un módulo
+> de negocio. El estado `retired` ya existe y decide con qué llave se cifra cada valor nuevo, pero el
+> recifrado progresivo por lotes de esta tabla **todavía no existe**: depende de db-scheduler
+> (ADR-0016) y llega con el cambio 9, `background-jobs-with-db-scheduler`.
 
 **Cómo se comprueba.** Una prueba de integración inserta un registro con documento de identidad,
 consulta la columna directamente con SQL crudo y verifica que el valor almacenado **no contiene**
