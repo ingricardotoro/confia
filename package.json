@@ -1,0 +1,19 @@
+{
+  "name": "confia",
+  "private": true,
+  "description": "CONFIA monorepo: pnpm workspaces and Turborepo. The backend is the Maven project under apps/api.",
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "generate": "turbo run generate",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "build": "turbo run build"
+  },
+  "devDependencies": {
+    "turbo": "2.11.5"
+  }
+}

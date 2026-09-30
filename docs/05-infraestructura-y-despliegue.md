@@ -234,11 +234,18 @@ desde el backend y regenera `packages/contracts` con orval, y solo después cons
 de modo que el contexto de construcción ya contiene el contrato vigente. El orden obligatorio es:
 backend y OpenAPI, luego generación de `packages/contracts`, luego construcción web (sección 7).
 
+> **Nota editorial, 2026-09-30 (`frontend-monorepo-and-contracts-pipeline`).** La versión de Node pasa
+> de 22 a **24**, la LTS activa, fijada en un solo lugar: `engines` del `package.json` raíz, con
+> `.nvmrc` para las máquinas de desarrollo y la integración continua. La imagen de abajo ya no lleva
+> dígest: el que tenía correspondía a la imagen de Node 22 y no se había verificado contra la imagen
+> publicada. El dígest se fija en el mismo cambio que introduzca Renovate, igual que el de `postgres:18-alpine` (pendiente heredado del
+> cambio 5 en `docs/09-roadmap-y-fases.md`). La versión de pnpm sale de `packageManager`.
+
 ```dockerfile
 # infra/docker/web.Dockerfile
 # syntax=docker/dockerfile:1.7
 
-ARG NODE_IMAGE=node:22.11.0-bookworm-slim@sha256:9b0e3c9f1c1e0d7c8b2f4a2f6d1e9c3a7b5d8e2f4c6a8b0d2e4f6a8c0e2f4a6b
+ARG NODE_IMAGE=node:24.21.0-bookworm-slim
 ARG NGINX_IMAGE=nginx:1.27.2-alpine@sha256:2ae06ebd39899cf5d5a09d4e12c48a5a6a6a5fa6f9e3d5b4e9f8a1b2c3d4e5f6
 
 # APP_DIR distingue admin-web de portal-web. Se construye una imagen por app,
@@ -903,13 +910,12 @@ jobs:
           java-version: '25'
           cache: maven
 
+      # pnpm's version comes from packageManager in the root package.json.
       - uses: pnpm/action-setup@v4
-        with:
-          version: '9'
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
