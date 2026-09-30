@@ -1,0 +1,8 @@
+# SPRING_PROFILES_ACTIVE=local (docs/05-infraestructura-y-despliegue.md): the only profiles, with
+# preprod, where the OpenAPI document endpoint and Swagger UI answer (docs/01-arquitectura.md §7;
+# frontend-monorepo-and-contracts-pipeline, design.md decision 3). Production never sets this.
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

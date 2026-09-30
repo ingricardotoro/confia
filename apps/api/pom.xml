@@ -90,6 +90,12 @@
          every one of those thresholds. -->
     <bcprov-jdk18on.version>1.86</bcprov-jdk18on.version>
 
+    <!-- springdoc-openapi (frontend-monorepo-and-contracts-pipeline, design.md decisions 1 to 3;
+         probe S1, apply-progress.md task 1.1): 3.1.1 is the release built against Spring Boot
+         4.1.0 (its parent is spring-boot-starter-parent 4.1.0, read from the published POM), the
+         line this build runs on. Not managed by the Spring Boot BOM. -->
+    <springdoc.version>3.1.1</springdoc.version>
+
     <!-- confia.pit.phase=none: PIT never runs on a plain ./mvnw verify with no profile active
          (design.md, decision 9). The mutation-report and mutation-gate profiles below rebind it to
          verify and choose the effective threshold; declared in this order on purpose so that
@@ -157,6 +163,14 @@
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk18on</artifactId>
         <version>${bcprov-jdk18on.version}</version>
+      </dependency>
+      <!-- OpenAPI 3.1 generation and, only on the local and preprod profiles, Swagger UI
+           (docs/01-arquitectura.md §7; frontend-monorepo-and-contracts-pipeline, design.md
+           decisions 1 to 3). -->
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>${springdoc.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

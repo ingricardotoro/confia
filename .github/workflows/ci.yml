@@ -67,6 +67,7 @@ jobs:
           path: |
             apps/api/**/target/site/jacoco/
             apps/api/**/target/pit-reports/
+            apps/api/app/target/openapi/
           retention-days: 14
 
   security:

@@ -1,7 +1,10 @@
 package com.confia.bootstrap;
 
+import com.confia.shared.web.openapi.ContractSchemas;
+import com.confia.shared.web.openapi.ProcessApiInfo;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
+import org.springframework.context.annotation.Import;
 
 /**
  * Administrative process entry point (ADR-0003, ADR-0013). {@code scanBasePackages} stays
@@ -18,8 +21,13 @@ import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
  * Without this exclusion Spring Boot tries to build a Hikari pool with no JDBC URL and this
  * process fails to start. The exclusion is removed by whichever change first registers a real
  * production {@code DataSource}.
+ *
+ * <p>{@link ContractSchemas} and {@link ProcessApiInfo} are imported explicitly, never scanned:
+ * {@code scanBasePackages} stays {@code com.confia.bootstrap} (frontend-monorepo-and-contracts-
+ * pipeline, design.md decision 4).
  */
 @SpringBootApplication(scanBasePackages = "com.confia.bootstrap",
         exclude = DataSourceAutoConfiguration.class)
+@Import({ContractSchemas.class, ProcessApiInfo.class})
 class AdminApplication {
 }
