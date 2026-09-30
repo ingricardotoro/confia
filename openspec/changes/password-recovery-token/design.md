@@ -772,7 +772,7 @@ No son sondas, porque se verificaron por lectura o por precedente en `main` (sec
 
 Quedan en el límite de quince o una por debajo. La propuesta estimó de 14 a 15; el diseño
 recortó una tarea porque la corrección de la premisa ya está fusionada (sección 2), y la decisión 13
-la devuelve. Si la fase de tareas llega a dieciséis, se aplica el corte de abajo sin esperar. Con el historial
+la devuelve. Si la fase de tareas llega a dieciséis, se consulta al propietario antes de aplicar el corte de abajo. Con el historial
 de la parte 1 (nueve pull requests para doce tareas) y de la parte 2 (trece para quince), la
 expectativa realista es **de nueve a doce pull requests encadenados**, no cinco. Si la fase de tareas
 superara quince, el corte previsto en la propuesta sigue siendo válido: C1 a C3 por un lado y C4 y C5
