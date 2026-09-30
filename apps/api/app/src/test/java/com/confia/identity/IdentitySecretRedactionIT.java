@@ -179,11 +179,11 @@ class IdentitySecretRedactionIT extends CommittingPostgresIntegrationTest {
         PlainTotpSecret totpSecret = enrollment.secret();
 
         Instant now = Instant.parse("2026-03-10T16:00:00Z");
+        TotpCode presentedCode = aCodeOutsideTheWindow(totpSecret, now);
         VerifyTotpCodeDecision rejected = new VerifyTotpCode(transactionRunner(),
                 new JooqTotpCredentialRepository(dsl), new JooqTotpVerificationBackoffStore(dsl),
                 encryption, new JooqAuditLogWriter(dsl), Clock.fixed(now, ZoneOffset.UTC))
-                .execute(contextOf(institutionId), accountId,
-                        aCodeOutsideTheWindow(totpSecret, now));
+                .execute(contextOf(institutionId), accountId, presentedCode);
 
         DataEncryptionKeyMaterial dek = transactionRunner().execute(contextOf(institutionId),
                 () -> new JooqDataEncryptionKeyRepository(dsl, new AesGcmCipher(), masterKey)
@@ -244,6 +244,17 @@ class IdentitySecretRedactionIT extends CommittingPostgresIntegrationTest {
                 masterKey.value());
         assertBytesNeverLeaked(collected, "the unwrapped data-encryption key (DEK)",
                 dek.rawKeyBytes());
+        // A presented TOTP code travels next to the password-reset token (password-recovery-token
+        // design.md decision 13), so neither a valid one nor a malformed one may be printed. Swept
+        // on its own text: six digits are short enough to occur by chance in the rows above.
+        String malformedCode = "12a456";
+        String totpCodeText = new StringBuilder()
+                .append(presentedCode)
+                .append(rejected)
+                .append(exceptionMessageOf(() -> new TotpCode(malformedCode)))
+                .toString();
+        assertSecretNeverLeaked(totpCodeText, "a presented TOTP code", presentedCode.value());
+        assertSecretNeverLeaked(totpCodeText, "a malformed presented TOTP code", malformedCode);
         // The stored hash legitimately sits in its own row, so it is swept against every
         // toString() of its value object only, never against the rows.
         StringBuilder hashToStrings = new StringBuilder();
