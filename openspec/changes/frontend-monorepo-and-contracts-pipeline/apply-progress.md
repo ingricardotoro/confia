@@ -1,6 +1,6 @@
 # Progreso de aplicación: `frontend-monorepo-and-contracts-pipeline`
 
-- **Corte en curso:** 3a (backend: springdoc, instantáneas y criterio de salida 7)
+- **Corte en curso:** 3a completo (tareas 1.1 a 1.5 en verde); siguiente, 3b
 - **Entorno:** sesión remota sin Docker ni JDK 25. Todo el corte 3a se verificó en la integración
   continua de la rama `change/frontend-monorepo-and-contracts-pipeline`, que parte de un checkout
   limpio con JDK 25 y Docker. Cada evidencia de abajo nombra la ejecución de la que sale.
@@ -76,3 +76,8 @@ el primer controlador.
   prueba que lo demuestra.
 - **Diff del corte**, sin `openspec/` ni las instantáneas: **+650 −28** en 19 archivos. Por debajo de
   800.
+- **Verificación del corte**, CI del PR `ingricardotoro/confia#64` sobre `d1ffbca`: `BUILD SUCCESS`;
+  `OpenApiContractSnapshotTest` `Tests run: 10`, `OpenApiExposureByProfileTest` `Tests run: 8`,
+  `EmptyShouldExceptionInventoryTest`, `LayeredArchitectureTest`, `SpringModulithVerificationTest` y
+  `SuppressionCitesAdrTest` en verde; 343 unitarias y 162 de integración en `app`, cero fallos;
+  cobertura cumplida; PIT de `domain` 94 %, igual que antes del corte.

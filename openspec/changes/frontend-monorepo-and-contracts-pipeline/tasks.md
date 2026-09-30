@@ -29,21 +29,21 @@ ejecutarse en local si hay Node 24.
 
 ## Corte 3a — backend: springdoc, instantáneas y criterio de salida 7
 
-- [ ] 1.1 **Sondas S1 y S2 (bloqueantes, `design.md` §7).** S1: fijar la versión de
+- [x] 1.1 **Sondas S1 y S2 (bloqueantes, `design.md` §7).** S1: fijar la versión de
   springdoc-openapi compatible con Spring Boot 4.1 y Java 25, y confirmar que un contexto de
   `AdminApplication` con el perfil `local` sirve `/v3/api-docs` sin `DataSource`. S2: generar dos
   veces el documento normalizado y confirmar que los bytes coinciden. Registrar versión, comando y
   resultado en `apply-progress.md`. **Si S1 falla, se detiene el cambio y se informa**: no se
   inventa un endpoint ni se degrada la versión de Spring Boot.
 
-- [ ] 1.2 **ROJO/VERDE: Swagger apagado por defecto.** ROJO: `OpenApiExposureByProfileTest` arranca
+- [x] 1.2 **ROJO/VERDE: Swagger apagado por defecto.** ROJO: `OpenApiExposureByProfileTest` arranca
   `AdminApplication` y `PortalApplication` con `prod` y con un perfil inexistente, y afirma que
   `/v3/api-docs` y la ruta de Swagger UI no responden; con `local`, que el documento responde. Falla
   porque springdoc no está. VERDE: la dependencia de 1.1 y la configuración de `application.yml`,
   `application-local.yml` y `application-preprod.yml` (decisión 3). — Requisito «Swagger UI y el
   endpoint del OpenAPI solo en local y preproducción», sus dos escenarios
 
-- [ ] 1.3 **ROJO/VERDE: esquemas transversales.** ROJO: una prueba afirma que los dos documentos
+- [x] 1.3 **ROJO/VERDE: esquemas transversales.** ROJO: una prueba afirma que los dos documentos
   contienen `Money` (`amount` y `currency` de tipo `string`, obligatorios, ninguna propiedad
   `number` ni `integer`) y `ProblemDetail` (`type`, `title`, `status`, `detail`, `instance` y
   `traceId`). VERDE: `ContractSchemas` en `com.confia.shared.web.openapi`, su `package-info.java`
@@ -51,7 +51,7 @@ ejecutarse en local si hay Node 24.
   Modulith y las reglas de capas siguen en verde; **si alguna lo rechaza, se detiene y se
   consulta**. — Requisito «Esquemas transversales del contrato…», sus dos escenarios
 
-- [ ] 1.4 **ROJO/VERDE: la instantánea y su puerta.** ROJO: `OpenApiContractSnapshotTest` compara
+- [x] 1.4 **ROJO/VERDE: la instantánea y su puerta.** ROJO: `OpenApiContractSnapshotTest` compara
   los dos documentos normalizados con `apps/api/openapi/admin.openapi.json` y
   `portal.openapi.json`, que todavía no existen. Afirma además que son dos documentos distintos y que
   ninguna ruta de `admin` aparece en `portal`. VERDE: generar las dos instantáneas con
@@ -62,7 +62,7 @@ ejecutarse en local si hay Node 24.
   `-Dconfia.openapi.update=true` la prueba también termina en fallo. — Requisito «El OpenAPI generado
   coincide con la instantánea aprobada», sus tres escenarios
 
-- [ ] 1.5 **Integración continua del backend, criterio de salida 7 y medición del corte.** Añadir
+- [x] 1.5 **Integración continua del backend, criterio de salida 7 y medición del corte.** Añadir
   `apps/api/app/target/openapi/` al artefacto `backend-reports`. Marcar el criterio 7 como cerrado en
   `docs/09-roadmap-y-fases.md`, citando la prueba que lo demuestra. Medir el diff del corte con
   `git diff --numstat` excluyendo `openspec/` y las instantáneas; **si pasa de 800, se detiene y se
