@@ -8,6 +8,8 @@ import com.confia.identity.domain.PlainPassword;
 import com.confia.identity.domain.PlainPasswordResetToken;
 import com.confia.identity.domain.PlainTotpSecret;
 import com.confia.identity.domain.StaffAccountId;
+import com.confia.identity.domain.TotpAlgorithm;
+import com.confia.identity.domain.TotpCode;
 import com.confia.identity.infrastructure.Argon2Pepper;
 import com.confia.identity.infrastructure.Argon2Profile;
 import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
@@ -32,12 +34,16 @@ import com.confia.shared.security.SecurityContext;
 import com.confia.support.CommittingPostgresIntegrationTest;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -55,6 +61,7 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
             new BouncyCastleArgon2PasswordHasher(Argon2Profile.floor(), PEPPER);
     static final HmacLoginIdentifierFingerprinter FINGERPRINTER =
             new HmacLoginIdentifierFingerprinter(PEPPER);
+    static final Duration TOTP_PERIOD = Duration.ofSeconds(30);
 
     final InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
     private final ColumnEncryptionMasterKey masterKey = randomMasterKey();
@@ -165,6 +172,36 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
 
     List<AuditRowSnapshot> auditRows(String action) {
         return auditRows().stream().filter(row -> row.action().equals(action)).toList();
+    }
+
+    /** The TOTP code the secret produces at {@code instant}. */
+    static TotpCode validCodeAt(PlainTotpSecret secret, String instant) {
+        return TotpAlgorithm.generate(secret.value(),
+                TotpAlgorithm.counterFor(Instant.parse(instant), TOTP_PERIOD));
+    }
+
+    /** The smallest six-digit code outside every counter two steps around {@code instant}. */
+    static TotpCode wrongCodeAt(PlainTotpSecret secret, String instant) {
+        long counter = TotpAlgorithm.counterFor(Instant.parse(instant), TOTP_PERIOD);
+        Set<String> acceptable = new HashSet<>();
+        for (long candidate = counter - 2; candidate <= counter + 2; candidate++) {
+            acceptable.add(TotpAlgorithm.generate(secret.value(), candidate).value());
+        }
+        for (int value = 0; ; value++) {
+            String code = String.format(Locale.ROOT, "%06d", value);
+            if (!acceptable.contains(code)) {
+                return new TotpCode(code);
+            }
+        }
+    }
+
+    /** The TOTP verification after login, through its own real transaction. */
+    VerifyTotpCodeDecision verifyAfterLoginAt(StaffAccountId accountId, TotpCode code,
+            String instant) {
+        return new VerifyTotpCode(transactionRunner(), new JooqTotpCredentialRepository(dsl),
+                new JooqTotpVerificationBackoffStore(dsl), encryptionService(),
+                new JooqAuditLogWriter(dsl), fixedClock(instant))
+                .execute(context(), accountId, code);
     }
 
     ColumnEncryptionService encryptionService() {
