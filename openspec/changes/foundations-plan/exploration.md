@@ -179,6 +179,19 @@ el cambio 1, que es su dueño. La carpeta `staff-identity-password-and-mfa` pas�
 `identity-module-and-password-authentication`; no hubo nunca una carpeta con el nombre de la parte A
 publicada.
 
+**Corrección (2026-09-30, exploración de `password-recovery-token`).** La frase de arriba «no usa
+TOTP» es falsa: `docs/03-seguridad.md` §4.7 exige un código TOTP o un código de recuperación para
+restablecer la contraseña de una cuenta con MFA. El corte sigue siendo válido porque la parte 2 ya
+está archivada, pero la parte 3 **depende** de ella.
+
+**Nota (2026-09-30, dos cambios nuevos en F0, aprobados por el propietario).** La lista pasa de trece
+a quince cambios:
+
+| # | Identificador del cambio | Cubre | Depende de | Origen |
+|---|---|---|---|---|
+| 14 | `transactional-email-adapter` | Puerto de envío de correo y su adaptador por SMTP (SES, ADR-0014). Entrega el enlace de recuperación de contraseña y el aviso de códigos de recuperación de MFA bajos, que hoy no tienen dueño | 9 (el envío corre en el trabajador) | Respuestas del propietario a `password-recovery-token` |
+| 15 | `process-entry-point-isolation` | Que cada proceso cargue solo lo suyo. `AdminApplication`, `PortalApplication` y `WorkerApplication` comparten el paquete `com.confia.bootstrap` y cada uno lo escanea, así que el contexto de un proceso carga también la configuración de los otros dos. Hoy no tiene efecto, porque ninguno registra módulos de negocio, pero el día que `AdminApplication` escanee un módulo administrativo, el portal lo cargaría también, contra ADR-0003. Debe incluir una prueba que falle si el contexto del portal contiene un bean o un paquete administrativo | 1. **Debe fusionarse antes del primer punto de entrada que registre un módulo de negocio**, es decir, antes de `session-tokens-and-web-layer` | Hallazgo de `frontend-monorepo-and-contracts-pipeline`, corte 3a (`apply-progress.md`, tarea 1.3) |
+
 **Hallazgo.** `docs/09-roadmap-y-fases.md` §3 no incluye el módulo `organization` en F0, pero
 ADR-0009 exige `institution_id NOT NULL` desde la primera migración y ADR-0017 asigna la tabla raíz
 de institución a ese módulo. Se recomienda incorporar el cambio 4, con la entidad raíz mínima, al

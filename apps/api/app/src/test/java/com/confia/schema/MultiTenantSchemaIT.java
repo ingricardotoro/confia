@@ -227,6 +227,51 @@ class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
     }
 
     /**
+     * The password-reset token table stores only the SHA-256 of a token, never the token
+     * (password-recovery-token design.md decision 1; specs/build-integrity/spec.md, scenario "El
+     * catálogo rechaza un hash que no es de 64 caracteres hexadecimales"). A 43-character base64url
+     * token written where its hash belongs is rejected by {@code
+     * identity_password_reset_token_hash_chk} even when the domain is bypassed, and a well-formed
+     * hash for the same account is accepted first, so the rejection cannot come from the foreign
+     * key, the row policy or a missing grant.
+     */
+    @Test
+    void theDatabaseRejectsAPasswordResetTokenStoredInPlaceOfItsHash() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        UUID accountId = UUID.randomUUID();
+        String wellFormedHash = "0123456789abcdef".repeat(4);
+        String base64UrlToken = "q9Zb2X-kP3r_Tm7Wv1cH8eN4sLd0fGyJ5uAiO6pRtQE";
+
+        withInstitutionContext(institutionId, () -> {
+            dsl.execute("""
+                    insert into identity_staff_account
+                        (institution_id, id, email, password_hash, mfa_required)
+                    values (?, ?, ?, ?, false)
+                    """, institutionId.value(), accountId, "token.hash@colegio.edu.hn",
+                    PLACEHOLDER_PASSWORD_HASH);
+            dsl.execute(PASSWORD_RESET_TOKEN_INSERT, institutionId.value(), UUID.randomUUID(),
+                    accountId, wellFormedHash);
+            dsl.execute("""
+                    update identity_password_reset_token set superseded_at = now()
+                    where institution_id = ? and account_id = ?
+                    """, institutionId.value(), accountId);
+
+            assertThat(base64UrlToken).hasSize(43);
+            assertThatThrownBy(() -> dsl.execute(PASSWORD_RESET_TOKEN_INSERT,
+                    institutionId.value(), UUID.randomUUID(), accountId, base64UrlToken))
+                    .as("the token itself must never fit where only its SHA-256 belongs")
+                    .isInstanceOf(DataAccessException.class)
+                    .hasMessageContaining("identity_password_reset_token_hash_chk");
+        });
+    }
+
+    private static final String PASSWORD_RESET_TOKEN_INSERT = """
+            insert into identity_password_reset_token
+                (institution_id, id, account_id, token_hash, issued_at, expires_at)
+            values (?, ?, ?, ?, now(), now() + interval '30 minutes')
+            """;
+
+    /**
      * Seeds one minimal institution row by direct SQL, with the session's {@code
      * app.institution_id} set to {@code id} itself (design.md decision 6, point 2: {@code WITH
      * CHECK} constrains the owner's own INSERT too).
