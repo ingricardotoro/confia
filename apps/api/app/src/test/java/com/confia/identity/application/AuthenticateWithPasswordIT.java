@@ -259,11 +259,16 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
                 .noneMatch(row -> row.action().equals("identity.login.failed"))
                 .noneMatch(row -> row.action().equals("identity.login.backoff_applied"));
 
+        assertThat(persistedConsecutiveFailures(institutionId, fingerprintOf(identifier),
+                Instant.parse("2026-03-10T13:00:05Z")))
+                .as("the counter itself must still read zero: this is the assertion that "
+                        + "distinguishes a reset from an advance, which requiredDelay cannot")
+                .isZero();
+
         AuthenticationDecision nextWrongAttempt = attempt(institutionId, identifier.value(),
                 WRONG_PASSWORD_RAW, "2026-03-10T13:00:10Z");
         assertThat(nextWrongAttempt.requiredDelay())
-                .as("the backoff counter never advanced from the pending second factor above: this "
-                        + "wrong password is ordinal 1 of a fresh cycle, still no delay")
+                .as("and this wrong password is therefore ordinal 1 of a fresh cycle, still no delay")
                 .isEqualTo(Duration.ZERO);
     }
 
@@ -288,6 +293,12 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
         assertThat(auditRows)
                 .as("pending enrollment is not a failed attempt either")
                 .noneMatch(row -> row.action().equals("identity.login.failed"));
+
+        assertThat(persistedConsecutiveFailures(institutionId, fingerprintOf(identifier),
+                Instant.parse("2026-03-10T13:30:05Z")))
+                .as("nor does pending enrollment advance the counter, read directly rather than "
+                        + "inferred from a delay that is zero on either side of the question")
+                .isZero();
     }
 
     /**
@@ -369,6 +380,24 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
             store.save(institutionId, fingerprint, new BackoffState(consecutiveFailures, lastAttemptAt));
             return null;
         });
+    }
+
+    /**
+     * Reads the persisted consecutive-failure counter without advancing it: {@code claim} is an
+     * {@code INSERT ... ON CONFLICT DO UPDATE} that sets the counter to itself and returns the prior
+     * state, which is how {@code LoginBackoffConcurrencyIT} already reads it.
+     *
+     * <p>This exists because asserting {@code requiredDelay} alone cannot prove the counter did not
+     * advance: {@code BackoffPolicy} owes no delay until the third consecutive failure, so ordinal 1
+     * and ordinal 2 both return {@code Duration.ZERO} and an assertion on the delay is blind between
+     * them. The pre-merge verification of this cut confirmed that blindness by making a pending
+     * second factor advance the counter — every test stayed green.
+     */
+    private int persistedConsecutiveFailures(InstitutionId institutionId,
+            IdentifierFingerprint fingerprint, Instant readAt) {
+        return transactionRunner().execute(contextOf(institutionId),
+                () -> new JooqLoginBackoffStore(dsl).claim(institutionId, fingerprint, readAt))
+                .consecutiveFailures();
     }
 
     private List<AuditRowSnapshot> auditRowsFor(InstitutionId institutionId,
