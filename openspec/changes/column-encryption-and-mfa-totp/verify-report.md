@@ -199,3 +199,24 @@ para decidir si alguno esconde una aserción ciega como la de CRITICAL-1.
 No archivar todavía. Con la decisión del propietario sobre CRITICAL-1, la opción (a) cabe en un PR
 pequeño: el requisito y la nota corregidos, la prueba del segundo y tercer intento, y la prueba de
 WARNING-2. Después, `/sdd-archive`.
+
+---
+
+## 6. Resolución posterior al informe (2026-09-30)
+
+El propietario eligió la **opción (a)** para CRITICAL-1. Cambios, en el PR `ingricardotoro/confia#62`:
+
+| Hallazgo | Resolución | Evidencia |
+|---|---|---|
+| CRITICAL-1 | El requisito del delta, la decisión 8 de `design.md` y `docs/03-seguridad.md` §4.3 describen la regla real, cada uno con una nota fechada. El escenario del sexto intento pasa de «antes de evaluar» a «un retardo antes de responder». Escenario nuevo: «El retroceso empieza en el tercer fallo y su contador vive 30 minutos» | `TotpVerificationBackoffIT.backoffStartsAtTheThirdFailureAndItsCounterLivesThirtyMinutesNotFifteen`, en verde |
+| WARNING-2 | La prueba del séptimo código afirma que quedan exactamente tres sin usar | `ConsumeRecoveryCodeIT.consumingTheSeventhCodeLeavesExactlyThreeAndDoesNotAuditTheLowSignal`, en verde |
+| WARNING-1 | Sin cambios: queda como errata del criterio de éxito, según la recomendación de este informe | — |
+| WARNING-3 | Pendiente heredado para `session-tokens-and-web-layer`, que el archivado debe llevar explícito | — |
+
+CI del PR #62: `BUILD SUCCESS`; `ConsumeRecoveryCodeIT` `Tests run: 4`, `TotpVerificationBackoffIT`
+`Tests run: 2`; 325 unitarias y **162** de integración en `app`, 186 en `kernel`, cero fallos; PIT de
+`kernel` 99 % y de `domain` de `app` 94 %.
+
+**Escenarios tras la resolución: 29** (23 de `identity` y 6 de `build-integrity`), los 29 con
+**PRUEBA** completa y ninguno PARCIAL. **No queda ningún CRITICAL abierto: el cambio puede
+archivarse.**
