@@ -532,7 +532,7 @@ necesario.
 
 Rama `change/column-encryption-and-mfa-totp-c5-redaction-and-docs`, base C4.
 
-- [ ] 5.1 **ROJO/VERDE — extensión de `IdentitySecretRedactionIT` con los cinco secretos nuevos, y
+- [x] 5.1 **ROJO/VERDE — extensión de `IdentitySecretRedactionIT` con los cinco secretos nuevos, y
   el control negativo de la propia herramienta de barrido.** Requiere Docker. ROJO: extender
   `.../test/java/com/confia/identity/IdentitySecretRedactionIT.java` (ya existente de la parte 1)
   para recoger, sobre una inscripción TOTP real completa (secreto, cifrado con KEK/DEK, diez
