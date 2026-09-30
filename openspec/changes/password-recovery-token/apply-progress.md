@@ -1,6 +1,6 @@
 # Progreso de aplicación: `password-recovery-token`
 
-- **Corte en curso:** C1.
+- **Corte en curso:** C2, sobre C1b.
 - **Entorno:** OpenJDK 25.0.4 (paquete de Ubuntu 24.04), Maven Wrapper del repositorio, Docker 29.3.1
   con `postgres:18-alpine`. El `JAVA_HOME` del sistema apunta al JDK 21, así que toda invocación de
   Maven exporta `JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64` en la propia orden.
@@ -187,3 +187,49 @@ Ninguno directo; es la base de I7, I8 e I20 (tareas 3.3 y 4.3).
     unas 380 líneas, más las 7 de `docs/09` que traen los artefactos SDD ya aprobados.
   - **C1b** `change/password-recovery-token-c1b-token-repository`, sobre C1a: tareas 1.2 y 1.3, unas
     740 líneas.
+
+---
+
+## Tarea 2.1 — Sonda S4 y la regla de 12 a 128 caracteres
+
+### Sonda S4
+
+**PASA.** La primera ejecución en `jshell`, con los emoji escritos como escapes `\uD83C…` por la
+entrada estándar, dio `17 17` y `18 18`: la consola de `jshell` no conserva los surrogados que
+recibe por la entrada, así que esa lectura no vale. Repetida con un archivo Java en UTF-8 que lleva
+los **literales copiados byte a byte del delta** (`specs/identity/spec.md`, línea 232):
+
+```
+casa azul🌋🌊    11 puntos de código, 13 unidades UTF-16, NFKC no lo cambia
+casa azul 🌋🌊   12 puntos de código, 14 unidades UTF-16, NFKC no lo cambia
+```
+
+El escenario aprobado no necesita ajuste.
+
+### ROJO
+
+`StaffPasswordLengthPolicyTest` (8 casos y 2 propiedades de jqwik): `test-compile` falla con 46
+errores `cannot find symbol`.
+
+### VERDE
+
+`StaffPasswordLengthPolicy` con `MIN_CODE_POINTS = 12`, `MAX_CODE_POINTS = 128`, NFKC y
+`codePointCount`. Devuelve `Accepted(PlainPassword)`, `TooShort` o `TooLong`, sin lanzar salvo con
+`null`.
+
+```
+StaffPasswordLengthPolicyTest   tests=10 failures=0 errors=0
+```
+
+La primera versión de la propiedad «todo valor de 12 a 128 es aceptado» se agotó (100 intentos, 92
+descartes) porque un solo generador de 0 a 140 puntos de código producía pocos casos dentro del
+rango. Se separaron los generadores: de 12 a 128 para esa propiedad y de 0 a 140 para la de rechazo.
+
+### Control negativo
+
+Contando con `length()` (unidades UTF-16) en vez de `codePointCount` fallan
+`theScenarioLiteralsAreCountedInCodePointsNotUtf16Units` y la propiedad de rechazo. Se restauró.
+
+### Escenarios
+
+I15 (parte unitaria) e I16.
