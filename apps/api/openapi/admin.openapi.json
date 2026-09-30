@@ -1,0 +1,57 @@
+{
+  "components" : {
+    "schemas" : {
+      "Money" : {
+        "description" : "A monetary amount as it travels over the API: never a JSON number",
+        "properties" : {
+          "amount" : {
+            "description" : "Decimal amount with up to four decimals, as a string",
+            "pattern" : "^-?\\d{1,10}(\\.\\d{1,4})?$",
+            "type" : "string"
+          },
+          "currency" : {
+            "description" : "ISO 4217 currency code",
+            "pattern" : "^[A-Z]{3}$",
+            "type" : "string"
+          }
+        },
+        "required" : [ "amount", "currency" ],
+        "type" : "object"
+      },
+      "ProblemDetail" : {
+        "description" : "An error response in RFC 9457 Problem Details format",
+        "properties" : {
+          "detail" : {
+            "type" : "string"
+          },
+          "instance" : {
+            "format" : "uri",
+            "type" : "string"
+          },
+          "status" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "traceId" : {
+            "description" : "Identifier of the request's trace, to correlate with logs",
+            "type" : "string"
+          },
+          "type" : {
+            "format" : "uri",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  },
+  "info" : {
+    "title" : "CONFIA admin API",
+    "version" : "v1"
+  },
+  "openapi" : "3.1.0",
+  "paths" : { }
+}

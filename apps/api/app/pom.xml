@@ -120,6 +120,14 @@
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
     </dependency>
+    <!-- springdoc-openapi (frontend-monorepo-and-contracts-pipeline, design.md decisions 1 to 3):
+         generates the OpenAPI 3.1 document of each process from its real entry point. The
+         endpoint and Swagger UI are off by default and turned on only by application-local.yml
+         and application-preprod.yml. Version managed in the parent's dependencyManagement. -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    </dependency>
     <!-- @NamedInterface (ADR-0022; design.md decision 12) is org.springframework.modulith.
          NamedInterface, which lives in spring-modulith-api, NOT in spring-modulith-core (S1b probe,
          apply-progress.md): a same-simple-name org.springframework.modulith.core.NamedInterface
