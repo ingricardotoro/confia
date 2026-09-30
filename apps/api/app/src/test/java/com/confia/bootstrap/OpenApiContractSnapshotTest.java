@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -83,9 +84,12 @@ class OpenApiContractSnapshotTest {
         assertThat(portal).isNotEqualTo(admin);
         assertThat(titleOf(admin)).isEqualTo(ConfiaApplication.ADMIN_API_TITLE);
         assertThat(titleOf(portal)).isEqualTo(ConfiaApplication.PORTAL_API_TITLE);
-        assertThat(pathsOf(portal))
+        // Disjointness, not doesNotContainAnyElementsOf: AssertJ rejects an empty iterable there,
+        // and today both documents have zero paths. The check becomes meaningful with the first
+        // controller, and until then it is vacuous by construction, which is said here.
+        assertThat(Collections.disjoint(pathsOf(portal), pathsOf(admin)))
                 .as("no operation of the administrative process may be served by the portal")
-                .doesNotContainAnyElementsOf(pathsOf(admin));
+                .isTrue();
     }
 
     @Test
