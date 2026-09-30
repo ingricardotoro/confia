@@ -1,6 +1,6 @@
 # Progreso de aplicación: `password-recovery-token`
 
-- **Corte en curso:** C2, sobre C1b.
+- **Corte en curso:** C3. C1a, C1b y C2 fusionados en `main` (#68, #69 y #70).
 - **Entorno:** OpenJDK 25.0.4 (paquete de Ubuntu 24.04), Maven Wrapper del repositorio, Docker 29.3.1
   con `postgres:18-alpine`. El `JAVA_HOME` del sistema apunta al JDK 21, así que toda invocación de
   Maven exporta `JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64` en la propia orden.
@@ -315,3 +315,46 @@ TotpVerificationBackoffIT    tests=2 failures=0 errors=0   (sin tocar)
   unitarias y 188 de integración.
 - **Diff medido** contra C1b, sin `openspec` ni código generado: **685 líneas**, dentro de las 800.
   Un solo pull request.
+
+---
+
+## Tarea 3.1 — `RequestPasswordReset` con el puerto de programación
+
+### ROJO
+
+`RequestPasswordResetTest` (4), `RequestPasswordResetIT` (5) y `PasswordResetRequestTimingReportIT`
+(1): `test-compile` falla con 54 errores `cannot find symbol` sobre los cuatro tipos nuevos.
+
+### VERDE
+
+- `PasswordResetIssuanceScheduler`: `schedule(InstitutionId, StaffAccountId)`, solo identificadores.
+  Sin adaptador de producción.
+- `RequestPasswordResetCommand`: un solo campo, el identificador presentado.
+- `RequestPasswordResetDecision`: un `record` sin componentes.
+- `RequestPasswordReset`: guarda de institución antes de abrir conexión; dentro de la transacción,
+  huella, búsqueda, programación si la cuenta existe y un asiento `identity.password_reset.requested`
+  con la huella como entidad en las dos ramas.
+
+```
+RequestPasswordResetTest              tests=4 failures=0 errors=0
+RequestPasswordResetIT                tests=5 failures=0 errors=0
+PasswordResetRequestTimingReportIT    tests=1 failures=0 errors=0   (informativo, no puerta)
+```
+
+La prueba de la guarda usa un `TransactionRunner` sobre un `SimpleDriverDataSource` sin URL:
+si la guarda no lanzara, abrir la transacción fallaría con otra excepción, nunca con
+`IllegalStateException`.
+
+### Control negativo
+
+Con el asiento escrito solo cuando la cuenta existe, falla
+`aNonexistentAddressGetsTheSameResultNothingScheduledAndOneEntryWithoutTheAddress`. Se restauró.
+
+### Notas
+
+- Docker se detuvo entre sesiones del contenedor y hubo que levantar `dockerd` de nuevo; ninguna
+  prueba se vio afectada.
+
+### Escenarios
+
+I1, I2, I26, I29, I30, I39 e I40.
