@@ -1,5 +1,7 @@
 # Delta para Integridad de la construcción
 
+- **Estado:** aprobado por el propietario del producto el 2026-09-30
+
 ## ADDED Requirements
 
 ### Requisito: El OpenAPI generado coincide con la instantánea aprobada
