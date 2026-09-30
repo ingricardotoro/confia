@@ -1,0 +1,28 @@
+package com.confia.architecture.fixture.exhaustiveswitch;
+
+import com.confia.identity.domain.AuthenticationResult;
+import com.confia.identity.domain.AuthenticationResult.Authenticated;
+import com.confia.identity.domain.AuthenticationResult.Rejected;
+import com.confia.identity.domain.AuthenticationResult.SecondFactorEnrollmentRequired;
+import com.confia.identity.domain.AuthenticationResult.SecondFactorRequired;
+
+/**
+ * The positive twin of {@code non-exhaustive-switch.java.txt}: the same switch, with all four
+ * branches present, over the real {@code AuthenticationResult} (column-encryption-and-mfa-totp
+ * design.md, decision 6; sonda S3 — this compiles clean under {@code -Xlint:all}, without a
+ * single warning). Proves the in-memory compilation harness itself is capable of accepting a real
+ * exhaustive switch, not only of rejecting a broken one — without this twin, a compilation harness
+ * that always reported failure would pass {@code aSwitchMissingOneOutcomeFailsToCompile} just as
+ * well.
+ */
+public final class ExhaustiveSwitchFixture {
+
+    public static String describe(AuthenticationResult result) {
+        return switch (result) {
+            case Authenticated authenticated -> "authenticated";
+            case Rejected rejected -> "rejected";
+            case SecondFactorRequired secondFactorRequired -> "second-factor-required";
+            case SecondFactorEnrollmentRequired enrollmentRequired -> "enrollment-required";
+        };
+    }
+}
