@@ -1,0 +1,8 @@
+{
+  "name": "@confia/api",
+  "private": true,
+  "description": "The Maven backend, seen from the pnpm workspace only so Turborepo can run its full verification in order (docs/01-arquitectura.md §4). CI's frontend job excludes it: the backend job already runs this.",
+  "scripts": {
+    "verify": "./mvnw -B verify"
+  }
+}

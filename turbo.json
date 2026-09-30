@@ -1,0 +1,51 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "agentGuidance": false,
+  "tasks": {
+    "generate": {
+      "outputs": [
+        "src/generated/**"
+      ]
+    },
+    "@confia/contracts#generate": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/api/openapi/*.json"
+      ],
+      "outputs": [
+        "src/generated/**"
+      ]
+    },
+    "lint": {
+      "dependsOn": [
+        "^generate",
+        "generate"
+      ]
+    },
+    "typecheck": {
+      "dependsOn": [
+        "^generate",
+        "generate"
+      ]
+    },
+    "test": {
+      "dependsOn": [
+        "^generate",
+        "generate"
+      ]
+    },
+    "build": {
+      "dependsOn": [
+        "^generate",
+        "generate",
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
+    },
+    "verify": {
+      "cache": false
+    }
+  }
+}

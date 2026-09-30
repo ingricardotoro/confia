@@ -1,0 +1,27 @@
+{
+  "name": "@confia/contracts",
+  "private": true,
+  "description": "GENERATED with orval from the approved OpenAPI snapshots in apps/api/openapi/. Never edited by hand: src/generated/ is ignored by Git and rebuilt on every generate.",
+  "type": "module",
+  "exports": {
+    "./admin": "./src/admin.ts",
+    "./portal": "./src/portal.ts"
+  },
+  "scripts": {
+    "generate": "orval --config orval.config.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@confia/config": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "orval": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
