@@ -6,6 +6,9 @@ dos deltas aprobados el mismo día:
 - `specs/identity/spec.md`: 21 requisitos, 46 escenarios (17 añadidos y 4 modificados);
 - `specs/build-integrity/spec.md`: 2 requisitos, 7 escenarios.
 
+- **Estado:** aprobado por el propietario el 2026-09-30, con la pregunta abierta 1 resuelta: la
+  fuga de `TotpCode` se corrige en este cambio (decisión 13).
+
 **Las especificaciones son el contrato.** Este diseño no encontró nada que obligue a reabrirlas
 (sección 0).
 
@@ -51,7 +54,7 @@ que los sostienen. Van en **cinco cortes encadenados** dentro de este mismo camb
 | Corte | Contenido |
 |---|---|
 | **C1** | `V7`, puerto y adaptador jOOQ del token, ampliación de `StaffAccountRepository`, extensión de `MultiTenantSchemaIT`, `RolePrivilegeMatrixIT` e `IdentityRowSecurityIT`. Sondas S1 y S2 |
-| **C2** | Dominio: token redactado, hash redactado, política del token (vigencia, ventana, motivos) y política de longitud. Sonda S4 |
+| **C2** | Dominio: token redactado, hash redactado, política del token (vigencia, ventana, motivos), política de longitud y `TotpCode` sin fuga (decisión 13). Sonda S4 |
 | **C3** | `RequestPasswordReset` con el puerto de programación, `IssuePasswordResetToken` con el puerto de envío, concurrencia de emisión. Sonda S3 |
 | **C4** | `ResetPasswordWithToken` con la composición del segundo factor, atomicidad, concurrencia de restablecimiento y contador TOTP compartido |
 | **C5** | Redacción con control negativo, inventario de ausencias, notas de documentación y cierre de trazabilidad |
@@ -504,6 +507,33 @@ Argon2id.
 - **Ningún texto de interfaz.** El mensaje del `202` va al catálogo de internacionalización en la
   parte 4.
 
+### Decisión 13 — `TotpCode` deja de exponer el valor presentado
+
+Añadida el 2026-09-30 por decisión del propietario sobre la pregunta abierta 1.
+
+**Hallazgo, verificado en `main` @ `b94fedb`.** `TotpCode.java:18-19` lanza
+`IllegalArgumentException("a TOTP code must be exactly 6 digits, was " + value)`. Además, como
+`TotpCode` es un `record`, su `toString()` implícito imprime `TotpCode[value=…]`. En el
+restablecimiento, el código viaja en el mismo comando que el token; cualquier registro de la
+excepción o del comando copiaría el valor presentado.
+
+**Decisión.**
+- El mensaje de la excepción conserva la regla y deja de interpolar el valor:
+  `"a TOTP code must be exactly 6 digits"`.
+- `TotpCode` sobrescribe `toString()` con un texto fijo sin el valor, igual que las clases
+  redactadas de la decisión 3. `equals` y `hashCode` del `record` no cambian: `VerifyTotpCode`
+  compara con `TotpAlgorithm.generate`, que no depende de ellos.
+- La validación no cambia: el patrón `^[0-9]{6}$` sigue igual y los cuatro casos de
+  `TotpCodeTest` siguen valiendo.
+
+**Pruebas.** `TotpCodeTest` gana dos casos que primero fallan en rojo contra el código actual: el
+mensaje de un valor rechazado (por ejemplo `"12a456"`) no contiene ese valor, y el `toString()` de
+un código válido no contiene sus seis dígitos. `IdentitySecretRedactionIT` añade `TotpCode` a la
+lista de valores que no pueden aparecer en registros (decisión 10).
+
+**Alcance.** Toca código archivado de la parte 2, pero solo en una clase de dominio, sin cambio de
+contrato ni de comportamiento observable salvo el texto. Es una tarea más en C2.
+
 ---
 
 ## 4. Flujo de datos
@@ -557,6 +587,7 @@ COMMITTED, …)`, precedida por la guarda de institución.
 | `identity/domain/PlainPasswordResetToken.java`, `PasswordResetTokenHash.java` | Crear | Decisión 3 |
 | `identity/domain/PasswordResetTokenPolicy.java`, `PasswordResetTokenRow.java`, `PasswordResetRejectionReason.java` | Crear | Decisión 4 |
 | `identity/domain/StaffPasswordLengthPolicy.java` | Crear | Decisión 8 |
+| `identity/domain/TotpCode.java` | Modificar | Decisión 13: mensaje y `toString()` sin el valor |
 | `identity/application/PasswordResetTokenRepository.java`, `PasswordResetIssuanceScheduler.java`, `PasswordResetLinkSender.java` | Crear | Puertos; los dos últimos sin adaptador |
 | `identity/application/RequestPasswordReset.java`, `RequestPasswordResetCommand.java`, `RequestPasswordResetDecision.java` | Crear | Decisión 6 |
 | `identity/application/IssuePasswordResetToken.java`, `IssuePasswordResetTokenDecision.java` | Crear | Decisión 6 |
@@ -669,7 +700,7 @@ parte 4.
 | Institución inyectada por quien llama | Comandos sin campo de institución más la guarda de `LoginInstitutionProvider` |
 | Códigos de recuperación de MFA sin retroceso | **Riesgo aceptado** por el propietario; lo acota el límite por IP de la parte 4 |
 | Cuenta con `mfa_required = true` sin secreto | **Riesgo aceptado**: quien controle el buzón obtiene la contraseña; la inscripción se exige en el siguiente inicio de sesión |
-| Mensaje de excepción de `TotpCode` | `TotpCode` interpola el valor rechazado en su mensaje («was » + value). No es un secreto declarado por la parte 2, pero en el restablecimiento viaja junto al token. Pregunta abierta 1 |
+| Mensaje de excepción y `toString()` de `TotpCode` | Ninguno de los dos contiene ya el valor (decisión 13), con prueba en `TotpCodeTest` e `IdentitySecretRedactionIT` |
 | Dependencias nuevas | Ninguna: SHA-256, `SecureRandom`, base64url y NFKC son JDK |
 
 ---
@@ -711,6 +742,7 @@ No son sondas, porque se verificaron por lectura o por precedente en `main` (sec
 - **C2.** Sonda S4.
   - Rojo y verde de `PasswordResetTokenPolicyTest`, `StaffPasswordLengthPolicyTest`,
     `PlainPasswordResetTokenTest` y `PasswordResetTokenHashTest`.
+  - Rojo y verde de los dos casos nuevos de `TotpCodeTest` (decisión 13).
 - **C3.** Sonda S3.
   - `RequestPasswordReset` y `IssuePasswordResetToken` con sus pruebas unitarias e
     `RequestPasswordResetIT`, `IssuePasswordResetTokenIT`.
@@ -732,14 +764,15 @@ No son sondas, porque se verificaron por lectura o por precedente en `main` (sec
 | Corte | Tareas | Líneas en una pasada | Con 1,5× a 3× | Riesgo de superar 800 líneas |
 |---|---|---|---|---|
 | C1 | 3 | ~450 | 675-1350 | Alto |
-| C2 | 2 | ~350 | 525-1050 | Medio |
+| C2 | 3 | ~400 | 600-1200 | Medio |
 | C3 | 3 | ~450 | 675-1350 | Alto |
 | C4 | 3 a 4 | ~600 | 900-1800 | **Muy alto**: es el corte con más pruebas de integración |
 | C5 | 2 | ~250 | 375-750 | Bajo |
-| **Total** | **13 a 14** | **~2100** | **3150-6300** | — |
+| **Total** | **14 a 15** | **~2150** | **3225-6450** | — |
 
-Quedan de uno a dos por debajo del límite de quince. La propuesta estimó de 14 a 15; el diseño
-recorta una tarea porque la corrección de la premisa ya está fusionada (sección 2). Con el historial
+Quedan en el límite de quince o una por debajo. La propuesta estimó de 14 a 15; el diseño
+recortó una tarea porque la corrección de la premisa ya está fusionada (sección 2), y la decisión 13
+la devuelve. Si la fase de tareas llega a dieciséis, se aplica el corte de abajo sin esperar. Con el historial
 de la parte 1 (nueve pull requests para doce tareas) y de la parte 2 (trece para quince), la
 expectativa realista es **de nueve a doce pull requests encadenados**, no cinco. Si la fase de tareas
 superara quince, el corte previsto en la propuesta sigue siendo válido: C1 a C3 por un lado y C4 y C5
@@ -749,9 +782,9 @@ por otro.
 
 ## 12. Preguntas abiertas
 
-- [ ] **`TotpCode` interpola el valor rechazado en su mensaje de excepción.** Un código mal formado
-      presentado junto al token acabaría en ese texto. No está en la lista de secretos de la parte 2
-      y cambiarlo toca código archivado. ¿Se corrige aquí, con una tarea más dentro del margen, o se
-      registra con dueño? La recomendación de este diseño es corregirlo aquí.
+- [x] **`TotpCode` interpola el valor rechazado en su mensaje de excepción.** Resuelta el
+      2026-09-30: el propietario decidió corregirlo en este cambio (decisión 13).
 - [ ] La sonda S4 es la única que podría obligar a ajustar el texto de un escenario ya aprobado.
+      Una comprobación previa con la normalización NFKC de Node dio `11 13` y `12 14`; la prueba en
+      Java de C2 sigue siendo la que cuenta.
 - [ ] Ninguna otra pregunta bloquea C1.
