@@ -1,8 +1,6 @@
 # Progreso de aplicación: `column-encryption-and-mfa-totp`
 
-- **Corte en curso:** C4 (completo, las tres tareas 4.1/4.2/4.3 en verde, más la regla de refuerzo de
-  ArchUnit no numerada de la sonda S4; ver el corte propuesto para PR más abajo). C1, C2 y C3 ya
-  fusionados.
+- **Corte en curso:** C5 (tarea 5.1 en verde; queda la 5.2). C1, C2, C3 y C4 ya fusionados.
 - **Entorno:** JDK 25 (Temurin 25.0.3+9), Maven 3.9.16, Docker disponible.
   El `JAVA_HOME` del sistema apunta al **JDK 21**, así que toda invocación de Maven exporta
   `JAVA_HOME` al 25 en la propia orden. `MAVEN_OPTS="-Djavax.net.ssl.trustStoreType=Windows-ROOT"` es
@@ -1511,3 +1509,55 @@ El corte cae en un límite de commit ya existente: no hubo que reescribir histor
 - **C4a solo**: `BUILD SUCCESS`, `05:24 min`, `Tests run: 155` de integración, cobertura cumplida.
 - **C4b sobre C4a**: `BUILD SUCCESS`, `05:14 min`, `Tests run: 158` de integración, cobertura
   cumplida.
+
+---
+
+## C5 — Tarea 5.1: barrido de redacción de los cuatro secretos nuevos
+
+Fecha: 2026-09-30. PR: `ingricardotoro/confia#60`.
+
+**Entorno de esta tarea, dicho con precisión.** Se escribió en una sesión remota sin Docker y con
+JDK 21, sin repositorio Maven local: la clase **no se compiló ni se ejecutó localmente**. La primera
+ejecución, y la evidencia que aquí se registra, es la integración continua del PR, sobre JDK 25.
+
+### Qué se añadió
+
+- `IdentitySecretRedactionIT.noExceptionNorToStringNorRowExposesTheTotpSecretARecoveryCodeTheKekOrADek`:
+  una inscripción TOTP real para `sofia.mejia@colegio.edu.hn` (secreto cifrado con una DEK envuelta
+  por la KEK, diez códigos de recuperación), una verificación TOTP rechazada con un código elegido
+  fuera de la ventana de tolerancia —rechazo cierto, no probable— y un fallo de autenticación GCM
+  forzado al descifrar con el AAD de otra fila. Recoge el `toString()` de los cinco objetos de valor
+  y de los resultados de los casos de uso, los mensajes de excepción a lo largo de toda la cadena de
+  causas (incluida `AeadIntegrityException`) y todas las filas de la institución en las cuatro
+  tablas de `V6` y en `shared_audit_log`.
+- Los secretos de bytes se buscan en cada codificación plausible de una fuga: base64, base64url,
+  hexadecimal en minúsculas y mayúsculas, `Arrays.toString` y, para el secreto TOTP, base32.
+- Las filas se renderizan valor a valor, nunca con `Result.format()` de jOOQ, que **trunca las
+  celdas largas**: una fuga podría pasar el barrido sin que este hubiera leído el valor entero.
+- Cada tabla barrida debe tener al menos una fila; una tabla vacía no puede pasar por limpia.
+- El nombre de tabla llega a la consulta como nombre citado de jOOQ, nunca por concatenación
+  (regla 12 de `CLAUDE.md`), aunque sean cinco constantes.
+- El hash almacenado del código de recuperación vive legítimamente en su propia fila, así que se
+  barre solo contra el `toString()` de su objeto de valor, no contra las filas.
+
+### Control negativo
+
+`LeakingMfaSecretFixture` (un `record` con un `String` y **sin** `toString()` sobrescrito) y
+`theRedactionSweepDetectsARealLeak`, en un método aparte. Va un paso más allá del esbozo de
+`design.md` decisión 9: además de afirmar que el fixture filtra, afirma que **el mismo auxiliar
+`assertSecretNeverLeaked` que usan todos los barridos lo rechaza**, y que su mensaje de fallo no
+repite el valor. Así el control prueba el barrido real, no solo la forma del `record`.
+
+### ROJO
+
+No hay ROJO sobre código de producción, y se dice así en vez de fingirlo: la tarea preveía verde
+sin cambios de producción, porque los cinco objetos de valor ya redactan desde las tareas 1.4, 2.2
+y 3.1, y así fue. La capacidad de fallar del barrido la demuestra el control negativo.
+
+### Evidencia de integración continua
+
+- `backend verify`: `BUILD SUCCESS`, `03:05 min`; `IdentitySecretRedactionIT`: `Tests run: 3,
+  Failures: 0, Errors: 0`.
+- Integración: `Tests run: 160` (158 de C4 más los dos nuevos). Unitarias de `app`: `324`.
+  `jacoco:check` cumplido.
+- Sin cambios de producción.
