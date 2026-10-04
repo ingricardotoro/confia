@@ -4,12 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
+import com.zaxxer.hikari.HikariDataSource;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.security.IdempotentExecutor;
 import com.confia.shared.security.TransactionRunner;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.List;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import javax.sql.DataSource;
@@ -43,6 +47,19 @@ class AdminProductionWiringTest {
                     .hasSize(1);
             assertThat(context.getBeansOfType(IdempotentExecutor.class)).hasSize(1);
             assertThat(context.getBeansOfType(ColumnEncryptionService.class)).hasSize(1);
+        } finally {
+            context.close();
+        }
+    }
+
+    @Test
+    void theAdminPoolIsLazyAndHasNotConnectedAfterStartup() throws SQLException {
+        ConfigurableApplicationContext context = start("admin");
+        try {
+            HikariDataSource pool = context.getBean(DataSource.class).unwrap(HikariDataSource.class);
+            assertThat(pool.getHikariPoolMXBean())
+                    .as("a pool that has started would have a MXBean: the start must be lazy")
+                    .isNull();
         } finally {
             context.close();
         }
@@ -87,20 +104,48 @@ class AdminProductionWiringTest {
         assertThatThrownBy(() -> ConfiaApplication.launch(
                 TestProcessArguments.adminWithoutMasterKey(), "admin"))
                 .satisfies(failure -> {
-                    String trace = stackTraceOf(failure);
-                    assertThat(trace).contains(TestProcessArguments.MASTER_KEY_PROPERTY);
-                    assertThat(trace).contains("IllegalStateException");
-                    assertThat(trace).doesNotContain(TestProcessArguments.MASTER_KEY_PROPERTY + "=");
+                    assertThat(stackTraceOf(failure)).contains(TestProcessArguments.MASTER_KEY_PROPERTY);
+                    assertThat(stackTraceOf(failure)).contains("IllegalStateException");
+                    assertNoSecretFragment(failure, "");
                 });
     }
 
     @Test
     void anInvalidMasterKeyStopsTheAdminProcessWithoutEchoingIt() {
-        String notBase64 = "not-a-valid-base64-key!";
+        String notBase64 = "Zq9#Xw7!Lm2@Pk4$";
 
         assertThatThrownBy(() -> ConfiaApplication.launch(
                 TestProcessArguments.adminWithMasterKey(notBase64), "admin"))
-                .satisfies(failure -> assertThat(stackTraceOf(failure)).doesNotContain(notBase64));
+                .satisfies(failure -> {
+                    assertThat(stackTraceOf(failure))
+                            .contains(TestProcessArguments.MASTER_KEY_PROPERTY);
+                    assertNoSecretFragment(failure, notBase64);
+                });
+    }
+
+    /**
+     * Walks the whole cause chain: no decoder exception may be chained (its message carries a
+     * fragment of the value), and no message or trace may contain the value or any substring of it
+     * longer than three characters.
+     */
+    private static void assertNoSecretFragment(Throwable failure, String secret) {
+        List<Throwable> chain = new ArrayList<>();
+        for (Throwable t = failure; t != null && !chain.contains(t); t = t.getCause()) {
+            chain.add(t);
+        }
+        assertThat(chain).as("no IllegalArgumentException anywhere in the cause chain")
+                .noneMatch(IllegalArgumentException.class::isInstance);
+        String everything = stackTraceOf(failure);
+        for (Throwable t : chain) {
+            everything += " | " + t.getMessage();
+        }
+        assertThat(everything).doesNotContain("Illegal base64");
+        for (int length = 4; length <= secret.length(); length++) {
+            for (int start = 0; start + length <= secret.length(); start++) {
+                assertThat(everything).as("fragment of the value")
+                        .doesNotContain(secret.substring(start, start + length));
+            }
+        }
     }
 
     private static ConfigurableApplicationContext start(String process) {

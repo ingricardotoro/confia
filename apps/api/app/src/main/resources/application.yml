@@ -14,11 +14,12 @@ spring:
     # NOTE: this property is inert. Spring Boot's own jOOQ autoconfiguration, which used to read
     # spring.jooq.*, does not exist in Spring Boot 4.1.1 (verified: zero classes under
     # org/springframework/boot/autoconfigure/jooq/ in spring-boot-autoconfigure-4.1.1.jar;
-    # apply-progress.md task 1.1, S1.6). A DSLContext is declared explicitly wherever it is needed
-    # (com.confia.support.IntegrationTestApplication for tests today; a production bean arrives
-    # with whichever change wires the adapter into a running process). This key is kept, not
+    # apply-progress.md task 1.1, S1.6). A DSLContext is declared explicitly wherever it is needed:
+    # the administrative process declares its own in SharedPlatformConfiguration
+    # (com.confia.shared.platform.infrastructure, with SQLDialect.POSTGRES in code) and tests use
+    # com.confia.support.IntegrationTestApplication. This key remains inert: it is kept, not
     # dropped, so the intended dialect stays discoverable next to the rest of the datasource
-    # configuration; nothing currently reads it.
+    # configuration; nothing reads it.
     sql-dialect: POSTGRES
 
 # OpenAPI (docs/01-arquitectura.md §7; frontend-monorepo-and-contracts-pipeline, design.md decision
