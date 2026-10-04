@@ -137,6 +137,25 @@ la fila permanece—, y el corte C1 no entregó índice ni trabajo de purga, sig
 cambio 6 de no enviar un índice sin consumidor. El dueño propuesto es el cambio que introduzca
 trabajo de mantenimiento programado con `db-scheduler` (ADR-0016).
 
+**Dos condiciones duras más de aceptación de `session-tokens-and-web-layer` (2026-10-03, de
+`password-recovery-token`).** El cambio `password-recovery-token` entrega el restablecimiento de
+contraseña como casos de uso, sin endpoint, sin sesiones y sin límite por dirección IP. Eso deja dos
+brechas que deben cerrarse antes de que exista un camino HTTP hacia ellas. Como la condición de
+arriba, se escriben aquí y no como preguntas abiertas, porque una pregunta abierta no bloquea nada:
+
+> **1. `session-tokens-and-web-layer` NO DEBE fusionar un endpoint de restablecimiento sin revocar
+> todas las familias de tokens de refresco de la cuenta al completarse el restablecimiento**
+> (`docs/03-seguridad.md` §4.5 y §4.7, ADR-0005 punto 4). Hoy `ResetPasswordWithToken` solo cambia la
+> contraseña, y `IdentityScopeExclusionInventoryTest` comprueba que ninguna clase de
+> `com.confia.identity` nombra sesiones ni tokens de refresco. Esa prueba se vuelve falsa el día que
+> llegue la primera emisión de refresco, y la prueba de que el restablecimiento las revoca es de
+> `session-tokens-and-web-layer`.
+>
+> **2. `session-tokens-and-web-layer` NO DEBE fusionar el endpoint de solicitud de restablecimiento
+> sin el límite de 10 solicitudes por hora por dirección IP** (`docs/03-seguridad.md` §4.7 y §10).
+> `RequestPasswordReset` aplica por sí mismo la respuesta uniforme, pero el límite de tres emisiones
+> por hora es por cuenta y no frena a quien recorre cuentas ajenas.
+
 **Nota (2026-09-27, tercer corte: la parte 2 se parte a su vez).** La propuesta de
 `mfa-totp-and-password-recovery` pronosticó **12 a 17 tareas solo para su primera mitad**, contra el
 límite de quince de `openspec/changes/README.md`, y más aún si se aprueba añadir los dos controles que

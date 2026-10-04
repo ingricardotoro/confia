@@ -514,6 +514,31 @@ usuario del personal, pero **no puede fijar la contraseña**: solo puede invalid
 disparar el flujo de token. Esto elimina el escenario del administrador que conoce la contraseña
 de un cajero. La acción se audita siempre.
 
+> **Nota editorial, 2026-10-03 (`password-recovery-token`).** Lo que el cambio entrega de esta
+> sección, y lo que deja con dueño:
+>
+> - **Tabla.** El token vive en `identity_password_reset_token` (migración `V7`): solo el SHA-256 en
+>   hexadecimal del texto base64url del token, la cuenta, la institución, el momento de emisión, el de
+>   vencimiento y las marcas de consumo y de reemplazo. Nunca se almacena el token en claro. Un índice
+>   parcial único garantiza a lo sumo un token vivo por cuenta.
+> - **Emisión en el trabajador.** La solicitud solo programa la emisión, con identificadores y sin
+>   correo (ADR-0016); el token lo genera `IssuePasswordResetToken` dentro del trabajador. Un
+>   restablecimiento solicitado no produce un token por sí solo. El adaptador de programación es del
+>   cambio 9 y el de envío del enlace, de un cambio de correo posterior.
+> - **Definición de MFA activa.** Una cuenta tiene MFA activa cuando `mfa_required` es verdadero **y**
+>   existe un secreto TOTP inscrito. Solo entonces se exige el segundo factor; con `mfa_required` sin
+>   secreto se restablece sin él y la inscripción se exige en el siguiente inicio de sesión, riesgo
+>   aceptado y escrito en el diseño del cambio.
+> - **Segundo factor.** Un código TOTP incorrecto suma al mismo contador de retroceso que el inicio de
+>   sesión (`identity_mfa_totp_backoff`), y el fallo se confirma aunque el token siga vivo.
+> - **Contraseña.** De 12 a 128 caracteres, medidos en caracteres y no en unidades de código.
+> - **Pendiente con dueño, `session-tokens-and-web-layer`:** la revocación de todas las sesiones al
+>   restablecer y el límite de 10 solicitudes por hora por IP. Son condiciones duras de aceptación de
+>   ese cambio, escritas en `openspec/changes/foundations-plan/exploration.md`.
+> - **Pendiente con dueño, cambio de correo posterior al cambio 9:** el envío real del enlace y el
+>   aviso al titular tras el restablecimiento, con IP y momento; la IP la aporta además
+>   `session-tokens-and-web-layer`.
+
 ---
 
 ## 5. Controles de autorización
@@ -688,6 +713,12 @@ crítico: un rol con `BYPASSRLS` anula silenciosamente todas las políticas.
 > `identity_mfa_totp_backoff`, reciben el mismo trato que `identity_login_backoff`: `SELECT`,
 > `INSERT` y `UPDATE` para `confia_admin_app`, sin `DELETE`; `SELECT` para `confia_readonly`; y
 > **ningún privilegio** para `confia_portal_app`.
+>
+> **Adenda, 2026-10-03 (`password-recovery-token`).** La tabla `identity_password_reset_token` recibe
+> el mismo trato que las anteriores: `SELECT`, `INSERT` y `UPDATE` para `confia_admin_app`, sin
+> `DELETE`; `SELECT` para `confia_readonly`; y **ningún privilegio** para `confia_portal_app`. Al no
+> haber `DELETE`, los tokens vencidos, usados y reemplazados se conservan hasta que el cambio 9
+> entregue la purga.
 
 ### 6.2 Contexto de sesión seguro
 

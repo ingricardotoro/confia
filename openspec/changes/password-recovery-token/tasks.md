@@ -493,7 +493,7 @@ Rama `change/password-recovery-token-c5-redaction-and-docs`, con base en C4.
   - **VERDE:** lo que las reglas exijan. No debería hacer falta código de producción.
   - **Escenarios:** I21, I22, I23 (segunda mitad), I25, I27 e I33. **Diseño:** decisiones 10 y 11.
 
-- [ ] 5.2 **Documentación, pruebas existentes de las brechas y cierre de trazabilidad.** No hay
+- [x] 5.2 **Documentación, pruebas existentes de las brechas y cierre de trazabilidad.** No hay
   rojo que observar en la parte documental, y se dice así.
   - **Notas fechadas**, sin reescribir el cuerpo de ninguna sección (decisión 12):
     - en `openspec/changes/foundations-plan/exploration.md`, las dos condiciones duras para
@@ -586,6 +586,24 @@ Rama `change/password-recovery-token-c5-redaction-and-docs`, con base en C4.
 | B5 | Permisos | La matriz cubre los cinco roles | 1.1 |
 | B6 | ídem | `confia_admin_app` no borra | 1.1 |
 | B7 | ídem | `confia_portal_app` sin privilegios | 1.1 |
+
+**Cierre de la trazabilidad contra las clases reales (tarea 5.2, 2026-10-03).** Los 53 escenarios
+tienen su clase de prueba en el árbol; esta tabla recoge solo donde la clase real difiere de lo que
+decía `design.md` §6.1, o donde la tabla no nombraba método.
+
+| Escenario | Clase y método reales | Diferencia con `design.md` §6.1 |
+|---|---|---|
+| I9, I10, I46 | `ResetPasswordWithSecondFactorIT` | §6.1 decía `ResetPasswordWithTokenIT`; los casos con MFA activa van en una clase propia (desviación de 4.2) |
+| I13, I14 | `PasswordResetTotpBackoffSharingIT` | Ninguna |
+| I8, I20 | `PasswordResetConcurrencyIT`, `PasswordResetAtomicityIT` | Ninguna |
+| I21, I22 | `IdentitySecretRedactionIT` (barrido y `thePasswordResetSweepDetectsARealLeakOfTheToken`) | Ninguna |
+| I23, primera mitad | `ResetPasswordWithTokenIT.aCompletedResetOnlyConsumesChangesTheHashAndAuditsWithoutNotifyingAnyone` y `IdentityScopeExclusionInventoryTest.noClassOfIdentityReferencesSessionsOrRefreshTokens` | Ninguna |
+| I25, I27, I33 | `IdentityScopeExclusionInventoryTest.noProductionClassImplementsTheIssuanceSchedulerOrTheLinkSender` y `.onlyResetPasswordWithTokenCallsReplacePasswordHash` | Ninguna; cada regla tiene su prueba gemela contra un accesorio |
+| I42 | `IdentityScopeExclusionInventoryTest.noProductionClassOfIdentityDependsOnAnyNetworkClientLibrary` | §6.1 decía `AuthenticateWithPasswordIT` (discrepancia 3) |
+| I44 | `AuthenticateWithPasswordTest.aSuccessfulLoginNeverRecalculatesTheStoredHash` | Ninguna (discrepancia 3) |
+| I45 | `ConsumeRecoveryCodeIT.consumingTheEighthCodeAuditsTheLowSignalWithoutSendingAnyEmail` | Ninguna |
+| B1 a B7 | `MultiTenantSchemaIT.theDatabaseRejectsAPasswordResetTokenStoredInPlaceOfItsHash`, `IdentityRowSecurityIT` y `RolePrivilegeMatrixIT` | La prueba del `CHECK` del hash está en `MultiTenantSchemaIT` (discrepancia 5) |
+| I24 | Sin prueba | Condición dura escrita en `foundations-plan/exploration.md` |
 
 **Sondas antes de la tarea que bloquean:**
 

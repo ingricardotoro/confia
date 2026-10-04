@@ -320,7 +320,7 @@ class IdentityScopeExclusionInventoryTest {
 
         assertThat(sessionOrRefreshTokenReferences(classes))
                 .as("no session or refresh-token concept exists in the identity module yet "
-                        + "(brecha con destino: session-tokens-and-web-layer, cambio 15)")
+                        + "(brecha con destino: session-tokens-and-web-layer, cuarta parte del cambio 7)")
                 .isEmpty();
     }
 

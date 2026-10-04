@@ -117,6 +117,20 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    con su aprovisionamiento sobre Redis, es del cambio 11 (`containerization-and-cicd-pipeline`). El
    estado del retroceso **por cuenta** vive en PostgreSQL, no en Redis (docs/03-seguridad.md §4.4,
    nota editorial del 2026-09-24): la dimensión por IP es la única que sigue apuntando a Redis.
+   **Pendientes heredados de la parte 3 (`password-recovery-token`, nota del 2026-10-03).** Esa parte
+   entrega el restablecimiento de contraseña con token de un solo uso como casos de uso, sin endpoint
+   ni sesiones, y deja seis pendientes con dueño nombrado: (a) **el adaptador de programación de la
+   emisión sobre db-scheduler y la purga de tokens vencidos** son del cambio 9
+   (`background-jobs-with-db-scheduler`); (b) **el adaptador de envío del enlace y el aviso al titular
+   tras el restablecimiento, con IP y momento,** son del cambio 14 (`transactional-email-adapter`),
+   posterior al cambio 9, que sirve también al aviso de códigos de recuperación de MFA bajos;
+   (c) **el endpoint, la respuesta `202 Accepted`, `Referrer-Policy: no-referrer` y la puerta de
+   tiempo de §4.6** son de `session-tokens-and-web-layer`; (d) **la revocación de todas las sesiones
+   al restablecer** y (e) **el límite de 10 solicitudes por hora por IP** son también de
+   `session-tokens-and-web-layer`, como condiciones duras de aceptación escritas en
+   `openspec/changes/foundations-plan/exploration.md`; (f) la prueba de que el restablecimiento revoca
+   las familias de refresco, escenario I24, existe solo como condición escrita y es de ese mismo
+   cambio. Hasta que lleguen (a) y (b) la recuperación no funciona de punta a punta.
 4. **Matriz de autorización** documentada y verificada por pruebas: qué rol puede hacer qué operación (brecha A7).
 5. Bitácora de auditoría de solo inserción, encadenada por hash, sin permiso de actualización ni borrado para el rol de aplicación (brecha B6).
 6. Infraestructura de idempotencia: marcador con clave primaria natural, espera acotada

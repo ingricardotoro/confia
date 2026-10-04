@@ -672,3 +672,43 @@ IdentityScopeExclusionInventoryTest    tests=12 failures=0 errors=0
 ### Escenarios
 
 I21, I22, I23 (primera mitad), I25, I27 e I33.
+
+---
+
+## Tarea 5.2 — Documentación, pruebas existentes de las brechas y trazabilidad
+
+**No hay rojo que observar en la parte documental**, y se dice así: son notas fechadas sin código. El
+único cambio de código es el texto de un mensaje de aserción de 5.1 (el destino de la brecha se nombra
+como «cuarta parte del cambio 7», no «cambio 15», que es `process-entry-point-isolation`).
+
+### Notas fechadas (2026-10-03), sin reescribir el cuerpo de ninguna sección
+
+- `openspec/changes/foundations-plan/exploration.md`: las dos condiciones duras de
+  `session-tokens-and-web-layer` (revocar todas las familias al restablecer; no fusionar el endpoint de
+  solicitud sin el límite de 10 por hora por IP), junto a la que ya existía para `identity_login_backoff`.
+- `docs/03-seguridad.md` §4.7: tabla, emisión en el trabajador, definición de MFA activa, SHA-256 del texto
+  base64url, retroceso compartido y pendientes con dueño. §6.1: adenda de privilegios de la tabla.
+- `docs/08-datos-privacidad-y-retencion.md`: nota tras la tabla de la línea 322, filas retenidas hasta el
+  cambio 9.
+- `docs/09-roadmap-y-fases.md` §3: pendientes heredados de la parte 3, con los seis dueños.
+
+### Pruebas existentes, sin tocarlas
+
+```
+AuthenticateWithPasswordTest#aSuccessfulLoginNeverRecalculatesTheStoredHash                      tests=1 failures=0  (I44)
+IdentityScopeExclusionInventoryTest#noProductionClassOfIdentityDependsOnAnyNetworkClientLibrary  tests=1 failures=0  (I42)
+ConsumeRecoveryCodeIT#consumingTheEighthCodeAuditsTheLowSignalWithoutSendingAnyEmail             tests=1 failures=0  (I45)
+```
+
+### I24, condición escrita
+
+Sin prueba en este cambio. Su prueba, que el restablecimiento revoca las familias de refresco cuando
+exista la primera emisión, es de `session-tokens-and-web-layer` y consta como condición dura en
+`foundations-plan/exploration.md`. `IdentityScopeExclusionInventoryTest.noClassOfIdentityReferencesSessionsOrRefreshTokens`
+(5.1) fallará ese día, a propósito.
+
+### Trazabilidad
+
+La tabla de «Cierre de la trazabilidad contra las clases reales» de `tasks.md` recoge las diferencias entre
+lo que decía `design.md` §6.1 y las clases reales. Se comprobó por lectura que cada clase que §6.1 nombra
+existe en el árbol de pruebas.
