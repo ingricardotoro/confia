@@ -1,6 +1,6 @@
 # Progreso de aplicación: `password-recovery-token`
 
-- **Corte en curso:** C4. C1a a C3b fusionados en `main` (#68 a #72).
+- **Corte en curso:** C5. C1a a C4c fusionados en `main` (#68 a #75).
 - **Entorno:** OpenJDK 25.0.4 (paquete de Ubuntu 24.04), Maven Wrapper del repositorio, Docker 29.3.1
   con `postgres:18-alpine`. El `JAVA_HOME` del sistema apunta al JDK 21, así que toda invocación de
   Maven exporta `JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64` en la propia orden.
@@ -608,3 +608,122 @@ I8 e I20.
     186, 393 y 216 pruebas.
   - **C4c** `change/password-recovery-token-c4c-second-factor`, sobre C4b: 4.2 y 4.3, y este
     registro, 497 líneas. Su árbol es idéntico al de la rama en la que se aplicó el corte completo.
+
+---
+
+## Tarea 5.1 — Redacción con control negativo e inventario de ausencias
+
+### Entorno y estado previo del árbol
+
+- El `JAVA_HOME` del sistema sigue apuntando al JDK 21; toda orden de Maven exporta
+  `JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-25.0.3.9-hotspot"`.
+- `main` estaba en `0f565d3`, pero el árbol de trabajo traía archivos **sin seguimiento** de un intento
+  anterior y descartado de otra herramienta (clases de `admin`, `portal`, `worker`, `JwtAuthenticationFilter`,
+  `apps/admin-web`, `apps/portal-web`, `backend/` y otros). Impedían compilar el módulo
+  (`org.springframework.security` no está en el classpath). Se apartaron sin borrarlos con
+  `git stash push -u` (`gemini-c5-leftovers-untracked`); no forman parte de este cambio. Quedan sin
+  seguimiento, sin tocar, `openspec/changes/archive/2026-10-02-*`, `openspec/specs/{admin-web,backend,bootstrap,portal-web}`,
+  `packages/contracts/src/{admin,portal}` y `screenshot.png`.
+
+### Pruebas
+
+- `IdentitySecretRedactionIT` (+2): una emisión y un restablecimiento reales, más un segundo intento con
+  el token ya consumido. Se barren los `toString()` del token, su hash, el comando, la contraseña nueva y
+  su hash Argon2id, los mensajes de tres excepciones y los asientos de auditoría. El hash SHA-256 y el hash
+  Argon2id se barren contra todo salvo la tabla que los guarda; el token y la contraseña en claro, también
+  contra las filas de `identity_password_reset_token`. La segunda prueba es el control negativo permanente,
+  contra `LeakingPasswordResetTokenFixture` (un `record` sin `toString()` redactado).
+- `IdentityScopeExclusionInventoryTest` (+6): ninguna clase de producción de `com.confia` implementa
+  `PasswordResetIssuanceScheduler` ni `PasswordResetLinkSender` (I25, I27); solo `ResetPasswordWithToken`
+  llama a `StaffAccountRepository.replacePasswordHash` (I33); ninguna clase de `com.confia.identity`
+  nombra sesiones ni tokens de refresco (I23, segunda mitad aparte). Cada regla tiene una prueba gemela contra
+  un accesorio permanente de `PasswordRecoveryScopeViolationFixtures`, que la viola.
+  Limitación documentada: la regla de los puertos ve clases que los implementan, no una lambda.
+
+### ROJO
+
+- Redacción: con las pruebas escritas y sin el accesorio, la compilación de pruebas falla
+  (`cannot find symbol: class LeakingPasswordResetTokenFixture`, 3 errores). Es un rojo de compilación; el
+  rojo de comportamiento es el control negativo de abajo.
+- Inventario: las reglas no tienen rojo propio contra producción limpia, porque la ausencia ya es cierta.
+  Su rojo es el control negativo.
+
+### VERDE
+
+Sin código de producción, como preveía la tarea.
+
+```
+IdentitySecretRedactionIT              tests=5  failures=0 errors=0
+IdentityScopeExclusionInventoryTest    tests=12 failures=0 errors=0
+```
+
+### Controles negativos (variantes locales, descartadas sin comprometer)
+
+1. **Redacción.** Con `PlainPasswordResetToken.toString()` devolviendo `"PlainPasswordResetToken[" + value + "]"`
+   fallan dos pruebas: el barrido
+   (`produced text unexpectedly contains the clear-text password-reset token (43 characters)`, sin imprimir
+   el valor) y la comprobación de que el token real imprime redactado. Restaurado con `git checkout`.
+2. **Inventario.** Una clase temporal de producción en `identity.infrastructure` que implementa los dos
+   puertos, llama a `replacePasswordHash` y declara un método `revokeRefreshTokens` hace fallar exactamente
+   las tres pruebas de producción (`noProductionClassImplementsTheIssuanceSchedulerOrTheLinkSender`,
+   `onlyResetPasswordWithTokenCallsReplacePasswordHash`, `noClassOfIdentityReferencesSessionsOrRefreshTokens`),
+   con 12 pruebas ejecutadas y 3 fallos. La clase se borró, incluido su `.class` en `target`.
+
+### Escenarios
+
+I21, I22, I23 (primera mitad), I25, I27 e I33.
+
+---
+
+## Tarea 5.2 — Documentación, pruebas existentes de las brechas y trazabilidad
+
+**No hay rojo que observar en la parte documental**, y se dice así: son notas fechadas sin código. El
+único cambio de código es el texto de un mensaje de aserción de 5.1 (el destino de la brecha se nombra
+como «cuarta parte del cambio 7», no «cambio 15», que es `process-entry-point-isolation`).
+
+### Notas fechadas (2026-10-03), sin reescribir el cuerpo de ninguna sección
+
+- `openspec/changes/foundations-plan/exploration.md`: las dos condiciones duras de
+  `session-tokens-and-web-layer` (revocar todas las familias al restablecer; no fusionar el endpoint de
+  solicitud sin el límite de 10 por hora por IP), junto a la que ya existía para `identity_login_backoff`.
+- `docs/03-seguridad.md` §4.7: tabla, emisión en el trabajador, definición de MFA activa, SHA-256 del texto
+  base64url, retroceso compartido y pendientes con dueño. §6.1: adenda de privilegios de la tabla.
+- `docs/08-datos-privacidad-y-retencion.md`: nota tras la tabla de la línea 322, filas retenidas hasta el
+  cambio 9.
+- `docs/09-roadmap-y-fases.md` §3: pendientes heredados de la parte 3, con los seis dueños.
+
+### Pruebas existentes, sin tocarlas
+
+```
+AuthenticateWithPasswordTest#aSuccessfulLoginNeverRecalculatesTheStoredHash                      tests=1 failures=0  (I44)
+IdentityScopeExclusionInventoryTest#noProductionClassOfIdentityDependsOnAnyNetworkClientLibrary  tests=1 failures=0  (I42)
+ConsumeRecoveryCodeIT#consumingTheEighthCodeAuditsTheLowSignalWithoutSendingAnyEmail             tests=1 failures=0  (I45)
+```
+
+### I24, condición escrita
+
+Sin prueba en este cambio. Su prueba, que el restablecimiento revoca las familias de refresco cuando
+exista la primera emisión, es de `session-tokens-and-web-layer` y consta como condición dura en
+`foundations-plan/exploration.md`. `IdentityScopeExclusionInventoryTest.noClassOfIdentityReferencesSessionsOrRefreshTokens`
+(5.1) fallará ese día, a propósito.
+
+### Trazabilidad
+
+La tabla de «Cierre de la trazabilidad contra las clases reales» de `tasks.md` recoge las diferencias entre
+lo que decía `design.md` §6.1 y las clases reales. Se comprobó por lectura que cada clase que §6.1 nombra
+existe en el árbol de pruebas.
+
+---
+
+## Cierre de C5
+
+- **`./mvnw -B clean verify`:** `BUILD SUCCESS` en 5 min 13 s. 186 pruebas del núcleo, 399 unitarias y
+  225 de integración (C4: 186, 393 y 223; C5 añade 6 unitarias y 2 de integración). La primera orden se
+  detuvo en `clean` porque OneDrive bloqueaba `kernel/target/pit-reports`; se borraron `kernel/target` y
+  `app/target` a mano y la segunda corrió limpia.
+- **Diff medido** contra `main` (`0f565d3`), sin `openspec` ni código generado: **445 líneas** (445
+  añadidas, 0 borradas), dentro del presupuesto de 800 y dentro del pronóstico de 375 a 750. Con
+  `openspec` incluido son 592. Un solo pull request, sin partir el corte.
+- **Cadena:** `change/password-recovery-token-c5-redaction-and-docs`, con base en `main`, porque C4 ya
+  está fusionado. Dos confirmaciones de trabajo: 5.1 (pruebas) y 5.2 (documentación y trazabilidad).
+- **Pendiente fuera del ejecutor:** empujar la rama y confirmar la integración continua (tarea 5.2).

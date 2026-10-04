@@ -328,6 +328,14 @@ identidad, actor que la atendió, momento de resolución, resultado y evidencia 
 | Registros de incidentes de seguridad y evidencia asociada | **Mínimo 2 años**, o lo que indique la asesoría legal | `docs/03-seguridad.md` sección 17.5 | Revisión manual antes de eliminar |
 | Respaldos de base de datos | Escalonado: 7 diarios, 4 semanales, 12 mensuales | Objetivo de recuperación y protección ante ransomware | Rotación automática. **Ver la nota de respaldos abajo** |
 
+> **Nota editorial, 2026-10-03 (`password-recovery-token`).** La fila «Tokens de refresco y de
+> recuperación» fija la eliminación automática de los tokens de recuperación, pero esa purga no
+> existe todavía: la tabla `identity_password_reset_token` se entrega sin `DELETE` para ningún rol, y
+> sus filas vencidas, usadas y reemplazadas se **retienen hasta que el cambio 9**
+> (`background-jobs-with-db-scheduler`) entregue el trabajo de purga. La fila no guarda el token ni dato
+> personal alguno, solo su SHA-256, el identificador interno de la cuenta y marcas de tiempo. La
+> vigencia de 30 minutos sí se aplica desde ya, porque la comprueba el restablecimiento.
+
 ### 6.1 La eliminación y los respaldos
 
 Un dato eliminado de la base de datos sigue existiendo en los respaldos hasta que esos respaldos

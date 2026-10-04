@@ -4,9 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.identity.application.AuthenticationCommand;
+import com.confia.identity.application.PasswordResetIssuanceScheduler;
+import com.confia.identity.application.PasswordResetLinkSender;
+import com.confia.identity.application.ResetPasswordWithToken;
+import com.confia.identity.application.StaffAccountRepository;
 import com.confia.identity.domain.BackoffPolicy;
 import com.confia.identity.domain.BackoffState;
 import com.confia.identity.infrastructure.Argon2Profile;
+import com.confia.identity.testsupport.fixture.PasswordRecoveryScopeViolationFixtures;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.crypto.DataEncryptionKeyRepository;
 import com.tngtech.archunit.core.domain.Dependency;
@@ -22,12 +27,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
@@ -229,6 +236,156 @@ class IdentityScopeExclusionInventoryTest {
                 .as("and it offers no operation a rotation job could call")
                 .noneMatch(name -> name.contains("reencrypt") || name.contains("rotate")
                         || name.contains("retire"));
+    }
+
+    /**
+     * Scenarios I25 and I27 (password-recovery-token design.md decision 11; specs/identity/spec.md,
+     * "Ausencia de programación real" and "Ausencia de envío"): the issuance scheduler and the link
+     * sender are ports without a production adapter. The db-scheduler adapter arrives with change
+     * 9 and the email adapter with change 14; this test fails the day either lands, which is when
+     * its owner rewrites it. It sees implementing classes, so a lambda in a configuration class is
+     * outside its reach; the first adapter that matters will be a named class.
+     */
+    @Test
+    void noProductionClassImplementsTheIssuanceSchedulerOrTheLinkSender() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+        assertThat(production.contain(PasswordResetIssuanceScheduler.class)
+                && production.contain(PasswordResetLinkSender.class))
+                .as("both ports must be part of the scanned production tree, or the absence "
+                        + "below would pass vacuously")
+                .isTrue();
+
+        assertThat(implementationsOf(production, PasswordResetIssuanceScheduler.class))
+                .as("no production adapter of the issuance scheduling port exists yet "
+                        + "(brecha con destino: cambio 9, background-jobs-with-db-scheduler)")
+                .isEmpty();
+        assertThat(implementationsOf(production, PasswordResetLinkSender.class))
+                .as("no production adapter of the reset link delivery port exists yet "
+                        + "(brecha con destino: cambio 14, transactional-email-adapter)")
+                .isEmpty();
+    }
+
+    @Test
+    void thePortAdapterRuleRejectsAFixtureThatImplementsEachPort() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(
+                PasswordRecoveryScopeViolationFixtures.SchedulerAdapter.class,
+                PasswordRecoveryScopeViolationFixtures.LinkSenderAdapter.class);
+
+        assertThat(implementationsOf(fixtures, PasswordResetIssuanceScheduler.class))
+                .containsExactly(PasswordRecoveryScopeViolationFixtures.SchedulerAdapter.class
+                        .getName());
+        assertThat(implementationsOf(fixtures, PasswordResetLinkSender.class))
+                .containsExactly(PasswordRecoveryScopeViolationFixtures.LinkSenderAdapter.class
+                        .getName());
+    }
+
+    /**
+     * Scenario I33 (design.md decision 11, "El único camino para cambiar una contraseña es el
+     * token"): across the whole production tree, the only class that calls {@code
+     * StaffAccountRepository.replacePasswordHash} is {@code ResetPasswordWithToken}. A future
+     * administrative reset would add a second caller and fail here, which is the point: it is a
+     * different change with its own authorization story.
+     */
+    @Test
+    void onlyResetPasswordWithTokenCallsReplacePasswordHash() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+
+        assertThat(callersOfReplacePasswordHash(production))
+                .as("exactly one production class rewrites a stored hash, and it is the reset "
+                        + "with a token; a non-empty expectation, so a renamed method cannot "
+                        + "make this pass vacuously")
+                .containsExactly(ResetPasswordWithToken.class.getName());
+    }
+
+    @Test
+    void theSinglePasswordWriterRuleRejectsAFixtureThatCallsReplacePasswordHash() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(
+                PasswordRecoveryScopeViolationFixtures.SecondPasswordWriter.class);
+
+        assertThat(callersOfReplacePasswordHash(fixtures))
+                .containsExactly(PasswordRecoveryScopeViolationFixtures.SecondPasswordWriter.class
+                        .getName());
+    }
+
+    /**
+     * Scenario I23, first half (design.md decision 11): nothing in {@code com.confia.identity..}
+     * mentions a session or a refresh token, whether in a class name, a member name or a type it
+     * depends on, so a reset can only change the password. The second half, that the gap closes
+     * with the first refresh-token issuance (I24), is a written condition of {@code
+     * session-tokens-and-web-layer} with no test in this change.
+     */
+    @Test
+    void noClassOfIdentityReferencesSessionsOrRefreshTokens() {
+        JavaClasses classes = assertNonEmptyIdentityProductionClasses();
+
+        assertThat(sessionOrRefreshTokenReferences(classes))
+                .as("no session or refresh-token concept exists in the identity module yet "
+                        + "(brecha con destino: session-tokens-and-web-layer, cuarta parte del cambio 7)")
+                .isEmpty();
+    }
+
+    @Test
+    void theSessionReferenceRuleRejectsAFixtureThatMentionsARefreshToken() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(
+                PasswordRecoveryScopeViolationFixtures.RefreshTokenFamilyRevoker.class);
+
+        assertThat(sessionOrRefreshTokenReferences(fixtures))
+                .anyMatch(reference -> reference.contains("RefreshTokenFamilyRevoker"))
+                .anyMatch(reference -> reference.contains("revokeAllRefreshTokensOf"));
+    }
+
+    private static List<String> implementationsOf(JavaClasses classes, Class<?> port) {
+        return classes.stream()
+                .filter(javaClass -> !javaClass.isInterface() && javaClass.isAssignableTo(port))
+                .map(JavaClass::getFullName)
+                .sorted()
+                .toList();
+    }
+
+    private static List<String> callersOfReplacePasswordHash(JavaClasses classes) {
+        return classes.stream()
+                .filter(javaClass -> javaClass.getMethodCallsFromSelf().stream()
+                        .anyMatch(call -> call.getTarget().getName().equals("replacePasswordHash")
+                                && call.getTarget().getOwner()
+                                        .isAssignableTo(StaffAccountRepository.class)))
+                .map(JavaClass::getFullName)
+                .sorted()
+                .toList();
+    }
+
+    /** Every class, member or dependency name under {@code com.confia.identity} that says session
+     * or refresh token, each as "owner: name" so a failure points at the offender. */
+    private static List<String> sessionOrRefreshTokenReferences(JavaClasses classes) {
+        Pattern sessionOrRefreshToken =
+                Pattern.compile("session|refresh[_-]?token", Pattern.CASE_INSENSITIVE);
+        List<String> references = new ArrayList<>();
+        for (JavaClass javaClass : classes) {
+            if (!javaClass.getPackageName().startsWith("com.confia.identity")) {
+                continue;
+            }
+            List<String> names = new ArrayList<>();
+            names.add(javaClass.getName());
+            javaClass.getFields().forEach(field -> names.add(field.getName()));
+            javaClass.getMethods().forEach(method -> names.add(method.getName()));
+            javaClass.getDirectDependenciesFromSelf()
+                    .forEach(dependency -> names.add(dependency.getTargetClass().getFullName()));
+            for (String name : names) {
+                if (sessionOrRefreshToken.matcher(name).find()) {
+                    references.add(javaClass.getFullName() + ": " + name);
+                }
+            }
+        }
+        return references;
+    }
+
+    private static JavaClasses assertNonEmptyProductionClasses() {
+        JavaClasses classes = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages("com.confia");
+        assertThat(classes.stream().map(JavaClass::getFullName).toList())
+                .as("the scanned com.confia production class tree must be real and populated")
+                .isNotEmpty();
+        return classes;
     }
 
     /**
