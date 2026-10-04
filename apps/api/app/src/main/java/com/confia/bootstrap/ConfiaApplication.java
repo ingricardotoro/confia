@@ -1,5 +1,8 @@
 package com.confia.bootstrap;
 
+import com.confia.bootstrap.admin.AdminApplication;
+import com.confia.bootstrap.portal.PortalApplication;
+import com.confia.bootstrap.worker.WorkerApplication;
 import com.confia.shared.web.openapi.ProcessApiInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,9 +16,9 @@ import org.springframework.context.ConfigurableApplicationContext;
  *
  * <pre>
  * APP_PROFILE ──&gt; ConfiaApplication#main
- *      admin   ──&gt; AdminApplication    (web)
- *      portal  ──&gt; PortalApplication   (web)
- *      worker  ──&gt; WorkerApplication   (no HTTP)
+ *      admin   ──&gt; bootstrap.admin.AdminApplication     (web)
+ *      portal  ──&gt; bootstrap.portal.PortalApplication   (web)
+ *      worker  ──&gt; bootstrap.worker.WorkerApplication   (no HTTP)
  *      migrate ──&gt; recognized, no behavior yet (change 11)
  *      other   ──&gt; aborts, non-zero exit code
  * </pre>
