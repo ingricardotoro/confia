@@ -65,4 +65,51 @@ class ConfiguredLoginInstitutionProviderTest {
             System.clearProperty(ConfiguredLoginInstitutionProvider.CONFIG_KEY);
         }
     }
+
+    @Test
+    void fromValueResolvesTheConfiguredInstitutionId() {
+        UUID institutionId = UUID.randomUUID();
+
+        ConfiguredLoginInstitutionProvider provider =
+                ConfiguredLoginInstitutionProvider.fromValue(institutionId.toString());
+
+        assertThat(provider.loginInstitutionId()).isEqualTo(new InstitutionId(institutionId));
+    }
+
+    @Test
+    void fromValueToleratesSurroundingWhitespace() {
+        UUID institutionId = UUID.randomUUID();
+
+        ConfiguredLoginInstitutionProvider provider =
+                ConfiguredLoginInstitutionProvider.fromValue("\t" + institutionId + " \n");
+
+        assertThat(provider.loginInstitutionId()).isEqualTo(new InstitutionId(institutionId));
+    }
+
+    @Test
+    void fromValueFailsWhenTheValueIsAbsentOrBlankNamingTheKey() {
+        assertThatThrownBy(() -> ConfiguredLoginInstitutionProvider.fromValue(null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(ConfiguredLoginInstitutionProvider.CONFIG_KEY);
+        assertThatThrownBy(() -> ConfiguredLoginInstitutionProvider.fromValue("  "))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(ConfiguredLoginInstitutionProvider.CONFIG_KEY);
+    }
+
+    /**
+     * A malformed value is never repeated and the parser's exception is never chained: its message
+     * would repeat the value (CLAUDE.md, regla 11).
+     */
+    @Test
+    void fromValueRejectsAMalformedValueWithoutEchoingItOrChainingTheParser() {
+        String malformed = "Qx7!Rk2#Jv9%Wm5@";
+
+        assertThatThrownBy(() -> ConfiguredLoginInstitutionProvider.fromValue(malformed))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(ConfiguredLoginInstitutionProvider.CONFIG_KEY)
+                .hasMessageNotContaining("Qx7!")
+                .hasMessageNotContaining("Rk2#")
+                .hasMessageNotContaining("Wm5@")
+                .hasNoCause();
+    }
 }
