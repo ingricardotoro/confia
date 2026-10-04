@@ -475,7 +475,7 @@ en `...-c4b-second-factor`, con base en la anterior.
 
 Rama `change/password-recovery-token-c5-redaction-and-docs`, con base en C4.
 
-- [ ] 5.1 **Redacción con control negativo e inventario de ausencias (ROJO/VERDE).** Requiere
+- [x] 5.1 **Redacción con control negativo e inventario de ausencias (ROJO/VERDE).** Requiere
   Docker.
   - **ROJO:**
     - `IdentitySecretRedactionIT` añade el token en claro, su SHA-256, la contraseña nueva y su hash

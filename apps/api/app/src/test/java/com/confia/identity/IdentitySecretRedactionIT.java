@@ -7,12 +7,22 @@ import static org.assertj.core.api.Assertions.fail;
 import com.confia.identity.application.AuthenticateWithPassword;
 import com.confia.identity.application.AuthenticationCommand;
 import com.confia.identity.application.AuthenticationDecision;
+import com.confia.identity.application.ConsumeRecoveryCode;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.EnrollTotpSecondFactorResult;
+import com.confia.identity.application.IssuePasswordResetToken;
+import com.confia.identity.application.IssuePasswordResetTokenDecision;
+import com.confia.identity.application.ResetOutcome;
+import com.confia.identity.application.ResetPasswordCommand;
+import com.confia.identity.application.ResetPasswordDecision;
+import com.confia.identity.application.ResetPasswordWithToken;
+import com.confia.identity.application.SecondFactorProof;
 import com.confia.identity.application.VerifyTotpCode;
 import com.confia.identity.application.VerifyTotpCodeDecision;
 import com.confia.identity.domain.LoginIdentifier;
+import com.confia.identity.domain.PasswordResetTokenHash;
 import com.confia.identity.domain.PlainPassword;
+import com.confia.identity.domain.PlainPasswordResetToken;
 import com.confia.identity.domain.PlainRecoveryCode;
 import com.confia.identity.domain.PlainTotpSecret;
 import com.confia.identity.domain.StaffAccountId;
@@ -26,11 +36,13 @@ import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
 import com.confia.identity.infrastructure.BouncyCastleRecoveryCodeHasher;
 import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
+import com.confia.identity.infrastructure.JooqPasswordResetTokenRepository;
 import com.confia.identity.infrastructure.JooqRecoveryCodeRepository;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
 import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.identity.infrastructure.JooqTotpVerificationBackoffStore;
 import com.confia.identity.testsupport.fixture.LeakingMfaSecretFixture;
+import com.confia.identity.testsupport.fixture.LeakingPasswordResetTokenFixture;
 import com.confia.kernel.AeadIntegrityException;
 import com.confia.kernel.AesGcmCipher;
 import com.confia.kernel.InstitutionId;
@@ -49,6 +61,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashSet;
@@ -287,6 +300,129 @@ class IdentitySecretRedactionIT extends CommittingPostgresIntegrationTest {
                 .hasMessageNotContaining(fakeSecret);
     }
 
+    /**
+     * Specs/identity/spec.md, requirement "Ningún secreto observable" (password-recovery-token
+     * design.md decision 10; scenarios I21 and I22): a real issuance followed by a real reset, with
+     * everything either produces as text swept for the four new secrets — the clear-text token, its
+     * SHA-256, the new password and its Argon2id hash. A TOTP code travels next to the token in the
+     * same command, but the MFA test above already sweeps it.
+     *
+     * <p>The token's SHA-256 and the new Argon2id hash legitimately sit in their own rows, so the
+     * text swept for them leaves out the table that stores each. The clear-text token and the new
+     * password are swept against every row as well, because no table may ever hold them.
+     */
+    @Test
+    void noExceptionNorToStringNorAuditRowExposesThePasswordResetTokenItsHashOrTheNewPassword() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        String newPasswordLiteral = "Clave-Nueva#2026";
+        Argon2Pepper pepper = Argon2Pepper.fromBase64(Base64.getEncoder().encodeToString(
+                new byte[32]));
+        BouncyCastleArgon2PasswordHasher hasher =
+                new BouncyCastleArgon2PasswordHasher(Argon2Profile.floor(), pepper);
+        StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
+        seedAccountWithOldPassword(institutionId, accountId, "carlos.pineda@colegio.edu.hn",
+                hasher.hash(PlainPassword.of("Contrasena-Anterior#1")));
+        ColumnEncryptionService encryption = encryptionServiceFor(randomMasterKey());
+        Clock clock = Clock.fixed(Instant.parse("2026-03-10T16:00:00Z"), ZoneOffset.UTC);
+
+        List<PlainPasswordResetToken> delivered = new ArrayList<>();
+        IssuePasswordResetTokenDecision issuance = new IssuePasswordResetToken(transactionRunner(),
+                new JooqStaffAccountRepository(dsl), new JooqPasswordResetTokenRepository(dsl),
+                (institution, account, token) -> delivered.add(token),
+                new JooqAuditLogWriter(dsl), new SecureRandom(), clock)
+                .execute(contextOf(institutionId), accountId);
+        assertThat(issuance).isEqualTo(IssuePasswordResetTokenDecision.ISSUED);
+        assertThat(delivered).as("the issuance must have delivered exactly one token").hasSize(1);
+        PlainPasswordResetToken token = delivered.get(0);
+        PasswordResetTokenHash tokenHash = PasswordResetTokenHash.of(token);
+
+        ResetPasswordWithToken reset = new ResetPasswordWithToken(transactionRunner(),
+                () -> institutionId, new JooqPasswordResetTokenRepository(dsl),
+                new JooqStaffAccountRepository(dsl), new JooqTotpCredentialRepository(dsl),
+                new VerifyTotpCode(transactionRunner(), new JooqTotpCredentialRepository(dsl),
+                        new JooqTotpVerificationBackoffStore(dsl), encryption,
+                        new JooqAuditLogWriter(dsl), clock),
+                new ConsumeRecoveryCode(transactionRunner(), new JooqRecoveryCodeRepository(dsl),
+                        new BouncyCastleRecoveryCodeHasher(Argon2Profile.floor(), pepper),
+                        new JooqAuditLogWriter(dsl), clock),
+                hasher, new JooqAuditLogWriter(dsl), clock);
+        ResetPasswordCommand command = new ResetPasswordCommand(token.value(), newPasswordLiteral,
+                new SecondFactorProof.None());
+        ResetPasswordDecision decision = reset.execute(contextOf(institutionId), command);
+        assertThat(decision.outcome()).isInstanceOf(ResetOutcome.Completed.class);
+
+        // A second attempt with the now-consumed token, so a refusal's text is swept too.
+        ResetPasswordDecision rejected = reset.execute(contextOf(institutionId), command);
+        assertThat(rejected.outcome()).isInstanceOf(ResetOutcome.TokenRejected.class);
+
+        StoredPasswordHash newHash = new StoredPasswordHash(storedHashOf(institutionId, accountId));
+        PlainPassword newPassword = PlainPassword.of(newPasswordLiteral);
+        List<AuditRowSnapshot> auditRows = auditRowsFor(institutionId);
+        assertThat(auditRows)
+                .as("the sweep must have the audit rows of the issuance and of the reset to read")
+                .anyMatch(row -> row.action().equals("identity.password_reset.issued"))
+                .anyMatch(row -> row.action().equals("identity.password_reset.completed"));
+
+        StringBuilder producedText = new StringBuilder()
+                .append(issuance)
+                .append(decision)
+                .append(rejected)
+                .append(token)
+                .append(tokenHash)
+                .append(command)
+                .append(newPassword)
+                .append(newHash)
+                .append(exceptionMessageOf(() -> PlainPasswordResetToken.of(token.value() + "X")))
+                .append(exceptionMessageOf(() -> new PasswordResetTokenHash(token.value())))
+                .append(exceptionMessageOf(() -> new StoredPasswordHash(newPasswordLiteral)));
+        for (AuditRowSnapshot row : auditRows) {
+            producedText.append(row);
+        }
+        String producedTextAndAudit = producedText.toString();
+        String tokenRows = rowsOf("identity_password_reset_token", institutionId);
+
+        assertSecretNeverLeaked(producedTextAndAudit, "the clear-text password-reset token",
+                token.value());
+        assertSecretNeverLeaked(tokenRows, "the clear-text password-reset token (stored rows)",
+                token.value());
+        assertSecretNeverLeaked(producedTextAndAudit, "the SHA-256 of the password-reset token",
+                tokenHash.value());
+        assertSecretNeverLeaked(producedTextAndAudit, "the new clear-text password",
+                newPasswordLiteral);
+        assertSecretNeverLeaked(tokenRows, "the new clear-text password (stored rows)",
+                newPasswordLiteral);
+        assertSecretNeverLeaked(producedTextAndAudit, "the new password's Argon2id hash",
+                newHash.value());
+        assertSecretNeverLeaked(tokenRows, "the new password's Argon2id hash (stored rows)",
+                newHash.value());
+    }
+
+    /**
+     * The negative control of the sweep above (password-recovery-token design.md decision 10;
+     * scenario I22), in its own method so a failure here and a failure of the sweep are never
+     * confused: a fixture that prints the token through its generated {@code toString()} does leak
+     * it, and {@link #assertSecretNeverLeaked} does reject that, without repeating the token in its
+     * own failure message. The same discipline as {@link #theRedactionSweepDetectsARealLeak}.
+     */
+    @Test
+    void thePasswordResetSweepDetectsARealLeakOfTheToken() {
+        PlainPasswordResetToken token = PlainPasswordResetToken.generate(new SecureRandom());
+        LeakingPasswordResetTokenFixture fixture =
+                new LeakingPasswordResetTokenFixture(token.value());
+
+        assertThat(fixture.toString())
+                .as("if this ever fails, the fixture changed shape, not the production code")
+                .contains(token.value());
+        assertThatThrownBy(() -> assertSecretNeverLeaked(fixture.toString(),
+                "the fixture's leaked password-reset token", token.value()))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("the fixture's leaked password-reset token")
+                .hasMessageNotContaining(token.value());
+        assertThat(token.toString())
+                .as("the real token, by contrast, prints redacted")
+                .doesNotContain(token.value());
+    }
+
     /** Every encoding a leaked byte secret could plausibly take in produced text. */
     private static void assertBytesNeverLeaked(String haystack, String secretDescription,
             byte[] secret) {
@@ -399,6 +535,26 @@ class IdentitySecretRedactionIT extends CommittingPostgresIntegrationTest {
                     "$argon2id$v=19$m=19456,t=3,p=1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNoaGFzaGhhc2g");
             return null;
         });
+    }
+
+    private void seedAccountWithOldPassword(InstitutionId institutionId, StaffAccountId accountId,
+            String email, StoredPasswordHash hash) {
+        transactionRunner().execute(contextOf(institutionId), () -> {
+            dsl.execute("""
+                    insert into identity_staff_account
+                        (institution_id, id, email, password_hash, mfa_required)
+                    values (?, ?, ?, ?, false)
+                    """, institutionId.value(), accountId.value(), email, hash.value());
+            return null;
+        });
+    }
+
+    private String storedHashOf(InstitutionId institutionId, StaffAccountId accountId) {
+        return transactionRunner().execute(contextOf(institutionId), () -> dsl.fetchOne("""
+                select password_hash from identity_staff_account
+                where institution_id = ? and id = ?
+                """, institutionId.value(), accountId.value())
+                .get("password_hash", String.class));
     }
 
     /**

@@ -1,6 +1,6 @@
 # Progreso de aplicación: `password-recovery-token`
 
-- **Corte en curso:** C4. C1a a C3b fusionados en `main` (#68 a #72).
+- **Corte en curso:** C5. C1a a C4c fusionados en `main` (#68 a #75).
 - **Entorno:** OpenJDK 25.0.4 (paquete de Ubuntu 24.04), Maven Wrapper del repositorio, Docker 29.3.1
   con `postgres:18-alpine`. El `JAVA_HOME` del sistema apunta al JDK 21, así que toda invocación de
   Maven exporta `JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64` en la propia orden.
@@ -608,3 +608,67 @@ I8 e I20.
     186, 393 y 216 pruebas.
   - **C4c** `change/password-recovery-token-c4c-second-factor`, sobre C4b: 4.2 y 4.3, y este
     registro, 497 líneas. Su árbol es idéntico al de la rama en la que se aplicó el corte completo.
+
+---
+
+## Tarea 5.1 — Redacción con control negativo e inventario de ausencias
+
+### Entorno y estado previo del árbol
+
+- El `JAVA_HOME` del sistema sigue apuntando al JDK 21; toda orden de Maven exporta
+  `JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-25.0.3.9-hotspot"`.
+- `main` estaba en `0f565d3`, pero el árbol de trabajo traía archivos **sin seguimiento** de un intento
+  anterior y descartado de otra herramienta (clases de `admin`, `portal`, `worker`, `JwtAuthenticationFilter`,
+  `apps/admin-web`, `apps/portal-web`, `backend/` y otros). Impedían compilar el módulo
+  (`org.springframework.security` no está en el classpath). Se apartaron sin borrarlos con
+  `git stash push -u` (`gemini-c5-leftovers-untracked`); no forman parte de este cambio. Quedan sin
+  seguimiento, sin tocar, `openspec/changes/archive/2026-10-02-*`, `openspec/specs/{admin-web,backend,bootstrap,portal-web}`,
+  `packages/contracts/src/{admin,portal}` y `screenshot.png`.
+
+### Pruebas
+
+- `IdentitySecretRedactionIT` (+2): una emisión y un restablecimiento reales, más un segundo intento con
+  el token ya consumido. Se barren los `toString()` del token, su hash, el comando, la contraseña nueva y
+  su hash Argon2id, los mensajes de tres excepciones y los asientos de auditoría. El hash SHA-256 y el hash
+  Argon2id se barren contra todo salvo la tabla que los guarda; el token y la contraseña en claro, también
+  contra las filas de `identity_password_reset_token`. La segunda prueba es el control negativo permanente,
+  contra `LeakingPasswordResetTokenFixture` (un `record` sin `toString()` redactado).
+- `IdentityScopeExclusionInventoryTest` (+6): ninguna clase de producción de `com.confia` implementa
+  `PasswordResetIssuanceScheduler` ni `PasswordResetLinkSender` (I25, I27); solo `ResetPasswordWithToken`
+  llama a `StaffAccountRepository.replacePasswordHash` (I33); ninguna clase de `com.confia.identity`
+  nombra sesiones ni tokens de refresco (I23, segunda mitad aparte). Cada regla tiene una prueba gemela contra
+  un accesorio permanente de `PasswordRecoveryScopeViolationFixtures`, que la viola.
+  Limitación documentada: la regla de los puertos ve clases que los implementan, no una lambda.
+
+### ROJO
+
+- Redacción: con las pruebas escritas y sin el accesorio, la compilación de pruebas falla
+  (`cannot find symbol: class LeakingPasswordResetTokenFixture`, 3 errores). Es un rojo de compilación; el
+  rojo de comportamiento es el control negativo de abajo.
+- Inventario: las reglas no tienen rojo propio contra producción limpia, porque la ausencia ya es cierta.
+  Su rojo es el control negativo.
+
+### VERDE
+
+Sin código de producción, como preveía la tarea.
+
+```
+IdentitySecretRedactionIT              tests=5  failures=0 errors=0
+IdentityScopeExclusionInventoryTest    tests=12 failures=0 errors=0
+```
+
+### Controles negativos (variantes locales, descartadas sin comprometer)
+
+1. **Redacción.** Con `PlainPasswordResetToken.toString()` devolviendo `"PlainPasswordResetToken[" + value + "]"`
+   fallan dos pruebas: el barrido
+   (`produced text unexpectedly contains the clear-text password-reset token (43 characters)`, sin imprimir
+   el valor) y la comprobación de que el token real imprime redactado. Restaurado con `git checkout`.
+2. **Inventario.** Una clase temporal de producción en `identity.infrastructure` que implementa los dos
+   puertos, llama a `replacePasswordHash` y declara un método `revokeRefreshTokens` hace fallar exactamente
+   las tres pruebas de producción (`noProductionClassImplementsTheIssuanceSchedulerOrTheLinkSender`,
+   `onlyResetPasswordWithTokenCallsReplacePasswordHash`, `noClassOfIdentityReferencesSessionsOrRefreshTokens`),
+   con 12 pruebas ejecutadas y 3 fallos. La clase se borró, incluido su `.class` en `target`.
+
+### Escenarios
+
+I21, I22, I23 (primera mitad), I25, I27 e I33.
