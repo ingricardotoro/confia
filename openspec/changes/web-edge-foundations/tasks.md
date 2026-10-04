@@ -679,3 +679,15 @@ Subtotal `build-integrity`: 34 escenarios, 34 con tarea, 0 huérfanos.
 tarea 5.1 y su migración a `web-edge`. Los entregables sin escenario (notas fechadas de `docs/03`,
 `docs/05`, `docs/09`, `docs/ui-ux` y `foundations-plan`) están cubiertos por las tareas 1.2, 2.3, 2.4,
 3.2 y 5.1.
+
+---
+
+## Nota fechada 2026-10-04: ruta de `SharedPlatformConfiguration` (tarea 1.1)
+
+Donde la tarea 1.1 nombra `apps/api/app/src/main/java/com/confia/shared/platform/` y el paquete
+`com.confia.shared.platform`, la clase y su `package-info.java` viven en
+`com.confia.shared.platform.infrastructure`, porque `JooqConfinedToInfrastructureTest` (ADR-0015,
+regla 4) prohíbe `org.jooq` fuera de `..infrastructure..`. El prohibido nominal de portal y trabajador
+sigue siendo `com.confia.shared.platform` (por prefijo). El bean `TransactionRunner` se declara en
+`shared.security.TransactionRunnerConfiguration` y `com.confia.shared.audit` entra en la lista de
+permitidos con el PR 5. Detalle en la nota fechada de `design.md` y en `apply-progress.md`.

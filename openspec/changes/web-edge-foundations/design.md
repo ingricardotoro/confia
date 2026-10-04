@@ -1072,3 +1072,18 @@ los provee. Cada PR se revierte con su commit de fusión, en orden inverso; ning
 2. **Estrategia de entrega: `auto-chain` con `stacked-to-main`.** Sustituye la elección `single-pr`
    de la preflight de la sesión para este cambio. Son los 11 PR de la sección 8, cada uno de 800
    líneas efectivas como máximo, y cada PR parte de `main` después de fusionar el anterior.
+
+### Nota fechada 2026-10-04: paquete de `SharedPlatformConfiguration` (decisión 2, PR 1)
+
+Durante la aplicación de la tarea 1.1 se comprobó que `SharedPlatformConfiguration` no puede vivir en
+`com.confia.shared.platform` sin segmento de capa: declara un `DSLContext` y
+`JooqConfinedToInfrastructureTest` (ADR-0015, regla 4) prohíbe `org.jooq` fuera de un paquete
+`..infrastructure..`. Vive en `com.confia.shared.platform.infrastructure` (con `package-info.java` y
+`@NamedInterface`). La lista de permitidos de administración nombra ese paquete exacto, porque la prueba
+de no vacuidad compara el paquete de origen por igualdad; el prohibido nominal de portal y trabajador
+sigue siendo `com.confia.shared.platform` (coincide por prefijo). Por la misma causa, el bean
+`TransactionRunner` se declara en `com.confia.shared.security.TransactionRunnerConfiguration`, que
+importa la configuración de plataforma: `TransactionsOnlyInSharedSecurityTest` (regla 7) confina
+`PlatformTransactionManager` a `shared.security`. Además, `com.confia.shared.audit` entra en la lista de
+permitidos con el PR 5, cuando aparece su primer bean. El texto anterior de este documento no se
+reescribe.
