@@ -54,7 +54,7 @@ con pruebas y documentación en el mismo commit que el comportamiento que cubren
 
 ## Fase 1: aislamiento de contextos, de rojo a verde
 
-- [ ] 1.1 **ROJO contra el estado actual (`design.md` §7, paso 1).** Crear, sin tocar producción,
+- [x] 1.1 **ROJO contra el estado actual (`design.md` §7, paso 1).** Crear, sin tocar producción,
   `apps/api/app/src/test/java/com/confia/bootstrap/ProcessBeanPolicy.java`,
   `apps/api/app/src/test/java/com/confia/bootstrap/ProcessBeanInspector.java` y
   `apps/api/app/src/test/java/com/confia/bootstrap/ProcessBeanIsolationTest.java` (decisiones 4 y 5:
@@ -74,7 +74,7 @@ con pruebas y documentación en el mismo commit que el comportamiento que cubren
   «Cada proceso solo contiene beans permitidos», «El portal contiene solo lo suyo» y «El trabajador
   recibe una importación ajena»
 
-- [ ] 1.2 **VERDE: mover y reanotar los tres puntos de entrada (decisiones 1 y 2).** Eliminar
+- [x] 1.2 **VERDE: mover y reanotar los tres puntos de entrada (decisiones 1 y 2).** Eliminar
   `apps/api/app/src/main/java/com/confia/bootstrap/AdminApplication.java`,
   `PortalApplication.java` y `WorkerApplication.java` y crear
   `apps/api/app/src/main/java/com/confia/bootstrap/admin/AdminApplication.java`,
@@ -95,7 +95,7 @@ con pruebas y documentación en el mismo commit que el comportamiento que cubren
 
 ## Fase 2: prueba negativa del inspector
 
-- [ ] 2.1 **ROJO/VERDE: `ProcessBeanInspectorTest` (decisión 4, sección 6).** Crear
+- [x] 2.1 **ROJO/VERDE: `ProcessBeanInspectorTest` (decisión 4, sección 6).** Crear
   `apps/api/app/src/test/java/com/confia/bootstrap/ProcessBeanInspectorTest.java` con tres
   `GenericApplicationContext` construidos a mano, sin Spring Boot: (1) un bean de una clase anidada
   de la propia prueba, fuera de toda lista, evaluado con `PORTAL`, produce una violación
