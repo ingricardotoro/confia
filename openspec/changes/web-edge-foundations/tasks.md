@@ -143,7 +143,7 @@ renumeraría la cadena.
     beans…» (cableado), «El contexto del portal…» y «Los puntos de entrada se registran de forma
     explícita»
 
-- [ ] 1.2 **PR 2 `identity-beans`: casos de uso de identidad como beans (decisión 3).**
+- [x] 1.2 **PR 2 `identity-beans`: casos de uso de identidad como beans (decisión 3).**
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/bootstrap/IdentityConfigurationSecretsTest.java`
     (con cada secreto ausente por separado, el arranque administrativo falla con un mensaje que
     nombra `confia.identity.argon2-pepper` o `confia.identity.login-institution-id` y no contiene
@@ -691,3 +691,14 @@ regla 4) prohíbe `org.jooq` fuera de `..infrastructure..`. El prohibido nominal
 sigue siendo `com.confia.shared.platform` (por prefijo). El bean `TransactionRunner` se declara en
 `shared.security.TransactionRunnerConfiguration` y `com.confia.shared.audit` entra en la lista de
 permitidos con el PR 5. Detalle en la nota fechada de `design.md` y en `apply-progress.md`.
+
+## Nota fechada 2026-10-04: ruta de `IdentityConfiguration` (tarea 1.2)
+
+Donde la tarea 1.2 nombra `apps/api/app/src/main/java/com/confia/identity/IdentityConfiguration.java` y
+la lista de permitidos `com.confia.identity`, la clase y su `package-info.java` (con `@NamedInterface`)
+viven en `com.confia.identity.infrastructure.wiring`, porque `JooqConfinedToInfrastructureTest`
+(ADR-0015, regla 4) prohíbe `org.jooq` fuera de `..infrastructure..` y la configuración recibe un
+`DSLContext`. La lista de permitidos de administración nombra `com.confia.identity.application`,
+`com.confia.identity.infrastructure` y `com.confia.identity.infrastructure.wiring`, cada uno exacto por la
+no vacuidad. `ConfiguredLoginInstitutionProvider` deja de repetir el valor rechazado en su mensaje y de
+encadenar el analizador de UUID. Detalle en la nota fechada de `design.md` y en `apply-progress.md`.

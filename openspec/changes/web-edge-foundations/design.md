@@ -1087,3 +1087,25 @@ importa la configuración de plataforma: `TransactionsOnlyInSharedSecurityTest` 
 `PlatformTransactionManager` a `shared.security`. Además, `com.confia.shared.audit` entra en la lista de
 permitidos con el PR 5, cuando aparece su primer bean. El texto anterior de este documento no se
 reescribe.
+
+### Nota fechada 2026-10-04: paquete de `IdentityConfiguration` (decisión 3, PR 2)
+
+Durante la aplicación de la tarea 1.2 se comprobó que `IdentityConfiguration` no puede vivir en la raíz
+del módulo, `com.confia.identity`: sus métodos de fábrica reciben un `DSLContext` para construir los
+adaptadores jOOQ de identidad, y `JooqConfinedToInfrastructureTest` (ADR-0015, regla 4) prohíbe
+`org.jooq` fuera de un paquete `..infrastructure..`. Vive en `com.confia.identity.infrastructure.wiring`,
+con `package-info.java` y `@NamedInterface` (ADR-0024 admite la configuración pública «en su paquete base
+o en un paquete anotado con `@NamedInterface`»). Se eligió un subpaquete y no anotar
+`com.confia.identity.infrastructure` entero para que solo la configuración sea pública y los adaptadores
+sigan internos al módulo. La lista de permitidos de administración nombra los tres paquetes de origen de
+sus beans, cada uno exacto porque la prueba de no vacuidad compara por igualdad:
+`com.confia.identity.application` (los casos de uso), `com.confia.identity.infrastructure` (los
+adaptadores) y `com.confia.identity.infrastructure.wiring` (la configuración). El prohibido nominal de
+portal, `com.confia.identity`, no cambia y sigue cubriendo los tres por prefijo.
+
+Dos precisiones de la misma decisión. Primera: `ConfiguredLoginInstitutionProvider` ya repetía el valor
+rechazado en su mensaje y encadenaba la excepción del analizador de UUID. La decisión 3 exige que ningún
+mensaje de arranque contenga el valor, así que el mensaje de un valor mal formado ya no lo incluye y la
+causa no se encadena; el resto de su comportamiento no cambia. Segunda: el pepper se lee con la misma
+regla que la llave maestra de la decisión 2, sin encadenar la causa de `Argon2Pepper.fromBase64`. El
+texto anterior de este documento no se reescribe.
