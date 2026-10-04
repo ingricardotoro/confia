@@ -3,7 +3,7 @@
 - **Cambio:** `process-entry-point-isolation`
 - **Modo:** TDD estricto. Ejecutor: `./mvnw verify` en `apps/api` (JDK 25.0.3, Docker).
 - **Estrategia de entrega:** `auto-chain`, `stacked-to-main`. Este lote es el **PR 1** (tareas 1.1, 1.2 y 2.1).
-- **Estado:** 3 de 10 tareas completas (1.1, 1.2, 2.1). Pendientes: 3.1, 3.2, 4.1, 5.1, 5.2, 5.3, 6.1.
+- **Estado:** 10 de 10 tareas completas (PR 1: 1.1, 1.2, 2.1; PR 2: 3.1 a 6.1, ver la última sección).
 
 ## Tareas
 
@@ -103,3 +103,97 @@ así que un error de escritura en la entrada prohibida pasaba inadvertido.
 - `./mvnw verify` completo: `BUILD SUCCESS` (Surefire 186 + 408, Failsafe 225, sin fallos).
 - Límite conocido: `invoicing`, `cashbox` y `reconciliation` todavía no tienen clases, así que
   sus entradas solo se pueden ejercitar cuando exista el primer bean de cada módulo.
+
+---
+
+# PR 2: tareas 3.1, 3.2, 4.1, 5.1, 5.2, 5.3 y 6.1
+
+- **Rama:** `change/process-entry-point-isolation-rules-and-adr` (desde `main` con el PR 1 fusionado).
+- **Estado:** 10 de 10 tareas completas. Los commits de este lote no se han empujado.
+
+## Tareas del PR 2
+
+- [x] 3.1 ROJO: `BootstrapEntryPointRulesTest` sin fixture (se compromete con 3.2)
+- [x] 3.2 VERDE: fixture y Spring Modulith (commit `89e775b`)
+- [x] 4.1 ADR-0024 y su registro (commit `d230f35`)
+- [x] 5.1 Documentación de arquitectura y roadmap (commit `059b23b`)
+- [x] 5.2 Skill `confia-module-scaffold` §4 (commit `cf12457`)
+- [x] 5.3 Javadoc obsoleto (commit `5258a8a`)
+- [x] 6.1 `./mvnw verify` completo, medición y trazabilidad (sin correcciones, sin commit propio)
+- Seguimiento de la revisión del PR #78 (S1, S2, S3): commit `f4b0173`
+
+## Evidencia de ROJO (tarea 3.1)
+
+Comando: `./mvnw verify -Dtest=BootstrapEntryPointRulesTest -Dsurefire.failIfNoSpecifiedTests=false`
+sin las clases del fixture. Resultado: `Tests run: 6, Failures: 3`. Fallan exactamente las tres
+mitades de fixture (`rejectsTheFixtureEntryPointDependingOnAnotherEntryPoint`,
+`rejectsTheFixtureClassOutsideTheRootReferencingAnEntryPoint` y
+`rejectsTheFixtureEntryPointThatScansComponents`), con el mensaje de ArchUnit `failed to check any
+classes` (conjunto vacío, `archRule.failOnEmptyShould=true`, ADR-0018). Las tres mitades de
+producción pasan desde 1.2.
+
+## Evidencia de VERDE y demostración (tarea 3.2)
+
+- Con las tres clases del fixture (`entrypoints/admin/ScanningEntryPoint`,
+  `entrypoints/portal/CrossEntryPointDependency`, `entrypointclient/OutsideEntryPointReference`):
+  `BootstrapEntryPointRulesTest` `Tests run: 6, Failures: 0`; `SpringModulithVerificationTest`
+  `Tests run: 2, Failures: 0`; `LayeredArchitectureTest` (2), `NoCyclesTest` (2),
+  `NoCrossModuleDomainImportsTest` (3) y `NoTechnicalLayerPackageNamesTest` (2) en verde, es decir,
+  no ven los paquetes nuevos. `SpringModulithVerificationTest` no necesitó cambio de código: el
+  resultado esperado (`Violations`) es el mismo; solo se actualizó su Javadoc.
+- **Demostración:** se añadió `@ComponentScan` de forma temporal a `WorkerApplication`. Resultado:
+  `Tests run: 6, Failures: 1`; falla `productionEntryPointsDoNotScanComponents` con «Class
+  <com.confia.bootstrap.worker.WorkerApplication> is meta-annotated with @ComponentScan». Revertido
+  con `git checkout`; `git status` sin cambios en ese archivo.
+- `./mvnw verify` completo: `BUILD SUCCESS`, Surefire 186 + 414, Failsafe 225.
+
+## Seguimiento de la revisión del PR #78
+
+- **S1.** `ProcessBeanIsolationTest` afirma que el contexto del trabajador no es un
+  `WebServerApplicationContext`. **Demostración:** con `ConfiaApplication` cambiado temporalmente a
+  `WebApplicationType.SERVLET` para el trabajador, falla con «the worker must start without a web
+  server» (`Tests run: 4, Failures: 1`). Revertido.
+- **S2.** La comprobación de no vacuidad exige, además del paquete de entrada, un bean de cada
+  otro paquete permitido (hoy `com.confia.shared.web.openapi` en administración y portal), derivado
+  de `ProcessBeanPolicy`, sin repetir nombres. **Demostración:** con `@Import({})` en
+  `AdminApplication`, falla con «non-vacuous: com.confia.shared.web.openapi must contribute a bean
+  to the admin context». Revertido.
+- **S3.** La regla `nothingOutsideReferencesAnEntryPoint` (tarea 3.1) está en su sitio, con sus dos
+  mitades.
+
+## Tabla de ciclo TDD (PR 2)
+
+| Tarea | Archivo de prueba | Nivel | Red de seguridad | ROJO | VERDE | TRIANGULACIÓN | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 3.1/3.2 | `BootstrapEntryPointRulesTest` | Estático (ArchUnit) | Línea base de `verify` en verde | 3 de 6 fallan por conjunto vacío | 6/6 | Dos mitades por regla (producción y fixture) | Sin cambios necesarios |
+| S1/S2 | `ProcessBeanIsolationTest` | Contexto real | 4/4 previo | Mutación temporal: falla 1 de 4 en cada demostración | 4/4 | Una demostración por aserción | Paquetes importados derivados de la política |
+| 4.1 a 5.3 | N/A (documentación y Javadoc) | N/A | `BootstrapEntryPointRulesTest` y Modulith en verde tras 5.3 | N/A | N/A | N/A (sin lógica) | N/A |
+
+## Tarea 6.1: cierre
+
+- `./mvnw verify` completo, `BUILD SUCCESS`: Surefire 186 (kernel) + 414 (app), Failsafe 225, sin
+  fallos. JaCoCo: «All coverage checks have been met» en `kernel` y en `app`.
+- **Mutación:** PIT no se ejecutó, porque pertenece a los perfiles `mutation-gate` y
+  `mutation-report` y no al `verify` por defecto; además este cambio no toca `kernel` ni ningún
+  paquete `domain`, que es su alcance.
+- **Diff del PR 2 contra `main`, excluyendo `openspec/` (`git diff --numstat main...HEAD`):**
+  - **Sin `-M`:** 349 adiciones + 25 eliminaciones = **374 líneas**.
+  - **Con `-M`:** idéntico, 374 (este PR no mueve archivos).
+  - Dentro de las 800 del proyecto y también de las 400 de la preflight.
+  - Desglose aproximado: ADR-0024 151; reglas de ArchUnit 79; fixture 42; ajustes de
+    `ProcessBeanIsolationTest` 24; documentación, skill y Javadoc el resto.
+- **Estrategia de entrega:** `auto-chain`, `stacked-to-main`; este es el PR 2 de 2.
+- **Trazabilidad:** los 19 escenarios del delta siguen cubiertos por la tabla de `tasks.md` (3+3+2+2+2+2+2+3
+  filas, ninguno sin tarea). Los de las tareas 3.1 y 3.2 se demuestran con las seis pruebas de
+  `BootstrapEntryPointRulesTest`; el de «Código de producción sin referencias externas» queda
+  además cubierto por 5.3, porque el Javadoc no genera dependencias de bytecode y la regla sigue
+  en verde.
+- **Criterios de éxito de `proposal.md`:** todos marcados.
+
+## Desviaciones del diseño (PR 2)
+
+Ninguna de comportamiento. `SpringModulithVerificationTest` solo cambió en su Javadoc (el
+resultado esperado no cambia, como pedía el diseño). Los tres comandos con `-Dtest` ejecutan
+igualmente los ITs de Failsafe; con `-DskipITs` el build termina en `BUILD FAILURE` por
+`failIfNoSpecifiedTests` de Failsafe, aunque las pruebas seleccionadas pasan: es ruido del
+comando acotado, no un fallo.
