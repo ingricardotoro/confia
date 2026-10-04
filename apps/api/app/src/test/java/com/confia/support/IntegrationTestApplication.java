@@ -16,8 +16,8 @@ import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
  * subclasses (design.md decision 7). {@code @SpringBootTest} without {@code classes} searches for
  * a {@code @SpringBootConfiguration} by walking up the test's own package, and the three real
  * entry points ({@code AdminApplication}, {@code PortalApplication}, {@code WorkerApplication})
- * are package-private under {@code com.confia.bootstrap} with a restricted {@code
- * scanBasePackages}, so none of them would ever be found from {@code com.confia.support}. This
+ * live in per-process sub-packages of {@code com.confia.bootstrap}, so none of them would ever be
+ * found from {@code com.confia.support}, and loading one would drag in a process wiring. This
  * class brings the data source, Flyway and a {@link DSLContext} and nothing else: no component
  * scanning, no web server ({@code webEnvironment = NONE} on the test classes that use it).
  *
