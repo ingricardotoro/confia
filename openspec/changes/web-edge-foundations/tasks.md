@@ -101,7 +101,7 @@ renumeraría la cadena.
 
 ## Fase 1: cableado de producción del proceso administrativo
 
-- [ ] 1.1 **PR 1 `platform-wiring`: `DataSource` y `shared` en administración (decisión 2).**
+- [x] 1.1 **PR 1 `platform-wiring`: `DataSource` y `shared` en administración (decisión 2).**
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/bootstrap/` las clases
     `TestProcessArguments.java` (argumentos por proceso: `--server.port=0` para los dos web y, solo
     para `admin`, `--spring.datasource.url=jdbc:postgresql://127.0.0.1:1/confia-unreachable` más la
