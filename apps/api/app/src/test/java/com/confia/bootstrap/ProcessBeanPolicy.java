@@ -28,10 +28,15 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
     private static final String ADMIN_MODULE = "administrative module (ADR-0003)";
     private static final String OPENAPI_SURFACE =
             "the worker never serves the OpenAPI surface (ADR-0003)";
+    private static final String ADMIN_WIRING =
+            "the production data access wiring is administrative only (web-edge-foundations D5)";
 
     static final ProcessBeanPolicy ADMIN = new ProcessBeanPolicy("admin",
             "com.confia.bootstrap.admin",
-            Set.of("com.confia.bootstrap.admin", "com.confia.shared.web.openapi"),
+            Set.of("com.confia.bootstrap.admin", "com.confia.shared.web.openapi",
+                    "com.confia.kernel", "com.confia.shared.platform.infrastructure",
+                    "com.confia.shared.security", "com.confia.shared.crypto",
+                    "com.confia.shared.infrastructure"),
             Map.of("com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON));
@@ -44,6 +49,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.invoicing", ADMIN_MODULE,
                     "com.confia.cashbox", ADMIN_MODULE,
                     "com.confia.reconciliation", ADMIN_MODULE,
+                    "com.confia.shared.platform", ADMIN_WIRING,
                     // Holds while identity serves staff only. The change that introduces the
                     // guardian subdomain (ADR-0003) narrows this to the staff sub-package, with
                     // the edit visible in its pull request.
@@ -56,7 +62,8 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
             Set.of("com.confia.bootstrap.worker"),
             Map.of("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
-                    "com.confia.shared.web.openapi", OPENAPI_SURFACE));
+                    "com.confia.shared.web.openapi", OPENAPI_SURFACE,
+                    "com.confia.shared.platform", ADMIN_WIRING));
 
     static Stream<ProcessBeanPolicy> all() {
         return Stream.of(ADMIN, PORTAL, WORKER);

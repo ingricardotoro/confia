@@ -17,7 +17,7 @@ import org.springframework.context.ConfigurableApplicationContext;
  * (design.md decisions 1 to 3). Starting the real entry point, rather than a test-only context, is
  * the point: the document a process publishes must be the one that process actually serves.
  *
- * <p>No database: both web entry points exclude {@code DataSourceAutoConfiguration}, so these tests
+ * <p>No database: the admin process starts with a lazy pool on an unreachable URL, so these tests
  * need no container and keep the {@code *Test} suffix ({@code IntegrationTestNamingTest}).
  */
 final class OpenApiProcess implements AutoCloseable {
@@ -40,8 +40,8 @@ final class OpenApiProcess implements AutoCloseable {
 
     /** @param appProfile {@code admin} or {@code portal}; @param springProfile e.g. {@code local} */
     static OpenApiProcess start(String appProfile, String springProfile) {
-        LaunchOutcome outcome = ConfiaApplication.launch(new String[] {"--server.port=0",
-                "--spring.profiles.active=" + springProfile}, appProfile);
+        LaunchOutcome outcome = ConfiaApplication.launch(TestProcessArguments.forProcess(appProfile,
+                "--spring.profiles.active=" + springProfile), appProfile);
         if (outcome.context() == null) {
             throw new IllegalStateException("the " + appProfile + " process did not start");
         }

@@ -25,8 +25,9 @@ import org.jooq.DSLContext;
  * confia.generated.jooq.tables.SharedDataEncryptionKey}'s generated table type carries this
  * module's own {@code Shared} prefix, confirmed by sonda S2, apply-progress.md task 1.2).
  * {@code final}, with an explicit constructor and no Spring annotation, the same pattern
- * {@link JooqAuditLogWriter} and {@link JooqIdempotencyRecordStore} already established: no
- * bootstrap process registers this as a bean yet.
+ * {@link JooqAuditLogWriter} and {@link JooqIdempotencyRecordStore} already established: the
+ * administrative process registers this as a bean in {@code SharedPlatformConfiguration}
+ * (web-edge-foundations design.md, decision 2).
  *
  * <p><b>Directly in {@code com.confia.shared.infrastructure}, not in a nested {@code
  * shared.crypto.infrastructure} package</b> (design.md, decision 2). {@code

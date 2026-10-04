@@ -23,10 +23,8 @@ class ProcessBeanIsolationTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("com.confia.bootstrap.ProcessBeanPolicy#all")
     void registersOnlyItsAllowedBeans(ProcessBeanPolicy policy) {
-        String[] args = "worker".equals(policy.process())
-                ? new String[0]
-                : new String[] {"--server.port=0"};
-        LaunchOutcome outcome = ConfiaApplication.launch(args, policy.process());
+        LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.forProcess(policy.process()), policy.process());
         ConfigurableApplicationContext context = outcome.context();
         try {
             assertThat(context).as("the %s process must start", policy.process()).isNotNull();

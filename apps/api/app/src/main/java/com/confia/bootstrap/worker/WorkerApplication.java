@@ -12,9 +12,9 @@ import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
  * background job is registered yet (db-scheduler tasks arrive with the modules that need them,
  * ADR-0016).
  *
- * <p>{@link DataSourceAutoConfiguration} is excluded for the same reason as in {@code
- * AdminApplication}: no {@code spring.datasource.*} property exists yet, and nothing here
- * consumes a {@code DataSource} bean today.
+ * <p>{@link DataSourceAutoConfiguration} stays excluded (decision D5 of web-edge-foundations): the
+ * worker has no database until the db-scheduler jobs of ADR-0016 arrive with change 9. Only the
+ * administrative process has a {@code DataSource}.
  *
  * <p>The class is public only so the launcher in the parent package can start it; nothing else
  * may reference it (enforced by ArchUnit).
