@@ -86,3 +86,20 @@ preexistente falló por el cambio de `@AutoConfigurationPackage`.
 Ninguna de comportamiento. Notas menores: `ProcessBeanInspector` no usa `LinkedHashSet` (un `TreeSet`
 da orden estable); la lista de permitidos del trabajador produce dos líneas para un bean prohibido y
 ausente de la lista a la vez (`ContractSchemas`), lo cual es informativo y no afecta el resultado.
+
+## Corrección tras la revisión del PR #78 (hallazgo I1)
+
+La revisión encontró que dos escenarios trazados a las tareas 1.1 y 2.1 no tenían una prueba
+permanente que pudiera fallar: «El portal arrastra un módulo administrativo» y «El trabajador recibe
+una importación ajena». El portal rechaza un bean de `identity` también por su lista de permitidos,
+así que un error de escritura en la entrada prohibida pasaba inadvertido.
+
+- `ProcessBeanInspectorTest` suma dos casos: un caso de uso de `identity` registrado de forma perezosa
+  en el portal debe reportarse con su motivo nominal («forbidden: staff-only module»), y
+  `ContractSchemas` en el trabajador debe reportarse como superficie OpenAPI prohibida.
+- **Demostración de protección:** con las entradas `com.confia.identity` y
+  `com.confia.shared.web.openapi` de `ProcessBeanPolicy` alteradas temporalmente, fallan
+  exactamente los dos casos nuevos (`Tests run: 5, Failures: 2`). Revertido.
+- `./mvnw verify` completo: `BUILD SUCCESS` (Surefire 186 + 408, Failsafe 225, sin fallos).
+- Límite conocido: `invoicing`, `cashbox` y `reconciliation` todavía no tienen clases, así que
+  sus entradas solo se pueden ejercitar cuando exista el primer bean de cada módulo.

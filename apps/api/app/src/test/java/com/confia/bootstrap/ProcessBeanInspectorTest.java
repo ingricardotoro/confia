@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.confia.bootstrap.admin.AdminApplication;
 import com.confia.bootstrap.portal.PortalApplication;
+import com.confia.bootstrap.worker.WorkerApplication;
+import com.confia.identity.application.AuthenticateWithPassword;
 import com.confia.shared.web.openapi.ContractSchemas;
 import java.util.List;
 import java.util.Set;
@@ -46,6 +48,42 @@ class ProcessBeanInspectorTest {
             assertThat(violations).anySatisfy(line -> assertThat(line)
                     .contains("com.confia.bootstrap.admin")
                     .contains("forbidden: another process entry point"));
+        }
+    }
+
+    /**
+     * The portal also rejects an identity bean through its allow-list, so only the "forbidden"
+     * line proves the named entry itself matches: a typo in it would leave just the allow-list
+     * line. The bean is lazy, so the use case is never instantiated and needs no collaborators.
+     */
+    @Test
+    void reportsAnAdministrativeModuleInThePortalThroughItsNamedEntryNotOnlyTheAllowList() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(AuthenticateWithPassword.class,
+                    definition -> definition.setLazyInit(true));
+            context.refresh();
+
+            List<String> violations = ProcessBeanInspector.violations(context,
+                    ProcessBeanPolicy.PORTAL);
+
+            assertThat(violations).anySatisfy(line -> assertThat(line)
+                    .contains("process 'portal'")
+                    .contains("com.confia.identity.application")
+                    .contains("forbidden: staff-only module"));
+        }
+    }
+
+    @Test
+    void reportsTheOpenApiSurfaceInTheWorkerAsForbidden() {
+        try (GenericApplicationContext context = contextWith(WorkerApplication.class,
+                ContractSchemas.class)) {
+            List<String> violations = ProcessBeanInspector.violations(context,
+                    ProcessBeanPolicy.WORKER);
+
+            assertThat(violations).anySatisfy(line -> assertThat(line)
+                    .contains("process 'worker'")
+                    .contains("com.confia.shared.web.openapi")
+                    .contains("forbidden: the worker never serves the OpenAPI surface"));
         }
     }
 
