@@ -24,8 +24,9 @@ import org.jooq.JSONB;
  * 4, R1: jOOQ confined to {@code infrastructure}; rule 3, R2: {@code SharedIdempotencyKey}'s
  * generated table type carries this module's own {@code Shared} prefix, confirmed by sonda S6).
  * {@code final}, with an explicit constructor over {@link DSLContext} and no Spring annotation, the
- * same pattern {@link com.confia.shared.infrastructure.JooqAuditLogReader} already established: no
- * bootstrap process registers this as a bean yet.
+ * same pattern {@link com.confia.shared.infrastructure.JooqAuditLogReader} already established: the
+ * administrative process registers this as a bean in {@code SharedPlatformConfiguration}
+ * (web-edge-foundations design.md, decision 2).
  *
  * <p><b>Never opens a transaction of its own</b> (ADR-0015 rule 7, R3): every method assumes it
  * runs inside the transaction the single transactional component of {@code shared/security} already

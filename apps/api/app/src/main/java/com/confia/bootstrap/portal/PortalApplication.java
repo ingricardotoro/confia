@@ -15,9 +15,9 @@ import org.springframework.context.annotation.Import;
  * <p>Registering a module here is a visible two-line change: its public configuration in the
  * {@code @Import} list and its package in {@code ProcessBeanPolicy}.
  *
- * <p>{@link DataSourceAutoConfiguration} is excluded for the same reason as in {@code
- * AdminApplication}: no {@code spring.datasource.*} property exists yet and nothing here consumes
- * a {@code DataSource} bean today.
+ * <p>{@link DataSourceAutoConfiguration} stays excluded (decision D5 of web-edge-foundations): the
+ * portal has no database at all, so its compromise cannot reach financial data. Only the
+ * administrative process has a {@code DataSource}.
  *
  * <p>The class is public only so the launcher in the parent package can start it; nothing else
  * may reference it (enforced by ArchUnit).

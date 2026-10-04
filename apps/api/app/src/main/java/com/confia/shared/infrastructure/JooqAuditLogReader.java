@@ -16,7 +16,8 @@ import org.jooq.JSONB;
  * carries this module's own {@code Shared} prefix). {@code final}, with an explicit constructor
  * over {@link DSLContext} and no Spring annotation, the same pattern {@link
  * com.confia.organization.infrastructure.JooqInstitutionRepository} already established: no
- * bootstrap process registers this as a bean yet.
+ * bootstrap process registers this as a bean yet (the administrative process wires only the audit
+ * writer, not this reader; web-edge-foundations design.md, decision 2).
  *
  * <p>Never returns {@code org.jooq.JSONB}, {@code java.time.OffsetDateTime} or any other jOOQ/JDK-
  * database type through the port: {@link #toSnapshot} converts every column explicitly, so {@link

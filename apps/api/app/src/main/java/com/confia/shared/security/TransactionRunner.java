@@ -19,13 +19,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * The single transactional component of {@code shared/security} (ADR-0015 rule 7; design.md,
  * decision 1 and decision 2). {@code final}, with an explicit constructor over {@link
  * PlatformTransactionManager} and {@link DataSource} and no Spring annotation — the same pattern
- * {@code JooqInstitutionRepository} already established: no bootstrap process registers this as a
- * bean yet. Registering it is <b>not</b> change 6's job (idempotency-key-infrastructure, design.md,
- * decision 12, point 1): that change consumes this class from its own test tree only. Registration
- * is the job of the first change that declares a real production {@link DataSource} and retires the
- * {@code DataSourceAutoConfiguration} exclusion from all three bootstrap processes ({@code
- * AdminApplication}, {@code PortalApplication}, {@code WorkerApplication}) — whichever change that
- * turns out to be.
+ * {@code JooqInstitutionRepository} already established: the administrative process registers
+ * this as a bean in {@code SharedPlatformConfiguration} (web-edge-foundations design.md, decision
+ * 2); the portal and the worker never do, because they have no {@code DataSource}.
  *
  * <p>Deliberately never touches jOOQ ({@code R1 JooqConfinedToInfrastructureTest} confines it to
  * {@code infrastructure}, and this component lives outside every layer): it opens its transaction

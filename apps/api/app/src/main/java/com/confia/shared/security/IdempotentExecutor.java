@@ -23,7 +23,8 @@ import tools.jackson.databind.json.JsonMapper;
  * decision 6; specs/build-integrity/spec.md, requirement "Marcador y efecto de negocio en una única
  * transacción atómica"). {@code final}, with an explicit constructor and no Spring annotation — the
  * same pattern {@link TransactionRunner} and {@code JooqInstitutionRepository} already established:
- * no bootstrap process registers this as a bean yet.
+ * the administrative process registers this as a bean in {@code SharedPlatformConfiguration}
+ * (web-edge-foundations design.md, decision 2).
  *
  * <p><b>Never opens a transaction of its own</b> (ADR-0015 rule 7, R3): {@link #execute} delegates
  * every write to {@link TransactionRunner#execute(SecurityContext, Supplier)}, satisfying the rule
