@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Fase:** diseñar
 - **Fecha:** 2026-10-04
-- **Estado:** borrador para aprobación del propietario del producto
+- **Estado:** aprobado por el propietario del producto el 2026-10-04
 - **Entradas:** `proposal.md` (aprobada el 2026-10-04, con las respuestas del propietario),
   `exploration.md`, `specs/web-edge/spec.md` (42 requisitos, 132 escenarios tras las correcciones de la sección 9) y
   `specs/build-integrity/spec.md` (delta), más las sondas P1 a P3 de Engram

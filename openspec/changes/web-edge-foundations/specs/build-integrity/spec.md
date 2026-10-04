@@ -1,6 +1,6 @@
 # Delta para Integridad de la construcción
 
-- **Estado:** borrador para aprobación del propietario del producto (propuesta aprobada el 2026-10-04)
+- **Estado:** aprobada por el propietario del producto el 2026-10-04
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 
 ## ADDED Requirements
