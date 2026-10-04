@@ -2,6 +2,12 @@
 # here: migrating is a separate concern of the "migrate" profile
 # (docs/05-infraestructura-y-despliegue.md; application-migrate.yml).
 spring:
+  datasource:
+    hikari:
+      # -1 never fails the context at startup when the database is down: the pool connects on first
+      # use. Only the administrative process has a DataSource; it is inert in the portal and the
+      # worker, which exclude DataSourceAutoConfiguration (web-edge-foundations design.md, decision 2).
+      initialization-fail-timeout: -1
   flyway:
     enabled: false
   jooq:

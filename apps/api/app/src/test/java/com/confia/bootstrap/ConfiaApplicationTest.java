@@ -18,7 +18,8 @@ class ConfiaApplicationTest {
 
     @Test
     void startsTheAdminWebContextOnTheAdminProfile() {
-        LaunchOutcome outcome = ConfiaApplication.launch(new String[] {"--server.port=0"}, "admin");
+        LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.forProcess("admin"), "admin");
         try {
             assertThat(outcome.exitCode()).isZero();
             assertThat(outcome.context()).isNotNull();
@@ -31,7 +32,8 @@ class ConfiaApplicationTest {
 
     @Test
     void startsThePortalWebContextOnThePortalProfile() {
-        LaunchOutcome outcome = ConfiaApplication.launch(new String[] {"--server.port=0"}, "portal");
+        LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.forProcess("portal"), "portal");
         try {
             assertThat(outcome.exitCode()).isZero();
             assertThat(outcome.context()).isNotNull();
@@ -44,7 +46,8 @@ class ConfiaApplicationTest {
 
     @Test
     void startsTheWorkerContextWithoutHttpOnTheWorkerProfile() {
-        LaunchOutcome outcome = ConfiaApplication.launch(new String[0], "worker");
+        LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.forProcess("worker"), "worker");
         try {
             assertThat(outcome.exitCode()).isZero();
             assertThat(outcome.context()).isNotNull();
