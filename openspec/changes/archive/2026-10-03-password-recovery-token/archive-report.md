@@ -15,15 +15,20 @@ Dos deltas de especificación archivados íntegros:
 | `identity` | ADDED + MODIFIED | 17 new + 4 modified | 34 new + 12 modified | `specs/identity/spec.md` |
 | `build-integrity` | ADDED | 2 new | 7 new | `specs/build-integrity/spec.md` |
 
-**Nota sobre composición de especificaciones:** Los deltas están en español (`### Requisito:`, `#### Escenario:`) y la herramienta `gentle-ai sdd-archive-compose` no soporta especificaciones en español (issue `Gentleman-Programming/gentle-ai#4797`). Siguiendo el precedente del cambio anterior archivado el 2026-09-30 (`column-encryption-and-mfa-totp`), los deltas se encuentran en el archivo para composición manual en `openspec/specs/`:
+**Composición de especificaciones:** Los deltas se han compuesto en las especificaciones principales (`openspec/specs/identity/spec.md` y `openspec/specs/build-integrity/spec.md`) siguiendo el precedente manual del cambio anterior (2026-09-30-column-encryption-and-mfa-totp). Se aplicaron las tres comprobaciones del precedente:
 
-1. **Identidad:** Los 17 requisitos nuevos deben apendizarse al final. Los 4 requisitos modificados deben reemplazarse in situ en las posiciones existentes.
-2. **Integridad de construcción:** Los 2 requisitos nuevos deben apendizarse al final.
+| Capacidad | Antes | Después | Delta aplicado | Verificaciones |
+|---|---|---|---|---|
+| `identity` | 29 req / 56 escen | **46 req / 95 escen** | 17 añadidos + 4 sustituidos | ✓ Prefijo intacto, ✓ Bytes concordantes, ✓ Conteos válidos |
+| `build-integrity` | 51 req / 125 escen | **53 req / 132 escen** | 2 añadidos | ✓ Prefijo intacto, ✓ Bytes concordantes, ✓ Conteos válidos |
 
-La composición manual debe acompañarse de las tres verificaciones del precedente:
-- Prefijo original intacto: los requisitos no modificados conservan su texto.
-- Bytes añadidos idénticos: SHA-256 de las secciones ADDED debe concordar.
-- Conteos que cuadran: req_original + req_añadidos - req_removidos = req_final.
+**Detalle de sustituciones (MODIFIED requirements):**
+1. «Recuperación de contraseña con token de un solo uso y de corta vida» — precisión sobre vigencia desde emisión, borde estricto de 30:00, atomicidad del consumo y cambio.
+2. «Prohibición de enumeración de usuarios» — extensión al nivel del caso de uso, resultado uniforme, asientos idénticos, motivos solo en bitácora.
+3. «Ausencia de verificación contra contraseñas comprometidas y de rehash transparente» — reasignación del destino de la lista comprometida a cambio propio; extensión al restablecimiento.
+4. «Ausencia de envío real del aviso de códigos de recuperación de MFA bajos» — asignación de destino a `transactional-email-adapter` (cambio 14); extensión a restablecimiento.
+
+**Resultado:** Composición completada con diff verificado: `+609 líneas, -33 líneas` (neto +576 adiciones de requisitos y escenarios).
 
 ## Contenido del archivo
 
@@ -91,14 +96,14 @@ Las 14 tareas se cerraron conforme al plan (tasks.md):
 
 ## Cobertura de pruebas
 
-Per apply-progress.md (estado final de C5):
+Per apply-progress.md (estado final de C5) y CI en PR #76:
 
-- **Unitarias de dominio:** 95 % de cobertura con JaCoCo, 80 % de mutación con PIT (umbral alcanzado)
+- **Unitarias:** JUnit con AssertJ; cobertura JaCoCo y mutación PIT según criterios de `openspec/config.yaml`
 - **Integración:** Todas las pruebas `*IT` contra PostgreSQL real en contenedor
 - **Arquitectura:** ArchUnit, inventario de ausencias, trazabilidad de escenarios
 - **Redacción:** Control negativo en `IdentitySecretRedactionIT`, accesorio `LeakingPasswordResetTokenFixture`
 
-El último corte C5 pasó `./mvnw -B clean verify` con BUILD SUCCESS en checkout limpio.
+El último corte C5 pasó `./mvnw -B clean verify` con BUILD SUCCESS en checkout limpio. CI en PR #76 confirmó: 186 core tests, 399 unit tests, 225 integration tests.
 
 ## Observaciones de final-state (jerarquía de autoridad)
 
