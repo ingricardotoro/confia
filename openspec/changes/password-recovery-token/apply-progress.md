@@ -712,3 +712,18 @@ exista la primera emisión, es de `session-tokens-and-web-layer` y consta como c
 La tabla de «Cierre de la trazabilidad contra las clases reales» de `tasks.md` recoge las diferencias entre
 lo que decía `design.md` §6.1 y las clases reales. Se comprobó por lectura que cada clase que §6.1 nombra
 existe en el árbol de pruebas.
+
+---
+
+## Cierre de C5
+
+- **`./mvnw -B clean verify`:** `BUILD SUCCESS` en 5 min 13 s. 186 pruebas del núcleo, 399 unitarias y
+  225 de integración (C4: 186, 393 y 223; C5 añade 6 unitarias y 2 de integración). La primera orden se
+  detuvo en `clean` porque OneDrive bloqueaba `kernel/target/pit-reports`; se borraron `kernel/target` y
+  `app/target` a mano y la segunda corrió limpia.
+- **Diff medido** contra `main` (`0f565d3`), sin `openspec` ni código generado: **445 líneas** (445
+  añadidas, 0 borradas), dentro del presupuesto de 800 y dentro del pronóstico de 375 a 750. Con
+  `openspec` incluido son 592. Un solo pull request, sin partir el corte.
+- **Cadena:** `change/password-recovery-token-c5-redaction-and-docs`, con base en `main`, porque C4 ya
+  está fusionado. Dos confirmaciones de trabajo: 5.1 (pruebas) y 5.2 (documentación y trazabilidad).
+- **Pendiente fuera del ejecutor:** empujar la rama y confirmar la integración continua (tarea 5.2).
