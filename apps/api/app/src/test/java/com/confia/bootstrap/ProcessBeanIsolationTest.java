@@ -3,10 +3,13 @@ package com.confia.bootstrap;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
+import java.util.Set;
+import java.util.TreeSet;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 
 /**
@@ -38,12 +41,33 @@ class ProcessBeanIsolationTest {
             softly.assertThat(ProcessBeanInspector.confiaBeans(context))
                     .as("non-vacuous: the inspector must see real beans of the entry package")
                     .anyMatch(bean -> bean.originPackages().contains(policy.entryPackage()));
+            // Non-vacuity of the imports: every other allowed package must contribute a bean, so
+            // a lost @Import (for example the OpenAPI surface of a web process) is caught.
+            for (String imported : importedPackages(policy)) {
+                softly.assertThat(ProcessBeanInspector.confiaBeans(context))
+                        .as("non-vacuous: %s must contribute a bean to the %s context",
+                                imported, policy.process())
+                        .anyMatch(bean -> bean.originPackages().contains(imported));
+            }
+            // The inspector only sees com.confia beans, so a web server leaking into the worker
+            // (for example through springdoc) would otherwise go unnoticed.
+            if ("worker".equals(policy.process())) {
+                softly.assertThat(context)
+                        .as("the worker must start without a web server")
+                        .isNotInstanceOf(WebServerApplicationContext.class);
+            }
             softly.assertAll();
         } finally {
             if (context != null) {
                 context.close();
             }
         }
+    }
+
+    private static Set<String> importedPackages(ProcessBeanPolicy policy) {
+        Set<String> imported = new TreeSet<>(policy.allowedPackages());
+        imported.remove(policy.entryPackage());
+        return imported;
     }
 
     /**

@@ -26,7 +26,11 @@ import org.springframework.modulith.core.Violations;
  * compiles to {@code target/test-classes}): with that narrower root, {@code moduleone} and
  * {@code moduletwo} each become their own Spring Modulith module, so {@code moduleone.domain}
  * reading {@code moduletwo.domain}'s internal package independently confirms the same violation
- * {@link NoCrossModuleDomainImportsTest} already proves with ArchUnit.
+ * {@link NoCrossModuleDomainImportsTest} already proves with ArchUnit. The entry point fixture
+ * ({@code entrypoints} and {@code entrypointclient}, ADR-0024) adds one more violation to the
+ * same scan: {@code entrypointclient} reads an internal package of {@code entrypoints}. The
+ * expected result does not change, and {@link BootstrapEntryPointRulesTest} proves that violation
+ * on its own.
  */
 class SpringModulithVerificationTest {
 

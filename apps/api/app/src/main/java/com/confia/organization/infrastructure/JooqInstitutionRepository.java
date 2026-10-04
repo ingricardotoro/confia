@@ -17,9 +17,9 @@ import org.jooq.DSLContext;
  * organization_institution} table (design.md decision 8; specs/organization/spec.md, requirement
  * "Contrato observable del adaptador jOOQ de InstitutionRepository contra la base real"). {@code
  * final}, with an explicit constructor over {@link DSLContext} and no Spring annotation: no use
- * case is registered as a bean yet in any of the three bootstrap processes, all of which restrict
- * component scanning to {@code com.confia.bootstrap} (design.md decision 8); registering this as a
- * bean is the job of whichever change first consumes it.
+ * case is registered as a bean yet in any of the three bootstrap processes, none of which scans
+ * components (ADR-0024); registering this as a bean is the job of whichever change first consumes
+ * it, with an explicit {@code @Import} in the entry point.
  *
  * <p>Read-only in this part of the change on purpose: the port only declares {@link
  * InstitutionRepository#findById}, so this class never opens a transaction and never fixes the

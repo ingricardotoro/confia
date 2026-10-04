@@ -112,7 +112,7 @@ con pruebas y documentación en el mismo commit que el comportamiento que cubren
 
 ## Fase 3: reglas de ArchUnit con fixture permanente
 
-- [ ] 3.1 **ROJO: `BootstrapEntryPointRulesTest` sin fixture (decisión 6).** Crear
+- [x] 3.1 **ROJO: `BootstrapEntryPointRulesTest` sin fixture (decisión 6).** Crear
   `apps/api/app/src/test/java/com/confia/architecture/BootstrapEntryPointRulesTest.java` con las tres
   reglas parametrizadas por raíz (`entryPointsDoNotDependOnEachOther`,
   `nothingOutsideReferencesAnEntryPoint` y `noEntryPointScansComponents`) y, por regla, la mitad de
@@ -125,7 +125,7 @@ con pruebas y documentación en el mismo commit que el comportamiento que cubren
   — Requisitos «Registro explícito», «Subpaquetes de `bootstrap` no dependen entre sí» y «Nada fuera
   de `bootstrap` referencia una clase de entrada»
 
-- [ ] 3.2 **VERDE: fixture y Spring Modulith.** Crear las tres clases del fixture, sin
+- [x] 3.2 **VERDE: fixture y Spring Modulith.** Crear las tres clases del fixture, sin
   `@SpringBootConfiguration`: `apps/api/app/src/test/java/com/confia/architecture/fixture/entrypoints/admin/ScanningEntryPoint.java`
   (lleva `@ComponentScan`), `apps/api/app/src/test/java/com/confia/architecture/fixture/entrypoints/portal/CrossEntryPointDependency.java`
   (referencia `ScanningEntryPoint`) y
@@ -145,7 +145,7 @@ con pruebas y documentación en el mismo commit que el comportamiento que cubren
 
 ## Fase 4: ADR-0024
 
-- [ ] 4.1 **ADR-0024 y su registro (decisión 7, sección 8).** Crear
+- [x] 4.1 **ADR-0024 y su registro (decisión 7, sección 8).** Crear
   `docs/adr/ADR-0024-registro-explicito-por-punto-de-entrada.md` en español neutro profesional, con
   estado Aceptado, contexto con la evidencia en rojo de 1.1, factores, opciones A a D, decisión D,
   la aclaración de «el trabajador corre con el perfil administrativo» de ADR-0003, la regla para
@@ -158,20 +158,20 @@ con pruebas y documentación en el mismo commit que el comportamiento que cubren
 
 ## Fase 5: documentación, skill y Javadoc
 
-- [ ] 5.1 **Documentación de arquitectura y roadmap (decisión 8).** Actualizar
+- [x] 5.1 **Documentación de arquitectura y roadmap (decisión 8).** Actualizar
   `docs/01-arquitectura.md` §4 (árbol de `bootstrap/` con los tres subpaquetes y el párrafo de la
   regla de dependencia, citando ADR-0024) y `docs/09-roadmap-y-fases.md` (nota del riesgo del
   2026-09-30 marcada como resuelta por el cambio 15, con referencia a la prueba que lo demuestra). El
   cuerpo de ADR-0003 no se toca. Commit: `docs(architecture): describe per-process entry point
   packages and close the change 15 risk`.
 
-- [ ] 5.2 **Skill `confia-module-scaffold` §4 (decisión 8).** Reescribir en
+- [x] 5.2 **Skill `confia-module-scaffold` §4 (decisión 8).** Reescribir en
   `.claude/skills/confia-module-scaffold/SKILL.md` §4 el párrafo que hoy dice que el mecanismo «se
   fija en F0»: describir el `@Import` de la configuración pública del módulo en la clase de entrada y
   la edición obligatoria de `ProcessBeanPolicy`, con referencia a ADR-0024 y a ADR-0022. Commit:
   `docs(skills): explain how a module registers in its entry point`.
 
-- [ ] 5.3 **Javadoc obsoleto (decisión 8).** Editar, solo comentarios:
+- [x] 5.3 **Javadoc obsoleto (decisión 8).** Editar, solo comentarios:
   `apps/api/app/src/main/java/com/confia/shared/web/openapi/ProcessApiInfo.java` (el título
   acompaña a la selección del proceso en un único lugar, sin justificarlo por el escaneo compartido),
   `apps/api/app/src/main/java/com/confia/shared/web/openapi/package-info.java` (consumidores
@@ -184,7 +184,7 @@ con pruebas y documentación en el mismo commit que el comportamiento que cubren
 
 ## Fase 6: cierre
 
-- [ ] 6.1 **`./mvnw verify` completo, medición del diff y barrido de trazabilidad.** Ejecutar
+- [x] 6.1 **`./mvnw verify` completo, medición del diff y barrido de trazabilidad.** Ejecutar
   `./mvnw verify` completo en `apps/api` y registrar el resultado de cobertura y mutación. Medir el
   diff de autor con `git diff --stat main...` y `git diff --numstat main...` (adiciones más
   eliminaciones), una vez **sin** `-M` y otra **con** `-M` para mostrar cuánto del movimiento de las

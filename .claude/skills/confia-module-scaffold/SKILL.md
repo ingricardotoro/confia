@@ -304,9 +304,25 @@ portal y trabajador. Cada uno declara de forma explícita qué módulos carga. V
 de estilo: es la barrera que garantiza que el código de facturación, caja, usuarios administrativos
 y auditoría completa no está siquiera cargado en memoria en el proceso expuesto a internet abierto.
 
-El mecanismo concreto con el que cada punto de entrada selecciona sus módulos se fija en F0. La
-garantía no depende del mecanismo, sino de la prueba obligatoria que arranca el contexto del
-portal y afirma que ningún controlador administrativo quedó registrado:
+Cada punto de entrada vive en su propio subpaquete (`bootstrap.admin`, `bootstrap.portal` y
+`bootstrap.worker`), se declara con `@SpringBootConfiguration` + `@EnableAutoConfiguration` y **no
+escanea componentes**: lo que carga lo escribe en su `@Import` (ADR-0024). Un módulo que un proceso
+deba cargar expone una **configuración pública** en su paquete base, o en un paquete anotado con
+`@NamedInterface` (ADR-0022), que declara sus beans de forma explícita; esa configuración se crea
+cuando existe el consumidor real, nunca de forma anticipada. Registrar el módulo exige **dos
+ediciones visibles en el mismo pull request**:
+
+1. el `@Import` de esa configuración en la clase de entrada del proceso (`AdminApplication`,
+   `PortalApplication` o `WorkerApplication`), y
+2. el paquete del módulo en la lista de permitidos de ese proceso en `ProcessBeanPolicy`
+   (`apps/api/app/src/test/java/<paquete-base>/bootstrap/`). Si el módulo es administrativo, su
+   paquete debe seguir en la lista de prohibidos del portal.
+
+Sin la segunda edición, `ProcessBeanIsolationTest` rompe la construcción: la lista de permitidos
+falla cerrado. Ninguna otra clase puede referenciar una clase de entrada (regla de ArchUnit en
+`BootstrapEntryPointRulesTest`). La garantía no depende solo de la estructura, sino de la prueba
+obligatoria que arranca el contexto del portal y afirma que ningún bean administrativo quedó
+registrado; para un controlador, en concreto:
 
 ```java
 // Illustrative. Verifies ADR-0003 and ADR-0013, check 9.

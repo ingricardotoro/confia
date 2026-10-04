@@ -188,18 +188,18 @@ bloqueado hasta resolverlo.
 
 ## Criterios de éxito
 
-- [ ] La prueba de lista de permitidos falla contra el estado actual, con evidencia en rojo
+- [x] La prueba de lista de permitidos falla contra el estado actual, con evidencia en rojo
       registrada antes de cualquier cambio de producción.
-- [ ] Tras el cambio, el contexto de cada proceso solo contiene beans de `com.confia.*` de su lista
+- [x] Tras el cambio, el contexto de cada proceso solo contiene beans de `com.confia.*` de su lista
       de permitidos; el portal no contiene ningún bean de `bootstrap.admin` ni de
       `bootstrap.worker`.
-- [ ] El contexto del trabajador no contiene `ContractSchemas` ni `ProcessApiInfo`.
-- [ ] Ningún punto de entrada usa `@SpringBootApplication` ni `@ComponentScan`; los tres conservan la
+- [x] El contexto del trabajador no contiene `ContractSchemas` ni `ProcessApiInfo`.
+- [x] Ningún punto de entrada usa `@SpringBootApplication` ni `@ComponentScan`; los tres conservan la
       exclusión de `DataSourceAutoConfiguration`.
-- [ ] La prueba negativa demuestra que el inspector detecta un bean fuera de la lista.
-- [ ] Las dos reglas de ArchUnit rechazan su fixture de violación deliberada.
-- [ ] `SpringModulithVerificationTest`, `ConfiaApplicationTest` y la comparación de la instantánea
+- [x] La prueba negativa demuestra que el inspector detecta un bean fuera de la lista.
+- [x] Las dos reglas de ArchUnit rechazan su fixture de violación deliberada.
+- [x] `SpringModulithVerificationTest`, `ConfiaApplicationTest` y la comparación de la instantánea
       del OpenAPI siguen en verde, y `./mvnw verify` completo termina en verde.
-- [ ] ADR-0024 está aceptado y aclara el significado de «perfil administrativo» del trabajador.
-- [ ] La skill `confia-module-scaffold` §4 explica cómo registrar un módulo en su punto de entrada.
-- [ ] El diff medido queda dentro del presupuesto, o el exceso se reporta antes de abrir el PR.
+- [x] ADR-0024 está aceptado y aclara el significado de «perfil administrativo» del trabajador.
+- [x] La skill `confia-module-scaffold` §4 explica cómo registrar un módulo en su punto de entrada.
+- [x] El diff medido queda dentro del presupuesto, o el exceso se reporta antes de abrir el PR.

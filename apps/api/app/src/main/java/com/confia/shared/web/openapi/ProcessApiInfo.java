@@ -11,10 +11,9 @@ import org.springframework.core.env.Environment;
  * design.md decision 1): the administrative and the portal documents must be told apart even
  * while neither has an operation yet.
  *
- * <p>The title comes from {@value #TITLE_PROPERTY}, which the launcher sets per process, and
- * <b>not</b> from a {@code @Bean} declared on each entry point. The three entry points share the
- * package {@code com.confia.bootstrap} and each scans it, so a bean declared on one of them could
- * be picked up by the others' contexts as well.
+ * <p>The title comes from {@value #TITLE_PROPERTY}, which the launcher sets next to the choice of
+ * process, so the title follows the process selection in a single place ({@code ConfiaApplication})
+ * and not a {@code @Bean} repeated on each entry point.
  */
 public final class ProcessApiInfo implements OpenApiCustomizer {
 

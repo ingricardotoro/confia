@@ -202,9 +202,11 @@ apps/api/
         │   ├── security/        # configuración de Spring Security, políticas, cifrado,
         │   │                    # idempotencia
         │   └── observability/   # logs estructurados, métricas y trazas
-        └── bootstrap/           # tres puntos de entrada en el mismo artefacto:
-                                 # administrativo, portal y trabajador. Cada uno declara
-                                 # de forma explícita qué módulos carga.
+        └── bootstrap/           # único `main` (`ConfiaApplication`, selecciona el proceso por
+                                 # `APP_PROFILE`) y tres puntos de entrada en el mismo artefacto.
+            ├── admin/           # `AdminApplication`: proceso administrativo
+            ├── portal/          # `PortalApplication`: proceso del portal de encargados
+            └── worker/          # `WorkerApplication`: proceso trabajador, sin servidor web
 ```
 
 El tipo base y los errores de dominio que antes se ubicaban en `shared/kernel` viven en el módulo
@@ -233,7 +235,11 @@ de `application`, que depende de `domain`. La capa `infrastructure` implementa p
 módulo: la comunicación entre módulos ocurre por casos de uso públicos o por eventos de dominio.
 ArchUnit verifica las reglas de capa, Spring Modulith verifica que ningún módulo acceda a los
 internos de otro, y el módulo `kernel` es una frontera de compilación de Maven. El proceso del
-portal no registra controladores de módulos administrativos (ADR-0003). Para el acceso a datos,
+portal no registra controladores de módulos administrativos (ADR-0003). Cada punto de entrada vive en su
+subpaquete de `bootstrap`, declara con `@Import` lo que carga y no escanea componentes, así que
+nada entra en un proceso sin estar escrito. Los subpaquetes no dependen entre sí, nada fuera de
+`bootstrap` referencia una clase de entrada y una lista de permitidos por proceso falla cerrado
+ante un bean ajeno (ADR-0024). Para el acceso a datos,
 ArchUnit verifica además que jOOQ y las clases generadas solo aparezcan en `infrastructure`, que un
 módulo no use las clases generadas de las tablas de otro, que ninguna transacción se abra fuera del
 componente transaccional de `shared/security` y que la API de SQL plano de jOOQ solo aparezca en la
