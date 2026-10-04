@@ -234,11 +234,13 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
 entrega valor visible. Mitigación: la infraestructura de F0 es la mínima que soporta un sistema
 financiero, no la ideal. Docker Compose, no Kubernetes.
 
-**Riesgo añadido el 2026-09-30: aislamiento de procesos (ADR-0003).** Los tres puntos de entrada
-comparten el paquete `com.confia.bootstrap` y cada uno lo escanea, así que el contexto del portal
-carga también la configuración del proceso administrativo. Hoy no tiene efecto, porque ninguno
-registra módulos de negocio. Mitigación: el cambio 15, `process-entry-point-isolation`, con una prueba
-que falle si el portal contiene algo administrativo, **antes** de `session-tokens-and-web-layer`
+**Riesgo añadido el 2026-09-30: aislamiento de procesos (ADR-0003). Resuelto por el cambio 15,
+`process-entry-point-isolation` (ADR-0024).** Los tres puntos de entrada compartían el paquete
+`com.confia.bootstrap` y cada uno lo escaneaba, así que el contexto del portal cargaba también la
+configuración del proceso administrativo. No tenía efecto, porque ninguno registra módulos
+de negocio. El cambio 15 mueve cada punto de entrada a su subpaquete, elimina el escaneo y lo cubre
+con `ProcessBeanIsolationTest` (lista de permitidos por proceso, que falla si el portal contiene
+algo administrativo) y tres reglas de ArchUnit, **antes** de `session-tokens-and-web-layer`
 (`openspec/changes/foundations-plan/exploration.md`, nota del 2026-09-30).
 
 ---
