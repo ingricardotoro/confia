@@ -61,12 +61,20 @@ Las 10 tareas del cambio fueron completadas en dos pull requests encadenados y f
 
 **Verificación de integridad:**
 
-- ✓ Prefijo pre-existente (líneas 1–13, cabecera y inicio del apartado de requisitos): byte-idéntico al original
-- ✓ SHA-256 del contenido apendido: `e7b5fd8ec21a591a5998baa9c3e4c1d0ebc0dfc42fa179eb2ac6fdb0fdde43ed`
-- ✓ Bytes apendidos: 11798
+- ✓ El archivo previo completo (80 762 bytes, 1440 líneas) es prefijo intacto del resultado; la única
+  línea añadida dentro de él es la reparación descrita abajo
+- ✓ Los bloques añadidos son byte a byte los ocho bloques `### Requisito:` del delta (11 775 bytes,
+  SHA-256 `3f27f2f91545ded8b77d43802d6e60e63991474d03648f3a6eb1e1ab5b8abaa1`), sin el encabezado
+  `## ADDED Requirements`, que es una marca del delta y no pertenece a la especificación principal
 - ✓ Requisitos nuevos: 8 (nombrados con formato `### Requisito:` en español neutro profesional)
 - ✓ Escenarios nuevos: 19 (nombrados con formato `#### Escenario:`)
 - ✓ Conteos coinciden: 53 + 8 = 61 requisitos; 132 + 19 = 151 escenarios
+
+**Reparación de un defecto heredado.** El archivo de `password-recovery-token` (commit `8d0c187`)
+perdió la última línea de su delta: el escenario «`confia_portal_app` no tiene ningún privilegio sobre
+la tabla nueva» terminaba sin su cláusula **ENTONCES**. Se restituye con el texto exacto de
+`archive/2026-10-03-password-recovery-token/specs/build-integrity/spec.md`, línea 85. Un barrido de
+todas las especificaciones principales no encontró otro escenario sin **ENTONCES**.
 
 Los 8 requisitos nuevos registran los comportamientos verificables que garantizan el aislamiento de procesos:
 

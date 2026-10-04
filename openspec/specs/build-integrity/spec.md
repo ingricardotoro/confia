@@ -1438,7 +1438,7 @@ de la tabla nueva para los cinco roles.
 
 - **DADO** el rol `confia_portal_app` conectado con el contexto de una institución
 - **CUANDO** intenta `SELECT`, `INSERT`, `UPDATE` o `DELETE` sobre la tabla de tokens de recuperación
-## ADDED Requirements
+- **ENTONCES** las cuatro operaciones se rechazan por falta de privilegio
 
 ### Requisito: Cada proceso registra solo beans de `com.confia.*` incluidos en su lista de permitidos
 
