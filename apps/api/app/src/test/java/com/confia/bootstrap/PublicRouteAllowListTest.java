@@ -164,10 +164,11 @@ class PublicRouteAllowListTest {
 
             List<String> leaks = leaks(harness.context(), harness.port(), realList);
 
-            // The three routes of the original control plus the seven the translator tests add
-            // (validated, bounded, required, constraint-violation, domain-known, domain-unknown
-            // and disconnected): each is permitted by the harness chain and absent from the list.
-            assertThat(leaks).hasSize(8);
+            // Every route the harness adds lives under /test/ and is permitted by its chain and
+            // absent from the real list, so each is a leak; the count is not pinned, so a harness
+            // route added by a later task does not need an edit here.
+            assertThat(leaks).as("non-vacuous: the harness leaks").hasSizeGreaterThanOrEqualTo(3);
+            assertThat(leaks).allMatch(leak -> leak.contains(" /test/"));
             assertThat(leaks).anyMatch(leak -> leak.startsWith("GET /test/open answered 200"));
             assertThat(leaks).anyMatch(leak -> leak.startsWith("GET /test/boom answered 500"));
             assertThat(leaks).anyMatch(leak -> leak.startsWith("GET /test/origin answered 200"));

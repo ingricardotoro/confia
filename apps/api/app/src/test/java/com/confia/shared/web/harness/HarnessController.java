@@ -5,7 +5,12 @@ import com.confia.shared.security.RequestOrigin;
 import com.confia.shared.web.problem.ProblemResponses;
 import com.confia.shared.web.request.RequestContextFilter;
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.SocketException;
+import java.sql.SQLException;
 import org.slf4j.MDC;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.MediaType;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -106,6 +111,7 @@ class HarnessController {
     String domainUnknown() {
         throw new UnknownDomainFailure();
     }
+/** Public for {@code GET}: a database failure whose root cause carries a socket's words. */    @GetMapping("/test/sql-reset")    String sqlReset() throws SQLException {        throw new SQLException("could not read the ledger",                new SocketException("Connection reset by peer"));    }    /** Registered for {@code POST} only and public for {@code GET}: a method the route does not serve. */    @PostMapping("/test/post-only")    String postOnly() {        return "posted";    }    /** Public for {@code GET}: fails the way a controller does with {@code ResponseStatusException}. */    @GetMapping("/test/status")    String status(@RequestParam(name = "code") int code) {        throw new ResponseStatusException(HttpStatusCode.valueOf(code), "secret reason");    }    /** Public for {@code GET}: a security exception raised inside the MVC layer. */    @GetMapping("/test/access-denied")    String accessDenied() {        throw new AccessDeniedException("secret reason");    }
 
     /** Public for {@code GET}: what the container raises when the client is gone. */
     @GetMapping("/test/disconnected")

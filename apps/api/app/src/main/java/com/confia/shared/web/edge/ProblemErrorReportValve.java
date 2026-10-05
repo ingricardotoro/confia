@@ -58,7 +58,9 @@ public final class ProblemErrorReportValve extends ErrorReportValve {
     }
 
     /**
-     * The code that answers a container status, by the catalog: {@code 401} is {@code
+     * The code that answers a container status, by the shared rule {@link ProblemCode#forStatus}
+     * (the translator uses the same one): {@code 404} is {@code resource-not-found}, {@code 415} is
+     * {@code unsupported-media-type}, {@code 401} is {@code
      * authentication-required}, {@code 403} is {@code forbidden}, {@code 405} is {@code
      * method-not-allowed}, a server error is {@code internal-error} and every other client error is
      * {@code validation-failed}. The answer carries the status of that code, which for a status the
@@ -66,12 +68,7 @@ public final class ProblemErrorReportValve extends ErrorReportValve {
      * original status survives in the log event of {@link #report}.
      */
     public static ProblemCode codeFor(int status) {
-        return switch (status) {
-            case 401 -> ProblemCode.AUTHENTICATION_REQUIRED;
-            case 403 -> ProblemCode.FORBIDDEN;
-            case 405 -> ProblemCode.METHOD_NOT_ALLOWED;
-            default -> status >= 500 ? ProblemCode.INTERNAL_ERROR : ProblemCode.VALIDATION_FAILED;
-        };
+        return ProblemCode.forStatus(status);
     }
 
     /**

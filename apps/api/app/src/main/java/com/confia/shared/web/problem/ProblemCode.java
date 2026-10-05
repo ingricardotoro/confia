@@ -69,6 +69,24 @@ public enum ProblemCode {
         return KEY_PREFIX + code + ".detail";
     }
 
+    /**
+     * The code that answers an HTTP status someone else chose, the one rule of the container's
+     * error report and of the MVC translator: {@code 401}, {@code 403}, {@code 404}, {@code 405}
+     * and {@code 415} have their own codes, any other client error is {@link #VALIDATION_FAILED},
+     * and a server error is {@link #INTERNAL_ERROR}. The status of the answer is the one of the
+     * code, not the one given, so a body and its response always agree.
+     */
+    public static ProblemCode forStatus(int status) {
+        return switch (status) {
+            case 401 -> AUTHENTICATION_REQUIRED;
+            case 403 -> FORBIDDEN;
+            case 404 -> RESOURCE_NOT_FOUND;
+            case 405 -> METHOD_NOT_ALLOWED;
+            case 415 -> UNSUPPORTED_MEDIA_TYPE;
+            default -> status >= 500 ? INTERNAL_ERROR : VALIDATION_FAILED;
+        };
+    }
+
     /** The code with exactly this text, or empty for an unknown, misspelled or {@code null} one. */
     public static Optional<ProblemCode> ofCode(String code) {
         for (ProblemCode candidate : values()) {

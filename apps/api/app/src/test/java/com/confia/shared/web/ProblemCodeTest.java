@@ -83,6 +83,15 @@ class ProblemCodeTest {
         assertThat(ProblemCode.ofCode(code)).isEmpty();
     }
 
+    @ParameterizedTest
+    @CsvSource({"400, validation-failed", "401, authentication-required", "403, forbidden",
+            "404, resource-not-found", "405, method-not-allowed", "406, validation-failed",
+            "409, validation-failed", "413, validation-failed", "415, unsupported-media-type",
+            "431, validation-failed", "500, internal-error", "503, internal-error"})
+    void theCodeOfAnHttpStatusIsTheOneRuleTheValveAndTheTranslatorShare(int status, String code) {
+        assertThat(ProblemCode.forStatus(status).code()).isEqualTo(code);
+    }
+
     @Test
     void aNullCodeIsNotACodeEither() {
         assertThat(ProblemCode.ofCode(null)).isEmpty();

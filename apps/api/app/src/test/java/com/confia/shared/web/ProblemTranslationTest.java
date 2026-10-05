@@ -9,6 +9,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.confia.shared.web.harness.HarnessProcess;
+import com.confia.shared.web.problem.ProblemCode;
 import com.confia.shared.web.problem.ProblemExceptionHandler;
 import java.io.IOException;
 import java.net.http.HttpResponse;
@@ -19,6 +20,8 @@ import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
 
@@ -220,6 +223,8 @@ class ProblemTranslationTest {
         List<ILoggingEvent> events = loggedWhile(() -> answers.add(process.get("/test/disconnected")));
         HttpResponse<String> response = answers.get(0);
 
+        assertThat(response.statusCode()).as("never a 2xx for a response nobody received")
+                .isEqualTo(499);
         assertThat(response.body()).as("nothing was written to the response").isEmpty();
         assertThat(response.headers().firstValue("Content-Type")).isEmpty();
         assertThat(events).hasSize(1);
@@ -230,6 +235,74 @@ class ProblemTranslationTest {
         assertThat(event.getFormattedMessage()).doesNotContainIgnoringCase("broken pipe")
                 .doesNotContain("ServletOutputStream");
     }
+
+    @Test
+    void aDatabaseFailureWhoseRootCauseSaysConnectionResetIsNeverAnEmpty200() {
+        List<HttpResponse<String>> answers = new ArrayList<>();
+        List<ILoggingEvent> events = loggedWhile(() -> answers.add(process.get("/test/sql-reset")));
+        HttpResponse<String> response = answers.get(0);
+
+        JsonNode problem = assertProblem(response, 500, "internal-error");
+        assertThat(everythingOf(response)).doesNotContain("Connection reset").doesNotContain("ledger")
+                .doesNotContain("SQLException");
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).getLevel()).isEqualTo(Level.ERROR);
+        assertThat(events.get(0).getThrowableProxy().getClassName())
+                .isEqualTo("java.sql.SQLException");
+        assertThat(events.get(0).getMDCPropertyMap())
+                .containsEntry("requestId", problem.get("traceId").asString());
+    }
+
+    // ---- the statuses the framework already chose ---------------------------------------------
+
+    @Test
+    void aMethodTheRouteDoesNotServeIs405WithItsAllowHeaderAndNoErrorInTheLog() {
+        List<HttpResponse<String>> answers = new ArrayList<>();
+        List<ILoggingEvent> events = loggedWhile(() -> answers.add(process.get("/test/post-only")));
+        HttpResponse<String> response = answers.get(0);
+
+        assertNoViolationList(assertProblem(response, 405, "method-not-allowed"));
+        assertThat(response.headers().allValues("Allow")).hasSize(1);
+        assertThat(response.headers().firstValue("Allow").orElseThrow()).contains("POST");
+        assertThat(events).as("a client's mistake is not an error").isEmpty();
+        assertBaseSecurityHeaders(response);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"401, authentication-required", "403, forbidden", "404, resource-not-found",
+            "406, validation-failed", "409, validation-failed", "413, validation-failed",
+            "415, unsupported-media-type", "500, internal-error", "503, internal-error"})
+    void aResponseStatusExceptionKeepsItsStatusAsTheCatalogCodeAndNeverItsReason(int status,
+            String code) {
+        List<HttpResponse<String>> answers = new ArrayList<>();
+        List<ILoggingEvent> events = loggedWhile(
+                () -> answers.add(process.get("/test/status?code=" + status)));
+        HttpResponse<String> response = answers.get(0);
+
+        JsonNode problem = assertProblem(response, ProblemCode.ofCode(code).orElseThrow().status(), code);
+        assertNoViolationList(problem);
+        assertThat(everythingOf(response)).doesNotContain("secret reason");
+        assertThat(events).extracting(ILoggingEvent::getLevel)
+                .as("only a server error is logged as an error")
+                .containsExactlyElementsOf(status >= 500 ? List.of(Level.ERROR) : List.of());
+    }
+
+    @Test
+    void aPublicRouteNoControllerServesIs404ResourceNotFoundAndNotAnInternalError() {
+        List<HttpResponse<String>> answers = new ArrayList<>();
+        List<ILoggingEvent> events = loggedWhile(() -> answers.add(process.get("/test/unmapped")));
+
+        assertNoViolationList(assertProblem(answers.get(0), 404, "resource-not-found"));
+        assertThat(events).isEmpty();
+    }
+
+    @Test
+    void aSecurityExceptionRaisedInsideTheMvcLayerIsAnsweredByTheSecurityChain() {
+        assertProblem(process.get("/test/access-denied", HarnessProcess.PRINCIPAL_HEADER, "someone"),
+                403, "forbidden");
+        assertProblem(process.get("/test/access-denied"), 401, "authentication-required");
+    }
+
 
     // ---- the contract ---------------------------------------------------------------------------
 
