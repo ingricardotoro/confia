@@ -3,14 +3,20 @@ package com.confia.bootstrap;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
+import jakarta.servlet.Filter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.security.web.SecurityFilterChain;
 
 /**
  * Specs/build-integrity of process-entry-point-isolation: each of the three processes, started
@@ -53,6 +59,17 @@ class ProcessBeanIsolationTest {
                 softly.assertThat(context)
                         .as("the worker must start without a web server")
                         .isNotInstanceOf(WebServerApplicationContext.class);
+                // Spring Security's autoconfiguration leaves three inert beans in a context
+                // without a web server unless the entry point excludes it (probe P1, design.md
+                // decision 4): an inert bean today is a surface someone wires up tomorrow.
+                softly.assertThat(context.getBeanNamesForType(SecurityFilterChain.class, true,
+                                false))
+                        .as("the worker has no security filter chain").isEmpty();
+                softly.assertThat(context.getBeanNamesForType(Filter.class, true, false))
+                        .as("the worker has no request filter").isEmpty();
+                softly.assertThat(beanNamesOfTypesIn(context, "org.springframework.security",
+                                "org.springframework.boot.security"))
+                        .as("the worker has no bean of a security package").isEmpty();
             }
             softly.assertAll();
         } finally {
@@ -60,6 +77,20 @@ class ProcessBeanIsolationTest {
                 context.close();
             }
         }
+    }
+
+    private static List<String> beanNamesOfTypesIn(ConfigurableApplicationContext context,
+            String... packages) {
+        ConfigurableListableBeanFactory factory = context.getBeanFactory();
+        List<String> names = new ArrayList<>();
+        factory.getBeanNamesIterator().forEachRemaining(name -> {
+            Class<?> type = factory.getType(name, false);
+            if (type != null && Arrays.stream(packages).anyMatch(
+                    candidate -> ProcessBeanPolicy.matches(type.getPackageName(), candidate))) {
+                names.add(name + " : " + type.getName());
+            }
+        });
+        return names;
     }
 
     private static Set<String> importedPackages(ProcessBeanPolicy policy) {

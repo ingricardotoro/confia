@@ -1,5 +1,6 @@
 package com.confia.shared.web.harness;
 
+import jakarta.servlet.Filter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -7,10 +8,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.security.web.SecurityFilterChain;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -49,9 +52,27 @@ public final class HarnessProcess implements AutoCloseable {
                 .run());
     }
 
+    /** Starts the harness with the portal allow-list. */
+    public static HarnessProcess startAsPortal(String... properties) {
+        String[] all = new String[properties.length + 1];
+        all[0] = WebEdgeHarness.PROCESS_PROPERTY + "=portal";
+        System.arraycopy(properties, 0, all, 1, properties.length);
+        return start(all);
+    }
+
     /** What the harness controllers observed. */
     public Calls calls() {
         return context.getBean(Calls.class);
+    }
+
+    /** The filters of the real security chain, in order. */
+    public List<Filter> securityFilters() {
+        return context.getBean(SecurityFilterChain.class).getFilters();
+    }
+
+    /** How many HTTP sessions the container created. */
+    public int sessionsCreated() {
+        return context.getBean(SessionCounter.class).created();
     }
 
     /** Sends {@code method} to {@code path}, which is used exactly as written. */

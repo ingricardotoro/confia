@@ -32,4 +32,18 @@ public final class ProblemAssertions {
         assertThat(UUID.fromString(body.get("traceId").asString())).isNotNull();
         return body;
     }
+
+    /** The five base security headers with their exact values, and neither {@code X-Powered-By}
+     * nor {@code Server}. */
+    public static void assertBaseSecurityHeaders(HttpResponse<String> response) {
+        assertThat(response.headers().allValues("X-Content-Type-Options")).containsExactly("nosniff");
+        assertThat(response.headers().allValues("X-Frame-Options")).containsExactly("DENY");
+        assertThat(response.headers().allValues("Referrer-Policy"))
+                .containsExactly("strict-origin-when-cross-origin");
+        assertThat(response.headers().allValues("Permissions-Policy")).containsExactly(
+                "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()");
+        assertThat(response.headers().allValues("Cache-Control")).containsExactly("no-store");
+        assertThat(response.headers().firstValue("X-Powered-By")).isEmpty();
+        assertThat(response.headers().firstValue("Server")).isEmpty();
+    }
 }

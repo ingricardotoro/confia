@@ -1,5 +1,9 @@
 package com.confia.shared.web.harness;
 
+import com.confia.shared.web.problem.ProblemResponses;
+import com.confia.shared.web.request.RequestContextFilter;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.MDC;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,5 +33,14 @@ class HarnessController {
     String protectedRoute() {
         calls.protectedInvoked();
         return "protected";
+    }
+
+    /** Public for {@code GET} and always failing, with a message that must never reach a client. */
+    @RequestMapping("/test/boom")
+    String boom(HttpServletRequest request) {
+        calls.failingInvoked(
+                (String) request.getAttribute(ProblemResponses.REQUEST_ID_ATTRIBUTE),
+                MDC.get(RequestContextFilter.MDC_KEY));
+        throw new IllegalStateException("jdbc:postgresql://host/db password=x");
     }
 }
