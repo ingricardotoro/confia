@@ -39,13 +39,19 @@ import org.junit.jupiter.api.Test;
 class IdempotencyScopeExclusionInventoryTest {
 
     /**
-     * (a) No production class in a {@code ..web..} package depends on {@code
-     * com.confia.shared.security}, and no production class carries the {@code Idempotency-Key}
-     * header literal — both true today only because no production {@code web} layer exists yet
-     * (brecha con destino: cambio 7).
+     * (a) No production class in a {@code ..web..} package depends on the idempotency types of
+     * {@code com.confia.shared.security}, and no production class carries the {@code
+     * Idempotency-Key} header literal — both true today only because no production idempotent
+     * endpoint exists yet (brecha con destino: cambio 7).
+     *
+     * <p>This used to forbid every dependency of a web class on the whole package. The request
+     * filter of web-edge-foundations (PR 7) now legitimately depends on {@code ClientAddress} and
+     * {@code RequestOrigin}, which live in the same package, so the check names what it was always
+     * about: the idempotency mechanism. The web edge of idempotency itself is PR 13, which retires
+     * this check.
      */
     @Test
-    void noWebPackageClassDependsOnSharedSecurityAndNoProductionClassMentionsTheHeaderLiteral()
+    void noWebPackageClassDependsOnIdempotencyAndNoProductionClassMentionsTheHeaderLiteral()
             throws IOException {
         JavaClasses classes = assertNonEmptyProductionClasses();
 
@@ -54,12 +60,15 @@ class IdempotencyScopeExclusionInventoryTest {
                 continue;
             }
             for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
-                assertThat(dependency.getTargetClass().getPackageName())
-                        .as("%s resides in a web package and must not depend on "
-                                        + "com.confia.shared.security — no controller exists yet "
-                                        + "(brecha con destino: cambio 7)",
-                                javaClass.getFullName())
-                        .doesNotStartWith("com.confia.shared.security");
+                JavaClass target = dependency.getTargetClass();
+                boolean idempotency = target.getPackageName().equals("com.confia.shared.security")
+                        && (target.getSimpleName().startsWith("Idempot")
+                                || target.getSimpleName().equals("RequestPayloadHasher"));
+                assertThat(idempotency)
+                        .as("%s resides in a web package and must not depend on %s: no idempotent "
+                                        + "endpoint exists yet (brecha con destino: cambio 7)",
+                                javaClass.getFullName(), target.getFullName())
+                        .isFalse();
             }
         }
 
