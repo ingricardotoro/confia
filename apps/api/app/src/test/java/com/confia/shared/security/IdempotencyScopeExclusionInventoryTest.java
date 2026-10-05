@@ -44,7 +44,8 @@ class IdempotencyScopeExclusionInventoryTest {
      * may depend on, by full class name. Add the next one here (2.3c adds {@code RequestOrigin}).
      */
     private static final Set<String> WEB_MAY_DEPEND_ON_SHARED_SECURITY = Set.of(
-            "com.confia.shared.security.ClientAddress", "com.confia.shared.security.ClientKey");
+            "com.confia.shared.security.ClientAddress", "com.confia.shared.security.ClientKey",
+            "com.confia.shared.security.RequestOrigin");
 
     /**
      * (a) A production class in a {@code ..web..} package may depend on {@code

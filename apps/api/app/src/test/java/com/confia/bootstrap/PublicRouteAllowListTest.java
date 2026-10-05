@@ -151,10 +151,10 @@ class PublicRouteAllowListTest {
     }
 
     /**
-     * The negative control: the harness chain permits {@code /test/open} and {@code /test/boom}
-     * without listing them in the real allow-list, which is exactly what a route added to a chain
-     * and forgotten in {@code PublicEndpoints} looks like. The check must fail, naming each
-     * route; {@code /x}, which the chain denies, must not be named.
+     * The negative control: the harness chain permits {@code /test/open}, {@code /test/boom} and
+     * {@code /test/origin} without listing them in the real allow-list, which is exactly what a
+     * route added to a chain and forgotten in {@code PublicEndpoints} looks like. The check must
+     * fail, naming each route; {@code /x}, which the chain denies, must not be named.
      */
     @Test
     void aRoutePermittedByAChainAndMissingFromTheAllowListFailsNamingTheRoute() {
@@ -164,12 +164,14 @@ class PublicRouteAllowListTest {
 
             List<String> leaks = leaks(harness.context(), harness.port(), realList);
 
-            assertThat(leaks).hasSize(2);
+            assertThat(leaks).hasSize(3);
             assertThat(leaks).anyMatch(leak -> leak.startsWith("GET /test/open answered 200"));
             assertThat(leaks).anyMatch(leak -> leak.startsWith("GET /test/boom answered 500"));
+            assertThat(leaks).anyMatch(leak -> leak.startsWith("GET /test/origin answered 200"));
             assertThat(leaks).noneMatch(leak -> leak.contains("/x"));
             assertThatThrownBy(() -> assertThat(leaks).isEmpty())
-                    .hasMessageContaining("/test/open").hasMessageContaining("/test/boom");
+                    .hasMessageContaining("/test/open").hasMessageContaining("/test/boom")
+                    .hasMessageContaining("/test/origin");
         }
     }
 

@@ -1,5 +1,6 @@
 package com.confia.shared.web.request;
 
+import com.confia.shared.security.RequestOrigin;
 import com.confia.shared.web.problem.ProblemCode;
 import com.confia.shared.web.problem.ProblemResponses;
 import jakarta.servlet.FilterChain;
@@ -35,10 +36,17 @@ public final class RequestContextFilter extends OncePerRequestFilter implements 
 
     private static final Logger LOG = LoggerFactory.getLogger(RequestContextFilter.class);
 
-    private final ProblemResponses problems;
+    private static final String USER_AGENT = "User-Agent";
 
-    public RequestContextFilter(ProblemResponses problems) {
+    private final ProblemResponses problems;
+    private final ClientAddressResolver addresses;
+    private final int userAgentMaxLength;
+
+    public RequestContextFilter(ProblemResponses problems, WebEdgeProperties properties) {
         this.problems = problems;
+        this.addresses = new ClientAddressResolver(
+                TrustedProxies.parse(properties.trustedProxies()));
+        this.userAgentMaxLength = properties.userAgentMaxLength();
     }
 
     @Override
@@ -49,11 +57,13 @@ public final class RequestContextFilter extends OncePerRequestFilter implements 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain chain) throws ServletException, IOException {
-        String requestId = UUID.randomUUID().toString();
-        request.setAttribute(ProblemResponses.REQUEST_ID_ATTRIBUTE, requestId);
-        MDC.put(MDC_KEY, requestId);
+        UUID requestId = UUID.randomUUID();
+        request.setAttribute(ProblemResponses.REQUEST_ID_ATTRIBUTE, requestId.toString());
+        MDC.put(MDC_KEY, requestId.toString());
+        RequestOrigin origin = new RequestOrigin(requestId,
+                addresses.resolve(request).orElse(null), userAgentOf(request));
         try {
-            chain.doFilter(request, response);
+            callWithOrigin(origin, request, response, chain);
         } catch (IOException | ServletException | RuntimeException e) {
             if (response.isCommitted()) {
                 throw e;
@@ -63,6 +73,47 @@ public final class RequestContextFilter extends OncePerRequestFilter implements 
         } finally {
             MDC.remove(MDC_KEY);
         }
+    }
+
+    /**
+     * Runs the rest of the chain with {@code origin} bound, and only for the length of that call.
+     * Checked exceptions of the chain come out as they went in.
+     */
+    private static void callWithOrigin(RequestOrigin origin, HttpServletRequest request,
+            HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
+        try {
+            ScopedValue.where(RequestOrigin.CURRENT, origin).call(() -> {
+                chain.doFilter(request, response);
+                return null;
+            });
+        } catch (IOException | ServletException | RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            // The call is declared to throw Exception; the chain throws nothing but the three above.
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * The {@code User-Agent} header cut to its limit, or {@code null} when there is none. Control
+     * characters become spaces, because a NUL would break the {@code TEXT} column that stores it,
+     * and a cut never leaves the first half of a surrogate pair.
+     */
+    private String userAgentOf(HttpServletRequest request) {
+        String raw = request.getHeader(USER_AGENT);
+        if (raw == null) {
+            return null;
+        }
+        int end = Math.min(raw.length(), userAgentMaxLength);
+        if (end < raw.length() && Character.isHighSurrogate(raw.charAt(end - 1))) {
+            end--;
+        }
+        StringBuilder kept = new StringBuilder(end);
+        for (int i = 0; i < end; i++) {
+            char c = raw.charAt(i);
+            kept.append(Character.isISOControl(c) ? ' ' : c);
+        }
+        return kept.toString();
     }
 
     private void answerWithTheLastResort(HttpServletRequest request, HttpServletResponse response,
