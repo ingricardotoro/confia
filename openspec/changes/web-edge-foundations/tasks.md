@@ -291,7 +291,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     de la cadena del portal, el trabajador sin borde, la ausencia de estado, la respuesta de la cadena con
     identificador y el idioma; requisito de `build-integrity` «El contexto del trabajador…»
 
-- [ ] 2.2a **PR 6a `container-rejections`: lo que Tomcat rechaza antes de los filtros y la prueba del acoplamiento
+- [x] 2.2a **PR 6a `container-rejections`: lo que Tomcat rechaza antes de los filtros y la prueba del acoplamiento
   de springdoc (decisiones 7 y 8).**
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/bootstrap/`
     `ContainerRejectionsTest.java` (procesos administrativo y portal reales, con su configuración de producción:

@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-04 (tarea 2.1c; 2.1a, 2.1b y 2.1c hechas)
+- **Última actualización:** 2026-10-04 (tarea 2.2a; 2.1a, 2.1b, 2.1c y 2.2a hechas)
 
 ## Estado de las tareas
 
@@ -14,7 +14,9 @@
 | 2.1a | PR 3 `problem-details-core` | Hecha | `2554745` y el commit `docs(sdd)` de esta rama |
 | 2.1b | PR 4 `security-chains` | Hecha | `f9bc884`, `6ba1744` y el commit `docs(sdd)` de esta rama |
 | 2.1c | PR 5 `portal-and-worker-chain` | Hecha | `7cf71ee` y el commit `docs(sdd)` de esta rama |
-| 2.2 a 6.1 | PR 6 a 13 y cierre | Pendientes (numeración nueva) | |
+| 2.2a | PR 6a `container-rejections` | Hecha | `d9d015b` y el commit `docs(sdd)` de esta rama |
+| 2.2b | PR 6b `edge-gates` | Pendiente (se construye desde `main` actualizado con `wip/web-edge-edge-gates-full`) | |
+| 2.3 a 6.1 | PR 7 a 13 y cierre | Pendientes | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
 
@@ -527,3 +529,58 @@ Con la corrección del bloqueante B1, el PR 5 mide 885 líneas efectivas frente 
 El propietario aprobó una **excepción de tamaño de 85 líneas** para entregarlo en un solo PR: la prueba
 unitaria que cierra el bloqueante viaja con el filtro que cubre, y el cambio se mantiene en 14 de 15
 tareas. No se recortaron pruebas ni comentarios.
+
+## Tarea 2.2a: PR 6a `container-rejections`
+
+Rama `change/web-edge-foundations-edge-gates`, desde `main` en `9627fb0`. La tarea 2.2 original se implementó y verificó
+completa (Surefire 186 + 585, Failsafe 225) y midió **1 111 líneas** efectivas (1 106 adiciones y 5 eliminaciones,
+igual con y sin `-M`) frente al tope de 800. El propietario aprobó partirla en 2.2a y 2.2b. El árbol completo y
+verificado está en la rama **local** `wip/web-edge-edge-gates-full` (commit `fee587f`, 21 archivos), que nunca se
+publica y es la fuente de 2.2b. Conteo: 15 tareas y 14 PR (dentro del máximo de 15; la excepción concedida por el
+propietario no se ejerce). Los PR se llaman 6a y 6b y los PR 7 a 13 conservan su número.
+
+### Evidencia del ciclo TDD (obtenida sobre el árbol completo, antes de la partición)
+
+| Paso | Observado |
+|---|---|
+| ROJO, brecha de Tomcat | `ContainerRejectionsTest` (admin y portal reales, sin válvula): `Tests run: 11, Failures: 6, Errors: 3`; `Expecting actual: "text/html;charset=utf-8" to start with: "application/problem+json"` en las seis combinaciones de `/x%2f`, `/x%00` y `TRACE`, y `Unexpected character ('<' ...)` al leer el cuerpo HTML como JSON en las tres del cuerpo. |
+| VERDE | Con la válvula: `ContainerRejectionsTest` 12/12 (incluye una línea de petición de 70 000 caracteres: cuerpo y respuesta con el mismo estado), `ProblemErrorReportValveTest` 10/10, `ProblemCodeTest` en verde. Un primer VERDE falló una aserción mía (`TRACE` aparecía en el cuerpo por un `doesNotContainIgnoringCase`); se corrigió a la forma exacta. |
+| S6 | `ProductionEdgeDefaultsTest` 6/6: producción trae springdoc apagado y `log-request-details` falso; `SPRINGDOC_API_DOCS_ENABLED` abre las dos entradas; con `--springdoc.api-docs.enabled=true` el documento responde 200 sin credencial en ambos procesos y todo lo demás sigue en 401. Un primer intento falló una aserción mía (`contains` para el valor `false`) y se corrigió. |
+| Cierre sobre 2.2a sola | `./mvnw verify` completo en esta rama: Surefire 186 + 565 (los 535 de la línea base más 30 nuevos), Failsafe 225, `BUILD SUCCESS`. La instantánea OpenAPI y `apps/api/routes` (que aún no existe) sin cambios. |
+
+### Demostraciones deliberadas (cada una revertida; `cmp` sin diferencias)
+
+| Ruptura | Resultado |
+|---|---|
+| Personalizador que no instala la válvula (`return factory -> { };`) | `ContainerRejectionsTest` `Tests run: 12, Failures: 6, Errors: 4`; `Expecting actual: "text/html;charset=utf-8" to start with: "application/problem+json"`. |
+| La válvula no llama a `SecurityHeadersFilter.apply` | `ContainerRejectionsTest` `Tests run: 12, Failures: 7`; `Expecting actual: ... to contain exactly (and in same order)` sobre las cabeceras base (no se capturó el valor exacto del mensaje). |
+
+### Decisiones y desviaciones (declaradas)
+
+1. **Estado de la respuesta de la válvula.** No conserva el estado del contenedor cuando el catálogo no lo tiene: 405 es
+   `method-not-allowed`, todo otro 4xx es `400 validation-failed` y todo 5xx `500 internal-error`; el cuerpo y la
+   respuesta coinciden siempre (RFC 9457). Nota fechada en `design.md`.
+2. **Código nuevo `method-not-allowed` (405)** con su entrada es-HN; la decisión 8 decía que el 405 no tenía productor.
+3. **`instance` es `/`** en lo que rechaza el contenedor: la ruta nunca se decodificó y no se repite.
+4. Esta parte no necesitó nada de 2.2b para pasar. `ProductionEdgeDefaultsTest` afirma `spring.mvc.log-request-details`
+   falso, que ya es el valor por omisión de Spring Boot, y la línea explícita de `application.yml` viaja en 2.2a. Los
+   ayudantes de `OpenApiProcess` que 2.2b también usa (`port()`) viajan aquí.
+5. La nota fechada de `design.md` (decisiones 7, 8 y 22) entra ya en 2.2a; sus párrafos cuarto y quinto (el prefijo
+   `org.apache.tomcat.util.http` y el control negativo de la lista blanca) describen trabajo de 2.2b.
+
+### Medición del PR 6a (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 386 | 5 | **391** |
+| Con `-M` | 386 | 5 | **391** |
+
+Pronóstico: ~395. Dentro del tope de 800. Tareas: 15 en total; hechas 6 de 15 (1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a).
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='ContainerRejectionsTest,ProblemErrorReportValveTest,ProblemCodeTest,ProductionEdgeDefaultsTest,ProblemCatalogCoverageTest,ProcessBeanIsolationTest'`; cierre por `./mvnw verify`: Surefire 186 + 565, Failsafe 225 |
+| Arnés de ejecución | Procesos administrativo y portal reales por `ConfiaApplication.launch` con su configuración de producción |
+| Frontera de reversión | Se retiran `ProblemErrorReportValve`, su personalizador en `WebEdgeConfiguration`, `METHOD_NOT_ALLOWED` con su catálogo, `writeWithoutRequestPath`, `SecurityHeadersFilter.apply` y las pruebas |

@@ -1157,3 +1157,35 @@ La brecha de la nota anterior (`/x%2f`, `/x%00` y `TRACE` reciben la página HTM
 y sin las cabeceras base) tiene dueña: la tarea 2.2 (PR 6 `edge-gates`), que debe probarla por los procesos
 reales y configurar el contenedor para cerrarla. La cabecera `Server` no se observó en el sondeo de 2.1c; 2.2 debe
 afirmar su ausencia. El texto anterior de este documento no se reescribe.
+
+### Nota fechada 2026-10-04: lo que Tomcat rechaza se responde con una válvula, el estado lo fija el código y la lista de prefijos crece en uno (decisiones 7, 8 y 22, PR 6)
+
+Primera, la brecha de Tomcat de las dos notas anteriores. Se cierra con `ProblemErrorReportValve`, una subclase de
+`ErrorReportValve` instalada por un `WebServerFactoryCustomizer` de `WebEdgeConfiguration` (un personalizador de
+contexto que la añade al `StandardHost` y fija su clase como la del informe de errores). Responde `/x%2f` y `/x%00`
+(400, `validation-failed`) y `TRACE` (405) con Problem Details, las cinco cabeceras base (los valores salen de
+`SecurityHeadersFilter.apply`, que sigue siendo su único dueño) y sin `Server` ni `X-Powered-By`. Nunca repite la
+ruta: el contenedor se negó a decodificarla, así que `instance` es `/` (`ProblemResponses.writeWithoutRequestPath`).
+Conserva las cabeceras que el contenedor ya puso, como `Allow` en el 405.
+
+Segunda, el catálogo. El `405` tiene un productor alcanzable desde esta tarea, así que la nota de la decisión 8
+(«`405` y `406` no tienen productor alcanzable») deja de valer para el `405`: se añade el código
+`method-not-allowed` (405), con su título y detalle es-HN en el catálogo. `406` sigue sin código.
+
+Tercera, la decisión deliberada sobre el estado. `ProblemBody.status` debe ser igual al estado HTTP (RFC 9457) y el
+estado de un código lo fija el catálogo (decisión 8). Por eso la válvula **no conserva el estado del contenedor**
+cuando el catálogo no lo tiene: todo 4xx distinto de 405 se responde `400 validation-failed` y todo 5xx
+`500 internal-error`. Un 414 o un 431 del contenedor llega, pues, como `400`; la respuesta y el cuerpo coinciden
+siempre en un solo estado. Se descartó conservar el estado del contenedor porque obligaría a catalogar cada estado
+posible del contenedor (404, 413, 414, 431, ...) o a emitir un cuerpo cuyo `type` no corresponde a su estado;
+cuando un cliente necesite distinguirlos nacerán con su código propio. `ContainerRejectionsTest` lo prueba con una
+línea de petición de 70 000 caracteres (cuerpo y respuesta con el mismo estado, cabeceras base) y
+`ProblemErrorReportValveTest` fija la correspondencia estado a código.
+
+Cuarta, la decisión 22. `SensitiveDataLoggingTest` mostró que la lista cerrada de cuatro prefijos no bastaba:
+`org.apache.tomcat.util.http.Rfc6265CookieProcessor` registra el valor crudo de `Cookie` en `DEBUG`. Se añadió
+`org.apache.tomcat.util.http` y la prueba lo cubre (sin la guarda, el mismo ciclo de peticiones sí filtra a `TRACE`).
+Quinta, `PublicRouteAllowListTest` usa como control negativo las rutas `/test/open` y `/test/boom` del arnés, que su
+cadena permite sin que estén en la lista real, en lugar de una segunda cadena que permita `/test/leak`: prueba lo
+mismo (una ruta permitida por una cadena y ausente de `PublicEndpoints` rompe la comprobación nombrándola) sin
+código nuevo en el arnés. El texto anterior de este documento no se reescribe.
