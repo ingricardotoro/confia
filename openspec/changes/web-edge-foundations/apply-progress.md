@@ -437,17 +437,18 @@ protegida y sobre una pública solo de `GET` (`401` con `application/problem+jso
 `/x%2e` y `/%78` (esta decodifica a `/x`) en la prueba de variantes existente. **Hallazgo:** `/x%2f`, `/x%00` y
 `TRACE` no llegan a la cadena: los rechaza Tomcat con su propia página HTML (`400`, `400` y `405`, sin Problem
 Details y sin las cabeceras base). Están cubiertas por pruebas que afirman lo que sí se cumple (estado `400` o
-`405` y ningún controlador corre). **Brecha abierta, para 2.2 o un cambio posterior (nota fechada 2026-10-04):**
+`405` y ningún controlador corre). **Brecha abierta, asignada a la tarea 2.2 (nota fechada 2026-10-04 en `tasks.md` y `design.md`):**
 la uniformidad de Problem Details y de cabeceras no alcanza a lo que el contenedor rechaza antes de los
 filtros; arreglarla exige configurar Tomcat (valve o página de error) o un filtro anterior al conector, que
 queda fuera del alcance de este PR.
 
 ### Desviaciones del diseño y de la tarea (declaradas)
 
-1. `RequestContextFilterChainTest` y `AdminSecurityHeadersAndSessionTest` no se crearon (nota fechada de
-   `tasks.md`): la rama verificada cubre ese contenido con `RequestContextFilterTest` y los cinco métodos devueltos
-   a `AdminSecurityChainTest`. No hay prueba unitaria con `MockFilterChain` ni del orden `HIGHEST_PRECEDENCE + 10`;
-   el orden se observa porque la respuesta `401` de la cadena ya lleva el `traceId` del servidor.
+1. `RequestContextFilterChainTest` y `AdminSecurityHeadersAndSessionTest` no se crearon, y **el propietario no
+   aprobó de forma explícita omitirlos** (ver la tabla de cobertura de la corrección de revisión, más abajo). La
+   afirmación anterior de que el orden `HIGHEST_PRECEDENCE + 10` «se observa porque la respuesta `401` de la
+   cadena ya lleva el `traceId` del servidor» era falsa: ninguna prueba por la cadena falla si cambia el orden
+   mientras el filtro siga antes de la cadena de Spring Security. La cubre `RequestContextFilterUnitTest`.
 2. Se añadió `StatelessChainTest` (no estaba en la tarea) por la condición I1: descubrió que las pruebas de
    respuesta no detectaban la falta de una sola de las dos líneas.
 3. `ProcessBeanPolicy` cambia el texto de `WEB_EDGE` («no filters, no security chain ... decision 4») conservando la
@@ -470,3 +471,59 @@ queda fuera del alcance de este PR.
 | Con `-M` | 690 | 22 | **712** |
 
 Pronóstico: 700 a 800. Dentro del tope de 800. Tareas: 14 de 15.
+
+### Corrección de la revisión independiente de 2.1c (2026-10-04)
+
+El revisor bloqueó el PR por B1. Una sola corrección sobre la misma rama.
+
+**B1: tres comportamientos del ROJO de 2.1c sin una prueba que pudiera fallar por su causa** (retirada del MDC al
+terminar, relanzado con la respuesta confirmada y orden del filtro). Se creó `RequestContextFilterUnitTest`
+(8 pruebas, sin contexto de Spring: `MockHttpServletRequest`, `MockHttpServletResponse` y cadenas lambda; un
+`ListAppender` de Logback sobre el registrador del filtro). Decisión sobre un valor ajeno en la clave `requestId`
+del MDC: el filtro es el dueño de la clave, así que lo **sustituye** durante la petición y la clave queda vacía al
+terminar (no restaura el valor ajeno). La prueba lo afirma. El atributo de la petición no se retira: es un objeto
+de la propia petición y no sobrevive a ella; no hay nada que afirmar.
+
+| Aserción | Prueba | Ruptura deliberada y mensaje exacto |
+|---|---|---|
+| (a) MDC vacío tras una cadena correcta, tras una que lanza y con un valor ajeno previo | `theLogContextIsEmptyAfterASuccessfulChain`, `theLogContextIsEmptyAfterAChainThatThrows`, `aForeignValueUnderTheKeyIsReplacedForTheRequestAndGoneAfterwards` | Quitar `MDC.remove(MDC_KEY)` del `finally`: `Tests run: 8, Failures: 3`; `expected: null but was: "1b1942de-..."` (las dos primeras) y `[the filter's id does not remain] expected: null but was: "a8c0a709-..."` (la del valor ajeno). |
+| (b) Dentro de la cadena, MDC y atributo son el mismo UUID | `insideTheChainTheLogContextAndTheRequestAttributeHoldTheSameServerUuid` | Cubierta además por `RequestContextFilterTest` (cadena real); sin ruptura propia. |
+| (c) Respuesta confirmada: relanza la misma instancia y no escribe cuerpo | `aCommittedResponseGetsTheSameExceptionBackAndNoBody` (`flushBuffer()` antes de lanzar) | Sustituir `response.isCommitted()` por `false`: `Tests run: 8, Failures: 1`; `Expecting actual: java.lang.IllegalStateException: Cannot reset buffer - response is already committed` (se esperaba la instancia lanzada por la cadena). |
+| (d) Orden `HIGHEST_PRECEDENCE + 10`, mayor que el de `SecurityHeadersFilter` y menor que -100 (cadena de Spring Security) | `itRunsRightAfterTheSecurityHeadersFilterAndAheadOfTheSecurityChain` | `HIGHEST_PRECEDENCE + 10` por `HIGHEST_PRECEDENCE`: `Tests run: 8, Failures: 1`; `expected: -2147483638 but was: -2147483648`. |
+| (e) El 500 no lleva el mensaje ni la clase y el registro recibe la excepción | `anUncommittedResponseBecomesAnInternalErrorWithNothingInternalInIt`, `theFullExceptionGoesToTheServerLogAndNotToTheClient` | Sin ruptura pedida; verdes sobre el filtro real. |
+
+Cada ruptura se revirtió y `cmp` contra la copia original no dio diferencias. Las pruebas se escribieron sobre un
+filtro que ya existía, de modo que su ROJO es la ruptura, no la ausencia de código.
+
+**I1:** `theLogContextOfOneRequestNeverCarriesTheIdOfThePreviousOne` pasaba sin `MDC.remove`; se renombró
+`eachRequestSeesItsOwnIdInTheLogContext`, que es lo que prueba. La retirada la prueba el unitario.
+
+**I2:** la brecha de Tomcat (`/x%2f`, `/x%00` y `TRACE`) queda asignada a la tarea 2.2, con una nota fechada
+2026-10-04 en `tasks.md` (bajo 2.2) y en `design.md`. Observación: el sondeo de 2.1c no vio la cabecera `Server`
+en esas tres respuestas (llegaron `connection`, `content-language`, `content-length`, `content-type`, `date` y
+`Allow` en el 405); 2.2 debe afirmar su ausencia en lugar de darla por supuesta.
+
+**Cobertura de los dos archivos no creados** (el propietario no aprobó de forma explícita omitirlos):
+
+| Escenario | Prueba que lo cubre |
+|---|---|
+| El cliente envía su propio identificador (ignorado, `traceparent` incluido) | `RequestContextFilterTest.theServerIgnoresTheIdentifiersTheClientSends` |
+| Respuesta de la cadena de seguridad con identificador del servidor | `RequestContextFilterTest.aResponseOfTheChainBeforeAnyControllerStillCarriesTheServerId` |
+| Cada petición tiene su identificador | `RequestContextFilterTest.everyRequestGetsItsOwnId` |
+| El `traceId` del último recurso es el que vio el controlador (atributo y MDC) | `RequestContextFilterTest.theTraceIdOfAnErrorIsTheIdTheControllerSawInTheRequestAndInTheLogContext` |
+| El último recurso no filtra nada y conserva las cabeceras base | `RequestContextFilterTest.theLastResortAnswersWithoutAnythingInternalAndKeepsTheSecurityHeaders` y `RequestContextFilterUnitTest.anUncommittedResponseBecomesAnInternalErrorWithNothingInternalInIt` |
+| Cabeceras base en respuesta de error | `AdminSecurityChainTest.anErrorResponseCarriesTheBaseSecurityHeaders` |
+| Cabeceras base en respuesta de éxito | `AdminSecurityChainTest.aSuccessResponseCarriesTheSameBaseSecurityHeaders` |
+| Ninguna respuesta crea sesión ni `Set-Cookie` | `AdminSecurityChainTest.noResponseCreatesASessionOrSetsACookie` y `StatelessChainTest` |
+| La cadena de consulta no aparece en `instance` | `AdminSecurityChainTest.theQueryStringNeverAppearsInTheInstance` |
+| Idioma fijo | `AdminSecurityChainTest.theLanguageIsFixedWhateverAcceptLanguageSays` |
+
+**Cierre:** `./mvnw verify` completo: Surefire 186 + 535 (los 527 anteriores más 8), Failsafe 225, `BUILD SUCCESS`.
+La instantánea OpenAPI y `routes` siguen sin cambios.
+
+### Excepción de tamaño del PR 5 (2026-10-04)
+
+Con la corrección del bloqueante B1, el PR 5 mide 885 líneas efectivas frente al presupuesto de 800.
+El propietario aprobó una **excepción de tamaño de 85 líneas** para entregarlo en un solo PR: la prueba
+unitaria que cierra el bloqueante viaja con el filtro que cubre, y el cambio se mantiene en 14 de 15
+tareas. No se recortaron pruebas ni comentarios.

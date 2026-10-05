@@ -322,6 +322,15 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     contienen cabeceras…» y «Ausencia de autenticación por credencial…» (ninguna ruta de producción);
     requisito de `build-integrity` «Instantánea aprobada del mapa de rutas del portal»
 
+  - **Nota fechada 2026-10-04 (heredada de 2.1c): lo que Tomcat responde antes de los filtros.** Esta tarea es la
+    dueña de la brecha: `/x%2f`, `/x%00` y `TRACE` los rechaza Tomcat antes de la cadena de filtros y reciben su
+    página HTML (400 y 405), sin Problem Details y sin las cabeceras base; la prueba de 2.1c solo afirma el
+    estado y que ningún controlador corre. El sondeo de 2.1c no observó la cabecera `Server` en esas respuestas
+    (llegaron `connection`, `content-language`, `content-length`, `content-type` y `date`, y `Allow` en el 405),
+    pero esta tarea debe afirmarlo. Debe añadir al ROJO una prueba por los procesos reales que exija, para esas tres
+    peticiones, `application/problem+json`, las cinco cabeceras base y ninguna cabecera `Server` ni `X-Powered-By`,
+    y al VERDE la configuración de Tomcat (válvula o página de error del contenedor) que lo cumpla.
+
 - [ ] 2.3 **PR 7 `request-origin`: IP, agente de usuario y origen en la auditoría (decisiones 11 a 13).**
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/security/`:
     `CidrBlockProperties.java` (jqwik contra una referencia con `BigInteger`),
@@ -827,9 +836,12 @@ la lista vacía y no solo explícita.
   `AdminSecurityHeadersAndSessionTest`. No se crearon: la rama verificada ya cubría esas pruebas con
   `RequestContextFilterTest` (por la cadena real: el identificador del servidor ignora `X-Request-Id` y
   `traceparent`, es distinto en cada petición, coincide con el que ve el controlador y con el MDC, y el último
-  recurso no filtra nada) y con los cinco métodos devueltos a `AdminSecurityChainTest`. La prueba con
-  `MockFilterChain` y el orden `HIGHEST_PRECEDENCE + 10` quedan cubiertos por la cadena real y no tienen prueba
-  propia. Se añadió `StatelessChainTest` (condición de fusión I1 de la revisión de 2.1b).
+  recurso no filtra nada) y con los cinco métodos devueltos a `AdminSecurityChainTest`. Tras la revisión
+  independiente se añadió `RequestContextFilterUnitTest` (sin contexto de Spring: MDC y atributo, relanzado con
+  la respuesta confirmada, orden `HIGHEST_PRECEDENCE + 10` y el último recurso), porque ninguna prueba por la
+  cadena podía fallar por esas causas. El propietario no aprobó de forma explícita omitir los dos archivos; el
+  contenido de cada uno está asignado en `apply-progress.md`. Se añadió `StatelessChainTest` (condición de
+  fusión I1 de la revisión de 2.1b).
 - **Ausencia de estado.** `SessionCreationPolicy.STATELESS` y `requestCache.disable` se **respaldan entre sí**:
   quitar solo una no cambia ninguna respuesta (`STATELESS` instala un `NullRequestCache`; sin `STATELESS` la
   caché deshabilitada tampoco guarda la petición), y las pruebas de sesión y de `Set-Cookie` solo fallan cuando

@@ -1150,3 +1150,10 @@ antes de entrar en la cadena de filtros: `/x%2f` y `/x%00` (400) y `TRACE` (405)
 contenedor, sin Problem Details y sin las cabeceras base. No llega ningún controlador y no se expone un detalle
 interno, pero la uniformidad de la decisión 8 no se cumple en esos tres casos. Queda como brecha abierta; el
 texto anterior de este documento no se reescribe.
+
+### Nota fechada 2026-10-04: la tarea 2.2 es la dueña de la brecha de Tomcat (decisiones 7 y 8, PR 5)
+
+La brecha de la nota anterior (`/x%2f`, `/x%00` y `TRACE` reciben la página HTML de Tomcat, sin Problem Details
+y sin las cabeceras base) tiene dueña: la tarea 2.2 (PR 6 `edge-gates`), que debe probarla por los procesos
+reales y configurar el contenedor para cerrarla. La cabecera `Server` no se observó en el sondeo de 2.1c; 2.2 debe
+afirmar su ausencia. El texto anterior de este documento no se reescribe.
