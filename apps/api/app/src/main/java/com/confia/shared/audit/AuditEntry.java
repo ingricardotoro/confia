@@ -13,9 +13,10 @@ import java.util.UUID;
  * the four makes it structurally impossible for an adapter to set them, which is exactly what
  * {@link AuditLogWriter}'s contract requires.
  *
- * <p>{@code sourceIp} and {@code userAgent} always travel {@code null} in this change: there is no
- * HTTP request yet to read either from (design.md, decision 8, "que este cambio pasa siempre en
- * NULL porque no hay petición HTTP").
+ * <p>{@code sourceIp} and {@code userAgent} are left {@code null} by the use cases: the request
+ * origin reaches them without a use case asking for it. {@link RequestOriginAuditLogWriter}
+ * completes both from the request being served and leaves them {@code null} outside a request;
+ * a value a caller does set always wins (web-edge-foundations design.md, decision 13).
  */
 public record AuditEntry(
         UUID institutionId,
