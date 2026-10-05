@@ -1189,3 +1189,19 @@ Quinta, `PublicRouteAllowListTest` usa como control negativo las rutas `/test/op
 cadena permite sin que estén en la lista real, en lugar de una segunda cadena que permita `/test/leak`: prueba lo
 mismo (una ruta permitida por una cadena y ausente de `PublicEndpoints` rompe la comprobación nombrándola) sin
 código nuevo en el arnés. El texto anterior de este documento no se reescribe.
+
+### Nota fechada 2026-10-04: lo que rechaza el contenedor se asigna por catálogo y se registra con su estado original (decisión 8, PR 6a)
+
+La revisión independiente de la tarea 2.2a (sin bloqueantes) señaló que la válvula respondía todo 4xx distinto de
+405 como `400 validation-failed` y todo 5xx como `500`, de modo que el estado original del contenedor se perdía
+(I1, I2 e I3). El propietario decidió «asignar por catálogo y registrar»: `ProblemErrorReportValve.codeFor` responde
+401 con `authentication-required`, 403 con `forbidden` y 405 con `method-not-allowed`; todo otro 4xx sigue siendo
+`400 validation-failed` y todo 5xx `500 internal-error`. Un `503` del contenedor se sigue respondiendo como `500`
+hasta que exista `capacity-exceeded` (tarea 3.x). El estado original sobrevive en un evento `INFO` fijo por cada
+rechazo respondido (`container rejection answered: status=…, method=…, traceId=…`), con el método solo si es uno
+estándar y el `traceId` igual al del cuerpo (la válvula lo genera, porque ningún filtro corrió); nunca la ruta, la
+consulta, cabeceras ni el texto o la clase de una excepción. Se eligió `INFO` y no `WARN` porque el rechazo es obra
+del cliente y no una alarma del operador, y cada petición rechazada deja una sola línea corta. La rama en que no
+queda a quién responder registra un mensaje fijo sin datos. Se descartó conservar el estado del contenedor en la
+respuesta por la razón de la nota anterior (habría que catalogar cada estado posible). El texto anterior de este
+documento no se reescribe.

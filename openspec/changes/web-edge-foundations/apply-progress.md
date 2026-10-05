@@ -584,3 +584,32 @@ Pronóstico: ~395. Dentro del tope de 800. Tareas: 15 en total; hechas 6 de 15 (
 | Orden enfocada y resultado | `-Dtest='ContainerRejectionsTest,ProblemErrorReportValveTest,ProblemCodeTest,ProductionEdgeDefaultsTest,ProblemCatalogCoverageTest,ProcessBeanIsolationTest'`; cierre por `./mvnw verify`: Surefire 186 + 565, Failsafe 225 |
 | Arnés de ejecución | Procesos administrativo y portal reales por `ConfiaApplication.launch` con su configuración de producción |
 | Frontera de reversión | Se retiran `ProblemErrorReportValve`, su personalizador en `WebEdgeConfiguration`, `METHOD_NOT_ALLOWED` con su catálogo, `writeWithoutRequestPath`, `SecurityHeadersFilter.apply` y las pruebas |
+
+### Revisión independiente de 2.2a y corrección (2026-10-04)
+
+Veredicto: sin bloqueantes. **I1, I2 e I3** (la válvula perdía el estado original del contenedor y respondía 401 y 403
+como 400) quedan resueltos por la decisión del propietario «asignar por catálogo y registrar», aplicada en un solo
+commit `fix(web)`:
+
+- `codeFor`: 401 a `authentication-required`, 403 a `forbidden`, 405 a `method-not-allowed`, todo otro 4xx a `400
+  validation-failed`, todo 5xx a `500 internal-error` (un 503 sigue respondiéndose 500 hasta `capacity-exceeded`, 3.x).
+- Cada rechazo respondido deja un evento `INFO` fijo (`container rejection answered: status=…, method=…, traceId=…`)
+  con el estado original, el método (solo si es estándar) y el `traceId` del cuerpo; la rama sin a quién responder deja
+  `container rejection could not be answered: the response was closed` (S1). Nunca ruta, consulta, cabeceras ni
+  excepción. `INFO` y no `WARN`: es obra del cliente y deja una línea corta por petición.
+- **S2 resuelta**: `ProblemErrorReportValveLogTest` prueba la instalación sobre un contenedor que no es `StandardHost`
+  (y con padre ausente) y la rama sin a quién responder, con Mockito.
+- **S5 resuelta**: la fila de trazabilidad «Documentación de API con perfil `local`» deja de citar 2.2a (la cubre 2.1b).
+- **S4 pendiente**, asignada al cambio de despliegue: una verificación de CI de que ningún manifiesto de producción fija
+  `SPRINGDOC_*`.
+
+Evidencia: ROJO (`ProblemErrorReportValveTest`, `ProblemErrorReportValveLogTest`, `ContainerRejectionsTest`): `Tests
+run: 32, Failures: 9` (401 y 403 respondidos como 400, y cero eventos en lugar de uno). VERDE: las tres clases en
+verde. Hallazgo: Tomcat informa `400` y no `414` para una línea de petición de 70 000 caracteres, ni `431` para una
+cabecera de 70 000, así que el estado original de esas dos ya es el del catálogo; la prueba del estado reescrito usa un
+`Expect` desconocido por socket, que el contenedor informa como `417` y se responde `400` (evento con `status=417`).
+
+| Ruptura | Resultado (cada una revertida; `cmp` sin diferencias) |
+|---|---|
+| `codeFor` responde 401 con `validation-failed` | `ProblemErrorReportValveTest` `Tests run: 14, Failures: 2`: `expected: "authentication-required" but was: "validation-failed"` y `expected: 401 but was: 400`. |
+| Quitar la llamada de registro de la válvula | `ContainerRejectionsTest` `Tests run: 16, Failures: 4`: `Expected size: 1 but was: 0` (los tres rechazos y el del estado reescrito). |

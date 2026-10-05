@@ -316,10 +316,11 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     `ProblemCode.METHOD_NOT_ALLOWED` (`method-not-allowed`, 405) con su título y detalle es-HN en
     `problems.properties`; `ProblemResponses.writeWithoutRequestPath` (`instance` es `/`: el contenedor se negó a
     decodificar la ruta y no se repite); `SecurityHeadersFilter.apply` estático (los valores siguen teniendo un
-    solo dueño); y en `application.yml` `spring.mvc.log-request-details: false`. La válvula mapea el estado al
-    del catálogo: 405 a `method-not-allowed`, todo otro 4xx a `400 validation-failed` y todo 5xx a `500
-    internal-error`, de modo que el `status` del cuerpo siempre es el de la respuesta (RFC 9457; nota fechada de
-    `design.md`).
+    solo dueño); y en `application.yml` `spring.mvc.log-request-details: false`. La válvula mapea por
+    catálogo: 401 a `authentication-required`, 403 a `forbidden`, 405 a `method-not-allowed`, todo otro 4xx a
+    `400 validation-failed` y todo 5xx a `500 internal-error`, de modo que el `status` del cuerpo siempre es el de
+    la respuesta (RFC 9457), y deja un evento `INFO` fijo con el estado original, el método y el `traceId`, sin
+    ruta, consulta, cabeceras ni excepción (decisión del propietario; nota fechada de `design.md`).
   - **Demostraciones deliberadas.** Un personalizador que no instala la válvula pone en rojo
     `ContainerRejectionsTest` (`text/html` frente a `application/problem+json`); una válvula que no aplica las
     cabeceras base la pone en rojo por las cabeceras; se revierten.
@@ -618,7 +619,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | La lista blanca pública es cerrada | Una ruta pública nueva sin editar la lista | 2.2b |
 | | La lista contiene solo lo declarado | 2.2b |
 | | Documentación de API con perfil `prod` | 2.1b, 2.2a |
-| | Documentación de API con perfil `local` | 2.1b, 2.2a |
+| | Documentación de API con perfil `local` | 2.1b |
 | La cadena administrativa no tiene estado | Ninguna respuesta crea sesión | 2.1c |
 | Cabeceras de seguridad base | Respuesta de error con las cabeceras base | 2.1a, 2.1c, 2.2a |
 | | Respuesta de éxito con las cabeceras base | 2.1a, 2.1c |
