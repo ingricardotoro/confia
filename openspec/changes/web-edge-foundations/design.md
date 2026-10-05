@@ -1292,14 +1292,23 @@ silenciosa es un riesgo de configuración: un descuido al escribir confía en di
   `trusted-proxies`, `trustedProxies` o `CONFIA_WEB_TRUSTEDPROXIES`. Tiene un control de no vacuidad y otro con las
   formas que usa un entorno. Límite: no ve valores pasados por línea de comandos en un script que no sea de esos tipos.
 
-### Nota fechada 2026-10-05: una excepción de seguridad lanzada dentro del MVC cae en el `500` del traductor (decisión 8, PR 8a)
 
-`ProblemExceptionHandler` termina con un manejador de `Exception` que responde `500 internal-error`. Una `AccessDeniedException`
-o una `AuthenticationException` lanzada **dentro** de la capa MVC (por ejemplo por un `@PreAuthorize`) llegaría a ese manejador
-antes que al `ExceptionTranslationFilter` y se respondería `500` en lugar de `403` o `401`. En este cambio no existe ninguna:
-no hay seguridad de métodos y la cadena responde fuera del MVC. **Dueño: el cambio 8 (RBAC)**, que debe hacer que el traductor
-las relance o las traduzca a `forbidden` y `authentication-required` antes de introducir la primera anotación de permiso. El
-texto anterior de este documento no se reescribe.
+### Nota fechada 2026-10-05: una excepción de seguridad lanzada dentro del MVC se relanza, y lo que el marco ya decidió se conserva (decisión 8, PR 8a)
+
+La revisión independiente de la tarea 2.4a corrigió tres cosas del manejador final del traductor. Primera: una `AccessDeniedException` o una
+`AuthenticationException` lanzada **dentro** de la capa MVC (por ejemplo por un `@PreAuthorize`) ya no se responde `500`: el traductor la
+relanza y la cadena de seguridad responde `403` o `401` (`ProblemTranslationTest` lo prueba por la cadena real). En este cambio no existe
+ninguna anotación de permiso. **Dueño del resto: el cambio 8 (RBAC)**, que debe probarlo con su primera anotación real. Segunda: la decisión 8 decía
+que `405` y `406` no tienen productor alcanzable y que caerían en `internal-error`; eso dejó de ser cierto (la nota del PR 6 ya lo corrigió para el
+`405` del contenedor) y el traductor lo cierra para todo `ErrorResponse` de Spring (`HttpRequestMethodNotSupportedException`,
+`HttpMediaTypeNotAcceptableException`, `ResponseStatusException`, `NoHandlerFoundException`, entre otros): su estado se traduce con la **misma regla**
+que la válvula del contenedor, ahora `ProblemCode.forStatus` (`401`, `403`, `404`, `405` con su cabecera `Allow`, `415` con sus códigos propios;
+cualquier otro `4xx` es `validation-failed` y todo `5xx` `internal-error`), sin registro de error para un `4xx` y sin repetir la razón. `406` queda
+como `validation-failed`: no tiene código propio. Una ruta pública sin controlador lanza `NoHandlerFoundException` (comprobado), no
+`NoResourceFoundException`; las dos dan `404 resource-not-found`. Tercera: un fallo no es «cliente desconectado» por el texto de su mensaje
+(«Connection reset by peer» lo dice también una base de datos o un servidor de correo): solo lo es si su cadena de causas contiene
+`AsyncRequestNotUsableException` o `ClientAbortException`, y aun entonces la respuesta queda con estado `499` y no `200`. El texto anterior de este
+documento no se reescribe.
 
 ### Nota fechada 2026-10-05: springdoc puede añadir las respuestas del `@RestControllerAdvice` a cada operación (decisión 8, PR 8a)
 

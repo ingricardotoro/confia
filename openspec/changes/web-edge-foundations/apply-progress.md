@@ -1101,3 +1101,30 @@ Las 2, 3 (con ocho fugas en esta parte), 4 y 5 de la sección «Tarea 2.4 comple
 | Orden enfocada y resultado | `-Dtest='ProblemTranslationTest,ProblemExceptionHandlerTest,ProblemCodeTest,ProblemCatalogCoverageTest,ResourceNotFoundTest,PublicRouteAllowListTest,OpenApi*Test,PortalRouteMapSnapshotTest,ProcessBeanIsolationTest'`: `Tests run: 90, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 763, Failsafe 229 |
 | Arnés de ejecución | Cadena real por HTTP con controladores de prueba que lanzan cada excepción, y los procesos administrativo y portal reales con `local` para el `404` |
 | Frontera de reversión | Se retiran `ProblemExceptionHandler`, los dos códigos y sus entradas de catálogo, el registro y las pruebas |
+
+### Revisión independiente de 2.4a y corrección (2026-10-05), DETENIDA ANTES DEL COMMIT por tamaño
+
+Veredicto de la revisión de seguridad: sin bloqueantes y sin fugas de datos; dos hallazgos importantes y cuatro sugerencias. La corrección está hecha y verificada
+pero **no se compromete**: con ella el PR 8a mide 946 líneas (928 adiciones y 18 eliminaciones, igual con y sin `-M`; la corrección sola, 359) frente al tope de 800. El árbol
+verificado está en la rama **local** `wip/web-edge-translator-core-fix` (nunca se publica); la rama de trabajo conserva el commit `7c609bb` de 2.4a.
+
+| Hallazgo | Cambio | Evidencia observada |
+|---|---|---|
+| I-1 (grave): `DisconnectedClientHelper` reconoce «Connection reset by peer» y «Broken pipe» en cualquier punto de la cadena de causas, de modo que una conexión caída a PostgreSQL, Redis o SMTP se trataba como cliente ausente y respondía `200` vacío sin registro | La desconexión se reconoce solo por tipo: `AsyncRequestNotUsableException` o `ClientAbortException` en la cadena de causas (hasta 16), nunca por texto. Una desconexión real deja el estado `499` (no `2xx`: ninguna métrica ni registro de acceso la cuenta como éxito; no `5xx`: un cliente que se va no levanta una alarma del servidor). Todo lo demás es `500 internal-error` con registro `ERROR` | ROJO: `COMPILATION ERROR` (`ProblemCode.forStatus`, `ProblemExceptionHandler.CLIENT_CLOSED_REQUEST`, tres `cannot find symbol`). VERDE: `Tests run: 120, Failures: 0` en las pruebas enfocadas tras corregir una aserción mía (la ruta `/test/sql-reset` contiene «reset»). Ruptura (volver a `DisconnectedClientHelper.isClientDisconnectedException(e)`): `Tests run: 33, Failures: 4`: `ProblemTranslationTest.aDatabaseFailureWhoseRootCauseSaysConnectionResetIsNeverAnEmpty200: expected: 500 but was: 499` (la cadena de causas del `SQLException` con `SocketException("Connection reset by peer")` se trataba como cliente ausente) y tres de `ProblemExceptionHandlerTest`. Revertida (`cmp`). |
+| I-2: el manejador de `Exception` convertía en `500` con traza completa la familia `ErrorResponse` (405 sin `Allow`, 406, `ResponseStatusException`, 413, 503, `NoHandlerFoundException`) | Una sola rama para todo `ErrorResponse`: `ProblemCode.forStatus` (la regla de `ProblemErrorReportValve.codeFor`, ahora compartida y ampliada con `404` y `415`), `Allow` conservada en el `405`, sin registro para un `4xx`, `ERROR` solo para un `5xx` y sin repetir la razón | Ruptura (rama desactivada con `false &&`): `Tests run: 26, Failures: 9`: `aMethodTheRouteDoesNotServeIs405WithItsAllowHeaderAndNoErrorInTheLog: expected: 405 but was: 500`, siete casos de `aResponseStatusExceptionKeepsItsStatusAsTheCatalogCodeAndNeverItsReason` y `aPublicRouteNoControllerServesIs404...`. Revertida (`cmp`). **Hallazgo:** una ruta pública sin controlador lanza `NoHandlerFoundException` (comprobado con una sonda temporal, retirada), no `NoResourceFoundException`; da `404 resource-not-found`. |
+| S-1 | `AccessDeniedException` y `AuthenticationException` se relanzan; la cadena responde `403` y `401` | `aSecurityExceptionRaisedInsideTheMvcLayerIsAnsweredByTheSecurityChain` (principal: `403 forbidden`; anónimo: `401 authentication-required`) y la prueba unitaria de relanzado. Nota de `design.md` actualizada. |
+| S-2 | La guarda `isCommitted()` es una ayuda común a todos los manejadores; un `DomainException` con código de estado `>= 500` se registra en `ERROR`; el registro del código desconocido nombra el código | `everyHandlerLeavesACommittedResponseAlone`, `aDomainErrorWhoseCodeIsAServerErrorIsLoggedAtError...` |
+| S-4 | `PublicRouteAllowListTest` identifica las fugas del arnés por el prefijo `/test/` y no por un conteo exacto | La prueba pasa con las nuevas rutas del arnés sin editar el conteo |
+
+**S-3, seguimiento no implementado:** el registro `ERROR` imprime la excepción completa y su mensaje puede traer valores del usuario (por ejemplo el
+`Detail: Key (x)=(valor)` de PostgreSQL). Dueño: la tarea 6.1 (cierre) debe revisar el registro de errores contra la regla 11 de `CLAUDE.md`, y la decisión de fondo
+(un filtro de mensajes de excepción en el registro estructurado) pertenece al cambio de observabilidad.
+
+Cierre: `./mvnw verify` completo: Surefire 186 + 797 (763 más 34), Failsafe 229, `BUILD SUCCESS`. Instantánea OpenAPI y `routes` sin cambios.
+
+### Excepción de tamaño del PR 8a (2026-10-05)
+
+Con la corrección de la revisión independiente (I-1, I-2, S-1, S-2 y S-4), 2.4a mide 946 líneas efectivas frente
+al presupuesto de 800. El propietario aprobó una **excepción de tamaño de unas 146 líneas** para entregarla en un solo
+PR. Así el traductor llega a `main` ya corregido, sin pasar un solo día con el defecto del `200` vacío ante una falla
+del servidor. No se recortaron pruebas ni comentarios.
