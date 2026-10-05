@@ -33,6 +33,9 @@ public final class HarnessProcess implements AutoCloseable {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
+    /** A value no response, header or log of an error may repeat: the harness sends and throws it. */
+    public static final String SENSITIVE_VALUE = "VALOR-SENSIBLE-123";
+
     /** The header a test sets to be authenticated as the named principal. */
     public static final String PRINCIPAL_HEADER = TestPrincipalFilter.HEADER;
 

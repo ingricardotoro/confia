@@ -57,6 +57,11 @@ class WebEdgeHarness {
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/open"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/boom"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/origin"));
+        endpoints.add(new PublicEndpoint(HttpMethod.POST, "/test/validated"));
+        for (String path : List.of("/test/required",
+                "/test/domain-known", "/test/domain-unknown", "/test/disconnected")) {
+            endpoints.add(new PublicEndpoint(HttpMethod.GET, path));
+        }
         return SecurityChains.denyByDefault(http, new PublicEndpoints(endpoints), problems)
                 .addFilterBefore(new TestPrincipalFilter(), AuthorizationFilter.class)
                 .build();
