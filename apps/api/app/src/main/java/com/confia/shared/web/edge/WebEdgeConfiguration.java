@@ -1,5 +1,6 @@
 package com.confia.shared.web.edge;
 
+import com.confia.shared.web.problem.ProblemExceptionHandler;
 import com.confia.shared.web.problem.ProblemRequestRejectedHandler;
 import com.confia.shared.web.problem.ProblemResponses;
 import com.confia.shared.web.request.RequestContextFilter;
@@ -18,7 +19,8 @@ import org.springframework.context.support.ResourceBundleMessageSource;
 /**
  * The parts of the web edge that the administrative and the portal process share (web-edge-
  * foundations design.md, decisions 5, 7, 8, 10 and 11): the two request filters, the Problem
- * Details writer with its message catalog, and the handler for the requests the firewall rejects.
+ * Details writer with its message catalog, the translator of the exceptions of the MVC layer, and
+ * the handler for the requests the firewall rejects.
  * Imported explicitly by {@code AdminApplication} and {@code PortalApplication} (ADR-0024); the
  * worker has no web edge and never loads it.
  *
@@ -49,6 +51,15 @@ public class WebEdgeConfiguration {
     @Bean
     ProblemResponses problemResponses(@Qualifier("problemMessageSource") MessageSource messages) {
         return new ProblemResponses(messages);
+    }
+
+    /**
+     * The one translator of the exceptions the MVC layer raises. Declared here, and not found by
+     * a component scan, because the entry points name every configuration they load (ADR-0024).
+     */
+    @Bean
+    ProblemExceptionHandler problemExceptionHandler(ProblemResponses problems) {
+        return new ProblemExceptionHandler(problems);
     }
 
     @Bean

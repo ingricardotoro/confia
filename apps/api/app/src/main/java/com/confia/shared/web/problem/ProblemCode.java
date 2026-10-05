@@ -9,8 +9,10 @@ import java.util.Optional;
  * cannot repeat because this is an enum.
  *
  * <p>This change owns only the codes its own producers can emit: the security chain's uniform
- * denials ({@link #AUTHENTICATION_REQUIRED} and {@link #FORBIDDEN}), the firewall's rejection
- * ({@link #VALIDATION_FAILED}) and the last resort ({@link #INTERNAL_ERROR}). {@link
+ * denials ({@link #AUTHENTICATION_REQUIRED} and {@link #FORBIDDEN}), the firewall's rejection and
+ * the translator's validation failures ({@link #VALIDATION_FAILED}), the translator's
+ * {@link #RESOURCE_NOT_FOUND} (a file that does not exist under a documentation prefix) and
+ * {@link #UNSUPPORTED_MEDIA_TYPE}, and the last resort ({@link #INTERNAL_ERROR}). {@link
  * #METHOD_NOT_ALLOWED} is the one answer to {@code TRACE}, which the container refuses before any
  * filter runs (task 2.2; design.md, decision 8, dated note). The sign-in codes
  * ({@code authentication-failed}, {@code token-invalid}, {@code token-expired}) and the
@@ -26,7 +28,9 @@ public enum ProblemCode {
     VALIDATION_FAILED("validation-failed", 400),
     AUTHENTICATION_REQUIRED("authentication-required", 401),
     FORBIDDEN("forbidden", 403),
+    RESOURCE_NOT_FOUND("resource-not-found", 404),
     METHOD_NOT_ALLOWED("method-not-allowed", 405),
+    UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
     INTERNAL_ERROR("internal-error", 500);
 
     private static final String TYPE_BASE = "https://confia.hn/problems/";
@@ -63,6 +67,24 @@ public enum ProblemCode {
     /** The catalog key of the {@code detail}. */
     public String detailKey() {
         return KEY_PREFIX + code + ".detail";
+    }
+
+    /**
+     * The code that answers an HTTP status someone else chose, the one rule of the container's
+     * error report and of the MVC translator: {@code 401}, {@code 403}, {@code 404}, {@code 405}
+     * and {@code 415} have their own codes, any other client error is {@link #VALIDATION_FAILED},
+     * and a server error is {@link #INTERNAL_ERROR}. The status of the answer is the one of the
+     * code, not the one given, so a body and its response always agree.
+     */
+    public static ProblemCode forStatus(int status) {
+        return switch (status) {
+            case 401 -> AUTHENTICATION_REQUIRED;
+            case 403 -> FORBIDDEN;
+            case 404 -> RESOURCE_NOT_FOUND;
+            case 405 -> METHOD_NOT_ALLOWED;
+            case 415 -> UNSUPPORTED_MEDIA_TYPE;
+            default -> status >= 500 ? INTERNAL_ERROR : VALIDATION_FAILED;
+        };
     }
 
     /** The code with exactly this text, or empty for an unknown, misspelled or {@code null} one. */

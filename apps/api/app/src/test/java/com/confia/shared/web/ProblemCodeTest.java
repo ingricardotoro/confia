@@ -25,10 +25,11 @@ class ProblemCodeTest {
     private static final Pattern KEBAB_CASE = Pattern.compile("[a-z]+(-[a-z]+)*");
 
     @Test
-    void thisChangeOwnsExactlyTheFiveCodesItCanProduce() {
+    void thisChangeOwnsExactlyTheCodesItCanProduce() {
         assertThat(Arrays.stream(ProblemCode.values()).map(ProblemCode::code))
                 .containsExactlyInAnyOrder("validation-failed", "authentication-required",
-                        "forbidden", "method-not-allowed", "internal-error");
+                        "forbidden", "resource-not-found", "method-not-allowed",
+                        "unsupported-media-type", "internal-error");
     }
 
     @Test
@@ -40,7 +41,7 @@ class ProblemCodeTest {
 
     @ParameterizedTest
     @CsvSource({"validation-failed, 400", "authentication-required, 401", "forbidden, 403",
-            "method-not-allowed, 405",
+            "resource-not-found, 404", "method-not-allowed, 405", "unsupported-media-type, 415",
             "internal-error, 500"})
     void eachCodeCarriesItsHttpStatus(String code, int status) {
         assertThat(ProblemCode.ofCode(code)).get().extracting(ProblemCode::status)
@@ -49,7 +50,7 @@ class ProblemCodeTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"validation-failed", "authentication-required", "forbidden",
-            "method-not-allowed",
+            "resource-not-found", "method-not-allowed", "unsupported-media-type",
             "internal-error"})
     void theTypeIsTheStableBaseFollowedByTheCodeAndNothingElse(String code) {
         ProblemCode problem = ProblemCode.ofCode(code).orElseThrow();
@@ -80,6 +81,15 @@ class ProblemCodeTest {
             "institution-not-found", "institution-inactive", "Forbidden", "", "forbidden "})
     void anUnknownOrMisspelledCodeIsNotACode(String code) {
         assertThat(ProblemCode.ofCode(code)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"400, validation-failed", "401, authentication-required", "403, forbidden",
+            "404, resource-not-found", "405, method-not-allowed", "406, validation-failed",
+            "409, validation-failed", "413, validation-failed", "415, unsupported-media-type",
+            "431, validation-failed", "500, internal-error", "503, internal-error"})
+    void theCodeOfAnHttpStatusIsTheOneRuleTheValveAndTheTranslatorShare(int status, String code) {
+        assertThat(ProblemCode.forStatus(status).code()).isEqualTo(code);
     }
 
     @Test
