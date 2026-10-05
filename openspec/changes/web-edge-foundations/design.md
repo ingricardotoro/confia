@@ -1318,3 +1318,21 @@ OpenAPI no cambió al registrar el traductor (comprobado). En cuanto exista la p
 respuestas que el contrato no aprobó. **Dueño: el primer endpoint de producción, es decir, `session-tokens-and-web-layer`**,
 que debe decidir si se desactiva esa propiedad o se aprueba el cambio de la instantánea. El texto anterior de este documento
 no se reescribe.
+
+### Nota fechada 2026-10-05: `errors` está acotado y saneado (decisión 9, PR 8b)
+
+La revisión independiente de 2.4b encontró que `errors` podía repetir texto del atacante y crecer sin límite. Qué se fijó:
+
+- **Tope fijo de 50 violaciones** (`ProblemBody.MAX_ERRORS`, el único lugar donde se aplica, en el constructor del registro). Razón: un cuerpo con miles de entradas
+  inválidas no debe producir una respuesta del mismo tamaño; 50 cubre con holgura cualquier formulario real y la interfaz solo necesita el primer puñado. Un fallo con
+  más sigue siendo `400 validation-failed`; las que sobran se omiten sin aviso.
+- **El campo no repite lo que el cliente eligió.** La ruta de una violación de Bean Validation se reconstruye nodo por nodo: solo nombres de propiedad, con todo índice o clave
+  de mapa reemplazado por `[]` (`props[].campo`, `items[].x`) y sin los nodos sintéticos (`<list element>`, `<return value>`, el método y `argN`). Un error sin la
+  violación original se corta en su primer subíndice. `FieldViolation` cierra además el campo al alfabeto `^[A-Za-z0-9_.\[\]-]{1,128}$` (si no cabe, queda vacío como en un
+  error global) y la razón a `^[a-z0-9]+(-[a-z0-9]+)*$` de a lo sumo 64 caracteres (si no, `invalid`).
+- **Una violación del valor de retorno es un defecto del servidor**, no del cliente: `ConstraintViolationException` con un nodo de retorno y `MethodValidationException`
+  de retorno responden `500 internal-error` con registro `ERROR`. Una violación de argumentos sigue siendo `400`. No se distingue «no viene de la entrada web» más allá del
+  valor de retorno: un servicio validado que lance `ConstraintViolationException` por un argumento sigue respondiendo `400`. Riesgo registrado.
+- **Los mensajes de restricción no se interpolan con lenguaje de expresiones:** un `ValidationConfigurationCustomizer` fija `ParameterMessageInterpolator` (en
+  `WebEdgeConfiguration`, que ya está en la lista de permitidos), de modo que `${validatedValue}` no sustituye el valor rechazado.
+- **`BindException` y `MethodValidationException` tienen traductor propio** y ganan a la rama genérica de `ErrorResponse`.
