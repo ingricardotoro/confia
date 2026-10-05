@@ -673,3 +673,28 @@ Pronóstico: ~716. Dentro del tope de 800. Tareas: 15 en total; hechas 7 de 15 (
 | Orden enfocada y resultado | `-Dtest='PublicRouteAllowListTest,PortalRouteMapSnapshotTest,SensitiveDataLoggingTest,ProcessBeanIsolationTest,ContainerRejectionsTest,SpringModulithVerificationTest'`: `Tests run: 42, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 595, Failsafe 225 |
 | Arnés de ejecución | Procesos administrativo y portal reales (perfil por omisión y `local`) con petición anónima a cada ruta enumerada, y el arnés sin base de datos para los controles negativos y las tres peticiones con secretos |
 | Frontera de reversión | Se retiran `SensitiveLogGuard` y su bean, `apps/api/routes/portal.routes.json`, `RegisteredRoutes` y las tres clases de prueba, y las adiciones de `HarnessProcess` |
+
+### Revisión independiente de 2.2b y corrección (2026-10-04)
+
+Veredicto: sin bloqueantes, cuatro hallazgos importantes. El propietario decidió corregir I-1, I-3 e I-4 en este PR y
+mover I-2 al cambio 9. Una sola corrección, en el commit `fix(web)`.
+
+| Hallazgo | Resolución | Evidencia observada |
+|---|---|---|
+| I-1a: jOOQ registra las sentencias con los valores enlazados en `DEBUG` | `Settings().withExecuteLogging(false)` en el `DSLContext` de `SharedPlatformConfiguration`; `SqlLoggingTest` (conexión simulada de jOOQ, sin base de datos) con un control: un `DSLContext` por omisión sí filtra `SECRETO-E` | ROJO: `Tests run: 2, Failures: 1`, `Expecting value to be false but was true`. Ruptura (quitar el ajuste): `Failures: 1`, `Expecting no elements of: "-> with bind values      : select 'SECRETO-E'", "Binding variable 1       : SECRETO-E (varchar /* java.lang.String */)"`. Revertida (`cmp`). |
+| I-1b: la cadena de consulta llegaba al registro por Spring Security | Prefijos `org.springframework.security` y `org.springframework.web.servlet.DispatcherServlet` en `SensitiveLogGuard`; `SensitiveDataLoggingTest` envía `?token=SECRETO-D` a una ruta aceptada y a una denegada | ROJO y ruptura (quitar los dos prefijos): `Tests run: 4, Failures: 1`, `Expecting empty but was: ["org.springframework.security.web.FilterChainProxy DEBUG message contains SECRETO-D", "...FilterChainProxy DEBUG message template contains SECRETO-D", "...RequestMatcherDelegatingAuthorizationManager TRACE message contains SECRETO-D", ...]`. Revertida (`cmp`). |
+| I-1c: Javadoc y decisión 22 prometían de más | Javadoc de la guardia y nota fechada en `design.md` con lo cubierto, lo preventivo y lo no cubierto | Lectura del diff |
+| I-3: `withoutTheGuard...` solo exigía `isNotEmpty()` | Afirma por secreto: A y C por `org.apache.coyote`, B por `org.apache.tomcat.util.http`, D por `org.springframework.security`. **Opción barata:** el arnés no tiene un endpoint con `@RequestBody`; los prefijos de conversores (y `tomcat.util.net`, `DispatcherServlet`, `mvc.method.annotation`) quedan declarados **preventivos, no ejercidos en vivo**, en el Javadoc y en `design.md` | Verde (4/4) |
+| I-4: un enrutador funcional era una entrada opaca que la comprobación anónima no alcanzaba | `PublicRouteAllowListTest.unenumerableRoutes` falla en cualquier perfil con `(functional router) is registered: functional routes must be enumerated before they are allowed`; `RegisteredRoutes` usa `BeanFactoryUtils.beansOfTypeIncludingAncestors`; control permanente con un contexto que tiene un `RouterFunction` | Ruptura (bean `RouterFunction` temporal en `WebEdgeConfiguration`): `Tests run: 11, Failures: 4`, `Expecting empty but was: ["(functional router) is registered: functional routes must be enumerated before they are allowed"]` y `Expecting empty but was: [ANY (functional router)]`. Revertida (`cmp`). |
+| I-2: el trabajador futuro con `DataSource` sin protección de registros | **Diferido al cambio 9** como cuarta condición dura de aceptación en `foundations-plan/exploration.md` (el trabajador prohíbe `shared.web`: la protección debe llegar por una configuración importable) | Lectura del diff |
+
+Sugerencias, como seguimientos (no se implementan: no caben en el presupuesto o no son baratas): **S-1** negarse a
+reescribir la instantánea cuando `CI` está definida y añadir CODEOWNERS para `apps/api/routes/`; **S-2** afirmar que la
+guardia sigue en la lista de filtros de Logback tras el arranque (hoy solo se afirma al inicio de la prueba sin guardia);
+**S-3** una prueba a nivel `INFO` (que sigue pasando).
+
+### Excepción de tamaño del PR 6b (2026-10-04)
+
+Con la corrección de la revisión, el PR 6b mide 902 líneas efectivas (901 adiciones y 1 eliminación) frente al
+presupuesto de 800. El propietario aprobó una **excepción de tamaño de unas 102 líneas** para entregarlo en un solo PR,
+como el PR 5. No se recortaron pruebas ni comentarios.

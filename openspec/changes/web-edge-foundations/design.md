@@ -1205,3 +1205,29 @@ del cliente y no una alarma del operador, y cada petición rechazada deja una so
 queda a quién responder registra un mensaje fijo sin datos. Se descartó conservar el estado del contenedor en la
 respuesta por la razón de la nota anterior (habría que catalogar cada estado posible). El texto anterior de este
 documento no se reescribe.
+
+### Nota fechada 2026-10-04: qué cubre exactamente la guardia de registros y qué no (decisión 22, PR 6b)
+
+La revisión de seguridad de la tarea 2.2b (sin bloqueantes) mostró que la decisión 22 prometía más de lo que cubría.
+Estado final, sin matices:
+
+- **Cubierto y demostrado en vivo** (`SensitiveDataLoggingTest` quita la guardia y exige que el secreto aparezca):
+  el `Authorization` y el cuerpo por `org.apache.coyote`, la cookie por `org.apache.tomcat.util.http` y la cadena de
+  consulta (`?token=...`) por `org.springframework.security` (`FilterChainProxy` registra `Securing GET <url con
+  consulta>` en `DEBUG` y `TRACE`).
+- **Preventivo, no ejercido en vivo**: `org.apache.tomcat.util.net`, `org.springframework.web.servlet.DispatcherServlet`,
+  `org.springframework.web.servlet.mvc.method.annotation` y `org.springframework.http.converter`. Son los
+  registradores documentados para escribir detalles de petición; el arnés no tiene un endpoint con `@RequestBody`, así
+  que los conversores de mensajes nunca corren y ninguna prueba los pone en rojo al quitarlos. La lista pasa a siete
+  prefijos (se añaden `org.springframework.security` y `DispatcherServlet`).
+- **Fuera de la guardia**: cualquier registrador que no esté en la lista, y todo lo que se registre en `INFO` o más.
+  jOOQ escribe cada sentencia con los valores enlazados incrustados en `DEBUG`; no se cubre con un prefijo sino con
+  `Settings.withExecuteLogging(false)` en el `DSLContext` de `SharedPlatformConfiguration`, que vale sea cual sea el
+  nivel de cualquier registrador. `SqlLoggingTest` lo prueba sobre la conexión simulada de jOOQ (con un control: un
+  `DSLContext` por omisión sí filtra el valor).
+- **Procesos**: el trabajador no tiene esta guardia ni `DataSource`. Quien se lo dé debe llevar la protección consigo
+  (condición dura cuarta de `foundations-plan/exploration.md`, dueño el cambio 9).
+
+Además, `PublicRouteAllowListTest` falla en cualquier perfil si existe una entrada `(functional router)`, que el
+anonimato no puede alcanzar: sus rutas deben enumerarse antes de permitirse. El texto anterior de este documento no se
+reescribe.
