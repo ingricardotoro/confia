@@ -57,7 +57,12 @@ public final class SensitiveLogGuard extends TurboFilter implements Initializing
             // the request URL, query string included, at DEBUG and TRACE, and the dispatcher is
             // documented to log request parameters.
             "org.springframework.security",
-            "org.springframework.web.servlet.DispatcherServlet");
+            "org.springframework.web.servlet.DispatcherServlet",
+            // Review of 2.4b: the resolvers of exceptions and the invokers of handlers record the
+            // exception with its rejected values, or the arguments of the call, at DEBUG and TRACE.
+            "org.springframework.web.servlet.mvc.support",
+            "org.springframework.web.servlet.mvc.annotation",
+            "org.springframework.web.servlet.handler", "org.springframework.web.method");
 
     /** Whether an event of {@code level} from {@code loggerName} must be dropped. */
     static boolean denies(Level level, String loggerName) {

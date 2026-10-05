@@ -155,6 +155,33 @@ class ProblemTranslationTest {
     }
 
     @Test
+    void aKeyTheClientChoseForAMapIsNeverEchoedInTheFieldPath() {
+        HttpResponse<String> response = postJson("{\"name\":\"ok\",\"props\":{\"" + SENSITIVE
+                + "\":{\"campo\":\"\"}}}");
+
+        JsonNode problem = assertProblem(response, 400, "validation-failed");
+        assertThat(problem.get("errors").size()).isEqualTo(1);
+        assertThat(problem.get("errors").get(0).get("field").asString())
+                .isEqualTo("props[].campo");
+        assertThat(problem.get("errors").get(0).get("reason").asString()).isEqualTo("not-blank");
+        assertThat(everythingOf(response)).doesNotContain(SENSITIVE);
+    }
+
+    @Test
+    void theListOfViolationsIsCappedAtFifty() {
+        StringBuilder entries = new StringBuilder();
+        for (int i = 0; i < 60; i++) {
+            entries.append(i == 0 ? "" : ",").append("\"k").append(i).append("\":{\"campo\":\"\"}");
+        }
+
+        HttpResponse<String> response = postJson(
+                "{\"name\":\"ok\",\"props\":{" + entries + "}}");
+
+        JsonNode problem = assertProblem(response, 400, "validation-failed");
+        assertThat(problem.get("errors").size()).as("60 violations, 50 listed").isEqualTo(50);
+    }
+
+    @Test
     void aTruncatedBodyAnswers400WithoutTheParserMessageAndWithoutAViolationList() {
         HttpResponse<String> response = postJson("{\"name\": \"" + SENSITIVE);
 

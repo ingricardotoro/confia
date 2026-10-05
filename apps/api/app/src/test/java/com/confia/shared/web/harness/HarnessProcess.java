@@ -69,6 +69,11 @@ public final class HarnessProcess implements AutoCloseable {
         return start(all);
     }
 
+    /** A bean of the harness context, for the tests that inspect its configuration. */
+    public <T> T bean(Class<T> type) {
+        return context.getBean(type);
+    }
+
     /** What the harness controllers observed. */
     public Calls calls() {
         return context.getBean(Calls.class);

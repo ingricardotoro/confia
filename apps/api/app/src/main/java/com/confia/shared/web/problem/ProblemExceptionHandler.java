@@ -12,6 +12,7 @@ import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.apache.catalina.connector.ClientAbortException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,9 +24,12 @@ import org.springframework.core.annotation.MergedAnnotations;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.BindException;
 import org.springframework.validation.Errors;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
+import org.springframework.validation.method.MethodValidationException;
+import org.springframework.validation.method.MethodValidationResult;
 import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
@@ -78,6 +82,8 @@ public final class ProblemExceptionHandler {
     /** Used when a parameter has no name the compiler kept, so the field is never absent. */
     private static final String UNNAMED_PARAMETER = "parameter";
 
+    private static final Pattern COMPILER_ARGUMENT = Pattern.compile("arg\\d+");
+
     private static final List<Class<? extends Annotation>> NAMED_BINDINGS =
             List.of(RequestParam.class, RequestHeader.class, PathVariable.class);
 
@@ -123,25 +129,50 @@ public final class ProblemExceptionHandler {
     @ExceptionHandler(HandlerMethodValidationException.class)
     public void invalidParameters(HandlerMethodValidationException e, HttpServletRequest request,
             HttpServletResponse response) throws IOException {
-        List<FieldViolation> violations = new ArrayList<>();
-        for (ParameterValidationResult result : e.getParameterValidationResults()) {
-            if (result instanceof Errors errors) {
-                violations.addAll(violationsOf(errors.getAllErrors()));
-            } else {
-                String name = nameOf(result.getMethodParameter());
-                for (MessageSourceResolvable error : result.getResolvableErrors()) {
-                    violations.add(FieldViolation.of(name, constraintOf(error)));
-                }
-            }
-        }
-        answer(request, response, ProblemCode.VALIDATION_FAILED, violations);
+        answer(request, response, ProblemCode.VALIDATION_FAILED, violationsOf(e));
     }
 
+    /**
+     * A binding failure that is neither of the two above, and the superclass of the first of them:
+     * its binding result is read the same way.
+     */
+    @ExceptionHandler(BindException.class)
+    public void invalidBinding(BindException e, HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
+        answer(request, response, ProblemCode.VALIDATION_FAILED,
+                violationsOf(e.getBindingResult().getAllErrors()));
+    }
+
+    /**
+     * What method validation raises for a validated service. A violation of an argument is the
+     * client's; one of the return value is a defect of the server and never the client's to hear
+     * about, so it is an {@code internal-error} logged in full.
+     */
+    @ExceptionHandler(MethodValidationException.class)
+    public void invalidMethod(MethodValidationException e, HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
+        if (e.isForReturnValue()) {
+            LOG.error("A validated method returned a value that breaks its constraints", e);
+            answer(request, response, ProblemCode.INTERNAL_ERROR);
+            return;
+        }
+        answer(request, response, ProblemCode.VALIDATION_FAILED, violationsOf(e));
+    }
+
+    /**
+     * A violation set raised by a validated service. One that includes a return value is a defect
+     * of the server (an {@code internal-error}, logged in full); the rest are the client's.
+     */
     @ExceptionHandler(ConstraintViolationException.class)
     public void invalidConstraints(ConstraintViolationException e, HttpServletRequest request,
             HttpServletResponse response) throws IOException {
         List<FieldViolation> violations = new ArrayList<>();
         for (ConstraintViolation<?> violation : e.getConstraintViolations()) {
+            if (isReturnValue(violation.getPropertyPath())) {
+                LOG.error("A validated method returned a value that breaks its constraints", e);
+                answer(request, response, ProblemCode.INTERNAL_ERROR);
+                return;
+            }
             violations.add(FieldViolation.of(fieldOf(violation.getPropertyPath()),
                     violation.getConstraintDescriptor().getAnnotation().annotationType()
                             .getSimpleName()));
@@ -261,15 +292,49 @@ public final class ProblemExceptionHandler {
     /**
      * The violations of a binding result. A violation of the whole object has no field and so an
      * empty one. Only the field and the constraint are read: never the rejected value or the
-     * message.
+     * message. When the error comes from Bean Validation its path is rebuilt from the nodes, so a
+     * map key or an index the client chose never reaches the field.
      */
     private static List<FieldViolation> violationsOf(List<? extends ObjectError> errors) {
         List<FieldViolation> violations = new ArrayList<>();
         for (ObjectError error : errors) {
-            String field = error instanceof FieldError fieldError ? fieldError.getField() : "";
+            String field = "";
+            if (error instanceof FieldError fieldError) {
+                field = error.contains(ConstraintViolation.class)
+                        ? fieldOf(error.unwrap(ConstraintViolation.class).getPropertyPath())
+                        : withoutSubscripts(fieldError.getField());
+            }
             violations.add(FieldViolation.of(field, constraintOf(error)));
         }
         return violations;
+    }
+
+    /** The violations of the parameters of a method, and of its cross-parameter constraints. */
+    private static List<FieldViolation> violationsOf(MethodValidationResult validation) {
+        List<FieldViolation> violations = new ArrayList<>();
+        for (ParameterValidationResult result : validation.getParameterValidationResults()) {
+            if (result instanceof Errors errors) {
+                violations.addAll(violationsOf(errors.getAllErrors()));
+            } else {
+                String name = nameOf(result.getMethodParameter());
+                for (MessageSourceResolvable error : result.getResolvableErrors()) {
+                    violations.add(FieldViolation.of(name, constraintOf(error)));
+                }
+            }
+        }
+        for (MessageSourceResolvable error : validation.getCrossParameterValidationResults()) {
+            violations.add(FieldViolation.of("", constraintOf(error)));
+        }
+        return violations;
+    }
+
+    /**
+     * A path whose structure is unknown, cut at its first subscript: what follows could be a key
+     * the client chose.
+     */
+    private static String withoutSubscripts(String path) {
+        int subscript = path.indexOf('[');
+        return subscript < 0 ? path : path.substring(0, subscript) + "[]";
     }
 
     /**
@@ -305,13 +370,48 @@ public final class ProblemExceptionHandler {
         return name == null ? UNNAMED_PARAMETER : name;
     }
 
-    /** The path of a violation, without the name of the method that was validated. */
+    /** Whether the path ends in the return value of a method, which is never client input. */
+    private static boolean isReturnValue(Path path) {
+        for (Path.Node node : path) {
+            if (node.getKind() == ElementKind.RETURN_VALUE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The path of a violation as the client knows it: property names joined by dots, with every
+     * index or map key replaced by {@code []} (the key is chosen by the client) and without the
+     * nodes that are not a property of the request: the method, the argument position the compiler
+     * numbered ({@code arg0}), the cross-parameter and the synthetic {@code <list element>} and
+     * the like.
+     */
     private static String fieldOf(Path path) {
-        String text = path.toString();
-        Path.Node first = path.iterator().next();
-        boolean method = first.getKind() == ElementKind.METHOD
-                || first.getKind() == ElementKind.CONSTRUCTOR;
-        String prefix = first.getName() + ".";
-        return method && text.startsWith(prefix) ? text.substring(prefix.length()) : text;
+        StringBuilder field = new StringBuilder();
+        for (Path.Node node : path) {
+            if (node.isInIterable() && !field.isEmpty()) {
+                field.append("[]");
+            }
+            if (isProperty(node)) {
+                if (!field.isEmpty()) {
+                    field.append('.');
+                }
+                field.append(node.getName());
+            }
+        }
+        return field.toString();
+    }
+
+    private static boolean isProperty(Path.Node node) {
+        String name = node.getName();
+        if (name == null || name.isEmpty() || name.charAt(0) == '<') {
+            return false;
+        }
+        return switch (node.getKind()) {
+            case METHOD, CONSTRUCTOR, RETURN_VALUE, CROSS_PARAMETER -> false;
+            case PARAMETER -> !COMPILER_ARGUMENT.matcher(name).matches();
+            default -> true;
+        };
     }
 }

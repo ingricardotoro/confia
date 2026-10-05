@@ -15,6 +15,21 @@ import java.util.regex.Pattern;
  */
 public record FieldViolation(String field, String reason) {
 
+    /**
+     * Both members are closed to what is not a plain value: a field outside the alphabet of a path
+     * (or longer than 128 characters) is the empty field, as for an error of the whole object, and
+     * a reason that is not a kebab-case name of at most 64 characters is {@code invalid}.
+     */
+    public FieldViolation {
+        field = field != null && FIELD.matcher(field).matches() ? field : "";
+        reason = reason != null && reason.length() <= MAX_REASON_LENGTH
+                && REASON.matcher(reason).matches() ? reason : "invalid";
+    }
+
+    private static final Pattern REASON = Pattern.compile("^[a-z0-9]+(-[a-z0-9]+)*$");
+    private static final Pattern FIELD = Pattern.compile("^[A-Za-z0-9_.\\[\\]-]{1,128}$");
+    private static final int MAX_REASON_LENGTH = 64;
+
     private static final Pattern WORD_BOUNDARY = Pattern.compile("(?<=[a-z0-9])(?=[A-Z])");
 
     /** A violation of the constraint named {@code constraintName}, such as {@code NotBlank}. */

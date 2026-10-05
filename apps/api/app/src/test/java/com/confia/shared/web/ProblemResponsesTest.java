@@ -175,6 +175,30 @@ class ProblemResponsesTest {
         assertThat(body.get("traceId").asString()).isEqualTo(REQUEST_ID);
     }
 
+    @Test
+    void errorsNeverHoldMoreThanFiftyViolationsAndFiftyAreKeptWhole() throws IOException {
+        MockHttpServletResponse capped = new MockHttpServletResponse();
+        MockHttpServletResponse exact = new MockHttpServletResponse();
+
+        writer().write(request("/x", null), capped, ProblemCode.VALIDATION_FAILED,
+                violations(51));
+        writer().write(request("/x", null), exact, ProblemCode.VALIDATION_FAILED,
+                violations(50));
+
+        JsonNode cappedBody = JSON.readTree(capped.getContentAsString());
+        assertThat(capped.getStatus()).isEqualTo(400);
+        assertThat(cappedBody.get("type").asString())
+                .isEqualTo("https://confia.hn/problems/validation-failed");
+        assertThat(cappedBody.get("errors").size()).isEqualTo(50);
+        assertThat(cappedBody.get("errors").get(49).get("field").asString()).isEqualTo("f49");
+        assertThat(JSON.readTree(exact.getContentAsString()).get("errors").size()).isEqualTo(50);
+    }
+
+    private static List<FieldViolation> violations(int count) {
+        return java.util.stream.IntStream.range(0, count)
+                .mapToObj(i -> new FieldViolation("f" + i, "size")).toList();
+    }
+
     @ParameterizedTest
     @CsvSource({"NotBlank, not-blank", "Size, size", "Pattern, pattern", "DecimalMin, decimal-min",
             "NotEmpty, not-empty", "AssertTrue, assert-true", "Email, email",

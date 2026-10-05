@@ -23,7 +23,14 @@ import java.util.List;
 public record ProblemBody(URI type, String title, int status, String detail, String instance,
         String traceId, @JsonInclude(JsonInclude.Include.NON_EMPTY) List<FieldViolation> errors) {
 
+    /**
+     * The most violations a response lists, whatever the client sent: a body with thousands of
+     * invalid entries must not become a response of the same size.
+     */
+    public static final int MAX_ERRORS = 50;
+
     public ProblemBody {
-        errors = errors == null ? List.of() : List.copyOf(errors);
+        errors = errors == null ? List.of()
+                : List.copyOf(errors.subList(0, Math.min(errors.size(), MAX_ERRORS)));
     }
 }

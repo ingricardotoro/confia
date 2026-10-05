@@ -7,9 +7,11 @@ import com.confia.shared.web.request.RequestContextFilter;
 import com.confia.shared.web.request.SecurityHeadersFilter;
 import com.confia.shared.web.request.SensitiveLogGuard;
 import com.confia.shared.web.request.WebEdgeProperties;
+import org.hibernate.validator.messageinterpolation.ParameterMessageInterpolator;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
+import org.springframework.boot.validation.autoconfigure.ValidationConfigurationCustomizer;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
@@ -46,6 +48,16 @@ public class WebEdgeConfiguration {
         source.setFallbackToSystemLocale(false);
         source.setUseCodeAsDefaultMessage(false);
         return source;
+    }
+
+    /**
+     * Constraint messages are never shown to a client (design.md, decision 9), so the validator
+     * interpolates them without an expression language: a message that held {@code \}
+     * could not put the rejected value anywhere.
+     */
+    @Bean
+    ValidationConfigurationCustomizer parameterMessageInterpolation() {
+        return configuration -> configuration.messageInterpolator(new ParameterMessageInterpolator());
     }
 
     @Bean

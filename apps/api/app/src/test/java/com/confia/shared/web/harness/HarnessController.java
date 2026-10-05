@@ -15,6 +15,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.net.SocketException;
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.Set;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatusCode;
@@ -79,7 +80,12 @@ class HarnessController {
     }
 
     /** The body the validated route accepts: a mandatory name of at most ten characters. */
-    record ValidatedBody(@NotBlank @Size(max = 10) String name) {
+    record ValidatedBody(@NotBlank @Size(max = 10) String name,
+            @Valid Map<String, Inner> props) {
+    }
+
+    /** The value of a map entry of the validated body: a mandatory field. */
+    record Inner(@NotBlank String campo) {
     }
 
     /** Public for {@code POST}, JSON only: the routes of validation, malformed bodies and 415. */
@@ -110,7 +116,7 @@ class HarnessController {
     @GetMapping("/test/constraint-violation")
     String constraintViolation() {
         Set<ConstraintViolation<ValidatedBody>> violations = VALIDATOR
-                .validate(new ValidatedBody(HarnessProcess.SENSITIVE_VALUE));
+                .validate(new ValidatedBody(HarnessProcess.SENSITIVE_VALUE, null));
         throw new ConstraintViolationException(violations);
     }
 
