@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-04 (tarea 1.2)
+- **Última actualización:** 2026-10-04 (tarea 2.1a; la tarea 2.1 original se partió en 2.1a, 2.1b y 2.1c)
 
 ## Estado de las tareas
 
@@ -11,7 +11,10 @@
 |---|---|---|---|
 | 1.1 | PR 1 `platform-wiring` | Hecha | `d9e6adf`, `9fcb65d` |
 | 1.2 | PR 2 `identity-beans` | Hecha | `aaa1161`, `4d99f98` |
-| 2.1 a 6.1 | PR 3 a 11 y cierre | Pendientes | |
+| 2.1a | PR 3 `problem-details-core` | Hecha | `2554745` y el commit `docs(sdd)` de esta rama |
+| 2.1b | PR 4 `security-chains` | Pendiente (se construye desde `main` tras fusionar el PR 3) | |
+| 2.1c | PR 5 `portal-and-worker-chain` | Pendiente | |
+| 2.2 a 6.1 | PR 6 a 13 y cierre | Pendientes (numeración nueva) | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
 
@@ -167,3 +170,84 @@ Pronóstico: 330 nominales, 500 en el peor caso; tope 800. Dentro del tope pero 
 pronóstico: el exceso lo explican `BootFailureAssertions` (70) y la ampliación de
 `TestProcessArguments` (78), que sustentan el recorrido de la cadena de causas exigido tras la revisión
 del PR 1, y la nota de `docs/05` (20). Ninguna prueba ni comentario se recortó.
+
+## Partición de la tarea 2.1 (decisión del propietario, 2026-10-04)
+
+La tarea 2.1 original (PR 3 `security-chains`) se implementó y verificó completa, y midió **2 000 líneas**
+efectivas (1 976 adiciones y 24 eliminaciones, igual con y sin `-M`) frente al tope de 800 y a un pronóstico
+de 520 nominales y 780 en el peor caso. El propietario aprobó partirla en 2.1a, 2.1b y 2.1c. El árbol
+completo y verificado (con sus pruebas, el arnés y las notas) está en la rama **local**
+`wip/web-edge-security-chains-full` (commit `a8fba42`, 44 archivos), que nunca se publica y es la fuente de
+2.1b y 2.1c. Tareas: 14; cadena: 13 PR.
+
+Evidencia del intento completo, que sigue siendo válida para 2.1b y 2.1c: ROJO (a) de `bannedDependencies`
+por la ruta de artefactos falsos (la descarga real falla con `PKIX path building failed`, sin tocar TLS);
+ROJO (b) `OpenApi*Test` `Tests run: 18, Failures: 16` con el starter y sin cadena; verde completo con
+Surefire 186 + 512, Failsafe 225; demostraciones: quitar `anyRequest().denyAll()` no rompe nada
+(`Tests run: 24, Failures: 0`, Spring Security 7 deniega por omisión), `anyRequest().permitAll()` da
+`Failures: 21` de 24 y quitar `ProblemAuthenticationEntryPoint` da `Failures: 27` de 36.
+
+## Tarea 2.1a: PR 3 `problem-details-core`
+
+### Rebalanceo antes del commit
+
+El primer corte de 2.1a (Problem Details, cabeceras e identificador de petición, con sus pruebas) midió
+**1 052 líneas** (1 044 adiciones y 8 eliminaciones) y no se comprometió. Sin recortar pruebas ni
+comentarios se movió, por su dependencia, el filtro `RequestContextFilter` con su prueba a 2.1c y
+`FieldViolation` con el miembro `errors` a 2.4 (los produce el traductor). `ProblemResponses` lleva ahora la
+constante pública `REQUEST_ID_ATTRIBUTE`, que el filtro de 2.1c escribirá (así `problem` ya no depende de
+`request`). Resultado: **775**.
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO | `-Dtest='ProblemCodeTest,ProblemCatalogCoverageTest,ProblemResponsesTest,SecurityHeadersFilterTest,RequestContextFilterTest,WebEdgeFiltersInProcessesTest'` | `COMPILATION ERROR` (122 líneas): `package com.confia.shared.web.problem does not exist` y `cannot find symbol`. Causa prevista. |
+| ROJO, lista de permitidos | `@Import` de `WebEdgeConfiguration` sin las líneas de `ProcessBeanPolicy` | `ProcessBeanIsolationTest` `Tests run: 4, Failures: 2` (administración y portal): `bean '...WebEdgeConfiguration' from package 'com.confia.shared.web.edge' - not in the allow-list` y los beans de `shared.web.request` y `shared.web.problem`. |
+| VERDE | Las pruebas nuevas más OpenAPI, aislamiento, Modulith, capas, jOOQ, puntos de entrada, cableado y `ConfiaApplicationTest` | `Tests run: 108, Failures: 0, Errors: 0, Skipped: 0` (primer corte, antes del rebalanceo) |
+| Demostración | `RequestContextFilter` reutiliza `X-Request-Id` (primer corte) | `Tests run: 7, Failures: 0, Errors: 1` (`UUID.fromString("cliente-123")`); revertida (`cmp`). Esta prueba y el filtro pasan a 2.1c. |
+| Demostración | Quitar `Cache-Control` de `SecurityHeadersFilter` | `SecurityHeadersFilterTest` y `WebEdgeFiltersInProcessesTest`: `Tests run: 6, Failures: 5`; revertida (`cmp`). |
+| Cierre | `./mvnw verify` completo sobre el corte final | Surefire 186 + 475 (los 437 de la línea base más 38 nuevos), Failsafe 225, `BUILD SUCCESS`. Instantánea OpenAPI y `routes` sin cambios. |
+
+Un primer intento del corte final no compiló (`ProblemResponses`, error mío al editar con `sed`); se
+corrigió y se repitió el `verify` completo antes de confirmar el resultado de arriba.
+
+Pruebas añadidas: 38 (`ProblemCodeTest` 21, `ProblemCatalogCoverageTest` 5, `ProblemResponsesTest` 6,
+`SecurityHeadersFilterTest` 4, `WebEdgeFiltersInProcessesTest` 2). Las 16 pruebas de OpenAPI siguen en
+verde sin tocarlas (la cadena de seguridad aún no existe; sus cuatro aserciones negativas cambian en 2.1b).
+
+### Pruebas que solo pasarían con la parte siguiente
+
+Ninguna en el corte final. Cuatro cosas dependían de partes posteriores y se resolvieron así:
+`ProblemResponses` leía una constante de `RequestContextFilter` (ahora la define ella misma); la prueba de
+cabeceras de «una respuesta denegada por la cadena» se hace con una cadena simulada (`MockFilterChain`) y no
+con la cadena real, que llega en 2.1b; la prueba de cabeceras en procesos reales usa el documento OpenAPI de
+`local`; y `ProblemBody` no lleva `errors` hasta 2.4.
+
+### Medición del PR 3 (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 767 | 8 | **775** |
+| Con `-M` | 767 | 8 | **775** |
+
+Pronóstico por parte: 600 a 800. Estimaciones de las siguientes: 2.1b de 600 a 800 (si pasa de 800 se
+mueven pruebas y arnés a 2.1c) y 2.1c de 700 a 800.
+
+### Desviaciones del diseño (declaradas)
+
+1. `ProblemBody` sin `errors` y sin `FieldViolation` (llegan en 2.4); `ProblemResponses` define
+   `REQUEST_ID_ATTRIBUTE`; `RequestContextFilter` llega en 2.1c. El diseño los ubicaba en el PR 3 completo.
+2. `ProcessBeanPolicy`: el trabajador prohíbe `com.confia.shared.web` completo, con una razón que conserva la
+   frase fijada por `ProcessBeanInspectorTest`; las prohibiciones de `org.springframework.security` llegan en
+   2.1c.
+3. Las demás desviaciones del intento completo (pruebas del portal en `com.confia.bootstrap`, la regla
+   `denyAll()` redundante) pertenecen a 2.1b y 2.1c y están en las notas fechadas de `design.md` y `tasks.md`.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | La del paso VERDE más `ProblemCodeTest`, `SecurityHeadersFilterTest`, `ProblemResponsesTest`, `WebEdgeFiltersInProcessesTest`; resultado final por `./mvnw verify`: Surefire 186 + 475, Failsafe 225 |
+| Arnés de ejecución | `MockFilterChain` para el filtro de cabeceras y `ConfiaApplication.launch` real del proceso administrativo y del portal con `local` |
+| Frontera de reversión | Se retiran los dos `@Import` de `WebEdgeConfiguration`, `shared.web.{edge,problem,request}`, `i18n/problems.properties`, las pruebas y las líneas de `ProcessBeanPolicy` |
