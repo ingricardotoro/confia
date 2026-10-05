@@ -251,3 +251,15 @@ mueven pruebas y arnés a 2.1c) y 2.1c de 700 a 800.
 | Orden enfocada y resultado | La del paso VERDE más `ProblemCodeTest`, `SecurityHeadersFilterTest`, `ProblemResponsesTest`, `WebEdgeFiltersInProcessesTest`; resultado final por `./mvnw verify`: Surefire 186 + 475, Failsafe 225 |
 | Arnés de ejecución | `MockFilterChain` para el filtro de cabeceras y `ConfiaApplication.launch` real del proceso administrativo y del portal con `local` |
 | Frontera de reversión | Se retiran los dos `@Import` de `WebEdgeConfiguration`, `shared.web.{edge,problem,request}`, `i18n/problems.properties`, las pruebas y las líneas de `ProcessBeanPolicy` |
+
+### Revisión independiente de 2.1a (2026-10-04)
+
+Riesgo evaluado: alto. Veredicto del revisor: sin hallazgos bloqueantes ni importantes, con cuatro
+sugerencias. Se corrigió la S1 antes de abrir el PR: `theLanguageIsTheCatalogsWhateverAcceptLanguageSays`
+no podía fallar por la causa que nombra, porque el catálogo real no tiene entradas en inglés. Ahora usa
+un `StaticMessageSource` con textos es-HN e ingleses. **Demostración:** con `request.getLocale()` en
+lugar de `CATALOG_LOCALE` en `ProblemResponses`, la prueba falla con
+`expected: "detalle es-HN" but was: "english detail"`; revertido. `./mvnw verify` completo: Surefire
+186 + 475, Failsafe 225, `BUILD SUCCESS`. Pendientes como sugerencia: S2 (cabeceras y `Server` en un
+error real del proceso, cubierto en 2.1c), S3 (`ProblemCode.ofCode` sin consumidor de producción hasta
+2.4) y S4 (dominio de ejemplo `confia.example` en la skill `confia-api-conventions`).

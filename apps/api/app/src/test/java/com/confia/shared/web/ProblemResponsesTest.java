@@ -91,13 +91,20 @@ class ProblemResponsesTest {
 
     @Test
     void theLanguageIsTheCatalogsWhateverAcceptLanguageSays() throws IOException {
-        org.springframework.context.support.ResourceBundleMessageSource catalog =
-                new org.springframework.context.support.ResourceBundleMessageSource();
-        catalog.setBasename("i18n/problems");
-        catalog.setDefaultEncoding("UTF-8");
-        catalog.setFallbackToSystemLocale(false);
-        String expected = ProblemCatalogCoverageTest.loadCatalog()
-                .getProperty(ProblemCode.AUTHENTICATION_REQUIRED.detailKey());
+        // An English entry exists on purpose: if the writer resolved the request locale instead of
+        // the fixed es-HN one, the English text would win and this test would fail.
+        StaticMessageSource catalog = new StaticMessageSource();
+        String key = ProblemCode.AUTHENTICATION_REQUIRED.detailKey();
+        String expected = "detalle es-HN";
+        catalog.addMessage(key, java.util.Locale.forLanguageTag("es-HN"), expected);
+        catalog.addMessage(key, java.util.Locale.US, "english detail");
+        catalog.addMessage(key, java.util.Locale.ENGLISH, "english detail");
+        catalog.addMessage(ProblemCode.AUTHENTICATION_REQUIRED.titleKey(),
+                java.util.Locale.forLanguageTag("es-HN"), "título es-HN");
+        catalog.addMessage(ProblemCode.AUTHENTICATION_REQUIRED.titleKey(), java.util.Locale.US,
+                "english title");
+        catalog.addMessage(ProblemCode.AUTHENTICATION_REQUIRED.titleKey(), java.util.Locale.ENGLISH,
+                "english title");
         MockHttpServletRequest english = request("/x", null);
         english.addHeader("Accept-Language", "en-US");
         english.addPreferredLocale(java.util.Locale.US);
