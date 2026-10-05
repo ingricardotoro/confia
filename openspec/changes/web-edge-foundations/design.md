@@ -1268,3 +1268,26 @@ Observaciones de la aplicación de la tarea 2.3, antes de partirla (ver la nota 
   `RequestOrigin`. La comprobación nombra lo que siempre buscó: ninguna clase `web` depende de los tipos de
   idempotencia (`Idempot*` y `RequestPayloadHasher`). El PR 13 la retira. El texto anterior de este documento no se
   reescribe.
+
+### Nota fechada 2026-10-05: un rango de proxies de confianza con bits de host se rechaza (decisión 12, PR 7b)
+
+Seguimiento S-2 de la revisión de 2.3a. `CidrBlock.parse` limpia en silencio los bits de host (`10.0.0.5/8` pasa a
+`10.0.0.0/8`). Para la lista de proxies de confianza, que decide a quién se le cree `X-Forwarded-For`, esa ampliación
+silenciosa es un riesgo de configuración: un descuido al escribir confía en dieciséis millones de direcciones.
+
+- **Decisión: rechazar.** `TrustedProxies.parse` usa el nuevo `CidrBlock.parseWithoutHostBits`, que lanza
+  `IllegalArgumentException` ("the address has host bits set beyond the prefix; write the network address") si algún
+  bit posterior al prefijo está en uno. El arranque falla con un mensaje que nombra `confia.web.trusted-proxies[i]` y
+  nunca repite el valor ni la dirección. Una dirección sin prefijo y `/32` o `/128` son bloques de uno y se aceptan;
+  `0.0.0.0/0` y `::/0` también (no tienen bits de host en uno).
+- **`CidrBlock.parse` no cambia.** Sigue enmascarando: `CidrBlockPropertiesTest` genera redes aleatorias con prefijos
+  aleatorios y exige coherencia con la referencia de `BigInteger`, así que depende de ese comportamiento. La versión
+  estricta es un método aparte y solo la usa la propiedad.
+- **Pruebas.** `WebEdgePropertiesTest`: cinco entradas con bits de host (IPv4 e IPv6) fallan nombrando la posición, sin
+  el valor y sin la dirección; ocho entradas válidas se aceptan. Ruptura: volver a `CidrBlock.parse` en `TrustedProxies`
+  da `Tests run: 25, Failures: 5` con `Expecting code to raise a throwable.`.
+- **Prueba de la regla «ningún archivo fija la lista».** Además de los cuatro perfiles conocidos, una prueba recorre el
+  repositorio (sin `.git`, `node_modules`, `target`, `docs`, `openspec` ni `test`) y falla si un archivo `yml`, `yaml`,
+  `properties`, `env`, de Dockerfile o de compose tiene una línea que no es comentario y que nombra
+  `trusted-proxies`, `trustedProxies` o `CONFIA_WEB_TRUSTEDPROXIES`. Tiene un control de no vacuidad y otro con las
+  formas que usa un entorno. Límite: no ve valores pasados por línea de comandos en un script que no sea de esos tipos.
