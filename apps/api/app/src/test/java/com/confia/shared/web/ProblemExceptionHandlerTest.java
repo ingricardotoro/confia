@@ -11,10 +11,16 @@ import com.confia.kernel.DomainException;
 import com.confia.shared.web.problem.ProblemCode;
 import com.confia.shared.web.problem.ProblemExceptionHandler;
 import com.confia.shared.web.problem.ProblemResponses;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import jakarta.validation.constraints.NotBlank;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.net.SocketException;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Set;
 import org.apache.catalina.connector.ClientAbortException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,10 +32,20 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.context.support.StaticMessageSource;
+import org.springframework.core.MethodParameter;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.ObjectError;
+import org.springframework.web.ErrorResponse;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The branches of {@link ProblemExceptionHandler} that the harness cannot reach with a real client:
@@ -37,6 +53,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
  * answers on the wire are proven in {@code ProblemTranslationTest}.
  */
 class ProblemExceptionHandlerTest {
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
     private final Logger logger = (Logger) LoggerFactory.getLogger(ProblemExceptionHandler.class);
@@ -211,5 +229,70 @@ class ProblemExceptionHandlerTest {
         assertThat(response.getContentAsString()).isEmpty();
         assertThat(List.copyOf(logged.list)).extracting(ILoggingEvent::getLevel)
                 .containsExactly(Level.DEBUG);
+    }
+
+    /** A service-style method whose parameter carries a constraint, validated by hand below. */
+    static final class Greeter {
+        void greet(@NotBlank String who) {
+        }
+    }
+
+    @Test
+    void aViolationOfAMethodParameterNamesTheParameterAndNotTheMethod() throws Exception {
+        Method greet = Greeter.class.getDeclaredMethod("greet", String.class);
+        Set<ConstraintViolation<Greeter>> violations = Validation.buildDefaultValidatorFactory()
+                .getValidator().forExecutables()
+                .validateParameters(new Greeter(), greet, new Object[] {" "});
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.invalidConstraints(new ConstraintViolationException(violations),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        JsonNode error = JSON.readTree(response.getContentAsString()).get("errors").get(0);
+        assertThat(error.get("field").asString()).as("not greet.arg0").isIn("arg0", "who");
+        assertThat(error.get("reason").asString()).isEqualTo("not-blank");
+        assertThat(response.getContentAsString()).doesNotContain("greet");
+    }
+
+    @Test
+    void anErrorOfTheWholeObjectHasAnEmptyFieldAndAnErrorWithoutCodesIsJustInvalid()
+            throws Exception {
+        BeanPropertyBindingResult result = new BeanPropertyBindingResult(new Object(), "body");
+        result.addError(new ObjectError("body", "a message that must not be repeated"));
+        MethodParameter parameter = new MethodParameter(Object.class.getMethod("toString"), -1);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.invalidBody(new MethodArgumentNotValidException(parameter, result),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        JsonNode errors = JSON.readTree(response.getContentAsString()).get("errors");
+        assertThat(errors.size()).isEqualTo(1);
+        assertThat(errors.get(0).get("field").asString()).isEmpty();
+        assertThat(errors.get(0).get("reason").asString()).isEqualTo("invalid");
+        assertThat(response.getContentAsString()).doesNotContain("repeated");
+    }
+
+    /**
+     * Both validation exceptions of Spring MVC are also an {@link ErrorResponse}, which the generic
+     * branch answers without {@code errors}. Spring picks the handler closest to the exception, so
+     * the specific handler wins; this pins that it does, and that the precondition that makes the
+     * ordering matter holds.
+     */
+    @Test
+    void theValidationHandlersWinOverTheGenericErrorResponseBranch() {
+        ExceptionHandlerMethodResolver resolver =
+                new ExceptionHandlerMethodResolver(ProblemExceptionHandler.class);
+
+        assertThat(ErrorResponse.class).isAssignableFrom(MethodArgumentNotValidException.class);
+        assertThat(ErrorResponse.class).isAssignableFrom(HandlerMethodValidationException.class);
+        assertThat(resolver.resolveMethodByExceptionType(MethodArgumentNotValidException.class))
+                .extracting(Method::getName).isEqualTo("invalidBody");
+        assertThat(resolver.resolveMethodByExceptionType(HandlerMethodValidationException.class))
+                .extracting(Method::getName).isEqualTo("invalidParameters");
+        assertThat(resolver.resolveMethodByExceptionType(ConstraintViolationException.class))
+                .extracting(Method::getName).isEqualTo("invalidConstraints");
+        assertThat(resolver.resolveMethodByExceptionType(HttpMediaTypeNotAcceptableException.class))
+                .as("non-vacuous: any other ErrorResponse still falls to the generic handler")
+                .extracting(Method::getName).isEqualTo("unexpected");
     }
 }

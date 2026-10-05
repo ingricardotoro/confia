@@ -44,6 +44,15 @@
       <artifactId>spring-boot-starter-security</artifactId>
     </dependency>
 
+    <!-- Jakarta Bean Validation (CLAUDE.md, regla 10) and its Hibernate Validator implementation,
+         whose groupId org.hibernate.validator is not one of the banned persistence groupIds. The
+         problem translator imports jakarta.validation directly, so the dependency is declared and
+         not left to arrive through springdoc. Version managed by the Spring Boot BOM. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+
     <!-- Data access (ADR-0015): jOOQ open source, Flyway and the PostgreSQL JDBC driver. No
          version on any of the three: managed by the Spring Boot 4.1.1 BOM (jOOQ 3.21.7, Flyway
          12.4.0, org.postgresql:postgresql 42.7.13 — design.md section 2, evidence table). -->
