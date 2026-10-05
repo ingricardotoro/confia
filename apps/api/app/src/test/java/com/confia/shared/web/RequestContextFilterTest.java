@@ -78,7 +78,7 @@ class RequestContextFilterTest {
     }
 
     @Test
-    void theLogContextOfOneRequestNeverCarriesTheIdOfThePreviousOne() {
+    void eachRequestSeesItsOwnIdInTheLogContext() {
         process.get("/test/boom");
         String first = process.calls().lastRequestIdInMdc();
         process.get("/test/boom");
