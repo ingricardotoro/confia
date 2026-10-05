@@ -2,6 +2,11 @@
 # here: migrating is a separate concern of the "migrate" profile
 # (docs/05-infraestructura-y-despliegue.md; application-migrate.yml).
 spring:
+  mvc:
+    # Never log request parameters or headers at DEBUG (web-edge-foundations design.md, decision
+    # 22; CLAUDE.md regla 11). Spring Boot already defaults this to false; it is explicit so that
+    # turning it on is a visible edit that a test refuses.
+    log-request-details: false
   datasource:
     hikari:
       # -1 never fails the context at startup when the database is down: the pool connects on first

@@ -58,6 +58,22 @@ final class OpenApiProcess implements AutoCloseable {
         return new OpenApiProcess(outcome.context());
     }
 
+    /** The running context, for tests that enumerate its routes. */
+    ConfigurableApplicationContext context() {
+        return context;
+    }
+
+    /** The port the process listens on. */
+    int port() {
+        return port;
+    }
+
+    /** The process started with {@code arguments} on top of its production configuration. */
+    static OpenApiProcess startWithArguments(String appProfile, String... arguments) {
+        return running(appProfile, ConfiaApplication.launch(
+                TestProcessArguments.forProcess(appProfile, arguments), appProfile));
+    }
+
     HttpResponse<String> get(String path) {
         return send("GET", path);
     }
