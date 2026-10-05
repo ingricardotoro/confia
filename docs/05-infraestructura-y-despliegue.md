@@ -850,6 +850,28 @@ nunca en el repositorio, conforme a `CLAUDE.md`, regla 13.
 > en el primer uso. Los casos de uso `RequestPasswordReset` e `IssuePasswordResetToken` no se
 > registran hasta que existan sus adaptadores (cambios 9 y 14).
 
+> **Nota fechada 2026-10-05 (cambio `web-edge-foundations`, PR 7 `request-origin`): proxies de
+> confianza.** Los procesos `admin` y `portal` deciden la IP del cliente así: es la dirección de la
+> conexión, salvo que esa dirección pertenezca a la lista de proxies de confianza; solo entonces se
+> lee `X-Forwarded-For`, de derecha a izquierda, y el cliente es la primera entrada que no es un
+> proxy de confianza. Una cabecera con una entrada que no es una IP, con más de 32 entradas o con más
+> de 1024 caracteres se ignora completa.
+>
+> | Variable de entorno | Propiedad | Formato |
+> |---|---|---|
+> | `CONFIA_WEB_TRUSTEDPROXIES` | `confia.web.trusted-proxies` | Direcciones IP o rangos CIDR separados por comas. **Vacía por omisión** |
+>
+> Ningún archivo del repositorio fija un valor: con la lista vacía, ningún cliente puede elegir su
+> propia IP. El despliegue (cambio 11) la llena con la dirección de nginx y, cuando corresponda, con
+> los rangos de Cloudflare. Una entrada inválida (por ejemplo `10.0.0.0/33`) detiene el arranque con
+> un mensaje que nombra la propiedad y la posición de la entrada, sin repetir su valor. Un rango con
+> bits de host (`10.0.0.5/8`) también la detiene: se escribe la dirección de red (`10.0.0.0/8`), para
+> que un descuido no amplíe en silencio a quién se le cree. `server.forward-headers-strategy`
+> queda fijada en `none`: sin esa línea, Spring Boot activa la estrategia nativa al detectar una
+> plataforma de nube y Tomcat reescribiría la dirección remota con sus propios rangos privados,
+> anulando la lista. El agente de usuario se guarda truncado a `confia.web.user-agent-max-length`
+> caracteres (512 por omisión).
+
 ---
 
 ## 7. Integración y entrega continuas

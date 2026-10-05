@@ -392,7 +392,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
   - **Cierre.** `./mvnw verify` completo. Commit: `feat(web): parse client addresses and CIDR ranges without
     resolving names`. — Requisito de `web-edge` «Las direcciones IPv6 se agrupan por /64»
 
-- [ ] 2.3b **PR 7b `trusted-proxy-resolution`: resolución de la IP del cliente y propiedad de proxies de confianza
+- [x] 2.3b **PR 7b `trusted-proxy-resolution`: resolución de la IP del cliente y propiedad de proxies de confianza
   (decisión 12).**
   - **ROJO.** Crear en `.../shared/web/request/` `ClientAddressResolverTest.java` (los ocho escenarios de la
     especificación como ejemplos, los límites de 32 entradas y 1 024 caracteres, la propiedad «con origen no
@@ -403,7 +403,9 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     `server.forward-headers-strategy: none`). **Rojo esperado:** clases inexistentes.
   - **VERDE.** Crear `.../shared/web/request/{TrustedProxies,ClientAddressResolver,WebEdgeProperties}.java`.
     `application.yml`: `server.forward-headers-strategy: none` y `confia.web.user-agent-max-length`. Ningún archivo
-    del repositorio fija un valor de `confia.web.trusted-proxies`. Nota fechada en
+    del repositorio fija un valor de `confia.web.trusted-proxies`, y una prueba recorre el repositorio para exigirlo.
+    Un rango con bits de host (`10.0.0.5/8`) detiene el arranque (seguimiento S-2 de 2.3a; nota fechada de
+    `design.md`; `CidrBlock.parseWithoutHostBits`). Nota fechada en
     `docs/05-infraestructura-y-despliegue.md` con `CONFIA_WEB_TRUSTEDPROXIES` (vacía por omisión).
   - **Demostración deliberada.** Hacer que el resolvedor confíe siempre en `X-Forwarded-For` rompe la propiedad de
     origen no confiable; se revierte.

@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-05 (tarea 2.3a; 2.1a a 2.2b y 2.3a hechas; 2.3 partida en cuatro)
+- **Última actualización:** 2026-10-05 (tarea 2.3b; 2.1a a 2.2b, 2.3a y 2.3b hechas)
 
 ## Estado de las tareas
 
@@ -17,7 +17,8 @@
 | 2.2a | PR 6a `container-rejections` | Hecha | `d9d015b` y el commit `docs(sdd)` de esta rama |
 | 2.2b | PR 6b `edge-gates` | Hecha | `c469734`, `8a2eb2e` y el commit `docs(sdd)` de esta rama |
 | 2.3a | PR 7a `client-address` | Hecha | `525cfee`, `c16f129` y los commits `docs(sdd)` de esta rama |
-| 2.3b a 2.3d | PR 7b a 7d | Pendientes (la tarea 2.3 completa está verificada en la rama local `wip/web-edge-request-origin-full`, commit `9e8b52f`) | |
+| 2.3b | PR 7b `trusted-proxy-resolution` | Hecha | `e1d5f7a` y el commit `docs(sdd)` de esta rama |
+| 2.3c y 2.3d | PR 7c y 7d | Pendientes (la tarea 2.3 completa está verificada en la rama local `wip/web-edge-request-origin-full`, commit `9e8b52f`) | |
 | 2.4 a 6.1 | PR 8 a 13 y cierre | Pendientes | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
@@ -789,3 +790,56 @@ Cierre: `./mvnw verify` completo: Surefire 186 + 659 (651 más 8), Failsafe 225,
 **Seguimientos, no implementados:** **S-2** `CidrBlock` enmascara en silencio los bits de host (`10.0.0.5/8` se acepta): decidir en 2.3b,
 dueña de la propiedad, si la lista de proxies de confianza debe rechazarlo. **S-3** las direcciones NAT64 y las IPv4-compatibles
 (`::a.b.c.d`) comparten un único cubo /64 en `rateLimitKey`: decidir en 3.1, dueña del limitador.
+
+## Tarea 2.3b: PR 7b `trusted-proxy-resolution`
+
+Rama `change/web-edge-foundations-trusted-proxies`, desde `main` en `24a4d7f` tras fusionar el PR 7a. El código sale de
+`wip/web-edge-request-origin-full` (sin tocarla; sigue en `9e8b52f`). `main` es la autoridad de lo de 2.3a: `CidrBlock`,
+`ClientAddress` y `IdempotencyScopeExclusionInventoryTest` no se portaron; solo se añadió `parseWithoutHostBits`.
+
+### Evidencia del ciclo TDD (reobservada sobre este árbol)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO 1 | `-Dtest='ClientAddressResolverTest,WebEdgePropertiesTest'` con las dos pruebas y sin producción | `COMPILATION ERROR`: `cannot find symbol` (`ClientAddressResolver`, `TrustedProxies`, `WebEdgeProperties`). Causa prevista. |
+| ROJO 2 (S-2) | Producción portada tal cual (con `CidrBlock.parse`), más las pruebas nuevas de bits de host | `ClientAddressResolverTest` `Tests run: 31, Failures: 0`; `WebEdgePropertiesTest` `Tests run: 25, Failures: 5`: `aRangeWithHostBitsSetStopsTheStart...(String)[1..5]`: `Expecting code to raise a throwable.` |
+| VERDE | `CidrBlock.parseWithoutHostBits` usado por `TrustedProxies`; con `CidrBlock*`, `ClientAddress*` e `IdempotencyScopeExclusionInventoryTest` | `Tests run: 122, Failures: 0, Errors: 0, Skipped: 0` (ClientAddressResolverTest 31 + 2 de jqwik, WebEdgePropertiesTest 25, CidrBlockPropertiesTest 18 + 3, ClientAddressPropertiesTest 36 + 4, inventario 3). El `BUILD FAILURE` de esa ejecución es la cobertura de JaCoCo con `-Dtest=` acotado. |
+| Cierre | `./mvnw verify` completo | Surefire 186 + 717 (los 659 de la línea base más 58 nuevos), Failsafe 225, `BUILD SUCCESS`. Instantánea OpenAPI y `routes` sin cambios (`git status` limpio de ellos). |
+
+Pruebas añadidas: 58 (`ClientAddressResolverTest` 33 con las dos de jqwik, `WebEdgePropertiesTest` 25).
+
+### Demostraciones deliberadas (cada una revertida; `cmp` sin diferencias)
+
+| Ruptura | Resultado |
+|---|---|
+| El resolvedor confía siempre en `X-Forwarded-For` (`if (remote.isEmpty())` en lugar de `remote.isEmpty() \|\| !trusted.contains(remote.get())`) | `ClientAddressResolverTest` `Tests run: 33, Failures: 5` (cuatro ejemplos y la propiedad): `Expecting actual: Optional[198.51.100.7] to contain: "203.0.113.9"`; propiedad: `Expecting actual: Optional[ClientAddress[address=/10.0.0.0]] to contain: ClientAddress[address=/11.7.7.7]`. |
+| S-2: `TrustedProxies` vuelve a `CidrBlock.parse` | `WebEdgePropertiesTest` `Tests run: 25, Failures: 5`: `Expecting code to raise a throwable.` en las cinco entradas con bits de host. |
+| Un archivo `application-extra.yml` con `confia.web.trusted-proxies: 10.0.0.0/8` (fuera de la lista de perfiles conocidos) | `WebEdgePropertiesTest` `Tests run: 25, Failures: 1`: `[apps\api\app\src\main\resources\application-extra.yml] Expecting empty but was: ["trusted-proxies: 10.0.0.0/8"]`. Archivo retirado. |
+
+### Decisión S-2 (seguimiento de la revisión de 2.3a)
+
+Se rechaza: `TrustedProxies` usa `CidrBlock.parseWithoutHostBits`; el arranque falla nombrando `confia.web.trusted-proxies[i]` sin
+repetir el valor. `CidrBlock.parse` no cambia (sus propiedades de 2.3a dependen del enmascarado). Nota fechada en `design.md`.
+
+### Desviaciones del diseño (declaradas)
+
+1. Rechazo de bits de host (S-2), por encargo de la revisión de 2.3a.
+2. `WebEdgePropertiesTest` recorre todo el repositorio y no solo los cuatro perfiles conocidos (con control de no vacuidad).
+3. Sin entradas nuevas en la lista de permitidos de `IdempotencyScopeExclusionInventoryTest`: los tipos nuevos solo dependen de `ClientAddress`.
+
+### Medición del PR 7b (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 714 | 1 | **715** |
+| Con `-M` | 714 | 1 | **715** |
+
+Pronóstico 592; dentro del tope de 800. El exceso: la prueba de recorrido del repositorio, los casos de S-2 y `parseWithoutHostBits`. Tareas: 18 en total; hechas 9.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='ClientAddressResolverTest,WebEdgePropertiesTest,CidrBlock*,ClientAddress*,IdempotencyScopeExclusionInventoryTest'`: `Tests run: 122, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 717, Failsafe 225 |
+| Arnés de ejecución | `Binder` de Spring Boot con `SystemEnvironmentPropertySource` y los YAML reales del classpath; resolvedor con ejemplos y jqwik (referencia de aritmética entera) |
+| Frontera de reversión | Se retiran `TrustedProxies`, `ClientAddressResolver`, `WebEdgeProperties`, `parseWithoutHostBits`, las dos pruebas, las dos claves de `application.yml` y la nota de `docs/05` |
