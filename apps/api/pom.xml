@@ -388,12 +388,21 @@
                     <exclude>org.springframework.data:spring-data-jdbc</exclude>
                     <exclude>org.quartz-scheduler:*</exclude>
                     <exclude>org.jobrunr:*</exclude>
+                    <!-- Spring Security is used only as a servlet filter chain: no OAuth2 resource
+                         server, no JWT decoding. Authentication belongs to the opaque session
+                         tokens of the session change (web-edge-foundations design.md, decision
+                         4). The two artifacts named here are the resource server itself, by the
+                         starter and by the library. -->
+                    <exclude>org.springframework.boot:spring-boot-starter-oauth2-resource-server</exclude>
+                    <exclude>org.springframework.security:spring-security-oauth2-resource-server</exclude>
                   </excludes>
                   <message>
                     Banned dependency (ADR-0015 forbids Hibernate/JPA/Spring Data JPA/Spring Data
-                    JDBC; ADR-0016 forbids Quartz/JobRunr and other task schedulers). Adding a new
-                    scheduler or persistence library to this list requires a new ADR, never a
-                    silent exclusion here.
+                    JDBC; ADR-0016 forbids Quartz/JobRunr and other task schedulers;
+                    web-edge-foundations design.md decision 4 keeps Spring Security a servlet
+                    filter chain and forbids the OAuth2 resource server). Adding a new scheduler,
+                    persistence library or authentication stack to this list requires a new ADR,
+                    never a silent exclusion here.
                   </message>
                 </bannedDependencies>
               </rules>
