@@ -1,5 +1,6 @@
 package com.confia.shared.web.edge;
 
+import com.confia.shared.web.problem.ProblemRequestRejectedHandler;
 import com.confia.shared.web.problem.ProblemResponses;
 import com.confia.shared.web.request.SecurityHeadersFilter;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -10,9 +11,10 @@ import org.springframework.context.support.ResourceBundleMessageSource;
 
 /**
  * The parts of the web edge that the administrative and the portal process share (web-edge-
- * foundations design.md, decisions 7, 8 and 10): the security headers filter and the Problem Details
- * writer with its message catalog. Imported explicitly by {@code AdminApplication} and {@code
- * PortalApplication} (ADR-0024); the worker has no web edge and never loads it.
+ * foundations design.md, decisions 5, 7, 8 and 10): the security headers filter, the Problem Details
+ * writer with its message catalog, and the handler for the requests the firewall rejects. Imported
+ * explicitly by {@code AdminApplication} and {@code PortalApplication} (ADR-0024); the worker has no
+ * web edge and never loads it.
  *
  * <p>The catalog is {@code i18n/problems.properties}, in UTF-8, the single source of every
  * {@code title} and {@code detail}. Its {@link MessageSource} is named {@code
@@ -45,5 +47,14 @@ public class WebEdgeConfiguration {
     @Bean
     SecurityHeadersFilter securityHeadersFilter() {
         return new SecurityHeadersFilter();
+    }
+
+    /**
+     * Spring Security's {@code WebSecurity} picks this bean up and hands it to its filter chain
+     * proxy, so a request the strict firewall rejects is answered with Problem Details too.
+     */
+    @Bean
+    ProblemRequestRejectedHandler problemRequestRejectedHandler(ProblemResponses problems) {
+        return new ProblemRequestRejectedHandler(problems);
     }
 }

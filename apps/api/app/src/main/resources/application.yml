@@ -8,6 +8,13 @@ spring:
       # use. Only the administrative process has a DataSource; it is inert in the portal and the
       # worker, which exclude DataSourceAutoConfiguration (web-edge-foundations design.md, decision 2).
       initialization-fail-timeout: -1
+  web:
+    resources:
+      # No static resource handler: without a mapping for /** the route map of a process holds only
+      # what a controller or springdoc registers, so "no production route" is true and checkable
+      # (web-edge-foundations design.md, decision 5). Swagger UI is served by springdoc's own
+      # resource handler, not by this one; the exposure test on the local profile proves it.
+      add-mappings: false
   flyway:
     enabled: false
   jooq:

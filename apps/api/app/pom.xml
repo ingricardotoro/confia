@@ -34,6 +34,16 @@
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
 
+    <!-- Spring Security as a servlet filter chain and nothing else (web-edge-foundations
+         design.md decision 4). Version managed by the Spring Boot BOM (Spring Security 7.1.1).
+         There is no user store, no OAuth2 resource server and no method security: apps/api/pom.xml
+         bans the two resource-server artifacts, and the entry points exclude the user-details
+         autoconfiguration so no generated password is ever logged (CLAUDE.md, regla 11). -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
     <!-- Data access (ADR-0015): jOOQ open source, Flyway and the PostgreSQL JDBC driver. No
          version on any of the three: managed by the Spring Boot 4.1.1 BOM (jOOQ 3.21.7, Flyway
          12.4.0, org.postgresql:postgresql 42.7.13 — design.md section 2, evidence table). -->
