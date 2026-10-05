@@ -2,11 +2,14 @@ package com.confia.bootstrap.admin;
 
 import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
 import com.confia.shared.platform.infrastructure.SharedPlatformConfiguration;
+import com.confia.shared.web.edge.AdminSecurityConfiguration;
 import com.confia.shared.web.edge.WebEdgeConfiguration;
 import com.confia.shared.web.openapi.ContractSchemas;
 import com.confia.shared.web.openapi.ProcessApiInfo;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
+import org.springframework.boot.webmvc.autoconfigure.error.ErrorMvcAutoConfiguration;
 import org.springframework.context.annotation.Import;
 
 /**
@@ -15,7 +18,8 @@ import org.springframework.context.annotation.Import;
  * only if it is written below, so a portal-only or worker-only component cannot arrive by
  * accident. This process registers the shared platform wiring (decision 2 of
  * web-edge-foundations), the {@code identity} module's use cases and secrets (decision 3) and the
- * web edge's request filters and Problem Details catalog (decisions 7, 8, 10 and 11).
+ * web edge: the request filters, the Problem Details catalog and the deny-by-default security
+ * chain (decisions 4 to 8).
  *
  * <p>Registering a module here is a visible two-line change: its public configuration in the
  * {@code @Import} list and its package in {@code ProcessBeanPolicy}, which the isolation test
@@ -26,12 +30,21 @@ import org.springframework.context.annotation.Import;
  * {@code SPRING_DATASOURCE_URL} and the pool connects lazily, so this process starts without a
  * reachable database and never migrates at startup.
  *
+ * <p>Two autoconfigurations are excluded (decisions 4 and 5). {@link
+ * UserDetailsServiceAutoConfiguration} would register an in-memory user and log a generated
+ * password, which CLAUDE.md regla 11 forbids and nothing here uses. {@link
+ * ErrorMvcAutoConfiguration} would register the {@code /error} controller and its white page, which
+ * the chain would have to authorize; without it the route map of the process holds no route that
+ * this change did not choose.
+ *
  * <p>The class is public only so the launcher in the parent package can start it; nothing else
  * may reference it (enforced by ArchUnit).
  */
 @SpringBootConfiguration
-@EnableAutoConfiguration
+@EnableAutoConfiguration(exclude = {UserDetailsServiceAutoConfiguration.class,
+        ErrorMvcAutoConfiguration.class})
 @Import({ContractSchemas.class, ProcessApiInfo.class, SharedPlatformConfiguration.class,
-        IdentityConfiguration.class, WebEdgeConfiguration.class})
+        IdentityConfiguration.class, WebEdgeConfiguration.class,
+        AdminSecurityConfiguration.class})
 public class AdminApplication {
 }

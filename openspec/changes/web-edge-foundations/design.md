@@ -1122,3 +1122,15 @@ cambiar), y la demostración deliberada pasa a ser la que sí rompe una prueba: 
 `anyRequest().permitAll()` da 21 fallos de 24. Segunda: `PortalSecurityChainTest` vive en
 `com.confia.bootstrap` y no en `com.confia.shared.web`, porque `ConfiaApplication.launch` y
 `OpenApiProcess` son privados al paquete (ADR-0024). El texto anterior de este documento no se reescribe.
+
+### Nota fechada 2026-10-04: la regla final `denyAll()` es obligatoria con la lista blanca vacía (decisión 5, PR 4)
+
+La nota anterior sobre `anyRequest().denyAll()` es correcta para una lista blanca con entradas, pero incompleta.
+Con la lista vacía (perfil `prod` o un perfil desconocido, que es la configuración de producción) la
+configuración de `authorizeHttpRequests` queda sin ninguna regla y Spring Security 7.1.1 se niega a construir la
+cadena con `IllegalStateException: At least one mapping is required (for example,
+authorizeHttpRequests().anyRequest().authenticated())`. Se comprobó quitando la línea: `AdminSecurityChainTest`
+pasa (el arnés siempre añade `/test/open`) pero `OpenApiExposureByProfileTest` falla en las cuatro ejecuciones
+negativas al arrancar el proceso. La regla se conserva como última regla explícita y deja de ser solo
+documentación: es lo que permite que la lista vacía produzca una cadena que deniega todo. El texto anterior de
+este documento no se reescribe.

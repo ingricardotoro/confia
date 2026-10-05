@@ -37,13 +37,27 @@ class OpenApiExposureByProfileTest {
     void neitherTheDocumentNorSwaggerUiAnswersOnAnyOtherProfile(String appProfile,
             String springProfile) {
         try (OpenApiProcess process = OpenApiProcess.start(appProfile, springProfile)) {
-            assertThat(process.get(OpenApiProcess.API_DOCS_PATH).statusCode())
-                    .as("the OpenAPI document must not be served with the %s profile",
-                            springProfile)
-                    .isEqualTo(404);
-            assertThat(process.get(OpenApiProcess.SWAGGER_UI_PATH).statusCode())
-                    .as("Swagger UI must not be served with the %s profile", springProfile)
-                    .isEqualTo(404);
+            assertDenied(process.get(OpenApiProcess.API_DOCS_PATH),
+                    "the OpenAPI document must not be served with the " + springProfile
+                            + " profile");
+            assertDenied(process.get(OpenApiProcess.SWAGGER_UI_PATH),
+                    "Swagger UI must not be served with the " + springProfile + " profile");
         }
+    }
+
+    /**
+     * The security chain answers before springdoc is ever asked (web-edge-foundations design.md,
+     * decision 6): a uniform {@code 401} with Problem Details, which is also what any route that
+     * does not exist gets, so neither the document nor the interface is served and nobody can tell
+     * whether they exist.
+     */
+    private static void assertDenied(HttpResponse<String> response, String reason) {
+        assertThat(response.statusCode()).as(reason).isEqualTo(401);
+        assertThat(response.headers().firstValue("Content-Type")).as(reason)
+                .hasValueSatisfying(type -> assertThat(type).startsWith("application/problem+json"));
+        assertThat(response.body()).as(reason)
+                .contains("\"type\":\"https://confia.hn/problems/authentication-required\"")
+                .doesNotContain("\"openapi\"")
+                .doesNotContain("swagger-ui-bundle");
     }
 }
