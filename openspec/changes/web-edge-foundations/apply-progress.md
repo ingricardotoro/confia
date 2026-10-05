@@ -352,3 +352,22 @@ Pronóstico: 600 a 800. Dentro del tope.
 | Orden enfocada y resultado | `-Dtest='AdminSecurityChainTest,OpenApi*Test,ProcessBeanIsolationTest'`: `Tests run: 40, Failures: 0, Errors: 0, Skipped: 0`; cierre por `./mvnw verify`: Surefire 186 + 493, Failsafe 225 |
 | Arnés de ejecución | Cadena real por HTTP (`RANDOM_PORT`) en un proceso sin base de datos con controladores de prueba y un filtro de principal de prueba, más los procesos administrativo y portal reales por `ConfiaApplication.launch` con `prod`, un perfil inexistente y `local` |
 | Frontera de reversión | Se retira `spring-boot-starter-security`: el sistema vuelve a no tener borde de seguridad (se retiran también las dos exclusiones de `bannedDependencies`, las clases de `shared.web.edge` y `shared.web.problem` de 2.1b, las exclusiones de `AdminApplication` y `PortalApplication` y `spring.web.resources.add-mappings`) |
+
+### Revisión independiente de 2.1b (2026-10-04)
+
+Riesgo evaluado: alto. Auditoría de seguridad: sin bloqueantes, un importante y seis sugerencias.
+
+- **I1 (importante): las garantías sin estado no tienen prueba en este PR.** `STATELESS`,
+  `requestCache.disable` y `csrf.disable` están en `SecurityChains`, pero las pruebas de sesión y de
+  `Set-Cookie` se movieron a 2.1c para respetar el presupuesto. **Decisión:** 2.1c es el siguiente PR
+  de la cadena y ningún otro PR se fusiona entre ambos. Para CSRF se registró una tercera condición
+  dura de aceptación de `session-tokens-and-web-layer` en `foundations-plan/exploration.md`: ninguna
+  credencial en cookie se fusiona sin CSRF de doble envío y una prueba que dé `403` sin `X-CSRF-Token`.
+- **S1 corregida:** el Javadoc de `ProblemRequestRejectedHandler` decía que los bytes rechazados nunca
+  se devuelven; ahora aclara que la ruta sí llega a `instance`, escapada, acotada y sin consulta.
+- **Para 2.1c:** S2 (`HEAD`, `OPTIONS`, `TRACE` y variantes `//x`, `%2f`, `%2e`, `%00`, `%78`) y S5
+  (prueba de la cadena del portal).
+- **Para 2.2:** S6 (la prueba de configuración debe reconocer que `SPRINGDOC_API_DOCS_ENABLED=true`
+  abriría la documentación en producción).
+- **Para 2.4:** S1 en su parte de prueba (`instance` en el `400` del firewall).
+- **Para `session-tokens-and-web-layer`:** S4 (`WWW-Authenticate` en el `401`).

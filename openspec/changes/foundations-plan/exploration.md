@@ -156,6 +156,16 @@ arriba, se escriben aquí y no como preguntas abiertas, porque una pregunta abie
 > `RequestPasswordReset` aplica por sí mismo la respuesta uniforme, pero el límite de tres emisiones
 > por hora es por cuenta y no frena a quien recorre cuentas ajenas.
 
+**Condición dura más de aceptación de `session-tokens-and-web-layer` (2026-10-04, de
+`web-edge-foundations`, revisión de seguridad del PR 4).** La cadena de `web-edge-foundations`
+desactiva CSRF porque hoy ninguna credencial viaja en una cookie (`SecurityChains`, decisión 5 de su
+diseño). `docs/03-seguridad.md` §8.3 exige CSRF de doble envío con prueba para toda credencial por
+cookie, y nada obliga hoy a reactivarlo:
+
+> **3. `session-tokens-and-web-layer` NO DEBE fusionar la primera credencial en cookie (la de refresco
+> o la de sesión) sin activar la protección CSRF de doble envío con verificación de `Origin` y sin una
+> prueba que demuestre que una petición mutadora con la cookie y sin `X-CSRF-Token` recibe `403`.**
+
 **Nota (2026-09-27, tercer corte: la parte 2 se parte a su vez).** La propuesta de
 `mfa-totp-and-password-recovery` pronosticó **12 a 17 tareas solo para su primera mitad**, contra el
 límite de quince de `openspec/changes/README.md`, y más aún si se aprueba añadir los dos controles que
