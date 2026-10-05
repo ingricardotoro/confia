@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-04 (tarea 2.2a; 2.1a, 2.1b, 2.1c y 2.2a hechas)
+- **Última actualización:** 2026-10-04 (tarea 2.2b; 2.1a, 2.1b, 2.1c, 2.2a y 2.2b hechas)
 
 ## Estado de las tareas
 
@@ -15,7 +15,7 @@
 | 2.1b | PR 4 `security-chains` | Hecha | `f9bc884`, `6ba1744` y el commit `docs(sdd)` de esta rama |
 | 2.1c | PR 5 `portal-and-worker-chain` | Hecha | `7cf71ee` y el commit `docs(sdd)` de esta rama |
 | 2.2a | PR 6a `container-rejections` | Hecha | `d9d015b` y el commit `docs(sdd)` de esta rama |
-| 2.2b | PR 6b `edge-gates` | Pendiente (se construye desde `main` actualizado con `wip/web-edge-edge-gates-full`) | |
+| 2.2b | PR 6b `edge-gates` | Hecha | `c469734`, `8a2eb2e` y el commit `docs(sdd)` de esta rama |
 | 2.3 a 6.1 | PR 7 a 13 y cierre | Pendientes | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
@@ -613,3 +613,63 @@ cabecera de 70 000, así que el estado original de esas dos ya es el del catálo
 |---|---|
 | `codeFor` responde 401 con `validation-failed` | `ProblemErrorReportValveTest` `Tests run: 14, Failures: 2`: `expected: "authentication-required" but was: "validation-failed"` y `expected: 401 but was: 400`. |
 | Quitar la llamada de registro de la válvula | `ContainerRejectionsTest` `Tests run: 16, Failures: 4`: `Expected size: 1 but was: 0` (los tres rechazos y el del estado reescrito). |
+
+## Tarea 2.2b: PR 6b `edge-gates`
+
+Rama `change/web-edge-foundations-edge-gates`, desde `main` en `04f14cd` tras fusionar el PR 6a. El código sale de la
+rama local `wip/web-edge-edge-gates-full` (sin tocarla; sigue en `fee587f`). `main` es la autoridad de todo lo ya
+fusionado en 2.2a: `ProblemErrorReportValve` (con el mapeo por catálogo y el registro), `ProblemCode`,
+`ProblemResponses`, `SecurityHeadersFilter`, `ContainerRejectionsTest`, `ProblemErrorReportValveTest`,
+`ProductionEdgeDefaultsTest` y `OpenApiProcess` no se tocaron; de la copia de respaldo solo se portó lo propio de 2.2b.
+
+### Evidencia del ciclo TDD (reobservada sobre este árbol)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO 1 | `-Dtest='PublicRouteAllowListTest,PortalRouteMapSnapshotTest,SensitiveDataLoggingTest'` con las pruebas, el arnés y `RegisteredRoutes`, sin producción | `COMPILATION ERROR`: `package SensitiveLogGuard does not exist` y `cannot find symbol` (`SensitiveDataLoggingTest.java` líneas 65, 130 a 158). |
+| ROJO 2 | Igual, con la clase `SensitiveLogGuard` pero sin su bean ni la instantánea | `Tests run: 20, Failures: 2, Errors: 3`. `PortalRouteMapSnapshotTest` `Tests run: 6, Failures: 1, Errors: 2`: `no approved snapshot at ..\routes\portal.routes.json yet. Generated map, to review and commit:` y `NoSuchFile ..\routes\portal.routes.json` en las dos que leen el archivo. `SensitiveDataLoggingTest` `Tests run: 4, Failures: 1, Errors: 1`: `Expecting empty but was: ["org.apache.coyote.http11.Http11InputBuffer DEBUG message contains SECRETO-A", ...SECRETO-B, ...SECRETO-C ...]` y `NoSuchBeanDefinition ... SensitiveLogGuard`. `PublicRouteAllowListTest` 10/10 en verde (ya había `PublicEndpoints`; sus controles son las rupturas de abajo). |
+| VERDE | `portal.routes.json` con `{"process": "portal", "routes": []}` y el bean `sensitiveLogGuard` en `WebEdgeConfiguration`; con `ProcessBeanIsolationTest`, `ContainerRejectionsTest` y `SpringModulithVerificationTest` | `PortalRouteMapSnapshotTest` 6, `PublicRouteAllowListTest` 10, `SensitiveDataLoggingTest` 4, `ProcessBeanIsolationTest` 4, `ContainerRejectionsTest` 16, `SpringModulithVerificationTest` 2: `Tests run: 42, Failures: 0, Errors: 0, Skipped: 0` (el `BUILD FAILURE` de esa ejecución es la cobertura de JaCoCo con `-Dtest=` acotado). |
+| Cierre | `./mvnw verify` completo | Surefire 186 + 595 (los 575 de la línea base más 20 nuevos), Failsafe 225, `BUILD SUCCESS`. La instantánea OpenAPI y `apps/api/routes/portal.routes.json` sin cambios (`git status` limpio). |
+
+Pruebas añadidas: 20 (`PublicRouteAllowListTest` 10, `PortalRouteMapSnapshotTest` 6, `SensitiveDataLoggingTest` 4).
+`SensitiveDataLoggingTest` usa los marcadores `SECRETO-A`, `SECRETO-B` y `SECRETO-C`, un `ListAppender` en la raíz con
+la raíz y los cinco prefijos en `TRACE`, y revisa cada evento de cualquier nivel (mensaje formateado, plantilla,
+argumentos, MDC y traza de pila). El control negativo (un evento registrado a propósito) debe producir exactamente las
+siete detecciones esperadas; otra prueba quita la guardia y exige que los secretos sí lleguen al registro.
+
+### Demostraciones deliberadas (cada una revertida; `cmp` sin diferencias)
+
+| Ruptura | Resultado |
+|---|---|
+| Un controlador temporal `GET /api/v1/temp-break` en el portal (importado desde `PortalApplication`) | `PortalRouteMapSnapshotTest` `Tests run: 6, Failures: 1`: `the portal route map differs from its approved snapshot ..\routes\portal.routes.json (added: GET /api/v1/temp-break)`. `PublicRouteAllowListTest` también falla (`Failures: 1`: producción no registra ninguna ruta en el portal). |
+| Quitar `@Bean` de `sensitiveLogGuard` | `SensitiveDataLoggingTest` `Tests run: 4, Failures: 1, Errors: 1`: `Expecting empty but was: ["org.apache.coyote.http11.Http11InputBuffer DEBUG message contains SECRETO-A", ...]` y `NoSuchBeanDefinition ... SensitiveLogGuard`. |
+| Una entrada `GET /v3/api-docs/unapproved` añadida a `PublicEndpoints` fuera de la lista aprobada | `PublicRouteAllowListTest` `Tests run: 10, Failures: 4`: `Expecting empty but was: [PublicEndpoint[method=GET, pattern=/v3/api-docs/unapproved]]` (producción) y `Expecting empty but was: ["GET /v3/api-docs/unapproved is allow-listed and no route serves it"]` (`local`). |
+
+### `-Dconfia.routes.update=true`
+
+`PortalRouteMapSnapshotTest` con la propiedad (y `-DargLine` para que llegue al proceso de pruebas): `Tests run: 6,
+Failures: 1`: `..\routes\portal.routes.json was rewritten because -Dconfia.routes.update=true is set; review the diff,
+commit it and run again without the property`. **Esa ejecución sí reescribió el archivo** (con formato multilínea); se
+restauró el contenido exacto y se confirmó con `cmp` contra el blob de `wip/web-edge-edge-gates-full` y con `git status`
+limpio. La instantánea OpenAPI no cambió.
+
+### Desviaciones del diseño (declaradas)
+
+Ninguna. Sin cambios en `ProcessBeanPolicy`: `shared.web.request` y `shared.web.edge` ya estaban permitidos desde 2.1a.
+
+### Medición del PR 6b (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 720 | 0 | **720** |
+| Con `-M` | 720 | 0 | **720** |
+
+Pronóstico: ~716. Dentro del tope de 800. Tareas: 15 en total; hechas 7 de 15 (1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b).
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='PublicRouteAllowListTest,PortalRouteMapSnapshotTest,SensitiveDataLoggingTest,ProcessBeanIsolationTest,ContainerRejectionsTest,SpringModulithVerificationTest'`: `Tests run: 42, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 595, Failsafe 225 |
+| Arnés de ejecución | Procesos administrativo y portal reales (perfil por omisión y `local`) con petición anónima a cada ruta enumerada, y el arnés sin base de datos para los controles negativos y las tres peticiones con secretos |
+| Frontera de reversión | Se retiran `SensitiveLogGuard` y su bean, `apps/api/routes/portal.routes.json`, `RegisteredRoutes` y las tres clases de prueba, y las adiciones de `HarnessProcess` |

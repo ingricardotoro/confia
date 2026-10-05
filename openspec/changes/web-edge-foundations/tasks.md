@@ -338,7 +338,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     peticiones, `application/problem+json`, las cinco cabeceras base y ninguna cabecera `Server` ni `X-Powered-By`,
     y al VERDE la configuración de Tomcat (válvula o página de error del contenedor) que lo cumpla.
 
-- [ ] 2.2b **PR 6b `edge-gates`: lista blanca cerrada, mapa de rutas y registros sin secretos
+- [x] 2.2b **PR 6b `edge-gates`: lista blanca cerrada, mapa de rutas y registros sin secretos
   (decisiones 21 y 22).**
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/bootstrap/RegisteredRoutes.java` (enumera
     `RequestMappingInfoHandlerMapping`, `RouterFunctionMapping` y `AbstractUrlHandlerMapping`),
