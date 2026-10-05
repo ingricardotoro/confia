@@ -17,6 +17,7 @@ import java.time.Clock;
 import javax.sql.DataSource;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
+import org.jooq.conf.Settings;
 import org.jooq.impl.DSL;
 import org.jooq.impl.DataSourceConnectionProvider;
 import org.jooq.impl.DefaultConfiguration;
@@ -63,9 +64,13 @@ public class SharedPlatformConfiguration {
     DSLContext dslContext(DataSource dataSource) {
         DataSourceConnectionProvider connectionProvider =
                 new DataSourceConnectionProvider(new TransactionAwareDataSourceProxy(dataSource));
+        // jOOQ logs each statement with its bind values inlined at DEBUG; a document number or a
+        // token must never reach a log (regla 11), so the statement logging is off in the
+        // settings, whatever level any logger has.
         return DSL.using(new DefaultConfiguration()
                 .set(connectionProvider)
-                .set(SQLDialect.POSTGRES));
+                .set(SQLDialect.POSTGRES)
+                .set(new Settings().withExecuteLogging(false)));
     }
 
     @Bean

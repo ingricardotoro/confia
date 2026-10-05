@@ -32,7 +32,8 @@ class SensitiveDataLoggingTest {
     private static final String BEARER = "SECRETO-A";
     private static final String COOKIE = "SECRETO-B";
     private static final String BODY = "SECRETO-C";
-    private static final List<String> SECRETS = List.of(BEARER, COOKIE, BODY);
+    private static final String QUERY = "SECRETO-D";
+    private static final List<String> SECRETS = List.of(BEARER, COOKIE, BODY, QUERY);
 
     /** Every way an event can carry text, searched for each secret; one entry per hit. */
     static List<String> violations(List<ILoggingEvent> events, List<String> secrets) {
@@ -76,6 +77,8 @@ class SensitiveDataLoggingTest {
                     "Cookie", "sid=" + COOKIE);
             process.sendWithBody("GET", "/test/boom", BODY, "Authorization", "Bearer " + BEARER,
                     "Cookie", "sid=" + COOKIE);
+            process.get("/test/open?token=" + QUERY);
+            process.get("/x?token=" + QUERY);
         } finally {
             root.detachAppender(appender);
             before.forEach(Logger::setLevel);
@@ -131,8 +134,17 @@ class SensitiveDataLoggingTest {
             assertThat(context.getTurboFilterList()).as("the guard is installed").contains(guard);
             context.getTurboFilterList().remove(guard);
             try {
-                assertThat(violations(logOf(process), SECRETS))
-                        .as("the guard is what keeps the secrets out").isNotEmpty();
+                List<String> leaks = violations(logOf(process), SECRETS);
+
+                assertThat(leaks).as("the guard is what keeps each secret out")
+                        .anyMatch(leak -> leak.startsWith("org.apache.coyote.")
+                                && leak.endsWith("contains " + BEARER))
+                        .anyMatch(leak -> leak.startsWith("org.apache.tomcat.util.http.")
+                                && leak.endsWith("contains " + COOKIE))
+                        .anyMatch(leak -> leak.startsWith("org.apache.coyote.")
+                                && leak.endsWith("contains " + BODY))
+                        .anyMatch(leak -> leak.startsWith("org.springframework.security.")
+                                && leak.endsWith("contains " + QUERY));
             } finally {
                 context.addTurboFilter(guard);
             }

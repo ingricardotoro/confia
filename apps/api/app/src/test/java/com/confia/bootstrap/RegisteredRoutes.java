@@ -1,9 +1,11 @@
 package com.confia.bootstrap;
 
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.servlet.function.support.RouterFunctionMapping;
@@ -51,18 +53,23 @@ final class RegisteredRoutes {
     /** The routes of {@code context}, sorted and without repetitions. */
     static List<Route> of(ApplicationContext context) {
         Set<Route> routes = new TreeSet<>();
-        context.getBeansOfType(RequestMappingInfoHandlerMapping.class).values()
+        mappings(context, RequestMappingInfoHandlerMapping.class)
                 .forEach(mapping -> mapping.getHandlerMethods().keySet()
                         .forEach(info -> add(routes, info)));
-        context.getBeansOfType(AbstractUrlHandlerMapping.class).values()
+        mappings(context, AbstractUrlHandlerMapping.class)
                 .forEach(mapping -> mapping.getHandlerMap().keySet()
                         .forEach(pattern -> routes.add(new Route(ANY_METHOD, pattern))));
-        context.getBeansOfType(RouterFunctionMapping.class).values().forEach(mapping -> {
+        mappings(context, RouterFunctionMapping.class).forEach(mapping -> {
             if (mapping.getRouterFunction() != null) {
                 routes.add(new Route(ANY_METHOD, FUNCTIONAL_ROUTER));
             }
         });
         return List.copyOf(routes);
+    }
+
+    /** The beans of a type in the context and in its ancestors, as a child context sees them. */
+    private static <T> Collection<T> mappings(ApplicationContext context, Class<T> type) {
+        return BeanFactoryUtils.beansOfTypeIncludingAncestors(context, type).values();
     }
 
     private static void add(Set<Route> routes, RequestMappingInfo info) {

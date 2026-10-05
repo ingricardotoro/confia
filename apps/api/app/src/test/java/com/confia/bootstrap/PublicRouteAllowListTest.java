@@ -20,6 +20,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.function.RouterFunction;
+import org.springframework.web.servlet.function.RouterFunctions;
+import org.springframework.web.servlet.function.ServerResponse;
+import org.springframework.web.servlet.function.support.RouterFunctionMapping;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.PathContainer;
@@ -44,6 +51,9 @@ class PublicRouteAllowListTest {
     static List<String> leaks(ApplicationContext context, int port, PublicEndpoints allowed) {
         List<String> leaks = new ArrayList<>();
         for (Route route : RegisteredRoutes.of(context)) {
+            if (RegisteredRoutes.FUNCTIONAL_ROUTER.equals(route.pattern())) {
+                continue; // opaque: reported by unenumerableRoutes, there is no path to call
+            }
             String method = RegisteredRoutes.ANY_METHOD.equals(route.method()) ? "GET"
                     : route.method();
             int status = anonymous(method, sample(route.pattern()), port);
@@ -69,6 +79,18 @@ class PublicRouteAllowListTest {
             }
         }
         return orphans;
+    }
+
+    /**
+     * A functional router is registered as one opaque entry, so neither the anonymous request nor
+     * the snapshot can see what it serves. Until its predicates are enumerated, any is a failure.
+     */
+    static List<String> unenumerableRoutes(ApplicationContext context) {
+        return RegisteredRoutes.of(context).stream()
+                .filter(route -> RegisteredRoutes.FUNCTIONAL_ROUTER.equals(route.pattern()))
+                .map(route -> RegisteredRoutes.FUNCTIONAL_ROUTER + " is registered: functional "
+                        + "routes must be enumerated before they are allowed")
+                .toList();
     }
 
     /** Whether an entry of {@code allowed} admits {@code method} on the concrete {@code path}. */
@@ -122,6 +144,7 @@ class PublicRouteAllowListTest {
                         .isNotEmpty();
                 assertThat(allowed.endpoints()).as("non-vacuous: and lists them").isNotEmpty();
             }
+            assertThat(unenumerableRoutes(context)).isEmpty();
             assertThat(leaks(context, running.port(), allowed)).isEmpty();
             assertThat(entriesWithoutARoute(context, allowed)).isEmpty();
         }
@@ -147,6 +170,38 @@ class PublicRouteAllowListTest {
             assertThat(leaks).noneMatch(leak -> leak.contains("/x"));
             assertThatThrownBy(() -> assertThat(leaks).isEmpty())
                     .hasMessageContaining("/test/open").hasMessageContaining("/test/boom");
+        }
+    }
+
+    /** The negative control of the guard above: a functional router in a context is reported. */
+    @Test
+    void aFunctionalRouterFailsSayingItsRoutesMustBeEnumeratedFirst() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(
+                FunctionalRouterConfiguration.class)) {
+            assertThat(RegisteredRoutes.of(context)).contains(
+                    new Route(RegisteredRoutes.ANY_METHOD, RegisteredRoutes.FUNCTIONAL_ROUTER));
+            assertThat(unenumerableRoutes(context)).containsExactly(
+                    "(functional router) is registered: functional routes must be enumerated "
+                            + "before they are allowed");
+        }
+        try (AnnotationConfigApplicationContext empty = new AnnotationConfigApplicationContext(
+                RouterFunctionMapping.class)) {
+            assertThat(unenumerableRoutes(empty)).as("no router, nothing to report").isEmpty();
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class FunctionalRouterConfiguration {
+
+        @Bean
+        RouterFunction<ServerResponse> functionalRoute() {
+            return RouterFunctions.route().GET("/functional", request -> ServerResponse.ok()
+                    .build()).build();
+        }
+
+        @Bean
+        RouterFunctionMapping routerFunctionMapping() {
+            return new RouterFunctionMapping();
         }
     }
 
