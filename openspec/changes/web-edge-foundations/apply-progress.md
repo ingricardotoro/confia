@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-04 (tarea 2.1a; la tarea 2.1 original se partió en 2.1a, 2.1b y 2.1c)
+- **Última actualización:** 2026-10-04 (tarea 2.1b; 2.1a y 2.1b hechas)
 
 ## Estado de las tareas
 
@@ -12,7 +12,7 @@
 | 1.1 | PR 1 `platform-wiring` | Hecha | `d9e6adf`, `9fcb65d` |
 | 1.2 | PR 2 `identity-beans` | Hecha | `aaa1161`, `4d99f98` |
 | 2.1a | PR 3 `problem-details-core` | Hecha | `2554745` y el commit `docs(sdd)` de esta rama |
-| 2.1b | PR 4 `security-chains` | Pendiente (se construye desde `main` tras fusionar el PR 3) | |
+| 2.1b | PR 4 `security-chains` | Hecha | `f9bc884`, `6ba1744` y el commit `docs(sdd)` de esta rama |
 | 2.1c | PR 5 `portal-and-worker-chain` | Pendiente | |
 | 2.2 a 6.1 | PR 6 a 13 y cierre | Pendientes (numeración nueva) | |
 
@@ -263,3 +263,92 @@ lugar de `CATALOG_LOCALE` en `ProblemResponses`, la prueba falla con
 186 + 475, Failsafe 225, `BUILD SUCCESS`. Pendientes como sugerencia: S2 (cabeceras y `Server` en un
 error real del proceso, cubierto en 2.1c), S3 (`ProblemCode.ofCode` sin consumidor de producción hasta
 2.4) y S4 (dominio de ejemplo `confia.example` en la skill `confia-api-conventions`).
+
+## Tarea 2.1b: PR 4 `security-chains`
+
+Rama `change/web-edge-foundations-security-chains`, creada desde `main` en `14d37fd` tras fusionar el PR 3. El
+código sale de la rama local `wip/web-edge-security-chains-full` (sin tocarla; sigue en `a8fba42`), partiendo
+siempre de la versión de `main` en los archivos de 2.1a (`ProblemResponses`, `ProblemBody` sin `errors` y
+`REQUEST_ID_ATTRIBUTE` en `ProblemResponses` no se tocaron).
+
+### Red de seguridad
+
+`OpenApi*Test`, `ProcessBeanIsolationTest`, `SecurityHeadersFilterTest` y `ProblemResponsesTest` en verde antes
+de tocar nada: `Tests run: 32, Failures: 0, Errors: 0` (la cobertura de JaCoCo falla con `-Dtest=` acotado, como
+avisa `tasks.md`).
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO (a), descarga real | Añadir de forma temporal `spring-boot-starter-oauth2-resource-server` a `app/pom.xml` y `./mvnw validate` | La descarga falla: `Could not transfer artifact org.springframework.boot:spring-boot-starter-oauth2-resource-server:pom:4.1.1 ... (certificate_unknown) PKIX path building failed`. No se tocó TLS ni el almacén de confianza. |
+| ROJO (a), ruta de artefactos falsos | Repositorio de archivos temporal en el directorio de trabajo de la sesión, con un POM y un JAR vacío de cada coordenada prohibida (`org.springframework.boot:spring-boot-starter-oauth2-resource-server:4.1.1` y `org.springframework.security:spring-security-oauth2-resource-server:7.1.1`), declarado en `app/pom.xml` solo mientras duró la prueba. **Sin** la prohibición | `./mvnw validate`: `BannedDependencies passed` en `confia-api` con la dependencia prohibida presente. Es el rojo: nada impide la dependencia. |
+| VERDE (a) | Con las dos exclusiones y su mensaje en `apps/api/pom.xml` | `BUILD FAILURE`, `Rule 2: ...BannedDependencies failed with message: Banned dependency (... web-edge-foundations design.md decision 4 keeps Spring Security a servlet filter chain and forbids the OAuth2 resource server)` y `org.springframework.boot:spring-boot-starter-oauth2-resource-server:jar:4.1.1 <--- banned via the exclude/include list`. Con la dependencia sustituida por la biblioteca: `org.springframework.security:spring-security-oauth2-resource-server:jar:7.1.1 <--- banned via the exclude/include list`. Las dos coordenadas quedan probadas por separado y el BOM gestiona ambas versiones. |
+| Limpieza de (a) | Se retiró el repositorio y la dependencia de `app/pom.xml` | `cmp` de `app/pom.xml` contra la copia original: sin diferencias. Se borraron de `~/.m2` los directorios `org/springframework/boot/spring-boot-starter-oauth2-resource-server` y `org/springframework/security/spring-security-oauth2-resource-server` (el resolvedor había dejado el POM falso y un `.lastUpdated`); `find ~/.m2 -iname '*oauth2-resource-server*'` devuelve 0 archivos. |
+| ROJO (b) | `spring-boot-starter-security` en `app/pom.xml`, sin cadena propia: `-Dtest='OpenApi*Test'` | `Tests run: 18, Failures: 16`: `OpenApiContractSnapshotTest` 8 de 10 y `OpenApiExposureByProfileTest` 8 de 8, con `expected: 200 but was: 401` (la cadena por omisión de Spring Boot pide autenticación básica; el log imprime la contraseña generada, que es lo que la exclusión de `UserDetailsServiceAutoConfiguration` evita). |
+| ROJO (c) | Arnés, `AdminSecurityChainTest`, `PublicEndpointsTest` y las aserciones nuevas de `OpenApiExposureByProfileTest` sin producción | `COMPILATION ERROR`, 30 errores `cannot find symbol` (`PublicEndpoint`, `PublicEndpoints`, `SecurityChains`). |
+| VERDE | Producción de `shared.web.edge` y `shared.web.problem`, `@Import` de las cadenas y exclusiones: `-Dtest='AdminSecurityChainTest,PublicEndpointsTest,OpenApi*Test,ProcessBeanIsolationTest,SecurityHeadersFilterTest,ProblemResponsesTest,WebEdgeFiltersInProcessesTest,ConfiaApplicationTest,AdminProductionWiringTest'` | `Tests run: 88, Failures: 0, Errors: 0, Skipped: 0` (`AdminSecurityChainTest` 24 y `PublicEndpointsTest` 7 en ese corte; después del rebalanceo, ver abajo). |
+| VERDE final | Tras el rebalanceo: `-Dtest='AdminSecurityChainTest,OpenApi*Test,ProcessBeanIsolationTest'` | `Tests run: 40, Failures: 0, Errors: 0, Skipped: 0` (`AdminSecurityChainTest` 18, `OpenApiContractSnapshotTest` 10, `OpenApiExposureByProfileTest` 8, `ProcessBeanIsolationTest` 4). |
+| Cierre | `./mvnw verify` completo sobre el árbol final | Surefire 186 + 493 (los 475 de la línea base más 18 nuevos), Failsafe 225, `BUILD SUCCESS`. La instantánea OpenAPI (`apps/api/openapi/*.json`) **sin cambios**: `git status` limpio de ellos. |
+
+Lista de permitidos del proceso: no hubo rojo de `ProcessBeanIsolationTest` por falta de línea de política.
+Los paquetes de los beans nuevos (`shared.web.edge` y `shared.web.problem`) ya estaban permitidos desde 2.1a, y el
+marco (`org.springframework.security`) no se inspecciona en administración ni portal, así que 2.1b no añade
+ninguna línea de política. La inspección nominal del trabajador llega en 2.1c.
+
+Pruebas añadidas: 18 (`AdminSecurityChainTest`: 8 métodos, tres parametrizados). Las 16 pruebas de OpenAPI
+quedan en verde: 12 sin tocar su código y 4 con la aserción corregida (de `404` a `401` con
+`application/problem+json`, `type` de `authentication-required` y sin el documento ni la interfaz).
+
+### Demostraciones deliberadas (cada una revertida; `cmp` contra la copia original sin diferencias)
+
+Sobre el árbol final (`AdminSecurityChainTest` 18 y `OpenApiExposureByProfileTest` 8):
+
+| Ruptura temporal | Resultado observado y causa |
+|---|---|
+| `SecurityChains`: `anyRequest().denyAll()` por `anyRequest().permitAll()` | `AdminSecurityChainTest` `Tests run: 18, Failures: 18`; total 22 de 26 con las 4 de `OpenApiExposureByProfileTest`. Causa leída en el mensaje: `expected: 401 but was: 200` (o `but was: 404` para la ruta sin controlador, y `expected: 0 but was: 2` en el contador de invocaciones de un controlador que no debía correr). |
+| `SecurityChains`: quitar `.authenticationEntryPoint(new ProblemAuthenticationEntryPoint(problems))` | `AdminSecurityChainTest` `Failures: 15` de 18 y total 19 de 26: `expected: 401 but was: 403` (sin punto de entrada la denegación anónima es el `403` por omisión y no un Problem Details). |
+| `SecurityChains`: quitar la línea `anyRequest().denyAll()` sin más | `AdminSecurityChainTest` `Tests run: 18, Failures: 0` (la prueba del arnés no cambia: Spring Security 7 deniega por omisión cuando hay reglas). Es el no-rojo documentado. **Pero** `OpenApiExposureByProfileTest` falla en las 4 ejecuciones negativas con `Errors: 4`: `BeanCreation Error creating bean with name 'adminSecurityFilterChain'` (y `portalSecurityFilterChain`), causa `IllegalStateException: At least one mapping is required`. Con la lista blanca vacía (perfil `prod`) la regla final es obligatoria. Nota fechada en `design.md` y `tasks.md`. |
+| Primer corte (24 pruebas), quitar el bean `problemRequestRejectedHandler` de `WebEdgeConfiguration` | `AdminSecurityChainTest` `Failures: 4`: `Expecting actual: "text/html;charset=utf-8" to start with: "application/problem+json"` (la página de error de Tomcat en lugar de Problem Details) en las tres variantes `/x;a=b`, `/x/.` y `/y/../x` y en la prueba del rechazo del cortafuegos, retirada después (en el árbol final fallan las tres variantes). |
+| Primer corte, `SecurityChains` ignora el método (`requestMatchers(endpoint.pattern())`) | `aGetOnlyPublicRouteDeniesEveryOtherMethod`: `Failures: 4` (`POST`, `PUT`, `DELETE`, `PATCH`), `expected: 401 but was: 200`. |
+
+Las dos últimas se hicieron antes del rebalanceo; los métodos que las detectan (salvo el retirado) siguen en el árbol final.
+
+### Rebalanceo antes del commit (tope de 800)
+
+El primer corte midió **977 líneas** (950 adiciones y 27 eliminaciones) y no se comprometió. Sin recortar pruebas
+ni comentarios se movieron a 2.1c, por su dependencia de la cadena real con cabeceras, sesión e identificador:
+cinco métodos de `AdminSecurityChainTest` (sesión y `Set-Cookie`, cabeceras base en error y éxito, consulta en
+`instance` e idioma fijo), `SessionCounter`, `assertBaseSecurityHeaders` y `PublicEndpointsTest`. Se retiró
+también `theFirewallRejectionCarriesNoViolationList` (con el cuerpo de 2.1a no hay `errors`: no podía fallar; vuelve
+con 2.4). Del arnés se dejaron fuera, por pertenecer a 2.1c, `/test/boom`, el acceso al filtro de identificador y
+`startAsPortal`. Resultado: **791**. `tasks.md` (filas de trazabilidad y nota fechada) y la tarea 2.1c lo
+reflejan; ningún escenario queda huérfano.
+
+### Medición del PR 4 (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 764 | 27 | **791** |
+| Con `-M` | 764 | 27 | **791** |
+
+Pronóstico: 600 a 800. Dentro del tope.
+
+### Desviaciones del diseño (declaradas)
+
+1. Sin línea nueva en `ProcessBeanPolicy` en 2.1b (los paquetes ya estaban permitidos desde 2.1a); el diseño
+   preveía el rojo de lista de permitidos para cada `@Import`, que aquí no aplica.
+2. Las pruebas de sesión, cabeceras, consulta e idioma por la cadena real y la prueba unitaria de `PublicEndpoints`
+   pasan a 2.1c por el tope de 800 (nota fechada de `tasks.md`).
+3. La regla `anyRequest().denyAll()` no es solo explícita: es obligatoria con la lista blanca vacía (nota fechada
+   de `design.md`).
+4. El trabajador conserva en 2.1b los tres beans inertes de Spring Security (P1): su exclusión y la prueba que la
+   exige son de 2.1c.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='AdminSecurityChainTest,OpenApi*Test,ProcessBeanIsolationTest'`: `Tests run: 40, Failures: 0, Errors: 0, Skipped: 0`; cierre por `./mvnw verify`: Surefire 186 + 493, Failsafe 225 |
+| Arnés de ejecución | Cadena real por HTTP (`RANDOM_PORT`) en un proceso sin base de datos con controladores de prueba y un filtro de principal de prueba, más los procesos administrativo y portal reales por `ConfiaApplication.launch` con `prod`, un perfil inexistente y `local` |
+| Frontera de reversión | Se retira `spring-boot-starter-security`: el sistema vuelve a no tener borde de seguridad (se retiran también las dos exclusiones de `bannedDependencies`, las clases de `shared.web.edge` y `shared.web.problem` de 2.1b, las exclusiones de `AdminApplication` y `PortalApplication` y `spring.web.resources.add-mappings`) |

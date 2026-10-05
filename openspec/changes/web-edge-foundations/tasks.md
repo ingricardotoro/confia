@@ -219,7 +219,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     entrada ni administrativos» y «Trabajador sin beans de otros puntos de entrada» (lista de permitidos y
     prohibidos del borde)
 
-- [ ] 2.1b **PR 4 `security-chains`: Spring Security como cadena de filtros (decisiones 4 y 5).**
+- [x] 2.1b **PR 4 `security-chains`: Spring Security como cadena de filtros (decisiones 4 y 5).**
   - **ROJO, en orden.** (a) Añadir de forma temporal `spring-boot-starter-oauth2-resource-server` y
     comprobar que `bannedDependencies` rompe `./mvnw verify`; registrar la salida una vez, como las
     prohibiciones de ADR-0015 y ADR-0016 (si la descarga falla por PKIX, probar la prohibición con
@@ -269,7 +269,10 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     denegada), `RequestContextFilterChainTest.java` en `.../shared/web/` (el `traceId` de la respuesta de la
     cadena es el del servidor; el cliente no lo elige; el del último recurso coincide con el visto por el
     controlador) y `AdminSecurityHeadersAndSessionTest.java` (cabeceras base en error y éxito, ninguna sesión
-    ni `Set-Cookie`, `instance` sin consulta e idioma fijo por la cadena real); ampliar `OpenApiProcess.java`
+    ni `Set-Cookie`, `instance` sin consulta e idioma fijo por la cadena real; **desde la rama local
+    `wip/web-edge-security-chains-full`** pasan aquí las pruebas que 2.1b movió, ver la nota fechada del final:
+    `PublicEndpointsTest.java`, `SessionCounter.java` y `assertBaseSecurityHeaders` del arnés, y los cinco
+    métodos de sesión, cabeceras, consulta e idioma de `AdminSecurityChainTest`); ampliar `OpenApiProcess.java`
     (`start(String)` y `send`) y la aserción de tipos del trabajador en `ProcessBeanIsolationTest.java` (cero
     `SecurityFilterChain`, cero filtros, cero beans de `org.springframework.security`). **Rojos esperados:** el
     trabajador recibe los 3 beans inertes de P1.
@@ -570,8 +573,8 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | | Documentación de API con perfil `prod` | 2.1b |
 | | Documentación de API con perfil `local` | 2.1b |
 | La cadena administrativa no tiene estado | Ninguna respuesta crea sesión | 2.1c |
-| Cabeceras de seguridad base | Respuesta de error con las cabeceras base | 2.1a |
-| | Respuesta de éxito con las cabeceras base | 2.1a |
+| Cabeceras de seguridad base | Respuesta de error con las cabeceras base | 2.1a, 2.1c |
+| | Respuesta de éxito con las cabeceras base | 2.1a, 2.1c |
 | Vigencia de sesión como puerto | El puerto existe y no tiene adaptador de producción | 2.5 |
 | | El puerto no arrastra a `identity` | 2.5 |
 | La cadena del portal deniega toda ruta | Toda ruta del portal es denegada | 2.1c |
@@ -581,7 +584,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | El trabajador no tiene cadena ni servidor web | Contexto del trabajador sin borde web | 2.1c |
 | Toda respuesta de error usa Problem Details | Respuesta de error bien formada | 2.1a |
 | | El identificador de traza es el de la petición | 2.1a |
-| | La cadena de consulta no aparece en `instance` | 2.1a |
+| | La cadena de consulta no aparece en `instance` | 2.1a, 2.1c |
 | El `type` deriva del código estable | El mismo código produce el mismo `type` | 2.1a |
 | | Códigos distintos producen `type` distintos | 2.1a |
 | | La denegación por falta de credencial es uniforme | 2.1b |
@@ -599,7 +602,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | | `errors` es una extensión fuera del esquema del contrato | 2.4 |
 | Catálogo de mensajes en español de Honduras | Código sin entrada en el catálogo | 2.1a |
 | | Entrada sin código | 2.1a |
-| | Idioma fijo | 2.1a |
+| | Idioma fijo | 2.1a, 2.1c |
 | El identificador de petición lo genera el servidor | El cliente envía su propio identificador | 2.1c, 2.3 |
 | | Identificadores únicos bajo concurrencia | 2.3 |
 | | Respuesta de la cadena de seguridad con identificador | 2.1c |
@@ -788,3 +791,32 @@ fechadas anteriores y `apply-progress.md` conservan la numeración vieja. La dem
 barrera de denegación por omisión es `anyRequest().permitAll()` (nota fechada de `design.md`). Trazabilidad:
 166 escenarios, 166 con tarea, 0 huérfanos; los 33 que apuntaban a 2.1 apuntan ahora a una sola de 2.1a (14),
 2.1b (11) o 2.1c (8).
+
+## Nota fechada 2026-10-04: lo que la tarea 2.1b movió a 2.1c y una precisión sobre `denyAll()`
+
+El primer corte de 2.1b (dependencia, prohibiciones, cadenas, manejadores, arnés y todas las pruebas de la
+rama local) midió **977 líneas** efectivas (950 adiciones y 27 eliminaciones) frente al tope de 800. Sin
+recortar pruebas ni comentarios se movieron a 2.1c, que es quien ya prueba la cadena real con cabeceras, sesión e
+identificador, estas piezas (siguen completas en `wip/web-edge-security-chains-full`): en `AdminSecurityChainTest`
+los métodos `noResponseCreatesASessionOrSetsACookie`, `anErrorResponseCarriesTheBaseSecurityHeaders`,
+`aSuccessResponseCarriesTheSameBaseSecurityHeaders`, `theQueryStringNeverAppearsInTheInstance` y
+`theLanguageIsFixedWhateverAcceptLanguageSays`; del arnés, `SessionCounter` y `assertBaseSecurityHeaders`; y
+`PublicEndpointsTest` (prueba unitaria de la lista blanca). También se dejó fuera de 2.1b
+`theFirewallRejectionCarriesNoViolationList`: con el cuerpo de 2.1a no existe `errors`, así que la aserción no
+podía fallar por la causa que nombra; vuelve en 2.4, que introduce `errors`. Además `RequestContextFilter`, el
+trabajador, `PortalSecurityChainTest`, `/test/boom` y `startAsPortal` del arnés siguen siendo de 2.1c. Resultado
+de 2.1b: **791**.
+
+Trazabilidad: los escenarios de cabeceras (error y éxito), de la cadena de consulta en `instance` y del idioma
+fijo conservan su prueba unitaria de 2.1a y suman 2.1c para la prueba por la cadena real (filas actualizadas
+arriba); «Ninguna respuesta crea sesión» ya era de 2.1c. Los escenarios «Documentación de API con perfil `prod`» y
+«con perfil `local`» siguen en 2.1b: los prueban `OpenApiExposureByProfileTest` (procesos reales, `401` con
+Problem Details y documento `200`) y `AdminSecurityChainTest` (sin springdoc); la prueba unitaria de
+`PublicEndpoints` llega con 2.1c. Ningún escenario queda huérfano: 166 escenarios, 166 con tarea.
+
+Precisión sobre `anyRequest().denyAll()` (complementa la nota fechada de `design.md`): quitar la línea no rompe
+`AdminSecurityChainTest` porque el arnés siempre tiene una ruta pública, pero **sí rompe el arranque** de los
+procesos reales cuando la lista blanca está vacía (perfil `prod` o desconocido): sin ninguna regla Spring Security
+lanza `IllegalStateException: At least one mapping is required`, y `OpenApiExposureByProfileTest` falla con
+`BeanCreation Error creating bean with name 'adminSecurityFilterChain'`. La regla final es, pues, obligatoria para
+la lista vacía y no solo explícita.
