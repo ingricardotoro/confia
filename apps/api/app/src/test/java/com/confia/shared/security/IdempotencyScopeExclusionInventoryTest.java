@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,13 +40,29 @@ import org.junit.jupiter.api.Test;
 class IdempotencyScopeExclusionInventoryTest {
 
     /**
-     * (a) No production class in a {@code ..web..} package depends on {@code
-     * com.confia.shared.security}, and no production class carries the {@code Idempotency-Key}
-     * header literal — both true today only because no production {@code web} layer exists yet
-     * (brecha con destino: cambio 7).
+     * The only types of {@code com.confia.shared.security} that a class in a {@code ..web..} package
+     * may depend on, by full class name. Add the next one here (2.3c adds {@code RequestOrigin}).
+     */
+    private static final Set<String> WEB_MAY_DEPEND_ON_SHARED_SECURITY = Set.of(
+            "com.confia.shared.security.ClientAddress", "com.confia.shared.security.ClientKey");
+
+    /**
+     * (a) A production class in a {@code ..web..} package may depend on {@code
+     * com.confia.shared.security} only through {@link #WEB_MAY_DEPEND_ON_SHARED_SECURITY}, and no
+     * production class carries the {@code Idempotency-Key} header literal — both true today only
+     * because no production idempotent endpoint exists yet (brecha con destino: cambio 7).
+     *
+     * <p>This used to forbid every dependency of a web class on the whole package, and was then
+     * narrowed to a denylist of idempotency names. A denylist by simple name misses a nested class
+     * (whose simple name drops the outer one) and any idempotency class added under another name,
+     * and let the web layer reach {@code TransactionRunner} and {@code SecurityContext} unnoticed.
+     * It is now an allowlist by full class name: the request filter of web-edge-foundations needs the
+     * address types and nothing else, and every other type of the package, including every
+     * idempotency type and every nested one, is rejected until a change names it here. The web edge
+     * of idempotency itself is PR 13, which retires this check.
      */
     @Test
-    void noWebPackageClassDependsOnSharedSecurityAndNoProductionClassMentionsTheHeaderLiteral()
+    void noWebPackageClassDependsOnSharedSecurityBeyondTheAllowlistAndNoClassMentionsTheHeaderLiteral()
             throws IOException {
         JavaClasses classes = assertNonEmptyProductionClasses();
 
@@ -54,12 +71,15 @@ class IdempotencyScopeExclusionInventoryTest {
                 continue;
             }
             for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
-                assertThat(dependency.getTargetClass().getPackageName())
-                        .as("%s resides in a web package and must not depend on "
-                                        + "com.confia.shared.security — no controller exists yet "
+                JavaClass target = dependency.getTargetClass();
+                boolean outsideTheAllowlist = target.getPackageName().equals("com.confia.shared.security")
+                        && !WEB_MAY_DEPEND_ON_SHARED_SECURITY.contains(target.getName());
+                assertThat(outsideTheAllowlist)
+                        .as("%s resides in a web package and depends on %s, which is not one of %s "
                                         + "(brecha con destino: cambio 7)",
-                                javaClass.getFullName())
-                        .doesNotStartWith("com.confia.shared.security");
+                                javaClass.getFullName(), target.getFullName(),
+                                WEB_MAY_DEPEND_ON_SHARED_SECURITY)
+                        .isFalse();
             }
         }
 

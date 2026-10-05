@@ -15,10 +15,10 @@
 
 | Campo | Valor |
 |---|---|
-| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 4 670 nominales** en 14 PR (el PR 3 original, medido en 2 000 líneas, se partió en tres, y el PR 6, medido en 1 111, en dos; ver las notas fechadas del final); peor caso con el factor histórico 1,5, unas 7 000 |
+| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 11 000 a 12 700** en 17 PR según el re-pronóstico del 2026-10-05 (nota fechada del final): 6 822 ya medidas (siete PR fusionados y la tarea 2.3, medida en 1 869 y partida en cuatro) más 4 200 a 5 900 estimadas para las tareas restantes. La estimación nominal original, de 4 670, subestimó las pruebas; no se recorta ninguna |
 | Riesgo frente al presupuesto | **Alto** frente a 400 de la preflight; **medio por PR** frente al presupuesto del proyecto de 800 (nominal de 320 a 520 por PR, peor caso de 480 a 780) |
 | Chained PRs recommended | Yes |
-| Suggested split | 14 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3 a 2.5, 3.1, 3.2, 4.1 y 5.1), más la tarea de cierre 6.1 |
+| Suggested split | 17 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a, 2.3b, 2.3c, 2.3d, 2.4, 2.5, 3.1, 3.2, 4.1 y 5.1), más la tarea de cierre 6.1 |
 | Delivery strategy | `auto-chain` (decidido por el propietario el 2026-10-04, en lugar del `single-pr` de la preflight de la sesión) |
 | Chain strategy | `stacked-to-main`: cada PR se fusiona a `main` en orden y el siguiente parte de `main` actualizado |
 | Presupuesto del proyecto por pull request (`docs/15-flujo-de-trabajo-git.md` §3) | 800 líneas de cambio efectivo |
@@ -38,15 +38,15 @@ decisión prevalece y es la que este documento registra.
 contaba y llega a unas 4 670 nominales. No se recorta con trucos de formato, ni se omiten pruebas,
 comentarios o documentación, ni se parte un PR de forma artificial.
 
-**Tareas.** 15 en total (14 de PR más 1 de cierre), en el máximo de 15 del proyecto; el propietario concedió además una excepción al tope (nota fechada del final), que con este conteo no se ejerce. La tarea 2.1 original
+**Tareas.** 18 en total (17 de PR más 1 de cierre). El máximo del proyecto es 15; el propietario concedió una excepción al tope (notas fechadas del final) y esta partición la ejerce: la tarea 2.3 midió 1 869 líneas y se partió en 2.3a, 2.3b, 2.3c y 2.3d. La tarea 2.1 original
 se partió en 2.1a, 2.1b y 2.1c por decisión del propietario (nota fechada del final). Las costuras restantes
 de la sección 8 del diseño (PR 5b, 8b y 10b del diseño) **no** son tareas reservadas. Si la medición de un
 PR supera 800 líneas, el ejecutor se detiene y consulta al orquestador antes de partir: usar otra costura
-llevaría el total a 15 como máximo con una sola, y cualquier costura exige primero replantear esta lista.
+llevaría el total por encima de lo planeado, y cualquier costura exige primero replantear esta lista y la decisión del propietario.
 
-**Orden.** Lineal de 1 a 13, con el PR 6 partido en 6a y 6b (la numeración de PR es la de las tareas 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a y 2.2b, 2.3,
+**Orden.** Lineal de 1 a 13, con el PR 6 partido en 6a y 6b y el PR 7 en 7a a 7d (la numeración de PR es la de las tareas 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a a 2.3d,
 2.4, 2.5, 3.1, 3.2, 4.1 y 5.1). Dependencias duras: el PR 2.1b necesita el 2.1a (`ProblemResponses`,
-filtros); el PR 7 (2.3) necesita el 3 (`RequestContextFilter`); el PR 8 (2.4) necesita el 3 (`ProblemCode`,
+filtros); el PR 7c (2.3c) necesita el 3 (`RequestContextFilter`) y el 7b; el 7d necesita el 7c; el PR 8 (2.4) necesita el 3 (`ProblemCode`,
 `ProblemResponses`); el PR 11 (3.2) necesita los PR 7 y 10; el PR 12 (4.1) necesita el 11
 (`CapacityExceededException`); el PR 13 (5.1) necesita el 8. La propuesta permite fusionar el PR 13 antes
 que los PR 10 a 12 (C3 no depende de C2); no se hace salvo decisión del propietario, porque renumeraría la
@@ -93,14 +93,17 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | 5 | Portal y trabajador sin borde de seguridad, cabeceras, sesión e identificador en la cadena real (2.1c) | PR 5 `portal-and-worker-chain` (~700 → 800) | Ídem con `-Dtest='PortalSecurityChainTest,RequestContextFilterTest,AdminSecurityChainTest,StatelessChainTest,PublicEndpointsTest,ProcessBeanIsolationTest'` | Portal por `ConfiaApplication.launch` y arnés con el filtro de contexto | Solo pruebas y las exclusiones del trabajador |
 | 6a | Problem Details y cabeceras base para lo que rechaza Tomcat, código `method-not-allowed` y prueba del acoplamiento de springdoc (2.2a) | PR 6a `container-rejections` (~395 medido) | `-Dtest='ContainerRejectionsTest,ProblemErrorReportValveTest,ProblemCodeTest,ProductionEdgeDefaultsTest,ProblemCatalogCoverageTest,ProcessBeanIsolationTest'` | Procesos administrativo y portal reales por `ConfiaApplication.launch` con su configuración de producción | Se retira la válvula y su personalizador, el código `method-not-allowed` y el método estático de cabeceras |
 | 6b | Lista blanca cerrada, mapa de rutas del portal, ninguna ruta de producción y guardia de registros (2.2b) | PR 6b `edge-gates` (~716 medido) | Ídem con `-Dtest='PublicRouteAllowListTest,PortalRouteMapSnapshotTest,SensitiveDataLoggingTest'` | Enumeración de rutas del contexto real y petición anónima a cada una | Solo pruebas, instantánea y guardia de registros |
-| 7 | IP del cliente por proxies de confianza, agente de usuario, `RequestOrigin` y decorador de auditoría (2.3) | PR 7 `request-origin` (~500 → 750) | Unidad: `-Dtest='CidrBlock*,ClientAddress*,WebEdgePropertiesTest,RequestContextFilterTest'`; IT: `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=RequestOriginAuditIT -Dfailsafe.failIfNoSpecifiedTests=false` | `RequestOriginAuditIT` con PostgreSQL (Testcontainers) y 50 peticiones concurrentes | El decorador se retira: la auditoría vuelve a `null` |
+| 7a | Direcciones de cliente (`ClientAddress`, `ClientKey`) y rangos CIDR (2.3a) | PR 7a `client-address` (513 en el árbol completo) | `-Dtest='CidrBlock*,ClientAddress*,IdempotencyScopeExclusionInventoryTest'` | jqwik contra referencias con `BigInteger`; sin proceso | Se retiran las tres clases y sus dos pruebas |
+| 7b | Resolución de la IP del cliente por proxies de confianza y propiedad `confia.web.trusted-proxies` (2.3b) | PR 7b `trusted-proxy-resolution` (592 medido) | `-Dtest='ClientAddressResolverTest,WebEdgePropertiesTest'` | Resolvedor con ejemplos y propiedades; `Binder` con `SystemEnvironmentPropertySource` | Se retiran las tres clases, las dos claves de `application.yml` y la nota de `docs/05` |
+| 7c | Identificador, agente de usuario y `RequestOrigin` ligado a la petición (2.3c) | PR 7c `request-origin-filter` (381 en el árbol completo) | `-Dtest='RequestContextFilter*,PublicRouteAllowListTest'` | Arnés sin base de datos con 100 peticiones simultáneas y un socket crudo sin `User-Agent` | Se retiran `RequestOrigin` y los cambios del filtro |
+| 7d | Origen de la petición en la bitácora (2.3d) | PR 7d `audit-origin` (383 medido) | Unidad: `-Dtest='RequestOriginAuditLogWriterTest,ProcessBeanIsolationTest'`; IT: `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=RequestOriginAuditIT -Dfailsafe.failIfNoSpecifiedTests=false` | `RequestOriginAuditIT` con PostgreSQL (Testcontainers) y 50 peticiones concurrentes | El decorador se retira: la auditoría vuelve a `null` |
 | 8 | Traductor de Problem Details completo (2.4) | PR 8 `problem-translator` (~380 → 570) | Ídem con `-Dtest='ProblemTranslationTest,ProblemCatalogCoverageTest'` | Controladores de prueba que lanzan cada excepción por la cadena real | Errores de MVC vuelven al formato de Spring |
 | 9 | Reglas W1, W2a, W2b y W3 con fixtures, `SessionValidity` e inventario de ausencias (2.5) | PR 9 `web-rules` (~380 → 570) | Ídem con `-Dtest='WebLayerDependencyRulesTest,WebExposedTypesRuleTest,SharedBoundaryRulesTest,EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest,WebEdgeScopeExclusionInventoryTest'` | Mitad de fixture rechazada con fragmentos que nombran la violación (ADR-0018) | Solo pruebas y un puerto sin uso |
 | 10 | Puerto y adaptador en memoria del limitador (3.1) | PR 10 `rate-limiter-core` (~500 → 750) | Ídem con `-Dtest='InMemoryRateLimiter*'` | jqwik contra un modelo ingenuo y 50 hilos en el mismo `InMemoryRateLimiter` | Clases nuevas sin consumidor |
 | 11 | Borde del limitador: `@RateLimited`, `429` y `503` (3.2) | PR 11 `rate-limiter-edge` (~320 → 480) | Ídem con `-Dtest='RateLimitEdgeTest,ProcessBeanIsolationTest'` | Petición por la cadena real a un controlador de prueba anotado | Se retira el interceptor y la configuración |
 | 12 | Materializador del retardo, hilos virtuales, tiempos de Tomcat y regla W4 (4.1) | PR 12 `delay-materializer` (~460 → 690) | Unidad: `-Dtest='RequiredDelayMaterializer*Test,BlockingWaitConfinementTest'`; IT: `-Dit.test=RequiredDelayMaterializerIT` | `RequiredDelayMaterializerIT` bajo Tomcat real con base de datos | Se retira el materializador y `spring.threads.virtual.enabled` vuelve a su omisión |
 | 13 | Borde HTTP de la idempotencia, controlador solo de prueba y regla W5 (5.1) | PR 13 `idempotency-edge` (~480 → 720) | `-Dtest='IdempotencyNotInIdentityTest,OpenApiContractSnapshotTest'`; IT: `-Dit.test=IdempotencyEdgeIT` | `IdempotencyEdgeIT` con `IdempotencyDemoController` y PostgreSQL | Se retira el borde; `IdempotentExecutor` queda intacto |
-| 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 14 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
+| 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 17 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
 
 ---
 
@@ -370,39 +373,76 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     contienen cabeceras…» y «Ausencia de autenticación por credencial…» (ninguna ruta de producción);
     requisito de `build-integrity` «Instantánea aprobada del mapa de rutas del portal»
 
-- [ ] 2.3 **PR 7 `request-origin`: IP, agente de usuario y origen en la auditoría (decisiones 11 a 13).**
-  - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/security/`:
-    `CidrBlockProperties.java` (jqwik contra una referencia con `BigInteger`),
-    `ClientAddressProperties.java` (mismo /64 equivale a la misma clave, IPv4 completa, mapeada igual a
-    IPv4, un nombre de host se trata como inválido y nunca se resuelve por DNS) y
-    `ClientAddressResolverTest.java` (los ocho escenarios de la especificación como ejemplos más la
-    propiedad «con origen no confiable el resultado es siempre `remote`»); en
-    `.../shared/web/request/`: `WebEdgePropertiesTest.java` (ausente, CIDR, inválida con mensaje que
-    nombra `confia.web.trusted-proxies[i]`, variable de entorno `CONFIA_WEB_TRUSTEDPROXIES` con
-    `SystemEnvironmentPropertySource` y `Binder`, y la aserción de `server.forward-headers-strategy:
-    none`) y ampliar `RequestContextFilterTest.java` (agente de usuario ausente y en el límite, 100
-    peticiones concurrentes con `CyclicBarrier` dan 100 identificadores); en
-    `apps/api/app/src/test/java/com/confia/shared/audit/RequestOriginAuditIT.java` (arnés con base de
-    datos: el asiento durante una petición lleva IP y agente, fuera de petición ambos `null`, 50
-    peticiones concurrentes sin cruces). **Rojo esperado:** clases inexistentes y `source_ip` nulo.
-  - **VERDE.** Crear `apps/api/app/src/main/java/com/confia/shared/security/{ClientAddress,RequestOrigin}.java`,
-    `.../shared/web/request/{CidrBlock,TrustedProxies,ClientAddressResolver,WebEdgeProperties}.java`,
-    ampliar `RequestContextFilter.java` (agente truncado a `confia.web.user-agent-max-length`, con los
-    caracteres de control sustituidos, y `ScopedValue.where(RequestOrigin.CURRENT, origin)`), crear
-    `.../shared/audit/RequestOriginAuditLogWriter.java` (decorador: un valor explícito del llamador
-    gana) y envolver el escritor en `SharedPlatformConfiguration.java`. `application.yml`:
-    `server.forward-headers-strategy: none` y `confia.web.user-agent-max-length`. Ningún archivo
+- [x] 2.3a **PR 7a `client-address`: direcciones de cliente y rangos CIDR (decisiones 12 y 15, la parte de tipos).**
+  - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/security/`
+    `ClientAddressPropertiesTest.java` (jqwik con una referencia con `BigInteger`: mismo /64 equivale a la
+    misma clave, IPv4 completa, mapeada igual a IPv4, zona ignorada, texto canónico, y un nombre de host, una
+    forma abreviada o con corchetes se rechaza y nunca se resuelve por DNS) y, en `.../shared/web/request/`,
+    `CidrBlockPropertiesTest.java` (jqwik contra una referencia con `BigInteger`, ejemplos de rango y entradas
+    inválidas). Se llaman `*PropertiesTest` porque Surefire solo ejecuta `*Test`. **Rojo esperado:** clases
+    inexistentes (error de compilación).
+  - **VERDE.** Crear `apps/api/app/src/main/java/com/confia/shared/security/{ClientAddress,ClientKey}.java` y
+    `.../shared/web/request/CidrBlock.java` (privada al paquete). `ClientAddress.parseLiteral` exige cuatro partes
+    decimales sin ceros a la izquierda para IPv4 y rechaza los corchetes, y solo entonces delega en
+    `InetAddress.ofLiteral`, que no resuelve nombres. `IdempotencyScopeExclusionInventoryTest` (a) pasa a una lista de permitidos por nombre
+    completo (`ClientAddress` y `ClientKey`) en lugar de prohibir todo `shared.security`: `CidrBlock`, una clase `web`, depende ya de `ClientAddress` y la prueba
+    fallaba (la brecha «con destino: cambio 7»).
+  - **Demostración deliberada.** Hacer que `CidrBlock.contains` ignore los bits parciales del último byte, o que
+    `rateLimitKey` use los 16 bytes de una IPv6, rompe la propiedad respectiva; se revierte.
+  - **Cierre.** `./mvnw verify` completo. Commit: `feat(web): parse client addresses and CIDR ranges without
+    resolving names`. — Requisito de `web-edge` «Las direcciones IPv6 se agrupan por /64»
+
+- [ ] 2.3b **PR 7b `trusted-proxy-resolution`: resolución de la IP del cliente y propiedad de proxies de confianza
+  (decisión 12).**
+  - **ROJO.** Crear en `.../shared/web/request/` `ClientAddressResolverTest.java` (los ocho escenarios de la
+    especificación como ejemplos, los límites de 32 entradas y 1 024 caracteres, la propiedad «con origen no
+    confiable el resultado es siempre `remote`» y una propiedad con una referencia de aritmética entera para el
+    origen confiable) y `WebEdgePropertiesTest.java` (ausente, CIDR, inválida con mensaje que nombra
+    `confia.web.trusted-proxies[i]`, variable de entorno `CONFIA_WEB_TRUSTEDPROXIES` con
+    `SystemEnvironmentPropertySource` y `Binder`, ningún archivo de configuración del repositorio fija una lista y
+    `server.forward-headers-strategy: none`). **Rojo esperado:** clases inexistentes.
+  - **VERDE.** Crear `.../shared/web/request/{TrustedProxies,ClientAddressResolver,WebEdgeProperties}.java`.
+    `application.yml`: `server.forward-headers-strategy: none` y `confia.web.user-agent-max-length`. Ningún archivo
     del repositorio fija un valor de `confia.web.trusted-proxies`. Nota fechada en
     `docs/05-infraestructura-y-despliegue.md` con `CONFIA_WEB_TRUSTEDPROXIES` (vacía por omisión).
-  - **Demostraciones deliberadas.** Hacer que el resolvedor confíe siempre en `X-Forwarded-For` rompe
-    la propiedad de origen no confiable; quitar la envoltura del escritor rompe `RequestOriginAuditIT`;
-    se revierten.
-  - **Cierre.** `./mvnw verify` completo (la IT corre con Failsafe y Docker). Commits:
-    `feat(web): resolve the client address only through trusted proxies` y
-    `feat(audit): record the request origin on audit entries`. — Requisitos de `web-edge` «El
-    identificador de petición lo genera el servidor», «La IP del cliente se obtiene solo a través de
-    proxies de confianza», «La lista de proxies de confianza…», «El agente de usuario…», «El origen de
-    la petición llega a la bitácora…» y «Las direcciones IPv6 se agrupan por /64»
+  - **Demostración deliberada.** Hacer que el resolvedor confíe siempre en `X-Forwarded-For` rompe la propiedad de
+    origen no confiable; se revierte.
+  - **Cierre.** `./mvnw verify` completo. Commit: `feat(web): resolve the client address only through trusted
+    proxies`. — Requisitos de `web-edge` «La IP del cliente se obtiene solo a través de proxies de confianza» y
+    «La lista de proxies de confianza es una propiedad por entorno, vacía por defecto»
+
+- [ ] 2.3c **PR 7c `request-origin-filter`: identificador, agente de usuario y origen ligado a la petición
+  (decisión 11).**
+  - **ROJO.** Ampliar `RequestContextFilterTest.java` (origen con el identificador del servidor y la dirección de
+    la conexión, cabecera ignorada sin proxies y obedecida con ellos, agente ausente y en el límite, 100 peticiones
+    concurrentes con `CyclicBarrier` que dan 100 identificadores, direcciones y agentes propios) y
+    `RequestContextFilterUnitTest.java` (origen ligado solo durante la cadena, caracteres de control sustituidos,
+    corte sin partir un par sustituto, dirección desconocida), el arnés (`/test/origin`, propiedades por línea de
+    comandos) y las dos pruebas existentes que dependen de él. **Rojo esperado:** `RequestOrigin` inexistente.
+  - **VERDE.** Crear `shared/security/RequestOrigin.java`; ampliar `RequestContextFilter.java` (agente truncado a
+    `confia.web.user-agent-max-length`, con los caracteres de control sustituidos, y
+    `ScopedValue.where(RequestOrigin.CURRENT, origin)`) y `WebEdgeConfiguration.java` (`@EnableConfigurationProperties`).
+    `PublicRouteAllowListTest` pasa a esperar la ruta del arnés, y se añade `RequestOrigin` a la lista de permitidos de
+    `IdempotencyScopeExclusionInventoryTest` (una sola línea).
+  - **Demostración deliberada.** Reutilizar un valor global en lugar de `ScopedValue`, o no sustituir los
+    caracteres de control, rompe las pruebas respectivas; se revierte.
+  - **Cierre.** `./mvnw verify` completo. Commit: `feat(web): bind the request origin for the whole request`. —
+    Requisitos de `web-edge` «El identificador de petición lo genera el servidor» y «El agente de usuario se
+    captura acotado»
+
+- [ ] 2.3d **PR 7d `audit-origin`: origen de la petición en la bitácora (decisión 13).**
+  - **ROJO.** Crear `.../shared/audit/RequestOriginAuditLogWriterTest.java` (completa solo lo nulo, un valor del
+    llamador gana, fuera de una petición el asiento pasa intacto) y `RequestOriginAuditIT.java` (arnés con base de
+    datos: el asiento durante una petición lleva IP y agente, fuera de petición ambos `null`, 50 peticiones
+    concurrentes con `CyclicBarrier` sin cruces). **Rojos esperados:** clase inexistente, después `source_ip`
+    nulo y, con la envoltura sin la línea de política, `not in the allow-list` nombrando `com.confia.shared.audit`.
+  - **VERDE.** Crear `.../shared/audit/RequestOriginAuditLogWriter.java` (decorador), envolver el escritor en
+    `SharedPlatformConfiguration.java`, añadir `com.confia.shared.audit` a la lista de administración de
+    `ProcessBeanPolicy` (la línea que el PR 1 difirió) y ajustar el Javadoc de `AuditEntry`.
+  - **Demostración deliberada.** Quitar la envoltura del escritor rompe `RequestOriginAuditIT`; se revierte.
+  - **Cierre.** `./mvnw verify` completo (la IT corre con Failsafe y Docker). Commit: `feat(audit): record the
+    request origin on audit entries`. — Requisito de `web-edge` «El origen de la petición llega a la bitácora de
+    auditoría»
 
 - [ ] 2.4 **PR 8 `problem-translator`: traductor completo de Problem Details (decisiones 8 a 10).**
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/problem/ProblemTranslationTest.java`
@@ -593,7 +633,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 
 ## Fase 6: cierre
 
-- [ ] 6.1 **Verificación completa, medición de los 14 PR y barrido de trazabilidad.** Con los 14 PR
+- [ ] 6.1 **Verificación completa, medición de los 17 PR y barrido de trazabilidad.** Con los 17 PR
   fusionados a `main`, ejecutar `./mvnw verify` completo en `apps/api` y registrar cobertura (global
   80 %, núcleo y `domain` 95 %) y mutación (umbral 80). Registrar en
   `openspec/changes/web-edge-foundations/apply-progress.md` la medición de cada PR con
@@ -651,26 +691,26 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | Catálogo de mensajes en español de Honduras | Código sin entrada en el catálogo | 2.1a |
 | | Entrada sin código | 2.1a |
 | | Idioma fijo | 2.1a, 2.1c |
-| El identificador de petición lo genera el servidor | El cliente envía su propio identificador | 2.1c, 2.3 |
-| | Identificadores únicos bajo concurrencia | 2.3 |
+| El identificador de petición lo genera el servidor | El cliente envía su propio identificador | 2.1c, 2.3c |
+| | Identificadores únicos bajo concurrencia | 2.3c |
 | | Respuesta de la cadena de seguridad con identificador | 2.1c |
-| La IP del cliente solo por proxies de confianza | Lista vacía, cabecera ignorada | 2.3 |
-| | Origen no confiable, cabecera ignorada | 2.3 |
-| | Origen confiable, cadena de dos proxies | 2.3 |
-| | Un cliente intenta anteponer una IP falsa | 2.3 |
-| | Todas las entradas son proxies de confianza | 2.3 |
-| | Entrada no válida en la cabecera | 2.3 |
-| | Varias líneas de la cabecera | 2.3 |
-| | IPv6 mapeada a IPv4 | 2.3 |
-| Lista de proxies de confianza por entorno | Propiedad ausente | 2.3 |
-| | Rango CIDR de entrada | 2.3 |
-| | Entrada inválida | 2.3 |
-| | Inyección por variable de entorno | 2.3 |
-| El agente de usuario se captura acotado | Cabecera ausente | 2.3 |
-| | Longitud en el límite | 2.3 |
-| El origen llega a la bitácora de auditoría | Asiento durante una petición | 2.3 |
-| | Asiento fuera de una petición | 2.3 |
-| | Peticiones concurrentes con orígenes distintos | 2.3 |
+| La IP del cliente solo por proxies de confianza | Lista vacía, cabecera ignorada | 2.3b |
+| | Origen no confiable, cabecera ignorada | 2.3b |
+| | Origen confiable, cadena de dos proxies | 2.3b |
+| | Un cliente intenta anteponer una IP falsa | 2.3b |
+| | Todas las entradas son proxies de confianza | 2.3b |
+| | Entrada no válida en la cabecera | 2.3b |
+| | Varias líneas de la cabecera | 2.3b |
+| | IPv6 mapeada a IPv4 | 2.3b |
+| Lista de proxies de confianza por entorno | Propiedad ausente | 2.3b |
+| | Rango CIDR de entrada | 2.3b |
+| | Entrada inválida | 2.3b |
+| | Inyección por variable de entorno | 2.3b |
+| El agente de usuario se captura acotado | Cabecera ausente | 2.3c |
+| | Longitud en el límite | 2.3c |
+| El origen llega a la bitácora de auditoría | Asiento durante una petición | 2.3d |
+| | Asiento fuera de una petición | 2.3d |
+| | Peticiones concurrentes con orígenes distintos | 2.3d |
 | Los registros no contienen cabeceras ni cuerpos | Petición con datos sensibles | 2.2b |
 | | Control negativo | 2.2b |
 | El puerto `RateLimiter` cuenta peticiones y fallos | Las dimensiones no se mezclan | 3.1 |
@@ -688,10 +728,10 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | | Tope de una hora | 3.1 |
 | | Diez minutos sin fallos terminan la restricción antes del tope | 3.1 |
 | | La restricción no se levanta mientras la IP sigue fallando | 3.1 |
-| Las direcciones IPv6 se agrupan por /64 | Dos direcciones del mismo /64 | 2.3 |
-| | Direcciones de /64 contiguos | 2.3 |
-| | IPv4 sin agrupar | 2.3 |
-| | IPv6 mapeada a IPv4 | 2.3 |
+| Las direcciones IPv6 se agrupan por /64 | Dos direcciones del mismo /64 | 2.3a |
+| | Direcciones de /64 contiguos | 2.3a |
+| | IPv4 sin agrupar | 2.3a |
+| | IPv6 mapeada a IPv4 | 2.3a |
 | La tabla acotada falla cerrada al llenarse | Límite exacto de la tabla | 3.1 |
 | | Tabla llena, IP con entrada vigente | 3.1 |
 | | Una entrada vencida libera espacio | 3.1 |
@@ -915,3 +955,57 @@ máximo de 15; la excepción concedida no se ejerce con este conteo. Trazabilida
 rutas de producción y la instantánea) apuntan ahora a 2.2b, y 2.2a suma cobertura a cuatro filas que ya tenían
 tarea (documentación con `prod` y con `local`, cabeceras en respuesta de error, y el estado de cada código). Las
 notas fechadas anteriores y `apply-progress.md` conservan los nombres viejos.
+
+## Nota fechada 2026-10-05: la tarea 2.3 se parte en 2.3a, 2.3b, 2.3c y 2.3d
+
+El propietario aprobó partir la tarea 2.3 (PR 7 `request-origin`) en cuatro porque la tarea, implementada y verificada
+completa (`./mvnw verify`: Surefire 186 + 712, Failsafe 228), midió **1 869 líneas efectivas** (1 831 adiciones y 38
+eliminaciones, igual con y sin `-M`, sin `openspec/`) frente al tope de 800 y a un pronóstico de unas 500. El
+propietario concedió además una **excepción al tope de 15 tareas**: el cambio pasa a **18 tareas** (17 de PR más la de
+cierre 6.1) y **17 PR**. El árbol completo y verificado se conserva en la rama **local** `wip/web-edge-request-origin-full`
+(commit `9e8b52f`, 31 archivos), que nunca se publica y es la fuente de las cuatro partes.
+
+| Parte | Contenido | Líneas medidas en el árbol completo |
+|---|---|---|
+| 2.3a `client-address` | `ClientAddress`, `ClientKey`, `CidrBlock`, `ClientAddressPropertiesTest`, `CidrBlockPropertiesTest`, ajuste de `IdempotencyScopeExclusionInventoryTest` | 513 |
+| 2.3b `trusted-proxy-resolution` | `TrustedProxies`, `ClientAddressResolver`, `WebEdgeProperties`, `ClientAddressResolverTest`, `WebEdgePropertiesTest`, `application.yml`, nota de `docs/05` | 592 |
+| 2.3c `request-origin-filter` | `RequestOrigin`, `RequestContextFilter`, `WebEdgeConfiguration`, ampliación del arnés y de las dos pruebas del filtro, ajuste de `PublicRouteAllowListTest` | 381 |
+| 2.3d `audit-origin` | `RequestOriginAuditLogWriter`, línea de `ProcessBeanPolicy`, envoltura en `SharedPlatformConfiguration`, Javadoc de `AuditEntry`, `RequestOriginAuditIT`, prueba del decorador | 383 |
+
+Numeración: los PR se llaman 7a a 7d y **los PR 8 a 13 conservan su número**. Orden: 2.3a, 2.3b, 2.3c y 2.3d, cada una
+desde `main` actualizado tras fusionar la anterior. Dependencias: 2.3b necesita 2.3a (`ClientAddress`, `CidrBlock`);
+2.3c necesita 2.3b (`WebEdgeProperties`) y el filtro de 2.1c; 2.3d necesita 2.3c (`RequestOrigin`). Cada parte debe
+estar en verde por sí sola: las pruebas de 2.3c que dependen del arnés ampliado, y el ajuste de `PublicRouteAllowListTest` viajan en 2.3c; el de
+`IdempotencyScopeExclusionInventoryTest` viaja en 2.3a, porque `CidrBlock` ya depende de `shared.security` (hallado al
+verificar 2.3a: la prueba falló y se movió). Trazabilidad: 166 escenarios, 166 con tarea, 0 huérfanos; los 23 que apuntaban a 2.3 apuntan ahora a
+una sola parte (2.3a: cuatro de IPv6 y /64; 2.3b: doce de resolución y de propiedad; 2.3c: cuatro, del identificador y
+del agente de usuario; 2.3d: tres, de la bitácora).
+
+## Nota fechada 2026-10-05: re-pronóstico de las tareas restantes
+
+Las mediciones reales superaron el pronóstico en cada tarea con arneses y pruebas de concurrencia o de propiedades, y el
+exceso está casi todo en pruebas:
+
+| Tarea | Pronóstico nominal | Medido |
+|---|---|---|
+| 2.1 (completa, antes de partirse) | ~520 | 2 000 |
+| 2.2 (completa, antes de partirse) | ~420 | 1 111 |
+| 2.3 (completa, antes de partirse) | ~500 | 1 869 (1 302 de pruebas, 531 de producción) |
+
+La proporción histórica es de 2,2 a 3,7 veces el nominal en esas tres. Estimación honesta de lo que queda, con la
+proporción de pruebas observada (más de 2 de cada 3 líneas) y sin pre-partir ninguna: **el propietario decide por tarea**
+cuando se mida.
+
+| Tarea | Nominal | Nueva estimación | ¿Probable partición? |
+|---|---|---|---|
+| 2.4 `problem-translator` | ~380 | 700 a 1 000 | Sí: diez escenarios por la cadena real, el traductor, los dos códigos y el catálogo; costura natural entre el traductor y la prueba por la cadena |
+| 2.5 `web-rules` | ~380 | 700 a 1 000 | Sí: cuatro reglas de ArchUnit con sus fixtures y el inventario de ausencias; costura entre W1 y W3, y W2a, W2b y el inventario |
+| 3.1 `rate-limiter-core` | ~500 | 800 a 1 100 | Sí: puerto, política, adaptador acotado, jqwik contra un modelo ingenuo y 50 hilos; costura entre el adaptador y las pruebas de concurrencia |
+| 3.2 `rate-limiter-edge` | ~320 | 500 a 700 | No, salvo que el interceptor y las políticas pidan más arneses |
+| 4.1 `delay-materializer` | ~460 | 800 a 1 100 | Sí: materializador, hilos virtuales, tiempos de Tomcat, W4 y una IT bajo Tomcat real |
+| 5.1 `idempotency-edge` | ~480 | 700 a 1 000 | Probable: interceptor, controlador de prueba, W5 y una IT con base de datos |
+| 6.1 cierre | ~0 | 0 a 50 | No: verificación, medición y notas; código solo si algo se corrige |
+
+Total restante: de 4 200 a 5 900 líneas en seis tareas de PR, frente a las 2 520 nominales. Con las 6 822 líneas ya medidas
+el cambio completo queda entre 11 000 y 12 700 líneas. Cada PR sigue con el tope de 800: la medición antes de abrir el
+PR decide, y una tarea que lo supere se detiene antes de confirmar, como en 2.1, 2.2 y 2.3.

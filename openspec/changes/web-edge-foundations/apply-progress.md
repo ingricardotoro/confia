@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-04 (tarea 2.2b; 2.1a, 2.1b, 2.1c, 2.2a y 2.2b hechas)
+- **Última actualización:** 2026-10-05 (tarea 2.3a; 2.1a a 2.2b y 2.3a hechas; 2.3 partida en cuatro)
 
 ## Estado de las tareas
 
@@ -16,7 +16,9 @@
 | 2.1c | PR 5 `portal-and-worker-chain` | Hecha | `7cf71ee` y el commit `docs(sdd)` de esta rama |
 | 2.2a | PR 6a `container-rejections` | Hecha | `d9d015b` y el commit `docs(sdd)` de esta rama |
 | 2.2b | PR 6b `edge-gates` | Hecha | `c469734`, `8a2eb2e` y el commit `docs(sdd)` de esta rama |
-| 2.3 a 6.1 | PR 7 a 13 y cierre | Pendientes | |
+| 2.3a | PR 7a `client-address` | Hecha | `525cfee`, `c16f129` y los commits `docs(sdd)` de esta rama |
+| 2.3b a 2.3d | PR 7b a 7d | Pendientes (la tarea 2.3 completa está verificada en la rama local `wip/web-edge-request-origin-full`, commit `9e8b52f`) | |
+| 2.4 a 6.1 | PR 8 a 13 y cierre | Pendientes | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
 
@@ -698,3 +700,92 @@ guardia sigue en la lista de filtros de Logback tras el arranque (hoy solo se af
 Con la corrección de la revisión, el PR 6b mide 902 líneas efectivas (901 adiciones y 1 eliminación) frente al
 presupuesto de 800. El propietario aprobó una **excepción de tamaño de unas 102 líneas** para entregarlo en un solo PR,
 como el PR 5. No se recortaron pruebas ni comentarios.
+
+## Partición de la tarea 2.3 (decisión del propietario, 2026-10-05)
+
+La tarea 2.3 original (PR 7 `request-origin`) se implementó y verificó completa (Surefire 186 + 712, Failsafe 228,
+`BUILD SUCCESS`) y midió **1 869 líneas** efectivas (1 831 adiciones y 38 eliminaciones, igual con y sin `-M`) frente al
+tope de 800 y a un pronóstico de unas 500. El propietario aprobó partirla en 2.3a, 2.3b, 2.3c y 2.3d y concedió una
+excepción al tope de 15 tareas (ahora 18 tareas y 17 PR). El árbol completo y verificado está en la rama **local**
+`wip/web-edge-request-origin-full` (commit `9e8b52f`, 31 archivos), que nunca se publica y es la fuente de las cuatro
+partes. Evidencia del árbol completo, válida para 2.3b a 2.3d:
+
+- ROJO 1 de compilación (clases inexistentes); ROJO 2 `Tests run: 123, Failures: 11, Errors: 2` (`ScopedValue.orElse(null)`
+  lanza `NullPointerException` en JDK 25: `RequestOrigin.current()` usa `isBound()`); ROJO 3 `Failures: 1` (las propiedades
+  por omisión pierden contra `application.yml`: el arnés las pasa por línea de comandos); VERDE `Tests run: 123, Failures: 0`.
+- Decorador: `Tests run: 5, Failures: 0`; IT en rojo con `expected: "203.0.113.9" but was: null`; línea de política en rojo
+  con `process 'admin': bean 'auditLogWriter' from package 'com.confia.shared.audit' - not in the allow-list`; verde
+  `Tests run: 22, Failures: 0` y la IT `Tests run: 3, Failures: 0`.
+- Rupturas: el resolvedor que confía siempre en `X-Forwarded-For` dio `Tests run: 60, Failures: 7` (propiedad:
+  `Expecting actual: Optional[ClientAddress[address=/10.0.0.0]] to contain: ClientAddress[address=/11.7.7.7]`); quitar la
+  envoltura del escritor dio `RequestOriginAuditIT` `Failures: 2` (`expected: "203.0.113.9" but was: null`).
+- Desviaciones del árbol completo (notas fechadas en `design.md`): `ofLiteral` acepta `1`, `127.1`, `1.2.3`, `010.0.0.1` y
+  `[::1]`; `ClientKey` nuevo; pruebas `*PropertiesTest`; `Optional` y `clientAddress` nulo; rango sobre IPv6 mapeada rechazado.
+
+## Tarea 2.3a: PR 7a `client-address`
+
+Rama `change/web-edge-foundations-request-origin`, desde `main` en `9d6e5f5`. El código sale de la rama local
+`wip/web-edge-request-origin-full` (sin tocarla; sigue en `9e8b52f`).
+
+### Evidencia del ciclo TDD (reobservada sobre este árbol)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO | `-Dtest='CidrBlock*,ClientAddress*'` con las dos pruebas y sin producción | `COMPILATION ERROR`: 102 errores `cannot find symbol` (`ClientAddress`, `CidrBlock`). Causa prevista. |
+| VERDE | Igual, con `ClientAddress`, `ClientKey` y `CidrBlock` | `Tests run: 53, Failures: 0, Errors: 0, Skipped: 0`: `ClientAddressPropertiesTest` 28 (+4 de jqwik) y `CidrBlockPropertiesTest` 18 (+3). |
+| Primer cierre | `./mvnw verify` | Surefire 186 + 651 con `Failures: 1`: `IdempotencyScopeExclusionInventoryTest.noWebPackageClassDependsOnSharedSecurityAndNoProductionClassMentionsTheHeaderLiteral`: `com.confia.shared.web.request.CidrBlock resides in a web package and must not depend on com.confia.shared.security ... (brecha con destino: cambio 7)`. |
+| Cierre | `./mvnw verify` completo tras mover a esta parte el ajuste de esa prueba (nombra los tipos de idempotencia en lugar de todo `shared.security`) | Surefire 186 + 651 (los 598 de la línea base más 53 nuevos), Failsafe 225, `BUILD SUCCESS`. Instantánea OpenAPI y `routes` sin cambios (`git status` limpio). |
+
+### Demostraciones deliberadas (cada una revertida; `cmp` sin diferencias)
+
+| Ruptura | Resultado |
+|---|---|
+| `ClientAddress.rateLimitKey` usa los 16 bytes de una IPv6 en lugar de 8 | `ClientAddressPropertiesTest` `Tests run: 28, Failures: 1` y `Tests run: 4, Failures: 1`: `expected: ClientKey[20010db800010002ffffffffffffffff] but was: ClientKey[20010db8000100020000000000000001]`. |
+| `CidrBlock.contains` ignora los bits parciales del último byte (`int mask = 0xFF`) | `CidrBlockPropertiesTest` `Tests run: 3, Failures: 2` (las dos propiedades de `BigInteger`, IPv4 e IPv6): `expected: true but was: false`; los 18 ejemplos pasan, así que solo las propiedades la detectan. |
+
+### Prueba que necesitó una parte posterior
+
+`IdempotencyScopeExclusionInventoryTest` (a) prohibía toda dependencia de una clase `web` hacia `shared.security`. Estaba
+planificada en 2.3c (con el filtro), pero `CidrBlock` es una clase `web` y ya depende de `ClientAddress`: se movió a 2.3a.
+`tasks.md` lo refleja (2.3a 513 líneas, 2.3c 381).
+
+### Desviaciones del diseño (declaradas)
+
+Las de la nota fechada de `design.md` (2026-10-05) que atañen a esta parte: `parseLiteral` más estricto que `ofLiteral`, `ClientKey`
+nuevo, `*PropertiesTest` y rango sobre IPv6 mapeada rechazado. Ninguna otra.
+
+### Medición del PR 7a (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 502 | 11 | **513** |
+| Con `-M` | 502 | 11 | **513** |
+
+Dentro del tope de 800. Tareas: 18 en total; hechas 8 (1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a).
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='CidrBlock*,ClientAddress*,IdempotencyScopeExclusionInventoryTest'`; cierre por `./mvnw verify`: Surefire 186 + 651, Failsafe 225 |
+| Arnés de ejecución | N/A: tipos puros sin frontera de ejecución; jqwik contra referencias independientes con `BigInteger` |
+| Frontera de reversión | Se retiran `ClientAddress`, `ClientKey`, `CidrBlock`, sus dos pruebas y el ajuste de `IdempotencyScopeExclusionInventoryTest` |
+
+### Revisión independiente de 2.3a y corrección (2026-10-05)
+
+Veredicto: sin bloqueantes, dos hallazgos importantes. Una sola corrección, en el commit `fix(web)` (`c16f129`).
+
+| Hallazgo | Cambio | Evidencia observada |
+|---|---|---|
+| I-1: un IPv4 incrustado en IPv6 eludía la regla de ceros a la izquierda (`::ffff:010.0.0.1`, `::ffff:1.2.3.04`, `::ffff:00.0.0.1`, `::1.2.3.04`) | `parseLiteral`: con `:` y `.`, la cola tras el último `:` debe cumplir la regla estricta de cuatro partes decimales | ROJO: `ClientAddressPropertiesTest` `Tests run: 40, Failures: 5` (casos 25, 26, 28, 29 y el de zona): `Expecting code to raise a throwable.` (`::ffff:1.2.3` ya lo rechazaba el JDK). Ruptura (quitar la comprobación de la cola, `return true`): `Tests run: 36, Failures: 4`, casos 25, 26, 28 y 29 con `Expecting code to raise a throwable.`. Revertida (`cmp`). |
+| I-2: la comprobación (a) de `IdempotencyScopeExclusionInventoryTest` era una lista negra por nombre simple (no veía clases anidadas ni `TransactionRunner`/`SecurityContext`) | Lista de permitidos por nombre completo, `WEB_MAY_DEPEND_ON_SHARED_SECURITY` = `ClientAddress` y `ClientKey`; 2.3c solo añade `RequestOrigin`. El literal `Idempotency-Key` sigue igual. Javadoc explicado | Ruptura: clase temporal `com.confia.shared.web.request.TempLeak` que referencia `IdempotentOutcome.Executed`: `com.confia.shared.web.request.TempLeak resides in a web package and depends on com.confia.shared.security.IdempotentOutcome$Executed, which is not one of [com.confia.shared.security.ClientKey, com.confia.shared.security.ClientAddress] (brecha con destino: cambio 7)`; con `TransactionRunner`: `... depends on com.confia.shared.security.TransactionRunner, which is not one of [...]`. Clase retirada. |
+| S-1: rechazar `%` | `parseLiteral` rechaza toda zona; la prueba de zona ignorada pasa a rechazo (`fe80::1%1`, `fe80::1%eth0`, `1.2.3.4%1`) | Dentro del ROJO de I-1 |
+| S-4 | `everyTextualFormOfOneAddressGivesTheSameKeyAndTheSameAddress`: comprimida, mayúsculas, expandida, `::ffff:a.b.c.d`, `::ffff:0102:0304` y `0:0:0:0:0:ffff:102:304` | Verde desde el principio (documenta el comportamiento) |
+| S-5 | La propiedad del /64 compara con los bytes **generados** (`new BigInteger(1, prefix)`) | `Tests run: 36` en verde |
+
+Cierre: `./mvnw verify` completo: Surefire 186 + 659 (651 más 8), Failsafe 225, `BUILD SUCCESS`. Medición del PR 7a tras la corrección
+(`git diff --numstat main...HEAD -- . ':!openspec'`, igual con y sin `-M`): 531 adiciones, 10 eliminaciones, **541** en total (tope 800).
+
+**Seguimientos, no implementados:** **S-2** `CidrBlock` enmascara en silencio los bits de host (`10.0.0.5/8` se acepta): decidir en 2.3b,
+dueña de la propiedad, si la lista de proxies de confianza debe rechazarlo. **S-3** las direcciones NAT64 y las IPv4-compatibles
+(`::a.b.c.d`) comparten un único cubo /64 en `rateLimitKey`: decidir en 3.1, dueña del limitador.
