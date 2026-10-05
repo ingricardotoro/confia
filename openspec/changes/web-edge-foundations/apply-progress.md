@@ -1145,7 +1145,7 @@ La nota de `docs/ui-ux/04-patrones-de-interaccion.md` §9 sí se tomó tal cual 
 | VERDE | Traductores reales (campo y restricción, nombre del parámetro por su enlace, ruta sin el nombre del método) y `spring-boot-starter-validation` en `app/pom.xml`; más `ProblemCodeTest`, `ProblemErrorReportValveTest`, `PublicRouteAllowListTest`, `OpenApi*Test` y `ProcessBeanIsolationTest` | `Tests run: 150, Failures: 0, Errors: 0, Skipped: 0` (el `BUILD FAILURE` es la cobertura de JaCoCo con `-Dtest=` acotado). |
 | Cierre | `./mvnw verify` completo | Surefire 186 + 818 (los 797 de la línea base más 21 nuevos), Failsafe 229, `BUILD SUCCESS`. Instantánea OpenAPI y `routes` **sin cambios** (`git status` limpio de ellos). |
 
-Pruebas añadidas: 21 (`ProblemResponsesTest` +10 casos: dos métodos y uno parametrizado de ocho; `ProblemTranslationTest` +9; `ProblemExceptionHandlerTest` +3 métodos que hacen 13 con
+Pruebas añadidas: 21 (`ProblemResponsesTest` +10 casos: dos métodos y uno parametrizado de ocho; `ProblemTranslationTest` +8 (cinco métodos y uno parametrizado de tres); `ProblemExceptionHandlerTest` +3 métodos que hacen 13 con
 los de 2.4a). Sin nuevo `PublicRouteAllowListTest`: ya identifica las fugas por el prefijo `/test/`, así que las dos rutas nuevas del arnés no necesitan editarlo.
 
 ### Demostraciones deliberadas (cada una revertida; `cmp` contra la copia original sin diferencias)
