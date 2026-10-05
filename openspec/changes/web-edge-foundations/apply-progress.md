@@ -948,7 +948,10 @@ simultáneas con `CyclicBarrier`).
 
 ### Cadena de hash y ausencia de esperas
 
-`source_ip` forma parte de la carga firmada (el disparador `BEFORE INSERT` lo incorpora al hash tras la inserción); `user_agent` no. El
+`source_ip` y `user_agent` forman parte de la carga firmada: el disparador `BEFORE INSERT` los incluye en el hash
+(`V3__chain_shared_audit_log.sql`, líneas 113 y 114), igual que `CanonicalAuditRowSerializer` (líneas 68 y 69), como exige
+`openspec/specs/audit-trail/spec.md`. Corrección del orquestador (2026-10-05): la primera versión de esta nota decía que
+`user_agent` no estaba firmado, lo cual era falso. El
 decorador solo rellena campos antes de la inserción, así que el disparador firma el valor definitivo. La IT llama a `DefaultAuditChainVerifier`
 sobre cada institución tras escribir y exige `Intact` con exactamente 1 fila (durante petición, fuera de petición, ejecutor común) y 50 filas
 (simultáneas). Ninguna prueba lee filas escritas por un hilo del servidor tras la respuesta: la ruta ejecuta el `TransactionRunner` hasta el
