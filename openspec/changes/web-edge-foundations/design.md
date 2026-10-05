@@ -1231,3 +1231,40 @@ Estado final, sin matices:
 Además, `PublicRouteAllowListTest` falla en cualquier perfil si existe una entrada `(functional router)`, que el
 anonimato no puede alcanzar: sus rutas deben enumerarse antes de permitirse. El texto anterior de este documento no se
 reescribe.
+
+### Nota fechada 2026-10-05: lo que la tarea 2.3 hizo distinto de lo previsto (decisiones 11, 12 y 13, PR 7)
+
+Observaciones de la aplicación de la tarea 2.3, antes de partirla (ver la nota de `tasks.md`):
+
+- **`InetAddress.ofLiteral` no basta como único punto de entrada.** Se comprobó con el JDK 25: acepta `1`
+  (`0.0.0.1`), `127.1`, `1.2.3` (`1.2.0.3`), `010.0.0.1` (decimal, `10.0.0.1`) y `[::1]`. La decisión 12 exige que
+  `[ipv6]` e `ip:puerto` sean entradas inválidas, y las formas abreviadas tienen más de una lectura según el
+  analizador. `ClientAddress.parseLiteral` exige cuatro partes decimales sin ceros a la izquierda para IPv4 y rechaza
+  los corchetes en IPv6, y solo entonces delega en `ofLiteral`. Un nombre sigue sin resolverse nunca: la prueba usa
+  `localhost`, que resuelve en cualquier máquina, y exige que se rechace.
+- **`ClientKey`.** La interfaz de la decisión 6 devuelve un `ClientKey` que ninguna tarea creaba. Es una clase final
+  de `shared.security` con los bytes copiados, `equals` y `hashCode` por contenido. Lo consumirá el limitador (3.x).
+- **Visibilidad.** `CidrBlock`, `TrustedProxies` y `ClientAddressResolver` son privados al paquete (la tabla de la
+  decisión 1 los marca «No (interno)»); por eso sus pruebas viven en `com.confia.shared.web.request` y no en
+  `shared.security` como decía la tarea. `RequestContextFilter` recibe `WebEdgeProperties` (público, enlazado por
+  constructor) y construye el resolvedor por dentro; `WebEdgeConfiguration` habilita las propiedades.
+- **IP desconocida.** El resolvedor devuelve `Optional` y `RequestOrigin.clientAddress` puede ser `null`: si el
+  contenedor no entrega una dirección remota que sea un literal IP, el origen queda sin dirección y el asiento escribe
+  `source_ip` nulo en lugar de fallar la petición. No ocurre en una conexión TCP.
+- **Rango sobre una IPv6 mapeada.** `CidrBlock` rechaza `::ffff:a.b.c.d/p` (el prefijo sería ambiguo entre las dos
+  formas); una dirección mapeada sin prefijo se normaliza a su IPv4.
+- **`ScopedValue` en JDK 25.** `ScopedValue.orElse(null)` lanza `NullPointerException`; `RequestOrigin.current()` usa
+  `isBound()`. `Carrier.call` declara `throws Exception`, así que el filtro vuelve a lanzar las tres excepciones
+  que la cadena puede lanzar y envuelve cualquier otra.
+- **Agente de usuario.** El corte no deja la primera mitad de un par sustituto, y todo carácter de control ISO
+  (también `DEL` y los de C1) pasa a espacio. Tomcat rechaza los caracteres de control en una cabecera real, así que la
+  sustitución se prueba sin contenedor.
+- **`com.confia.shared.audit` entra en la lista de permitidos de administración** en este PR, como anunciaba la nota del
+  PR 1: el primer bean de ese paquete es el decorador. La no vacuidad la sostiene `auditLogWriter`.
+- **Pruebas de jqwik.** Los archivos se llaman `*PropertiesTest`: Surefire solo ejecuta `*Test`, `Test*`, `*Tests` y
+  `*TestCase`, y una clase `*Properties` no se ejecutaría en silencio.
+- **Brecha de las pruebas anteriores.** `IdempotencyScopeExclusionInventoryTest` prohibía toda dependencia de una clase
+  `web` hacia `shared.security` («brecha con destino: cambio 7»); el filtro depende ahora de `ClientAddress` y
+  `RequestOrigin`. La comprobación nombra lo que siempre buscó: ninguna clase `web` depende de los tipos de
+  idempotencia (`Idempot*` y `RequestPayloadHasher`). El PR 13 la retira. El texto anterior de este documento no se
+  reescribe.
