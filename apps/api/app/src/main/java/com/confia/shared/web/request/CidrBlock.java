@@ -29,6 +29,20 @@ final class CidrBlock {
      *     prefix that fits its family; the message never repeats the entry
      */
     static CidrBlock parse(String entry) {
+        return parse(entry, false);
+    }
+
+    /**
+     * Like {@link #parse}, and also rejects an address with a bit set beyond the prefix, which
+     * {@code parse} would clear in silence ({@code 10.0.0.5/8} would become {@code 10.0.0.0/8}). For
+     * a list that decides whom to believe, the wider range is a configuration risk, not a
+     * convenience. The message never repeats the entry.
+     */
+    static CidrBlock parseWithoutHostBits(String entry) {
+        return parse(entry, true);
+    }
+
+    private static CidrBlock parse(String entry, boolean rejectHostBits) {
         int slash = entry.indexOf('/');
         String addressText = slash < 0 ? entry : entry.substring(0, slash);
         ClientAddress address = ClientAddress.parseLiteral(addressText);
@@ -48,7 +62,12 @@ final class CidrBlock {
             throw new IllegalArgumentException(
                     "write a range over an IPv4-mapped address in its IPv4 form");
         }
-        return new CidrBlock(masked(bytes, bits), bits);
+        byte[] network = masked(bytes, bits);
+        if (rejectHostBits && !Arrays.equals(network, bytes)) {
+            throw new IllegalArgumentException(
+                    "the address has host bits set beyond the prefix; write the network address");
+        }
+        return new CidrBlock(network, bits);
     }
 
     boolean contains(ClientAddress candidate) {

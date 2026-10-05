@@ -1,6 +1,22 @@
 # Default configuration for the three real entry points (admin, portal, worker). Flyway never runs
 # here: migrating is a separate concern of the "migrate" profile
 # (docs/05-infraestructura-y-despliegue.md; application-migrate.yml).
+server:
+  # Never let the container rewrite the remote address from X-Forwarded-For on its own. Without
+  # this line Spring Boot switches the native strategy on when it detects a cloud platform (for
+  # example Kubernetes) and Tomcat then trusts its own private ranges, which would defeat the
+  # trusted-proxy list that RequestContextFilter applies (web-edge-foundations design.md, decision
+  # 12).
+  forward-headers-strategy: none
+
+confia:
+  web:
+    # How many characters of the User-Agent header the request origin keeps. The list of trusted
+    # proxies is deliberately not set in any file of the repository: it is empty unless the
+    # environment sets it (CONFIA_WEB_TRUSTEDPROXIES), so by default no client can choose its own
+    # address.
+    user-agent-max-length: 512
+
 spring:
   mvc:
     # Never log request parameters or headers at DEBUG (web-edge-foundations design.md, decision
