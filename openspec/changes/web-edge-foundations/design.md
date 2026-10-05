@@ -1109,3 +1109,16 @@ mensaje de arranque contenga el valor, así que el mensaje de un valor mal forma
 causa no se encadena; el resto de su comportamiento no cambia. Segunda: el pepper se lee con la misma
 regla que la llave maestra de la decisión 2, sin encadenar la causa de `Argon2Pepper.fromBase64`. El
 texto anterior de este documento no se reescribe.
+
+### Nota fechada 2026-10-04: la regla final `denyAll()` y el lugar de las pruebas del portal (decisiones 4 y 5, PR 3)
+
+Dos precisiones surgidas al aplicar la tarea 2.1. Primera: la decisión 5 y la tarea 2.1 afirman que quitar
+`anyRequest().denyAll()` pone en rojo `AdminSecurityChainTest`. No es cierto en Spring Security 7.1.1: sin
+esa regla, una petición que no coincide con ninguna entrada de la lista **sigue denegada**, porque
+`RequestMatcherDelegatingAuthorizationManager` deniega por omisión cuando ninguna regla coincide. Se
+comprobó: sin la línea, `AdminSecurityChainTest` pasa 24 de 24. La regla se conserva como última regla
+explícita (documenta la intención y no depende de un valor por omisión que una versión futura podría
+cambiar), y la demostración deliberada pasa a ser la que sí rompe una prueba: sustituirla por
+`anyRequest().permitAll()` da 21 fallos de 24. Segunda: `PortalSecurityChainTest` vive en
+`com.confia.bootstrap` y no en `com.confia.shared.web`, porque `ConfiaApplication.launch` y
+`OpenApiProcess` son privados al paquete (ADR-0024). El texto anterior de este documento no se reescribe.

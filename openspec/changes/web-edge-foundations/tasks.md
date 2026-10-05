@@ -15,10 +15,10 @@
 
 | Campo | Valor |
 |---|---|
-| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 4 670 nominales** en 11 PR; peor caso con el factor histórico 1,5, unas 7 000 |
+| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 4 670 nominales** en 13 PR (el PR 3 original, medido en 2 000 líneas, se partió en tres; ver la nota fechada del final); peor caso con el factor histórico 1,5, unas 7 000 |
 | Riesgo frente al presupuesto | **Alto** frente a 400 de la preflight; **medio por PR** frente al presupuesto del proyecto de 800 (nominal de 320 a 520 por PR, peor caso de 480 a 780) |
 | Chained PRs recommended | Yes |
-| Suggested split | 11 PR apilados contra `main` (uno por tarea 1.1 a 5.1), más la tarea de cierre 6.1 |
+| Suggested split | 13 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2 a 2.5, 3.1, 3.2, 4.1 y 5.1), más la tarea de cierre 6.1 |
 | Delivery strategy | `auto-chain` (decidido por el propietario el 2026-10-04, en lugar del `single-pr` de la preflight de la sesión) |
 | Chain strategy | `stacked-to-main`: cada PR se fusiona a `main` en orden y el siguiente parte de `main` actualizado |
 | Presupuesto del proyecto por pull request (`docs/15-flujo-de-trabajo-git.md` §3) | 800 líneas de cambio efectivo |
@@ -38,17 +38,19 @@ decisión prevalece y es la que este documento registra.
 contaba y llega a unas 4 670 nominales. No se recorta con trucos de formato, ni se omiten pruebas,
 comentarios o documentación, ni se parte un PR de forma artificial.
 
-**Tareas.** 12 en total (11 de PR más 1 de cierre), dentro del máximo de 15 del proyecto. Las cuatro
-costuras de la sección 8 del diseño (PR 3b, 5b, 8b y 10b) **no** son tareas reservadas. Si la medición
-de un PR supera 800 líneas, el ejecutor se detiene y consulta al orquestador antes de partir: usar las
-cuatro costuras llevaría el total a 16 y excedería el máximo, así que cualquier costura exige primero
-replantear esta lista.
+**Tareas.** 14 en total (13 de PR más 1 de cierre), dentro del máximo de 15 del proyecto. La tarea 2.1 original
+se partió en 2.1a, 2.1b y 2.1c por decisión del propietario (nota fechada del final). Las costuras restantes
+de la sección 8 del diseño (PR 5b, 8b y 10b del diseño) **no** son tareas reservadas. Si la medición de un
+PR supera 800 líneas, el ejecutor se detiene y consulta al orquestador antes de partir: usar otra costura
+llevaría el total a 15 como máximo con una sola, y cualquier costura exige primero replantear esta lista.
 
-**Orden.** Lineal de 1 a 11. Dependencias duras: el PR 5 necesita el 3 (`RequestContextFilter`); el
-PR 6 necesita el 3 (`ProblemCode`, `ProblemResponses`); el PR 9 necesita los 5 y 8; el PR 10 necesita
-el 9 (`CapacityExceededException`); el PR 11 necesita el 6. La propuesta permite fusionar el PR 11
-antes que los PR 8 a 10 (C3 no depende de C2); no se hace salvo decisión del propietario, porque
-renumeraría la cadena.
+**Orden.** Lineal de 1 a 13 (la numeración de PR es la de las tareas 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2, 2.3,
+2.4, 2.5, 3.1, 3.2, 4.1 y 5.1). Dependencias duras: el PR 2.1b necesita el 2.1a (`ProblemResponses`,
+filtros); el PR 7 (2.3) necesita el 3 (`RequestContextFilter`); el PR 8 (2.4) necesita el 3 (`ProblemCode`,
+`ProblemResponses`); el PR 11 (3.2) necesita los PR 7 y 10; el PR 12 (4.1) necesita el 11
+(`CapacityExceededException`); el PR 13 (5.1) necesita el 8. La propuesta permite fusionar el PR 13 antes
+que los PR 10 a 12 (C3 no depende de C2); no se hace salvo decisión del propietario, porque renumeraría la
+cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa la numeración nueva.
 
 ### Reglas comunes a todas las tareas
 
@@ -86,16 +88,18 @@ renumeraría la cadena.
 |---|---|---|---|---|---|
 | 1 | `DataSource`, `DSLContext`, `TransactionRunner`, `Clock`, adaptadores de `shared` y cifrado en administración, sin base de datos (tarea 1.1) | PR 1 `platform-wiring` (~380 → 570) | `./mvnw -pl app -am verify -DskipITs -Dsurefire.failIfNoSpecifiedTests=false -Dtest='AdminProductionWiringTest,ProcessBeanIsolationTest,ConfiaApplicationTest'` | `ConfiaApplication.launch` real de los tres procesos con una URL inalcanzable | Administración vuelve a excluir `DataSourceAutoConfiguration` |
 | 2 | Cinco casos de uso de identidad como beans y secretos que fallan al arrancar (1.2) | PR 2 `identity-beans` (~330 → 500) | Ídem con `-Dtest='AdminProductionWiringTest,IdentityConfigurationSecretsTest,ProcessBeanIsolationTest,IdentityScopeExclusionInventoryTest'` | Arranque real sin y con cada secreto | Se retira `IdentityConfiguration` y su `@Import` |
-| 3 | Spring Security como cadena, cadenas de administración y portal, cabeceras, id de petición, Problem Details base y catálogo (2.1) | PR 3 `security-chains` (~520 → 780) | Ídem con `-Dtest='AdminSecurityChainTest,PortalSecurityChainTest,ProblemCodeTest,ProblemCatalogCoverageTest,OpenApi*Test,ProcessBeanIsolationTest'` | Cadena real por HTTP (`RANDOM_PORT`) en el arnés sin base de datos y portal por `ConfiaApplication.launch` | Se retira la dependencia: el sistema vuelve a no tener borde |
-| 4 | Lista blanca cerrada, mapa de rutas del portal, ninguna ruta de producción y guardia de registros (2.2) | PR 4 `edge-gates` (~420 → 630) | Ídem con `-Dtest='PublicRouteAllowListTest,PortalRouteMapSnapshotTest,SensitiveDataLoggingTest'` | Enumeración de rutas del contexto real y petición anónima a cada una | Solo pruebas, instantánea y guardia de registros |
-| 5 | IP del cliente por proxies de confianza, agente de usuario, `RequestOrigin` y decorador de auditoría (2.3) | PR 5 `request-origin` (~500 → 750) | Unidad: `-Dtest='CidrBlock*,ClientAddress*,WebEdgePropertiesTest,RequestContextFilterTest'`; IT: `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=RequestOriginAuditIT -Dfailsafe.failIfNoSpecifiedTests=false` | `RequestOriginAuditIT` con PostgreSQL (Testcontainers) y 50 peticiones concurrentes | El decorador se retira: la auditoría vuelve a `null` |
-| 6 | Traductor de Problem Details completo (2.4) | PR 6 `problem-translator` (~380 → 570) | Ídem con `-Dtest='ProblemTranslationTest,ProblemCatalogCoverageTest'` | Controladores de prueba que lanzan cada excepción por la cadena real | Errores de MVC vuelven al formato de Spring |
-| 7 | Reglas W1, W2a, W2b y W3 con fixtures, `SessionValidity` e inventario de ausencias (2.5) | PR 7 `web-rules` (~380 → 570) | Ídem con `-Dtest='WebLayerDependencyRulesTest,WebExposedTypesRuleTest,SharedBoundaryRulesTest,EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest,WebEdgeScopeExclusionInventoryTest'` | Mitad de fixture rechazada con fragmentos que nombran la violación (ADR-0018) | Solo pruebas y un puerto sin uso |
-| 8 | Puerto y adaptador en memoria del limitador (3.1) | PR 8 `rate-limiter-core` (~500 → 750) | Ídem con `-Dtest='InMemoryRateLimiter*'` | jqwik contra un modelo ingenuo y 50 hilos en el mismo `InMemoryRateLimiter` | Clases nuevas sin consumidor |
-| 9 | Borde del limitador: `@RateLimited`, `429` y `503` (3.2) | PR 9 `rate-limiter-edge` (~320 → 480) | Ídem con `-Dtest='RateLimitEdgeTest,ProcessBeanIsolationTest'` | Petición por la cadena real a un controlador de prueba anotado | Se retira el interceptor y la configuración |
-| 10 | Materializador del retardo, hilos virtuales, tiempos de Tomcat y regla W4 (4.1) | PR 10 `delay-materializer` (~460 → 690) | Unidad: `-Dtest='RequiredDelayMaterializer*Test,BlockingWaitConfinementTest'`; IT: `-Dit.test=RequiredDelayMaterializerIT` | `RequiredDelayMaterializerIT` bajo Tomcat real con base de datos | Se retira el materializador y `spring.threads.virtual.enabled` vuelve a su omisión |
-| 11 | Borde HTTP de la idempotencia, controlador solo de prueba y regla W5 (5.1) | PR 11 `idempotency-edge` (~480 → 720) | `-Dtest='IdempotencyNotInIdentityTest,OpenApiContractSnapshotTest'`; IT: `-Dit.test=IdempotencyEdgeIT` | `IdempotencyEdgeIT` con `IdempotencyDemoController` y PostgreSQL | Se retira el borde; `IdempotentExecutor` queda intacto |
-| 12 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 11 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
+| 3 | Códigos y cuerpo de Problem Details, catálogo es-HN, cabeceras base e identificador de petición del servidor, sin Spring Security (2.1a) | PR 3 `problem-details-core` (~775 medido; 600 → 800) | Ídem con `-Dtest='ProblemCodeTest,ProblemCatalogCoverageTest,ProblemResponsesTest,SecurityHeadersFilterTest,WebEdgeFiltersInProcessesTest,ProcessBeanIsolationTest,OpenApi*Test'` | Filtros reales con `MockFilterChain` y los procesos administrativo y portal reales por `ConfiaApplication.launch` | Se retiran los dos `@Import`, `shared.web.{edge,problem,request}` y el catálogo |
+| 4 | Spring Security como cadena: dependencia y prohibiciones, `SecurityChains`, lista blanca, cadenas de administración y portal, manejadores y arnés sin base de datos (2.1b) | PR 4 `security-chains` (~600 → 800) | Ídem con `-Dtest='AdminSecurityChainTest,PublicEndpointsTest,OpenApi*Test,ProcessBeanIsolationTest'` | Cadena real por HTTP (`RANDOM_PORT`) en el arnés sin base de datos | Se retira la dependencia: el sistema vuelve a no tener borde de seguridad |
+| 5 | Portal y trabajador sin borde de seguridad, cabeceras, sesión e identificador en la cadena real (2.1c) | PR 5 `portal-and-worker-chain` (~700 → 800) | Ídem con `-Dtest='PortalSecurityChainTest,RequestContextFilterTest,RequestContextFilterChainTest,AdminSecurityHeadersAndSessionTest,ProcessBeanIsolationTest'` | Portal por `ConfiaApplication.launch` y arnés con el filtro de contexto | Solo pruebas y las exclusiones del trabajador |
+| 6 | Lista blanca cerrada, mapa de rutas del portal, ninguna ruta de producción y guardia de registros (2.2) | PR 6 `edge-gates` (~420 → 630) | Ídem con `-Dtest='PublicRouteAllowListTest,PortalRouteMapSnapshotTest,SensitiveDataLoggingTest'` | Enumeración de rutas del contexto real y petición anónima a cada una | Solo pruebas, instantánea y guardia de registros |
+| 7 | IP del cliente por proxies de confianza, agente de usuario, `RequestOrigin` y decorador de auditoría (2.3) | PR 7 `request-origin` (~500 → 750) | Unidad: `-Dtest='CidrBlock*,ClientAddress*,WebEdgePropertiesTest,RequestContextFilterTest'`; IT: `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=RequestOriginAuditIT -Dfailsafe.failIfNoSpecifiedTests=false` | `RequestOriginAuditIT` con PostgreSQL (Testcontainers) y 50 peticiones concurrentes | El decorador se retira: la auditoría vuelve a `null` |
+| 8 | Traductor de Problem Details completo (2.4) | PR 8 `problem-translator` (~380 → 570) | Ídem con `-Dtest='ProblemTranslationTest,ProblemCatalogCoverageTest'` | Controladores de prueba que lanzan cada excepción por la cadena real | Errores de MVC vuelven al formato de Spring |
+| 9 | Reglas W1, W2a, W2b y W3 con fixtures, `SessionValidity` e inventario de ausencias (2.5) | PR 9 `web-rules` (~380 → 570) | Ídem con `-Dtest='WebLayerDependencyRulesTest,WebExposedTypesRuleTest,SharedBoundaryRulesTest,EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest,WebEdgeScopeExclusionInventoryTest'` | Mitad de fixture rechazada con fragmentos que nombran la violación (ADR-0018) | Solo pruebas y un puerto sin uso |
+| 10 | Puerto y adaptador en memoria del limitador (3.1) | PR 10 `rate-limiter-core` (~500 → 750) | Ídem con `-Dtest='InMemoryRateLimiter*'` | jqwik contra un modelo ingenuo y 50 hilos en el mismo `InMemoryRateLimiter` | Clases nuevas sin consumidor |
+| 11 | Borde del limitador: `@RateLimited`, `429` y `503` (3.2) | PR 11 `rate-limiter-edge` (~320 → 480) | Ídem con `-Dtest='RateLimitEdgeTest,ProcessBeanIsolationTest'` | Petición por la cadena real a un controlador de prueba anotado | Se retira el interceptor y la configuración |
+| 12 | Materializador del retardo, hilos virtuales, tiempos de Tomcat y regla W4 (4.1) | PR 12 `delay-materializer` (~460 → 690) | Unidad: `-Dtest='RequiredDelayMaterializer*Test,BlockingWaitConfinementTest'`; IT: `-Dit.test=RequiredDelayMaterializerIT` | `RequiredDelayMaterializerIT` bajo Tomcat real con base de datos | Se retira el materializador y `spring.threads.virtual.enabled` vuelve a su omisión |
+| 13 | Borde HTTP de la idempotencia, controlador solo de prueba y regla W5 (5.1) | PR 13 `idempotency-edge` (~480 → 720) | `-Dtest='IdempotencyNotInIdentityTest,OpenApiContractSnapshotTest'`; IT: `-Dit.test=IdempotencyEdgeIT` | `IdempotencyEdgeIT` con `IdempotencyDemoController` y PostgreSQL | Se retira el borde; `IdempotentExecutor` queda intacto |
+| 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 13 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
 
 ---
 
@@ -177,59 +181,113 @@ renumeraría la cadena.
 
 ## Fase 2: borde de seguridad, origen y reglas
 
-- [ ] 2.1 **PR 3 `security-chains`: Spring Security como cadena de filtros (decisiones 4 a 8 y 10).**
+- [x] 2.1a **PR 3 `problem-details-core`: Problem Details, catálogo es-HN y cabeceras base, sin Spring Security (decisiones 7, 8 y 10, parte).**
+  - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/web/`: `ProblemCodeTest.java`
+    (códigos únicos y en kebab, estado por código, `type` determinista y distinto por código, código
+    desconocido o `null` vacío), `ProblemCatalogCoverageTest.java` (cada código con `title` y `detail`,
+    cada entrada con su código, ambos con control negativo sobre un catálogo alterado; no existen
+    `authentication-failed`, `token-invalid`, `token-expired`, `institution-not-found` ni
+    `institution-inactive`), `ProblemResponsesTest.java` (los cinco campos de RFC 9457 y `traceId`, `status`
+    igual al estado HTTP, `instance` sin cadena de consulta y recortado a 1 024, idioma fijo con
+    `Accept-Language: en-US`), `SecurityHeadersFilterTest.java` (las cinco cabeceras con sus valores en una
+    respuesta de éxito y en una de error, fijadas antes de que la cadena escriba, sin `X-Powered-By` ni
+    `Server`) y, en `apps/api/app/src/test/java/com/confia/bootstrap/`, `WebEdgeFiltersInProcessesTest.java`
+    (los procesos administrativo y portal reales, por `ConfiaApplication.launch` con el perfil `local`,
+    responden el documento OpenAPI con las cinco cabeceras). En `ProcessBeanPolicy.java` el trabajador
+    prohíbe `com.confia.shared.web` (sustituye al subpaquete `openapi`) conservando la frase «the worker
+    never serves the OpenAPI surface». **Rojos esperados:** error de compilación por clases inexistentes;
+    con el `@Import` y sin las líneas de política, `ProcessBeanIsolationTest` falla con `not in the
+    allow-list` nombrando `shared.web.edge`, `shared.web.request` y `shared.web.problem`.
+  - **VERDE.** Crear en `apps/api/app/src/main/java/com/confia/shared/web/problem/`: `ProblemCode` (solo
+    `validation-failed`, `authentication-required`, `forbidden` e `internal-error`), `ProblemBody` (sin
+    `errors`, que llega con el traductor en 2.4) y `ProblemResponses` (con la constante pública
+    `REQUEST_ID_ATTRIBUTE`, que el filtro de contexto de 2.1c escribe); en `.../shared/web/request/`:
+    `SecurityHeadersFilter` (primer filtro); en `.../shared/web/edge/`: `WebEdgeConfiguration`
+    (`problemMessageSource` con idioma fijo `es-HN`, `ProblemResponses` y el filtro de cabeceras) y
+    `package-info.java` con `@NamedInterface`; `apps/api/app/src/main/resources/i18n/problems.properties`.
+    `AdminApplication.java` y `PortalApplication.java` importan `WebEdgeConfiguration`;
+    `ProcessBeanPolicy.java`: administración y portal permiten `shared.web.edge`, `shared.web.request` y
+    `shared.web.problem` (cada línea primero en rojo sin el `@Import`). Sin la dependencia de seguridad.
+  - **Demostraciones deliberadas.** Quitar `Cache-Control` de `SecurityHeadersFilter` pone en rojo
+    `SecurityHeadersFilterTest` y `WebEdgeFiltersInProcessesTest`; se revierte.
+  - **Cierre.** Las 16 pruebas de OpenAPI en verde con la instantánea **sin cambios**,
+    `SpringModulithVerificationTest` en verde y `./mvnw verify` completo. Commit:
+    `feat(web): add base security headers, a server-generated request id and Problem Details` (el
+    identificador llega en 2.1c; el mensaje del commit conserva el texto previsto). — Requisitos de
+    `web-edge` de las cabeceras, de Problem Details (forma, `instance`, `traceId`), del `type`, del
+    catálogo de códigos y de mensajes; requisitos de `build-integrity` «Portal sin beans de otros puntos de
+    entrada ni administrativos» y «Trabajador sin beans de otros puntos de entrada» (lista de permitidos y
+    prohibidos del borde)
+
+- [ ] 2.1b **PR 4 `security-chains`: Spring Security como cadena de filtros (decisiones 4 y 5).**
   - **ROJO, en orden.** (a) Añadir de forma temporal `spring-boot-starter-oauth2-resource-server` y
     comprobar que `bannedDependencies` rompe `./mvnw verify`; registrar la salida una vez, como las
-    prohibiciones de ADR-0015 y ADR-0016. (b) Añadir el starter de seguridad sin cadena propia y
-    registrar que las 16 pruebas de OpenAPI (8 de `OpenApiContractSnapshotTest` y 8 de
-    `OpenApiExposureByProfileTest`) fallan, como observó la sonda P1. (c) Crear en
-    `apps/api/app/src/test/java/com/confia/shared/web/harness/` el arnés sin base de datos
-    (`RANDOM_PORT`, controladores de prueba, filtro de principal de prueba y una lista
-    `PublicEndpoints` con rutas añadidas solo por el arnés), y en
-    `apps/api/app/src/test/java/com/confia/shared/web/` las clases `AdminSecurityChainTest.java`,
-    `PortalSecurityChainTest.java` (por `ConfiaApplication.launch`), `ProblemCodeTest.java`,
-    `ProblemCatalogCoverageTest.java`, `RequestContextFilterTest.java` (identificador del servidor
-    ignora el del cliente y aparece en el `401`) y la aserción de tipos del trabajador en
-    `ProcessBeanIsolationTest.java` (cero beans de seguridad). Cambiar en
-    `OpenApiExposureByProfileTest.java` las cuatro aserciones negativas (`prod` y perfil inexistente)
-    de `404` a `401` con `application/problem+json` y `type` de `authentication-required`. **Rojos
-    esperados:** `AdminSecurityChainTest` responde `200`/`404` sin la cadena; `PortalSecurityChainTest`
-    responde `404`; las pruebas de catálogo fallan por clase y archivo inexistentes; el trabajador
-    recibe los 3 beans inertes de P1.
-  - **VERDE.** En `apps/api/app/pom.xml` el `spring-boot-starter-security`; en `apps/api/pom.xml` las
-    dos exclusiones de `bannedDependencies` con mensaje que cita el diseño. Crear en
-    `apps/api/app/src/main/java/com/confia/shared/web/edge/`: `WebEdgeConfiguration`,
-    `AdminSecurityConfiguration`, `PortalSecurityConfiguration`, `SecurityChains`
-    (`denyByDefault`, con `anyRequest().denyAll()` como última regla), `PublicEndpoints`,
-    `PublicEndpoint` y `package-info.java` con `@NamedInterface`; en `.../shared/web/request/`:
-    `SecurityHeadersFilter` (cinco cabeceras, primer filtro) y `RequestContextFilter` (UUID del
-    servidor en el atributo de petición y en el MDC, último recurso `500`); en `.../shared/web/problem/`:
-    `ProblemCode` (solo `authentication-required`, `forbidden`, `validation-failed` e
-    `internal-error`), `ProblemBody`, `FieldViolation`, `ProblemResponses`,
-    `ProblemAuthenticationEntryPoint`, `ProblemAccessDeniedHandler` y `ProblemRequestRejectedHandler`;
-    `apps/api/app/src/main/resources/i18n/problems.properties` y el bean `problemMessageSource` (idioma
-    fijo `es-HN`). Editar `AdminApplication.java` y `PortalApplication.java` (`@Import`, exclusiones de
-    `UserDetailsServiceAutoConfiguration` y `ErrorMvcAutoConfiguration`) y `WorkerApplication.java`
-    (exclusión de `SecurityAutoConfiguration` y `UserDetailsServiceAutoConfiguration`, por clase y con
-    el nombre calificado confirmado contra el jar). `application.yml`:
-    `spring.web.resources.add-mappings: false`. `ProcessBeanPolicy.java`: administración y portal
-    permiten `shared.web.edge`, `shared.web.request` y `shared.web.problem`; el trabajador prohíbe
-    `com.confia.shared.web` (sustituye al subpaquete `openapi`), `org.springframework.security` y
-    `org.springframework.boot.security`; cada línea primero en rojo sin `@Import`.
-  - **Demostraciones deliberadas.** Quitar `anyRequest().denyAll()` pone en rojo
-    `AdminSecurityChainTest` (una ruta fuera de la lista deja de dar `401`); quitar
-    `ProblemAuthenticationEntryPoint` hace fallar el cuerpo del `401`; ambas se revierten.
-  - **Cierre.** Las 16 pruebas de OpenAPI en verde (12 sin tocar su código y 4 con la aserción
-    corregida) y la instantánea **sin cambios**; si cambiara, el diseño es incorrecto y se investiga.
-    `./mvnw verify` completo. Commits: `build(api): add Spring Security as a filter chain and ban the
-    OAuth2 resource server`, `feat(web): deny every route by default in the admin and portal chains`
-    y `feat(web): add base security headers, a server-generated request id and Problem Details`.
-    — Requisitos de `web-edge` de la cadena administrativa, la lista blanca de documentación, la
-    ausencia de estado, las cabeceras, la cadena del portal, el trabajador sin borde, Problem Details,
-    `type`, catálogo y mensajes; requisitos de `build-integrity` «Spring Security se usa solo como
-    cadena de filtros…» y «El contexto del trabajador…»
+    prohibiciones de ADR-0015 y ADR-0016 (si la descarga falla por PKIX, probar la prohibición con
+    artefactos falsos de las coordenadas prohibidas en un repositorio de archivos temporal, sin tocar TLS ni
+    el almacén de confianza, y borrar de `~/.m2` cualquier copia). (b) Añadir el starter de seguridad sin cadena
+    propia y registrar que las 16 pruebas de OpenAPI fallan, como observó la sonda P1. (c) Crear en
+    `apps/api/app/src/test/java/com/confia/shared/web/harness/` el arnés sin base de datos (`RANDOM_PORT`,
+    controladores de prueba, filtro de principal de prueba y una lista `PublicEndpoints` con rutas añadidas
+    solo por el arnés) y, en `.../shared/web/`, `AdminSecurityChainTest.java` (ruta no registrada y registrada
+    fuera de la lista, respuesta indistinguible, `403` con principal, métodos sobre ruta pública `GET`,
+    variantes de la ruta, denegación uniforme, documentación sin springdoc) y `PublicEndpointsTest.java`.
+    Cambiar en `OpenApiExposureByProfileTest.java` las cuatro aserciones negativas (`prod` y perfil
+    inexistente) de `404` a `401` con `application/problem+json` y `type` de `authentication-required`.
+    **Rojos esperados:** `AdminSecurityChainTest` falla por clases inexistentes y, con el starter y sin cadena,
+    las respuestas no son Problem Details.
+  - **VERDE.** En `apps/api/app/pom.xml` el `spring-boot-starter-security`; en `apps/api/pom.xml` las dos
+    exclusiones de `bannedDependencies` con mensaje que cita el diseño. Crear en
+    `apps/api/app/src/main/java/com/confia/shared/web/edge/`: `AdminSecurityConfiguration`,
+    `PortalSecurityConfiguration`, `SecurityChains` (`denyByDefault`, con `anyRequest().denyAll()` como última
+    regla explícita), `PublicEndpoints` y `PublicEndpoint`; en `.../shared/web/problem/`:
+    `ProblemAuthenticationEntryPoint`, `ProblemAccessDeniedHandler` y `ProblemRequestRejectedHandler`
+    (registrado como bean en `WebEdgeConfiguration`). Editar `AdminApplication.java` y `PortalApplication.java`
+    (`@Import` de su cadena, exclusiones de `UserDetailsServiceAutoConfiguration` y `ErrorMvcAutoConfiguration`,
+    con los nombres calificados confirmados contra el jar) y `application.yml`
+    (`spring.web.resources.add-mappings: false`). Cada `@Import` primero en rojo sin su línea de política.
+  - **Demostraciones deliberadas.** Sustituir `anyRequest().denyAll()` por `anyRequest().permitAll()` pone en
+    rojo `AdminSecurityChainTest` (una ruta fuera de la lista deja de dar `401`); quitar
+    `ProblemAuthenticationEntryPoint` hace fallar el estado y el cuerpo del `401`; ambas se revierten. Quitar la
+    línea de `denyAll()` sin más no pone nada en rojo (Spring Security 7 deniega por omisión; nota fechada de
+    `design.md`).
+  - **Cierre.** Las 16 pruebas de OpenAPI en verde (12 sin tocar su código y 4 con la aserción corregida) y la
+    instantánea **sin cambios**; si cambiara, el diseño es incorrecto y se investiga. `./mvnw verify` completo.
+    Commits: `feat(web): deny every route by default in the admin and portal chains` y
+    `build(api): ban the OAuth2 resource server so Spring Security stays a filter chain`. — Requisitos de
+    `web-edge` de la cadena administrativa (los seis escenarios), la documentación `prod` y `local` del
+    proceso administrativo y la denegación uniforme; requisitos de `build-integrity` «Spring Security se usa solo
+    como cadena de filtros…». Si la medición supera 800, se mueven pruebas y arnés a 2.1c antes del commit.
 
-- [ ] 2.2 **PR 4 `edge-gates`: lista blanca cerrada, mapa de rutas y registros sin secretos
+- [ ] 2.1c **PR 5 `portal-and-worker-chain`: portal, trabajador y la cadena real con cabeceras, sesión e identificador (decisiones 4, 5, 7 y 11).**
+  - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/RequestContextFilterTest.java` (con
+    `MockFilterChain`: identificador UUID del servidor que ignora `X-Request-Id` y `traceparent`, distinto en
+    cada petición, atributo y MDC visibles dentro de la cadena y retirados al terminar, último recurso `500
+    internal-error` sin el mensaje ni la clase, relanza si la respuesta ya está confirmada, orden
+    `HIGHEST_PRECEDENCE + 10`), `apps/api/app/src/test/java/com/confia/bootstrap/PortalSecurityChainTest.java` (por
+    `ConfiaApplication.launch`: toda ruta con todo método responde `401` con `application/problem+json` y las
+    cabeceras base; con `local` solo abre el documento; una ruta añadida al contexto del portal sigue
+    denegada), `RequestContextFilterChainTest.java` en `.../shared/web/` (el `traceId` de la respuesta de la
+    cadena es el del servidor; el cliente no lo elige; el del último recurso coincide con el visto por el
+    controlador) y `AdminSecurityHeadersAndSessionTest.java` (cabeceras base en error y éxito, ninguna sesión
+    ni `Set-Cookie`, `instance` sin consulta e idioma fijo por la cadena real); ampliar `OpenApiProcess.java`
+    (`start(String)` y `send`) y la aserción de tipos del trabajador en `ProcessBeanIsolationTest.java` (cero
+    `SecurityFilterChain`, cero filtros, cero beans de `org.springframework.security`). **Rojos esperados:** el
+    trabajador recibe los 3 beans inertes de P1.
+  - **VERDE.** Crear `apps/api/app/src/main/java/com/confia/shared/web/request/RequestContextFilter.java`
+    (UUID del servidor en el atributo `ProblemResponses.REQUEST_ID_ATTRIBUTE` y en el MDC, último recurso
+    `500`; orden `HIGHEST_PRECEDENCE + 10`) y su bean `serverRequestContextFilter` en `WebEdgeConfiguration.java`
+    (el nombre evita chocar con `requestContextFilter` de Spring). Editar `WorkerApplication.java` (exclusión de `SecurityAutoConfiguration` y
+    `UserDetailsServiceAutoConfiguration`, por clase) y `ProcessBeanPolicy.java` (el trabajador prohíbe
+    `org.springframework.security` y `org.springframework.boot.security`); cada línea primero en rojo.
+  - **Demostraciones deliberadas.** Hacer que `RequestContextFilter` reutilice el `X-Request-Id` del cliente
+    pone en rojo `RequestContextFilterTest`; quitar `ProblemAuthenticationEntryPoint` de la cadena hace fallar
+    `PortalSecurityChainTest` y `RequestContextFilterChainTest`; ambas se revierten.
+  - **Cierre.** `./mvnw verify` completo. Commit:
+    `test(web): prove the portal and worker have no open route or security bean`. — Requisitos de `web-edge`
+    de la cadena del portal, el trabajador sin borde, la ausencia de estado, la respuesta de la cadena con
+    identificador y el idioma; requisito de `build-integrity` «El contexto del trabajador…»
+
+- [ ] 2.2 **PR 6 `edge-gates`: lista blanca cerrada, mapa de rutas y registros sin secretos
   (decisiones 21 y 22).**
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/bootstrap/RegisteredRoutes.java` (enumera
     `RequestMappingInfoHandlerMapping`, `RouterFunctionMapping` y `AbstractUrlHandlerMapping`),
@@ -261,7 +319,7 @@ renumeraría la cadena.
     contienen cabeceras…» y «Ausencia de autenticación por credencial…» (ninguna ruta de producción);
     requisito de `build-integrity` «Instantánea aprobada del mapa de rutas del portal»
 
-- [ ] 2.3 **PR 5 `request-origin`: IP, agente de usuario y origen en la auditoría (decisiones 11 a 13).**
+- [ ] 2.3 **PR 7 `request-origin`: IP, agente de usuario y origen en la auditoría (decisiones 11 a 13).**
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/security/`:
     `CidrBlockProperties.java` (jqwik contra una referencia con `BigInteger`),
     `ClientAddressProperties.java` (mismo /64 equivale a la misma clave, IPv4 completa, mapeada igual a
@@ -295,7 +353,7 @@ renumeraría la cadena.
     proxies de confianza», «La lista de proxies de confianza…», «El agente de usuario…», «El origen de
     la petición llega a la bitácora…» y «Las direcciones IPv6 se agrupan por /64»
 
-- [ ] 2.4 **PR 6 `problem-translator`: traductor completo de Problem Details (decisiones 8 a 10).**
+- [ ] 2.4 **PR 8 `problem-translator`: traductor completo de Problem Details (decisiones 8 a 10).**
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/problem/ProblemTranslationTest.java`
     (por la cadena real y controladores de prueba: validación con `errors` sin el valor rechazado,
     cuerpo truncado sin el mensaje del analizador, `415`, `404 resource-not-found` bajo
@@ -304,8 +362,11 @@ renumeraría la cadena.
     nivel `DEBUG`, y el mismo `requestId` en el registro del servidor y en `traceId`); ampliar
     `ProblemCodeTest.java` y `ProblemCatalogCoverageTest.java` con `resource-not-found` y
     `unsupported-media-type`; aserción de que el esquema `ProblemDetail` de `ContractSchemas` sigue con
-    sus seis propiedades. **Rojo esperado:** cuerpos por omisión de Spring.
-  - **VERDE.** Crear `apps/api/app/src/main/java/com/confia/shared/web/problem/ProblemExceptionHandler.java`
+    sus seis propiedades; ampliar `ProblemResponsesTest.java` con `errors` omitido sin violaciones y
+    listado con ellas. **Rojo esperado:** cuerpos por omisión de Spring.
+  - **VERDE.** Crear `FieldViolation` y añadir a `ProblemBody` el miembro `errors`
+    (`@JsonInclude(NON_EMPTY)`) y la sobrecarga de `ProblemResponses.write` con violaciones (movidos de la
+    antigua 2.1 porque solo este traductor los produce). Crear `apps/api/app/src/main/java/com/confia/shared/web/problem/ProblemExceptionHandler.java`
     (`@RestControllerAdvice`, orden más alto; `DomainException` por `ProblemCode.ofCode`, excepciones
     del marco enumeradas, desconexión por `DisconnectedClientHelper`, todo lo demás `500`) y registrarlo
     en `WebEdgeConfiguration.java`; añadir los dos códigos y sus claves `title` y `detail` a
@@ -318,7 +379,7 @@ renumeraría la cadena.
     «Catálogo de códigos…», «Las respuestas de error no exponen detalles internos» y «Un fallo de
     validación produce `validation-failed`…»
 
-- [ ] 2.5 **PR 7 `web-rules`: reglas de ArchUnit de la capa `web` e inventario de ausencias (decisión 20).**
+- [ ] 2.5 **PR 9 `web-rules`: reglas de ArchUnit de la capa `web` e inventario de ausencias (decisión 20).**
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/architecture/`:
     `WebLayerDependencyRulesTest.java` (W1), `SharedBoundaryRulesTest.java` (W3, por raíz: producción
     `com.confia`, fixture `com.confia.architecture.fixture.sharedboundary`),
@@ -352,7 +413,7 @@ renumeraría la cadena.
 
 ## Fase 3: limitador de peticiones
 
-- [ ] 3.1 **PR 8 `rate-limiter-core`: puerto y adaptador en memoria (decisiones 15 y 16).**
+- [ ] 3.1 **PR 10 `rate-limiter-core`: puerto y adaptador en memoria (decisiones 15 y 16).**
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/security/`:
     `MutableClock.java` (soporte), `InMemoryRateLimiterTest.java` (escenarios de las capas 1 y 2,
     bordes de ventana, tope de 1 h, rechazos que no mueven la ventana, `Retry-After` en segundos
@@ -376,7 +437,7 @@ renumeraría la cadena.
     acotada…» y «La limitación del limitador en memoria está declarada por escrito» (estado perdido al
     reiniciar)
 
-- [ ] 3.2 **PR 9 `rate-limiter-edge`: `@RateLimited`, `429` y `503` (decisión 17).**
+- [ ] 3.2 **PR 11 `rate-limiter-edge`: `@RateLimited`, `429` y `503` (decisión 17).**
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/ratelimit/RateLimitEdgeTest.java`
     (por la cadena real con un controlador de prueba anotado: `429` con `Retry-After` en segundos
     enteros, sin límite ni cupo en la respuesta, `503 capacity-exceeded` sin `Retry-After` con la tabla
@@ -406,7 +467,7 @@ renumeraría la cadena.
 
 ## Fase 4: materialización del retardo
 
-- [ ] 4.1 **PR 10 `delay-materializer`: espera tras el commit en hilos virtuales (decisión 18).**
+- [ ] 4.1 **PR 12 `delay-materializer`: espera tras el commit en hilos virtuales (decisión 18).**
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/web/delay/`:
     `RequiredDelayMaterializerTest.java` (llamado desde hilos virtuales: permiso antes del caso de uso,
     `503` con `P` en uso, liberación tras excepción, retardo cero y negativo sin espera, espera
@@ -445,7 +506,7 @@ renumeraría la cadena.
 
 ## Fase 5: idempotencia en el borde
 
-- [ ] 5.1 **PR 11 `idempotency-edge`: borde HTTP de la idempotencia (decisión 19).**
+- [ ] 5.1 **PR 13 `idempotency-edge`: borde HTTP de la idempotencia (decisión 19).**
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/idempotency/IdempotencyDemoController.java`
     (solo en el árbol de pruebas, registrado únicamente en el arnés con base de datos),
     `IdempotencyEdgeIT.java` (`400` ausente, en blanco, repetida, larga, con espacio interior o fuera
@@ -481,7 +542,7 @@ renumeraría la cadena.
 
 ## Fase 6: cierre
 
-- [ ] 6.1 **Verificación completa, medición de los 11 PR y barrido de trazabilidad.** Con los 11 PR
+- [ ] 6.1 **Verificación completa, medición de los 13 PR y barrido de trazabilidad.** Con los 11 PR
   fusionados a `main`, ejecutar `./mvnw verify` completo en `apps/api` y registrar cobertura (global
   80 %, núcleo y `domain` 95 %) y mutación (umbral 80). Registrar en
   `openspec/changes/web-edge-foundations/apply-progress.md` la medición de cada PR con
@@ -498,37 +559,37 @@ renumeraría la cadena.
 
 | Requisito | Escenario | Tarea |
 |---|---|---|
-| La cadena administrativa deniega por defecto | Ruta no registrada sin credencial | 2.1 |
-| | Ruta registrada fuera de la lista blanca | 2.1 |
-| | La respuesta no distingue rutas existentes de inexistentes | 2.1 |
-| | Principal autenticado sin permiso | 2.1 |
-| | Método distinto al permitido en una ruta pública | 2.1 |
-| | Variantes de la ruta no eluden la denegación | 2.1 |
+| La cadena administrativa deniega por defecto | Ruta no registrada sin credencial | 2.1b |
+| | Ruta registrada fuera de la lista blanca | 2.1b |
+| | La respuesta no distingue rutas existentes de inexistentes | 2.1b |
+| | Principal autenticado sin permiso | 2.1b |
+| | Método distinto al permitido en una ruta pública | 2.1b |
+| | Variantes de la ruta no eluden la denegación | 2.1b |
 | La lista blanca pública es cerrada | Una ruta pública nueva sin editar la lista | 2.2 |
 | | La lista contiene solo lo declarado | 2.2 |
-| | Documentación de API con perfil `prod` | 2.1 |
-| | Documentación de API con perfil `local` | 2.1 |
-| La cadena administrativa no tiene estado | Ninguna respuesta crea sesión | 2.1 |
-| Cabeceras de seguridad base | Respuesta de error con las cabeceras base | 2.1 |
-| | Respuesta de éxito con las cabeceras base | 2.1 |
+| | Documentación de API con perfil `prod` | 2.1b |
+| | Documentación de API con perfil `local` | 2.1b |
+| La cadena administrativa no tiene estado | Ninguna respuesta crea sesión | 2.1c |
+| Cabeceras de seguridad base | Respuesta de error con las cabeceras base | 2.1a |
+| | Respuesta de éxito con las cabeceras base | 2.1a |
 | Vigencia de sesión como puerto | El puerto existe y no tiene adaptador de producción | 2.5 |
 | | El puerto no arrastra a `identity` | 2.5 |
-| La cadena del portal deniega toda ruta | Toda ruta del portal es denegada | 2.1 |
-| | Una ruta añadida al portal sigue denegada | 2.1, 2.2 |
+| La cadena del portal deniega toda ruta | Toda ruta del portal es denegada | 2.1c |
+| | Una ruta añadida al portal sigue denegada | 2.1c, 2.2 |
 | | Sin ruta pública en el portal | 2.2 |
-| | Documentación del portal con perfil `local` | 2.1 |
-| El trabajador no tiene cadena ni servidor web | Contexto del trabajador sin borde web | 2.1 |
-| Toda respuesta de error usa Problem Details | Respuesta de error bien formada | 2.1 |
-| | El identificador de traza es el de la petición | 2.1 |
-| | La cadena de consulta no aparece en `instance` | 2.1 |
-| El `type` deriva del código estable | El mismo código produce el mismo `type` | 2.1 |
-| | Códigos distintos producen `type` distintos | 2.1 |
-| | La denegación por falta de credencial es uniforme | 2.1 |
-| Catálogo de códigos y estados HTTP | Cada código tiene su estado | 2.1, 2.4, 3.2, 5.1 |
+| | Documentación del portal con perfil `local` | 2.1c |
+| El trabajador no tiene cadena ni servidor web | Contexto del trabajador sin borde web | 2.1c |
+| Toda respuesta de error usa Problem Details | Respuesta de error bien formada | 2.1a |
+| | El identificador de traza es el de la petición | 2.1a |
+| | La cadena de consulta no aparece en `instance` | 2.1a |
+| El `type` deriva del código estable | El mismo código produce el mismo `type` | 2.1a |
+| | Códigos distintos producen `type` distintos | 2.1a |
+| | La denegación por falta de credencial es uniforme | 2.1b |
+| Catálogo de códigos y estados HTTP | Cada código tiene su estado | 2.1a, 2.4, 3.2, 5.1 |
 | | Tipo de contenido no admitido | 2.4 |
 | | Recurso inexistente bajo un prefijo de documentación | 2.4 |
 | | Un código desconocido no se filtra | 2.4 |
-| | Los códigos de autenticación aún no existen | 2.1 |
+| | Los códigos de autenticación aún no existen | 2.1a |
 | Las respuestas de error no exponen detalles internos | Excepción no prevista | 2.4 |
 | | Excepción de dominio con mensaje interno | 2.4 |
 | | El detalle técnico queda solo en el servidor | 2.4 |
@@ -536,12 +597,12 @@ renumeraría la cadena.
 | | El valor rechazado no se repite | 2.4 |
 | | Cuerpo mal formado | 2.4 |
 | | `errors` es una extensión fuera del esquema del contrato | 2.4 |
-| Catálogo de mensajes en español de Honduras | Código sin entrada en el catálogo | 2.1 |
-| | Entrada sin código | 2.1 |
-| | Idioma fijo | 2.1 |
-| El identificador de petición lo genera el servidor | El cliente envía su propio identificador | 2.1, 2.3 |
+| Catálogo de mensajes en español de Honduras | Código sin entrada en el catálogo | 2.1a |
+| | Entrada sin código | 2.1a |
+| | Idioma fijo | 2.1a |
+| El identificador de petición lo genera el servidor | El cliente envía su propio identificador | 2.1c, 2.3 |
 | | Identificadores únicos bajo concurrencia | 2.3 |
-| | Respuesta de la cadena de seguridad con identificador | 2.1 |
+| | Respuesta de la cadena de seguridad con identificador | 2.1c |
 | La IP del cliente solo por proxies de confianza | Lista vacía, cabecera ignorada | 2.3 |
 | | Origen no confiable, cabecera ignorada | 2.3 |
 | | Origen confiable, cadena de dos proxies | 2.3 |
@@ -640,8 +701,8 @@ Subtotal `web-edge`: 132 escenarios, 132 con tarea, 0 huérfanos.
 | El administrativo arranca sin conexión ni migración | El proceso administrativo arranca con la base de datos inalcanzable | 1.1 |
 | | Portal y trabajador no tienen `DataSource` | 1.1 |
 | | Las pruebas de arranque no necesitan Docker | 1.1 |
-| Spring Security solo como cadena de filtros | Se añade el servidor de recursos OAuth2 | 2.1 |
-| | La dependencia de Spring Security converge | 2.1 |
+| Spring Security solo como cadena de filtros | Se añade el servidor de recursos OAuth2 | 2.1b |
+| | La dependencia de Spring Security converge | 2.1b |
 | Reglas de dependencia de la capa `web` | Fixture con una clase `web` que depende de `infrastructure` | 2.5 |
 | | Fixture con `shared` que depende de `identity` | 2.5 |
 | | Código de producción sin dependencias prohibidas | 2.5 |
@@ -663,11 +724,11 @@ Subtotal `web-edge`: 132 escenarios, 132 con tarea, 0 huérfanos.
 | | El proceso administrativo registra el cableado de producción | 1.1, 1.2 |
 | Portal sin beans de otros puntos de entrada ni administrativos | El portal arrastra un punto de entrada ajeno | 1.1 |
 | | El portal arrastra un módulo administrativo | 1.1, 1.2 |
-| | El portal contiene solo lo suyo | 1.1, 2.1 |
+| | El portal contiene solo lo suyo | 1.1, 2.1a |
 | | El portal no hereda el cableado administrativo | 1.1 |
 | Trabajador sin beans de otros puntos de entrada | El trabajador recibe una importación ajena | 1.1 |
-| | El trabajador arranca sin servidor web y sin beans ajenos | 1.1, 2.1 |
-| | El trabajador no recibe el borde web | 2.1 |
+| | El trabajador arranca sin servidor web y sin beans ajenos | 1.1, 2.1c |
+| | El trabajador no recibe el borde web | 2.1a |
 | Puntos de entrada de registro explícito | Un punto de entrada vuelve a escanear | 1.1 |
 | | Los tres puntos de entrada cumplen la forma explícita | 1.1 |
 | | El portal o el trabajador dejan de excluir el `DataSource` | 1.1 |
@@ -702,3 +763,28 @@ viven en `com.confia.identity.infrastructure.wiring`, porque `JooqConfinedToInfr
 `com.confia.identity.infrastructure` y `com.confia.identity.infrastructure.wiring`, cada uno exacto por la
 no vacuidad. `ConfiguredLoginInstitutionProvider` deja de repetir el valor rechazado en su mensaje y de
 encadenar el analizador de UUID. Detalle en la nota fechada de `design.md` y en `apply-progress.md`.
+
+## Nota fechada 2026-10-04: partición de la tarea 2.1 en 2.1a, 2.1b y 2.1c
+
+El propietario aprobó partir la tarea 2.1 (PR 3 `security-chains`) en tres porque el PR verificado
+midió **2 000 líneas efectivas** (1 976 adiciones y 24 eliminaciones, igual con y sin `-M`, sin
+`openspec/`) frente al tope de 800 y a un pronóstico de 520 nominales y 780 en el peor caso. La costura 3b del
+diseño (cabeceras e identificador de petición) no bastaba: dejaba unas 1 700 líneas. El árbol completo y
+verificado se conserva en la rama local `wip/web-edge-security-chains-full`, que **nunca se publica** y es la
+fuente de las tres partes.
+
+- **2.1a `problem-details-core` (PR 3)**, sin Spring Security: Problem Details, catálogo y cabeceras base.
+  Medido en 775 líneas. Un primer intento que incluía también el filtro de identificador de petición y
+  `errors` midió 1 052 y se rebalanceó sin recortar nada: el filtro de contexto (con su prueba) pasa a 2.1c y
+  `FieldViolation` con `errors` pasa a 2.4, que es quien los produce.
+- **2.1b `security-chains` (PR 4)**: dependencia, prohibiciones, cadenas, manejadores y arnés. Estimación 600 a
+  800; si la medición supera 800 se mueven pruebas y arnés a 2.1c antes del commit.
+- **2.1c `portal-and-worker-chain` (PR 5)**: filtro de identificador de petición, portal, trabajador y las
+  pruebas de la cadena real con cabeceras, sesión e identificador. Estimación 700 a 800.
+
+Las tareas pasan de 12 a 14 y la cadena de PR de 11 a 13 (máximo del proyecto: 15). Desde la tarea 2.2 los
+números de PR se desplazan dos puestos (PR 4 pasa a 6, PR 5 a 7, y así hasta PR 11 que pasa a 13); las notas
+fechadas anteriores y `apply-progress.md` conservan la numeración vieja. La demostración deliberada de la
+barrera de denegación por omisión es `anyRequest().permitAll()` (nota fechada de `design.md`). Trazabilidad:
+166 escenarios, 166 con tarea, 0 huérfanos; los 33 que apuntaban a 2.1 apuntan ahora a una sola de 2.1a (14),
+2.1b (11) o 2.1c (8).

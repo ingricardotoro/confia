@@ -26,8 +26,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
     private static final String SCHEDULER_REASON = "only the worker runs db-scheduler (ADR-0016)";
     private static final String OTHER_ENTRY_POINT = "another process entry point (ADR-0003)";
     private static final String ADMIN_MODULE = "administrative module (ADR-0003)";
-    private static final String OPENAPI_SURFACE =
-            "the worker never serves the OpenAPI surface (ADR-0003)";
+    private static final String WEB_EDGE =
+            "the worker never serves the OpenAPI surface or any other part of the web edge: "
+                    + "no request filters (ADR-0003; web-edge-foundations decisions 1 and 7)";
     private static final String ADMIN_WIRING =
             "the production data access wiring is administrative only (web-edge-foundations D5)";
 
@@ -37,6 +38,12 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.kernel", "com.confia.shared.platform.infrastructure",
                     "com.confia.shared.security", "com.confia.shared.crypto",
                     "com.confia.shared.infrastructure",
+                    // The web edge: its configurations, the request filters and the Problem
+                    // Details writer. Each is exact because the non-vacuity check compares by
+                    // equality, and each contributes a bean (a configuration, a filter, the
+                    // writer).
+                    "com.confia.shared.web.edge", "com.confia.shared.web.request",
+                    "com.confia.shared.web.problem",
                     // The identity module as the three packages its beans come from: the use
                     // cases, the adapters, and the named-interface package of its configuration.
                     // Each entry is exact because the non-vacuity check compares by equality.
@@ -48,7 +55,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
 
     static final ProcessBeanPolicy PORTAL = new ProcessBeanPolicy("portal",
             "com.confia.bootstrap.portal",
-            Set.of("com.confia.bootstrap.portal", "com.confia.shared.web.openapi"),
+            Set.of("com.confia.bootstrap.portal", "com.confia.shared.web.openapi",
+                    "com.confia.shared.web.edge", "com.confia.shared.web.request",
+                    "com.confia.shared.web.problem"),
             Map.of("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     "com.confia.invoicing", ADMIN_MODULE,
@@ -67,7 +76,8 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
             Set.of("com.confia.bootstrap.worker"),
             Map.of("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
-                    "com.confia.shared.web.openapi", OPENAPI_SURFACE,
+                    // The whole web package: the OpenAPI surface and every part of the edge.
+                    "com.confia.shared.web", WEB_EDGE,
                     "com.confia.shared.platform", ADMIN_WIRING));
 
     static Stream<ProcessBeanPolicy> all() {
