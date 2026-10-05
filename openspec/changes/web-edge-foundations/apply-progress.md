@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-05 (tarea 2.3c; 2.1a a 2.2b y 2.3a a 2.3c hechas)
+- **Última actualización:** 2026-10-05 (tarea 2.3d; 2.1a a 2.2b y 2.3a a 2.3d hechas)
 
 ## Estado de las tareas
 
@@ -19,7 +19,7 @@
 | 2.3a | PR 7a `client-address` | Hecha | `525cfee`, `c16f129` y los commits `docs(sdd)` de esta rama |
 | 2.3b | PR 7b `trusted-proxy-resolution` | Hecha | `e1d5f7a` y el commit `docs(sdd)` de esta rama |
 | 2.3c | PR 7c `request-origin-filter` | Hecha | `5b271e4` y el commit `docs(sdd)` de esta rama |
-| 2.3d | PR 7d `audit-origin` | Pendiente (la tarea 2.3 completa está verificada en la rama local `wip/web-edge-request-origin-full`, commit `9e8b52f`) | |
+| 2.3d | PR 7d `audit-origin` | Hecha | `8a20946` y el commit `docs(sdd)` de esta rama |
 | 2.4 a 6.1 | PR 8 a 13 y cierre | Pendientes | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
@@ -917,3 +917,67 @@ Evidencia: ROJO `-Dtest='RequestContextFilter*'`: `Tests run: 19, Failures: 3, E
 
 Cierre: `./mvnw verify` completo: Surefire 186 + 734 (730 más 4), Failsafe 225, `BUILD SUCCESS`. Medición del PR 7c tras la corrección
 (`git diff --numstat main...HEAD -- . ':!openspec'`, igual con y sin `-M`): 454 adiciones, 24 eliminaciones, **478** en total (tope 800).
+
+## Tarea 2.3d: PR 7d `audit-origin`
+
+Rama `change/web-edge-foundations-audit-origin`, desde `main` en `5bd1cce` tras fusionar el PR 7c. El código sale de
+`wip/web-edge-request-origin-full` (sin tocarla; sigue en `9e8b52f`). `main` es la autoridad de lo de 2.3a a 2.3c: solo se portaron
+`RequestOriginAuditLogWriter`, la envoltura, la línea de `ProcessBeanPolicy` y el Javadoc de `AuditEntry`; las dos pruebas se ampliaron.
+
+### Evidencia del ciclo TDD (reobservada sobre este árbol)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO 1 | `-Dtest=RequestOriginAuditLogWriterTest` con las dos pruebas y sin producción | `COMPILATION ERROR`: `cannot find symbol: class RequestOriginAuditLogWriter`. Causa prevista. |
+| VERDE del decorador | Igual, con el decorador portado y sin envolver | `RequestOriginAuditLogWriterTest` `Tests run: 6, Failures: 0, Errors: 0, Skipped: 0` |
+| ROJO 2 | `RequestOriginAuditIT` (Failsafe, Docker) con el decorador existente pero sin envolver | `Tests run: 4, Failures: 2`: `expected: "203.0.113.9" but was: null` y `expected: "198.51.100.1" but was: null` (la de 50 peticiones). Las pruebas de origen ausente pasan por construcción. |
+| ROJO 3 | Con la envoltura en `SharedPlatformConfiguration` y sin la línea de política: `-Dtest=ProcessBeanIsolationTest` | `Tests run: 4, Failures: 1`: `process 'admin': bean 'auditLogWriter' from package 'com.confia.shared.audit' - not in the allow-list` |
+| VERDE | `-Dtest='RequestOriginAuditLogWriterTest,ProcessBeanIsolationTest' -Dit.test=RequestOriginAuditIT` | Surefire `Tests run: 10, Failures: 0` (6 + 4); Failsafe `Tests run: 4, Failures: 0` |
+| Cierre | `./mvnw verify` completo | Surefire 186 + 740 (los 734 de la línea base más 6), Failsafe 229 (225 más 4), `BUILD SUCCESS`. Instantánea OpenAPI y `routes` sin cambios (`git status` limpio de ellos). |
+
+Pruebas añadidas: 6 unitarias (`RequestOriginAuditLogWriterTest`: el origen completa solo lo nulo, IPv6 canónica, un valor del llamador gana,
+origen sin dirección o sin agente, **hilo sin vinculación (seguimiento S-2 de 2.3c)**, fuera de petición) y 4 de integración
+(`RequestOriginAuditIT`: durante una petición, fuera de petición, **trabajo entregado a un ejecutor común durante una petición** y 50 peticiones
+simultáneas con `CyclicBarrier`).
+
+### Demostración deliberada (revertida; `cmp` contra la copia original sin diferencias)
+
+| Ruptura | Resultado |
+|---|---|
+| Quitar la envoltura (`return new JooqAuditLogWriter(dsl)`) | `RequestOriginAuditIT` `Tests run: 4, Failures: 2`: `expected: "203.0.113.9" but was: null` y `expected: "198.51.100.1" but was: null`. |
+
+### Cadena de hash y ausencia de esperas
+
+`source_ip` y `user_agent` forman parte de la carga firmada: el disparador `BEFORE INSERT` los incluye en el hash
+(`V3__chain_shared_audit_log.sql`, líneas 113 y 114), igual que `CanonicalAuditRowSerializer` (líneas 68 y 69), como exige
+`openspec/specs/audit-trail/spec.md`. Corrección del orquestador (2026-10-05): la primera versión de esta nota decía que
+`user_agent` no estaba firmado, lo cual era falso. El
+decorador solo rellena campos antes de la inserción, así que el disparador firma el valor definitivo. La IT llama a `DefaultAuditChainVerifier`
+sobre cada institución tras escribir y exige `Intact` con exactamente 1 fila (durante petición, fuera de petición, ejecutor común) y 50 filas
+(simultáneas). Ninguna prueba lee filas escritas por un hilo del servidor tras la respuesta: la ruta ejecuta el `TransactionRunner` hasta el
+commit antes de responder (en la ruta del ejecutor común, esperando el `Future`), así que no hay esperas que acotar. La prueba de 50 afirma
+conteo exacto, el conjunto exacto de marcadores, 50 IP distintas y la IP y el agente propios de cada fila. Ni el decorador ni las pruebas
+registran la IP ni el agente.
+
+### Desviaciones del diseño (declaradas)
+
+Ninguna. Se añaden a las pruebas del árbol completo la del hilo sin vinculación (unitaria e IT), la comprobación de la cadena de hash y las de conteo exacto.
+`clientAddress` nulo ya estaba cubierto en la prueba unitaria `anOriginWithoutAnAddressOrAnAgentLeavesThoseFieldsNull`; la IT no puede
+producirlo porque el contenedor siempre entrega un literal.
+
+### Medición del PR 7d (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 467 | 4 | **471** |
+| Con `-M` | 467 | 4 | **471** |
+
+Pronóstico 383; dentro del tope de 800. Tareas: 18 en total; hechas 11.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='RequestOriginAuditLogWriterTest,ProcessBeanIsolationTest' -Dit.test=RequestOriginAuditIT`: Surefire 10/0 fallos, Failsafe 4/0; cierre por `./mvnw verify`: Surefire 186 + 740, Failsafe 229 |
+| Arnés de ejecución | Servidor real en puerto aleatorio con PostgreSQL (Testcontainers), `SharedPlatformConfiguration` y el borde web de producción, `TransactionRunner` real, 50 peticiones simultáneas y verificador de cadena |
+| Frontera de reversión | Se retiran `RequestOriginAuditLogWriter`, la envoltura en `SharedPlatformConfiguration`, la línea de `ProcessBeanPolicy`, el ajuste de Javadoc de `AuditEntry` y las dos pruebas: la auditoría vuelve a `null` |

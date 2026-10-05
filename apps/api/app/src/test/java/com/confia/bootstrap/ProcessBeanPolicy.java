@@ -41,6 +41,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.kernel", "com.confia.shared.platform.infrastructure",
                     "com.confia.shared.security", "com.confia.shared.crypto",
                     "com.confia.shared.infrastructure",
+                    // The audit writer is the decorator that adds the request origin; it is the
+                    // first bean whose class lives in this package (exact, like every entry).
+                    "com.confia.shared.audit",
                     // The web edge: its configurations, the request filters and the Problem
                     // Details writer. Each is exact because the non-vacuity check compares by
                     // equality, and each contributes a bean (a configuration, a filter, the

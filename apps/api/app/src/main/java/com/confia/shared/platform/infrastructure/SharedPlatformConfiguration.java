@@ -2,6 +2,7 @@ package com.confia.shared.platform.infrastructure;
 
 import com.confia.kernel.AesGcmCipher;
 import com.confia.shared.audit.AuditLogWriter;
+import com.confia.shared.audit.RequestOriginAuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionMasterKey;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.crypto.DataEncryptionKeyRepository;
@@ -80,7 +81,7 @@ public class SharedPlatformConfiguration {
 
     @Bean
     AuditLogWriter auditLogWriter(DSLContext dsl) {
-        return new JooqAuditLogWriter(dsl);
+        return new RequestOriginAuditLogWriter(new JooqAuditLogWriter(dsl));
     }
 
     @Bean

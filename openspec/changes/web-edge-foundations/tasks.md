@@ -432,7 +432,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     Requisitos de `web-edge` «El identificador de petición lo genera el servidor» y «El agente de usuario se
     captura acotado»
 
-- [ ] 2.3d **PR 7d `audit-origin`: origen de la petición en la bitácora (decisión 13).**
+- [x] 2.3d **PR 7d `audit-origin`: origen de la petición en la bitácora (decisión 13).**
   - **ROJO.** Crear `.../shared/audit/RequestOriginAuditLogWriterTest.java` (completa solo lo nulo, un valor del
     llamador gana, fuera de una petición el asiento pasa intacto) y `RequestOriginAuditIT.java` (arnés con base de
     datos: el asiento durante una petición lleva IP y agente, fuera de petición ambos `null`, 50 peticiones
