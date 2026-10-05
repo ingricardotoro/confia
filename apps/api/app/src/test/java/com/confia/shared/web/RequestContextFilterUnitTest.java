@@ -150,6 +150,70 @@ class RequestContextFilterUnitTest {
                 .doesNotContain("IOException").doesNotContain("java.io");
     }
 
+    /** A request whose user agent cannot be read, which makes the origin fail to build. */
+    private static final class UnreadableRequest extends MockHttpServletRequest {
+        UnreadableRequest() {
+            super("GET", "/x");
+        }
+
+        @Override
+        public String getHeader(String name) {
+            throw new IllegalStateException(SECRET_MESSAGE);
+        }
+    }
+
+    @Test
+    void aFailureWhileBuildingTheOriginStillCleansTheLogContextAndGetsTheLastResort()
+            throws Exception {
+        UnreadableRequest request = new UnreadableRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        List<String> chainRan = new ArrayList<>();
+
+        run(request, response, (req, res) -> chainRan.add("ran"));
+
+        assertThat(chainRan).as("the chain never runs without an origin").isEmpty();
+        assertThat(MDC.get(RequestContextFilter.MDC_KEY)).as("no id stays on a reused thread")
+                .isNull();
+        assertThat(response.getStatus()).isEqualTo(500);
+        String id = (String) request.getAttribute(ProblemResponses.REQUEST_ID_ATTRIBUTE);
+        assertThat(UUID.fromString(id)).isNotNull();
+        assertThat(response.getContentAsString()).contains("internal-error")
+                .contains("\"traceId\":\"" + id + "\"")
+                .doesNotContain(SECRET_MESSAGE).doesNotContain("hunter2");
+    }
+
+    @Test
+    void invisibleAndLineBreakingCharactersInTheUserAgentAreReplacedBySpaces() throws Exception {
+        // U+2028 and U+2029 break lines, U+202E reverses text, U+200B and U+FEFF are invisible.
+        String raw = "a b c‮d​e﻿" + "f⁦g";
+
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", raw)).orElseThrow().userAgent())
+                .isEqualTo("a b c d e f g");
+    }
+
+    @Test
+    void anUnpairedSurrogateIsReplacedWhetherOrNotTheValueWasCut() throws Exception {
+        // A lone high surrogate at the end of a value that was not cut, then a lone low one and
+        // a lone high one in the middle; a valid pair is kept as it is.
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", "ab\ud83d")).orElseThrow()
+                .userAgent()).isEqualTo("ab ");
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", "a\ude00b\ud83dc"))
+                .orElseThrow().userAgent()).isEqualTo("a b c");
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", "a😀b")).orElseThrow()
+                .userAgent()).isEqualTo("a😀b");
+    }
+
+    @Test
+    void replacingAfterTheCutKeepsTheLimitAndNeverSplitsAPair() throws Exception {
+        String formatAtTheCut = "x".repeat(19) + "​" + "tail";
+        String pairEndingAtTheCut = "x".repeat(18) + "😀" + "tail";
+
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", formatAtTheCut)).orElseThrow()
+                .userAgent()).isEqualTo("x".repeat(19) + " ");
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", pairEndingAtTheCut))
+                .orElseThrow().userAgent()).isEqualTo("x".repeat(18) + "😀");
+    }
+
     @Test
     void theFullExceptionGoesToTheServerLogAndNotToTheClient() throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();

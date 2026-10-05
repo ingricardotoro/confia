@@ -59,10 +59,12 @@ public final class RequestContextFilter extends OncePerRequestFilter implements 
             FilterChain chain) throws ServletException, IOException {
         UUID requestId = UUID.randomUUID();
         request.setAttribute(ProblemResponses.REQUEST_ID_ATTRIBUTE, requestId.toString());
-        MDC.put(MDC_KEY, requestId.toString());
-        RequestOrigin origin = new RequestOrigin(requestId,
-                addresses.resolve(request).orElse(null), userAgentOf(request));
         try {
+            // Everything that can fail is inside the try: the finally always cleans the log
+            // context, and the last resort still answers with the id the attribute carries.
+            MDC.put(MDC_KEY, requestId.toString());
+            RequestOrigin origin = new RequestOrigin(requestId,
+                    addresses.resolve(request).orElse(null), userAgentOf(request));
             callWithOrigin(origin, request, response, chain);
         } catch (IOException | ServletException | RuntimeException e) {
             if (response.isCommitted()) {
@@ -111,9 +113,28 @@ public final class RequestContextFilter extends OncePerRequestFilter implements 
         StringBuilder kept = new StringBuilder(end);
         for (int i = 0; i < end; i++) {
             char c = raw.charAt(i);
-            kept.append(Character.isISOControl(c) ? ' ' : c);
+            if (Character.isHighSurrogate(c) && i + 1 < end
+                    && Character.isLowSurrogate(raw.charAt(i + 1))) {
+                kept.append(c).append(raw.charAt(++i));
+            } else {
+                kept.append(isUnsafe(c) ? ' ' : c);
+            }
         }
         return kept.toString();
+    }
+
+    /**
+     * Whether {@code c} must not reach storage or a log viewer: a control character, a line or
+     * paragraph separator (U+2028, U+2029), a format character (bidirectional controls, zero-width
+     * characters, the byte order mark) or half of a surrogate pair that has no other half.
+     */
+    private static boolean isUnsafe(char c) {
+        if (Character.isSurrogate(c)) {
+            return true;
+        }
+        int type = Character.getType(c);
+        return type == Character.CONTROL || type == Character.FORMAT
+                || type == Character.LINE_SEPARATOR || type == Character.PARAGRAPH_SEPARATOR;
     }
 
     private void answerWithTheLastResort(HttpServletRequest request, HttpServletResponse response,

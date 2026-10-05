@@ -185,27 +185,34 @@ class RequestContextFilterTest {
     @Test
     void aHundredSimultaneousRequestsEachGetTheirOwnIdAddressAndAgent() throws Exception {
         int requests = 100;
-        CyclicBarrier allReady = new CyclicBarrier(requests);
-        List<Future<JsonNode>> calls = new ArrayList<>();
-        try (ExecutorService pool = Executors.newFixedThreadPool(requests)) {
-            for (int i = 0; i < requests; i++) {
-                int n = i;
-                calls.add(pool.submit(() -> {
-                    allReady.await(30, TimeUnit.SECONDS);
-                    return origin(behindAProxy, FORWARDED, "198.51.100." + (n + 1),
-                            "User-Agent", "agent-" + n);
-                }));
+        Set<String> ids = new HashSet<>();
+        // Two rounds against the same server: the second one is served by threads the first used,
+        // and a value left behind on a reused thread would show as the previous round's agent.
+        for (int round = 0; round < 2; round++) {
+            CyclicBarrier allReady = new CyclicBarrier(requests);
+            List<Future<JsonNode>> calls = new ArrayList<>();
+            try (ExecutorService pool = Executors.newFixedThreadPool(requests)) {
+                for (int i = 0; i < requests; i++) {
+                    int n = i;
+                    String agent = "agent-" + round + "-" + n;
+                    calls.add(pool.submit(() -> {
+                        allReady.await(30, TimeUnit.SECONDS);
+                        return origin(behindAProxy, FORWARDED, "198.51.100." + (n + 1),
+                                "User-Agent", agent);
+                    }));
+                }
+                for (int i = 0; i < requests; i++) {
+                    JsonNode origin = calls.get(i).get(60, TimeUnit.SECONDS);
+                    assertThat(origin.get("sourceIp").asString())
+                            .isEqualTo("198.51.100." + (i + 1));
+                    assertThat(origin.get("userAgent").asString())
+                            .isEqualTo("agent-" + round + "-" + i);
+                    assertThat(origin.get("requestIdAttribute").asString())
+                            .isEqualTo(origin.get("requestId").asString());
+                    ids.add(origin.get("requestId").asString());
+                }
             }
-            Set<String> ids = new HashSet<>();
-            for (int i = 0; i < requests; i++) {
-                JsonNode origin = calls.get(i).get(60, TimeUnit.SECONDS);
-                assertThat(origin.get("sourceIp").asString()).isEqualTo("198.51.100." + (i + 1));
-                assertThat(origin.get("userAgent").asString()).isEqualTo("agent-" + i);
-                assertThat(origin.get("requestIdAttribute").asString())
-                        .isEqualTo(origin.get("requestId").asString());
-                ids.add(origin.get("requestId").asString());
-            }
-            assertThat(ids).hasSize(requests);
         }
+        assertThat(ids).as("every one of the 200 requests had its own id").hasSize(2 * requests);
     }
 }
