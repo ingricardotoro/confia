@@ -8,6 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -43,13 +44,18 @@ public final class HarnessProcess implements AutoCloseable {
         this.port = ((WebServerApplicationContext) context).getWebServer().getPort();
     }
 
-    /** Starts the harness with the admin allow-list and any extra {@code key=value} properties. */
+    /**
+     * Starts the harness with the admin allow-list and any extra {@code key=value} properties.
+     * They are given as command-line arguments, which outrank {@code application.yml}: a property
+     * that file also sets, such as {@code confia.web.user-agent-max-length}, would otherwise win.
+     */
     public static HarnessProcess start(String... properties) {
+        String[] arguments = Arrays.stream(properties).map(property -> "--" + property)
+                .toArray(String[]::new);
         return new HarnessProcess(new SpringApplicationBuilder(WebEdgeHarness.class)
                 .web(WebApplicationType.SERVLET)
                 .properties("server.port=0")
-                .properties(properties)
-                .run());
+                .run(arguments));
     }
 
     /** Starts the harness with the portal allow-list. */
@@ -131,7 +137,12 @@ public final class HarnessProcess implements AutoCloseable {
 
     /** The body of {@code response} as a JSON tree. */
     public static JsonNode json(HttpResponse<String> response) {
-        return JSON.readTree(response.body());
+        return json(response.body());
+    }
+
+    /** {@code body} as a JSON tree. */
+    public static JsonNode json(String body) {
+        return JSON.readTree(body);
     }
 
     @Override

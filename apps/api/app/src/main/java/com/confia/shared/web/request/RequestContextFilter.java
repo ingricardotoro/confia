@@ -1,5 +1,6 @@
 package com.confia.shared.web.request;
 
+import com.confia.shared.security.RequestOrigin;
 import com.confia.shared.web.problem.ProblemCode;
 import com.confia.shared.web.problem.ProblemResponses;
 import jakarta.servlet.FilterChain;
@@ -35,10 +36,17 @@ public final class RequestContextFilter extends OncePerRequestFilter implements 
 
     private static final Logger LOG = LoggerFactory.getLogger(RequestContextFilter.class);
 
-    private final ProblemResponses problems;
+    private static final String USER_AGENT = "User-Agent";
 
-    public RequestContextFilter(ProblemResponses problems) {
+    private final ProblemResponses problems;
+    private final ClientAddressResolver addresses;
+    private final int userAgentMaxLength;
+
+    public RequestContextFilter(ProblemResponses problems, WebEdgeProperties properties) {
         this.problems = problems;
+        this.addresses = new ClientAddressResolver(
+                TrustedProxies.parse(properties.trustedProxies()));
+        this.userAgentMaxLength = properties.userAgentMaxLength();
     }
 
     @Override
@@ -49,11 +57,15 @@ public final class RequestContextFilter extends OncePerRequestFilter implements 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain chain) throws ServletException, IOException {
-        String requestId = UUID.randomUUID().toString();
-        request.setAttribute(ProblemResponses.REQUEST_ID_ATTRIBUTE, requestId);
-        MDC.put(MDC_KEY, requestId);
+        UUID requestId = UUID.randomUUID();
+        request.setAttribute(ProblemResponses.REQUEST_ID_ATTRIBUTE, requestId.toString());
         try {
-            chain.doFilter(request, response);
+            // Everything that can fail is inside the try: the finally always cleans the log
+            // context, and the last resort still answers with the id the attribute carries.
+            MDC.put(MDC_KEY, requestId.toString());
+            RequestOrigin origin = new RequestOrigin(requestId,
+                    addresses.resolve(request).orElse(null), userAgentOf(request));
+            callWithOrigin(origin, request, response, chain);
         } catch (IOException | ServletException | RuntimeException e) {
             if (response.isCommitted()) {
                 throw e;
@@ -63,6 +75,66 @@ public final class RequestContextFilter extends OncePerRequestFilter implements 
         } finally {
             MDC.remove(MDC_KEY);
         }
+    }
+
+    /**
+     * Runs the rest of the chain with {@code origin} bound, and only for the length of that call.
+     * Checked exceptions of the chain come out as they went in.
+     */
+    private static void callWithOrigin(RequestOrigin origin, HttpServletRequest request,
+            HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
+        try {
+            ScopedValue.where(RequestOrigin.CURRENT, origin).call(() -> {
+                chain.doFilter(request, response);
+                return null;
+            });
+        } catch (IOException | ServletException | RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            // The call is declared to throw Exception; the chain throws nothing but the three above.
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * The {@code User-Agent} header cut to its limit, or {@code null} when there is none. Control
+     * characters become spaces, because a NUL would break the {@code TEXT} column that stores it,
+     * and a cut never leaves the first half of a surrogate pair.
+     */
+    private String userAgentOf(HttpServletRequest request) {
+        String raw = request.getHeader(USER_AGENT);
+        if (raw == null) {
+            return null;
+        }
+        int end = Math.min(raw.length(), userAgentMaxLength);
+        if (end < raw.length() && Character.isHighSurrogate(raw.charAt(end - 1))) {
+            end--;
+        }
+        StringBuilder kept = new StringBuilder(end);
+        for (int i = 0; i < end; i++) {
+            char c = raw.charAt(i);
+            if (Character.isHighSurrogate(c) && i + 1 < end
+                    && Character.isLowSurrogate(raw.charAt(i + 1))) {
+                kept.append(c).append(raw.charAt(++i));
+            } else {
+                kept.append(isUnsafe(c) ? ' ' : c);
+            }
+        }
+        return kept.toString();
+    }
+
+    /**
+     * Whether {@code c} must not reach storage or a log viewer: a control character, a line or
+     * paragraph separator (U+2028, U+2029), a format character (bidirectional controls, zero-width
+     * characters, the byte order mark) or half of a surrogate pair that has no other half.
+     */
+    private static boolean isUnsafe(char c) {
+        if (Character.isSurrogate(c)) {
+            return true;
+        }
+        int type = Character.getType(c);
+        return type == Character.CONTROL || type == Character.FORMAT
+                || type == Character.LINE_SEPARATOR || type == Character.PARAGRAPH_SEPARATOR;
     }
 
     private void answerWithTheLastResort(HttpServletRequest request, HttpServletResponse response,

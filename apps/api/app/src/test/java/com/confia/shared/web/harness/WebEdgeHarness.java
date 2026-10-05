@@ -25,7 +25,7 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
  * design.md, decision 5): the real {@link WebEdgeConfiguration} and the real {@link
  * SecurityChains#denyByDefault}, the same exclusions the real entry points carry, and test-only
  * controllers. The allow-list is the real one for the process named by {@value #PROCESS_PROPERTY}
- * plus two routes only this harness adds, and a stand-in principal filter lets a test be
+ * plus the routes only this harness adds, and a stand-in principal filter lets a test be
  * authenticated, which no production code can do yet.
  */
 @SpringBootConfiguration
@@ -56,6 +56,7 @@ class WebEdgeHarness {
         List<PublicEndpoint> endpoints = new ArrayList<>(real.endpoints());
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/open"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/boom"));
+        endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/origin"));
         return SecurityChains.denyByDefault(http, new PublicEndpoints(endpoints), problems)
                 .addFilterBefore(new TestPrincipalFilter(), AuthorizationFilter.class)
                 .build();

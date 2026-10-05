@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-05 (tarea 2.3b; 2.1a a 2.2b, 2.3a y 2.3b hechas)
+- **Última actualización:** 2026-10-05 (tarea 2.3c; 2.1a a 2.2b y 2.3a a 2.3c hechas)
 
 ## Estado de las tareas
 
@@ -18,7 +18,8 @@
 | 2.2b | PR 6b `edge-gates` | Hecha | `c469734`, `8a2eb2e` y el commit `docs(sdd)` de esta rama |
 | 2.3a | PR 7a `client-address` | Hecha | `525cfee`, `c16f129` y los commits `docs(sdd)` de esta rama |
 | 2.3b | PR 7b `trusted-proxy-resolution` | Hecha | `e1d5f7a` y el commit `docs(sdd)` de esta rama |
-| 2.3c y 2.3d | PR 7c y 7d | Pendientes (la tarea 2.3 completa está verificada en la rama local `wip/web-edge-request-origin-full`, commit `9e8b52f`) | |
+| 2.3c | PR 7c `request-origin-filter` | Hecha | `5b271e4` y el commit `docs(sdd)` de esta rama |
+| 2.3d | PR 7d `audit-origin` | Pendiente (la tarea 2.3 completa está verificada en la rama local `wip/web-edge-request-origin-full`, commit `9e8b52f`) | |
 | 2.4 a 6.1 | PR 8 a 13 y cierre | Pendientes | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
@@ -843,3 +844,76 @@ Pronóstico 592; dentro del tope de 800. El exceso: la prueba de recorrido del r
 | Orden enfocada y resultado | `-Dtest='ClientAddressResolverTest,WebEdgePropertiesTest,CidrBlock*,ClientAddress*,IdempotencyScopeExclusionInventoryTest'`: `Tests run: 122, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 717, Failsafe 225 |
 | Arnés de ejecución | `Binder` de Spring Boot con `SystemEnvironmentPropertySource` y los YAML reales del classpath; resolvedor con ejemplos y jqwik (referencia de aritmética entera) |
 | Frontera de reversión | Se retiran `TrustedProxies`, `ClientAddressResolver`, `WebEdgeProperties`, `parseWithoutHostBits`, las dos pruebas, las dos claves de `application.yml` y la nota de `docs/05` |
+
+## Tarea 2.3c: PR 7c `request-origin-filter`
+
+Rama `change/web-edge-foundations-request-origin-filter`, desde `main` en `5d99ba3` tras fusionar el PR 7b. El código sale de
+`wip/web-edge-request-origin-full` (sin tocarla; sigue en `9e8b52f`). `main` es la autoridad de lo de 2.3a y 2.3b: `ClientAddress`,
+`CidrBlock`, `TrustedProxies`, `WebEdgePropertiesTest` y el inventario no se portaron; en el inventario solo se añadió la línea de
+`RequestOrigin` a la lista de permitidos por nombre completo.
+
+### Evidencia del ciclo TDD (reobservada sobre este árbol)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO 1 | `-Dtest='RequestContextFilter*,PublicRouteAllowListTest'` con las pruebas y el arnés, sin producción | `COMPILATION ERROR`: `cannot find symbol` (`RequestOrigin`) y `constructor RequestContextFilter ... cannot be applied to given types`. Causa prevista. |
+| ROJO 2 | `RequestOrigin` y `WebEdgeConfiguration` portados y el constructor del filtro con `WebEdgeProperties`, sin ligar el origen ni leer el agente | `Tests run: 38, Failures: 6, Errors: 8`: `PublicRouteAllowListTest` 11 (`Failures: 1`, falta `/test/origin` en las fugas), `RequestContextFilterTest` 12 (`Failures: 5, Errors: 1`, el arnés no encuentra origen) y `RequestContextFilterUnitTest` 15 (`Errors: 7`, `NoSuchElement No value present`). |
+| VERDE | Filtro portado, más `IdempotencyScopeExclusionInventoryTest`, `ProcessBeanIsolationTest` y `WebEdgePropertiesTest` | `Tests run: 70, Failures: 0, Errors: 0, Skipped: 0` (`PublicRouteAllowListTest` 11, `RequestContextFilterTest` 12, `RequestContextFilterUnitTest` 15, inventario 3, `ProcessBeanIsolationTest` 4, `WebEdgePropertiesTest` 25). El `BUILD FAILURE` de esa ejecución es la cobertura de JaCoCo con `-Dtest=` acotado. |
+| Cierre | `./mvnw verify` completo | Surefire 186 + 730 (los 717 de la línea base más 13 nuevos), Failsafe 225, `BUILD SUCCESS`. Instantánea OpenAPI y `routes` sin cambios (`git status` limpio de ellos). |
+
+Pruebas añadidas: 13 (`RequestContextFilterTest` +6, `RequestContextFilterUnitTest` +7). La prueba de 100 peticiones simultáneas con
+`CyclicBarrier` afirma, por índice, la dirección y el agente propios de cada respuesta, que el identificador del atributo es el del origen, y
+exactamente 100 identificadores distintos. Ninguna prueba lee lo que un hilo del servidor hace después de la respuesta, así que no hay
+esperas que acotar.
+
+### Demostraciones deliberadas (cada una revertida; `cmp` sin diferencias)
+
+| Ruptura | Resultado |
+|---|---|
+| Un valor global (`static volatile`) en lugar de `ScopedValue`, escrito por el filtro y nunca limpiado | `RequestContextFilterTest` `Tests run: 12, Failures: 1` (`aHundredSimultaneousRequestsEachGetTheirOwnIdAddressAndAgent`): `expected: "198.51.100.1" but was: "198.51.100.5"` (cruce entre peticiones); `RequestContextFilterUnitTest` `Tests run: 15, Failures: 1`: `[nothing is bound once the filter returns] Expecting an empty Optional but was containing value: RequestOrigin[requestId=..., clientAddress=ClientAddress[address=/203.0.113.9], userAgent=agente-prueba]`. |
+| No sustituir los caracteres de control del agente (`kept.append(c)`) | `RequestContextFilterUnitTest` `Tests run: 15, Failures: 1` (`controlCharactersInTheUserAgentAreReplacedBySpacesBeforeItIsKept`): `expected: "a b c d e f"` frente al valor con `\t`, `NUL`, `DEL` y `NEL` intactos. |
+
+### Desviaciones del diseño (declaradas)
+
+Ninguna. Sin cambios en `ProcessBeanPolicy`: `shared.web.request` y `shared.web.edge` ya estaban permitidos. `design.md` no cambia (la nota
+del 2026-10-05 ya describe `RequestOrigin`, `isBound()` y el corte sin partir un par sustituto).
+
+### Medición del PR 7c (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 360 | 24 | **384** |
+| Con `-M` | 360 | 24 | **384** |
+
+Pronóstico 381; dentro del tope de 800. Tareas: 18 en total; hechas 10.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='RequestContextFilter*,PublicRouteAllowListTest,IdempotencyScopeExclusionInventoryTest,ProcessBeanIsolationTest,WebEdgePropertiesTest'`: `Tests run: 70, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 730, Failsafe 225 |
+| Arnés de ejecución | Arnés HTTP sin base de datos (`/test/origin`, propiedades por línea de comandos) con 100 peticiones simultáneas y un socket crudo sin `User-Agent`; pruebas unitarias del filtro con `MockHttpServletRequest` |
+| Frontera de reversión | Se retiran `RequestOrigin`, los cambios de `RequestContextFilter` y `WebEdgeConfiguration`, la línea de `IdempotencyScopeExclusionInventoryTest` y las ampliaciones de pruebas y arnés |
+
+### Revisión independiente de 2.3c y corrección (2026-10-05)
+
+Veredicto: sin bloqueantes, dos hallazgos importantes. Una sola corrección, en el commit `fix(web)`.
+
+| Hallazgo | Cambio | Evidencia observada |
+|---|---|---|
+| I-1: `MDC.put` y la construcción del origen corrían antes del `try`; si fallaban, el identificador quedaba en el MDC de un hilo reutilizado y el último recurso no respondía | El atributo se fija primero; `MDC.put` y la construcción del origen pasan dentro del `try` | ROJO: `aFailureWhileBuildingTheOriginStillCleansTheLogContextAndGetsTheLastResort` (una petición cuyo `getHeader` lanza): `IllegalState jdbc:postgresql://host/db password=hunter2` escapa del filtro. Verde: la cadena no corre, MDC vacío, `500 internal-error`, `traceId` igual al atributo y sin el mensaje. |
+| I-2: solo se sustituía `Character.isISOControl` | También `FORMAT`, `LINE_SEPARATOR`, `PARAGRAPH_SEPARATOR` y `CONTROL` por `Character.getType` (U+2028, U+2029, U+202A-202E, U+2066-2069, U+200B-200F, U+FEFF) | ROJO: `expected: "a b c d e f g" but was: "a?b?c?d?e?f?g"`. |
+| S-1: un sustituto suelto sin truncar sobrevivía | Todo sustituto sin pareja (alto o bajo) pasa a espacio; el par válido se conserva | ROJO: `expected: "ab " but was: "ab` (más el caso del medio). El orden (cortar y luego sustituir) mantiene el límite y no parte un par: `replacingAfterTheCutKeepsTheLimitAndNeverSplitsAPair`. |
+| S-2: `RequestOrigin` no se hereda en un ejecutor común | Línea de Javadoc: solo lo heredan las bifurcaciones de `StructuredTaskScope`. **Para 2.3d:** probar que el escritor de bitácora tolera un origen ausente (trabajo fuera del hilo de la petición) | Lectura del diff |
+| S-3: segunda ronda de 100 peticiones | `aHundredSimultaneousRequestsEachGetTheirOwnIdAddressAndAgent` hace dos rondas contra el mismo servidor, con agentes distintos por ronda y 200 identificadores distintos | Verde |
+
+Evidencia: ROJO `-Dtest='RequestContextFilter*'`: `Tests run: 19, Failures: 3, Errors: 1` (unitaria; la de integración 12/12). VERDE: 12 y 19, `Tests run: 31, Failures: 0`.
+
+| Ruptura (cada una revertida; `cmp` sin diferencias) | Resultado |
+|---|---|
+| Solo `MDC.put` de nuevo sobre el `try` (la que pedía la revisión) | `Tests run: 19, Failures: 0`: **no falla**. `MDC.put` no puede lanzar y la construcción del origen sigue dentro del `try`; la ruptura no es observable. |
+| Sustancial: `MDC.put` **y** la construcción del origen sobre el `try` (la estructura anterior) | `Tests run: 19, Errors: 1`: `aFailureWhileBuildingTheOriginStill...:172->run:73 IllegalState jdbc:postgresql://host/db password=hunter2` (el fallo escapa; no hay 500). |
+| `Character.isISOControl` solo, en lugar de `isUnsafe` | `Tests run: 19, Failures: 3`: `expected: "ab " but was: "ab`, `expected: "a b c d e f g" but was: "a?b?c?d?e?f?g"` y `expected: "xxxxxxxxxxxxxxxxxxx " but was: "xxxxxxxxxxxxxxxxxxx?"`. |
+
+Cierre: `./mvnw verify` completo: Surefire 186 + 734 (730 más 4), Failsafe 225, `BUILD SUCCESS`. Medición del PR 7c tras la corrección
+(`git diff --numstat main...HEAD -- . ':!openspec'`, igual con y sin `-M`): 454 adiciones, 24 eliminaciones, **478** en total (tope 800).

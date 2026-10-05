@@ -5,7 +5,9 @@ import com.confia.shared.web.problem.ProblemResponses;
 import com.confia.shared.web.request.RequestContextFilter;
 import com.confia.shared.web.request.SecurityHeadersFilter;
 import com.confia.shared.web.request.SensitiveLogGuard;
+import com.confia.shared.web.request.WebEdgeProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.MessageSource;
@@ -31,6 +33,7 @@ import org.springframework.context.support.ResourceBundleMessageSource;
  * {@code RequestContextFilter} follows it, both ahead of any security filter chain.
  */
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(WebEdgeProperties.class)
 public class WebEdgeConfiguration {
 
     @Bean
@@ -58,8 +61,9 @@ public class WebEdgeConfiguration {
      * Spring Boot registers for an unrelated purpose.
      */
     @Bean
-    RequestContextFilter serverRequestContextFilter(ProblemResponses problems) {
-        return new RequestContextFilter(problems);
+    RequestContextFilter serverRequestContextFilter(ProblemResponses problems,
+            WebEdgeProperties properties) {
+        return new RequestContextFilter(problems, properties);
     }
 
     /**

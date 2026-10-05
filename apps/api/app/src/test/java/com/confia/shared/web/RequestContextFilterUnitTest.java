@@ -6,15 +6,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.confia.shared.security.RequestOrigin;
 import com.confia.shared.web.problem.ProblemCode;
 import com.confia.shared.web.problem.ProblemResponses;
 import com.confia.shared.web.request.RequestContextFilter;
 import com.confia.shared.web.request.SecurityHeadersFilter;
+import com.confia.shared.web.request.WebEdgeProperties;
 import jakarta.servlet.FilterChain;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +41,8 @@ class RequestContextFilterUnitTest {
 
     private static final String SECRET_MESSAGE = "jdbc:postgresql://host/db password=hunter2";
 
-    private final RequestContextFilter filter = new RequestContextFilter(writer());
+    private final RequestContextFilter filter = new RequestContextFilter(writer(),
+            new WebEdgeProperties(List.of("10.0.0.1"), 20));
     private final Logger logger = (Logger) LoggerFactory.getLogger(RequestContextFilter.class);
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
 
@@ -146,6 +150,70 @@ class RequestContextFilterUnitTest {
                 .doesNotContain("IOException").doesNotContain("java.io");
     }
 
+    /** A request whose user agent cannot be read, which makes the origin fail to build. */
+    private static final class UnreadableRequest extends MockHttpServletRequest {
+        UnreadableRequest() {
+            super("GET", "/x");
+        }
+
+        @Override
+        public String getHeader(String name) {
+            throw new IllegalStateException(SECRET_MESSAGE);
+        }
+    }
+
+    @Test
+    void aFailureWhileBuildingTheOriginStillCleansTheLogContextAndGetsTheLastResort()
+            throws Exception {
+        UnreadableRequest request = new UnreadableRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        List<String> chainRan = new ArrayList<>();
+
+        run(request, response, (req, res) -> chainRan.add("ran"));
+
+        assertThat(chainRan).as("the chain never runs without an origin").isEmpty();
+        assertThat(MDC.get(RequestContextFilter.MDC_KEY)).as("no id stays on a reused thread")
+                .isNull();
+        assertThat(response.getStatus()).isEqualTo(500);
+        String id = (String) request.getAttribute(ProblemResponses.REQUEST_ID_ATTRIBUTE);
+        assertThat(UUID.fromString(id)).isNotNull();
+        assertThat(response.getContentAsString()).contains("internal-error")
+                .contains("\"traceId\":\"" + id + "\"")
+                .doesNotContain(SECRET_MESSAGE).doesNotContain("hunter2");
+    }
+
+    @Test
+    void invisibleAndLineBreakingCharactersInTheUserAgentAreReplacedBySpaces() throws Exception {
+        // U+2028 and U+2029 break lines, U+202E reverses text, U+200B and U+FEFF are invisible.
+        String raw = "a b c‮d​e﻿" + "f⁦g";
+
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", raw)).orElseThrow().userAgent())
+                .isEqualTo("a b c d e f g");
+    }
+
+    @Test
+    void anUnpairedSurrogateIsReplacedWhetherOrNotTheValueWasCut() throws Exception {
+        // A lone high surrogate at the end of a value that was not cut, then a lone low one and
+        // a lone high one in the middle; a valid pair is kept as it is.
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", "ab\ud83d")).orElseThrow()
+                .userAgent()).isEqualTo("ab ");
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", "a\ude00b\ud83dc"))
+                .orElseThrow().userAgent()).isEqualTo("a b c");
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", "a😀b")).orElseThrow()
+                .userAgent()).isEqualTo("a😀b");
+    }
+
+    @Test
+    void replacingAfterTheCutKeepsTheLimitAndNeverSplitsAPair() throws Exception {
+        String formatAtTheCut = "x".repeat(19) + "​" + "tail";
+        String pairEndingAtTheCut = "x".repeat(18) + "😀" + "tail";
+
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", formatAtTheCut)).orElseThrow()
+                .userAgent()).isEqualTo("x".repeat(19) + " ");
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", pairEndingAtTheCut))
+                .orElseThrow().userAgent()).isEqualTo("x".repeat(18) + "😀");
+    }
+
     @Test
     void theFullExceptionGoesToTheServerLogAndNotToTheClient() throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -161,6 +229,102 @@ class RequestContextFilterUnitTest {
         assertThat(logged.list.get(0).getThrowableProxy().getClassName())
                 .isEqualTo(IllegalStateException.class.getName());
         assertThat(logged.list.get(0).getThrowableProxy().getMessage()).isEqualTo(SECRET_MESSAGE);
+    }
+
+    /** The origin the chain sees while it runs, empty when none is bound. */
+    private Optional<RequestOrigin> originSeenByTheChain(MockHttpServletRequest request)
+            throws Exception {
+        List<Optional<RequestOrigin>> seen = new ArrayList<>();
+        run(request, new MockHttpServletResponse(), (req, res) -> seen.add(RequestOrigin.current()));
+        assertThat(seen).hasSize(1);
+        return seen.get(0);
+    }
+
+    private static MockHttpServletRequest requestFrom(String remote, String userAgent) {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/x");
+        request.setRemoteAddr(remote);
+        if (userAgent != null) {
+            request.addHeader("User-Agent", userAgent);
+        }
+        return request;
+    }
+
+    @Test
+    void theOriginIsBoundForTheChainWithTheLogContextIdAndIsGoneWhenItReturnsOrThrows()
+            throws Exception {
+        List<String> seen = new ArrayList<>();
+        MockHttpServletRequest request = requestFrom("203.0.113.9", "agente-prueba");
+
+        run(request, new MockHttpServletResponse(), (req, res) -> {
+            RequestOrigin origin = RequestOrigin.current().orElseThrow();
+            seen.add(origin.requestId().toString());
+            seen.add(MDC.get(RequestContextFilter.MDC_KEY));
+            seen.add(origin.clientAddress().canonical());
+            seen.add(origin.userAgent());
+        });
+
+        assertThat(seen.subList(2, 4)).containsExactly("203.0.113.9", "agente-prueba");
+        assertThat(seen.get(1)).isEqualTo(seen.get(0));
+        assertThat(RequestOrigin.current()).as("nothing is bound once the filter returns").isEmpty();
+
+        run(requestFrom("203.0.113.9", null), new MockHttpServletResponse(), (req, res) -> {
+            throw new IllegalStateException(SECRET_MESSAGE);
+        });
+        assertThat(RequestOrigin.current()).as("nor once the chain throws").isEmpty();
+    }
+
+    @Test
+    void aForwardedHeaderOfAnUntrustedPeerIsNeverTheClientAddress() throws Exception {
+        MockHttpServletRequest request = requestFrom("203.0.113.9", null);
+        request.addHeader("X-Forwarded-For", "198.51.100.7");
+
+        assertThat(originSeenByTheChain(request).orElseThrow().clientAddress().canonical())
+                .isEqualTo("203.0.113.9");
+    }
+
+    @Test
+    void everyForwardedHeaderLineOfATrustedPeerIsOneList() throws Exception {
+        MockHttpServletRequest request = requestFrom("10.0.0.1", null);
+        request.addHeader("X-Forwarded-For", "198.51.100.7");
+        request.addHeader("X-Forwarded-For", "10.0.0.1");
+
+        assertThat(originSeenByTheChain(request).orElseThrow().clientAddress().canonical())
+                .isEqualTo("198.51.100.7");
+    }
+
+    @Test
+    void aMissingUserAgentIsNullAndTheRequestIsProcessed() throws Exception {
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", null)).orElseThrow().userAgent())
+                .isNull();
+    }
+
+    @Test
+    void controlCharactersInTheUserAgentAreReplacedBySpacesBeforeItIsKept() throws Exception {
+        String raw = "a\u0000b\tc\u007fd\u0085e\nf";
+
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", raw)).orElseThrow().userAgent())
+                .isEqualTo("a b c d e f");
+    }
+
+    @Test
+    void theUserAgentIsCutToTheLimitAndNeverInTheMiddleOfASurrogatePair() throws Exception {
+        String atTheLimit = "x".repeat(20);
+
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", atTheLimit)).orElseThrow()
+                .userAgent()).isEqualTo(atTheLimit);
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", atTheLimit + "y")).orElseThrow()
+                .userAgent()).isEqualTo(atTheLimit);
+        // The 20th character would be half of the emoji: the cut drops the half rather than keep it.
+        String emojiAtTheCut = "x".repeat(19) + "😀";
+        assertThat(originSeenByTheChain(requestFrom("203.0.113.9", emojiAtTheCut)).orElseThrow()
+                .userAgent()).isEqualTo("x".repeat(19));
+    }
+
+    @Test
+    void aRemoteAddressThatIsNotAnIpLeavesTheClientAddressUnknownInsteadOfFailingTheRequest()
+            throws Exception {
+        assertThat(originSeenByTheChain(requestFrom("not-an-ip", "agente")).orElseThrow()
+                .clientAddress()).isNull();
     }
 
     @Test

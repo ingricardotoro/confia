@@ -413,7 +413,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     proxies`. — Requisitos de `web-edge` «La IP del cliente se obtiene solo a través de proxies de confianza» y
     «La lista de proxies de confianza es una propiedad por entorno, vacía por defecto»
 
-- [ ] 2.3c **PR 7c `request-origin-filter`: identificador, agente de usuario y origen ligado a la petición
+- [x] 2.3c **PR 7c `request-origin-filter`: identificador, agente de usuario y origen ligado a la petición
   (decisión 11).**
   - **ROJO.** Ampliar `RequestContextFilterTest.java` (origen con el identificador del servidor y la dirección de
     la conexión, cabecera ignorada sin proxies y obedecida con ellos, agente ausente y en el límite, 100 peticiones
