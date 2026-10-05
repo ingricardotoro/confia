@@ -4,13 +4,21 @@ import static com.confia.shared.web.harness.ProblemAssertions.assertBaseSecurity
 import static com.confia.shared.web.harness.ProblemAssertions.assertProblem;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import com.confia.shared.web.edge.ProblemErrorReportValve;
 import com.confia.shared.web.harness.HarnessProcess;
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -78,6 +86,75 @@ class ContainerRejectionsTest {
                 .doesNotContainIgnoringCase("tomcat")
                 .doesNotContainIgnoringCase("<html")
                 .doesNotContainIgnoringCase("exception");
+    }
+
+    /**
+     * Every rejection leaves one fixed event with the original status of the container (which the
+     * answer may rewrite: a 417 is answered as 400), the method and the trace id of the answer,
+     * and never the path, the query, a header or an exception.
+     */
+    @ParameterizedTest
+    @CsvSource({"GET, /x%2f, 400", "GET, /x%00, 400", "TRACE, /x, 405"})
+    void eachRejectionLeavesOneFixedEventWithTheOriginalStatusAndNothingTheClientSent(
+            String method, String path, int status) {
+        List<ILoggingEvent> events = loggedBy(() -> admin.send(method, path));
+
+        assertThat(events).hasSize(1);
+        assertRejectionEvent(events.get(0), status, method, path);
+    }
+    @Test
+    void theEventOfARewrittenStatusCarriesTheOriginalOneAndTheTraceIdOfTheBody() throws Exception {
+        AtomicReference<String> raw = new AtomicReference<>();
+
+        List<ILoggingEvent> events = loggedBy(() -> raw.set(rawExchange(
+                "GET / HTTP/1.1\r\nHost: localhost\r\nExpect: something-else\r\n"
+                        + "Connection: close\r\n\r\n")));
+
+        assertThat(events).hasSize(1);
+        String message = events.get(0).getFormattedMessage();
+        assertThat(message).as("the container's own status, which is not the catalog's")
+                .matches("container rejection answered: status=417, method=GET, "
+                        + "traceId=[0-9a-f-]{36}");
+        assertThat(raw.get()).startsWith("HTTP/1.1 400 ").contains("application/problem+json")
+                .contains("\"status\":400").contains("\"type\":\"https://confia.hn/problems/"
+                        + "validation-failed\"");
+        assertThat(raw.get()).contains(message.substring(message.indexOf("traceId=") + 8));
+        assertThat(message).doesNotContain("something-else").doesNotContain("Expect");
+    }
+
+    /** One request written as is to the admin process and the whole answer read back. */
+    private static String rawExchange(String request) {
+        try (java.net.Socket socket = new java.net.Socket("localhost", admin.port())) {
+            socket.setSoTimeout(10_000);
+            socket.getOutputStream().write(request.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return new String(socket.getInputStream().readAllBytes(),
+                    java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
+    private static List<ILoggingEvent> loggedBy(Runnable action) {
+        Logger logger = (Logger) LoggerFactory.getLogger(ProblemErrorReportValve.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            action.run();
+        } finally {
+            logger.detachAppender(appender);
+        }
+        return new ArrayList<>(appender.list);
+    }
+
+    private static void assertRejectionEvent(ILoggingEvent event, int status, String method,
+            String path) {
+        assertThat(event.getFormattedMessage()).matches("container rejection answered: status="
+                + status + ", method=" + method + ", traceId=[0-9a-f-]{36}");
+        assertThat(event.getArgumentArray()).hasSize(3);
+        assertThat(event.getThrowableProxy()).isNull();
+        assertThat(event.getFormattedMessage()).doesNotContainIgnoringCase(path.substring(1))
+                .doesNotContainIgnoringCase("tomcat").doesNotContainIgnoringCase("exception");
     }
 
     @Test

@@ -4,11 +4,15 @@ import com.confia.shared.web.problem.ProblemCode;
 import com.confia.shared.web.problem.ProblemResponses;
 import com.confia.shared.web.request.SecurityHeadersFilter;
 import java.io.IOException;
+import java.util.Set;
+import java.util.UUID;
 import org.apache.catalina.Container;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.core.StandardHost;
 import org.apache.catalina.valves.ErrorReportValve;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The error report of the embedded Tomcat, replaced so that what the container refuses before any
@@ -26,6 +30,10 @@ import org.apache.catalina.valves.ErrorReportValve;
  * Tomcat's own report does.
  */
 public final class ProblemErrorReportValve extends ErrorReportValve {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ProblemErrorReportValve.class);
+    private static final Set<String> STANDARD_METHODS = Set.of("GET", "HEAD", "POST", "PUT",
+            "DELETE", "PATCH", "OPTIONS", "TRACE", "CONNECT");
 
     private final ProblemResponses problems;
 
@@ -50,31 +58,54 @@ public final class ProblemErrorReportValve extends ErrorReportValve {
     }
 
     /**
-     * The code that answers a container status: {@code 405} is {@code method-not-allowed}, a
-     * server error is {@code internal-error} and every other client error is {@code
-     * validation-failed}. The answer carries the status of that code, which for a status the
-     * catalog does not have (for example {@code 414}) is the nearest one it does.
+     * The code that answers a container status, by the catalog: {@code 401} is {@code
+     * authentication-required}, {@code 403} is {@code forbidden}, {@code 405} is {@code
+     * method-not-allowed}, a server error is {@code internal-error} and every other client error is
+     * {@code validation-failed}. The answer carries the status of that code, which for a status the
+     * catalog does not have (for example {@code 414} or {@code 503}) is the nearest one it does; the
+     * original status survives in the log event of {@link #report}.
      */
     public static ProblemCode codeFor(int status) {
-        if (status == ProblemCode.METHOD_NOT_ALLOWED.status()) {
-            return ProblemCode.METHOD_NOT_ALLOWED;
-        }
-        return status >= 500 ? ProblemCode.INTERNAL_ERROR : ProblemCode.VALIDATION_FAILED;
+        return switch (status) {
+            case 401 -> ProblemCode.AUTHENTICATION_REQUIRED;
+            case 403 -> ProblemCode.FORBIDDEN;
+            case 405 -> ProblemCode.METHOD_NOT_ALLOWED;
+            default -> status >= 500 ? ProblemCode.INTERNAL_ERROR : ProblemCode.VALIDATION_FAILED;
+        };
     }
 
+    /**
+     * Answers the rejection and leaves one event at {@code INFO}: it is the client's doing, not an
+     * operator's alarm, and a fixed message of three bounded fields is cheap enough that a flood
+     * of rejected requests cannot flood the log with more than one short line each. It carries the
+     * original status of the container, the method when it is a standard one, and the trace id of
+     * the answer. It never carries the path, the query, a header, or the text or class of any
+     * exception.
+     */
     @Override
     protected void report(Request request, Response response, Throwable throwable) {
-        if (response.getStatus() < 400 || response.getContentWritten() > 0
-                || !response.setErrorReported()) {
+        int status = response.getStatus();
+        if (status < 400 || response.getContentWritten() > 0 || !response.setErrorReported()) {
             return;
         }
         try {
             response.resetBuffer();
             SecurityHeadersFilter.apply(response);
-            problems.writeWithoutRequestPath(request, response, codeFor(response.getStatus()));
+            String traceId = UUID.randomUUID().toString();
+            request.setAttribute(ProblemResponses.REQUEST_ID_ATTRIBUTE, traceId);
+            problems.writeWithoutRequestPath(request, response, codeFor(status));
+            LOG.info("container rejection answered: status={}, method={}, traceId={}", status,
+                    methodOf(request), traceId);
         } catch (IOException | IllegalStateException e) {
-            // The client went away or the response was closed under us: there is nobody to
-            // answer, and the container's own report ignores the same failure.
+            // Nobody to answer: the client went away or the response was closed under us. Fixed
+            // text and no data, not even the exception.
+            LOG.info("container rejection could not be answered: the response was closed");
         }
+    }
+
+    /** The method when it is one of the standard ones, so a client cannot choose what is logged. */
+    private static String methodOf(Request request) {
+        String method = request.getMethod();
+        return method != null && STANDARD_METHODS.contains(method) ? method : "OTHER";
     }
 }
