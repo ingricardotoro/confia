@@ -93,9 +93,9 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | 5 | Portal y trabajador sin borde de seguridad, cabeceras, sesión e identificador en la cadena real (2.1c) | PR 5 `portal-and-worker-chain` (~700 → 800) | Ídem con `-Dtest='PortalSecurityChainTest,RequestContextFilterTest,AdminSecurityChainTest,StatelessChainTest,PublicEndpointsTest,ProcessBeanIsolationTest'` | Portal por `ConfiaApplication.launch` y arnés con el filtro de contexto | Solo pruebas y las exclusiones del trabajador |
 | 6a | Problem Details y cabeceras base para lo que rechaza Tomcat, código `method-not-allowed` y prueba del acoplamiento de springdoc (2.2a) | PR 6a `container-rejections` (~395 medido) | `-Dtest='ContainerRejectionsTest,ProblemErrorReportValveTest,ProblemCodeTest,ProductionEdgeDefaultsTest,ProblemCatalogCoverageTest,ProcessBeanIsolationTest'` | Procesos administrativo y portal reales por `ConfiaApplication.launch` con su configuración de producción | Se retira la válvula y su personalizador, el código `method-not-allowed` y el método estático de cabeceras |
 | 6b | Lista blanca cerrada, mapa de rutas del portal, ninguna ruta de producción y guardia de registros (2.2b) | PR 6b `edge-gates` (~716 medido) | Ídem con `-Dtest='PublicRouteAllowListTest,PortalRouteMapSnapshotTest,SensitiveDataLoggingTest'` | Enumeración de rutas del contexto real y petición anónima a cada una | Solo pruebas, instantánea y guardia de registros |
-| 7a | Direcciones de cliente (`ClientAddress`, `ClientKey`) y rangos CIDR (2.3a) | PR 7a `client-address` (482 medido) | `-Dtest='CidrBlock*,ClientAddress*'` | jqwik contra referencias con `BigInteger`; sin proceso | Se retiran las tres clases y sus dos pruebas |
+| 7a | Direcciones de cliente (`ClientAddress`, `ClientKey`) y rangos CIDR (2.3a) | PR 7a `client-address` (513 en el árbol completo) | `-Dtest='CidrBlock*,ClientAddress*,IdempotencyScopeExclusionInventoryTest'` | jqwik contra referencias con `BigInteger`; sin proceso | Se retiran las tres clases y sus dos pruebas |
 | 7b | Resolución de la IP del cliente por proxies de confianza y propiedad `confia.web.trusted-proxies` (2.3b) | PR 7b `trusted-proxy-resolution` (592 medido) | `-Dtest='ClientAddressResolverTest,WebEdgePropertiesTest'` | Resolvedor con ejemplos y propiedades; `Binder` con `SystemEnvironmentPropertySource` | Se retiran las tres clases, las dos claves de `application.yml` y la nota de `docs/05` |
-| 7c | Identificador, agente de usuario y `RequestOrigin` ligado a la petición (2.3c) | PR 7c `request-origin-filter` (412 medido) | `-Dtest='RequestContextFilter*,PublicRouteAllowListTest,IdempotencyScopeExclusionInventoryTest'` | Arnés sin base de datos con 100 peticiones simultáneas y un socket crudo sin `User-Agent` | Se retiran `RequestOrigin` y los cambios del filtro |
+| 7c | Identificador, agente de usuario y `RequestOrigin` ligado a la petición (2.3c) | PR 7c `request-origin-filter` (381 en el árbol completo) | `-Dtest='RequestContextFilter*,PublicRouteAllowListTest'` | Arnés sin base de datos con 100 peticiones simultáneas y un socket crudo sin `User-Agent` | Se retiran `RequestOrigin` y los cambios del filtro |
 | 7d | Origen de la petición en la bitácora (2.3d) | PR 7d `audit-origin` (383 medido) | Unidad: `-Dtest='RequestOriginAuditLogWriterTest,ProcessBeanIsolationTest'`; IT: `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=RequestOriginAuditIT -Dfailsafe.failIfNoSpecifiedTests=false` | `RequestOriginAuditIT` con PostgreSQL (Testcontainers) y 50 peticiones concurrentes | El decorador se retira: la auditoría vuelve a `null` |
 | 8 | Traductor de Problem Details completo (2.4) | PR 8 `problem-translator` (~380 → 570) | Ídem con `-Dtest='ProblemTranslationTest,ProblemCatalogCoverageTest'` | Controladores de prueba que lanzan cada excepción por la cadena real | Errores de MVC vuelven al formato de Spring |
 | 9 | Reglas W1, W2a, W2b y W3 con fixtures, `SessionValidity` e inventario de ausencias (2.5) | PR 9 `web-rules` (~380 → 570) | Ídem con `-Dtest='WebLayerDependencyRulesTest,WebExposedTypesRuleTest,SharedBoundaryRulesTest,EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest,WebEdgeScopeExclusionInventoryTest'` | Mitad de fixture rechazada con fragmentos que nombran la violación (ADR-0018) | Solo pruebas y un puerto sin uso |
@@ -373,7 +373,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     contienen cabeceras…» y «Ausencia de autenticación por credencial…» (ninguna ruta de producción);
     requisito de `build-integrity` «Instantánea aprobada del mapa de rutas del portal»
 
-- [ ] 2.3a **PR 7a `client-address`: direcciones de cliente y rangos CIDR (decisiones 12 y 15, la parte de tipos).**
+- [x] 2.3a **PR 7a `client-address`: direcciones de cliente y rangos CIDR (decisiones 12 y 15, la parte de tipos).**
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/security/`
     `ClientAddressPropertiesTest.java` (jqwik con una referencia con `BigInteger`: mismo /64 equivale a la
     misma clave, IPv4 completa, mapeada igual a IPv4, zona ignorada, texto canónico, y un nombre de host, una
@@ -384,7 +384,9 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
   - **VERDE.** Crear `apps/api/app/src/main/java/com/confia/shared/security/{ClientAddress,ClientKey}.java` y
     `.../shared/web/request/CidrBlock.java` (privada al paquete). `ClientAddress.parseLiteral` exige cuatro partes
     decimales sin ceros a la izquierda para IPv4 y rechaza los corchetes, y solo entonces delega en
-    `InetAddress.ofLiteral`, que no resuelve nombres.
+    `InetAddress.ofLiteral`, que no resuelve nombres. `IdempotencyScopeExclusionInventoryTest` (a) nombra los tipos de
+    idempotencia en lugar de todo `shared.security`: `CidrBlock`, una clase `web`, depende ya de `ClientAddress` y la prueba
+    fallaba (la brecha «con destino: cambio 7»).
   - **Demostración deliberada.** Hacer que `CidrBlock.contains` ignore los bits parciales del último byte, o que
     `rateLimitKey` use los 16 bytes de una IPv6, rompe la propiedad respectiva; se revierte.
   - **Cierre.** `./mvnw verify` completo. Commit: `feat(web): parse client addresses and CIDR ranges without
@@ -420,8 +422,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
   - **VERDE.** Crear `shared/security/RequestOrigin.java`; ampliar `RequestContextFilter.java` (agente truncado a
     `confia.web.user-agent-max-length`, con los caracteres de control sustituidos, y
     `ScopedValue.where(RequestOrigin.CURRENT, origin)`) y `WebEdgeConfiguration.java` (`@EnableConfigurationProperties`).
-    `PublicRouteAllowListTest` pasa a esperar la ruta del arnés y `IdempotencyScopeExclusionInventoryTest` nombra los
-    tipos de idempotencia en lugar de todo `shared.security`.
+    `PublicRouteAllowListTest` pasa a esperar la ruta del arnés.
   - **Demostración deliberada.** Reutilizar un valor global en lugar de `ScopedValue`, o no sustituir los
     caracteres de control, rompe las pruebas respectivas; se revierte.
   - **Cierre.** `./mvnw verify` completo. Commit: `feat(web): bind the request origin for the whole request`. —
@@ -965,17 +966,17 @@ cierre 6.1) y **17 PR**. El árbol completo y verificado se conserva en la rama 
 
 | Parte | Contenido | Líneas medidas en el árbol completo |
 |---|---|---|
-| 2.3a `client-address` | `ClientAddress`, `ClientKey`, `CidrBlock`, `ClientAddressPropertiesTest`, `CidrBlockPropertiesTest` | 482 |
+| 2.3a `client-address` | `ClientAddress`, `ClientKey`, `CidrBlock`, `ClientAddressPropertiesTest`, `CidrBlockPropertiesTest`, ajuste de `IdempotencyScopeExclusionInventoryTest` | 513 |
 | 2.3b `trusted-proxy-resolution` | `TrustedProxies`, `ClientAddressResolver`, `WebEdgeProperties`, `ClientAddressResolverTest`, `WebEdgePropertiesTest`, `application.yml`, nota de `docs/05` | 592 |
-| 2.3c `request-origin-filter` | `RequestOrigin`, `RequestContextFilter`, `WebEdgeConfiguration`, ampliación del arnés y de las dos pruebas del filtro, ajuste de `PublicRouteAllowListTest` y `IdempotencyScopeExclusionInventoryTest` | 412 |
+| 2.3c `request-origin-filter` | `RequestOrigin`, `RequestContextFilter`, `WebEdgeConfiguration`, ampliación del arnés y de las dos pruebas del filtro, ajuste de `PublicRouteAllowListTest` | 381 |
 | 2.3d `audit-origin` | `RequestOriginAuditLogWriter`, línea de `ProcessBeanPolicy`, envoltura en `SharedPlatformConfiguration`, Javadoc de `AuditEntry`, `RequestOriginAuditIT`, prueba del decorador | 383 |
 
 Numeración: los PR se llaman 7a a 7d y **los PR 8 a 13 conservan su número**. Orden: 2.3a, 2.3b, 2.3c y 2.3d, cada una
 desde `main` actualizado tras fusionar la anterior. Dependencias: 2.3b necesita 2.3a (`ClientAddress`, `CidrBlock`);
 2.3c necesita 2.3b (`WebEdgeProperties`) y el filtro de 2.1c; 2.3d necesita 2.3c (`RequestOrigin`). Cada parte debe
-estar en verde por sí sola: las pruebas de 2.3c que dependen del arnés ampliado, y los dos ajustes de pruebas
-existentes (`PublicRouteAllowListTest` y `IdempotencyScopeExclusionInventoryTest`), viajan en 2.3c, la parte que los
-vuelve necesarios. Trazabilidad: 166 escenarios, 166 con tarea, 0 huérfanos; los 23 que apuntaban a 2.3 apuntan ahora a
+estar en verde por sí sola: las pruebas de 2.3c que dependen del arnés ampliado, y el ajuste de `PublicRouteAllowListTest` viajan en 2.3c; el de
+`IdempotencyScopeExclusionInventoryTest` viaja en 2.3a, porque `CidrBlock` ya depende de `shared.security` (hallado al
+verificar 2.3a: la prueba falló y se movió). Trazabilidad: 166 escenarios, 166 con tarea, 0 huérfanos; los 23 que apuntaban a 2.3 apuntan ahora a
 una sola parte (2.3a: cuatro de IPv6 y /64; 2.3b: doce de resolución y de propiedad; 2.3c: cuatro, del identificador y
 del agente de usuario; 2.3d: tres, de la bitácora).
 
