@@ -894,3 +894,26 @@ Pronóstico 381; dentro del tope de 800. Tareas: 18 en total; hechas 10.
 | Orden enfocada y resultado | `-Dtest='RequestContextFilter*,PublicRouteAllowListTest,IdempotencyScopeExclusionInventoryTest,ProcessBeanIsolationTest,WebEdgePropertiesTest'`: `Tests run: 70, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 730, Failsafe 225 |
 | Arnés de ejecución | Arnés HTTP sin base de datos (`/test/origin`, propiedades por línea de comandos) con 100 peticiones simultáneas y un socket crudo sin `User-Agent`; pruebas unitarias del filtro con `MockHttpServletRequest` |
 | Frontera de reversión | Se retiran `RequestOrigin`, los cambios de `RequestContextFilter` y `WebEdgeConfiguration`, la línea de `IdempotencyScopeExclusionInventoryTest` y las ampliaciones de pruebas y arnés |
+
+### Revisión independiente de 2.3c y corrección (2026-10-05)
+
+Veredicto: sin bloqueantes, dos hallazgos importantes. Una sola corrección, en el commit `fix(web)`.
+
+| Hallazgo | Cambio | Evidencia observada |
+|---|---|---|
+| I-1: `MDC.put` y la construcción del origen corrían antes del `try`; si fallaban, el identificador quedaba en el MDC de un hilo reutilizado y el último recurso no respondía | El atributo se fija primero; `MDC.put` y la construcción del origen pasan dentro del `try` | ROJO: `aFailureWhileBuildingTheOriginStillCleansTheLogContextAndGetsTheLastResort` (una petición cuyo `getHeader` lanza): `IllegalState jdbc:postgresql://host/db password=hunter2` escapa del filtro. Verde: la cadena no corre, MDC vacío, `500 internal-error`, `traceId` igual al atributo y sin el mensaje. |
+| I-2: solo se sustituía `Character.isISOControl` | También `FORMAT`, `LINE_SEPARATOR`, `PARAGRAPH_SEPARATOR` y `CONTROL` por `Character.getType` (U+2028, U+2029, U+202A-202E, U+2066-2069, U+200B-200F, U+FEFF) | ROJO: `expected: "a b c d e f g" but was: "a?b?c?d?e?f?g"`. |
+| S-1: un sustituto suelto sin truncar sobrevivía | Todo sustituto sin pareja (alto o bajo) pasa a espacio; el par válido se conserva | ROJO: `expected: "ab " but was: "ab` (más el caso del medio). El orden (cortar y luego sustituir) mantiene el límite y no parte un par: `replacingAfterTheCutKeepsTheLimitAndNeverSplitsAPair`. |
+| S-2: `RequestOrigin` no se hereda en un ejecutor común | Línea de Javadoc: solo lo heredan las bifurcaciones de `StructuredTaskScope`. **Para 2.3d:** probar que el escritor de bitácora tolera un origen ausente (trabajo fuera del hilo de la petición) | Lectura del diff |
+| S-3: segunda ronda de 100 peticiones | `aHundredSimultaneousRequestsEachGetTheirOwnIdAddressAndAgent` hace dos rondas contra el mismo servidor, con agentes distintos por ronda y 200 identificadores distintos | Verde |
+
+Evidencia: ROJO `-Dtest='RequestContextFilter*'`: `Tests run: 19, Failures: 3, Errors: 1` (unitaria; la de integración 12/12). VERDE: 12 y 19, `Tests run: 31, Failures: 0`.
+
+| Ruptura (cada una revertida; `cmp` sin diferencias) | Resultado |
+|---|---|
+| Solo `MDC.put` de nuevo sobre el `try` (la que pedía la revisión) | `Tests run: 19, Failures: 0`: **no falla**. `MDC.put` no puede lanzar y la construcción del origen sigue dentro del `try`; la ruptura no es observable. |
+| Sustancial: `MDC.put` **y** la construcción del origen sobre el `try` (la estructura anterior) | `Tests run: 19, Errors: 1`: `aFailureWhileBuildingTheOriginStill...:172->run:73 IllegalState jdbc:postgresql://host/db password=hunter2` (el fallo escapa; no hay 500). |
+| `Character.isISOControl` solo, en lugar de `isUnsafe` | `Tests run: 19, Failures: 3`: `expected: "ab " but was: "ab`, `expected: "a b c d e f g" but was: "a?b?c?d?e?f?g"` y `expected: "xxxxxxxxxxxxxxxxxxx " but was: "xxxxxxxxxxxxxxxxxxx?"`. |
+
+Cierre: `./mvnw verify` completo: Surefire 186 + 734 (730 más 4), Failsafe 225, `BUILD SUCCESS`. Medición del PR 7c tras la corrección
+(`git diff --numstat main...HEAD -- . ':!openspec'`, igual con y sin `-M`): 454 adiciones, 24 eliminaciones, **478** en total (tope 800).
