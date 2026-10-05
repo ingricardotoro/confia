@@ -2,6 +2,7 @@ package com.confia.bootstrap.admin;
 
 import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
 import com.confia.shared.platform.infrastructure.SharedPlatformConfiguration;
+import com.confia.shared.web.edge.WebEdgeConfiguration;
 import com.confia.shared.web.openapi.ContractSchemas;
 import com.confia.shared.web.openapi.ProcessApiInfo;
 import org.springframework.boot.SpringBootConfiguration;
@@ -13,7 +14,8 @@ import org.springframework.context.annotation.Import;
  * process loads with {@code @Import}, never with a component scan: a class enters this context
  * only if it is written below, so a portal-only or worker-only component cannot arrive by
  * accident. This process registers the shared platform wiring (decision 2 of
- * web-edge-foundations) and the {@code identity} module's use cases and secrets (decision 3).
+ * web-edge-foundations), the {@code identity} module's use cases and secrets (decision 3) and the
+ * web edge's request filters and Problem Details catalog (decisions 7, 8, 10 and 11).
  *
  * <p>Registering a module here is a visible two-line change: its public configuration in the
  * {@code @Import} list and its package in {@code ProcessBeanPolicy}, which the isolation test
@@ -30,6 +32,6 @@ import org.springframework.context.annotation.Import;
 @SpringBootConfiguration
 @EnableAutoConfiguration
 @Import({ContractSchemas.class, ProcessApiInfo.class, SharedPlatformConfiguration.class,
-        IdentityConfiguration.class})
+        IdentityConfiguration.class, WebEdgeConfiguration.class})
 public class AdminApplication {
 }

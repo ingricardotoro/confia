@@ -1,5 +1,6 @@
 package com.confia.bootstrap.portal;
 
+import com.confia.shared.web.edge.WebEdgeConfiguration;
 import com.confia.shared.web.openapi.ContractSchemas;
 import com.confia.shared.web.openapi.ProcessApiInfo;
 import org.springframework.boot.SpringBootConfiguration;
@@ -10,7 +11,9 @@ import org.springframework.context.annotation.Import;
 /**
  * Guardian portal process entry point (ADR-0003, ADR-0013, ADR-0024). It declares everything this
  * process loads with {@code @Import}, never with a component scan, so administrative code cannot
- * reach the process exposed to guardians by accident. No business module is registered yet.
+ * reach the process exposed to guardians by accident. No business module is registered yet; the
+ * web edge's request filters and Problem Details catalog are (web-edge-foundations decisions 7, 8,
+ * 10 and 11).
  *
  * <p>Registering a module here is a visible two-line change: its public configuration in the
  * {@code @Import} list and its package in {@code ProcessBeanPolicy}.
@@ -24,6 +27,6 @@ import org.springframework.context.annotation.Import;
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = DataSourceAutoConfiguration.class)
-@Import({ContractSchemas.class, ProcessApiInfo.class})
+@Import({ContractSchemas.class, ProcessApiInfo.class, WebEdgeConfiguration.class})
 public class PortalApplication {
 }
