@@ -1134,3 +1134,19 @@ pasa (el arnés siempre añade `/test/open`) pero `OpenApiExposureByProfileTest`
 negativas al arrancar el proceso. La regla se conserva como última regla explícita y deja de ser solo
 documentación: es lo que permite que la lista vacía produzca una cadena que deniega todo. El texto anterior de
 este documento no se reescribe.
+
+### Nota fechada 2026-10-04: `STATELESS` y `requestCache.disable` se respaldan, y lo que Tomcat responde antes de la cadena (decisión 5, PR 5)
+
+Primera: la decisión 5 lista `sessionCreationPolicy(STATELESS)` y `requestCache(disable)` como dos garantías
+de ausencia de estado. Se comprobó quitándolas una a una que son **redundantes entre sí** para las respuestas:
+`STATELESS` instala un `NullRequestCache`, y sin `STATELESS` la caché deshabilitada tampoco guarda la petición,
+de modo que ninguna prueba de respuesta (sesión, `Set-Cookie`) falla con una sola quitada; solo fallan con las
+dos quitadas (`JSESSIONID` en `Set-Cookie`). Se conservan las dos, y `StatelessChainTest` las prueba por
+separado sobre la cadena real (ningún `RequestCacheAwareFilter`; repositorio de contexto exactamente
+`RequestAttributeSecurityContextRepository`), porque un inicio de sesión posterior que guarde un contexto
+abriría una sesión por la que se hubiera quitado. Segunda: la decisión 7 afirma que el filtro de cabeceras cubre
+«los rechazos del cortafuegos, de la cadena, del limitador y del último recurso». No cubre lo que Tomcat rechaza
+antes de entrar en la cadena de filtros: `/x%2f` y `/x%00` (400) y `TRACE` (405) reciben la página HTML del
+contenedor, sin Problem Details y sin las cabeceras base. No llega ningún controlador y no se expone un detalle
+interno, pero la uniformidad de la decisión 8 no se cumple en esos tres casos. Queda como brecha abierta; el
+texto anterior de este documento no se reescribe.

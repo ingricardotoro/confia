@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-04 (tarea 2.1b; 2.1a y 2.1b hechas)
+- **Última actualización:** 2026-10-04 (tarea 2.1c; 2.1a, 2.1b y 2.1c hechas)
 
 ## Estado de las tareas
 
@@ -13,7 +13,7 @@
 | 1.2 | PR 2 `identity-beans` | Hecha | `aaa1161`, `4d99f98` |
 | 2.1a | PR 3 `problem-details-core` | Hecha | `2554745` y el commit `docs(sdd)` de esta rama |
 | 2.1b | PR 4 `security-chains` | Hecha | `f9bc884`, `6ba1744` y el commit `docs(sdd)` de esta rama |
-| 2.1c | PR 5 `portal-and-worker-chain` | Pendiente | |
+| 2.1c | PR 5 `portal-and-worker-chain` | Hecha | `7cf71ee` y el commit `docs(sdd)` de esta rama |
 | 2.2 a 6.1 | PR 6 a 13 y cierre | Pendientes (numeración nueva) | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
@@ -371,3 +371,102 @@ Riesgo evaluado: alto. Auditoría de seguridad: sin bloqueantes, un importante y
   abriría la documentación en producción).
 - **Para 2.4:** S1 en su parte de prueba (`instance` en el `400` del firewall).
 - **Para `session-tokens-and-web-layer`:** S4 (`WWW-Authenticate` en el `401`).
+
+## Tarea 2.1c: PR 5 `portal-and-worker-chain`
+
+Rama `change/web-edge-foundations-portal-and-worker`, creada desde `main` en `92a730b` tras fusionar el PR 4. El
+código sale de la rama local `wip/web-edge-security-chains-full` (sin tocarla; sigue en `a8fba42`), partiendo
+siempre de la versión de `main` en los archivos de 2.1a y 2.1b: `ProblemResponses` conserva
+`REQUEST_ID_ATTRIBUTE` (el filtro y el controlador de prueba la leen de allí), no hay `FieldViolation` ni
+`ProblemBody.errors`, y el Javadoc de `ProblemRequestRejectedHandler` y la prueba de idioma no se tocaron.
+
+### Red de seguridad
+
+`AdminSecurityChainTest`, `OpenApi*Test`, `ProcessBeanIsolationTest`, `SecurityHeadersFilterTest`,
+`ProblemResponsesTest` y `WebEdgeFiltersInProcessesTest` antes de tocar nada: `Tests run: 52, Failures: 0,
+Errors: 0` (la cobertura de JaCoCo falla con `-Dtest=` acotado, como avisa `tasks.md`).
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO, línea 1 de `ProcessBeanPolicy` | Prohibido nominal `org.springframework.security` para el trabajador, sin tocar `WorkerApplication`: `-Dtest='ProcessBeanIsolationTest,ProcessBeanInspectorTest'` | `Tests run: 9, Failures: 1`: `process 'worker': bean 'authenticationEventPublisher' from package 'org.springframework.security.authentication' - forbidden: the worker has no security chain and no security bean (web-edge-foundations decision 4)`. |
+| ROJO, línea 2 | Se añade `org.springframework.boot.security` | `Tests run: 9, Failures: 1`, ahora con los registros de los 3 beans inertes de P1: `SecurityAutoConfiguration` (paquete `org.springframework.boot.security.autoconfigure`), `authenticationEventPublisher` (en los paquetes de Spring Boot y de Spring Security) y `spring.security-...SecurityProperties`. |
+| ROJO, aserciones de tipo | `ProcessBeanIsolationTest` con cero `SecurityFilterChain`, cero `Filter` y cero beans de los dos paquetes | `Tests run: 9, Failures: 1`: `[the worker has no bean of a security package] Expecting empty but was: ["org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration : ...`. Las dos primeras aserciones ya pasaban (el trabajador no tiene cadena ni filtro); la tercera es la que detecta los inertes. |
+| VERDE (trabajador) | Exclusión de `SecurityAutoConfiguration` y `UserDetailsServiceAutoConfiguration` en `WorkerApplication` | `Tests run: 9, Failures: 0, Errors: 0, Skipped: 0`. |
+| ROJO (filtro y cadena) | `AdminSecurityChainTest` ampliado, `PortalSecurityChainTest`, `RequestContextFilterTest`, `PublicEndpointsTest` y el arnés ampliado, sin `RequestContextFilter` | `COMPILATION ERROR`: `cannot find symbol` en `HarnessController.java` (`RequestContextFilter`), 4 líneas. |
+| VERDE | `RequestContextFilter`, el bean `serverRequestContextFilter` y las pruebas: `-Dtest='AdminSecurityChainTest,PortalSecurityChainTest,RequestContextFilterTest,PublicEndpointsTest,ProcessBeanIsolationTest'` | `Tests run: 46, Failures: 0, Errors: 0, Skipped: 0` (`AdminSecurityChainTest` 23, `PortalSecurityChainTest` 6, `RequestContextFilterTest` 6, `PublicEndpointsTest` 7, `ProcessBeanIsolationTest` 4). |
+| VERDE final | Con `StatelessChainTest` y los casos de S2, más OpenAPI, cableado, Modulith y `ConfiaApplicationTest` | `Tests run: 116, Failures: 0, Errors: 0, Skipped: 0` (`AdminSecurityChainTest` 31, `StatelessChainTest` 2). |
+| Cierre | `./mvnw verify` completo sobre el árbol final | Surefire 186 + 527 (los 493 de la línea base más 34 nuevos), Failsafe 225, `BUILD SUCCESS`. La instantánea OpenAPI (`apps/api/openapi/*.json`) y `apps/api/routes` **sin cambios**: `git status` limpio de ellos. |
+
+Pruebas añadidas: 34 (`AdminSecurityChainTest` +13, `PortalSecurityChainTest` 6, `PublicEndpointsTest` 7,
+`RequestContextFilterTest` 6 y `StatelessChainTest` 2).
+
+### Condición de fusión I1 (revisión de 2.1b): la cadena no tiene estado
+
+Cada ruptura se hizo sobre `SecurityChains`, se corrió `-Dtest='StatelessChainTest,AdminSecurityChainTest,PortalSecurityChainTest'`
+y se revirtió (`cmp` contra la copia original sin diferencias y `git diff` vacío del archivo).
+
+| Ruptura | Antes de `StatelessChainTest` | Con `StatelessChainTest` (mensaje exacto) |
+|---|---|---|
+| Quitar `sessionManagement(... STATELESS)` | `Tests run: 29, Failures: 0`: **ninguna prueba falla** | `Tests run: 31, Failures: 1`: `StatelessChainTest.theSecurityContextLivesOnlyInTheRequestAndNeverInASession`: `[any other repository keeps the context in the HTTP session] ... to be exactly an instance of: ...RequestAttributeSecurityContextRepository but was an instance of: ...DelegatingSecurityContextRepository` |
+| Quitar `requestCache(RequestCacheConfigurer::disable)` | `Tests run: 29, Failures: 0`: **ninguna prueba falla** | `Tests run: 31, Failures: 1`: `StatelessChainTest.theChainSavesNoRequestToReplayAfterALogin`: `[a request cache filter would save the request in a session] Expecting actual: [... SecurityContextHolderFilter, RequestCacheAwareFilter, SecurityContextHolderAwareRequestFilter ...]` |
+| Quitar las dos | `Tests run: 29, Failures: 1`: `AdminSecurityChainTest.noResponseCreatesASessionOrSetsACookie`: `Expecting an empty Optional but was containing value: "JSESSIONID=...; Path=/; HttpOnly"` | Igual, más los dos de `StatelessChainTest` (no se repitió con la clase nueva) |
+
+Hallazgo: las dos líneas se respaldan para las respuestas (`STATELESS` instala un `NullRequestCache`, y sin
+`STATELESS` la caché deshabilitada tampoco guarda la petición), así que **las pruebas de respuesta que 2.1b movió
+a este PR no bastaban**: quitar una sola línea las dejaba todas en verde. Por eso se añadió `StatelessChainTest`,
+que inspecciona la cadena real, con reflexión sobre el campo `securityContextRepository` de
+`SecurityContextHolderFilter` (nombre de Spring Security 7.1.1; si cambia, la prueba falla y no pasa en
+silencio). `csrf.disable` no tiene prueba aquí: su condición de aceptación quedó registrada en
+`foundations-plan/exploration.md` (ninguna credencial en cookie se fusiona sin CSRF).
+
+### Otras demostraciones deliberadas (cada una revertida; `cmp` contra la copia original sin diferencias)
+
+| Ruptura temporal | Resultado observado y causa |
+|---|---|
+| **S5.** `PortalSecurityConfiguration` sustituida por `http.csrf(disable).authorizeHttpRequests(anyRequest().permitAll())` | `PortalSecurityChainTest` `Tests run: 6, Failures: 5` (las tres del parámetro, la documentación `prod` y la de `local`): `expected: 401 but was: 404`. La sexta (`aRouteAddedToThePortalContextIsStillDenied...`) usa el arnés con la cadena real y no la del proceso, y sigue en verde. |
+| `RequestContextFilter` reutiliza el `X-Request-Id` del cliente | `RequestContextFilterTest` `Tests run: 6, Errors: 1`: `theServerIgnoresTheIdentifiersTheClientSends`: `IllegalArgumentException: Invalid UUID string: cliente-123`. |
+| `SecurityChains`: quitar `ProblemAuthenticationEntryPoint` | `Tests run: 45, Failures: 30` (`PortalSecurityChainTest` 6, `AdminSecurityChainTest` 21, `RequestContextFilterTest` 3): `expected: 401 but was: 403`. |
+| Quitar la exclusión de `SecurityAutoConfiguration` del trabajador | Es el rojo del primer cuadro (anterior al verde); no se repitió. |
+
+### S2 de la revisión de 2.1b: métodos y variantes de ruta
+
+Cupieron en el presupuesto (712 de 800) y están en `AdminSecurityChainTest`: `HEAD` y `OPTIONS` sobre una ruta
+protegida y sobre una pública solo de `GET` (`401` con `application/problem+json`), y las variantes `//x`,
+`/x%2e` y `/%78` (esta decodifica a `/x`) en la prueba de variantes existente. **Hallazgo:** `/x%2f`, `/x%00` y
+`TRACE` no llegan a la cadena: los rechaza Tomcat con su propia página HTML (`400`, `400` y `405`, sin Problem
+Details y sin las cabeceras base). Están cubiertas por pruebas que afirman lo que sí se cumple (estado `400` o
+`405` y ningún controlador corre). **Brecha abierta, para 2.2 o un cambio posterior (nota fechada 2026-10-04):**
+la uniformidad de Problem Details y de cabeceras no alcanza a lo que el contenedor rechaza antes de los
+filtros; arreglarla exige configurar Tomcat (valve o página de error) o un filtro anterior al conector, que
+queda fuera del alcance de este PR.
+
+### Desviaciones del diseño y de la tarea (declaradas)
+
+1. `RequestContextFilterChainTest` y `AdminSecurityHeadersAndSessionTest` no se crearon (nota fechada de
+   `tasks.md`): la rama verificada cubre ese contenido con `RequestContextFilterTest` y los cinco métodos devueltos
+   a `AdminSecurityChainTest`. No hay prueba unitaria con `MockFilterChain` ni del orden `HIGHEST_PRECEDENCE + 10`;
+   el orden se observa porque la respuesta `401` de la cadena ya lleva el `traceId` del servidor.
+2. Se añadió `StatelessChainTest` (no estaba en la tarea) por la condición I1: descubrió que las pruebas de
+   respuesta no detectaban la falta de una sola de las dos líneas.
+3. `ProcessBeanPolicy` cambia el texto de `WEB_EDGE` («no filters, no security chain ... decision 4») conservando la
+   frase fijada por `ProcessBeanInspectorTest`.
+4. `FieldViolation`, `ProblemBody.errors` y `theFirewallRejectionCarriesNoViolationList` siguen en 2.4.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='AdminSecurityChainTest,PortalSecurityChainTest,RequestContextFilterTest,PublicEndpointsTest,StatelessChainTest,ProcessBeanIsolationTest,ProcessBeanInspectorTest,OpenApi*Test,SecurityHeadersFilterTest,ProblemResponsesTest,WebEdgeFiltersInProcessesTest,ConfiaApplicationTest,AdminProductionWiringTest,SpringModulithVerificationTest'`: `Tests run: 116, Failures: 0, Errors: 0, Skipped: 0`; cierre por `./mvnw verify`: Surefire 186 + 527, Failsafe 225 |
+| Arnés de ejecución | Cadena real por HTTP (`RANDOM_PORT`) en el arnés sin base de datos, el portal real por `ConfiaApplication.launch` (`prod` y `local`) y los tres procesos reales para el trabajador |
+| Frontera de reversión | Se retiran `RequestContextFilter`, su bean y la exclusión del trabajador (`WorkerApplication`), las dos líneas de `ProcessBeanPolicy` y las pruebas; el resto es de 2.1a y 2.1b |
+
+### Medición del PR 5 (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 690 | 22 | **712** |
+| Con `-M` | 690 | 22 | **712** |
+
+Pronóstico: 700 a 800. Dentro del tope de 800. Tareas: 14 de 15.
