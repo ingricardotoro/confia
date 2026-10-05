@@ -33,6 +33,7 @@ public final class ProblemResponses {
 
     private static final String MEDIA_TYPE = "application/problem+json";
     private static final int MAX_INSTANCE_LENGTH = 1024;
+    private static final String NO_PATH = "/";
 
     private final MessageSource messages;
     private final JsonMapper mapper = JsonMapper.builder().build();
@@ -44,9 +45,24 @@ public final class ProblemResponses {
     /** Writes {@code code} as the response. */
     public void write(HttpServletRequest request, HttpServletResponse response, ProblemCode code)
             throws IOException {
+        write(request, response, code, instanceOf(request));
+    }
+
+    /**
+     * Writes {@code code} with {@value #NO_PATH} as the {@code instance}: for a request the
+     * container itself refused, whose path was never decoded or validated and is not repeated to
+     * the client at all.
+     */
+    public void writeWithoutRequestPath(HttpServletRequest request, HttpServletResponse response,
+            ProblemCode code) throws IOException {
+        write(request, response, code, NO_PATH);
+    }
+
+    private void write(HttpServletRequest request, HttpServletResponse response, ProblemCode code,
+            String instance) throws IOException {
         ProblemBody body = new ProblemBody(code.type(),
                 messages.getMessage(code.titleKey(), null, CATALOG_LOCALE), code.status(),
-                messages.getMessage(code.detailKey(), null, CATALOG_LOCALE), instanceOf(request),
+                messages.getMessage(code.detailKey(), null, CATALOG_LOCALE), instance,
                 traceIdOf(request));
         byte[] bytes = mapper.writeValueAsBytes(body);
         response.setStatus(code.status());

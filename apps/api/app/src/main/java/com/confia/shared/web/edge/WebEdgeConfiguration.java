@@ -5,6 +5,8 @@ import com.confia.shared.web.problem.ProblemResponses;
 import com.confia.shared.web.request.RequestContextFilter;
 import com.confia.shared.web.request.SecurityHeadersFilter;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -66,5 +68,18 @@ public class WebEdgeConfiguration {
     @Bean
     ProblemRequestRejectedHandler problemRequestRejectedHandler(ProblemResponses problems) {
         return new ProblemRequestRejectedHandler(problems);
+    }
+
+    /**
+     * Replaces Tomcat's HTML error report with {@link ProblemErrorReportValve}, so what the
+     * container refuses before any filter runs is answered with Problem Details and the base
+     * headers too. The context customizer runs when the embedded server is built, and fails the
+     * start if the host cannot be reached, rather than leaving the HTML page in place.
+     */
+    @Bean
+    WebServerFactoryCustomizer<TomcatServletWebServerFactory> problemErrorReportCustomizer(
+            ProblemResponses problems) {
+        return factory -> factory.addContextCustomizers(
+                context -> ProblemErrorReportValve.install(context.getParent(), problems));
     }
 }

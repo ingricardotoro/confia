@@ -25,10 +25,10 @@ class ProblemCodeTest {
     private static final Pattern KEBAB_CASE = Pattern.compile("[a-z]+(-[a-z]+)*");
 
     @Test
-    void thisChangeOwnsExactlyTheFourCodesItCanProduce() {
+    void thisChangeOwnsExactlyTheFiveCodesItCanProduce() {
         assertThat(Arrays.stream(ProblemCode.values()).map(ProblemCode::code))
                 .containsExactlyInAnyOrder("validation-failed", "authentication-required",
-                        "forbidden", "internal-error");
+                        "forbidden", "method-not-allowed", "internal-error");
     }
 
     @Test
@@ -40,6 +40,7 @@ class ProblemCodeTest {
 
     @ParameterizedTest
     @CsvSource({"validation-failed, 400", "authentication-required, 401", "forbidden, 403",
+            "method-not-allowed, 405",
             "internal-error, 500"})
     void eachCodeCarriesItsHttpStatus(String code, int status) {
         assertThat(ProblemCode.ofCode(code)).get().extracting(ProblemCode::status)
@@ -48,6 +49,7 @@ class ProblemCodeTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"validation-failed", "authentication-required", "forbidden",
+            "method-not-allowed",
             "internal-error"})
     void theTypeIsTheStableBaseFollowedByTheCodeAndNothingElse(String code) {
         ProblemCode problem = ProblemCode.ofCode(code).orElseThrow();

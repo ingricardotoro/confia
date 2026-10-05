@@ -15,10 +15,10 @@
 
 | Campo | Valor |
 |---|---|
-| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 4 670 nominales** en 13 PR (el PR 3 original, medido en 2 000 líneas, se partió en tres; ver la nota fechada del final); peor caso con el factor histórico 1,5, unas 7 000 |
+| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 4 670 nominales** en 14 PR (el PR 3 original, medido en 2 000 líneas, se partió en tres, y el PR 6, medido en 1 111, en dos; ver las notas fechadas del final); peor caso con el factor histórico 1,5, unas 7 000 |
 | Riesgo frente al presupuesto | **Alto** frente a 400 de la preflight; **medio por PR** frente al presupuesto del proyecto de 800 (nominal de 320 a 520 por PR, peor caso de 480 a 780) |
 | Chained PRs recommended | Yes |
-| Suggested split | 13 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2 a 2.5, 3.1, 3.2, 4.1 y 5.1), más la tarea de cierre 6.1 |
+| Suggested split | 14 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3 a 2.5, 3.1, 3.2, 4.1 y 5.1), más la tarea de cierre 6.1 |
 | Delivery strategy | `auto-chain` (decidido por el propietario el 2026-10-04, en lugar del `single-pr` de la preflight de la sesión) |
 | Chain strategy | `stacked-to-main`: cada PR se fusiona a `main` en orden y el siguiente parte de `main` actualizado |
 | Presupuesto del proyecto por pull request (`docs/15-flujo-de-trabajo-git.md` §3) | 800 líneas de cambio efectivo |
@@ -38,13 +38,13 @@ decisión prevalece y es la que este documento registra.
 contaba y llega a unas 4 670 nominales. No se recorta con trucos de formato, ni se omiten pruebas,
 comentarios o documentación, ni se parte un PR de forma artificial.
 
-**Tareas.** 14 en total (13 de PR más 1 de cierre), dentro del máximo de 15 del proyecto. La tarea 2.1 original
+**Tareas.** 15 en total (14 de PR más 1 de cierre), en el máximo de 15 del proyecto; el propietario concedió además una excepción al tope (nota fechada del final), que con este conteo no se ejerce. La tarea 2.1 original
 se partió en 2.1a, 2.1b y 2.1c por decisión del propietario (nota fechada del final). Las costuras restantes
 de la sección 8 del diseño (PR 5b, 8b y 10b del diseño) **no** son tareas reservadas. Si la medición de un
 PR supera 800 líneas, el ejecutor se detiene y consulta al orquestador antes de partir: usar otra costura
 llevaría el total a 15 como máximo con una sola, y cualquier costura exige primero replantear esta lista.
 
-**Orden.** Lineal de 1 a 13 (la numeración de PR es la de las tareas 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2, 2.3,
+**Orden.** Lineal de 1 a 13, con el PR 6 partido en 6a y 6b (la numeración de PR es la de las tareas 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a y 2.2b, 2.3,
 2.4, 2.5, 3.1, 3.2, 4.1 y 5.1). Dependencias duras: el PR 2.1b necesita el 2.1a (`ProblemResponses`,
 filtros); el PR 7 (2.3) necesita el 3 (`RequestContextFilter`); el PR 8 (2.4) necesita el 3 (`ProblemCode`,
 `ProblemResponses`); el PR 11 (3.2) necesita los PR 7 y 10; el PR 12 (4.1) necesita el 11
@@ -91,7 +91,8 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | 3 | Códigos y cuerpo de Problem Details, catálogo es-HN, cabeceras base e identificador de petición del servidor, sin Spring Security (2.1a) | PR 3 `problem-details-core` (~775 medido; 600 → 800) | Ídem con `-Dtest='ProblemCodeTest,ProblemCatalogCoverageTest,ProblemResponsesTest,SecurityHeadersFilterTest,WebEdgeFiltersInProcessesTest,ProcessBeanIsolationTest,OpenApi*Test'` | Filtros reales con `MockFilterChain` y los procesos administrativo y portal reales por `ConfiaApplication.launch` | Se retiran los dos `@Import`, `shared.web.{edge,problem,request}` y el catálogo |
 | 4 | Spring Security como cadena: dependencia y prohibiciones, `SecurityChains`, lista blanca, cadenas de administración y portal, manejadores y arnés sin base de datos (2.1b) | PR 4 `security-chains` (~600 → 800) | Ídem con `-Dtest='AdminSecurityChainTest,PublicEndpointsTest,OpenApi*Test,ProcessBeanIsolationTest'` | Cadena real por HTTP (`RANDOM_PORT`) en el arnés sin base de datos | Se retira la dependencia: el sistema vuelve a no tener borde de seguridad |
 | 5 | Portal y trabajador sin borde de seguridad, cabeceras, sesión e identificador en la cadena real (2.1c) | PR 5 `portal-and-worker-chain` (~700 → 800) | Ídem con `-Dtest='PortalSecurityChainTest,RequestContextFilterTest,AdminSecurityChainTest,StatelessChainTest,PublicEndpointsTest,ProcessBeanIsolationTest'` | Portal por `ConfiaApplication.launch` y arnés con el filtro de contexto | Solo pruebas y las exclusiones del trabajador |
-| 6 | Lista blanca cerrada, mapa de rutas del portal, ninguna ruta de producción y guardia de registros (2.2) | PR 6 `edge-gates` (~420 → 630) | Ídem con `-Dtest='PublicRouteAllowListTest,PortalRouteMapSnapshotTest,SensitiveDataLoggingTest'` | Enumeración de rutas del contexto real y petición anónima a cada una | Solo pruebas, instantánea y guardia de registros |
+| 6a | Problem Details y cabeceras base para lo que rechaza Tomcat, código `method-not-allowed` y prueba del acoplamiento de springdoc (2.2a) | PR 6a `container-rejections` (~395 medido) | `-Dtest='ContainerRejectionsTest,ProblemErrorReportValveTest,ProblemCodeTest,ProductionEdgeDefaultsTest,ProblemCatalogCoverageTest,ProcessBeanIsolationTest'` | Procesos administrativo y portal reales por `ConfiaApplication.launch` con su configuración de producción | Se retira la válvula y su personalizador, el código `method-not-allowed` y el método estático de cabeceras |
+| 6b | Lista blanca cerrada, mapa de rutas del portal, ninguna ruta de producción y guardia de registros (2.2b) | PR 6b `edge-gates` (~716 medido) | Ídem con `-Dtest='PublicRouteAllowListTest,PortalRouteMapSnapshotTest,SensitiveDataLoggingTest'` | Enumeración de rutas del contexto real y petición anónima a cada una | Solo pruebas, instantánea y guardia de registros |
 | 7 | IP del cliente por proxies de confianza, agente de usuario, `RequestOrigin` y decorador de auditoría (2.3) | PR 7 `request-origin` (~500 → 750) | Unidad: `-Dtest='CidrBlock*,ClientAddress*,WebEdgePropertiesTest,RequestContextFilterTest'`; IT: `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=RequestOriginAuditIT -Dfailsafe.failIfNoSpecifiedTests=false` | `RequestOriginAuditIT` con PostgreSQL (Testcontainers) y 50 peticiones concurrentes | El decorador se retira: la auditoría vuelve a `null` |
 | 8 | Traductor de Problem Details completo (2.4) | PR 8 `problem-translator` (~380 → 570) | Ídem con `-Dtest='ProblemTranslationTest,ProblemCatalogCoverageTest'` | Controladores de prueba que lanzan cada excepción por la cadena real | Errores de MVC vuelven al formato de Spring |
 | 9 | Reglas W1, W2a, W2b y W3 con fixtures, `SessionValidity` e inventario de ausencias (2.5) | PR 9 `web-rules` (~380 → 570) | Ídem con `-Dtest='WebLayerDependencyRulesTest,WebExposedTypesRuleTest,SharedBoundaryRulesTest,EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest,WebEdgeScopeExclusionInventoryTest'` | Mitad de fixture rechazada con fragmentos que nombran la violación (ADR-0018) | Solo pruebas y un puerto sin uso |
@@ -99,7 +100,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | 11 | Borde del limitador: `@RateLimited`, `429` y `503` (3.2) | PR 11 `rate-limiter-edge` (~320 → 480) | Ídem con `-Dtest='RateLimitEdgeTest,ProcessBeanIsolationTest'` | Petición por la cadena real a un controlador de prueba anotado | Se retira el interceptor y la configuración |
 | 12 | Materializador del retardo, hilos virtuales, tiempos de Tomcat y regla W4 (4.1) | PR 12 `delay-materializer` (~460 → 690) | Unidad: `-Dtest='RequiredDelayMaterializer*Test,BlockingWaitConfinementTest'`; IT: `-Dit.test=RequiredDelayMaterializerIT` | `RequiredDelayMaterializerIT` bajo Tomcat real con base de datos | Se retira el materializador y `spring.threads.virtual.enabled` vuelve a su omisión |
 | 13 | Borde HTTP de la idempotencia, controlador solo de prueba y regla W5 (5.1) | PR 13 `idempotency-edge` (~480 → 720) | `-Dtest='IdempotencyNotInIdentityTest,OpenApiContractSnapshotTest'`; IT: `-Dit.test=IdempotencyEdgeIT` | `IdempotencyEdgeIT` con `IdempotencyDemoController` y PostgreSQL | Se retira el borde; `IdempotentExecutor` queda intacto |
-| 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 13 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
+| 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 14 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
 
 ---
 
@@ -290,37 +291,43 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     de la cadena del portal, el trabajador sin borde, la ausencia de estado, la respuesta de la cadena con
     identificador y el idioma; requisito de `build-integrity` «El contexto del trabajador…»
 
-- [ ] 2.2 **PR 6 `edge-gates`: lista blanca cerrada, mapa de rutas y registros sin secretos
-  (decisiones 21 y 22).**
-  - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/bootstrap/RegisteredRoutes.java` (enumera
-    `RequestMappingInfoHandlerMapping`, `RouterFunctionMapping` y `AbstractUrlHandlerMapping`),
-    `PublicRouteAllowListTest.java` (administración y portal, perfil por omisión y `local`, petición
-    anónima a cada ruta y, como control negativo, una segunda cadena de prueba que permite
-    `/test/leak` y hace fallar la comprobación nombrando la ruta; incluye la aserción de cero rutas de
-    producción en administración), `PortalRouteMapSnapshotTest.java` (con control negativo permanente
-    sobre una copia alterada en un directorio temporal; nunca sobrescribe, y
-    `-Dconfia.routes.update=true` aun así falla) y
-    `apps/api/app/src/test/java/com/confia/shared/web/request/SensitiveDataLoggingTest.java`
-    (`ListAppender` en la raíz con la raíz y los prefijos protegidos en `TRACE`, `Authorization: Bearer
-    SECRETO-A`, `Cookie: sid=SECRETO-B` y un cuerpo con `SECRETO-C` a tres rutas, aceptada, denegada y
-    con `500`; control negativo con un evento registrado a propósito; ausencia de
-    `generated security password`). **Rojos esperados:** `PortalRouteMapSnapshotTest` falla por
-    instantánea ausente; `SensitiveDataLoggingTest` falla porque Spring registra el cuerpo en `DEBUG`.
-  - **VERDE.** Crear `apps/api/routes/portal.routes.json` a mano con
-    `{"process": "portal", "routes": []}`; crear
-    `apps/api/app/src/main/java/com/confia/shared/web/request/SensitiveLogGuard.java` (`TurboFilter`
-    de Logback que deniega `DEBUG` y `TRACE` de los cuatro prefijos de la decisión 22) instalado por un
-    bean de `WebEdgeConfiguration.java` al refrescar el contexto; en `application.yml`
-    `spring.mvc.log-request-details: false`.
-  - **Demostraciones deliberadas.** Un controlador temporal en el portal rompe
-    `PortalRouteMapSnapshotTest` nombrando la ruta; desactivar el bean de `SensitiveLogGuard` rompe
-    `SensitiveDataLoggingTest`; se revierten.
-  - **Cierre.** `./mvnw verify` completo. Commits:
-    `test(web): enforce a closed public route allow-list and a portal route map snapshot` y
-    `feat(web): block debug logging of request headers and bodies`. — Requisitos de `web-edge`
-    «La lista blanca pública es cerrada…», «La cadena del portal deniega toda ruta», «Los registros no
-    contienen cabeceras…» y «Ausencia de autenticación por credencial…» (ninguna ruta de producción);
-    requisito de `build-integrity` «Instantánea aprobada del mapa de rutas del portal»
+- [x] 2.2a **PR 6a `container-rejections`: lo que Tomcat rechaza antes de los filtros y la prueba del acoplamiento
+  de springdoc (decisiones 7 y 8).**
+  - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/bootstrap/`
+    `ContainerRejectionsTest.java` (procesos administrativo y portal reales, con su configuración de producción:
+    para `/x%2f`, `/x%00` y `TRACE` exige `application/problem+json`, las cinco cabeceras base con sus valores
+    exactos y **ninguna** cabecera `Server` ni `X-Powered-By` (se afirma su ausencia, no se supone); que el cuerpo
+    no repite la ruta rechazada ni nada del contenedor (`instance` es `/`); que el `Allow` del 405 se conserva; y
+    que una línea de petición de 70 000 caracteres recibe un solo estado en el cuerpo y en la respuesta),
+    `ProductionEdgeDefaultsTest.java` (S6: producción trae springdoc apagado y `spring.mvc.log-request-details`
+    falso; `SPRINGDOC_API_DOCS_ENABLED=true` abre las dos entradas de documentación de `PublicEndpoints`; con
+    `--springdoc.api-docs.enabled=true` el documento responde `200` sin credencial en ambos procesos y todo lo
+    demás sigue en `401`, de modo que el acoplamiento queda fijado como comportamiento previsto, ADR-0013) y
+    `apps/api/app/src/test/java/com/confia/shared/web/ProblemErrorReportValveTest.java` (qué código responde a
+    cada estado que informa el contenedor); ampliar `ProblemCodeTest.java` con `method-not-allowed` (405) y
+    añadir a `OpenApiProcess.java` `context()`, `port()` y `startWithArguments`. **Rojo esperado:**
+    `ContainerRejectionsTest` falla con `Expecting actual: "text/html;charset=utf-8" to start with:
+    "application/problem+json"` (la página HTML del contenedor); el resto no compila sin la producción.
+  - **VERDE.** Crear
+    `apps/api/app/src/main/java/com/confia/shared/web/edge/ProblemErrorReportValve.java` (subclase de
+    `ErrorReportValve` que escribe Problem Details con `ProblemResponses.writeWithoutRequestPath`, aplica
+    `SecurityHeadersFilter.apply` y conserva las cabeceras que el contenedor ya puso) e instalarla con un
+    `WebServerFactoryCustomizer<TomcatServletWebServerFactory>` en `WebEdgeConfiguration.java`; añadir
+    `ProblemCode.METHOD_NOT_ALLOWED` (`method-not-allowed`, 405) con su título y detalle es-HN en
+    `problems.properties`; `ProblemResponses.writeWithoutRequestPath` (`instance` es `/`: el contenedor se negó a
+    decodificar la ruta y no se repite); `SecurityHeadersFilter.apply` estático (los valores siguen teniendo un
+    solo dueño); y en `application.yml` `spring.mvc.log-request-details: false`. La válvula mapea por
+    catálogo: 401 a `authentication-required`, 403 a `forbidden`, 405 a `method-not-allowed`, todo otro 4xx a
+    `400 validation-failed` y todo 5xx a `500 internal-error`, de modo que el `status` del cuerpo siempre es el de
+    la respuesta (RFC 9457), y deja un evento `INFO` fijo con el estado original, el método y el `traceId`, sin
+    ruta, consulta, cabeceras ni excepción (decisión del propietario; nota fechada de `design.md`).
+  - **Demostraciones deliberadas.** Un personalizador que no instala la válvula pone en rojo
+    `ContainerRejectionsTest` (`text/html` frente a `application/problem+json`); una válvula que no aplica las
+    cabeceras base la pone en rojo por las cabeceras; se revierten.
+  - **Cierre.** `./mvnw verify` completo. Commit: `feat(web): answer container rejections with Problem Details
+    and the base security headers`. — Requisito de `web-edge` «Cabeceras de seguridad base» (respuesta de error)
+    para lo que el contenedor rechaza; catálogo de códigos (`405`); escenarios de documentación con `prod` y
+    `local` por el acoplamiento de `springdoc.api-docs.enabled` (S6 de la revisión de 2.1b)
 
   - **Nota fechada 2026-10-04 (heredada de 2.1c): lo que Tomcat responde antes de los filtros.** Esta tarea es la
     dueña de la brecha: `/x%2f`, `/x%00` y `TRACE` los rechaza Tomcat antes de la cadena de filtros y reciben su
@@ -330,6 +337,38 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     pero esta tarea debe afirmarlo. Debe añadir al ROJO una prueba por los procesos reales que exija, para esas tres
     peticiones, `application/problem+json`, las cinco cabeceras base y ninguna cabecera `Server` ni `X-Powered-By`,
     y al VERDE la configuración de Tomcat (válvula o página de error del contenedor) que lo cumpla.
+
+- [ ] 2.2b **PR 6b `edge-gates`: lista blanca cerrada, mapa de rutas y registros sin secretos
+  (decisiones 21 y 22).**
+  - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/bootstrap/RegisteredRoutes.java` (enumera
+    `RequestMappingInfoHandlerMapping`, `RouterFunctionMapping` y `AbstractUrlHandlerMapping`),
+    `PublicRouteAllowListTest.java` (administración y portal, perfil por omisión y `local`, petición
+    anónima a cada ruta y, como control negativo, las rutas del arnés que su cadena permite sin que estén en
+    la lista real, que hacen fallar la comprobación nombrando la ruta; incluye la aserción de cero rutas de
+    producción en administración y portal), `PortalRouteMapSnapshotTest.java` (con control negativo permanente
+    sobre una copia alterada en un directorio temporal; nunca sobrescribe, y
+    `-Dconfia.routes.update=true` aun así falla) y
+    `apps/api/app/src/test/java/com/confia/shared/web/request/SensitiveDataLoggingTest.java`
+    (`ListAppender` en la raíz con la raíz y los prefijos protegidos en `TRACE`, `Authorization: Bearer
+    SECRETO-A`, `Cookie: sid=SECRETO-B` y un cuerpo con `SECRETO-C` a tres rutas, aceptada, denegada y
+    con `500`; control negativo con un evento registrado a propósito; ausencia de
+    `generated security password`); ampliar `HarnessProcess.java` con envío con cuerpo, contexto y puerto.
+    **Rojos esperados:** `PortalRouteMapSnapshotTest` falla por instantánea ausente; `SensitiveDataLoggingTest`
+    falla porque Tomcat registra las cabeceras y la cookie en `DEBUG`.
+  - **VERDE.** Crear `apps/api/routes/portal.routes.json` a mano con
+    `{"process": "portal", "routes": []}`; crear
+    `apps/api/app/src/main/java/com/confia/shared/web/request/SensitiveLogGuard.java` (`TurboFilter`
+    de Logback que deniega `DEBUG` y `TRACE` de los cinco prefijos de la decisión 22, ampliada con
+    `org.apache.tomcat.util.http`) instalado por un bean de `WebEdgeConfiguration.java` al refrescar el contexto.
+  - **Demostraciones deliberadas.** Un controlador temporal en el portal rompe
+    `PortalRouteMapSnapshotTest` nombrando la ruta; desactivar el bean de `SensitiveLogGuard` rompe
+    `SensitiveDataLoggingTest`; se revierten.
+  - **Cierre.** `./mvnw verify` completo. Commits:
+    `test(web): enforce a closed public route allow-list and a portal route map snapshot` y
+    `feat(web): block debug logging of request headers and bodies`. — Requisitos de `web-edge`
+    «La lista blanca pública es cerrada…», «La cadena del portal deniega toda ruta», «Los registros no
+    contienen cabeceras…» y «Ausencia de autenticación por credencial…» (ninguna ruta de producción);
+    requisito de `build-integrity` «Instantánea aprobada del mapa de rutas del portal»
 
 - [ ] 2.3 **PR 7 `request-origin`: IP, agente de usuario y origen en la auditoría (decisiones 11 a 13).**
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/security/`:
@@ -554,7 +593,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 
 ## Fase 6: cierre
 
-- [ ] 6.1 **Verificación completa, medición de los 13 PR y barrido de trazabilidad.** Con los 11 PR
+- [ ] 6.1 **Verificación completa, medición de los 14 PR y barrido de trazabilidad.** Con los 14 PR
   fusionados a `main`, ejecutar `./mvnw verify` completo en `apps/api` y registrar cobertura (global
   80 %, núcleo y `domain` 95 %) y mutación (umbral 80). Registrar en
   `openspec/changes/web-edge-foundations/apply-progress.md` la medición de cada PR con
@@ -577,18 +616,18 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | | Principal autenticado sin permiso | 2.1b |
 | | Método distinto al permitido en una ruta pública | 2.1b |
 | | Variantes de la ruta no eluden la denegación | 2.1b |
-| La lista blanca pública es cerrada | Una ruta pública nueva sin editar la lista | 2.2 |
-| | La lista contiene solo lo declarado | 2.2 |
-| | Documentación de API con perfil `prod` | 2.1b |
+| La lista blanca pública es cerrada | Una ruta pública nueva sin editar la lista | 2.2b |
+| | La lista contiene solo lo declarado | 2.2b |
+| | Documentación de API con perfil `prod` | 2.1b, 2.2a |
 | | Documentación de API con perfil `local` | 2.1b |
 | La cadena administrativa no tiene estado | Ninguna respuesta crea sesión | 2.1c |
-| Cabeceras de seguridad base | Respuesta de error con las cabeceras base | 2.1a, 2.1c |
+| Cabeceras de seguridad base | Respuesta de error con las cabeceras base | 2.1a, 2.1c, 2.2a |
 | | Respuesta de éxito con las cabeceras base | 2.1a, 2.1c |
 | Vigencia de sesión como puerto | El puerto existe y no tiene adaptador de producción | 2.5 |
 | | El puerto no arrastra a `identity` | 2.5 |
 | La cadena del portal deniega toda ruta | Toda ruta del portal es denegada | 2.1c |
-| | Una ruta añadida al portal sigue denegada | 2.1c, 2.2 |
-| | Sin ruta pública en el portal | 2.2 |
+| | Una ruta añadida al portal sigue denegada | 2.1c, 2.2b |
+| | Sin ruta pública en el portal | 2.2b |
 | | Documentación del portal con perfil `local` | 2.1c |
 | El trabajador no tiene cadena ni servidor web | Contexto del trabajador sin borde web | 2.1c |
 | Toda respuesta de error usa Problem Details | Respuesta de error bien formada | 2.1a |
@@ -597,7 +636,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | El `type` deriva del código estable | El mismo código produce el mismo `type` | 2.1a |
 | | Códigos distintos producen `type` distintos | 2.1a |
 | | La denegación por falta de credencial es uniforme | 2.1b |
-| Catálogo de códigos y estados HTTP | Cada código tiene su estado | 2.1a, 2.4, 3.2, 5.1 |
+| Catálogo de códigos y estados HTTP | Cada código tiene su estado | 2.1a, 2.2a, 2.4, 3.2, 5.1 |
 | | Tipo de contenido no admitido | 2.4 |
 | | Recurso inexistente bajo un prefijo de documentación | 2.4 |
 | | Un código desconocido no se filtra | 2.4 |
@@ -632,8 +671,8 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | El origen llega a la bitácora de auditoría | Asiento durante una petición | 2.3 |
 | | Asiento fuera de una petición | 2.3 |
 | | Peticiones concurrentes con orígenes distintos | 2.3 |
-| Los registros no contienen cabeceras ni cuerpos | Petición con datos sensibles | 2.2 |
-| | Control negativo | 2.2 |
+| Los registros no contienen cabeceras ni cuerpos | Petición con datos sensibles | 2.2b |
+| | Control negativo | 2.2b |
 | El puerto `RateLimiter` cuenta peticiones y fallos | Las dimensiones no se mezclan | 3.1 |
 | | Una petición rechazada no extiende la ventana | 3.1 |
 | Capa 1, 10 peticiones por minuto por IP | Límite exacto | 3.1 |
@@ -697,7 +736,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | | Carga equivalente con distinto orden de campos | 5.1 |
 | El controlador de demostración vive solo en pruebas | El controlador de demostración no está en los procesos reales | 5.1 |
 | | El documento OpenAPI no cambia | 5.1 |
-| Ausencia de autenticación por credencial y tokens | Ninguna ruta de producción en el proceso administrativo | 2.2 |
+| Ausencia de autenticación por credencial y tokens | Ninguna ruta de producción en el proceso administrativo | 2.2b |
 | | Ningún componente de tokens ni de sesión | 2.5 |
 | | El limitador y el materializador no están aplicados a un endpoint de producción | 4.1 |
 | Ausencia de matriz de roles y RBAC | Ninguna regla de permiso sobre una ruta | 2.5 |
@@ -725,9 +764,9 @@ Subtotal `web-edge`: 132 escenarios, 132 con tarea, 0 huérfanos.
 | La espera bloqueante se confina al materializador | Fixture con una espera fuera del materializador | 4.1 |
 | | El materializador es la única clase con espera | 4.1 |
 | | Se mantiene la prohibición en `identity` | 4.1 |
-| Instantánea aprobada del mapa de rutas del portal | Una ruta nueva en el portal rompe la construcción | 2.2 |
-| | Instantánea ausente | 2.2 |
-| | Mapa idéntico a la instantánea | 2.2 |
+| Instantánea aprobada del mapa de rutas del portal | Una ruta nueva en el portal rompe la construcción | 2.2b |
+| | Instantánea ausente | 2.2b |
+| | Mapa idéntico a la instantánea | 2.2b |
 | La idempotencia HTTP no se aplica a identidad | Fixture con un endpoint de identidad que usa la idempotencia | 5.1 |
 | | Código de producción sin uso en identidad | 5.1 |
 | Cada proceso registra solo beans de su lista | Un bean fuera de la lista rompe la construcción | 1.1, 1.2 |
@@ -852,3 +891,27 @@ la lista vacía y no solo explícita.
   `/x%00` y `/%78`. Hallazgo: `/x%2f`, `/x%00` y `TRACE` los rechaza **Tomcat antes de cualquier filtro** (400 y
   405 con su propia página HTML): son seguros (ningún controlador corre) pero no son Problem Details y no llevan
   las cabeceras base. Queda registrado como brecha para 2.2 o un cambio posterior (ver `apply-progress.md`).
+
+## Nota fechada 2026-10-04: la tarea 2.2 se parte en 2.2a y 2.2b
+
+El propietario aprobó partir la tarea 2.2 (PR 6 `edge-gates`) en dos porque la tarea verificada completa midió
+**1 111 líneas efectivas** (1 106 adiciones y 5 eliminaciones, igual con y sin `-M`, sin `openspec/`) frente al
+tope de 800: a lo previsto (cinco archivos de prueba y la guarda de registros) se sumaron la brecha de Tomcat
+heredada de 2.1c (válvula, código `method-not-allowed`, prueba por los procesos reales) y la prueba S6. El
+propietario concedió además una excepción al tope de 15 tareas. El árbol completo y verificado se conserva en la
+rama local `wip/web-edge-edge-gates-full`, que **nunca se publica** y es la fuente de las dos partes.
+
+- **2.2a `container-rejections` (PR 6a)**: la válvula del informe de errores de Tomcat, el código
+  `method-not-allowed`, `ContainerRejectionsTest`, `ProblemErrorReportValveTest`, `ProductionEdgeDefaultsTest` (S6)
+  y la línea `spring.mvc.log-request-details`. Medido en unas 395 líneas.
+- **2.2b `edge-gates` (PR 6b)**: `RegisteredRoutes`, `PublicRouteAllowListTest`, `PortalRouteMapSnapshotTest`,
+  `portal.routes.json`, `SensitiveLogGuard` y `SensitiveDataLoggingTest`. Medido en unas 716 líneas en el árbol
+  completo.
+
+Numeración: los dos PR se llaman 6a y 6b y **los PR 7 a 13 conservan su número**, para no reescribir las
+referencias de las demás tareas. Conteo: 15 tareas (14 de PR más la de cierre 6.1) y 14 PR, es decir, dentro del
+máximo de 15; la excepción concedida no se ejerce con este conteo. Trazabilidad: 166 escenarios, 166 con tarea,
+0 huérfanos; los que apuntaban a 2.2 (diez filas, de la lista blanca, el portal, los registros, la ausencia de
+rutas de producción y la instantánea) apuntan ahora a 2.2b, y 2.2a suma cobertura a cuatro filas que ya tenían
+tarea (documentación con `prod` y con `local`, cabeceras en respuesta de error, y el estado de cada código). Las
+notas fechadas anteriores y `apply-progress.md` conservan los nombres viejos.

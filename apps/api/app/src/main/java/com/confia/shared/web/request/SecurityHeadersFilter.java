@@ -31,11 +31,20 @@ public final class SecurityHeadersFilter extends OncePerRequestFilter implements
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain chain) throws ServletException, IOException {
+        apply(response);
+        chain.doFilter(request, response);
+    }
+
+    /**
+     * Sets the five base headers on {@code response}. Public so that the container's error report,
+     * which answers what Tomcat refuses before any filter runs, writes the very same values: the
+     * values have this one owner.
+     */
+    public static void apply(HttpServletResponse response) {
         response.setHeader("X-Content-Type-Options", "nosniff");
         response.setHeader("X-Frame-Options", "DENY");
         response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
         response.setHeader("Permissions-Policy", PERMISSIONS_POLICY);
         response.setHeader("Cache-Control", "no-store");
-        chain.doFilter(request, response);
     }
 }

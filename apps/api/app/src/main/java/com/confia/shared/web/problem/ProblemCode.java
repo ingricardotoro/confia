@@ -10,7 +10,9 @@ import java.util.Optional;
  *
  * <p>This change owns only the codes its own producers can emit: the security chain's uniform
  * denials ({@link #AUTHENTICATION_REQUIRED} and {@link #FORBIDDEN}), the firewall's rejection
- * ({@link #VALIDATION_FAILED}) and the last resort ({@link #INTERNAL_ERROR}). The sign-in codes
+ * ({@link #VALIDATION_FAILED}) and the last resort ({@link #INTERNAL_ERROR}). {@link
+ * #METHOD_NOT_ALLOWED} is the one answer to {@code TRACE}, which the container refuses before any
+ * filter runs (task 2.2; design.md, decision 8, dated note). The sign-in codes
  * ({@code authentication-failed}, {@code token-invalid}, {@code token-expired}) and the
  * institution codes belong to the session change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
@@ -24,6 +26,7 @@ public enum ProblemCode {
     VALIDATION_FAILED("validation-failed", 400),
     AUTHENTICATION_REQUIRED("authentication-required", 401),
     FORBIDDEN("forbidden", 403),
+    METHOD_NOT_ALLOWED("method-not-allowed", 405),
     INTERNAL_ERROR("internal-error", 500);
 
     private static final String TYPE_BASE = "https://confia.hn/problems/";
