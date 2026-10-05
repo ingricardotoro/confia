@@ -16,7 +16,7 @@
 | 2.1c | PR 5 `portal-and-worker-chain` | Hecha | `7cf71ee` y el commit `docs(sdd)` de esta rama |
 | 2.2a | PR 6a `container-rejections` | Hecha | `d9d015b` y el commit `docs(sdd)` de esta rama |
 | 2.2b | PR 6b `edge-gates` | Hecha | `c469734`, `8a2eb2e` y el commit `docs(sdd)` de esta rama |
-| 2.3a | PR 7a `client-address` | Hecha | `525cfee` y el commit `docs(sdd)` de esta rama |
+| 2.3a | PR 7a `client-address` | Hecha | `525cfee`, `c16f129` y los commits `docs(sdd)` de esta rama |
 | 2.3b a 2.3d | PR 7b a 7d | Pendientes (la tarea 2.3 completa está verificada en la rama local `wip/web-edge-request-origin-full`, commit `9e8b52f`) | |
 | 2.4 a 6.1 | PR 8 a 13 y cierre | Pendientes | |
 
@@ -770,3 +770,22 @@ Dentro del tope de 800. Tareas: 18 en total; hechas 8 (1.1, 1.2, 2.1a, 2.1b, 2.1
 | Orden enfocada y resultado | `-Dtest='CidrBlock*,ClientAddress*,IdempotencyScopeExclusionInventoryTest'`; cierre por `./mvnw verify`: Surefire 186 + 651, Failsafe 225 |
 | Arnés de ejecución | N/A: tipos puros sin frontera de ejecución; jqwik contra referencias independientes con `BigInteger` |
 | Frontera de reversión | Se retiran `ClientAddress`, `ClientKey`, `CidrBlock`, sus dos pruebas y el ajuste de `IdempotencyScopeExclusionInventoryTest` |
+
+### Revisión independiente de 2.3a y corrección (2026-10-05)
+
+Veredicto: sin bloqueantes, dos hallazgos importantes. Una sola corrección, en el commit `fix(web)` (`c16f129`).
+
+| Hallazgo | Cambio | Evidencia observada |
+|---|---|---|
+| I-1: un IPv4 incrustado en IPv6 eludía la regla de ceros a la izquierda (`::ffff:010.0.0.1`, `::ffff:1.2.3.04`, `::ffff:00.0.0.1`, `::1.2.3.04`) | `parseLiteral`: con `:` y `.`, la cola tras el último `:` debe cumplir la regla estricta de cuatro partes decimales | ROJO: `ClientAddressPropertiesTest` `Tests run: 40, Failures: 5` (casos 25, 26, 28, 29 y el de zona): `Expecting code to raise a throwable.` (`::ffff:1.2.3` ya lo rechazaba el JDK). Ruptura (quitar la comprobación de la cola, `return true`): `Tests run: 36, Failures: 4`, casos 25, 26, 28 y 29 con `Expecting code to raise a throwable.`. Revertida (`cmp`). |
+| I-2: la comprobación (a) de `IdempotencyScopeExclusionInventoryTest` era una lista negra por nombre simple (no veía clases anidadas ni `TransactionRunner`/`SecurityContext`) | Lista de permitidos por nombre completo, `WEB_MAY_DEPEND_ON_SHARED_SECURITY` = `ClientAddress` y `ClientKey`; 2.3c solo añade `RequestOrigin`. El literal `Idempotency-Key` sigue igual. Javadoc explicado | Ruptura: clase temporal `com.confia.shared.web.request.TempLeak` que referencia `IdempotentOutcome.Executed`: `com.confia.shared.web.request.TempLeak resides in a web package and depends on com.confia.shared.security.IdempotentOutcome$Executed, which is not one of [com.confia.shared.security.ClientKey, com.confia.shared.security.ClientAddress] (brecha con destino: cambio 7)`; con `TransactionRunner`: `... depends on com.confia.shared.security.TransactionRunner, which is not one of [...]`. Clase retirada. |
+| S-1: rechazar `%` | `parseLiteral` rechaza toda zona; la prueba de zona ignorada pasa a rechazo (`fe80::1%1`, `fe80::1%eth0`, `1.2.3.4%1`) | Dentro del ROJO de I-1 |
+| S-4 | `everyTextualFormOfOneAddressGivesTheSameKeyAndTheSameAddress`: comprimida, mayúsculas, expandida, `::ffff:a.b.c.d`, `::ffff:0102:0304` y `0:0:0:0:0:ffff:102:304` | Verde desde el principio (documenta el comportamiento) |
+| S-5 | La propiedad del /64 compara con los bytes **generados** (`new BigInteger(1, prefix)`) | `Tests run: 36` en verde |
+
+Cierre: `./mvnw verify` completo: Surefire 186 + 659 (651 más 8), Failsafe 225, `BUILD SUCCESS`. Medición del PR 7a tras la corrección
+(`git diff --numstat main...HEAD -- . ':!openspec'`, igual con y sin `-M`): 531 adiciones, 10 eliminaciones, **541** en total (tope 800).
+
+**Seguimientos, no implementados:** **S-2** `CidrBlock` enmascara en silencio los bits de host (`10.0.0.5/8` se acepta): decidir en 2.3b,
+dueña de la propiedad, si la lista de proxies de confianza debe rechazarlo. **S-3** las direcciones NAT64 y las IPv4-compatibles
+(`::a.b.c.d`) comparten un único cubo /64 en `rateLimitKey`: decidir en 3.1, dueña del limitador.

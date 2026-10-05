@@ -384,8 +384,8 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
   - **VERDE.** Crear `apps/api/app/src/main/java/com/confia/shared/security/{ClientAddress,ClientKey}.java` y
     `.../shared/web/request/CidrBlock.java` (privada al paquete). `ClientAddress.parseLiteral` exige cuatro partes
     decimales sin ceros a la izquierda para IPv4 y rechaza los corchetes, y solo entonces delega en
-    `InetAddress.ofLiteral`, que no resuelve nombres. `IdempotencyScopeExclusionInventoryTest` (a) nombra los tipos de
-    idempotencia en lugar de todo `shared.security`: `CidrBlock`, una clase `web`, depende ya de `ClientAddress` y la prueba
+    `InetAddress.ofLiteral`, que no resuelve nombres. `IdempotencyScopeExclusionInventoryTest` (a) pasa a una lista de permitidos por nombre
+    completo (`ClientAddress` y `ClientKey`) en lugar de prohibir todo `shared.security`: `CidrBlock`, una clase `web`, depende ya de `ClientAddress` y la prueba
     fallaba (la brecha «con destino: cambio 7»).
   - **Demostración deliberada.** Hacer que `CidrBlock.contains` ignore los bits parciales del último byte, o que
     `rateLimitKey` use los 16 bytes de una IPv6, rompe la propiedad respectiva; se revierte.
@@ -422,7 +422,8 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
   - **VERDE.** Crear `shared/security/RequestOrigin.java`; ampliar `RequestContextFilter.java` (agente truncado a
     `confia.web.user-agent-max-length`, con los caracteres de control sustituidos, y
     `ScopedValue.where(RequestOrigin.CURRENT, origin)`) y `WebEdgeConfiguration.java` (`@EnableConfigurationProperties`).
-    `PublicRouteAllowListTest` pasa a esperar la ruta del arnés.
+    `PublicRouteAllowListTest` pasa a esperar la ruta del arnés, y se añade `RequestOrigin` a la lista de permitidos de
+    `IdempotencyScopeExclusionInventoryTest` (una sola línea).
   - **Demostración deliberada.** Reutilizar un valor global en lugar de `ScopedValue`, o no sustituir los
     caracteres de control, rompe las pruebas respectivas; se revierte.
   - **Cierre.** `./mvnw verify` completo. Commit: `feat(web): bind the request origin for the whole request`. —
