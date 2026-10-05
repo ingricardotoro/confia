@@ -141,10 +141,36 @@ class ContainerRejectionsTest {
         logger.addAppender(appender);
         try {
             action.run();
+            awaitAnEvent(appender);
         } finally {
             logger.detachAppender(appender);
         }
-        return new ArrayList<>(appender.list);
+        synchronized (appender) {
+            return new ArrayList<>(appender.list);
+        }
+    }
+
+    /**
+     * The valve logs after it has written the answer, so the client can hold the response while
+     * the container thread has not logged yet. Waits, bounded, for that event instead of reading
+     * the list at once. {@code AppenderBase#doAppend} is synchronized on the appender, so reading
+     * under the same lock sees what the container thread added.
+     */
+    private static void awaitAnEvent(ListAppender<ILoggingEvent> appender) {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            synchronized (appender) {
+                if (!appender.list.isEmpty()) {
+                    return;
+                }
+            }
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     private static void assertRejectionEvent(ILoggingEvent event, int status, String method,

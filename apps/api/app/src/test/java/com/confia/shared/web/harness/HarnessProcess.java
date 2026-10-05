@@ -94,6 +94,36 @@ public final class HarnessProcess implements AutoCloseable {
         }
     }
 
+    /** Like {@link #send}, with {@code body} as the request body. */
+    public HttpResponse<String> sendWithBody(String method, String path, String body,
+            String... headerPairs) {
+        HttpRequest.Builder request = HttpRequest
+                .newBuilder(URI.create("http://localhost:" + port + path))
+                .timeout(Duration.ofSeconds(30))
+                .method(method, HttpRequest.BodyPublishers.ofString(body));
+        for (int i = 0; i < headerPairs.length; i += 2) {
+            request.header(headerPairs[i], headerPairs[i + 1]);
+        }
+        try {
+            return HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted while calling " + path, e);
+        }
+    }
+
+    /** The running context, for tests that enumerate its routes. */
+    public ConfigurableApplicationContext context() {
+        return context;
+    }
+
+    /** The port the harness listens on. */
+    public int port() {
+        return port;
+    }
+
     /** {@code GET path}. */
     public HttpResponse<String> get(String path, String... headerPairs) {
         return send("GET", path, headerPairs);

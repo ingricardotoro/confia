@@ -166,6 +166,22 @@ cookie, y nada obliga hoy a reactivarlo:
 > o la de sesión) sin activar la protección CSRF de doble envío con verificación de `Origin` y sin una
 > prueba que demuestre que una petición mutadora con la cookie y sin `X-CSRF-Token` recibe `403`.**
 
+**Condición dura de aceptación de `background-jobs-with-db-scheduler` (cambio 9) (2026-10-04, de
+`web-edge-foundations`, revisión de seguridad del PR 6b).** La protección de registros de la regla 11
+(`SensitiveLogGuard` y `Settings.withExecuteLogging(false)` de jOOQ) existe hoy solo donde hay `DataSource`
+y borde web: el proceso administrativo. El trabajador no tiene `DataSource` y su política de procesos
+prohíbe `com.confia.shared.web`, de modo que no recibe la guardia. Se escribe aquí y no como pregunta abierta,
+porque una pregunta abierta no bloquea nada:
+
+> **4. `background-jobs-with-db-scheduler` NO DEBE dar un `DataSource` al trabajador ni ejecutar SQL en él sin que
+> la protección de registros sensibles esté activa en ese proceso, y NO DEBE fusionarse sin una prueba que lo
+> demuestre** (con `org.jooq` y la raíz en `DEBUG`, un valor enlazado distintivo no aparece en ningún evento del
+> proceso trabajador real).
+
+Como el trabajador prohíbe `com.confia.shared.web`, la protección debe llegar por una configuración que el
+trabajador sí pueda importar (por ejemplo una de `shared.platform` o `shared.logging`, con su línea en
+`ProcessBeanPolicy`). El ajuste de jOOQ ya viaja con el `DSLContext` compartido; la guardia de Logback no.
+
 **Nota (2026-09-27, tercer corte: la parte 2 se parte a su vez).** La propuesta de
 `mfa-totp-and-password-recovery` pronosticó **12 a 17 tareas solo para su primera mitad**, contra el
 límite de quince de `openspec/changes/README.md`, y más aún si se aprueba añadir los dos controles que

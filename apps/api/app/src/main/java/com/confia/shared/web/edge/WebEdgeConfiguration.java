@@ -4,6 +4,7 @@ import com.confia.shared.web.problem.ProblemRequestRejectedHandler;
 import com.confia.shared.web.problem.ProblemResponses;
 import com.confia.shared.web.request.RequestContextFilter;
 import com.confia.shared.web.request.SecurityHeadersFilter;
+import com.confia.shared.web.request.SensitiveLogGuard;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
@@ -68,6 +69,12 @@ public class WebEdgeConfiguration {
     @Bean
     ProblemRequestRejectedHandler problemRequestRejectedHandler(ProblemResponses problems) {
         return new ProblemRequestRejectedHandler(problems);
+    }
+
+    /** Denies the debug and trace logging of raw headers and bodies (decision 22). */
+    @Bean
+    SensitiveLogGuard sensitiveLogGuard() {
+        return new SensitiveLogGuard();
     }
 
     /**
