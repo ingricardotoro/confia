@@ -20,7 +20,9 @@
 | 2.3b | PR 7b `trusted-proxy-resolution` | Hecha | `e1d5f7a` y el commit `docs(sdd)` de esta rama |
 | 2.3c | PR 7c `request-origin-filter` | Hecha | `5b271e4` y el commit `docs(sdd)` de esta rama |
 | 2.3d | PR 7d `audit-origin` | Hecha | `8a20946` y el commit `docs(sdd)` de esta rama |
-| 2.4 a 6.1 | PR 8 a 13 y cierre | Pendientes | |
+| 2.4a | PR 8a `translator-core` | Hecha | `7c609bb` y el commit `docs(sdd)` de esta rama |
+| 2.4b | PR 8b `field-violations` | Pendiente (necesita 2.4a fusionada) | |
+| 2.5 a 6.1 | PR 9 a 13 y cierre | Pendientes | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
 
@@ -981,3 +983,121 @@ Pronóstico 383; dentro del tope de 800. Tareas: 18 en total; hechas 11.
 | Orden enfocada y resultado | `-Dtest='RequestOriginAuditLogWriterTest,ProcessBeanIsolationTest' -Dit.test=RequestOriginAuditIT`: Surefire 10/0 fallos, Failsafe 4/0; cierre por `./mvnw verify`: Surefire 186 + 740, Failsafe 229 |
 | Arnés de ejecución | Servidor real en puerto aleatorio con PostgreSQL (Testcontainers), `SharedPlatformConfiguration` y el borde web de producción, `TransactionRunner` real, 50 peticiones simultáneas y verificador de cadena |
 | Frontera de reversión | Se retiran `RequestOriginAuditLogWriter`, la envoltura en `SharedPlatformConfiguration`, la línea de `ProcessBeanPolicy`, el ajuste de Javadoc de `AuditEntry` y las dos pruebas: la auditoría vuelve a `null` |
+## Tarea 2.4 completa: PR 8 `problem-translator` (detenida antes del commit: excedía el tope; el propietario aprobó la costura 2.4a + 2.4b)
+
+Rama de trabajo `change/web-edge-foundations-problem-translator`, desde `main` en `a831dd3` tras fusionar el PR 7d. Se implementó la
+tarea 2.4 completa y se verificó (`./mvnw verify`), pero midió **1 046 líneas** efectivas (1 029 adiciones y 17 eliminaciones, igual con y sin
+`-M`) frente al tope de 800 y a un pronóstico de 700 a 1 000. Por instrucción del orquestador no se compromete en la rama de trabajo: el árbol
+completo y verificado está en la rama **local** `wip/web-edge-problem-translator-full` (commit `7e61aff`, 19 archivos), que nunca se publica, y la
+rama de trabajo vuelve a `main`, limpia. **La tarea 2.4 NO se marca `[x]`.**
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| Red de seguridad | `-Dtest='ProblemCodeTest,ProblemCatalogCoverageTest,ProblemResponsesTest,RequestContextFilterTest,OpenApiContractSnapshotTest,SensitiveDataLoggingTest'` sobre la rama sin cambios | `Tests run: 60, Failures: 0, Errors: 0, Skipped: 0` |
+| ROJO 1 | `-Dtest='ProblemTranslationTest,ProblemExceptionHandlerTest,ProblemCodeTest,ProblemCatalogCoverageTest,ProblemResponsesTest,ResourceNotFoundTest,PublicRouteAllowListTest'` con las pruebas y el arnés, sin producción | `COMPILATION ERROR`: 11 errores `cannot find symbol` (`FieldViolation`, `ProblemExceptionHandler`) e `incompatible types` en la sobrecarga de `ProblemResponses.write`. Causa prevista. |
+| ROJO 2 | Mismo comando, con `FieldViolation`, `ProblemBody.errors`, la sobrecarga de `write` y un `ProblemExceptionHandler` sin cuerpo ni registro, y sin los dos códigos | `Tests run: 84, Failures: 12, Errors: 12, Skipped: 0`: `ResourceNotFoundTest` 2 de 2 (el `404` de `/swagger-ui/**` acababa en el último recurso), `ProblemCodeTest` `Failures: 3, Errors: 2`, `ProblemCatalogCoverageTest` `Failures: 1`, `ProblemExceptionHandlerTest` `Errors: 5` (`UnsupportedOperationException`), `ProblemTranslationTest` `Failures: 6, Errors: 5` (`errors` ausente: `NullPointer ... JsonNode.get("errors") is null`; `415` respondido por la válvula como `400`; registro vacío). Las pruebas de cuerpo mal formado, cabecera ausente y tipo erróneo pasaban por la válvula del contenedor (con `instance` `/`); se les añadió la aserción de `instance` igual a la ruta, que solo cumple el traductor. |
+| VERDE parcial | Con los dos códigos, el catálogo y el traductor registrado | `Tests run: 84, Failures: 2`: la ruta del portal bajo `/swagger-ui/` también es pública en `local` (404 y no 401: la hipótesis de la prueba era falsa, se corrigió la prueba) y el nombre del parámetro (`parameter`: el build no conserva los nombres) |
+| VERDE | Nombre por la anotación de enlace (`@RequestParam`, `@RequestHeader`, `@PathVariable`) y la restricción como el prefijo antes del primer punto del último código (`Max.int` es `max`), más OpenAPI, aislamiento, `ContainerRejectionsTest`, `RequestContextFilterTest`, `SensitiveDataLoggingTest` y `AdminSecurityChainTest` | `Tests run: 171, Failures: 0, Errors: 0, Skipped: 0` (el `BUILD FAILURE` de esa ejecución es la cobertura de JaCoCo con `-Dtest=` acotado) |
+| TRIANGULAR | Pruebas unitarias del traductor y un caso de encabezado con restricción | `ProblemExceptionHandlerTest` `Tests run: 7, Failures: 0` (respuesta ya confirmada, desconexión por texto y por clase, error de E/S que no es desconexión, violación de método sin el nombre del método, error global sin códigos) |
+| Cierre | `./mvnw verify` completo sobre el árbol final | Surefire 186 + 783 (los 740 de la línea base más 43 nuevos), Failsafe 229, `BUILD SUCCESS`. La instantánea OpenAPI (`apps/api/openapi/*.json`) y `apps/api/routes` **sin cambios** (`git status` limpio de ellos); la prueba `theProblemDetailSchemaOfTheContractStillDeclaresItsSixPropertiesAndNotErrors` afirma las seis propiedades de `ProblemDetail` en las dos instantáneas. |
+
+Pruebas añadidas: 43 (`ProblemTranslationTest` 18, `ProblemExceptionHandlerTest` 7, `ResourceNotFoundTest` 3, `ProblemResponsesTest` +10, `ProblemCodeTest` +4,
+`ProblemCatalogCoverageTest` +1). `theFirewallRejectionCarriesNoViolationListAndNoRawRejectedBytes` (seguimiento S1 de la revisión de 2.1b) vuelve aquí: sin `errors`,
+`instance` igual a la ruta sin decodificar ni consulta, sin saltos de línea crudos en el cuerpo y sin `Set-Cookie`. Ninguna prueba lee algo que un hilo del servidor
+haga después de la respuesta: el traductor registra antes de escribir, así que no hay esperas que acotar.
+
+### Demostraciones deliberadas (cada una revertida; `cmp` contra la copia original sin diferencias)
+
+| Ruptura | Resultado |
+|---|---|
+| `ProblemExceptionHandler.unexpected` escribe `e.getMessage()` en el `detail` del `500` | `Tests run: 25, Failures: 3`: `anUnforeseenExceptionAnswers500WithNothingInternalInTheBodyOrTheHeaders`: `Expecting actual: "{"type":"https://confia.hn/problems/internal-error","title":"t","status":500,"detail":"jdbc:postgresql://host/db password=x",...` `not to contain: "jdbc"`; además `theTechnicalDetailStays...` (el `traceId` inventado no es el del registro) y `anIoErrorThatIsNotAVanishedClientIsAnUnforeseenFailure`. |
+| Quitar `@JsonInclude(NON_EMPTY)` de `ProblemBody.errors` | `Tests run: 37, Failures: 9`: `ProblemResponsesTest.errorsIsOmittedWhenThereAreNoViolations`: `[a response without a violation list has no errors member] Expecting value to be false but was true`, siete de `ProblemTranslationTest` (`[the response has no errors member]`) y `ResourceNotFoundTest`. |
+
+### Medición del árbol completo (`git diff --numstat main...wip/web-edge-problem-translator-full -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 1 029 | 17 | **1 046** |
+| Con `-M` | 1 029 | 17 | **1 046** |
+
+Por archivo: `ProblemTranslationTest` 318, `ProblemExceptionHandler` 218, `ProblemExceptionHandlerTest` 172, `HarnessController` 87, `ProblemResponsesTest` 49,
+`ResourceNotFoundTest` 53, `FieldViolation` 25, docs 18, el resto 87.
+
+### Costura propuesta (medida sobre árboles reales, no estimada)
+
+| Parte | Contenido | Líneas |
+|---|---|---|
+| **A `translator-core`** | `RESOURCE_NOT_FOUND` y `UNSUPPORTED_MEDIA_TYPE`, catálogo, `ProblemExceptionHandler` con `DomainException`, cuerpo ilegible, cabecera o parámetro ausente o de tipo erróneo, `415`, `404` y último recurso con desconexión; registro en `WebEdgeConfiguration`; el arnés con las rutas `validated` (sin restricciones), `required`, `domain-known`, `domain-unknown` y `disconnected`; `ProblemTranslationTest` (10), `ProblemExceptionHandlerTest` (5), `ResourceNotFoundTest`, `ProblemCodeTest`, `ProblemCatalogCoverageTest`. Se probó en un árbol aparte: `Tests run: 82, Failures: 0` con OpenAPI, aislamiento y rutas. Contiene la ruptura del `getMessage()`. | **641** (633 adiciones, 8 eliminaciones) |
+| **B `field-violations`** | `FieldViolation`, el miembro `errors` con `@JsonInclude(NON_EMPTY)` y la sobrecarga de `write`, los tres traductores de validación y sus ayudas (nombre por anotación de enlace, restricción en kebab-case), la dependencia `spring-boot-starter-validation`, las rutas `bounded` y `constraint-violation` y las restricciones de `validated`, las pruebas de validación (8 en `ProblemTranslationTest`, 2 en `ProblemExceptionHandlerTest`, 10 en `ProblemResponsesTest`) y la nota de `docs/ui-ux`. Contiene la ruptura de `@JsonInclude`. | **417** (402 adiciones, 15 eliminaciones) sobre A |
+
+Las dos partes suman 1 058 (12 más que el árbol completo: B reescribe unas líneas de A). Ambas caben en 800. Dependencia dura: B necesita A; A sola deja los
+fallos de validación de campo en el `500` genérico, sin consecuencia mientras ningún endpoint de producción valide (no existe ninguno).
+
+### Desviaciones del diseño (declaradas)
+
+1. **`spring-boot-starter-validation` en `app/pom.xml`.** El traductor importa `jakarta.validation` en producción y esa API solo llegaba de forma transitiva por
+   springdoc; se declara de forma explícita (Hibernate Validator vive en `org.hibernate.validator`, que no está en la lista de grupos prohibidos).
+2. **Ubicación de las pruebas.** `ProblemTranslationTest` está en `com.confia.shared.web` (donde viven las demás pruebas de la cadena y el arnés), no en
+   `shared/web/problem/` como dice la tarea. La prueba del `404` real está en `com.confia.bootstrap` (`ResourceNotFoundTest`) porque `OpenApiProcess` es privada al paquete.
+3. **`PublicRouteAllowListTest`**: el control negativo contaba 3 fugas del arnés; ahora cuenta 10 (las siete rutas nuevas del arnés).
+4. **El portal también responde `404 resource-not-found`** bajo `/swagger-ui/**` con `local` (su documentación es pública en ese perfil); sin `local`, `401`.
+5. **El nombre del campo de un parámetro** sale de la anotación de enlace, no del compilador (el build no conserva los nombres de parámetros).
+6. **Una excepción de seguridad lanzada dentro del MVC** (por ejemplo `AccessDeniedException` de un `@PreAuthorize`, cambio 8) caería hoy en el `500` del
+   último recurso del traductor; no existe ninguna en este cambio. Riesgo registrado para el cambio 8.
+7. **springdoc** puede añadir las respuestas del `@RestControllerAdvice` a cada operación cuando existan operaciones; hoy el documento no tiene ninguna y la
+   instantánea no cambia. Riesgo registrado para el primer endpoint de producción.
+
+### Evidencia de la unidad de trabajo (árbol completo)
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='ProblemTranslationTest,ProblemExceptionHandlerTest,ProblemCodeTest,ProblemCatalogCoverageTest,ProblemResponsesTest,ResourceNotFoundTest,PublicRouteAllowListTest,OpenApi*Test,ProcessBeanIsolationTest,ContainerRejectionsTest,RequestContextFilterTest,SensitiveDataLoggingTest,AdminSecurityChainTest'`: `Tests run: 171, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 783, Failsafe 229 |
+| Arnés de ejecución | Cadena real por HTTP en un proceso sin base de datos con controladores de prueba que lanzan cada excepción, más el proceso administrativo y el del portal reales con `local` para el `404` |
+| Frontera de reversión | Se retiran `ProblemExceptionHandler`, `FieldViolation`, el miembro `errors`, la sobrecarga de `write`, los dos códigos y sus entradas de catálogo, la dependencia del starter y las pruebas |
+
+## Tarea 2.4a: PR 8a `translator-core`
+
+Rama `change/web-edge-foundations-problem-translator`, desde `main` en `a831dd3`. El código sale de la rama local
+`wip/web-edge-problem-translator-full` (sin tocarla; sigue en `f833cd9`), recortado a la parte A exactamente como se midió (641 líneas). Decisión del
+propietario (2026-10-05): partir 2.4 en 2.4a y 2.4b; el cambio pasa a 19 tareas y 18 PR. Re-plan en `tasks.md` y nota fechada del final; dos riesgos
+con dueño en `design.md` (excepción de seguridad dentro del MVC: cambio 8; respuestas de `@RestControllerAdvice` en springdoc: `session-tokens-and-web-layer`).
+
+### Evidencia del ciclo TDD (reobservada sobre este árbol)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO 1 | `-Dtest='ProblemTranslationTest,ProblemExceptionHandlerTest,ProblemCodeTest,ProblemCatalogCoverageTest,ResourceNotFoundTest,PublicRouteAllowListTest'` con las pruebas y el arnés, sin producción | `COMPILATION ERROR`: seis `cannot find symbol` (`ProblemExceptionHandler`). Causa prevista. |
+| ROJO 2 | Con `ProblemCode` y el traductor, sin catálogo ni registro | `Tests run: 62, Failures: 12, Errors: 0`: `ResourceNotFoundTest` 2 de 3, `ProblemCatalogCoverageTest` 3 de 6, `ProblemTranslationTest` 7 de 10. |
+| VERDE | Con catálogo y registro, más OpenAPI, `PortalRouteMapSnapshotTest` y `ProcessBeanIsolationTest` | `Tests run: 90, Failures: 0, Errors: 0, Skipped: 0` (el `BUILD FAILURE` es la cobertura de JaCoCo con `-Dtest=` acotado) |
+| Cierre | `./mvnw verify` completo | Surefire 186 + 763 (los 740 de la línea base más 23 nuevos), Failsafe 229, `BUILD SUCCESS`. Instantánea OpenAPI y `routes` sin cambios. |
+
+Pruebas añadidas: 23 (`ProblemTranslationTest` 10, `ProblemExceptionHandlerTest` 5, `ResourceNotFoundTest` 3, `ProblemCodeTest` +4, `ProblemCatalogCoverageTest` +1).
+
+### Demostración deliberada (revertida; `cmp` sin diferencias)
+
+`ProblemExceptionHandler.unexpected` escribe `e.getMessage()` en el `detail`: `Tests run: 15, Failures: 3`. `anUnforeseenExceptionAnswers500WithNothingInternalInTheBodyOrTheHeaders`:
+`Expecting actual: "{"type":"https://confia.hn/problems/internal-error","title":"t","status":500,"detail":"jdbc:postgresql://host/db password=x",...` `not to contain: "jdbc"`;
+además `theTechnicalDetailStays...` y `anIoErrorThatIsNotAVanishedClientIsAnUnforeseenFailure`.
+
+### Medición del PR 8a (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 633 | 8 | **641** |
+| Con `-M` | 633 | 8 | **641** |
+
+Dentro del tope de 800. Tareas: 19 en total; hechas 12.
+
+### Desviaciones del diseño (declaradas)
+
+Las 2, 3 (con ocho fugas en esta parte), 4 y 5 de la sección «Tarea 2.4 completa»; la 1 (dependencia del starter de validación) y las notas de `docs/ui-ux` viajan en 2.4b.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='ProblemTranslationTest,ProblemExceptionHandlerTest,ProblemCodeTest,ProblemCatalogCoverageTest,ResourceNotFoundTest,PublicRouteAllowListTest,OpenApi*Test,PortalRouteMapSnapshotTest,ProcessBeanIsolationTest'`: `Tests run: 90, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 763, Failsafe 229 |
+| Arnés de ejecución | Cadena real por HTTP con controladores de prueba que lanzan cada excepción, y los procesos administrativo y portal reales con `local` para el `404` |
+| Frontera de reversión | Se retiran `ProblemExceptionHandler`, los dos códigos y sus entradas de catálogo, el registro y las pruebas |

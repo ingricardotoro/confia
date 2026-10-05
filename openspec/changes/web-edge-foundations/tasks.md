@@ -15,10 +15,10 @@
 
 | Campo | Valor |
 |---|---|
-| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 11 000 a 12 700** en 17 PR según el re-pronóstico del 2026-10-05 (nota fechada del final): 6 822 ya medidas (siete PR fusionados y la tarea 2.3, medida en 1 869 y partida en cuatro) más 4 200 a 5 900 estimadas para las tareas restantes. La estimación nominal original, de 4 670, subestimó las pruebas; no se recorta ninguna |
+| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 11 000 a 12 700** en 18 PR según el re-pronóstico del 2026-10-05 (nota fechada del final): 6 822 ya medidas (siete PR fusionados y la tarea 2.3, medida en 1 869 y partida en cuatro) más 4 200 a 5 900 estimadas para las tareas restantes. La estimación nominal original, de 4 670, subestimó las pruebas; no se recorta ninguna |
 | Riesgo frente al presupuesto | **Alto** frente a 400 de la preflight; **medio por PR** frente al presupuesto del proyecto de 800 (nominal de 320 a 520 por PR, peor caso de 480 a 780) |
 | Chained PRs recommended | Yes |
-| Suggested split | 17 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a, 2.3b, 2.3c, 2.3d, 2.4, 2.5, 3.1, 3.2, 4.1 y 5.1), más la tarea de cierre 6.1 |
+| Suggested split | 18 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a, 2.3b, 2.3c, 2.3d, 2.4a, 2.4b, 2.5, 3.1, 3.2, 4.1 y 5.1), más la tarea de cierre 6.1 |
 | Delivery strategy | `auto-chain` (decidido por el propietario el 2026-10-04, en lugar del `single-pr` de la preflight de la sesión) |
 | Chain strategy | `stacked-to-main`: cada PR se fusiona a `main` en orden y el siguiente parte de `main` actualizado |
 | Presupuesto del proyecto por pull request (`docs/15-flujo-de-trabajo-git.md` §3) | 800 líneas de cambio efectivo |
@@ -38,17 +38,17 @@ decisión prevalece y es la que este documento registra.
 contaba y llega a unas 4 670 nominales. No se recorta con trucos de formato, ni se omiten pruebas,
 comentarios o documentación, ni se parte un PR de forma artificial.
 
-**Tareas.** 18 en total (17 de PR más 1 de cierre). El máximo del proyecto es 15; el propietario concedió una excepción al tope (notas fechadas del final) y esta partición la ejerce: la tarea 2.3 midió 1 869 líneas y se partió en 2.3a, 2.3b, 2.3c y 2.3d. La tarea 2.1 original
+**Tareas.** 19 en total (18 de PR más 1 de cierre). El máximo del proyecto es 15; el propietario concedió una excepción al tope (notas fechadas del final) y esta partición la ejerce: la tarea 2.3 midió 1 869 líneas y se partió en 2.3a, 2.3b, 2.3c y 2.3d. La tarea 2.1 original
 se partió en 2.1a, 2.1b y 2.1c por decisión del propietario (nota fechada del final). Las costuras restantes
 de la sección 8 del diseño (PR 5b, 8b y 10b del diseño) **no** son tareas reservadas. Si la medición de un
 PR supera 800 líneas, el ejecutor se detiene y consulta al orquestador antes de partir: usar otra costura
 llevaría el total por encima de lo planeado, y cualquier costura exige primero replantear esta lista y la decisión del propietario.
 
-**Orden.** Lineal de 1 a 13, con el PR 6 partido en 6a y 6b y el PR 7 en 7a a 7d (la numeración de PR es la de las tareas 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a a 2.3d,
-2.4, 2.5, 3.1, 3.2, 4.1 y 5.1). Dependencias duras: el PR 2.1b necesita el 2.1a (`ProblemResponses`,
-filtros); el PR 7c (2.3c) necesita el 3 (`RequestContextFilter`) y el 7b; el 7d necesita el 7c; el PR 8 (2.4) necesita el 3 (`ProblemCode`,
-`ProblemResponses`); el PR 11 (3.2) necesita los PR 7 y 10; el PR 12 (4.1) necesita el 11
-(`CapacityExceededException`); el PR 13 (5.1) necesita el 8. La propuesta permite fusionar el PR 13 antes
+**Orden.** Lineal de 1 a 13, con el PR 6 partido en 6a y 6b y el PR 7 en 7a a 7d (la numeración de PR es la de las tareas 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a a 2.3d, 2.4a y 2.4b,
+2.5, 3.1, 3.2, 4.1 y 5.1). Dependencias duras: el PR 2.1b necesita el 2.1a (`ProblemResponses`,
+filtros); el PR 7c (2.3c) necesita el 3 (`RequestContextFilter`) y el 7b; el 7d necesita el 7c; el PR 8a (2.4a) necesita el 3 (`ProblemCode`,
+`ProblemResponses`); el PR 8b (2.4b) necesita el 8a; el PR 11 (3.2) necesita los PR 7 y 10; el PR 12 (4.1) necesita el 11
+(`CapacityExceededException`); el PR 13 (5.1) necesita el 8a. La propuesta permite fusionar el PR 13 antes
 que los PR 10 a 12 (C3 no depende de C2); no se hace salvo decisión del propietario, porque renumeraría la
 cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa la numeración nueva.
 
@@ -97,13 +97,14 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | 7b | Resolución de la IP del cliente por proxies de confianza y propiedad `confia.web.trusted-proxies` (2.3b) | PR 7b `trusted-proxy-resolution` (592 medido) | `-Dtest='ClientAddressResolverTest,WebEdgePropertiesTest'` | Resolvedor con ejemplos y propiedades; `Binder` con `SystemEnvironmentPropertySource` | Se retiran las tres clases, las dos claves de `application.yml` y la nota de `docs/05` |
 | 7c | Identificador, agente de usuario y `RequestOrigin` ligado a la petición (2.3c) | PR 7c `request-origin-filter` (381 en el árbol completo) | `-Dtest='RequestContextFilter*,PublicRouteAllowListTest'` | Arnés sin base de datos con 100 peticiones simultáneas y un socket crudo sin `User-Agent` | Se retiran `RequestOrigin` y los cambios del filtro |
 | 7d | Origen de la petición en la bitácora (2.3d) | PR 7d `audit-origin` (383 medido) | Unidad: `-Dtest='RequestOriginAuditLogWriterTest,ProcessBeanIsolationTest'`; IT: `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=RequestOriginAuditIT -Dfailsafe.failIfNoSpecifiedTests=false` | `RequestOriginAuditIT` con PostgreSQL (Testcontainers) y 50 peticiones concurrentes | El decorador se retira: la auditoría vuelve a `null` |
-| 8 | Traductor de Problem Details completo (2.4) | PR 8 `problem-translator` (~380 → 570) | Ídem con `-Dtest='ProblemTranslationTest,ProblemCatalogCoverageTest'` | Controladores de prueba que lanzan cada excepción por la cadena real | Errores de MVC vuelven al formato de Spring |
+| 8a | Traductor de Problem Details sin lista de campos: `DomainException`, cuerpo ilegible, cabecera o parámetro ausente o de tipo erróneo, `415`, `404` y último recurso con desconexión; códigos `resource-not-found` y `unsupported-media-type` (2.4a) | PR 8a `translator-core` (641 medido en el árbol completo) | `-Dtest='ProblemTranslationTest,ProblemExceptionHandlerTest,ResourceNotFoundTest,ProblemCodeTest,ProblemCatalogCoverageTest,PublicRouteAllowListTest'` | Controladores de prueba que lanzan cada excepción por la cadena real, y los procesos administrativo y portal reales con `local` para el `404` | Se retiran `ProblemExceptionHandler`, los dos códigos y sus entradas de catálogo; los errores de MVC vuelven al formato de Spring |
+| 8b | Lista de campos de un fallo de validación: `FieldViolation`, `errors`, sobrecarga de `write` y los tres traductores de validación (2.4b) | PR 8b `field-violations` (417 medido sobre 8a) | `-Dtest='ProblemTranslationTest,ProblemExceptionHandlerTest,ProblemResponsesTest'` | Controladores de prueba con restricciones de cuerpo, parámetro y cabecera por la cadena real | Se retiran `FieldViolation`, el miembro `errors`, la sobrecarga y los tres traductores; la dependencia del starter de validación |
 | 9 | Reglas W1, W2a, W2b y W3 con fixtures, `SessionValidity` e inventario de ausencias (2.5) | PR 9 `web-rules` (~380 → 570) | Ídem con `-Dtest='WebLayerDependencyRulesTest,WebExposedTypesRuleTest,SharedBoundaryRulesTest,EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest,WebEdgeScopeExclusionInventoryTest'` | Mitad de fixture rechazada con fragmentos que nombran la violación (ADR-0018) | Solo pruebas y un puerto sin uso |
 | 10 | Puerto y adaptador en memoria del limitador (3.1) | PR 10 `rate-limiter-core` (~500 → 750) | Ídem con `-Dtest='InMemoryRateLimiter*'` | jqwik contra un modelo ingenuo y 50 hilos en el mismo `InMemoryRateLimiter` | Clases nuevas sin consumidor |
 | 11 | Borde del limitador: `@RateLimited`, `429` y `503` (3.2) | PR 11 `rate-limiter-edge` (~320 → 480) | Ídem con `-Dtest='RateLimitEdgeTest,ProcessBeanIsolationTest'` | Petición por la cadena real a un controlador de prueba anotado | Se retira el interceptor y la configuración |
 | 12 | Materializador del retardo, hilos virtuales, tiempos de Tomcat y regla W4 (4.1) | PR 12 `delay-materializer` (~460 → 690) | Unidad: `-Dtest='RequiredDelayMaterializer*Test,BlockingWaitConfinementTest'`; IT: `-Dit.test=RequiredDelayMaterializerIT` | `RequiredDelayMaterializerIT` bajo Tomcat real con base de datos | Se retira el materializador y `spring.threads.virtual.enabled` vuelve a su omisión |
 | 13 | Borde HTTP de la idempotencia, controlador solo de prueba y regla W5 (5.1) | PR 13 `idempotency-edge` (~480 → 720) | `-Dtest='IdempotencyNotInIdentityTest,OpenApiContractSnapshotTest'`; IT: `-Dit.test=IdempotencyEdgeIT` | `IdempotencyEdgeIT` con `IdempotencyDemoController` y PostgreSQL | Se retira el borde; `IdempotentExecutor` queda intacto |
-| 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 17 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
+| 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 18 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
 
 ---
 
@@ -446,30 +447,52 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     request origin on audit entries`. — Requisito de `web-edge` «El origen de la petición llega a la bitácora de
     auditoría»
 
-- [ ] 2.4 **PR 8 `problem-translator`: traductor completo de Problem Details (decisiones 8 a 10).**
-  - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/problem/ProblemTranslationTest.java`
-    (por la cadena real y controladores de prueba: validación con `errors` sin el valor rechazado,
-    cuerpo truncado sin el mensaje del analizador, `415`, `404 resource-not-found` bajo
-    `/swagger-ui/**` en `local`, `IllegalStateException` con mensaje sensible, `DomainException` con
-    mensaje interno, `DomainException` de código desconocido, desconexión del cliente sin escritura y
-    nivel `DEBUG`, y el mismo `requestId` en el registro del servidor y en `traceId`); ampliar
-    `ProblemCodeTest.java` y `ProblemCatalogCoverageTest.java` con `resource-not-found` y
-    `unsupported-media-type`; aserción de que el esquema `ProblemDetail` de `ContractSchemas` sigue con
-    sus seis propiedades; ampliar `ProblemResponsesTest.java` con `errors` omitido sin violaciones y
-    listado con ellas. **Rojo esperado:** cuerpos por omisión de Spring.
-  - **VERDE.** Crear `FieldViolation` y añadir a `ProblemBody` el miembro `errors`
-    (`@JsonInclude(NON_EMPTY)`) y la sobrecarga de `ProblemResponses.write` con violaciones (movidos de la
-    antigua 2.1 porque solo este traductor los produce). Crear `apps/api/app/src/main/java/com/confia/shared/web/problem/ProblemExceptionHandler.java`
-    (`@RestControllerAdvice`, orden más alto; `DomainException` por `ProblemCode.ofCode`, excepciones
-    del marco enumeradas, desconexión por `DisconnectedClientHelper`, todo lo demás `500`) y registrarlo
-    en `WebEdgeConfiguration.java`; añadir los dos códigos y sus claves `title` y `detail` a
-    `problems.properties`. Nota fechada en `docs/ui-ux/04-patrones-de-interaccion.md` §9 con la
+- [x] 2.4a **PR 8a `translator-core`: traductor de Problem Details sin lista de campos (decisiones 8 a 10).**
+  Primera parte de la partición de 2.4 (nota fechada del final); fuente: la rama local
+  `wip/web-edge-problem-translator-full`. Medida en 641 líneas.
+  - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/web/`: `ProblemTranslationTest.java`
+    (por la cadena real y controladores de prueba: cuerpo truncado sin el mensaje del analizador, cabecera
+    o parámetro ausente y valor de tipo erróneo, cortafuegos sin lista de campos y sin bytes crudos en
+    `instance`, `415`, `IllegalStateException` con mensaje sensible, `DomainException` con mensaje interno,
+    `DomainException` de código desconocido, desconexión del cliente sin escritura y nivel `DEBUG`, el mismo
+    `requestId` en el registro del servidor y en `traceId`, y las seis propiedades de `ProblemDetail` en
+    las dos instantáneas) y `ProblemExceptionHandlerTest.java` (respuesta ya confirmada y las formas de un
+    cliente que se fue); en `apps/api/app/src/test/java/com/confia/bootstrap/` `ResourceNotFoundTest.java`
+    (`404 resource-not-found` bajo `/swagger-ui/**` con `local` en administración y portal, y `401` sin `local`);
+    ampliar `ProblemCodeTest.java` y `ProblemCatalogCoverageTest.java` con los dos códigos; ampliar el arnés
+    (`HarnessController`, `WebEdgeHarness`, `HarnessProcess`) con las rutas `validated`, `required`,
+    `domain-known`, `domain-unknown` y `disconnected`; ajustar el control negativo de `PublicRouteAllowListTest`
+    a ocho fugas. **Rojo esperado:** error de compilación (`ProblemExceptionHandler`) y después cuerpos por
+    omisión del contenedor.
+  - **VERDE.** Añadir los códigos `resource-not-found` (404) y `unsupported-media-type` (415) a `ProblemCode.java`
+    y sus claves `title` y `detail` a `problems.properties`; crear `ProblemExceptionHandler.java`
+    (`@RestControllerAdvice`, orden más alto; `DomainException` por `ProblemCode.ofCode`, cuerpo ilegible y
+    parámetros ausentes o mal tipados, `415`, `404`, desconexión por `DisconnectedClientHelper`, todo lo demás
+    `500` registrado en `ERROR` antes de escribir) y registrarlo en `WebEdgeConfiguration.java`.
+  - **Demostración deliberada.** Devolver `getMessage()` en el `detail` del `500` rompe la aserción de «sin
+    detalles internos»; se revierte con `cmp`.
+  - **Cierre.** `OpenApiContractSnapshotTest` y `PortalRouteMapSnapshotTest` sin cambios y `./mvnw verify`
+    completo. Commit: `feat(web): translate framework and domain exceptions into Problem Details`. — Requisitos
+    de `web-edge` «Catálogo de códigos…» y «Las respuestas de error no exponen detalles internos»
+
+- [ ] 2.4b **PR 8b `field-violations`: lista de campos de un fallo de validación (decisión 9).**
+  Segunda parte de la partición; necesita 2.4a. Fuente: la misma rama local. Medida en 417 líneas sobre 2.4a.
+  - **ROJO.** Ampliar `ProblemResponsesTest.java` (`errors` omitido sin violaciones y listado con ellas, y la
+    razón en kebab-case), `ProblemTranslationTest.java` (campo inválido por cuerpo, valor rechazado que no se
+    repite, `ConstraintViolationException`, restricción de parámetro y de cabecera nombradas por su enlace) y
+    `ProblemExceptionHandlerTest.java` (violación de método sin el nombre del método y error global sin
+    códigos); ampliar el arnés con las rutas `bounded` y `constraint-violation` y las restricciones de
+    `validated`; ajustar `PublicRouteAllowListTest` a diez fugas. **Rojo esperado:** error de compilación
+    (`FieldViolation`) y después cuerpos sin `errors`.
+  - **VERDE.** Crear `FieldViolation.java`, añadir a `ProblemBody` el miembro `errors`
+    (`@JsonInclude(NON_EMPTY)`) y la sobrecarga de `ProblemResponses.write` con violaciones, añadir los tres
+    traductores de validación a `ProblemExceptionHandler.java`, declarar `spring-boot-starter-validation` en
+    `app/pom.xml`, y añadir a `docs/ui-ux/04-patrones-de-interaccion.md` §9 la nota fechada con la
     correspondencia de códigos y el idioma, sin reescribir su tabla.
-  - **Demostración deliberada.** Devolver `getMessage()` en el `detail` del `500` rompe la aserción de
-    «sin detalles internos»; se revierte.
+  - **Demostración deliberada.** Quitar `@JsonInclude(NON_EMPTY)` de `errors` hace aparecer `errors: []` en toda
+    respuesta y rompe las aserciones de ausencia; se revierte con `cmp`.
   - **Cierre.** `OpenApiContractSnapshotTest` sin cambios y `./mvnw verify` completo. Commit:
-    `feat(web): translate every exception into a Problem Details response`. — Requisitos de `web-edge`
-    «Catálogo de códigos…», «Las respuestas de error no exponen detalles internos» y «Un fallo de
+    `feat(web): list the violated fields of a validation failure`. — Requisito de `web-edge` «Un fallo de
     validación produce `validation-failed`…»
 
 - [ ] 2.5 **PR 9 `web-rules`: reglas de ArchUnit de la capa `web` e inventario de ausencias (decisión 20).**
@@ -635,7 +658,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 
 ## Fase 6: cierre
 
-- [ ] 6.1 **Verificación completa, medición de los 17 PR y barrido de trazabilidad.** Con los 17 PR
+- [ ] 6.1 **Verificación completa, medición de los 18 PR y barrido de trazabilidad.** Con los 18 PR
   fusionados a `main`, ejecutar `./mvnw verify` completo en `apps/api` y registrar cobertura (global
   80 %, núcleo y `domain` 95 %) y mutación (umbral 80). Registrar en
   `openspec/changes/web-edge-foundations/apply-progress.md` la medición de cada PR con
@@ -678,18 +701,18 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | El `type` deriva del código estable | El mismo código produce el mismo `type` | 2.1a |
 | | Códigos distintos producen `type` distintos | 2.1a |
 | | La denegación por falta de credencial es uniforme | 2.1b |
-| Catálogo de códigos y estados HTTP | Cada código tiene su estado | 2.1a, 2.2a, 2.4, 3.2, 5.1 |
-| | Tipo de contenido no admitido | 2.4 |
-| | Recurso inexistente bajo un prefijo de documentación | 2.4 |
-| | Un código desconocido no se filtra | 2.4 |
+| Catálogo de códigos y estados HTTP | Cada código tiene su estado | 2.1a, 2.2a, 2.4a, 3.2, 5.1 |
+| | Tipo de contenido no admitido | 2.4a |
+| | Recurso inexistente bajo un prefijo de documentación | 2.4a |
+| | Un código desconocido no se filtra | 2.4a |
 | | Los códigos de autenticación aún no existen | 2.1a |
-| Las respuestas de error no exponen detalles internos | Excepción no prevista | 2.4 |
-| | Excepción de dominio con mensaje interno | 2.4 |
-| | El detalle técnico queda solo en el servidor | 2.4 |
-| Un fallo de validación produce `validation-failed` | Campo inválido | 2.4 |
-| | El valor rechazado no se repite | 2.4 |
-| | Cuerpo mal formado | 2.4 |
-| | `errors` es una extensión fuera del esquema del contrato | 2.4 |
+| Las respuestas de error no exponen detalles internos | Excepción no prevista | 2.4a |
+| | Excepción de dominio con mensaje interno | 2.4a |
+| | El detalle técnico queda solo en el servidor | 2.4a |
+| Un fallo de validación produce `validation-failed` | Campo inválido | 2.4b |
+| | El valor rechazado no se repite | 2.4b |
+| | Cuerpo mal formado | 2.4a |
+| | `errors` es una extensión fuera del esquema del contrato | 2.4b |
 | Catálogo de mensajes en español de Honduras | Código sin entrada en el catálogo | 2.1a |
 | | Entrada sin código | 2.1a |
 | | Idioma fijo | 2.1a, 2.1c |
@@ -1011,3 +1034,25 @@ cuando se mida.
 Total restante: de 4 200 a 5 900 líneas en seis tareas de PR, frente a las 2 520 nominales. Con las 6 822 líneas ya medidas
 el cambio completo queda entre 11 000 y 12 700 líneas. Cada PR sigue con el tope de 800: la medición antes de abrir el
 PR decide, y una tarea que lo supere se detiene antes de confirmar, como en 2.1, 2.2 y 2.3.
+
+## Nota fechada 2026-10-05: la tarea 2.4 se parte en 2.4a y 2.4b
+
+El propietario aprobó partir la tarea 2.4 (PR 8 `problem-translator`) en dos porque la tarea, implementada y verificada
+completa (`./mvnw verify`: Surefire 186 + 783, Failsafe 229), midió **1 046 líneas efectivas** (1 029 adiciones y 17
+eliminaciones, igual con y sin `-M`, sin `openspec/`) frente al tope de 800 y a un pronóstico de 700 a 1 000. El cambio pasa
+a **19 tareas** (18 de PR más la de cierre 6.1) y **18 PR**, dentro de la excepción al tope de 15 tareas que el propietario ya
+concedió. El árbol completo y verificado se conserva en la rama **local** `wip/web-edge-problem-translator-full` (commits
+`7e61aff` y `f833cd9`), que nunca se publica y es la fuente de las dos partes.
+
+| Parte | Contenido | Líneas medidas sobre árboles reales |
+|---|---|---|
+| 2.4a `translator-core` | Códigos `resource-not-found` y `unsupported-media-type` con su catálogo, `ProblemExceptionHandler` (dominio, cuerpo ilegible, cabecera o parámetro ausente o mal tipado, `415`, `404`, último recurso y desconexión), registro, arnés, `ProblemTranslationTest`, `ProblemExceptionHandlerTest`, `ResourceNotFoundTest` | 641 |
+| 2.4b `field-violations` | `FieldViolation`, `errors` con `@JsonInclude(NON_EMPTY)`, sobrecarga de `write`, los tres traductores de validación, `spring-boot-starter-validation`, pruebas de validación y nota de `docs/ui-ux` | 417 sobre 2.4a |
+
+Numeración: los PR se llaman 8a y 8b y **los PR 9 a 13 conservan su número**. Orden: 2.4a y después 2.4b desde `main`
+actualizado; 2.4b necesita 2.4a. Cada parte debe estar en verde por sí sola: el control negativo de `PublicRouteAllowListTest`
+espera ocho fugas en 2.4a (las rutas `validated`, `required`, `domain-known`, `domain-unknown` y `disconnected` más las tres
+originales) y diez en 2.4b. Entre 2.4a y 2.4b un fallo de validación de campo cae en el `500` genérico; sin consecuencia, porque
+ningún endpoint de producción valida todavía. Trazabilidad: 166 escenarios, 166 con tarea, 0 huérfanos; los 11 que apuntaban a 2.4
+apuntan ahora a una sola parte (2.4a: ocho, de estados, tipo no admitido, recurso inexistente, código desconocido, detalles
+internos y cuerpo mal formado; 2.4b: tres, de campo inválido, valor rechazado y `errors` fuera del esquema).

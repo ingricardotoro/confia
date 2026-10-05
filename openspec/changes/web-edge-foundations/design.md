@@ -1291,3 +1291,21 @@ silenciosa es un riesgo de configuración: un descuido al escribir confía en di
   `properties`, `env`, de Dockerfile o de compose tiene una línea que no es comentario y que nombra
   `trusted-proxies`, `trustedProxies` o `CONFIA_WEB_TRUSTEDPROXIES`. Tiene un control de no vacuidad y otro con las
   formas que usa un entorno. Límite: no ve valores pasados por línea de comandos en un script que no sea de esos tipos.
+
+### Nota fechada 2026-10-05: una excepción de seguridad lanzada dentro del MVC cae en el `500` del traductor (decisión 8, PR 8a)
+
+`ProblemExceptionHandler` termina con un manejador de `Exception` que responde `500 internal-error`. Una `AccessDeniedException`
+o una `AuthenticationException` lanzada **dentro** de la capa MVC (por ejemplo por un `@PreAuthorize`) llegaría a ese manejador
+antes que al `ExceptionTranslationFilter` y se respondería `500` en lugar de `403` o `401`. En este cambio no existe ninguna:
+no hay seguridad de métodos y la cadena responde fuera del MVC. **Dueño: el cambio 8 (RBAC)**, que debe hacer que el traductor
+las relance o las traduzca a `forbidden` y `authentication-required` antes de introducir la primera anotación de permiso. El
+texto anterior de este documento no se reescribe.
+
+### Nota fechada 2026-10-05: springdoc puede añadir las respuestas del `@RestControllerAdvice` a cada operación (decisión 8, PR 8a)
+
+springdoc recorre los `@ControllerAdvice` y puede adjuntar las respuestas de sus manejadores a toda operación del documento
+(propiedad `springdoc.override-with-generic-response`). Hoy el documento no tiene ninguna operación, y por eso la instantánea
+OpenAPI no cambió al registrar el traductor (comprobado). En cuanto exista la primera operación el documento podría ganar
+respuestas que el contrato no aprobó. **Dueño: el primer endpoint de producción, es decir, `session-tokens-and-web-layer`**,
+que debe decidir si se desactiva esa propiedad o se aprueba el cambio de la instantánea. El texto anterior de este documento
+no se reescribe.
