@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-05 (tarea 2.3d; 2.1a a 2.2b y 2.3a a 2.3d hechas)
+- **Última actualización:** 2026-10-05 (tarea 2.4b; 2.1a a 2.2b, 2.3a a 2.3d y 2.4a a 2.4b hechas)
 
 ## Estado de las tareas
 
@@ -21,7 +21,7 @@
 | 2.3c | PR 7c `request-origin-filter` | Hecha | `5b271e4` y el commit `docs(sdd)` de esta rama |
 | 2.3d | PR 7d `audit-origin` | Hecha | `8a20946` y el commit `docs(sdd)` de esta rama |
 | 2.4a | PR 8a `translator-core` | Hecha | `7c609bb` y el commit `docs(sdd)` de esta rama |
-| 2.4b | PR 8b `field-violations` | Pendiente (necesita 2.4a fusionada) | |
+| 2.4b | PR 8b `field-violations` | Hecha | `9431be6` y el commit `docs(sdd)` de esta rama |
 | 2.5 a 6.1 | PR 9 a 13 y cierre | Pendientes | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
@@ -1128,3 +1128,69 @@ Con la corrección de la revisión independiente (I-1, I-2, S-1, S-2 y S-4), 2.4
 al presupuesto de 800. El propietario aprobó una **excepción de tamaño de unas 146 líneas** para entregarla en un solo
 PR. Así el traductor llega a `main` ya corregido, sin pasar un solo día con el defecto del `200` vacío ante una falla
 del servidor. No se recortaron pruebas ni comentarios.
+
+## Tarea 2.4b: PR 8b `field-violations`
+
+Rama `change/web-edge-foundations-field-violations`, desde `main` en `b1d2cb6` tras fusionar el PR 8a (con su corrección de revisión). El código sale de la rama
+local `wip/web-edge-problem-translator-full` (sin tocarla; sigue en `f833cd9`), pero **solo** las adiciones de 2.4b sobre la versión de `main`: esa copia es anterior a la
+corrección de 2.4a y difiere mucho de `ProblemExceptionHandler`, `ProblemCode`, `ProblemErrorReportValve` y `PublicRouteAllowListTest` de `main`, que no se tomaron.
+La nota de `docs/ui-ux/04-patrones-de-interaccion.md` §9 sí se tomó tal cual (el archivo solo difería por esa nota).
+
+### Evidencia del ciclo TDD (reobservada sobre este árbol)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO 1 | `-Dtest='ProblemTranslationTest,ProblemExceptionHandlerTest,ProblemResponsesTest'` con pruebas y arnés, sin producción | `COMPILATION ERROR`, siete `cannot find symbol` / tipos incompatibles (`FieldViolation`, `ProblemResponses.write` con violaciones, `invalidBody`, `invalidConstraints`). |
+| ROJO 2 | `FieldViolation`, `errors` y la sobrecarga de `write`, más los tres traductores como esqueleto sin lista | `Tests run: 60, Failures: 0, Errors: 9`: `ProblemTranslationTest` 7 de 31 y `ProblemExceptionHandlerTest` 2 de 13, todas `NullPointer ... JsonNode.get(String) is null` (cuerpo `400 validation-failed` sin `errors`); `ProblemResponsesTest` 16/16. |
+| VERDE | Traductores reales (campo y restricción, nombre del parámetro por su enlace, ruta sin el nombre del método) y `spring-boot-starter-validation` en `app/pom.xml`; más `ProblemCodeTest`, `ProblemErrorReportValveTest`, `PublicRouteAllowListTest`, `OpenApi*Test` y `ProcessBeanIsolationTest` | `Tests run: 150, Failures: 0, Errors: 0, Skipped: 0` (el `BUILD FAILURE` es la cobertura de JaCoCo con `-Dtest=` acotado). |
+| Cierre | `./mvnw verify` completo | Surefire 186 + 818 (los 797 de la línea base más 21 nuevos), Failsafe 229, `BUILD SUCCESS`. Instantánea OpenAPI y `routes` **sin cambios** (`git status` limpio de ellos). |
+
+Pruebas añadidas: 21 (`ProblemResponsesTest` +10 casos: dos métodos y uno parametrizado de ocho; `ProblemTranslationTest` +9; `ProblemExceptionHandlerTest` +3 métodos que hacen 13 con
+los de 2.4a). Sin nuevo `PublicRouteAllowListTest`: ya identifica las fugas por el prefijo `/test/`, así que las dos rutas nuevas del arnés no necesitan editarlo.
+
+### Demostraciones deliberadas (cada una revertida; `cmp` contra la copia original sin diferencias)
+
+| Ruptura temporal | Resultado observado |
+|---|---|
+| Quitar `@JsonInclude(NON_EMPTY)` de `ProblemBody.errors` | `Tests run: 71, Failures: 19`: `ProblemResponsesTest.errorsIsOmittedWhenThereAreNoViolations` con `[a response without a violation list has no errors member] Expecting value to be false but was true`, y 18 de `ProblemTranslationTest` por `[the response has no errors member] Expecting value to be false but was true` (toda respuesta llevaba `errors: []`). `PublicRouteAllowListTest` y las de OpenAPI siguen en verde. |
+| Quitar `@ExceptionHandler` de `MethodArgumentNotValidException` y de `HandlerMethodValidationException` (la rama genérica de `ErrorResponse` responde) | `Tests run: 60, Failures: 1, Errors: 6`: `ProblemExceptionHandlerTest.theValidationHandlersWinOverTheGenericErrorResponseBranch` falla y seis de `ProblemTranslationTest` (`anInvalidField...` x3, `theRejectedValue...`, `aConstraintOnAParameter...`, `aParameterAndAHeader...`) con `NullPointer ... JsonNode.get(String) is null`: el estado sigue siendo `400 validation-failed` pero sin `errors`. |
+
+### Prueba del orden de los traductores
+
+`MethodArgumentNotValidException` y `HandlerMethodValidationException` implementan `ErrorResponse`, así que la rama genérica de `unexpected` también las cubriría y respondería
+`400 validation-failed` sin `errors`. Spring elige el manejador más cercano al tipo de la excepción, y `theValidationHandlersWinOverTheGenericErrorResponseBranch` lo fija con
+`ExceptionHandlerMethodResolver`: comprueba la precondición (ambas son `ErrorResponse`), que cada excepción de validación se resuelve a `invalidBody`, `invalidParameters` e
+`invalidConstraints`, y que otra `ErrorResponse` (`HttpMediaTypeNotAcceptableException`) sigue cayendo en `unexpected`. Las pruebas por HTTP real (`anInvalidField...`,
+`aConstraintOnAParameter...`) prueban lo mismo de extremo a extremo.
+
+### Seguridad
+
+`errors` lleva solo el nombre del campo y la restricción derivada de los códigos del catálogo de Spring (`Size`, `Max.int` se reduce a `Max`). Nunca el valor rechazado, el texto de
+la restricción, el nombre del método (`fieldOf` lo recorta) ni un mensaje del analizador. Un error de objeto no lleva campo (cadena vacía) y uno sin códigos es `invalid`. Pruebas con
+`HarnessProcess.SENSITIVE_VALUE` en el cuerpo y las cabeceras.
+
+### Medición del PR 8b (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 450 | 14 | **464** |
+| Con `-M` | 450 | 14 | **464** |
+
+Pronóstico: 417; tope 800. Dentro del tope.
+
+### Desviaciones del diseño (declaradas)
+
+1. **Rama de `main` como autoridad.** Solo se portaron las adiciones de 2.4b; el traductor de `main` conserva su orden (relanzado de seguridad, desconexión por tipo, `ErrorResponse` por `forStatus`).
+   Los tres traductores nuevos escriben mediante la guarda común `answer` (una respuesta confirmada no se toca), como el resto de `main`; la copia de respaldo escribía sin guarda.
+2. **Prueba inestable corregida durante el cierre.** `aParameterAndAHeaderAreNamed...` afirmaba que todo el cuerpo no contenía `9"`, pero el `traceId` es un UUID aleatorio y termina en `9` una de cada 16
+   veces (un primer `verify` falló por eso). Ahora la aserción recae solo en el arreglo `errors`. El árbol de respaldo conserva la versión inestable.
+3. **`spring-boot-starter-validation` ya llegaba de forma transitiva** (el rojo de comportamiento no pudo depender de su ausencia: la validación ya se ejecutaba); se declara de forma explícita de todos modos,
+   como pide la tarea. Descarga sin incidencias (sin PKIX).
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='ProblemTranslationTest,ProblemExceptionHandlerTest,ProblemResponsesTest,ProblemCodeTest,ProblemErrorReportValveTest,PublicRouteAllowListTest,OpenApi*Test,ProcessBeanIsolationTest'`: `Tests run: 150, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 818, Failsafe 229 |
+| Arnés de ejecución | Cadena real por HTTP con controladores de prueba (`validated` con `@Valid` y restricciones de cuerpo, `bounded` con restricciones de parámetro y cabecera, `constraint-violation`) |
+| Frontera de reversión | Se retiran `FieldViolation`, el miembro `errors`, la sobrecarga de `write`, los tres traductores, la dependencia del starter, la nota de `docs/ui-ux` y las pruebas |

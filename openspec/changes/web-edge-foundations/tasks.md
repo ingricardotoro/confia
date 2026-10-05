@@ -475,7 +475,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     completo. Commit: `feat(web): translate framework and domain exceptions into Problem Details`. — Requisitos
     de `web-edge` «Catálogo de códigos…» y «Las respuestas de error no exponen detalles internos»
 
-- [ ] 2.4b **PR 8b `field-violations`: lista de campos de un fallo de validación (decisión 9).**
+- [x] 2.4b **PR 8b `field-violations`: lista de campos de un fallo de validación (decisión 9).**
   Segunda parte de la partición; necesita 2.4a. Fuente: la misma rama local. Medida en 417 líneas sobre 2.4a.
   - **ROJO.** Ampliar `ProblemResponsesTest.java` (`errors` omitido sin violaciones y listado con ellas, y la
     razón en kebab-case), `ProblemTranslationTest.java` (campo inválido por cuerpo, valor rechazado que no se
