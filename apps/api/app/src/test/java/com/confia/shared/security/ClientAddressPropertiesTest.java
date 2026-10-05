@@ -17,7 +17,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * {@link ClientAddress}: the only door through which a text becomes an address, and the key under
  * which the rate limiter will count it (web-edge-foundations design.md, decisions 12 and 15; specs
  * "Las direcciones IPv6 se agrupan por /64"). The key properties compare with a reference that is
- * independent of the code under test: the top 64 bits of the address as a {@link BigInteger}.
+ * independent of the code under test: the top 64 bits that the test itself generated, as a {@link BigInteger}.
  */
 class ClientAddressPropertiesTest {
 
@@ -34,8 +34,9 @@ class ClientAddressPropertiesTest {
         boolean sameKey = ClientAddress.parseLiteral(first).rateLimitKey()
                 .equals(ClientAddress.parseLiteral(second).rateLimitKey());
 
-        BigInteger firstTop = top64(ClientAddress.parseLiteral(first));
-        BigInteger secondTop = top64(ClientAddress.parseLiteral(second));
+        // The reference reads the bytes this test generated, not what the parser returned.
+        BigInteger firstTop = new BigInteger(1, prefix);
+        BigInteger secondTop = new BigInteger(1, samePrefix ? prefix : otherPrefix);
         assertThat(sameKey).isEqualTo(firstTop.equals(secondTop));
         if (samePrefix) {
             assertThat(sameKey).isTrue();
@@ -102,13 +103,21 @@ class ClientAddressPropertiesTest {
     }
 
     @Test
-    void theZoneOfAnIpv6AddressIsIgnored() {
-        ClientAddress scoped = ClientAddress.parseLiteral("fe80::1%1");
-        ClientAddress plain = ClientAddress.parseLiteral("fe80::1");
-
-        assertThat(scoped).isEqualTo(plain);
-        assertThat(scoped.rateLimitKey()).isEqualTo(plain.rateLimitKey());
-        assertThat(scoped.canonical()).isEqualTo("fe80:0:0:0:0:0:0:1");
+    void everyTextualFormOfOneAddressGivesTheSameKeyAndTheSameAddress() {
+        ClientKey expectedV6 = ClientAddress.parseLiteral("2001:db8::1").rateLimitKey();
+        for (String form : new String[] {"2001:db8::1", "2001:DB8::1", "2001:0db8:0000:0000:0000:0000:0000:0001",
+                "2001:db8:0:0:0:0:0:1", "2001:Db8::0001"}) {
+            assertThat(ClientAddress.parseLiteral(form).rateLimitKey()).as(form).isEqualTo(expectedV6);
+            assertThat(ClientAddress.parseLiteral(form).canonical()).as(form)
+                    .isEqualTo("2001:db8:0:0:0:0:0:1");
+        }
+        ClientAddress plain = ClientAddress.parseLiteral("1.2.3.4");
+        for (String form : new String[] {"::ffff:1.2.3.4", "::FFFF:1.2.3.4", "::ffff:0102:0304",
+                "0:0:0:0:0:ffff:102:304"}) {
+            assertThat(ClientAddress.parseLiteral(form)).as(form).isEqualTo(plain);
+            assertThat(ClientAddress.parseLiteral(form).rateLimitKey()).as(form)
+                    .isEqualTo(plain.rateLimitKey());
+        }
     }
 
     @Test
@@ -122,7 +131,8 @@ class ClientAddressPropertiesTest {
     @ValueSource(strings = {"localhost", "ip6-localhost", "example.invalid", "", " ", "1", "127.1",
             "1.2.3", "010.0.0.1", "00.0.0.1", "1.2.3.4.5", "1.2.3.4:80", "[::1]", "[::1]:443",
             " 1.2.3.4", "1.2.3.4 ", "256.1.1.1", "0x7f.0.0.1", "-1.2.3.4", "+1.2.3.4", "::g",
-            ":::", "1.2.3.", ".1.2.3"})
+            ":::", "1.2.3.", ".1.2.3", "::ffff:010.0.0.1", "::ffff:1.2.3.04", "::ffff:1.2.3",
+            "::1.2.3.04", "::ffff:00.0.0.1", "fe80::1%1", "fe80::1%eth0", "1.2.3.4%1"})
     void aTextThatIsNotAFourPartIpv4OrAnIpv6LiteralIsRejectedAndNeverResolved(String text) {
         // "localhost" resolves on every machine through the hosts file: rejecting it proves the
         // text is never handed to a resolver.
@@ -134,10 +144,6 @@ class ClientAddressPropertiesTest {
     void aNullAddressIsRejected() {
         assertThatThrownBy(() -> ClientAddress.parseLiteral(null))
                 .isInstanceOf(NullPointerException.class);
-    }
-
-    private static BigInteger top64(ClientAddress address) {
-        return new BigInteger(1, address.address().getAddress()).shiftRight(64);
     }
 
     private static String ipv6(byte[] prefix, byte[] hostPart) {

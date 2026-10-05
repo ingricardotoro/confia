@@ -12,10 +12,11 @@ import java.util.regex.Pattern;
  * parts or an IPv6 literal, and nothing else: a host name is rejected, never resolved, because
  * {@link InetAddress#ofLiteral} does not consult a resolver. Its shorthand forms ({@code 127.1},
  * {@code 1.2.3}, a lone number, a leading zero that some parsers read as octal) and the bracketed
- * IPv6 form are rejected here as well, because a header an attacker writes must have one reading.
+ * IPv6 form, a zone and an IPv4 tail that breaks the same rule ({@code ::ffff:010.0.0.1}) are
+ * rejected here as well, because a header an attacker writes must have one reading.
  *
  * <p>The address is always held normalized: an IPv6 address that maps an IPv4 one is the IPv4
- * address, and the zone of an IPv6 address is dropped. Equality is therefore the equality of the
+ * address. A zone is rejected. Equality is therefore the equality of the
  * address every part of the system sees.
  *
  * @param address the normalized address
@@ -43,8 +44,7 @@ public record ClientAddress(InetAddress address) {
     public static ClientAddress parseLiteral(String literal) {
         Objects.requireNonNull(literal, "literal");
         boolean ipv6 = literal.indexOf(':') >= 0;
-        boolean acceptable = ipv6
-                ? literal.indexOf('[') < 0 && literal.indexOf(']') < 0
+        boolean acceptable = ipv6 ? acceptableIpv6(literal)
                 : IPV4_FOUR_DECIMAL_PARTS.matcher(literal).matches();
         if (!acceptable) {
             throw new IllegalArgumentException("the text is not an IPv4 or IPv6 address literal");
@@ -54,6 +54,19 @@ public record ClientAddress(InetAddress address) {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("the text is not an IPv4 or IPv6 address literal");
         }
+    }
+
+    /**
+     * No brackets and no zone (a zone is never legitimate in a client header, and resolving it makes
+     * the JDK consult the network interfaces), and an IPv4 tail, as in {@code ::ffff:1.2.3.4}, obeys the
+     * same four-decimal-part rule as a bare IPv4 address, so it has one reading.
+     */
+    private static boolean acceptableIpv6(String literal) {
+        if (literal.indexOf('[') >= 0 || literal.indexOf(']') >= 0 || literal.indexOf('%') >= 0) {
+            return false;
+        }
+        return literal.indexOf('.') < 0 || IPV4_FOUR_DECIMAL_PARTS
+                .matcher(literal.substring(literal.lastIndexOf(':') + 1)).matches();
     }
 
     /**
