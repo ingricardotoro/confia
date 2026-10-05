@@ -24,9 +24,9 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
  * A web process without a database, for the tests of the real security chain (web-edge-foundations
  * design.md, decision 5): the real {@link WebEdgeConfiguration} and the real {@link
  * SecurityChains#denyByDefault}, the same exclusions the real entry points carry, and test-only
- * controllers. The allow-list is the real administrative one plus a route only this harness adds,
- * and a stand-in principal filter lets a test be authenticated, which no production code can do
- * yet.
+ * controllers. The allow-list is the real one for the process named by {@value #PROCESS_PROPERTY}
+ * plus two routes only this harness adds, and a stand-in principal filter lets a test be
+ * authenticated, which no production code can do yet.
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {DataSourceAutoConfiguration.class,
@@ -34,17 +34,28 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
 @Import({WebEdgeConfiguration.class, HarnessController.class})
 class WebEdgeHarness {
 
+    /** {@code admin} (the default) or {@code portal}: which real allow-list the chain starts from. */
+    static final String PROCESS_PROPERTY = "harness.process";
+
     @Bean
     Calls calls() {
         return new Calls();
     }
 
     @Bean
+    SessionCounter sessionCounter() {
+        return new SessionCounter();
+    }
+
+    @Bean
     SecurityFilterChain harnessChain(HttpSecurity http, Environment environment,
             ProblemResponses problems) throws Exception {
-        List<PublicEndpoint> endpoints = new ArrayList<>(
-                PublicEndpoints.forAdmin(environment).endpoints());
+        PublicEndpoints real = "portal".equals(environment.getProperty(PROCESS_PROPERTY))
+                ? PublicEndpoints.forPortal(environment)
+                : PublicEndpoints.forAdmin(environment);
+        List<PublicEndpoint> endpoints = new ArrayList<>(real.endpoints());
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/open"));
+        endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/boom"));
         return SecurityChains.denyByDefault(http, new PublicEndpoints(endpoints), problems)
                 .addFilterBefore(new TestPrincipalFilter(), AuthorizationFilter.class)
                 .build();

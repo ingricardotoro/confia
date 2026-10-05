@@ -28,7 +28,10 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
     private static final String ADMIN_MODULE = "administrative module (ADR-0003)";
     private static final String WEB_EDGE =
             "the worker never serves the OpenAPI surface or any other part of the web edge: "
-                    + "no request filters (ADR-0003; web-edge-foundations decisions 1 and 7)";
+                    + "no filters, no security chain (ADR-0003; web-edge-foundations decision 4)";
+    private static final String SPRING_SECURITY =
+            "the worker has no security chain and no security bean (web-edge-foundations "
+                    + "decision 4)";
     private static final String ADMIN_WIRING =
             "the production data access wiring is administrative only (web-edge-foundations D5)";
 
@@ -78,7 +81,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     // The whole web package: the OpenAPI surface and every part of the edge.
                     "com.confia.shared.web", WEB_EDGE,
-                    "com.confia.shared.platform", ADMIN_WIRING));
+                    "com.confia.shared.platform", ADMIN_WIRING,
+                    "org.springframework.security", SPRING_SECURITY,
+                    "org.springframework.boot.security", SPRING_SECURITY));
 
     static Stream<ProcessBeanPolicy> all() {
         return Stream.of(ADMIN, PORTAL, WORKER);

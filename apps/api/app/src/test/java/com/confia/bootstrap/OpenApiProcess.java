@@ -42,6 +42,16 @@ final class OpenApiProcess implements AutoCloseable {
     static OpenApiProcess start(String appProfile, String springProfile) {
         LaunchOutcome outcome = ConfiaApplication.launch(TestProcessArguments.forProcess(appProfile,
                 "--spring.profiles.active=" + springProfile), appProfile);
+        return running(appProfile, outcome);
+    }
+
+    /** The process with its default configuration, which is production's: no Spring profile. */
+    static OpenApiProcess start(String appProfile) {
+        return running(appProfile,
+                ConfiaApplication.launch(TestProcessArguments.forProcess(appProfile), appProfile));
+    }
+
+    private static OpenApiProcess running(String appProfile, LaunchOutcome outcome) {
         if (outcome.context() == null) {
             throw new IllegalStateException("the " + appProfile + " process did not start");
         }
@@ -49,9 +59,14 @@ final class OpenApiProcess implements AutoCloseable {
     }
 
     HttpResponse<String> get(String path) {
+        return send("GET", path);
+    }
+
+    /** Sends {@code method} to {@code path}, which is used exactly as written. */
+    HttpResponse<String> send(String method, String path) {
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
                 .timeout(Duration.ofSeconds(30))
-                .GET()
+                .method(method, HttpRequest.BodyPublishers.noBody())
                 .build();
         try {
             return HTTP.send(request, HttpResponse.BodyHandlers.ofString());

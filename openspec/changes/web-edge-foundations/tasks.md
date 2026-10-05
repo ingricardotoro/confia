@@ -90,7 +90,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | 2 | Cinco casos de uso de identidad como beans y secretos que fallan al arrancar (1.2) | PR 2 `identity-beans` (~330 → 500) | Ídem con `-Dtest='AdminProductionWiringTest,IdentityConfigurationSecretsTest,ProcessBeanIsolationTest,IdentityScopeExclusionInventoryTest'` | Arranque real sin y con cada secreto | Se retira `IdentityConfiguration` y su `@Import` |
 | 3 | Códigos y cuerpo de Problem Details, catálogo es-HN, cabeceras base e identificador de petición del servidor, sin Spring Security (2.1a) | PR 3 `problem-details-core` (~775 medido; 600 → 800) | Ídem con `-Dtest='ProblemCodeTest,ProblemCatalogCoverageTest,ProblemResponsesTest,SecurityHeadersFilterTest,WebEdgeFiltersInProcessesTest,ProcessBeanIsolationTest,OpenApi*Test'` | Filtros reales con `MockFilterChain` y los procesos administrativo y portal reales por `ConfiaApplication.launch` | Se retiran los dos `@Import`, `shared.web.{edge,problem,request}` y el catálogo |
 | 4 | Spring Security como cadena: dependencia y prohibiciones, `SecurityChains`, lista blanca, cadenas de administración y portal, manejadores y arnés sin base de datos (2.1b) | PR 4 `security-chains` (~600 → 800) | Ídem con `-Dtest='AdminSecurityChainTest,PublicEndpointsTest,OpenApi*Test,ProcessBeanIsolationTest'` | Cadena real por HTTP (`RANDOM_PORT`) en el arnés sin base de datos | Se retira la dependencia: el sistema vuelve a no tener borde de seguridad |
-| 5 | Portal y trabajador sin borde de seguridad, cabeceras, sesión e identificador en la cadena real (2.1c) | PR 5 `portal-and-worker-chain` (~700 → 800) | Ídem con `-Dtest='PortalSecurityChainTest,RequestContextFilterTest,RequestContextFilterChainTest,AdminSecurityHeadersAndSessionTest,ProcessBeanIsolationTest'` | Portal por `ConfiaApplication.launch` y arnés con el filtro de contexto | Solo pruebas y las exclusiones del trabajador |
+| 5 | Portal y trabajador sin borde de seguridad, cabeceras, sesión e identificador en la cadena real (2.1c) | PR 5 `portal-and-worker-chain` (~700 → 800) | Ídem con `-Dtest='PortalSecurityChainTest,RequestContextFilterTest,AdminSecurityChainTest,StatelessChainTest,PublicEndpointsTest,ProcessBeanIsolationTest'` | Portal por `ConfiaApplication.launch` y arnés con el filtro de contexto | Solo pruebas y las exclusiones del trabajador |
 | 6 | Lista blanca cerrada, mapa de rutas del portal, ninguna ruta de producción y guardia de registros (2.2) | PR 6 `edge-gates` (~420 → 630) | Ídem con `-Dtest='PublicRouteAllowListTest,PortalRouteMapSnapshotTest,SensitiveDataLoggingTest'` | Enumeración de rutas del contexto real y petición anónima a cada una | Solo pruebas, instantánea y guardia de registros |
 | 7 | IP del cliente por proxies de confianza, agente de usuario, `RequestOrigin` y decorador de auditoría (2.3) | PR 7 `request-origin` (~500 → 750) | Unidad: `-Dtest='CidrBlock*,ClientAddress*,WebEdgePropertiesTest,RequestContextFilterTest'`; IT: `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=RequestOriginAuditIT -Dfailsafe.failIfNoSpecifiedTests=false` | `RequestOriginAuditIT` con PostgreSQL (Testcontainers) y 50 peticiones concurrentes | El decorador se retira: la auditoría vuelve a `null` |
 | 8 | Traductor de Problem Details completo (2.4) | PR 8 `problem-translator` (~380 → 570) | Ídem con `-Dtest='ProblemTranslationTest,ProblemCatalogCoverageTest'` | Controladores de prueba que lanzan cada excepción por la cadena real | Errores de MVC vuelven al formato de Spring |
@@ -258,7 +258,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     proceso administrativo y la denegación uniforme; requisitos de `build-integrity` «Spring Security se usa solo
     como cadena de filtros…». Si la medición supera 800, se mueven pruebas y arnés a 2.1c antes del commit.
 
-- [ ] 2.1c **PR 5 `portal-and-worker-chain`: portal, trabajador y la cadena real con cabeceras, sesión e identificador (decisiones 4, 5, 7 y 11).**
+- [x] 2.1c **PR 5 `portal-and-worker-chain`: portal, trabajador y la cadena real con cabeceras, sesión e identificador (decisiones 4, 5, 7 y 11).**
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/RequestContextFilterTest.java` (con
     `MockFilterChain`: identificador UUID del servidor que ignora `X-Request-Id` y `traceparent`, distinto en
     cada petición, atributo y MDC visibles dentro de la cadena y retirados al terminar, último recurso `500
@@ -321,6 +321,15 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     «La lista blanca pública es cerrada…», «La cadena del portal deniega toda ruta», «Los registros no
     contienen cabeceras…» y «Ausencia de autenticación por credencial…» (ninguna ruta de producción);
     requisito de `build-integrity` «Instantánea aprobada del mapa de rutas del portal»
+
+  - **Nota fechada 2026-10-04 (heredada de 2.1c): lo que Tomcat responde antes de los filtros.** Esta tarea es la
+    dueña de la brecha: `/x%2f`, `/x%00` y `TRACE` los rechaza Tomcat antes de la cadena de filtros y reciben su
+    página HTML (400 y 405), sin Problem Details y sin las cabeceras base; la prueba de 2.1c solo afirma el
+    estado y que ningún controlador corre. El sondeo de 2.1c no observó la cabecera `Server` en esas respuestas
+    (llegaron `connection`, `content-language`, `content-length`, `content-type` y `date`, y `Allow` en el 405),
+    pero esta tarea debe afirmarlo. Debe añadir al ROJO una prueba por los procesos reales que exija, para esas tres
+    peticiones, `application/problem+json`, las cinco cabeceras base y ninguna cabecera `Server` ni `X-Powered-By`,
+    y al VERDE la configuración de Tomcat (válvula o página de error del contenedor) que lo cumpla.
 
 - [ ] 2.3 **PR 7 `request-origin`: IP, agente de usuario y origen en la auditoría (decisiones 11 a 13).**
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/security/`:
@@ -820,3 +829,26 @@ procesos reales cuando la lista blanca está vacía (perfil `prod` o desconocido
 lanza `IllegalStateException: At least one mapping is required`, y `OpenApiExposureByProfileTest` falla con
 `BeanCreation Error creating bean with name 'adminSecurityFilterChain'`. La regla final es, pues, obligatoria para
 la lista vacía y no solo explícita.
+
+## Nota fechada 2026-10-04: lo que la tarea 2.1c hizo distinto de lo previsto
+
+- **Archivos de prueba.** El texto de la tarea preveía `RequestContextFilterChainTest` y
+  `AdminSecurityHeadersAndSessionTest`. No se crearon: la rama verificada ya cubría esas pruebas con
+  `RequestContextFilterTest` (por la cadena real: el identificador del servidor ignora `X-Request-Id` y
+  `traceparent`, es distinto en cada petición, coincide con el que ve el controlador y con el MDC, y el último
+  recurso no filtra nada) y con los cinco métodos devueltos a `AdminSecurityChainTest`. Tras la revisión
+  independiente se añadió `RequestContextFilterUnitTest` (sin contexto de Spring: MDC y atributo, relanzado con
+  la respuesta confirmada, orden `HIGHEST_PRECEDENCE + 10` y el último recurso), porque ninguna prueba por la
+  cadena podía fallar por esas causas. El propietario no aprobó de forma explícita omitir los dos archivos; el
+  contenido de cada uno está asignado en `apply-progress.md`. Se añadió `StatelessChainTest` (condición de
+  fusión I1 de la revisión de 2.1b).
+- **Ausencia de estado.** `SessionCreationPolicy.STATELESS` y `requestCache.disable` se **respaldan entre sí**:
+  quitar solo una no cambia ninguna respuesta (`STATELESS` instala un `NullRequestCache`; sin `STATELESS` la
+  caché deshabilitada tampoco guarda la petición), y las pruebas de sesión y de `Set-Cookie` solo fallan cuando
+  se quitan las dos. Por eso `StatelessChainTest` inspecciona la cadena real: ningún `RequestCacheAwareFilter` y
+  un `SecurityContextHolderFilter` cuyo repositorio es exactamente `RequestAttributeSecurityContextRepository`.
+  Con eso, quitar cualquiera de las dos líneas pone en rojo una prueba. Detalle en `apply-progress.md`.
+- **S2 de la revisión de 2.1b.** Entraron `HEAD`, `OPTIONS` y `TRACE` y las variantes `//x`, `/x%2f`, `/x%2e`,
+  `/x%00` y `/%78`. Hallazgo: `/x%2f`, `/x%00` y `TRACE` los rechaza **Tomcat antes de cualquier filtro** (400 y
+  405 con su propia página HTML): son seguros (ningún controlador corre) pero no son Problem Details y no llevan
+  las cabeceras base. Queda registrado como brecha para 2.2 o un cambio posterior (ver `apply-progress.md`).

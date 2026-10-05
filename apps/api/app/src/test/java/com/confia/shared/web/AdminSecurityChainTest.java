@@ -1,5 +1,6 @@
 package com.confia.shared.web;
 
+import static com.confia.shared.web.harness.ProblemAssertions.assertBaseSecurityHeaders;
 import static com.confia.shared.web.harness.ProblemAssertions.assertProblem;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -13,11 +14,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Specs/web-edge, the administrative chain (design.md decisions 5 and 6): deny by default with a
- * uniform {@code 401} or {@code 403} in Problem Details. The chain is the real one, behind the
- * database-free harness, and a request that must be denied never reaches a controller. The
- * headers, the absence of a session and the fixed language through this chain are proved in the
- * next part of the change, with the request id filter.
+ * Specs/web-edge, the administrative chain (design.md decisions 5 to 8): deny by default with a
+ * uniform {@code 401} or {@code 403}, no session, the base security headers on every response, and
+ * Problem Details with the catalog's fixed language. The chain is the real one, behind the
+ * database-free harness, and a request that must be denied never reaches a controller.
  */
 class AdminSecurityChainTest {
 
@@ -84,7 +84,21 @@ class AdminSecurityChainTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/x/", "/X", "/x;a=b", "/x/.", "/y/../x"})
+    @ValueSource(strings = {"HEAD", "OPTIONS"})
+    void theMethodsNobodyListedAreDeniedOnAProtectedAndOnAGetOnlyPublicRoute(String method) {
+        for (String path : new String[] {"/x", "/test/open"}) {
+            HttpResponse<String> response = process.send(method, path);
+
+            assertThat(response.statusCode()).as("%s %s", method, path).isEqualTo(401);
+            assertThat(response.headers().firstValue("Content-Type")).as("%s %s", method, path)
+                    .hasValueSatisfying(type -> assertThat(type)
+                            .startsWith("application/problem+json"));
+        }
+        assertThat(process.calls().protectedInvocations()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/x/", "/X", "/x;a=b", "/x/.", "/y/../x", "//x", "/x%2e", "/%78"})
     void aVariantOfAProtectedPathNeverReachesItsController(String path) {
         HttpResponse<String> response = process.get(path);
 
@@ -92,6 +106,65 @@ class AdminSecurityChainTest {
         assertProblem(response, response.statusCode(),
                 response.statusCode() == 400 ? "validation-failed" : "authentication-required");
         assertThat(process.calls().protectedInvocations()).isZero();
+    }
+
+    /**
+     * Tomcat refuses these, and {@code TRACE}, before any filter runs, so the answer is its own page
+     * and not Problem Details, and carries none of the base headers. They are safe (no controller
+     * runs, no {@code 2xx}) but not yet uniform; {@code apply-progress.md} records the gap.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"/x%2f", "/x%00"})
+    void anEncodedSeparatorOrNulIsRefusedByTheContainerAndNeverReachesAController(String path) {
+        assertThat(process.get(path).statusCode()).as("%s", path).isEqualTo(400);
+        assertThat(process.calls().protectedInvocations()).isZero();
+    }
+
+    @Test
+    void traceIsRefusedByTheContainerAndNeverReachesAController() {
+        assertThat(process.send("TRACE", "/x").statusCode()).isEqualTo(405);
+        assertThat(process.send("TRACE", "/test/open").statusCode()).isEqualTo(405);
+        assertThat(process.calls().protectedInvocations()).isZero();
+    }
+
+    @Test
+    void noResponseCreatesASessionOrSetsACookie() {
+        int before = process.sessionsCreated();
+
+        HttpResponse<String> open = process.get("/test/open");
+        HttpResponse<String> denied = process.get("/x");
+        HttpResponse<String> forbidden = process.get("/x", HarnessProcess.PRINCIPAL_HEADER, "p");
+
+        assertThat(open.statusCode()).isEqualTo(200);
+        assertThat(denied.statusCode()).isEqualTo(401);
+        assertThat(forbidden.statusCode()).isEqualTo(403);
+        for (HttpResponse<String> response : java.util.List.of(open, denied, forbidden)) {
+            assertThat(response.headers().firstValue("Set-Cookie")).isEmpty();
+        }
+        assertThat(process.sessionsCreated()).isEqualTo(before);
+    }
+
+    @Test
+    void anErrorResponseCarriesTheBaseSecurityHeaders() {
+        assertBaseSecurityHeaders(process.get("/x"));
+        assertBaseSecurityHeaders(process.get("/x", HarnessProcess.PRINCIPAL_HEADER, "p"));
+    }
+
+    @Test
+    void aSuccessResponseCarriesTheSameBaseSecurityHeaders() {
+        HttpResponse<String> open = process.get("/test/open");
+
+        assertThat(open.statusCode()).isEqualTo(200);
+        assertBaseSecurityHeaders(open);
+    }
+
+    @Test
+    void theQueryStringNeverAppearsInTheInstance() {
+        HttpResponse<String> response = process.get("/x?token=secreto");
+
+        JsonNode body = assertProblem(response, 401, "authentication-required");
+        assertThat(body.get("instance").asString()).isEqualTo("/x");
+        assertThat(response.body()).doesNotContain("token").doesNotContain("secreto");
     }
 
     @Test
@@ -108,6 +181,20 @@ class AdminSecurityChainTest {
                 assertThat(body.get(field)).as(field).isEqualTo(reference.get(field));
             }
         }
+    }
+
+    @Test
+    void theLanguageIsFixedWhateverAcceptLanguageSays() {
+        String detail = ProblemCatalogCoverageTest.loadCatalog()
+                .getProperty("problem.authentication-required.detail");
+
+        JsonNode plain = assertProblem(process.get("/x"), 401, "authentication-required");
+        JsonNode english = assertProblem(process.get("/x", "Accept-Language", "en-US"), 401,
+                "authentication-required");
+
+        assertThat(detail).isNotBlank();
+        assertThat(plain.get("detail").asString()).isEqualTo(detail);
+        assertThat(english.get("detail").asString()).isEqualTo(detail);
     }
 
     @ParameterizedTest
