@@ -830,6 +830,26 @@ Los secretos reales de preproducción y producción viven en el almacén de secr
 proveedor de CI/CD (secretos cifrados de GitHub Actions) y se inyectan en tiempo de despliegue,
 nunca en el repositorio, conforme a `CLAUDE.md`, regla 13.
 
+> **Nota fechada 2026-10-04 (cambio `web-edge-foundations`, PR 2 `identity-beans`): variables del
+> proceso administrativo.** Desde este cambio, solo el proceso `admin` abre una conexión a la base de
+> datos y registra los casos de uso de identidad. Necesita, además de `SPRING_DATASOURCE_URL`,
+> `SPRING_DATASOURCE_USERNAME` y `SPRING_DATASOURCE_PASSWORD` (el rol `confia_admin_app`), tres
+> secretos. Se leen al arrancar y, si falta alguno o es inválido, el proceso se detiene antes de
+> aceptar una sola petición, con un mensaje que nombra la propiedad y nunca repite ninguna parte
+> del valor:
+>
+> | Variable de entorno | Propiedad | Formato |
+> |---|---|---|
+> | `CONFIA_CRYPTO_COLUMNMASTERKEY` | `confia.crypto.column-master-key` | Base64 de 32 bytes: llave maestra del cifrado de columnas |
+> | `CONFIA_IDENTITY_ARGON2PEPPER` | `confia.identity.argon2-pepper` | Base64 de 32 bytes: pimienta de Argon2id y del identificador de inicio de sesión |
+> | `CONFIA_IDENTITY_LOGININSTITUTIONID` | `confia.identity.login-institution-id` | UUID de la institución de inicio de sesión del proceso |
+>
+> Los tres valores viven en el almacén de secretos y nunca en el repositorio, ni siquiera como
+> ejemplo. `portal` y `worker` no los leen ni abren conexión a la base de datos. El grupo de
+> conexiones es perezoso: un proceso `admin` con la base de datos caída arranca y reporta el fallo
+> en el primer uso. Los casos de uso `RequestPasswordReset` e `IssuePasswordResetToken` no se
+> registran hasta que existan sus adaptadores (cambios 9 y 14).
+
 ---
 
 ## 7. Integración y entrega continuas

@@ -1,21 +1,29 @@
 package com.confia.bootstrap;
 
+import static com.confia.bootstrap.BootFailureAssertions.assertNoSecretFragment;
+import static com.confia.bootstrap.BootFailureAssertions.stackTraceOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
+import com.confia.identity.application.AuthenticateWithPassword;
+import com.confia.identity.application.ConsumeRecoveryCode;
+import com.confia.identity.application.EnrollTotpSecondFactor;
+import com.confia.identity.application.IssuePasswordResetToken;
+import com.confia.identity.application.LoginInstitutionProvider;
+import com.confia.identity.application.RequestPasswordReset;
+import com.confia.identity.application.ResetPasswordWithToken;
+import com.confia.identity.application.VerifyTotpCode;
+import com.confia.kernel.InstitutionId;
 import com.zaxxer.hikari.HikariDataSource;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.security.IdempotentExecutor;
 import com.confia.shared.security.TransactionRunner;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.ArrayList;
-import java.util.List;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.ZoneOffset;
+import java.util.UUID;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.jooq.DSLContext;
@@ -27,10 +35,10 @@ import org.springframework.context.ConfigurableApplicationContext;
 
 /**
  * Specs/build-integrity of web-edge-foundations: the administrative process registers its
- * production data access (decision 2), starts with a database nothing listens on, and never runs
- * a migration at startup; the portal and the worker still have no {@code DataSource}. Every
- * context is started through the production launcher with {@link TestProcessArguments}, so no
- * container is needed and this stays a {@code *Test}.
+ * production data access (decision 2) and its identity use cases (decision 3), starts with a
+ * database nothing listens on, and never runs a migration at startup; the portal and the worker
+ * still have no {@code DataSource}. Every context is started through the production launcher with
+ * {@link TestProcessArguments}, so no container is needed and this stays a {@code *Test}.
  */
 class AdminProductionWiringTest {
 
@@ -47,6 +55,59 @@ class AdminProductionWiringTest {
                     .hasSize(1);
             assertThat(context.getBeansOfType(IdempotentExecutor.class)).hasSize(1);
             assertThat(context.getBeansOfType(ColumnEncryptionService.class)).hasSize(1);
+        } finally {
+            context.close();
+        }
+    }
+
+    @Test
+    void theAdminContextHoldsTheFiveIdentityUseCasesWhosePortsHaveAProductionAdapter() {
+        ConfigurableApplicationContext context = start("admin");
+        try {
+            assertThat(context.getBeansOfType(AuthenticateWithPassword.class)).hasSize(1);
+            assertThat(context.getBeansOfType(VerifyTotpCode.class)).hasSize(1);
+            assertThat(context.getBeansOfType(ConsumeRecoveryCode.class)).hasSize(1);
+            assertThat(context.getBeansOfType(EnrollTotpSecondFactor.class)).hasSize(1);
+            assertThat(context.getBeansOfType(ResetPasswordWithToken.class)).hasSize(1);
+        } finally {
+            context.close();
+        }
+    }
+
+    /**
+     * The two use cases that need the password reset scheduler and the link sender, which have no
+     * production adapter until changes 9 and 14, are not registered: registering them would take a
+     * fake adapter or a lambda (decision 3). The check looks at bean definitions as well as at
+     * instances ({@code getBeanNamesForType} with eager initialization allowed), so a lazy or
+     * prototype definition cannot hide.
+     */
+    @Test
+    void theTwoPasswordResetIssuingUseCasesAreNotBeans() {
+        ConfigurableApplicationContext context = start("admin");
+        try {
+            assertThat(context.getBeansOfType(ResetPasswordWithToken.class))
+                    .as("non-vacuous: the sibling use case that does have its adapters is a bean")
+                    .hasSize(1);
+            assertThat(context.getBeanNamesForType(RequestPasswordReset.class, true, true))
+                    .as("RequestPasswordReset waits for PasswordResetIssuanceScheduler")
+                    .isEmpty();
+            assertThat(context.getBeanNamesForType(IssuePasswordResetToken.class, true, true))
+                    .as("IssuePasswordResetToken waits for PasswordResetLinkSender")
+                    .isEmpty();
+        } finally {
+            context.close();
+        }
+    }
+
+    @Test
+    void theLoginInstitutionComesFromTheConfiguredProperty() {
+        UUID institution = UUID.randomUUID();
+        ConfigurableApplicationContext context = start("admin",
+                TestProcessArguments.adminWith(TestProcessArguments.INSTITUTION_PROPERTY,
+                        institution.toString()));
+        try {
+            assertThat(context.getBean(LoginInstitutionProvider.class).loginInstitutionId())
+                    .isEqualTo(new InstitutionId(institution));
         } finally {
             context.close();
         }
@@ -99,6 +160,19 @@ class AdminProductionWiringTest {
         }
     }
 
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"portal", "worker"})
+    void portalAndWorkerHoldNoIdentityUseCase(String process) {
+        ConfigurableApplicationContext context = start(process);
+        try {
+            assertThat(context.getBeansOfType(AuthenticateWithPassword.class)).isEmpty();
+            assertThat(context.getBeansOfType(ResetPasswordWithToken.class)).isEmpty();
+            assertThat(context.getBeansOfType(LoginInstitutionProvider.class)).isEmpty();
+        } finally {
+            context.close();
+        }
+    }
+
     @Test
     void aMissingMasterKeyStopsTheAdminProcessAndNamesThePropertyWithoutAnyValue() {
         assertThatThrownBy(() -> ConfiaApplication.launch(
@@ -123,41 +197,13 @@ class AdminProductionWiringTest {
                 });
     }
 
-    /**
-     * Walks the whole cause chain: no decoder exception may be chained (its message carries a
-     * fragment of the value), and no message or trace may contain the value or any substring of it
-     * longer than three characters.
-     */
-    private static void assertNoSecretFragment(Throwable failure, String secret) {
-        List<Throwable> chain = new ArrayList<>();
-        for (Throwable t = failure; t != null && !chain.contains(t); t = t.getCause()) {
-            chain.add(t);
-        }
-        assertThat(chain).as("no IllegalArgumentException anywhere in the cause chain")
-                .noneMatch(IllegalArgumentException.class::isInstance);
-        String everything = stackTraceOf(failure);
-        for (Throwable t : chain) {
-            everything += " | " + t.getMessage();
-        }
-        assertThat(everything).doesNotContain("Illegal base64");
-        for (int length = 4; length <= secret.length(); length++) {
-            for (int start = 0; start + length <= secret.length(); start++) {
-                assertThat(everything).as("fragment of the value")
-                        .doesNotContain(secret.substring(start, start + length));
-            }
-        }
+    private static ConfigurableApplicationContext start(String process) {
+        return start(process, TestProcessArguments.forProcess(process));
     }
 
-    private static ConfigurableApplicationContext start(String process) {
-        LaunchOutcome outcome = ConfiaApplication.launch(
-                TestProcessArguments.forProcess(process), process);
+    private static ConfigurableApplicationContext start(String process, String[] arguments) {
+        LaunchOutcome outcome = ConfiaApplication.launch(arguments, process);
         assertThat(outcome.context()).as("the %s process must start", process).isNotNull();
         return outcome.context();
-    }
-
-    private static String stackTraceOf(Throwable failure) {
-        StringWriter writer = new StringWriter();
-        failure.printStackTrace(new PrintWriter(writer));
-        return writer.toString();
     }
 }

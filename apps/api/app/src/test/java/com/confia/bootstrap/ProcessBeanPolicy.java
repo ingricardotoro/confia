@@ -36,7 +36,12 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
             Set.of("com.confia.bootstrap.admin", "com.confia.shared.web.openapi",
                     "com.confia.kernel", "com.confia.shared.platform.infrastructure",
                     "com.confia.shared.security", "com.confia.shared.crypto",
-                    "com.confia.shared.infrastructure"),
+                    "com.confia.shared.infrastructure",
+                    // The identity module as the three packages its beans come from: the use
+                    // cases, the adapters, and the named-interface package of its configuration.
+                    // Each entry is exact because the non-vacuity check compares by equality.
+                    "com.confia.identity.application", "com.confia.identity.infrastructure",
+                    "com.confia.identity.infrastructure.wiring"),
             Map.of("com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON));

@@ -16,6 +16,10 @@ import java.util.Objects;
  * {@code TransactionRunner} y {@code JooqInstitutionRepository} reciben lo suyo". This class only
  * ever validates that whatever arrives decodes to exactly {@value #LENGTH_BYTES} bytes, and fails
  * loudly at construction if it does not — never later, on first use.
+ *
+ * <p>The administrative process now supplies it: {@code IdentityConfiguration} reads the property
+ * {@code confia.identity.argon2-pepper} (environment variable {@code
+ * CONFIA_IDENTITY_ARGON2PEPPER}) at startup (web-edge-foundations design.md, decision 3).
  */
 public final class Argon2Pepper {
 
