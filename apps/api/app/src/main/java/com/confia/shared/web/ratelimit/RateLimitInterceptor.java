@@ -66,7 +66,10 @@ public final class RateLimitInterceptor implements HandlerInterceptor {
     private final RateLimiterRegistry limiters;
     private final RateLimitMetrics metrics;
     private final LongSupplier monotonicNanos;
-    private final AtomicReference<Long> lastLoggedAt = new AtomicReference<>();
+    // One bound per message: a failing limiter and a failing metrics adapter are different defects,
+    // and the line of one must never hide the line of the other in the same second.
+    private final AtomicReference<Long> lastLimiterFailureAt = new AtomicReference<>();
+    private final AtomicReference<Long> lastMetricsFailureAt = new AtomicReference<>();
 
     /** The interceptor of production: the bound of the log is read from {@link System#nanoTime()}. */
     public RateLimitInterceptor(RateLimiterRegistry limiters, RateLimitMetrics metrics) {
@@ -123,7 +126,8 @@ public final class RateLimitInterceptor implements HandlerInterceptor {
             }
             return Verdict.of(limiter.get().tryAcquire(client));
         } catch (RuntimeException unexpected) {
-            logFailure("rate limiter failed unexpectedly", policy, unexpected);
+            logFailure("rate limiter failed unexpectedly", policy, unexpected,
+                    lastLimiterFailureAt);
             return Verdict.refusal(CapacityReason.LIMITER_FAILURE);
         }
     }
@@ -133,12 +137,13 @@ public final class RateLimitInterceptor implements HandlerInterceptor {
         try {
             metrics.capacityExhausted(policy, reason);
         } catch (RuntimeException failing) {
-            logFailure("rate limit metrics failed", policy, failing);
+            logFailure("rate limit metrics failed", policy, failing, lastMetricsFailureAt);
         }
     }
 
-    private void logFailure(String message, String policy, RuntimeException failure) {
-        if (!mayLog()) {
+    private void logFailure(String message, String policy, RuntimeException failure,
+            AtomicReference<Long> lastLoggedAt) {
+        if (!mayLog(lastLoggedAt)) {
             return;
         }
         LOG.atError().addKeyValue("policy", policy)
@@ -146,7 +151,7 @@ public final class RateLimitInterceptor implements HandlerInterceptor {
     }
 
     /** At most one line per interval; only the difference of two readings is meaningful. */
-    private boolean mayLog() {
+    private boolean mayLog(AtomicReference<Long> lastLoggedAt) {
         long now = monotonicNanos.getAsLong();
         Long previous = lastLoggedAt.get();
         if (previous != null && now - previous < LOG_INTERVAL_NANOS) {

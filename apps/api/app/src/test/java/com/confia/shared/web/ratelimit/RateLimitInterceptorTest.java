@@ -271,6 +271,26 @@ class RateLimitInterceptorTest {
         assertThat(logged.list).as("exactly one second later the next one is written").hasSize(2);
     }
 
+    /**
+     * A failing limiter and a failing metrics adapter are two defects, each with its own bound: when
+     * both fail in the same instant, both lines are written and neither hides the other.
+     */
+    @Test
+    void aFailingLimiterAndAFailingAdapterInTheSameSecondEachLeaveTheirOwnLine() throws Exception {
+        RateLimitMetrics failing = (policy, reason) -> {
+            throw new UnsupportedOperationException("adapter down");
+        };
+        RateLimitInterceptor interceptor = interceptorAnswering(() -> {
+            throw new IllegalStateException("limiter down");
+        }, failing);
+
+        assertThatThrownBy(() -> preHandle(interceptor, handler("limited"), origin(CLIENT)))
+                .isInstanceOf(CapacityExceededException.class);
+
+        assertThat(logged.list).extracting(ILoggingEvent::getFormattedMessage)
+                .containsExactly("rate limiter failed unexpectedly", "rate limit metrics failed");
+    }
+
     @Test
     void aPolicyTheRegistryDoesNotHoldIsARefusalAtRunTime() throws Exception {
         RateLimitInterceptor interceptor = interceptorAnswering(Admitted::new);
