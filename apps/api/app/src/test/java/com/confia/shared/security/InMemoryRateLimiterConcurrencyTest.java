@@ -8,6 +8,7 @@ import com.confia.shared.security.RateLimitDecision.Limited;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -15,6 +16,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntFunction;
 import org.junit.jupiter.api.RepeatedTest;
 
@@ -103,11 +105,13 @@ class InMemoryRateLimiterConcurrencyTest {
     }
 
     @RepeatedTest(REPETITIONS)
-    void aTableOfNHoldingNoOneAdmitsExactlyNOfTwoNIpsAndNeverGrowsPastN() throws Exception {
+    void aTableOfNHoldingNoOneAdmitsExactlyNOfTwoNIpsAndNeverReservesPastN() throws Exception {
         InMemoryRateLimiter limiter = new InMemoryRateLimiter(tableOf(TABLE_SIZE), clock);
         AtomicBoolean finished = new AtomicBoolean();
         AtomicInteger largest = new AtomicInteger();
-        Thread sampler = startSampler(limiter, finished, largest);
+        AtomicLong samples = new AtomicLong();
+        Thread sampler = startSampler(limiter, finished, largest, samples);
+        long before = samples.get();
 
         List<RateLimitDecision> decisions;
         try {
@@ -119,12 +123,13 @@ class InMemoryRateLimiterConcurrencyTest {
 
         assertThat(count(decisions, Admitted.class)).isEqualTo(TABLE_SIZE);
         assertThat(count(decisions, CapacityExhausted.class)).isEqualTo(TABLE_SIZE);
+        assertSampled(samples, before);
         assertThat(largest.get()).isLessThanOrEqualTo(TABLE_SIZE);
         assertAtRest(limiter, TABLE_SIZE);
     }
 
     @RepeatedTest(REPETITIONS)
-    void sweepingExpiredEntriesWhileNewIpsArriveNeverOverfillsTheTable() throws Exception {
+    void sweepingExpiredEntriesWhileNewIpsArriveNeverReservesPastTheTable() throws Exception {
         InMemoryRateLimiter limiter = new InMemoryRateLimiter(tableOf(TABLE_SIZE), clock);
         for (int n = 0; n < TABLE_SIZE; n++) {
             assertThat(limiter.tryAcquire(client(n))).isEqualTo(new Admitted());
@@ -132,7 +137,9 @@ class InMemoryRateLimiterConcurrencyTest {
         clock.advance(MINUTE.plusSeconds(1));
         AtomicBoolean finished = new AtomicBoolean();
         AtomicInteger largest = new AtomicInteger();
-        Thread sampler = startSampler(limiter, finished, largest);
+        AtomicLong samples = new AtomicLong();
+        Thread sampler = startSampler(limiter, finished, largest, samples);
+        long before = samples.get();
 
         List<RateLimitDecision> decisions;
         try {
@@ -148,6 +155,7 @@ class InMemoryRateLimiterConcurrencyTest {
         // one, at most N, and every other answer is a refusal. The old entries are all gone.
         assertThat(admitted).isBetween(1L, (long) TABLE_SIZE);
         assertThat(count(decisions, CapacityExhausted.class)).isEqualTo(2L * TABLE_SIZE - admitted);
+        assertSampled(samples, before);
         assertThat(largest.get()).isLessThanOrEqualTo(TABLE_SIZE);
         assertAtRest(limiter, (int) admitted);
     }
@@ -156,16 +164,33 @@ class InMemoryRateLimiterConcurrencyTest {
      * Samples the counter of reserved slots, not {@code ConcurrentHashMap.size()}: the counter is a
      * single atomic value, so the bound it reports is a real instant, while the map adds up its
      * bins one after another and may total a table that never existed while entries come and go
-     * (review I-3).
+     * (review I-3). What the samples bound is therefore the <b>reservations</b>, which a
+     * non-atomic reservation would push past N; that the map itself never holds N + 1 entries for an
+     * instant (release only after removal, see {@code InMemoryRateLimiter#reclaim}) is left
+     * unsampled on purpose, because no snapshot of the map exists (review of 3.1c).
+     *
+     * <p>It returns only once the first sample has been taken, so the workers always start against a
+     * running sampler, and {@link #assertSampled} makes a test fail if no sample was ever taken
+     * instead of passing on a largest value that stayed 0 (review of 3.1c).
      */
     private static Thread startSampler(InMemoryRateLimiter limiter, AtomicBoolean finished,
-            AtomicInteger largest) {
-        return Thread.ofPlatform().start(() -> {
-            while (!finished.get()) {
+            AtomicInteger largest, AtomicLong samples) throws InterruptedException {
+        CountDownLatch firstSample = new CountDownLatch(1);
+        Thread sampler = Thread.ofPlatform().start(() -> {
+            do {
                 largest.accumulateAndGet(limiter.reservedForTest(), Math::max);
+                samples.incrementAndGet();
+                firstSample.countDown();
                 Thread.onSpinWait();
-            }
+            } while (!finished.get());
         });
+        assertThat(firstSample.await(30, TimeUnit.SECONDS)).as("the sampler started").isTrue();
+        return sampler;
+    }
+
+    /** A sampled bound only means something if sampling went on while the workers ran. */
+    private static void assertSampled(AtomicLong samples, long before) {
+        assertThat(samples.get()).as("samples taken while the workers ran").isGreaterThan(before);
     }
 
     /** At rest nobody is inserting or removing, so the map and the counter must agree exactly. */
