@@ -4,7 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
 import com.confia.shared.observability.metrics.LogRateLimitMetrics;
+import com.confia.shared.security.RateLimiter;
+import com.confia.shared.web.ratelimit.RateLimitInterceptor;
 import com.confia.shared.web.ratelimit.RateLimitMetrics;
+import com.confia.shared.web.ratelimit.RateLimitProperties;
+import com.confia.shared.web.ratelimit.RateLimiterRegistry;
 import jakarta.servlet.Filter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -82,25 +86,35 @@ class ProcessBeanIsolationTest {
     }
 
     /**
-     * The adapter of the rate limiter's capacity signal belongs to the administrative process alone
-     * (web-edge-foundations design.md, decision 17): the other two start without a bean of that
-     * package, and the administrative one holds exactly one {@link RateLimitMetrics}, the adapter.
+     * The rate limiter and the adapter of its capacity signal belong to the administrative process
+     * alone (web-edge-foundations design.md, decision 17): it is the only one with a login to
+     * protect. The other two start without a bean of either package or of the limiter port, and the
+     * administrative one holds the interceptor, the registry, the properties, one limiter and the
+     * adapter.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("com.confia.bootstrap.ProcessBeanPolicy#all")
-    void onlyTheAdministrativeProcessHoldsTheMetricsAdapter(ProcessBeanPolicy policy) {
+    void onlyTheAdministrativeProcessHoldsTheRateLimiterAndItsMetrics(ProcessBeanPolicy policy) {
         LaunchOutcome outcome = ConfiaApplication.launch(
                 TestProcessArguments.forProcess(policy.process()), policy.process());
         ConfigurableApplicationContext context = outcome.context();
         try {
             assertThat(context).as("the %s process must start", policy.process()).isNotNull();
-            List<String> held = beanNamesOfTypesIn(context, "com.confia.shared.observability");
+            List<String> held = beanNamesOfTypesIn(context, "com.confia.shared.web.ratelimit",
+                    "com.confia.shared.observability");
             if ("admin".equals(policy.process())) {
-                assertThat(held).anyMatch(bean -> bean.endsWith(LogRateLimitMetrics.class.getName()));
+                assertThat(held).anyMatch(bean -> bean.endsWith(RateLimitInterceptor.class.getName()))
+                        .anyMatch(bean -> bean.endsWith(RateLimiterRegistry.class.getName()))
+                        .anyMatch(bean -> bean.endsWith(RateLimitProperties.class.getName()))
+                        .anyMatch(bean -> bean.endsWith(LogRateLimitMetrics.class.getName()));
                 assertThat(context.getBeansOfType(RateLimitMetrics.class)).hasSize(1);
+                assertThat(context.getBeansOfType(RateLimiter.class)).as("one limiter per policy")
+                        .containsOnlyKeys("admin-login");
             } else {
-                assertThat(held).as("no metrics adapter in the %s process", policy.process())
-                        .isEmpty();
+                assertThat(held).as("no rate limiter and no metrics adapter in the %s process",
+                        policy.process()).isEmpty();
+                assertThat(context.getBeansOfType(RateLimiter.class))
+                        .as("no limiter in the %s process", policy.process()).isEmpty();
             }
         } finally {
             if (context != null) {

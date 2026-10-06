@@ -14,6 +14,7 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.ApplicationListener;
 import org.springframework.security.web.SecurityFilterChain;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -58,6 +59,22 @@ public final class HarnessProcess implements AutoCloseable {
         return new HarnessProcess(new SpringApplicationBuilder(WebEdgeHarness.class)
                 .web(WebApplicationType.SERVLET)
                 .properties("server.port=0")
+                .run(arguments));
+    }
+
+    /**
+     * Like {@link #start}, with a listener registered before the context refreshes, so that a test
+     * can learn how far a start that fails got (for example, whether the web server was ever
+     * started).
+     */
+    public static HarnessProcess startObserved(ApplicationListener<?> listener,
+            String... properties) {
+        String[] arguments = Arrays.stream(properties).map(property -> "--" + property)
+                .toArray(String[]::new);
+        return new HarnessProcess(new SpringApplicationBuilder(WebEdgeHarness.class)
+                .web(WebApplicationType.SERVLET)
+                .properties("server.port=0")
+                .listeners(listener)
                 .run(arguments));
     }
 

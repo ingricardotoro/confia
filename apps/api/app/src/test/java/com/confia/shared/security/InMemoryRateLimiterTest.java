@@ -456,6 +456,25 @@ class InMemoryRateLimiterTest {
                 .isEqualTo(10_000);
     }
 
+    /**
+     * Review I-3: the table of a policy is allocated to hold {@code maxEntries} clients, so a value of
+     * two billion would be a memory bomb written as configuration. The bound is a literal here on
+     * purpose.
+     */
+    @ParameterizedTest
+    @CsvSource({"1000001", "2147483647"})
+    void aTableAboveOneMillionEntriesIsRejectedNamingTheField(int value) {
+        assertThatThrownBy(() -> policyWith("maxEntries", value))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maxEntries")
+                .hasMessageContaining("1000000");
+    }
+
+    @Test
+    void aTableOfExactlyOneMillionEntriesIsAccepted() {
+        assertThat(policyWith("maxEntries", 1_000_000).maxEntries()).isEqualTo(1_000_000);
+    }
+
     @Test
     void aMissingDurationIsRejectedNamingTheField() {
         assertThatThrownBy(() -> new RateLimitPolicy(10, MINUTE, 10, null, MINUTE, HOUR, 10))

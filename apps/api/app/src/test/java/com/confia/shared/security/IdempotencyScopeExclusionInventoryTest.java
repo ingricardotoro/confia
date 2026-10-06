@@ -42,7 +42,11 @@ class IdempotencyScopeExclusionInventoryTest {
     /**
      * The only types of {@code com.confia.shared.security} that a class in a {@code ..web..} package
      * may depend on, by full class name. Add the next one here (2.3c added {@code RequestOrigin}; 3.2b
-     * added the limiter and its answers, which the interceptor of the edge uses).
+     * added the limiter and its answers, which the interceptor of the edge uses; 3.2c added
+     * {@code RateLimitPolicy}, a plain value that the properties and the throttling configuration
+     * hand to the limiter. {@code InMemoryRateLimiter} stays out on purpose: a shared.security
+     * configuration builds it and exposes only the port, so the web layer never names the
+     * implementation).
      */
     private static final Set<String> WEB_MAY_DEPEND_ON_SHARED_SECURITY = Set.of(
             "com.confia.shared.security.ClientAddress", "com.confia.shared.security.ClientKey",
@@ -50,7 +54,8 @@ class IdempotencyScopeExclusionInventoryTest {
             "com.confia.shared.security.RateLimitDecision",
             "com.confia.shared.security.RateLimitDecision$Admitted",
             "com.confia.shared.security.RateLimitDecision$Limited",
-            "com.confia.shared.security.RateLimitDecision$CapacityExhausted");
+            "com.confia.shared.security.RateLimitDecision$CapacityExhausted",
+            "com.confia.shared.security.RateLimitPolicy");
 
     /**
      * (a) A production class in a {@code ..web..} package may depend on {@code

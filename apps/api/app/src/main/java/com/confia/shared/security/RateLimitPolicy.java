@@ -15,7 +15,7 @@ import java.time.Duration;
  * @param restrictedInterval layer 2: the least time between two admitted attempts while restricted
  * @param restrictionCap layer 2: the longest a restriction lasts, after which the failures start
  *     again from zero
- * @param maxEntries the most clients the table holds
+ * @param maxEntries the most clients the table holds, at most one million
  */
 public record RateLimitPolicy(int requestLimit, Duration requestWindow, int failureThreshold,
         Duration failureWindow, Duration restrictedInterval, Duration restrictionCap,
@@ -29,16 +29,25 @@ public record RateLimitPolicy(int requestLimit, Duration requestWindow, int fail
      */
     private static final int MAX_COUNT = 10_000;
 
+    /**
+     * The most {@code maxEntries} may be (review I-3). The table is bounded so that a flood of clients
+     * cannot exhaust the memory of the process, and that holds only if the bound itself is bounded: a
+     * configuration mistake of two billion entries would be the same exhaustion, written as a value.
+     * Twenty times the fifty thousand of the administrative login.
+     */
+    private static final int MAX_ENTRIES = 1_000_000;
+
     public RateLimitPolicy {
         positive(requestLimit, "requestLimit");
-        atMost(requestLimit, "requestLimit");
+        atMost(requestLimit, "requestLimit", MAX_COUNT);
         positive(requestWindow, "requestWindow");
         positive(failureThreshold, "failureThreshold");
-        atMost(failureThreshold, "failureThreshold");
+        atMost(failureThreshold, "failureThreshold", MAX_COUNT);
         positive(failureWindow, "failureWindow");
         positive(restrictedInterval, "restrictedInterval");
         positive(restrictionCap, "restrictionCap");
         positive(maxEntries, "maxEntries");
+        atMost(maxEntries, "maxEntries", MAX_ENTRIES);
     }
 
     private static void positive(int value, String name) {
@@ -47,9 +56,9 @@ public record RateLimitPolicy(int requestLimit, Duration requestWindow, int fail
         }
     }
 
-    private static void atMost(int value, String name) {
-        if (value > MAX_COUNT) {
-            throw new IllegalArgumentException(name + " must not exceed " + MAX_COUNT);
+    private static void atMost(int value, String name, int bound) {
+        if (value > bound) {
+            throw new IllegalArgumentException(name + " must not exceed " + bound);
         }
     }
 

@@ -12,6 +12,8 @@ public final class Calls {
 
     private final AtomicInteger protectedRoute = new AtomicInteger();
     private final AtomicInteger openRoute = new AtomicInteger();
+    private final AtomicInteger limitedRoute = new AtomicInteger();
+    private final AtomicInteger useCase = new AtomicInteger();
     private final AtomicReference<String> requestIdAttribute = new AtomicReference<>();
     private final AtomicReference<String> requestIdInMdc = new AtomicReference<>();
 
@@ -23,6 +25,16 @@ public final class Calls {
     /** Invocations of the registered route the harness added to the allow-list. */
     public int openInvocations() {
         return openRoute.get();
+    }
+
+    /** Invocations of the controller method annotated with {@code @RateLimited}. */
+    public int limitedInvocations() {
+        return limitedRoute.get();
+    }
+
+    /** Invocations of the stand-in use case that controller calls. */
+    public int useCaseInvocations() {
+        return useCase.get();
     }
 
     /** The request id attribute the last invocation of the failing route saw. */
@@ -41,6 +53,14 @@ public final class Calls {
 
     void openInvoked() {
         openRoute.incrementAndGet();
+    }
+
+    void limitedInvoked() {
+        limitedRoute.incrementAndGet();
+    }
+
+    void useCaseInvoked() {
+        useCase.incrementAndGet();
     }
 
     void failingInvoked(String attribute, String mdc) {

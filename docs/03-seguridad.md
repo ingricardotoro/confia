@@ -448,6 +448,28 @@ retardos y el bloqueo por IP contra múltiples cuentas.
 > enumeración, penalización del atacante secuencial y rastro auditable. La cota de tasa la pone la
 > dimensión por IP.
 
+> **Nota fechada 2026-10-06 (cambio `web-edge-foundations`, PR 11c `edge-throttling-wiring`): limitador
+> interino en memoria para la dimensión por IP.** Hasta que el cambio 11 aprovisione Redis, la
+> dimensión por dirección IP de esta sección la cumple un limitador **en memoria del proceso
+> administrativo** (`InMemoryRateLimiter`, que se construye en `shared.security` y la capa web solo
+> conoce a través del puerto `RateLimiter`). Se declara con `@RateLimited(policy = "admin-login")` en
+> el método del controlador y se evalúa en el borde antes de abrir ninguna transacción. Tiene tres
+> limitaciones, que no se presentan como equivalentes al estado compartido de Redis:
+>
+> 1. **El estado es por proceso.** Cada proceso cuenta lo suyo.
+> 2. **Se pierde al reiniciar.** Una IP con su límite agotado vuelve a admitirse con un proceso nuevo.
+> 3. **No se comparte entre réplicas.** Un cliente que alcanza dos réplicas recibe el límite de
+>    cada una.
+>
+> Semántica de la capa 2 (la de la fila «Por dirección IP» de la tabla): desde el décimo fallo
+> dentro de 10 minutos, la IP queda restringida a un intento por minuto. La restricción termina en
+> el primero de dos instantes: el tope de una hora, con el contador de fallos en cero, o 10 minutos
+> sin ningún fallo. **No** termina porque los fallos de la ventana bajen del umbral mientras la IP
+> sigue fallando: con un atacante a un intento por minuto eso levantaría la restricción en cada
+> intento y le devolvería una ráfaga de 10. Un éxito no limpia el contador de la IP, porque el
+> puerto no tiene operación de éxito. El adaptador de Redis del cambio 11 sustituye a este detrás
+> del mismo puerto y debe conservar esta semántica.
+
 ### 4.5 Sesiones y tokens
 
 | Aspecto | Decisión |
@@ -1330,6 +1352,49 @@ Reglas adicionales:
 **Cómo se comprueba.** Prueba de carga con k6 que ejecuta el escenario de cada fila y verifica el
 código de estado y la cabecera `Retry-After`. Panel de tasa de 429 por endpoint en el tablero
 operativo: un pico de 429 legítimos indica un límite mal calibrado, no un ataque.
+
+> **Nota fechada 2026-10-06 (cambio `web-edge-foundations`, PR 11c `edge-throttling-wiring`): limitador
+> interino, respuestas y riesgo de autodenegación.** La fila «Administración, inicio de sesión»
+> (10 por minuto por IP) la aplica hoy el limitador interino en memoria descrito en la nota fechada
+> de la sección 4.4, con sus tres limitaciones (estado por proceso, se pierde al reiniciar y no se
+> comparte entre réplicas); el estado compartido en Redis llega con el cambio 11 detrás del mismo
+> puerto. Los valores viven en configuración (`confia.web.rate-limit.admin-login.*`) y se validan al
+> arrancar: un valor no positivo, o una cota por encima de su máximo (10 000 para el límite y el
+> umbral de fallos, 1 000 000 para `max-entries`), detiene el proceso con un mensaje que nombra la
+> propiedad. La respuesta de rechazo es `429` con `Retry-After` en segundos enteros redondeados hacia
+> arriba, sin el límite ni el cupo restante, y se produce antes de que el controlador o el caso de
+> uso se ejecuten; una petición `HEAD` a un manejador `GET` limitado se limita igual. La política
+> `admin-login` está registrada y todavía no se aplica a ninguna ruta de producción.
+>
+> **Riesgo residual de autodenegación (hallazgo I-2 de la revisión de seguridad).** La tabla del
+> limitador está acotada (`max-entries`, 50 000 por omisión) y **falla cerrada** por decisión del
+> propietario: con la tabla llena de entradas vigentes responde `503` con el código
+> `capacity-exceeded`, sin `Retry-After` y sin indicar qué IP lo causó, y nunca desaloja una entrada
+> vigente. Con IPv6 un atacante dispone de muchos bloques /64, que es la granularidad de la clave,
+> y puede llenar la tabla; una entrada restringida, además, se mantiene viva mientras tenga un fallo
+> cada menos de 10 minutos. El efecto es que los clientes nuevos reciben `503` mientras dure el
+> ataque. Mitigaciones:
+>
+> - `max-entries` con holgura sobre los clientes que se esperan a la vez.
+> - Una métrica y una alerta cada vez que el limitador responde `CapacityExhausted`. Mientras no
+>   exista el registro de métricas (el cambio de observabilidad), la señal es **un evento `WARN`
+>   fijo y estructurado**, con los campos `event` (`rate_limit_capacity_exhausted`), `policy`,
+>   `reason` y `suppressed`, sin IP, ruta, cabecera ni clave, y acotado a un evento por segundo por
+>   política y causa (`suppressed` cuenta los que se omitieron). La alerta se monta sobre ese
+>   evento; el adaptador hacia Prometheus lo sustituye sin tocar el limitador.
+> - Un límite en el borde (nginx o WAF) por /48 o por /32, a cargo del cambio 11.
+>
+> **Cómo leer el campo `reason` y un `503` del marco.** `reason` distingue un ataque de un defecto:
+> `table_full` es la tabla llena (el escenario de este riesgo); `no_origin`, `no_address`,
+> `unknown_policy` y `limiter_failure` son defectos de cableado o del limitador, que fallan cerrado
+> igual, y el operador debe tratarlos como un error, no como un ataque (`limiter_failure`, además,
+> deja un `ERROR` con solo la clase de la excepción). El código `capacity-exceeded` también responde
+> a los `503` del marco (un tiempo de espera asíncrono, una `ResponseStatusException(503)`). El
+> evento está acotado a uno por segundo por política y causa, y los omitidos se cuentan en
+> `suppressed` del siguiente, así que la falta de un evento en el mismo instante no descarta al
+> limitador. La lectura correcta es por tendencia: eventos recientes de `table_full` indican que los
+> `503` vienen del limitador; su ausencia sostenida, junto con el registro de errores del servidor,
+> indica que vienen del marco (nota fechada de `docs/07-observabilidad-y-operaciones.md` §5.4).
 
 ---
 
