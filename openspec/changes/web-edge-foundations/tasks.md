@@ -15,10 +15,10 @@
 
 | Campo | Valor |
 |---|---|
-| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 11 000 a 12 700** en 18 PR según el re-pronóstico del 2026-10-05 (nota fechada del final): 6 822 ya medidas (siete PR fusionados y la tarea 2.3, medida en 1 869 y partida en cuatro) más 4 200 a 5 900 estimadas para las tareas restantes. La estimación nominal original, de 4 670, subestimó las pruebas; no se recorta ninguna |
+| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 11 000 a 12 700** en 19 PR según el re-pronóstico del 2026-10-05 (nota fechada del final): 6 822 ya medidas (siete PR fusionados y la tarea 2.3, medida en 1 869 y partida en cuatro) más 4 200 a 5 900 estimadas para las tareas restantes. La estimación nominal original, de 4 670, subestimó las pruebas; no se recorta ninguna |
 | Riesgo frente al presupuesto | **Alto** frente a 400 de la preflight; **medio por PR** frente al presupuesto del proyecto de 800 (nominal de 320 a 520 por PR, peor caso de 480 a 780) |
 | Chained PRs recommended | Yes |
-| Suggested split | 18 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a, 2.3b, 2.3c, 2.3d, 2.4a, 2.4b, 2.5, 3.1, 3.2, 4.1 y 5.1), más la tarea de cierre 6.1 |
+| Suggested split | 19 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a, 2.3b, 2.3c, 2.3d, 2.4a, 2.4b, 2.5, 3.1a, 3.1b, 3.2, 4.1 y 5.1), más la tarea de cierre 6.1 |
 | Delivery strategy | `auto-chain` (decidido por el propietario el 2026-10-04, en lugar del `single-pr` de la preflight de la sesión) |
 | Chain strategy | `stacked-to-main`: cada PR se fusiona a `main` en orden y el siguiente parte de `main` actualizado |
 | Presupuesto del proyecto por pull request (`docs/15-flujo-de-trabajo-git.md` §3) | 800 líneas de cambio efectivo |
@@ -38,16 +38,16 @@ decisión prevalece y es la que este documento registra.
 contaba y llega a unas 4 670 nominales. No se recorta con trucos de formato, ni se omiten pruebas,
 comentarios o documentación, ni se parte un PR de forma artificial.
 
-**Tareas.** 19 en total (18 de PR más 1 de cierre). El máximo del proyecto es 15; el propietario concedió una excepción al tope (notas fechadas del final) y esta partición la ejerce: la tarea 2.3 midió 1 869 líneas y se partió en 2.3a, 2.3b, 2.3c y 2.3d. La tarea 2.1 original
+**Tareas.** 20 en total (19 de PR más 1 de cierre). El máximo del proyecto es 15; el propietario concedió una excepción al tope (notas fechadas del final) y esta partición la ejerce: la tarea 2.3 midió 1 869 líneas y se partió en 2.3a, 2.3b, 2.3c y 2.3d. La tarea 2.1 original
 se partió en 2.1a, 2.1b y 2.1c por decisión del propietario (nota fechada del final). Las costuras restantes
 de la sección 8 del diseño (PR 5b, 8b y 10b del diseño) **no** son tareas reservadas. Si la medición de un
 PR supera 800 líneas, el ejecutor se detiene y consulta al orquestador antes de partir: usar otra costura
 llevaría el total por encima de lo planeado, y cualquier costura exige primero replantear esta lista y la decisión del propietario.
 
-**Orden.** Lineal de 1 a 13, con el PR 6 partido en 6a y 6b y el PR 7 en 7a a 7d (la numeración de PR es la de las tareas 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a a 2.3d, 2.4a y 2.4b,
-2.5, 3.1, 3.2, 4.1 y 5.1). Dependencias duras: el PR 2.1b necesita el 2.1a (`ProblemResponses`,
+**Orden.** Lineal de 1 a 13, con el PR 6 partido en 6a y 6b, el PR 7 en 7a a 7d y el PR 10 en 10a y 10b (la numeración de PR es la de las tareas 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a a 2.3d, 2.4a y 2.4b,
+2.5, 3.1a, 3.1b, 3.2, 4.1 y 5.1). Dependencias duras: el PR 2.1b necesita el 2.1a (`ProblemResponses`,
 filtros); el PR 7c (2.3c) necesita el 3 (`RequestContextFilter`) y el 7b; el 7d necesita el 7c; el PR 8a (2.4a) necesita el 3 (`ProblemCode`,
-`ProblemResponses`); el PR 8b (2.4b) necesita el 8a; el PR 11 (3.2) necesita los PR 7 y 10; el PR 12 (4.1) necesita el 11
+`ProblemResponses`); el PR 8b (2.4b) necesita el 8a; el PR 10b (3.1b) necesita el 10a (3.1a); el PR 11 (3.2) necesita los PR 7 y 10b; el PR 12 (4.1) necesita el 11
 (`CapacityExceededException`); el PR 13 (5.1) necesita el 8a. La propuesta permite fusionar el PR 13 antes
 que los PR 10 a 12 (C3 no depende de C2); no se hace salvo decisión del propietario, porque renumeraría la
 cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa la numeración nueva.
@@ -100,11 +100,12 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | 8a | Traductor de Problem Details sin lista de campos: `DomainException`, cuerpo ilegible, cabecera o parámetro ausente o de tipo erróneo, `415`, `404` y último recurso con desconexión; códigos `resource-not-found` y `unsupported-media-type` (2.4a) | PR 8a `translator-core` (641 medido en el árbol completo) | `-Dtest='ProblemTranslationTest,ProblemExceptionHandlerTest,ResourceNotFoundTest,ProblemCodeTest,ProblemCatalogCoverageTest,PublicRouteAllowListTest'` | Controladores de prueba que lanzan cada excepción por la cadena real, y los procesos administrativo y portal reales con `local` para el `404` | Se retiran `ProblemExceptionHandler`, los dos códigos y sus entradas de catálogo; los errores de MVC vuelven al formato de Spring |
 | 8b | Lista de campos de un fallo de validación: `FieldViolation`, `errors`, sobrecarga de `write` y los tres traductores de validación (2.4b) | PR 8b `field-violations` (417 medido sobre 8a) | `-Dtest='ProblemTranslationTest,ProblemExceptionHandlerTest,ProblemResponsesTest'` | Controladores de prueba con restricciones de cuerpo, parámetro y cabecera por la cadena real | Se retiran `FieldViolation`, el miembro `errors`, la sobrecarga y los tres traductores; la dependencia del starter de validación |
 | 9 | Reglas W1, W2a, W2b y W3 con fixtures, `SessionValidity` e inventario de ausencias (2.5) | PR 9 `web-rules` (~380 → 570) | Ídem con `-Dtest='WebLayerDependencyRulesTest,WebExposedTypesRuleTest,SharedBoundaryRulesTest,EmptyShouldExceptionInventoryTest,SuppressionCitesAdrTest,WebEdgeScopeExclusionInventoryTest'` | Mitad de fixture rechazada con fragmentos que nombran la violación (ADR-0018) | Solo pruebas y un puerto sin uso |
-| 10 | Puerto y adaptador en memoria del limitador (3.1) | PR 10 `rate-limiter-core` (~500 → 750) | Ídem con `-Dtest='InMemoryRateLimiter*'` | jqwik contra un modelo ingenuo y 50 hilos en el mismo `InMemoryRateLimiter` | Clases nuevas sin consumidor |
+| 10a | Puerto, decisión, política y adaptador en memoria con las capas 1 y 2 (3.1a) | PR 10a `rate-limiter-core` (983 medido: excepción de unas 183 líneas) | Ídem con `-Dtest='InMemoryRateLimiterTest'` | Escenarios por capa con `MutableClock`, sin consumidor | Clases nuevas sin consumidor |
+| 10b | Tabla acotada que falla cerrada: pruebas de tabla, jqwik contra un modelo ingenuo y 50 hilos (3.1b) | PR 10b `rate-limiter-table-and-stress` (unas 609, estimadas) | Ídem con `-Dtest='InMemoryRateLimiter*'` | jqwik y 50 hilos en el mismo `InMemoryRateLimiter` | Se retiran `size()` y las tres clases de prueba |
 | 11 | Borde del limitador: `@RateLimited`, `429` y `503` (3.2) | PR 11 `rate-limiter-edge` (~320 → 480) | Ídem con `-Dtest='RateLimitEdgeTest,ProcessBeanIsolationTest'` | Petición por la cadena real a un controlador de prueba anotado | Se retira el interceptor y la configuración |
 | 12 | Materializador del retardo, hilos virtuales, tiempos de Tomcat y regla W4 (4.1) | PR 12 `delay-materializer` (~460 → 690) | Unidad: `-Dtest='RequiredDelayMaterializer*Test,BlockingWaitConfinementTest'`; IT: `-Dit.test=RequiredDelayMaterializerIT` | `RequiredDelayMaterializerIT` bajo Tomcat real con base de datos | Se retira el materializador y `spring.threads.virtual.enabled` vuelve a su omisión |
 | 13 | Borde HTTP de la idempotencia, controlador solo de prueba y regla W5 (5.1) | PR 13 `idempotency-edge` (~480 → 720) | `-Dtest='IdempotencyNotInIdentityTest,OpenApiContractSnapshotTest'`; IT: `-Dit.test=IdempotencyEdgeIT` | `IdempotencyEdgeIT` con `IdempotencyDemoController` y PostgreSQL | Se retira el borde; `IdempotentExecutor` queda intacto |
-| 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 18 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
+| 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 19 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
 
 ---
 
@@ -529,29 +530,59 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 
 ## Fase 3: limitador de peticiones
 
-- [ ] 3.1 **PR 10 `rate-limiter-core`: puerto y adaptador en memoria (decisiones 15 y 16).**
-  - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/security/`:
-    `MutableClock.java` (soporte), `InMemoryRateLimiterTest.java` (escenarios de las capas 1 y 2,
-    bordes de ventana, tope de 1 h, rechazos que no mueven la ventana, `Retry-After` en segundos
-    redondeados hacia arriba, reinicio igual a una instancia nueva, política con valor no positivo),
-    `InMemoryRateLimiterProperties.java` (jqwik contra un modelo de referencia ingenuo con listas sin
-    acotar, sobre secuencias aleatorias de `avanzar reloj`, `tryAcquire` y `recordFailure`) e
-    `InMemoryRateLimiterConcurrencyTest.java` (50 hilos y la misma IP admiten exactamente 10; tabla de
-    `N` con `2N` IP admite exactamente `N` y su tamaño nunca supera `N`, muestreado; repetido 20
-    veces). **Rojo esperado:** clases inexistentes.
+- [x] 3.1a **PR 10a `rate-limiter-core`: puerto, política y adaptador en memoria con las capas 1 y 2 (decisiones 15 y 16).**
+  - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/security/`: `MutableClock.java`
+    (soporte) e `InMemoryRateLimiterTest.java` (dimensiones separadas, rechazos que no mueven la
+    ventana, capas 1 y 2, bordes de ventana, tope de 1 h, fin anticipado por diez minutos sin fallos,
+    la restricción que no se levanta mientras la IP sigue fallando, `Retry-After` en segundos
+    redondeados hacia arriba, claves /64 y la decisión S-3, límite y umbral mayores que la primera
+    reserva del anillo, política con valor no positivo, nulo o demasiado grande, y reinicio igual a
+    una instancia nueva). **Rojo esperado:** clases inexistentes.
   - **VERDE.** Crear en `apps/api/app/src/main/java/com/confia/shared/security/`: `RateLimiter`,
-    `RateLimitDecision` (sellada: `Admitted`, `Limited`, `CapacityExhausted`), `RateLimitPolicy`
-    (constructor compacto con todos los valores positivos) e `InMemoryRateLimiter` (`ConcurrentHashMap`
-    con `compute` por clave, reserva de hueco con CAS, recuperación perezosa con barrido a lo sumo una
-    vez por segundo, sin `@Scheduled` y sin desalojar nunca una entrada vigente). Sin consumidor.
-  - **Demostraciones deliberadas.** Cambiar `>=` por `>` en el descarte de admisiones rompe el escenario
-    de borde de ventana; sustituir el rechazo por desalojo LRU rompe la prueba de concurrencia de la
-    tabla; se revierten.
-  - **Cierre.** Cobertura y mutación sin caer de umbral y `./mvnw verify` completo. Commit:
-    `feat(security): add the in-memory rate limiter with a bounded fail-closed table`. — Requisitos de
-    `web-edge` «El puerto `RateLimiter` cuenta peticiones y fallos…», «Capa 1…», «Capa 2…», «La tabla
-    acotada…» y «La limitación del limitador en memoria está declarada por escrito» (estado perdido al
-    reiniciar)
+    `RateLimitDecision` (sellada: `Admitted`, `Limited` con `retryAfterSeconds()`,
+    `CapacityExhausted`), `RateLimitPolicy` (constructor compacto con todos los valores positivos que
+    nombra el campo) e `InMemoryRateLimiter` (`ConcurrentHashMap` con `compute` por clave, reserva de
+    hueco con CAS, recuperación perezosa con barrido a lo sumo una vez por segundo, el hueco se
+    devuelve después de la eliminación, sin `@Scheduled` y sin desalojar nunca una entrada vigente;
+    limitación declarada en el Javadoc). Sin consumidor ni bean: `ProcessBeanPolicy` no cambia.
+  - **Demostraciones deliberadas.** Terminar la restricción cuando los fallos de la ventana bajan del
+    umbral rompe tres pruebas de la capa 2. Cambiar `>=` por `>` en el descarte de admisiones **no
+    rompe nada aquí**: una admisión con edad igual a la ventana da una espera de cero y se admite
+    igual, así que es un mutante equivalente para las decisiones; solo lo distingue la recuperación
+    de la tabla, y por eso lo matan las pruebas de borde de 3.1b (nota fechada del final). Se
+    revierten con `cmp`.
+  - **Cierre.** `./mvnw verify` completo; la cobertura de módulo no cae de 80 %. Commit:
+    `feat(security): add the rate limiter port and its in-memory two-layer adapter`. — Requisitos de
+    `web-edge` «El puerto `RateLimiter` cuenta peticiones y fallos…», «Capa 1…» (salvo la exactitud
+    bajo concurrencia), «Capa 2…», «Retry-After redondeado hacia arriba», «Tamaño máximo no válido» de
+    «La tabla acotada…» y «La limitación del limitador en memoria está declarada por escrito» (estado
+    perdido al reiniciar)
+
+- [ ] 3.1b **PR 10b `rate-limiter-table-and-stress`: la tabla acotada, jqwik y concurrencia (decisión 16).**
+  Necesita 3.1a.
+  - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/security/`:
+    `InMemoryRateLimiterTableTest.java` (límite exacto de la tabla, tabla llena con una IP vigente, una
+    entrada vencida libera espacio, **las dos pruebas de borde de reclamación** por petición y por
+    fallo, barrido a lo sumo una vez por segundo, entradas mantenidas por un fallo, una restricción o
+    un intervalo, y el fallo de una IP que la tabla llena no puede alojar),
+    `InMemoryRateLimiterPropertiesTest.java` (jqwik contra un modelo de referencia ingenuo con listas
+    sin acotar, sobre secuencias de `avanzar reloj`, `tryAcquire`, `recordFailure` e intento fallido;
+    la tabla de dos entradas nunca las supera; `Retry-After` es el techo calculado con `BigDecimal`)
+    e `InMemoryRateLimiterConcurrencyTest.java` (50 hilos y la misma IP admiten exactamente 10; 10
+    fallos concurrentes restringen y 9 no; tabla de `N` con `2N` IP admite exactamente `N` y su tamaño
+    nunca supera `N`, muestreado; barrido concurrente; cada uno repetido 20 veces). El nombre de la
+    clase de propiedades termina en `Test` para que Surefire la ejecute en `verify`. **Rojo
+    esperado:** `size()` no existe (error de compilación) y las clases nuevas.
+  - **VERDE.** Añadir `int size()` de paquete a `InMemoryRateLimiter` (solo lo usan las pruebas).
+  - **Demostraciones deliberadas.** Sustituir el rechazo por desalojo rompe la prueba de concurrencia
+    de la tabla y las pruebas de tabla; cambiar `>=` por `>` en el descarte de admisiones rompe
+    `anEntryIsReclaimedExactlyWhenItsLastRequestLeavesTheWindow`; cambiar `>=` por `>` en el tope de
+    la restricción, registrar el rechazo y barrer en cada llamada rompen pruebas de esta parte; se
+    revierten con `cmp`.
+  - **Cierre.** Cobertura y `./mvnw verify` completo. Commit: `test(security): prove the bounded
+    table fails closed under concurrency and against a naive model`. — Requisitos de `web-edge`
+    «Exactitud bajo concurrencia» de la capa 1 y los cuatro escenarios restantes de «La tabla
+    acotada…» (límite exacto, tabla llena con IP vigente, entrada vencida y llenado concurrente)
 
 - [ ] 3.2 **PR 11 `rate-limiter-edge`: `@RateLimited`, `429` y `503` (decisión 17).**
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/ratelimit/RateLimitEdgeTest.java`
@@ -658,7 +689,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 
 ## Fase 6: cierre
 
-- [ ] 6.1 **Verificación completa, medición de los 18 PR y barrido de trazabilidad.** Con los 18 PR
+- [ ] 6.1 **Verificación completa, medición de los 19 PR y barrido de trazabilidad.** Con los 19 PR
   fusionados a `main`, ejecutar `./mvnw verify` completo en `apps/api` y registrar cobertura (global
   80 %, núcleo y `domain` 95 %) y mutación (umbral 80). Registrar en
   `openspec/changes/web-edge-foundations/apply-progress.md` la medición de cada PR con
@@ -738,38 +769,38 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | | Peticiones concurrentes con orígenes distintos | 2.3d |
 | Los registros no contienen cabeceras ni cuerpos | Petición con datos sensibles | 2.2b |
 | | Control negativo | 2.2b |
-| El puerto `RateLimiter` cuenta peticiones y fallos | Las dimensiones no se mezclan | 3.1 |
-| | Una petición rechazada no extiende la ventana | 3.1 |
-| Capa 1, 10 peticiones por minuto por IP | Límite exacto | 3.1 |
-| | Primera petición de una IP | 3.1 |
-| | La ventana se desliza | 3.1 |
-| | IP distinta, contador distinto | 3.1 |
-| | Exactitud bajo concurrencia | 3.1 |
-| Capa 2, retroceso por fallos por IP | El fallo nueve no activa la restricción | 3.1 |
-| | El fallo diez activa la restricción | 3.1 |
-| | Los fallos fuera de la ventana no cuentan | 3.1 |
-| | Un fallo en el borde exacto de la ventana | 3.1 |
-| | El éxito no limpia el contador de la IP | 3.1 |
-| | Tope de una hora | 3.1 |
-| | Diez minutos sin fallos terminan la restricción antes del tope | 3.1 |
-| | La restricción no se levanta mientras la IP sigue fallando | 3.1 |
+| El puerto `RateLimiter` cuenta peticiones y fallos | Las dimensiones no se mezclan | 3.1a |
+| | Una petición rechazada no extiende la ventana | 3.1a |
+| Capa 1, 10 peticiones por minuto por IP | Límite exacto | 3.1a |
+| | Primera petición de una IP | 3.1a |
+| | La ventana se desliza | 3.1a |
+| | IP distinta, contador distinto | 3.1a |
+| | Exactitud bajo concurrencia | 3.1b |
+| Capa 2, retroceso por fallos por IP | El fallo nueve no activa la restricción | 3.1a |
+| | El fallo diez activa la restricción | 3.1a |
+| | Los fallos fuera de la ventana no cuentan | 3.1a |
+| | Un fallo en el borde exacto de la ventana | 3.1a |
+| | El éxito no limpia el contador de la IP | 3.1a |
+| | Tope de una hora | 3.1a |
+| | Diez minutos sin fallos terminan la restricción antes del tope | 3.1a |
+| | La restricción no se levanta mientras la IP sigue fallando | 3.1a |
 | Las direcciones IPv6 se agrupan por /64 | Dos direcciones del mismo /64 | 2.3a |
 | | Direcciones de /64 contiguos | 2.3a |
 | | IPv4 sin agrupar | 2.3a |
 | | IPv6 mapeada a IPv4 | 2.3a |
-| La tabla acotada falla cerrada al llenarse | Límite exacto de la tabla | 3.1 |
-| | Tabla llena, IP con entrada vigente | 3.1 |
-| | Una entrada vencida libera espacio | 3.1 |
-| | Llenado concurrente | 3.1 |
-| | Tamaño máximo no válido | 3.1 |
-| El rechazo por límite responde `429` con `Retry-After` | Retry-After redondeado hacia arriba | 3.1, 3.2 |
+| La tabla acotada falla cerrada al llenarse | Límite exacto de la tabla | 3.1b |
+| | Tabla llena, IP con entrada vigente | 3.1b |
+| | Una entrada vencida libera espacio | 3.1b |
+| | Llenado concurrente | 3.1b |
+| | Tamaño máximo no válido | 3.1a |
+| El rechazo por límite responde `429` con `Retry-After` | Retry-After redondeado hacia arriba | 3.1a, 3.2 |
 | | Retry-After de la capa 1 | 3.2 |
 | | Sin cupo ni límite | 3.2 |
 | El limitador se ejecuta antes del caso de uso | Petición rechazada sin efecto | 3.2 |
 | Los límites viven en configuración | Cambio de configuración | 3.2 |
 | | Valores por defecto | 3.2 |
 | | Valor no positivo | 3.2 |
-| La limitación del limitador en memoria está declarada | Estado perdido al reiniciar | 3.1 |
+| La limitación del limitador en memoria está declarada | Estado perdido al reiniciar | 3.1a |
 | | Nota fechada en la documentación | 3.2 |
 | El retardo se materializa tras confirmar la transacción | La espera ocurre tras el commit | 4.1 |
 | | Sin recursos retenidos durante la espera | 4.1 |
@@ -1025,7 +1056,7 @@ cuando se mida.
 |---|---|---|---|
 | 2.4 `problem-translator` | ~380 | 700 a 1 000 | Sí: diez escenarios por la cadena real, el traductor, los dos códigos y el catálogo; costura natural entre el traductor y la prueba por la cadena |
 | 2.5 `web-rules` | ~380 | 700 a 1 000 | Sí: cuatro reglas de ArchUnit con sus fixtures y el inventario de ausencias; costura entre W1 y W3, y W2a, W2b y el inventario |
-| 3.1 `rate-limiter-core` | ~500 | 800 a 1 100 | Sí: puerto, política, adaptador acotado, jqwik contra un modelo ingenuo y 50 hilos; costura entre el adaptador y las pruebas de concurrencia |
+| 3.1a y 3.1b `rate-limiter-core` | ~500 | 1 548 medidas (994 + 609) | Ya partida por decisión del propietario (nota fechada del final): 3.1a puerto, política, adaptador y pruebas de las capas; 3.1b tabla acotada, jqwik y concurrencia |
 | 3.2 `rate-limiter-edge` | ~320 | 500 a 700 | No, salvo que el interceptor y las políticas pidan más arneses |
 | 4.1 `delay-materializer` | ~460 | 800 a 1 100 | Sí: materializador, hilos virtuales, tiempos de Tomcat, W4 y una IT bajo Tomcat real |
 | 5.1 `idempotency-edge` | ~480 | 700 a 1 000 | Probable: interceptor, controlador de prueba, W5 y una IT con base de datos |
@@ -1056,3 +1087,26 @@ originales) y diez en 2.4b. Entre 2.4a y 2.4b un fallo de validación de campo c
 ningún endpoint de producción valida todavía. Trazabilidad: 166 escenarios, 166 con tarea, 0 huérfanos; los 11 que apuntaban a 2.4
 apuntan ahora a una sola parte (2.4a: ocho, de estados, tipo no admitido, recurso inexistente, código desconocido, detalles
 internos y cuerpo mal formado; 2.4b: tres, de campo inválido, valor rechazado y `errors` fuera del esquema).
+
+## Nota fechada 2026-10-05: la tarea 3.1 se parte en 3.1a y 3.1b
+
+La tarea 3.1 verificada midió **1 548 líneas efectivas** (447 de producción, 45 de soporte y 1 056 de pruebas) frente al tope de 800 y a un pronóstico de 800 a 1 100; el árbol
+completo y verificado (`./mvnw verify`: Surefire 186 + 1 007, Failsafe 229) está en la rama local `wip/web-edge-rate-limiter-core-full`. El propietario aprobó la **costura B** y una
+**excepción de tamaño de unas 194 líneas para 3.1a**:
+
+| Parte | Contenido | Líneas |
+|---|---|---|
+| 3.1a `rate-limiter-core` | Puerto, decisión, política, adaptador, `MutableClock` y `InMemoryRateLimiterTest` sin la sección de la tabla | 983 medidas al construirla (994 estimadas sobre el árbol completo; sin `size()`, que pasa a 3.1b) |
+| 3.1b `rate-limiter-table-and-stress` | Pruebas de la tabla como clase propia, propiedades de jqwik y concurrencia, y `size()` | unas 609 (estimadas) |
+
+El cambio pasa a **20 tareas** (19 de PR más la de cierre 6.1) y **19 PR**, dentro de la excepción al tope de 15 tareas que el propietario ya concedió. Orden y dependencia: 3.1a y luego
+3.1b desde `main` actualizado; 3.1b necesita 3.1a (el adaptador y la política); 3.2 necesita 3.1b. Numeración de PR: 10a y 10b; los PR 11 a 13 conservan su número.
+
+**Dónde van las pruebas de borde de reclamación.** Van en **3.1b**, en la clase de la tabla. Razón: lo que ejercen es la recuperación de entradas vencidas, que es la tabla, y son
+lo único que distingue `>=` de `>` en el descarte de admisiones (con `>` una admisión con edad igual a la ventana da una espera de cero y se admite igual, así que ninguna prueba de las
+capas lo ve). Así, en 3.1a esa ruptura queda en verde y está declarada como mutante equivalente para las decisiones, y 3.1b la mata. Llevarlas a 3.1a habría añadido unas 30 líneas a la
+parte que ya excede el tope y las habría separado del resto de las pruebas de reclamación.
+
+**Escenarios.** Los de `specs/web-edge/spec.md` que apuntaban a 3.1 apuntan ahora a una sola parte: a 3.1a las dimensiones, la capa 1 (salvo la exactitud bajo concurrencia), la capa 2,
+«Tamaño máximo no válido» (lo prueba la política), «Retry-After redondeado hacia arriba» (junto con 3.2) y «Estado perdido al reiniciar»; a 3.1b «Exactitud bajo concurrencia» y los
+cuatro de la tabla (límite exacto, tabla llena con IP vigente, entrada vencida y llenado concurrente). Trazabilidad: 166 escenarios, 166 con tarea, 0 huérfanos.
