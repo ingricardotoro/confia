@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-05 (tarea 3.1a; 2.1a a 2.5 y 3.1a hechas; 3.1 partida en 3.1a y 3.1b)
+- **Última actualización:** 2026-10-05 (tarea 3.1b; 3.1a y 3.1b hechas; la tarea 3.1b original se partió en 3.1b y 3.1c por tamaño)
 
 ## Estado de las tareas
 
@@ -23,7 +23,8 @@
 | 2.4a | PR 8a `translator-core` | Hecha | `7c609bb` y el commit `docs(sdd)` de esta rama |
 | 2.4b | PR 8b `field-violations` | Hecha | `9431be6` y el commit `docs(sdd)` de esta rama |
 | 3.1a | PR 10a `rate-limiter-core` | Hecha (983 líneas, excepción de unas 183) | `3162cca` y el commit `docs(sdd)` de esta rama |
-| 3.1b | PR 10b `rate-limiter-table-and-stress` | Pendiente (se construye desde `main` actualizado; fuente: `wip/web-edge-rate-limiter-core-full`) | |
+| 3.1b | PR 10b `rate-limiter-table` | Hecha (596 líneas) | `5a223f0`, `e05d5ed` y el commit `docs(sdd)` de esta rama |
+| 3.1c | PR 10c `rate-limiter-stress` | Pendiente (se construye desde `main` actualizado; fuente: `wip/web-edge-rate-limiter-table-full`) | |
 | 3.2 a 6.1 | PR 11 a 13 y cierre | Pendientes | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
@@ -1482,3 +1483,141 @@ por CAS y la liberación tras la eliminación son correctas.
 | S-2: cota razonable de los límites de la política | 3.1b o 3.2, validándola en `RateLimitPolicy` |
 | S-3: costo del barrido con tablas grandes | Seguimiento: medir si `maxEntries` llega a cientos de miles |
 | S-4: `NaiveReference` comparte la lectura de las reglas | Aceptada: la mitigan las pruebas escritas a mano contra los escenarios |
+
+## Intento completo de la tarea 3.1b original (VERIFICADO Y DETENIDO ANTES DEL COMMIT por tamaño: 1 025 líneas frente a 800; el propietario aprobó la costura B sin excepción)
+
+Rama `change/web-edge-foundations-rate-limiter-table` desde `main` en `014c3b0` (tras fusionar el PR 96). Sin commits. El árbol de trabajo contiene el código y las pruebas verificados, más la nota fechada de `design.md` (S-2 y el diseño de I-1). La tarea 3.1b **no** se marca `[x]`: falta decidir la costura (abajo). Fuente de las pruebas: `wip/web-edge-rate-limiter-core-full` (sin tocarla; su punta es `19baade`, hijo de `7b8baf9`, ambos intactos).
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| Red de seguridad | `InMemoryRateLimiterTest` de `main` (ya recortada) | 47 pruebas en verde en la línea base de 3.1a (Surefire 186 + 914, Failsafe 229) |
+| ROJO | `-Dtest='InMemoryRateLimiter*'` con `MutableClock` convertida en fuente de nanosegundos, `InMemoryRateLimiterTest` adaptada y con las pruebas de S-2, las clases `InMemoryRateLimiterTableTest`, `...PropertiesTest`, `...ConcurrencyTest` y `...TimeTest` y sin producción | `COMPILATION ERROR`, 52 líneas de error: `MutableClock cannot be converted to java.time.Clock` y `cannot find symbol` (`size()`, `reservedForTest()`) |
+| VERDE | Mismo comando, con la producción | `Tests run: 161, Failures: 0, Errors: 0, Skipped: 0` (concurrencia 80, tabla 10, `InMemoryRateLimiterTest` 53, tiempo 15, propiedades 3). La cobertura de JaCoCo falla con `-Dtest=` acotado, como avisa `tasks.md`. |
+| Cierre | `./mvnw verify` completo | Surefire 186 + 1 028 (los 914 de la línea base más 114 nuevos), Failsafe 229, `All coverage checks have been met`, `BUILD SUCCESS`. Instantánea OpenAPI sin cambios (`git status` limpio de ella). |
+
+Pruebas añadidas: 114 (`InMemoryRateLimiterTest` +6 de S-2, `InMemoryRateLimiterTableTest` 10, `InMemoryRateLimiterTimeTest` 15, `InMemoryRateLimiterPropertiesTest` 3, `InMemoryRateLimiterConcurrencyTest` 80).
+
+### Diseño de I-1, S-1, I-3 y S-2
+
+- **I-1.** El constructor público es `InMemoryRateLimiter(RateLimitPolicy)` y usa `System::nanoTime`; el de `(RateLimitPolicy, LongSupplier)` es de paquete. 3.2 cablea el primero y no tiene reloj de pared que inyectar. `MutableClock` pasó a ser una fuente `LongSupplier` de nanosegundos (arranque arbitrario negativo: solo importan las diferencias). La comparación de la barrida es una diferencia (`now - due < 0`), no `<`. Javadoc corregido (ya no dice que el reloj «solo puede hacer esperar más»).
+- **Prueba de I-1.** `InMemoryRateLimiterTimeTest`: (a) inspecciona con ArchUnit las dependencias y llamadas del limitador y sus clases anidadas (ni `Clock`, `Instant`, `LocalDateTime`, `ZonedDateTime`, `OffsetDateTime`, `Date`, ni `System.currentTimeMillis`, `Instant.now`, `Clock.*`); (b) las capas 1 y 2 y la barrida deciden igual con el contador empezando en 0, -1, `Long.MIN_VALUE` y a 5, 45 y 700 s del desbordamiento de `Long.MAX_VALUE`; (c) el constructor de producción cuenta con `System.nanoTime`. **Desviación:** no existe una prueba que mueva el reloj de pared del sistema (no se puede mover desde una prueba); la garantía es que el limitador ya no depende de ninguno, y la comprueba (a).
+- **S-1.** La hora se lee dentro del `compute` (y del `computeIfPresent` de la barrida). Prueba determinista sin esperas por reloj: un hilo lento lee la hora y se retiene hasta que otro, que lee una hora posterior, queda `BLOCKED` o termina.
+- **I-3.** Los muestreadores leen `reservedForTest()` (contador atómico de ranuras) con `Thread.onSpinWait()`; `size() == reservedForTest()` se comprueba solo en reposo.
+- **S-2.** `requestLimit` y `failureThreshold` con cota de 10 000 en `RateLimitPolicy`; nota fechada en `design.md`.
+
+### Demostraciones deliberadas (cada una revertida; `cmp` contra la copia original sin diferencias)
+
+| Ruptura temporal | Resultado observado |
+|---|---|
+| Desalojar una entrada y reintentar en lugar de rechazar | `Tests run: 161, Failures: 57`: concurrencia 40 (`aTableOfNHoldingNoOneAdmitsExactlyNOfTwoNIpsAndNeverGrowsPastN`), tabla 10 (`expected: CapacityExhausted[]`), tiempo 6 y la propiedad de la tabla |
+| `>=` por `>` en el descarte de admisiones | `Failures: 1`: `InMemoryRateLimiterTableTest.anEntryIsReclaimedExactlyWhenItsLastRequestLeavesTheWindow`: `expected: Admitted[] but was: CapacityExhausted[]` |
+| `>=` por `>` en el tope de la restricción | `Failures: 1`: `InMemoryRateLimiterTest.theRestrictionEndsAtTheOneHourCapEvenIfTheIpKeepsFailing:282` |
+| Registrar el rechazo (`admitted.add(now)` antes de `Limited`) | `Failures: 4`: `aRejectedRequestIsNeverRecordedAndNeverMovesTheWindow`, `theWindowSlidesRequestByRequest`, `aLimitAndAThresholdLargerThanTheFirstAllocationAreCountedExactly` y la propiedad contra el modelo |
+| Barrer en cada llamada | `Failures: 1`: `InMemoryRateLimiterTableTest.theTableIsSweptAtMostOnceASecond` |
+| I-1: `now()` lee `Instant.now()` (fuente de pared) | `Failures: 77`, entre ellas `theLimiterDependsOnNoWallClockAndReadsNoWallTime`: `[types of a wall clock] Expecting empty but was: ["java.time.Instant", "java.time.Instant", "java.time.Instant"]`, y las 12 de contador arbitrario y de barrida |
+| S-1: leer la hora antes del `compute` | `Failures: 1`: `aTimestampIsReadInsideTheLockOfItsClientSoTheRingStaysInOrder`: `[the earlier time is recorded first] expected: Admitted[] but was: Limited[retryAfter=PT1M10S]` |
+| Comparación de la barrida con `<` absoluto | `Failures: 1`: `theSweepRecoversRoomAcrossTheWrapOfTheCounter` (el arranque a 5 s del desbordamiento) |
+
+### Concurrencia: cinco ejecuciones seguidas de `InMemoryRateLimiterConcurrencyTest` solo
+
+`Tests run: 80, Failures: 0, Errors: 0, Skipped: 0` en las cinco (400 repeticiones), más las ejecuciones enfocadas y el `verify` completo, sin ninguna falla intermitente.
+
+### Medición (`git diff --numstat HEAD -- . ':!openspec'` con `git add -N`; igual con y sin `-M`)
+
+| Archivo | Adiciones | Eliminaciones |
+|---|---|---|
+| `InMemoryRateLimiter.java` | 62 | 33 |
+| `RateLimitPolicy.java` | 16 | 0 |
+| `MutableClock.java` | 22 | 26 |
+| `InMemoryRateLimiterTest.java` | 27 | 4 |
+| `InMemoryRateLimiterTimeTest.java` | 222 | 0 |
+| `InMemoryRateLimiterTableTest.java` | 192 | 0 |
+| `InMemoryRateLimiterPropertiesTest.java` | 240 | 0 |
+| `InMemoryRateLimiterConcurrencyTest.java` | 181 | 0 |
+| **Total** | **962** | **63** = **1 025** |
+
+Pronóstico: unas 609 más I-1, I-3, S-1 y S-2. Las tres clases de la tabla, las propiedades y la concurrencia miden 613; el resto (412: `TimeTest` 222, producción 111, `MutableClock` 48 y `InMemoryRateLimiterTest` 31) es el trabajo de la revisión. No se recortó ninguna prueba ni comentario.
+
+### Propuesta de costura (pendiente de decisión del propietario)
+
+| Opción | Parte | Contenido | Líneas |
+|---|---|---|---|
+| A (`size:exception`) | PR 10b | Todo | 1 025 (225 sobre el tope) |
+| B (recomendada) | PR 10b | I-1, S-1 y S-2 con `TimeTest` (412) y `InMemoryRateLimiterTableTest` (192) | **604** |
+| B | PR 10c | `InMemoryRateLimiterPropertiesTest` (240) y `InMemoryRateLimiterConcurrencyTest` (181) con I-3 | **421** |
+
+Con B los dos PR quedan dentro de 800; el cambio pasaría a 21 tareas y 20 PR. 3.2 necesitaría 3.1b y 3.1c fusionadas (la exactitud bajo concurrencia es de 3.1c).
+
+### Decisión del propietario (2026-10-05): costura B sin excepción de tamaño
+
+El árbol completo de arriba se conserva en la rama **local** `wip/web-edge-rate-limiter-table-full` (`faf1878`, nunca se publica). La tarea se parte en **3.1b** (I-1, S-1, S-2, `InMemoryRateLimiterTimeTest` e `InMemoryRateLimiterTableTest`; 596 líneas medidas) y **3.1c** (`InMemoryRateLimiterPropertiesTest`, `InMemoryRateLimiterConcurrencyTest` con I-3 y `reservedForTest()`; unas 421). El cambio pasa a **21 tareas y 20 PR**; 3.1c necesita 3.1b y 3.2 necesita 3.1c. Los números de arriba (114 pruebas, 1 025 líneas, demostraciones y cinco ejecuciones de concurrencia) son del árbol completo; los de la parte construida están abajo y las demostraciones de 3.1c se repetirán al construirla.
+
+## Tarea 3.1b: PR 10b `rate-limiter-table` (parte construida)
+
+Rama `change/web-edge-foundations-rate-limiter-table` desde `main` en `014c3b0`; el código y las pruebas salen de `wip/web-edge-rate-limiter-table-full` (sin tocarla), salvo `reservedForTest()`, que se queda en 3.1c porque solo lo usa su prueba de concurrencia. Se verificó **en solitario**, sin las clases de propiedades y concurrencia.
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| Red de seguridad | `InMemoryRateLimiterTest` de `main` | 47 pruebas en verde (Surefire 186 + 914, Failsafe 229) |
+| ROJO | `-Dtest='InMemoryRateLimiter*'` con `MutableClock` de nanosegundos, `InMemoryRateLimiterTest` adaptada, `InMemoryRateLimiterTableTest` e `InMemoryRateLimiterTimeTest` y sin producción | `COMPILATION ERROR`, 28 líneas de error (`MutableClock cannot be converted to java.time.Clock`, `cannot find symbol`) |
+| VERDE | Mismo comando, con la producción | `Tests run: 78, Failures: 0, Errors: 0, Skipped: 0` (tabla 10, `InMemoryRateLimiterTest` 53, tiempo 15). La cobertura de JaCoCo falla con `-Dtest=` acotado. |
+| Cierre | `./mvnw verify` completo | Surefire 186 + 945 (los 914 de la línea base más 31 nuevos), Failsafe 229, `All coverage checks have been met`, `BUILD SUCCESS`. Instantánea OpenAPI sin cambios. |
+
+Pruebas añadidas: 31 (`InMemoryRateLimiterTest` +6 de S-2, tabla 10, tiempo 15).
+
+### Demostraciones deliberadas (cada una revertida; `cmp` contra la copia original sin diferencias)
+
+| Ruptura temporal | Resultado observado (sobre las 78) |
+|---|---|
+| I-1: `now()` lee `Instant.now()` | `Failures: 35`, entre ellas `theLimiterDependsOnNoWallClockAndReadsNoWallTime`: `[types of a wall clock] Expecting empty but was: ["java.time.Instant", "java.time.Instant", "java.time.Instant"]` |
+| S-1: leer la hora antes del `compute` | `Failures: 1`: `aTimestampIsReadInsideTheLockOfItsClientSoTheRingStaysInOrder`: `[the earlier time is recorded first] expected: Admitted[] but was: Limited[retryAfter=PT1M10S]` |
+| `>=` por `>` en el tope de la restricción | `Failures: 1`: `theRestrictionEndsAtTheOneHourCapEvenIfTheIpKeepsFailing` (`expected: Admitted[] but was: Limited[retryAfter=PT1M]`) |
+| `>=` por `>` en el descarte de admisiones | `Failures: 1`: `anEntryIsReclaimedExactlyWhenItsLastRequestLeavesTheWindow` (`expected: Admitted[] but was: CapacityExhausted[]`) |
+| Barrer en cada llamada | `Failures: 1`: `theTableIsSweptAtMostOnceASecond` |
+| Registrar el rechazo | `Failures: 3`: `aRejectedRequestIsNeverRecordedAndNeverMovesTheWindow`, `theWindowSlidesRequestByRequest` y `aLimitAndAThresholdLargerThanTheFirstAllocationAreCountedExactly` |
+| Comparar la barrida con `<` absoluto | `Failures: 1`: `theSweepRecoversRoomAcrossTheWrapOfTheCounter` |
+
+### Medición del PR 10b (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 533 | 63 | **596** |
+| Con `-M` | 533 | 63 | **596** |
+
+`InMemoryRateLimiter` 54 + 33, `RateLimitPolicy` 16, `MutableClock` 22 + 26, `InMemoryRateLimiterTest` 27 + 4, `InMemoryRateLimiterTimeTest` 222, `InMemoryRateLimiterTableTest` 192. Dentro del tope de 800.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='InMemoryRateLimiter*'`: `Tests run: 78, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 945, Failsafe 229 |
+| Arnés de ejecución | N/A: el limitador no tiene consumidor ni borde HTTP hasta 3.2; las pruebas ejercen el adaptador real, el constructor de producción con `System.nanoTime` y un hilo lento y uno rápido sobre la misma clave |
+| Frontera de reversión | `InMemoryRateLimiter` y `RateLimitPolicy` vuelven a su versión de 3.1a, `MutableClock` e `InMemoryRateLimiterTest` también, y se retiran `InMemoryRateLimiterTableTest` e `InMemoryRateLimiterTimeTest` |
+
+### Diseño de I-1 para el bean de 3.2
+
+El constructor público es `InMemoryRateLimiter(RateLimitPolicy)` y usa `System::nanoTime`; el de `(RateLimitPolicy, LongSupplier)` es de paquete. 3.2 cablea `new InMemoryRateLimiter(policy)` y no tiene reloj de pared que inyectar. Cota de S-2: 10 000 para `requestLimit` y `failureThreshold`.
+
+### Revisión independiente de 3.1b (2026-10-05)
+
+Riesgo evaluado: alto. Veredicto: aprobado, sin bloqueantes. La revisión confirmó que toda comparación de tiempo usa
+diferencias (`now - x` contra una duración, y `now - due < 0` para el barrido), así que el desbordamiento del contador
+de `System.nanoTime` es seguro. También confirmó que las decisiones de las capas 1 y 2 de 3.1a no cambian, que la cota
+de 10 000 de S-2 es razonable y que la prueba de ArchUnit «sin reloj de pared» no es vacua.
+
+- **Hallazgo «importante» refutado por el orquestador.** La revisión afirmó que inicializar `nextSweepAt` con la hora
+  de construcción impide barrer durante el primer segundo. Es falso: la condición es `now - due < 0`, así que el
+  barrido está vencido desde el instante de construcción. Se probó cambiando la inicialización a `now - 1 s`, sin que
+  cambiara ningún resultado. No se modificó el código de producción. Sí se añadió
+  `aFullTableIsSweptOnTheFirstRefusalWithoutWaitingASecond`, con ventanas de milisegundos, que **falla** si el primer
+  vencimiento se retrasa (`now + 1 s`: `assertAdmitted` en la línea 214), para fijar la propiedad.
+- **Sugerencia aplicada.** `anEntryIsReclaimedExactlyWhenItsRestrictedIntervalEnds` prueba el borde exacto del
+  intervalo restringido (1 ns antes y exactamente al final, con limitadores separados). La mutación `<` → `<=` en
+  `isReclaimable` ahora falla en la línea 199 y se revirtió con `cmp`.
+- **Seguimientos.** Una cota superior para `maxEntries` (del orden de 10⁶) y ampliar `WALL_CLOCK_TYPES` con
+  `LocalDate`, `Calendar` y `java.sql.Timestamp`. Ambos son de bajo valor.
+- `./mvnw verify` completo: Surefire 186 + 947, Failsafe 229, `BUILD SUCCESS`.

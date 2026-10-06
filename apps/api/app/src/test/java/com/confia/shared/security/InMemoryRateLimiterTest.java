@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.confia.shared.security.RateLimitDecision.Admitted;
 import com.confia.shared.security.RateLimitDecision.Limited;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -37,7 +36,7 @@ class InMemoryRateLimiterTest {
 
     private static final ClientAddress CLIENT = ip("203.0.113.9");
 
-    private final MutableClock clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
+    private final MutableClock clock = new MutableClock();
 
     private static ClientAddress ip(String literal) {
         return ClientAddress.parseLiteral(literal);
@@ -237,7 +236,7 @@ class InMemoryRateLimiterTest {
         advanceSeconds(10);
         assertAdmitted(atTheEdge.tryAcquire(CLIENT));
 
-        MutableClock otherClock = new MutableClock(clock.instant());
+        MutableClock otherClock = new MutableClock(clock.getAsLong());
         InMemoryRateLimiter justInside = new InMemoryRateLimiter(ADMIN_LOGIN, otherClock);
         ClientAddress other = ip("203.0.113.10");
         justInside.recordFailure(other);
@@ -333,7 +332,7 @@ class InMemoryRateLimiterTest {
         // attempt of t = 9 s.
         assertLimited(layerTwoLonger.tryAcquire(CLIENT), Duration.ofSeconds(59));
 
-        MutableClock otherClock = new MutableClock(clock.instant());
+        MutableClock otherClock = new MutableClock(clock.getAsLong());
         InMemoryRateLimiter layerOneLonger = new InMemoryRateLimiter(new RateLimitPolicy(
                 2, MINUTE, 2, TEN_MINUTES, Duration.ofSeconds(10), HOUR, 100), otherClock);
         ClientAddress other = ip("203.0.113.10");
@@ -431,6 +430,30 @@ class InMemoryRateLimiterTest {
                 MINUTE, HOUR, 10))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("requestWindow");
+    }
+
+    /**
+     * Review S-2: every operation on a client runs under the lock of its table bin, and the failure
+     * count walks the whole ring, so a limit or a threshold of a billion would make one request
+     * cost a billion steps. The bound is part of the policy, written here as a literal on purpose.
+     */
+    @ParameterizedTest
+    @CsvSource({"requestLimit,10001", "requestLimit,2147483647", "failureThreshold,10001",
+            "failureThreshold,2147483647"})
+    void aCountAboveTenThousandIsRejectedNamingTheField(String field, int value) {
+        assertThatThrownBy(() -> policyWith(field, value))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(field)
+                .hasMessageContaining("10000");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"requestLimit", "failureThreshold"})
+    void aCountOfExactlyTenThousandIsAccepted(String field) {
+        RateLimitPolicy policy = policyWith(field, 10_000);
+
+        assertThat(field.equals("requestLimit") ? policy.requestLimit() : policy.failureThreshold())
+                .isEqualTo(10_000);
     }
 
     @Test
