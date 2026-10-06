@@ -15,10 +15,10 @@
 
 | Campo | Valor |
 |---|---|
-| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 11 000 a 12 700** en 22 PR según el re-pronóstico del 2026-10-05 y la partición de 3.2 del 2026-10-06 (nota fechada del final): 6 822 ya medidas (siete PR fusionados y la tarea 2.3, medida en 1 869 y partida en cuatro) más 4 200 a 5 900 estimadas para las tareas restantes. La estimación nominal original, de 4 670, subestimó las pruebas; no se recorta ninguna |
+| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 11 000 a 12 700** en 24 PR según el re-pronóstico del 2026-10-05 y la partición de 3.2 del 2026-10-06 (nota fechada del final): 6 822 ya medidas (siete PR fusionados y la tarea 2.3, medida en 1 869 y partida en cuatro) más 4 200 a 5 900 estimadas para las tareas restantes. La estimación nominal original, de 4 670, subestimó las pruebas; no se recorta ninguna |
 | Riesgo frente al presupuesto | **Alto** frente a 400 de la preflight; **medio por PR** frente al presupuesto del proyecto de 800 (nominal de 320 a 520 por PR, peor caso de 480 a 780) |
 | Chained PRs recommended | Yes |
-| Suggested split | 22 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a, 2.3b, 2.3c, 2.3d, 2.4a, 2.4b, 2.5, 3.1a, 3.1b, 3.1c, 3.2a, 3.2b, 3.2c, 4.1 y 5.1), más la tarea de cierre 6.1 |
+| Suggested split | 24 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a, 2.3b, 2.3c, 2.3d, 2.4a, 2.4b, 2.5, 3.1a, 3.1b, 3.1c, 3.2a, 3.2b, 3.2c, 4.1a, 4.1b, 4.1c y 5.1), más la tarea de cierre 6.1 |
 | Delivery strategy | `auto-chain` (decidido por el propietario el 2026-10-04, en lugar del `single-pr` de la preflight de la sesión) |
 | Chain strategy | `stacked-to-main`: cada PR se fusiona a `main` en orden y el siguiente parte de `main` actualizado |
 | Presupuesto del proyecto por pull request (`docs/15-flujo-de-trabajo-git.md` §3) | 800 líneas de cambio efectivo |
@@ -106,7 +106,9 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | 11a | Códigos `429` y `503`, traductores y señal de capacidad agotada: puerto `RateLimitMetrics` y adaptador interino (3.2a) | PR 11a `edge-rejection-codes-and-capacity-signal` (unas 505, medidas en el árbol completo) | `-Dtest='ProblemCodeTest,ProblemCatalogCoverageTest,ProblemErrorReportValveTest,ProblemTranslationTest,ProblemExceptionHandlerTest,LogRateLimitMetricsTest,ProcessBeanIsolationTest'` | Procesos reales para el aislamiento; evento de registro con reloj inyectado | Se retiran los dos códigos y manejadores, el puerto, el adaptador y su línea de `ProcessBeanPolicy` |
 | 11b | `@RateLimited`, registro de limitadores e interceptor que falla cerrado (3.2b) | PR 11b `edge-interceptor` (unas 407, medidas en el árbol completo) | `-Dtest='RateLimitInterceptorTest,IdempotencyScopeExclusionInventoryTest'` | Interceptor con un limitador de respuesta fija y `RequestOrigin` ligado | Se retiran las cuatro clases y su prueba |
 | 11c | Borde del limitador: configuración, política `admin-login`, propiedades y notas de seguridad (3.2c) | PR 11c `edge-throttling-wiring` (unas 639, medidas en el árbol completo) | `-Dtest='RateLimitEdgeTest,RateLimitPropertiesTest,ProcessBeanIsolationTest'` | Petición por la cadena real a un controlador de prueba anotado | Se retira la configuración, las propiedades y el arnés |
-| 12 | Materializador del retardo, hilos virtuales, tiempos de Tomcat y regla W4 (4.1) | PR 12 `delay-materializer` (~460 → 690) | Unidad: `-Dtest='RequiredDelayMaterializer*Test,BlockingWaitConfinementTest'`; IT: `-Dit.test=RequiredDelayMaterializerIT` | `RequiredDelayMaterializerIT` bajo Tomcat real con base de datos | Se retira el materializador y `spring.threads.virtual.enabled` vuelve a su omisión |
+| 12a | Materializador del retardo, propiedades, configuración solo de administración, ajustes de Tomcat y pruebas de unidad y concurrencia (4.1a) | PR 12a `delay-materializer-core` (773, medidas en el árbol completo) | `-Dtest='RequiredDelayMaterializer*Test,ProcessBeanIsolationTest'` | Pruebas de unidad y de concurrencia con temporizador controlado | Se retira el materializador y `spring.threads.virtual.enabled` vuelve a su omisión |
+| 12b | Prueba en tiempo de ejecución: validación de la configuración, aislamiento por proceso, valores del conector y la IT bajo Tomcat real con base de datos (4.1b) | PR 12b `delay-materializer-runtime-proof` (578, medidas) | `-Dtest='RequiredDelayConfigurationTest,ProcessBeanIsolationTest,ProductionEdgeDefaultsTest'`; IT: `-Dit.test=RequiredDelayMaterializerIT` | `RequiredDelayMaterializerIT` | Se retiran las pruebas |
+| 12c | Regla W4 y ampliación del inventario de exclusión del borde (4.1c) | PR 12c `blocking-wait-rule` (399, medidas) | `-Dtest='BlockingWaitConfinementTest,WebEdgeScopeExclusionInventoryTest'` | Fixture `BadSleepingWebComponent` detectado | Se retiran la regla y sus fixtures |
 | 13 | Borde HTTP de la idempotencia, controlador solo de prueba y regla W5 (5.1) | PR 13 `idempotency-edge` (~480 → 720) | `-Dtest='IdempotencyNotInIdentityTest,OpenApiContractSnapshotTest'`; IT: `-Dit.test=IdempotencyEdgeIT` | `IdempotencyEdgeIT` con `IdempotencyDemoController` y PostgreSQL | Se retira el borde; `IdempotentExecutor` queda intacto |
 | 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 22 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
 
@@ -747,7 +749,8 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 
 ## Fase 4: materialización del retardo
 
-- [ ] 4.1 **PR 12 `delay-materializer`: espera tras el commit en hilos virtuales (decisión 18).**
+- [ ] 4.1 **PR 12 `delay-materializer`: espera tras el commit en hilos virtuales (decisión 18).** Partida en 4.1a, 4.1b y 4.1c
+  (nota fechada del final, 2026-10-06); el contenido de abajo es el alcance conjunto de las tres partes.
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/web/delay/`:
     `RequiredDelayMaterializerTest.java` (llamado desde hilos virtuales: permiso antes del caso de uso,
     `503` con `P` en uso, liberación tras excepción, retardo cero y negativo sin espera, espera
@@ -783,6 +786,17 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     de estado compartido del limitador…» y «Ausencia de autenticación por credencial…» (limitador y
     materializador sin uso); requisito de `build-integrity` «La espera bloqueante del retardo se
     confina al materializador»
+
+- [ ] 4.1a **PR 12a `delay-materializer-core`.** `RequiredDelayMaterializer`, `Delayed`, `DelayTimer`, `DelayProperties`,
+  `RequiredDelayConfiguration` (`shared.web.edge`, `@Import` solo en `AdminApplication`), la línea `com.confia.shared.web.delay` de
+  `ProcessBeanPolicy`, `application.yml`, `GatedTimer`, `RequiredDelayMaterializerTest` y `RequiredDelayMaterializerConcurrencyTest`.
+  Demostraciones: permiso después del caso de uso y `release()` fuera de `finally`. Necesita 3.2c.
+- [ ] 4.1b **PR 12b `delay-materializer-runtime-proof`.** `RequiredDelayConfigurationTest`, la ampliación de
+  `ProcessBeanIsolationTest`, la de `ProductionEdgeDefaultsTest` y `RequiredDelayMaterializerIT` (espera tras el commit, cero
+  conexiones activas y ningún bloqueo durante la espera, hilo virtual y desconexión sin `ERROR`). Necesita 4.1a.
+- [ ] 4.1c **PR 12c `blocking-wait-rule`.** `BlockingWaitConfinementTest` (W4, con no vacuidad y el fixture
+  `BadSleepingWebComponent`) y la ampliación de `WebEdgeScopeExclusionInventoryTest` con sus fixtures. Necesita 4.1b.
+  4.1 se marca hecha cuando se fusiona 4.1c.
 
 ## Fase 5: idempotencia en el borde
 
@@ -822,7 +836,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 
 ## Fase 6: cierre
 
-- [ ] 6.1 **Verificación completa, medición de los 22 PR y barrido de trazabilidad.** Con los 22 PR
+- [ ] 6.1 **Verificación completa, medición de los 24 PR y barrido de trazabilidad.** Con los 24 PR
   fusionados a `main`, ejecutar `./mvnw verify` completo en `apps/api` y registrar cobertura (global
   80 %, núcleo y `domain` 95 %) y mutación (umbral 80). Registrar en
   `openspec/changes/web-edge-foundations/apply-progress.md` la medición de cada PR con
@@ -1294,3 +1308,21 @@ La tarea 3.2c midió **839 líneas efectivas** (818 añadidas y 21 eliminadas, s
 11c-1/11c-2, porque las notas de seguridad se revisan junto con el cableado que describen. El cambio sigue con 23 tareas y 22 PR.
 
 **Ampliación (2026-10-06).** Las correcciones de la revisión independiente de 3.2c (la prueba de S-2 y la nota I-1 de `docs/03`) llevaron la medición a **869 líneas**. El propietario amplió la excepción para cubrir esas 30 líneas en el mismo PR 11c.
+
+## Nota fechada 2026-10-06: la tarea 4.1 se parte en 4.1a, 4.1b y 4.1c
+
+La tarea 4.1 verificada midió **1 750 líneas efectivas** (253 de producción y 1 497 de pruebas) frente al tope de 800 y a un pronóstico de
+460 a 690. El árbol completo y verificado (`./mvnw verify`: Surefire 186 + 1 160, Failsafe 233) se conserva en la rama **local**
+`wip/web-edge-delay-materializer-full` (911c025). El propietario aprobó la costura de tres PR **sin excepción de tamaño**:
+
+| Parte | Contenido | Líneas medidas |
+|---|---|---|
+| 4.1a `delay-materializer-core` | Producción, configuración, `application.yml`, línea de la política de beans y pruebas de unidad y concurrencia | 773 |
+| 4.1b `delay-materializer-runtime-proof` | Prueba de configuración, aislamiento por proceso, valores del conector y la IT | 578 |
+| 4.1c `blocking-wait-rule` | Regla W4, inventario de exclusión y fixtures | 399 |
+
+El cambio pasa a **25 tareas** (24 de PR más la de cierre 6.1) y **24 PR**, dentro de la excepción al tope de 15 tareas que el
+propietario ya concedió. Orden: 4.1a, 4.1b y 4.1c, y después 5.1. Los escenarios de `web-edge` de 4.1 se reparten así: la
+espera tras el commit, la suma del retardo, el semáforo acotado y la desconexión se prueban por unidad en 4.1a y por la cadena real en
+4.1b; «La espera no retiene hilos…» se prueba en 4.1b; «Ausencia de estado compartido del limitador…», «Ausencia de autenticación por
+credencial…» y el requisito de `build-integrity` de la espera bloqueante, en 4.1c.

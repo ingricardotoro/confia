@@ -2021,3 +2021,15 @@ Alternativa con excepción de tamaño: dos PR, 12a (código más pruebas de unid
 | Orden enfocada y resultado | Unidad: `-Dtest='RequiredDelayMaterializer*Test,BlockingWaitConfinementTest'` y compañeras, 74 pruebas en verde; IT: `-Dit.test=RequiredDelayMaterializerIT`, 4 en verde |
 | Arnés de ejecución | IT con PostgreSQL (Testcontainers), Tomcat real en puerto aleatorio, `HikariPoolMXBean` y `pg_locks` durante la espera, socket crudo con `SO_LINGER 0` para la desconexión |
 | Frontera de reversión | Se retiran el paquete `delay`, `RequiredDelayConfiguration`, su `@Import`, la línea de `ProcessBeanPolicy` y las claves de `application.yml` |
+
+### Partición de 4.1 y PR 12a (2026-10-06)
+
+El propietario aprobó partir 4.1 en tres PR **sin excepción de tamaño**: 4.1a `delay-materializer-core`, con 773 líneas; 4.1b
+`delay-materializer-runtime-proof`, con 578; y 4.1c `blocking-wait-rule`, con 399. La sección anterior describe el árbol
+completo, que se conserva en la rama local `wip/web-edge-delay-materializer-full` (911c025). Cada PR toma de ese árbol solo sus
+archivos, sin cambiarlos.
+
+**PR 12a.** Incluye los archivos de producción, `RequiredDelayConfiguration`, el `@Import` en `AdminApplication`, `application.yml`, la
+línea de `ProcessBeanPolicy`, `GatedTimer`, `RequiredDelayMaterializerTest` y `RequiredDelayMaterializerConcurrencyTest`. Las
+demostraciones del permiso y de `finally`, y el rojo de la lista de permitidos, son las registradas arriba. El `./mvnw verify` completo
+sobre el árbol de 12a solo dio Surefire 186 + 1 134, Failsafe 229, 0 fallos, cobertura cumplida y `BUILD SUCCESS`.
