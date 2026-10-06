@@ -1918,7 +1918,7 @@ Por archivo: `RateLimitEdgeTest` 289, `RateLimitPropertiesTest` 102, `RateLimitP
 
 ### Decisiones y desviaciones
 
-1. **S-6:** `RateLimiterConfiguration` (`shared.security`, `@Import` desde `AdminApplication`) construye el limitador con el nombre de su política como nombre de bean (`admin-login`) y solo expone `RateLimiter`; `ThrottlingConfiguration` recibe `Map<String, RateLimiter>` y publica un bean `RateLimitPolicy` desde las propiedades. La lista de permitidos pasa a **seis tipos** (suma `RateLimitPolicy`; `InMemoryRateLimiter` no entra).
+1. **S-6:** `RateLimiterConfiguration` (`shared.security`, `@Import` desde `AdminApplication`) construye el limitador con el nombre de su política como nombre de bean (`admin-login`) y solo expone `RateLimiter`; `ThrottlingConfiguration` recibe `Map<String, RateLimiter>` y publica un bean `RateLimitPolicy` desde las propiedades. La lista de permitidos pasa a **nueve entradas por nombre completo** (siete tipos más dos variantes anidadas de `RateLimitDecision` contadas aparte; antes eran ocho) (suma `RateLimitPolicy`; `InMemoryRateLimiter` no entra).
 2. **S-b:** `theStartThatNamesAnUnknownPolicyFailsBeforeTheWebServerAcceptsAConnection` (con no vacuidad) usa `HarnessProcess.startObserved` y comprueba que nunca se publica `WebServerInitializedEvent`.
 3. **S-3:** `aHeadRequestToTheLimitedGetHandlerIsLimitedExactlyLikeAGet` (el arnés permite `HEAD` en `/test/limited`).
 4. Evento de la señal con `reason=table_full` (campos exactos en orden).
@@ -1929,3 +1929,26 @@ Por archivo: `RateLimitEdgeTest` 289, `RateLimitPropertiesTest` 102, `RateLimitP
 `./mvnw verify` completo: Surefire 186 (kernel) + 1 111 (app), Failsafe 229, `BUILD SUCCESS`.
 
 **Decisión del propietario (2026-10-06):** se acepta la excepción de tamaño para 3.2c (839 líneas; 777 sin `docs/03`) en un solo PR 11c. Commits de código, de documentación de seguridad y de SDD por separado.
+
+### Revisión independiente de 3.2c (2026-10-06)
+
+Riesgo evaluado: alto. Veredicto: se puede fusionar, sin bloqueantes. La revisión confirmó estos puntos:
+
+- falla cerrado por la cadena real;
+- `admin-login` no está aplicada a ninguna ruta de producción;
+- solo el proceso administrativo carga el limitador;
+- se cumple S-6 (la capa web nunca nombra `InMemoryRateLimiter`);
+- las pruebas de S-b y de `HEAD` no son vacuas;
+- no se registran datos del cliente.
+
+Antes de fusionar, el orquestador corrigió:
+
+- **I-1 (documental):** la nota de `docs/03` §10 decía que, si no hay un evento en ese instante, el `503` no vino del limitador. Como el evento está acotado a uno por segundo por política y causa, esa regla confundiría una autodenegación con un `503` del marco. La nota se reescribió como una lectura por tendencia que incluye `suppressed`. `docs/07` §5.4 ya decía que se leyera `reason` junto al registro de errores, así que no cambia.
+- **S-2:** una propiedad mal escrita (`request-limt`) dejaba en silencio el valor por omisión. `RateLimitProperties` usa ahora `ignoreUnknownFields = false`. Lo cubren las pruebas `aMisspelledPropertyStopsTheStartInsteadOfLeavingTheDefault` y `aWellSpelledPropertyStillStarts`, que pasan por el mecanismo real de enlace (`ApplicationContextRunner`). **Rojo observado** sin la corrección: `RateLimitPropertiesTest` 21 pruebas, 1 fallo, en la línea 103, porque el contexto arrancaba. **Verde:** 21/21.
+- **S-4:** el conteo de la lista de permitidos se corrigió arriba a nueve entradas.
+
+Para seguimiento (no bloquean):
+
+- **S-1:** acotar el producto `maxEntries × (requestLimit + failureThreshold)`. Con los valores por omisión son unos 8 MB; con los máximos permitidos, unos 160 GB. Queda para el cambio de observabilidad y endurecimiento o para una decisión del propietario.
+- **S-3:** comprobar al arrancar que los nombres de bean del registro forman un conjunto cerrado de políticas conocidas.
+- **S-5:** la validación duplicada entre `RateLimitProperties` y `RateLimitPolicy`. Hoy no se solapa.
