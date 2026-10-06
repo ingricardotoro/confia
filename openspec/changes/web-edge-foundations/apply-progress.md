@@ -1886,3 +1886,46 @@ las cotas separadas con `AtomicReference<Long>` son correctas. El orquestador co
 - **Para 3.2c (S-b):** una prueba de arranque fallido con una política inexistente por la cadena real, que verifique que
   `RateLimitPolicyCheck` detiene el arranque antes de que el servidor acepte conexiones.
 - **Aceptado (S-c):** un fallo del propio `LOG.atError()` escaparía como `500`. Es improbable.
+
+## 3.2c `edge-throttling-wiring` (2026-10-06) - construido y verificado, SIN COMMIT por tamaño
+
+Estado: árbol completo y `./mvnw verify` en verde; **no se hicieron commits** porque la medición supera el tope de 800 líneas.
+
+### Medición (`git diff --numstat main -- . ':!openspec'`, con `git add -N` para contar los archivos nuevos)
+
+**839 líneas** (818 adiciones, 21 eliminaciones); 777 sin `docs/03-seguridad.md` (62). Pronóstico de la tarea: unas 639.
+Por archivo: `RateLimitEdgeTest` 289, `RateLimitPropertiesTest` 102, `RateLimitProperties` 86, `ThrottlingConfiguration` 72,
+`LimitedController` 40, `RateLimiterConfiguration` 27, `ProcessBeanIsolationTest` 30, `UnknownPolicyController` 21,
+`Calls` 20, `InMemoryRateLimiterTest` 19, `HarnessProcess` 17, `RateLimitPolicy` 21, resto menor.
+
+### Tabla de ciclo TDD (modo estricto)
+
+| Unidad | ROJO observado | VERDE |
+|---|---|---|
+| Línea `com.confia.shared.web.ratelimit` de `ProcessBeanPolicy` (escrita primero) | `ProcessBeanIsolationTest`: `Tests run: 7, Failures: 1`; `non-vacuous: com.confia.shared.web.ratelimit must contribute a bean to the admin context` | `Tests run: 7, Failures: 0` tras el `@Import` |
+| Pruebas nuevas (`RateLimitEdgeTest`, `RateLimitPropertiesTest`, arnés, aislamiento) | error de compilación: `RateLimitProperties`, `ThrottlingConfiguration` y `RateLimiterConfiguration` inexistentes | `RateLimitEdgeTest` 11, `ProcessBeanIsolationTest` 7, inventario 3 en verde |
+| I-3 (`maxEntries` <= 1 000 000) | `InMemoryRateLimiterTest` 2 fallos y `RateLimitPropertiesTest` 1 fallo (`Expecting code to raise a throwable`) | `RateLimitPolicy.MAX_ENTRIES`; verde |
+
+### Demostraciones deliberadas (cada una revertida; `cmp` sin diferencias)
+
+| Ruptura | Resultado observado |
+|---|---|
+| `tryAcquire` en `postHandle` | `RateLimitEdgeTest` `Failures: 7`: `aRejectedRequestReachesNeitherTheControllerNorTheUseCase:114` (`expected: 429 but was: 200`; el controlador ya había respondido), HEAD, 503 de tabla llena, evento, etc. |
+| Quitar `signal(policy, verdict.reason())` | `RateLimitEdgeTest` `Failures: 1`: `aFullTableLeavesOneFixedWarnWithThePolicyAndNothingOfTheClient:162` (`Expected size: 1 but was: 0`) |
+| I-3: quitar la comprobación de `maxEntries` | `InMemoryRateLimiterTest.aTableAboveOneMillionEntriesIsRejectedNamingTheField` (2) y `RateLimitPropertiesTest.aCountAboveTheBound...` (1) |
+| S-6: `ThrottlingConfiguration` nombra `InMemoryRateLimiter` | `IdempotencyScopeExclusionInventoryTest`: `ThrottlingConfiguration resides in a web package and depends on ...InMemoryRateLimiter, which is not one of [...]` |
+| `@Import` sin la línea de `ProcessBeanPolicy` | `ProcessBeanIsolationTest`: `bean 'rateLimitInterceptor' from package 'com.confia.shared.web.ratelimit' - not in the allow-list` (y registro, comprobación, propiedades) |
+
+### Decisiones y desviaciones
+
+1. **S-6:** `RateLimiterConfiguration` (`shared.security`, `@Import` desde `AdminApplication`) construye el limitador con el nombre de su política como nombre de bean (`admin-login`) y solo expone `RateLimiter`; `ThrottlingConfiguration` recibe `Map<String, RateLimiter>` y publica un bean `RateLimitPolicy` desde las propiedades. La lista de permitidos pasa a **seis tipos** (suma `RateLimitPolicy`; `InMemoryRateLimiter` no entra).
+2. **S-b:** `theStartThatNamesAnUnknownPolicyFailsBeforeTheWebServerAcceptsAConnection` (con no vacuidad) usa `HarnessProcess.startObserved` y comprueba que nunca se publica `WebServerInitializedEvent`.
+3. **S-3:** `aHeadRequestToTheLimitedGetHandlerIsLimitedExactlyLikeAGet` (el arnés permite `HEAD` en `/test/limited`).
+4. Evento de la señal con `reason=table_full` (campos exactos en orden).
+5. Notas fechadas de `docs/03` §4.4 y §10 (limitador interino, tres limitaciones, capa 2, I-2 con tres mitigaciones, campo `reason` y lectura del `503` del marco).
+
+### Cierre de la verificación
+
+`./mvnw verify` completo: Surefire 186 (kernel) + 1 111 (app), Failsafe 229, `BUILD SUCCESS`.
+
+**Decisión del propietario (2026-10-06):** se acepta la excepción de tamaño para 3.2c (839 líneas; 777 sin `docs/03`) en un solo PR 11c. Commits de código, de documentación de seguridad y de SDD por separado.
