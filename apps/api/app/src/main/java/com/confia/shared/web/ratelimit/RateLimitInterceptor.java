@@ -11,6 +11,7 @@ import com.confia.shared.web.problem.CapacityExceededException;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
@@ -124,8 +125,10 @@ public final class RateLimitInterceptor implements HandlerInterceptor {
             if (client == null) {
                 return Verdict.refusal(CapacityReason.NO_ADDRESS);
             }
-            return Verdict.of(limiter.get().tryAcquire(client));
-        } catch (RuntimeException unexpected) {
+            // A limiter that answers null broke its contract: a refusal with a cause, never an NPE 500.
+            return Verdict.of(Objects.requireNonNull(limiter.get().tryAcquire(client),
+                    "the limiter answered no decision"));
+        } catch (RuntimeException | LinkageError unexpected) {
             logFailure("rate limiter failed unexpectedly", policy, unexpected,
                     lastLimiterFailureAt);
             return Verdict.refusal(CapacityReason.LIMITER_FAILURE);
@@ -136,12 +139,14 @@ public final class RateLimitInterceptor implements HandlerInterceptor {
     private void signal(String policy, CapacityReason reason) {
         try {
             metrics.capacityExhausted(policy, reason);
-        } catch (RuntimeException failing) {
+        } catch (RuntimeException | LinkageError failing) {
+            // LinkageError too: a metrics library missing at run time must still answer 503, not 500.
+            // Never Throwable, so an OutOfMemoryError is not swallowed.
             logFailure("rate limit metrics failed", policy, failing, lastMetricsFailureAt);
         }
     }
 
-    private void logFailure(String message, String policy, RuntimeException failure,
+    private void logFailure(String message, String policy, Throwable failure,
             AtomicReference<Long> lastLoggedAt) {
         if (!mayLog(lastLoggedAt)) {
             return;

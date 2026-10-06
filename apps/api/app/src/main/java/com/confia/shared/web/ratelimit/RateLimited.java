@@ -22,6 +22,10 @@ import java.lang.annotation.Target;
  * dispatch only and lets the {@code ASYNC} dispatch of the same request through, because the
  * limiter was already asked once for it; that is correct for a handler that has been proven to be
  * dispatched exactly that way, and nothing else has.
+ *
+ * <p>For the same reason <b>no filter may call {@code startAsync} and dispatch to a limited
+ * handler</b>: that {@code ASYNC} dispatch would reach the handler without any {@code REQUEST}
+ * dispatch having asked the limiter.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)

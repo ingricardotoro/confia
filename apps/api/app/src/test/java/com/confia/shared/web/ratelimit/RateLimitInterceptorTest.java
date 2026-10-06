@@ -291,6 +291,40 @@ class RateLimitInterceptorTest {
                 .containsExactly("rate limiter failed unexpectedly", "rate limit metrics failed");
     }
 
+    /** A limiter that answers no decision broke its contract: a refusal with its cause, not a 500. */
+    @Test
+    void aLimiterThatAnswersNoDecisionIsARefusalWithItsCauseAndNeverAServerError()
+            throws Exception {
+        RateLimitInterceptor interceptor = interceptorAnswering(() -> null);
+
+        assertThatThrownBy(() -> preHandle(interceptor, handler("limited"), origin(CLIENT)))
+                .isInstanceOf(CapacityExceededException.class).hasNoCause();
+
+        assertThat(reported).containsExactly(new Signal(POLICY, LIMITER_FAILURE));
+        assertThat(logged.list).extracting(ILoggingEvent::getFormattedMessage)
+                .containsExactly("rate limiter failed unexpectedly");
+    }
+
+    /**
+     * A metrics library missing at run time throws a {@link LinkageError}, not an exception: the
+     * answer must still be the refusal, never the 500 of the error (review of 3.2b, M-1).
+     */
+    @Test
+    void aMetricsAdapterThatCannotLinkStillAnswersTheRefusal() throws Exception {
+        RateLimitMetrics unlinked = (policy, reason) -> {
+            throw new NoClassDefFoundError("io/micrometer/Counter");
+        };
+        RateLimitInterceptor interceptor = interceptorAnswering(CapacityExhausted::new, unlinked);
+
+        assertThatThrownBy(() -> preHandle(interceptor, handler("limited"), origin(CLIENT)))
+                .isInstanceOf(CapacityExceededException.class).hasNoCause();
+
+        assertThat(logged.list).extracting(ILoggingEvent::getFormattedMessage)
+                .containsExactly("rate limit metrics failed");
+        assertThat(fieldsOf(logged.list.get(0))).containsEntry("exception",
+                NoClassDefFoundError.class.getName());
+    }
+
     @Test
     void aPolicyTheRegistryDoesNotHoldIsARefusalAtRunTime() throws Exception {
         RateLimitInterceptor interceptor = interceptorAnswering(Admitted::new);
