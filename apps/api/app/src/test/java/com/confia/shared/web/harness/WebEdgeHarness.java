@@ -2,7 +2,10 @@ package com.confia.shared.web.harness;
 
 import com.confia.shared.web.edge.PublicEndpoint;
 import com.confia.shared.web.edge.PublicEndpoints;
+import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
+import com.confia.shared.security.RateLimiterConfiguration;
 import com.confia.shared.web.edge.SecurityChains;
+import com.confia.shared.web.edge.ThrottlingConfiguration;
 import com.confia.shared.web.edge.WebEdgeConfiguration;
 import com.confia.shared.web.problem.ProblemResponses;
 import java.util.ArrayList;
@@ -31,7 +34,9 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {DataSourceAutoConfiguration.class,
         UserDetailsServiceAutoConfiguration.class, ErrorMvcAutoConfiguration.class})
-@Import({WebEdgeConfiguration.class, HarnessController.class})
+@Import({WebEdgeConfiguration.class, RateLimiterConfiguration.class,
+        ThrottlingConfiguration.class, ObservabilityMetricsConfiguration.class,
+        HarnessController.class, LimitedController.class, UnknownPolicyController.class})
 class WebEdgeHarness {
 
     /** {@code admin} (the default) or {@code portal}: which real allow-list the chain starts from. */
@@ -57,6 +62,9 @@ class WebEdgeHarness {
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/open"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/boom"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/origin"));
+        endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/limited"));
+        endpoints.add(new PublicEndpoint(HttpMethod.HEAD, "/test/limited"));
+        endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/unlimited"));
         endpoints.add(new PublicEndpoint(HttpMethod.POST, "/test/validated"));
         for (String path : List.of("/test/bounded", "/test/constraint-violation", "/test/required", "/test/sql-reset", "/test/post-only", "/test/status", "/test/access-denied",
                 "/test/unmapped",
