@@ -1371,3 +1371,25 @@ Hallazgos de la revisión de seguridad del limitador en memoria, resueltos en la
 - **I-1, fuente de tiempo.** `InMemoryRateLimiter` ya no recibe un `Clock`. Mide con una fuente monotónica de nanosegundos y solo usa diferencias (también la comparación de la barrida, que sobrevive al desbordamiento del contador). Diseño para el bean de 3.2: el constructor **público** es `InMemoryRateLimiter(RateLimitPolicy)` y usa `System::nanoTime`; el de dos argumentos (`LongSupplier`) es de paquete y solo lo usan las pruebas. 3.2 registra `new InMemoryRateLimiter(policy)` y no tiene forma de inyectar un reloj de pared. Un salto del reloj del sistema, hacia adelante o hacia atrás, no puede alterar ninguna decisión porque el limitador ya no lo lee; lo garantiza una prueba que inspecciona las dependencias y las llamadas del limitador (sin `Clock`, `Instant`, `System.currentTimeMillis` ni `Instant.now`).
 - **S-1.** La hora se lee **dentro** del `compute` de la clave (y dentro del `computeIfPresent` de la barrida), de modo que las marcas del anillo quedan en el orden en que las operaciones se aplicaron a la entrada.
 - **S-2, cota de la política.** `requestLimit` y `failureThreshold` no pueden superar **10 000** (`RateLimitPolicy`, mensaje `<campo> must not exceed 10000`). Razón: cada operación sobre un cliente corre bajo el bloqueo de su cubo de la tabla y el conteo de fallos recorre el anillo completo, así que la cota acota el trabajo bajo bloqueo y la memoria de una entrada, con tres órdenes de magnitud de holgura sobre el diez del inicio de sesión administrativo. `maxEntries` y las duraciones conservan sus validaciones previas (positivo; las duraciones, además, representables en nanosegundos). La prueba usa el literal 10 000 a propósito.
+
+### Nota fechada 2026-10-06: los códigos `429` y `503` y la señal de capacidad agotada (decisión 17, PR 11a)
+
+Lo que la tarea 3.2a (PR 11a `edge-rejection-codes-and-capacity-signal`) fijó, incluida la decisión del propietario sobre la métrica del hallazgo I-2. El interceptor, el registro y el borde completo son de 3.2b y 3.2c.
+
+- **Puerto de métricas mínimo y adaptador interino (decisión del propietario, I-2).** No existe Micrometer, Actuator ni Prometheus en el backend. `docs/07-observabilidad-y-operaciones.md` §1.1 y §5.4
+  dicen que el código emite métricas por un puerto y que el adaptador vive en `shared/observability/metrics`. El puerto `RateLimitMetrics` (`shared.web.ratelimit`) tiene una operación,
+  `capacityExhausted(String policy)`: la política es el único argumento, de modo que ningún adaptador puede filtrar más. El adaptador interino `LogRateLimitMetrics`
+  (`shared.observability.metrics`) escribe **un evento `WARN` fijo** (`rate limit capacity exhausted`) con tres pares clave-valor SLF4J: `event=rate_limit_capacity_exhausted`, `policy` y `suppressed`
+  (los eventos omitidos desde el anterior de esa política). Sin IP, ruta, cabecera ni clave. Está acotado a **un evento por segundo por política**, con una fuente monotónica
+  (`System::nanoTime`; el constructor de paquete con `LongSupplier` es de pruebas) y una ventana por política en un `ConcurrentHashMap` (las políticas son los pocos nombres que el código registra). El adaptador
+  de Prometheus llega con el cambio de observabilidad sin tocar el limitador ni el interceptor. Se registra por ADR-0024 (`ObservabilityMetricsConfiguration` en el `@Import` de `AdminApplication`, con
+  `@NamedInterface` y consumidor en el Javadoc, ADR-0022, y la línea `com.confia.shared.observability.metrics` en `ProcessBeanPolicy`, escrita primero en rojo). Nota en `docs/07`; la de `docs/03` §10 es de 3.2c.
+  Quien llama al puerto es el interceptor (3.2b).
+- **Mapeo del contenedor, decidido: `429` y `503` ya tienen código.** `ProblemCode.forStatus` mapea `429` a `too-many-requests` y `503` a `capacity-exceeded` (antes `400` y `500`). Cumple lo anotado en la
+  revisión I3 de 2.2a («`503` conservará su estado cuando exista `capacity-exceeded`») y cuesta dos líneas más las tablas de `ProblemCodeTest`, `ProblemErrorReportValveTest` y
+  `ProblemTranslationTest`. Efecto colateral aceptado: una `ResponseStatusException(503)` o un `AsyncRequestTimeoutException` (503) del marco responde
+  `capacity-exceeded` con estado 503 en lugar de `internal-error` con 500, y sigue registrándose como error de servidor. Un `429` que venga del marco o del contenedor no lleva `Retry-After`
+  (solo lo escribe el manejador de `TooManyRequestsException`); ninguno existe hoy.
+- **Ubicación de las excepciones.** `TooManyRequestsException` en `shared.web.ratelimit` (la lanzará el interceptor) y `CapacityExceededException` en `shared.web.problem` (la comparten el limitador y el
+  semáforo de la decisión 18, que no depende de `ratelimit`). Ambas sin traza de pila y con mensaje fijo: un rechazo es el uso normal bajo ataque. `ProblemExceptionHandler` las traduce y no registra nada
+  (un cliente sobre su límite no es un error del servidor; la causa de un `503` ya dejó su señal). El manejador de `problem` depende de `ratelimit`: un ciclo entre paquetes del mismo módulo `shared`, que `NoCyclesTest` (por módulo) no prohíbe.

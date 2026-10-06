@@ -26,7 +26,7 @@
 | 3.1b | PR 10b `rate-limiter-table` | Hecha (596 líneas) | `5a223f0`, `e05d5ed` y el commit `docs(sdd)` de esta rama |
 | 3.1c | PR 10c `rate-limiter-stress` | Hecha | `5c06aab`, `3d55b9a` y los commits `docs(sdd)` de esa rama |
 | 3.2 | PR 11 `rate-limiter-edge` | Construida y verificada completa, detenida antes del commit por tamaño (1 551 líneas); el propietario aprobó la costura de tres PR el 2026-10-06; fuente: rama local `wip/web-edge-rate-limiter-edge-full` (`cf93861`) | |
-| 3.2a | PR 11a `edge-rejection-codes-and-capacity-signal` | Pendiente (se construye desde el árbol de respaldo) | |
+| 3.2a | PR 11a `edge-rejection-codes-and-capacity-signal` | Hecha (517 líneas) | `bf1b5c9`, `733785b` y el commit `docs(sdd)` de esta rama |
 | 3.2b | PR 11b `edge-interceptor` | Pendiente (necesita 3.2a, desde `main` actualizado) | |
 | 3.2c | PR 11c `edge-throttling-wiring` | Pendiente (necesita 3.2b, desde `main` actualizado) | |
 | 4.1 a 6.1 | PR 12, 13 y cierre | Pendientes | |
@@ -1746,3 +1746,55 @@ Orden: 11a, 11b y 11c; 11b necesita 11a (el puerto y las excepciones) y 11c nece
 | Orden enfocada y resultado | VERDE B y VERDE de `ProcessBeanPolicy` de arriba: `Tests run: 63, Failures: 0` y `Tests run: 30, Failures: 0`; cierre completo Surefire 186 + 1087, Failsafe 229 |
 | Arnés de ejecución | `HarnessProcess` real (Tomcat, `RequestContextFilter`, cadena de seguridad real, interceptor y traductor reales), clientes distintos por `X-Forwarded-For` con el bucle local como proxy de confianza; y `ConfiaApplication.launch` real de los tres procesos para el aislamiento |
 | Frontera de reversión | `ThrottlingConfiguration`, `ratelimit/`, `observability/metrics/`, el `@Import` de `AdminApplication`, las dos líneas de `ProcessBeanPolicy`, los dos códigos y manejadores y el mapeo de `forStatus` |
+
+## Tarea 3.2a: PR 11a `edge-rejection-codes-and-capacity-signal` (costura aprobada por el propietario, 2026-10-06; sin excepción de tamaño)
+
+Construida desde la rama de respaldo `wip/web-edge-rate-limiter-edge-full` (`cf93861`, local, nunca se publica). Verde por sí sola. La re-planificación de `tasks.md` (3.2a, 3.2b, 3.2c; 23 tareas y 22 PR) está en el commit `docs(sdd)` `2330d57`.
+
+### Evidencia del ciclo TDD (reobservada sobre este árbol)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO A (códigos, catálogo, válvula y traducción) | `-Dtest='ProblemCodeTest,ProblemCatalogCoverageTest,ProblemErrorReportValveTest,ProblemTranslationTest'` con las tablas ya ampliadas | `Tests run: 105, Failures: 10, Errors: 4, Skipped: 0` |
+| VERDE A | Igual, tras `ProblemCode`, `ProblemErrorReportValve` (Javadoc) y las dos claves del catálogo | `Tests run: 105, Failures: 0, Errors: 0, Skipped: 0` |
+| ROJO del manejador | `test-compile` con `ProblemExceptionHandlerTest` ampliado | `COMPILATION ERROR`: `cannot find symbol` en `CapacityExceededException` y `package com.confia.shared.web.ratelimit does not exist` |
+| VERDE del manejador | Las cinco clases (A más `ProblemExceptionHandlerTest`), tras `CapacityExceededException`, `TooManyRequestsException` y los dos manejadores | `Tests run: 126, Failures: 0, Errors: 0, Skipped: 0` |
+| ROJO de la métrica | `test-compile` con `LogRateLimitMetricsTest` | `COMPILATION ERROR`: `cannot find symbol` en `LogRateLimitMetrics` |
+| VERDE de la métrica | `-Dtest='LogRateLimitMetricsTest'` tras el puerto, el adaptador, la configuración y el `package-info` | `Tests run: 6, Failures: 0, Errors: 0, Skipped: 0` |
+| ROJO de `ProcessBeanPolicy` (primero la línea) | La línea `com.confia.shared.observability.metrics` y la prueba nueva `onlyTheAdministrativeProcessHoldsTheMetricsAdapter`, sin el `@Import` | `Tests run: 7, Failures: 2, Errors: 0` (`non-vacuous: com.confia.shared.observability.metrics must contribute a bean to the admin context`) |
+| VERDE de `ProcessBeanPolicy` | Con el `@Import` de `ObservabilityMetricsConfiguration` en `AdminApplication` | `ProcessBeanIsolationTest` 7/7 junto a `AdminProductionWiringTest` y `ConfiaApplicationTest`: `Tests run: 30, Failures: 0, Errors: 0` |
+| Cierre | `./mvnw verify` completo | **Surefire 186 + 1 051 (los 1 030 de la línea base y 21 nuevos), Failsafe 229, `BUILD SUCCESS`** |
+
+### Demostraciones deliberadas (cada una revertida de inmediato; `cmp` contra la copia original sin diferencias)
+
+1. **Quitar la cota de un evento por segundo** (`if (true)` en lugar de comparar con el segundo): `LogRateLimitMetricsTest` `Tests run: 6, Failures: 3`; mensajes `Expected size: 1 but was: 1000` (una ráfaga de 1 000 rechazos) y `Expected size: 1 but was: 2` (el constructor de producción). `cmp`: igual.
+2. **`>` en lugar de `>=` en el borde del segundo:** `Tests run: 6, Failures: 3`; mensajes `Expecting actual: [0L, 1L] to contain exactly (and in same order): [0L, 0L, 0L]` y `Expected size: 2 but was: 1`. `cmp`: igual.
+3. **No escribir `Retry-After` en el manejador del `429`:** `ProblemExceptionHandlerTest` `Tests run: 21, Failures: 1`; mensaje `Expecting actual: [] to contain exactly (and in same order): ["15"]`. `cmp`: igual.
+
+La llamada a la métrica y `tryAcquire` en `preHandle` son del interceptor y sus demostraciones se hacen en 3.2b (unidad) y 3.2c (cadena real), como dice `tasks.md`.
+
+### Medición del PR 11a (`git diff --numstat main...HEAD -- . :!openspec`; igual con y sin `-M`)
+
+| Parte | Líneas |
+|---|---|
+| Producción | 244 |
+| Pruebas | 261 |
+| Documentación (`docs/07`) | 12 |
+| **Total** | **517** (497 adiciones y 20 eliminaciones) |
+
+Por commit: `feat(web): add the 429 and 503 problem codes and their translators` 184 y `feat(observability): report an exhausted rate limiter table as a bounded warn event` 333. El pronóstico era de unas 505.
+
+### Desviaciones respecto de la tarea completa 3.2 (declaradas)
+
+1. **`IdempotencyScopeExclusionInventoryTest` no se toca:** ninguna clase de un paquete `..web..` de esta parte depende todavía de un tipo de `shared.security`; las siete entradas llegan con 3.2b (cuatro) y 3.2c (tres).
+2. **La prueba de aislamiento** es la variante solo de métricas (`onlyTheAdministrativeProcessHoldsTheMetricsAdapter`); la que cubre el interceptor, el registro y las propiedades llega con 3.2c.
+3. **El manejador de `problem` depende de `TooManyRequestsException` de `ratelimit`** (ciclo entre paquetes del mismo módulo `shared`, que `NoCyclesTest` no prohíbe).
+4. La nota de `design.md` de esta parte cubre el puerto, el adaptador, el mapeo del contenedor y la ubicación de las excepciones; el resto (interceptor, comprobación de arranque, registro) va con 3.2b y 3.2c.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `Tests run: 126, Failures: 0` (códigos y manejadores), `Tests run: 6, Failures: 0` (adaptador) y `Tests run: 30, Failures: 0` (aislamiento); cierre completo Surefire 186 + 1 051, Failsafe 229 |
+| Arnés de ejecución | `HarnessProcess` real para `ProblemTranslationTest` (`ResponseStatusException` de `429` y `503` por la cadena real) y `ConfiaApplication.launch` real de los tres procesos para el aislamiento |
+| Frontera de reversión | Los dos códigos, `forStatus`, las dos claves del catálogo, las dos excepciones y sus manejadores, `RateLimitMetrics`, el paquete `observability/metrics`, su `@Import` y su línea de `ProcessBeanPolicy` |

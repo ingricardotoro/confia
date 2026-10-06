@@ -626,7 +626,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     contador solo en reposo y se añade `Thread.onSpinWait()` al bucle del muestreador. Esta tarea
     **debe fusionarse antes de 3.2**.
 
-- [ ] 3.2a **PR 11a `edge-rejection-codes-and-capacity-signal`: los códigos `429` y `503` y la señal de capacidad agotada (decisión 17).**
+- [x] 3.2a **PR 11a `edge-rejection-codes-and-capacity-signal`: los códigos `429` y `503` y la señal de capacidad agotada (decisión 17).**
   Necesita 3.1c (y por tanto 3.1b, con el reloj monotónico, y 3.1a) y los PR 7. La tarea 3.2 original se partió en 3.2a, 3.2b y 3.2c por tamaño
   (nota fechada 2026-10-06 del final); esta parte no tiene consumidor del limitador todavía.
   - **ROJO.** Ampliar `ProblemCodeTest`, `ProblemCatalogCoverageTest`, `ProblemErrorReportValveTest` y
