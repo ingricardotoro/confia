@@ -8,6 +8,16 @@ server:
   # trusted-proxy list that RequestContextFilter applies (web-edge-foundations design.md, decision
   # 12).
   forward-headers-strategy: none
+  # Bounds on what a client can hold open (web-edge-foundations design.md, decision 18). The header
+  # size doubles Spring Boot's 8KB default to admit long tokens; it is the one ceiling on the request
+  # line and all headers together, X-Forwarded-For included, which has no cap of its own.
+  max-http-request-header-size: 16KB
+  tomcat:
+    # Reading the request: a client that sends it too slowly is cut off.
+    connection-timeout: 10s
+    # How long an idle connection is kept for the next request, and how many it may carry.
+    keep-alive-timeout: 20s
+    max-keep-alive-requests: 100
 
 confia:
   web:
@@ -18,6 +28,12 @@ confia:
     user-agent-max-length: 512
 
 spring:
+  threads:
+    virtual:
+      # Every request runs on a virtual thread, so the required delay of an answer waits without
+      # holding a thread of the server's pool (web-edge-foundations design.md, decision 18, probe
+      # P3). The delay materializer refuses to start with this off.
+      enabled: true
   mvc:
     # Never log request parameters or headers at DEBUG (web-edge-foundations design.md, decision
     # 22; CLAUDE.md regla 11). Spring Boot already defaults this to false; it is explicit so that

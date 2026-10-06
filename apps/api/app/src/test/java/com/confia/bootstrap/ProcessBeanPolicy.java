@@ -55,6 +55,10 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // of the second. Administrative only, and each exact for the same reason.
                     "com.confia.shared.web.ratelimit",
                     "com.confia.shared.observability.metrics",
+                    // The delay materializer and its properties: the bounded semaphore a
+                    // login-like endpoint takes a permit from before its use case runs.
+                    // Administrative only, and exact like every entry.
+                    "com.confia.shared.web.delay",
                     // The identity module as the three packages its beans come from: the use
                     // cases, the adapters, and the named-interface package of its configuration.
                     // Each entry is exact because the non-vacuity check compares by equality.

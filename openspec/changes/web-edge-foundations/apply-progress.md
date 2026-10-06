@@ -1952,3 +1952,115 @@ Para seguimiento (no bloquean):
 - **S-1:** acotar el producto `maxEntries × (requestLimit + failureThreshold)`. Con los valores por omisión son unos 8 MB; con los máximos permitidos, unos 160 GB. Queda para el cambio de observabilidad y endurecimiento o para una decisión del propietario.
 - **S-3:** comprobar al arrancar que los nombres de bean del registro forman un conjunto cerrado de políticas conocidas.
 - **S-5:** la validación duplicada entre `RateLimitProperties` y `RateLimitPolicy`. Hoy no se solapa.
+
+## Tarea 4.1: PR 12 `delay-materializer` (2026-10-06) - construida y verificada, SIN COMMIT por tamaño (1 750 líneas frente a 800)
+
+Rama `change/web-edge-foundations-delay-materializer`, desde `main` en `8f908e4`. Modo estricto. **No se hicieron commits y 4.1 sigue sin marcarse `[x]`**: la medición supera el tope y la regla común exige detenerse y consultar antes de partir.
+
+### Medición (`git diff --numstat main -- . ':!openspec'`, con `git add -N`; sin código generado)
+
+**1 750 líneas** (1 745 adiciones y 5 eliminaciones) frente a 800; pronóstico de la tabla: ~460 → 690. Producción 253; pruebas 1 497.
+
+| Archivo | Líneas |
+|---|---|
+| `shared/web/delay/RequiredDelayMaterializer` | 112 |
+| `shared/web/delay/DelayProperties` / `DelayTimer` / `Delayed` | 29 / 19 / 21 |
+| `shared/web/edge/RequiredDelayConfiguration` | 47 |
+| `AdminApplication`, `CapacityExceededException` (Javadoc), `application.yml` | 8, 2, 15 |
+| `RequiredDelayMaterializerTest` / `RequiredDelayMaterializerConcurrencyTest` / `GatedTimer` | 372 / 74 / 70 |
+| `RequiredDelayConfigurationTest` | 96 |
+| `RequiredDelayMaterializerIT` | 410 |
+| `ProcessBeanPolicy` / `ProcessBeanIsolationTest` / `ProductionEdgeDefaultsTest` | 4 / 34 / 38 |
+| `BlockingWaitConfinementTest` / `BadSleepingWebComponent` | 154 / 32 |
+| `WebEdgeScopeExclusionInventoryTest` / `WebEdgeScopeViolationFixtures` | 169 / 44 |
+
+### Costura propuesta (pendiente de decisión del propietario; líneas medidas, adiciones más eliminaciones)
+
+Tres PR apilados. La costura sigue la del propio texto de la tarea (código y pruebas de unidad, prueba de integración, regla de arquitectura):
+
+| PR | Contenido | Líneas |
+|---|---|---|
+| 12a `delay-materializer-core` | Paquete `delay` (181), `RequiredDelayConfiguration` (47), `AdminApplication` (8), Javadoc (2), `application.yml` (15), línea de `ProcessBeanPolicy` (4), `GatedTimer` (70), `RequiredDelayMaterializerTest` (372), `RequiredDelayMaterializerConcurrencyTest` (74) | 773 |
+| 12b `delay-materializer-runtime-proof` | `RequiredDelayConfigurationTest` (96), prueba de aislamiento de proceso (34), `ProductionEdgeDefaultsTest` (38), `RequiredDelayMaterializerIT` (410) | 578 |
+| 12c `blocking-wait-rule` | `BlockingWaitConfinementTest` (154), fixture (32), ampliación del inventario (169) y sus fixtures (44) | 399 |
+
+Alternativa con excepción de tamaño: dos PR, 12a (código más pruebas de unidad e IT) y 12b (arquitectura), pero 12a mediría unos 1 351. La tabla de la sección 8 y la lista de tareas exigen primero replantear la lista, porque cualquiera de las dos añade tareas.
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO 1 (lista de permitidos, escrita primero) | `-Dtest=ProcessBeanIsolationTest` con solo la línea `com.confia.shared.web.delay` | `Tests run: 7, Failures: 1`: `non-vacuous: com.confia.shared.web.delay must contribute a bean to the admin context` |
+| ROJO 2 (pruebas nuevas, sin producción) | `test-compile` | `COMPILATION ERROR`: `cannot find symbol` en `RequiredDelayMaterializer` (47), `Delayed` (21) y `RequiredDelayConfiguration` (4); la causa prevista (clases inexistentes) |
+| VERDE | `-Dtest='RequiredDelayMaterializer*Test,RequiredDelayConfigurationTest,BlockingWaitConfinementTest,WebEdgeScopeExclusionInventoryTest,ProcessBeanIsolationTest,ProductionEdgeDefaultsTest'` | 20 + 1 + 9 + 4 + 22 + 10 + 8 pruebas en verde tras corregir la aserción de no vacuidad del inventario (esperaba `RateLimitInterceptor`, que el detector excluye por ser uno de los tipos del limitador; ahora espera `RateLimitPolicyCheck`) |
+| VERDE IT | `-Dit.test=RequiredDelayMaterializerIT` | `Tests run: 4, Failures: 0` |
+| Cierre | `./mvnw verify` completo desde `apps/api` | **Surefire 186 (kernel) + 1 160 (app), Failsafe 233, `BUILD SUCCESS`**; la instantánea OpenAPI no cambió |
+
+### Demostraciones deliberadas (cada una revertida; `cmp` contra la copia original sin diferencias)
+
+| Ruptura | Resultado observado |
+|---|---|
+| Pedir el permiso después del caso de uso (`tryAcquire` tras `useCase.get()`) | `Failures: 3`: `RequiredDelayMaterializerTest.aRequestWithAllThePermitsInUseIsRefusedBeforeTheUseCaseRuns:85` (`the use case of the refused request never ran`, valor 1), `thePermitIsTakenBeforeTheUseCaseRuns:65` y `RequiredDelayMaterializerConcurrencyTest...:61` (16 invocaciones en lugar de 8) |
+| Quitar `permits.release()` del `finally` | `Failures: 10, Errors: 1`, entre ellos `thePermitIsReleasedWhenTheUseCaseThrows:120` (`the only permit came back...`), `aPermitFreedByAFinishedWaitAdmitsTheNextRequest:106` (`CapacityExceededException`) y el de concurrencia `:72` |
+| Extra: `ProblemExceptionHandler` deja de reconocer la desconexión (`false && clientWentAway(e)`) | `RequiredDelayMaterializerIT.aClientThatClosesDuringTheWaitLeavesNoErrorAndTheServerFreesItsPermit:211` (`the abandoned answer is not an error of the server`): demuestra que la escritura falla de verdad y que la prueba no es vacua |
+| `@Import` sin la línea de `ProcessBeanPolicy` | `ProcessBeanIsolationTest.registersOnlyItsAllowedBeans:82`: `bean 'requiredDelayMaterializer' from package 'com.confia.shared.web.delay' - not in the allow-list` (y `DelayProperties`) |
+
+### Decisiones y desviaciones (declaradas)
+
+1. **Configuración nueva** `RequiredDelayConfiguration` en `shared.web.edge` (la tarea admitía `ThrottlingConfiguration` o una configuración propia). Falla el arranque, con el nombre de la propiedad, ante permisos no positivos, propiedad mal escrita (`ignoreUnknownFields = false`), más de la mitad de `server.tomcat.max-connections` o `spring.threads.virtual.enabled` apagada.
+2. **Orden del materializador:** el hilo de plataforma y la transacción activa se rechazan **antes** del permiso y del caso de uso (si no, el caso de uso confirmaría y después la espera retendría un hilo de plataforma); la transacción se vuelve a comprobar antes de esperar. Una interrupción restablece la marca y lanza `IllegalStateException`; nunca registra nada.
+3. **`server.tomcat.threads.max=2` en la IT no tiene efecto con hilos virtuales:** Spring Boot sustituye el ejecutor de Tomcat por uno virtual, de modo que la cota `T` del escenario es nominal. La propiedad que sí importa (la espera corre en hilo virtual) la prueba la IT (`timer.virtualThreads()`) y `ProductionEdgeDefaultsTest` (`VirtualThreadExecutor` en el conector real).
+4. **Inventario:** «su paquete» del limitador incluye `shared.security` (donde viven el puerto y la implementación); el detector de Redis busca recursos de clientes (`io.lettuce`, `redis.clients`, `org.redisson`, `spring-data-redis`) en el camino de clases y dependencias de producción, con fixture de detección por predicado.
+5. **W4:** `Object.wait` se reconoce por la forma de sus tres sobrecargas, porque una llamada sin calificar nombra a la clase llamante como propietaria en el bytecode. La no vacuidad exige que el materializador sea la única clase del alcance que espera.
+6. Pruebas añadidas fuera de la lista de la tarea: `RequiredDelayConfigurationTest`, `onlyTheAdministrativeProcessHoldsTheDelayMaterializer`, `productionRunsRequestsOnVirtualThreadsAndBoundsTheConnectionTimes` y el ayudante `GatedTimer`.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | Unidad: `-Dtest='RequiredDelayMaterializer*Test,BlockingWaitConfinementTest'` y compañeras, 74 pruebas en verde; IT: `-Dit.test=RequiredDelayMaterializerIT`, 4 en verde |
+| Arnés de ejecución | IT con PostgreSQL (Testcontainers), Tomcat real en puerto aleatorio, `HikariPoolMXBean` y `pg_locks` durante la espera, socket crudo con `SO_LINGER 0` para la desconexión |
+| Frontera de reversión | Se retiran el paquete `delay`, `RequiredDelayConfiguration`, su `@Import`, la línea de `ProcessBeanPolicy` y las claves de `application.yml` |
+
+### Partición de 4.1 y PR 12a (2026-10-06)
+
+El propietario aprobó partir 4.1 en tres PR **sin excepción de tamaño**: 4.1a `delay-materializer-core`, con 773 líneas; 4.1b
+`delay-materializer-runtime-proof`, con 578; y 4.1c `blocking-wait-rule`, con 399. La sección anterior describe el árbol
+completo, que se conserva en la rama local `wip/web-edge-delay-materializer-full` (911c025). Cada PR toma de ese árbol solo sus
+archivos, sin cambiarlos.
+
+**PR 12a.** Incluye los archivos de producción, `RequiredDelayConfiguration`, el `@Import` en `AdminApplication`, `application.yml`, la
+línea de `ProcessBeanPolicy`, `GatedTimer`, `RequiredDelayMaterializerTest` y `RequiredDelayMaterializerConcurrencyTest`. Las
+demostraciones del permiso y de `finally`, y el rojo de la lista de permitidos, son las registradas arriba. El `./mvnw verify` completo
+sobre el árbol de 12a solo dio Surefire 186 + 1 134, Failsafe 229, 0 fallos, cobertura cumplida y `BUILD SUCCESS`.
+
+### Revisión independiente de 4.1a (2026-10-06)
+
+Veredicto: apto para fusionar, sin bloqueantes ni importantes. La revisión confirmó estos puntos:
+
+- el permiso se toma antes del caso de uso y hay exactamente una liberación en `finally`;
+- se rechazan el hilo de plataforma y la transacción activa;
+- un retardo cero o negativo no espera;
+- la interrupción vuelve a marcar el hilo como interrumpido;
+- la configuración es solo de administración;
+- `DelayProperties` rechaza campos desconocidos;
+- los hilos virtuales globales son seguros en JDK 25 (JEP 491);
+- las pruebas son deterministas y la de concurrencia demuestra exactamente `P` admitidas.
+
+Corregido:
+
+- **S4:** el comentario de `max-http-request-header-size` decía que acota, cuando en realidad duplica la omisión de 8KB de Spring Boot. Ahora lo dice y aclara que es el único techo de `X-Forwarded-For`.
+
+Para 4.1b:
+
+- **S1:** las validaciones de arranque y los valores de Tomcat se prueban allí, como declara la partición.
+- **S2:** rechazar `server.tomcat.max-connections <= 0` con un mensaje propio, y considerar enlazar `TomcatServerProperties` en lugar de la constante 8192.
+- **S5:** la ausencia de `ERROR` ante una desconexión solo vale por la IT.
+
+Para el cambio de sesión:
+
+- **S3:** un tope superior de `requiredDelay`, por ejemplo en `Delayed`, cuando exista el primer caso de uso que lo produzca.
+
+Para el cambio 9:
+
+- confirmar que el ejecutor de db-scheduler no depende de `spring.threads.virtual.enabled`.
