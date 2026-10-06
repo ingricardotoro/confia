@@ -7,8 +7,12 @@ import com.confia.shared.web.edge.PublicEndpoint;
 import com.confia.shared.web.edge.PublicEndpoints;
 import java.net.http.HttpResponse;
 import java.util.Map;
+import org.apache.coyote.http11.AbstractHttp11Protocol;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.tomcat.TomcatWebServer;
+import org.springframework.boot.web.server.WebServer;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.http.HttpMethod;
@@ -36,6 +40,40 @@ class ProductionEdgeDefaultsTest {
                     .isEqualTo("false");
             assertThat(PublicEndpoints.forAdmin(environment).endpoints()).isEmpty();
             assertThat(PublicEndpoints.forPortal(environment).endpoints()).isEmpty();
+        }
+    }
+
+    /**
+     * Specs/web-edge, "La espera no retiene hilos de plataforma del servidor" (design.md, decision
+     * 18): requests run on virtual threads, and the connection times are bounded so a slow client
+     * cannot hold a socket for long. Read from the running server, not only from the property.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"admin", "portal"})
+    void productionRunsRequestsOnVirtualThreadsAndBoundsTheConnectionTimes(String process) {
+        try (OpenApiProcess running = OpenApiProcess.start(process)) {
+            var environment = running.context().getEnvironment();
+            assertThat(environment.getProperty("spring.threads.virtual.enabled"))
+                    .isEqualTo("true");
+            assertThat(environment.getProperty("server.tomcat.connection-timeout"))
+                    .isEqualTo("10s");
+            assertThat(environment.getProperty("server.tomcat.keep-alive-timeout"))
+                    .isEqualTo("20s");
+            assertThat(environment.getProperty("server.tomcat.max-keep-alive-requests"))
+                    .isEqualTo("100");
+            assertThat(environment.getProperty("server.max-http-request-header-size"))
+                    .isEqualTo("16KB");
+
+            WebServer server = ((WebServerApplicationContext) running.context()).getWebServer();
+            AbstractHttp11Protocol<?> protocol = (AbstractHttp11Protocol<?>) ((TomcatWebServer)
+                    server).getTomcat().getConnector().getProtocolHandler();
+            assertThat(protocol.getConnectionTimeout()).isEqualTo(10_000);
+            assertThat(protocol.getKeepAliveTimeout()).isEqualTo(20_000);
+            assertThat(protocol.getMaxKeepAliveRequests()).isEqualTo(100);
+            assertThat(protocol.getMaxHttpRequestHeaderSize()).isEqualTo(16 * 1024);
+            assertThat(protocol.getExecutor().getClass().getSimpleName())
+                    .as("Tomcat hands each request to a virtual thread")
+                    .isEqualTo("VirtualThreadExecutor");
         }
     }
 

@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
 import com.confia.shared.observability.metrics.LogRateLimitMetrics;
 import com.confia.shared.security.RateLimiter;
+import com.confia.shared.web.delay.DelayProperties;
+import com.confia.shared.web.delay.RequiredDelayMaterializer;
 import com.confia.shared.web.ratelimit.RateLimitInterceptor;
 import com.confia.shared.web.ratelimit.RateLimitMetrics;
 import com.confia.shared.web.ratelimit.RateLimitProperties;
@@ -115,6 +117,38 @@ class ProcessBeanIsolationTest {
                         policy.process()).isEmpty();
                 assertThat(context.getBeansOfType(RateLimiter.class))
                         .as("no limiter in the %s process", policy.process()).isEmpty();
+            }
+        } finally {
+            if (context != null) {
+                context.close();
+            }
+        }
+    }
+
+    /**
+     * The delay materializer belongs to the administrative process alone (web-edge-foundations
+     * design.md, decision 18): it is the only one with a login whose answer must be delayed. The
+     * other two start without a bean of its package; the administrative one holds the
+     * materializer, with the permits its properties say, and its properties.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("com.confia.bootstrap.ProcessBeanPolicy#all")
+    void onlyTheAdministrativeProcessHoldsTheDelayMaterializer(ProcessBeanPolicy policy) {
+        LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.forProcess(policy.process()), policy.process());
+        ConfigurableApplicationContext context = outcome.context();
+        try {
+            assertThat(context).as("the %s process must start", policy.process()).isNotNull();
+            List<String> held = beanNamesOfTypesIn(context, "com.confia.shared.web.delay");
+            if ("admin".equals(policy.process())) {
+                assertThat(held).anyMatch(bean -> bean.endsWith(
+                                RequiredDelayMaterializer.class.getName()))
+                        .anyMatch(bean -> bean.endsWith(DelayProperties.class.getName()));
+                assertThat(context.getBean(RequiredDelayMaterializer.class).availablePermits())
+                        .as("the permits are the 200 of the default").isEqualTo(200);
+            } else {
+                assertThat(held).as("no delay materializer in the %s process", policy.process())
+                        .isEmpty();
             }
         } finally {
             if (context != null) {

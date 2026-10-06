@@ -14,7 +14,8 @@ import org.springframework.core.env.Environment;
  * with the session change.
  *
  * <p>The start stops, with a message that names the property, when the permits are not positive
- * ({@link DelayProperties}), when they are more than half of {@code server.tomcat.max-connections}
+ * ({@link DelayProperties}), when {@code server.tomcat.max-connections} is not positive (Tomcat
+ * reads -1 as no limit), when they are more than half of {@code server.tomcat.max-connections}
  * (so that the waits can never use up the sockets of the requests that do not wait), or when {@code
  * spring.threads.virtual.enabled} is off (a wait on a platform thread would hold a thread of the
  * server's pool).
@@ -36,6 +37,11 @@ public class RequiredDelayConfiguration {
         }
         int maxConnections = environment.getProperty(MAX_CONNECTIONS, Integer.class,
                 TOMCAT_DEFAULT_MAX_CONNECTIONS);
+        if (maxConnections <= 0) {
+            // -1 is "no limit" to Tomcat, and half of no limit bounds nothing.
+            throw new IllegalStateException(MAX_CONNECTIONS + " must be positive, so that the "
+                    + "waits can be bounded to half of it; it is " + maxConnections);
+        }
         if ((long) properties.maxConcurrentWaits() * 2 > maxConnections) {
             throw new IllegalStateException(DelayProperties.MAX_CONCURRENT_WAITS + " is "
                     + properties.maxConcurrentWaits() + ", which is more than half of "
