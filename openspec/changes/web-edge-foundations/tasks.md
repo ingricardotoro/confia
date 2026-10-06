@@ -791,7 +791,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
   `RequiredDelayConfiguration` (`shared.web.edge`, `@Import` solo en `AdminApplication`), la línea `com.confia.shared.web.delay` de
   `ProcessBeanPolicy`, `application.yml`, `GatedTimer`, `RequiredDelayMaterializerTest` y `RequiredDelayMaterializerConcurrencyTest`.
   Demostraciones: permiso después del caso de uso y `release()` fuera de `finally`. Necesita 3.2c.
-- [ ] 4.1b **PR 12b `delay-materializer-runtime-proof`.** `RequiredDelayConfigurationTest`, la ampliación de
+- [x] 4.1b **PR 12b `delay-materializer-runtime-proof`.** `RequiredDelayConfigurationTest`, la ampliación de
   `ProcessBeanIsolationTest`, la de `ProductionEdgeDefaultsTest` y `RequiredDelayMaterializerIT` (espera tras el commit, cero
   conexiones activas y ningún bloqueo durante la espera, hilo virtual y desconexión sin `ERROR`). Necesita 4.1a.
 - [ ] 4.1c **PR 12c `blocking-wait-rule`.** `BlockingWaitConfinementTest` (W4, con no vacuidad y el fixture
