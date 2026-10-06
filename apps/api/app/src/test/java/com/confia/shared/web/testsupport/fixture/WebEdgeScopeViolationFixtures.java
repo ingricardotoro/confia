@@ -1,9 +1,16 @@
 package com.confia.shared.web.testsupport.fixture;
 
+import com.confia.shared.security.ClientAddress;
+import com.confia.shared.security.RateLimitDecision;
+import com.confia.shared.security.RateLimiter;
 import com.confia.shared.security.SessionValidity;
+import com.confia.shared.web.delay.Delayed;
+import com.confia.shared.web.delay.RequiredDelayMaterializer;
+import com.confia.shared.web.ratelimit.RateLimited;
 import jakarta.servlet.http.Cookie;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.time.Duration;
 import java.util.UUID;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -119,5 +126,42 @@ public final class WebEdgeScopeViolationFixtures {
 
     /** A DTO of an institution, which no web package may hold yet. */
     public record InstitutionSummaryDto(String name) {
+    }
+
+    /** A second implementation of the limiter port, when production has exactly one. */
+    public static final class SecondRateLimiter implements RateLimiter {
+
+        @Override
+        public RateLimitDecision tryAcquire(ClientAddress client) {
+            return new RateLimitDecision.Admitted();
+        }
+
+        @Override
+        public void recordFailure(ClientAddress client) {
+            // Deliberately empty: only the implementation of the port matters to the check.
+        }
+    }
+
+    /** A controller that applies the limiter to a route, which no production controller does. */
+    public static final class LimitedLoginController {
+
+        @RateLimited(policy = "admin-login")
+        public String login() {
+            return "done";
+        }
+    }
+
+    /** A class outside the edge that asks the materializer for a delay, which none does yet. */
+    public static final class DelayingLoginController {
+
+        private final RequiredDelayMaterializer materializer;
+
+        public DelayingLoginController(RequiredDelayMaterializer materializer) {
+            this.materializer = materializer;
+        }
+
+        public String login() {
+            return materializer.execute(() -> new Delayed<>("done", Duration.ofMillis(10)));
+        }
     }
 }
