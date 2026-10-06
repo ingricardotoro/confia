@@ -107,6 +107,14 @@ public final class InMemoryRateLimiter implements RateLimiter {
         return table.size();
     }
 
+    /**
+     * The slots reserved now, one atomic value; the tests sample it under contention, where {@link
+     * ConcurrentHashMap#size()} is not a snapshot. At rest it equals {@link #size()}.
+     */
+    int reservedForTest() {
+        return reserved.get();
+    }
+
     private RateLimitDecision decide(ClientKey key) {
         RateLimitDecision[] decision = {EXHAUSTED};
         apply(key, (entry, now) -> decision[0] = entry.tryAcquire(now, limits));

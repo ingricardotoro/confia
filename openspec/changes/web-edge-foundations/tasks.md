@@ -597,7 +597,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     un argumento. **S-1:** la hora se lee dentro del `compute`. **S-2:** `requestLimit` y
     `failureThreshold` con cota de 10 000 (nota fechada de `design.md`).
 
-- [ ] 3.1c **PR 10c `rate-limiter-stress`: jqwik contra un modelo ingenuo y concurrencia (decisión 16).**
+- [x] 3.1c **PR 10c `rate-limiter-stress`: jqwik contra un modelo ingenuo y concurrencia (decisión 16).**
   Necesita 3.1b.
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/security/`:
     `InMemoryRateLimiterPropertiesTest.java` (jqwik contra un modelo de referencia ingenuo con listas
