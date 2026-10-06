@@ -8,9 +8,11 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.confia.kernel.DomainException;
+import com.confia.shared.web.problem.CapacityExceededException;
 import com.confia.shared.web.problem.ProblemCode;
 import com.confia.shared.web.problem.ProblemExceptionHandler;
 import com.confia.shared.web.problem.ProblemResponses;
+import com.confia.shared.web.ratelimit.TooManyRequestsException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -190,6 +192,111 @@ class ProblemExceptionHandlerTest {
 
         assertThat(response.getContentAsString()).isEmpty();
         assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void aLimitedRequestIs429WithItsWaitInWholeSecondsAndNothingIsLogged() throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.tooManyRequests(new TooManyRequestsException(15),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getHeaders("Retry-After")).containsExactly("15");
+        assertThat(response.getContentAsString()).contains("too-many-requests");
+        assertThat(logged.list).as("a client over its limit is not an error").isEmpty();
+    }
+
+    @Test
+    void aFullTableIs503WithNoWaitAndNoClue() throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.capacityExceeded(new CapacityExceededException(),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        assertThat(response.getStatus()).isEqualTo(503);
+        assertThat(response.getHeaderNames()).as("no Retry-After: nobody can promise a time")
+                .doesNotContain("Retry-After");
+        assertThat(response.getContentAsString()).contains("capacity-exceeded");
+        assertThat(logged.list).isEmpty();
+    }
+
+    @Test
+    void theLimiterHandlersLeaveACommittedResponseAlone() throws IOException {
+        MockHttpServletResponse limited = new MockHttpServletResponse();
+        limited.setCommitted(true);
+        MockHttpServletResponse full = new MockHttpServletResponse();
+        full.setCommitted(true);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/x");
+
+        handler.tooManyRequests(new TooManyRequestsException(15), request, limited);
+        handler.capacityExceeded(new CapacityExceededException(), request, full);
+
+        assertThat(limited.getContentAsString()).isEmpty();
+        assertThat(limited.getHeaderNames()).doesNotContain("Retry-After");
+        assertThat(limited.getStatus()).isEqualTo(200);
+        assertThat(full.getContentAsString()).isEmpty();
+        assertThat(full.getStatus()).isEqualTo(200);
+    }
+
+    /**
+     * A {@code 429} of the framework (or of a controller that raises one) keeps the {@code
+     * Retry-After} its author chose, as a {@code 405} keeps its {@code Allow}: the catalog text
+     * tells the client to wait the time that header gives, so the header must be there. Only the
+     * {@code 429} keeps it; a {@code 503} never carries one (nobody can promise a time).
+     */
+    @Test
+    void aFrameworkTooManyRequestsKeepsItsRetryAfterAndNeverItsReason() throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.unexpected(statusWithRetryAfter(429, "30"), new MockHttpServletRequest("GET", "/x"),
+                response);
+
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getHeaders("Retry-After")).containsExactly("30");
+        assertThat(response.getContentAsString()).contains("too-many-requests")
+                .doesNotContain("secret reason");
+        assertThat(logged.list).as("a client over its limit is not an error").isEmpty();
+    }
+
+    @Test
+    void aFrameworkTooManyRequestsWithoutARetryAfterAnswersWithoutOne() throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.unexpected(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatusCode.valueOf(429), "secret reason"),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getHeaderNames()).doesNotContain("Retry-After");
+    }
+
+    @Test
+    void aFrameworkServiceUnavailableNeverCarriesARetryAfterEvenIfItsAuthorSetOne()
+            throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.unexpected(statusWithRetryAfter(503, "30"), new MockHttpServletRequest("GET", "/x"),
+                response);
+
+        assertThat(response.getStatus()).isEqualTo(503);
+        assertThat(response.getContentAsString()).contains("capacity-exceeded");
+        assertThat(response.getHeaderNames()).doesNotContain("Retry-After");
+    }
+
+    /** A {@code ResponseStatusException} that carries a header, the way its subclasses do. */
+    private static org.springframework.web.server.ResponseStatusException statusWithRetryAfter(
+            int status, String seconds) {
+        return new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatusCode.valueOf(status), "secret reason") {
+            @Override
+            public org.springframework.http.HttpHeaders getHeaders() {
+                org.springframework.http.HttpHeaders headers =
+                        new org.springframework.http.HttpHeaders();
+                headers.set("Retry-After", seconds);
+                return headers;
+            }
+        };
     }
 
     @Test

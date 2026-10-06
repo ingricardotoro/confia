@@ -29,7 +29,8 @@ class ProblemCodeTest {
         assertThat(Arrays.stream(ProblemCode.values()).map(ProblemCode::code))
                 .containsExactlyInAnyOrder("validation-failed", "authentication-required",
                         "forbidden", "resource-not-found", "method-not-allowed",
-                        "unsupported-media-type", "internal-error");
+                        "unsupported-media-type", "too-many-requests", "internal-error",
+                        "capacity-exceeded");
     }
 
     @Test
@@ -42,7 +43,7 @@ class ProblemCodeTest {
     @ParameterizedTest
     @CsvSource({"validation-failed, 400", "authentication-required, 401", "forbidden, 403",
             "resource-not-found, 404", "method-not-allowed, 405", "unsupported-media-type, 415",
-            "internal-error, 500"})
+            "too-many-requests, 429", "internal-error, 500", "capacity-exceeded, 503"})
     void eachCodeCarriesItsHttpStatus(String code, int status) {
         assertThat(ProblemCode.ofCode(code)).get().extracting(ProblemCode::status)
                 .isEqualTo(status);
@@ -51,7 +52,7 @@ class ProblemCodeTest {
     @ParameterizedTest
     @ValueSource(strings = {"validation-failed", "authentication-required", "forbidden",
             "resource-not-found", "method-not-allowed", "unsupported-media-type",
-            "internal-error"})
+            "too-many-requests", "internal-error", "capacity-exceeded"})
     void theTypeIsTheStableBaseFollowedByTheCodeAndNothingElse(String code) {
         ProblemCode problem = ProblemCode.ofCode(code).orElseThrow();
         assertThat(problem.type()).isEqualTo(URI.create("https://confia.hn/problems/" + code));
@@ -87,7 +88,8 @@ class ProblemCodeTest {
     @CsvSource({"400, validation-failed", "401, authentication-required", "403, forbidden",
             "404, resource-not-found", "405, method-not-allowed", "406, validation-failed",
             "409, validation-failed", "413, validation-failed", "415, unsupported-media-type",
-            "431, validation-failed", "500, internal-error", "503, internal-error"})
+            "429, too-many-requests", "431, validation-failed", "500, internal-error",
+            "503, capacity-exceeded"})
     void theCodeOfAnHttpStatusIsTheOneRuleTheValveAndTheTranslatorShare(int status, String code) {
         assertThat(ProblemCode.forStatus(status).code()).isEqualTo(code);
     }

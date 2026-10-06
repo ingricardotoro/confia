@@ -22,15 +22,15 @@ class ProblemErrorReportValveTest {
     @CsvSource({"400, validation-failed", "404, resource-not-found", "414, validation-failed",
             "415, unsupported-media-type", "409, validation-failed",
             "431, validation-failed", "401, authentication-required", "403, forbidden",
-            "405, method-not-allowed", "500, internal-error",
-            "503, internal-error"})
+            "405, method-not-allowed", "429, too-many-requests", "500, internal-error",
+            "503, capacity-exceeded"})
     void eachStatusTheContainerReportsHasOneCode(int status, String code) {
         assertThat(ProblemErrorReportValve.codeFor(status).code()).isEqualTo(code);
     }
 
     @ParameterizedTest
     @CsvSource({"401, 401", "403, 403", "404, 404", "405, 405", "415, 415", "414, 400",
-            "503, 500"})
+            "429, 429", "503, 503"})
     void theAnswerCarriesTheStatusOfItsCodeAndNotTheOneTheContainerReported(int reported,
             int answered) {
         ProblemCode code = ProblemErrorReportValve.codeFor(reported);

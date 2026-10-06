@@ -1,6 +1,7 @@
 package com.confia.shared.web.problem;
 
 import com.confia.kernel.DomainException;
+import com.confia.shared.web.ratelimit.TooManyRequestsException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolation;
@@ -113,6 +114,33 @@ public final class ProblemExceptionHandler {
     }
 
     /**
+     * A client over its rate limit: {@code 429 too-many-requests} with {@code Retry-After} in whole
+     * seconds and nothing about the limit or what is left of it. A client over its limit is not an
+     * error of the server, so nothing is logged.
+     */
+    @ExceptionHandler(TooManyRequestsException.class)
+    public void tooManyRequests(TooManyRequestsException e, HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
+        if (!response.isCommitted()) {
+            response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(e.retryAfterSeconds()));
+        }
+        answer(request, response, ProblemCode.TOO_MANY_REQUESTS);
+    }
+
+    /**
+     * A server with no capacity for the request: {@code 503 capacity-exceeded}, with no {@code
+     * Retry-After} because nobody can promise a time, and nothing that says why. The cause is for
+     * the operator, not the client: the limiter leaves its own signal with a reason (see {@code
+     * RateLimitMetrics}), and a framework {@code 503} leaves the server error log; the response
+     * says no more than the condition.
+     */
+    @ExceptionHandler(CapacityExceededException.class)
+    public void capacityExceeded(CapacityExceededException e, HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
+        answer(request, response, ProblemCode.CAPACITY_EXCEEDED);
+    }
+
+    /**
      * The three validation failures answer {@code 400 validation-failed} with the list of violated
      * fields. Two of them ({@link MethodArgumentNotValidException} and {@link
      * HandlerMethodValidationException}) are also an {@link ErrorResponse}; Spring picks the
@@ -210,8 +238,9 @@ public final class ProblemExceptionHandler {
      * failure whose causes include a write-side type of the container or of Spring means the
      * client went away: nothing is written. A Spring {@link ErrorResponse} already carries the
      * status its author chose, which {@link ProblemCode#forStatus} turns into the catalog's code
-     * (a {@code 405} keeps its {@code Allow} header), and only a server error is logged. Anything
-     * else is a {@code 500 internal-error}, logged in full with the request id.
+     * (a {@code 405} keeps its {@code Allow} header and a {@code 429} its {@code Retry-After}), and
+     * only a server error is logged. Anything else is a {@code 500 internal-error}, logged in full
+     * with the request id.
      *
      * @throws AccessDeniedException for the security chain to answer
      * @throws AuthenticationException for the security chain to answer
@@ -250,6 +279,14 @@ public final class ProblemExceptionHandler {
             String allow = framework.getHeaders().getFirst(HttpHeaders.ALLOW);
             if (allow != null) {
                 response.setHeader(HttpHeaders.ALLOW, allow);
+            }
+        }
+        if (code == ProblemCode.TOO_MANY_REQUESTS && !response.isCommitted()) {
+            // The catalog text tells the client to wait the time of this header, so a 429 that the
+            // framework or a controller raised keeps the one its author chose.
+            String wait = framework.getHeaders().getFirst(HttpHeaders.RETRY_AFTER);
+            if (wait != null) {
+                response.setHeader(HttpHeaders.RETRY_AFTER, wait);
             }
         }
         answer(request, response, code);

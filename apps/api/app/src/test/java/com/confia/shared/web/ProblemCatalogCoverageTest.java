@@ -119,6 +119,18 @@ class ProblemCatalogCoverageTest {
     }
 
     @Test
+    void theTwoCodesOfTheLimiterHaveTheirOwnEntriesInTheCatalog() {
+        Properties catalog = loadCatalog();
+        for (String code : List.of("too-many-requests", "capacity-exceeded")) {
+            assertThat(ProblemCode.ofCode(code)).as("code %s", code).isPresent();
+            assertThat(catalog.getProperty("problem." + code + ".title")).as("title of %s", code)
+                    .isNotBlank();
+            assertThat(catalog.getProperty("problem." + code + ".detail")).as("detail of %s", code)
+                    .isNotBlank();
+        }
+    }
+
+    @Test
     void theAuthenticationCodesOfTheSessionChangeDoNotExistYet() {
         Properties catalog = loadCatalog();
         for (String later : CODES_OF_LATER_CHANGES) {

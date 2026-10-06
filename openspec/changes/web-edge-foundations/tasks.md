@@ -15,10 +15,10 @@
 
 | Campo | Valor |
 |---|---|
-| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 11 000 a 12 700** en 20 PR según el re-pronóstico del 2026-10-05 (nota fechada del final): 6 822 ya medidas (siete PR fusionados y la tarea 2.3, medida en 1 869 y partida en cuatro) más 4 200 a 5 900 estimadas para las tareas restantes. La estimación nominal original, de 4 670, subestimó las pruebas; no se recorta ninguna |
+| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 11 000 a 12 700** en 22 PR según el re-pronóstico del 2026-10-05 y la partición de 3.2 del 2026-10-06 (nota fechada del final): 6 822 ya medidas (siete PR fusionados y la tarea 2.3, medida en 1 869 y partida en cuatro) más 4 200 a 5 900 estimadas para las tareas restantes. La estimación nominal original, de 4 670, subestimó las pruebas; no se recorta ninguna |
 | Riesgo frente al presupuesto | **Alto** frente a 400 de la preflight; **medio por PR** frente al presupuesto del proyecto de 800 (nominal de 320 a 520 por PR, peor caso de 480 a 780) |
 | Chained PRs recommended | Yes |
-| Suggested split | 20 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a, 2.3b, 2.3c, 2.3d, 2.4a, 2.4b, 2.5, 3.1a, 3.1b, 3.1c, 3.2, 4.1 y 5.1), más la tarea de cierre 6.1 |
+| Suggested split | 22 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a, 2.3b, 2.3c, 2.3d, 2.4a, 2.4b, 2.5, 3.1a, 3.1b, 3.1c, 3.2a, 3.2b, 3.2c, 4.1 y 5.1), más la tarea de cierre 6.1 |
 | Delivery strategy | `auto-chain` (decidido por el propietario el 2026-10-04, en lugar del `single-pr` de la preflight de la sesión) |
 | Chain strategy | `stacked-to-main`: cada PR se fusiona a `main` en orden y el siguiente parte de `main` actualizado |
 | Presupuesto del proyecto por pull request (`docs/15-flujo-de-trabajo-git.md` §3) | 800 líneas de cambio efectivo |
@@ -44,11 +44,11 @@ de la sección 8 del diseño (PR 5b, 8b y 10b del diseño) **no** son tareas res
 PR supera 800 líneas, el ejecutor se detiene y consulta al orquestador antes de partir: usar otra costura
 llevaría el total por encima de lo planeado, y cualquier costura exige primero replantear esta lista y la decisión del propietario.
 
-**Orden.** Lineal de 1 a 13, con el PR 6 partido en 6a y 6b, el PR 7 en 7a a 7d y el PR 10 en 10a, 10b y 10c (la numeración de PR es la de las tareas 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a a 2.3d, 2.4a y 2.4b,
-2.5, 3.1a, 3.1b, 3.1c, 3.2, 4.1 y 5.1). Dependencias duras: el PR 2.1b necesita el 2.1a (`ProblemResponses`,
+**Orden.** Lineal de 1 a 13, con el PR 6 partido en 6a y 6b, el PR 7 en 7a a 7d y el PR 10 en 10a, 10b y 10c y el PR 11 en 11a, 11b y 11c (la numeración de PR es la de las tareas 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a a 2.3d, 2.4a y 2.4b,
+2.5, 3.1a, 3.1b, 3.1c, 3.2a, 3.2b, 3.2c, 4.1 y 5.1). Dependencias duras: el PR 2.1b necesita el 2.1a (`ProblemResponses`,
 filtros); el PR 7c (2.3c) necesita el 3 (`RequestContextFilter`) y el 7b; el 7d necesita el 7c; el PR 8a (2.4a) necesita el 3 (`ProblemCode`,
-`ProblemResponses`); el PR 8b (2.4b) necesita el 8a; el PR 10b (3.1b) necesita el 10a (3.1a); el PR 10c (3.1c) necesita el 10b (3.1b); el PR 11 (3.2) necesita los PR 7 y 10c; el PR 12 (4.1) necesita el 11
-(`CapacityExceededException`); el PR 13 (5.1) necesita el 8a. La propuesta permite fusionar el PR 13 antes
+`ProblemResponses`); el PR 8b (2.4b) necesita el 8a; el PR 10b (3.1b) necesita el 10a (3.1a); el PR 10c (3.1c) necesita el 10b (3.1b); el PR 11a (3.2a) necesita los PR 7 y 10c; el PR 11b (3.2b) necesita el 11a; el PR 11c (3.2c) necesita el 11b; el PR 12 (4.1) necesita el 11c
+(`CapacityExceededException`, que entrega el 11a); el PR 13 (5.1) necesita el 8a. La propuesta permite fusionar el PR 13 antes
 que los PR 10 a 12 (C3 no depende de C2); no se hace salvo decisión del propietario, porque renumeraría la
 cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa la numeración nueva.
 
@@ -103,10 +103,12 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | 10a | Puerto, decisión, política y adaptador en memoria con las capas 1 y 2 (3.1a) | PR 10a `rate-limiter-core` (983 medido: excepción de unas 183 líneas) | Ídem con `-Dtest='InMemoryRateLimiterTest'` | Escenarios por capa con `MutableClock`, sin consumidor | Clases nuevas sin consumidor |
 | 10b | Fuente de tiempo monotónica, cota de la política y tabla acotada que falla cerrada (3.1b) | PR 10b `rate-limiter-table` (596 medido) | Ídem con `-Dtest='InMemoryRateLimiter*'` | Constructor de producción con `System.nanoTime` y contador que cruza el desbordamiento | Se retiran `size()`, las dos clases de prueba nuevas y el cambio de constructor; el limitador vuelve a recibir un `Clock` |
 | 10c | jqwik contra un modelo ingenuo y 50 hilos sobre la tabla (3.1c) | PR 10c `rate-limiter-stress` (unas 421, estimadas) | Ídem con `-Dtest='InMemoryRateLimiter*'` | jqwik y 50 hilos en el mismo `InMemoryRateLimiter` | Se retiran `reservedForTest()` y las dos clases de prueba |
-| 11 | Borde del limitador: `@RateLimited`, `429` y `503` (3.2) | PR 11 `rate-limiter-edge` (~320 → 480) | Ídem con `-Dtest='RateLimitEdgeTest,ProcessBeanIsolationTest'` | Petición por la cadena real a un controlador de prueba anotado | Se retira el interceptor y la configuración |
+| 11a | Códigos `429` y `503`, traductores y señal de capacidad agotada: puerto `RateLimitMetrics` y adaptador interino (3.2a) | PR 11a `edge-rejection-codes-and-capacity-signal` (unas 505, medidas en el árbol completo) | `-Dtest='ProblemCodeTest,ProblemCatalogCoverageTest,ProblemErrorReportValveTest,ProblemTranslationTest,ProblemExceptionHandlerTest,LogRateLimitMetricsTest,ProcessBeanIsolationTest'` | Procesos reales para el aislamiento; evento de registro con reloj inyectado | Se retiran los dos códigos y manejadores, el puerto, el adaptador y su línea de `ProcessBeanPolicy` |
+| 11b | `@RateLimited`, registro de limitadores e interceptor que falla cerrado (3.2b) | PR 11b `edge-interceptor` (unas 407, medidas en el árbol completo) | `-Dtest='RateLimitInterceptorTest,IdempotencyScopeExclusionInventoryTest'` | Interceptor con un limitador de respuesta fija y `RequestOrigin` ligado | Se retiran las cuatro clases y su prueba |
+| 11c | Borde del limitador: configuración, política `admin-login`, propiedades y notas de seguridad (3.2c) | PR 11c `edge-throttling-wiring` (unas 639, medidas en el árbol completo) | `-Dtest='RateLimitEdgeTest,RateLimitPropertiesTest,ProcessBeanIsolationTest'` | Petición por la cadena real a un controlador de prueba anotado | Se retira la configuración, las propiedades y el arnés |
 | 12 | Materializador del retardo, hilos virtuales, tiempos de Tomcat y regla W4 (4.1) | PR 12 `delay-materializer` (~460 → 690) | Unidad: `-Dtest='RequiredDelayMaterializer*Test,BlockingWaitConfinementTest'`; IT: `-Dit.test=RequiredDelayMaterializerIT` | `RequiredDelayMaterializerIT` bajo Tomcat real con base de datos | Se retira el materializador y `spring.threads.virtual.enabled` vuelve a su omisión |
 | 13 | Borde HTTP de la idempotencia, controlador solo de prueba y regla W5 (5.1) | PR 13 `idempotency-edge` (~480 → 720) | `-Dtest='IdempotencyNotInIdentityTest,OpenApiContractSnapshotTest'`; IT: `-Dit.test=IdempotencyEdgeIT` | `IdempotencyEdgeIT` con `IdempotencyDemoController` y PostgreSQL | Se retira el borde; `IdempotentExecutor` queda intacto |
-| 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 20 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
+| 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 22 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
 
 ---
 
@@ -624,41 +626,114 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     contador solo en reposo y se añade `Thread.onSpinWait()` al bucle del muestreador. Esta tarea
     **debe fusionarse antes de 3.2**.
 
-- [ ] 3.2 **PR 11 `rate-limiter-edge`: `@RateLimited`, `429` y `503` (decisión 17).**
-  Necesita 3.1c (y por tanto 3.1b, con el reloj monotónico, y 3.1a) y los PR 7.
-  - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/ratelimit/RateLimitEdgeTest.java`
-    (por la cadena real con un controlador de prueba anotado: `429` con `Retry-After` en segundos
-    enteros, sin límite ni cupo en la respuesta, `503 capacity-exceeded` sin `Retry-After` con la tabla
-    llena, cero invocaciones del controlador y del caso de uso de prueba ante un rechazo, política
-    desconocida impide el arranque nombrándola, valores por omisión, cambio de configuración y valor no
-    positivo con mensaje que nombra la propiedad); ampliar `ProcessBeanIsolationTest.java` y
-    `ProblemCatalogCoverageTest.java`. **Rojo esperado:** la ruta responde `200`; el código y las
-    claves no existen.
-  - **VERDE.** Crear en `apps/api/app/src/main/java/com/confia/shared/web/ratelimit/`: `RateLimited`,
-    `RateLimitInterceptor` (`preHandle`; ausencia de `RequestOrigin` o error inesperado cuenta como
-    `CapacityExhausted`), `RateLimitProperties` (registro enlazado por constructor, prefijo
-    `confia.web.rate-limit.admin-login`) y `TooManyRequestsException`; en
-    `.../shared/web/problem/`: `CapacityExceededException`, los códigos `too-many-requests` y
-    `capacity-exceeded` y sus claves en `problems.properties`, con los dos manejadores en
-    `ProblemExceptionHandler.java`; `.../shared/web/edge/ThrottlingConfiguration.java` (política
-    `admin-login` registrada pero **no aplicada** a ninguna ruta de producción) con su `@Import` en
-    `AdminApplication.java` y la línea `com.confia.shared.web.ratelimit` en `ProcessBeanPolicy.java`
-    (primero en rojo). Notas fechadas en `docs/03-seguridad.md` §4.4 y §10 con el limitador interino,
-    sus tres limitaciones y la semántica de la capa 2.
-    **Añadido 2026-10-05 (revisión de seguridad del limitador, I-2):** declarar en esas mismas notas el
-    riesgo residual de autodenegación: con IPv6 un atacante dispone de muchas /64 y puede llenar la tabla,
-    que falla cerrada por decisión del propietario, y una entrada restringida se mantiene viva con un fallo
-    cada menos de 10 minutos. Mitigaciones: `maxEntries` con holgura, una métrica y una alerta cada vez que se
-    responde `CapacityExhausted`, y límite en el borde (nginx o WAF) por /48 o /32, este último a cargo del
-    cambio 11. La métrica y su prueba pertenecen a esta tarea. Requisito previo: 3.1b y 3.1c fusionadas, con el reloj
-    monotónico de su hallazgo I-1.
-  - **Demostración deliberada.** Mover la llamada a `tryAcquire` a `postHandle` hace que el controlador
-    se invoque ante un rechazo y rompe la prueba; se revierte.
-  - **Cierre.** `./mvnw verify` completo. Commits: `feat(web): reject over-limit requests before the
-    controller with 429 and 503` y `docs(security): declare the interim in-memory rate limiter and its
-    limits`. — Requisitos de `web-edge` «El rechazo por límite responde `429`…», «El limitador se
-    ejecuta antes del caso de uso», «Los límites viven en configuración…» y la nota fechada del
-    requisito «La limitación del limitador en memoria…»
+- [x] 3.2a **PR 11a `edge-rejection-codes-and-capacity-signal`: los códigos `429` y `503` y la señal de capacidad agotada (decisión 17).**
+  Necesita 3.1c (y por tanto 3.1b, con el reloj monotónico, y 3.1a) y los PR 7. La tarea 3.2 original se partió en 3.2a, 3.2b y 3.2c por tamaño
+  (nota fechada 2026-10-06 del final); esta parte no tiene consumidor del limitador todavía.
+  - **ROJO.** Ampliar `ProblemCodeTest`, `ProblemCatalogCoverageTest`, `ProblemErrorReportValveTest` y
+    `ProblemTranslationTest` (códigos `too-many-requests` con `429` y `capacity-exceeded` con `503`, sus claves
+    del catálogo y la regla `forStatus` compartida por la válvula y el traductor), `ProblemExceptionHandlerTest`
+    (`429` con `Retry-After` en segundos enteros y sin registro, `503` sin `Retry-After`, respuesta ya
+    confirmada intacta), crear `LogRateLimitMetricsTest` en
+    `apps/api/app/src/test/java/com/confia/shared/observability/metrics/` (campos exactos, ningún dato del
+    cliente, una ráfaga son un evento y el siguiente trae el recuento omitido, el límite exacto de un segundo,
+    una ventana por política, el constructor de producción) y ampliar `ProcessBeanIsolationTest` con la prueba
+    de que solo el proceso administrativo contiene el adaptador de métricas. **Rojo esperado:** las tablas de
+    códigos fallan (`Tests run: 105, Failures: 10, Errors: 4`); el resto es un error de compilación (clases
+    inexistentes); y la línea `com.confia.shared.observability.metrics` de `ProcessBeanPolicy.java`, escrita
+    **primero**, falla con `non-vacuous: ... must contribute a bean to the admin context`.
+  - **VERDE.** En `.../shared/web/problem/`: los dos códigos y `forStatus` (`429` y `503`), `CapacityExceededException`
+    y los dos manejadores de `ProblemExceptionHandler.java`; sus claves en `problems.properties` (sin números) y
+    el Javadoc de `ProblemErrorReportValve.java`; en `.../shared/web/ratelimit/`: `TooManyRequestsException` y el
+    puerto `RateLimitMetrics` (`capacityExhausted(String policy)`); en `.../shared/observability/metrics/`:
+    `LogRateLimitMetrics` (un evento `WARN` fijo con `event`, `policy` y `suppressed`, a lo sumo uno por segundo
+    por política, con `System::nanoTime`), `ObservabilityMetricsConfiguration` y `package-info.java` con
+    `@NamedInterface` y su consumidor (ADR-0022), con su `@Import` en `AdminApplication.java` (ADR-0024). Nota
+    fechada en `docs/07-observabilidad-y-operaciones.md` §5.4: primer puerto de métricas y su adaptador interino.
+    No se añade ninguna dependencia de métricas.
+  - **Demostraciones deliberadas.** Quitar la cota de un evento por segundo (emitir siempre), comparar con `>` en
+    lugar de `>=` en el borde del segundo y no escribir `Retry-After` en el manejador del `429` rompen pruebas de
+    esta parte; se revierten con `cmp`. (La llamada del interceptor a la métrica es de 3.2b.)
+  - **Cierre.** `./mvnw verify` completo. Commits: `feat(web): add the 429 and 503 problem codes and their
+    translators` y `feat(observability): report an exhausted rate limiter table as a bounded warn event`. —
+    Requisito de `web-edge` «Catálogo de códigos de error y estados HTTP con productor en este cambio» (cada código tiene su estado)
+  - **Añadido 2026-10-05 (revisión de seguridad del limitador, I-2; decisión del propietario).** No existe Micrometer,
+    Actuator ni Prometheus en el backend; `docs/07` dice que los módulos emiten métricas por un puerto con el adaptador
+    en `shared/observability/metrics`. Esta parte crea el puerto mínimo y el adaptador interino; el adaptador de
+    Prometheus llega con el cambio de observabilidad sin tocar el limitador. La llamada a la métrica y su prueba por la
+    cadena real son de 3.2b y 3.2c.
+  - **Nota fechada 2026-10-06 (revisión de seguridad independiente de 11a, sin bloqueantes; corrección acotada hecha en esta parte).**
+    **I-2:** el puerto pasa a `capacityExhausted(String policy, CapacityReason reason)` con `CapacityReason` cerrado (`TABLE_FULL`,
+    `NO_ORIGIN`, `NO_ADDRESS`, `UNKNOWN_POLICY`, `LIMITER_FAILURE`) y el evento lleva un cuarto campo fijo `reason`; la cota es por
+    política y causa; se corrigen el Javadoc de `CapacityExceededException` y la decisión 17, que decían que «el registro del servidor
+    distingue la causa», lo que no era cierto. **S-4:** `ProblemExceptionHandler` copia `Retry-After` de un `429` del marco (con prueba;
+    un `503` nunca lo lleva). **S-5:** nota fechada de `docs/07` §5.4 (`capacity-exceeded` también responde a los `503` del marco).
+    **S-7:** Javadoc del adaptador (lo omitido tras el último evento se informa con el siguiente). La demostración deliberada
+    «quitar el campo `reason`» rompe `LogRateLimitMetricsTest`; se revierte con `cmp`.
+
+- [ ] 3.2b **PR 11b `edge-interceptor`: `@RateLimited` y el interceptor que falla cerrado (decisión 17).**
+  Necesita 3.2a (el puerto de métricas y las dos excepciones).
+  - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/ratelimit/RateLimitInterceptorTest.java`
+    (admitida avanza y el limitador vio al cliente de la petición; `Limited` de 200 ms da `Retry-After` 1 y de 15 s da
+    15; `CapacityExhausted` da `CapacityExceededException` y una señal con solo la política; sin `RequestOrigin`, sin
+    dirección, política ausente del registro y fallo inesperado del limitador son una negativa por falta de
+    capacidad y nunca una admisión; un método sin la anotación o un manejador que no es `HandlerMethod` no se
+    limita; la comprobación de arranque nombra cada política desconocida y el método). Ampliar
+    `IdempotencyScopeExclusionInventoryTest.java` con los tipos de `shared.security` que usa el limitador en el borde
+    (`RateLimiter`, `RateLimitDecision` y sus tres variantes). **Rojo esperado:** error de compilación (clases inexistentes).
+  - **VERDE.** En `.../shared/web/ratelimit/`: `RateLimited`, `RateLimiterRegistry`, `RateLimitInterceptor`
+    (`preHandle`; ausencia de `RequestOrigin` o error inesperado cuenta como `CapacityExhausted`, que señala a
+    `RateLimitMetrics`) y `RateLimitPolicyCheck`.
+  - **Demostraciones deliberadas.** Mover la llamada a `tryAcquire` a `postHandle` rompe las pruebas de esta parte, porque
+    el interceptor deja de lanzar en `preHandle` (el controlador se invocaría ante un rechazo); quitar la llamada
+    `metrics.capacityExhausted(...)` rompe las pruebas de la señal. Ambas se prueban aquí por la unidad, que es donde
+    vive el sitio de la llamada, y se repiten por la cadena real en 3.2c; se revierten con `cmp`.
+  - **Cierre.** `./mvnw verify` completo. Commit: `feat(web): ask the limiter before a rate limited controller runs`. —
+    Requisitos de `web-edge` «El rechazo por límite responde `429`…» (redondeo y capa 1)
+  - **Nota fechada 2026-10-06 (revisión de seguridad independiente del árbol completo de 3.2; se construye en esta parte).**
+    **I-1:** en `preHandle`, devolver `true` para `DispatcherType.ASYNC` (el despacho `REQUEST` ya se evaluó), con una prueba,
+    y una nota en el Javadoc de `RateLimited` (o una regla) que prohíba anotar manejadores asíncronos hasta que tengan su prueba.
+    **Causa en cada camino:** todo camino que falla cerrado pasa su `CapacityReason` al puerto (`NO_ORIGIN`, `NO_ADDRESS`,
+    `UNKNOWN_POLICY`, `LIMITER_FAILURE`, `TABLE_FULL` para `CapacityExhausted`); una excepción inesperada del limitador se registra en
+    `ERROR` con **solo la clase** de la excepción, acotada, nunca su mensaje ni una dirección. La fuente de respaldo
+    `wip/web-edge-rate-limiter-edge-full` llama todavía a la firma de un argumento y se adapta al construirla.
+    **S-1:** la llamada a la métrica va dentro de `try`/`catch`, de modo que un adaptador que falla nunca escape como un `500` (la
+    respuesta sigue siendo `503`). **S-2:** el Javadoc dice «método, no clase» (`@RateLimited` solo anota métodos).
+    **S-3:** una prueba de `HEAD` sobre un manejador limitado (limita igual que `GET`). Las demostraciones deliberadas de esta
+    parte incluyen quitar la causa del camino de `UNKNOWN_POLICY`.
+
+- [ ] 3.2c **PR 11c `edge-throttling-wiring`: configuración, política `admin-login` y borde completo (decisión 17).**
+  Necesita 3.2b.
+  - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/ratelimit/RateLimitEdgeTest.java` (por la
+    cadena real con un controlador de prueba anotado: `429` con `Retry-After` en segundos enteros, sin límite ni
+    cupo en la respuesta, `503 capacity-exceeded` sin `Retry-After` con la tabla llena, cero invocaciones del
+    controlador y del caso de uso de prueba ante un rechazo, el evento de la señal con campos exactos, política
+    desconocida que impide el arranque nombrándola, valores por omisión, cambio de configuración y valor no positivo
+    con mensaje que nombra la propiedad) y `RateLimitPropertiesTest.java`; crear en el arnés `LimitedController` y
+    `UnknownPolicyController` y ampliar `Calls` y `WebEdgeHarness`; ampliar `ProcessBeanIsolationTest.java` (solo el
+    proceso administrativo contiene el interceptor, el registro y las propiedades) y la línea
+    `com.confia.shared.web.ratelimit` de `ProcessBeanPolicy.java` (primero en rojo). Ampliar `IdempotencyScopeExclusionInventoryTest.java` con `RateLimitPolicy` e `InMemoryRateLimiter`. **Rojo esperado:** error de
+    compilación (`ThrottlingConfiguration` y `RateLimitProperties` no existen) y la línea de política sin bean.
+  - **VERDE.** Crear `RateLimitProperties` (registro enlazado por constructor, prefijo
+    `confia.web.rate-limit.admin-login`, con mensajes que nombran la propiedad) y
+    `.../shared/web/edge/ThrottlingConfiguration.java` (política `admin-login` registrada pero **no aplicada** a ninguna
+    ruta de producción, con el constructor público del limitador) con su `@Import` en `AdminApplication.java`. Notas
+    fechadas en `docs/03-seguridad.md` §4.4 y §10 con el limitador interino, sus tres limitaciones, la semántica de la
+    capa 2 y, del hallazgo I-2, el riesgo residual de autodenegación y sus tres mitigaciones (`maxEntries` con holgura,
+    la señal y la alerta de 3.2a y 3.2b, y el límite en el borde por /48 o /32 a cargo del cambio 11).
+  - **Demostraciones deliberadas.** Las dos de 3.2b repetidas por la cadena real: `tryAcquire` en `postHandle` hace
+    que el controlador se invoque ante un rechazo y rompe la prueba; quitar la llamada a la métrica rompe la prueba del
+    evento. Se revierten con `cmp`.
+  - **Cierre.** `./mvnw verify` completo. Commits: `feat(web): reject over-limit requests before the controller with
+    429 and 503` y `docs(security): declare the interim in-memory rate limiter and its limits`. — Requisitos de
+    `web-edge` «El rechazo por límite responde `429`…» (sin cupo ni límite), «El limitador se ejecuta antes del caso
+    de uso», «Los límites viven en configuración…» y la nota fechada del requisito «La limitación del limitador en
+    memoria…»
+  - **Nota fechada 2026-10-06 (revisión de seguridad independiente del árbol completo de 3.2; se construye en esta parte).**
+    **I-3:** una cota superior para `maxEntries` (por ejemplo 1 000 000) en `RateLimitPolicy`, con su prueba en
+    `InMemoryRateLimiterTest` y una de sobrepasarla en `RateLimitPropertiesTest` (el mensaje nombra la propiedad). **S-6:** el limitador se
+    construye en una configuración de `shared.security` que expone solo `RateLimiter`, de modo que la lista de permitidos de la capa
+    web hacia `shared.security` queda en seis tipos y no incluye `InMemoryRateLimiter` (el registro de `ThrottlingConfiguration` recibe
+    el puerto). La nota de `docs/03` §10 incluye el campo `reason` del evento y la lectura del `503` del marco (nota de `docs/07`).
 
 ## Fase 4: materialización del retardo
 
@@ -737,7 +812,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 
 ## Fase 6: cierre
 
-- [ ] 6.1 **Verificación completa, medición de los 20 PR y barrido de trazabilidad.** Con los 20 PR
+- [ ] 6.1 **Verificación completa, medición de los 22 PR y barrido de trazabilidad.** Con los 22 PR
   fusionados a `main`, ejecutar `./mvnw verify` completo en `apps/api` y registrar cobertura (global
   80 %, núcleo y `domain` 95 %) y mutación (umbral 80). Registrar en
   `openspec/changes/web-edge-foundations/apply-progress.md` la medición de cada PR con
@@ -780,7 +855,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | El `type` deriva del código estable | El mismo código produce el mismo `type` | 2.1a |
 | | Códigos distintos producen `type` distintos | 2.1a |
 | | La denegación por falta de credencial es uniforme | 2.1b |
-| Catálogo de códigos y estados HTTP | Cada código tiene su estado | 2.1a, 2.2a, 2.4a, 3.2, 5.1 |
+| Catálogo de códigos y estados HTTP | Cada código tiene su estado | 2.1a, 2.2a, 2.4a, 3.2a, 5.1 |
 | | Tipo de contenido no admitido | 2.4a |
 | | Recurso inexistente bajo un prefijo de documentación | 2.4a |
 | | Un código desconocido no se filtra | 2.4a |
@@ -841,15 +916,15 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | | Una entrada vencida libera espacio | 3.1b |
 | | Llenado concurrente | 3.1c |
 | | Tamaño máximo no válido | 3.1a |
-| El rechazo por límite responde `429` con `Retry-After` | Retry-After redondeado hacia arriba | 3.1a, 3.2 |
-| | Retry-After de la capa 1 | 3.2 |
-| | Sin cupo ni límite | 3.2 |
-| El limitador se ejecuta antes del caso de uso | Petición rechazada sin efecto | 3.2 |
-| Los límites viven en configuración | Cambio de configuración | 3.2 |
-| | Valores por defecto | 3.2 |
-| | Valor no positivo | 3.2 |
+| El rechazo por límite responde `429` con `Retry-After` | Retry-After redondeado hacia arriba | 3.1a, 3.2b |
+| | Retry-After de la capa 1 | 3.2b |
+| | Sin cupo ni límite | 3.2c |
+| El limitador se ejecuta antes del caso de uso | Petición rechazada sin efecto | 3.2c |
+| Los límites viven en configuración | Cambio de configuración | 3.2c |
+| | Valores por defecto | 3.2c |
+| | Valor no positivo | 3.2c |
 | La limitación del limitador en memoria está declarada | Estado perdido al reiniciar | 3.1a |
-| | Nota fechada en la documentación | 3.2 |
+| | Nota fechada en la documentación | 3.2c |
 | El retardo se materializa tras confirmar la transacción | La espera ocurre tras el commit | 4.1 |
 | | Sin recursos retenidos durante la espera | 4.1 |
 | | Retardo cero | 4.1 |
@@ -934,7 +1009,7 @@ Subtotal `build-integrity`: 34 escenarios, 34 con tarea, 0 huérfanos.
 («Ausencia de superficie HTTP que exija la cabecera de idempotencia»): sin escenarios; lo cubre la
 tarea 5.1 y su migración a `web-edge`. Los entregables sin escenario (notas fechadas de `docs/03`,
 `docs/05`, `docs/09`, `docs/ui-ux` y `foundations-plan`) están cubiertos por las tareas 1.2, 2.3, 2.4,
-3.2 y 5.1.
+3.2a, 3.2c y 5.1.
 
 ---
 
@@ -1177,3 +1252,27 @@ El cambio pasa a **21 tareas** (20 de PR más la de cierre 6.1) y **20 PR**, den
 **Escenarios.** Los que apuntaban a 3.1b apuntan ahora a una sola parte: a 3.1b «Límite exacto de la tabla», «Tabla llena, IP con entrada vigente» y «Una entrada vencida libera espacio»;
 a 3.1c «Exactitud bajo concurrencia» y «Llenado concurrente». Trazabilidad: 166 escenarios, 166 con tarea, 0 huérfanos. La nota fechada de I-1 e I-3 de la tarea 3.1b original se divide
 entre las dos partes (I-1, S-1 y S-2 en 3.1b; I-3 en 3.1c).
+
+## Nota fechada 2026-10-06: la tarea 3.2 se parte en 3.2a, 3.2b y 3.2c
+
+La tarea 3.2, construida y verificada completa (`./mvnw verify`: Surefire 186 + 1 087, Failsafe 229), midió **1 551 líneas efectivas** (1 528 adiciones y 23 eliminaciones, igual con y sin `-M`,
+sin `openspec/`) frente al tope de 800 y a un pronóstico de 500 a 700: las pruebas sumaron 907 líneas y la decisión del propietario sobre la métrica del hallazgo I-2 añadió un puerto, un
+adaptador y su registro. **El propietario aprobó la costura de tres PR sin excepción de tamaño**; el árbol completo y verificado se conserva en la rama **local**
+`wip/web-edge-rate-limiter-edge-full` (`cf93861`), que nunca se publica.
+
+| Parte | Contenido | Líneas |
+|---|---|---|
+| 3.2a `edge-rejection-codes-and-capacity-signal` | Códigos `too-many-requests` y `capacity-exceeded`, catálogo, `forStatus` y válvula; `TooManyRequestsException`, `CapacityExceededException` y sus manejadores; puerto `RateLimitMetrics`, `LogRateLimitMetrics`, su configuración y nota de `docs/07` | unas 505 |
+| 3.2b `edge-interceptor` | `RateLimited`, `RateLimiterRegistry`, `RateLimitInterceptor`, `RateLimitPolicyCheck` y su prueba | unas 407 |
+| 3.2c `edge-throttling-wiring` | `RateLimitProperties`, `ThrottlingConfiguration`, arnés, `RateLimitEdgeTest`, `RateLimitPropertiesTest` y notas de `docs/03` | unas 639 |
+
+El cambio pasa a **23 tareas** (22 de PR más la de cierre 6.1) y **22 PR**, dentro de la excepción al tope de 15 tareas que el propietario ya concedió. Orden y dependencia: 3.2a, 3.2b y 3.2c,
+cada una desde `main` actualizado; **3.2b necesita 3.2a; 3.2c necesita 3.2b; 4.1 necesita 3.2c**. Numeración de PR: 11a, 11b y 11c; los PR 12 y 13 conservan su número.
+
+**Demostraciones deliberadas.** La llamada a la métrica y `tryAcquire` en `preHandle` viven en el interceptor, así que sus dos demostraciones se hacen en 3.2b con la prueba de unidad
+(que es la que falla en cuanto el interceptor deja de lanzar en `preHandle` o de señalar) y se repiten en 3.2c por la cadena real. 3.2a demuestra la cota de un evento por segundo, el borde
+del segundo y la cabecera `Retry-After` del manejador.
+
+**Escenarios.** Los que apuntaban a 3.2 apuntan ahora a una sola parte: a 3.2a «Cada código tiene su estado»; a 3.2b «Retry-After redondeado hacia arriba» (con 3.1a) y «Retry-After de la capa 1»;
+a 3.2c «Sin cupo ni límite», «Petición rechazada sin efecto», «Cambio de configuración», «Valores por defecto», «Valor no positivo» y «Nota fechada en la documentación». Trazabilidad: 166 escenarios,
+166 con tarea, 0 huérfanos. Las notas fechadas van con lo que describen: la de `docs/07` en 3.2a, las de `docs/03` en 3.2c y la de `design.md` en 3.2a (puerto y adaptador) y 3.2c (borde).
