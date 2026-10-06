@@ -2194,3 +2194,41 @@ sección anterior describe el árbol completo, que se conserva en la rama local 
 | Repetición con más de dos valores | `aRepeatedHeaderIsInvalidEvenWhenBothValuesAreEqual` |
 
 `./mvnw verify` completo sobre el árbol de 13a: Surefire 186 + 1 186, Failsafe 233, 0 fallos, cobertura cumplida y `BUILD SUCCESS`.
+
+### Revisión independiente de 5.1a (2026-10-06)
+
+Veredicto: apto para fusionar, sin bloqueantes.
+
+La revisión confirmó estos puntos:
+
+- La validación de la cabecera y sus códigos se ajustan a la especificación.
+- El manejador falla cerrado cuando no hay clave validada o falta la plantilla de ruta.
+- El digest tiene un sobre fijo, sin confusión entre el cuerpo y las variables de ruta.
+- La institución sale solo del `SecurityContext`.
+- `Idempotent-Replay` aparece solo en una repetición.
+- El 409 y el 422 los escribe el traductor único.
+- El borde se carga solo en el proceso administrativo.
+- W5 no es vacía.
+- No se registra la clave ni la carga.
+
+Corregido:
+
+- **I1 (documental).** `IdempotentRequestHandler` entra a `main` en 5.1a sin prueba propia y se prueba solo en 5.1b. Ahora lo dicen la fila
+  13a y la tarea 5.1b de `tasks.md`. Además, 5.1b añade una prueba de unidad de las tres ramas del manejador que fallan cerrado, que
+  ni 13a ni la IT cubrían.
+- **S1.** El Javadoc de `handle` advierte que solo el cuerpo y las variables de ruta entran en el digest, así que todo dato que cambie
+  el efecto debe viajar en uno de ellos.
+- **S4.** `IdempotencyKeyInterceptorTest` pasa de 12 a 17 pruebas. Se añadieron estos casos y se separaron la clave ausente y la clave
+  en blanco:
+  - una cabecera en blanco junto a una válida;
+  - un valor con coma, que es una sola clave;
+  - ningún rechazo repite la clave;
+  - un manejador que no es un método.
+
+Para seguimiento:
+
+- **S2, la clave del marcador sin el actor:** la decide `confia-architect` cuando existan endpoints reales.
+- **S3, una guarda de construcción para que todo endpoint de dinero declare `@IdempotentWrite`:** se resuelve con el primer endpoint
+  real.
+- **S5 y S6, estrechar a nivel de clase la lista ampliada y la exención de W5:** son opcionales.
+- **S7, igualdad numérica del cuerpo repetido:** se comprueba con un decimal en 13b o en el primer endpoint real.

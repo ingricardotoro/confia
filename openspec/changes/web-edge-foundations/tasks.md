@@ -109,7 +109,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | 12a | Materializador del retardo, propiedades, configuración solo de administración, ajustes de Tomcat y pruebas de unidad y concurrencia (4.1a) | PR 12a `delay-materializer-core` (773, medidas en el árbol completo) | `-Dtest='RequiredDelayMaterializer*Test,ProcessBeanIsolationTest'` | Pruebas de unidad y de concurrencia con temporizador controlado | Se retira el materializador y `spring.threads.virtual.enabled` vuelve a su omisión |
 | 12b | Prueba en tiempo de ejecución: validación de la configuración, aislamiento por proceso, valores del conector y la IT bajo Tomcat real con base de datos (4.1b) | PR 12b `delay-materializer-runtime-proof` (578, medidas) | `-Dtest='RequiredDelayConfigurationTest,ProcessBeanIsolationTest,ProductionEdgeDefaultsTest'`; IT: `-Dit.test=RequiredDelayMaterializerIT` | `RequiredDelayMaterializerIT` | Se retiran las pruebas |
 | 12c | Regla W4 y ampliación del inventario de exclusión del borde (4.1c) | PR 12c `blocking-wait-rule` (399, medidas) | `-Dtest='BlockingWaitConfinementTest,WebEdgeScopeExclusionInventoryTest'` | Fixture `BadSleepingWebComponent` detectado | Se retiran la regla y sus fixtures |
-| 13a | Borde de la idempotencia: anotación, interceptor, manejador, códigos, configuración solo de administración, regla W5 y notas de `docs/09` (5.1a) | PR 13a `idempotency-edge-core` (736, medidas) | `-Dtest='IdempotencyKeyInterceptorTest,IdempotencyNotInIdentityTest,ProcessBeanIsolationTest'` | Prueba de unidad del interceptor y regla W5 | Se retira el borde de la idempotencia |
+| 13a | Borde de la idempotencia: anotación, interceptor, manejador, códigos, configuración solo de administración, regla W5 y notas de `docs/09`; el manejador se prueba solo en 13b (5.1a) | PR 13a `idempotency-edge-core` (unas 770, medidas) | `-Dtest='IdempotencyKeyInterceptorTest,IdempotencyNotInIdentityTest,ProcessBeanIsolationTest'` | Prueba de unidad del interceptor y regla W5 | Se retira el borde de la idempotencia |
 | 13b | Prueba por la cadena real con base de datos: controlador de demostración, sonda, `IdempotencyEdgeIT` y su ausencia de los procesos reales (5.1b) | PR 13b `idempotency-edge-runtime-proof` (713, medidas) | `-Dtest=IdempotencyDemoAbsentFromProcessesTest`; IT: `-Dit.test=IdempotencyEdgeIT` | `IdempotencyEdgeIT` | Se retiran las pruebas |
 | 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 22 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
 
@@ -843,7 +843,10 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
   `IdempotencyKeyInterceptorTest` y las notas de `docs/09` y de `foundations-plan/exploration.md`. Necesita 4.1c.
 - [ ] 5.1b **PR 13b `idempotency-edge-runtime-proof`.** `IdempotencyDemoController`, `DemoProbe`, `IdempotencyEdgeIT` (17 pruebas por
   la cadena real con base de datos, con la demostración de `23505`) e `IdempotencyDemoAbsentFromProcessesTest`, que necesita la clase
-  del controlador de demostración en el árbol de pruebas. Necesita 5.1a. 5.1 se marca hecha cuando se fusiona 5.1b.
+  del controlador de demostración en el árbol de pruebas. Añade además (I1 de la revisión de 5.1a) una prueba de unidad de
+  `IdempotentRequestHandler` con `MockHttpServletRequest` y un `IdempotentExecutor` simulado para sus tres ramas que fallan cerrado: sin
+  clave validada, sin plantilla de ruta y con un endpoint de más de 200 caracteres. **5.1a entrega el manejador sin prueba propia; se
+  prueba solo en 5.1b, que se fusiona inmediatamente después.** Necesita 5.1a. 5.1 se marca hecha cuando se fusiona 5.1b.
 
 ## Fase 6: cierre
 
