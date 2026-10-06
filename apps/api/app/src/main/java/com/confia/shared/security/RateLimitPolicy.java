@@ -21,10 +21,20 @@ public record RateLimitPolicy(int requestLimit, Duration requestWindow, int fail
         Duration failureWindow, Duration restrictedInterval, Duration restrictionCap,
         int maxEntries) {
 
+    /**
+     * The most a {@code requestLimit} or a {@code failureThreshold} may be (review S-2). Every
+     * operation on a client runs under the lock of its table bin and the failure count walks the
+     * whole ring, so the bound keeps that work, and the memory of one entry, small whatever the
+     * configuration says. Three orders of magnitude above the ten of the administrative login.
+     */
+    private static final int MAX_COUNT = 10_000;
+
     public RateLimitPolicy {
         positive(requestLimit, "requestLimit");
+        atMost(requestLimit, "requestLimit");
         positive(requestWindow, "requestWindow");
         positive(failureThreshold, "failureThreshold");
+        atMost(failureThreshold, "failureThreshold");
         positive(failureWindow, "failureWindow");
         positive(restrictedInterval, "restrictedInterval");
         positive(restrictionCap, "restrictionCap");
@@ -34,6 +44,12 @@ public record RateLimitPolicy(int requestLimit, Duration requestWindow, int fail
     private static void positive(int value, String name) {
         if (value <= 0) {
             throw new IllegalArgumentException(name + " must be positive");
+        }
+    }
+
+    private static void atMost(int value, String name) {
+        if (value > MAX_COUNT) {
+            throw new IllegalArgumentException(name + " must not exceed " + MAX_COUNT);
         }
     }
 
