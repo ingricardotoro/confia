@@ -239,6 +239,66 @@ class ProblemExceptionHandlerTest {
         assertThat(full.getStatus()).isEqualTo(200);
     }
 
+    /**
+     * A {@code 429} of the framework (or of a controller that raises one) keeps the {@code
+     * Retry-After} its author chose, as a {@code 405} keeps its {@code Allow}: the catalog text
+     * tells the client to wait the time that header gives, so the header must be there. Only the
+     * {@code 429} keeps it; a {@code 503} never carries one (nobody can promise a time).
+     */
+    @Test
+    void aFrameworkTooManyRequestsKeepsItsRetryAfterAndNeverItsReason() throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.unexpected(statusWithRetryAfter(429, "30"), new MockHttpServletRequest("GET", "/x"),
+                response);
+
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getHeaders("Retry-After")).containsExactly("30");
+        assertThat(response.getContentAsString()).contains("too-many-requests")
+                .doesNotContain("secret reason");
+        assertThat(logged.list).as("a client over its limit is not an error").isEmpty();
+    }
+
+    @Test
+    void aFrameworkTooManyRequestsWithoutARetryAfterAnswersWithoutOne() throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.unexpected(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatusCode.valueOf(429), "secret reason"),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getHeaderNames()).doesNotContain("Retry-After");
+    }
+
+    @Test
+    void aFrameworkServiceUnavailableNeverCarriesARetryAfterEvenIfItsAuthorSetOne()
+            throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.unexpected(statusWithRetryAfter(503, "30"), new MockHttpServletRequest("GET", "/x"),
+                response);
+
+        assertThat(response.getStatus()).isEqualTo(503);
+        assertThat(response.getContentAsString()).contains("capacity-exceeded");
+        assertThat(response.getHeaderNames()).doesNotContain("Retry-After");
+    }
+
+    /** A {@code ResponseStatusException} that carries a header, the way its subclasses do. */
+    private static org.springframework.web.server.ResponseStatusException statusWithRetryAfter(
+            int status, String seconds) {
+        return new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatusCode.valueOf(status), "secret reason") {
+            @Override
+            public org.springframework.http.HttpHeaders getHeaders() {
+                org.springframework.http.HttpHeaders headers =
+                        new org.springframework.http.HttpHeaders();
+                headers.set("Retry-After", seconds);
+                return headers;
+            }
+        };
+    }
+
     @Test
     void aDomainErrorWhoseCodeIsAServerErrorIsLoggedAtErrorAndAnUnknownCodeIsNamedInTheLog()
             throws IOException {

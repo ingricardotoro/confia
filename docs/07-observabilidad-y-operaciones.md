@@ -510,6 +510,17 @@ regla de dependencia del resto del sistema y no se relaja para observabilidad.
 > ese evento. El adaptador hacia Prometheus llega con el cambio de observabilidad y sustituye a
 > este sin tocar el limitador ni el interceptor. No se añadió ninguna dependencia de métricas.
 
+> **Nota fechada 2026-10-06 (cambio `web-edge-foundations`, PR 11a, revisión de seguridad independiente):
+> el evento nombra la causa y `capacity-exceeded` no implica al limitador.** El puerto es ahora
+> `capacityExhausted(policy, reason)` y el evento lleva un cuarto campo fijo, `reason`, de un conjunto
+> cerrado que el código elige (`table_full`, `no_origin`, `no_address`, `unknown_policy`,
+> `limiter_failure`), para distinguir un ataque (tabla llena) de un defecto del cableado. La cota de un
+> evento por segundo es por política **y causa**, de modo que una inundación de `table_full` no oculta en
+> el mismo segundo un defecto raro. Los eventos omitidos tras el último escrito se informan solo con el
+> siguiente. Además, el código `capacity-exceeded` (`503`) **también** responde a los `503` del marco (un
+> tiempo de espera asíncrono, una `ResponseStatusException(503)`), así que ya no implica por sí solo al
+> limitador: el operador debe leer el `reason` del evento y el registro de errores del servidor.
+
 ---
 
 ## 6. Tableros de Grafana

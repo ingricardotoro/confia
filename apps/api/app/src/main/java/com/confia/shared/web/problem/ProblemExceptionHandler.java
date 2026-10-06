@@ -129,8 +129,10 @@ public final class ProblemExceptionHandler {
 
     /**
      * A server with no capacity for the request: {@code 503 capacity-exceeded}, with no {@code
-     * Retry-After} because nobody can promise a time, and nothing that says why. Whatever raised
-     * it has already left its own signal; the response says no more than the condition.
+     * Retry-After} because nobody can promise a time, and nothing that says why. The cause is for
+     * the operator, not the client: the limiter leaves its own signal with a reason (see {@code
+     * RateLimitMetrics}), and a framework {@code 503} leaves the server error log; the response
+     * says no more than the condition.
      */
     @ExceptionHandler(CapacityExceededException.class)
     public void capacityExceeded(CapacityExceededException e, HttpServletRequest request,
@@ -236,8 +238,9 @@ public final class ProblemExceptionHandler {
      * failure whose causes include a write-side type of the container or of Spring means the
      * client went away: nothing is written. A Spring {@link ErrorResponse} already carries the
      * status its author chose, which {@link ProblemCode#forStatus} turns into the catalog's code
-     * (a {@code 405} keeps its {@code Allow} header), and only a server error is logged. Anything
-     * else is a {@code 500 internal-error}, logged in full with the request id.
+     * (a {@code 405} keeps its {@code Allow} header and a {@code 429} its {@code Retry-After}), and
+     * only a server error is logged. Anything else is a {@code 500 internal-error}, logged in full
+     * with the request id.
      *
      * @throws AccessDeniedException for the security chain to answer
      * @throws AuthenticationException for the security chain to answer
@@ -276,6 +279,14 @@ public final class ProblemExceptionHandler {
             String allow = framework.getHeaders().getFirst(HttpHeaders.ALLOW);
             if (allow != null) {
                 response.setHeader(HttpHeaders.ALLOW, allow);
+            }
+        }
+        if (code == ProblemCode.TOO_MANY_REQUESTS && !response.isCommitted()) {
+            // The catalog text tells the client to wait the time of this header, so a 429 that the
+            // framework or a controller raised keeps the one its author chose.
+            String wait = framework.getHeaders().getFirst(HttpHeaders.RETRY_AFTER);
+            if (wait != null) {
+                response.setHeader(HttpHeaders.RETRY_AFTER, wait);
             }
         }
         answer(request, response, code);
