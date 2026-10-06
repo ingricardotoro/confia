@@ -670,7 +670,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     **S-7:** Javadoc del adaptador (lo omitido tras el último evento se informa con el siguiente). La demostración deliberada
     «quitar el campo `reason`» rompe `LogRateLimitMetricsTest`; se revierte con `cmp`.
 
-- [ ] 3.2b **PR 11b `edge-interceptor`: `@RateLimited` y el interceptor que falla cerrado (decisión 17).**
+- [x] 3.2b **PR 11b `edge-interceptor`: `@RateLimited` y el interceptor que falla cerrado (decisión 17).**
   Necesita 3.2a (el puerto de métricas y las dos excepciones).
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/ratelimit/RateLimitInterceptorTest.java`
     (admitida avanza y el limitador vio al cliente de la petición; `Limited` de 200 ms da `Retry-After` 1 y de 15 s da
@@ -700,6 +700,13 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     respuesta sigue siendo `503`). **S-2:** el Javadoc dice «método, no clase» (`@RateLimited` solo anota métodos).
     **S-3:** una prueba de `HEAD` sobre un manejador limitado (limita igual que `GET`). Las demostraciones deliberadas de esta
     parte incluyen quitar la causa del camino de `UNKNOWN_POLICY`.
+  - **Nota fechada 2026-10-06 (hecho en 3.2b; S-3 pasa a 3.2c).** Construido: I-1 (`ASYNC` pasa; prueba y Javadoc de `RateLimited`;
+    la demostración de quitar la comprobación rompe `anAsyncDispatchIsNotEvaluatedAgain...`), la causa en cada camino (`NO_ORIGIN`,
+    `NO_ADDRESS`, `UNKNOWN_POLICY`, `LIMITER_FAILURE`, `TABLE_FULL`), el registro `ERROR` con solo la clase de la excepción y acotado a uno
+    por segundo, S-1 (la métrica dentro de `try`/`catch`, con su propio `ERROR` acotado y sin mensaje) y S-2. **S-3 no se hace aquí:** que
+    Spring resuelva `HEAD` al manejador de `GET` es un hecho del mapeo real de manejadores, y una prueba de unidad que entregue una petición
+    `HEAD` al interceptor solo lo supondría. Se prueba por la cadena real en 3.2c (`RateLimitEdgeTest`: `HEAD` sobre el manejador limitado
+    limita igual que `GET`).
 
 - [ ] 3.2c **PR 11c `edge-throttling-wiring`: configuración, política `admin-login` y borde completo (decisión 17).**
   Necesita 3.2b.
@@ -734,6 +741,9 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     construye en una configuración de `shared.security` que expone solo `RateLimiter`, de modo que la lista de permitidos de la capa
     web hacia `shared.security` queda en seis tipos y no incluye `InMemoryRateLimiter` (el registro de `ThrottlingConfiguration` recibe
     el puerto). La nota de `docs/03` §10 incluye el campo `reason` del evento y la lectura del `503` del marco (nota de `docs/07`).
+  - **Nota fechada 2026-10-06 (S-3, movida desde 3.2b).** `RateLimitEdgeTest` añade una petición `HEAD` sobre el manejador limitado
+    por la cadena real (el arnés y el mapeo de `HEAD` a `GET` de Spring): debe limitar igual que `GET` (`429` con `Retry-After`, cero
+    invocaciones del controlador). No se prueba por unidad en 3.2b porque ese mapeo es del marco y la unidad solo lo supondría.
 
 ## Fase 4: materialización del retardo
 

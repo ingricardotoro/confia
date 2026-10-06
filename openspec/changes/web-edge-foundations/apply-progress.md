@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-06 (3.2 partida en 3.2a, 3.2b y 3.2c por decisión del propietario; 3.1a, 3.1b y 3.1c hechas)
+- **Última actualización:** 2026-10-06 (3.2b hecha; 3.2c pendiente)
 
 ## Estado de las tareas
 
@@ -27,7 +27,7 @@
 | 3.1c | PR 10c `rate-limiter-stress` | Hecha | `5c06aab`, `3d55b9a` y los commits `docs(sdd)` de esa rama |
 | 3.2 | PR 11 `rate-limiter-edge` | Construida y verificada completa, detenida antes del commit por tamaño (1 551 líneas); el propietario aprobó la costura de tres PR el 2026-10-06; fuente: rama local `wip/web-edge-rate-limiter-edge-full` (`cf93861`) | |
 | 3.2a | PR 11a `edge-rejection-codes-and-capacity-signal` | Hecha (517 líneas; 732 tras la corrección de la revisión) | `bf1b5c9`, `733785b`, `fdc3786` y los commits `docs(sdd)` de esta rama |
-| 3.2b | PR 11b `edge-interceptor` | Pendiente (necesita 3.2a, desde `main` actualizado) | |
+| 3.2b | PR 11b `edge-interceptor` | Hecha (653 líneas) | `325bf27` y el commit `docs(sdd)` de esta rama |
 | 3.2c | PR 11c `edge-throttling-wiring` | Pendiente (necesita 3.2b, desde `main` actualizado) | |
 | 4.1 a 6.1 | PR 12, 13 y cierre | Pendientes | |
 
@@ -1814,3 +1814,75 @@ La revisión cubrió 11a y el árbol completo de 3.2 y **no encontró bloqueante
 **Evidencia.** ROJO: `test-compile` con `LogRateLimitMetricsTest` ampliado (`COMPILATION ERROR`, `cannot find symbol` en `CapacityReason`); tras el puerto y el adaptador, `LogRateLimitMetricsTest` `Tests run: 14, Failures: 0` y `ProblemExceptionHandlerTest` `Tests run: 24, Failures: 1` (`aFrameworkTooManyRequestsKeepsItsRetryAfterAndNeverItsReason`, el rojo de S-4); VERDE: `LogRateLimitMetricsTest`, `ProblemExceptionHandlerTest` y `ProblemTranslationTest` `Tests run: 72, Failures: 0`. **Demostración deliberada:** quitar el campo `reason` del evento da `LogRateLimitMetricsTest` `Tests run: 14, Failures: 8` (`Actual and expected should have same size but actual size is: 3 while expected size is: 4` y `Expecting actual: ["event", "policy", "suppressed"] to contain exactly (and in same order): ["event", "policy", "reason", "suppressed"]`); revertida, `cmp` igual. Cierre: `./mvnw verify` completo, **Surefire 186 + 1 062, Failsafe 229, `BUILD SUCCESS`**.
 
 **Medición del PR 11a tras la corrección** (`git diff --numstat main...HEAD -- . :!openspec`, igual con y sin `-M`): **732 líneas** (710 adiciones y 22 eliminaciones), frente a 517 antes y a 800 de tope. **Fuente de respaldo:** `wip/web-edge-rate-limiter-edge-full` no se modificó; su interceptor y sus pruebas llaman a la firma de un argumento y 3.2b adapta los puntos de llamada al construirse.
+
+## Tarea 3.2b: PR 11b `edge-interceptor`
+
+Rama `change/web-edge-foundations-edge-interceptor`, creada desde `main` en `5c590c5` tras fusionar el PR 11a. Código portado de la rama local `wip/web-edge-rate-limiter-edge-full` (`cf93861`, no se tocó): `RateLimited`, `RateLimiterRegistry` y `RateLimitPolicyCheck` sin cambios de fondo; el interceptor y su prueba se rehicieron sobre la firma de dos argumentos de `RateLimitMetrics` de `main`. Las cinco entradas de la lista de permitidos de `IdempotencyScopeExclusionInventoryTest` (`RateLimiter`, `RateLimitDecision` y sus tres variantes).
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO | `test-compile` con `RateLimitInterceptorTest` (13 métodos) y la lista de permitidos ampliada, sin producción | `COMPILATION ERROR`: `cannot find symbol` en `RateLimitInterceptor`, `RateLimited`, `RateLimiterRegistry` y `RateLimitPolicyCheck` (11 errores en la primera pasada) |
+| VERDE | `-Dtest='RateLimitInterceptorTest,IdempotencyScopeExclusionInventoryTest'` | `Tests run: 13, Failures: 0` (`RateLimitInterceptorTest`) y `Tests run: 3, Failures: 0` (inventario); total `Tests run: 16, Failures: 0, Errors: 0, Skipped: 0` |
+| Cierre | `./mvnw verify` completo | **Surefire 186 + 1 075 (los 1 062 de la línea base y 13 nuevos), Failsafe 229, `BUILD SUCCESS`**. Instantánea OpenAPI sin cambios (`git status` limpio de ella) |
+
+### Demostraciones deliberadas (cada una revertida de inmediato; `cmp` contra la copia original sin diferencias)
+
+| Ruptura | Resultado observado |
+|---|---|
+| I-1: quitar la comprobación de `DispatcherType.ASYNC` | `Tests run: 13, Failures: 0, Errors: 1`: `anAsyncDispatchIsNotEvaluatedAgainBecauseTheRequestDispatchAlreadyWas` con `CapacityExceeded capacity exceeded` |
+| Quitar la causa del camino de `UNKNOWN_POLICY` (`Verdict.refusal(null)`) | `Failures: 1`: `aPolicyTheRegistryDoesNotHoldIsARefusalAtRunTime`, `Expecting actual: [Signal[policy=no-such-policy, reason=null]] to contain exactly (and in same order): [Signal[policy=no-such-policy, reason=UNKNOWN_POLICY]]` |
+| `tryAcquire` movido a `postHandle` | `Tests run: 13, Failures: 11`; mensaje `Expecting code to raise a throwable.` (el interceptor deja de lanzar en `preHandle`) |
+| Quitar la llamada `metrics.capacityExhausted(...)` | `Tests run: 13, Failures: 7`: `Expecting actual: [] to contain exactly (and in same order): [Signal[policy=admin-login, reason=NO_ORIGIN]]` (y `NO_ADDRESS`, `UNKNOWN_POLICY`), más `Expected size: 1 but was: 0` en la prueba del adaptador que falla |
+| S-1: la métrica fuera de `try`/`catch` | `Failures: 1`: `aFailingMetricsAdapterNeverTurnsARefusalIntoAServerError`, `[the answer stays 503, never the 500 of the exception of the adapter] Expecting actual throwable to be an instance of: ...CapacityExceededException` |
+
+### Desviaciones (declaradas)
+
+1. **S-3 (`HEAD`) pasa a 3.2c** con nota fechada en `tasks.md`: es un hecho del mapeo real de manejadores; la unidad solo lo supondría.
+2. **La lista de permitidos suma cinco nombres de clase**, no cuatro (`RateLimitDecision` más sus tres variantes más `RateLimiter`); `RateLimitPolicy` e `InMemoryRateLimiter` quedan para 3.2c (y `InMemoryRateLimiter` ya no, por S-6).
+3. **Registro de fallos de la métrica:** además del `ERROR` del limitador, un adaptador de métricas que falla escribe un `ERROR` propio (`rate limit metrics failed`, solo política y clase), con la misma cota de uno por segundo; así el defecto no es silencioso. El interceptor lleva un segundo constructor de paquete con una fuente monotónica para las pruebas.
+4. El interceptor captura `RuntimeException` (no `Error`) como en la fuente de respaldo.
+
+### Medición del PR 11b (`git diff --numstat main...HEAD -- . ':!openspec'`; igual con y sin `-M`)
+
+**653 líneas** (651 adiciones y 2 eliminaciones) frente a 800 de tope: interceptor 157, comprobación de arranque 56, registro 30, anotación 33, prueba del interceptor 368, inventario 9. Pronóstico: unas 407 más las correcciones de la revisión.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `Tests run: 16, Failures: 0` (interceptor e inventario); cierre completo Surefire 186 + 1 075, Failsafe 229 |
+| Arnés de ejecución | Interceptor con un limitador de respuesta fija, `RequestOrigin` ligado por `ScopedValue` y un `ListAppender` de Logback; la cadena real llega en 3.2c |
+| Frontera de reversión | Se retiran las cuatro clases, su prueba y las cinco entradas de la lista de permitidos |
+
+### Corrección del orquestador en 3.2b (2026-10-06)
+
+El agente señaló en su informe que las dos líneas `ERROR` del interceptor (fallo del limitador y fallo del adaptador
+de métricas) compartían un único tope de una por segundo. Cuando el limitador falla, el interceptor registra el fallo
+y después llama a la métrica; si el adaptador también falla en ese mismo segundo, su línea quedaba suprimida, y son
+dos defectos distintos que el operador necesita ver. Ahora cada mensaje tiene su propio tope
+(`lastLimiterFailureAt` y `lastMetricsFailureAt`).
+
+- Prueba nueva: `aFailingLimiterAndAFailingAdapterInTheSameSecondEachLeaveTheirOwnLine` exige las dos líneas en
+  orden. **Ruptura:** con el tope compartido falla en la línea 291. Revertida con `cmp`.
+- `./mvnw verify` completo: Surefire 186 + 1076, Failsafe 229, `BUILD SUCCESS`.
+
+### Revisión independiente de 3.2b (2026-10-06)
+
+Riesgo evaluado: alto. Veredicto: aprobable, sin bloqueantes. La revisión confirmó que es seguro dejar pasar el
+despacho `ASYNC`, que cada camino lleva su causa, que solo se registran la clase de la excepción y la política, y que
+las cotas separadas con `AtomicReference<Long>` son correctas. El orquestador corrigió sus dos hallazgos importantes:
+
+- **M-1:** un adaptador de métricas que lanza un `LinkageError` (por ejemplo `NoClassDefFoundError` cuando llegue
+  Prometheus) daba `500`. Ahora `signal` y `decide` capturan `RuntimeException | LinkageError`, nunca `Throwable`, para
+  no tragar un `OutOfMemoryError`. Prueba `aMetricsAdapterThatCannotLinkStillAnswersTheRefusal`. **Ruptura:** sin
+  `LinkageError` falla en la línea 320.
+- **M-2:** un limitador que devolvía `null` producía un `NullPointerException` como `500`, sin señal. Ahora
+  `requireNonNull` dentro del `try` lo convierte en `LIMITER_FAILURE`. Prueba
+  `aLimiterThatAnswersNoDecisionIsARefusalWithItsCauseAndNeverAServerError`. **Ruptura:** sin la comprobación falla en la
+  línea 301. Ambas rupturas se revirtieron con `cmp`.
+- **S-a:** el Javadoc de `RateLimited` prohíbe además que un filtro haga `startAsync` y despache a un manejador limitado.
+- **Para 3.2c (S-b):** una prueba de arranque fallido con una política inexistente por la cadena real, que verifique que
+  `RateLimitPolicyCheck` detiene el arranque antes de que el servidor acepte conexiones.
+- **Aceptado (S-c):** un fallo del propio `LOG.atError()` escaparía como `500`. Es improbable.
