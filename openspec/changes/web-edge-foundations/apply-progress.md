@@ -2232,3 +2232,25 @@ Para seguimiento:
   real.
 - **S5 y S6, estrechar a nivel de clase la lista ampliada y la exención de W5:** son opcionales.
 - **S7, igualdad numérica del cuerpo repetido:** se comprueba con un decimal en 13b o en el primer endpoint real.
+
+### PR 13b, tarea 5.1b (2026-10-06)
+
+Toma del árbol completo, sin cambios, los archivos `IdempotencyDemoController`, `DemoProbe`, `IdempotencyEdgeIT` (17 pruebas) e
+`IdempotencyDemoAbsentFromProcessesTest`. Las evidencias de rojo y de rupturas de esas pruebas son las registradas en la sección «Tarea 5.1»,
+entre ellas la del `23505`, que responde `409` en lugar de reproducir y rompe la línea 329.
+
+Añade `IdempotentRequestHandlerTest` (4 pruebas, por I1 de la revisión de 5.1a). Cubre las tres ramas que fallan cerrado (sin clave
+validada, sin plantilla de ruta y endpoint de más de 200 caracteres), en cada una sin interacción con el ejecutor y sin ejecutar el caso
+de uso, y el borde de exactamente 200 caracteres, que llega entero al ejecutor. La prueba se escribió sobre código que ya existía, así
+que no tuvo un rojo previo. Se rompió el código a propósito dos veces para demostrar que puede fallar; después se restauró y se
+comprobó con `cmp`:
+
+| Ruptura | Prueba que falla |
+|---|---|
+| `>=` en el ancho | `anEndpointOfExactlyTheWidthOfTheMarkerTableReachesTheExecutorWhole` |
+| Plantilla ausente sustituida por la URI concreta | `aWriteThatMatchedNoRouteTemplateIsRefusedBeforeTheExecutor` |
+
+`./mvnw verify` completo, con la IT: Surefire 186 + 1 197, Failsafe 250, 0 fallos, cobertura cumplida y `BUILD SUCCESS`.
+
+Tamaño: 804 líneas, con una excepción de 4 líneas aprobada por el propietario. Con 5.1b, la tarea 5.1 queda hecha y el árbol
+`wip/web-edge-idempotency-edge-full` queda entregado completo.

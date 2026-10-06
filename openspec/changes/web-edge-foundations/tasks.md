@@ -801,7 +801,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 
 ## Fase 5: idempotencia en el borde
 
-- [ ] 5.1 **PR 13 `idempotency-edge`: borde HTTP de la idempotencia (decisión 19).** Partida en 5.1a y 5.1b (nota fechada
+- [x] 5.1 **PR 13 `idempotency-edge`: borde HTTP de la idempotencia (decisión 19).** Partida en 5.1a y 5.1b (nota fechada
   del final, 2026-10-06); el contenido de abajo es el alcance conjunto de las dos partes.
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/idempotency/IdempotencyDemoController.java`
     (solo en el árbol de pruebas, registrado únicamente en el arnés con base de datos),
@@ -841,7 +841,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
   `@Import` en `AdminApplication`, tres códigos y catálogo), la línea de `ProcessBeanPolicy`, `IdempotencyScopeExclusionInventoryTest`,
   `ProblemCodeTest`, `ProblemCatalogCoverageTest`, W5 con su fixture, la prueba de unidad
   `IdempotencyKeyInterceptorTest` y las notas de `docs/09` y de `foundations-plan/exploration.md`. Necesita 4.1c.
-- [ ] 5.1b **PR 13b `idempotency-edge-runtime-proof`.** `IdempotencyDemoController`, `DemoProbe`, `IdempotencyEdgeIT` (17 pruebas por
+- [x] 5.1b **PR 13b `idempotency-edge-runtime-proof`.** `IdempotencyDemoController`, `DemoProbe`, `IdempotencyEdgeIT` (17 pruebas por
   la cadena real con base de datos, con la demostración de `23505`) e `IdempotencyDemoAbsentFromProcessesTest`, que necesita la clase
   del controlador de demostración en el árbol de pruebas. Añade además (I1 de la revisión de 5.1a) una prueba de unidad de
   `IdempotentRequestHandler` con `MockHttpServletRequest` y un `IdempotentExecutor` simulado para sus tres ramas que fallan cerrado: sin
@@ -1361,3 +1361,7 @@ nombraba, `IdempotencyKeyInvalidException`.
 
 **Ajuste de la costura (2026-10-06).** `IdempotencyDemoAbsentFromProcessesTest` pasa de 5.1a a 5.1b: comprueba la ausencia del controlador de
 demostración cargando su clase del árbol de pruebas, y esa clase llega con 5.1b. En 5.1a fallaba con `ClassNotFoundException`. Medido: 5.1a 736 y 5.1b 713.
+
+**Excepción de tamaño para 5.1b (2026-10-06).** 5.1b midió **804 líneas efectivas**: 713 del árbol completo más las 91 de
+`IdempotentRequestHandlerTest`, que pidió la revisión de 5.1a (I1). El propietario aprobó una excepción de 4 líneas en un solo PR 13b, sin
+recortar contenido.
