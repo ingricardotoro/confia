@@ -1638,3 +1638,24 @@ Traslado directo, hecho por el orquestador, desde la rama local verificada `wip/
 | `./mvnw verify` completo | Surefire 186 + 1030, Failsafe 229, `BUILD SUCCESS` |
 
 Con 3.1a, 3.1b y 3.1c fusionadas, la tarea 3.1 queda completa. 3.2 ya puede empezar.
+
+### Revisión independiente de 3.1c (2026-10-05)
+
+Riesgo evaluado: alto, aunque el único cambio de producción es `reservedForTest()`, de paquete. Veredicto: aprobado,
+sin bloqueantes, con 2 hallazgos importantes y 3 sugerencias. El orquestador corrigió los dos importantes:
+
+- **I-1: el muestreador podía no llegar a muestrear mientras corrían los hilos de trabajo,** y entonces
+  `largest <= N` pasaba en vacío con `largest` en 0. Ahora `startSampler` devuelve el hilo solo después de la primera
+  muestra (`CountDownLatch`), cuenta las muestras en un `AtomicLong` y `assertSampled` exige que haya muestras
+  posteriores al arranque. **Ruptura:** sin `samples.incrementAndGet()` fallan 40 de 80 con
+  `[samples taken while the workers ran]`. Revertida con `cmp`.
+- **I-2: el nombre prometía más de lo que se mide.** Las pruebas acotan las **reservas**, no el tamaño instantáneo del
+  mapa, del que no existe una instantánea. Se renombraron a `...NeverReservesPastN` y
+  `...NeverReservesPastTheTable`, y el Javadoc del muestreador declara que la propiedad «el mapa nunca tiene N + 1
+  entradas en ningún instante» (liberar el hueco solo después de quitar la entrada) queda sin muestrear a propósito.
+- **Sugerencias registradas como seguimiento:** una etiqueta de cobertura de jqwik específica para «restringida con menos
+  fallos que el umbral en la ventana»; `Thread.yield()` o un tope de muestras en runners con pocas vCPU. La independencia
+  de `NaiveReference` es de estructura de datos y no de especificación; se acepta, porque la mitigan las pruebas
+  escritas a mano.
+- Cinco ejecuciones seguidas de la clase de concurrencia, sola: 80/80 en las cinco. `./mvnw verify` completo:
+  Surefire 186 + 1030, Failsafe 229, `BUILD SUCCESS`.
