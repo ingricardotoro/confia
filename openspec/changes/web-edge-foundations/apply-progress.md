@@ -1621,3 +1621,20 @@ de 10 000 de S-2 es razonable y que la prueba de ArchUnit «sin reloj de pared»
 - **Seguimientos.** Una cota superior para `maxEntries` (del orden de 10⁶) y ampliar `WALL_CLOCK_TYPES` con
   `LocalDate`, `Calendar` y `java.sql.Timestamp`. Ambos son de bajo valor.
 - `./mvnw verify` completo: Surefire 186 + 947, Failsafe 229, `BUILD SUCCESS`.
+
+### Tarea 3.1c (2026-10-05)
+
+Traslado directo, hecho por el orquestador, desde la rama local verificada `wip/web-edge-rate-limiter-table-full`
+(`faf1878`): `InMemoryRateLimiterPropertiesTest` e `InMemoryRateLimiterConcurrencyTest` sin cambios, más
+`int reservedForTest()` de paquete en `InMemoryRateLimiter` (I-3: el contador atómico de ranuras reservadas).
+
+| Paso | Resultado |
+|---|---|
+| ROJO | Error de compilación: `cannot find symbol` en `InMemoryRateLimiterConcurrencyTest.java:[165,49]` y `[173,27]` (`reservedForTest()`) |
+| VERDE | `ConcurrencyTest` 80/80 y `PropertiesTest` 3/3 |
+| Cinco ejecuciones seguidas de la clase de concurrencia, sola | 80/80, 80/80, 80/80, 80/80, 80/80 |
+| Ruptura: la tabla nunca rechaza (`reserveSlot` devuelve `true` al estar llena, como cualquier desalojo) | `ConcurrencyTest` `Failures: 40` de 80, `expected: 50L`. Revertida con `cmp` |
+| Ruptura: la restricción se levanta cuando los fallos de la ventana bajan del umbral (regla descartada) | `PropertiesTest` `Failures: 1`, `expected: Limited[retryAfter=PT19.000000001S]` contra el modelo ingenuo. Revertida con `cmp` |
+| `./mvnw verify` completo | Surefire 186 + 1030, Failsafe 229, `BUILD SUCCESS` |
+
+Con 3.1a, 3.1b y 3.1c fusionadas, la tarea 3.1 queda completa. 3.2 ya puede empezar.
