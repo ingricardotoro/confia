@@ -1292,3 +1292,5 @@ a 3.2c «Sin cupo ni límite», «Petición rechazada sin efecto», «Cambio de 
 La tarea 3.2c midió **839 líneas efectivas** (818 añadidas y 21 eliminadas, sin `openspec/`) frente al tope de 800 y al pronóstico de unas 639. Sin las notas de
 `docs/03-seguridad.md` (62 líneas) mide 777. El propietario aprobó una **excepción de tamaño de unas 39 líneas** y un solo PR 11c, en lugar de la costura
 11c-1/11c-2, porque las notas de seguridad se revisan junto con el cableado que describen. El cambio sigue con 23 tareas y 22 PR.
+
+**Ampliación (2026-10-06).** Las correcciones de la revisión independiente de 3.2c (la prueba de S-2 y la nota I-1 de `docs/03`) llevaron la medición a **869 líneas**. El propietario amplió la excepción para cubrir esas 30 líneas en el mismo PR 11c.
