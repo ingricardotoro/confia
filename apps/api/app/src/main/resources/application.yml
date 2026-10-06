@@ -9,7 +9,8 @@ server:
   # 12).
   forward-headers-strategy: none
   # Bounds on what a client can hold open (web-edge-foundations design.md, decision 18). The header
-  # size also bounds X-Forwarded-For, which the request origin reads.
+  # size doubles Spring Boot's 8KB default to admit long tokens; it is the one ceiling on the request
+  # line and all headers together, X-Forwarded-For included, which has no cap of its own.
   max-http-request-header-size: 16KB
   tomcat:
     # Reading the request: a client that sends it too slowly is cut off.

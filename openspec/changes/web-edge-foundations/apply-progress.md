@@ -2033,3 +2033,34 @@ archivos, sin cambiarlos.
 línea de `ProcessBeanPolicy`, `GatedTimer`, `RequiredDelayMaterializerTest` y `RequiredDelayMaterializerConcurrencyTest`. Las
 demostraciones del permiso y de `finally`, y el rojo de la lista de permitidos, son las registradas arriba. El `./mvnw verify` completo
 sobre el árbol de 12a solo dio Surefire 186 + 1 134, Failsafe 229, 0 fallos, cobertura cumplida y `BUILD SUCCESS`.
+
+### Revisión independiente de 4.1a (2026-10-06)
+
+Veredicto: apto para fusionar, sin bloqueantes ni importantes. La revisión confirmó estos puntos:
+
+- el permiso se toma antes del caso de uso y hay exactamente una liberación en `finally`;
+- se rechazan el hilo de plataforma y la transacción activa;
+- un retardo cero o negativo no espera;
+- la interrupción vuelve a marcar el hilo como interrumpido;
+- la configuración es solo de administración;
+- `DelayProperties` rechaza campos desconocidos;
+- los hilos virtuales globales son seguros en JDK 25 (JEP 491);
+- las pruebas son deterministas y la de concurrencia demuestra exactamente `P` admitidas.
+
+Corregido:
+
+- **S4:** el comentario de `max-http-request-header-size` decía que acota, cuando en realidad duplica la omisión de 8KB de Spring Boot. Ahora lo dice y aclara que es el único techo de `X-Forwarded-For`.
+
+Para 4.1b:
+
+- **S1:** las validaciones de arranque y los valores de Tomcat se prueban allí, como declara la partición.
+- **S2:** rechazar `server.tomcat.max-connections <= 0` con un mensaje propio, y considerar enlazar `TomcatServerProperties` en lugar de la constante 8192.
+- **S5:** la ausencia de `ERROR` ante una desconexión solo vale por la IT.
+
+Para el cambio de sesión:
+
+- **S3:** un tope superior de `requiredDelay`, por ejemplo en `Delayed`, cuando exista el primer caso de uso que lo produzca.
+
+Para el cambio 9:
+
+- confirmar que el ejecutor de db-scheduler no depende de `spring.threads.virtual.enabled`.
