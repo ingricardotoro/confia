@@ -787,7 +787,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     materializador sin uso); requisito de `build-integrity` «La espera bloqueante del retardo se
     confina al materializador»
 
-- [ ] 4.1a **PR 12a `delay-materializer-core`.** `RequiredDelayMaterializer`, `Delayed`, `DelayTimer`, `DelayProperties`,
+- [x] 4.1a **PR 12a `delay-materializer-core`.** `RequiredDelayMaterializer`, `Delayed`, `DelayTimer`, `DelayProperties`,
   `RequiredDelayConfiguration` (`shared.web.edge`, `@Import` solo en `AdminApplication`), la línea `com.confia.shared.web.delay` de
   `ProcessBeanPolicy`, `application.yml`, `GatedTimer`, `RequiredDelayMaterializerTest` y `RequiredDelayMaterializerConcurrencyTest`.
   Demostraciones: permiso después del caso de uso y `release()` fuera de `finally`. Necesita 3.2c.
