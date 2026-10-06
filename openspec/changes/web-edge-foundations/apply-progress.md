@@ -1855,3 +1855,15 @@ Rama `change/web-edge-foundations-edge-interceptor`, creada desde `main` en `5c5
 | Orden enfocada y resultado | `Tests run: 16, Failures: 0` (interceptor e inventario); cierre completo Surefire 186 + 1 075, Failsafe 229 |
 | Arnés de ejecución | Interceptor con un limitador de respuesta fija, `RequestOrigin` ligado por `ScopedValue` y un `ListAppender` de Logback; la cadena real llega en 3.2c |
 | Frontera de reversión | Se retiran las cuatro clases, su prueba y las cinco entradas de la lista de permitidos |
+
+### Corrección del orquestador en 3.2b (2026-10-06)
+
+El agente señaló en su informe que las dos líneas `ERROR` del interceptor (fallo del limitador y fallo del adaptador
+de métricas) compartían un único tope de una por segundo. Cuando el limitador falla, el interceptor registra el fallo
+y después llama a la métrica; si el adaptador también falla en ese mismo segundo, su línea quedaba suprimida, y son
+dos defectos distintos que el operador necesita ver. Ahora cada mensaje tiene su propio tope
+(`lastLimiterFailureAt` y `lastMetricsFailureAt`).
+
+- Prueba nueva: `aFailingLimiterAndAFailingAdapterInTheSameSecondEachLeaveTheirOwnLine` exige las dos líneas en
+  orden. **Ruptura:** con el tope compartido falla en la línea 291. Revertida con `cmp`.
+- `./mvnw verify` completo: Surefire 186 + 1076, Failsafe 229, `BUILD SUCCESS`.
