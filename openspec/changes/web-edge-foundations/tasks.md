@@ -850,7 +850,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 
 ## Fase 6: cierre
 
-- [ ] 6.1 **Verificación completa, medición de los 25 PR y barrido de trazabilidad.** Con los 25 PR
+- [x] 6.1 **Verificación completa, medición de los 25 PR y barrido de trazabilidad.** Con los 25 PR
   fusionados a `main`, ejecutar `./mvnw verify` completo en `apps/api` y registrar cobertura (global
   80 %, núcleo y `domain` 95 %) y mutación (umbral 80). Registrar en
   `openspec/changes/web-edge-foundations/apply-progress.md` la medición de cada PR con
@@ -1365,3 +1365,16 @@ demostración cargando su clase del árbol de pruebas, y esa clase llega con 5.1
 **Excepción de tamaño para 5.1b (2026-10-06).** 5.1b midió **804 líneas efectivas**: 713 del árbol completo más las 91 de
 `IdempotentRequestHandlerTest`, que pidió la revisión de 5.1a (I1). El propietario aprobó una excepción de 4 líneas en un solo PR 13b, sin
 recortar contenido.
+
+## Nota fechada 2026-10-06: cierre 6.1
+
+- **Ampliación retroactiva de la excepción del PR #87 (2.2b `edge-gates`).** La medición del cierre dio **930 líneas efectivas** frente a
+  las 902 aprobadas. La diferencia sale del último commit, `8f3a40c` (+27 −1 en `ContainerRejectionsTest`), que llegó después de la
+  medición. El propietario aceptó la ampliación a 930 sin cambio de código; el PR ya está fusionado.
+- **S-3 (regla 11 de `CLAUDE.md`), decisión del propietario: corregir dentro del cierre.** El cierre encontró que Tomcat
+  (`org.apache.coyote.http11.Http11Processor`) registra a nivel `INFO` la primera petición mal formada de cada procesador con el destino
+  completo, consulta incluida, y que cualquier cliente sin sesión puede provocarlo. `SensitiveLogGuard` deniega ahora también el `INFO`
+  de ese registrador exacto; su `WARN` y su `ERROR` siguen pasando. Lo prueba `MalformedRequestLoggingTest`. Siguen pendientes para el
+  cambio de observabilidad y para el primer cambio con un endpoint que use la base de datos: el registro `ERROR` de
+  `ProblemExceptionHandler.unexpected`, que imprime la excepción completa (el `Detail: Key (...)=(...)` de PostgreSQL), y un filtro
+  de mensajes de excepción.

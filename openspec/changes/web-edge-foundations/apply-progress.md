@@ -2402,3 +2402,28 @@ condición del cambio de observabilidad y del primero que añada un endpoint con
 - No se comprobó el texto exacto del mensaje de `MethodValidationException` para un valor devuelto en la versión de Spring en uso; la fila de `:183`/`:200` se clasifica por la ausencia de ruta, no por esa lectura.
 - El efecto de la opción (a) del hallazgo del contenedor (nivel `WARN` del registrador) no se probó.
 - Las causas de las diferencias de #82, #86, #89, #90, #91 y #100 respecto del plan no se investigaron commit por commit.
+
+### Decisiones del propietario sobre el cierre 6.1 (2026-10-06)
+
+**S-3: se corrige ahora, ampliando `SensitiveLogGuard`.** El guardia deniega el `INFO` del registrador exacto
+`org.apache.coyote.http11.Http11Processor` (`INFO_PROTECTED_LOGGERS`). Su `WARN` y su `ERROR` siguen pasando, igual que las líneas de
+arranque y parada del conector (`Http11NioProtocol`).
+
+`MalformedRequestLoggingTest` (3 pruebas) usa un proceso nuevo por prueba, porque Tomcat escribe esa línea a nivel `INFO` una sola vez
+por procesador. Cada prueba envía por socket crudo `GET /x?token=SECRETO-E^`.
+
+- **Rojo observado:** 3 pruebas, 2 fallos. El mensaje fue `org.apache.coyote.http11.Http11Processor INFO stack trace contains SECRETO-E`.
+- **Verde:** 3/3, junto con `SensitiveDataLoggingTest` (4) y `SensitiveLogGuardPrefixesTest` (7).
+- **No vacuidad:** `withoutTheGuardTheFirstMalformedRequestDoesLeakAtInfo` retira el guardia y comprueba que el secreto sí aparece en
+  ese registrador a nivel `INFO`.
+
+**PR #87: el propietario acepta la ampliación retroactiva de la excepción a 930 líneas.** La causa es el commit `8f3a40c`.
+
+**Pendientes para otros cambios:**
+
+- el `ERROR` de `ProblemExceptionHandler.unexpected` con la excepción completa;
+- un filtro de mensajes de excepción en el registro estructurado.
+
+Ambos quedan como condición del cambio de observabilidad y del primer endpoint que use la base de datos.
+
+`./mvnw verify` completo con la corrección de S-3: Surefire 186 + 1 200, Failsafe 250, 0 fallos, cobertura cumplida y `BUILD SUCCESS`. La tarea 6.1 queda hecha.
