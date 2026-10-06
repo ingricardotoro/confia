@@ -1389,9 +1389,12 @@ operativo: un pico de 429 legítimos indica un límite mal calibrado, no un ataq
 > `unknown_policy` y `limiter_failure` son defectos de cableado o del limitador, que fallan cerrado
 > igual, y el operador debe tratarlos como un error, no como un ataque (`limiter_failure`, además,
 > deja un `ERROR` con solo la clase de la excepción). El código `capacity-exceeded` también responde
-> a los `503` del marco (un tiempo de espera asíncrono, una `ResponseStatusException(503)`): si no hay
-> un evento `rate_limit_capacity_exhausted` en ese instante, el `503` no vino del limitador (nota
-> fechada de `docs/07-observabilidad-y-operaciones.md` §5.4).
+> a los `503` del marco (un tiempo de espera asíncrono, una `ResponseStatusException(503)`). El
+> evento está acotado a uno por segundo por política y causa, y los omitidos se cuentan en
+> `suppressed` del siguiente, así que la falta de un evento en el mismo instante no descarta al
+> limitador. La lectura correcta es por tendencia: eventos recientes de `table_full` indican que los
+> `503` vienen del limitador; su ausencia sostenida, junto con el registro de errores del servidor,
+> indica que vienen del marco (nota fechada de `docs/07-observabilidad-y-operaciones.md` §5.4).
 
 ---
 

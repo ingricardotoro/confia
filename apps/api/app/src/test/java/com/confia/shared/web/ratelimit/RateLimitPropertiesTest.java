@@ -11,8 +11,11 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.MapPropertySource;
 
 /**
@@ -90,6 +93,29 @@ class RateLimitPropertiesTest {
         assertThatThrownBy(() -> bind(values)).satisfies(failure ->
                 assertThat(messagesOf(failure)).contains(PREFIX + "." + property)
                         .contains("must not exceed " + bound));
+    }
+
+    @Test
+    void aMisspelledPropertyStopsTheStartInsteadOfLeavingTheDefault() {
+        // A typo in a security control must not quietly keep ten requests a minute.
+        new ApplicationContextRunner().withUserConfiguration(PropertiesOnly.class)
+                .withPropertyValues(PREFIX + ".request-limt=3")
+                .run(context -> assertThat(context).hasFailed().getFailure()
+                        .satisfies(failure -> assertThat(messagesOf(failure))
+                                .contains(PREFIX + ".request-limt")));
+    }
+
+    @Test
+    void aWellSpelledPropertyStillStarts() {
+        new ApplicationContextRunner().withUserConfiguration(PropertiesOnly.class)
+                .withPropertyValues(PREFIX + ".request-limit=3")
+                .run(context -> assertThat(context.getBean(RateLimitProperties.class)
+                        .requestLimit()).isEqualTo(3));
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(RateLimitProperties.class)
+    static class PropertiesOnly {
     }
 
     private static String messagesOf(Throwable failure) {

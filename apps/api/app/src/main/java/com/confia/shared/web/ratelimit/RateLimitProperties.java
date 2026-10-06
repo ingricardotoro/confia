@@ -21,7 +21,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param maxEntries {@code max-entries}: the clients the table holds, with headroom over the
  *     clients that are expected at once, because a full table refuses every new one
  */
-@ConfigurationProperties(prefix = RateLimitProperties.PREFIX)
+// Unknown fields stop the start: a misspelled limit must never silently keep the default.
+@ConfigurationProperties(prefix = RateLimitProperties.PREFIX, ignoreUnknownFields = false)
 public record RateLimitProperties(@DefaultValue("10") int requestLimit,
         @DefaultValue("1m") Duration requestWindow, @DefaultValue("10") int failureThreshold,
         @DefaultValue("10m") Duration failureWindow,
