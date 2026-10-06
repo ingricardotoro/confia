@@ -2081,3 +2081,17 @@ mitad de un número negativo.
 
 `./mvnw verify` completo, con la IT: Surefire 186 + 1 150, Failsafe 233 (incluye las 4 pruebas de `RequiredDelayMaterializerIT`),
 0 fallos, cobertura cumplida y `BUILD SUCCESS`.
+
+### PR 12c, tarea 4.1c (2026-10-06)
+
+Toma del árbol completo, sin cambios, los archivos `BlockingWaitConfinementTest` (regla W4), `BadSleepingWebComponent`, la ampliación de
+`WebEdgeScopeExclusionInventoryTest` y la de `WebEdgeScopeViolationFixtures`. Con este PR el árbol de `wip/web-edge-delay-materializer-full`
+queda entregado completo. Solo difieren tres archivos, por las correcciones de revisión: `RequiredDelayConfiguration` y su prueba (S2) y
+`application.yml` (S4). Con 4.1c fusionada, la tarea 4.1 queda hecha.
+
+**Ruptura deliberada adicional.** Sin la exención del materializador en la condición de W4, la prueba
+`productionCodeWaitsOnlyInTheMaterializer` falla con el mensaje `RequiredDelayMaterializer calls Thread.sleep(...)`. Después se
+restauró el archivo y `cmp` confirmó que quedó idéntico.
+
+`./mvnw verify` completo: Surefire 186 + 1 162, Failsafe 233, 0 fallos, cobertura cumplida y `BUILD SUCCESS`. Tamaño: 399 líneas
+efectivas.

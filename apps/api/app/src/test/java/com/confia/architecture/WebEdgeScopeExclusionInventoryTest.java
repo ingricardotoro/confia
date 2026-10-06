@@ -3,6 +3,7 @@ package com.confia.architecture;
 import static com.confia.architecture.ArchitectureTestSupport.productionClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.confia.shared.security.RateLimiter;
 import com.confia.shared.security.SessionValidity;
 import com.confia.shared.web.testsupport.fixture.WebEdgeScopeViolationFixtures;
 import com.tngtech.archunit.core.domain.Dependency;
@@ -14,6 +15,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.AuthenticationProvider;
 
@@ -32,7 +34,12 @@ import org.springframework.security.authentication.AuthenticationProvider;
  *   <li>no authorization rule on a route beyond the public allow-list and the final denial, and no
  *       method-level permission annotation (owner: change 8, RBAC);
  *   <li>no class of a {@code ..web..} package has {@code Institution} in its name (owner: the first
- *       endpoint of institution administration).
+ *       endpoint of institution administration);
+ *   <li>the limiter and the delay materializer are used by no production class outside their own
+ *       packages and {@code shared.web.edge}, which wires them (owner: slice C6a, the first
+ *       endpoint that applies them);
+ *   <li>the limiter port has one implementation, the in-memory one, and no Redis client is on the
+ *       class path (owner: change 11, containerization-and-cicd-pipeline).
  * </ul>
  *
  * <p>Static inventories over the compiled class tree, in the manner of {@code
@@ -55,6 +62,31 @@ class WebEdgeScopeExclusionInventoryTest {
             "org.springframework.security.access.annotation.Secured",
             "jakarta.annotation.security.RolesAllowed",
             "org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity");
+
+    /** The types through which a class applies the limiter, and the packages that may. */
+    private static final Set<String> LIMITER_TYPES = Set.of(
+            "com.confia.shared.security.RateLimiter",
+            "com.confia.shared.web.ratelimit.RateLimited",
+            "com.confia.shared.web.ratelimit.RateLimiterRegistry",
+            "com.confia.shared.web.ratelimit.RateLimitInterceptor");
+    private static final Set<String> LIMITER_PACKAGES = Set.of("com.confia.shared.web.ratelimit",
+            "com.confia.shared.security", "com.confia.shared.web.edge");
+
+    /** The types through which a class asks for a delay, and the packages that may. */
+    private static final Set<String> MATERIALIZER_TYPES = Set.of(
+            "com.confia.shared.web.delay.RequiredDelayMaterializer",
+            "com.confia.shared.web.delay.Delayed", "com.confia.shared.web.delay.DelayTimer",
+            "com.confia.shared.web.delay.DelayProperties");
+    private static final Set<String> MATERIALIZER_PACKAGES =
+            Set.of("com.confia.shared.web.delay", "com.confia.shared.web.edge");
+
+    /** A class of each Redis client library the project could pick, as a class path resource. */
+    private static final List<String> REDIS_CLIENT_RESOURCES = List.of(
+            "io/lettuce/core/RedisClient.class", "redis/clients/jedis/Jedis.class",
+            "org/redisson/Redisson.class",
+            "org/springframework/data/redis/core/RedisTemplate.class");
+    private static final List<String> REDIS_CLIENT_PACKAGES = List.of("io.lettuce",
+            "redis.clients", "org.redisson", "org.springframework.data.redis");
 
     // --- The session validity port has no adapter (owner: session-tokens-and-web-layer, C5b) ---
 
@@ -248,7 +280,142 @@ class WebEdgeScopeExclusionInventoryTest {
                         .getName());
     }
 
+    // --- The limiter and the delay materializer apply to no production endpoint (owner: C6a) ---
+
+    @Test
+    void noProductionClassOutsideTheEdgeUsesTheLimiter() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+
+        assertThat(usesOf(production, LIMITER_TYPES, Set.of()))
+                .as("non-vacuous: the edge configuration and the startup check really use the "
+                        + "limiter types, so the check below looks at real dependencies")
+                .contains("com.confia.shared.web.edge.ThrottlingConfiguration",
+                        "com.confia.shared.web.ratelimit.RateLimitPolicyCheck");
+        assertThat(usesOf(production, LIMITER_TYPES, LIMITER_PACKAGES))
+                .as("only the limiter's own packages and the edge use it: no production "
+                        + "endpoint applies it, and H1 stays open for slice C6a")
+                .isEmpty();
+    }
+
+    @Test
+    void theLimiterDetectorFindsAControllerThatAppliesIt() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(
+                WebEdgeScopeViolationFixtures.LimitedLoginController.class);
+
+        assertThat(usesOf(fixtures, LIMITER_TYPES, LIMITER_PACKAGES)).containsExactly(
+                WebEdgeScopeViolationFixtures.LimitedLoginController.class.getName());
+    }
+
+    @Test
+    void noProductionClassOutsideTheEdgeUsesTheDelayMaterializer() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+
+        assertThat(usesOf(production, MATERIALIZER_TYPES, Set.of()))
+                .as("non-vacuous: the edge configuration really uses the materializer types")
+                .contains("com.confia.shared.web.edge.RequiredDelayConfiguration");
+        assertThat(usesOf(production, MATERIALIZER_TYPES, MATERIALIZER_PACKAGES))
+                .as("only the materializer's own package and the edge use it: no production "
+                        + "endpoint asks it for a delay, and H1 stays open for slice C6a")
+                .isEmpty();
+    }
+
+    @Test
+    void theMaterializerDetectorFindsAControllerThatAsksForADelay() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(
+                WebEdgeScopeViolationFixtures.DelayingLoginController.class);
+
+        assertThat(usesOf(fixtures, MATERIALIZER_TYPES, MATERIALIZER_PACKAGES)).containsExactly(
+                WebEdgeScopeViolationFixtures.DelayingLoginController.class.getName());
+    }
+
+    // --- One limiter implementation and no Redis client (owner: change 11) ---
+
+    @Test
+    void theLimiterPortHasASingleImplementationAndItIsInMemory() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+
+        assertThat(production.get(RateLimiter.class).isInterface()).as("the port is an interface")
+                .isTrue();
+        assertThat(implementationsOf(production, RateLimiter.class))
+                .as("the in-memory limiter is the only implementation: the Redis adapter that "
+                        + "implements the same port is change 11's")
+                .containsExactly("com.confia.shared.security.InMemoryRateLimiter");
+    }
+
+    @Test
+    void theImplementationDetectorFindsASecondLimiter() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(
+                WebEdgeScopeViolationFixtures.SecondRateLimiter.class);
+
+        assertThat(implementationsOf(fixtures, RateLimiter.class)).containsExactly(
+                WebEdgeScopeViolationFixtures.SecondRateLimiter.class.getName());
+    }
+
+    @Test
+    void noRedisClientIsOnTheClassPathAndNoProductionClassDependsOnOne() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+        Predicate<String> onTheClassPath =
+                resource -> WebEdgeScopeExclusionInventoryTest.class.getClassLoader()
+                        .getResource(resource) != null;
+
+        assertThat(onTheClassPath.test("org/springframework/web/servlet/DispatcherServlet.class"))
+                .as("non-vacuous: the lookup finds a class that really is on the class path")
+                .isTrue();
+        assertThat(redisClientsFound(onTheClassPath))
+                .as("no Redis client is on the class path: the adapter that shares the limiter "
+                        + "between processes is change 11's")
+                .isEmpty();
+        assertThat(classesDependingOnARedisClient(production)).isEmpty();
+    }
+
+    @Test
+    void theRedisDetectorsFindAClientOnTheClassPathAndADependencyOnOne() {
+        assertThat(redisClientsFound(resource -> resource.equals("redis/clients/jedis/Jedis.class")))
+                .containsExactly("redis/clients/jedis/Jedis.class");
+        assertThat(isARedisClientPackage("io.lettuce.core")).isTrue();
+        assertThat(isARedisClientPackage("org.springframework.data.redis.core")).isTrue();
+        assertThat(isARedisClientPackage("org.redisson")).isTrue();
+        assertThat(isARedisClientPackage("com.confia.shared.web.delay")).isFalse();
+    }
+
     // --- Detectors, each used on production and on its fixture ---
+
+    /**
+     * The classes outside {@code allowedPackages} (exact package names) that depend on any of
+     * {@code types}: through a field, a parameter, a return type, a call or an annotation. The
+     * types themselves are skipped, and so is any class that belongs to an allowed package.
+     */
+    private static List<String> usesOf(JavaClasses classes, Set<String> types,
+            Set<String> allowedPackages) {
+        return classes.stream()
+                .filter(javaClass -> !allowedPackages.contains(javaClass.getPackageName()))
+                .filter(javaClass -> !types.contains(javaClass.getName()))
+                .filter(javaClass -> javaClass.getDirectDependenciesFromSelf().stream()
+                        .anyMatch(dependency -> types.contains(
+                                dependency.getTargetClass().getName())))
+                .map(JavaClass::getName)
+                .sorted()
+                .toList();
+    }
+
+    private static List<String> redisClientsFound(Predicate<String> onTheClassPath) {
+        return REDIS_CLIENT_RESOURCES.stream().filter(onTheClassPath).sorted().toList();
+    }
+
+    private static boolean isARedisClientPackage(String packageName) {
+        return REDIS_CLIENT_PACKAGES.stream().anyMatch(
+                candidate -> packageName.equals(candidate) || packageName.startsWith(candidate + "."));
+    }
+
+    private static List<String> classesDependingOnARedisClient(JavaClasses classes) {
+        return classes.stream()
+                .filter(javaClass -> javaClass.getDirectDependenciesFromSelf().stream()
+                        .anyMatch(dependency -> isARedisClientPackage(
+                                dependency.getTargetClass().getPackageName())))
+                .map(JavaClass::getName)
+                .sorted()
+                .toList();
+    }
 
     private static List<String> implementationsOf(JavaClasses classes, Class<?> port) {
         return classes.stream()

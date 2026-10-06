@@ -749,7 +749,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 
 ## Fase 4: materialización del retardo
 
-- [ ] 4.1 **PR 12 `delay-materializer`: espera tras el commit en hilos virtuales (decisión 18).** Partida en 4.1a, 4.1b y 4.1c
+- [x] 4.1 **PR 12 `delay-materializer`: espera tras el commit en hilos virtuales (decisión 18).** Partida en 4.1a, 4.1b y 4.1c
   (nota fechada del final, 2026-10-06); el contenido de abajo es el alcance conjunto de las tres partes.
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/shared/web/delay/`:
     `RequiredDelayMaterializerTest.java` (llamado desde hilos virtuales: permiso antes del caso de uso,
@@ -794,7 +794,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 - [x] 4.1b **PR 12b `delay-materializer-runtime-proof`.** `RequiredDelayConfigurationTest`, la ampliación de
   `ProcessBeanIsolationTest`, la de `ProductionEdgeDefaultsTest` y `RequiredDelayMaterializerIT` (espera tras el commit, cero
   conexiones activas y ningún bloqueo durante la espera, hilo virtual y desconexión sin `ERROR`). Necesita 4.1a.
-- [ ] 4.1c **PR 12c `blocking-wait-rule`.** `BlockingWaitConfinementTest` (W4, con no vacuidad y el fixture
+- [x] 4.1c **PR 12c `blocking-wait-rule`.** `BlockingWaitConfinementTest` (W4, con no vacuidad y el fixture
   `BadSleepingWebComponent`) y la ampliación de `WebEdgeScopeExclusionInventoryTest` con sus fixtures. Necesita 4.1b.
   4.1 se marca hecha cuando se fusiona 4.1c.
 
