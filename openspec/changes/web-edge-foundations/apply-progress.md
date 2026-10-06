@@ -1295,3 +1295,10 @@ Veredicto: sin bloqueantes. Hallazgos y resolución:
 | S3: duplicación entre W2a y W2b y entre los detectores | Aceptada como duplicación (cada regla conserva su propio ámbito y mensaje). |
 
 Cierre: `./mvnw verify` completo: Surefire 186 + 867 (865 más 2: la dependencia del puerto y su fixture), Failsafe 229, `BUILD SUCCESS`. Instantánea OpenAPI y `routes` sin cambios.
+
+### Ampliación de la excepción de tamaño del PR 9 (2026-10-05)
+
+Con las correcciones de la revisión independiente (I1 e I2 del orquestador en `5728e0d`; I3, S1 y S2 en `2615366`),
+el PR 9 mide 916 líneas efectivas (911 añadidas y 5 eliminadas) frente al presupuesto de 800. Sigue habiendo solo 17
+líneas de producción. El propietario amplió la excepción de tamaño de 22 a **116 líneas**: la corrección viaja con
+las reglas que corrige. No se recortaron pruebas ni comentarios.
