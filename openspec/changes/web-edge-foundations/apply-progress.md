@@ -2064,3 +2064,20 @@ Para el cambio de sesión:
 Para el cambio 9:
 
 - confirmar que el ejecutor de db-scheduler no depende de `spring.threads.virtual.enabled`.
+
+### PR 12b, tarea 4.1b (2026-10-06)
+
+Toma del árbol completo (`wip/web-edge-delay-materializer-full`), sin cambios, los archivos `RequiredDelayConfigurationTest`, la
+ampliación de `ProcessBeanIsolationTest`, la de `ProductionEdgeDefaultsTest` y `RequiredDelayMaterializerIT`. Las evidencias de rojo y
+de rupturas son las registradas en la sección «Tarea 4.1».
+
+Añade además **S2** de la revisión de 4.1a: un `server.tomcat.max-connections` no positivo detiene el arranque con su propio motivo,
+porque Tomcat lee -1 como «sin límite» y la mitad de «sin límite» no acota nada. Antes, el mensaje decía que las esperas superaban la
+mitad de un número negativo.
+
+- **Rojo observado:** `RequiredDelayConfigurationTest`, 11 pruebas, 2 fallos, en los casos 0 y -1 de
+  `aConnectionLimitThatIsNotPositiveStopsTheStartWithItsOwnReason`.
+- **Verde:** 11/11.
+
+`./mvnw verify` completo, con la IT: Surefire 186 + 1 150, Failsafe 233 (incluye las 4 pruebas de `RequiredDelayMaterializerIT`),
+0 fallos, cobertura cumplida y `BUILD SUCCESS`.
