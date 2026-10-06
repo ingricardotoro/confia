@@ -1,5 +1,6 @@
 package com.confia.architecture;
 
+import static com.confia.architecture.ArchitectureTestSupport.fixtureClasses;
 import static com.confia.architecture.ArchitectureTestSupport.productionClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -7,6 +8,7 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import java.util.List;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
+import org.springframework.stereotype.Controller;
 
 /**
  * ADR-0018, mechanism (a), "Inventario de caducidad", extended by ADR-0020 §2 with a second marker
@@ -29,8 +31,14 @@ class EmptyShouldExceptionInventoryTest {
     }
 
     /**
-     * Package-visible for {@link SuppressionCitesAdrTest}'s count check. <b>Empty today</b>: no
-     * exception is in force. The last one, {@link Marker#OPTIONAL_LAYER} on {@code
+     * Package-visible for {@link SuppressionCitesAdrTest}'s count check. <b>One entry today</b>:
+     * the production half of {@code WebExposedTypesRuleTest}'s controller signature rule (rule
+     * W2a, web-edge-foundations design.md, decision 20) evaluates against no class at all, because
+     * no production class is a controller yet. Its owner is {@code session-tokens-and-web-layer},
+     * whose first production endpoint ends the condition, and the build fails that day until the
+     * exception is removed from the rule together with this entry (ADR-0018, section 2).
+     *
+     * <p>History: the last {@link Marker#OPTIONAL_LAYER} exception, on {@code
      * LayeredArchitectureTest.productionLayeringRule}, layer {@code Web} (ADR-0020 §2), expired in F0
      * change 3 (frontend-monorepo-and-contracts-pipeline, task 1.3), when {@link
      * com.confia.shared.web.openapi.ContractSchemas} became the first production class in a {@code
@@ -43,7 +51,16 @@ class EmptyShouldExceptionInventoryTest {
      * organization.domain} added its first production class (change 4). The mechanism itself stays
      * in place for whichever future exception needs it.
      */
-    static final List<ExpiringException> EXCEPTIONS = List.of();
+    static final List<ExpiringException> EXCEPTIONS = List.of(
+            new ExpiringException(Marker.ALLOW_EMPTY_SHOULD,
+                    "WebExposedTypesRuleTest.productionControllersExposeNoDomainOrPersistenceType"
+                            + " (rule W2a, the public signature of controllers)",
+                    "ADR-0018",
+                    "no production class is meta-annotated with @Controller (owner: "
+                            + "session-tokens-and-web-layer, whose first production endpoint "
+                            + "ends this exception)",
+                    production -> production.stream()
+                            .noneMatch(javaClass -> javaClass.isMetaAnnotatedWith(Controller.class))));
 
     @Test
     void everyExceptionsConditionStillHolds() {
@@ -56,6 +73,21 @@ class EmptyShouldExceptionInventoryTest {
                             exception.rule(), exception.adr(), exception.condition())
                     .isTrue();
         }
+    }
+
+    /**
+     * The controller condition is a real check: it holds over production today and stops holding as
+     * soon as a class is a controller, which the permanent fixture of rule W2a is. Without this,
+     * an expiry predicate that always answered {@code true} would pass the test above forever.
+     */
+    @Test
+    void theControllerConditionStopsHoldingWhenAControllerExists() {
+        ExpiringException controllers = EXCEPTIONS.stream()
+                .filter(exception -> exception.marker() == Marker.ALLOW_EMPTY_SHOULD)
+                .findFirst().orElseThrow();
+
+        assertThat(controllers.stillJustified().test(productionClasses())).isTrue();
+        assertThat(controllers.stillJustified().test(fixtureClasses())).isFalse();
     }
 
     /** Package-visible for {@link SuppressionCitesAdrTest}'s per-marker count check. */

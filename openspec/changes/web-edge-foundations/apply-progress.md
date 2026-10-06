@@ -1226,3 +1226,79 @@ Con la corrección de la revisión independiente (I1, I2 y S1 a S5, más cuatro 
 141 líneas** para entregarla en un solo PR: la validación de campos llega a `main` ya acotada, sin reflejar claves de
 mapa y sin la sustitución de `${validatedValue}`. No se recortaron pruebas ni comentarios. El orquestador verificó la
 corrección (89 pruebas enfocadas en verde) y la confirmó.
+
+## Tarea 2.5: PR 9 `web-rules` (DETENIDA ANTES DEL COMMIT por tamaño: 822 líneas frente a 800)
+
+Rama de trabajo `change/web-edge-foundations-web-rules` desde `main` en `507435c`, **restablecida a `main` y limpia**. El árbol completo y verificado está en la rama local
+`wip/web-edge-web-rules-full` (nunca se empuja). La tarea 2.5 sigue sin marcar `[x]`: falta decidir la costura (abajo).
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO 1 (mitades de fixture) | `-Dtest='WebLayerDependencyRulesTest,SharedBoundaryRulesTest,WebExposedTypesRuleTest'` sin fixtures ni puerto | `WebLayerDependencyRulesTest` `Tests run: 2, Failures: 1` (rechaza por `BadWeb` de otra capa, sin nombrar `BadWebUsesInfrastructure`); `SharedBoundaryRulesTest` `Tests run: 2, Failures: 1` (`failed to check any classes`); `WebExposedTypesRuleTest` `Tests run: 5, Failures: 3` (las dos mitades de fixture y la de producción de W2a, las tres por `failed to check any classes`). Las mitades de producción de W1, W3 y W2b ya pasaban sobre clases reales de `shared.web`. |
+| ROJO 2 (inventario) | `WebEdgeScopeExclusionInventoryTest` con `SessionValidity` y el soporte de fixtures ausentes | `COMPILATION ERROR`: `cannot find symbol class SessionValidity` (cuatro veces). |
+| ROJO 3 (excepción sin inventario) | W2a de producción con `allowEmptyShould(true)`, sin la entrada | `SuppressionCitesAdrTest` `Tests run: 10, Failures: 1`: `allowEmptyShould( call sites must match ... expected: 0 but was: 1`. |
+| VERDE | las ocho clases de arquitectura más `ProcessBeanIsolationTest` | `Tests run: 41, Failures: 0, Errors: 0, Skipped: 0` (`LayeredArchitectureTest` 2, `SpringModulithVerificationTest` 2, `EmptyShouldExceptionInventoryTest` 2, `SuppressionCitesAdrTest` 10, `WebEdgeScopeExclusionInventoryTest` 12, `WebExposedTypesRuleTest` 5, `WebLayerDependencyRulesTest` 2, `SharedBoundaryRulesTest` 2, `ProcessBeanIsolationTest` 4). |
+| Cierre | `./mvnw verify` completo | Surefire 186 + 865 (los 843 de la línea base más 22 nuevos), Failsafe 229, `BUILD SUCCESS`. Instantánea OpenAPI y `routes` sin cambios (`git status` limpio de ellos). |
+
+Pruebas añadidas: 22 (`WebLayerDependencyRulesTest` 2, `SharedBoundaryRulesTest` 2, `WebExposedTypesRuleTest` 5, `WebEdgeScopeExclusionInventoryTest` 12 y `EmptyShouldExceptionInventoryTest` +1).
+
+### Demostraciones deliberadas (cada una revertida; archivos temporales borrados y `git status` limpio; `cmp` en las ediciones sobre archivos existentes)
+
+| Ruptura temporal | Resultado observado |
+|---|---|
+| Campo `org.jooq.DSLContext` en una clase temporal de `shared.web.problem` | `WebLayerDependencyRulesTest.productionWebClassesNeverDependOnInfrastructureOrJooq`: `Field <com.confia.shared.web.problem.TempJooqBreak.leaked> has type <org.jooq.DSLContext>`; también falla W2b: `TempJooqBreak.leaked is or contains org.jooq.DSLContext, which a web class must replace with explicit values`. |
+| Clase temporal de `shared.security` con un campo de `com.confia.identity.domain.StaffAccountId` | `SharedBoundaryRulesTest.productionSharedDependsOnlyOnSharedAndKernel`: `Field <...TempSharedUsesIdentity.leaked> has type <com.confia.identity.domain.StaffAccountId>`. |
+| Controlador temporal (`@RestController`) en `shared.web.problem` que devuelve ese tipo | W2a: `TempController.leak() exposes com.confia.identity.domain.StaffAccountId in its public signature, which a controller must replace with an explicit DTO`; `EmptyShouldExceptionInventoryTest.everyExceptionsConditionStillHolds`: `... ADR-0018 exception no longer holds (no production class is meta-annotated with @Controller ...)`. |
+| `SessionValidity` con un método por omisión que devuelve un tipo de `identity` (con `cmp`) | `WebEdgeScopeExclusionInventoryTest...`: `[shared must not depend on identity ...] Expecting empty but was: ["com.confia.identity.domain.StaffAccountId"]`, y W3 con `Method <...SessionValidity.owner()> has return type <...StaffAccountId>`. |
+| Una clase temporal por cada ausencia (implementa `SessionValidity`, implementa `AuthenticationProvider`, usa `jakarta.servlet.http.Cookie`, llama `hasRole` sobre una ruta, lleva `@PreAuthorize`, y `InstitutionTempDto` en un paquete `web`), en una sola ejecución | Seis fallos, cada uno nombrando su clase: `Expecting empty but was: ["com.confia.shared.security.TempSessionValidityImpl"]`, `["com.confia.shared.security.TempAuthProvider"]`, `["com.confia.shared.web.request.TempCookieUser"]`, `["com.confia.shared.web.edge.TempRoleChain applies hasRole(...) to a route"]`, `["com.confia.shared.web.edge.TempPreAuth"]`, `["com.confia.shared.web.edge.InstitutionTempDto"]`. Un primer intento falló en la aserción de base (exigía el conjunto exacto `{permitAll, denyAll}` y `hasRole` lo alteraba); la aserción de base pasó a `containsAll`, de modo que el fallo cae en la ausencia y nombra la clase. |
+
+### Medición (`git diff --numstat main...HEAD -- . ':!openspec'` sobre la rama de respaldo)
+
+Total **822 líneas** (819 adiciones y 3 eliminaciones), igual con y sin `-M` (todo es nuevo salvo `EmptyShouldExceptionInventoryTest`). Pronóstico: 700 a 1 000; tope 800.
+
+### Costura propuesta (medida en líneas, adiciones más eliminaciones)
+
+| Parte | Contenido | Líneas |
+|---|---|---|
+| PR 9a `web-boundary-rules` | W1 (`WebLayerDependencyRulesTest` 48, fixture `BadWebUsesInfrastructure` 27), W3 (`SharedBoundaryRulesTest` 54, fixtures `BadSharedUsesIdentity` 18 y `SomeIdentityType` 13), el puerto `SessionValidity` 17, W2a y W2b (`WebExposedTypesRuleTest` 172, fixtures `BadRecordReturningController` 24 y `BadDomainCarryingDto` 12) y la entrada del inventario (`EmptyShouldExceptionInventoryTest` 38) | 423 |
+| PR 9b `web-scope-inventory` | `WebEdgeScopeExclusionInventoryTest` 310 y `WebEdgeScopeViolationFixtures` 89 (necesita `SessionValidity` de 9a) | 399 |
+
+### Desviaciones del diseño (declaradas)
+
+1. **Soporte de fixtures de las ausencias en `com.confia.shared.web.testsupport.fixture`**, no en `architecture/fixture/**`: la ausencia de `Institution` solo mira paquetes `..web..` y las reglas que recorren `architecture.fixture` no deben ver esas clases. Mismo patrón que `identity.testsupport.fixture`.
+2. **`LayeredArchitectureTest` sí ve `BadWebUsesInfrastructure`, `BadRecordReturningController`, `BadDomainCarryingDto` y `BadSharedUsesIdentity`** (están en paquetes `..web..`, y los tres primeros dependen de tipos de `layering`): por construcción solo pueden sumar violaciones (no se contaron una a una) a una mitad de fixture que ya se rechaza y que sigue nombrando `BadDomain`, `BadApplication` y `BadWeb`. Su resultado no cambia (2 de 2). Tampoco cambia el de `SpringModulithVerificationTest` (2 de 2): los módulos nuevos (`webedge`, `sharedboundary`) solo añaden violaciones a una verificación que ya espera `Violations`.
+3. **W1 sigue la tabla del diseño** (`infrastructure`, jOOQ generado y `org.jooq`). El requisito de `build-integrity` nombra además el `domain` de otro módulo: lo cubre `LayeredArchitectureTest` (la capa `Web` solo accede a `Application`) y W2b para los campos; no se añadió un cuarto destino sin fixture propio.
+4. **`SessionValidity` no necesita nada en `ProcessBeanPolicy` ni en los inventarios de procesos**: es una interfaz sin bean.
+5. **Prueba adicional** `theControllerConditionStopsHoldingWhenAControllerExists` en `EmptyShouldExceptionInventoryTest`: sin ella un predicado de caducidad que siempre respondiera `true` nunca fallaría.
+
+### Excepción de tamaño del PR 9 (2026-10-05)
+
+La tarea 2.5 verificada mide 822 líneas efectivas (819 añadidas y 3 eliminadas) frente al presupuesto de 800. Solo
+17 son de producción (el puerto `SessionValidity`); el resto son reglas de ArchUnit, fixtures permanentes y el
+inventario de ausencias. El propietario aprobó una **excepción de tamaño de 22 líneas** en lugar de partirla, porque
+dividirla agregaría una tarea y un ciclo de PR sin mejorar la revisión. El árbol se tomó sin cambios de la rama local
+verificada `wip/web-edge-web-rules-full` (`47efcef`). Tarea 2.5 cerrada.
+
+### Revisión independiente de 2.5 y corrección (2026-10-05)
+
+Veredicto: sin bloqueantes. Hallazgos y resolución:
+
+| Hallazgo | Resolución |
+|---|---|
+| I1: `LayeredArchitectureTest` comparaba fragmentos sueltos (`BadWeb`, `BadDomain`) y los fixtures de `webedge` los satisfacían | Corregido por el orquestador en `5728e0d` (fragmentos calificados por paquete, probado que falla si `layering/web/BadWeb` deja de violar). |
+| I2: faltaba nombrar `fixture.webedge.web.BadDomainCarryingDto` | Corregido por el orquestador en `5728e0d`. |
+| I3: `SessionValidity` tiene un solo método abstracto; `@Bean SessionValidity v() { return id -> true; }` sería un bean sin clase implementadora y `implementationsOf` seguiría en verde | `WebEdgeScopeExclusionInventoryTest.noProductionClassOtherThanThePortItselfDependsOnIt`: ninguna clase de producción distinta del puerto tiene una dependencia directa de él (campo, parámetro, retorno o llamada), sobre una base no vacía, con el fixture `LambdaSessionValidityFactory`. Ruptura: clase temporal con `SessionValidity v() { return id -> true; }` falla con `Expecting empty but was: ["com.confia.shared.security.TempLambdaPort"]`. Revertida y borrada. |
+| S1: las anotaciones de permiso no cubrían meta-anotaciones ni `@EnableMethodSecurity` | Se comprueba con `isMetaAnnotatedWith` (clase y método) y se añade `EnableMethodSecurity` al conjunto, con fixtures `ComposedPermissionOperation` (anotación compuesta `@AdminOnly` que lleva `@PreAuthorize`) y `MethodSecurityEnabler`. Rupturas: una anotación compuesta temporal da `Expecting empty but was: ["com.confia.shared.security.TempComposed", ...]` y una clase temporal con `@EnableMethodSecurity` da `["com.confia.shared.security.TempEnable"]`. Revertidas y borradas. |
+| S2: nada impedía escanear `com.confia.architecture.fixture` | Nota en el Javadoc de `BadRecordReturningController`: ninguna prueba de contexto puede escanear ese paquete. |
+| S3: duplicación entre W2a y W2b y entre los detectores | Aceptada como duplicación (cada regla conserva su propio ámbito y mensaje). |
+
+Cierre: `./mvnw verify` completo: Surefire 186 + 867 (865 más 2: la dependencia del puerto y su fixture), Failsafe 229, `BUILD SUCCESS`. Instantánea OpenAPI y `routes` sin cambios.
+
+### Ampliación de la excepción de tamaño del PR 9 (2026-10-05)
+
+Con las correcciones de la revisión independiente (I1 e I2 del orquestador en `5728e0d`; I3, S1 y S2 en `2615366`),
+el PR 9 mide 916 líneas efectivas (911 añadidas y 5 eliminadas) frente al presupuesto de 800. Sigue habiendo solo 17
+líneas de producción. El propietario amplió la excepción de tamaño de 22 a **116 líneas**: la corrección viaja con
+las reglas que corrige. No se recortaron pruebas ni comentarios.

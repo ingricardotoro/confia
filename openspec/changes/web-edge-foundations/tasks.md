@@ -495,7 +495,7 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     `feat(web): list the violated fields of a validation failure`. — Requisito de `web-edge` «Un fallo de
     validación produce `validation-failed`…»
 
-- [ ] 2.5 **PR 9 `web-rules`: reglas de ArchUnit de la capa `web` e inventario de ausencias (decisión 20).**
+- [x] 2.5 **PR 9 `web-rules`: reglas de ArchUnit de la capa `web` e inventario de ausencias (decisión 20).**
   - **ROJO.** Crear en `apps/api/app/src/test/java/com/confia/architecture/`:
     `WebLayerDependencyRulesTest.java` (W1), `SharedBoundaryRulesTest.java` (W3, por raíz: producción
     `com.confia`, fixture `com.confia.architecture.fixture.sharedboundary`),
