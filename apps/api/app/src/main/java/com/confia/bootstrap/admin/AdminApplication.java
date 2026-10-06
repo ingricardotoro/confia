@@ -5,6 +5,7 @@ import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration
 import com.confia.shared.platform.infrastructure.SharedPlatformConfiguration;
 import com.confia.shared.security.RateLimiterConfiguration;
 import com.confia.shared.web.edge.AdminSecurityConfiguration;
+import com.confia.shared.web.edge.RequiredDelayConfiguration;
 import com.confia.shared.web.edge.ThrottlingConfiguration;
 import com.confia.shared.web.edge.WebEdgeConfiguration;
 import com.confia.shared.web.openapi.ContractSchemas;
@@ -22,8 +23,8 @@ import org.springframework.context.annotation.Import;
  * accident. This process registers the shared platform wiring (decision 2 of
  * web-edge-foundations), the {@code identity} module's use cases and secrets (decision 3) and the
  * web edge: the request filters, the Problem Details catalog and the deny-by-default security
- * chain (decisions 4 to 8), and the rate limiter at the edge with the adapter of its capacity
- * signal (decision 17).
+ * chain (decisions 4 to 8), the rate limiter at the edge with the adapter of its capacity
+ * signal (decision 17), and the materializer of the required delay (decision 18).
  *
  * <p>Registering a module here is a visible two-line change: its public configuration in the
  * {@code @Import} list and its package in {@code ProcessBeanPolicy}, which the isolation test
@@ -50,6 +51,7 @@ import org.springframework.context.annotation.Import;
 @Import({ContractSchemas.class, ProcessApiInfo.class, SharedPlatformConfiguration.class,
         IdentityConfiguration.class, WebEdgeConfiguration.class,
         AdminSecurityConfiguration.class, ObservabilityMetricsConfiguration.class,
-        RateLimiterConfiguration.class, ThrottlingConfiguration.class})
+        RateLimiterConfiguration.class, ThrottlingConfiguration.class,
+        RequiredDelayConfiguration.class})
 public class AdminApplication {
 }
