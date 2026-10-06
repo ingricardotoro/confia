@@ -53,7 +53,8 @@ class WebEdgeScopeExclusionInventoryTest {
             "org.springframework.security.access.prepost.PreAuthorize",
             "org.springframework.security.access.prepost.PostAuthorize",
             "org.springframework.security.access.annotation.Secured",
-            "jakarta.annotation.security.RolesAllowed");
+            "jakarta.annotation.security.RolesAllowed",
+            "org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity");
 
     // --- The session validity port has no adapter (owner: session-tokens-and-web-layer, C5b) ---
 
@@ -89,6 +90,37 @@ class WebEdgeScopeExclusionInventoryTest {
         assertThat(implementationsOf(fixtures, SessionValidity.class))
                 .containsExactly(WebEdgeScopeViolationFixtures.SessionValidityAdapter.class
                         .getName());
+    }
+
+    /**
+     * The port has a single abstract method, so a lambda is an implementation that no class
+     * declares: a factory method that returns {@code SessionValidity} would be a bean with no
+     * implementing class. Any dependency on the port from another class (field, parameter,
+     * return type or call) is therefore forbidden until its owner closes the gap.
+     */
+    @Test
+    void noProductionClassOtherThanThePortItselfDependsOnIt() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+
+        assertThat(production.stream().filter(javaClass -> javaClass.getName()
+                .equals(SessionValidity.class.getName())))
+                .as("the scanned set holds the port itself, which the scan must skip, so the "
+                        + "scan runs over a populated tree")
+                .hasSize(1);
+        assertThat(classesDependingOnThePort(production))
+                .as("no production class holds, returns, takes or calls the session validity "
+                        + "port, which also rules out a lambda-backed bean")
+                .isEmpty();
+    }
+
+    @Test
+    void theDependencyDetectorFindsAFixtureThatReturnsALambdaBackedPort() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(
+                WebEdgeScopeViolationFixtures.LambdaSessionValidityFactory.class);
+
+        assertThat(classesDependingOnThePort(fixtures))
+                .containsExactly(WebEdgeScopeViolationFixtures.LambdaSessionValidityFactory
+                        .class.getName());
     }
 
     // --- No credential authentication (owner: session-tokens-and-web-layer) ---
@@ -182,11 +214,15 @@ class WebEdgeScopeExclusionInventoryTest {
     void thePermissionAnnotationDetectorFindsFixturesThatCarryEach() {
         JavaClasses fixtures = new ClassFileImporter().importClasses(
                 WebEdgeScopeViolationFixtures.PreAuthorizedOperation.class,
-                WebEdgeScopeViolationFixtures.SecuredOperation.class);
+                WebEdgeScopeViolationFixtures.SecuredOperation.class,
+                WebEdgeScopeViolationFixtures.ComposedPermissionOperation.class,
+                WebEdgeScopeViolationFixtures.MethodSecurityEnabler.class);
 
         assertThat(classesWithAPermissionAnnotation(fixtures)).containsExactlyInAnyOrder(
                 WebEdgeScopeViolationFixtures.PreAuthorizedOperation.class.getName(),
-                WebEdgeScopeViolationFixtures.SecuredOperation.class.getName());
+                WebEdgeScopeViolationFixtures.SecuredOperation.class.getName(),
+                WebEdgeScopeViolationFixtures.ComposedPermissionOperation.class.getName(),
+                WebEdgeScopeViolationFixtures.MethodSecurityEnabler.class.getName());
     }
 
     // --- No institution DTO (owner: the first institution administration endpoint) ---
@@ -218,6 +254,17 @@ class WebEdgeScopeExclusionInventoryTest {
         return classes.stream()
                 .filter(javaClass -> !javaClass.isInterface())
                 .filter(javaClass -> javaClass.isAssignableTo(port))
+                .map(JavaClass::getName)
+                .sorted()
+                .toList();
+    }
+
+    private static List<String> classesDependingOnThePort(JavaClasses classes) {
+        return classes.stream()
+                .filter(javaClass -> !javaClass.getName().equals(SessionValidity.class.getName()))
+                .filter(javaClass -> javaClass.getDirectDependenciesFromSelf().stream()
+                        .anyMatch(dependency -> dependency.getTargetClass().getName()
+                                .equals(SessionValidity.class.getName())))
                 .map(JavaClass::getName)
                 .sorted()
                 .toList();
@@ -270,7 +317,7 @@ class WebEdgeScopeExclusionInventoryTest {
     private static List<String> classesWithAPermissionAnnotation(JavaClasses classes) {
         return classes.stream()
                 .filter(javaClass -> PERMISSION_ANNOTATIONS.stream()
-                                .anyMatch(javaClass::isAnnotatedWith)
+                                .anyMatch(javaClass::isMetaAnnotatedWith)
                         || javaClass.getMethods().stream().anyMatch(
                                 WebEdgeScopeExclusionInventoryTest::hasAPermissionAnnotation))
                 .map(JavaClass::getName)
@@ -279,7 +326,7 @@ class WebEdgeScopeExclusionInventoryTest {
     }
 
     private static boolean hasAPermissionAnnotation(JavaMethod method) {
-        return PERMISSION_ANNOTATIONS.stream().anyMatch(method::isAnnotatedWith);
+        return PERMISSION_ANNOTATIONS.stream().anyMatch(method::isMetaAnnotatedWith);
     }
 
     /**

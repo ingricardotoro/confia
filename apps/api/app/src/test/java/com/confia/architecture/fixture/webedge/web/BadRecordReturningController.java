@@ -9,7 +9,9 @@ import org.springframework.web.bind.annotation.RestController;
  * controller whose public signature exposes a jOOQ {@code Record} as its return type and a {@code
  * domain} type, inside a generic argument, as a parameter. It is meta-annotated with
  * {@code @Controller} through {@code @RestController}, which is how production controllers will
- * be. Permanent, never removed, and never registered with a Spring context.
+ * be. Permanent, never removed, and never registered with a Spring context: no test context
+ * may component-scan {@code com.confia.architecture.fixture}, or this controller would be
+ * mapped as a real endpoint.
  */
 @RestController
 public class BadRecordReturningController {

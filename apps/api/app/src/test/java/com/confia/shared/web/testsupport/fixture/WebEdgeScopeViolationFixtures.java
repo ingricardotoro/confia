@@ -2,11 +2,14 @@ package com.confia.shared.web.testsupport.fixture;
 
 import com.confia.shared.security.SessionValidity;
 import jakarta.servlet.http.Cookie;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.UUID;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 
 /**
@@ -80,6 +83,37 @@ public final class WebEdgeScopeViolationFixtures {
         @Secured("ROLE_ADMIN")
         public void run() {
             // Deliberately empty: only the annotation matters to the check.
+        }
+    }
+
+    /** A composed annotation that carries a permission expression through meta-annotation. */
+    @Retention(RetentionPolicy.RUNTIME)
+    @PreAuthorize("hasRole('ADMIN')")
+    public @interface AdminOnly {
+    }
+
+    /** An operation guarded only through a composed annotation. */
+    public static final class ComposedPermissionOperation {
+
+        @AdminOnly
+        public void run() {
+            // Deliberately empty: only the meta-annotation matters to the check.
+        }
+    }
+
+    /** A configuration that turns method security on, which no production class does yet. */
+    @EnableMethodSecurity
+    public static final class MethodSecurityEnabler {
+    }
+
+    /**
+     * A factory that returns the session validity port from a lambda: a bean with no implementing
+     * class, which only the dependency check can see.
+     */
+    public static final class LambdaSessionValidityFactory {
+
+        public SessionValidity alwaysActive() {
+            return sessionId -> true;
         }
     }
 
