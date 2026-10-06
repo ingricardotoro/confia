@@ -8,9 +8,11 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.confia.kernel.DomainException;
+import com.confia.shared.web.problem.CapacityExceededException;
 import com.confia.shared.web.problem.ProblemCode;
 import com.confia.shared.web.problem.ProblemExceptionHandler;
 import com.confia.shared.web.problem.ProblemResponses;
+import com.confia.shared.web.ratelimit.TooManyRequestsException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -190,6 +192,51 @@ class ProblemExceptionHandlerTest {
 
         assertThat(response.getContentAsString()).isEmpty();
         assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void aLimitedRequestIs429WithItsWaitInWholeSecondsAndNothingIsLogged() throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.tooManyRequests(new TooManyRequestsException(15),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getHeaders("Retry-After")).containsExactly("15");
+        assertThat(response.getContentAsString()).contains("too-many-requests");
+        assertThat(logged.list).as("a client over its limit is not an error").isEmpty();
+    }
+
+    @Test
+    void aFullTableIs503WithNoWaitAndNoClue() throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.capacityExceeded(new CapacityExceededException(),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        assertThat(response.getStatus()).isEqualTo(503);
+        assertThat(response.getHeaderNames()).as("no Retry-After: nobody can promise a time")
+                .doesNotContain("Retry-After");
+        assertThat(response.getContentAsString()).contains("capacity-exceeded");
+        assertThat(logged.list).isEmpty();
+    }
+
+    @Test
+    void theLimiterHandlersLeaveACommittedResponseAlone() throws IOException {
+        MockHttpServletResponse limited = new MockHttpServletResponse();
+        limited.setCommitted(true);
+        MockHttpServletResponse full = new MockHttpServletResponse();
+        full.setCommitted(true);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/x");
+
+        handler.tooManyRequests(new TooManyRequestsException(15), request, limited);
+        handler.capacityExceeded(new CapacityExceededException(), request, full);
+
+        assertThat(limited.getContentAsString()).isEmpty();
+        assertThat(limited.getHeaderNames()).doesNotContain("Retry-After");
+        assertThat(limited.getStatus()).isEqualTo(200);
+        assertThat(full.getContentAsString()).isEmpty();
+        assertThat(full.getStatus()).isEqualTo(200);
     }
 
     @Test

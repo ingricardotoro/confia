@@ -14,7 +14,10 @@ import java.util.Optional;
  * {@link #RESOURCE_NOT_FOUND} (a file that does not exist under a documentation prefix) and
  * {@link #UNSUPPORTED_MEDIA_TYPE}, and the last resort ({@link #INTERNAL_ERROR}). {@link
  * #METHOD_NOT_ALLOWED} is the one answer to {@code TRACE}, which the container refuses before any
- * filter runs (task 2.2; design.md, decision 8, dated note). The sign-in codes
+ * filter runs (task 2.2; design.md, decision 8, dated note). The rate limiter at the edge owns
+ * {@link #TOO_MANY_REQUESTS} (a client over its limit) and {@link #CAPACITY_EXCEEDED} (a server
+ * with no room to count another client, or to serve one more waiting request); the second never
+ * says who or what caused it (task 3.2; design.md, decision 17). The sign-in codes
  * ({@code authentication-failed}, {@code token-invalid}, {@code token-expired}) and the
  * institution codes belong to the session change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
@@ -31,7 +34,9 @@ public enum ProblemCode {
     RESOURCE_NOT_FOUND("resource-not-found", 404),
     METHOD_NOT_ALLOWED("method-not-allowed", 405),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
-    INTERNAL_ERROR("internal-error", 500);
+    TOO_MANY_REQUESTS("too-many-requests", 429),
+    INTERNAL_ERROR("internal-error", 500),
+    CAPACITY_EXCEEDED("capacity-exceeded", 503);
 
     private static final String TYPE_BASE = "https://confia.hn/problems/";
     private static final String KEY_PREFIX = "problem.";
@@ -71,10 +76,11 @@ public enum ProblemCode {
 
     /**
      * The code that answers an HTTP status someone else chose, the one rule of the container's
-     * error report and of the MVC translator: {@code 401}, {@code 403}, {@code 404}, {@code 405}
-     * and {@code 415} have their own codes, any other client error is {@link #VALIDATION_FAILED},
-     * and a server error is {@link #INTERNAL_ERROR}. The status of the answer is the one of the
-     * code, not the one given, so a body and its response always agree.
+     * error report and of the MVC translator: {@code 401}, {@code 403}, {@code 404}, {@code 405},
+     * {@code 415}, {@code 429} and {@code 503} have their own codes, any other client error is
+     * {@link #VALIDATION_FAILED}, and any other server error is {@link #INTERNAL_ERROR}. The
+     * status of the answer is the one of the code, not the one given, so a body and its response
+     * always agree.
      */
     public static ProblemCode forStatus(int status) {
         return switch (status) {
@@ -83,6 +89,8 @@ public enum ProblemCode {
             case 404 -> RESOURCE_NOT_FOUND;
             case 405 -> METHOD_NOT_ALLOWED;
             case 415 -> UNSUPPORTED_MEDIA_TYPE;
+            case 429 -> TOO_MANY_REQUESTS;
+            case 503 -> CAPACITY_EXCEEDED;
             default -> status >= 500 ? INTERNAL_ERROR : VALIDATION_FAILED;
         };
     }

@@ -367,7 +367,8 @@ class ProblemTranslationTest {
     @ParameterizedTest
     @CsvSource({"401, authentication-required", "403, forbidden", "404, resource-not-found",
             "406, validation-failed", "409, validation-failed", "413, validation-failed",
-            "415, unsupported-media-type", "500, internal-error", "503, internal-error"})
+            "415, unsupported-media-type", "429, too-many-requests", "500, internal-error",
+            "503, capacity-exceeded"})
     void aResponseStatusExceptionKeepsItsStatusAsTheCatalogCodeAndNeverItsReason(int status,
             String code) {
         List<HttpResponse<String>> answers = new ArrayList<>();

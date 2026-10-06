@@ -62,10 +62,11 @@ public final class ProblemErrorReportValve extends ErrorReportValve {
      * (the translator uses the same one): {@code 404} is {@code resource-not-found}, {@code 415} is
      * {@code unsupported-media-type}, {@code 401} is {@code
      * authentication-required}, {@code 403} is {@code forbidden}, {@code 405} is {@code
-     * method-not-allowed}, a server error is {@code internal-error} and every other client error is
-     * {@code validation-failed}. The answer carries the status of that code, which for a status the
-     * catalog does not have (for example {@code 414} or {@code 503}) is the nearest one it does; the
-     * original status survives in the log event of {@link #report}.
+     * method-not-allowed}, {@code 429} is {@code too-many-requests}, {@code 503} is
+     * {@code capacity-exceeded}, any other server error is {@code internal-error} and every other
+     * client error is {@code validation-failed}. The answer carries the status of that code, which
+     * for a status the catalog does not have (for example {@code 414}) is the nearest one it does;
+     * the original status survives in the log event of {@link #report}.
      */
     public static ProblemCode codeFor(int status) {
         return ProblemCode.forStatus(status);

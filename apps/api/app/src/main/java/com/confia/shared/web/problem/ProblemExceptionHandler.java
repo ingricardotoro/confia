@@ -1,6 +1,7 @@
 package com.confia.shared.web.problem;
 
 import com.confia.kernel.DomainException;
+import com.confia.shared.web.ratelimit.TooManyRequestsException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolation;
@@ -110,6 +111,31 @@ public final class ProblemExceptionHandler {
             LOG.error("A domain exception answered with a server error", e);
         }
         answer(request, response, code.orElse(ProblemCode.INTERNAL_ERROR));
+    }
+
+    /**
+     * A client over its rate limit: {@code 429 too-many-requests} with {@code Retry-After} in whole
+     * seconds and nothing about the limit or what is left of it. A client over its limit is not an
+     * error of the server, so nothing is logged.
+     */
+    @ExceptionHandler(TooManyRequestsException.class)
+    public void tooManyRequests(TooManyRequestsException e, HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
+        if (!response.isCommitted()) {
+            response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(e.retryAfterSeconds()));
+        }
+        answer(request, response, ProblemCode.TOO_MANY_REQUESTS);
+    }
+
+    /**
+     * A server with no capacity for the request: {@code 503 capacity-exceeded}, with no {@code
+     * Retry-After} because nobody can promise a time, and nothing that says why. Whatever raised
+     * it has already left its own signal; the response says no more than the condition.
+     */
+    @ExceptionHandler(CapacityExceededException.class)
+    public void capacityExceeded(CapacityExceededException e, HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
+        answer(request, response, ProblemCode.CAPACITY_EXCEEDED);
     }
 
     /**
