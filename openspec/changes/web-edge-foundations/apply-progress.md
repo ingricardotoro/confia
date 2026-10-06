@@ -1280,3 +1280,18 @@ La tarea 2.5 verificada mide 822 líneas efectivas (819 añadidas y 3 eliminadas
 inventario de ausencias. El propietario aprobó una **excepción de tamaño de 22 líneas** en lugar de partirla, porque
 dividirla agregaría una tarea y un ciclo de PR sin mejorar la revisión. El árbol se tomó sin cambios de la rama local
 verificada `wip/web-edge-web-rules-full` (`47efcef`). Tarea 2.5 cerrada.
+
+### Revisión independiente de 2.5 y corrección (2026-10-05)
+
+Veredicto: sin bloqueantes. Hallazgos y resolución:
+
+| Hallazgo | Resolución |
+|---|---|
+| I1: `LayeredArchitectureTest` comparaba fragmentos sueltos (`BadWeb`, `BadDomain`) y los fixtures de `webedge` los satisfacían | Corregido por el orquestador en `5728e0d` (fragmentos calificados por paquete, probado que falla si `layering/web/BadWeb` deja de violar). |
+| I2: faltaba nombrar `fixture.webedge.web.BadDomainCarryingDto` | Corregido por el orquestador en `5728e0d`. |
+| I3: `SessionValidity` tiene un solo método abstracto; `@Bean SessionValidity v() { return id -> true; }` sería un bean sin clase implementadora y `implementationsOf` seguiría en verde | `WebEdgeScopeExclusionInventoryTest.noProductionClassOtherThanThePortItselfDependsOnIt`: ninguna clase de producción distinta del puerto tiene una dependencia directa de él (campo, parámetro, retorno o llamada), sobre una base no vacía, con el fixture `LambdaSessionValidityFactory`. Ruptura: clase temporal con `SessionValidity v() { return id -> true; }` falla con `Expecting empty but was: ["com.confia.shared.security.TempLambdaPort"]`. Revertida y borrada. |
+| S1: las anotaciones de permiso no cubrían meta-anotaciones ni `@EnableMethodSecurity` | Se comprueba con `isMetaAnnotatedWith` (clase y método) y se añade `EnableMethodSecurity` al conjunto, con fixtures `ComposedPermissionOperation` (anotación compuesta `@AdminOnly` que lleva `@PreAuthorize`) y `MethodSecurityEnabler`. Rupturas: una anotación compuesta temporal da `Expecting empty but was: ["com.confia.shared.security.TempComposed", ...]` y una clase temporal con `@EnableMethodSecurity` da `["com.confia.shared.security.TempEnable"]`. Revertidas y borradas. |
+| S2: nada impedía escanear `com.confia.architecture.fixture` | Nota en el Javadoc de `BadRecordReturningController`: ninguna prueba de contexto puede escanear ese paquete. |
+| S3: duplicación entre W2a y W2b y entre los detectores | Aceptada como duplicación (cada regla conserva su propio ámbito y mensaje). |
+
+Cierre: `./mvnw verify` completo: Surefire 186 + 867 (865 más 2: la dependencia del puerto y su fixture), Failsafe 229, `BUILD SUCCESS`. Instantánea OpenAPI y `routes` sin cambios.
