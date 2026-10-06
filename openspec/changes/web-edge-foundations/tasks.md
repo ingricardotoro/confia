@@ -661,6 +661,14 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     en `shared/observability/metrics`. Esta parte crea el puerto mínimo y el adaptador interino; el adaptador de
     Prometheus llega con el cambio de observabilidad sin tocar el limitador. La llamada a la métrica y su prueba por la
     cadena real son de 3.2b y 3.2c.
+  - **Nota fechada 2026-10-06 (revisión de seguridad independiente de 11a, sin bloqueantes; corrección acotada hecha en esta parte).**
+    **I-2:** el puerto pasa a `capacityExhausted(String policy, CapacityReason reason)` con `CapacityReason` cerrado (`TABLE_FULL`,
+    `NO_ORIGIN`, `NO_ADDRESS`, `UNKNOWN_POLICY`, `LIMITER_FAILURE`) y el evento lleva un cuarto campo fijo `reason`; la cota es por
+    política y causa; se corrigen el Javadoc de `CapacityExceededException` y la decisión 17, que decían que «el registro del servidor
+    distingue la causa», lo que no era cierto. **S-4:** `ProblemExceptionHandler` copia `Retry-After` de un `429` del marco (con prueba;
+    un `503` nunca lo lleva). **S-5:** nota fechada de `docs/07` §5.4 (`capacity-exceeded` también responde a los `503` del marco).
+    **S-7:** Javadoc del adaptador (lo omitido tras el último evento se informa con el siguiente). La demostración deliberada
+    «quitar el campo `reason`» rompe `LogRateLimitMetricsTest`; se revierte con `cmp`.
 
 - [ ] 3.2b **PR 11b `edge-interceptor`: `@RateLimited` y el interceptor que falla cerrado (decisión 17).**
   Necesita 3.2a (el puerto de métricas y las dos excepciones).
@@ -681,6 +689,17 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     vive el sitio de la llamada, y se repiten por la cadena real en 3.2c; se revierten con `cmp`.
   - **Cierre.** `./mvnw verify` completo. Commit: `feat(web): ask the limiter before a rate limited controller runs`. —
     Requisitos de `web-edge` «El rechazo por límite responde `429`…» (redondeo y capa 1)
+  - **Nota fechada 2026-10-06 (revisión de seguridad independiente del árbol completo de 3.2; se construye en esta parte).**
+    **I-1:** en `preHandle`, devolver `true` para `DispatcherType.ASYNC` (el despacho `REQUEST` ya se evaluó), con una prueba,
+    y una nota en el Javadoc de `RateLimited` (o una regla) que prohíba anotar manejadores asíncronos hasta que tengan su prueba.
+    **Causa en cada camino:** todo camino que falla cerrado pasa su `CapacityReason` al puerto (`NO_ORIGIN`, `NO_ADDRESS`,
+    `UNKNOWN_POLICY`, `LIMITER_FAILURE`, `TABLE_FULL` para `CapacityExhausted`); una excepción inesperada del limitador se registra en
+    `ERROR` con **solo la clase** de la excepción, acotada, nunca su mensaje ni una dirección. La fuente de respaldo
+    `wip/web-edge-rate-limiter-edge-full` llama todavía a la firma de un argumento y se adapta al construirla.
+    **S-1:** la llamada a la métrica va dentro de `try`/`catch`, de modo que un adaptador que falla nunca escape como un `500` (la
+    respuesta sigue siendo `503`). **S-2:** el Javadoc dice «método, no clase» (`@RateLimited` solo anota métodos).
+    **S-3:** una prueba de `HEAD` sobre un manejador limitado (limita igual que `GET`). Las demostraciones deliberadas de esta
+    parte incluyen quitar la causa del camino de `UNKNOWN_POLICY`.
 
 - [ ] 3.2c **PR 11c `edge-throttling-wiring`: configuración, política `admin-login` y borde completo (decisión 17).**
   Necesita 3.2b.
@@ -709,6 +728,12 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     `web-edge` «El rechazo por límite responde `429`…» (sin cupo ni límite), «El limitador se ejecuta antes del caso
     de uso», «Los límites viven en configuración…» y la nota fechada del requisito «La limitación del limitador en
     memoria…»
+  - **Nota fechada 2026-10-06 (revisión de seguridad independiente del árbol completo de 3.2; se construye en esta parte).**
+    **I-3:** una cota superior para `maxEntries` (por ejemplo 1 000 000) en `RateLimitPolicy`, con su prueba en
+    `InMemoryRateLimiterTest` y una de sobrepasarla en `RateLimitPropertiesTest` (el mensaje nombra la propiedad). **S-6:** el limitador se
+    construye en una configuración de `shared.security` que expone solo `RateLimiter`, de modo que la lista de permitidos de la capa
+    web hacia `shared.security` queda en seis tipos y no incluye `InMemoryRateLimiter` (el registro de `ThrottlingConfiguration` recibe
+    el puerto). La nota de `docs/03` §10 incluye el campo `reason` del evento y la lectura del `503` del marco (nota de `docs/07`).
 
 ## Fase 4: materialización del retardo
 

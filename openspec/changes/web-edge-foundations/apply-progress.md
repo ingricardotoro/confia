@@ -26,7 +26,7 @@
 | 3.1b | PR 10b `rate-limiter-table` | Hecha (596 líneas) | `5a223f0`, `e05d5ed` y el commit `docs(sdd)` de esta rama |
 | 3.1c | PR 10c `rate-limiter-stress` | Hecha | `5c06aab`, `3d55b9a` y los commits `docs(sdd)` de esa rama |
 | 3.2 | PR 11 `rate-limiter-edge` | Construida y verificada completa, detenida antes del commit por tamaño (1 551 líneas); el propietario aprobó la costura de tres PR el 2026-10-06; fuente: rama local `wip/web-edge-rate-limiter-edge-full` (`cf93861`) | |
-| 3.2a | PR 11a `edge-rejection-codes-and-capacity-signal` | Hecha (517 líneas) | `bf1b5c9`, `733785b` y el commit `docs(sdd)` de esta rama |
+| 3.2a | PR 11a `edge-rejection-codes-and-capacity-signal` | Hecha (517 líneas; 732 tras la corrección de la revisión) | `bf1b5c9`, `733785b`, `fdc3786` y los commits `docs(sdd)` de esta rama |
 | 3.2b | PR 11b `edge-interceptor` | Pendiente (necesita 3.2a, desde `main` actualizado) | |
 | 3.2c | PR 11c `edge-throttling-wiring` | Pendiente (necesita 3.2b, desde `main` actualizado) | |
 | 4.1 a 6.1 | PR 12, 13 y cierre | Pendientes | |
@@ -1798,3 +1798,19 @@ Por commit: `feat(web): add the 429 and 503 problem codes and their translators`
 | Orden enfocada y resultado | `Tests run: 126, Failures: 0` (códigos y manejadores), `Tests run: 6, Failures: 0` (adaptador) y `Tests run: 30, Failures: 0` (aislamiento); cierre completo Surefire 186 + 1 051, Failsafe 229 |
 | Arnés de ejecución | `HarnessProcess` real para `ProblemTranslationTest` (`ResponseStatusException` de `429` y `503` por la cadena real) y `ConfiaApplication.launch` real de los tres procesos para el aislamiento |
 | Frontera de reversión | Los dos códigos, `forStatus`, las dos claves del catálogo, las dos excepciones y sus manejadores, `RateLimitMetrics`, el paquete `observability/metrics`, su `@Import` y su línea de `ProcessBeanPolicy` |
+
+### Revisión de seguridad independiente de 3.2a y corrección acotada (2026-10-06)
+
+La revisión cubrió 11a y el árbol completo de 3.2 y **no encontró bloqueantes**: 11a es fusionable. Se aplicó una sola corrección acotada en 11a (commit `fdc3786`, `fix(observability): name the cause of an exhausted rate limit and keep Retry-After on framework 429s`):
+
+| Hallazgo | Resolución |
+|---|---|
+| **I-2** (el mismo evento para una tabla llena, un origen ausente, una dirección nula, una política desconocida y un fallo del limitador; el Javadoc y la decisión 17 decían que «el registro distingue la causa») | Puerto `capacityExhausted(String policy, CapacityReason reason)`; `CapacityReason` cerrado (`TABLE_FULL`, `NO_ORIGIN`, `NO_ADDRESS`, `UNKNOWN_POLICY`, `LIMITER_FAILURE`); cuarto campo fijo `reason` en `LogRateLimitMetrics` (`table_full`…); cota **por política y causa** (una inundación de `table_full` no oculta un defecto raro en el mismo segundo; estado cerrado: políticas por cinco causas); el adaptador no registra excepciones ni direcciones; Javadoc corregido y nota fechada en `design.md`; `policy` debe ser una constante de compilación |
+| **S-4** (`Retry-After` de un `429` del marco) | `ProblemExceptionHandler.frameworkError` lo copia de `framework.getHeaders()` para el `429` (un `503` nunca lo lleva); pruebas con y sin la cabecera y con un `503` que la trae |
+| **S-5** | Nota fechada de `docs/07` §5.4: `capacity-exceeded` también responde a los `503` del marco; el operador lee el `reason` y el registro de errores |
+| **S-7** | Javadoc de `LogRateLimitMetrics` y prueba: lo omitido tras el último evento se informa con el siguiente |
+| **I-1, S-1, S-2, S-3** (3.2b) y **I-3, S-6** (3.2c) | Notas fechadas bajo cada tarea de `tasks.md`; no se construyen ahora |
+
+**Evidencia.** ROJO: `test-compile` con `LogRateLimitMetricsTest` ampliado (`COMPILATION ERROR`, `cannot find symbol` en `CapacityReason`); tras el puerto y el adaptador, `LogRateLimitMetricsTest` `Tests run: 14, Failures: 0` y `ProblemExceptionHandlerTest` `Tests run: 24, Failures: 1` (`aFrameworkTooManyRequestsKeepsItsRetryAfterAndNeverItsReason`, el rojo de S-4); VERDE: `LogRateLimitMetricsTest`, `ProblemExceptionHandlerTest` y `ProblemTranslationTest` `Tests run: 72, Failures: 0`. **Demostración deliberada:** quitar el campo `reason` del evento da `LogRateLimitMetricsTest` `Tests run: 14, Failures: 8` (`Actual and expected should have same size but actual size is: 3 while expected size is: 4` y `Expecting actual: ["event", "policy", "suppressed"] to contain exactly (and in same order): ["event", "policy", "reason", "suppressed"]`); revertida, `cmp` igual. Cierre: `./mvnw verify` completo, **Surefire 186 + 1 062, Failsafe 229, `BUILD SUCCESS`**.
+
+**Medición del PR 11a tras la corrección** (`git diff --numstat main...HEAD -- . :!openspec`, igual con y sin `-M`): **732 líneas** (710 adiciones y 22 eliminaciones), frente a 517 antes y a 800 de tope. **Fuente de respaldo:** `wip/web-edge-rate-limiter-edge-full` no se modificó; su interceptor y sus pruebas llaman a la firma de un argumento y 3.2b adapta los puntos de llamada al construirse.
