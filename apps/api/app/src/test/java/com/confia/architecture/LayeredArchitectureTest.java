@@ -130,7 +130,14 @@ class LayeredArchitectureTest {
         // classes that must appear in the violation message closes that gap: a build where the rule
         // still throws but no longer names BadDomain, BadApplication or BadWeb is not a rejection of
         // the layering violations, it is noise, and this assertion now tells the two apart.
-        assertRuleRejects(fixtureLayeringRule(), fixtureClasses(), "BadDomain", "BadApplication",
-                "BadWeb");
+        //
+        // The fragments are qualified by package (web-edge-foundations task 2.5 review, I1):
+        // fixtureClasses() also imports fixture.webedge, whose BadWebUsesInfrastructure and
+        // BadDomainCarryingDto contain "BadWeb" and "BadDomain", so bare names would let this
+        // pass even if the layering fixtures stopped violating. BadDomainCarryingDto is named on
+        // its own as the case of a web class reaching a domain type (review I2).
+        assertRuleRejects(fixtureLayeringRule(), fixtureClasses(),
+                "fixture.layering.domain.BadDomain", "fixture.layering.application.BadApplication",
+                "fixture.layering.web.BadWeb", "fixture.webedge.web.BadDomainCarryingDto");
     }
 }
