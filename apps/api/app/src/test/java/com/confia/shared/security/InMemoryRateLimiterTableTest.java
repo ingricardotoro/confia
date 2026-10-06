@@ -177,6 +177,43 @@ class InMemoryRateLimiterTableTest {
         assertAdmitted(limiter.tryAcquire(client(2)));
     }
 
+    /**
+     * The restricted interval clause on its exact edge: 1 ns before the interval ends the entry still
+     * counts, and exactly at the end it is reclaimed. Each probe uses a fresh limiter so a sweep made
+     * by the first one cannot hide the second (sweeps run at most once a second).
+     */
+    @Test
+    void anEntryIsReclaimedExactlyWhenItsRestrictedIntervalEnds() {
+        RateLimitPolicy policy = new RateLimitPolicy(2, Duration.ofSeconds(10), 2,
+                Duration.ofSeconds(20), Duration.ofSeconds(30), MINUTE, 1);
+
+        InMemoryRateLimiter justBefore = limiter(policy);
+        assertAdmitted(justBefore.tryAcquire(client(1)));
+        clock.advance(Duration.ofSeconds(30).minus(NANO));
+        assertExhausted(justBefore.tryAcquire(client(2)));
+
+        MutableClock exactClock = new MutableClock();
+        InMemoryRateLimiter exactly = new InMemoryRateLimiter(policy, exactClock);
+        assertAdmitted(exactly.tryAcquire(client(1)));
+        exactClock.advance(Duration.ofSeconds(30));
+        assertAdmitted(exactly.tryAcquire(client(2)));
+    }
+
+    /**
+     * The first sweep is already due: with windows shorter than the sweep interval, a full table
+     * whose only entry has expired takes a new IP at once instead of refusing it for a second.
+     */
+    @Test
+    void aFullTableIsSweptOnTheFirstRefusalWithoutWaitingASecond() {
+        InMemoryRateLimiter limiter = limiter(new RateLimitPolicy(1, Duration.ofMillis(10), 1,
+                Duration.ofMillis(10), Duration.ofMillis(5), MINUTE, 1));
+        assertAdmitted(limiter.tryAcquire(client(1)));
+
+        clock.advance(Duration.ofMillis(20));
+
+        assertAdmitted(limiter.tryAcquire(client(2)));
+    }
+
     @Test
     void aFailureOfAnIpTheFullTableCannotHoldIsDroppedAndNeverEvictsAnEntry() {
         InMemoryRateLimiter limiter = limiter(tableOf(1));
