@@ -1336,3 +1336,30 @@ La revisión independiente de 2.4b encontró que `errors` podía repetir texto d
 - **Los mensajes de restricción no se interpolan con lenguaje de expresiones:** un `ValidationConfigurationCustomizer` fija `ParameterMessageInterpolator` (en
   `WebEdgeConfiguration`, que ya está en la lista de permitidos), de modo que `${validatedValue}` no sustituye el valor rechazado.
 - **`BindException` y `MethodValidationException` tienen traductor propio** y ganan a la rama genérica de `ErrorResponse`.
+
+### Nota fechada 2026-10-05: lo que el limitador en memoria fijó al construirse y la decisión S-3 (decisiones 15 y 16, PR 10)
+
+- **S-3 (seguimiento de la revisión de 2.3a): se acepta y se documenta, sin cambio de código.** Las direcciones NAT64 (`64:ff9b::/96`) y las IPv4 compatibles (`::a.b.c.d`)
+  son direcciones IPv6 para la clave, así que todas las de un /64 comparten un cubo. Razón: ninguna de las dos es enrutable como origen de una conexión, de modo que la única forma
+  de encontrarlas es una cabecera escrita por un cliente a través de un proxy de confianza; y la fusión solo endurece el límite (varias direcciones, un contador), nunca lo relaja:
+  no sirve para evadir. Normalizarlas a la IPv4 incrustada cambiaría `ClientAddress` (2.3a, ya fusionada) por un caso que no ocurre. `InMemoryRateLimiterTest` lo documenta con un
+  caso (`nat64AndIpv4CompatibleAddressesAreAcceptedAsOneSharedSlash64`), de modo que cambiarlo sea una decisión y no un accidente. Reabrir si algún día el servidor se despliega
+  detrás de un traductor NAT64 que entregue ese prefijo como origen real.
+- **Limitación declarada por escrito.** El Javadoc de `InMemoryRateLimiter` declara que el estado es por proceso, se pierde al reiniciar y no se comparte entre réplicas, y que no
+  equivale al estado compartido de Redis (cambio 11). La nota fechada de `docs/03-seguridad.md` §4.4 y §10 sigue siendo de la tarea 3.2, como indica `tasks.md`.
+- **`RateLimitDecision.Limited` calcula `Retry-After`.** `retryAfterSeconds()` redondea hacia arriba y nunca devuelve menos de 1; la tarea 3.2 solo lo escribe en la cabecera. El
+  límite decide en nanosegundos y el redondeo ocurre una vez, en el tipo.
+- **Las edades se calculan siempre como `now - instante`**, nunca como `instante + duración`, que desbordaría con una duración larga; `RateLimitPolicy` rechaza además una
+  duración que no cabe en nanosegundos, nombrando el valor.
+- **Un fallo de una IP que la tabla llena no puede alojar no se registra.** El puerto no puede rechazarlo (`recordFailure` no devuelve nada). Es inocuo: la misma IP recibe
+  `CapacityExhausted` en su siguiente `tryAcquire` mientras la tabla siga llena, y `recordFailure` se llama tras una admisión, cuya entrada sigue viva salvo que el intento dure más que la ventana de peticiones. Nunca
+  desaloja una entrada.
+- **El hueco de una entrada reclamada se devuelve al contador después de que el mapa la elimina**, no dentro de la eliminación. La primera versión lo devolvía dentro y la prueba de
+  barrido concurrente observó una tabla de 51 entradas con un máximo de 50: otro hilo ocupaba el hueco mientras la entrada vieja seguía en el mapa. Corregido (`reclaim`); la
+  invariante «la tabla no supera `maxEntries` en ningún instante» es la del requisito.
+- **`>=` frente a `>` en el descarte de admisiones solo se observa a través de la recuperación.** Una admisión con antigüedad exactamente igual a la ventana, conservada, da una
+  espera de cero y se admite igual, así que el borde de la capa 1 no distingue los dos operadores. Se observa en la tabla: la entrada deja de ser reclamable. Lo cubren
+  `anEntryIsReclaimedExactlyWhenItsLastRequestLeavesTheWindow` y su par de fallos.
+- **«Los fallos registrados se conservan» (fin anticipado de la capa 2) no es observable.** Los fallos conservados tienen todos antigüedad mayor o igual que la ventana y nunca
+  vuelven a contar con un reloj que no retrocede; vaciarlos daría el mismo comportamiento. El adaptador no los vacía y la prueba comprueba la consecuencia observable (el siguiente
+  fallo cuenta uno).

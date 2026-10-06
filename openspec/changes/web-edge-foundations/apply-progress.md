@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-05 (tarea 2.4b; 2.1a a 2.2b, 2.3a a 2.3d y 2.4a a 2.4b hechas)
+- **Última actualización:** 2026-10-05 (tarea 3.1a; 2.1a a 2.5 y 3.1a hechas; 3.1 partida en 3.1a y 3.1b)
 
 ## Estado de las tareas
 
@@ -22,7 +22,9 @@
 | 2.3d | PR 7d `audit-origin` | Hecha | `8a20946` y el commit `docs(sdd)` de esta rama |
 | 2.4a | PR 8a `translator-core` | Hecha | `7c609bb` y el commit `docs(sdd)` de esta rama |
 | 2.4b | PR 8b `field-violations` | Hecha | `9431be6` y el commit `docs(sdd)` de esta rama |
-| 2.5 a 6.1 | PR 9 a 13 y cierre | Pendientes | |
+| 3.1a | PR 10a `rate-limiter-core` | Hecha (983 líneas, excepción de unas 183) | `3162cca` y el commit `docs(sdd)` de esta rama |
+| 3.1b | PR 10b `rate-limiter-table-and-stress` | Pendiente (se construye desde `main` actualizado; fuente: `wip/web-edge-rate-limiter-core-full`) | |
+| 3.2 a 6.1 | PR 11 a 13 y cierre | Pendientes | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
 
@@ -1302,3 +1304,181 @@ Con las correcciones de la revisión independiente (I1 e I2 del orquestador en `
 el PR 9 mide 916 líneas efectivas (911 añadidas y 5 eliminadas) frente al presupuesto de 800. Sigue habiendo solo 17
 líneas de producción. El propietario amplió la excepción de tamaño de 22 a **116 líneas**: la corrección viaja con
 las reglas que corrige. No se recortaron pruebas ni comentarios.
+
+## Tarea 3.1: PR 10 `rate-limiter-core` (VERIFICADA Y DETENIDA ANTES DEL COMMIT por tamaño: 1 548 líneas frente a 800)
+
+Rama de trabajo `change/web-edge-foundations-rate-limiter-core` desde `main` en `e557639` (tras fusionar el PR 94), **sin commits y sin código**. El árbol completo y verificado
+está en la rama local `wip/web-edge-rate-limiter-core-full` (nunca se empuja). La tarea 3.1 sigue sin marcar `[x]`: falta decidir la costura (abajo). Los cambios de `openspec/`
+(la nota fechada de `design.md`, esta sección y la nota de `tasks.md`) quedan sin confirmar en el árbol de trabajo.
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| Red de seguridad | N/A: solo archivos nuevos; línea base en `main` (`e557639`) medida en un árbol aparte con `./mvnw -pl app -am test` | Surefire 186 + 867, `BUILD SUCCESS` |
+| ROJO | `./mvnw -pl app -am verify -DskipITs -Dsurefire.failIfNoSpecifiedTests=false -Dtest='InMemoryRateLimiter*'` con `MutableClock`, `InMemoryRateLimiterTest`, `InMemoryRateLimiterProperties` e `InMemoryRateLimiterConcurrencyTest` y sin producción | `COMPILATION ERROR` (más de 40 errores): `package com.confia.shared.security.RateLimitDecision does not exist` y `cannot find symbol` (`InMemoryRateLimiter`, `RateLimitPolicy`, `Limited`...). Es la causa prevista. |
+| VERDE, primer intento | Mismo comando, con la producción | `Tests run: 136, Failures: 1, Errors: 2`. (1) `sweepingExpiredEntriesWhileNewIpsArriveNeverOverfillsTheTable`: `Expecting actual: 51 to be less than or equal to: 50`. **Defecto real de producción, no de la prueba:** el barrido devolvía el hueco al contador dentro de `computeIfPresent`, antes de que el mapa eliminara la entrada, y otro hilo ocupaba el hueco con la entrada vieja aún en el mapa. Corregido con `reclaim` (el hueco vuelve después de la eliminación). (2) Las dos propiedades de jqwik: `IllegalArgumentException: Entries must not be empty`: había usado `Statistics.label(...)` y `Statistics.coverage` solo mira las estadísticas sin etiqueta. Corregido en la prueba. |
+| VERDE | Mismo comando | `Tests run: 136, Failures: 0, Errors: 0, Skipped: 0` (`InMemoryRateLimiterConcurrencyTest` 80, `InMemoryRateLimiterTest` 53, propiedades 3). La cobertura de JaCoCo falla con `-Dtest=` acotado, como avisa `tasks.md`. |
+| Refuerzo tras las demostraciones | Una prueba de borde de reclamación por petición y otra por fallo, una de límite y umbral mayores que la primera reserva del anillo (cubre `grow`), una de duración nula, y un generador de propiedades que produce intentos fallidos (`FAILED_LOGIN`) con una política en la que 20 s de intervalo y 30 s de ventana dejan menos de tres fallos dentro de la ventana | Ver las demostraciones: sin el generador nuevo, la propiedad no detectaba la ruptura de la regla de no levantar (400 intentos en verde). Final: `-Dtest='InMemoryRateLimiter*'` → `Tests run: 140, Failures: 0, Errors: 0, Skipped: 0` (80 + 57 + 3). |
+| Cierre | `./mvnw verify` completo sobre el árbol final | Surefire 186 + 1 007 (los 867 de la línea base más 140 nuevos), Failsafe 229, `All coverage checks have been met` (módulo `kernel` y `confia-api`), `BUILD SUCCESS`. |
+
+Pruebas añadidas: 140 (`InMemoryRateLimiterTest` 57, `InMemoryRateLimiterConcurrencyTest` 80 con cuatro escenarios repetidos 20 veces, `InMemoryRateLimiterPropertiesTest` 3). JaCoCo sobre las
+clases nuevas: 100 % de líneas y de ramas en `InMemoryRateLimiter` (y sus tipos internos), `RateLimitPolicy` y `RateLimitDecision`.
+
+**Mutación (PIT).** `./mvnw verify` por omisión no ejecuta PIT (solo los perfiles `mutation-report` y `mutation-gate`) y su alcance es `com.confia.*.domain.*`; `shared.security` no es un
+paquete `domain`, así que el umbral de 80 no aplica a este código y no se ejecutó. El umbral de cobertura de módulo (80 %) sí aplica y se cumple.
+
+### Modelo de referencia de jqwik
+
+`NaiveReference` guarda, por cliente, todas las admisiones y todos los fallos en listas sin acotar, nunca descarta una y recalcula cada respuesta desde las listas (cuenta las
+admisiones con edad menor que la ventana y toma la más antigua de ellas; cuenta los fallos con edad menor que la ventana; aplica las dos formas de terminar la restricción). Cuenta
+en nanosegundos desde cero y no lee el limitador, el reloj ni ninguna clave: los clientes los define la propia prueba (dos direcciones de un /64 son un cliente). El limitador usa dos
+anillos pequeños y una marca de tiempo. Se compara la decisión y el `Retry-After` al nanosegundo sobre secuencias de hasta 150 operaciones (mover el reloj, a menudo a un nanosegundo
+de un borde de la política; `tryAcquire`; `recordFailure`; intento fallido) con la cobertura de estadísticas exigida (`admitted`, `limited`, `limited while restricted`, `failure`).
+Dos propiedades más: la tabla de dos entradas nunca contiene más de dos y rechaza solo cuando está llena; y `Retry-After` es el techo en segundos calculado con `BigDecimal`.
+
+### Concurrencia
+
+Cuatro escenarios con `CyclicBarrier`, reloj `MutableClock` quieto y sin esperas por reloj de pared, cada uno repetido 20 veces: 50 hilos y una IP admiten exactamente 10 y limitan 40 (y
+otra ronda tras mover el reloj admite otros 10: los 40 rechazos no movieron nada); 9 fallos concurrentes no restringen y 10 sí; tabla de 50 con 100 IP admite exactamente 50 y rechaza 50,
+con un hilo que muestrea `size()` y no supera 50 nunca; barrido concurrente con la tabla llena de entradas vencidas (entre 1 y 50 admitidas, `size()` igual a las admitidas, nunca por
+encima de 50). Resultado: cinco ejecuciones seguidas de `InMemoryRateLimiterConcurrencyTest` solo (`Tests run: 80, Failures: 0` cinco veces, 400 repeticiones), las ejecuciones enfocadas
+y el `verify` completo, sin ninguna falla intermitente tras corregir el defecto del hueco.
+
+### Demostraciones deliberadas (cada una revertida; `cmp` contra la copia original sin diferencias)
+
+| Ruptura temporal | Resultado observado |
+|---|---|
+| `>=` por `>` en el descarte de admisiones (`settle`) | Primero: `Tests run: 136, Failures: 0`: **no rompe nada**. La espera de una admisión con edad igual a la ventana es cero y se admite igual (el anillo la sobrescribe), así que el borde de la capa 1 no distingue los dos operadores; es un mutante equivalente para las decisiones. Solo cambia si la entrada es reclamable, así que se añadieron `anEntryIsReclaimedExactlyWhenItsLastRequestLeavesTheWindow` y su par de fallos. Con ellos: `Tests run: 138, Failures: 1`: `expected: Admitted[] but was: CapacityExhausted[]`. |
+| Sustituir el rechazo por desalojo (se quita una entrada y se reintenta) | `Tests run: 138, Failures: 51`: concurrencia 40 (`aTableOfNHoldingNoOneAdmitsExactlyNOfTwoNIpsAndNeverGrowsPastN expected: 50L but was: 69L`, 94, 87, 100...; y la de barrido), unitarias 10 (se esperaba `CapacityExhausted[]`) y la propiedad de la tabla (`Count of 0 for ["refused"]`). |
+| Capa 2: terminar la restricción cuando los fallos de la ventana bajan del umbral (regla descartada) | Antes del generador de intentos fallidos: `Tests run: 138, Failures: 3` solo en pruebas unitarias (`theRestrictionIsNotLiftedWhileTheIpKeepsFailing: expected: Limited[retryAfter=PT1M] but was: Admitted`); la propiedad seguía en verde. Con el generador nuevo: `Failures: 4`, la propiedad también (`expected: Limited[retryAfter=PT9.999999466S]`). |
+| Capa 2: tope `>=` por `>` | `Tests run: 138, Failures: 1`: `theRestrictionEndsAtTheOneHourCapEvenIfTheIpKeepsFailing` (`assertAdmitted`, el segundo intento de la misma marca). |
+| Registrar el rechazo (`admitted.add` antes de devolver `Limited`) | `Failures: 3`: `aRejectedRequestIsNeverRecordedAndNeverMovesTheWindow`, `theWindowSlidesRequestByRequest` y la propiedad. |
+| `Retry-After` redondeado hacia abajo | `Failures: 4`: tres casos de `retryAfterIsWholeSecondsRoundedUpAndNeverBelowOne` y la propiedad del techo. |
+| Barrer en cada llamada | `Failures: 1`: `theTableIsSweptAtMostOnceASecond`. |
+
+Equivalencia declarada: vaciar los fallos al terminar la restricción por diez minutos sin fallos tampoco se puede observar (ver la nota de `design.md`).
+
+### Desviaciones del diseño y de `tasks.md` (declaradas)
+
+1. **`InMemoryRateLimiterPropertiesTest`, no `InMemoryRateLimiterProperties`.** El nombre de `tasks.md` no coincide con el patrón de Surefire (`*Test`): con él, `./mvnw verify` no ejecuta la
+   clase (lo comprobé: Surefire dio 1 003, tres menos de los esperados, porque las tres propiedades no corrían). Se renombró; el comando `-Dtest='InMemoryRateLimiter*'` de `tasks.md` sigue
+   incluyéndola.
+2. **`RateLimitDecision.Limited.retryAfterSeconds()`** (no está en el diseño): el redondeo hacia arriba, con mínimo de 1, vive en el tipo y 3.2 solo lo escribe en la cabecera.
+3. **`InMemoryRateLimiter.size()`** (de paquete): lo necesita la prueba de concurrencia para muestrear la cota. No lo usa producción.
+4. **Sin `try/catch` que devuelva el hueco ante una excepción** dentro de `compute`: nada entre la reserva y la inserción puede lanzar salvo un `Error` que termina el proceso, y una
+   rama que ninguna prueba puede ejecutar es peor que su ausencia. Queda documentado en el Javadoc de `apply`.
+5. **La limitación declarada por escrito está en el Javadoc de `InMemoryRateLimiter`**; la nota fechada de `docs/03-seguridad.md` §4.4 y §10 sigue siendo de 3.2, como dice `tasks.md`.
+6. **`ProcessBeanPolicy`: no hace falta ninguna línea.** El limitador no se registra como bean (sin consumidor; el cableado es 3.2). `ProcessBeanIsolationTest` 4/4, `ProcessBeanInspectorTest` 5/5,
+   `SpringModulithVerificationTest`, `LayeredArchitectureTest` y `EmptyShouldExceptionInventoryTest` siguen en verde en el `verify` completo.
+
+### Decisión S-3 (seguimiento de la revisión de 2.3a)
+
+**Se acepta y se documenta, sin cambio de código.** Las direcciones NAT64 (`64:ff9b::/96`) y las IPv4 compatibles (`::a.b.c.d`) comparten un cubo /64 en `rateLimitKey`. Razón: ninguna es
+enrutable como origen de una conexión, así que solo se encuentran en una cabecera escrita por un cliente a través de un proxy de confianza, y la fusión solo endurece el límite; no sirve
+para evadirlo. Normalizar cambiaría `ClientAddress` (2.3a, fusionada) por un caso que no ocurre. Nota fechada en `design.md` y prueba que lo documenta
+(`nat64AndIpv4CompatibleAddressesAreAcceptedAsOneSharedSlash64`). Se reabre si el servidor se despliega detrás de un traductor NAT64 que entregue ese prefijo como origen real.
+
+### Medición (`git diff --numstat HEAD -- . ':!openspec'` sobre el árbol con `git add -N`; todo es nuevo, así que es igual con y sin `-M`)
+
+| Archivo | Líneas |
+|---|---|
+| `InMemoryRateLimiter.java` | 329 |
+| `RateLimitPolicy.java` | 51 |
+| `RateLimitDecision.java` | 44 |
+| `RateLimiter.java` | 23 |
+| `MutableClock.java` | 45 |
+| `InMemoryRateLimiterTest.java` | 645 |
+| `InMemoryRateLimiterPropertiesTest.java` | 242 |
+| `InMemoryRateLimiterConcurrencyTest.java` | 169 |
+| **Total** | **1 548** (447 de producción, 45 de soporte de prueba y 1 056 de pruebas) |
+
+Pronóstico: 800 a 1 100; tope 800. No se recortó ninguna prueba ni comentario. El exceso es de pruebas: la producción mide 447.
+
+### Costura propuesta (medida en líneas; adiciones más eliminaciones)
+
+`InMemoryRateLimiterTest` se parte por la sección «tabla acotada» (143 líneas, 423 a 565); el resto mide 502.
+
+| Opción | Parte | Contenido | Líneas |
+|---|---|---|---|
+| A (sin partir, `size:exception`) | PR 10 | Todo | 1 548 (748 sobre el tope) |
+| B (recomendada) | PR 10a `rate-limiter-core` | Puerto, decisión, política, adaptador (447), `MutableClock` (45) y `InMemoryRateLimiterTest` sin la sección de la tabla (502) | **994** (194 sobre el tope: sigue necesitando excepción) |
+| B | PR 10b `rate-limiter-table-and-stress` | La sección de la tabla como clase `InMemoryRateLimiterTableTest` (143 más unas 55 líneas de cabecera y utilidades que necesita la clase nueva, estimadas), `InMemoryRateLimiterPropertiesTest` (242) y `InMemoryRateLimiterConcurrencyTest` (169) | unas **609** (estimación; el resto medido) |
+| C (la que insinúa `tasks.md`) | PR 10a | Producción (447), `MutableClock` (45) y `InMemoryRateLimiterTest` completa (645) | 1 137 |
+| C | PR 10b | Propiedades (242) y concurrencia (169) | 411 |
+
+No hay costura por archivos que deje ambas partes dentro de 800 sin separar la producción de sus pruebas. B deja la segunda parte dentro del tope; la primera lleva el código y la mayoría de las
+pruebas del contrato y necesita una excepción de unas 194 líneas. A es una sola unidad cohesiva (447 de producción) con una excepción de 748.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='InMemoryRateLimiter*'`: `Tests run: 140, Failures: 0, Errors: 0, Skipped: 0`; cierre por `./mvnw verify`: Surefire 186 + 1 007, Failsafe 229 |
+| Arnés de ejecución | Hilos reales con `CyclicBarrier` sobre un mismo `InMemoryRateLimiter` y un `MutableClock`; el limitador no tiene consumidor ni borde HTTP en esta tarea (3.2), así que no hay otro arnés en ejecución |
+| Frontera de reversión | Se retiran `RateLimiter`, `RateLimitDecision`, `RateLimitPolicy`, `InMemoryRateLimiter`, `MutableClock` y las tres clases de prueba; ningún archivo existente cambia |
+
+## Tarea 3.1a: PR 10a `rate-limiter-core` (costura B aprobada por el propietario, 2026-10-05)
+
+El propietario aprobó la costura B de la tarea 3.1 (la anterior, detenida con 1 548 líneas) y una excepción de tamaño de unas 194 líneas para 3.1a; el cambio pasa a 20 tareas y 19 PR
+(`tasks.md`, nota fechada del final). Rama `change/web-edge-foundations-rate-limiter-core` desde `main` en `e557639`; el código sale de `wip/web-edge-rate-limiter-core-full`
+(`7b8baf9`, sin tocarla). 3.1b se construye después desde `main` actualizado.
+
+### Evidencia del ciclo TDD (reobservada sobre este árbol)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO | `-Dtest='InMemoryRateLimiter*'` con `MutableClock` e `InMemoryRateLimiterTest` (sin la sección de la tabla) y sin producción | `COMPILATION ERROR`: `package com.confia.shared.security.RateLimitDecision does not exist` y `cannot find symbol` (126 líneas de error) |
+| VERDE | Con la producción (sin `size()`) | `Tests run: 47, Failures: 0, Errors: 0, Skipped: 0` |
+| Cierre | `./mvnw verify` completo | Surefire 186 + 914 (867 más 47), Failsafe 229, `All coverage checks have been met`, `BUILD SUCCESS` |
+
+Pruebas añadidas: 47. Cobertura de las clases nuevas en esta parte: `RateLimitPolicy` y `RateLimitDecision` al 100 %; `InMemoryRateLimiter` deja sin cubrir el barrido y la reclamación (19 líneas
+y 19 ramas), que prueba 3.1b; el umbral de módulo (80 %) se cumple.
+
+### Demostraciones deliberadas (cada una revertida; `cmp` contra la copia original sin diferencias)
+
+| Ruptura temporal | Resultado observado |
+|---|---|
+| Capa 2: terminar la restricción cuando los fallos de la ventana bajan del umbral | `Tests run: 47, Failures: 3`: `aFailureCountsOnlyWhileItsAgeIsStrictlyBelowTheWindow` (`expected: Limited[retryAfter=PT50S] but was: Admitted[]`), `theRestrictionEndsAtTheOneHourCapEvenIfTheIpKeepsFailing` (`expected: Admitted[] but was: Limited[retryAfter=PT1M]`) y `theRestrictionIsNotLiftedWhileTheIpKeepsFailing` (`expected: Limited[retryAfter=PT1M] but was: Admitted[]`). |
+| `>=` por `>` en el descarte de admisiones | `Tests run: 47, Failures: 0`: **sin fallo**, como se declaró en 3.1: es un mutante equivalente para las decisiones y solo lo distinguen las pruebas de borde de reclamación, que van en 3.1b. |
+
+### Desviaciones respecto de 3.1 completa (declaradas)
+
+1. `size()` no está en 3.1a (ninguna prueba de esta parte lo usa); llega con 3.1b.
+2. Las pruebas de borde de reclamación van en 3.1b, con la tabla (razón en la nota fechada de `tasks.md`).
+3. «Tamaño máximo no válido» (política) apunta a 3.1a; los otros cuatro escenarios de la tabla y «Exactitud bajo concurrencia», a 3.1b.
+
+### Medición del PR 10a (`git diff --numstat main...HEAD -- . ':!openspec'`)
+
+| Medición | Adiciones | Eliminaciones | Total |
+|---|---|---|---|
+| Sin `-M` | 983 | 0 | **983** |
+| Con `-M` | 983 | 0 | **983** |
+
+`InMemoryRateLimiter` 324, `RateLimitPolicy` 51, `RateLimitDecision` 44, `RateLimiter` 23, `MutableClock` 45, `InMemoryRateLimiterTest` 496. Pronóstico de la costura: 994; excepción de tamaño: unas
+183 líneas (aprobadas unas 194). No se recortó nada.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='InMemoryRateLimiter*'`: `Tests run: 47, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 914, Failsafe 229 |
+| Arnés de ejecución | N/A: el limitador no tiene consumidor ni borde HTTP hasta 3.2; las pruebas ejercen el adaptador real con `MutableClock` |
+| Frontera de reversión | Se retiran `RateLimiter`, `RateLimitDecision`, `RateLimitPolicy`, `InMemoryRateLimiter`, `MutableClock` e `InMemoryRateLimiterTest`; ningún archivo existente cambia |
+
+### Revisión de seguridad del limitador en memoria (2026-10-05)
+
+Riesgo evaluado: alto. La revisión independiente cubrió la porción 3.1a y el árbol completo de la rama local
+`wip/web-edge-rate-limiter-core-full`. Veredicto: 0 bloqueantes, 3 importantes y 4 sugerencias. **3.1a es aprobable**:
+el limitador no tiene consumidor ni bean, así que nada es alcanzable hoy. La lógica de las dos capas, la reserva
+por CAS y la liberación tras la eliminación son correctas.
+
+| Hallazgo | Asignación |
+|---|---|
+| I-1: el reloj es de pared (`Clock.instant()`), no monotónico | 3.1b, que debe fusionarse antes de 3.2 |
+| I-2: autodenegación con muchas /64 (la tabla falla cerrada) | 3.2: declararla en `docs/03`, métrica y alerta de `CapacityExhausted`; límite por /48 o /32 en el borde, cambio 11 |
+| I-3: el muestreo de `ConcurrentHashMap.size()` no es atómico | 3.1b |
+| S-1: el reloj se lee antes de `compute` | 3.1b, junto con I-1 |
+| S-2: cota razonable de los límites de la política | 3.1b o 3.2, validándola en `RateLimitPolicy` |
+| S-3: costo del barrido con tablas grandes | Seguimiento: medir si `maxEntries` llega a cientos de miles |
+| S-4: `NaiveReference` comparte la lectura de las reglas | Aceptada: la mitigan las pruebas escritas a mano contra los escenarios |
