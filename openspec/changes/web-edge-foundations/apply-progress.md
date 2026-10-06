@@ -1601,3 +1601,23 @@ Pruebas añadidas: 31 (`InMemoryRateLimiterTest` +6 de S-2, tabla 10, tiempo 15)
 ### Diseño de I-1 para el bean de 3.2
 
 El constructor público es `InMemoryRateLimiter(RateLimitPolicy)` y usa `System::nanoTime`; el de `(RateLimitPolicy, LongSupplier)` es de paquete. 3.2 cablea `new InMemoryRateLimiter(policy)` y no tiene reloj de pared que inyectar. Cota de S-2: 10 000 para `requestLimit` y `failureThreshold`.
+
+### Revisión independiente de 3.1b (2026-10-05)
+
+Riesgo evaluado: alto. Veredicto: aprobado, sin bloqueantes. La revisión confirmó que toda comparación de tiempo usa
+diferencias (`now - x` contra una duración, y `now - due < 0` para el barrido), así que el desbordamiento del contador
+de `System.nanoTime` es seguro. También confirmó que las decisiones de las capas 1 y 2 de 3.1a no cambian, que la cota
+de 10 000 de S-2 es razonable y que la prueba de ArchUnit «sin reloj de pared» no es vacua.
+
+- **Hallazgo «importante» refutado por el orquestador.** La revisión afirmó que inicializar `nextSweepAt` con la hora
+  de construcción impide barrer durante el primer segundo. Es falso: la condición es `now - due < 0`, así que el
+  barrido está vencido desde el instante de construcción. Se probó cambiando la inicialización a `now - 1 s`, sin que
+  cambiara ningún resultado. No se modificó el código de producción. Sí se añadió
+  `aFullTableIsSweptOnTheFirstRefusalWithoutWaitingASecond`, con ventanas de milisegundos, que **falla** si el primer
+  vencimiento se retrasa (`now + 1 s`: `assertAdmitted` en la línea 214), para fijar la propiedad.
+- **Sugerencia aplicada.** `anEntryIsReclaimedExactlyWhenItsRestrictedIntervalEnds` prueba el borde exacto del
+  intervalo restringido (1 ns antes y exactamente al final, con limitadores separados). La mutación `<` → `<=` en
+  `isReclaimable` ahora falla en la línea 199 y se revirtió con `cmp`.
+- **Seguimientos.** Una cota superior para `maxEntries` (del orden de 10⁶) y ampliar `WALL_CLOCK_TYPES` con
+  `LocalDate`, `Calendar` y `java.sql.Timestamp`. Ambos son de bajo valor.
+- `./mvnw verify` completo: Surefire 186 + 947, Failsafe 229, `BUILD SUCCESS`.
