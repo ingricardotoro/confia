@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-05 (tarea 3.1b; 3.1a y 3.1b hechas; la tarea 3.1b original se partió en 3.1b y 3.1c por tamaño)
+- **Última actualización:** 2026-10-06 (3.2 partida en 3.2a, 3.2b y 3.2c por decisión del propietario; 3.1a, 3.1b y 3.1c hechas)
 
 ## Estado de las tareas
 
@@ -24,8 +24,12 @@
 | 2.4b | PR 8b `field-violations` | Hecha | `9431be6` y el commit `docs(sdd)` de esta rama |
 | 3.1a | PR 10a `rate-limiter-core` | Hecha (983 líneas, excepción de unas 183) | `3162cca` y el commit `docs(sdd)` de esta rama |
 | 3.1b | PR 10b `rate-limiter-table` | Hecha (596 líneas) | `5a223f0`, `e05d5ed` y el commit `docs(sdd)` de esta rama |
-| 3.1c | PR 10c `rate-limiter-stress` | Pendiente (se construye desde `main` actualizado; fuente: `wip/web-edge-rate-limiter-table-full`) | |
-| 3.2 a 6.1 | PR 11 a 13 y cierre | Pendientes | |
+| 3.1c | PR 10c `rate-limiter-stress` | Hecha | `5c06aab`, `3d55b9a` y los commits `docs(sdd)` de esa rama |
+| 3.2 | PR 11 `rate-limiter-edge` | Construida y verificada completa, detenida antes del commit por tamaño (1 551 líneas); el propietario aprobó la costura de tres PR el 2026-10-06; fuente: rama local `wip/web-edge-rate-limiter-edge-full` (`cf93861`) | |
+| 3.2a | PR 11a `edge-rejection-codes-and-capacity-signal` | Pendiente (se construye desde el árbol de respaldo) | |
+| 3.2b | PR 11b `edge-interceptor` | Pendiente (necesita 3.2a, desde `main` actualizado) | |
+| 3.2c | PR 11c `edge-throttling-wiring` | Pendiente (necesita 3.2b, desde `main` actualizado) | |
+| 4.1 a 6.1 | PR 12, 13 y cierre | Pendientes | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
 
@@ -1659,3 +1663,86 @@ sin bloqueantes, con 2 hallazgos importantes y 3 sugerencias. El orquestador cor
   escritas a mano.
 - Cinco ejecuciones seguidas de la clase de concurrencia, sola: 80/80 en las cinco. `./mvnw verify` completo:
   Surefire 186 + 1030, Failsafe 229, `BUILD SUCCESS`.
+
+## Tarea 3.2: PR 11 `rate-limiter-edge` (VERIFICADA Y DETENIDA ANTES DEL COMMIT por tamaño: 1 551 líneas frente a 800)
+
+Árbol completo en la rama local `wip/web-edge-rate-limiter-edge-full` (nunca se sube). La rama de trabajo `change/web-edge-foundations-rate-limiter-edge` queda limpia en `main` (`98ad2ef`). `tasks.md` **no** marca 3.2 como hecha: la tarea no se entregó. Incluye la decisión del propietario del 2026-10-05 sobre la métrica de I-2.
+
+### Evidencia del ciclo TDD (modo estricto; ejecutor `./mvnw verify` desde `apps/api`)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| Red de seguridad | Línea base indicada por el orquestador (Surefire 186 + 1030, Failsafe 229) | Sin fallos previos |
+| ROJO A (códigos, catálogo y mapeo del contenedor) | `-Dtest='ProblemCodeTest,ProblemCatalogCoverageTest,ProblemErrorReportValveTest,ProblemTranslationTest'` con las tablas ya ampliadas | `Tests run: 105, Failures: 10, Errors: 4, Skipped: 0` (ProblemCodeTest 44: 5 fallos y 2 errores; ProblemErrorReportValveTest 20: 4 fallos; ProblemCatalogCoverageTest 7: 1 fallo; ProblemTranslationTest 34: 2 errores `NoSuchElement`) |
+| VERDE A | Igual, tras `ProblemCode` (`TOO_MANY_REQUESTS` 429, `CAPACITY_EXCEEDED` 503, `forStatus`), las dos claves del catálogo y el Javadoc de la válvula | `Tests run: 105, Failures: 0, Errors: 0, Skipped: 0` |
+| ROJO B (resto) | `./mvnw -q -pl app -am test-compile` con `RateLimitInterceptorTest`, `RateLimitPropertiesTest`, `RateLimitEdgeTest`, `LogRateLimitMetricsTest`, `ProblemExceptionHandlerTest` ampliado y el arnés ampliado | `COMPILATION ERROR` (`cannot find symbol` en `RateLimited`, `RateLimitInterceptor`, `RateLimiterRegistry`, `RateLimitProperties`, `RateLimitMetrics`, `LogRateLimitMetrics`, `ThrottlingConfiguration`, `ObservabilityMetricsConfiguration`, `CapacityExceededException`, `TooManyRequestsException`), el rojo previsto |
+| VERDE B | `-Dtest='RateLimitInterceptorTest,RateLimitPropertiesTest,LogRateLimitMetricsTest,ProblemExceptionHandlerTest,RateLimitEdgeTest'` | `Tests run: 63, Failures: 0, Errors: 0, Skipped: 0` (LogRateLimitMetricsTest 6, ProblemExceptionHandlerTest 21, RateLimitEdgeTest 9, RateLimitInterceptorTest 9, RateLimitPropertiesTest 18). Las líneas `APPLICATION FAILED TO START` son los arranques que deben fallar (política desconocida y valor no positivo). Primera pasada: 2 fallos propios de las pruebas (el `ListAppender` se adjuntaba antes de arrancar el proceso y `LoggingApplicationListener` reinicia el registro; y una aserción que prohibía el nombre de la política en la lista de conocidas), corregidos en la prueba, nunca en el código |
+| ROJO de `ProcessBeanPolicy` (primero la línea) | Las dos líneas (`com.confia.shared.web.ratelimit` y `com.confia.shared.observability.metrics`) y la prueba nueva `onlyTheAdministrativeProcessHoldsTheRateLimiterAndItsMetrics`, sin el `@Import` en `AdminApplication` | `Tests run: 7, Failures: 2, Errors: 0`: `registersOnlyItsAllowedBeans[1]` falla con `non-vacuous: com.confia.shared.web.ratelimit must contribute a bean to the admin context` **y** `non-vacuous: com.confia.shared.observability.metrics must contribute a bean to the admin context`; la prueba nueva falla en el proceso administrativo |
+| VERDE de `ProcessBeanPolicy` | Con el `@Import` de `ObservabilityMetricsConfiguration` y `ThrottlingConfiguration` en `AdminApplication` | `ProcessBeanIsolationTest` 7/7, `AdminProductionWiringTest` 13/13, `ConfiaApplicationTest` 10/10: `Tests run: 30, Failures: 0, Errors: 0` |
+| Cierre, primera pasada | `./mvnw verify` completo | Surefire 186 + 1087 con **1 fallo**: `IdempotencyScopeExclusionInventoryTest` (lista de permitidos de `..web..` hacia `shared.security`: `RateLimiterRegistry` depende de `RateLimiter`). Rojo legítimo del inventario («añade el siguiente aquí») |
+| Cierre | `./mvnw verify` completo tras ampliar esa lista con los siete tipos del limitador | **Surefire 186 + 1087 (los 1030 de la línea base y 57 nuevos), Failsafe 229, `BUILD SUCCESS`** |
+
+### Demostraciones deliberadas (cada una revertida de inmediato; `cmp` contra la copia original sin diferencias)
+
+1. **`tryAcquire` movido a `postHandle`** (`preHandle` devuelve `true` y la decisión corre después del controlador): `RateLimitEdgeTest` `Tests run: 9, Failures: 6` y `RateLimitInterceptorTest` `Tests run: 9, Failures: 7`. Mensaje de `aRejectedRequestReachesNeitherTheControllerNorTheUseCase`: `expected: 429 but was: 200`. `cmp` de `RateLimitInterceptor.java` contra la copia: igual.
+2. **Se quita la llamada `metrics.capacityExhausted(...)` del interceptor:** `RateLimitEdgeTest` `Tests run: 9, Failures: 1` (`aFullTableLeavesOneFixedWarnWithThePolicyAndNothingOfTheClient`: `Expected size: 1 but was: 0 in: []`) y `RateLimitInterceptorTest` `Tests run: 9, Failures: 5` (`aFullTableIsRefusedAsLackOfCapacityAndReportedOnceWithThePolicyOnly`: `Expecting actual: [] to contain exactly (and in same order): ["admin-login"]`, y las cuatro de fallo cerrado). `cmp`: igual.
+
+### Puerto y adaptador de la métrica (decisión del propietario, I-2)
+
+- **Puerto** `RateLimitMetrics` (`shared.web.ratelimit`): `void capacityExhausted(String policy)`. La política es el único argumento. El interceptor lo llama cuando la decisión es `CapacityExhausted`, incluida la que sale de un fallo cerrado (sin origen, sin dirección, política ausente del registro o excepción del limitador).
+- **Adaptador interino** `LogRateLimitMetrics` (`shared.observability.metrics`): un evento `WARN` fijo, mensaje `rate limit capacity exhausted`, con los pares clave-valor `event=rate_limit_capacity_exhausted`, `policy` y `suppressed` (SLF4J 2 `atWarn().addKeyValue`). Acotado a un evento por segundo **por política** con una fuente monotónica (constructor público `System::nanoTime`, de paquete con `LongSupplier` para pruebas) y una ventana por política que guarda cuántas señales se omitieron. Sin IP, ruta, cabecera ni clave (el puerto no las conoce). Sin dependencias nuevas.
+- **Registro (ADR-0024):** `ObservabilityMetricsConfiguration` en el `@Import` de `AdminApplication`; `package-info` con `@NamedInterface` y su consumidor (ADR-0022); línea `com.confia.shared.observability.metrics` en `ProcessBeanPolicy` (en rojo primero, ver arriba). Portal y trabajador no la cargan.
+- **Pruebas:** `LogRateLimitMetricsTest` (6: campos exactos y orden, ningún dato del cliente, 1 000 llamadas en un instante son un evento y el siguiente trae `suppressed=1000`, el límite exacto de un segundo con un nanosegundo de diferencia, un segundo tranquilo reinicia el contador, una ventana por política, el constructor de producción) con reloj inyectado; `RateLimitEdgeTest` lee el evento por la cadena real. El evento se escribe **antes** de la respuesta, así que no hay carrera con la lectura del registro; el `ListAppender` se adjunta **después** de arrancar el proceso.
+- Notas fechadas: `design.md` (final), `docs/07-observabilidad-y-operaciones.md` (§5.4) y `docs/03-seguridad.md` §4.4 y §10 (limitador interino, sus tres limitaciones, la semántica de la capa 2, el riesgo de autodenegación I-2 y sus tres mitigaciones).
+
+### Decisión sobre el mapeo `429` y `503` del contenedor
+
+`ProblemCode.forStatus` mapea ahora `429` a `too-many-requests` y `503` a `capacity-exceeded` (antes `400` y `500`), de modo que `ProblemErrorReportValve.codeFor` queda coherente y la anotación de la revisión I3 de 2.2a («`503` conservará su estado cuando exista `capacity-exceeded`») se cumple. Costó dos líneas y tres tablas de pruebas ya existentes (`ProblemCodeTest`, `ProblemErrorReportValveTest`, `ProblemTranslationTest`). Efecto colateral aceptado y registrado en `design.md`: una `ResponseStatusException(503)` o un `AsyncRequestTimeoutException` del marco responde `capacity-exceeded` y se sigue registrando como error de servidor. Un `429` del marco o del contenedor no lleva `Retry-After`; ninguno existe hoy.
+
+### Qué se construyó (resumen)
+
+- `shared/web/ratelimit/`: `RateLimited`, `RateLimitInterceptor` (falla cerrado), `RateLimiterRegistry`, `RateLimitPolicyCheck` (arranque: política desconocida nombrada, antes de aceptar conexiones), `RateLimitProperties` (registro enlazado por constructor, prefijo `confia.web.rate-limit.admin-login`, el mensaje nombra la propiedad también para la cota de 10 000), `RateLimitMetrics`, `TooManyRequestsException`.
+- `shared/web/problem/`: `CapacityExceededException`, los dos códigos, los dos manejadores en `ProblemExceptionHandler` (con la guarda de respuesta ya confirmada y `Retry-After` solo en el `429`) y dos claves del catálogo sin números.
+- `shared/web/edge/ThrottlingConfiguration` (política `admin-login` registrada y **no aplicada** a ninguna ruta de producción; `new InMemoryRateLimiter(policy)` con el constructor público de `System::nanoTime`) y su `@Import` en `AdminApplication`.
+- Arnés: `LimitedController` (ruta `GET /test/limited` con `@RateLimited(policy = "admin-login")` y un caso de uso de prueba que cuenta invocaciones), `UnknownPolicyController` (solo con `harness.unknown-policy=true`), contadores en `Calls`, y las importaciones y rutas públicas en `WebEdgeHarness`.
+- `OpenApiContractSnapshotTest` y `portal.routes.json` sin cambios (`git status` limpio de ambos tras `verify`).
+
+### Medición (`git add -A` y `git diff --cached --numstat -- . :!openspec`; igual con y sin `-M`, todo es nuevo salvo ediciones)
+
+| Parte | Líneas (adiciones + eliminaciones) |
+|---|---|
+| Producción (`src/main`) | 581 |
+| Pruebas (`src/test`) | 907 |
+| Documentación (`docs/`) | 63 |
+| **Total** | **1 551** (1 528 adiciones y 23 eliminaciones) |
+
+El pronóstico era de 500 a 700. Se desvía porque las pruebas (`RateLimitEdgeTest` 222, `RateLimitInterceptorTest` 212, `LogRateLimitMetricsTest` 150, `RateLimitPropertiesTest` 101) y el puerto de métricas con su adaptador y su registro, que añadió el propietario con la decisión de I-2, no estaban en la previsión. No se recortó ninguna prueba ni comentario.
+
+### Costura propuesta (tres PR apilados; líneas medidas sobre el árbol completo, con las partes compartidas repartidas)
+
+| PR | Contenido | Líneas |
+|---|---|---|
+| 11a `edge-rejection-codes-and-capacity-signal` | Códigos `too-many-requests` y `capacity-exceeded` con catálogo, `forStatus` y válvula; `TooManyRequestsException`, `CapacityExceededException` y sus dos manejadores; puerto `RateLimitMetrics`, `LogRateLimitMetrics`, `ObservabilityMetricsConfiguration`, `package-info`; su línea de `ProcessBeanPolicy`, su `@Import` y la variante de la prueba de aislamiento solo de métricas; `LogRateLimitMetricsTest`; nota de `docs/07` | unas 505 (códigos 184, métricas 321) |
+| 11b `edge-interceptor` | `RateLimited`, `RateLimiterRegistry`, `RateLimitInterceptor`, `RateLimitPolicyCheck` y `RateLimitInterceptorTest`, con la ampliación de la lista de `IdempotencyScopeExclusionInventoryTest` (12 líneas) | unas 407 |
+| 11c `edge-throttling-wiring` | `RateLimitProperties`, `ThrottlingConfiguration`, su `@Import` y su línea de política, la prueba de aislamiento completa, el arnés (`LimitedController`, `UnknownPolicyController`, `Calls`, `WebEdgeHarness`), `RateLimitEdgeTest`, `RateLimitPropertiesTest`, notas de `docs/03` §4.4 y §10 | unas 639 |
+
+Orden: 11a, 11b y 11c; 11b necesita 11a (el puerto y las excepciones) y 11c necesita 11b. Los tres quedan por debajo de 800 sin excepción de tamaño. Las cifras de los archivos compartidos (`AdminApplication`, `ProcessBeanPolicy`, `ProcessBeanIsolationTest`, la lista del inventario) son aproximadas y se afinan al construir cada parte.
+
+### Desviaciones del diseño y de `tasks.md` (declaradas)
+
+1. **Más clases de las que lista `tasks.md`:** `RateLimiterRegistry`, `RateLimitPolicyCheck` (la comprobación de arranque que pide la decisión 17), `RateLimitMetrics` y su adaptador, `ObservabilityMetricsConfiguration` y los dos controladores del arnés.
+2. **`IdempotencyScopeExclusionInventoryTest`** se amplía con siete tipos de `shared.security` que las clases web del limitador usan (`RateLimiter`, `RateLimitDecision` con sus tres variantes, `RateLimitPolicy` e `InMemoryRateLimiter`). El propio inventario indica «añade el siguiente aquí».
+3. **Ubicación de las excepciones:** `TooManyRequestsException` en `ratelimit` (como pide `tasks.md`) y `CapacityExceededException` en `problem`. El manejador de `problem` depende de `ratelimit` y el interceptor de `problem`: es un ciclo entre paquetes del mismo módulo `shared`, que `NoCyclesTest` (rebanadas por módulo) no prohíbe. No se movió la excepción para no partir lo que `tasks.md` fija.
+4. **Mapeo del contenedor** de `429` y `503` hecho ahora (ver arriba), no solo registrado.
+5. **Registro del interceptor** con un `WebMvcConfigurer` anónimo dentro de `ThrottlingConfiguration` en lugar de que la configuración lo implemente: una clase de configuración que recibe por constructor un bean que ella misma declara crea una referencia circular.
+6. **`application.yml` no cambia:** los valores por omisión viven en `RateLimitProperties` y los prueban `RateLimitPropertiesTest` y `RateLimitEdgeTest`.
+7. **Retry-After exacto de la capa 1 en el borde:** la prueba por la cadena real comprueba un entero entre 1 y 60 (la espera real depende del tiempo transcurrido); los valores exactos (200 ms da 1, 15 s da 15) se prueban en `RateLimitInterceptorTest` con un limitador de respuesta fija, y el valor escrito en la cabecera en `ProblemExceptionHandlerTest`.
+8. **Escenario «no se abre ninguna transacción»:** el arnés no tiene base de datos; se prueba con cero invocaciones del controlador y del caso de uso de prueba. La transacción real llega con el controlador de la parte 4b.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | VERDE B y VERDE de `ProcessBeanPolicy` de arriba: `Tests run: 63, Failures: 0` y `Tests run: 30, Failures: 0`; cierre completo Surefire 186 + 1087, Failsafe 229 |
+| Arnés de ejecución | `HarnessProcess` real (Tomcat, `RequestContextFilter`, cadena de seguridad real, interceptor y traductor reales), clientes distintos por `X-Forwarded-For` con el bucle local como proxy de confianza; y `ConfiaApplication.launch` real de los tres procesos para el aislamiento |
+| Frontera de reversión | `ThrottlingConfiguration`, `ratelimit/`, `observability/metrics/`, el `@Import` de `AdminApplication`, las dos líneas de `ProcessBeanPolicy`, los dos códigos y manejadores y el mapeo de `forStatus` |
