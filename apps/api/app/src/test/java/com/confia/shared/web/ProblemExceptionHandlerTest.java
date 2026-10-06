@@ -11,10 +11,24 @@ import com.confia.kernel.DomainException;
 import com.confia.shared.web.problem.ProblemCode;
 import com.confia.shared.web.problem.ProblemExceptionHandler;
 import com.confia.shared.web.problem.ProblemResponses;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Path;
+import jakarta.validation.Valid;
+import jakarta.validation.Validator;
+import jakarta.validation.metadata.ConstraintDescriptor;
+import jakarta.validation.Validation;
+import jakarta.validation.constraints.NotBlank;
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Map;
 import java.net.SocketException;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Set;
 import org.apache.catalina.connector.ClientAbortException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,10 +40,27 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.context.support.StaticMessageSource;
+import org.springframework.context.support.DefaultMessageSourceResolvable;
+import org.springframework.context.MessageSourceResolvable;
+import org.springframework.core.MethodParameter;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.method.MethodValidationException;
+import org.springframework.validation.method.MethodValidationResult;
+import org.springframework.validation.method.ParameterValidationResult;
+import org.springframework.validation.ObjectError;
+import org.springframework.web.ErrorResponse;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The branches of {@link ProblemExceptionHandler} that the harness cannot reach with a real client:
@@ -37,6 +68,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
  * answers on the wire are proven in {@code ProblemTranslationTest}.
  */
 class ProblemExceptionHandlerTest {
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
     private final Logger logger = (Logger) LoggerFactory.getLogger(ProblemExceptionHandler.class);
@@ -211,5 +244,224 @@ class ProblemExceptionHandlerTest {
         assertThat(response.getContentAsString()).isEmpty();
         assertThat(List.copyOf(logged.list)).extracting(ILoggingEvent::getLevel)
                 .containsExactly(Level.DEBUG);
+    }
+
+    /** A service-style method whose parameter carries a constraint, validated by hand below. */
+    static final class Greeter {
+        void greet(@NotBlank String who) {
+        }
+
+        @NotBlank
+        String name() {
+            return "";
+        }
+    }
+
+    /** A body with a map and a list, to see what a path does with the keys and the indexes. */
+    record Holder(@Valid Map<String, Item> props, List<@NotBlank String> items) {
+    }
+
+    record Item(@NotBlank String campo) {
+    }
+
+    private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory()
+            .getValidator();
+
+    @Test
+    void aMapKeyAnAnIndexAndTheSyntheticNodesNeverReachTheFieldPath() throws Exception {
+        String key = "VALOR-SENSIBLE-123";
+        Holder holder = new Holder(Map.of(key, new Item(""), "x].secret[y", new Item(" ")),
+                List.of("ok", " "));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.invalidConstraints(new ConstraintViolationException(VALIDATOR.validate(holder)),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        JsonNode errors = JSON.readTree(response.getContentAsString()).get("errors");
+        List<String> fields = new ArrayList<>();
+        errors.forEach(error -> fields.add(error.get("field").asString()));
+        assertThat(fields).containsExactlyInAnyOrder("props[].campo", "props[].campo", "items[]");
+        assertThat(response.getContentAsString()).doesNotContain("VALOR").doesNotContain("secret")
+                .doesNotContain("<");
+    }
+
+    @Test
+    void aViolationOfAReturnValueIsAServerDefectAnsweredAs500AndLoggedAtError() throws Exception {
+        Method name = Greeter.class.getDeclaredMethod("name");
+        Set<ConstraintViolation<Greeter>> violations = VALIDATOR.forExecutables()
+                .validateReturnValue(new Greeter(), name, "");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.invalidConstraints(new ConstraintViolationException(violations),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        assertThat(violations).hasSize(1);
+        assertThat(response.getStatus()).isEqualTo(500);
+        assertThat(response.getContentAsString()).contains("internal-error")
+                .doesNotContain("errors").doesNotContain("name");
+        assertThat(logged.list).extracting(ILoggingEvent::getLevel).containsExactly(Level.ERROR);
+    }
+
+    @Test
+    void aViolationWithAnEmptyPathIsAnEmptyFieldAndNotACrash() throws Exception {
+        NotBlank annotation = Greeter.class.getDeclaredMethod("greet", String.class)
+                .getParameters()[0].getAnnotation(NotBlank.class);
+        ConstraintDescriptor<?> descriptor = (ConstraintDescriptor<?>) Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[] {ConstraintDescriptor.class},
+                (proxy, method, args) -> "getAnnotation".equals(method.getName()) ? annotation
+                        : null);
+        Path empty = () -> Collections.emptyIterator();
+        ConstraintViolation<?> violation = (ConstraintViolation<?>) Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[] {ConstraintViolation.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getPropertyPath" -> empty;
+                    case "getConstraintDescriptor" -> descriptor;
+                    case "hashCode" -> 1;
+                    case "equals" -> proxy == args[0];
+                    default -> null;
+                });
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.invalidConstraints(new ConstraintViolationException(Set.of(violation)),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        JsonNode error = JSON.readTree(response.getContentAsString()).get("errors").get(0);
+        assertThat(response.getStatus()).isEqualTo(400);
+        assertThat(error.get("field").asString()).isEmpty();
+        assertThat(error.get("reason").asString()).isEqualTo("not-blank");
+    }
+
+    @Test
+    void aBindExceptionIsTranslatedFromItsBindingResult() throws Exception {
+        BeanPropertyBindingResult result = new BeanPropertyBindingResult(new Object(), "body");
+        result.addError(new FieldError("body", "name", "a message that must not be repeated"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.invalidBinding(new BindException(result), new MockHttpServletRequest("GET", "/x"),
+                response);
+
+        JsonNode errors = JSON.readTree(response.getContentAsString()).get("errors");
+        assertThat(response.getStatus()).isEqualTo(400);
+        assertThat(errors.size()).isEqualTo(1);
+        assertThat(errors.get(0).get("field").asString()).isEqualTo("name");
+        assertThat(response.getContentAsString()).doesNotContain("repeated");
+    }
+
+    @Test
+    void aMethodValidationExceptionIsAValidationFailureForAParameterAndAServerDefectForAReturn()
+            throws Exception {
+        Method greet = Greeter.class.getDeclaredMethod("greet", String.class);
+        ParameterValidationResult parameter = new ParameterValidationResult(
+                new MethodParameter(greet, 0), " ",
+                List.of(new DefaultMessageSourceResolvable(
+                        new String[] {"NotBlank.greet.who", "NotBlank"}, "must not be repeated")),
+                null, null, null, (error, type) -> null);
+        MockHttpServletResponse parameters = new MockHttpServletResponse();
+        MockHttpServletResponse returned = new MockHttpServletResponse();
+
+        handler.invalidMethod(new MethodValidationException(
+                MethodValidationResult.create(new Greeter(), greet, List.of(parameter))),
+                new MockHttpServletRequest("GET", "/x"), parameters);
+        handler.invalidMethod(new MethodValidationException(new ReturnValueResult(greet)),
+                new MockHttpServletRequest("GET", "/x"), returned);
+
+        JsonNode error = JSON.readTree(parameters.getContentAsString()).get("errors").get(0);
+        assertThat(parameters.getStatus()).isEqualTo(400);
+        assertThat(error.get("reason").asString()).isEqualTo("not-blank");
+        assertThat(parameters.getContentAsString()).doesNotContain("repeated");
+        assertThat(returned.getStatus()).isEqualTo(500);
+        assertThat(returned.getContentAsString()).contains("internal-error")
+                .doesNotContain("errors");
+    }
+
+    /** A method validation result that reports the return value as the invalid part. */
+    private record ReturnValueResult(Method method) implements MethodValidationResult {
+        @Override
+        public Object getTarget() {
+            return new Greeter();
+        }
+
+        @Override
+        public Method getMethod() {
+            return method;
+        }
+
+        @Override
+        public boolean isForReturnValue() {
+            return true;
+        }
+
+        @Override
+        public List<ParameterValidationResult> getParameterValidationResults() {
+            return List.of();
+        }
+
+        @Override
+        public List<MessageSourceResolvable> getCrossParameterValidationResults() {
+            return List.of();
+        }
+    }
+
+    @Test
+    void aViolationOfAMethodParameterNamesTheParameterAndNotTheMethod() throws Exception {
+        Method greet = Greeter.class.getDeclaredMethod("greet", String.class);
+        Set<ConstraintViolation<Greeter>> violations = Validation.buildDefaultValidatorFactory()
+                .getValidator().forExecutables()
+                .validateParameters(new Greeter(), greet, new Object[] {" "});
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.invalidConstraints(new ConstraintViolationException(violations),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        JsonNode error = JSON.readTree(response.getContentAsString()).get("errors").get(0);
+        assertThat(error.get("field").asString()).as("not greet.arg0").isIn("", "who");
+        assertThat(error.get("reason").asString()).isEqualTo("not-blank");
+        assertThat(response.getContentAsString()).doesNotContain("greet");
+    }
+
+    @Test
+    void anErrorOfTheWholeObjectHasAnEmptyFieldAndAnErrorWithoutCodesIsJustInvalid()
+            throws Exception {
+        BeanPropertyBindingResult result = new BeanPropertyBindingResult(new Object(), "body");
+        result.addError(new ObjectError("body", "a message that must not be repeated"));
+        MethodParameter parameter = new MethodParameter(Object.class.getMethod("toString"), -1);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.invalidBody(new MethodArgumentNotValidException(parameter, result),
+                new MockHttpServletRequest("GET", "/x"), response);
+
+        JsonNode errors = JSON.readTree(response.getContentAsString()).get("errors");
+        assertThat(errors.size()).isEqualTo(1);
+        assertThat(errors.get(0).get("field").asString()).isEmpty();
+        assertThat(errors.get(0).get("reason").asString()).isEqualTo("invalid");
+        assertThat(response.getContentAsString()).doesNotContain("repeated");
+    }
+
+    /**
+     * Both validation exceptions of Spring MVC are also an {@link ErrorResponse}, which the generic
+     * branch answers without {@code errors}. Spring picks the handler closest to the exception, so
+     * the specific handler wins; this pins that it does, and that the precondition that makes the
+     * ordering matter holds.
+     */
+    @Test
+    void theValidationHandlersWinOverTheGenericErrorResponseBranch() {
+        ExceptionHandlerMethodResolver resolver =
+                new ExceptionHandlerMethodResolver(ProblemExceptionHandler.class);
+
+        assertThat(ErrorResponse.class).isAssignableFrom(MethodArgumentNotValidException.class);
+        assertThat(ErrorResponse.class).isAssignableFrom(HandlerMethodValidationException.class);
+        assertThat(resolver.resolveMethodByExceptionType(MethodArgumentNotValidException.class))
+                .extracting(Method::getName).isEqualTo("invalidBody");
+        assertThat(resolver.resolveMethodByExceptionType(HandlerMethodValidationException.class))
+                .extracting(Method::getName).isEqualTo("invalidParameters");
+        assertThat(resolver.resolveMethodByExceptionType(ConstraintViolationException.class))
+                .extracting(Method::getName).isEqualTo("invalidConstraints");
+        assertThat(resolver.resolveMethodByExceptionType(BindException.class))
+                .extracting(Method::getName).isEqualTo("invalidBinding");
+        assertThat(resolver.resolveMethodByExceptionType(MethodValidationException.class))
+                .extracting(Method::getName).isEqualTo("invalidMethod");
+        assertThat(resolver.resolveMethodByExceptionType(HttpMediaTypeNotAcceptableException.class))
+                .as("non-vacuous: any other ErrorResponse still falls to the generic handler")
+                .extracting(Method::getName).isEqualTo("unexpected");
     }
 }

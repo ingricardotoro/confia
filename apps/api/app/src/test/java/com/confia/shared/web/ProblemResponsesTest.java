@@ -2,10 +2,14 @@ package com.confia.shared.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.confia.shared.web.problem.FieldViolation;
 import com.confia.shared.web.problem.ProblemCode;
 import com.confia.shared.web.problem.ProblemResponses;
 import java.io.IOException;
+import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -132,5 +136,74 @@ class ProblemResponsesTest {
 
         String traceId = JSON.readTree(response.getContentAsString()).get("traceId").asString();
         assertThat(java.util.UUID.fromString(traceId)).isNotNull();
+    }
+
+    @Test
+    void errorsIsOmittedWhenThereAreNoViolations() throws IOException {
+        MockHttpServletResponse without = new MockHttpServletResponse();
+        MockHttpServletResponse empty = new MockHttpServletResponse();
+
+        writer().write(request("/x", null), without, ProblemCode.INTERNAL_ERROR);
+        writer().write(request("/x", null), empty, ProblemCode.VALIDATION_FAILED, List.of());
+
+        assertThat(JSON.readTree(without.getContentAsString()).has("errors"))
+                .as("a response without a violation list has no errors member").isFalse();
+        assertThat(JSON.readTree(empty.getContentAsString()).has("errors"))
+                .as("an empty list is the same as none: the member is omitted").isFalse();
+        assertThat(empty.getContentAsString()).doesNotContain("errors");
+    }
+
+    @Test
+    void errorsListsTheFieldAndTheReasonOfEveryViolationAndNothingElse() throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        writer().write(request("/x", null), response, ProblemCode.VALIDATION_FAILED,
+                List.of(new FieldViolation("name", "not-blank"),
+                        new FieldViolation("items[0].quantity", "min")));
+
+        assertThat(response.getStatus()).isEqualTo(400);
+        JsonNode body = JSON.readTree(response.getContentAsString());
+        JsonNode errors = body.get("errors");
+        assertThat(errors.size()).isEqualTo(2);
+        assertThat(errors.get(0).get("field").asString()).isEqualTo("name");
+        assertThat(errors.get(0).get("reason").asString()).isEqualTo("not-blank");
+        assertThat(errors.get(1).get("field").asString()).isEqualTo("items[0].quantity");
+        assertThat(errors.get(1).get("reason").asString()).isEqualTo("min");
+        assertThat(errors.get(0).size()).as("only field and reason").isEqualTo(2);
+        assertThat(body.get("type").asString())
+                .isEqualTo("https://confia.hn/problems/validation-failed");
+        assertThat(body.get("traceId").asString()).isEqualTo(REQUEST_ID);
+    }
+
+    @Test
+    void errorsNeverHoldMoreThanFiftyViolationsAndFiftyAreKeptWhole() throws IOException {
+        MockHttpServletResponse capped = new MockHttpServletResponse();
+        MockHttpServletResponse exact = new MockHttpServletResponse();
+
+        writer().write(request("/x", null), capped, ProblemCode.VALIDATION_FAILED,
+                violations(51));
+        writer().write(request("/x", null), exact, ProblemCode.VALIDATION_FAILED,
+                violations(50));
+
+        JsonNode cappedBody = JSON.readTree(capped.getContentAsString());
+        assertThat(capped.getStatus()).isEqualTo(400);
+        assertThat(cappedBody.get("type").asString())
+                .isEqualTo("https://confia.hn/problems/validation-failed");
+        assertThat(cappedBody.get("errors").size()).isEqualTo(50);
+        assertThat(cappedBody.get("errors").get(49).get("field").asString()).isEqualTo("f49");
+        assertThat(JSON.readTree(exact.getContentAsString()).get("errors").size()).isEqualTo(50);
+    }
+
+    private static List<FieldViolation> violations(int count) {
+        return java.util.stream.IntStream.range(0, count)
+                .mapToObj(i -> new FieldViolation("f" + i, "size")).toList();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"NotBlank, not-blank", "Size, size", "Pattern, pattern", "DecimalMin, decimal-min",
+            "NotEmpty, not-empty", "AssertTrue, assert-true", "Email, email",
+            "PositiveOrZero, positive-or-zero"})
+    void theReasonIsTheSimpleNameOfTheConstraintInKebabCase(String constraint, String reason) {
+        assertThat(FieldViolation.of("f", constraint).reason()).isEqualTo(reason);
     }
 }

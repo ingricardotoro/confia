@@ -5,8 +5,18 @@ import com.confia.shared.security.RequestOrigin;
 import com.confia.shared.web.problem.ProblemResponses;
 import com.confia.shared.web.request.RequestContextFilter;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Valid;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.net.SocketException;
 import java.sql.SQLException;
+import java.util.Map;
+import java.util.Set;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.security.access.AccessDeniedException;
@@ -69,14 +79,30 @@ class HarnessController {
             String userAgent) {
     }
 
-    /** The body the validated route accepts: a name. */
-    record ValidatedBody(String name) {
+    /** The body the validated route accepts: a mandatory name of at most ten characters. */
+    record ValidatedBody(@NotBlank @Size(max = 10) String name,
+            @Valid Map<String, Inner> props) {
+    }
+
+    /** The value of a map entry of the validated body: a mandatory field. */
+    record Inner(@NotBlank String campo) {
     }
 
     /** Public for {@code POST}, JSON only: the routes of validation, malformed bodies and 415. */
     @PostMapping(path = "/test/validated", consumes = MediaType.APPLICATION_JSON_VALUE)
-    String validated(@RequestBody ValidatedBody body) {
+    String validated(@Valid @RequestBody ValidatedBody body) {
         return "accepted";
+    }
+
+    /**
+     * Public for {@code GET}: a constraint on a request parameter and another on a header, checked
+     * by Spring's method validation. Both are named explicitly, because the build does not keep
+     * parameter names.
+     */
+    @GetMapping("/test/bounded")
+    String bounded(@RequestParam(name = "size") @Max(5) int size,
+            @RequestHeader(name = "X-Limit", defaultValue = "0") @Max(3) int limit) {
+        return "size " + size + limit;
     }
 
     /** Public for {@code GET}: a mandatory header and a mandatory, typed parameter. */
@@ -85,6 +111,17 @@ class HarnessController {
             @RequestParam(name = "count") int count) {
         return header + count;
     }
+
+    /** Public for {@code GET}: a violation set raised the way a validated service raises it. */
+    @GetMapping("/test/constraint-violation")
+    String constraintViolation() {
+        Set<ConstraintViolation<ValidatedBody>> violations = VALIDATOR
+                .validate(new ValidatedBody(HarnessProcess.SENSITIVE_VALUE, null));
+        throw new ConstraintViolationException(violations);
+    }
+
+    private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory()
+            .getValidator();
 
     /** A business rule whose code the catalog knows, with an internal message that holds a document id. */
     static final class KnownDomainFailure extends DomainException {

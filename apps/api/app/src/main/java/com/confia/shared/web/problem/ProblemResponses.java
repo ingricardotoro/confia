@@ -3,6 +3,7 @@ package com.confia.shared.web.problem;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.context.MessageSource;
@@ -45,7 +46,16 @@ public final class ProblemResponses {
     /** Writes {@code code} as the response. */
     public void write(HttpServletRequest request, HttpServletResponse response, ProblemCode code)
             throws IOException {
-        write(request, response, code, instanceOf(request));
+        write(request, response, code, instanceOf(request), List.of());
+    }
+
+    /**
+     * Writes {@code code} with the violated constraints in {@code errors}: the field and the
+     * constraint of each, never a rejected value. An empty list is the same as none.
+     */
+    public void write(HttpServletRequest request, HttpServletResponse response, ProblemCode code,
+            List<FieldViolation> violations) throws IOException {
+        write(request, response, code, instanceOf(request), violations);
     }
 
     /**
@@ -55,15 +65,15 @@ public final class ProblemResponses {
      */
     public void writeWithoutRequestPath(HttpServletRequest request, HttpServletResponse response,
             ProblemCode code) throws IOException {
-        write(request, response, code, NO_PATH);
+        write(request, response, code, NO_PATH, List.of());
     }
 
     private void write(HttpServletRequest request, HttpServletResponse response, ProblemCode code,
-            String instance) throws IOException {
+            String instance, List<FieldViolation> violations) throws IOException {
         ProblemBody body = new ProblemBody(code.type(),
                 messages.getMessage(code.titleKey(), null, CATALOG_LOCALE), code.status(),
                 messages.getMessage(code.detailKey(), null, CATALOG_LOCALE), instance,
-                traceIdOf(request));
+                traceIdOf(request), violations);
         byte[] bytes = mapper.writeValueAsBytes(body);
         response.setStatus(code.status());
         response.setContentType(MEDIA_TYPE);

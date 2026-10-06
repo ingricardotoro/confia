@@ -85,6 +85,102 @@ class ProblemTranslationTest {
         assertThat(body.has("errors")).as("the response has no errors member").isFalse();
     }
 
+    // ---- validation -----------------------------------------------------------------------
+
+    @ParameterizedTest
+    @CsvSource(value = {"{\"name\":\"\"}|not-blank", "{\"name\":\"abcdefghijk\"}|size",
+            "{}|not-blank"}, delimiter = '|')
+    void anInvalidFieldAnswers400NamingTheFieldAndTheConstraint(String body, String reason) {
+        HttpResponse<String> response = postJson(body);
+
+        JsonNode problem = assertProblem(response, 400, "validation-failed");
+        assertThat(problem.get("errors").size()).as("exactly one violation").isEqualTo(1);
+        assertThat(problem.get("errors").get(0).get("field").asString()).isEqualTo("name");
+        assertThat(problem.get("errors").get(0).get("reason").asString()).isEqualTo(reason);
+        assertBaseSecurityHeaders(response);
+    }
+
+    @Test
+    void theValueAtTheExactMaximumLengthIsAccepted() {
+        assertThat(postJson("{\"name\":\"abcdefghij\"}").statusCode()).isEqualTo(200);
+        assertThat(postJson("{\"name\":\"abcdefghijk\"}").statusCode()).isEqualTo(400);
+    }
+
+    @Test
+    void theRejectedValueIsRepeatedNeitherInTheBodyNorInTheHeaders() {
+        HttpResponse<String> response = postJson("{\"name\":\"" + SENSITIVE + "\"}");
+
+        JsonNode problem = assertProblem(response, 400, "validation-failed");
+        assertThat(problem.get("errors").size()).isEqualTo(1);
+        assertThat(everythingOf(response)).doesNotContain(SENSITIVE);
+    }
+
+    @Test
+    void aConstraintViolationExceptionIsTranslatedLikeAnyOtherValidationFailure() {
+        HttpResponse<String> response = process.get("/test/constraint-violation");
+
+        JsonNode problem = assertProblem(response, 400, "validation-failed");
+        assertThat(problem.get("errors").size()).isEqualTo(1);
+        assertThat(problem.get("errors").get(0).get("field").asString()).isEqualTo("name");
+        assertThat(problem.get("errors").get(0).get("reason").asString()).isEqualTo("size");
+        assertThat(everythingOf(response)).doesNotContain(SENSITIVE);
+    }
+
+    @Test
+    void aConstraintOnAParameterIsTranslatedWithItsNameAndNeverItsValue() {
+        assertThat(process.get("/test/bounded?size=5").statusCode())
+                .as("non-vacuous: the limit itself is accepted").isEqualTo(200);
+
+        HttpResponse<String> response = process.get("/test/bounded?size=6");
+
+        JsonNode problem = assertProblem(response, 400, "validation-failed");
+        assertThat(problem.get("errors").size()).isEqualTo(1);
+        assertThat(problem.get("errors").get(0).get("field").asString()).isEqualTo("size");
+        assertThat(problem.get("errors").get(0).get("reason").asString()).isEqualTo("max");
+        assertThat(problem.get("errors").get(0).size()).as("only field and reason").isEqualTo(2);
+    }
+
+    @Test
+    void aParameterAndAHeaderAreNamedByTheirBindingAndEachKeepsItsOwnConstraint() {
+        HttpResponse<String> response = process.get("/test/bounded?size=" + 6, "X-Limit", "9");
+
+        JsonNode problem = assertProblem(response, 400, "validation-failed");
+        List<String> fields = new ArrayList<>();
+        problem.get("errors").forEach(error -> fields.add(
+                error.get("field").asString() + ":" + error.get("reason").asString()));
+        assertThat(fields).containsExactlyInAnyOrder("size:max", "X-Limit:max");
+        assertThat(problem.get("errors").toString())
+                .as("the list holds names and constraints, never the rejected 9 or the 6")
+                .doesNotContain("9").doesNotContain("6");
+    }
+
+    @Test
+    void aKeyTheClientChoseForAMapIsNeverEchoedInTheFieldPath() {
+        HttpResponse<String> response = postJson("{\"name\":\"ok\",\"props\":{\"" + SENSITIVE
+                + "\":{\"campo\":\"\"}}}");
+
+        JsonNode problem = assertProblem(response, 400, "validation-failed");
+        assertThat(problem.get("errors").size()).isEqualTo(1);
+        assertThat(problem.get("errors").get(0).get("field").asString())
+                .isEqualTo("props[].campo");
+        assertThat(problem.get("errors").get(0).get("reason").asString()).isEqualTo("not-blank");
+        assertThat(everythingOf(response)).doesNotContain(SENSITIVE);
+    }
+
+    @Test
+    void theListOfViolationsIsCappedAtFifty() {
+        StringBuilder entries = new StringBuilder();
+        for (int i = 0; i < 60; i++) {
+            entries.append(i == 0 ? "" : ",").append("\"k").append(i).append("\":{\"campo\":\"\"}");
+        }
+
+        HttpResponse<String> response = postJson(
+                "{\"name\":\"ok\",\"props\":{" + entries + "}}");
+
+        JsonNode problem = assertProblem(response, 400, "validation-failed");
+        assertThat(problem.get("errors").size()).as("60 violations, 50 listed").isEqualTo(50);
+    }
+
     @Test
     void aTruncatedBodyAnswers400WithoutTheParserMessageAndWithoutAViolationList() {
         HttpResponse<String> response = postJson("{\"name\": \"" + SENSITIVE);

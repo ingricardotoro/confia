@@ -738,6 +738,24 @@ Reglas de presentación del error:
 3. Los reintentos automáticos de TanStack Query están **prohibidos en mutaciones financieras**. Las
    consultas de lectura sí reintentan hasta dos veces con retroceso exponencial.
 
+> **Nota fechada 2026-10-05 (cambio `web-edge-foundations`, traductor de errores).** La tabla de
+> arriba no se reescribe; esta nota fija lo que el backend publica hoy. Primero, los códigos
+> publicados difieren de tres nombres de la tabla, y un código publicado no se renombra (ADR-0019,
+> punto 3): `validation-failed` (400) es el `validation-error` de la tabla, `too-many-requests` (429)
+> es `rate-limited` y `forbidden` (403) es `insufficient-permission`. Los demás códigos de la tabla
+> llegan con los cambios que los producen. El backend añade `authentication-required` (401, toda
+> petición anónima denegada), `resource-not-found` (404), `method-not-allowed` (405),
+> `unsupported-media-type` (415) e `internal-error` (500, toda excepción no prevista y todo error de
+> dominio con un código que el catálogo no conoce). Segundo, el idioma: `title` y `detail` llegan en
+> español de Honduras desde el catálogo del backend, no en inglés, y no varían con `Accept-Language`;
+> la interfaz sigue mapeando `type` a su propia clave y no los muestra. Tercero, `errors` solo existe
+> en `validation-failed` y es un arreglo de `{ "field": "<ruta del campo>", "reason": "<restricción>" }`
+> con la restricción en kebab-case (`not-blank`, `size`, `max`); nunca trae el valor rechazado. Un
+> cuerpo mal formado, una cabecera o un parámetro ausentes o de tipo erróneo también responden
+> `validation-failed`, pero sin `errors`. `errors` es una extensión de RFC 9457 que el esquema
+> `ProblemDetail` del contrato OpenAPI todavía no declara; la declara el primer endpoint de
+> producción con validación.
+
 ---
 
 ## 10. Búsqueda y filtrado
