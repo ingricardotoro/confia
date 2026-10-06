@@ -57,11 +57,15 @@ class IdempotencyKeyInterceptorTest {
                 .isEqualTo(MAXIMUM);
     }
 
-    @ParameterizedTest(name = "[{0}]")
-    @ValueSource(strings = {"", " ", "\t"})
-    void anAbsentOrBlankKeyIsMissing(String blank) {
+    @Test
+    void anAbsentKeyIsMissing() {
         assertThatThrownBy(() -> preHandle(withKey(), "write"))
                 .isInstanceOf(IdempotencyKeyMissingException.class);
+    }
+
+    @ParameterizedTest(name = "[{0}]")
+    @ValueSource(strings = {"", " ", "\t"})
+    void aBlankKeyIsMissing(String blank) {
         assertThatThrownBy(() -> preHandle(withKey(blank), "write"))
                 .isInstanceOf(IdempotencyKeyMissingException.class);
     }
@@ -83,6 +87,36 @@ class IdempotencyKeyInterceptorTest {
     void aRepeatedHeaderIsInvalidEvenWhenBothValuesAreEqual() {
         assertThatThrownBy(() -> preHandle(withKey("same", "same"), "write"))
                 .isInstanceOf(IdempotencyKeyInvalidException.class);
+    }
+
+    @Test
+    void aBlankHeaderBesideAValidOneIsARepeatedHeader() {
+        assertThatThrownBy(() -> preHandle(withKey("", "valid"), "write"))
+                .isInstanceOf(IdempotencyKeyInvalidException.class);
+    }
+
+    @Test
+    void oneValueWithACommaIsOneKeyAndNeverSplit() throws Exception {
+        MockHttpServletRequest request = withKey("a,b");
+
+        assertThat(preHandle(request, "write")).isTrue();
+        assertThat(request.getAttribute(IdempotencyKeyInterceptor.KEY_ATTRIBUTE)).isEqualTo("a,b");
+    }
+
+    @Test
+    void noRefusalRepeatsTheKeyItRefused() {
+        String key = "secret-" + "k".repeat(IdempotencyKeyInterceptor.MAX_KEY_LENGTH);
+
+        assertThatThrownBy(() -> preHandle(withKey(key), "write"))
+                .isInstanceOf(IdempotencyKeyInvalidException.class)
+                .satisfies(refusal -> assertThat(String.valueOf(refusal.getMessage()))
+                        .doesNotContain("secret-"));
+    }
+
+    @Test
+    void aHandlerThatIsNotAMethodIsNotTouched() throws Exception {
+        assertThat(interceptor.preHandle(withKey(), new MockHttpServletResponse(), new Object()))
+                .isTrue();
     }
 
     @Test

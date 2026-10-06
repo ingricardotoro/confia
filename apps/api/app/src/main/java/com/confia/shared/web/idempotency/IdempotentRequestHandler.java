@@ -67,6 +67,10 @@ public final class IdempotentRequestHandler {
     }
 
     /**
+     * Only the body and the path variables are digested as the payload: anything else that changes
+     * the effect of the write, such as a query parameter, must travel in one of them, or a repeated
+     * key would replay the stored answer for a different request.
+     *
      * @param request the request of a method that declares {@link IdempotentWrite}
      * @param context the security context of the write, with the institution
      * @param body the parsed request body, or {@code null} when there is none
