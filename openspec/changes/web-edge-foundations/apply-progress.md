@@ -1867,3 +1867,22 @@ dos defectos distintos que el operador necesita ver. Ahora cada mensaje tiene su
 - Prueba nueva: `aFailingLimiterAndAFailingAdapterInTheSameSecondEachLeaveTheirOwnLine` exige las dos líneas en
   orden. **Ruptura:** con el tope compartido falla en la línea 291. Revertida con `cmp`.
 - `./mvnw verify` completo: Surefire 186 + 1076, Failsafe 229, `BUILD SUCCESS`.
+
+### Revisión independiente de 3.2b (2026-10-06)
+
+Riesgo evaluado: alto. Veredicto: aprobable, sin bloqueantes. La revisión confirmó que es seguro dejar pasar el
+despacho `ASYNC`, que cada camino lleva su causa, que solo se registran la clase de la excepción y la política, y que
+las cotas separadas con `AtomicReference<Long>` son correctas. El orquestador corrigió sus dos hallazgos importantes:
+
+- **M-1:** un adaptador de métricas que lanza un `LinkageError` (por ejemplo `NoClassDefFoundError` cuando llegue
+  Prometheus) daba `500`. Ahora `signal` y `decide` capturan `RuntimeException | LinkageError`, nunca `Throwable`, para
+  no tragar un `OutOfMemoryError`. Prueba `aMetricsAdapterThatCannotLinkStillAnswersTheRefusal`. **Ruptura:** sin
+  `LinkageError` falla en la línea 320.
+- **M-2:** un limitador que devolvía `null` producía un `NullPointerException` como `500`, sin señal. Ahora
+  `requireNonNull` dentro del `try` lo convierte en `LIMITER_FAILURE`. Prueba
+  `aLimiterThatAnswersNoDecisionIsARefusalWithItsCauseAndNeverAServerError`. **Ruptura:** sin la comprobación falla en la
+  línea 301. Ambas rupturas se revirtieron con `cmp`.
+- **S-a:** el Javadoc de `RateLimited` prohíbe además que un filtro haga `startAsync` y despache a un manejador limitado.
+- **Para 3.2c (S-b):** una prueba de arranque fallido con una política inexistente por la cadena real, que verifique que
+  `RateLimitPolicyCheck` detiene el arranque antes de que el servidor acepte conexiones.
+- **Aceptado (S-c):** un fallo del propio `LOG.atError()` escaparía como `500`. Es improbable.
