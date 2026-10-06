@@ -17,7 +17,8 @@ import org.springframework.beans.factory.InitializingBean;
  * headers, bodies or query strings, at whatever level someone configures, so an {@code
  * Authorization} header, a cookie, a body or a token in a query string can never reach a log by
  * turning a level up (web-edge-foundations design.md, decision 22; CLAUDE.md regla 11). {@code
- * INFO}, {@code WARN} and {@code ERROR} of those loggers still pass.
+ * INFO}, {@code WARN} and {@code ERROR} of those loggers still pass, with one exception: the
+ * {@code INFO} of {@link #INFO_PROTECTED_LOGGERS}, which is written for any client with no session.
  *
  * <p><b>What is covered, and how it is known.</b> {@code SensitiveDataLoggingTest} proves each
  * prefix the process really logs through, by removing the guard and showing the secret appear:
@@ -64,9 +65,22 @@ public final class SensitiveLogGuard extends TurboFilter implements Initializing
             "org.springframework.web.servlet.mvc.annotation",
             "org.springframework.web.servlet.handler", "org.springframework.web.method");
 
+    /**
+     * The exact loggers whose {@code INFO} is denied as well (review S-3 of the close of
+     * web-edge-foundations, {@code MalformedRequestLoggingTest}): Tomcat logs the first malformed
+     * request of a connection processor at {@code INFO} with the whole request target in the
+     * exception, query string included, and any client can send one. Its {@code WARN} and {@code
+     * ERROR} still pass.
+     */
+    static final List<String> INFO_PROTECTED_LOGGERS =
+            List.of("org.apache.coyote.http11.Http11Processor");
+
     /** Whether an event of {@code level} from {@code loggerName} must be dropped. */
     static boolean denies(Level level, String loggerName) {
-        return level.toInt() <= Level.DEBUG_INT && isProtected(loggerName);
+        if (level.toInt() <= Level.DEBUG_INT && isProtected(loggerName)) {
+            return true;
+        }
+        return level.toInt() <= Level.INFO_INT && INFO_PROTECTED_LOGGERS.contains(loggerName);
     }
 
     private static boolean isProtected(String loggerName) {
