@@ -41,11 +41,16 @@ class IdempotencyScopeExclusionInventoryTest {
 
     /**
      * The only types of {@code com.confia.shared.security} that a class in a {@code ..web..} package
-     * may depend on, by full class name. Add the next one here (2.3c adds {@code RequestOrigin}).
+     * may depend on, by full class name. Add the next one here (2.3c added {@code RequestOrigin}; 3.2b
+     * added the limiter and its answers, which the interceptor of the edge uses).
      */
     private static final Set<String> WEB_MAY_DEPEND_ON_SHARED_SECURITY = Set.of(
             "com.confia.shared.security.ClientAddress", "com.confia.shared.security.ClientKey",
-            "com.confia.shared.security.RequestOrigin");
+            "com.confia.shared.security.RequestOrigin", "com.confia.shared.security.RateLimiter",
+            "com.confia.shared.security.RateLimitDecision",
+            "com.confia.shared.security.RateLimitDecision$Admitted",
+            "com.confia.shared.security.RateLimitDecision$Limited",
+            "com.confia.shared.security.RateLimitDecision$CapacityExhausted");
 
     /**
      * (a) A production class in a {@code ..web..} package may depend on {@code
