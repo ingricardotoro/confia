@@ -131,6 +131,19 @@ class ProblemCatalogCoverageTest {
     }
 
     @Test
+    void theThreeCodesOfTheIdempotencyEdgeHaveTheirOwnEntriesInTheCatalog() {
+        Properties catalog = loadCatalog();
+        for (String code : List.of("idempotency-key-missing", "idempotency-conflict",
+                "idempotency-payload-mismatch")) {
+            assertThat(ProblemCode.ofCode(code)).as("code %s", code).isPresent();
+            assertThat(catalog.getProperty("problem." + code + ".title")).as("title of %s", code)
+                    .isNotBlank();
+            assertThat(catalog.getProperty("problem." + code + ".detail")).as("detail of %s", code)
+                    .isNotBlank();
+        }
+    }
+
+    @Test
     void theAuthenticationCodesOfTheSessionChangeDoNotExistYet() {
         Properties catalog = loadCatalog();
         for (String later : CODES_OF_LATER_CHANGES) {

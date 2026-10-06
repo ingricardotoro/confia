@@ -224,6 +224,30 @@ el cambio 1, que es su dueño. La carpeta `staff-identity-password-and-mfa` pas�
 `identity-module-and-password-authentication`; no hubo nunca una carpeta con el nombre de la parte A
 publicada.
 
+**Nota (2026-10-04, cuarto corte: la parte 4 se parte, y el limitador en memoria se acepta hasta el
+cambio 11; registrada el 2026-10-06 por `web-edge-foundations`, PR 13).** La parte 4
+(`session-tokens-and-web-layer`) necesitaba, antes de emitir un solo token, un borde web que no
+existía: cableado de producción, cadena de seguridad, formato de error, origen de la petición,
+limitador, materialización del retardo y superficie HTTP de la idempotencia. Por decisión del
+propietario del 2026-10-04 (D1) el cambio 7 se ejecuta ahora como **cinco** cambios SDD secuenciales:
+
+1. `identity-module-and-password-authentication` — archivado el 2026-09-27.
+2. `column-encryption-and-mfa-totp`.
+3. `password-recovery-token`.
+4. `web-edge-foundations` — parte 4a: el borde, sin ningún endpoint de negocio.
+5. `session-tokens-and-web-layer` — parte 4b: tokens, sesiones y los endpoints de identidad. Hereda
+   las condiciones duras H1 a H4 con su texto y su dueño, y consume lo que la parte 4a entrega.
+
+Además, el propietario aceptó por escrito (D2) el **limitador por dirección IP en memoria por proceso**
+como el «tope funcional equivalente» de la condición dura H1 de arriba, **hasta que el cambio 11
+(`containerization-and-cicd-pipeline`) traiga Redis** y su adaptador detrás del mismo puerto. Sus
+limitaciones se declaran: el estado es por proceso, se pierde al reiniciar y no se comparte entre
+réplicas; falla cerrado (`503`) cuando su tabla acotada se llena. La condición H1 conserva su texto y
+su dueño: se cierra en `session-tokens-and-web-layer`, que es quien aplica el limitador al endpoint de
+inicio de sesión. Tampoco se aplica `Idempotency-Key` a ningún endpoint de identidad (D3): el borde
+HTTP genérico de la idempotencia lo entrega la parte 4a y se demuestra solo con un controlador del
+árbol de pruebas.
+
 **Corrección (2026-09-30, exploración de `password-recovery-token`).** La frase de arriba «no usa
 TOTP» es falsa: `docs/03-seguridad.md` §4.7 exige un código TOTP o un código de recuperación para
 restablecer la contraseña de una cuenta con MFA. El corte sigue siendo válido porque la parte 2 ya

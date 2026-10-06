@@ -2095,3 +2095,140 @@ restauró el archivo y `cmp` confirmó que quedó idéntico.
 
 `./mvnw verify` completo: Surefire 186 + 1 162, Failsafe 233, 0 fallos, cobertura cumplida y `BUILD SUCCESS`. Tamaño: 399 líneas
 efectivas.
+
+## Tarea 5.1: PR 13 `idempotency-edge` (2026-10-06) - construida y verificada, SIN COMMIT por tamaño (1 346 líneas frente a 800)
+
+Rama `change/web-edge-foundations-idempotency-edge`, desde `main` en `37b62c2`. Árbol completo y verificado, sin confirmar. La tarea 5.1 sigue
+sin marcar en `tasks.md` hasta que se decida la costura y se fusione.
+
+### Medición (`git diff --numstat main -- . ':!openspec'`, con `git add -N`; sin código generado; `git reset -q` después)
+
+**1 346 líneas** (1 322 adiciones y 24 eliminaciones). Producción 350 (interceptor 84, manejador 127, configuración 47, anotación 28, dos
+excepciones 39, `ProblemCode` 10, catálogo 9, `AdminApplication` 6); pruebas 965 (IT 500, controlador de demostración 77, `DemoProbe` 72,
+W5 122 más su fixture 22, ausencia en los procesos 64, inventario 77, códigos 27, política de beans 4); documentación 31 (`docs/09`). Fuera
+de la medición, por estar en `openspec/`: la nota del cuarto corte en `foundations-plan/exploration.md` (24 líneas).
+
+### Costura propuesta (pendiente de decisión del propietario; líneas medidas sobre este árbol)
+
+| Parte | Contenido | Líneas |
+|---|---|---|
+| 13a `idempotency-edge-core` | Producción (350), códigos y catálogo con sus pruebas (27), línea de `ProcessBeanPolicy` (4), inventario de `shared.security` (77), W5 con su fixture (144), ausencia en los procesos reales (64) y las notas de `docs/09` (31) | 697 |
+| 13b `idempotency-edge-runtime-proof` | `IdempotencyDemoController`, `DemoProbe` e `IdempotencyEdgeIT` (todos los escenarios con base de datos) | 649 |
+
+13b necesita 13a. Cada parte queda en verde por sí sola. 13a prueba el mecanismo por sus guardas (W5, inventario, ausencia en los procesos reales, códigos y
+catálogo) pero no ejercita el interceptor ni el manejador: ese comportamiento lo prueba 13b. Una prueba de unidad del interceptor con
+`MockHttpServletRequest` llevaría 13a a unas 790 líneas; no se escribió.
+
+### Tabla de ciclo TDD (modo estricto)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO 1 | `test-compile` con `IdempotencyEdgeIT`, `IdempotencyDemoController`, `DemoProbe`, `IdempotencyNotInIdentityTest`, su fixture y `IdempotencyDemoAbsentFromProcessesTest`, sin producción | `COMPILATION ERROR`: `cannot find symbol` en `IdempotentWrite`, `IdempotencyKeyInterceptor`, `IdempotentRequestHandler` e `IdempotencyEdgeConfiguration` |
+| ROJO 2 | Producción creada y `@Import` en `AdminApplication`, **sin** la línea de `ProcessBeanPolicy` y sin los códigos: `-Dtest='ProcessBeanIsolationTest,ProblemCodeTest,ProblemCatalogCoverageTest'` | `Tests run: 68, Failures: 6, Errors: 3`. `ProcessBeanIsolationTest.registersOnlyItsAllowedBeans` falla con `process 'admin': bean 'idempotencyKeyInterceptor' from package 'com.confia.shared.web.idempotency' - not in the allow-list` (y `idempotentRequestHandler`); `ProblemCodeTest` falla en el conjunto de códigos, en tres estados y en tres `type` (`NoSuchElement`); `ProblemCatalogCoverageTest` falla en `idempotency-key-missing` |
+| VERDE | Línea de la política, tres códigos y seis entradas de catálogo | Los mismos tests en verde; `IdempotencyNotInIdentityTest` 5/5, `IdempotencyDemoAbsentFromProcessesTest` 2/2, `OpenApiContractSnapshotTest` 10/10 sin tocar la instantánea |
+| ROJO 3 (inventario) | `IdempotencyScopeExclusionInventoryTest` con su versión de `main` sobre el árbol nuevo | Falla: `IdempotencyEdgeConfiguration resides in a web package and depends on ...IdempotentExecutor, which is not one of [...]`. Con la ampliación de la lista (el borde puede nombrar el ejecutor, el resultado, la respuesta, la clave y el contexto; solo la configuración nombra el ejecutor) y la literal `Idempotency-Key` confinada a `shared.web.idempotency`, 3/3 |
+| IT, primera pasada | `-Dit.test=IdempotencyEdgeIT` | `Tests run: 17, Failures: 2`: (1) la clave `clavé` enviada con el cliente JDK se aceptó con `201`, porque el cliente reescribe el carácter antes de enviarlo: la prueba pasó a un socket crudo con los bytes en UTF-8 y en ISO-8859-1; (2) la guardia de registros no veía ninguna línea: se añadió una línea de sonda que prueba que la captura funciona |
+| Cierre | `./mvnw verify` completo | **Surefire 186 + 1 176, Failsafe 250 (233 más las 17 de `IdempotencyEdgeIT`), `BUILD SUCCESS`**, 0 fallos, 0 omitidos, cobertura cumplida. `apps/api/openapi` y `apps/api/routes` sin cambios |
+
+### Demostraciones deliberadas (cada una revertida de inmediato; `cmp` contra la copia guardada, sin diferencias; ninguna ruptura queda en el árbol)
+
+| Ruptura | Resultado observado |
+|---|---|
+| `IdempotentExecutor`: ante `23505` lanzar `IdempotencyConflictException` en lugar de reproducir en la transacción T3 (la ruptura pedida por la tarea) | `Failures: 1`: `aSecondRequestThatCollidesWithAKeyTheFirstConfirmsReplaysItsAnswerAndIsNeverA409`, línea 329, `[never a 409]` |
+| El manejador no añade `Idempotent-Replay` | `Failures: 5`: líneas 209, 254, 275, 304 y 330 (repetición, orden de campos, variables de ruta, reintento tras `409` y colisión confirmada) |
+| El interceptor omite el rechazo de la cabecera ausente | `Failures: 1`: `aKeyThatIsAbsentOrNotAcceptableIsRefusedBeforeTheUseCaseRuns`, línea 142 |
+| El interceptor omite el rechazo de la clave en blanco | `Failures: 2`: la misma prueba parametrizada, líneas 142 (vacía y solo espacios) |
+| Longitud máxima con `>=` en lugar de `>` | `Failures: 1`: `aKeyOfExactlyTheMaximumLengthIsAccepted`, línea 182 |
+| El endpoint se calcula con la ruta concreta y no con la plantilla | `Failures: 1`: `thePathVariablesAreCoveredByThePayloadAndTheEndpointIsTheMethodAndTheTemplate`, línea 271 (la otra cuenta ya no choca en `422`) |
+| La carga resumida omite las variables de ruta | `Failures: 1`: la misma prueba, línea 271 |
+| W5: la condición deja de tratar `architecture.fixture.identity` como identidad | `Failures: 1`: `rejectsTheFixtureSignInEndpointThatAppliesTheMechanism`, línea 64 (la regla ya no rechaza el fixture) |
+
+### Decisiones y desviaciones (declaradas)
+
+1. **Códigos de la clave no aceptable.** El encargo de la sesión pedía `idempotency-key-missing` para todas las formas. La especificación aprobada
+   (`web-edge`, «Cabecera `Idempotency-Key` obligatoria…», y la decisión 19 del diseño) distingue: ausente o en blanco responde `400
+   idempotency-key-missing`; repetida, de más de 128 caracteres, con espacio interior o fuera de ASCII visible responde `400 validation-failed`.
+   Se siguió la especificación. Para eso se añadió `IdempotencyKeyInvalidException` (código `validation-failed`), que `tasks.md` no lista.
+2. **Las excepciones del componente no se capturan en el manejador.** `IdempotencyConflictException` e `IdempotencyPayloadMismatchException` ya son
+   `DomainException` con los códigos `idempotency-conflict` e `idempotency-payload-mismatch`; con los tres códigos nuevos en `ProblemCode` y en el
+   catálogo, el traductor único las responde `409` y `422`. El «manejador» de cada código es ese traductor, sin código nuevo. El contrato de
+   `IdempotentExecutor` no cambió.
+3. **La ausencia del controlador de demostración** se prueba en `IdempotencyDemoAbsentFromProcessesTest` (paquete `bootstrap`, `*Test`, sin Docker)
+   y no dentro de `IdempotencyEdgeIT`, porque `OpenApiProcess` y `RegisteredRoutes` son de paquete y los dos procesos arrancan sin base de datos.
+4. **`IdempotencyScopeExclusionInventoryTest` se amplió** (la tarea no lo lista, pero su propio texto decía que el PR 13 retira ese control): el
+   borde de idempotencia puede nombrar cinco tipos más de `shared.security` y la literal `Idempotency-Key` solo existe en
+   `shared.web.idempotency`, con comprobación de no vacuidad.
+5. **Sincronización.** Solo `CountDownLatch`. El `409` espera la cota de 250 ms del propio ejecutor, que es lo que se prueba. En el escenario de
+   `23505` la segunda petición avisa (un decorador del almacén, por `BeanPostProcessor` en el arnés) antes de escribir su marcador y solo entonces se
+   libera la primera; el resultado es el mismo si la primera confirma antes o después de que la segunda llegue a su `INSERT`, pero la confirmación debe
+   caber en los 250 ms de la espera acotada, un riesgo de inestabilidad bajo carga extrema que se declara.
+6. **Tope de 128 y endpoint.** La plantilla de ruta de más de 200 caracteres lanza `IllegalStateException` (defecto del programador, `500`), porque la
+   columna `endpoint` acota a 200 y truncar mezclaría operaciones.
+7. **Sin cuerpo de petición** el manejador resume `null` de JSON; la propiedad de que el dinero viaja como cadena (regla 1) es de cada endpoint.
+
+### Evidencia de la unidad de trabajo
+
+| Evidencia | Valor |
+|---|---|
+| Orden enfocada y resultado | `-Dtest='IdempotencyNotInIdentityTest,IdempotencyDemoAbsentFromProcessesTest,IdempotencyScopeExclusionInventoryTest,ProcessBeanIsolationTest,Problem*Test,OpenApiContractSnapshotTest'` en verde; IT: `-Dit.test=IdempotencyEdgeIT`, 17/17 |
+| Arnés de ejecución | `IdempotencyEdgeIT`: PostgreSQL (Testcontainers), `IdempotentExecutor` real, Tomcat y cadena reales en puerto aleatorio, controlador solo de prueba |
+| Frontera de reversión | Se retiran `shared/web/idempotency`, `IdempotencyEdgeConfiguration`, su `@Import`, la línea de `ProcessBeanPolicy`, los tres códigos y sus entradas de catálogo, y las pruebas; `IdempotentExecutor` queda intacto |
+
+### Partición de 5.1 y PR 13a (2026-10-06)
+
+El propietario aprobó partir 5.1 en dos PR **sin excepción de tamaño**, con una prueba de unidad nueva del interceptor en 5.1a. La
+sección anterior describe el árbol completo, que se conserva en la rama local `wip/web-edge-idempotency-edge-full` (8044604).
+
+**PR 13a, con 736 líneas.** Toma del árbol completo, sin cambios, todo salvo `IdempotencyDemoController`, `DemoProbe`, `IdempotencyEdgeIT` e
+`IdempotencyDemoAbsentFromProcessesTest`, y añade `IdempotencyKeyInterceptorTest` (12 pruebas).
+
+- **Por qué la prueba de ausencia pasa a 5.1b.** En el primer `verify` del árbol de 13a, esa prueba falló con
+  `ClassNotFoundException: ...IdempotencyDemoController`, porque carga la clase del controlador de demostración y esa clase llega con
+  5.1b.
+- **`IdempotencyKeyInterceptorTest`.** Se escribió sobre un interceptor que ya existía, así que no tuvo un rojo previo. Para demostrar
+  que puede fallar se rompió el código dos veces a propósito, y después se restauró y se comprobó con `cmp`:
+
+| Ruptura | Prueba que falla |
+|---|---|
+| Longitud máxima más uno | `aKeyOneCharacterLongerThanTheMaximumIsInvalid` |
+| Repetición con más de dos valores | `aRepeatedHeaderIsInvalidEvenWhenBothValuesAreEqual` |
+
+`./mvnw verify` completo sobre el árbol de 13a: Surefire 186 + 1 186, Failsafe 233, 0 fallos, cobertura cumplida y `BUILD SUCCESS`.
+
+### Revisión independiente de 5.1a (2026-10-06)
+
+Veredicto: apto para fusionar, sin bloqueantes.
+
+La revisión confirmó estos puntos:
+
+- La validación de la cabecera y sus códigos se ajustan a la especificación.
+- El manejador falla cerrado cuando no hay clave validada o falta la plantilla de ruta.
+- El digest tiene un sobre fijo, sin confusión entre el cuerpo y las variables de ruta.
+- La institución sale solo del `SecurityContext`.
+- `Idempotent-Replay` aparece solo en una repetición.
+- El 409 y el 422 los escribe el traductor único.
+- El borde se carga solo en el proceso administrativo.
+- W5 no es vacía.
+- No se registra la clave ni la carga.
+
+Corregido:
+
+- **I1 (documental).** `IdempotentRequestHandler` entra a `main` en 5.1a sin prueba propia y se prueba solo en 5.1b. Ahora lo dicen la fila
+  13a y la tarea 5.1b de `tasks.md`. Además, 5.1b añade una prueba de unidad de las tres ramas del manejador que fallan cerrado, que
+  ni 13a ni la IT cubrían.
+- **S1.** El Javadoc de `handle` advierte que solo el cuerpo y las variables de ruta entran en el digest, así que todo dato que cambie
+  el efecto debe viajar en uno de ellos.
+- **S4.** `IdempotencyKeyInterceptorTest` pasa de 12 a 17 pruebas. Se añadieron estos casos y se separaron la clave ausente y la clave
+  en blanco:
+  - una cabecera en blanco junto a una válida;
+  - un valor con coma, que es una sola clave;
+  - ningún rechazo repite la clave;
+  - un manejador que no es un método.
+
+Para seguimiento:
+
+- **S2, la clave del marcador sin el actor:** la decide `confia-architect` cuando existan endpoints reales.
+- **S3, una guarda de construcción para que todo endpoint de dinero declare `@IdempotentWrite`:** se resuelve con el primer endpoint
+  real.
+- **S5 y S6, estrechar a nivel de clase la lista ampliada y la exención de W5:** son opcionales.
+- **S7, igualdad numérica del cuerpo repetido:** se comprueba con un decimal en 13b o en el primer endpoint real.

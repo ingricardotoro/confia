@@ -17,7 +17,12 @@ import java.util.Optional;
  * filter runs (task 2.2; design.md, decision 8, dated note). The rate limiter at the edge owns
  * {@link #TOO_MANY_REQUESTS} (a client over its limit) and {@link #CAPACITY_EXCEEDED} (a server
  * with no room to count another client, or to serve one more waiting request); the second never
- * says who or what caused it (task 3.2; design.md, decision 17). The sign-in codes
+ * says who or what caused it (task 3.2; design.md, decision 17). The HTTP edge of idempotency
+ * owns {@link #IDEMPOTENCY_KEY_MISSING} (a write with no usable key), {@link #IDEMPOTENCY_CONFLICT}
+ * (the same key still in flight after the bounded wait) and {@link #IDEMPOTENCY_PAYLOAD_MISMATCH}
+ * (the same key with another payload); the first is raised by the interceptor, the other two are
+ * the codes of the domain exceptions of {@code IdempotentExecutor}, which the one translator
+ * answers from the catalog (task 5.1; design.md, decision 19). The sign-in codes
  * ({@code authentication-failed}, {@code token-invalid}, {@code token-expired}) and the
  * institution codes belong to the session change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
@@ -29,11 +34,14 @@ import java.util.Optional;
 public enum ProblemCode {
 
     VALIDATION_FAILED("validation-failed", 400),
+    IDEMPOTENCY_KEY_MISSING("idempotency-key-missing", 400),
     AUTHENTICATION_REQUIRED("authentication-required", 401),
     FORBIDDEN("forbidden", 403),
     RESOURCE_NOT_FOUND("resource-not-found", 404),
     METHOD_NOT_ALLOWED("method-not-allowed", 405),
+    IDEMPOTENCY_CONFLICT("idempotency-conflict", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
+    IDEMPOTENCY_PAYLOAD_MISMATCH("idempotency-payload-mismatch", 422),
     TOO_MANY_REQUESTS("too-many-requests", 429),
     INTERNAL_ERROR("internal-error", 500),
     CAPACITY_EXCEEDED("capacity-exceeded", 503);

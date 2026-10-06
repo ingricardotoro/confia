@@ -59,6 +59,10 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // login-like endpoint takes a permit from before its use case runs.
                     // Administrative only, and exact like every entry.
                     "com.confia.shared.web.delay",
+                    // The HTTP edge of idempotency: the interceptor that validates the
+                    // Idempotency-Key header and the handler that runs a use case under it.
+                    // Administrative only, and exact like every entry.
+                    "com.confia.shared.web.idempotency",
                     // The identity module as the three packages its beans come from: the use
                     // cases, the adapters, and the named-interface package of its configuration.
                     // Each entry is exact because the non-vacuity check compares by equality.

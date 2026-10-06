@@ -15,10 +15,10 @@
 
 | Campo | Valor |
 |---|---|
-| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 11 000 a 12 700** en 24 PR según el re-pronóstico del 2026-10-05 y la partición de 3.2 del 2026-10-06 (nota fechada del final): 6 822 ya medidas (siete PR fusionados y la tarea 2.3, medida en 1 869 y partida en cuatro) más 4 200 a 5 900 estimadas para las tareas restantes. La estimación nominal original, de 4 670, subestimó las pruebas; no se recorta ninguna |
+| Líneas de cambio estimadas (adiciones + eliminaciones, sin `openspec/`) | **unas 11 000 a 12 700** en 25 PR según el re-pronóstico del 2026-10-05 y la partición de 3.2 del 2026-10-06 (nota fechada del final): 6 822 ya medidas (siete PR fusionados y la tarea 2.3, medida en 1 869 y partida en cuatro) más 4 200 a 5 900 estimadas para las tareas restantes. La estimación nominal original, de 4 670, subestimó las pruebas; no se recorta ninguna |
 | Riesgo frente al presupuesto | **Alto** frente a 400 de la preflight; **medio por PR** frente al presupuesto del proyecto de 800 (nominal de 320 a 520 por PR, peor caso de 480 a 780) |
 | Chained PRs recommended | Yes |
-| Suggested split | 24 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a, 2.3b, 2.3c, 2.3d, 2.4a, 2.4b, 2.5, 3.1a, 3.1b, 3.1c, 3.2a, 3.2b, 3.2c, 4.1a, 4.1b, 4.1c y 5.1), más la tarea de cierre 6.1 |
+| Suggested split | 25 PR apilados contra `main` (uno por tarea 1.1, 1.2, 2.1a, 2.1b, 2.1c, 2.2a, 2.2b, 2.3a, 2.3b, 2.3c, 2.3d, 2.4a, 2.4b, 2.5, 3.1a, 3.1b, 3.1c, 3.2a, 3.2b, 3.2c, 4.1a, 4.1b, 4.1c, 5.1a y 5.1b), más la tarea de cierre 6.1 |
 | Delivery strategy | `auto-chain` (decidido por el propietario el 2026-10-04, en lugar del `single-pr` de la preflight de la sesión) |
 | Chain strategy | `stacked-to-main`: cada PR se fusiona a `main` en orden y el siguiente parte de `main` actualizado |
 | Presupuesto del proyecto por pull request (`docs/15-flujo-de-trabajo-git.md` §3) | 800 líneas de cambio efectivo |
@@ -109,7 +109,8 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 | 12a | Materializador del retardo, propiedades, configuración solo de administración, ajustes de Tomcat y pruebas de unidad y concurrencia (4.1a) | PR 12a `delay-materializer-core` (773, medidas en el árbol completo) | `-Dtest='RequiredDelayMaterializer*Test,ProcessBeanIsolationTest'` | Pruebas de unidad y de concurrencia con temporizador controlado | Se retira el materializador y `spring.threads.virtual.enabled` vuelve a su omisión |
 | 12b | Prueba en tiempo de ejecución: validación de la configuración, aislamiento por proceso, valores del conector y la IT bajo Tomcat real con base de datos (4.1b) | PR 12b `delay-materializer-runtime-proof` (578, medidas) | `-Dtest='RequiredDelayConfigurationTest,ProcessBeanIsolationTest,ProductionEdgeDefaultsTest'`; IT: `-Dit.test=RequiredDelayMaterializerIT` | `RequiredDelayMaterializerIT` | Se retiran las pruebas |
 | 12c | Regla W4 y ampliación del inventario de exclusión del borde (4.1c) | PR 12c `blocking-wait-rule` (399, medidas) | `-Dtest='BlockingWaitConfinementTest,WebEdgeScopeExclusionInventoryTest'` | Fixture `BadSleepingWebComponent` detectado | Se retiran la regla y sus fixtures |
-| 13 | Borde HTTP de la idempotencia, controlador solo de prueba y regla W5 (5.1) | PR 13 `idempotency-edge` (~480 → 720) | `-Dtest='IdempotencyNotInIdentityTest,OpenApiContractSnapshotTest'`; IT: `-Dit.test=IdempotencyEdgeIT` | `IdempotencyEdgeIT` con `IdempotencyDemoController` y PostgreSQL | Se retira el borde; `IdempotentExecutor` queda intacto |
+| 13a | Borde de la idempotencia: anotación, interceptor, manejador, códigos, configuración solo de administración, regla W5 y notas de `docs/09`; el manejador se prueba solo en 13b (5.1a) | PR 13a `idempotency-edge-core` (unas 770, medidas) | `-Dtest='IdempotencyKeyInterceptorTest,IdempotencyNotInIdentityTest,ProcessBeanIsolationTest'` | Prueba de unidad del interceptor y regla W5 | Se retira el borde de la idempotencia |
+| 13b | Prueba por la cadena real con base de datos: controlador de demostración, sonda, `IdempotencyEdgeIT` y su ausencia de los procesos reales (5.1b) | PR 13b `idempotency-edge-runtime-proof` (713, medidas) | `-Dtest=IdempotencyDemoAbsentFromProcessesTest`; IT: `-Dit.test=IdempotencyEdgeIT` | `IdempotencyEdgeIT` | Se retiran las pruebas |
 | 14 | Cierre: verificación completa, medición y barrido de trazabilidad (6.1) | Sin PR propio (registro en `apply-progress.md`) | `./mvnw verify` completo sobre `main` con los 22 PR fusionados | N/A: tarea de verificación, sin comportamiento nuevo | N/A |
 
 ---
@@ -800,7 +801,8 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
 
 ## Fase 5: idempotencia en el borde
 
-- [ ] 5.1 **PR 13 `idempotency-edge`: borde HTTP de la idempotencia (decisión 19).**
+- [ ] 5.1 **PR 13 `idempotency-edge`: borde HTTP de la idempotencia (decisión 19).** Partida en 5.1a y 5.1b (nota fechada
+  del final, 2026-10-06); el contenido de abajo es el alcance conjunto de las dos partes.
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/idempotency/IdempotencyDemoController.java`
     (solo en el árbol de pruebas, registrado únicamente en el arnés con base de datos),
     `IdempotencyEdgeIT.java` (`400` ausente, en blanco, repetida, larga, con espacio interior o fuera
@@ -834,9 +836,21 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     `build-integrity` «El mecanismo HTTP de idempotencia no se aplica…» y el requisito retirado de
     ausencia de superficie HTTP (migrado a `web-edge`)
 
+- [x] 5.1a **PR 13a `idempotency-edge-core`.** Producción (`IdempotentWrite`, `IdempotencyKeyInterceptor`,
+  `IdempotentRequestHandler`, `IdempotencyKeyMissingException`, `IdempotencyKeyInvalidException`, `IdempotencyEdgeConfiguration`,
+  `@Import` en `AdminApplication`, tres códigos y catálogo), la línea de `ProcessBeanPolicy`, `IdempotencyScopeExclusionInventoryTest`,
+  `ProblemCodeTest`, `ProblemCatalogCoverageTest`, W5 con su fixture, la prueba de unidad
+  `IdempotencyKeyInterceptorTest` y las notas de `docs/09` y de `foundations-plan/exploration.md`. Necesita 4.1c.
+- [ ] 5.1b **PR 13b `idempotency-edge-runtime-proof`.** `IdempotencyDemoController`, `DemoProbe`, `IdempotencyEdgeIT` (17 pruebas por
+  la cadena real con base de datos, con la demostración de `23505`) e `IdempotencyDemoAbsentFromProcessesTest`, que necesita la clase
+  del controlador de demostración en el árbol de pruebas. Añade además (I1 de la revisión de 5.1a) una prueba de unidad de
+  `IdempotentRequestHandler` con `MockHttpServletRequest` y un `IdempotentExecutor` simulado para sus tres ramas que fallan cerrado: sin
+  clave validada, sin plantilla de ruta y con un endpoint de más de 200 caracteres. **5.1a entrega el manejador sin prueba propia; se
+  prueba solo en 5.1b, que se fusiona inmediatamente después.** Necesita 5.1a. 5.1 se marca hecha cuando se fusiona 5.1b.
+
 ## Fase 6: cierre
 
-- [ ] 6.1 **Verificación completa, medición de los 24 PR y barrido de trazabilidad.** Con los 24 PR
+- [ ] 6.1 **Verificación completa, medición de los 25 PR y barrido de trazabilidad.** Con los 25 PR
   fusionados a `main`, ejecutar `./mvnw verify` completo en `apps/api` y registrar cobertura (global
   80 %, núcleo y `domain` 95 %) y mutación (umbral 80). Registrar en
   `openspec/changes/web-edge-foundations/apply-progress.md` la medición de cada PR con
@@ -1326,3 +1340,24 @@ propietario ya concedió. Orden: 4.1a, 4.1b y 4.1c, y después 5.1. Los escenari
 espera tras el commit, la suma del retardo, el semáforo acotado y la desconexión se prueban por unidad en 4.1a y por la cadena real en
 4.1b; «La espera no retiene hilos…» se prueba en 4.1b; «Ausencia de estado compartido del limitador…», «Ausencia de autenticación por
 credencial…» y el requisito de `build-integrity` de la espera bloqueante, en 4.1c.
+
+## Nota fechada 2026-10-06: la tarea 5.1 se parte en 5.1a y 5.1b
+
+La tarea 5.1 verificada midió **1 346 líneas efectivas** (350 de producción, 965 de pruebas y 31 de `docs/09`) frente al tope de 800 y a
+un pronóstico de unas 720. El árbol completo y verificado (`./mvnw verify`: Surefire 186 + 1 176, Failsafe 250) se conserva en la rama
+**local** `wip/web-edge-idempotency-edge-full` (8044604). El propietario aprobó dos PR **sin excepción de tamaño**, con una prueba de
+unidad nueva del interceptor en 5.1a, para que la parte que entrega el interceptor también lo pruebe:
+
+| Parte | Contenido | Líneas |
+|---|---|---|
+| 5.1a `idempotency-edge-core` | Producción, códigos, política de beans, inventario, W5, prueba de unidad del interceptor y notas de `docs/09` | 736 |
+| 5.1b `idempotency-edge-runtime-proof` | Controlador de demostración, sonda, `IdempotencyEdgeIT` y la prueba de su ausencia de los procesos reales | 713 |
+
+El cambio pasa a **26 tareas** (25 de PR más la de cierre 6.1) y **25 PR**, dentro de la excepción al tope de 15 tareas que el
+propietario ya concedió. **Desviación respecto del texto de 5.1, conforme a la especificación:** solo una cabecera ausente o en blanco
+responde `idempotency-key-missing`. Una cabecera repetida, de más de 128 caracteres, con un espacio interior o fuera de ASCII responde
+`400 validation-failed` (requisito de `web-edge`, escenario de la clave mal formada), por medio de una clase que la lista de 5.1 no
+nombraba, `IdempotencyKeyInvalidException`.
+
+**Ajuste de la costura (2026-10-06).** `IdempotencyDemoAbsentFromProcessesTest` pasa de 5.1a a 5.1b: comprueba la ausencia del controlador de
+demostración cargando su clase del árbol de pruebas, y esa clase llega con 5.1b. En 5.1a fallaba con `ClassNotFoundException`. Medido: 5.1a 736 y 5.1b 713.

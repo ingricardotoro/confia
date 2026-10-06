@@ -131,6 +131,22 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    `openspec/changes/foundations-plan/exploration.md`; (f) la prueba de que el restablecimiento revoca
    las familias de refresco, escenario I24, existe solo como condición escrita y es de ese mismo
    cambio. Hasta que lleguen (a) y (b) la recuperación no funciona de punta a punta.
+
+   > **Nota fechada 2026-10-06 (cambio `web-edge-foundations`, PR 13 `idempotency-edge`): partición
+   > de la parte 4 y corrección de las líneas 114 y 115.** El propietario partió la parte 4 en dos
+   > cambios SDD el 2026-10-04 (decisión D1). `web-edge-foundations` (parte 4a) entrega, sin ningún
+   > endpoint de negocio, el cableado de producción del proceso administrativo, la cadena de seguridad
+   > que deniega por defecto con su lista blanca cerrada, Problem Details y el catálogo es-HN, el
+   > origen de la petición, el limitador por IP en memoria, el materializador del retardo y el borde
+   > HTTP de la idempotencia. `session-tokens-and-web-layer` (parte 4b) conserva los tokens, las
+   > sesiones, los endpoints de identidad y las condiciones duras H1 a H4, y consume lo que 4a
+   > entrega. Las líneas 114 y 115 afirman que la cabecera `Idempotency-Key` obligatoria sobre el
+   > endpoint de inicio de sesión es de `session-tokens-and-web-layer`: eso **se retira** (decisión D3).
+   > `IdempotentExecutor` almacena y reproduce el cuerpo de la respuesta, de modo que los tokens de
+   > un inicio de sesión, de un refresco o de una verificación de MFA quedarían guardados en claro
+   > (`CLAUDE.md`, reglas 11 y 13). Ningún endpoint de identidad usa el mecanismo, y la regla de
+   > ArchUnit W5 (`IdempotencyNotInIdentityTest`) rompe la construcción si alguno lo usa. El texto
+   > original se conserva como histórico.
 4. **Matriz de autorización** documentada y verificada por pruebas: qué rol puede hacer qué operación (brecha A7).
 5. Bitácora de auditoría de solo inserción, encadenada por hash, sin permiso de actualización ni borrado para el rol de aplicación (brecha B6).
 6. Infraestructura de idempotencia: marcador con clave primaria natural, espera acotada
@@ -139,6 +155,21 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    (`staff-authentication-mfa-sessions`, que trae el primer endpoint) la mitad de superficie HTTP:
    la cabecera `Idempotency-Key` obligatoria en el borde, su rechazo con `400`, la cabecera
    `Idempotent-Replay` y la traducción de las salidas del componente a `200`/`409`/`422` (brecha B7).
+
+   > **Nota fechada 2026-10-06 (cambio `web-edge-foundations`, PR 13 `idempotency-edge`): la mitad
+   > HTTP de la idempotencia la entrega `web-edge-foundations`, no
+   > `staff-authentication-mfa-sessions`.** Cierra la mitad HTTP de la brecha B7: la anotación
+   > `@IdempotentWrite`, un interceptor que valida la cabecera `Idempotency-Key` antes del controlador
+   > y un manejador que traduce las salidas de `IdempotentExecutor` sin modificar su contrato. Ausente
+   > o en blanco responde `400` con `idempotency-key-missing`; repetida, de más de 128 caracteres o con
+   > un carácter fuera de ASCII visible responde `400` con `validation-failed`. La ejecución real
+   > responde con el estado y el cuerpo del caso de uso, sin `Idempotent-Replay`; la repetición
+   > devuelve el mismo estado y cuerpo con `Idempotent-Replay: true`; una espera agotada responde `409`
+   > con `idempotency-conflict`; una carga distinta responde `422` con `idempotency-payload-mismatch`.
+   > La colisión con una clave que otra petición ya confirmó (`SQLState 23505`) **no** responde `409`:
+   > se reproduce la respuesta de la ganadora con `Idempotent-Replay: true`. El mecanismo se demuestra
+   > con un controlador que vive solo en el árbol de pruebas y ningún endpoint de producción lo usa
+   > todavía.
 7. Logs estructurados con redacción por lista de campos, métricas, trazas con OpenTelemetry.
 8. Contenedores, entorno de preproducción, canalización de integración y despliegue continuo.
    **Pendiente heredado del cambio 1 (hallazgo W9):** el escaneo de dependencias **analiza los

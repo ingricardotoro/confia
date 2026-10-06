@@ -2,6 +2,7 @@ package com.confia.shared.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -17,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -39,6 +41,9 @@ import org.junit.jupiter.api.Test;
  */
 class IdempotencyScopeExclusionInventoryTest {
 
+    /** The package of the HTTP idempotency mechanism, the one web package that may use the core. */
+    private static final String EDGE_PACKAGE = "com.confia.shared.web.idempotency";
+
     /**
      * The only types of {@code com.confia.shared.security} that a class in a {@code ..web..} package
      * may depend on, by full class name. Add the next one here (2.3c added {@code RequestOrigin}; 3.2b
@@ -57,11 +62,36 @@ class IdempotencyScopeExclusionInventoryTest {
             "com.confia.shared.security.RateLimitDecision$CapacityExhausted",
             "com.confia.shared.security.RateLimitPolicy");
 
+    private static final String EXECUTOR = "com.confia.shared.security.IdempotentExecutor";
+
+    /** The one class outside the mechanism that wires it, and so names the executor it needs. */
+    private static final String EDGE_CONFIGURATION =
+            "com.confia.shared.web.edge.IdempotencyEdgeConfiguration";
+
+    /**
+     * What only the HTTP idempotency mechanism ({@value #EDGE_PACKAGE}) may add to the list above
+     * (5.1): the executor it calls, what it returns, the key it builds and the context it carries.
+     * No other web class may name any of them, so a controller reaches idempotency only through the
+     * handler of the edge and never through the component directly; the one other class that may name
+     * the executor is {@link #EDGE_CONFIGURATION}, which hands it to the handler. The two exceptions of the
+     * component are not here: they are domain exceptions the one translator already answers.
+     */
+    private static final Set<String> IDEMPOTENCY_EDGE_MAY_ALSO_DEPEND_ON = Set.of(
+            EXECUTOR, "com.confia.shared.security.IdempotentOutcome",
+            "com.confia.shared.security.IdempotentOutcome$Executed",
+            "com.confia.shared.security.IdempotentOutcome$Replayed",
+            "com.confia.shared.security.IdempotentResponse",
+            "com.confia.shared.security.IdempotencyKey",
+            "com.confia.shared.security.SecurityContext");
+
     /**
      * (a) A production class in a {@code ..web..} package may depend on {@code
-     * com.confia.shared.security} only through {@link #WEB_MAY_DEPEND_ON_SHARED_SECURITY}, and no
-     * production class carries the {@code Idempotency-Key} header literal — both true today only
-     * because no production idempotent endpoint exists yet (brecha con destino: cambio 7).
+     * com.confia.shared.security} only through {@link #WEB_MAY_DEPEND_ON_SHARED_SECURITY}, plus
+     * {@link #IDEMPOTENCY_EDGE_MAY_ALSO_DEPEND_ON} for the classes of {@value #EDGE_PACKAGE} alone;
+     * and no production class outside that package carries the {@code Idempotency-Key} header
+     * literal. Before 5.1 no production class could, because no production idempotent endpoint
+     * existed (brecha con destino: cambio 7); the web edge of idempotency, delivered by PR 13,
+     * retires that blanket absence and keeps the part that still holds: the mechanism has one home.
      *
      * <p>This used to forbid every dependency of a web class on the whole package, and was then
      * narrowed to a denylist of idempotency names. A denylist by simple name misses a nested class
@@ -69,11 +99,10 @@ class IdempotencyScopeExclusionInventoryTest {
      * and let the web layer reach {@code TransactionRunner} and {@code SecurityContext} unnoticed.
      * It is now an allowlist by full class name: the request filter of web-edge-foundations needs the
      * address types and nothing else, and every other type of the package, including every
-     * idempotency type and every nested one, is rejected until a change names it here. The web edge
-     * of idempotency itself is PR 13, which retires this check.
+     * idempotency type and every nested one, is rejected until a change names it here.
      */
     @Test
-    void noWebPackageClassDependsOnSharedSecurityBeyondTheAllowlistAndNoClassMentionsTheHeaderLiteral()
+    void noWebClassOutsideTheIdempotencyEdgeDependsOnSharedSecurityBeyondTheAllowlistOrMentionsTheHeaderLiteral()
             throws IOException {
         JavaClasses classes = assertNonEmptyProductionClasses();
 
@@ -81,25 +110,41 @@ class IdempotencyScopeExclusionInventoryTest {
             if (!("." + javaClass.getPackageName() + ".").contains(".web.")) {
                 continue;
             }
+            Set<String> allowed = new HashSet<>(WEB_MAY_DEPEND_ON_SHARED_SECURITY);
+            if (isInEdgePackage(javaClass)) {
+                allowed.addAll(IDEMPOTENCY_EDGE_MAY_ALSO_DEPEND_ON);
+            }
+            if (javaClass.getName().equals(EDGE_CONFIGURATION)) {
+                allowed.add(EXECUTOR);
+            }
             for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
                 JavaClass target = dependency.getTargetClass();
                 boolean outsideTheAllowlist = target.getPackageName().equals("com.confia.shared.security")
-                        && !WEB_MAY_DEPEND_ON_SHARED_SECURITY.contains(target.getName());
+                        && !allowed.contains(target.getName());
                 assertThat(outsideTheAllowlist)
-                        .as("%s resides in a web package and depends on %s, which is not one of %s "
-                                        + "(brecha con destino: cambio 7)",
-                                javaClass.getFullName(), target.getFullName(),
-                                WEB_MAY_DEPEND_ON_SHARED_SECURITY)
+                        .as("%s resides in a web package and depends on %s, which is not one of %s",
+                                javaClass.getFullName(), target.getFullName(), allowed)
                         .isFalse();
             }
         }
 
-        String bytecodeText = concatenatedProductionBytecodeText(classes);
-        assertThat(bytecodeText)
-                .as("no production class must carry the Idempotency-Key header literal yet: no "
-                        + "web layer of production code exists in this cut (brecha con destino: "
-                        + "cambio 7)")
+        JavaClasses edge = classes.that(DescribedPredicate.describe("are the idempotency edge",
+                IdempotencyScopeExclusionInventoryTest::isInEdgePackage));
+        assertThat(concatenatedProductionBytecodeText(edge))
+                .as("non-vacuous: the edge is where the Idempotency-Key literal lives, or the "
+                        + "check below would look for it in the wrong place")
+                .contains("Idempotency-Key");
+        JavaClasses everythingElse = classes.that(DescribedPredicate.describe(
+                "are not the idempotency edge",
+                javaClass -> !isInEdgePackage(javaClass)));
+        assertThat(concatenatedProductionBytecodeText(everythingElse))
+                .as("no production class outside %s may carry the Idempotency-Key header literal",
+                        EDGE_PACKAGE)
                 .doesNotContain("Idempotency-Key");
+    }
+
+    private static boolean isInEdgePackage(JavaClass javaClass) {
+        return javaClass.getPackageName().equals(EDGE_PACKAGE);
     }
 
     /**
