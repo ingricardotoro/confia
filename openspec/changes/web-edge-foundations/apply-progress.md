@@ -3,7 +3,7 @@
 - **Cambio:** `web-edge-foundations` (F0, cambio 7, parte 4a)
 - **Modo:** TDD estricto (`./mvnw verify` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `auto-chain` con `stacked-to-main`, tope de 800 líneas efectivas por PR
-- **Última actualización:** 2026-10-06 (3.2b hecha; 3.2c pendiente)
+- **Última actualización:** 2026-10-06 (tareas 1.1 a 5.1b hechas y fusionadas; 6.1 registrada en «Cierre 6.1», sin marcar)
 
 ## Estado de las tareas
 
@@ -28,8 +28,13 @@
 | 3.2 | PR 11 `rate-limiter-edge` | Construida y verificada completa, detenida antes del commit por tamaño (1 551 líneas); el propietario aprobó la costura de tres PR el 2026-10-06; fuente: rama local `wip/web-edge-rate-limiter-edge-full` (`cf93861`) | |
 | 3.2a | PR 11a `edge-rejection-codes-and-capacity-signal` | Hecha (517 líneas; 732 tras la corrección de la revisión) | `bf1b5c9`, `733785b`, `fdc3786` y los commits `docs(sdd)` de esta rama |
 | 3.2b | PR 11b `edge-interceptor` | Hecha (653 líneas) | `325bf27` y el commit `docs(sdd)` de esta rama |
-| 3.2c | PR 11c `edge-throttling-wiring` | Pendiente (necesita 3.2b, desde `main` actualizado) | |
-| 4.1 a 6.1 | PR 12, 13 y cierre | Pendientes | |
+| 3.2c | PR 11c `edge-throttling-wiring` | Hecha (869 líneas, con excepción de tamaño aprobada) | PR #101 |
+| 4.1a | PR 12a `delay-materializer-core` | Hecha (774 líneas) | PR #102 |
+| 4.1b | PR 12b `delay-materializer-runtime-proof` | Hecha (597 líneas) | PR #103 |
+| 4.1c | PR 12c `blocking-wait-rule` | Hecha (399 líneas) | PR #104 |
+| 5.1a | PR 13a `idempotency-edge-core` | Hecha (774 líneas) | PR #105 |
+| 5.1b | PR 13b `idempotency-edge-runtime-proof` | Hecha (804 líneas, con excepción de 4) | PR #106 |
+| 6.1 | Cierre | Verificación, medición y barrido registrados en «Cierre 6.1»; sin marcar hasta que el propietario decida sobre S-3 | |
 
 ## Tarea 1.1: PR 1 `platform-wiring`
 
@@ -2254,3 +2259,171 @@ comprobó con `cmp`:
 
 Tamaño: 804 líneas, con una excepción de 4 líneas aprobada por el propietario. Con 5.1b, la tarea 5.1 queda hecha y el árbol
 `wip/web-edge-idempotency-edge-full` queda entregado completo.
+
+## Cierre 6.1 (2026-10-06)
+
+Rama `change/web-edge-foundations-close`, desde `main` en `e010674` (merge del PR #106), con los 25 PR del cambio fusionados. Esta sección es de
+registro: no cambia código ni pruebas. **6.1 no se marca hecha**: queda a la espera de la decisión del propietario sobre el hallazgo de S-3.
+
+### 1. Verificación completa
+
+| Orden | Resultado observado |
+|---|---|
+| `./mvnw verify` desde `apps/api` (JDK 25.0.3.9 Temurin, Docker activo) | `BUILD SUCCESS` en 5 min 24 s. Surefire: kernel **186**, app **1 197**; Failsafe (app): **250**; 0 fallos, 0 errores, 0 omitidas. `jacoco:check` cumplido en kernel y app |
+| `./mvnw verify -Pmutation-gate` (perfil que activa PIT en `verify`; sin perfil, `confia.pit.phase=none` y PIT no corre) | `BUILD SUCCESS` en 6 min 36 s, mismas cifras de pruebas |
+
+**Cobertura (JaCoCo, `jacoco.csv` de la ejecución fusionada de pruebas unitarias e IT).**
+
+| Alcance | Líneas | Ramas | Umbral |
+|---|---|---|---|
+| `app`, global | 97,79 % | 93,33 % | 80 % (línea y rama, `jacoco:check`) |
+| `kernel` | 98,33 % | 100 % | 95 % |
+| `identity.domain` | 98,6 % | 100 % | 95 % |
+| `organization.domain` | 100 % | 100 % | 95 % |
+| `shared.audit` (con su propia regla) | 98,9 % | 100 % | 95 % |
+
+**Mutación (PIT 1.30.0, mutadores `STRONGER`, umbral 80).** Kernel: 194 mutantes generados, 192 muertos (**99 %**), fortaleza de pruebas 99 %. App
+(`com.confia.*.domain.*`): 251 generados, 236 muertos (**94 %**), un mutante sin cobertura, fortaleza 94 %. Ambos sobre el umbral.
+
+### 2. Medición de los 25 PR (`git diff --numstat <merge>^1 <merge> -- . ':!openspec'`, adiciones más eliminaciones)
+
+La medición con y sin `-M` es **idéntica en los 25 PR** (ningún renombrado). La columna «Plan» es el nominal y el peor caso de la tabla de unidades de
+trabajo o, cuando una nota fechada lo registra, la cifra medida al partir. La numeración de PR es la de los merges de GitHub (el #95 es un `chore(deps)` ajeno
+al cambio).
+
+| PR | Tarea | Rama | Plan | Sin `-M` | Con `-M` | Excepción aprobada | Lectura |
+|---|---|---|---|---|---|---|---|
+| #81 | 1.1 | `change/web-edge-foundations` | ~380 → 570 | 499 | 499 | no | dentro |
+| #82 | 1.2 | `identity-beans` | ~330 → 500 | 710 | 710 | no | sobre el peor caso, bajo 800 |
+| #83 | 2.1a | `problem-details` | 775 medido | 782 | 782 | no | dentro |
+| #84 | 2.1b | `security-chains` | 791 medido | 793 | 793 | no | dentro |
+| #85 | 2.1c | `portal-and-worker` | ~700 → 800 | 885 | 885 | 85 | dentro de la excepción (885) |
+| #86 | 2.2a | `container-rejections` | ~395 medido | 579 | 579 | no | sobre lo medido, bajo 800 |
+| #87 | 2.2b | `edge-gates` | ~716 medido | **930** | 930 | ~102 (902) | **28 sobre la excepción registrada** |
+| #88 | 2.3a | `client-address` | 513 | 541 | 541 | no | bajo 800 |
+| #89 | 2.3b | `trusted-proxies` | 592 | 715 | 715 | no | bajo 800 |
+| #90 | 2.3c | `request-origin-filter` | 381 | 478 | 478 | no | bajo 800 |
+| #91 | 2.3d | `audit-origin` | 383 | 471 | 471 | no | bajo 800 |
+| #92 | 2.4a | `translator-core` | 641 | 946 | 946 | 146 | dentro de la excepción (946) |
+| #93 | 2.4b | `field-violations` | 417 | 941 | 941 | 141 | dentro de la excepción (941) |
+| #94 | 2.5 | `web-rules` | ~380 → 570 | 916 | 916 | 116 | dentro de la excepción (916) |
+| #96 | 3.1a | `rate-limiter-core` | 983 | 983 | 983 | ~183 (tasks.md: 194) | dentro de la excepción |
+| #97 | 3.1b | `rate-limiter-table` | 596 | 633 | 633 | no | bajo 800 |
+| #98 | 3.1c | `rate-limiter-stress` | ~421 | 454 | 454 | no | bajo 800 |
+| #99 | 3.2a | `rejection-codes` | ~505 | 732 | 732 | no | bajo 800 (732 registrado tras la revisión) |
+| #100 | 3.2b | `edge-interceptor` | ~407 | 721 | 721 | no | bajo 800 (653 registrado al cerrar la tarea) |
+| #101 | 3.2c | `edge-throttling-wiring` | ~639 | 869 | 869 | 39 + 30 (869) | dentro de la excepción |
+| #102 | 4.1a | `delay-materializer` | 773 | 774 | 774 | no | bajo 800 |
+| #103 | 4.1b | `delay-runtime-proof` | 578 | 597 | 597 | no | bajo 800 |
+| #104 | 4.1c | `blocking-wait-rule` | 399 | 399 | 399 | no | bajo 800 |
+| #105 | 5.1a | `idempotency-edge` | 736 | 774 | 774 | no | bajo 800 |
+| #106 | 5.1b | `idempotency-runtime-proof` | 713 | 804 | 804 | 4 (804) | dentro de la excepción |
+
+Total de los 25 PR: **17 926 líneas** efectivas. Es mayor que el re-pronóstico de 11 000 a 12 700 de la nota del 2026-10-05: las correcciones de las revisiones
+independientes, casi todas de pruebas, se sumaron después de esa cifra. La diferencia neta entre la base del cambio (`ed5036d`) y `main`, fuera de `openspec/`, es de
+17 348 (17 246 añadidas y 102 eliminadas): menor porque algunas líneas se editaron en más de un PR, e incluye 8 líneas de `pnpm-lock.yaml` del PR #95, ajeno al cambio.
+
+**PR sobre su tope o excepción.** Con excepción registrada y respetada: #85, #92, #93, #94, #96, #101 y #106 (cada uno coincide con su excepción). Sin excepción y sobre 800: ninguno.
+**Un solo desvío**: el PR #87 (2.2b) mide 930 frente a 902 (800 más la excepción de unas 102). Las 28 líneas de diferencia son del último commit de la rama, `8f3a40c`
+(`ContainerRejectionsTest`, 27 añadidas y 1 eliminada: esperar el evento en lugar de competir con el hilo del contenedor), posterior a la medición de 902. No se registró ampliación
+de la excepción. Queda declarado aquí para que el propietario lo acepte o lo corrija. Seis PR (#82, #86, #89, #90, #91, #100) superan su peor caso o su cifra medida pero quedan bajo 800.
+
+### 3. Criterios de éxito de `proposal.md`
+
+Evidencia: las suites citadas pasaron en la ejecución de la sección 1 (reportes de Surefire y Failsafe de esa corrida).
+
+| # | Criterio | Estado | Evidencia |
+|---|---|---|---|
+| 1 | `./mvnw verify` en verde, con la puerta de mutación | Cumplido | `verify` y `verify -Pmutation-gate`: `BUILD SUCCESS`; PIT 99 % y 94 % (umbral 80) |
+| 2 | Administración registra `DataSource`, `TransactionRunner`, `DSLContext`, `Clock` e identidad; aislamiento sigue prohibiendo `identity` en el portal | Cumplido | `AdminProductionWiringTest` 13/13, `ProcessBeanIsolationTest` 10/10 |
+| 3 | Portal y trabajador sin `DataSource`; sus pruebas de arranque sin Docker | Cumplido, con una reserva | Primera parte: `AdminProductionWiringTest.portalAndWorkerHoldNoDataSource`. La ausencia de Docker se demostró en la tarea 1.1 (arranque con URL inalcanzable); este cierre se ejecutó con Docker activo y **no la volvió a demostrar** |
+| 4 | Ruta de administración fuera de la lista blanca: `401`/`403` con Problem Details; una prueba falla si se añade una ruta pública sin editar la lista | Cumplido | `AdminSecurityChainTest` 31/31, `PublicRouteAllowListTest` 11/11 |
+| 5 | Portal con cadena que deniega todo e instantánea de rutas | Cumplido | `PortalSecurityChainTest` 6/6, `PortalRouteMapSnapshotTest` 6/6, `apps/api/routes/portal.routes.json` |
+| 6 | Todo error en `application/problem+json`, `type` por código estable, `detail` del catálogo, sin traza ni clase | Cumplido | `ProblemResponsesTest` 17, `ProblemTranslationTest` 34, `ProblemCatalogCoverageTest` 8, `ContainerRejectionsTest` |
+| 7 | Identificador de petición del servidor; `X-Forwarded-For` solo desde proxies de confianza | Cumplido | `RequestContextFilterTest` 12, `ClientAddressResolverTest` 33 |
+| 8 | Asiento durante una petición con `sourceIp` y `userAgent` | Cumplido | `RequestOriginAuditIT` 4/4 (Failsafe, PostgreSQL real) |
+| 9 | `429` con `Retry-After`, agrupación /64 y tabla llena que rechaza | Cumplido | `RateLimitEdgeTest` 11, `InMemoryRateLimiterTest` 56, `InMemoryRateLimiterTableTest` 12, `ClientAddressPropertiesTest` 40 |
+| 10 | Retardo tras el commit, `503` uniforme con semáforo agotado, abandono al cerrar el cliente | Cumplido | `RequiredDelayMaterializerTest` 20, `RequiredDelayMaterializerIT` 4/4 |
+| 11 | Controlador de prueba: `400`, `Idempotent-Replay`, `409`, `422` | Cumplido | `IdempotencyEdgeIT` 17/17 |
+| 12 | Ninguna clase `web` de producción aplica `Idempotency-Key` a identidad | Cumplido | `IdempotencyNotInIdentityTest` 5/5 |
+| 13 | Ningún registro con cabeceras de autorización, cookies ni cuerpos, con control negativo | **Cumplido solo para la lista de registradores guardados; véase S-3** | `SensitiveDataLoggingTest` 4/4 (control negativo: sin la guardia el secreto aparece). La guardia solo cubre `DEBUG` y `TRACE`. El hallazgo de la sección 6 muestra que Tomcat registra a `INFO`, una vez por proceso, el destino de una petición mal formada con su cadena de consulta |
+| 14 | Notas fechadas de `docs/09`, `docs/03` y `foundations-plan/exploration.md`, sin reescribir el cuerpo | Cumplido (revisión humana del diff) | `git diff ed5036d HEAD`: `docs/03` +65, `docs/05` +42, `docs/07` +23, `docs/09` +31, `docs/ui-ux/04` +18 y `foundations-plan/exploration.md` +50, **0 eliminaciones** en los seis |
+| 15 | Cobertura global de `app` en 80 % y `domain` en 95 % | Cumplido | Sección 1: 97,79 % de líneas y 93,33 % de ramas global; `domain` 98,6 % y 100 % |
+
+Ningún criterio queda diferido ni sin cumplir. El 13 queda condicionado a la decisión del propietario sobre S-3.
+
+### 4. Instantáneas sin cambios
+
+- `apps/api/openapi/admin.openapi.json` y `portal.openapi.json`: `git diff ed5036d HEAD -- apps/api/openapi` vacío y ningún commit del cambio las toca (la última es `d43c8c5`, anterior).
+- `apps/api/routes/portal.routes.json`: **no existía en la base** y la crea el PR 6b (`c469734`, `{"process": "portal", "routes": []}`); ningún commit posterior la modifica. Es decir, se creó una vez con el mapa vacío y no cambió.
+
+### 5. Recuento de los 166 escenarios
+
+- Las tablas de trazabilidad suman **132** filas de `web-edge` y **34** de `build-integrity` (166). Los 166 títulos coinciden exactamente (diferencia vacía) con los 166 encabezados `####` de las dos especificaciones: **0 huérfanos, 0 duplicados**.
+- Las tareas a las que apuntan son 1.1, 1.2, 2.1a a 2.1c, 2.2a, 2.2b, 2.3a a 2.3d, 2.4a, 2.4b, 2.5, 3.1a a 3.1c, 3.2a a 3.2c, 4.1 y 5.1: **todas `[x]` en `tasks.md`**.
+- Limitación: las tablas relacionan escenario con tarea, no con prueba. El control por nombre se hizo con los identificadores que cita `tasks.md`: **66 nombres de clase** `*Test`/`*IT`, de los cuales 63 existen en el árbol de pruebas. Los tres que no: `AdminSecurityHeadersAndSessionTest` y `RequestContextFilterChainTest` (la nota fechada de 2.1c declara que no se crearon y dónde quedó su contenido: `AdminSecurityChainTest` y `RequestContextFilterTest`) y `PropertiesTest`, que es el fragmento del patrón `*PropertiesTest`, no una clase.
+- De **16 nombres de método** citados entre comillas en `tasks.md`, 15 existen. Renombrado: `theFirewallRejectionCarriesNoViolationList` es hoy `theFirewallRejectionCarriesNoViolationListAndNoRawRejectedBytes` (`ProblemTranslationTest.java:220`), conforme a `apply-progress.md`. Ninguna prueba nombrada falta sin explicación.
+- No se verificó una correspondencia escenario por escenario con un método de prueba concreto: se verificó que las suites citadas existen y están en verde.
+- Revisión humana de documentación (lectura del diff, sección 3, criterio 14): el escenario «Nota fechada en la documentación» (`web-edge`, 3.2c, `docs/03`) y los entregables sin escenario (notas de `docs/05`, `docs/07`, `docs/09`, `docs/ui-ux` y `foundations-plan`) se verificaron leyendo el diff, no con una prueba automática.
+
+### 6. Revisión S-3: registro de errores frente a la regla 11
+
+Alcance: todo registro a `ERROR` (y los `WARN`/`INFO` que pasan una excepción o un valor) en `apps/api/app/src/main`, más lo que hace el contenedor. Hechos que acotan la lectura:
+**ningún `application*.yml` declara configuración de registro** (sin filtro de mensajes de excepción ni formato estructurado: la traza completa sale por el formato por defecto); el proceso administrativo
+**no tiene hoy ninguna ruta de producción** y su cadena responde `401` a todo; el portal no tiene rutas; los únicos controladores están en el árbol de pruebas. Por eso ningún valor de usuario llega hoy a un `ERROR` de la aplicación por una ruta de negocio.
+
+| Lugar | Qué registra | ¿Puede llegar un valor del usuario? | Clasificación |
+|---|---|---|---|
+| `ProblemExceptionHandler.java:108-109` (código de dominio desconocido, con `e`) | Mensaje y traza de la `DomainException`; el código es kebab-case validado | Los mensajes de las `DomainException` actuales son fijos (organización, idempotencia, kernel). Un mensaje futuro con valor llegaría completo | Segura hoy; riesgo futuro condicionado al autor de la excepción |
+| `ProblemExceptionHandler.java:111` (dominio con estado `>= 500`) | Igual | Igual | Igual |
+| `ProblemExceptionHandler.java:183` y `:200` (violación del valor devuelto, con `e`) | Mensaje de `MethodValidationException` o `ConstraintViolationException` (ruta de la propiedad y texto de la restricción) | Solo si una plantilla de mensaje usa `${validatedValue}`; hoy no hay ninguna (la 2.4b retiró esa sustitución) y ninguna ruta de producción lo alcanza | Segura hoy; no verificado qué incluye cada versión de Spring en el mensaje del caso de valor devuelto |
+| `ProblemExceptionHandler.java:268` (`unexpected`: cualquier excepción sin manejador, con `e`) | Mensaje y traza completos | **Sí, en cuanto exista una ruta con acceso a datos.** Ejemplo concreto: una violación de unicidad de PostgreSQL llega como `DataAccessException` de jOOQ cuyo mensaje trae la línea `Detail: Key (columna)=(valor) already exists`, con el valor que mandó el cliente. Hoy ninguna ruta lo produce | **Riesgo real a futuro, sin ruta hoy.** La decisión de fondo (filtro de mensajes) es del cambio de observabilidad |
+| `ProblemExceptionHandler.java:276` (`ErrorResponse` `5xx`, con `e`) | Mensaje de la excepción del framework, p. ej. la razón de un `ResponseStatusException` | Solo si el autor de la razón la rellena con un valor | Segura hoy; riesgo futuro igual que `:268` |
+| `RequestContextFilter.java:73` (excepción que escapa de la cadena, con `e`) | Mensaje y traza completos | Sin ruta conocida hoy: el rechazo del cortafuegos (`RequestRejectedException`) lo maneja `ProblemRequestRejectedHandler` sin registrar nada | Segura hoy; misma clase de riesgo futuro que `:268` |
+| `RateLimitInterceptor.java:154-155` | Solo la política y el nombre de la clase de la excepción | No | Segura |
+| `LogRateLimitMetrics.java:77` (`WARN`) | Evento con política y causa cerrada | No | Segura |
+| `ProblemErrorReportValve.java:95` y `:100` (`INFO`) | Estado, método estándar (o `OTHER`) e identificador de traza; sin ruta, consulta, cabecera ni excepción | No | Segura (probada por `ContainerRejectionsTest`) |
+| `ConfiaApplication.java:61` | Mensaje de `UnknownAppProfileException`, que repite el valor de la variable de entorno del perfil | Es entrada del operador al arrancar, no de un cliente | Segura / fuera de alcance |
+| `TrustedProxies.java:35`, `SharedPlatformConfiguration.java:122`, `IdentityConfiguration.java:88`, `RateLimitProperties.java:48` | Mensajes de validación de configuración al arrancar, sin el valor ni la causa encadenada (decisión 3) | Solo entrada del operador | Segura / fuera de alcance |
+| **Contenedor: `org.apache.coyote.http11.Http11Processor` (Tomcat 11.0.24), a `INFO`** | La primera petición mal formada de cada proceso deja «Error parsing HTTP request header» con la traza; el mensaje de la excepción trae el **destino de la petición completo, cadena de consulta incluida** (`iib.invalidRequestTarget=Invalid character found in the request target [{0}]`; el método y el protocolo inválidos se registran igual con `{0}`) | **Sí, hoy y sin autenticación.** Observado en una corrida temporal (retirada, el árbol queda limpio) contra el proceso administrativo real: `GET /x?token=SECRETVALUE123^ HTTP/1.1` produjo un evento `INFO` con el mensaje `Invalid character found in the request target [/x?token=SECRETVALUE123^ ]. The valid characters are defined in RFC 7230 and RFC 3986`. Las siguientes ocurrencias bajan a `DEBUG`, que `SensitiveLogGuard` ya deniega (`org.apache.coyote`); la primera de cada proceso pasa | **Riesgo real de la regla 11, alcanzable hoy: candidato a bloqueante** (ver abajo) |
+
+**Gravedad del hallazgo del contenedor.** Hoy el valor que llega al registro es el que envía quien hace la petición, así que no expone el secreto de un tercero; el riesgo se materializa
+cuando una ruta lleve un token en la cadena de consulta y un cliente legítimo (por ejemplo un navegador, que no codifica `{`, `}`, `|` ni `^`) envíe esa URL con uno de esos caracteres como primera petición mal formada del proceso. Sale una sola vez por proceso.
+No se modificó ningún código de producción: la decisión es del propietario. Opciones, sin implementar: (a) fijar `logging.level.org.apache.coyote.http11.Http11Processor=WARN` en `application.yml` (una línea; no verificada en esta revisión);
+(b) ampliar `SensitiveLogGuard` para negar también `INFO` de ese registrador; (c) aceptar el riesgo y dejarlo como condición dura del cambio que ponga el primer token en una URL.
+
+**Conclusión de S-3.** Ningún `ERROR` de la aplicación expone hoy un valor de usuario por una ruta existente. Un `unexpected` con acceso a datos sí lo hará (ejemplo de PostgreSQL arriba) y no existe filtro: debe quedar como
+condición del cambio de observabilidad y del primero que añada un endpoint con base de datos. El único camino real alcanzable hoy es el de Tomcat a `INFO`.
+
+### 7. Qué no se verificó
+
+- La ausencia de Docker en las pruebas de arranque de portal y trabajador (criterio 3) no se repitió en este cierre.
+- No se comprobó escenario por escenario la existencia de un método de prueba propio; solo clases y métodos citados por `tasks.md`.
+- No se comprobó el texto exacto del mensaje de `MethodValidationException` para un valor devuelto en la versión de Spring en uso; la fila de `:183`/`:200` se clasifica por la ausencia de ruta, no por esa lectura.
+- El efecto de la opción (a) del hallazgo del contenedor (nivel `WARN` del registrador) no se probó.
+- Las causas de las diferencias de #82, #86, #89, #90, #91 y #100 respecto del plan no se investigaron commit por commit.
+
+### Decisiones del propietario sobre el cierre 6.1 (2026-10-06)
+
+**S-3: se corrige ahora, ampliando `SensitiveLogGuard`.** El guardia deniega el `INFO` del registrador exacto
+`org.apache.coyote.http11.Http11Processor` (`INFO_PROTECTED_LOGGERS`). Su `WARN` y su `ERROR` siguen pasando, igual que las líneas de
+arranque y parada del conector (`Http11NioProtocol`).
+
+`MalformedRequestLoggingTest` (3 pruebas) usa un proceso nuevo por prueba, porque Tomcat escribe esa línea a nivel `INFO` una sola vez
+por procesador. Cada prueba envía por socket crudo `GET /x?token=SECRETO-E^`.
+
+- **Rojo observado:** 3 pruebas, 2 fallos. El mensaje fue `org.apache.coyote.http11.Http11Processor INFO stack trace contains SECRETO-E`.
+- **Verde:** 3/3, junto con `SensitiveDataLoggingTest` (4) y `SensitiveLogGuardPrefixesTest` (7).
+- **No vacuidad:** `withoutTheGuardTheFirstMalformedRequestDoesLeakAtInfo` retira el guardia y comprueba que el secreto sí aparece en
+  ese registrador a nivel `INFO`.
+
+**PR #87: el propietario acepta la ampliación retroactiva de la excepción a 930 líneas.** La causa es el commit `8f3a40c`.
+
+**Pendientes para otros cambios:**
+
+- el `ERROR` de `ProblemExceptionHandler.unexpected` con la excepción completa;
+- un filtro de mensajes de excepción en el registro estructurado.
+
+Ambos quedan como condición del cambio de observabilidad y del primer endpoint que use la base de datos.
+
+`./mvnw verify` completo con la corrección de S-3: Surefire 186 + 1 200, Failsafe 250, 0 fallos, cobertura cumplida y `BUILD SUCCESS`. La tarea 6.1 queda hecha.
