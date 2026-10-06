@@ -583,6 +583,16 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     table fails closed under concurrency and against a naive model`. — Requisitos de `web-edge`
     «Exactitud bajo concurrencia» de la capa 1 y los cuatro escenarios restantes de «La tabla
     acotada…» (límite exacto, tabla llena con IP vigente, entrada vencida y llenado concurrente)
+  - **Nota fechada 2026-10-05 (revisión de seguridad del limitador, hallazgos asignados a esta tarea).**
+    **I-1:** `InMemoryRateLimiter` mide el tiempo con `Clock.instant()`, un reloj de pared. Un salto hacia
+    adelante desbloquea a todos y uno hacia atrás detiene el barrido hasta llenar la tabla. Esta tarea
+    sustituye la fuente por una monotónica (nanosegundos de `System.nanoTime` en producción y
+    `MutableClock` en pruebas; los cálculos solo usan diferencias), corrige el Javadoc que dice que el reloj
+    «solo puede hacer esperar más» y añade una prueba de que un salto del reloj de pared no cambia ninguna
+    decisión. **Debe fusionarse antes de 3.2**, que es la primera tarea que da un consumidor al limitador.
+    **I-3:** las pruebas de concurrencia muestrean `ConcurrentHashMap.size()`, que no es una instantánea
+    atómica; muestrear en su lugar el contador de ranuras reservadas (atómico), comprobar `size()` igual al
+    contador solo en reposo, y añadir `Thread.onSpinWait()` al bucle del muestreador.
 
 - [ ] 3.2 **PR 11 `rate-limiter-edge`: `@RateLimited`, `429` y `503` (decisión 17).**
   - **ROJO.** Crear `apps/api/app/src/test/java/com/confia/shared/web/ratelimit/RateLimitEdgeTest.java`
@@ -604,6 +614,13 @@ cadena. En el resto de este documento «PR N» de las tareas 2.2 en adelante usa
     `AdminApplication.java` y la línea `com.confia.shared.web.ratelimit` en `ProcessBeanPolicy.java`
     (primero en rojo). Notas fechadas en `docs/03-seguridad.md` §4.4 y §10 con el limitador interino,
     sus tres limitaciones y la semántica de la capa 2.
+    **Añadido 2026-10-05 (revisión de seguridad del limitador, I-2):** declarar en esas mismas notas el
+    riesgo residual de autodenegación: con IPv6 un atacante dispone de muchas /64 y puede llenar la tabla,
+    que falla cerrada por decisión del propietario, y una entrada restringida se mantiene viva con un fallo
+    cada menos de 10 minutos. Mitigaciones: `maxEntries` con holgura, una métrica y una alerta cada vez que se
+    responde `CapacityExhausted`, y límite en el borde (nginx o WAF) por /48 o /32, este último a cargo del
+    cambio 11. La métrica y su prueba pertenecen a esta tarea. Requisito previo: 3.1b fusionada, con el reloj
+    monotónico de su hallazgo I-1.
   - **Demostración deliberada.** Mover la llamada a `tryAcquire` a `postHandle` hace que el controlador
     se invoque ante un rechazo y rompe la prueba; se revierte.
   - **Cierre.** `./mvnw verify` completo. Commits: `feat(web): reject over-limit requests before the

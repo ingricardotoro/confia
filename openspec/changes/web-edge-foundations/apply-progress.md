@@ -1465,3 +1465,20 @@ y 19 ramas), que prueba 3.1b; el umbral de módulo (80 %) se cumple.
 | Orden enfocada y resultado | `-Dtest='InMemoryRateLimiter*'`: `Tests run: 47, Failures: 0`; cierre por `./mvnw verify`: Surefire 186 + 914, Failsafe 229 |
 | Arnés de ejecución | N/A: el limitador no tiene consumidor ni borde HTTP hasta 3.2; las pruebas ejercen el adaptador real con `MutableClock` |
 | Frontera de reversión | Se retiran `RateLimiter`, `RateLimitDecision`, `RateLimitPolicy`, `InMemoryRateLimiter`, `MutableClock` e `InMemoryRateLimiterTest`; ningún archivo existente cambia |
+
+### Revisión de seguridad del limitador en memoria (2026-10-05)
+
+Riesgo evaluado: alto. La revisión independiente cubrió la porción 3.1a y el árbol completo de la rama local
+`wip/web-edge-rate-limiter-core-full`. Veredicto: 0 bloqueantes, 3 importantes y 4 sugerencias. **3.1a es aprobable**:
+el limitador no tiene consumidor ni bean, así que nada es alcanzable hoy. La lógica de las dos capas, la reserva
+por CAS y la liberación tras la eliminación son correctas.
+
+| Hallazgo | Asignación |
+|---|---|
+| I-1: el reloj es de pared (`Clock.instant()`), no monotónico | 3.1b, que debe fusionarse antes de 3.2 |
+| I-2: autodenegación con muchas /64 (la tabla falla cerrada) | 3.2: declararla en `docs/03`, métrica y alerta de `CapacityExhausted`; límite por /48 o /32 en el borde, cambio 11 |
+| I-3: el muestreo de `ConcurrentHashMap.size()` no es atómico | 3.1b |
+| S-1: el reloj se lee antes de `compute` | 3.1b, junto con I-1 |
+| S-2: cota razonable de los límites de la política | 3.1b o 3.2, validándola en `RateLimitPolicy` |
+| S-3: costo del barrido con tablas grandes | Seguimiento: medir si `maxEntries` llega a cientos de miles |
+| S-4: `NaiveReference` comparte la lectura de las reglas | Aceptada: la mitigan las pruebas escritas a mano contra los escenarios |
