@@ -498,6 +498,18 @@ El adaptador que implementa este puerto vive en `shared/observability/metrics`. 
 Prometheus, `application` conoce solo el puerto, e `infrastructure` conoce el cliente. Es la misma
 regla de dependencia del resto del sistema y no se relaja para observabilidad.
 
+> **Nota fechada 2026-10-06 (cambio `web-edge-foundations`, PR 11 `rate-limiter-edge`): primer
+> puerto de métricas y su adaptador interino.** Todavía no existe Micrometer, Actuator ni
+> Prometheus en el backend. El limitador de tasa del borde declara el puerto `RateLimitMetrics`
+> (`shared/web/ratelimit`) con una sola operación, `capacityExhausted(policy)`, y su adaptador
+> `LogRateLimitMetrics` vive en `shared/observability/metrics`. Mientras no haya registro de
+> métricas, el adaptador escribe **un evento `WARN` fijo y estructurado** cada vez que el limitador
+> responde `CapacityExhausted`, con los campos `event` (`rate_limit_capacity_exhausted`), `policy` y
+> `suppressed`, sin IP, ruta, cabecera ni clave. Está acotado a un evento por segundo por política,
+> con una fuente de tiempo monotónica, y la alerta de autodenegación del limitador se monta sobre
+> ese evento. El adaptador hacia Prometheus llega con el cambio de observabilidad y sustituye a
+> este sin tocar el limitador ni el interceptor. No se añadió ninguna dependencia de métricas.
+
 ---
 
 ## 6. Tableros de Grafana

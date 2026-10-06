@@ -3,6 +3,8 @@ package com.confia.bootstrap;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
+import com.confia.shared.observability.metrics.LogRateLimitMetrics;
+import com.confia.shared.web.ratelimit.RateLimitMetrics;
 import jakarta.servlet.Filter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -72,6 +74,34 @@ class ProcessBeanIsolationTest {
                         .as("the worker has no bean of a security package").isEmpty();
             }
             softly.assertAll();
+        } finally {
+            if (context != null) {
+                context.close();
+            }
+        }
+    }
+
+    /**
+     * The adapter of the rate limiter's capacity signal belongs to the administrative process alone
+     * (web-edge-foundations design.md, decision 17): the other two start without a bean of that
+     * package, and the administrative one holds exactly one {@link RateLimitMetrics}, the adapter.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("com.confia.bootstrap.ProcessBeanPolicy#all")
+    void onlyTheAdministrativeProcessHoldsTheMetricsAdapter(ProcessBeanPolicy policy) {
+        LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.forProcess(policy.process()), policy.process());
+        ConfigurableApplicationContext context = outcome.context();
+        try {
+            assertThat(context).as("the %s process must start", policy.process()).isNotNull();
+            List<String> held = beanNamesOfTypesIn(context, "com.confia.shared.observability");
+            if ("admin".equals(policy.process())) {
+                assertThat(held).anyMatch(bean -> bean.endsWith(LogRateLimitMetrics.class.getName()));
+                assertThat(context.getBeansOfType(RateLimitMetrics.class)).hasSize(1);
+            } else {
+                assertThat(held).as("no metrics adapter in the %s process", policy.process())
+                        .isEmpty();
+            }
         } finally {
             if (context != null) {
                 context.close();

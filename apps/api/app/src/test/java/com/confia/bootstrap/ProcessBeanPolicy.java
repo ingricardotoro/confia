@@ -50,6 +50,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // writer).
                     "com.confia.shared.web.edge", "com.confia.shared.web.request",
                     "com.confia.shared.web.problem",
+                    // The adapter of the rate limiter's capacity signal: administrative only, exact
+                    // because the non-vacuity check compares by equality.
+                    "com.confia.shared.observability.metrics",
                     // The identity module as the three packages its beans come from: the use
                     // cases, the adapters, and the named-interface package of its configuration.
                     // Each entry is exact because the non-vacuity check compares by equality.
