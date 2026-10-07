@@ -40,6 +40,10 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
             Set.of("com.confia.bootstrap.admin", "com.confia.shared.web.openapi",
                     "com.confia.kernel", "com.confia.shared.platform.infrastructure",
                     "com.confia.shared.security", "com.confia.shared.crypto",
+                    // The administrative signing key ring and its configuration (ADR-0005
+                    // check 14). A parent entry already covers it by sub-package; it is listed so
+                    // the non-vacuity check fails if the import is ever lost (exact, like every entry).
+                    "com.confia.shared.security.token",
                     "com.confia.shared.infrastructure",
                     // The audit writer is the decorator that adds the request origin; it is the
                     // first bean whose class lives in this package (exact, like every entry).
