@@ -268,3 +268,89 @@ Sus cinco sugerencias pasan a la tarea 1.4 (nota fechada en `tasks.md`).
 | Total de la aplicación | 329 de 345 (95 %) |
 
 **Tamaño:** 799 líneas efectivas.
+
+## Tarea 1.2 `signing-key-ring` (2026-10-07, modo TDD estricto, rama `change/session-tokens-and-web-layer-02-signing-key-ring`)
+
+Árbol completo construido y verificado, **sin comprometer**: mide 1 127 líneas efectivas, por encima de 800. Siguiendo la regla fija del
+propietario (nota fechada de la partición de 1.1), se guardó una copia local en `wip/session-tokens-signing-key-ring-full` y se mide la
+partición de abajo. El orquestador entrega las partes.
+
+### Ciclo TDD (rojos observados, con su causa)
+
+| Paso | Qué se corrió | Causa observada |
+|---|---|---|
+| Rojo 1 | `./mvnw -q -pl app -am test-compile` con las pruebas y sin producción | Error de compilación por símbolos inexistentes: `SigningKeyRing.fromEnvironment`, `SigningKeyPlacementGuard` y `SessionTokenConfiguration` (`SigningKeyRingTest`, `SigningKeyPlacementGuardTest` y `ProcessBeanInspectorTest`) |
+| Verde del anillo | `-Dtest='SigningKeyRingTest,...'` | `SigningKeyRingTest`, 31 casos en verde |
+| Rojo de las líneas prohibidas | `ProcessBeanInspectorTest` antes de editar `ProcessBeanPolicy` | 2 fallos (portal y trabajador): la regla nominal no existía; solo habría fallado la lista de permitidos |
+| Rojo del guardián | `SigningKeyPlacementGuardTest` con la fuente de variables de entorno nombrada `systemEnvironment-test` | 4 fallos, «Expecting code to raise a throwable». **Causa real:** el nombre de la fuente no terminaba en `-systemEnvironment`, así que Spring Boot no aplicaba el enlace relajado; es un defecto de la prueba, corregido con el nombre `guard-test-systemEnvironment`; no se tocó producción |
+| Rojo de arranque sin cableado | `SigningKeyStartupTest` y `SigningKeyAbsencesTest` con el guardián y el `@Import` ausentes | 9 fallos y 3 errores en `SigningKeyStartupTest` (el proceso arrancaba o faltaba el bean `SigningKeyRing`); las ausencias de `SigningKeyAbsencesTest` pasan desde el inicio, como era de esperar: son rieles de ausencia y no pueden estar en rojo antes del cambio |
+| Verde parcial | guardián añadido a `ConfiaApplication.launch` | quedan en rojo solo los 3 fallos y los 3 errores que dependen del anillo |
+| **S-6** (primer rojo del cableado) | `@Import(SessionTokenConfiguration)` en `AdminApplication` sin cambiar `TestProcessArguments` | **16 errores y 2 fallos**: `ConfiaApplicationTest` 1, `OpenApiExposureByProfileTest` 4, `ProcessBeanIsolationTest` 3, `SigningKeyAbsencesTest` 5 y `SigningKeyStartupTest` 3 errores y 2 fallos. Causa: `BeanCreationException` con «the property confia.security.admin-signing.current.kid is required and was not set». Se corrige con el par generado en `TestProcessArguments` |
+| Verde S-6 | `TestProcessArguments` añade el par con `KeyPairGenerator.getInstance("Ed25519")` | `ConfiaApplicationTest` 10, `OpenApiExposureByProfileTest` 8, `ProcessBeanIsolationTest` 10, `SigningKeyAbsencesTest` 6 y `SigningKeyStartupTest` 14, todos en verde |
+
+**Rojo esperado que no se produjo (desviación).** El documento de tareas esperaba `not in the allow-list` nombrando
+`com.confia.shared.security.token` al importar sin línea de política. No ocurre: la lista de permitidos del administrativo ya contiene
+`com.confia.shared.security`, y una coincidencia incluye sus subpaquetes por diseño (`ProcessBeanPolicy.matches`). La línea exacta
+`com.confia.shared.security.token` se añadió igualmente porque la comprobación de no vacuidad compara por igualdad, y su valor se
+demuestra con la ruptura 3. La regla de la lista de permitidos (BI23) sigue demostrada por la prueba negativa permanente del inspector.
+
+### Rupturas deliberadas (todas revertidas y comprobadas con `cmp`)
+
+| Ruptura | Prueba y línea que fallan |
+|---|---|
+| 1. Se comenta `requireMatchingPair(privateKey, publicKey)` en `SigningKeyLoader.load` | `SigningKeyRingTest.aPairWhosePublicKeyDoesNotMatchThePrivateKeyIsDetectedBySigningAndVerifying`, línea 153 (1 fallo de 31) |
+| 2. El guardián de portal y trabajador deja de listar `...admin-signing.previous.private-key` | `SigningKeyStartupTest.theOtherProcessesAbortWhenThePreviousAdministrativePrivateKeyIsPresent` (2 casos, línea 134 de `assertAbortsBeforeTheContext`) y `SigningKeyPlacementGuardTest.theNonAdministrativeGuardFindsTheAdministrativePrivateKeyInAnOperatingSystemVariable`, línea 47 |
+| 3. Se quita `SessionTokenConfiguration.class` del `@Import` de `AdminApplication` | `ProcessBeanIsolationTest.registersOnlyItsAllowedBeans` línea 84 («non-vacuous: com.confia.shared.security.token must contribute a bean to the admin context») y `onlyTheAdministrativeProcessHoldsTheSigningKeyRing`, línea 178 |
+
+### Verificación completa
+
+`./mvnw verify -Pmutation-gate` (Docker en ejecución): Surefire 186 + 1 420, Failsafe 250, 0 fallos, cobertura cumplida y `BUILD SUCCESS`.
+El escaneo de secretos (búsqueda de marcadores PEM y de los prefijos DER de Ed25519 PKCS#8 y X.509 sobre todos los archivos rastreados y nuevos,
+salvo `openspec/`) no halla ninguna clave (BI29).
+
+| Métrica de PIT | Resultado |
+|---|---|
+| Paquete `com.confia.shared.security.token` | 135 de 140 mutantes muertos (96 %); líneas, 180 de 188 (96 %); fuerza de prueba 97 % |
+| Supervivientes nuevos | `SigningKeyLoader` 3 (`load`, `optional`, `requireMatchingPair`: la longitud y el relleno de la sonda aleatoria no son observables) y `SessionTokenConfiguration` sin cobertura de PIT (la cubren las pruebas de proceso, que no son objetivo de PIT) |
+| Total de la aplicación | 371 de 391 (95 %) |
+
+### Medición y partición
+
+Medido con `git add -N . && git diff --numstat main -- . ':!openspec'` y `git reset -q`: **1 127 líneas** (1 116 añadidas, 11 borradas), con
+32 de `docs/05`. Supera 800. Costura natural, la que ya nombraba el documento de tareas («guardián a 2b»):
+
+| Parte | Contenido | Líneas |
+|---|---|---|
+| **2a `signing-key-ring`** | `SigningKeyLoader`, `SigningKey.isValidKid`, `SigningKeyRing.fromEnvironment`, `SessionTokenConfiguration`, `@Import` en `AdminApplication`, línea de la lista de permitidos del administrativo, par generado en `TestProcessArguments`, `SigningKeyRingTest`, la parte administrativa y de ausencia de `SigningKeyStartupTest`, `SigningKeyAbsencesTest` y la prueba de aislamiento del anillo | **775** (medida en un árbol aparte, con 91 pruebas focalizadas en verde) |
+| **2b `signing-key-placement-guard`** | `SigningKeyPlacementGuard`, su alta en `ConfiaApplication.launch`, `SigningKeyPlacementGuardTest`, el resto de `SigningKeyStartupTest` (portal, trabajador y nombre reservado), las líneas prohibidas de portal y trabajador con su prueba del inspector y la nota de `docs/05` | **352** |
+
+2b necesita 2a. Escenarios de 2a: I78 a I82, I84, BI21, BI22, BI28, BI29 y las dos ausencias. Escenarios de 2b: I83, I140 y BI22 (prohibidos nominales).
+La verificación completa de 2a por separado no se corrió (solo las pruebas focalizadas); la del árbol completo sí.
+
+### Desviaciones y notas
+
+- El motivo de las líneas prohibidas se escribe en inglés (`administrative signing keys, ADR-0005 check 14 ...`), como el resto de
+  `ProcessBeanPolicy`; el documento de tareas lo citaba en español.
+- `SigningKeyStartupTest` ejercita el rechazo del portal y del trabajador y el nombre reservado con un valor de símbolos que ningún mensaje
+  del código puede contener, y no con una clave generada: con 44 caracteres de Base64 aleatorio un fragmento de 4 caracteres podría
+  aparecer por azar en una traza y volver inestable la prueba.
+- `previous.public-key` sin `previous.kid` se rechaza (no se ignora en silencio); el diseño solo nombraba el caso inverso.
+- `SigningKeyPlacementGuardTest` es una prueba unitaria añadida (no listada en la tarea) que demuestra el enlace relajado con una variable
+  de entorno de sistema simulada; los procesos no pueden fijar variables de entorno desde la prueba.
+- `SigningKey.isValidKid` pasa de privado a visible en el paquete para que el cargador valide con la misma regla y nombre la propiedad.
+
+## PR 2a `signing-key-ring` (tarea 1.2a)
+
+Árbol reducido a la parte 2a: se retiraron `SigningKeyPlacementGuard` y su prueba, su alta en `ConfiaApplication.launch`, los
+cambios de `ProcessBeanInspectorTest` y la nota de `docs/05`; de `SigningKeyStartupTest` se retiraron las pruebas de portal, trabajador y
+nombre reservado (y sus constantes); de `ProcessBeanPolicy`, las líneas prohibidas de portal y trabajador; de `TestProcessArguments`, las
+constantes de las propiedades `previous.private-key` y del portal; el Javadoc de `package-info` ya no afirma el guardián.
+
+- **Verificación completa** (`./mvnw verify -Pmutation-gate`, Docker en ejecución): Surefire 186 + 1 401, Failsafe 250, 0 fallos,
+  cobertura cumplida, `BUILD SUCCESS`.
+- **PIT, paquete `com.confia.shared.security.token`:** 131 de 136 mutantes muertos (96 %); líneas 166/174 (95 %); fuerza de prueba 97 %.
+  Total de la aplicación: 367 de 387 (95 %).
+- **Rupturas deliberadas de 2a** (1 y 3 de la sección anterior), revertidas y comprobadas con `cmp`; no queda ninguna en el árbol:
+  1. Con `requireMatchingPair` comentada en `SigningKeyLoader.load` falla `SigningKeyRingTest.aPairWhosePublicKeyDoesNotMatchThePrivateKeyIsDetectedBySigningAndVerifying`, línea 153 (1 de 31).
+  3. Sin `SessionTokenConfiguration.class` en el `@Import` de `AdminApplication` fallan `ProcessBeanIsolationTest.registersOnlyItsAllowedBeans` (línea 84, no vacuidad) y `onlyTheAdministrativeProcessHoldsTheSigningKeyRing` (línea 178).
+- **Tamaño:** 762 líneas efectivas (753 añadidas, 9 borradas), con el mismo método de medición; por debajo de 800.
