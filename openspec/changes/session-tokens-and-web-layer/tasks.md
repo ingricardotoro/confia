@@ -187,7 +187,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
       en cerrado como «not valid standard Base64».
     - **H3 y H4 (opcionales):** la prueba de los caminos JWKS se compara con un camino arbitrario, y la cabecera canónica se toma de
       `JwsFixtures` en vez de reescribirla a mano.
-- [ ] 1.3 **PR 3 `signing-hash-confinement`: ninguna utilidad de firma ni de hash fuera de `identity` y `shared.security` (decisión 16).**
+- [x] 1.3 **PR 3 `signing-hash-confinement`: ninguna utilidad de firma ni de hash fuera de `identity` y `shared.security` (decisión 16).**
   - **ROJO.** Crear `test/java/com/confia/architecture/SigningAndHashingConfinementTest.java` (dos mitades, ADR-0018: producción real sin
     conjunto vacío y fixtures) con los fixtures permanentes `test/java/com/confia/architecture/fixture/hashing/outside/` —
     `BadDigestOutsideIdentity` (en `com.confia.shared.web`, `MessageDigest.getInstance`), `BadSignatureOutside`, `BadKeyFactoryOutside`,
