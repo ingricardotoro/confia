@@ -417,16 +417,21 @@
            own targetClasses/targetTests, scoped to every business module's domain package (the
            same double-wildcard reasoning as the JaCoCo PACKAGE rule above); version, the plugin
            dependency on pitest-junit5-plugin and the mutationCoverage execution are managed in the
-           parent (same pattern as kernel/pom.xml). -->
+           parent (same pattern as kernel/pom.xml). The in-house JWS codec and its key ring in
+           com.confia.shared.security.token are the one non-domain target: a signature or header
+           mutation that no test catches is a token forgery (session-tokens-and-web-layer design.md,
+           decision 2; threshold 80 like the domain packages). -->
       <plugin>
         <groupId>org.pitest</groupId>
         <artifactId>pitest-maven</artifactId>
         <configuration>
           <targetClasses>
             <param>com.confia.*.domain.*</param>
+            <param>com.confia.shared.security.token.*</param>
           </targetClasses>
           <targetTests>
             <param>com.confia.*.domain.*</param>
+            <param>com.confia.shared.security.token.*</param>
           </targetTests>
         </configuration>
       </plugin>
