@@ -443,7 +443,7 @@ Cada fixture se rechaza por nombre y por utilidad: la aserción de `rejectsTheFi
 
 ### Medición
 
-`git add -N . && git diff --numstat main -- . ':!openspec'`: **391 líneas** (todas del árbol `apps/api`; 391 añadidas, 22 borradas contando las dos clases delegantes: 369 netas en archivos nuevos y 22 modificadas), por debajo de 800.
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **391 líneas** (369 añadidas y 22 borradas, todas del árbol `apps/api`), por debajo de 800.
 
 ### Desviaciones
 
