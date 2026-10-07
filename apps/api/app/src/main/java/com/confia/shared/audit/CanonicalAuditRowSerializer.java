@@ -1,11 +1,10 @@
 package com.confia.shared.audit;
 
+import com.confia.shared.security.Digests;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -47,7 +46,7 @@ public class CanonicalAuditRowSerializer {
 
     /** {@code sha256(preimage(row))} — the exact composition {@code shared_audit_row_hash} uses. */
     public byte[] rowHash(CanonicalAuditRow row) {
-        return sha256(preimage(row));
+        return Digests.sha256(preimage(row));
     }
 
     /**
@@ -252,13 +251,5 @@ public class CanonicalAuditRowSerializer {
 
     private static String canonUuid(UUID value) {
         return value == null ? null : value.toString();
-    }
-
-    private static byte[] sha256(byte[] data) {
-        try {
-            return MessageDigest.getInstance("SHA-256").digest(data);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 must be available on every supported JDK", e);
-        }
     }
 }

@@ -414,3 +414,40 @@ supervivientes nuevos relevantes); total de la aplicación 371 de 391 (95 %).
 - **H4 no se hizo:** `JwsFixtures` es de paquete (`com.confia.shared.security.token`) y `SigningKeyStartupTest` vive en `com.confia.bootstrap`; usarlo exigiría hacer público un fixture entre paquetes. Se deja la cabecera escrita a mano.
 - El valor Ed448 de H2 es un sobre PKCS#8 de Ed448 con cuerpo fijo patronado, no una clave generada, para no versionar material de clave ni introducir azar.
 - Con 1.2b fusionada, la tarea 1.2 queda hecha y la regla de orden (ninguna emisión ni verificación de tokens antes de 1.2b) se cumple.
+
+## PR 3 `signing-hash-confinement` (tarea 1.3, 2026-10-07, modo TDD estricto)
+
+Rama `change/session-tokens-and-web-layer-03-signing-hash-confinement`, desde `main` en 0f6ec2e (con 1.1 y 1.2 fusionadas).
+
+### Ciclo TDD (rojo observado)
+
+| Paso | Qué se corrió | Resultado observado |
+|---|---|---|
+| Rojo | `SigningAndHashingConfinementTest` con los nueve fixtures y sin `Digests` | 6 pruebas, **3 fallos**. `productionCodeOutsideIdentityAndSharedSecurityNeitherSignsNorHashes` (línea 71) falla sobre producción real, «violated (2 times)», y las dos violaciones son de `com.confia.shared.audit.CanonicalAuditRowSerializer.sha256` (`MessageDigest.getInstance` y `MessageDigest.digest`, línea 259): ninguna otra clase. Fallan además `theAuditChainSerializerDelegatesItsHashToTheSecurityUtility` y la mitad de `shared.security` de `identityAndSharedSecurityReallyUseTheForbiddenUtilities` por la ausencia de `Digests`. La mitad de fixtures (siete rechazos por nombre, dos fixtures sin rechazo) pasa desde el inicio |
+| Verde | `Digests`, delegación desde `CanonicalAuditRowSerializer` y `RequestPayloadHasher`, `DigestsTest` (3 vectores FIPS 180-4 y longitud) | `SigningAndHashingConfinementTest` 6, `DigestsTest` 4, `CanonicalAuditRowSerializerTest` 3, `RequestPayloadHasherTest` 5: 18 en verde. Las pruebas de la cadena de auditoría no se modificaron |
+
+La regla no tiene lista de permitidos: `noClasses().that().resideOutsideOfPackages("com.confia.identity..", "com.confia.shared.security..")` (incluye subpaquetes como `shared.security.token`) `.should().dependOnClassesThat(...)` las siete utilidades. Evalúa solo clases de producción (`DO_NOT_INCLUDE_TESTS`), de modo que `JwsFixtures` y cualquier ayudante del árbol de pruebas no cuentan.
+
+### Rupturas deliberadas (revertidas y comprobadas con `cmp`)
+
+| Ruptura | Prueba y línea que fallan |
+|---|---|
+| `CanonicalAuditRowSerializer.rowHash` vuelve a usar `MessageDigest` | `SigningAndHashingConfinementTest.productionCodeOutsideIdentityAndSharedSecurityNeitherSignsNorHashes`, línea 71 (`CanonicalAuditRowSerializer.java:49`, `MessageDigest.getInstance` y `.digest`), y `theAuditChainSerializerDelegatesItsHashToTheSecurityUtility`, línea 134 |
+| La regla deja de reconocer `javax.crypto.Mac` y `org.bouncycastle` | `rejectsTheFixtureOfEachOfTheSevenForbiddenUtilities` falla porque el mensaje no nombra `BadBouncyCastleOutside` (y tampoco `BadMacOutside`); además `identityAndSharedSecurityReallyUseTheForbiddenUtilities`, línea 101 |
+
+Cada fixture se rechaza por nombre y por utilidad: la aserción de `rejectsTheFixtureOfEachOfTheSevenForbiddenUtilities` exige los siete nombres de clase y sus siete utilidades. `GoodCipherOutside` y `GoodSecureRandomOutside` no aparecen en el mensaje de rechazo.
+
+### Verificación completa
+
+`./mvnw verify -Pmutation-gate` (Docker en ejecución): Surefire 186 + 1 433, Failsafe 250, 0 fallos, `BUILD SUCCESS`. PIT total de la aplicación: 371 de 391 (95 %), 2 sin cobertura.
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **391 líneas** (369 añadidas y 22 borradas, todas del árbol `apps/api`), por debajo de 800.
+
+### Desviaciones
+
+- Los fixtures viven todos bajo `architecture.fixture.hashing.outside` (como los demás fixtures permanentes): `BadDigestOutsideIdentity` representa a una clase de `com.confia.shared.web` por estar fuera de los dos paquetes permitidos; no se coloca una clase de prueba en el paquete real `shared.web`.
+- La regla cubre siete utilidades, no seis: `MessageDigest` (BI11) más las seis de BI38.
+- Se añadió `DigestsTest` (vectores de FIPS 180-4) para fijar los bytes de la utilidad nueva; no figuraba en la tarea.
+- `RequestPayloadHasher` está en `shared.security` y ya estaba permitido; delega igualmente en `Digests` para tener un único SHA-256 (la tarea lo pide).
