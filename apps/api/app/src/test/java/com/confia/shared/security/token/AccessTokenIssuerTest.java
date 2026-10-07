@@ -10,9 +10,11 @@ import static com.confia.shared.security.token.AccessTokenFixtures.issuerAt;
 import static com.confia.shared.security.token.AccessTokenFixtures.namesOf;
 import static com.confia.shared.security.token.AccessTokenFixtures.payloadOf;
 import static com.confia.shared.security.token.AccessTokenFixtures.payloadTextOf;
+import static com.confia.shared.security.token.AccessTokenFixtures.verifierAt;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.AuthenticationMethod;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -193,7 +195,7 @@ class AccessTokenIssuerTest {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // What a token prints
+    // What a token prints, and the round trip
     // ---------------------------------------------------------------------------------------------
 
     @Test
@@ -208,6 +210,21 @@ class AccessTokenIssuerTest {
                 .doesNotContain(ACCOUNT.toString()).contains("redacted")
                 .contains(NOW.plusSeconds(600).toString());
         assertThat(String.valueOf(token)).isEqualTo(printed);
+    }
+
+    @Test
+    void whatTheIssuerIssuesTheVerifierAcceptsAtTheSameInstant() {
+        AccessToken access = issuer.issueAccess(ACCOUNT, INSTITUTION, SESSION, PASSWORD_AND_OTP);
+
+        AuthenticatedActor actor = verifierAt(NOW).verifyAccess(access.compact());
+
+        assertThat(actor.accountId()).isEqualTo(ACCOUNT);
+        assertThat(actor.institutionId()).isEqualTo(INSTITUTION);
+        assertThat(actor.sessionId()).isEqualTo(SESSION);
+        assertThat(actor.methods()).containsExactlyInAnyOrder(AuthenticationMethod.PASSWORD,
+                AuthenticationMethod.ONE_TIME_PASSWORD);
+        assertThat(actor.issuedAt()).isEqualTo(NOW);
+        assertThat(actor.expiresAt()).isEqualTo(NOW.plusSeconds(600));
     }
 
     private static List<String> texts(JsonNode array) {
