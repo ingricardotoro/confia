@@ -613,4 +613,48 @@ administrativo tiene emisor y verificador; el portal y el trabajador, ninguno). 
 
 ### Desviaciones
 
-Ninguna respecto al diseño. Los supervivientes de `ClaimReader` se cubren con las pruebas de propiedades de 1.4e.
+Ninguna respecto al diseño. (Corregido tras la revisión independiente: la afirmación anterior de que las pruebas de propiedades de 1.4e cubren los supervivientes de `ClaimReader` no estaba verificada y se retira.)
+
+### Revisión independiente de 1.4c (2026-10-07)
+
+Veredicto: se puede fusionar, sin bloqueantes. La revisión confirmó estos puntos:
+
+- La validación es por tipo JSON y nunca por coerción.
+- La lista cerrada es exacta.
+- `aud` como arreglo se rechaza.
+- `amr` es exacto, en contenido y en orden.
+- Los UUID se exigen en forma canónica (`toString().equals(texto)`).
+- `EXPIRED` solo se informa con la firma y los claims íntegros.
+- `exp == now` está vencido.
+- El reloj es inyectado.
+- Ninguna excepción acaba en aceptación.
+- No hay registro.
+- Los beans existen solo en el proceso administrativo.
+
+**Corregido en este PR:**
+
+- **I-1, desbordamiento de `long`.** Faltaba la prueba de un número fuera de `long`. Un entero 2^64 + un segundo válido se parsea como
+  `BigIntegerNode`, y `longValue()` lo recortaría a ese segundo válido. Se añadieron siete casos a `accessClaimsOfTheWrongTypeOrValue`:
+  - 2^64;
+  - 2^64 + `exp` válido, y lo mismo para `iat`;
+  - `Long.MIN_VALUE`;
+  - un número de cuarenta dígitos;
+  - `LAST_EPOCH_SECOND + 1`.
+- **I-2, bordes del rango de fechas.** Faltaban esas pruebas. Se añadió `theFirstAndTheLastSecondOfTheDateRangeAreDates`: `iat = 0` da
+  `EXPIRED`, nunca `CLAIMS_INVALID`, y el último segundo de 9999 se acepta verificado justo antes.
+
+  **Rupturas deliberadas sobre `ClaimReader.epochSecond`**, revertidas y comprobadas con `cmp`:
+
+  | Ruptura | Resultado |
+  |---|---|
+  | Sin `canConvertToLong()` | 4 fallos |
+  | `value <= 0` | 1 fallo |
+  | `value >= LAST_EPOCH_SECOND` | 1 error |
+
+  `AccessTokenVerifierTest` pasa de 99 a 106 pruebas.
+- **S-1.** La nota de `docs/03` §4.5 describía como presente el verificador del token restringido. Ahora dice que el rechazo de la
+  audiencia `confia-admin-mfa` ya existe y que el token restringido, con su verificador, llega en 1.4d.
+- **S-2.** Se retiró la afirmación no verificada sobre los supervivientes de `ClaimReader`.
+
+**Para 1.4d (observación de la revisión):** el token de acceso y el restringido comparten clave y cabecera, y solo la audiencia y el
+conjunto de claims los separan. 1.4d fija `aud` y sus claims propios, con una prueba cruzada en ambos sentidos.
