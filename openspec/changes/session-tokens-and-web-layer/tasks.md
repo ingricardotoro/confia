@@ -96,7 +96,8 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
 
 ## Fase 1: núcleo criptográfico y de tokens
 
-- [ ] 1.1 **PR 1 `jws-compact-codec`: códec JWS Ed25519 (decisión 2).** Rutas bajo `apps/api/app/src/` salvo indicación.
+- [ ] 1.1 **PR 1 `jws-compact-codec`: códec JWS Ed25519 (decisión 2).** Partida en 1.1a, 1.1b y 1.1c (nota fechada del
+  final, 2026-10-06); el contenido de abajo es el alcance conjunto de las tres partes. Rutas bajo `apps/api/app/src/` salvo indicación.
   - **ROJO, ataques primero.** Crear en `test/java/com/confia/shared/security/token/`: `Ed25519SignaturesRfc8037Test.java`
     (S-1 ya probada: la firma publicada de RFC 8037 A.4 verifica con la clave pública del RFC, envuelta en X.509 con el prefijo DER
     fijo; con un bit alterado se rechaza; con un par generado en la prueba la firma es determinista, I46),
@@ -127,6 +128,17 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     de «Spring Security solo como cadena de filtros».
   - **Nota de costura.** El diseño §5 pone `SigningKey` y `SigningKeyRing` en el PR 2, pero `CompactJws` los necesita. Este PR crea la
     forma en memoria; el PR 2 añade el cargador sin cambiar la firma pública. Es un ajuste de orden, no de diseño.
+
+- [x] 1.1a **PR 1a `jws-primitives`.** `Base64Url` (canónico estricto), `Ed25519Signatures` (convierte la `SignatureException` del
+  JDK en `false`), `package-info` con `@NamedInterface`, `JwsFixtures`, `Base64UrlTest`, `Base64UrlPropertiesTest`,
+  `Ed25519SignaturesRfc8037Test`, el recurso del vector RFC 8037 A.4 sin clave privada y el objetivo de PIT
+  `com.confia.shared.security.token.*`. Escenarios I46 e I138 (parte de la primitiva). Medido: 551 líneas.
+- [ ] 1.1b **PR 1b `jws-key-ring-and-bans`.** `SigningKey` (restricción del `kid` a `[A-Za-z0-9._-]{1,64}`), `SigningKeyRing` en
+  memoria con las cabeceras canónicas precalculadas, `SigningKeyRingInMemoryTest`, `TokenRejection`, `TokenRejectedException` y
+  `bannedDependencies` de Nimbus, Tink, jjwt y java-jwt con la evidencia de BI33. Necesita 1.1a.
+- [ ] 1.1c **PR 1c `jws-compact-codec`.** `CompactJws`, `VerifiedJws`, `CompactJwsAttackTest` y `CompactJwsPropertiesTest`; demostraciones
+  de la cabecera canónica y de la carga analizada antes de la firma; puerta de PIT del paquete (BI30 a BI32). Necesita 1.1b.
+  1.1 se marca hecha cuando se fusiona 1.1c.
 
 - [ ] 1.2 **PR 2 `signing-key-ring`: anillo de claves, cargador y verificación de arranque (decisión 3, O12, DA-17, D-N2).**
   - **ROJO.** Crear `test/java/com/confia/shared/security/token/SigningKeyRingTest.java` (propiedad ausente, Base64 inválido, PKCS#8 de
@@ -702,7 +714,20 @@ preparado en `apply-progress.md` por la tarea 5.2 y se cumple en el informe de a
 - **`verify`.** 5 min 24 s hoy contra 8 min de tope; las `*IT` nuevas comparten contenedor.
 - **Jackson 3.** Los nombres exactos de las opciones del `JsonMapper` se confirman en el rojo de 1.4 (S-5 es de S2).
 
+## Nota fechada 2026-10-06: partición de 1.1 y regla general de tamaño
 
+La tarea 1.1 verificada midió **1 631 líneas efectivas** (419 de producción, 19 de los `pom.xml` y 1 193 de pruebas) frente al
+tope de 800 y a un pronóstico realista de 730. El árbol completo y verificado (`./mvnw verify`: Surefire 186 + 1 355, Failsafe 250;
+PIT del paquete 94 de 95, 98,9 %) se conserva en la rama **local** `wip/session-tokens-jws-codec-full` (2461b4f). El propietario
+aprobó partirla en tres PR:
 
+| Parte | Contenido | Líneas |
+|---|---|---|
+| 1.1a `jws-primitives` | Base64url, primitiva Ed25519, vector RFC sin clave privada, fixtures | 551 (medidas) |
+| 1.1b `jws-key-ring-and-bans` | Anillo en memoria, tipos de rechazo, prohibiciones de Maven | unas 300 |
+| 1.1c `jws-compact-codec` | Códec, ataques y propiedades, puerta de PIT | unas 830 (excepción de unas 30 líneas si se confirma la medida) |
 
-
+**Regla general aprobada por el propietario (2026-10-06).** Cuando una tarea de este cambio supere 800 líneas efectivas, el
+orquestador la parte por sus costuras naturales en PR de 800 como máximo **sin consultar**, con una nota fechada que registra la
+medida y la partición. Solo consulta al propietario si una parte indivisible exige una excepción de tamaño. El tope de 15 tareas se
+supera en consecuencia: cada parte cuenta como una tarea de la cadena.
