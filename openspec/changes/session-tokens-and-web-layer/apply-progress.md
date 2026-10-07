@@ -551,3 +551,33 @@ cambio S5 de `CompactJwsPropertiesTest`. Ningún archivo de 1.4b a 1.4e se inclu
 
 Ninguna respecto al diseño. Los tres niveles de la sección «PR 4» anterior (rojo A, verde A, rupturas) siguen siendo el registro de la tarea completa; esta parte solo
 reproduce su rojo A.
+
+## PR 4b `access-token-issuer` (tarea 1.4b, 2026-10-07, modo TDD estricto)
+
+Segunda de las cinco partes de 1.4. Se parte de `main` en ffb2043 (que ya contiene 1.4a); el árbol completo de 1.4 sigue intacto en la rama local
+`wip/session-tokens-access-tokens-full` (c7456c6). Commit de código: `0db43f1`, `feat(security): issue admin access tokens and carry the authenticated actor`.
+
+### Contenido
+
+`AuthenticatedActor` (con `CURRENT` como `ScopedValue` público y `current()` basado en `isBound()`), `AuthenticationMethod`, `AccessToken` (`toString` redactado),
+la mitad de serialización de `AccessTokenClaims` y `AccessTokenIssuer.issueAccess`. Pruebas: `AuthenticatedActorTest` (10), `AccessTokenIssuerTest` (12, sin el viaje de
+ida y vuelta, que pertenece a 1.4c) y los fixtures del emisor de `AccessTokenFixtures`. El emisor es una clase simple probada directamente: los beans llegan en 1.4c y
+`ProcessBeanIsolationTest` sigue en verde. Nada referencia tipos de 1.4c a 1.4e (`ClaimReader`, verificador, `MfaPurpose`, `MfaTokenClaims`, `issueMfa`).
+
+### Evidencia de trabajo
+
+| Evidencia | Resultado |
+|---|---|
+| Rojo re-observado | Con las pruebas de 1.4b presentes y sus clases de producción ausentes, `test-compile` falla con errores de compilación `cannot find symbol` (`AuthenticatedActor`, `AccessTokenIssuer`, `AuthenticationMethod`) |
+| Ruptura deliberada | `AccessTokenClaims.LIFETIME` de 600 a 601: `AccessTokenIssuerTest` falla en 4 de 12 pruebas. Se revirtió y se comprobó con `cmp`; no queda ninguna ruptura |
+| Verde y verificación completa | `./mvnw verify -Pmutation-gate` en `apps/api` (Docker en ejecución): Surefire 186 y 1 482, Failsafe 250, 0 fallos, `BUILD SUCCESS` |
+| PIT, paquete `com.confia.shared.security.token` | **95 %** (153 de 160 mutantes muertos); los 7 supervivientes pertenecen a `CompactJws`, `SigningKeyLoader` y `SessionTokenConfiguration`, ninguno a las clases de 1.4b; umbral de 80 cumplido |
+| Límite de reversión | Los ocho archivos de la parte; `git revert` del commit de código la retira sin tocar el resto |
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **679 líneas** (todas añadidas), por debajo de 800.
+
+### Desviaciones
+
+Ninguna respecto al diseño. Los fixtures omiten, por pertenecer a 1.4c a 1.4e, `verifierAt`, `accessClaims`, `mfaClaims`, la clave ajena y los ayudantes de firma manual.

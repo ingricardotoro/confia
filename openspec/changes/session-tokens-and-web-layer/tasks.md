@@ -249,7 +249,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     | 1.4e `claim-rules-and-web-isolation` | `AccessTokenClaimsPropertyTest`, `WebLayerTokenIsolationTest`, `BadWebClassUsingVerifier` | unas 272 |
 
     - [x] 1.4a `codec-hardening` (S1 a S5). Commit `fix(shared): harden the JWS codec input, encoding and claims exposure`.
-    - [ ] 1.4b `access-token-issuer`.
+    - [x] 1.4b `access-token-issuer`. Commit `feat(security): issue admin access tokens and carry the authenticated actor`.
     - [ ] 1.4c `access-token-verifier`.
     - [ ] 1.4d `restricted-mfa-token`.
     - [ ] 1.4e `claim-rules-and-web-isolation`.
