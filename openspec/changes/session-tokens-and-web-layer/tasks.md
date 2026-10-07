@@ -167,6 +167,26 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     `docs(infra): document the admin signing key variables`. Tamaño: nominal 330, realista 730; costura, guardián a 2b. — Escenarios
     I78 a I84, I140, BI21 a BI23, BI28, BI29 y las dos ausencias de JWKS y del par del portal.
 
+- [x] 1.2a **PR 2a `signing-key-ring`.** `SigningKeyLoader`, `SigningKey.isValidKid` (visible en el paquete), `SigningKeyRing.fromEnvironment`,
+  `SessionTokenConfiguration` y su `@Import` en `AdminApplication`, la línea de la lista de permitidos del administrativo, el par generado
+  en `TestProcessArguments`, `SigningKeyRingTest`, la parte administrativa de `SigningKeyStartupTest`, `SigningKeyAbsencesTest` y la prueba
+  de aislamiento del anillo. Medido: 762 líneas. Escenarios I78 a I82, I84, BI21, BI22, BI28, BI29 y las dos ausencias.
+- [ ] 1.2b **PR 2b `signing-key-placement-guard`.** `SigningKeyPlacementGuard` y su alta en `ConfiaApplication.launch`,
+  `SigningKeyPlacementGuardTest`, el resto de `SigningKeyStartupTest` (portal, trabajador y nombre reservado), las líneas prohibidas de
+  portal y trabajador en `ProcessBeanPolicy` con su prueba en `ProcessBeanInspectorTest`, y la nota de `docs/05`. Necesita 1.2a.
+  Árbol completo en la rama local `wip/session-tokens-signing-key-ring-full` (cda620a). Escenarios I83, I140 y BI22 (prohibidos nominales).
+  1.2 se marca hecha cuando se fusiona 1.2b.
+
+  - **Nota fechada 2026-10-07 (revisión independiente de 1.2a; se construye en 1.2b).**
+    - **Regla de orden:** ninguna tarea que emita o verifique tokens (1.4 y 3.3) se fusiona antes que 1.2b, y ningún despliegue recibe la
+      clave privada administrativa mientras 1.2b no esté en `main`. Sin el guardián, nada impide arrancar el portal con esa clave en su
+      entorno.
+    - **H2:** `SigningKeyStartupTest` añade un arranque real con `current.private-key` en Base64 válido que no es una clave (o Ed448) y
+      afirma con `assertNoSecretFragment` que la traza no repite el valor.
+    - **Valores con salto de línea:** la nota de `docs/05` documenta que un valor con salto de línea final o un PEM de varias líneas falla
+      en cerrado como «not valid standard Base64».
+    - **H3 y H4 (opcionales):** la prueba de los caminos JWKS se compara con un camino arbitrario, y la cabecera canónica se toma de
+      `JwsFixtures` en vez de reescribirla a mano.
 - [ ] 1.3 **PR 3 `signing-hash-confinement`: ninguna utilidad de firma ni de hash fuera de `identity` y `shared.security` (decisión 16).**
   - **ROJO.** Crear `test/java/com/confia/architecture/SigningAndHashingConfinementTest.java` (dos mitades, ADR-0018: producción real sin
     conjunto vacío y fixtures) con los fixtures permanentes `test/java/com/confia/architecture/fixture/hashing/outside/` —
@@ -744,3 +764,14 @@ aprobó partirla en tres PR:
 orquestador la parte por sus costuras naturales en PR de 800 como máximo **sin consultar**, con una nota fechada que registra la
 medida y la partición. Solo consulta al propietario si una parte indivisible exige una excepción de tamaño. El tope de 15 tareas se
 supera en consecuencia: cada parte cuenta como una tarea de la cadena.
+
+## Nota fechada 2026-10-07: partición de 1.2
+
+La tarea 1.2 verificada midió **1 127 líneas efectivas** (`git diff --numstat main`, sin `openspec/`; 32 de ellas de `docs/05`), por encima
+de 800. El árbol completo y verificado (`./mvnw verify -Pmutation-gate`: Surefire 186 + 1 420, Failsafe 250) se conserva en la rama
+**local** `wip/session-tokens-signing-key-ring-full` (cda620a). Por la regla general de 2026-10-06 se parte sin consultar:
+
+| Parte | Contenido | Líneas |
+|---|---|---|
+| 1.2a `signing-key-ring` | Cargador, anillo desde el entorno, configuración y su `@Import`, claves de prueba, pruebas del anillo, de arranque administrativo, de ausencias y de aislamiento | 762 (medidas) |
+| 1.2b `signing-key-placement-guard` | Guardián de ubicación, su alta, pruebas de portal, trabajador y nombre reservado, líneas prohibidas, nota de `docs/05` | unas 352 |

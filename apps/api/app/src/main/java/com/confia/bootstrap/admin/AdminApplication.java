@@ -4,6 +4,7 @@ import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
 import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
 import com.confia.shared.platform.infrastructure.SharedPlatformConfiguration;
 import com.confia.shared.security.RateLimiterConfiguration;
+import com.confia.shared.security.token.SessionTokenConfiguration;
 import com.confia.shared.web.edge.AdminSecurityConfiguration;
 import com.confia.shared.web.edge.IdempotencyEdgeConfiguration;
 import com.confia.shared.web.edge.RequiredDelayConfiguration;
@@ -54,6 +55,7 @@ import org.springframework.context.annotation.Import;
         IdentityConfiguration.class, WebEdgeConfiguration.class,
         AdminSecurityConfiguration.class, ObservabilityMetricsConfiguration.class,
         RateLimiterConfiguration.class, ThrottlingConfiguration.class,
-        RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class})
+        RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,
+        SessionTokenConfiguration.class})
 public class AdminApplication {
 }

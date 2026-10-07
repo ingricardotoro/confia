@@ -1,5 +1,8 @@
 package com.confia.bootstrap;
 
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -17,8 +20,9 @@ import java.util.UUID;
  * <p>The two web processes bind to a random port. The administrative process also receives a
  * JDBC URL that nothing listens on, which is enough because the connection pool is lazy, and the
  * three secrets of decision 3 (the column-encryption master key, the Argon2id pepper and the login
- * institution id), generated at runtime: no secret value is ever written in the repository
- * (CLAUDE.md, regla 13).
+ * institution id), generated at runtime, and an Ed25519 signing key pair generated the same way
+ * (session-tokens-and-web-layer design.md, decision 3): no secret value and no key is ever written
+ * in the repository (CLAUDE.md, regla 13).
  */
 final class TestProcessArguments {
 
@@ -30,6 +34,19 @@ final class TestProcessArguments {
 
     /** The property the administrative process reads its login institution id from. */
     static final String INSTITUTION_PROPERTY = "confia.identity.login-institution-id";
+
+    /** The kid of the signing key every administrative test process starts with. */
+    static final String SIGNING_KID = "test-admin-key";
+
+    /** The properties of the administrative signing key ring (design.md, decision 3). */
+    static final String CURRENT_KID_PROPERTY = "confia.security.admin-signing.current.kid";
+    static final String CURRENT_PRIVATE_KEY_PROPERTY =
+            "confia.security.admin-signing.current.private-key";
+    static final String CURRENT_PUBLIC_KEY_PROPERTY =
+            "confia.security.admin-signing.current.public-key";
+    static final String PREVIOUS_KID_PROPERTY = "confia.security.admin-signing.previous.kid";
+    static final String PREVIOUS_PUBLIC_KEY_PROPERTY =
+            "confia.security.admin-signing.previous.public-key";
 
     /** A JDBC URL no server answers on: port 1 on the loopback interface. */
     static final String UNREACHABLE_JDBC_URL =
@@ -79,13 +96,14 @@ final class TestProcessArguments {
      * The complete administrative arguments: every property valid and freshly generated, then
      * {@code overrides} applied on top, a {@code null} value removing that property.
      */
-    private static String[] adminWith(Map<String, String> overrides) {
+    static String[] adminWith(Map<String, String> overrides) {
         Map<String, String> properties = new LinkedHashMap<>();
         properties.put("server.port", "0");
         properties.put("spring.datasource.url", UNREACHABLE_JDBC_URL);
         properties.put(MASTER_KEY_PROPERTY, newMasterKey());
         properties.put(PEPPER_PROPERTY, newPepper());
         properties.put(INSTITUTION_PROPERTY, UUID.randomUUID().toString());
+        properties.putAll(newSigningKeyProperties());
         overrides.forEach((property, value) -> {
             if (value == null) {
                 properties.remove(property);
@@ -96,6 +114,36 @@ final class TestProcessArguments {
         return properties.entrySet().stream()
                 .map(entry -> "--" + entry.getKey() + "=" + entry.getValue())
                 .toArray(String[]::new);
+    }
+
+    /**
+     * A signing key pair made now, with {@code KeyPairGenerator.getInstance("Ed25519")}, as the
+     * three properties of the current key: the kid, the PKCS#8 private key and the X.509 public
+     * key, both in standard Base64. Different on every call; nothing of it is ever written down
+     * (CLAUDE.md, regla 13).
+     */
+    static Map<String, String> newSigningKeyProperties() {
+        KeyPair pair = newEd25519Pair();
+        Map<String, String> properties = new LinkedHashMap<>();
+        properties.put(CURRENT_KID_PROPERTY, SIGNING_KID);
+        properties.put(CURRENT_PRIVATE_KEY_PROPERTY,
+                Base64.getEncoder().encodeToString(pair.getPrivate().getEncoded()));
+        properties.put(CURRENT_PUBLIC_KEY_PROPERTY,
+                Base64.getEncoder().encodeToString(pair.getPublic().getEncoded()));
+        return properties;
+    }
+
+    /** The X.509 public key of a fresh pair in Base64, for a previous key of a rotation. */
+    static String newPublicKey() {
+        return Base64.getEncoder().encodeToString(newEd25519Pair().getPublic().getEncoded());
+    }
+
+    private static KeyPair newEd25519Pair() {
+        try {
+            return KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /** A fresh random 32-byte key in Base64, different on every call. */

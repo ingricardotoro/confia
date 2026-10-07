@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.core.env.Environment;
 
 /**
  * The keys a process signs and verifies with: one {@code current} key that signs and verifies and,
@@ -11,8 +12,8 @@ import java.util.Optional;
  * design.md, decision 3). For every kid it holds the canonical header segment, computed once, which
  * is what the codec compares a received header with (decision 2, step 2).
  *
- * <p>This is the in-memory shape the codec needs. The loader that builds a ring from the process
- * environment, with its startup checks, is added by the next task without changing this signature.
+ * <p>A process builds its ring with {@link #fromEnvironment(Environment)}, which runs every startup
+ * check; the {@code of} factories are the in-memory shape the codec and its tests use.
  */
 public final class SigningKeyRing {
 
@@ -46,6 +47,17 @@ public final class SigningKeyRing {
 
     public static SigningKeyRing of(SigningKey current, SigningKey previous) {
         return new SigningKeyRing(current, previous);
+    }
+
+    /**
+     * The ring a process builds from its environment (design.md, decision 3): the {@code current}
+     * key with its private and public parts and, optionally, the {@code previous} public key.
+     *
+     * @throws IllegalStateException naming the property, and never repeating a value, when the
+     *     configuration is missing, malformed or inconsistent
+     */
+    public static SigningKeyRing fromEnvironment(Environment environment) {
+        return SigningKeyLoader.load(environment);
     }
 
     /** The key that signs. */

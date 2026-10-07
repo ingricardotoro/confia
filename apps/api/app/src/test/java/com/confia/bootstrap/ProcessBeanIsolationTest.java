@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
 import com.confia.shared.observability.metrics.LogRateLimitMetrics;
 import com.confia.shared.security.RateLimiter;
+import com.confia.shared.security.token.SessionTokenConfiguration;
+import com.confia.shared.security.token.SigningKeyRing;
 import com.confia.shared.web.delay.DelayProperties;
 import com.confia.shared.web.delay.RequiredDelayMaterializer;
 import com.confia.shared.web.ratelimit.RateLimitInterceptor;
@@ -148,6 +150,39 @@ class ProcessBeanIsolationTest {
                         .as("the permits are the 200 of the default").isEqualTo(200);
             } else {
                 assertThat(held).as("no delay materializer in the %s process", policy.process())
+                        .isEmpty();
+            }
+        } finally {
+            if (context != null) {
+                context.close();
+            }
+        }
+    }
+
+    /**
+     * The key ring belongs to the administrative process alone (session-tokens-and-web-layer
+     * design.md, decision 3; ADR-0005, check 14; specs/build-integrity, BI21 and BI22): the other
+     * two start without a bean of the token package, and the administrative one holds the
+     * configuration and one ring that signs.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("com.confia.bootstrap.ProcessBeanPolicy#all")
+    void onlyTheAdministrativeProcessHoldsTheSigningKeyRing(ProcessBeanPolicy policy) {
+        LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.forProcess(policy.process()), policy.process());
+        ConfigurableApplicationContext context = outcome.context();
+        try {
+            assertThat(context).as("the %s process must start", policy.process()).isNotNull();
+            List<String> held = beanNamesOfTypesIn(context, "com.confia.shared.security.token");
+            if ("admin".equals(policy.process())) {
+                assertThat(held).anyMatch(bean -> bean.endsWith(SessionTokenConfiguration.class
+                                .getName()))
+                        .anyMatch(bean -> bean.endsWith(SigningKeyRing.class.getName()));
+                assertThat(context.getBeansOfType(SigningKeyRing.class)).hasSize(1);
+                assertThat(context.getBean(SigningKeyRing.class).signingKey().hasPrivateKey())
+                        .isTrue();
+            } else {
+                assertThat(held).as("no signing key bean in the %s process", policy.process())
                         .isEmpty();
             }
         } finally {

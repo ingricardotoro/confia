@@ -23,7 +23,7 @@ public final class SigningKey {
     private final PrivateKey privateKey;
 
     private SigningKey(String kid, PublicKey publicKey, PrivateKey privateKey) {
-        if (!KID.matcher(Objects.requireNonNull(kid, "kid")).matches()) {
+        if (!isValidKid(Objects.requireNonNull(kid, "kid"))) {
             throw new IllegalArgumentException("the kid is outside [A-Za-z0-9._-]{1,64}");
         }
         this.kid = kid;
@@ -39,6 +39,11 @@ public final class SigningKey {
     /** A key that only verifies, like the previous key of a rotation. */
     public static SigningKey verifyOnly(String kid, PublicKey publicKey) {
         return new SigningKey(kid, publicKey, null);
+    }
+
+    /** Whether the text is a kid: 1 to 64 characters of {@code A-Z a-z 0-9 . _ -}. */
+    static boolean isValidKid(String kid) {
+        return KID.matcher(kid).matches();
     }
 
     public String kid() {
