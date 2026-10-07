@@ -12,8 +12,8 @@
  *
  * <p><b>{@code @NamedInterface}, and who consumes it</b> (ADR-0022: every new named interface of
  * {@code shared} names the real consumers that justify it). They are {@code bootstrap}, whose
- * {@code ConfiaApplication} will check the key placement (task 1.2b) and {@code AdminApplication}
- * imports the key ring configuration, and {@code identity}, whose session use cases will sign and verify
+ * {@code ConfiaApplication} and {@code AdminApplication} check and import the key ring and its
+ * configuration, and {@code identity}, whose session use cases will sign and verify
  * tokens (tasks 1.4 and 3.3). Nothing outside {@code shared}, {@code bootstrap} and {@code identity}
  * may depend on this package; the web layer reaches it only through the authentication filter of
  * {@code shared.web}.

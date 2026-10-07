@@ -6,10 +6,14 @@ import com.confia.bootstrap.admin.AdminApplication;
 import com.confia.bootstrap.portal.PortalApplication;
 import com.confia.bootstrap.worker.WorkerApplication;
 import com.confia.identity.application.AuthenticateWithPassword;
+import com.confia.shared.security.token.SessionTokenConfiguration;
 import com.confia.shared.web.openapi.ContractSchemas;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.context.support.GenericApplicationContext;
 
 /**
@@ -71,6 +75,33 @@ class ProcessBeanInspectorTest {
                     .contains("com.confia.identity.application")
                     .contains("forbidden: staff-only module"));
         }
+    }
+
+    /**
+     * The token package holds the administrative signing keys (ADR-0005, check 14). Neither the
+     * portal nor the worker allow-lists it, so only the "forbidden" line proves each named entry
+     * matches. The configuration is lazy, so its factory methods never run.
+     */
+    @ParameterizedTest
+    @MethodSource("portalAndWorker")
+    void reportsTheAdministrativeSigningKeysInThePortalAndTheWorkerThroughTheirNamedEntries(
+            ProcessBeanPolicy policy) {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(SessionTokenConfiguration.class,
+                    definition -> definition.setLazyInit(true));
+            context.refresh();
+
+            List<String> violations = ProcessBeanInspector.violations(context, policy);
+
+            assertThat(violations).anySatisfy(line -> assertThat(line)
+                    .contains("process '" + policy.process() + "'")
+                    .contains("com.confia.shared.security.token")
+                    .contains("forbidden: administrative signing keys, ADR-0005 check 14"));
+        }
+    }
+
+    static Stream<ProcessBeanPolicy> portalAndWorker() {
+        return Stream.of(ProcessBeanPolicy.PORTAL, ProcessBeanPolicy.WORKER);
     }
 
     @Test

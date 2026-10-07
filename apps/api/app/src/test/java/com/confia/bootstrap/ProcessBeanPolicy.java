@@ -32,6 +32,10 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
     private static final String SPRING_SECURITY =
             "the worker has no security chain and no security bean (web-edge-foundations "
                     + "decision 4)";
+    private static final String TOKEN_PACKAGE = "com.confia.shared.security.token";
+    private static final String ADMIN_SIGNING_KEYS =
+            "administrative signing keys, ADR-0005 check 14 (the portal and the worker never hold a "
+                    + "signing key ring)";
     private static final String ADMIN_WIRING =
             "the production data access wiring is administrative only (web-edge-foundations D5)";
 
@@ -92,7 +96,8 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // the edit visible in its pull request.
                     "com.confia.identity", "staff-only module while identity has no guardian "
                             + "subdomain (ADR-0003)",
-                    SCHEDULER_PACKAGE, SCHEDULER_REASON));
+                    SCHEDULER_PACKAGE, SCHEDULER_REASON,
+                    TOKEN_PACKAGE, ADMIN_SIGNING_KEYS));
 
     static final ProcessBeanPolicy WORKER = new ProcessBeanPolicy("worker",
             "com.confia.bootstrap.worker",
@@ -103,7 +108,8 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.shared.web", WEB_EDGE,
                     "com.confia.shared.platform", ADMIN_WIRING,
                     "org.springframework.security", SPRING_SECURITY,
-                    "org.springframework.boot.security", SPRING_SECURITY));
+                    "org.springframework.boot.security", SPRING_SECURITY,
+                    TOKEN_PACKAGE, ADMIN_SIGNING_KEYS));
 
     static Stream<ProcessBeanPolicy> all() {
         return Stream.of(ADMIN, PORTAL, WORKER);

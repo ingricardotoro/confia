@@ -46,6 +46,13 @@ class SigningKeyAbsencesTest {
     }
 
     @Test
+    void aRequestForAnArbitraryPathGetsTheSameStatusSoTheKeyRoutesAreNotSpecial() {
+        try (OpenApiProcess admin = OpenApiProcess.start("admin")) {
+            assertThat(admin.get("/an/arbitrary/path/nobody/wrote").statusCode()).isEqualTo(401);
+        }
+    }
+
+    @Test
     void thePortalHasNoKeyRingAndNoBeanOfTheTokenPackage() {
         try (OpenApiProcess portal = OpenApiProcess.start("portal")) {
             ApplicationContext context = portal.context();

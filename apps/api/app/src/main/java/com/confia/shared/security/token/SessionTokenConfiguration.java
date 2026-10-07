@@ -13,8 +13,7 @@ import org.springframework.core.env.Environment;
  * value (CLAUDE.md, regla 11).
  *
  * <p>Only {@code AdminApplication} imports it. The portal and the worker must never hold a ring:
- * this package is absent from the allow-list of both in {@code ProcessBeanPolicy}, so a ring there
- * fails the build; task 1.2b adds the explicit prohibition and the startup guard (ADR-0005, check 14).
+ * {@code ProcessBeanPolicy} lists this package as forbidden for both (ADR-0005, check 14).
  */
 @Configuration(proxyBeanMethods = false)
 public class SessionTokenConfiguration {

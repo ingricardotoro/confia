@@ -1,5 +1,6 @@
 package com.confia.bootstrap;
 
+import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -45,8 +46,16 @@ final class TestProcessArguments {
     static final String CURRENT_PUBLIC_KEY_PROPERTY =
             "confia.security.admin-signing.current.public-key";
     static final String PREVIOUS_KID_PROPERTY = "confia.security.admin-signing.previous.kid";
+    static final String PREVIOUS_PRIVATE_KEY_PROPERTY =
+            "confia.security.admin-signing.previous.private-key";
     static final String PREVIOUS_PUBLIC_KEY_PROPERTY =
             "confia.security.admin-signing.previous.public-key";
+
+    /** The reserved names of the portal's own private key (design.md, D-N2): never loaded. */
+    static final String PORTAL_CURRENT_PRIVATE_KEY_PROPERTY =
+            "confia.security.portal-signing.current.private-key";
+    static final String PORTAL_PREVIOUS_PRIVATE_KEY_PROPERTY =
+            "confia.security.portal-signing.previous.private-key";
 
     /** A JDBC URL no server answers on: port 1 on the loopback interface. */
     static final String UNREACHABLE_JDBC_URL =
@@ -136,6 +145,31 @@ final class TestProcessArguments {
     /** The X.509 public key of a fresh pair in Base64, for a previous key of a rotation. */
     static String newPublicKey() {
         return Base64.getEncoder().encodeToString(newEd25519Pair().getPublic().getEncoded());
+    }
+
+    /**
+     * Standard Base64 that decodes but is not a key of any kind. Fixed, and not random, so that
+     * a test asserting "no fragment of the value in the trace" cannot fail by chance.
+     */
+    static String base64ThatIsNotAKey() {
+        return Base64.getEncoder().encodeToString(
+                "this text decodes but it is not a key".getBytes(StandardCharsets.US_ASCII));
+    }
+
+    /**
+     * A well-formed PKCS#8 envelope of an Ed448 private key (algorithm identifier 1.3.101.113)
+     * around a fixed, patterned 57-byte body that is not a real key. A parser that only checked
+     * the envelope would accept it; the loader must refuse it because it is not Ed25519.
+     */
+    static String ed448ShapedPrivateKeyBase64() {
+        byte[] header = {0x30, 0x47, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x71,
+                0x04, 0x3b, 0x04, 0x39};
+        byte[] der = new byte[header.length + 57];
+        System.arraycopy(header, 0, der, 0, header.length);
+        for (int i = header.length; i < der.length; i++) {
+            der[i] = (byte) (i * 37 + 11);
+        }
+        return Base64.getEncoder().encodeToString(der);
     }
 
     private static KeyPair newEd25519Pair() {
