@@ -17,8 +17,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * The codec over random payloads (session-tokens-and-web-layer design.md, decision 2; scenarios I47
  * and I55): whatever the payload, the issued token verifies and returns what was signed, and a token
- * with any single bit of any character changed is rejected with a {@link TokenRejectedException} and
- * never with another kind of exception. Every character of the token is covered by the signature, by
+ * with any single bit of any character changed is rejected with a {@link TokenRejectedException}, never
+ * with another kind of exception and never for a reason that comes after the signature (S5). Every character of the token is covered by the signature, by
  * the canonical header or by the canonical encoding, so no bit is free.
  */
 class CompactJwsPropertiesTest {
@@ -52,7 +52,12 @@ class CompactJwsPropertiesTest {
         String altered = new String(bytes, StandardCharsets.ISO_8859_1);
 
         assertThat(altered).isNotEqualTo(token);
-        assertThatThrownBy(() -> JWS.verify(altered)).isExactlyInstanceOf(TokenRejectedException.class);
+        // The payload is only read after the signature has verified, so a single altered bit can end
+        // in one of these three reasons and never in MALFORMED_CLAIMS, CLAIMS_INVALID or EXPIRED (S5).
+        assertThatThrownBy(() -> JWS.verify(altered)).isExactlyInstanceOf(TokenRejectedException.class)
+                .satisfies(e -> assertThat(((TokenRejectedException) e).rejection()).isIn(
+                        TokenRejection.MALFORMED, TokenRejection.UNKNOWN_HEADER,
+                        TokenRejection.BAD_SIGNATURE));
     }
 
     @Provide

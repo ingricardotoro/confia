@@ -451,3 +451,103 @@ Cada fixture se rechaza por nombre y por utilidad: la aserción de `rejectsTheFi
 - La regla cubre siete utilidades, no seis: `MessageDigest` (BI11) más las seis de BI38.
 - Se añadió `DigestsTest` (vectores de FIPS 180-4) para fijar los bytes de la utilidad nueva; no figuraba en la tarea.
 - `RequestPayloadHasher` está en `shared.security` y ya estaba permitido; delega igualmente en `Digests` para tener un único SHA-256 (la tarea lo pide).
+
+## PR 4 `access-and-mfa-tokens` (tarea 1.4, 2026-10-07, modo TDD estricto)
+
+Rama `change/session-tokens-and-web-layer-04-access-and-mfa-tokens`, desde `main` en 9b6f0a3 (con 1.1, 1.2 y 1.3 fusionadas). La tarea completa y verificada
+midió **2 676 líneas efectivas**, por encima de 800: se conserva en la rama **local** `wip/session-tokens-access-tokens-full` y se parte por la regla
+general del 2026-10-06 (ver «Medición» y la propuesta de partición).
+
+### Ciclo TDD (rojos observados)
+
+| Paso | Qué se corrió | Resultado observado |
+|---|---|---|
+| Rojo A (S1 a S4) | `-Dtest='CompactJwsHardeningTest,CompactJwsPropertiesTest'` contra el códec sin cambios | 26 pruebas de endurecimiento, **19 fallos**: los 10 casos de `sign` con carga que no es un objeto (arreglo, número, cadena, `null`, no JSON, vacía, dos objetos, nombre repetido, basura final, marca de orden de bytes) no lanzan `IllegalArgumentException` (S1); `sign` acepta una carga de 3 000 caracteres y un token de 2 049 (S1, línea 93); la copia de `VerifiedJws.claims()` no es independiente, `second.has("injected")` es verdadero (S2, línea 116); la carga se acepta en UTF-16 LE, UTF-16 BE, UTF-32 BE, UTF-16 con marca de orden, UTF-8 con marca de orden y con una barra sobrelarga `C0 AF` (S4, 6 de 8 casos) |
+| Verde A | `CompactJws.sign` analiza la carga y mide el token; `VerifiedJws` privatiza el árbol y entrega una copia; la carga se decodifica con `CharsetDecoder` en `REPORT` | `CompactJwsHardeningTest` 27, `CompactJwsAttackTest` 98, `CompactJwsPropertiesTest` 2: 127 en verde |
+| Rojo B | `test-compile` con las pruebas de claims, emisor, verificador, principal, regla `WebLayerTokenIsolationTest` y su fixture, sin producción | Error de compilación en 7 archivos de prueba: `AuthenticatedActor`, `AuthenticationMethod`, `AccessTokenIssuer`, `AccessTokenVerifier`, `AccessToken`, `MfaPurpose` y `MfaTokenClaims` no existen (`BadWebClassUsingVerifier`, `SigningKeyStartupTest`, `AuthenticatedActorTest`, las pruebas de propiedades, del emisor y del verificador) |
+| Verde B | `ClaimReader`, `AccessTokenClaims`, `MfaTokenClaims`, `MfaPurpose`, `AccessToken`, `AccessTokenIssuer`, `AccessTokenVerifier`, `AuthenticatedActor`, `AuthenticationMethod` y los tres beans de `SessionTokenConfiguration` | 296 pruebas focalizadas en verde a la primera ejecución. Un error de la propia prueba (jqwik no tiene un generador por defecto de `UUID`) se corrigió con un `@Provide` |
+
+**Rieles que no pueden estar en rojo antes del cambio.** S3 (carga de 600 niveles de anidamiento → `MALFORMED_CLAIMS`; token de 10 MB → `MALFORMED`) y S5 (la
+propiedad del bit único afirma `MALFORMED`, `UNKNOWN_HEADER` o `BAD_SIGNATURE`) pasan desde la primera ejecución: el límite de anidamiento por defecto de
+Jackson 3 ya es 500 y la longitud se comprueba antes de decodificar. El límite se declara ahora de forma explícita (`MAX_NESTING_DEPTH = 500`) para que no
+dependa del valor por defecto de la biblioteca. Dos de los ocho casos de S4 (secuencia de sustituto codificada y secuencia truncada) tampoco fallaban: Jackson ya
+los rechazaba.
+
+**Opciones de Jackson 3 confirmadas.** `StreamReadFeature.STRICT_DUPLICATE_DETECTION` y `DeserializationFeature.FAIL_ON_TRAILING_TOKENS` (ya en el códec) bastan.
+`FAIL_ON_UNKNOWN_PROPERTIES` y `FAIL_ON_NULL_FOR_PRIMITIVES` no se usan: las claims se leen como árbol, no se ligan a un tipo, y la lista cerrada la hace
+`ClaimReader` (nombre por nombre, con el tipo JSON de cada una).
+
+### Rupturas deliberadas (revertidas y comprobadas con `cmp`)
+
+| Ruptura | Prueba y línea que fallan |
+|---|---|
+| `AccessTokenClaims.LIFETIME` de 600 a 601 s | `AccessTokenIssuerTest.anAccessTokenLivesExactlySixHundredSecondsAndReportsItsExpiry`, línea 74 (y otras cuatro del emisor: líneas 57, 88, 211 y 227); `AccessTokenVerifierTest` 10 pruebas (`aValidAccessTokenYieldsTheActorItsClaimsDescribe`, `expIsStrict...`, `thereIsNoClockLeewayOnExpiry`, línea 210, entre otras); `AccessTokenClaimsPropertyTest.whatTheIssuerSigns...`, línea 60 |
+| Quitar la lista cerrada de `ClaimReader` (el constructor deja de comparar los nombres con los declarados) | `AccessTokenVerifierTest.aClaimThatIsNotDeclaredMakesTheTokenInvalidWhateverItsValue`, línea 159 (13 fallos en la clase); `MfaTokenVerifierTest.aRestrictedClaimOfTheWrongTypeOrValue...`, línea 126, y `theAccessVerifierRefusesARestrictedToken...`, línea 88; `AccessTokenClaimsPropertyTest.anyClaimAdded...`, línea 98; `MfaTokenClaimsPropertyTest.anyClaimAdded...`, línea 59 |
+
+### Verificación completa
+
+`./mvnw verify -Pmutation-gate` (Docker en ejecución): Surefire 186 + 1 641, Failsafe 250, 0 fallos, `BUILD SUCCESS`.
+PIT, paquete `com.confia.shared.security.token`: **209 de 230 mutantes muertos (90,9 %)**, 17 sobrevivientes y 4 sin cobertura (los 4 son los métodos de fábrica de
+`SessionTokenConfiguration`, que PIT no ejecuta porque corre solo pruebas unitarias; `SigningKeyStartupTest` los ejercita por arranque real). Total de la
+aplicación: 445 de 481 (93 %). Los sobrevivientes nuevos están en `ClaimReader` (límites de `epochSecond` y de `texts`, equivalentes) y en `CompactJws.readObject`.
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **2 676 líneas** (2 654 añadidas y 22 borradas; 723 de producción, 1 924 de pruebas y 29 de `docs/03`).
+
+Partición propuesta (cada parte se mide por archivo; los archivos compartidos se reparten por bloque):
+
+| Parte | Contenido | Líneas |
+|---|---|---|
+| 4a `access-token-issuer` | `AuthenticatedActor`, `AuthenticationMethod`, `AccessToken`, serialización de `AccessTokenClaims`, `issueAccess`, `AuthenticatedActorTest`, `AccessTokenIssuerTest` (sin el viaje de ida y vuelta), fixtures del emisor | unas 690 |
+| 4b `access-token-verifier` | `ClaimReader`, lectura de `AccessTokenClaims`, `verifyAccess`, los beans de `SessionTokenConfiguration`, `AccessTokenVerifierTest`, el viaje de ida y vuelta, la prueba de arranque real, nota de `docs/03` | unas 735 |
+| 4c `restricted-mfa-token` (la costura nombrada) | `MfaTokenClaims`, `MfaPurpose`, `issueMfa`, `verifyMfa`, `mfaClaims` de los fixtures, `MfaTokenIssuerTest`, `MfaTokenVerifierTest`, `MfaTokenClaimsPropertyTest` | unas 630 |
+| 4d `codec-hardening-and-claim-rules` | S1 a S5 (`CompactJws`, `VerifiedJws`, `CompactJwsHardeningTest`, `CompactJwsPropertiesTest`), `AccessTokenClaimsPropertyTest`, `WebLayerTokenIsolationTest` con `BadWebClassUsingVerifier` | unas 625 |
+
+El endurecimiento (355 líneas) es independiente de las demás partes y puede ir primero; entonces la propiedad de claims de acceso y la regla de aislamiento
+(272 líneas, ambas necesitan el verificador) quedan como quinta parte.
+
+### Desviaciones
+
+- **`AuthenticatedActor.CURRENT` es público.** El diseño lo dibuja de paquete, pero el filtro de la tarea 2.1 vive en `shared.web.authentication` y debe enlazarlo,
+  igual que `RequestOrigin.CURRENT`.
+- **El verificador lanza `TokenRejectedException`** en lugar de devolver un valor `Valid | Expired | Invalid` (diseño §6; la especificación deja la forma al diseño).
+  `verifyAccess` devuelve el principal y `verifyMfa` las claims del restringido.
+- **`WebLayerTokenIsolationTest` prohíbe todo el paquete `shared.security.token..`** a las clases `..web..`, no solo las cuatro clases nombradas, con las dos
+  exenciones por nombre completo (el filtro, que llega en 2.1, y `AdminSecurityConfiguration`). El fixture vive en `fixture/token/web/` y no en `fixture/token/`,
+  porque la regla se aplica a paquetes `..web..`.
+- **`VerifiedJws` pasa de registro a clase final** con constructor de paquete y `claims()` que devuelve una copia profunda (S2); `toString` imprime solo el `kid`.
+- **`sign` ahora analiza la carga** para exigir un objeto con nombres únicos en UTF-8 estricto (S1, S4); el costo es un análisis por emisión.
+- **Las pruebas del restringido están en clases propias** (`MfaToken*Test`) para que la costura 4c sea una partición por archivo.
+- Sin línea nueva en `ProcessBeanPolicy`: el paquete `shared.security.token` ya estaba permitido para administración y prohibido para portal y trabajador, y
+  `SigningKeyStartupTest` afirma ahora que portal y trabajador tampoco tienen emisor ni verificador.
+- Duplicados mínimos de ayudantes de aserción entre `AccessTokenVerifierTest` y `MfaTokenVerifierTest` (unas 20 líneas), a cambio de la partición por archivo.
+
+## PR 4a `codec-hardening` (tarea 1.4a, 2026-10-07, modo TDD estricto)
+
+Primera de las cinco partes de 1.4 (ver la nota fechada «partición de 1.4» en `tasks.md`). Se parte de `main` en 9b6f0a3; el árbol completo de 1.4 sigue
+intacto en la rama local `wip/session-tokens-access-tokens-full` (c7456c6). Commit de código: `6421263`, `fix(shared): harden the JWS codec input, encoding and claims exposure`.
+
+### Contenido
+
+`CompactJws` (S1, S3, S4: `sign` rechaza cargas que no son objeto y tokens de más de 2 048 caracteres, decodificación UTF-8 estricta, límite explícito de
+anidamiento), `VerifiedJws` (S2: clase final, constructor de paquete, `claims()` devuelve una copia profunda), `CompactJwsHardeningTest` (nuevo, 27 pruebas) y el
+cambio S5 de `CompactJwsPropertiesTest`. Ningún archivo de 1.4b a 1.4e se incluye; no fue necesario adaptar `CompactJwsAttackTest` ni otros llamadores de `main`.
+
+### Evidencia de trabajo
+
+| Evidencia | Resultado |
+|---|---|
+| Rojo re-observado | Con `CompactJws` restaurado desde `main` (y `VerifiedJws` nuevo), `-Dtest=CompactJwsHardeningTest`: 27 pruebas, **18 fallos**. Se restauró y se comprobó con `cmp` |
+| Verde y verificación completa | `./mvnw verify -Pmutation-gate` en `apps/api` (Docker en ejecución): Surefire 186 y 1 460, Failsafe 250, 0 fallos, `BUILD SUCCESS` |
+| PIT, paquete `com.confia.shared.security.token` | **95 %** (145 de 152 mutantes muertos), cobertura de líneas 96 % (205 de 213); umbral de 80 cumplido |
+| Límite de reversión | Los cuatro archivos Java de la parte; `git revert` del commit de código devuelve el códec a `main` sin tocar el resto |
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **391 líneas** (369 añadidas y 22 borradas), por debajo de 800.
+
+### Desviaciones
+
+Ninguna respecto al diseño. Los tres niveles de la sección «PR 4» anterior (rojo A, verde A, rupturas) siguen siendo el registro de la tarea completa; esta parte solo
+reproduce su rojo A.
