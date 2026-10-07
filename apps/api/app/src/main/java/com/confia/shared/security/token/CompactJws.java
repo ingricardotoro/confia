@@ -1,8 +1,15 @@
 package com.confia.shared.security.token;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
+import java.util.Optional;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.StreamReadConstraints;
 import tools.jackson.core.StreamReadFeature;
+import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -31,8 +38,19 @@ public final class CompactJws {
     private static final char FIRST_VISIBLE_ASCII = 0x21;
     private static final char LAST_VISIBLE_ASCII = 0x7e;
 
-    /** Its own mapper, never Spring's: repeated member names and trailing content are refused. */
-    private static final JsonMapper PAYLOAD_MAPPER = JsonMapper.builder()
+    /** The deepest nesting a payload may have; a token cannot hold much more, and none needs any. */
+    static final int MAX_NESTING_DEPTH = 500;
+
+    private static final char BYTE_ORDER_MARK = '﻿';
+
+    /**
+     * Its own mapper, never Spring's: repeated member names and trailing content are refused, and
+     * the nesting limit is stated here instead of being whatever the library defaults to.
+     */
+    private static final JsonMapper PAYLOAD_MAPPER = JsonMapper.builder(JsonFactory.builder()
+            .streamReadConstraints(
+                    StreamReadConstraints.builder().maxNestingDepth(MAX_NESTING_DEPTH).build())
+            .build())
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .build();
@@ -43,12 +61,28 @@ public final class CompactJws {
         this.ring = ring;
     }
 
-    /** Signs the payload bytes, already serialized as a JSON object, with the current key. */
+    /**
+     * Signs the payload bytes with the current key.
+     *
+     * @param payload a JSON object in strict UTF-8 with unique member names
+     * @throws IllegalArgumentException when the payload is not such an object, or when the token
+     *     would be longer than {@value #MAX_TOKEN_LENGTH} characters, which {@link #verify} would
+     *     refuse; the message never repeats any of the payload
+     */
     public String sign(byte[] payload) {
+        Objects.requireNonNull(payload, "payload");
+        if (readObject(payload).isEmpty()) {
+            throw new IllegalArgumentException("the payload is not a JSON object with unique names");
+        }
         String signingInput = ring.currentHeaderSegment() + SEGMENT_SEPARATOR + Base64Url.encode(payload);
         byte[] signature = Ed25519Signatures.sign(ring.signingKey().privateKey(),
                 signingInput.getBytes(StandardCharsets.US_ASCII));
-        return signingInput + SEGMENT_SEPARATOR + Base64Url.encode(signature);
+        String token = signingInput + SEGMENT_SEPARATOR + Base64Url.encode(signature);
+        if (token.length() > MAX_TOKEN_LENGTH) {
+            throw new IllegalArgumentException(
+                    "the token would be longer than " + MAX_TOKEN_LENGTH + " characters");
+        }
+        return token;
     }
 
     /**
@@ -74,20 +108,36 @@ public final class CompactJws {
         }
         byte[] payload = Base64Url.decode(token.substring(firstSeparator + 1, secondSeparator))
                 .orElseThrow(() -> new TokenRejectedException(TokenRejection.MALFORMED_CLAIMS));
-        return new VerifiedJws(key.kid(), parseObject(payload));
+        ObjectNode claims = readObject(payload)
+                .orElseThrow(() -> new TokenRejectedException(TokenRejection.MALFORMED_CLAIMS));
+        return new VerifiedJws(key.kid(), claims);
     }
 
-    private static ObjectNode parseObject(byte[] payload) {
+    /**
+     * The payload as a JSON object, or empty when it is not one. The bytes are decoded as strict
+     * UTF-8 first, so that the parser never detects an encoding by itself (UTF-16, UTF-32, a byte
+     * order mark) and an ill-formed sequence is refused instead of replaced (follow-up S4).
+     */
+    private static Optional<ObjectNode> readObject(byte[] payload) {
+        String text;
+        try {
+            text = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(payload)).toString();
+        } catch (CharacterCodingException e) {
+            return Optional.empty();
+        }
+        if (!text.isEmpty() && text.charAt(0) == BYTE_ORDER_MARK) {
+            return Optional.empty();
+        }
         JsonNode node;
         try {
-            node = PAYLOAD_MAPPER.readTree(payload);
+            node = PAYLOAD_MAPPER.readTree(text);
         } catch (JacksonException e) {
-            throw new TokenRejectedException(TokenRejection.MALFORMED_CLAIMS);
+            return Optional.empty();
         }
-        if (node instanceof ObjectNode object) {
-            return object;
-        }
-        throw new TokenRejectedException(TokenRejection.MALFORMED_CLAIMS);
+        return node instanceof ObjectNode object ? Optional.of(object) : Optional.empty();
     }
 
     /** Step 1: at most 2048 visible ASCII characters, exactly two dots, three non-empty segments. */
