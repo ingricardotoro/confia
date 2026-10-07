@@ -658,3 +658,45 @@ Veredicto: se puede fusionar, sin bloqueantes. La revisión confirmó estos punt
 
 **Para 1.4d (observación de la revisión):** el token de acceso y el restringido comparten clave y cabecera, y solo la audiencia y el
 conjunto de claims los separan. 1.4d fija `aud` y sus claims propios, con una prueba cruzada en ambos sentidos.
+
+## PR 4d `restricted-mfa-token` (tarea 1.4d, 2026-10-07, modo TDD estricto)
+
+Cuarta de las cinco partes de 1.4. Se parte de `main` en 8fae156 (que ya contiene 1.4a, 1.4b y 1.4c con sus pruebas endurecidas tras la revisión); el árbol completo
+sigue en `wip/session-tokens-access-tokens-full` (c7456c6). Commits: `d509a89` (`feat(security): issue and verify the restricted MFA token`) y `b705aa6`
+(`docs(security): describe the restricted MFA token as delivered`).
+
+### Contenido
+
+`MfaTokenClaims` (`aud` = `confia-admin-mfa`, `exp - iat` = 300, `purpose` de un conjunto cerrado, sin `sid`), `MfaPurpose`, `AccessTokenIssuer.issueMfa` y
+`AccessTokenVerifier.verifyMfa`, fusionados en las versiones de `main` que solo tenían `issueAccess` y `verifyAccess`. `ClaimReader` no cambia: el respaldo no tiene ruta
+MFA propia en él. Se restituye `mfaClaims` en `AccessTokenFixtures`. Pruebas: `MfaTokenIssuerTest`, `MfaTokenVerifierTest` y `MfaTokenClaimsPropertyTest`. Los comentarios de
+`AccessTokenClaims` y `SessionTokenConfiguration` vuelven a nombrar ambos tipos. Nota de `docs/03-seguridad.md` §4.5: el token restringido figura como presente. Emitir un
+token restringido no escribe en ninguna tabla. Nada referencia tipos de 1.4e. No se perdió ningún endurecimiento de 1.4c (`AccessTokenVerifierTest` queda intacto).
+
+### Prueba cruzada (requisito de la revisión de 1.4c)
+
+El token de acceso y el restringido comparten clave y cabecera; solo `aud` y el conjunto de claims los separan. `MfaTokenVerifierTest` fija ambos sentidos con el
+`TokenRejection` exacto (`CLAIMS_INVALID`) mediante `assertAccessRejected` y `assertMfaRejected`:
+
+- `theRestrictedTokenIsRejectedByTheAccessVerifierAndTheAccessTokenByTheMfaVerifier`: un token MFA válido en `verifyAccess` y uno de acceso válido en `verifyMfa`.
+- `...ForItsAudienceAlone`: cada uno con todos sus claims correctos y solo la audiencia cruzada.
+- `theAccessVerifierRefusesARestrictedTokenWhateverClaimsAreAddedToMakeItLookLikeAnAccessOne`: un MFA disfrazado con `sid` y `exp` de acceso, con y sin audiencia de acceso.
+
+### Evidencia de trabajo
+
+| Evidencia | Resultado |
+|---|---|
+| Rojo re-observado | Con las pruebas MFA presentes y `MfaTokenClaims`, `MfaPurpose`, `issueMfa` y `verifyMfa` ausentes, `test-compile` falla con `cannot find symbol` |
+| Verde focalizado | `-Dtest='MfaToken*Test,AccessToken*Test'` sin fallos |
+| Ruptura deliberada | `MfaTokenClaims.LIFETIME` de 300 a 301: fallan 10 pruebas (4 de `MfaTokenIssuerTest`, 1 de `MfaTokenClaimsPropertyTest`, 5 de `MfaTokenVerifierTest`). Se revirtió y se comprobó con `cmp`; no queda ninguna ruptura |
+| Verde y verificación completa | `./mvnw verify -Pmutation-gate` en `apps/api`: Surefire 186 y 1 640, Failsafe 250, 0 fallos, `BUILD SUCCESS` |
+| PIT, paquete `com.confia.shared.security.token` | **92 %** (212 de 230 mutantes muertos; fuerza de las pruebas 94 %); umbral de 80 cumplido |
+| Límite de reversión | Los archivos Java de la parte y la nota de `docs/03`; `git revert` de los dos commits la retira sin tocar el resto |
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **669 líneas** (650 añadidas y 19 borradas), por debajo de 800.
+
+### Desviaciones
+
+Ninguna respecto al diseño.

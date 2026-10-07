@@ -251,7 +251,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     - [x] 1.4a `codec-hardening` (S1 a S5). Commit `fix(shared): harden the JWS codec input, encoding and claims exposure`.
     - [x] 1.4b `access-token-issuer`. Commit `feat(security): issue admin access tokens and carry the authenticated actor`.
     - [x] 1.4c `access-token-verifier`. Commits `feat(security): verify admin access tokens against a closed claim list` y `docs(security): note the in-house JWS and key rotation`.
-    - [ ] 1.4d `restricted-mfa-token`.
+    - [x] 1.4d `restricted-mfa-token`. Commits `feat(security): issue and verify the restricted MFA token` y `docs(security): describe the restricted MFA token as delivered`.
     - [ ] 1.4e `claim-rules-and-web-isolation`.
     - La casilla 1.4 se marca cuando 1.4a a 1.4e estén hechas.
 
