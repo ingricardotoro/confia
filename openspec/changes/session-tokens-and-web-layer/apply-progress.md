@@ -188,3 +188,26 @@ y `BUILD SUCCESS`.
 |---|---|
 | Paquete `com.confia.shared.security.token` | 11 de 11 mutantes muertos (100 %) |
 | Total de la aplicación | 247 de 262 (94 %) |
+
+### Revisión independiente de 1.1a (2026-10-06)
+
+Veredicto: apto para fusionar, sin bloqueantes ni importantes. La revisión confirmó:
+
+- el decodificador es estricto y canónico: el único texto aceptado para unos bytes es su codificación canónica;
+- la `SignatureException` del JDK se convierte en `false`, y cualquier otra excepción se propaga como error de configuración;
+- no hay ninguna clave privada ni ningún secreto en el diff ni en las últimas 50 revisiones;
+- `JwsFixtures` firma con el `Signature` del JDK y no con la clase bajo prueba.
+
+**Corregido:**
+
+- **S5.** El Javadoc del paquete describía el anillo y la prohibición de bibliotecas como presentes. Ahora dice que llegan en 1.1b y
+  1.1c.
+- **S1.** El Javadoc de `Base64Url.decode` advierte que no acota nada y que quien decodifique entrada de un cliente debe acotar antes la
+  longitud.
+- **S3.** La prueba nueva `aKeyThatIsNotEd25519IsAConfigurationErrorAndNeverAnInvalidSignature` cubre la clave X25519 en `sign` y en
+  `verify`. Ruptura deliberada: con `return false` en lugar de la excepción, la prueba falla; se restauró y `cmp` confirmó el archivo
+  idéntico. Las aserciones de longitud usan ahora `SIGNATURE_LENGTH`, lo que atiende en parte S2.
+
+**Aceptado hasta 1.1c:** S4, porque los auxiliares de `JwsFixtures` sin uso en 1a son código de pruebas que 1.1c ejercita.
+
+**Verificación.** `./mvnw verify -Pmutation-gate`: Surefire 186 + 1 237, Failsafe 250, 0 fallos y `BUILD SUCCESS`.
