@@ -10,9 +10,11 @@ import ch.qos.logback.core.read.ListAppender;
 import com.confia.shared.web.edge.ProblemErrorReportValve;
 import com.confia.shared.web.harness.HarnessProcess;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -97,7 +99,7 @@ class ContainerRejectionsTest {
     @CsvSource({"GET, /x%2f, 400", "GET, /x%00, 400", "TRACE, /x, 405"})
     void eachRejectionLeavesOneFixedEventWithTheOriginalStatusAndNothingTheClientSent(
             String method, String path, int status) {
-        List<ILoggingEvent> events = loggedBy(() -> admin.send(method, path));
+        List<ILoggingEvent> events = loggedBy(() -> admin.send(method, path).body());
 
         assertThat(events).hasSize(1);
         assertRejectionEvent(events.get(0), status, method, path);
@@ -106,9 +108,11 @@ class ContainerRejectionsTest {
     void theEventOfARewrittenStatusCarriesTheOriginalOneAndTheTraceIdOfTheBody() throws Exception {
         AtomicReference<String> raw = new AtomicReference<>();
 
-        List<ILoggingEvent> events = loggedBy(() -> raw.set(rawExchange(
-                "GET / HTTP/1.1\r\nHost: localhost\r\nExpect: something-else\r\n"
-                        + "Connection: close\r\n\r\n")));
+        List<ILoggingEvent> events = loggedBy(() -> {
+            raw.set(rawExchange("GET / HTTP/1.1\r\nHost: localhost\r\nExpect: something-else\r\n"
+                    + "Connection: close\r\n\r\n"));
+            return raw.get();
+        });
 
         assertThat(events).hasSize(1);
         String message = events.get(0).getFormattedMessage();
@@ -134,33 +138,46 @@ class ContainerRejectionsTest {
         }
     }
 
-    private static List<ILoggingEvent> loggedBy(Runnable action) {
+    private static final Pattern TRACE_ID = Pattern.compile("\"traceId\":\"([0-9a-f-]{36})\"");
+
+    /**
+     * The events of this one request: those that end with the trace id of its answer. The valve
+     * logs after it has written the answer, so the line of an earlier request (a test that does
+     * not capture, or the previous case) can land while this capture is open; filtering by the
+     * trace id keeps it out instead of counting it.
+     */
+    private static List<ILoggingEvent> loggedBy(Supplier<String> exchange) {
         Logger logger = (Logger) LoggerFactory.getLogger(ProblemErrorReportValve.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
+        String suffix;
         try {
-            action.run();
-            awaitAnEvent(appender);
+            Matcher matcher = TRACE_ID.matcher(exchange.get());
+            assertThat(matcher.find()).as("non-vacuous: the answer carries a trace id").isTrue();
+            suffix = "traceId=" + matcher.group(1);
+            awaitAnEventEndingWith(appender, suffix);
         } finally {
             logger.detachAppender(appender);
         }
         synchronized (appender) {
-            return new ArrayList<>(appender.list);
+            return appender.list.stream()
+                    .filter(event -> event.getFormattedMessage().endsWith(suffix)).toList();
         }
     }
 
     /**
-     * The valve logs after it has written the answer, so the client can hold the response while
-     * the container thread has not logged yet. Waits, bounded, for that event instead of reading
-     * the list at once. {@code AppenderBase#doAppend} is synchronized on the appender, so reading
-     * under the same lock sees what the container thread added.
+     * The client can hold the answer before the container thread has logged, so this waits,
+     * bounded, for the event of this request. {@code AppenderBase#doAppend} is synchronized on the
+     * appender, so reading under the same lock sees what the container thread added.
      */
-    private static void awaitAnEvent(ListAppender<ILoggingEvent> appender) {
+    private static void awaitAnEventEndingWith(ListAppender<ILoggingEvent> appender,
+            String suffix) {
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
         while (System.nanoTime() < deadline) {
             synchronized (appender) {
-                if (!appender.list.isEmpty()) {
+                if (appender.list.stream()
+                        .anyMatch(event -> event.getFormattedMessage().endsWith(suffix))) {
                     return;
                 }
             }
