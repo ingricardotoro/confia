@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.AuthenticationMethod;
+import java.math.BigInteger;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -49,6 +50,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 class AccessTokenVerifierTest {
 
     private static final Map<String, Object> VALID = accessClaims(NOW);
+    /** The last second of 9999-12-31, the end of the date range a claim may hold. */
+    private static final long LAST_EPOCH_SECOND = 253_402_300_799L;
+    private static final BigInteger TWO_TO_THE_64 = BigInteger.TWO.pow(64);
     private static final AccessTokenVerifier VERIFIER = verifierAt(NOW);
     private static final List<String> ACCESS_NAMES = List.of("iss", "aud", "sub", "exp", "iat", "jti",
             "sid", "tenant", "amr");
@@ -108,6 +112,16 @@ class AccessTokenVerifierTest {
                 Arguments.of("iat as null", "iat", null),
                 Arguments.of("exp beyond the range of a date", "exp", 9_000_000_000_000_000_000L),
                 Arguments.of("iat negative", "iat", -1L),
+                Arguments.of("iat of the least long", "iat", Long.MIN_VALUE),
+                Arguments.of("exp one second past the last date", "exp", LAST_EPOCH_SECOND + 1),
+                // A number beyond a long would wrap to its low 64 bits; only the conversion check
+                // stops a value of 2^64 + a valid second from reading as that valid second.
+                Arguments.of("exp of 2^64", "exp", TWO_TO_THE_64),
+                Arguments.of("exp of 2^64 plus its valid value", "exp",
+                        TWO_TO_THE_64.add(BigInteger.valueOf(NOW.getEpochSecond() + 600))),
+                Arguments.of("iat of 2^64 plus its valid value", "iat",
+                        TWO_TO_THE_64.add(BigInteger.valueOf(NOW.getEpochSecond()))),
+                Arguments.of("exp of forty digits", "exp", new BigInteger("1".repeat(40))),
                 Arguments.of("tenant that is not a UUID", "tenant", "colegio-1"),
                 Arguments.of("tenant as a number", "tenant", 42),
                 Arguments.of("tenant in upper case", "tenant", INSTITUTION.toString().toUpperCase()),
@@ -201,6 +215,20 @@ class AccessTokenVerifierTest {
         assertRejected(() -> verifierAt(exp.plusNanos(1)).verifyAccess(token), TokenRejection.EXPIRED);
         assertRejected(() -> verifierAt(Instant.parse("2026-10-12T10:30:00Z")).verifyAccess(token),
                 TokenRejection.EXPIRED);
+    }
+
+    @Test
+    void theFirstAndTheLastSecondOfTheDateRangeAreDates() {
+        // The very first second is a date: a token from 1970 is expired, never invalid.
+        assertRejected(() -> verifierAt(NOW).verifyAccess(signed(with(with(VALID, "iat", 0L), "exp",
+                600L))), TokenRejection.EXPIRED);
+
+        // The very last second is a date: verified just before it, the token is accepted.
+        AccessTokenVerifier atTheEnd = verifierAt(Instant.ofEpochSecond(LAST_EPOCH_SECOND - 300));
+        String last = signed(with(with(VALID, "iat", LAST_EPOCH_SECOND - 600), "exp",
+                LAST_EPOCH_SECOND));
+        assertThat(atTheEnd.verifyAccess(last).issuedAt())
+                .isEqualTo(Instant.ofEpochSecond(LAST_EPOCH_SECOND - 600));
     }
 
     @Test
