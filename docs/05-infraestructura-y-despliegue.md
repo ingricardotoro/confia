@@ -872,6 +872,46 @@ nunca en el repositorio, conforme a `CLAUDE.md`, regla 13.
 > anulando la lista. El agente de usuario se guarda truncado a `confia.web.user-agent-max-length`
 > caracteres (512 por omisión).
 
+> **Nota fechada 2026-10-07 (cambio `session-tokens-and-web-layer`, PR 2 `signing-key-ring`): claves
+> de firma del proceso administrativo.** El proceso `admin` firma y verifica el token de acceso con
+> un anillo de claves Ed25519: una clave vigente (`current`), que firma y verifica, y, durante una
+> rotación, una anterior (`previous`), que solo verifica y nunca lleva clave privada. Se lee al
+> arrancar; si falta algo, un valor es inválido o el par no corresponde, el proceso se detiene antes
+> de aceptar una petición, con un mensaje que nombra la propiedad y nunca repite ninguna parte del
+> valor:
+>
+> | Variable de entorno | Propiedad | Formato | Obligatoria |
+> |---|---|---|---|
+> | `CONFIA_SECURITY_ADMINSIGNING_CURRENT_KID` | `confia.security.admin-signing.current.kid` | De 1 a 64 caracteres de `A-Z`, `a-z`, `0-9`, `.`, `_` y `-` | Sí |
+> | `CONFIA_SECURITY_ADMINSIGNING_CURRENT_PRIVATEKEY` | `confia.security.admin-signing.current.private-key` | PKCS#8 DER en Base64 estándar | Sí |
+> | `CONFIA_SECURITY_ADMINSIGNING_CURRENT_PUBLICKEY` | `confia.security.admin-signing.current.public-key` | X.509 `SubjectPublicKeyInfo` DER en Base64 estándar | Sí |
+> | `CONFIA_SECURITY_ADMINSIGNING_PREVIOUS_KID` | `confia.security.admin-signing.previous.kid` | Igual que la vigente, distinto de ella | No |
+> | `CONFIA_SECURITY_ADMINSIGNING_PREVIOUS_PUBLICKEY` | `confia.security.admin-signing.previous.public-key` | X.509 DER en Base64 | Solo si hay `previous.kid` |
+>
+> La clave pública es obligatoria junto a la privada porque el JDK no deriva la pública de una
+> privada Ed25519: al arrancar se firman 32 bytes aleatorios con la privada y se verifican con la
+> pública, y un par que no corresponde detiene el proceso. Una propiedad `...previous.private-key`
+> también lo detiene. Los cinco valores viven en el almacén de secretos y **ninguno tiene valor en el
+> repositorio**, ni en un perfil, ni como ejemplo; las pruebas generan su propio par en cada
+> ejecución.
+>
+> **Formato exacto de los valores.** Cada valor de clave es **una sola línea** de Base64 estándar,
+> sin espacios ni saltos de línea. Un valor con un salto de línea al final (por ejemplo, el que
+> deja un archivo de secreto creado con un editor) o un PEM de varias líneas, con sus líneas
+> `-----BEGIN ...-----`, **detiene el proceso en cerrado** con el mensaje «not valid standard
+> Base64», porque el decodificador no los acepta. Un valor que sí es Base64 pero no es una clave
+> Ed25519 (por ejemplo, una clave Ed448) se rechaza igual, nombrando solo la propiedad. Quite el
+> salto de línea final (`tr -d '\n'`) o convierta el PEM a su DER en una línea antes de guardarlo.
+>
+> **Verificación de ubicación (ADR-0005, verificación 14).** `portal` y `worker` no arrancan si su
+> entorno contiene `confia.security.admin-signing.current.private-key` o
+> `confia.security.admin-signing.previous.private-key`, y `admin` no arranca si contiene
+> `confia.security.portal-signing.current.private-key` o `confia.security.portal-signing.previous.private-key`:
+> ese nombre queda **reservado** para la clave privada del portal y nada se carga de él todavía. La
+> comprobación se hace antes de crear el contexto, ve variables de entorno, propiedades del sistema y
+> argumentos con el enlace relajado de nombres de Spring, y su mensaje nombra la propiedad sin leer
+> su valor.
+
 ---
 
 ## 7. Integración y entrega continuas

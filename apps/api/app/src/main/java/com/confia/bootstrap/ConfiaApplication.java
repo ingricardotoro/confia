@@ -3,6 +3,7 @@ package com.confia.bootstrap;
 import com.confia.bootstrap.admin.AdminApplication;
 import com.confia.bootstrap.portal.PortalApplication;
 import com.confia.bootstrap.worker.WorkerApplication;
+import com.confia.shared.security.token.SigningKeyPlacementGuard;
 import com.confia.shared.web.openapi.ProcessApiInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,11 @@ import org.springframework.context.ConfigurableApplicationContext;
  *      migrate ──&gt; recognized, no behavior yet (change 11)
  *      other   ──&gt; aborts, non-zero exit code
  * </pre>
+ *
+ * <p>Each process also gets, before its context exists, a {@link SigningKeyPlacementGuard}: the
+ * portal and the worker refuse to start with the administrative signing private key in their
+ * environment, and the administrative process refuses the name reserved for the portal's
+ * (ADR-0005, check 14; session-tokens-and-web-layer design.md, decision 3).
  */
 public final class ConfiaApplication {
 
@@ -66,14 +72,17 @@ public final class ConfiaApplication {
             case ADMIN -> LaunchOutcome.running(
                     new SpringApplicationBuilder(AdminApplication.class)
                             .properties(ProcessApiInfo.TITLE_PROPERTY + "=" + ADMIN_API_TITLE)
+                            .listeners(SigningKeyPlacementGuard.forAdministrativeProcess())
                             .run(args));
             case PORTAL -> LaunchOutcome.running(
                     new SpringApplicationBuilder(PortalApplication.class)
                             .properties(ProcessApiInfo.TITLE_PROPERTY + "=" + PORTAL_API_TITLE)
+                            .listeners(SigningKeyPlacementGuard.forNonAdministrativeProcess())
                             .run(args));
             case WORKER -> LaunchOutcome.running(
                     new SpringApplicationBuilder(WorkerApplication.class)
                             .web(WebApplicationType.NONE)
+                            .listeners(SigningKeyPlacementGuard.forNonAdministrativeProcess())
                             .run(args));
             // Recognized only: applying Flyway migrations and exiting arrives with change 11
             // (design.md decision 12 of jooq-flyway-testcontainers-wiring — no deployed
