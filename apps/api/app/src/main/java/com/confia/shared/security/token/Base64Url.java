@@ -21,7 +21,11 @@ public final class Base64Url {
         return ENCODER.encodeToString(bytes);
     }
 
-    /** The decoded bytes, or empty when the text is not the canonical encoding of any byte array. */
+    /**
+     * The decoded bytes, or empty when the text is not the canonical encoding of any byte array.
+     * It allocates about three times the length of the text and bounds nothing: a caller that
+     * decodes what a client sent must bound the length first.
+     */
     public static Optional<byte[]> decode(String text) {
         byte[] bytes;
         try {

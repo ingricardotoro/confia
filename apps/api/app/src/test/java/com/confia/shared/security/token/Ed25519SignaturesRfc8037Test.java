@@ -29,7 +29,7 @@ class Ed25519SignaturesRfc8037Test {
 
     @Test
     void thePublishedRfcSignatureVerifiesWithThePublicKeyOfTheAppendix() {
-        assertThat(VECTOR.signature()).hasSize(64);
+        assertThat(VECTOR.signature()).hasSize(Ed25519Signatures.SIGNATURE_LENGTH);
         assertThat(Ed25519Signatures.verify(VECTOR.publicKey(), VECTOR.signingInputBytes(),
                 VECTOR.signature())).isTrue();
     }
@@ -124,5 +124,18 @@ class Ed25519SignaturesRfc8037Test {
         jdk.initVerify(VECTOR.publicKey());
         jdk.update(VECTOR.signingInput().getBytes(StandardCharsets.US_ASCII));
         return jdk.verify(signature);
+    }
+
+    @Test
+    void aKeyThatIsNotEd25519IsAConfigurationErrorAndNeverAnInvalidSignature() throws Exception {
+        // A wrong key is a defect of the ring, not a hostile token: it must surface, never read as false.
+        KeyPair x25519 = java.security.KeyPairGenerator.getInstance("X25519").generateKeyPair();
+        byte[] message = "message".getBytes(StandardCharsets.US_ASCII);
+
+        assertThatThrownBy(() -> Ed25519Signatures.sign(x25519.getPrivate(), message))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> Ed25519Signatures.verify(x25519.getPublic(), message,
+                new byte[Ed25519Signatures.SIGNATURE_LENGTH]))
+                .isInstanceOf(IllegalStateException.class);
     }
 }
