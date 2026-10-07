@@ -177,6 +177,16 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   Árbol completo en la rama local `wip/session-tokens-signing-key-ring-full` (cda620a). Escenarios I83, I140 y BI22 (prohibidos nominales).
   1.2 se marca hecha cuando se fusiona 1.2b.
 
+  - **Nota fechada 2026-10-07 (revisión independiente de 1.2a; se construye en 1.2b).**
+    - **Regla de orden:** ninguna tarea que emita o verifique tokens (1.4 y 3.3) se fusiona antes que 1.2b, y ningún despliegue recibe la
+      clave privada administrativa mientras 1.2b no esté en `main`. Sin el guardián, nada impide arrancar el portal con esa clave en su
+      entorno.
+    - **H2:** `SigningKeyStartupTest` añade un arranque real con `current.private-key` en Base64 válido que no es una clave (o Ed448) y
+      afirma con `assertNoSecretFragment` que la traza no repite el valor.
+    - **Valores con salto de línea:** la nota de `docs/05` documenta que un valor con salto de línea final o un PEM de varias líneas falla
+      en cerrado como «not valid standard Base64».
+    - **H3 y H4 (opcionales):** la prueba de los caminos JWKS se compara con un camino arbitrario, y la cabecera canónica se toma de
+      `JwsFixtures` en vez de reescribirla a mano.
 - [ ] 1.3 **PR 3 `signing-hash-confinement`: ninguna utilidad de firma ni de hash fuera de `identity` y `shared.security` (decisión 16).**
   - **ROJO.** Crear `test/java/com/confia/architecture/SigningAndHashingConfinementTest.java` (dos mitades, ADR-0018: producción real sin
     conjunto vacío y fixtures) con los fixtures permanentes `test/java/com/confia/architecture/fixture/hashing/outside/` —

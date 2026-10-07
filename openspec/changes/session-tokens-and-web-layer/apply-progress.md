@@ -354,3 +354,25 @@ constantes de las propiedades `previous.private-key` y del portal; el Javadoc de
   1. Con `requireMatchingPair` comentada en `SigningKeyLoader.load` falla `SigningKeyRingTest.aPairWhosePublicKeyDoesNotMatchThePrivateKeyIsDetectedBySigningAndVerifying`, línea 153 (1 de 31).
   3. Sin `SessionTokenConfiguration.class` en el `@Import` de `AdminApplication` fallan `ProcessBeanIsolationTest.registersOnlyItsAllowedBeans` (línea 84, no vacuidad) y `onlyTheAdministrativeProcessHoldsTheSigningKeyRing` (línea 178).
 - **Tamaño:** 762 líneas efectivas (753 añadidas, 9 borradas), con el mismo método de medición; por debajo de 800.
+
+### Revisión independiente de 1.2a (2026-10-07)
+
+Veredicto: apto para fusionar, sin bloqueantes ni importantes. La revisión confirmó:
+
+- el cargador rechaza Ed448, RSA y Base64 inválido;
+- ninguna clave `previous` lleva clave privada, ni siquiera vacía;
+- la correspondencia del par se comprueba firmando una muestra aleatoria;
+- ningún mensaje lleva valores ni causa encadenada;
+- no hay registro;
+- el anillo existe solo en el proceso administrativo, y portal y trabajador fallan en cerrado por la lista de permitidos;
+- no hay material de clave en el diff.
+
+**Corregido:** H1. El Javadoc de `SessionTokenConfiguration` afirmaba una prohibición explícita para portal y trabajador que llega en 1.2b;
+ahora describe la garantía real, la ausencia en la lista de permitidos.
+
+**Pasan a 1.2b** (nota fechada en `tasks.md`):
+
+- la regla de orden: nada que emita o verifique tokens se fusiona antes que 1.2b;
+- la prueba H2 de arranque con un valor malformado;
+- la nota de valores con salto de línea;
+- H3 y H4, opcionales.
