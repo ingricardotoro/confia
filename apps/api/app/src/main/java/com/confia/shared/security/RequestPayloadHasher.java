@@ -2,8 +2,6 @@ package com.confia.shared.security;
 
 import com.confia.shared.audit.CanonicalAuditRowSerializer;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Objects;
 import tools.jackson.databind.JsonNode;
@@ -46,7 +44,7 @@ public final class RequestPayloadHasher {
         byte[] preimage = concat(
                 FORMAT_VERSION.getBytes(StandardCharsets.UTF_8),
                 canonicalJson.getBytes(StandardCharsets.UTF_8));
-        return HEX.formatHex(sha256(preimage));
+        return HEX.formatHex(Digests.sha256(preimage));
     }
 
     private static byte[] concat(byte[] first, byte[] second) {
@@ -54,13 +52,5 @@ public final class RequestPayloadHasher {
         System.arraycopy(first, 0, result, 0, first.length);
         System.arraycopy(second, 0, result, first.length, second.length);
         return result;
-    }
-
-    private static byte[] sha256(byte[] data) {
-        try {
-            return MessageDigest.getInstance("SHA-256").digest(data);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 must be available on every supported JDK", e);
-        }
     }
 }
