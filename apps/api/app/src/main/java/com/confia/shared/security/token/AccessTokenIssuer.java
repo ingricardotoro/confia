@@ -9,13 +9,14 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Issues the administrative access token (session-tokens-and-web-layer design.md, decision 4): ten
- * minutes of life for a session. It is signed by the codec with the current key, carries a random
- * {@code jti}, and takes its issue time from the injected clock truncated to whole seconds.
+ * Issues the two kinds of administrative token (session-tokens-and-web-layer design.md, decision 4):
+ * the access token, ten minutes of life for a session, and the restricted MFA token, five minutes for
+ * completing the second factor. Both are signed by the codec with the current key, carry a random
+ * {@code jti}, and take their issue time from the injected clock truncated to whole seconds.
  *
- * <p>It holds the codec and a clock and nothing else. In particular it writes to no table: issuing an
- * access token does not create a refresh-token family, because the family is the business of the
- * session use case, which asks for a token once it has one.
+ * <p>It holds the codec and a clock and nothing else. In particular it writes to no table: issuing a
+ * restricted token creates no refresh-token family and issuing an access token does not either, because
+ * the family is the business of the session use case, which asks for a token once it has one.
  */
 public final class AccessTokenIssuer {
 
@@ -47,6 +48,17 @@ public final class AccessTokenIssuer {
         byte[] payload = AccessTokenClaims.serialize(accountId, institutionId, sessionId,
                 UUID.randomUUID(), methods, issuedAt);
         return new AccessToken(jws.sign(payload), issuedAt.plus(AccessTokenClaims.LIFETIME));
+    }
+
+    /** A restricted token for completing the second factor: no session, five minutes. */
+    public AccessToken issueMfa(UUID accountId, UUID institutionId, MfaPurpose purpose) {
+        Objects.requireNonNull(accountId, "accountId");
+        Objects.requireNonNull(institutionId, "institutionId");
+        Objects.requireNonNull(purpose, "purpose");
+        Instant issuedAt = now();
+        byte[] payload = MfaTokenClaims.serialize(accountId, institutionId, UUID.randomUUID(), purpose,
+                issuedAt);
+        return new AccessToken(jws.sign(payload), issuedAt.plus(MfaTokenClaims.LIFETIME));
     }
 
     private Instant now() {

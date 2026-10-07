@@ -8,8 +8,8 @@ import org.springframework.core.env.Environment;
 /**
  * The public configuration of the administrative tokens (session-tokens-and-web-layer design.md,
  * decisions 3 and 4; ADR-0024). It registers the key ring, built from the process environment with
- * every startup check, the codec over that ring, and the issuer and the verifier of the access
- * token, which share the codec and the process clock. The properties are read with {@link
+ * every startup check, the codec over that ring, and the issuer and the verifier of the access and
+ * restricted tokens, which share the codec and the process clock. The properties are read with {@link
  * Environment#getProperty(String)} and never with {@code @Value}, so that a failure never prints a
  * value (CLAUDE.md, regla 11).
  *
