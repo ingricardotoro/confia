@@ -236,6 +236,25 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
       Jackson.
     - **S5:** la propiedad del bit único afirma que el motivo es `MALFORMED`, `UNKNOWN_HEADER` o `BAD_SIGNATURE`, nunca
       `MALFORMED_CLAIMS`.
+  - **Nota fechada 2026-10-07: partición de 1.4.** La tarea completa y verificada midió **2 676 líneas efectivas**, por encima de 800; por la regla
+    general del 2026-10-06 se parte sin consultar en cinco partes ordenadas. La tarea completa se conserva en la rama local
+    `wip/session-tokens-access-tokens-full` (c7456c6), que es la fuente de verdad y no se modifica.
+
+    | Parte | Contenido | Tamaño |
+    |---|---|---|
+    | 1.4a `codec-hardening` | S1 a S5: `CompactJws`, `VerifiedJws`, `CompactJwsHardeningTest`, cambio S5 de `CompactJwsPropertiesTest`; independiente del resto | unas 355 |
+    | 1.4b `access-token-issuer` | `AuthenticatedActor`, `AuthenticationMethod`, `AccessToken`, mitad de serialización de `AccessTokenClaims`, `issueAccess`, sus pruebas y fixtures | unas 690 |
+    | 1.4c `access-token-verifier` | `ClaimReader`, mitad de lectura, `verifyAccess`, beans de `SessionTokenConfiguration`, `AccessTokenVerifierTest`, viaje de ida y vuelta, `SigningKeyStartupTest`, notas de `docs/03` | unas 735 |
+    | 1.4d `restricted-mfa-token` | `MfaTokenClaims`, `MfaPurpose`, `issueMfa`, `verifyMfa`, pruebas del restringido | unas 630 |
+    | 1.4e `claim-rules-and-web-isolation` | `AccessTokenClaimsPropertyTest`, `WebLayerTokenIsolationTest`, `BadWebClassUsingVerifier` | unas 272 |
+
+    - [x] 1.4a `codec-hardening` (S1 a S5). Commit `fix(shared): harden the JWS codec input, encoding and claims exposure`.
+    - [ ] 1.4b `access-token-issuer`.
+    - [ ] 1.4c `access-token-verifier`.
+    - [ ] 1.4d `restricted-mfa-token`.
+    - [ ] 1.4e `claim-rules-and-web-isolation`.
+    - La casilla 1.4 se marca cuando 1.4a a 1.4e estén hechas.
+
 
 ## Fase 2: filtro, institución y registro
 
