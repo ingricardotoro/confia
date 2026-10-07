@@ -395,12 +395,22 @@
                          starter and by the library. -->
                     <exclude>org.springframework.boot:spring-boot-starter-oauth2-resource-server</exclude>
                     <exclude>org.springframework.security:spring-security-oauth2-resource-server</exclude>
+                    <!-- No JOSE or JWT library of any kind: the administrative token is an
+                         in-house compact JWS over the JDK's own Ed25519 (owner decision DA-2,
+                         session-tokens-and-web-layer design.md decision 2). Nimbus JOSE, Tink,
+                         jjwt and java-jwt, by groupId (and artifact where the group is wider). -->
+                    <exclude>com.nimbusds:*</exclude>
+                    <exclude>com.google.crypto.tink:*</exclude>
+                    <exclude>io.jsonwebtoken:*</exclude>
+                    <exclude>com.auth0:java-jwt</exclude>
                   </excludes>
                   <message>
                     Banned dependency (ADR-0015 forbids Hibernate/JPA/Spring Data JPA/Spring Data
                     JDBC; ADR-0016 forbids Quartz/JobRunr and other task schedulers;
                     web-edge-foundations design.md decision 4 keeps Spring Security a servlet
-                    filter chain and forbids the OAuth2 resource server). Adding a new scheduler,
+                    filter chain and forbids the OAuth2 resource server; owner decision DA-2
+                    forbids Nimbus JOSE, Tink, jjwt and java-jwt because tokens are signed by the
+                    in-house JWS codec of shared.security.token). Adding a new scheduler,
                     persistence library or authentication stack to this list requires a new ADR,
                     never a silent exclusion here.
                   </message>

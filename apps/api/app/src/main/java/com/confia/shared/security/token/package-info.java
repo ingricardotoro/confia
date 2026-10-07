@@ -1,9 +1,9 @@
 /**
  * The in-house compact JWS of the administrative access token (session-tokens-and-web-layer
  * design.md, decisions 1 and 2; owner decision DA-2: no JOSE or JWT library). It is delivered in
- * three parts: this package holds today the primitives, strict and canonical base64url and Ed25519
- * over the JDK's own {@code Signature}; task 1.1b adds the in-memory ring of signing keys and the ban
- * of JOSE and JWT libraries in {@code apps/api/pom.xml}, and task 1.1c the closed-header codec.
+ * three parts: this package holds the primitives, strict and canonical base64url and Ed25519 over
+ * the JDK's own {@code Signature}, and the in-memory ring of signing keys, and {@code apps/api/pom.xml}
+ * bans JOSE and JWT libraries by name; task 1.1c adds the closed-header codec.
  *
  * <p>This package carries no layer segment ({@code domain}, {@code application}, {@code
  * infrastructure} or {@code web}), like {@link com.confia.shared.security}: {@link

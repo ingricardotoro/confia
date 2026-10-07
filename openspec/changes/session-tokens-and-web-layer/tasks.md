@@ -133,7 +133,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   JDK en `false`), `package-info` con `@NamedInterface`, `JwsFixtures`, `Base64UrlTest`, `Base64UrlPropertiesTest`,
   `Ed25519SignaturesRfc8037Test`, el recurso del vector RFC 8037 A.4 sin clave privada y el objetivo de PIT
   `com.confia.shared.security.token.*`. Escenarios I46 e I138 (parte de la primitiva). Medido: 551 líneas.
-- [ ] 1.1b **PR 1b `jws-key-ring-and-bans`.** `SigningKey` (restricción del `kid` a `[A-Za-z0-9._-]{1,64}`), `SigningKeyRing` en
+- [x] 1.1b **PR 1b `jws-key-ring-and-bans`.** `SigningKey` (restricción del `kid` a `[A-Za-z0-9._-]{1,64}`), `SigningKeyRing` en
   memoria con las cabeceras canónicas precalculadas, `SigningKeyRingInMemoryTest`, `TokenRejection`, `TokenRejectedException` y
   `bannedDependencies` de Nimbus, Tink, jjwt y java-jwt con la evidencia de BI33. Necesita 1.1a.
 - [ ] 1.1c **PR 1c `jws-compact-codec`.** `CompactJws`, `VerifiedJws`, `CompactJwsAttackTest` y `CompactJwsPropertiesTest`; demostraciones
