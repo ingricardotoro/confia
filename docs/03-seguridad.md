@@ -494,6 +494,24 @@ desatendida, sin cambiar la vida del token de refresco ni la revocación por fam
 ya especifica. `docs/ui-ux/04-patrones-de-interaccion.md` documenta el comportamiento visible de
 este control.
 
+> **Nota fechada 2026-10-07 (cambio `session-tokens-and-web-layer`, PR 4 `access-and-mfa-tokens`):
+> firma del token de acceso con un JWS propio sobre el JDK.** La fila «Token de acceso» de la tabla
+> anterior se cumple con un JWS compacto implementado en `com.confia.shared.security.token`, sin
+> ninguna biblioteca JOSE ni JWT (Nimbus, Tink, jjwt y java-jwt están prohibidas por nombre en
+> `bannedDependencies`, decisión DA-2). El único emisor es el propio proceso administrativo, de modo que
+> la cabecera es siempre `{"alg":"EdDSA","kid":"<kid>"}`: el verificador la compara carácter a carácter
+> con la cabecera canónica de cada `kid` del anillo y no interpreta ninguna cabecera que envíe el
+> cliente, lo que cierra de una vez `alg: none`, la confusión de algoritmo, `crit`, `jku`, `jwk` y
+> cualquier miembro adicional. El token de acceso tiene exactamente nueve claims (`iss`, `aud`, `sub`,
+> `exp`, `iat`, `jti`, `sid`, `tenant`, `amr`), vive 600 segundos, no lleva `permissions` hasta el cambio
+> 8 ni ningún dato personal, y el verificador no aplica tolerancia de reloj sobre `exp`; un token con
+> la audiencia `confia-admin-mfa` ya se rechaza. El token restringido de MFA (audiencia
+> `confia-admin-mfa`, 300 segundos, sin `sid`, `purpose` de un conjunto cerrado) llega con la parte
+> 1.4d, con su propio verificador; desde entonces ninguno de los dos verificadores acepta al otro. La fila «Rotación de
+> claves» se cumple, hasta el cambio 11, con las variables de entorno de `docs/05` y un anillo de dos
+> claves, `current` y `previous`, descrito en 11.2. La publicación por JWKS queda diferida: el único
+> verificador es el propio proceso, con el anillo en memoria.
+
 ### 4.6 Prevención de enumeración de usuarios
 
 La enumeración es el paso previo de todo ataque de relleno de credenciales, y en este sistema
@@ -1436,6 +1454,18 @@ operativo: un pico de 429 legítimos indica un límite mal calibrado, no un ataq
 Cada rotación se registra en `docs/seguridad/registro-de-rotacion.md` con secreto, fecha, actor y
 verificación posterior. Un secreto sin registro de rotación en el último periodo aparece en la
 alerta mensual de higiene de secretos.
+
+> **Nota fechada 2026-10-07 (cambio `session-tokens-and-web-layer`, PR 4 `access-and-mfa-tokens`):
+> rotación de las llaves de firma administrativas hasta el cambio 11.** Mientras el cambio 11 no
+> aprovisione un gestor de secretos, las llaves de firma administrativas llegan por variable de entorno
+> (nombres en `docs/05-infraestructura-y-despliegue.md`) y el anillo tiene una o dos claves Ed25519. La
+> clave `current` firma y verifica; la clave `previous`, si existe, solo verifica y nunca lleva clave
+> privada. La rotación semestral publica la clave nueva como `current`, mueve la pública anterior a
+> `previous` y la retira una vez pasada la vida de un token (10 minutos) más el margen operativo: un
+> token firmado con la clave retirada deja de verificar y su titular vuelve a autenticarse. «Publicadas
+> por JWKS interno» de la tabla anterior queda diferido (decisión DA-16): no existe ninguna ruta que
+> publique claves públicas. Ni el portal ni el trabajador reciben la clave privada administrativa y el
+> proceso administrativo no arranca si encuentra el nombre reservado para una clave privada del portal.
 
 ### 11.3 Escaneo de secretos
 

@@ -581,3 +581,80 @@ ida y vuelta, que pertenece a 1.4c) y los fixtures del emisor de `AccessTokenFix
 ### Desviaciones
 
 Ninguna respecto al diseño. Los fixtures omiten, por pertenecer a 1.4c a 1.4e, `verifierAt`, `accessClaims`, `mfaClaims`, la clave ajena y los ayudantes de firma manual.
+
+## PR 4c `access-token-verifier` (tarea 1.4c, 2026-10-07, modo TDD estricto)
+
+Tercera de las cinco partes de 1.4. Se parte de `main` en ba169d4 (que ya contiene 1.4a y 1.4b); el árbol completo de 1.4 sigue intacto en la rama local
+`wip/session-tokens-access-tokens-full` (c7456c6). Commits: `4cae9ff` (`feat(security): verify admin access tokens against a closed claim list`) y `8236f2c`
+(`docs(security): note the in-house JWS and key rotation`).
+
+### Contenido
+
+`ClaimReader`, la mitad de lectura de `AccessTokenClaims` (`read`, `NAMES`, `methodsOf`), `AccessTokenVerifier.verifyAccess` (sin `verifyMfa`) y los beans de
+`SessionTokenConfiguration` (códec, emisor y verificador). Pruebas: `AccessTokenVerifierTest` (99), el viaje de ida y vuelta emisor-verificador en
+`AccessTokenIssuerTest` (13), los fixtures del verificador en `AccessTokenFixtures` (sin `mfaClaims`) y la ampliación de `SigningKeyStartupTest` (el proceso
+administrativo tiene emisor y verificador; el portal y el trabajador, ninguno). Notas fechadas de `docs/03-seguridad.md` §4.5 y §11.2. Los comentarios de
+`AccessTokenClaims` y `SessionTokenConfiguration` se redujeron a la ruta de acceso; nada referencia tipos de 1.4d ni 1.4e.
+
+### Evidencia de trabajo
+
+| Evidencia | Resultado |
+|---|---|
+| Rojo re-observado | Con las pruebas de 1.4c presentes y `AccessTokenVerifier` y `ClaimReader` ausentes, `test-compile` falla con `cannot find symbol` (`AccessTokenVerifier`, `verifierAt`) |
+| Verde focalizado | `-Dtest='AccessTokenVerifierTest,AccessTokenIssuerTest,SigningKeyStartupTest'`: 129 pruebas, 0 fallos, `BUILD SUCCESS` |
+| Ruptura deliberada | Se quitó la lista cerrada de claims del constructor de `ClaimReader` (solo `!claims.isObject()`): `AccessTokenVerifierTest` falla en 13 de 99 pruebas. Se revirtió y se comprobó con `cmp`; no queda ninguna ruptura |
+| Verde y verificación completa | `./mvnw verify -Pmutation-gate` en `apps/api` (Docker en ejecución, 10 min 20 s): Surefire 186 y 1 583, Failsafe 250, 0 fallos, `BUILD SUCCESS` |
+| PIT, paquete `com.confia.shared.security.token` | **90 %** (195 de 216 mutantes muertos); `ClaimReader` 74 % (31 de 42) y `AccessTokenVerifier` 100 %; umbral de 80 cumplido |
+| Límite de reversión | Los nueve archivos Java de la parte y las notas de `docs/03`; `git revert` de los dos commits la retira sin tocar el resto |
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **754 líneas** (740 añadidas y 14 borradas), por debajo de 800.
+
+### Desviaciones
+
+Ninguna respecto al diseño. (Corregido tras la revisión independiente: la afirmación anterior de que las pruebas de propiedades de 1.4e cubren los supervivientes de `ClaimReader` no estaba verificada y se retira.)
+
+### Revisión independiente de 1.4c (2026-10-07)
+
+Veredicto: se puede fusionar, sin bloqueantes. La revisión confirmó estos puntos:
+
+- La validación es por tipo JSON y nunca por coerción.
+- La lista cerrada es exacta.
+- `aud` como arreglo se rechaza.
+- `amr` es exacto, en contenido y en orden.
+- Los UUID se exigen en forma canónica (`toString().equals(texto)`).
+- `EXPIRED` solo se informa con la firma y los claims íntegros.
+- `exp == now` está vencido.
+- El reloj es inyectado.
+- Ninguna excepción acaba en aceptación.
+- No hay registro.
+- Los beans existen solo en el proceso administrativo.
+
+**Corregido en este PR:**
+
+- **I-1, desbordamiento de `long`.** Faltaba la prueba de un número fuera de `long`. Un entero 2^64 + un segundo válido se parsea como
+  `BigIntegerNode`, y `longValue()` lo recortaría a ese segundo válido. Se añadieron siete casos a `accessClaimsOfTheWrongTypeOrValue`:
+  - 2^64;
+  - 2^64 + `exp` válido, y lo mismo para `iat`;
+  - `Long.MIN_VALUE`;
+  - un número de cuarenta dígitos;
+  - `LAST_EPOCH_SECOND + 1`.
+- **I-2, bordes del rango de fechas.** Faltaban esas pruebas. Se añadió `theFirstAndTheLastSecondOfTheDateRangeAreDates`: `iat = 0` da
+  `EXPIRED`, nunca `CLAIMS_INVALID`, y el último segundo de 9999 se acepta verificado justo antes.
+
+  **Rupturas deliberadas sobre `ClaimReader.epochSecond`**, revertidas y comprobadas con `cmp`:
+
+  | Ruptura | Resultado |
+  |---|---|
+  | Sin `canConvertToLong()` | 4 fallos |
+  | `value <= 0` | 1 fallo |
+  | `value >= LAST_EPOCH_SECOND` | 1 error |
+
+  `AccessTokenVerifierTest` pasa de 99 a 106 pruebas.
+- **S-1.** La nota de `docs/03` §4.5 describía como presente el verificador del token restringido. Ahora dice que el rechazo de la
+  audiencia `confia-admin-mfa` ya existe y que el token restringido, con su verificador, llega en 1.4d.
+- **S-2.** Se retiró la afirmación no verificada sobre los supervivientes de `ClaimReader`.
+
+**Para 1.4d (observación de la revisión):** el token de acceso y el restringido comparten clave y cabecera, y solo la audiencia y el
+conjunto de claims los separan. 1.4d fija `aud` y sus claims propios, con una prueba cruzada en ambos sentidos.

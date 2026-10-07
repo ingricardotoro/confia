@@ -7,9 +7,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
+import com.confia.shared.security.AuthenticationMethod;
+import com.confia.shared.security.token.AccessToken;
+import com.confia.shared.security.token.AccessTokenIssuer;
+import com.confia.shared.security.token.AccessTokenVerifier;
 import com.confia.shared.security.token.SigningKeyRing;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -60,6 +66,26 @@ class SigningKeyStartupTest {
         }
     }
 
+    /** Task 1.4: the issuer and the verifier are beans of the administrative process, on its own ring. */
+    @Test
+    void theAdministrativeProcessHoldsAnIssuerAndAVerifierThatAgreeOnItsRing() {
+        LaunchOutcome outcome = launch("admin", TestProcessArguments.forProcess("admin"));
+        try {
+            AccessTokenIssuer issuer = outcome.context().getBean(AccessTokenIssuer.class);
+            AccessTokenVerifier verifier = outcome.context().getBean(AccessTokenVerifier.class);
+            UUID account = UUID.randomUUID();
+            UUID session = UUID.randomUUID();
+
+            AccessToken token = issuer.issueAccess(account, UUID.randomUUID(), session,
+                    EnumSet.of(AuthenticationMethod.PASSWORD));
+
+            assertThat(verifier.verifyAccess(token.compact()).sessionId()).isEqualTo(session);
+            assertThat(verifier.verifyAccess(token.compact()).accountId()).isEqualTo(account);
+        } finally {
+            close(outcome.context());
+        }
+    }
+
     @Test
     void theAdministrativeProcessStartsWithAPreviousPublicKeyAndHoldsBothInItsRing() {
         Map<String, String> overrides = new LinkedHashMap<>();
@@ -85,6 +111,10 @@ class SigningKeyStartupTest {
             assertThat(outcome.context()).isNotNull();
             assertThat(outcome.context().getBeansOfType(SigningKeyRing.class))
                     .as("no signing key ring in the %s process", process).isEmpty();
+            assertThat(outcome.context().getBeansOfType(AccessTokenIssuer.class))
+                    .as("no token issuer in the %s process", process).isEmpty();
+            assertThat(outcome.context().getBeansOfType(AccessTokenVerifier.class))
+                    .as("no token verifier in the %s process", process).isEmpty();
         } finally {
             close(outcome.context());
         }
