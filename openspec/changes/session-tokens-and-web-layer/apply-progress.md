@@ -211,3 +211,26 @@ Veredicto: apto para fusionar, sin bloqueantes ni importantes. La revisión conf
 **Aceptado hasta 1.1c:** S4, porque los auxiliares de `JwsFixtures` sin uso en 1a son código de pruebas que 1.1c ejercita.
 
 **Verificación.** `./mvnw verify -Pmutation-gate`: Surefire 186 + 1 237, Failsafe 250, 0 fallos y `BUILD SUCCESS`.
+
+### PR 1b `jws-key-ring-and-bans` (2026-10-06)
+
+Toma del árbol completo, sin cambios, los archivos `SigningKey`, `SigningKeyRing`, `SigningKeyRingInMemoryTest` y las prohibiciones de
+`apps/api/pom.xml`. Además actualiza el Javadoc de `package-info`, que pasa a describir el anillo y la prohibición como presentes.
+
+**Desviación respecto de la tarea 1.1b.** `TokenRejection` y `TokenRejectedException` pasan a 1.1c: en 1b ningún código las usaría ni
+las probaría, que es la clase de código sin uso que señaló la sugerencia S4 de la revisión de 1a.
+
+**Evidencias.** Son las registradas en la sección «Tarea 1.1»:
+
+- **Ruptura deliberada:** con `keyForHeaderSegment` devolviendo siempre la clave actual, `SigningKeyRingInMemoryTest` da 2 fallos.
+- **BI33:** el enforcer rechaza, nombrándolos, Nimbus JOSE, jjwt, Tink, java-jwt y el starter OAuth2 de recursos, con artefactos falsos en
+  un repositorio temporal. La descarga real falló por PKIX y no se tocó TLS.
+
+**Verificación.** `./mvnw verify -Pmutation-gate`: Surefire 186 + 1 256, Failsafe 250, 0 fallos, cobertura cumplida y `BUILD SUCCESS`.
+
+| Métrica de PIT | Resultado |
+|---|---|
+| Paquete `com.confia.shared.security.token` | 41 de 43 mutantes muertos (95 %); líneas, 61 de 67 (91 %) |
+| Total de la aplicación | 277 de 294 (94 %) |
+
+**Tamaño:** 295 líneas efectivas.
