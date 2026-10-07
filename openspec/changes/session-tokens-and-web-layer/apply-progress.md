@@ -581,3 +581,36 @@ ida y vuelta, que pertenece a 1.4c) y los fixtures del emisor de `AccessTokenFix
 ### Desviaciones
 
 Ninguna respecto al diseño. Los fixtures omiten, por pertenecer a 1.4c a 1.4e, `verifierAt`, `accessClaims`, `mfaClaims`, la clave ajena y los ayudantes de firma manual.
+
+## PR 4c `access-token-verifier` (tarea 1.4c, 2026-10-07, modo TDD estricto)
+
+Tercera de las cinco partes de 1.4. Se parte de `main` en ba169d4 (que ya contiene 1.4a y 1.4b); el árbol completo de 1.4 sigue intacto en la rama local
+`wip/session-tokens-access-tokens-full` (c7456c6). Commits: `4cae9ff` (`feat(security): verify admin access tokens against a closed claim list`) y `8236f2c`
+(`docs(security): note the in-house JWS and key rotation`).
+
+### Contenido
+
+`ClaimReader`, la mitad de lectura de `AccessTokenClaims` (`read`, `NAMES`, `methodsOf`), `AccessTokenVerifier.verifyAccess` (sin `verifyMfa`) y los beans de
+`SessionTokenConfiguration` (códec, emisor y verificador). Pruebas: `AccessTokenVerifierTest` (99), el viaje de ida y vuelta emisor-verificador en
+`AccessTokenIssuerTest` (13), los fixtures del verificador en `AccessTokenFixtures` (sin `mfaClaims`) y la ampliación de `SigningKeyStartupTest` (el proceso
+administrativo tiene emisor y verificador; el portal y el trabajador, ninguno). Notas fechadas de `docs/03-seguridad.md` §4.5 y §11.2. Los comentarios de
+`AccessTokenClaims` y `SessionTokenConfiguration` se redujeron a la ruta de acceso; nada referencia tipos de 1.4d ni 1.4e.
+
+### Evidencia de trabajo
+
+| Evidencia | Resultado |
+|---|---|
+| Rojo re-observado | Con las pruebas de 1.4c presentes y `AccessTokenVerifier` y `ClaimReader` ausentes, `test-compile` falla con `cannot find symbol` (`AccessTokenVerifier`, `verifierAt`) |
+| Verde focalizado | `-Dtest='AccessTokenVerifierTest,AccessTokenIssuerTest,SigningKeyStartupTest'`: 129 pruebas, 0 fallos, `BUILD SUCCESS` |
+| Ruptura deliberada | Se quitó la lista cerrada de claims del constructor de `ClaimReader` (solo `!claims.isObject()`): `AccessTokenVerifierTest` falla en 13 de 99 pruebas. Se revirtió y se comprobó con `cmp`; no queda ninguna ruptura |
+| Verde y verificación completa | `./mvnw verify -Pmutation-gate` en `apps/api` (Docker en ejecución, 10 min 20 s): Surefire 186 y 1 583, Failsafe 250, 0 fallos, `BUILD SUCCESS` |
+| PIT, paquete `com.confia.shared.security.token` | **90 %** (195 de 216 mutantes muertos); `ClaimReader` 74 % (31 de 42) y `AccessTokenVerifier` 100 %; umbral de 80 cumplido |
+| Límite de reversión | Los nueve archivos Java de la parte y las notas de `docs/03`; `git revert` de los dos commits la retira sin tocar el resto |
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **754 líneas** (740 añadidas y 14 borradas), por debajo de 800.
+
+### Desviaciones
+
+Ninguna respecto al diseño. Los supervivientes de `ClaimReader` se cubren con las pruebas de propiedades de 1.4e.
