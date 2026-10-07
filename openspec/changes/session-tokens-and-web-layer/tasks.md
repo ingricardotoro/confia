@@ -96,7 +96,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
 
 ## Fase 1: núcleo criptográfico y de tokens
 
-- [ ] 1.1 **PR 1 `jws-compact-codec`: códec JWS Ed25519 (decisión 2).** Partida en 1.1a, 1.1b y 1.1c (nota fechada del
+- [x] 1.1 **PR 1 `jws-compact-codec`: códec JWS Ed25519 (decisión 2).** Partida en 1.1a, 1.1b y 1.1c (nota fechada del
   final, 2026-10-06); el contenido de abajo es el alcance conjunto de las tres partes. Rutas bajo `apps/api/app/src/` salvo indicación.
   - **ROJO, ataques primero.** Crear en `test/java/com/confia/shared/security/token/`: `Ed25519SignaturesRfc8037Test.java`
     (S-1 ya probada: la firma publicada de RFC 8037 A.4 verifica con la clave pública del RFC, envuelta en X.509 con el prefijo DER
@@ -136,7 +136,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
 - [x] 1.1b **PR 1b `jws-key-ring-and-bans`.** `SigningKey` (restricción del `kid` a `[A-Za-z0-9._-]{1,64}`), `SigningKeyRing` en
   memoria con las cabeceras canónicas precalculadas, `SigningKeyRingInMemoryTest`, `TokenRejection`, `TokenRejectedException` y
   `bannedDependencies` de Nimbus, Tink, jjwt y java-jwt con la evidencia de BI33. Necesita 1.1a.
-- [ ] 1.1c **PR 1c `jws-compact-codec`.** `CompactJws`, `VerifiedJws`, `CompactJwsAttackTest` y `CompactJwsPropertiesTest`; demostraciones
+- [x] 1.1c **PR 1c `jws-compact-codec`.** `CompactJws`, `VerifiedJws`, `CompactJwsAttackTest` y `CompactJwsPropertiesTest`; demostraciones
   de la cabecera canónica y de la carga analizada antes de la firma; puerta de PIT del paquete (BI30 a BI32). Necesita 1.1b.
   1.1 se marca hecha cuando se fusiona 1.1c.
 
@@ -203,6 +203,19 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   - **Cierre.** `./mvnw verify` completo. Commits: `feat(security): issue and verify admin access and restricted MFA tokens` y
     `docs(security): note the in-house JWS and key rotation`. Tamaño: nominal 320, realista 700; costura, restringido a 4b. — Escenarios
     I58 a I77, I139 y BI14.
+
+  - **Nota fechada 2026-10-06 (revisión independiente de 1.1c; se construye en 1.4).** Las cinco sugerencias de la revisión del
+    códec pasan a la tarea 1.4, la de los claims:
+    - **S1:** `CompactJws.sign` lanza `IllegalArgumentException` ante una carga que no es un objeto JSON o que produce un token de más
+      de 2 048 caracteres.
+    - **S2:** `VerifiedJws` no expone un `ObjectNode` mutable (copia defensiva o `JsonNode`). El validador de claims comprueba el tipo
+      de cada claim (`isIntegralNumber`, `isTextual`) y nunca se fía de `asLong()` o `asText()`, que convierten tipos.
+    - **S3:** pruebas de una carga firmada con más de 500 niveles de anidamiento (`MALFORMED_CLAIMS`) y de un token de 10 MB (`MALFORMED`
+      sin decodificar).
+    - **S4:** la carga se decodifica como UTF-8 estricto (`CodingErrorAction.REPORT`), sin la detección automática de codificación de
+      Jackson.
+    - **S5:** la propiedad del bit único afirma que el motivo es `MALFORMED`, `UNKNOWN_HEADER` o `BAD_SIGNATURE`, nunca
+      `MALFORMED_CLAIMS`.
 
 ## Fase 2: filtro, institución y registro
 

@@ -234,3 +234,37 @@ las probaría, que es la clase de código sin uso que señaló la sugerencia S4 
 | Total de la aplicación | 277 de 294 (94 %) |
 
 **Tamaño:** 295 líneas efectivas.
+
+### PR 1c `jws-compact-codec` (2026-10-06)
+
+Toma del árbol completo, sin cambios, los archivos `CompactJws`, `VerifiedJws`, `TokenRejection`, `TokenRejectedException`,
+`CompactJwsAttackTest` (98 casos) y `CompactJwsPropertiesTest`, y deja el Javadoc de `package-info` en su forma final. Con este PR la tarea
+1.1 queda hecha y el árbol `wip/session-tokens-jws-codec-full` queda entregado completo. Solo difieren las correcciones de la revisión
+de 1a.
+
+**Evidencias.** Las rupturas 1, 4 y 5 de la sección «Tarea 1.1» son de este PR, todas revertidas y comprobadas con `cmp`:
+
+| Ruptura | Pruebas que fallan |
+|---|---|
+| 1. El anillo devuelve siempre la clave actual | 39 fallos y 1 error en `CompactJwsAttackTest` |
+| 4. La carga se analiza antes de la firma | Falla `thePayloadIsNeverParsedBeforeTheSignatureIsVerified` |
+| 5. `>=` en la longitud | Falla el borde de 2 048 y 2 049 caracteres |
+
+**Revisión independiente.** Veredicto: apto para fusionar, sin bloqueantes ni importantes. Confirmó:
+
+- el orden de verificación, con la longitud acotada antes de cualquier decodificación (lo que cierra S1 de 1a);
+- la comparación exacta de la cabecera y que ninguna clave sustituye a otra;
+- que no hay ningún `catch` que lleve a aceptar un token;
+- que las excepciones no llevan traza ni datos del token;
+- que los ataques afirman el motivo exacto del rechazo.
+
+Sus cinco sugerencias pasan a la tarea 1.4 (nota fechada en `tasks.md`).
+
+**Verificación.** `./mvnw verify -Pmutation-gate`: Surefire 186 + 1 356, Failsafe 250, 0 fallos, cobertura cumplida y `BUILD SUCCESS`.
+
+| Métrica de PIT | Resultado |
+|---|---|
+| Paquete `com.confia.shared.security.token` | 93 de 94 mutantes muertos (99 %); líneas, 110 de 114 (96 %) |
+| Total de la aplicación | 329 de 345 (95 %) |
+
+**Tamaño:** 799 líneas efectivas.
