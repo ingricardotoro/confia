@@ -167,19 +167,6 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     `docs(infra): document the admin signing key variables`. Tamaño: nominal 330, realista 730; costura, guardián a 2b. — Escenarios
     I78 a I84, I140, BI21 a BI23, BI28, BI29 y las dos ausencias de JWKS y del par del portal.
 
-  - **Nota fechada 2026-10-06 (revisión independiente de 1.1c; se construye en 1.4).** Las cinco sugerencias de la revisión del
-    códec pasan a la tarea 1.4, la de los claims:
-    - **S1:** `CompactJws.sign` lanza `IllegalArgumentException` ante una carga que no es un objeto JSON o que produce un token de más
-      de 2 048 caracteres.
-    - **S2:** `VerifiedJws` no expone un `ObjectNode` mutable (copia defensiva o `JsonNode`). El validador de claims comprueba el tipo
-      de cada claim (`isIntegralNumber`, `isTextual`) y nunca se fía de `asLong()` o `asText()`, que convierten tipos.
-    - **S3:** pruebas de una carga firmada con más de 500 niveles de anidamiento (`MALFORMED_CLAIMS`) y de un token de 10 MB (`MALFORMED`
-      sin decodificar).
-    - **S4:** la carga se decodifica como UTF-8 estricto (`CodingErrorAction.REPORT`), sin la detección automática de codificación de
-      Jackson.
-    - **S5:** la propiedad del bit único afirma que el motivo es `MALFORMED`, `UNKNOWN_HEADER` o `BAD_SIGNATURE`, nunca
-      `MALFORMED_CLAIMS`.
-
 - [ ] 1.3 **PR 3 `signing-hash-confinement`: ninguna utilidad de firma ni de hash fuera de `identity` y `shared.security` (decisión 16).**
   - **ROJO.** Crear `test/java/com/confia/architecture/SigningAndHashingConfinementTest.java` (dos mitades, ADR-0018: producción real sin
     conjunto vacío y fixtures) con los fixtures permanentes `test/java/com/confia/architecture/fixture/hashing/outside/` —
@@ -216,6 +203,19 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   - **Cierre.** `./mvnw verify` completo. Commits: `feat(security): issue and verify admin access and restricted MFA tokens` y
     `docs(security): note the in-house JWS and key rotation`. Tamaño: nominal 320, realista 700; costura, restringido a 4b. — Escenarios
     I58 a I77, I139 y BI14.
+
+  - **Nota fechada 2026-10-06 (revisión independiente de 1.1c; se construye en 1.4).** Las cinco sugerencias de la revisión del
+    códec pasan a la tarea 1.4, la de los claims:
+    - **S1:** `CompactJws.sign` lanza `IllegalArgumentException` ante una carga que no es un objeto JSON o que produce un token de más
+      de 2 048 caracteres.
+    - **S2:** `VerifiedJws` no expone un `ObjectNode` mutable (copia defensiva o `JsonNode`). El validador de claims comprueba el tipo
+      de cada claim (`isIntegralNumber`, `isTextual`) y nunca se fía de `asLong()` o `asText()`, que convierten tipos.
+    - **S3:** pruebas de una carga firmada con más de 500 niveles de anidamiento (`MALFORMED_CLAIMS`) y de un token de 10 MB (`MALFORMED`
+      sin decodificar).
+    - **S4:** la carga se decodifica como UTF-8 estricto (`CodingErrorAction.REPORT`), sin la detección automática de codificación de
+      Jackson.
+    - **S5:** la propiedad del bit único afirma que el motivo es `MALFORMED`, `UNKNOWN_HEADER` o `BAD_SIGNATURE`, nunca
+      `MALFORMED_CLAIMS`.
 
 ## Fase 2: filtro, institución y registro
 
