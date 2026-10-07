@@ -140,7 +140,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   de la cabecera canónica y de la carga analizada antes de la firma; puerta de PIT del paquete (BI30 a BI32). Necesita 1.1b.
   1.1 se marca hecha cuando se fusiona 1.1c.
 
-- [ ] 1.2 **PR 2 `signing-key-ring`: anillo de claves, cargador y verificación de arranque (decisión 3, O12, DA-17, D-N2).**
+- [x] 1.2 **PR 2 `signing-key-ring`: anillo de claves, cargador y verificación de arranque (decisión 3, O12, DA-17, D-N2).**
   - **ROJO.** Crear `test/java/com/confia/shared/security/token/SigningKeyRingTest.java` (propiedad ausente, Base64 inválido, PKCS#8 de
     Ed448 rechazado con `InvalidKeySpecException` (S-3 ya probada), par que no corresponde detectado al firmar y verificar 32 bytes
     aleatorios, `kid` inválido o repetido, claves públicas repetidas, `previous` sin pública, `previous` con privada, mensajes que
@@ -171,7 +171,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   `SessionTokenConfiguration` y su `@Import` en `AdminApplication`, la línea de la lista de permitidos del administrativo, el par generado
   en `TestProcessArguments`, `SigningKeyRingTest`, la parte administrativa de `SigningKeyStartupTest`, `SigningKeyAbsencesTest` y la prueba
   de aislamiento del anillo. Medido: 762 líneas. Escenarios I78 a I82, I84, BI21, BI22, BI28, BI29 y las dos ausencias.
-- [ ] 1.2b **PR 2b `signing-key-placement-guard`.** `SigningKeyPlacementGuard` y su alta en `ConfiaApplication.launch`,
+- [x] 1.2b **PR 2b `signing-key-placement-guard`.** `SigningKeyPlacementGuard` y su alta en `ConfiaApplication.launch`,
   `SigningKeyPlacementGuardTest`, el resto de `SigningKeyStartupTest` (portal, trabajador y nombre reservado), las líneas prohibidas de
   portal y trabajador en `ProcessBeanPolicy` con su prueba en `ProcessBeanInspectorTest`, y la nota de `docs/05`. Necesita 1.2a.
   Árbol completo en la rama local `wip/session-tokens-signing-key-ring-full` (cda620a). Escenarios I83, I140 y BI22 (prohibidos nominales).

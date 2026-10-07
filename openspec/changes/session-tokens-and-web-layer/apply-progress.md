@@ -376,3 +376,41 @@ ahora describe la garantía real, la ausencia en la lista de permitidos.
 - la prueba H2 de arranque con un valor malformado;
 - la nota de valores con salto de línea;
 - H3 y H4, opcionales.
+
+## PR 2b `signing-key-placement-guard` (tarea 1.2b, 2026-10-07, modo TDD estricto)
+
+Rama `change/session-tokens-and-web-layer-02b-signing-key-placement-guard`, desde `main` en 5b90c61 (con 1.2a fusionada). Contenido tomado de
+`wip/session-tokens-signing-key-ring-full` (cda620a) y fusionado sobre las versiones de 2a, sin revertir la corrección H1.
+
+### Ciclo TDD (rojos observados)
+
+| Paso | Qué se corrió | Resultado observado |
+|---|---|---|
+| Rojo 1 | `./mvnw -pl app -am test-compile` con las pruebas y sin producción | Error de compilación: `SigningKeyPlacementGuard` no existe (9 símbolos en `SigningKeyPlacementGuardTest`) |
+| Rojo 2 | Guardián creado pero sin alta en `ConfiaApplication.launch` ni líneas prohibidas; `-Dtest='SigningKeyPlacementGuardTest,SigningKeyStartupTest,ProcessBeanInspectorTest,SigningKeyAbsencesTest'` | 38 pruebas, **8 fallos**: `SigningKeyStartupTest` 6 (portal y trabajador con clave actual y previa, y los dos nombres reservados, línea 114 y `assertAbortsBeforeTheContext` línea 154) y `ProcessBeanInspectorTest` 2 (línea 96, sin línea nominal prohibida). Los 8 casos de `SigningKeyPlacementGuardTest` pasan porque prueban la clase aislada |
+| Verde | alta del guardián, líneas prohibidas, `SessionTokenConfiguration` y `package-info` en presente | 51 pruebas focalizadas en verde (incluye `ProcessBeanIsolationTest`) |
+
+**Seguimientos de la revisión de 1.2a.** H2 (dos casos de arranque real con `current.private-key` en Base64 válido que no es clave y con un sobre PKCS#8 de Ed448; `assertNoSecretFragment`) y H3 (camino arbitrario en `SigningKeyAbsencesTest`) pasan desde su primera ejecución: son rieles de regresión sobre el cargador de 2a y no pueden estar en rojo antes del cambio. Los valores son fijos y no aleatorios para que la afirmación de «ningún fragmento» no falle por azar. La nota de `docs/05` documenta el valor con salto de línea final y el PEM de varias líneas.
+
+### Rupturas deliberadas (revertidas y comprobadas con `cmp`)
+
+| Ruptura | Prueba y línea que fallan |
+|---|---|
+| El guardián de portal y trabajador deja de listar `...admin-signing.previous.private-key` | `SigningKeyStartupTest.theOtherProcessesAbortWhenThePreviousAdministrativePrivateKeyIsPresent` (2 casos, `assertAbortsBeforeTheContext` línea 154) y `SigningKeyPlacementGuardTest.theNonAdministrativeGuardFindsTheAdministrativePrivateKeyInAnOperatingSystemVariable`, línea 47 |
+| El guardián administrativo deja de listar `...portal-signing.previous.private-key` | `SigningKeyStartupTest.theAdministrativeProcessAbortsWhenTheReservedPortalPrivateKeyNameIsPresent`, línea 114, y `SigningKeyPlacementGuardTest.theAdministrativeGuardFindsTheReservedPortalNameInAnOperatingSystemVariable`, línea 63 |
+
+### Verificación completa
+
+`./mvnw verify -Pmutation-gate` (Docker en ejecución): Surefire 186 + 1 423, Failsafe 250, 0 fallos, `BUILD SUCCESS`.
+PIT, paquete `com.confia.shared.security.token`: 135 de 140 mutantes muertos (96 %), 4 sobrevivientes y 1 sin cobertura (los de 2a más el guardián sin
+supervivientes nuevos relevantes); total de la aplicación 371 de 391 (95 %).
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **441 líneas** (431 añadidas, 10 borradas), por debajo de 800.
+
+### Desviaciones
+
+- **H4 no se hizo:** `JwsFixtures` es de paquete (`com.confia.shared.security.token`) y `SigningKeyStartupTest` vive en `com.confia.bootstrap`; usarlo exigiría hacer público un fixture entre paquetes. Se deja la cabecera escrita a mano.
+- El valor Ed448 de H2 es un sobre PKCS#8 de Ed448 con cuerpo fijo patronado, no una clave generada, para no versionar material de clave ni introducir azar.
+- Con 1.2b fusionada, la tarea 1.2 queda hecha y la regla de orden (ninguna emisión ni verificación de tokens antes de 1.2b) se cumple.
