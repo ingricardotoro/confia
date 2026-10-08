@@ -21,10 +21,10 @@ import tools.jackson.databind.JsonNode;
  */
 final class AccessTokenClaims {
 
-    /** The issuer of the administrative tokens. */
+    /** The issuer of both kinds of administrative token. */
     static final String ISSUER = "confia-admin";
 
-    /** The audience of the access token. */
+    /** The audience of the access token; the restricted token's is {@code confia-admin-mfa}. */
     static final String AUDIENCE = "confia-admin";
 
     /** The exact life of the access token. */

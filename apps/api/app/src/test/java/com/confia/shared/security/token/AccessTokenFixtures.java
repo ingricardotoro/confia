@@ -76,6 +76,21 @@ final class AccessTokenFixtures {
         return claims;
     }
 
+    /** The nine claims of a valid restricted MFA token issued at {@code issuedAt}. */
+    static Map<String, Object> mfaClaims(Instant issuedAt, String purpose) {
+        Map<String, Object> claims = new LinkedHashMap<>();
+        claims.put("iss", "confia-admin");
+        claims.put("aud", "confia-admin-mfa");
+        claims.put("sub", ACCOUNT.toString());
+        claims.put("exp", issuedAt.getEpochSecond() + 300);
+        claims.put("iat", issuedAt.getEpochSecond());
+        claims.put("jti", TOKEN_ID.toString());
+        claims.put("tenant", INSTITUTION.toString());
+        claims.put("amr", List.of("pwd"));
+        claims.put("purpose", purpose);
+        return claims;
+    }
+
     static Map<String, Object> without(Map<String, Object> claims, String name) {
         Map<String, Object> copy = new LinkedHashMap<>(claims);
         copy.remove(name);

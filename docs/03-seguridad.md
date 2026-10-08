@@ -504,10 +504,9 @@ este control.
 > cliente, lo que cierra de una vez `alg: none`, la confusión de algoritmo, `crit`, `jku`, `jwk` y
 > cualquier miembro adicional. El token de acceso tiene exactamente nueve claims (`iss`, `aud`, `sub`,
 > `exp`, `iat`, `jti`, `sid`, `tenant`, `amr`), vive 600 segundos, no lleva `permissions` hasta el cambio
-> 8 ni ningún dato personal, y el verificador no aplica tolerancia de reloj sobre `exp`; un token con
-> la audiencia `confia-admin-mfa` ya se rechaza. El token restringido de MFA (audiencia
-> `confia-admin-mfa`, 300 segundos, sin `sid`, `purpose` de un conjunto cerrado) llega con la parte
-> 1.4d, con su propio verificador; desde entonces ninguno de los dos verificadores acepta al otro. La fila «Rotación de
+> 8 ni ningún dato personal, y el verificador no aplica tolerancia de reloj sobre `exp`. El token
+> restringido de MFA (audiencia `confia-admin-mfa`, 300 segundos, sin `sid`, `purpose` de un conjunto
+> cerrado) es de otro tipo y ninguno de los dos verificadores acepta al otro. La fila «Rotación de
 > claves» se cumple, hasta el cambio 11, con las variables de entorno de `docs/05` y un anillo de dos
 > claves, `current` y `previous`, descrito en 11.2. La publicación por JWKS queda diferida: el único
 > verificador es el propio proceso, con el anillo en memoria.
