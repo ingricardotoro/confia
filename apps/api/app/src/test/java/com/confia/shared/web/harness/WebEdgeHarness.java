@@ -1,5 +1,6 @@
 package com.confia.shared.web.harness;
 
+import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
 import com.confia.shared.web.authentication.AccessTokenAuthenticationFilter;
 import com.confia.shared.web.authentication.AuthenticatedEndpoint;
 import com.confia.shared.web.authentication.AuthenticatedEndpoints;
@@ -42,7 +43,8 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
         UserDetailsServiceAutoConfiguration.class, ErrorMvcAutoConfiguration.class})
 @Import({WebEdgeConfiguration.class, RateLimiterConfiguration.class,
         ThrottlingConfiguration.class, ObservabilityMetricsConfiguration.class,
-        HarnessController.class, LimitedController.class, UnknownPolicyController.class})
+        OrganizationConfiguration.class, HarnessController.class, LimitedController.class,
+        UnknownPolicyController.class})
 class WebEdgeHarness {
 
     /** {@code admin} (the default) or {@code portal}: which real allow-list the chain starts from. */
@@ -76,6 +78,7 @@ class WebEdgeHarness {
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/boom"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/fail-open"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/origin"));
+        endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/institution-open"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/limited"));
         endpoints.add(new PublicEndpoint(HttpMethod.HEAD, "/test/limited"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/unlimited"));
@@ -93,6 +96,8 @@ class WebEdgeHarness {
         AuthenticatedEndpoints authenticated = new AuthenticatedEndpoints(List.of(
                 new AuthenticatedEndpoint(HttpMethod.GET, "/test/whoami", SessionCheck.TOKEN_ONLY),
                 new AuthenticatedEndpoint(HttpMethod.GET, "/test/live", SessionCheck.LIVE_SESSION),
+                new AuthenticatedEndpoint(HttpMethod.GET, "/test/institution", SessionCheck.TOKEN_ONLY),
+                new AuthenticatedEndpoint(HttpMethod.POST, "/test/institution", SessionCheck.TOKEN_ONLY),
                 new AuthenticatedEndpoint(HttpMethod.GET, "/test/fail-authenticated",
                         SessionCheck.TOKEN_ONLY)));
         return SecurityChains

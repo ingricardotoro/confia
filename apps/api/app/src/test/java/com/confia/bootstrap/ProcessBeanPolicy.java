@@ -39,6 +39,10 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
     private static final String ADMIN_WIRING =
             "the production data access wiring is administrative only (web-edge-foundations D5)";
 
+    private static final String STAFF_INSTITUTION =
+            "the institution is resolved from an administrative token, which only the "
+                    + "administrative process verifies (ADR-0009)";
+
     static final ProcessBeanPolicy ADMIN = new ProcessBeanPolicy("admin",
             "com.confia.bootstrap.admin",
             Set.of("com.confia.bootstrap.admin", "com.confia.shared.web.openapi",
@@ -75,7 +79,13 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // cases, the adapters, and the named-interface package of its configuration.
                     // Each entry is exact because the non-vacuity check compares by equality.
                     "com.confia.identity.application", "com.confia.identity.infrastructure",
-                    "com.confia.identity.infrastructure.wiring"),
+                    "com.confia.identity.infrastructure.wiring",
+                    // The organization module as the two packages its beans come from: the
+                    // adapter that resolves the current institution from the token, and the
+                    // named-interface package of its configuration. Administrative only (a staff
+                    // token), and each entry exact like every other.
+                    "com.confia.organization.infrastructure",
+                    "com.confia.organization.infrastructure.wiring"),
             Map.of("com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON));
@@ -97,7 +107,10 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.identity", "staff-only module while identity has no guardian "
                             + "subdomain (ADR-0003)",
                     SCHEDULER_PACKAGE, SCHEDULER_REASON,
-                    TOKEN_PACKAGE, ADMIN_SIGNING_KEYS));
+                    TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
+                    // The adapter reads the institution of a staff token, which the portal never
+                    // verifies (decision 6 of session-tokens-and-web-layer).
+                    "com.confia.organization", STAFF_INSTITUTION));
 
     static final ProcessBeanPolicy WORKER = new ProcessBeanPolicy("worker",
             "com.confia.bootstrap.worker",
@@ -109,7 +122,8 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.shared.platform", ADMIN_WIRING,
                     "org.springframework.security", SPRING_SECURITY,
                     "org.springframework.boot.security", SPRING_SECURITY,
-                    TOKEN_PACKAGE, ADMIN_SIGNING_KEYS));
+                    TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
+                    "com.confia.organization", STAFF_INSTITUTION));
 
     static Stream<ProcessBeanPolicy> all() {
         return Stream.of(ADMIN, PORTAL, WORKER);

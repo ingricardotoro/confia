@@ -1,6 +1,7 @@
 package com.confia.shared.web.harness;
 
 import com.confia.kernel.DomainException;
+import com.confia.organization.application.CurrentInstitutionProvider;
 import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.RequestOrigin;
 import com.confia.shared.web.authentication.ActorAuthentication;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -43,9 +45,11 @@ import org.springframework.web.bind.annotation.RestController;
 class HarnessController {
 
     private final Calls calls;
+    private final CurrentInstitutionProvider institutions;
 
-    HarnessController(Calls calls) {
+    HarnessController(Calls calls, CurrentInstitutionProvider institutions) {
         this.calls = calls;
+        this.institutions = institutions;
     }
 
     /** Registered and public: the harness adds it to the allow-list for {@code GET} only. */
@@ -185,6 +189,27 @@ class HarnessController {
     String live() {
         calls.authenticatedInvoked();
         return "live";
+    }
+
+    /** What the institution routes report: the institution the production adapter resolved. */
+    record InstitutionView(String institutionId) {
+    }
+
+    /**
+     * On the authenticated list for {@code GET} and {@code POST}, token only: answers with the
+     * institution the production {@code CurrentInstitutionProvider} resolves. The body of the
+     * {@code POST} is read and ignored on purpose, to prove it cannot change the answer.
+     */
+    @RequestMapping(path = "/test/institution", method = {RequestMethod.GET, RequestMethod.POST})
+    InstitutionView institution(@RequestBody(required = false) Map<String, Object> ignored) {
+        calls.authenticatedInvoked();
+        return new InstitutionView(institutions.currentInstitutionId().value().toString());
+    }
+
+    /** Public for {@code GET}: asks for the institution without any authentication, a wiring defect. */
+    @GetMapping("/test/institution-open")
+    InstitutionView institutionOpen() {
+        return new InstitutionView(institutions.currentInstitutionId().value().toString());
     }
 
     /** Public for {@code GET}: whether an actor is bound, which only a verified token can do. */
