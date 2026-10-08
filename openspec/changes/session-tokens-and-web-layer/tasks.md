@@ -291,6 +291,23 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     `feat(web): add token-invalid and token-expired codes and WWW-Authenticate on every 401`. Tamaño: nominal 360, realista 790; costura,
     `WWW-Authenticate` y catálogo a 5b. — Escenarios WE01 a WE26 (salvo WE27 y WE28), WE30, WE31, WE33 a WE35, WE40 a WE42, BI19 y los
     escenarios sin identificador de la cadena que deniega por defecto, del `type`, del catálogo y de ausencia de reglas de permiso.
+  - **Nota fechada 2026-10-07: partición de 2.1.** La tarea completa y verificada (`./mvnw verify -Pmutation-gate` en verde, instantánea de OpenAPI sin
+    cambios) midió **1 566 líneas efectivas**, por encima de 800; por la regla general del 2026-10-06 se parte sin consultar en tres partes ordenadas. La
+    partición en dos que sugería la costura de 5b no cabe: filtro, cadena y lista autenticada suman 1 194 con sus pruebas. La tarea completa se conserva en la
+    rama local `wip/session-tokens-bearer-filter-full` (b98ca4d), que es la fuente de verdad y no se modifica. Las dos primeras partes quedan por debajo de
+    800; 2.1b queda en unas 800 y, si al construirla supera el tope, sus pruebas de la cadena administrativa (`AdminSecurityChainTest`, `ConfiaApplicationTest`)
+    pasan a 2.1c.
+
+    | Parte | Contenido | Tamaño |
+    |---|---|---|
+    | 2.1a `token-codes-and-authenticated-list` | `AccessTokenRejectedException`, `AccessTokenExpiredException`, `token-invalid` y `token-expired` con su es-HN, `ProblemAuthenticationEntryPoint` de tres casos, `AuthenticatedEndpoint`, `AuthenticatedEndpoints`, `SessionCheck`, segundo constructor de `SecurityChains`, inversiones de `ProblemCatalogCoverageTest` y `WebEdgeScopeExclusionInventoryTest`; sin filtro | 398 (medida) |
+    | 2.1b `bearer-authentication-filter` | `AccessTokenAuthenticationFilter`, `ActorAuthentication`, cableado en `AdminSecurityConfiguration`, `HarnessTokens` y rutas del arnés, `AccessTokenAuthenticationFilterTest`, ampliación de `AdminSecurityChainTest`, `ConfiaApplicationTest`, retirada de `PENDING_EXEMPT_CLASSES` | unas 800 (803 con las aserciones de `WWW-Authenticate`, que pasan a 2.1c) |
+    | 2.1c `www-authenticate-and-credential-confinement` | `WWW-Authenticate` en `ProblemResponses`, `ProblemResponsesTest`, `WwwAuthenticateChallengeTest`, `PortalChainBearerTest`, `BearerCredentialConfinementTest` y las aserciones de la cabecera en las pruebas de 2.1a y 2.1b | unas 380 |
+
+    - [x] 2.1a `token-codes-and-authenticated-list`. Commit `feat(web): add token-invalid and token-expired codes and the authenticated route list`.
+    - [ ] 2.1b `bearer-authentication-filter`. Commit `feat(web): authenticate the admin chain with a bearer access token filter`.
+    - [ ] 2.1c `www-authenticate-and-credential-confinement`. Commit `feat(web): add WWW-Authenticate on every 401 and pin the bearer credential confinement`.
+    - La casilla 2.1 se marca cuando 2.1a a 2.1c estén hechas. Las tres demostraciones deliberadas se hicieron sobre la tarea completa (ver «PR 5a» en `apply-progress.md`).
 
 - [ ] 2.2 **PR 6 `current-institution-adapter`: institución solo del principal (decisión 6, ADR-0009).**
   - **ROJO.** Crear `test/java/com/confia/organization/infrastructure/TokenCurrentInstitutionProviderTest.java` (la institución sale del
