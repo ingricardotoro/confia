@@ -16,11 +16,19 @@ import jakarta.validation.Validator;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.lang.reflect.Proxy;
 import java.net.SocketException;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Map;
 import java.util.Set;
+import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.ServerErrorMessage;
 import org.slf4j.MDC;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -161,6 +169,53 @@ class HarnessController {
     @GetMapping("/test/disconnected")
     String disconnected() throws AsyncRequestNotUsableException {
         throw new AsyncRequestNotUsableException("ServletOutputStream failed to write: Broken pipe");
+    }
+
+    /** The uniqueness violation PostgreSQL reports, with the value the client sent in its detail. */
+    static final String UNIQUE_DETAIL = "Key (email)=(valor.unico@colegio.edu.hn) already exists.";
+
+    private static PSQLException uniqueViolation() {
+        return new PSQLException(new ServerErrorMessage("SERROR\0C23505\0Mduplicate key value "
+                + "violates unique constraint \"staff_account_email_key\"\0D" + UNIQUE_DETAIL
+                + "\0\0"));
+    }
+
+    /** Public for {@code GET}: a bare driver failure with a unique violation, as the driver raises it. */
+    @GetMapping("/test/data-access-sql")
+    String dataAccessSql() throws SQLException {
+        throw uniqueViolation();
+    }
+
+    /** Public for {@code GET}: the same violation as Spring's data access hierarchy wraps it. */
+    @GetMapping("/test/data-access-spring")
+    String dataAccessSpring() {
+        throw new DuplicateKeyException("StatementCallback; SQL [insert into staff_account]; "
+                + uniqueViolation().getMessage(), uniqueViolation());
+    }
+
+    /** Public for {@code GET}: a Spring data access failure with no SQL exception in its causes. */
+    @GetMapping("/test/data-access-bare")
+    String dataAccessBare() {
+        throw new CannotAcquireLockException("Detail: " + UNIQUE_DETAIL);
+    }
+
+    /**
+     * Public for {@code GET}: the same violation as jOOQ translates it, by running a real query
+     * against a connection whose statements fail with the driver's exception.
+     */
+    @GetMapping("/test/data-access-jooq")
+    String dataAccessJooq() {
+        Connection failing = (Connection) Proxy.newProxyInstance(
+                HarnessController.class.getClassLoader(), new Class<?>[] {Connection.class},
+                (proxy, method, arguments) -> {
+                    if (method.getName().equals("prepareStatement")
+                            || method.getName().equals("getMetaData")) {
+                        throw uniqueViolation();
+                    }
+                    return null;
+                });
+        DSL.using(failing, SQLDialect.POSTGRES).selectOne().fetch();
+        throw new IllegalStateException("jOOQ did not fail");
     }
 
     /** What the authenticated routes report about the request they serve. */

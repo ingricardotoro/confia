@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
  * purpose, and the guard is shown to be the cause by taking it away: without it the same requests
  * do leak into the log at that level.
  */
-class SensitiveDataLoggingTest {
+public class SensitiveDataLoggingTest {
 
     private static final String BEARER = "SECRETO-A";
     private static final String COOKIE = "SECRETO-B";
@@ -38,7 +38,7 @@ class SensitiveDataLoggingTest {
     private static final List<String> SECRETS = List.of(BEARER, COOKIE, BODY, QUERY);
 
     /** Every way an event can carry text, searched for each secret; one entry per hit. */
-    static List<String> violations(List<ILoggingEvent> events, List<String> secrets) {
+    public static List<String> violations(List<ILoggingEvent> events, List<String> secrets) {
         List<String> found = new ArrayList<>();
         for (ILoggingEvent event : events) {
             Map<String, String> carriers = new LinkedHashMap<>();

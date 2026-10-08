@@ -83,7 +83,8 @@ class WebEdgeHarness {
         endpoints.add(new PublicEndpoint(HttpMethod.HEAD, "/test/limited"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/unlimited"));
         endpoints.add(new PublicEndpoint(HttpMethod.POST, "/test/validated"));
-        for (String path : List.of("/test/bounded", "/test/constraint-violation", "/test/required", "/test/sql-reset", "/test/post-only", "/test/status", "/test/access-denied",
+        for (String path : List.of("/test/bounded", "/test/constraint-violation", "/test/required", "/test/sql-reset", "/test/data-access-sql", "/test/data-access-spring",
+                "/test/data-access-jooq", "/test/data-access-bare", "/test/post-only", "/test/status", "/test/access-denied",
                 "/test/unmapped",
                 "/test/domain-known", "/test/domain-unknown", "/test/disconnected")) {
             endpoints.add(new PublicEndpoint(HttpMethod.GET, path));
