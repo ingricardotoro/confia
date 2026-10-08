@@ -310,8 +310,8 @@ public enum AuthenticationMethod { PASSWORD /* "pwd" */, ONE_TIME_PASSWORD /* "o
 **Filtro `AccessTokenAuthenticationFilter`** (`OncePerRequestFilter`), solo en
 `AdminSecurityConfiguration`; el portal no cambia:
 
-1. Sin cabecera `Authorization`, o con un esquema distinto de `Bearer` → sigue la cadena como anónimo.
-2. Más de una cabecera `Authorization`, esquema `Bearer` (sin distinguir mayúsculas) sin exactamente
+1. Sin cabecera `Authorization`, o con un esquema distinto de `Bearer` → sigue la cadena como anónimo. Una cabecera presente pero vacía o solo de espacios no es «sin cabecera»: es una credencial rota y sigue el paso 2.
+2. Más de una cabecera `Authorization`, una vacía o solo de espacios, esquema `Bearer` (sin distinguir mayúsculas) sin exactamente
    un espacio y un `token68`, o un token que el verificador rechaza → **no sigue la cadena**: llama al
    punto de entrada con `AccessTokenExpiredException` (solo `EXPIRED`) o
    `AccessTokenRejectedException` (todo lo demás).
@@ -320,7 +320,7 @@ public enum AuthenticationMethod { PASSWORD /* "pwd" */, ONE_TIME_PASSWORD /* "o
 4. Éxito → `ActorAuthentication` (autenticada, sin autoridades) en el `SecurityContextHolder` de
    Spring para la autorización, y el resto de la cadena corre dentro de
    `ScopedValue.where(AuthenticatedActor.CURRENT, actor)`, igual que `RequestOrigin` (decisión 11 de
-   4a). `SecurityContextHolderFilter` limpia el contexto de Spring al terminar.
+   4a). El propio filtro limpia el contexto de Spring en un `finally` (`SecurityContextHolder.clearContext()`), además de `SecurityContextHolderFilter`, para que un hilo del grupo nunca empiece la petición siguiente con el principal anterior.
 
 - **Un token inválido en una ruta pública también responde `401`.** Un cliente que envía una
   credencial rota recibe la causa; la SPA no envía `Authorization` a rutas públicas.

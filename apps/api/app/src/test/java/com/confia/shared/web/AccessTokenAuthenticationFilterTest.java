@@ -91,9 +91,21 @@ class AccessTokenAuthenticationFilterTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"Bearer", "Bearer ", "Bearer  abc.def.ghi", "Bearer abc def",
-            "Bearer abc.def.ghi extra", "bearer", "BEARER ", "Bearer a b c"})
+            "Bearer abc.def.ghi extra", "bearer", "BEARER ", "Bearer a b c", ""})
     void aMalformedBearerHeaderIsTokenInvalid(String header) {
         assertInvalid(process.get("/test/whoami", "Authorization", header));
+    }
+
+    @Test
+    void aTabInPlaceOfTheSpaceAfterBearerIsTokenInvalid() {
+        assertInvalid(process.get("/test/whoami", "Authorization",
+                "Bearer\t" + process.tokens().access()));
+        assertThat(process.calls().authenticatedInvocations()).isEqualTo(authenticatedBefore);
+    }
+
+    @Test
+    void anEmptyAuthorizationHeaderIsTokenInvalidOnAPublicRouteToo() {
+        assertInvalid(process.get("/test/actor", "Authorization", ""));
     }
 
     @Test
