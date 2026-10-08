@@ -25,6 +25,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ProblemAuthenticationEntryPointTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final String CHALLENGE_OF_A_BAD_TOKEN = "Bearer error=\"invalid_token\"";
 
     private static MockHttpServletResponse answer(AuthenticationException exception)
             throws IOException {
@@ -49,6 +50,7 @@ class ProblemAuthenticationEntryPointTest {
 
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(typeOf(response)).isEqualTo("https://confia.hn/problems/token-expired");
+        assertThat(response.getHeader("WWW-Authenticate")).isEqualTo(CHALLENGE_OF_A_BAD_TOKEN);
     }
 
     @Test
@@ -57,6 +59,7 @@ class ProblemAuthenticationEntryPointTest {
 
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(typeOf(response)).isEqualTo("https://confia.hn/problems/token-invalid");
+        assertThat(response.getHeader("WWW-Authenticate")).isEqualTo(CHALLENGE_OF_A_BAD_TOKEN);
     }
 
     @Test
@@ -68,6 +71,7 @@ class ProblemAuthenticationEntryPointTest {
 
             assertThat(typeOf(response))
                     .isEqualTo("https://confia.hn/problems/authentication-required");
+            assertThat(response.getHeader("WWW-Authenticate")).isEqualTo("Bearer");
             assertThat(response.getContentAsString()).doesNotContain("SECRETO-MENSAJE");
         }
     }

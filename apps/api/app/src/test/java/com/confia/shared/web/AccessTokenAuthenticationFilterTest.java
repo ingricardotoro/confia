@@ -25,6 +25,8 @@ import tools.jackson.databind.JsonNode;
  */
 class AccessTokenAuthenticationFilterTest {
 
+    private static final String INVALID = "Bearer error=\"invalid_token\"";
+
     private static HarnessProcess process;
 
     private int authenticatedBefore;
@@ -52,15 +54,17 @@ class AccessTokenAuthenticationFilterTest {
 
     private static void assertInvalid(HttpResponse<String> response) {
         assertProblem(response, 401, "token-invalid");
+        assertThat(response.headers().allValues("WWW-Authenticate")).containsExactly(INVALID);
     }
 
     // --- No credential, or one that is not a bearer token ---
 
     @Test
-    void noCredentialIsAnonymousAndGetsTheUniformDenial() {
+    void noCredentialIsAnonymousAndGetsTheUniformDenialWithTheBearerChallenge() {
         HttpResponse<String> response = process.get("/test/whoami");
 
         assertProblem(response, 401, "authentication-required");
+        assertThat(response.headers().allValues("WWW-Authenticate")).containsExactly("Bearer");
         assertThat(process.calls().authenticatedInvocations()).isEqualTo(authenticatedBefore);
     }
 
@@ -87,9 +91,21 @@ class AccessTokenAuthenticationFilterTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"Bearer", "Bearer ", "Bearer  abc.def.ghi", "Bearer abc def",
-            "Bearer abc.def.ghi extra", "bearer", "BEARER ", "Bearer a b c"})
+            "Bearer abc.def.ghi extra", "bearer", "BEARER ", "Bearer a b c", ""})
     void aMalformedBearerHeaderIsTokenInvalid(String header) {
         assertInvalid(process.get("/test/whoami", "Authorization", header));
+    }
+
+    @Test
+    void aTabInPlaceOfTheSpaceAfterBearerIsTokenInvalid() {
+        assertInvalid(process.get("/test/whoami", "Authorization",
+                "Bearer\t" + process.tokens().access()));
+        assertThat(process.calls().authenticatedInvocations()).isEqualTo(authenticatedBefore);
+    }
+
+    @Test
+    void anEmptyAuthorizationHeaderIsTokenInvalidOnAPublicRouteToo() {
+        assertInvalid(process.get("/test/actor", "Authorization", ""));
     }
 
     @Test
@@ -144,6 +160,7 @@ class AccessTokenAuthenticationFilterTest {
         HttpResponse<String> response = process.get("/test/whoami", "Authorization", bearer(expired));
 
         assertProblem(response, 401, "token-expired");
+        assertThat(response.headers().allValues("WWW-Authenticate")).containsExactly(INVALID);
         assertThat(process.calls().authenticatedInvocations()).isEqualTo(authenticatedBefore);
     }
 

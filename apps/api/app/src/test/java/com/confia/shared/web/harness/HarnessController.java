@@ -193,6 +193,18 @@ class HarnessController {
         return Map.of("present", AuthenticatedActor.current().isPresent());
     }
 
+    /** Public for {@code GET}: fails with a {@code 500} whose message is a marker the log test looks for. */
+    @GetMapping("/test/fail-open")
+    String failOpen() {
+        throw new IllegalStateException("sentinel-fail-open");
+    }
+
+    /** On the authenticated list for {@code GET}, token only: the same failure behind a valid token. */
+    @GetMapping("/test/fail-authenticated")
+    String failAuthenticated() {
+        throw new IllegalStateException("sentinel-fail-authenticated");
+    }
+
     /** Public for {@code GET} and always failing, with a message that must never reach a client. */
     @RequestMapping("/test/boom")
     String boom(HttpServletRequest request) {

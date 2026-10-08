@@ -18,7 +18,12 @@ public final class ActorAuthentication implements Authentication {
 
     private static final long serialVersionUID = 1L;
 
-    private final AuthenticatedActor actor;
+    /**
+     * Transient on purpose: {@link Authentication} is {@code Serializable}, and a session store
+     * or a cache that wrote this object out would persist the principal. Nothing in the process
+     * does, because the chain is stateless; the modifier keeps it that way.
+     */
+    private final transient AuthenticatedActor actor;
 
     public ActorAuthentication(AuthenticatedActor actor) {
         this.actor = Objects.requireNonNull(actor, "actor");

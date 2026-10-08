@@ -74,6 +74,7 @@ class WebEdgeHarness {
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/open"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/actor"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/boom"));
+        endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/fail-open"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/origin"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/limited"));
         endpoints.add(new PublicEndpoint(HttpMethod.HEAD, "/test/limited"));
@@ -91,7 +92,9 @@ class WebEdgeHarness {
         }
         AuthenticatedEndpoints authenticated = new AuthenticatedEndpoints(List.of(
                 new AuthenticatedEndpoint(HttpMethod.GET, "/test/whoami", SessionCheck.TOKEN_ONLY),
-                new AuthenticatedEndpoint(HttpMethod.GET, "/test/live", SessionCheck.LIVE_SESSION)));
+                new AuthenticatedEndpoint(HttpMethod.GET, "/test/live", SessionCheck.LIVE_SESSION),
+                new AuthenticatedEndpoint(HttpMethod.GET, "/test/fail-authenticated",
+                        SessionCheck.TOKEN_ONLY)));
         return SecurityChains
                 .denyByDefault(http, new PublicEndpoints(endpoints), authenticated, problems)
                 .addFilterBefore(new AccessTokenAuthenticationFilter(tokens.verifier(),

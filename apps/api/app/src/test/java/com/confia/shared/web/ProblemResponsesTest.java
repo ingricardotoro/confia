@@ -61,6 +61,40 @@ class ProblemResponsesTest {
         assertThat(body.get("traceId").asString()).isEqualTo(REQUEST_ID);
     }
 
+    @ParameterizedTest
+    @CsvSource({"AUTHENTICATION_REQUIRED, Bearer", "TOKEN_INVALID, Bearer error=\"invalid_token\"",
+            "TOKEN_EXPIRED, Bearer error=\"invalid_token\""})
+    void every401CarriesTheChallengeOfItsCodeAndNothingElse(ProblemCode code, String challenge)
+            throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        writer().write(request("/x", null), response, code);
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(response.getHeaders("WWW-Authenticate")).containsExactly(challenge);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"VALIDATION_FAILED", "FORBIDDEN", "RESOURCE_NOT_FOUND", "TOO_MANY_REQUESTS",
+            "INTERNAL_ERROR", "CAPACITY_EXCEEDED"})
+    void noOtherStatusCarriesAChallenge(ProblemCode code) throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        writer().write(request("/x", null), response, code);
+
+        assertThat(response.getHeaders("WWW-Authenticate")).isEmpty();
+    }
+
+    @Test
+    void theChallengeAlsoAccompaniesTheResponseWithoutARequestPath() throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        writer().writeWithoutRequestPath(request("/x", null), response,
+                ProblemCode.AUTHENTICATION_REQUIRED);
+
+        assertThat(response.getHeaders("WWW-Authenticate")).containsExactly("Bearer");
+    }
+
     @Test
     void theStatusFollowsTheCodeAndNotAFixedValue() throws IOException {
         MockHttpServletResponse response = new MockHttpServletResponse();

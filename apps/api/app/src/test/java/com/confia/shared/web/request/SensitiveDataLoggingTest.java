@@ -9,7 +9,9 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.ThrowableProxyUtil;
 import ch.qos.logback.core.read.ListAppender;
 import com.confia.shared.web.harness.HarnessProcess;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +60,20 @@ class SensitiveDataLoggingTest {
         return found;
     }
 
-    private static List<ILoggingEvent> logOf(HarnessProcess process) {
+    /** The messages the two failing routes of the harness throw; a stack trace holds each one. */
+    private static final String FAIL_OPEN = "sentinel-fail-open";
+    private static final String FAIL_AUTHENTICATED = "sentinel-fail-authenticated";
+
+    /** The token, its payload segment and the payload it decodes to: all three are secrets. */
+    private static List<String> secretsOf(String token) {
+        String payload = token.split("[.]")[1];
+        String decoded = new String(Base64.getUrlDecoder().decode(payload), StandardCharsets.UTF_8);
+        List<String> secrets = new ArrayList<>(SECRETS);
+        secrets.addAll(List.of(token, payload, decoded));
+        return secrets;
+    }
+
+    private static List<ILoggingEvent> logOf(HarnessProcess process, String token) {
         LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
         Logger root = context.getLogger(Logger.ROOT_LOGGER_NAME);
         Map<Logger, Level> before = new LinkedHashMap<>();
@@ -79,6 +94,10 @@ class SensitiveDataLoggingTest {
                     "Cookie", "sid=" + COOKIE);
             process.get("/test/open?token=" + QUERY);
             process.get("/x?token=" + QUERY);
+            // A VALID token on two routes that fail with a 500: the token reaches the translator
+            // and the log of an unexpected failure, on a public route and on an authenticated one.
+            process.get("/test/fail-open", "Authorization", "Bearer " + token);
+            process.get("/test/fail-authenticated", "Authorization", "Bearer " + token);
         } finally {
             root.detachAppender(appender);
             before.forEach(Logger::setLevel);
@@ -89,11 +108,17 @@ class SensitiveDataLoggingTest {
     @Test
     void noEventOfAnyRequestCarriesTheAuthorizationTheCookieOrTheBody() {
         try (HarnessProcess process = HarnessProcess.start()) {
-            List<ILoggingEvent> events = logOf(process);
+            String token = process.tokens().access();
+            List<ILoggingEvent> events = logOf(process, token);
 
             assertThat(events).as("non-vacuous: the requests did produce events")
                     .anyMatch(event -> event.getThrowableProxy() != null);
-            assertThat(violations(events, SECRETS)).isEmpty();
+            assertThat(events).as("non-vacuous: both failing routes ran with a valid token")
+                    .anyMatch(event -> event.getThrowableProxy() != null && ThrowableProxyUtil
+                            .asString(event.getThrowableProxy()).contains(FAIL_OPEN))
+                    .anyMatch(event -> event.getThrowableProxy() != null && ThrowableProxyUtil
+                            .asString(event.getThrowableProxy()).contains(FAIL_AUTHENTICATED));
+            assertThat(violations(events, secretsOf(token))).isEmpty();
             assertThat(events).extracting(ILoggingEvent::getFormattedMessage)
                     .noneMatch(message -> message.contains("generated security password"));
         }
@@ -134,7 +159,8 @@ class SensitiveDataLoggingTest {
             assertThat(context.getTurboFilterList()).as("the guard is installed").contains(guard);
             context.getTurboFilterList().remove(guard);
             try {
-                List<String> leaks = violations(logOf(process), SECRETS);
+                String token = process.tokens().access();
+                List<String> leaks = violations(logOf(process, token), secretsOf(token));
 
                 assertThat(leaks).as("the guard is what keeps each secret out")
                         .anyMatch(leak -> leak.startsWith("org.apache.coyote.")

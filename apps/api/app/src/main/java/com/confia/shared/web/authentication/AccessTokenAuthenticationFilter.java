@@ -27,10 +27,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * web layer that reads a token: everything after it reads the {@link AuthenticatedActor} it binds.
  *
  * <ol>
- *   <li>No {@code Authorization} header, or a scheme other than {@code Bearer}: the request goes on
+ *   <li>No {@code Authorization} header at all, or a scheme other than {@code Bearer}: the request goes on
  *       as anonymous, and the chain decides.
- *   <li>More than one {@code Authorization} header, a {@code Bearer} header that is not exactly one
- *       space and a token, or a token the verifier refuses: the chain is not continued. The entry
+ *   <li>More than one {@code Authorization} header, one that is empty or only whitespace, a {@code
+ *       Bearer} header that is not exactly one space and a token, or a token the verifier refuses: the chain is not continued. The entry
  *       point answers {@code token-expired} for an intact token whose time has passed and {@code
  *       token-invalid} for everything else, on a public route as much as on a protected one, because
  *       a client that sent a broken credential should hear the cause.
@@ -72,24 +72,30 @@ public final class AccessTokenAuthenticationFilter extends OncePerRequestFilter 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain chain) throws ServletException, IOException {
-        AuthenticatedActor actor = null;
         try {
-            Optional<String> token = bearerTokenOf(request);
-            if (token.isPresent()) {
-                actor = authenticate(token.get(), request);
+            AuthenticatedActor actor = null;
+            try {
+                Optional<String> token = bearerTokenOf(request);
+                if (token.isPresent()) {
+                    actor = authenticate(token.get(), request);
+                }
+            } catch (AccessTokenRejectedException rejection) {
+                entryPoint.commence(request, response, rejection);
+                return;
             }
-        } catch (AccessTokenRejectedException rejection) {
-            entryPoint.commence(request, response, rejection);
-            return;
+            if (actor == null) {
+                chain.doFilter(request, response);
+                return;
+            }
+            SecurityContext context = SecurityContextHolder.createEmptyContext();
+            context.setAuthentication(new ActorAuthentication(actor));
+            SecurityContextHolder.setContext(context);
+            callWithActor(actor, request, response, chain);
+        } finally {
+            // The filter owns what it put on the thread: a pooled worker never starts the next
+            // request with this caller's principal, whatever else clears the context.
+            SecurityContextHolder.clearContext();
         }
-        if (actor == null) {
-            chain.doFilter(request, response);
-            return;
-        }
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(new ActorAuthentication(actor));
-        SecurityContextHolder.setContext(context);
-        callWithActor(actor, request, response, chain);
     }
 
     /**
@@ -108,6 +114,9 @@ public final class AccessTokenAuthenticationFilter extends OncePerRequestFilter 
             throw new AccessTokenRejectedException();
         }
         String value = headers.get(0);
+        if (value.isBlank()) {
+            throw new AccessTokenRejectedException();
+        }
         int end = schemeEnd(value);
         if (!BEARER.equalsIgnoreCase(value.substring(0, end))) {
             return Optional.empty();
