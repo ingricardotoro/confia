@@ -7,8 +7,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.security.web.SecurityFilterChain;
 
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
+import com.confia.shared.web.authentication.AccessTokenAuthenticationFilter;
 
 /**
  * One test per {@link AppProfile} value, plus the invalid/missing case (task 3.1). Admin and
@@ -55,6 +57,27 @@ class ConfiaApplicationTest {
             assertThat(outcome.context()).isNotInstanceOf(WebServerApplicationContext.class);
         } finally {
             close(outcome.context());
+        }
+    }
+
+    @Test
+    void theAdminChainAuthenticatesBearerTokensAndThePortalChainDoesNot() {
+        LaunchOutcome admin = ConfiaApplication.launch(TestProcessArguments.forProcess("admin"),
+                "admin");
+        try {
+            assertThat(admin.context().getBean(SecurityFilterChain.class).getFilters())
+                    .hasAtLeastOneElementOfType(AccessTokenAuthenticationFilter.class);
+        } finally {
+            close(admin.context());
+        }
+        LaunchOutcome portal = ConfiaApplication.launch(TestProcessArguments.forProcess("portal"),
+                "portal");
+        try {
+            assertThat(portal.context().getBean(SecurityFilterChain.class).getFilters())
+                    .isNotEmpty()
+                    .doesNotHaveAnyElementsOfTypes(AccessTokenAuthenticationFilter.class);
+        } finally {
+            close(portal.context());
         }
     }
 

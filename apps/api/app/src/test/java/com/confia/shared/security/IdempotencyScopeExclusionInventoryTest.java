@@ -49,7 +49,9 @@ class IdempotencyScopeExclusionInventoryTest {
      * may depend on, by full class name. Add the next one here (2.3c added {@code RequestOrigin}; 3.2b
      * added the limiter and its answers, which the interceptor of the edge uses; 3.2c added
      * {@code RateLimitPolicy}, a plain value that the properties and the throttling configuration
-     * hand to the limiter. {@code InMemoryRateLimiter} stays out on purpose: a shared.security
+     * hand to the limiter; 2.1 of session-tokens-and-web-layer added {@code AuthenticatedActor}, the
+     * principal the bearer filter binds and Spring's view of it carries. {@code InMemoryRateLimiter}
+     * stays out on purpose: a shared.security
      * configuration builds it and exposes only the port, so the web layer never names the
      * implementation).
      */
@@ -60,7 +62,8 @@ class IdempotencyScopeExclusionInventoryTest {
             "com.confia.shared.security.RateLimitDecision$Admitted",
             "com.confia.shared.security.RateLimitDecision$Limited",
             "com.confia.shared.security.RateLimitDecision$CapacityExhausted",
-            "com.confia.shared.security.RateLimitPolicy");
+            "com.confia.shared.security.RateLimitPolicy",
+            "com.confia.shared.security.AuthenticatedActor");
 
     private static final String EXECUTOR = "com.confia.shared.security.IdempotentExecutor";
 
