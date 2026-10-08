@@ -700,3 +700,40 @@ El token de acceso y el restringido comparten clave y cabecera; solo `aud` y el 
 ### Desviaciones
 
 Ninguna respecto al diseño.
+
+## PR 4e `claim-rules-and-web-isolation` (tarea 1.4e, cierre de la partición de 1.4)
+
+Contenido: `AccessTokenClaimsPropertyTest` (jqwik), `architecture/WebLayerTokenIsolationTest` y el fixture permanente `architecture/fixture/token/web/BadWebClassUsingVerifier`. Se
+trajeron de `c7456c6` solo esos tres archivos; el cambio de `AccessTokenVerifierTest` de esa rama no se trajo, porque `main` ya conserva sus pruebas de `epochSecond` (más completas).
+
+### Decisión sobre las exenciones de la regla BI14
+
+- La regla es no vacía: la prueba `theRuleEvaluatesRealProductionWebClasses` exige que el conjunto evaluado contenga `AdminSecurityConfiguration` y `ProblemBody`, y la mitad de fixture exige que
+  `BadWebClassUsingVerifier` sea rechazada nombrando los cuatro tipos (`AccessTokenVerifier`, `CompactJws`, `SigningKeyRing`, `AccessTokenIssuer`).
+- Se eximen dos clases por nombre completo (y sus clases internas): `AccessTokenAuthenticationFilter`, que llega con la tarea 2.1, y `AdminSecurityConfiguration`. Ninguna otra.
+- Eximir por nombre una clase inexistente es frágil, así que se añadió `everyExemptNameIsARealClassOrIsListedAsPending`: cada nombre eximido debe existir o figurar en `PENDING_EXEMPT_CLASSES`,
+  y una entrada pendiente cuya clase ya exista hace fallar la prueba (obliga a retirarla de la lista cuando llegue 2.1). Un error tipográfico queda así detectado y no exime en silencio.
+
+### Evidencia de trabajo
+
+| Evidencia | Resultado |
+|---|---|
+| Rojo re-observado | Fixture rechazado por nombre (`BadWebClassUsingVerifier`) con los cuatro tipos; propiedad de claims en rojo al debilitar la lista cerrada (abajo) |
+| Verde focalizado | `-Dtest='WebLayerTokenIsolationTest,AccessTokenClaimsPropertyTest'`: 5 y 4 pruebas, 0 fallos |
+| Ruptura 1 | Regla con `..web..` cambiado por `..nowhere..`: fallan `rejectsTheFixtureWebClassThatVerifiesATokenItself` y la mitad de producción (regla sin clases evaluadas). Revertida, `cmp` limpio |
+| Ruptura 2 | `ClaimReader` línea 38 `equals(declared)` a `containsAll(declared)`: falla `anyClaimAddedToTheClosedListMakesTheTokenInvalid`. Revertida, `cmp` limpio |
+| Ruptura 3 (informativa) | `declared.containsAll(propertyNames)` (permite faltantes): ninguna prueba de la propiedad falla, porque la lectura tipada de cada claim ya rechaza la ausencia; no se declara cubierta por esa propiedad |
+| Verificación completa | `./mvnw verify -Pmutation-gate`: Surefire 1 649 (antes 1 640) y Failsafe 250, 0 fallos, `BUILD SUCCESS` |
+| PIT, paquete `com.confia.shared.security.token` | 93 % (448 de 481 mutantes muertos), umbral de 80 cumplido |
+| PIT, `ClaimReader` | Antes (main, medido en un `verify` limpio): 34 de 42 muertos, 8 supervivientes. Después: 34 de 42, los mismos 8. `AccessTokenClaimsPropertyTest` no mata ninguno |
+| Límite de reversión | Los tres archivos de prueba; `git revert` del commit los retira |
+
+Supervivientes de `ClaimReader` (líneas 38, 51, 81, 85, 94, 99; `RemoveConditionalMutator`) siguen abiertos; no se afirma cobertura que no se midió.
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **297 líneas** (297 añadidas, 0 borradas), por debajo de 800.
+
+### Desviaciones
+
+Ninguna respecto al diseño. La partición 1.4a a 1.4e queda completa y la casilla 1.4 se marca hecha.
