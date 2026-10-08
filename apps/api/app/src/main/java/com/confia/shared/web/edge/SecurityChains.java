@@ -1,8 +1,10 @@
 package com.confia.shared.web.edge;
 
+import com.confia.shared.web.authentication.AuthenticatedEndpoints;
 import com.confia.shared.web.problem.ProblemAccessDeniedHandler;
 import com.confia.shared.web.problem.ProblemAuthenticationEntryPoint;
 import com.confia.shared.web.problem.ProblemResponses;
+import java.util.List;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
@@ -22,6 +24,12 @@ import org.springframework.security.config.http.SessionCreationPolicy;
  * last rule denies everything else, so the answer never depends on whether a controller exists. An
  * anonymous request that is denied is sent to the entry point ({@code 401}); an authenticated one
  * goes to the access-denied handler ({@code 403}). Both answer with Problem Details.
+ *
+ * <p>The administrative chain adds a second list between the two (session-tokens-and-web-layer
+ * design.md, decision 5): the routes of {@link AuthenticatedEndpoints}, each for its own method,
+ * which any authenticated actor may use, with no role, permission or second factor involved. The
+ * order is public routes, authenticated routes, then the final denial, so an authenticated actor on a
+ * route that is on neither list gets {@code 403}.
  */
 public final class SecurityChains {
 
@@ -34,6 +42,15 @@ public final class SecurityChains {
      */
     public static HttpSecurity denyByDefault(HttpSecurity http, PublicEndpoints endpoints,
             ProblemResponses problems) throws Exception {
+        return denyByDefault(http, endpoints, new AuthenticatedEndpoints(List.of()), problems);
+    }
+
+    /**
+     * Like the chain without authenticated routes, with the routes of {@code authenticated}
+     * between the public ones and the final denial.
+     */
+    public static HttpSecurity denyByDefault(HttpSecurity http, PublicEndpoints endpoints,
+            AuthenticatedEndpoints authenticated, ProblemResponses problems) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
@@ -49,6 +66,9 @@ public final class SecurityChains {
                 .authorizeHttpRequests(requests -> {
                     endpoints.endpoints().forEach(endpoint -> requests
                             .requestMatchers(endpoint.method(), endpoint.pattern()).permitAll());
+                    authenticated.endpoints().forEach(endpoint -> requests
+                            .requestMatchers(endpoint.method(), endpoint.pattern())
+                            .authenticated());
                     requests.anyRequest().denyAll();
                 });
     }

@@ -737,3 +737,56 @@ Supervivientes de `ClaimReader` (líneas 38, 51, 81, 85, 94, 99; `RemoveConditio
 ### Desviaciones
 
 Ninguna respecto al diseño. La partición 1.4a a 1.4e queda completa y la casilla 1.4 se marca hecha.
+
+## PR 5a `token-codes-and-authenticated-list` (tarea 2.1a, 2026-10-07, modo TDD estricto)
+
+Primera de las tres partes de 2.1 (ver la nota fechada «partición de 2.1» en `tasks.md`). Se parte de `main` en 1d19245; el árbol completo de 2.1 sigue intacto en la
+rama local `wip/session-tokens-bearer-filter-full` (b98ca4d). Commit de código: `21ba138`, `feat(web): add token-invalid and token-expired codes and the authenticated route list`.
+
+### Honestidad sobre el rojo
+
+El agente anterior se detuvo sin registrar nada de 2.1, de modo que el rojo de las pruebas nuevas ya no se puede observar en su orden original. Por eso la evidencia de
+estricto TDD de toda la tarea 2.1 son las cuatro rupturas deliberadas de abajo, hechas sobre el árbol completo (b98ca4d) antes de partirlo. No se afirma un rojo previo
+que no se observó.
+
+### Contenido de 2.1a
+
+`AccessTokenRejectedException`, `AccessTokenExpiredException`, `AuthenticatedEndpoint`, `AuthenticatedEndpoints` (vacía en producción), `SessionCheck`, `package-info`
+(`@NamedInterface`); `token-invalid` y `token-expired` en `ProblemCode` y en `problems.properties` (es-HN); `ProblemAuthenticationEntryPoint` con tres casos por tipo de
+excepción; segundo constructor de `SecurityChains` (públicas, autenticadas, `denyAll()` al final) y su uso desde `AdminSecurityConfiguration` con la lista vacía. Pruebas:
+`ProblemCodeTest`, inversión de BI19 en `ProblemCatalogCoverageTest` (con los controles negativos), `ProblemAuthenticationEntryPointTest`, `AuthenticatedEndpointsTest` y
+`ALLOWED_ROUTE_RULES = {permitAll, authenticated, denyAll}` en `WebEdgeScopeExclusionInventoryTest`. No hay filtro: ninguna ruta se autentica todavía y nada eleva las
+excepciones; `WebLayerTokenIsolationTest` conserva el filtro en `PENDING_EXEMPT_CLASSES` hasta 2.1b. El comentario de `ProblemCode` no menciona `WWW-Authenticate` (llega en 2.1c).
+
+### Rupturas deliberadas (sobre la tarea completa, `-Dtest` acotado)
+
+Cada una se revirtió y se comprobó con `cmp`; tras la última el árbol coincidía con b98ca4d.
+
+| # | Ruptura | Resultado |
+|---|---|---|
+| 1 | `AccessTokenExpiredException` sustituida por la de rechazo en el filtro | `AccessTokenAuthenticationFilterTest`: 26 pruebas, 2 fallos: `anExpiredTokenWithAnIntactSignatureIsTokenExpired` y `aBrokenCredentialOnAPublicRouteIsStill401WithTheCause` |
+| 2 | El filtro lee también `?access_token=` | `BearerCredentialConfinementTest`: 6 pruebas, 1 fallo: `aCredentialOutsideTheAuthorizationHeaderIsIgnored`. La primera ejecución se hizo con `AccessTokenAuthenticationFilterTest`, que no contiene esa comprobación, y pasó; el caso vive en la clase de confinamiento (2.1c) |
+| 3 | Sin `setHeader` de `WWW-Authenticate` en `ProblemResponses` | 105 pruebas de 7 clases, **28 fallos** (la tarea decía doce): 16 de `AccessTokenAuthenticationFilterTest`, 4 de `WwwAuthenticateChallengeTest`, 4 de `ProblemResponsesTest`, 3 de `ProblemAuthenticationEntryPointTest`, 1 de `PortalChainBearerTest` |
+| 4a | Filtro retirado de `AdminSecurityConfiguration` | `ConfiaApplicationTest`: 11 pruebas, 1 fallo: `theAdminChainAuthenticatesBearerTokensAndThePortalChainDoesNot`. Las pruebas por HTTP no lo detectan porque el arnés construye su propia cadena con el mismo filtro; la cadena real la cubre esta prueba |
+| 4b | Filtro neutralizado (pasa la petición sin autenticar) | 64 pruebas, 21 fallos: 19 de `AccessTokenAuthenticationFilterTest` y 2 de `AdminSecurityChainTest` (`aRegisteredRouteNobodyAddedToEitherListIsDeniedEvenToAValidToken`, `aBrokenBearerCredentialIsNotTheUniformDenialAnymoreAndSaysSo`) |
+
+### Evidencia de trabajo (2.1a)
+
+| Evidencia | Resultado |
+|---|---|
+| Verde focalizado | Incluido en la verificación completa de abajo; sin filtro no hay prueba por HTTP en esta parte |
+| Verde y verificación completa | `./mvnw verify -Pmutation-gate` en `apps/api` (Docker en ejecución): Surefire 186 y 1 662, Failsafe 250, 0 fallos, `BUILD SUCCESS` |
+| Instantánea de OpenAPI | `OpenApiContractSnapshotTest` 10 pruebas en verde; el archivo de la instantánea no cambió |
+| PIT | Núcleo 99 % (192 de 194 mutantes); paquete `com.confia.shared.security.token` 93 % (448 de 481); umbral de 80 cumplido |
+| Límite de reversión | Los archivos de la parte; `git revert` del commit de código devuelve la cadena a `main` sin tocar el resto |
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **398 líneas**, por debajo de 800. Medición de las otras dos partes sobre árboles intermedios, sin construirlas:
+2.1b unas 800 (803 con las aserciones de `WWW-Authenticate`, que pasan a 2.1c) y 2.1c unas 380; la suma supera 1 566 por unas 14 líneas porque `AdminSecurityConfiguration`,
+`ProblemCode` y `ProblemAuthenticationEntryPointTest` se tocan en dos partes.
+
+### Desviaciones
+
+La tarea se parte en tres y no en dos: filtro, cadena y lista con sus pruebas suman 1 194 líneas. Sin otras desviaciones respecto al diseño. Quedan 2.1b y 2.1c; 2.1b está al
+límite del tope y puede necesitar mover `AdminSecurityChainTest` y `ConfiaApplicationTest` a 2.1c.

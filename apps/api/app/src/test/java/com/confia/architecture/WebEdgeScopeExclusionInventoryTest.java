@@ -31,7 +31,8 @@ import org.springframework.security.authentication.AuthenticationProvider;
  *       identity} (owner: {@code session-tokens-and-web-layer}, slice C5b);
  *   <li>no class is an {@code AuthenticationProvider} and none uses {@code
  *       jakarta.servlet.http.Cookie} (owner: {@code session-tokens-and-web-layer});
- *   <li>no authorization rule on a route beyond the public allow-list and the final denial, and no
+ *   <li>no authorization rule on a route beyond the public allow-list, the authenticated list (any
+ *       authenticated actor, no role) and the final denial, and no
  *       method-level permission annotation (owner: change 8, RBAC);
  *   <li>no class of a {@code ..web..} package has {@code Institution} in its name (owner: the first
  *       endpoint of institution administration);
@@ -55,7 +56,8 @@ class WebEdgeScopeExclusionInventoryTest {
     private static final String AUTHORIZED_URL =
             "org.springframework.security.config.annotation.web.configurers"
                     + ".AuthorizeHttpRequestsConfigurer$AuthorizedUrl";
-    private static final Set<String> ALLOWED_ROUTE_RULES = Set.of("permitAll", "denyAll");
+    private static final Set<String> ALLOWED_ROUTE_RULES =
+            Set.of("permitAll", "authenticated", "denyAll");
     private static final Set<String> PERMISSION_ANNOTATIONS = Set.of(
             "org.springframework.security.access.prepost.PreAuthorize",
             "org.springframework.security.access.prepost.PostAuthorize",
@@ -204,15 +206,15 @@ class WebEdgeScopeExclusionInventoryTest {
     // --- No permission rule on a route (owner: change 8, RBAC) ---
 
     @Test
-    void theChainHoldsOnlyPublicRoutesAndTheFinalDenial() {
+    void theChainHoldsOnlyPublicRoutesAuthenticatedRoutesAndTheFinalDenial() {
         JavaClasses production = assertNonEmptyProductionClasses();
 
         assertThat(routeRulesApplied(production))
-                .as("the scan sees the real chain: its allow-list permits routes and its last "
+                .as("the scan sees the real chain: its lists permit and authenticate routes and its last "
                         + "rule denies every other one")
                 .containsAll(ALLOWED_ROUTE_RULES);
         assertThat(routeRulesBeyondTheAllowListAndTheFinalDenial(production))
-                .as("no route carries a role, permission, authentication or MFA rule: the matrix "
+                .as("no route carries a role, permission or MFA rule: the matrix "
                         + "is change 8's")
                 .isEmpty();
     }
