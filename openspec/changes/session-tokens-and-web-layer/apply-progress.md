@@ -859,3 +859,67 @@ es que `SensitiveDataLoggingTest` envía `Bearer SECRETO-A` a `/test/open` y a `
 **Pasan a 2.1c** (nota fechada en `tasks.md`): I-1 (ruta 500 con token válido), I-2 (`clearContext()` y prueba de que el contexto no pasa a
 la petición siguiente), S-1 y S-3. S-2 queda como riesgo aceptado, a decidir por `confia-architect`.
 
+
+## PR 5c `www-authenticate-and-credential-confinement` (tarea 2.1c, 2026-10-07, modo TDD estricto)
+
+Tercera y última parte de 2.1. Se parte de `main` en 917062f (ya contiene 2.1a y 2.1b); la fuente de verdad es la rama local
+`wip/session-tokens-bearer-filter-full` (b98ca4d), de la que se trajeron los archivos con `git show` (sin `checkout`). Commits de código: `df8b3a6`
+(`feat(web): add WWW-Authenticate on every 401 and confine the bearer credential to its header`) y `3209608`
+(`fix(web): clear the security context after each request and treat an empty Authorization header as an invalid token`). Con esta parte la tarea 2.1 queda completa.
+
+### Contenido tomado de la copia de respaldo (A)
+
+`WWW-Authenticate` fijada en un solo lugar, `ProblemResponses.challengeOf`: `Bearer` para `authentication-required`, `Bearer error="invalid_token"` para
+`token-invalid` y `token-expired`, sin `realm` ni `error_description`; el resto de los códigos no lleva desafío. Pruebas: `ProblemResponsesTest`,
+`WwwAuthenticateChallengeTest`, `PortalChainBearerTest`, `BearerCredentialConfinementTest`, y las aserciones de la cabecera repuestas en
+`AccessTokenAuthenticationFilterTest` y `ProblemAuthenticationEntryPointTest`. Se corrigió además el Javadoc de `ProblemCode`.
+
+### Seguimientos de la revisión independiente (B), nuevos en esta parte
+
+| # | Cambio | Pruebas |
+|---|---|---|
+| I-1 | Rutas del arnés `/test/fail-open` (pública) y `/test/fail-authenticated` (autenticada, `TOKEN_ONLY`), ambas lanzan una excepción con un marcador | `SensitiveDataLoggingTest.logOf` envía un token válido (`process.tokens().access()`) a las dos con `TRACE` activo; el token, su segmento de carga y la carga decodificada se añaden a los secretos; se afirma que ambas trazas existen (no vacuo) y que ningún secreto aparece |
+| I-2 | El trabajo del filtro va en `try { ... } finally { SecurityContextHolder.clearContext(); }` | `AccessTokenAuthenticationFilterContextTest` (nueva, 10 casos con `MockHttpServletRequest`/`MockFilterChain`): token válido y luego ninguno en el mismo hilo, cadena que falla, petición anónima con un contexto previo |
+| S-1 | Cabecera `Authorization` presente pero vacía o solo de espacios: `401 token-invalid` (antes, anónima). Otros esquemas, como Basic, siguen anónimos | HTTP: cabecera vacía en ruta autenticada y en pública, `Bearer<TAB><token>`; unitaria: `""`, `" "`, `"   "`, `"\t"`, `Bearer<TAB>`, Basic anónimo. Nota de la decisión 5 de `design.md` actualizada (pasos 1, 2 y 4) |
+| S-3 | `ActorAuthentication.actor` pasa a `transient`, con comentario | Prueba por reflexión en `AccessTokenAuthenticationFilterContextTest` |
+
+### ROJO observado (antes de tocar el código de producción)
+
+`-Dtest='AccessTokenAuthenticationFilterContextTest,SensitiveDataLoggingTest,AccessTokenAuthenticationFilterTest'`, con las pruebas y las rutas del controlador pero sin
+registrarlas en el arnés ni cambiar el filtro:
+
+- `AccessTokenAuthenticationFilterContextTest`: 10 pruebas, 8 fallos (los tres de `clearContext`, el de `transient` y los cuatro de cabecera vacía o en blanco; pasan `Bearer<TAB>` y Basic, que ya eran correctos).
+- `AccessTokenAuthenticationFilterTest`: 29 pruebas, 2 fallos (`aMalformedBearerHeaderIsTokenInvalid[9]` con `""` y `anEmptyAuthorizationHeaderIsTokenInvalidOnAPublicRouteToo`).
+- `SensitiveDataLoggingTest`: 1 fallo, `noEventOfAnyRequestCarriesTheAuthorizationTheCookieOrTheBody` (sin traza de las rutas que fallan).
+
+VERDE: mismo comando más las pruebas de la parte A, sin fallos.
+
+### Rupturas deliberadas (`-Dtest` acotado)
+
+Cada una se revirtió y se comprobó con `cmp`; no queda ninguna.
+
+| # | Ruptura | Resultado |
+|---|---|---|
+| 1 | Se quita `clearContext()` del `finally` del filtro | `AccessTokenAuthenticationFilterContextTest`: 10 pruebas, 3 fallos: `thePrincipalOfOneRequestNeverReachesTheNextRequestOnTheSameThread`, `theContextIsClearedWhenTheRestOfTheChainFails`, `anAnonymousRequestAlsoLeavesTheThreadClean` |
+| 2 | El filtro lee también `?access_token=` | `BearerCredentialConfinementTest`: 6 pruebas, 1 fallo: `aCredentialOutsideTheAuthorizationHeaderIsIgnored` |
+| 3 | Se quita `response.setHeader("WWW-Authenticate", ...)` de `ProblemResponses` | 19 fallos de `AccessTokenAuthenticationFilterTest`, 1 de `PortalChainBearerTest`, 3 de `ProblemAuthenticationEntryPointTest` y 4 de `ProblemResponsesTest` (y los de `WwwAuthenticateChallengeTest`, cortados en la salida) |
+
+### Evidencia de trabajo (2.1c)
+
+| Evidencia | Resultado |
+|---|---|
+| Verde focalizado | Las ocho clases de la parte (`AccessTokenAuthenticationFilterContextTest`, `SensitiveDataLoggingTest`, `AccessTokenAuthenticationFilterTest`, `WwwAuthenticateChallengeTest`, `BearerCredentialConfinementTest`, `PortalChainBearerTest`, `ProblemResponsesTest`, `ProblemAuthenticationEntryPointTest`): sin fallos |
+| Verificación completa | `./mvnw verify -Pmutation-gate` en `apps/api` (Docker en ejecución, 12 min 37 s): Surefire 186 y 1 729, Failsafe 250, 0 fallos, `BUILD SUCCESS` |
+| Instantánea de OpenAPI | El archivo de la instantánea no cambió (`git status` limpio tras la construcción, sin diferencias en `apps/api/openapi` respecto de `main`) |
+| PIT | Paquete `com.confia.shared.security.token` 93 % (448 de 481), fuerza de pruebas 94 %; umbral de 80 cumplido (la construcción pasó la compuerta) |
+| Límite de reversión | `git revert` de `3209608` retira los seguimientos B; `git revert` de `df8b3a6` retira el desafío y la prueba de confinamiento sin tocar el filtro de 2.1b |
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **671 líneas** (644 añadidas, 27 borradas), por debajo de 800. Las dos partes anteriores quedaron en 398 y 798.
+
+### Desviaciones y riesgos
+
+- Sin desviaciones respecto al diseño; la nota de la decisión 5 se actualizó para reflejar S-1 e I-2.
+- S-2 sigue como riesgo aceptado, a decidir por `confia-architect`: la verificación Ed25519 ocurre antes del limitador de tasa.
+- Tarea 2.1 completa (2.1a, 2.1b, 2.1c). Siguiente: 2.2.

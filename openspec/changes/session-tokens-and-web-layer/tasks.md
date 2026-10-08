@@ -258,7 +258,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
 
 ## Fase 2: filtro, institución y registro
 
-- [ ] 2.1 **PR 5 `bearer-authentication-filter`: filtro, principal, lista autenticada y códigos (decisión 5).**
+- [x] 2.1 **PR 5 `bearer-authentication-filter`: filtro, principal, lista autenticada y códigos (decisión 5).**
   - **ROJO.** Crear en `test/java/com/confia/shared/web/`: `AccessTokenAuthenticationFilterTest.java` (arnés sin base de datos con
     `RANDOM_PORT` y un doble de `SessionValidity`; sin credencial `401 authentication-required` + `WWW-Authenticate: Bearer`; `Basic`
     anónimo; `Bearer` vacío, con dos espacios, con espacio interior o dos cabeceras → `token-invalid`; token alterado, de otra clave,
@@ -306,7 +306,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
 
     - [x] 2.1a `token-codes-and-authenticated-list`. Commit `feat(web): add token-invalid and token-expired codes and the authenticated route list`.
     - [x] 2.1b `bearer-authentication-filter`. Commit `feat(web): authenticate the admin chain with a bearer access token filter`.
-    - [ ] 2.1c `www-authenticate-and-credential-confinement`. Commit `feat(web): add WWW-Authenticate on every 401 and pin the bearer credential confinement`.
+    - [x] 2.1c `www-authenticate-and-credential-confinement`. Commit `feat(web): add WWW-Authenticate on every 401 and pin the bearer credential confinement`.
     - La casilla 2.1 se marca cuando 2.1a a 2.1c estén hechas. Las tres demostraciones deliberadas se hicieron sobre la tarea completa (ver «PR 5a» en `apply-progress.md`).
 
   - **Nota fechada 2026-10-07 (revisión independiente de 2.1b; se construye en 2.1c).**
