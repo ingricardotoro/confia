@@ -203,7 +203,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   - **Cierre.** `./mvnw verify` completo. Commit: `refactor(shared): move the audit chain SHA-256 to a security utility and confine hashing`.
     Tamaño: nominal 200, realista 440. — Escenarios BI11, BI12, BI13, BI38.
 
-- [ ] 1.4 **PR 4 `access-and-mfa-tokens`: claims, emisor, verificador y principal (decisión 4, decisión 5 parte tipos).**
+- [x] 1.4 **PR 4 `access-and-mfa-tokens`: claims, emisor, verificador y principal (decisión 4, decisión 5 parte tipos).**
   - **ROJO.** Crear `test/java/com/confia/shared/security/token/AccessTokenVerifierTest.java` y `AccessTokenIssuerTest.java` (lista cerrada:
     claim extra, repetido, nulo, de tipo distinto, `aud` como arreglo, `permissions` presente; `exp - iat = 600` y `aud = confia-admin`
     (ADR-0005, prueba 3); borde `exp == now` vencido; `iat > now + 60 s`; emisor y audiencia incorrectos; falta de cada claim; `Expired`
@@ -252,7 +252,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     - [x] 1.4b `access-token-issuer`. Commit `feat(security): issue admin access tokens and carry the authenticated actor`.
     - [x] 1.4c `access-token-verifier`. Commits `feat(security): verify admin access tokens against a closed claim list` y `docs(security): note the in-house JWS and key rotation`.
     - [x] 1.4d `restricted-mfa-token`. Commits `feat(security): issue and verify the restricted MFA token` y `docs(security): describe the restricted MFA token as delivered`.
-    - [ ] 1.4e `claim-rules-and-web-isolation`.
+    - [x] 1.4e `claim-rules-and-web-isolation`. Commit `test(security): pin the claim rules and keep the web layer off the token package`.
     - La casilla 1.4 se marca cuando 1.4a a 1.4e estén hechas.
 
 
