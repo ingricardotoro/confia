@@ -91,6 +91,11 @@ public final class HarnessProcess implements AutoCloseable {
         return context.getBean(type);
     }
 
+    /** The tokens this harness's chain accepts, and the ones it must refuse. */
+    public HarnessTokens tokens() {
+        return context.getBean(HarnessTokens.class);
+    }
+
     /** What the harness controllers observed. */
     public Calls calls() {
         return context.getBean(Calls.class);

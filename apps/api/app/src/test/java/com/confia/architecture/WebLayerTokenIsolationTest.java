@@ -25,8 +25,8 @@ import org.junit.jupiter.api.Test;
  * the real web classes and carries no empty-set exception. The fixture half must reject {@code
  * BadWebClassUsingVerifier} for each of the four named types. The two exempt classes are named by
  * their complete names and, as inner classes included, by nothing else: a third class, or the same
- * simple name in another package, is not exempt. The filter does not exist yet: it arrives with task 2.1. Naming it
- * here means the rule needs no edit then, and {@code PENDING_EXEMPT_CLASSES} plus the test that checks
+ * simple name in another package, is not exempt. The filter arrived with task 2.1; it was named
+ * here before it existed so the rule needed no edit then, and {@code PENDING_EXEMPT_CLASSES} plus the test that checks
  * every exempt name keeps a typo from standing as a silent exemption.
  */
 class WebLayerTokenIsolationTest {
@@ -42,8 +42,7 @@ class WebLayerTokenIsolationTest {
      * unexempt or an exemption pointing at nothing; the test below fails on it. Remove an entry when
      * its class arrives: the same test fails while a listed class already exists.
      */
-    static final List<String> PENDING_EXEMPT_CLASSES = List.of(
-            "com.confia.shared.web.authentication.AccessTokenAuthenticationFilter");
+    static final List<String> PENDING_EXEMPT_CLASSES = List.of();
 
     private static final DescribedPredicate<JavaClass> NOT_EXEMPT =
             new DescribedPredicate<>("not the authentication filter or the administrative chain "

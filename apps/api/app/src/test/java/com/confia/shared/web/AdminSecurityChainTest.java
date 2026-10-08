@@ -174,13 +174,42 @@ class AdminSecurityChainTest {
         for (HttpResponse<String> response : java.util.List.of(
                 process.get("/b"),
                 process.get("/deep/er/route"),
-                process.get("/c", "Authorization", "Bearer not.a.valid.token"),
                 process.get("/c", "Authorization", "Basic !!!not-base64!!!"))) {
             JsonNode body = assertProblem(response, 401, "authentication-required");
             for (String field : new String[] {"type", "title", "detail"}) {
                 assertThat(body.get(field)).as(field).isEqualTo(reference.get(field));
             }
         }
+    }
+
+    @Test
+    void aBrokenBearerCredentialIsNotTheUniformDenialAnymoreAndSaysSo() {
+        HttpResponse<String> response = process.get("/c", "Authorization",
+                "Bearer not.a.valid.token");
+
+        assertProblem(response, 401, "token-invalid");
+    }
+
+    // --- The authenticated list: a closed list, parallel to the public one ---
+
+    @Test
+    void anAuthenticatedRouteWithoutACredentialIsDeniedBeforeItsControllerRuns() {
+        int before = process.calls().authenticatedInvocations();
+
+        assertProblem(process.get("/test/whoami"), 401, "authentication-required");
+        assertProblem(process.send("POST", "/test/whoami"), 401, "authentication-required");
+
+        assertThat(process.calls().authenticatedInvocations()).isEqualTo(before);
+    }
+
+    @Test
+    void aRegisteredRouteNobodyAddedToEitherListIsDeniedEvenToAValidToken() {
+        int before = process.calls().protectedInvocations();
+        String token = process.tokens().access();
+
+        assertProblem(process.get("/x", "Authorization", "Bearer " + token), 403, "forbidden");
+
+        assertThat(process.calls().protectedInvocations()).isEqualTo(before);
     }
 
     @Test

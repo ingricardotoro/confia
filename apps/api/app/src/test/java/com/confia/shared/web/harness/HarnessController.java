@@ -1,7 +1,9 @@
 package com.confia.shared.web.harness;
 
 import com.confia.kernel.DomainException;
+import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.RequestOrigin;
+import com.confia.shared.web.authentication.ActorAuthentication;
 import com.confia.shared.web.problem.ProblemResponses;
 import com.confia.shared.web.request.RequestContextFilter;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,6 +22,7 @@ import java.util.Set;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.MediaType;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
@@ -154,6 +157,40 @@ class HarnessController {
     @GetMapping("/test/disconnected")
     String disconnected() throws AsyncRequestNotUsableException {
         throw new AsyncRequestNotUsableException("ServletOutputStream failed to write: Broken pipe");
+    }
+
+    /** What the authenticated routes report about the request they serve. */
+    record ActorView(String accountId, String institutionId, String sessionId,
+            boolean springAuthenticated) {
+    }
+
+    /**
+     * On the authenticated list for {@code GET}, token only: reports the actor the filter bound and
+     * whether Spring's own security context holds the matching authentication.
+     */
+    @GetMapping("/test/whoami")
+    ActorView whoami() {
+        calls.authenticatedInvoked();
+        AuthenticatedActor actor = AuthenticatedActor.current().orElseThrow(
+                () -> new IllegalStateException("no authenticated actor is bound to this request"));
+        boolean spring = SecurityContextHolder.getContext()
+                .getAuthentication() instanceof ActorAuthentication authentication
+                && authentication.getPrincipal().equals(actor);
+        return new ActorView(actor.accountId().toString(), actor.institutionId().toString(),
+                actor.sessionId().toString(), spring);
+    }
+
+    /** On the authenticated list for {@code GET}, with the live-session check. */
+    @GetMapping("/test/live")
+    String live() {
+        calls.authenticatedInvoked();
+        return "live";
+    }
+
+    /** Public for {@code GET}: whether an actor is bound, which only a verified token can do. */
+    @GetMapping("/test/actor")
+    Map<String, Boolean> actor() {
+        return Map.of("present", AuthenticatedActor.current().isPresent());
     }
 
     /** Public for {@code GET} and always failing, with a message that must never reach a client. */

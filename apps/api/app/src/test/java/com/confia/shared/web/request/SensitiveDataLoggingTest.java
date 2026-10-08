@@ -75,7 +75,7 @@ class SensitiveDataLoggingTest {
                     "Cookie", "sid=" + COOKIE);
             process.sendWithBody("POST", "/x", BODY, "Authorization", "Bearer " + BEARER,
                     "Cookie", "sid=" + COOKIE);
-            process.sendWithBody("GET", "/test/boom", BODY, "Authorization", "Bearer " + BEARER,
+            process.sendWithBody("GET", "/test/boom", BODY,
                     "Cookie", "sid=" + COOKIE);
             process.get("/test/open?token=" + QUERY);
             process.get("/x?token=" + QUERY);
