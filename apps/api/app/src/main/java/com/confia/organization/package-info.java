@@ -5,9 +5,12 @@
  *
  * <p>Out of scope in this change ({@code institution-root-and-multitenancy-baseline}, F0 change
  * 4): the {@code organization_institution} table, its Flyway migration and its jOOQ repository
- * (change 5, proposal decision D1); the adapter that resolves the current institution from the
- * authenticated token (change 7, ADR-0009); institution administration — create, toggle, screens,
+ * (change 5, proposal decision D1); institution administration — create, toggle, screens,
  * endpoints (ADR-0009, point 5, deferred until a second real institution exists).
+ *
+ * <p>The adapter that resolves the current institution from the authenticated token ({@link
+ * com.confia.organization.infrastructure.TokenCurrentInstitutionProvider}, ADR-0009) arrived with
+ * {@code session-tokens-and-web-layer}.
  *
  * <p>This module has no {@code infrastructure} or {@code web} package yet (proposal, "Dentro de
  * alcance", point 4): the only honest {@code infrastructure} adapter is the jOOQ repository of

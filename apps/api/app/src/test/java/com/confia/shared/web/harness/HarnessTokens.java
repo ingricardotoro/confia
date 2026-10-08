@@ -67,6 +67,13 @@ public final class HarnessTokens {
         return accessAt(Instant.now());
     }
 
+    /** A valid access token for {@link #ACCOUNT} in {@code institution}, issued now. */
+    public String accessForInstitution(UUID institution) {
+        return new AccessTokenIssuer(jws, Clock.systemUTC())
+                .issueAccess(ACCOUNT, institution, SESSION, Set.of(AuthenticationMethod.PASSWORD))
+                .compact();
+    }
+
     /** An access token issued at {@code issuedAt}: expired when that was more than ten minutes ago. */
     public String accessAt(Instant issuedAt) {
         return new AccessTokenIssuer(jws, Clock.fixed(issuedAt, java.time.ZoneOffset.UTC))
