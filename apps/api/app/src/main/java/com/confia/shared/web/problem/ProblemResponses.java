@@ -35,6 +35,9 @@ public final class ProblemResponses {
     private static final String MEDIA_TYPE = "application/problem+json";
     private static final int MAX_INSTANCE_LENGTH = 1024;
     private static final String NO_PATH = "/";
+    private static final String CHALLENGE_HEADER = "WWW-Authenticate";
+    private static final String BEARER = "Bearer";
+    private static final String BEARER_INVALID_TOKEN = "Bearer error=\"invalid_token\"";
 
     private final MessageSource messages;
     private final JsonMapper mapper = JsonMapper.builder().build();
@@ -76,9 +79,27 @@ public final class ProblemResponses {
                 traceIdOf(request), violations);
         byte[] bytes = mapper.writeValueAsBytes(body);
         response.setStatus(code.status());
+        String challenge = challengeOf(code);
+        if (challenge != null) {
+            response.setHeader(CHALLENGE_HEADER, challenge);
+        }
         response.setContentType(MEDIA_TYPE);
         response.setContentLength(bytes.length);
         response.getOutputStream().write(bytes);
+    }
+
+    /**
+     * The {@code WWW-Authenticate} value RFC 9110 requires of every {@code 401}, decided by the code
+     * and by nothing else, in this one place (session-tokens-and-web-layer design.md, decision 5):
+     * no realm and no description, because the client needs neither and a description would only
+     * offer text to an attacker. Any other status carries no challenge.
+     */
+    private static String challengeOf(ProblemCode code) {
+        return switch (code) {
+            case AUTHENTICATION_REQUIRED -> BEARER;
+            case TOKEN_INVALID, TOKEN_EXPIRED -> BEARER_INVALID_TOKEN;
+            default -> null;
+        };
     }
 
     private static String instanceOf(HttpServletRequest request) {

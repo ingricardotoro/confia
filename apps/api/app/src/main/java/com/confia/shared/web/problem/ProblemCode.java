@@ -24,7 +24,8 @@ import java.util.Optional;
  * the codes of the domain exceptions of {@code IdempotentExecutor}, which the one translator
  * answers from the catalog (task 5.1; design.md, decision 19). The bearer filter of the administrative
  * chain owns {@link #TOKEN_INVALID} (a credential that is present and not good, including a session
- * that is over) and {@link #TOKEN_EXPIRED} (an intact token whose time has passed)
+ * that is over) and {@link #TOKEN_EXPIRED} (an intact token whose time has passed), and the
+ * {@code WWW-Authenticate} challenge of each {@code 401} follows from its code
  * (session-tokens-and-web-layer design.md, decision 5). The sign-in code
  * ({@code authentication-failed}) and the
  * institution codes belong to the session change and do not exist yet. {@link
