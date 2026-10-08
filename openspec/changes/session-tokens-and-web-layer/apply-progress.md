@@ -790,3 +790,51 @@ Cada una se revirtió y se comprobó con `cmp`; tras la última el árbol coinci
 
 La tarea se parte en tres y no en dos: filtro, cadena y lista con sus pruebas suman 1 194 líneas. Sin otras desviaciones respecto al diseño. Quedan 2.1b y 2.1c; 2.1b está al
 límite del tope y puede necesitar mover `AdminSecurityChainTest` y `ConfiaApplicationTest` a 2.1c.
+
+## PR 5b `bearer-authentication-filter` (tarea 2.1b, 2026-10-07, modo TDD estricto)
+
+Segunda de las tres partes de 2.1. Se parte de `main` en 6f6a9c4 (que ya contiene 2.1a); la fuente de verdad sigue siendo la rama local
+`wip/session-tokens-bearer-filter-full` (b98ca4d), de la que se trajeron los archivos con `git show`. Commit de código: `661d73b`,
+`feat(web): authenticate the admin chain with a bearer access token filter`.
+
+### Contenido de 2.1b
+
+`AccessTokenAuthenticationFilter` y `ActorAuthentication`; el filtro se construye con `new` en `AdminSecurityConfiguration` y se añade con
+`addFilterBefore(..., AnonymousAuthenticationFilter.class)` (no es un bean). Arnés: `HarnessTokens`, rutas autenticadas (`/test/whoami`, `/test/live`) y pública
+(`/test/actor`) en `HarnessController`, `Calls`, `HarnessProcess` y `WebEdgeHarness` (la cadena del portal del arnés no lleva el filtro). Pruebas:
+`AccessTokenAuthenticationFilterTest` (26), ampliación de `AdminSecurityChainTest` (34), `ConfiaApplicationTest` (11), el cambio de `SensitiveDataLoggingTest`
+(la petición rota a `/test/boom` ya no envía `Bearer`, porque ahora se rechazaría antes del controlador), `AuthenticatedActor` en el inventario de
+`IdempotencyScopeExclusionInventoryTest` y `PENDING_EXEMPT_CLASSES` vacía en `WebLayerTokenIsolationTest`. `SECRETO-TOKEN` ausente de todo registro a `TRACE` se comprueba en
+`AccessTokenAuthenticationFilterTest` y `SensitiveDataLoggingTest`.
+
+### Aserciones que pasan a 2.1c
+
+Las tres comprobaciones de la cabecera `WWW-Authenticate` de `AccessTokenAuthenticationFilterTest` (en `assertInvalid`, en el caso sin credencial y en el caso vencido) y la
+constante `INVALID`; el caso sin credencial se renombró a `noCredentialIsAnonymousAndGetsTheUniformDenial`. 2.1c las repone junto con `ProblemResponses`.
+`AdminSecurityChainTest` y `ConfiaApplicationTest` se quedaron en 2.1b: la medición cabe en el tope.
+
+### Rupturas deliberadas (árbol de 2.1b, `-Dtest` acotado)
+
+Cada una se revirtió y se comprobó con `cmp`.
+
+| # | Ruptura | Resultado |
+|---|---|---|
+| 1 | `AccessTokenExpiredException` sustituida por la de rechazo en el filtro | `AccessTokenAuthenticationFilterTest`: 26 pruebas, 2 fallos: `anExpiredTokenWithAnIntactSignatureIsTokenExpired` y `aBrokenCredentialOnAPublicRouteIsStill401WithTheCause` |
+| 2 | Filtro retirado de `AdminSecurityConfiguration` | `ConfiaApplicationTest`: 11 pruebas, 1 fallo: `theAdminChainAuthenticatesBearerTokensAndThePortalChainDoesNot` (es la única que lo detecta: el arnés construye su propia cadena) |
+| 3 | Filtro neutralizado (pasa la petición sin autenticar) | 75 pruebas, 21 fallos: 19 de `AccessTokenAuthenticationFilterTest` y 2 de `AdminSecurityChainTest` |
+
+La ruptura de `?access_token=` y la de `WWW-Authenticate` pertenecen a 2.1c.
+
+### Evidencia de trabajo (2.1b)
+
+| Evidencia | Resultado |
+|---|---|
+| Verde focalizado | `-Dtest='AccessTokenAuthenticationFilterTest,AdminSecurityChainTest,ConfiaApplicationTest,WebLayerTokenIsolationTest,SensitiveDataLoggingTest,IdempotencyScopeExclusionInventoryTest'`: 83 pruebas, 0 fallos |
+| Verificación completa | `./mvnw verify -Pmutation-gate` en `apps/api` (Docker en ejecución): Surefire 186 y 1 692, Failsafe 250, 0 fallos, `BUILD SUCCESS` |
+| Instantánea de OpenAPI | `OpenApiContractSnapshotTest` 10 pruebas en verde; el archivo de la instantánea no cambió |
+| PIT | Núcleo 99 % (192 de 194); paquete `com.confia.shared.security.token` 93 % (448 de 481) |
+| Límite de reversión | Los archivos de la parte; `git revert` del commit de código devuelve la cadena administrativa a 2.1a |
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **798 líneas**, por debajo de 800. Queda 2.1c (unas 380).

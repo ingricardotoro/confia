@@ -305,7 +305,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     | 2.1c `www-authenticate-and-credential-confinement` | `WWW-Authenticate` en `ProblemResponses`, `ProblemResponsesTest`, `WwwAuthenticateChallengeTest`, `PortalChainBearerTest`, `BearerCredentialConfinementTest` y las aserciones de la cabecera en las pruebas de 2.1a y 2.1b | unas 380 |
 
     - [x] 2.1a `token-codes-and-authenticated-list`. Commit `feat(web): add token-invalid and token-expired codes and the authenticated route list`.
-    - [ ] 2.1b `bearer-authentication-filter`. Commit `feat(web): authenticate the admin chain with a bearer access token filter`.
+    - [x] 2.1b `bearer-authentication-filter`. Commit `feat(web): authenticate the admin chain with a bearer access token filter`.
     - [ ] 2.1c `www-authenticate-and-credential-confinement`. Commit `feat(web): add WWW-Authenticate on every 401 and pin the bearer credential confinement`.
     - La casilla 2.1 se marca cuando 2.1a a 2.1c estén hechas. Las tres demostraciones deliberadas se hicieron sobre la tarea completa (ver «PR 5a» en `apply-progress.md`).
 
