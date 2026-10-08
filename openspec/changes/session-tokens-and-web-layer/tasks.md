@@ -508,6 +508,10 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
 
 ---
 
+  - **Nota fechada 2026-10-07 (pendiente de 2.2; se construye en 5.2).** En 2.2, OR05 y OR10 se probaron solo en la unidad. Esta tarea
+    añade sus pruebas por HTTP sobre `GET /api/v1/auth/sessions/current`:
+    - un token con `tenant` de A y `sid` de B responde `401 token-invalid`;
+    - el contexto de base de datos con el rol real `confia_admin_app` es el de la institución del token.
 ## Trazabilidad: escenarios de `specs/identity/spec.md` (124)
 
 Los escenarios sin identificador se citan por su título. Cada escenario tiene exactamente una tarea dueña; las notas
