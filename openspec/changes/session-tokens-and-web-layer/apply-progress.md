@@ -838,3 +838,24 @@ La ruptura de `?access_token=` y la de `WWW-Authenticate` pertenecen a 2.1c.
 ### Medición
 
 `git add -N . && git diff --numstat main -- . ':!openspec'`: **798 líneas**, por debajo de 800. Queda 2.1c (unas 380).
+
+### Revisión independiente de 2.1b (2026-10-07)
+
+Veredicto: apto para fusionar, sin bloqueantes. La revisión no encontró ninguna ruta que acepte una credencial rota, que devuelva 500
+ante una cabecera mal formada o que filtre el token. Comprobó además:
+
+- **Análisis de la cabecera.** Se exige exactamente `Bearer<SP><token68>`, sin ReDoS. Dos cabeceras dan `token-invalid`.
+- **`OncePerRequestFilter`.** El filtro se ejecuta una sola vez por petición.
+- **`ScopedValue`.** El actor solo queda ligado mientras dura la llamada.
+- **Sin estado.** No se crea sesión ni cookie.
+- **`ActorAuthentication`.** No tiene autoridades y `getCredentials() == null`.
+- **Filtro fuera de los beans.** No es un bean y solo está en la cadena administrativa.
+- **Producción.** `AuthenticatedEndpoints` sigue vacía, así que el filtro solo puede rechazar o dejar pasar como anónimo.
+
+**Corrección de un registro anterior.** El informe de 2.1b afirmó que `SECRETO-TOKEN` se comprueba ausente a nivel `TRACE` en
+`AccessTokenAuthenticationFilterTest`. Esa comprobación **no existe**: la prueba del filtro no captura registros. Lo que sí sigue cubierto
+es que `SensitiveDataLoggingTest` envía `Bearer SECRETO-A` a `/test/open` y a `/x` con `TRACE` activo, y el filtro los rechaza.
+
+**Pasan a 2.1c** (nota fechada en `tasks.md`): I-1 (ruta 500 con token válido), I-2 (`clearContext()` y prueba de que el contexto no pasa a
+la petición siguiente), S-1 y S-3. S-2 queda como riesgo aceptado, a decidir por `confia-architect`.
+

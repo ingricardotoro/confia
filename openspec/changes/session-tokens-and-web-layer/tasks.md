@@ -309,6 +309,23 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     - [ ] 2.1c `www-authenticate-and-credential-confinement`. Commit `feat(web): add WWW-Authenticate on every 401 and pin the bearer credential confinement`.
     - La casilla 2.1 se marca cuando 2.1a a 2.1c estén hechas. Las tres demostraciones deliberadas se hicieron sobre la tarea completa (ver «PR 5a» en `apply-progress.md`).
 
+  - **Nota fechada 2026-10-07 (revisión independiente de 2.1b; se construye en 2.1c).**
+    - **I-1.** Desde 2.1b, la petición de `SensitiveDataLoggingTest` a `/test/boom` ya no envía `Bearer`, porque el filtro la rechazaría
+      antes. Con eso la garantía «un token válido nunca llega a un registro en una ruta que falla con 500» quedó sin cobertura. 2.1c
+      añade al arnés:
+      - una ruta pública y otra autenticada (`TOKEN_ONLY`), ambas lanzando una excepción;
+      - en `logOf`, un token válido (`process.tokens().access()`), con el token y su carga añadidos a `SECRETS`.
+    - **I-2.** El filtro no limpia el `SecurityContext`; hoy lo hace `SecurityContextHolderFilter` de Spring Security y ninguna prueba lo
+      demuestra. 2.1c:
+      - envuelve el trabajo del filtro en `try/finally` con `SecurityContextHolder.clearContext()`;
+      - añade una prueba de que el principal de una petición no pasa a la siguiente en el mismo hilo, por ejemplo ejecutando el filtro
+        dos veces con `MockHttpServletRequest` y afirmando que no queda autenticación.
+    - **S-1, decidir y probar.** Una cabecera `Authorization` vacía hoy se trata como anónima. Hay que decidir si es `token-invalid`
+      («una credencial rota debe oírse») y probarlo, incluido `Bearer	...`.
+    - **S-3.** Marcar como `transient` el `actor` de `ActorAuthentication`, o comentar por qué es `Serializable`.
+    - **S-2, riesgo aceptado, decide `confia-architect`.** La verificación de la firma ocurre antes del limitador de tasa, que es un
+      interceptor MVC, así que un anónimo puede forzar verificaciones Ed25519 sin límite. El coste está acotado por los 2 048 caracteres
+      del token. Se valora un límite por IP antes del filtro en la fase de limitación.
 - [ ] 2.2 **PR 6 `current-institution-adapter`: institución solo del principal (decisión 6, ADR-0009).**
   - **ROJO.** Crear `test/java/com/confia/organization/infrastructure/TokenCurrentInstitutionProviderTest.java` (la institución sale del
     actor; sin actor `IllegalStateException`; la de configuración del proceso no se usa; 50 peticiones concurrentes de dos instituciones con
