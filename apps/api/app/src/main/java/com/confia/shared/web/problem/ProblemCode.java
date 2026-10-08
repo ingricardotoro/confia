@@ -22,8 +22,11 @@ import java.util.Optional;
  * (the same key still in flight after the bounded wait) and {@link #IDEMPOTENCY_PAYLOAD_MISMATCH}
  * (the same key with another payload); the first is raised by the interceptor, the other two are
  * the codes of the domain exceptions of {@code IdempotentExecutor}, which the one translator
- * answers from the catalog (task 5.1; design.md, decision 19). The sign-in codes
- * ({@code authentication-failed}, {@code token-invalid}, {@code token-expired}) and the
+ * answers from the catalog (task 5.1; design.md, decision 19). The bearer filter of the administrative
+ * chain owns {@link #TOKEN_INVALID} (a credential that is present and not good, including a session
+ * that is over) and {@link #TOKEN_EXPIRED} (an intact token whose time has passed)
+ * (session-tokens-and-web-layer design.md, decision 5). The sign-in code
+ * ({@code authentication-failed}) and the
  * institution codes belong to the session change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
@@ -36,6 +39,8 @@ public enum ProblemCode {
     VALIDATION_FAILED("validation-failed", 400),
     IDEMPOTENCY_KEY_MISSING("idempotency-key-missing", 400),
     AUTHENTICATION_REQUIRED("authentication-required", 401),
+    TOKEN_INVALID("token-invalid", 401),
+    TOKEN_EXPIRED("token-expired", 401),
     FORBIDDEN("forbidden", 403),
     RESOURCE_NOT_FOUND("resource-not-found", 404),
     METHOD_NOT_ALLOWED("method-not-allowed", 405),
