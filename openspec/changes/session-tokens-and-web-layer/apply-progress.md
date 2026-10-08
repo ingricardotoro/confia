@@ -923,3 +923,61 @@ Cada una se revirtió y se comprobó con `cmp`; no queda ninguna.
 - Sin desviaciones respecto al diseño; la nota de la decisión 5 se actualizó para reflejar S-1 e I-2.
 - S-2 sigue como riesgo aceptado, a decidir por `confia-architect`: la verificación Ed25519 ocurre antes del limitador de tasa.
 - Tarea 2.1 completa (2.1a, 2.1b, 2.1c). Siguiente: 2.2.
+
+## PR 6 `current-institution-adapter` (tarea 2.2, 2026-10-07, modo TDD estricto)
+
+Rama `change/session-tokens-and-web-layer-06-current-institution-adapter`, desde `main` (880782c). Un solo commit de código:
+`feat(organization): resolve the current institution only from the authenticated principal`. Tamaño 495 líneas efectivas, sin partición.
+
+### Contenido
+
+- `organization.infrastructure.TokenCurrentInstitutionProvider`: devuelve `new InstitutionId(actor.institutionId())` con `AuthenticatedActor.current()`; sin actor lanza
+  `IllegalStateException` (el borde la traduce a `500 internal-error`). No recibe la petición ni lee configuración del proceso.
+- `organization.infrastructure.wiring.OrganizationConfiguration` y `package-info` (`@NamedInterface`, consumidor `AdminApplication`); `@Import` en `AdminApplication`.
+  `ResolveCurrentInstitution` sigue sin registrarse.
+- `ProcessBeanPolicy`: el proceso administrativo admite `com.confia.organization.infrastructure` y `...infrastructure.wiring`; portal y trabajador
+  prohíben `com.confia.organization` (solo el administrativo verifica un token de personal).
+- Arnés: `HarnessTokens.accessForInstitution`, rutas `/test/institution` (`GET` y `POST`, `TOKEN_ONLY`) y `/test/institution-open` (pública), e `@Import` de
+  `OrganizationConfiguration` en `WebEdgeHarness`.
+- Pruebas nuevas: `TokenCurrentInstitutionProviderTest` (7) y `CurrentInstitutionFromTokenTest` (14).
+
+### ROJO observado
+
+1. Pruebas y arnés sin código de producción: error de compilación, `cannot find symbol` para `TokenCurrentInstitutionProvider` y `OrganizationConfiguration`
+   (paquete `com.confia.organization.infrastructure.wiring` inexistente).
+2. Con el código de producción y el `@Import`, pero sin las líneas de `ProcessBeanPolicy`: `ProcessBeanIsolationTest.registersOnlyItsAllowedBeans[1]` (admin), 13 pruebas, 1 fallo:
+   `bean 'com.confia.organization.infrastructure.wiring.OrganizationConfiguration' from package 'com.confia.organization.infrastructure.wiring' - not in the allow-list`
+   y `bean 'currentInstitutionProvider' from package 'com.confia.organization.infrastructure' - not in the allow-list` (también para el paquete `wiring`).
+
+VERDE: `-Dtest='ProcessBeanIsolationTest,CurrentInstitutionFromTokenTest,TokenCurrentInstitutionProviderTest'`: 13 + 7 + 14 = 34 pruebas, sin fallos.
+
+### Ruptura deliberada
+
+El adaptador lee `X-Institution-Id` de `RequestContextHolder` cuando es un UUID. `-Dtest='CurrentInstitutionFromTokenTest,TokenCurrentInstitutionProviderTest'`: 21 pruebas, 3 fallos,
+todos de `CurrentInstitutionFromTokenTest`: `theInstitutionHeadersAreIgnored` y `aMalformedInstitutionHeaderNeitherChangesTheResolutionNorFails[4]` y `[5]` (los valores UUID
+bien formados). Se revirtió y se comprobó con `cmp`; no queda ninguna ruptura.
+
+### Evidencia de trabajo
+
+| Evidencia | Resultado |
+|---|---|
+| Verde focalizado | 34 pruebas (arriba), sin fallos |
+| Verificación completa | `./mvnw verify -Pmutation-gate` en `apps/api` (Docker en ejecución, 12 min 12 s): Surefire 186 y 1 750, Failsafe 250, 0 fallos, `BUILD SUCCESS` |
+| Instantánea de OpenAPI | Sin cambios (`git status` limpio en `apps/api/openapi` tras la construcción) |
+| PIT | Compuerta superada; `shared.security.token` 93 % (448 de 481) |
+| Límite de reversión | `git revert` del commit retira adaptador, configuración, `@Import`, líneas de la política y rutas del arnés |
+
+### Medición
+
+`git add -N . && git diff --numstat main -- . ':!openspec'`: **495 líneas** (479 añadidas, 16 borradas), por debajo de 800.
+
+### Desviaciones y riesgos
+
+- **OR05 y OR10 se prueban en la unidad, no por HTTP ni con el rol real de base de datos.** La ruta `GET /api/v1/auth/sessions/current` y la comprobación
+  `SessionValidity` no existen hasta las tareas 3 a 5 (la ruta de la sesión actual va última), y el arnés no tiene base de datos. `TokenCurrentInstitutionProviderTest` demuestra
+  que `actor.securityContext(...)` lleva la institución del token (la B de un token con `sid` de la A) y no otra; la prueba con PostgreSQL real y la `401 token-invalid` por HTTP
+  quedan para la tarea de la sesión actual, donde la lectura con `confia_admin_app` ya existe.
+- OR02 se prueba por HTTP con `confia.identity.login-institution-id` distinto de la institución del token; en la unidad el adaptador no tiene dónde leer la configuración.
+- El caso de `Host` de OR06 usa un socket crudo, porque el cliente HTTP del JDK no permite fijar esa cabecera.
+- Se añadió la prohibición de `com.confia.organization` en portal y trabajador (no figuraba en la tarea) para que solo el administrativo reciba el adaptador.
+- Se retocaron dos comentarios de documentación (`AdminApplication`, `organization/package-info`) que decían que el adaptador era de un cambio futuro.

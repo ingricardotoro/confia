@@ -326,7 +326,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     - **S-2, riesgo aceptado, decide `confia-architect`.** La verificación de la firma ocurre antes del limitador de tasa, que es un
       interceptor MVC, así que un anónimo puede forzar verificaciones Ed25519 sin límite. El coste está acotado por los 2 048 caracteres
       del token. Se valora un límite por IP antes del filtro en la fase de limitación.
-- [ ] 2.2 **PR 6 `current-institution-adapter`: institución solo del principal (decisión 6, ADR-0009).**
+- [x] 2.2 **PR 6 `current-institution-adapter`: institución solo del principal (decisión 6, ADR-0009).**
   - **ROJO.** Crear `test/java/com/confia/organization/infrastructure/TokenCurrentInstitutionProviderTest.java` (la institución sale del
     actor; sin actor `IllegalStateException`; la de configuración del proceso no se usa; 50 peticiones concurrentes de dos instituciones con
     `CyclicBarrier` sin cruces; el contexto de base de datos es el del token; `tenant` de A con `sid` de B no autentica la sesión) y
@@ -340,6 +340,11 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   - **Demostración deliberada.** Leer la institución de `X-Institution-Id` pone en rojo `CurrentInstitutionFromTokenTest`; se revierte.
   - **Cierre.** `./mvnw verify`. Commit: `feat(organization): resolve the current institution only from the authenticated principal`. Tamaño:
     nominal 220, realista 480. — Escenarios OR01 a OR11 y «Resolución con un doble en memoria».
+
+  - **Nota fechada 2026-10-07: PR 6 hecho.** Medido 495 líneas efectivas (479 añadidas, 16 borradas), sin partición. `./mvnw verify -Pmutation-gate` en verde y
+    la instantánea de OpenAPI sin cambios. La demostración deliberada (leer `X-Institution-Id`) puso en rojo tres casos de `CurrentInstitutionFromTokenTest`.
+    OR05 y OR10 se prueban en la unidad (`actor.securityContext`) porque la ruta de la sesión actual y la base de datos del arnés llegan más tarde; la prueba
+    por HTTP y con el rol real queda para la tarea de la sesión actual. Portal y trabajador prohíben `com.confia.organization`. Detalle en «PR 6» de `apply-progress.md`.
 
 - [ ] 2.3 **PR 7 `data-access-log-redaction`: corrección mínima de `unexpected` (decisión 14, O1).**
   - **ROJO.** Ampliar `test/java/com/confia/shared/web/problem/ProblemTranslationTest.java`: un controlador del arnés lanza una excepción de
