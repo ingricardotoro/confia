@@ -11,6 +11,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.confia.shared.web.harness.HarnessProcess;
 import com.confia.shared.web.problem.ProblemCode;
 import com.confia.shared.web.problem.ProblemExceptionHandler;
+import com.confia.shared.web.request.SensitiveDataLoggingTest;
 import java.io.IOException;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
@@ -343,10 +344,79 @@ class ProblemTranslationTest {
                 .doesNotContain("SQLException");
         assertThat(events).hasSize(1);
         assertThat(events.get(0).getLevel()).isEqualTo(Level.ERROR);
-        assertThat(events.get(0).getThrowableProxy().getClassName())
-                .isEqualTo("java.sql.SQLException");
+        assertThat(events.get(0).getThrowableProxy())
+                .as("a data access failure is logged by class names, never with its exception")
+                .isNull();
+        assertThat(events.get(0).getFormattedMessage()).contains("java.sql.SQLException")
+                .doesNotContain("Connection reset").doesNotContain("ledger");
         assertThat(events.get(0).getMDCPropertyMap())
                 .containsEntry("requestId", problem.get("traceId").asString());
+    }
+
+    // ---- data access failures: the value of a unique violation never reaches the log -----------
+
+    private static final String UNIQUE_VALUE = "valor.unico@colegio.edu.hn";
+    private static final List<String> DETAIL_AND_VALUE = List.of("Detail:", UNIQUE_VALUE);
+
+    @ParameterizedTest
+    @CsvSource({"/test/data-access-sql, org.postgresql.util.PSQLException",
+            "/test/data-access-spring, org.springframework.dao.DuplicateKeyException",
+            "/test/data-access-jooq, org.jooq.exception.IntegrityConstraintViolationException"})
+    void anUntranslatedUniqueViolationLeavesOneLineWithClassNamesAndSqlStateOnly(String route,
+            String exceptionClass) {
+        List<HttpResponse<String>> answers = new ArrayList<>();
+        List<ILoggingEvent> events = loggedWhile(() -> answers.add(process.get(route)));
+        HttpResponse<String> response = answers.get(0);
+
+        JsonNode problem = assertProblem(response, 500, "internal-error");
+        assertThat(everythingOf(response)).doesNotContain(UNIQUE_VALUE).doesNotContain("Detail")
+                .doesNotContain("23505").doesNotContain("PSQLException");
+        assertThat(events).as("exactly one event").hasSize(1);
+        ILoggingEvent event = events.get(0);
+        assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+        assertThat(event.getThrowableProxy()).as("no exception is attached, so no stack").isNull();
+        assertThat(event.getFormattedMessage()).as("one line").doesNotContain("\n")
+                .contains(exceptionClass).contains("org.postgresql.util.PSQLException")
+                .contains("23505");
+        assertThat(event.getMDCPropertyMap())
+                .containsEntry("requestId", problem.get("traceId").asString());
+        assertThat(SensitiveDataLoggingTest.violations(events, DETAIL_AND_VALUE))
+                .as("neither the detail nor the value, in the message, arguments, MDC or stack")
+                .isEmpty();
+    }
+
+    @Test
+    void aSpringDataAccessFailureWithNoSqlExceptionIsLoggedByClassWithoutItsMessage() {
+        List<HttpResponse<String>> answers = new ArrayList<>();
+        List<ILoggingEvent> events = loggedWhile(() -> answers.add(process.get("/test/data-access-bare")));
+
+        assertProblem(answers.get(0), 500, "internal-error");
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).getThrowableProxy()).isNull();
+        assertThat(events.get(0).getFormattedMessage())
+                .contains("org.springframework.dao.CannotAcquireLockException")
+                .contains("cause=none").contains("sqlState=none");
+        assertThat(SensitiveDataLoggingTest.violations(events, DETAIL_AND_VALUE)).isEmpty();
+    }
+
+    @Test
+    void theVerifierReportsADetailLoggedOnPurpose() {
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        Logger probe = (Logger) LoggerFactory.getLogger("com.confia.test.negative-control");
+        probe.addAppender(appender);
+        try {
+            probe.error("failed", new IllegalStateException(
+                    "ERROR: duplicate key\n  Detail: Key (email)=(" + UNIQUE_VALUE + ") already exists"));
+        } finally {
+            probe.detachAndStopAllAppenders();
+        }
+
+        assertThat(SensitiveDataLoggingTest.violations(appender.list, DETAIL_AND_VALUE))
+                .containsExactlyInAnyOrder(
+                        "com.confia.test.negative-control ERROR stack trace contains Detail:",
+                        "com.confia.test.negative-control ERROR stack trace contains "
+                                + UNIQUE_VALUE);
     }
 
     // ---- the statuses the framework already chose ---------------------------------------------

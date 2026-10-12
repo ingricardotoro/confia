@@ -981,3 +981,46 @@ bien formados). Se revirtió y se comprobó con `cmp`; no queda ninguna ruptura.
 - El caso de `Host` de OR06 usa un socket crudo, porque el cliente HTTP del JDK no permite fijar esa cabecera.
 - Se añadió la prohibición de `com.confia.organization` en portal y trabajador (no figuraba en la tarea) para que solo el administrativo reciba el adaptador.
 - Se retocaron dos comentarios de documentación (`AdminApplication`, `organization/package-info`) que decían que el adaptador era de un cambio futuro.
+
+### PR 7 `data-access-log-redaction`, tarea 2.3 (2026-10-08)
+
+Cierra el seguimiento O1 heredado de `web-edge-foundations` (cierre 6.1, S-3). Antes, `ProblemExceptionHandler.unexpected` registraba a
+`ERROR` la excepción completa, y una violación de PostgreSQL trae en su mensaje el `Detail: Key (columna)=(valor)` con el dato del cliente.
+
+**Cambio.** Ahora, cuando una excepción sin traducción viene de la base de datos, se registra una sola línea sin la excepción adjunta. La
+línea solo lleva:
+
+- la clase de la excepción;
+- la clase de la causa;
+- el `SQLState`.
+
+El `requestId` va en el MDC. La detección recorre la cadena de causas, hasta 16 niveles, buscando una `java.sql.SQLException` o una
+`DataAccessException` de Spring sin `SQLException`. Así reconoce los envoltorios de jOOQ sin depender de `org.jooq` (W1). Las excepciones
+que no son de datos, como `IllegalStateException` o `DomainException`, conservan su registro anterior.
+
+**Pruebas.** `ProblemTranslationTest` usa una `PSQLException` real con `Detail: Key (email)=(valor.unico@colegio.edu.hn) already exists`
+y `SQLState 23505`. Afirma:
+
+- que ningún mensaje, argumento, MDC ni traza contiene `Detail:` ni el valor;
+- que la línea contiene `23505` y las dos clases;
+- que el `requestId` del MDC coincide con el `traceId` del cuerpo;
+- que la respuesta es `500 internal-error` sin el valor.
+
+Hay además un control negativo con `SensitiveDataLoggingTest.violations`.
+
+**Incidencia.** El agente que construyó la tarea se detuvo sin registrar nada y dejó aplicada su ruptura deliberada: la excepción
+seguía adjunta en la línea de acceso a datos. El orquestador la detectó al revisar el diff y la corrigió.
+
+**Evidencia observada por el orquestador:**
+
+- **Ruptura deliberada:** con la excepción adjunta (la ruptura que quedó en el árbol), `ProblemTranslationTest` da 39 pruebas y 5 fallos.
+  Fallan la violación de unicidad (tres casos), la `DataAccessException` de Spring sin `SQLException` y la de conexión reiniciada. Sin la
+  ruptura, 39/39 y `SensitiveDataLoggingTest` 4/4.
+- **Rojo reproducido:** se restauró el `ProblemExceptionHandler` de `main` y se corrieron las pruebas nuevas. Dieron 39 pruebas y 5 fallos,
+  y la salida muestra `Detail: Key (email)=(valor.unico@colegio.edu.hn) already exists` llegando al registro. Se restauró la corrección y
+  `cmp` confirmó el archivo idéntico.
+- **`./mvnw verify -Pmutation-gate`:** Surefire 186 + 1 755, Failsafe 250, 0 fallos, cobertura cumplida, `BUILD SUCCESS`. Mutación de
+  la aplicación: 93 %. La instantánea OpenAPI no cambia.
+  - Un primer intento lo detuvo Claude Code por falta de memoria en el equipo. Se relanzó con autorización del propietario.
+
+**Tamaño:** 183 líneas efectivas.

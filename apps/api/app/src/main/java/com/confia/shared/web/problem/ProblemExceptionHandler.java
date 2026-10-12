@@ -10,6 +10,7 @@ import jakarta.validation.ElementKind;
 import jakarta.validation.Path;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +24,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.MergedAnnotation;
 import org.springframework.core.annotation.MergedAnnotations;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
@@ -240,7 +242,8 @@ public final class ProblemExceptionHandler {
      * status its author chose, which {@link ProblemCode#forStatus} turns into the catalog's code
      * (a {@code 405} keeps its {@code Allow} header and a {@code 429} its {@code Retry-After}), and
      * only a server error is logged. Anything else is a {@code 500 internal-error}, logged in full
-     * with the request id.
+     * with the request id, except a failure of the database, whose log line holds class names and
+     * the SQLState and never the exception, because the driver's message repeats the row's values.
      *
      * @throws AccessDeniedException for the security chain to answer
      * @throws AuthenticationException for the security chain to answer
@@ -265,8 +268,48 @@ public final class ProblemExceptionHandler {
             frameworkError(framework, e, request, response);
             return;
         }
-        LOG.error("An exception was not translated by any specific handler", e);
+        Optional<DataAccessFailure> dataAccess = DataAccessFailure.of(e);
+        if (dataAccess.isPresent()) {
+            // The driver's message carries the offending row ("Detail: Key (email)=(...)"), so the
+            // exception is not attached: only class names and the SQLState are safe to log.
+            DataAccessFailure failure = dataAccess.get();
+            LOG.error("A data access failure was not translated by any specific handler:"
+                    + " exception={} cause={} sqlState={}", e.getClass().getName(),
+                    failure.causeClass(), failure.sqlState());
+        } else {
+            LOG.error("An exception was not translated by any specific handler", e);
+        }
         answer(request, response, ProblemCode.INTERNAL_ERROR);
+    }
+
+    /**
+     * What is safe to log of a failure that comes from the database: the class of the {@link
+     * SQLException} (or of the cause of a Spring {@link DataAccessException} that has none) and its
+     * SQLState. It is found by walking the causes, so a persistence library's own wrapper (jOOQ's
+     * included) is recognised without this layer depending on it.
+     */
+    private record DataAccessFailure(String causeClass, String sqlState) {
+
+        private static final String NONE = "none";
+
+        static Optional<DataAccessFailure> of(Throwable failure) {
+            DataAccessFailure withoutSql = null;
+            Throwable cause = failure;
+            for (int depth = 0; cause != null && depth < MAX_CAUSES; depth++) {
+                if (cause instanceof SQLException sql) {
+                    String state = sql.getSQLState();
+                    return Optional.of(new DataAccessFailure(sql.getClass().getName(),
+                            state == null ? NONE : state));
+                }
+                if (withoutSql == null && cause instanceof DataAccessException) {
+                    Throwable inner = cause.getCause();
+                    withoutSql = new DataAccessFailure(
+                            inner == null ? NONE : inner.getClass().getName(), NONE);
+                }
+                cause = cause.getCause();
+            }
+            return Optional.ofNullable(withoutSql);
+        }
     }
 
     private void frameworkError(ErrorResponse framework, Exception e, HttpServletRequest request,

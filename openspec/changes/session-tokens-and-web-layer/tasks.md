@@ -346,7 +346,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     OR05 y OR10 se prueban en la unidad (`actor.securityContext`) porque la ruta de la sesión actual y la base de datos del arnés llegan más tarde; la prueba
     por HTTP y con el rol real queda para la tarea de la sesión actual. Portal y trabajador prohíben `com.confia.organization`. Detalle en «PR 6» de `apply-progress.md`.
 
-- [ ] 2.3 **PR 7 `data-access-log-redaction`: corrección mínima de `unexpected` (decisión 14, O1).**
+- [x] 2.3 **PR 7 `data-access-log-redaction`: corrección mínima de `unexpected` (decisión 14, O1).**
   - **ROJO.** Ampliar `test/java/com/confia/shared/web/problem/ProblemTranslationTest.java`: un controlador del arnés lanza una excepción de
     acceso a datos con una `PSQLException` real (`ServerErrorMessage` con `Detail: Key (email)=(valor.unico@colegio.edu.hn) already exists`,
     `SQLState 23505`); un `ListAppender` en la raíz afirma que ningún mensaje, argumento, MDC ni `ThrowableProxy` contiene `Detail:` ni el
