@@ -1166,3 +1166,22 @@ reorganizaron en local, sin subir nada. El rojo y las rupturas de I1 e I2 son lo
 **Verificación del árbol de 3.1a.** `./mvnw verify -Pmutation-gate`: Surefire 186 + 1 755, Failsafe 266, 0 fallos, cobertura cumplida y
 `BUILD SUCCESS`; mutación del 99 % y el 93 %; la instantánea OpenAPI no cambia. Claude Code detuvo dos veces este cambio por falta de
 memoria en el equipo, y se relanzó con autorización del propietario.
+
+### PR 8b `refresh-token-privileges`, tarea 3.1b (2026-10-12)
+
+Toma de la rama de respaldo `wip/session-tokens-refresh-store-hardened` (e591b19), sin cambios, la ampliación de `RolePrivilegeMatrixIT`
+(cinco roles más `PUBLIC`, privilegio de `UPDATE` por columna leído de `pg_attribute`), la de `MultiTenantSchemaIT` (las dos tablas sin
+lista de exclusión) y la nota de `docs/08`.
+
+**Rojo y ruptura.** El rojo original, con las tablas inexistentes, está en la sección «PR 8». Estas pruebas describen una V8 ya fusionada,
+así que no pueden observarse en rojo de nuevo. Para demostrar que pueden fallar, se repitió la ruptura deliberada sobre una copia local
+de V8 que no se confirma: se concedieron `DELETE` sobre `identity_refresh_token` y un `UPDATE` completo sobre la familia.
+
+- Resultado: `RolePrivilegeMatrixIT` dio 40 pruebas y 1 fallo, en `confiaAdminAppUpdatesOnlyTheStateColumnsAndNeverDeletesOnTheRefreshTokenTables`,
+  con el mensaje `confia_admin_app must never have DELETE on identity_refresh_token`.
+- Se restauró V8 y `cmp` confirmó el archivo idéntico. La migración fusionada no tiene ningún cambio pendiente.
+
+**Verificación.** `./mvnw verify -Pmutation-gate`: Surefire 186 + 1 755, Failsafe 273, 0 fallos, cobertura cumplida y `BUILD SUCCESS`.
+La instantánea OpenAPI no cambia.
+
+**Tamaño:** 218 líneas efectivas.

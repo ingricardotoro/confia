@@ -8,6 +8,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -58,6 +60,20 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
      * rows are retained until change 9 decides the purge (owner, 2026-09-30).
      */
     private static final String PASSWORD_RESET_TOKEN_TABLE = "identity_password_reset_token";
+
+    /**
+     * The two tables {@code V8} creates (session-tokens-and-web-layer design.md decision 8;
+     * specs/build-integrity/spec.md, requirement "Permisos de acceso a las tablas de familias y
+     * tokens de refresco por rol de base de datos y por columna"), mapped to the only columns
+     * {@code confia_admin_app} may {@code UPDATE}. They are the first tables with column-level
+     * grants, so the table-level {@code UPDATE} must be absent and the column set exact.
+     */
+    private static final Map<String, Set<String>> REFRESH_TABLE_UPDATABLE_COLUMNS = Map.of(
+            "identity_refresh_token_family",
+            Set.of("last_used_at", "revoked_at", "revoked_reason"),
+            "identity_refresh_token",
+            Set.of("consumed_at", "consumed_user_agent_fingerprint", "replaced_by",
+                    "successor_token_ciphertext"));
 
     private static final List<String> ALL_PRIVILEGES =
             List.of("SELECT", "INSERT", "UPDATE", "DELETE");
@@ -618,6 +634,157 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
                 statement.execute("drop role if exists " + scratchRole);
             }
         }
+    }
+
+    /**
+     * {@code confia_admin_app} on the refresh-token tables: {@code SELECT} and {@code INSERT} at
+     * table level, {@code UPDATE} <b>only</b> on the columns that change state, and never {@code
+     * DELETE}. {@code has_table_privilege(..., 'UPDATE')} is true only for a table-level grant, so
+     * it is false here; {@code has_column_privilege} is read for every real column of the table
+     * (from {@code pg_attribute}, not a hand-written list) so a column added later without a
+     * deliberate grant stays immutable and a widened grant is caught.
+     */
+    @Test
+    void confiaAdminAppUpdatesOnlyTheStateColumnsAndNeverDeletesOnTheRefreshTokenTables() {
+        REFRESH_TABLE_UPDATABLE_COLUMNS.forEach((table, updatable) -> {
+            assertThat(hasTablePrivilege("confia_admin_app", table, "SELECT")).isTrue();
+            assertThat(hasTablePrivilege("confia_admin_app", table, "INSERT")).isTrue();
+            assertThat(hasTablePrivilege("confia_admin_app", table, "UPDATE"))
+                    .as("UPDATE on %s must be granted per column, never for the whole table",
+                            table)
+                    .isFalse();
+            assertThat(hasTablePrivilege("confia_admin_app", table, "DELETE"))
+                    .as("confia_admin_app must never have DELETE on %s: rows are retained until "
+                            + "change 9 decides the purge", table)
+                    .isFalse();
+
+            List<String> columns = columnsOf(table);
+            assertThat(columns).as("columns of %s read from the catalogue", table)
+                    .containsAll(updatable);
+            for (String column : columns) {
+                assertThat(hasColumnPrivilege("confia_admin_app", table, column, "UPDATE"))
+                        .as("UPDATE on %s.%s", table, column)
+                        .isEqualTo(updatable.contains(column));
+                assertThat(hasColumnPrivilege("confia_admin_app", table, column, "SELECT"))
+                        .as("SELECT on %s.%s", table, column).isTrue();
+            }
+        });
+    }
+
+    @Test
+    void confiaPortalAppHasNoPrivilegeAtAnyLevelOnTheRefreshTokenTables() {
+        REFRESH_TABLE_UPDATABLE_COLUMNS.keySet().forEach(table -> {
+            for (String privilege : ALL_PRIVILEGES) {
+                assertThat(hasTablePrivilege("confia_portal_app", table, privilege))
+                        .as("confia_portal_app must have no %s on %s: staff data", privilege,
+                                table)
+                        .isFalse();
+            }
+            for (String column : columnsOf(table)) {
+                for (String privilege : List.of("SELECT", "INSERT", "UPDATE", "REFERENCES")) {
+                    assertThat(hasColumnPrivilege("confia_portal_app", table, column, privilege))
+                            .as("confia_portal_app must have no column-level %s on %s.%s",
+                                    privilege, table, column)
+                            .isFalse();
+                }
+            }
+        });
+    }
+
+    @Test
+    void confiaReadonlyOnlySelectsTheRefreshTokenTablesAtEveryLevel() {
+        REFRESH_TABLE_UPDATABLE_COLUMNS.keySet().forEach(table -> {
+            assertThat(hasTablePrivilege("confia_readonly", table, "SELECT")).isTrue();
+            assertThat(hasTablePrivilege("confia_readonly", table, "INSERT")).isFalse();
+            assertThat(hasTablePrivilege("confia_readonly", table, "UPDATE")).isFalse();
+            assertThat(hasTablePrivilege("confia_readonly", table, "DELETE")).isFalse();
+            for (String column : columnsOf(table)) {
+                assertThat(hasColumnPrivilege("confia_readonly", table, column, "UPDATE"))
+                        .as("confia_readonly must not UPDATE %s.%s", table, column).isFalse();
+            }
+        });
+    }
+
+    /** {@code confia_backup} reads through {@code pg_read_all_data}, which never bypasses RLS. */
+    @Test
+    void confiaBackupCanOnlySelectTheRefreshTokenTablesThroughPgReadAllData() {
+        REFRESH_TABLE_UPDATABLE_COLUMNS.keySet().forEach(table -> {
+            assertThat(hasTablePrivilege("confia_backup", table, "SELECT")).isTrue();
+            assertThat(hasTablePrivilege("confia_backup", table, "INSERT")).isFalse();
+            assertThat(hasTablePrivilege("confia_backup", table, "UPDATE")).isFalse();
+            assertThat(hasTablePrivilege("confia_backup", table, "DELETE")).isFalse();
+        });
+    }
+
+    /** {@code confia_owner} is not subject to {@code GRANT}/{@code REVOKE}: retains all four. */
+    @Test
+    void confiaOwnerRetainsAllPrivilegesOnTheRefreshTokenTablesByDefinition() {
+        REFRESH_TABLE_UPDATABLE_COLUMNS.keySet().forEach(table -> {
+            for (String privilege : ALL_PRIVILEGES) {
+                assertThat(hasTablePrivilege("confia_owner", table, privilege))
+                        .as("confia_owner must retain %s on %s by definition", privilege, table)
+                        .isTrue();
+            }
+        });
+    }
+
+    /** {@code PUBLIC} and a role outside the five: {@code V8} revokes before it grants. */
+    @Test
+    void publicAndAnyRoleOutsideTheFiveInheritNoPrivilegeOnTheRefreshTokenTables()
+            throws SQLException {
+        for (String table : REFRESH_TABLE_UPDATABLE_COLUMNS.keySet()) {
+            for (String privilege : ALL_PRIVILEGES) {
+                assertThat(hasTablePrivilege("public", table, privilege))
+                        .as("PUBLIC must hold no %s on %s", privilege, table).isFalse();
+            }
+            for (String column : columnsOf(table)) {
+                assertThat(hasColumnPrivilege("public", table, column, "UPDATE"))
+                        .as("PUBLIC must hold no column-level UPDATE on %s.%s", table, column)
+                        .isFalse();
+            }
+        }
+
+        String scratchRole = "probe_role_outside_the_five_refresh_token";
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres");
+                Statement statement = superuser.createStatement()) {
+            statement.execute("drop role if exists " + scratchRole);
+            statement.execute("create role " + scratchRole + " nosuperuser nobypassrls");
+            try {
+                for (String table : REFRESH_TABLE_UPDATABLE_COLUMNS.keySet()) {
+                    for (String privilege : ALL_PRIVILEGES) {
+                        assertThat(hasTablePrivilege(scratchRole, table, privilege))
+                                .as("a role that is none of the five must inherit no %s on %s",
+                                        privilege, table)
+                                .isFalse();
+                    }
+                    for (String column : columnsOf(table)) {
+                        assertThat(hasColumnPrivilege(scratchRole, table, column, "UPDATE"))
+                                .as("no column-level UPDATE on %s.%s", table, column).isFalse();
+                    }
+                }
+            } finally {
+                statement.execute("drop role if exists " + scratchRole);
+            }
+        }
+    }
+
+    /** Real, non-dropped columns of a public table, read from {@code pg_attribute}. */
+    private List<String> columnsOf(String table) {
+        return dsl.fetch("""
+                select attname from pg_attribute
+                 where attrelid = (quote_ident(?))::regclass and attnum > 0 and not attisdropped
+                 order by attnum
+                """, table).getValues("attname", String.class);
+    }
+
+    /**
+     * {@code has_column_privilege}: true for a table-level grant too, which is why the table-level
+     * assertions above are made separately.
+     */
+    private boolean hasColumnPrivilege(String role, String table, String column,
+            String privilege) {
+        return dsl.fetchOne("select has_column_privilege(?, ?, ?, ?) as has_priv", role, table,
+                column, privilege).get("has_priv", Boolean.class);
     }
 
     /** {@code has_table_privilege(role, table, privilege)}, evaluated by PostgreSQL itself. */

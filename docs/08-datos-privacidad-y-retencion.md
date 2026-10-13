@@ -336,6 +336,26 @@ identidad, actor que la atendió, momento de resolución, resultado y evidencia 
 > personal alguno, solo su SHA-256, el identificador interno de la cuenta y marcas de tiempo. La
 > vigencia de 30 minutos sí se aplica desde ya, porque la comprueba el restablecimiento.
 
+> **Nota editorial, 2026-10-11 (`session-tokens-and-web-layer`, migración `V8`).** La fila «Tokens de
+> refresco y de recuperación» también cubre las tablas `identity_refresh_token_family` e
+> `identity_refresh_token`, que se entregan sin `DELETE` para ningún rol. Sus filas, incluidas las de
+> familias revocadas y tokens vencidos, se **retienen hasta que el cambio 9**
+> (`background-jobs-with-db-scheduler`) entregue el trabajo de purga. La vigencia sí se aplica desde
+> ya, porque se deriva de las columnas y del reloj y no se escribe. Dos datos de la familia merecen
+> mención expresa:
+>
+> - **Dirección IP (`ip_first_seen`).** Se guarda **en claro**, por la misma decisión del propietario
+>   del 2026-09-22 que rige la bitácora (sección 4.1): una IP hasheada no permite investigar un
+>   incidente por rango de red. Solo se registra la del inicio de sesión; no se actualiza ni se
+>   aplica como vínculo de la sesión.
+> - **Huella del agente de usuario (`user_agent_fingerprint` y `consumed_user_agent_fingerprint`).**
+>   Es el SHA-256 en hexadecimal del agente de usuario saneado, nunca el texto original. Se registra
+>   para decidir si un reintento dentro de la ventana de gracia proviene del mismo dispositivo.
+>
+> Ambos datos son personales de bajo impacto, accesibles solo para el rol de aplicación del proceso
+> administrativo y de lectura, aislados por institución mediante seguridad a nivel de fila, y se
+> conservan hasta la purga del cambio 9.
+
 ### 6.1 La eliminación y los respaldos
 
 Un dato eliminado de la base de datos sigue existiendo en los respaldos hasta que esos respaldos

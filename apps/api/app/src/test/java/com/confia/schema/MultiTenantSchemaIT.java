@@ -265,6 +265,37 @@ class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
         });
     }
 
+    /**
+     * Scenario BI01 (session-tokens-and-web-layer specs/build-integrity/spec.md): the generic
+     * gates above iterate every table of the catalogue and carry no exclusion list, so the two
+     * refresh-token tables pass them by satisfying them. This pins the premise: both exist, none
+     * of them sits in an exclusion set, and each one declares the discriminator, row security
+     * (enabled and forced), one policy and institution-scoped unique indexes.
+     */
+    @Test
+    void theTwoRefreshTokenTablesPassTheGenericGatesWithoutAnyExclusion() {
+        List<String> refreshTables =
+                List.of("identity_refresh_token_family", "identity_refresh_token");
+        List<BaseTable> tables = baseTablesInPublicSchema();
+        List<UniqueIndex> uniqueIndexes = uniqueIndexesInPublicSchema();
+        for (String name : refreshTables) {
+            assertThat(TECHNICAL_TABLES).doesNotContain(name);
+            assertThat(CLOSED_CATALOGUE_TABLES).doesNotContain(name);
+            assertThat(tables).filteredOn(table -> table.name().equals(name))
+                    .singleElement()
+                    .satisfies(table -> assertThat(table.hasNotNullInstitutionId())
+                            .as("%s declares institution_id NOT NULL", name).isTrue());
+            RowSecurityFlags flags = rowSecurityFlagsOf(name);
+            assertThat(flags.rowSecurity()).as("%s ENABLE ROW LEVEL SECURITY", name).isTrue();
+            assertThat(flags.forceRowSecurity()).as("%s FORCE ROW LEVEL SECURITY", name).isTrue();
+            assertThat(policyCountOn(name)).as("%s has one policy", name).isEqualTo(1L);
+            assertThat(uniqueIndexes).filteredOn(index -> index.tableName().equals(name))
+                    .as("unique indexes of %s", name)
+                    .isNotEmpty()
+                    .allSatisfy(index -> assertThat(index.columns()).contains("institution_id"));
+        }
+    }
+
     private static final String PASSWORD_RESET_TOKEN_INSERT = """
             insert into identity_password_reset_token
                 (institution_id, id, account_id, token_hash, issued_at, expires_at)
