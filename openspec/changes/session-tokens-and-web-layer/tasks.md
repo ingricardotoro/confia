@@ -443,6 +443,15 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   - **Cierre.** `./mvnw verify`; JaCoCo de `identity.domain` en 95 y PIT en 80. Commit: `feat(identity): issue refresh token families with hashed tokens`. Tamaño:
     nominal 330, realista 730; costura, repositorios a 10a. — Escenarios I87 a I90, I119, I120, I126, los dos de MFA y los tres de origen en la bitácora.
 
+  - **Nota fechada 2026-10-12 (revisión independiente de 3.2; se construye en 3.3).**
+    - **I-2, concurrencia con el restablecimiento.** Con READ COMMITTED, `FOR UPDATE` no impide que una emisión concurrente inserte una
+      familia nueva mientras se restablece la contraseña, y esa familia quedaría viva con la contraseña antigua. Por eso la emisión debe
+      tomar el mismo bloqueo de la cuenta (`lockById`, `FOR UPDATE`) antes de insertar la familia, respetando el orden cuenta → familias.
+      Lo prueba una prueba de concurrencia entre un restablecimiento y una emisión simultáneos (S-1).
+    - **I-1, regla complementaria de la regla (b).** La regla (b) de `IdentityScopeExclusionInventoryTest` solo vigila las llamadas a
+      `replacePasswordHash`. La nueva regla de ArchUnit establece que solo `JooqStaffAccountRepository.replacePasswordHash` puede escribir
+      el campo `PASSWORD_HASH`, y tiene un fixture que lo viola.
+    - **S-3.** `ResetPasswordWithToken` falla si `replacePasswordHash` devuelve `false`, en lugar de ignorar el resultado.
 ## Fase 4: rotación, reutilización y gracia
 
 - [ ] 4.1 **PR 11 `refresh-rotation`: rotación fresca, vigencias y rechazos (decisión 10).**
@@ -461,6 +470,9 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   - **Cierre.** `./mvnw verify`. Commit: `feat(identity): rotate refresh tokens with lifetime rules`. Tamaño: nominal 300, realista 660. — Escenarios I91 a I94, I109 a I114,
     I121, I142, I145 y las ausencias de conservación de filas y de vinculación por agente e IP.
 
+  - **Nota fechada 2026-10-12 (revisión de 3.2, I-2).** La rotación vuelve a leer `revoked_at` después de bloquear la fila de la familia y
+    no bloquea la cuenta después de la familia, para que el orden de bloqueo cuenta → familias no forme ciclos con el restablecimiento.
+    S-1: añadir la prueba de concurrencia entre un restablecimiento y una rotación simultáneos.
 - [ ] 4.2 **PR 12 `reuse-detection`: reutilización confirmada y concurrencia (b) y (c).**
   - **ROJO.** Ampliar `RotateRefreshTokenIT.java` (ADR-0005, prueba 1: reutilización fuera de la gracia revoca la familia con `reuse_detected`,
     deja cero tokens vigentes y escribe `identity.session.reuse_detected`; **la revocación se lee en una transacción nueva tras el
@@ -475,6 +487,8 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   - **Cierre.** `./mvnw verify`. Commit: `feat(identity): revoke the family and audit when a refresh token is reused`. Tamaño: nominal 300, realista 660; costura,
     concurrencia a 12b. — Escenarios I104 a I108, I128, I143, I144 y la ausencia de aviso al titular.
 
+  - **Nota fechada 2026-10-12 (revisión de 3.2, S-2).** La revocación por reutilización (`reuse_detected`) también vacía los
+    `successor_token_ciphertext` de la familia, como hace el revocador del restablecimiento.
 - [ ] 4.3 **PR 13 `grace-window`: sucesor cifrado y ventana de 10 s (decisión 11, D-N1).**
   - **ROJO.** Crear `test/java/com/confia/identity/infrastructure/RefreshGraceWindowIT.java` (ADR-0005, prueba 2: reintento dentro de 10 s desde el
     mismo dispositivo devuelve el mismo refresco sucesor y un acceso **nuevo** con mismos `sid`, `sub`, `tenant`, `amr` y otro `jti`, sin revocar;

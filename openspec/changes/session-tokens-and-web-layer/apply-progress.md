@@ -1259,3 +1259,26 @@ mutación del 99 % (194) y el 93 % (481). La instantánea de OpenAPI no cambia.
 
 **Límite de reversión.** Revertir este PR devuelve el constructor viejo de `ResetPasswordWithToken`; exige haber revertido antes 3.3 a 5.2, porque
 ninguna emisión puede existir sin esta revocación.
+
+### Revisión independiente de 3.2 (2026-10-12)
+
+Veredicto: aprobado para fusionar, sin bloqueantes. **H2 se cumple tal como está redactada.** La revisión confirmó:
+
+- una sola transacción, con la cuenta bloqueada (`lockById`) antes de consumir el token, cambiar el hash, revocar y auditar;
+- el revocador no abre una transacción propia y revoca exactamente las filas bloqueadas;
+- las familias ya revocadas conservan su motivo;
+- el vaciado del sucesor es compatible con los disparadores de V8;
+- los rechazos y la inscripción de MFA no revocan nada;
+- en la auditoría solo se interpolan una constante de enum y un entero, así que no admite inyección;
+- la retirada de la regla de ausencia es segura, porque la sustituyen las reglas (a) y (b), que no son vacías.
+
+**Corrección de la evidencia del agente.** El agente informó con honestidad que su `cmp` tras la ruptura comparaba el archivo con la copia
+que acababa de hacer, así que no probaba nada. El orquestador comprobó leyendo el código que hay una sola llamada a `revokeAllLive`, después
+de `consume` y de `replacePasswordHash`, en el camino `Completed`, y que no queda ninguna ruptura.
+
+**Pasan a otras tareas** (notas fechadas en `tasks.md`):
+
+- a 3.3: I-2 (la emisión toma el bloqueo de la cuenta, con una prueba de concurrencia frente al restablecimiento), I-1 (solo
+  `replacePasswordHash` escribe `PASSWORD_HASH`) y S-3 (fallar si `replacePasswordHash` devuelve `false`);
+- a 4.1: volver a leer `revoked_at` tras bloquear la familia, y la prueba de concurrencia con la rotación;
+- a 4.2: S-2 (la revocación por reutilización vacía el sucesor cifrado).
