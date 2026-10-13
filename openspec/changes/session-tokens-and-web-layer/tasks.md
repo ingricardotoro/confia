@@ -362,7 +362,8 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
 
 ## Fase 3: almacén, revocación al restablecer y emisión
 
-- [ ] 3.1 **PR 8 `refresh-token-store-v8`: migración V8 (decisión 8).**
+- [ ] 3.1 **PR 8 `refresh-token-store-v8`: migración V8 (decisión 8).** Partida en 3.1a y 3.1b (nota fechada
+  2026-10-11 debajo); el contenido de abajo es el alcance conjunto.
   - **ROJO.** Crear `test/java/com/confia/identity/infrastructure/RefreshTokenSchemaIT.java` (rol `confia_admin_app` real: aislamiento A/B en
     ambas tablas, cero filas sin contexto y con contexto vacío, `INSERT` de otra institución rechazado por `WITH CHECK`, token hacia
     familia ajena rechazado, hash de 43 caracteres rechazado, motivos `admin_revoke` y `logout` rechazados y `reuse_detected` y
@@ -381,6 +382,32 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     `RolePrivilegeMatrixIT`; se revierte (en una migración local no comprometida).
   - **Cierre.** `./mvnw verify`. Commit: `feat(identity): add refresh token family and token tables with row-level security`. Tamaño: nominal 300,
     realista 660. — Escenarios BI01 a BI10, BI36, BI37 y «El catálogo de motivos no declara motivos sin productor».
+
+- [x] 3.1a **PR 8a `refresh-token-tables`.** La migración V8 endurecida tras la revisión (I1, I2, S2 y S3),
+  `RefreshTokenStateIntegrityIT` (sucesor en la misma familia, disparadores de solo avance, cotas) y `RevocationReasonCatalogIT`. Así cada
+  regla de la base de datos entra probada en el mismo PR que la introduce. 777 líneas.
+- [ ] 3.1b **PR 8b `refresh-token-privileges`.** La ampliación de `RolePrivilegeMatrixIT` (cinco roles, nivel de columna), la de
+  `MultiTenantSchemaIT` (las dos tablas, sin lista de exclusión) y la nota fechada de `docs/08`. Unas 218 líneas. Necesita 3.1a.
+- [ ] 3.1c **PR 8c `refresh-token-schema-behaviour`.** `RefreshTokenSchemaIT` (34 casos con el rol real `confia_admin_app`), con el ajuste
+  de la nota del 2026-10-12, y la demostración deliberada de conceder `DELETE` o un `UPDATE` completo. Unas 692 líneas. Necesita 3.1b. Al
+  fusionarse, 3.1 queda hecha.
+  - **Nota fechada 2026-10-11: partición de 3.1.** La tarea verificada midió **1 067 líneas efectivas**. El código de jOOQ generado
+    está en `target/` y no cuenta. Se partió por archivos completos, según la regla general del propietario. El árbol completo y
+    verificado está en la rama local `wip/session-tokens-refresh-store-full` (1182136).
+  - **Desviación.** `RevocationReasonCatalogIT` se llama `*IT` y no `*Test`, como pedía la tarea: necesita la base migrada y Failsafe
+    solo ejecuta `*IT`.
+  - **Nota fechada 2026-10-12: ajuste que 3.1c debe llevar.** 3.1a endureció V8 (sucesor en la misma familia y disparadores de solo
+    avance; `RefreshTokenStateIntegrityIT` entra en 3.1a). Contra el V8 nuevo, `RefreshTokenSchemaIT` (1182136) pasa 33 de 34 casos. El que
+    falla es `anEncryptedSuccessorNeedsTheVersionPrefixAndAConsumedToken`: escribe el sucesor cifrado en una sentencia aparte, sobre un
+    token ya consumido, y el disparador `identity_refresh_token_ciphertext_forward` lo rechaza antes que el `CHECK`. Ajuste: en ese caso las
+    comprobaciones de `identity_refresh_token_successor_chk` (sin prefijo, `v2:`) se hacen en la misma sentencia que consume el token (fija
+    `consumed_at`, huella, `replaced_by` y el texto cifrado a la vez), y se añade el prefijo sin contenido `v1:`; la escritura posterior
+    sobre un token consumido ya se prueba en `RefreshTokenStateIntegrityIT`. El resto (nombres de restricción, índices únicos parciales,
+    clave diferida del sucesor) no cambia.
+  - **Nota fechada 2026-10-12: nueva partición de 3.1.** El endurecimiento llevó 3.1a a 995 líneas. Según la regla general del
+    propietario, se partió de modo que cada regla del motor entre probada con su migración: 3.1a, 777 líneas; 3.1b, unas 218; 3.1c, unas
+    692. El índice `identity_refresh_token_family_idx` se eliminó porque el nuevo índice único `(institution_id, family_id, id)` lo
+    cubre. El árbol endurecido y verificado está en la rama local `wip/session-tokens-refresh-store-hardened` (e591b19).
 
 - [ ] 3.2 **PR 9 `revoke-sessions-on-reset`: H2 (decisión 12).**
   - **ROJO.** Crear `test/java/com/confia/identity/infrastructure/PasswordResetRevokesSessionsIT.java` (**I24:** el restablecimiento revoca
