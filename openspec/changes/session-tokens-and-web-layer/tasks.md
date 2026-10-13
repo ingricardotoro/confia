@@ -362,7 +362,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
 
 ## Fase 3: almacén, revocación al restablecer y emisión
 
-- [ ] 3.1 **PR 8 `refresh-token-store-v8`: migración V8 (decisión 8).** Partida en 3.1a y 3.1b (nota fechada
+- [x] 3.1 **PR 8 `refresh-token-store-v8`: migración V8 (decisión 8).** Partida en 3.1a y 3.1b (nota fechada
   2026-10-11 debajo); el contenido de abajo es el alcance conjunto.
   - **ROJO.** Crear `test/java/com/confia/identity/infrastructure/RefreshTokenSchemaIT.java` (rol `confia_admin_app` real: aislamiento A/B en
     ambas tablas, cero filas sin contexto y con contexto vacío, `INSERT` de otra institución rechazado por `WITH CHECK`, token hacia
@@ -388,7 +388,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   regla de la base de datos entra probada en el mismo PR que la introduce. 777 líneas.
 - [x] 3.1b **PR 8b `refresh-token-privileges`.** La ampliación de `RolePrivilegeMatrixIT` (cinco roles, nivel de columna), la de
   `MultiTenantSchemaIT` (las dos tablas, sin lista de exclusión) y la nota fechada de `docs/08`. Unas 218 líneas. Necesita 3.1a.
-- [ ] 3.1c **PR 8c `refresh-token-schema-behaviour`.** `RefreshTokenSchemaIT` (34 casos con el rol real `confia_admin_app`), con el ajuste
+- [x] 3.1c **PR 8c `refresh-token-schema-behaviour`.** `RefreshTokenSchemaIT` (34 casos con el rol real `confia_admin_app`), con el ajuste
   de la nota del 2026-10-12, y la demostración deliberada de conceder `DELETE` o un `UPDATE` completo. Unas 692 líneas. Necesita 3.1b. Al
   fusionarse, 3.1 queda hecha.
   - **Nota fechada 2026-10-11: partición de 3.1.** La tarea verificada midió **1 067 líneas efectivas**. El código de jOOQ generado

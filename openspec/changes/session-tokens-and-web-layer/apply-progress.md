@@ -1185,3 +1185,25 @@ de V8 que no se confirma: se concedieron `DELETE` sobre `identity_refresh_token`
 La instantánea OpenAPI no cambia.
 
 **Tamaño:** 218 líneas efectivas.
+
+### PR 8c `refresh-token-schema-behaviour`, tarea 3.1c (2026-10-12)
+
+Última parte de 3.1. Trae de la rama de respaldo `wip/session-tokens-refresh-store-full` (1182136) `RefreshTokenSchemaIT` (34 casos con el rol
+real `confia_admin_app`), con el ajuste de la nota del 2026-10-12. No se tocó V8.
+
+**Ajuste.** `anEncryptedSuccessorNeedsTheVersionPrefixAndAConsumedToken` escribía el texto cifrado en una sentencia aparte sobre un token ya
+consumido, y el disparador `identity_refresh_token_ciphertext_forward` lo rechazaba antes que el `CHECK`. Ahora las comprobaciones de
+`identity_refresh_token_successor_chk` se hacen dentro de la sentencia que consume el token (fija `consumed_at`, huella, `replaced_by` y texto
+cifrado a la vez): sin prefijo, `v2:` y el prefijo sin contenido `v1:` se rechazan, y `v1:AAAA` se acepta. Se mantiene el rechazo de escribir
+el texto sobre un token abierto. Se quitó el subcaso de la escritura posterior, que ya cubre `RefreshTokenStateIntegrityIT`. La prueba no
+referencia `identity_refresh_token_family_idx`.
+
+**Rojo y ruptura.** El rojo original, con las tablas inexistentes, está en la sección «PR 8». Para demostrar que la prueba puede fallar se
+añadieron, sobre una copia local de V8 que no se confirma, `GRANT DELETE ON identity_refresh_token TO confia_admin_app` y un
+`GRANT UPDATE ON identity_refresh_token_family` completo. Resultado: 34 casos, 8 fallos (el `DELETE` sobre `identity_refresh_token` y siete
+columnas de la familia que debían ser inmutables). Se restauró V8 y `cmp` confirmó el archivo idéntico.
+
+**Verificación.** Prueba aislada: 34 casos, 0 fallos. `./mvnw verify -Pmutation-gate`: Surefire 186 + 1 755, Failsafe 307, 0 fallos,
+cobertura cumplida, `BUILD SUCCESS`; mutación del 99 % y el 93 %. La instantánea OpenAPI no cambia.
+
+**Tamaño:** 698 líneas efectivas. Con esto 3.1 queda hecha.
