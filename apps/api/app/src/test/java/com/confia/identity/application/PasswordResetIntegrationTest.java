@@ -15,6 +15,7 @@ import com.confia.identity.infrastructure.Argon2Profile;
 import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
 import com.confia.identity.infrastructure.BouncyCastleRecoveryCodeHasher;
 import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
+import com.confia.identity.infrastructure.JooqAccountSessionRevoker;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqPasswordResetTokenRepository;
 import com.confia.identity.infrastructure.JooqRecoveryCodeRepository;
@@ -132,6 +133,13 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
 
     ResetPasswordWithToken resetUseCase(String instant, AuditLogWriter auditLogWriter,
             PasswordResetTokenRepository tokens, InstitutionId configuredInstitution) {
+        return resetUseCase(instant, auditLogWriter, tokens, configuredInstitution,
+                new JooqAccountSessionRevoker(dsl));
+    }
+
+    ResetPasswordWithToken resetUseCase(String instant, AuditLogWriter auditLogWriter,
+            PasswordResetTokenRepository tokens, InstitutionId configuredInstitution,
+            AccountSessionRevoker revoker) {
         Clock clock = fixedClock(instant);
         VerifyTotpCode verifyTotp = new VerifyTotpCode(transactionRunner(),
                 new JooqTotpCredentialRepository(dsl), new JooqTotpVerificationBackoffStore(dsl),
@@ -142,7 +150,7 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
                 clock);
         return new ResetPasswordWithToken(transactionRunner(), () -> configuredInstitution, tokens,
                 new JooqStaffAccountRepository(dsl), new JooqTotpCredentialRepository(dsl),
-                verifyTotp, consumeRecoveryCode, HASHER, auditLogWriter, clock);
+                verifyTotp, consumeRecoveryCode, HASHER, revoker, auditLogWriter, clock);
     }
 
     AuthenticationResult loginAt(String email, String password, String instant) {

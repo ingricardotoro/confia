@@ -249,8 +249,8 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
         List<AuditRowSnapshot> all = auditRows();
         List<AuditRowSnapshot> produced = all.subList(actionsBefore.size(), all.size());
         assertThat(produced).extracting(AuditRowSnapshot::action)
-                .containsExactly(ACTION_COMPLETED);
-        assertThat(produced.get(0).entityId()).isEqualTo(ana.value().toString());
+                .containsExactly("identity.session.revoked", ACTION_COMPLETED);
+        assertThat(produced.get(1).entityId()).isEqualTo(ana.value().toString());
         assertThat(rowOf(token)).get().extracting(row -> row.consumedAt()).isNotNull();
         assertThat(auditRows()).extracting(row -> row.action().toLowerCase(Locale.ROOT))
                 .noneMatch(action -> action.contains("notif") || action.contains("email")

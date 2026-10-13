@@ -1,6 +1,7 @@
 package com.confia.identity.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.identity.application.ResetOutcome.Completed;
 import com.confia.identity.application.ResetOutcome.PasswordRejected;
@@ -55,6 +56,7 @@ class ResetPasswordWithTokenTest {
     private final FakeAccounts accounts = new FakeAccounts();
     private final FakeTotpCredentials totpCredentials = new FakeTotpCredentials();
     private final CountingHasher hasher = new CountingHasher();
+    private final FakeRevoker revoker = new FakeRevoker(accounts);
     private final List<AuditEntry> audit = new ArrayList<>();
 
     @Test
@@ -116,8 +118,90 @@ class ResetPasswordWithTokenTest {
         assertThat(hasher.hashes).isEqualTo(1);
         assertThat(accounts.replacedWith).isNotNull();
         assertThat(audit).extracting(AuditEntry::action)
-                .containsExactly("identity.password_reset.completed");
-        assertThat(audit.get(0).afterValue()).isEqualTo("{\"secondFactor\":\"none\"}");
+                .containsExactly("identity.session.revoked", "identity.password_reset.completed");
+        assertThat(audit.get(1).afterValue()).isEqualTo("{\"secondFactor\":\"none\"}");
+    }
+
+    /** Scenario I24 at the unit level: once, after the hash, with the reset's own instant. */
+    @Test
+    void aCompletedResetRevokesOnceAfterTheHashIsReplacedAndAuditsTheCount() {
+        StaffAccountId account = seedLiveTokenFor(false);
+        revoker.revoked = 3;
+
+        ResetPasswordDecision decision = useCase().runWithinTransaction(INSTITUTION, "",
+                command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None()));
+
+        assertThat(decision.outcome()).isInstanceOf(Completed.class);
+        assertThat(revoker.calls).isEqualTo(1);
+        assertThat(revoker.institution).isEqualTo(INSTITUTION);
+        assertThat(revoker.account).isEqualTo(account);
+        assertThat(revoker.reason).isEqualTo(SessionRevocationReason.PASSWORD_CHANGE);
+        assertThat(revoker.at).isEqualTo(NOW);
+        assertThat(revoker.hashWasReplacedBeforeTheCall).isTrue();
+        assertThat(audit.get(0)).satisfies(entry -> {
+            assertThat(entry.action()).isEqualTo("identity.session.revoked");
+            assertThat(entry.entityType()).isEqualTo("identity.staff_account");
+            assertThat(entry.entityId()).isEqualTo(account.value().toString());
+            assertThat(entry.actorId()).isEqualTo(account.value());
+            assertThat(entry.outcome()).isEqualTo("success");
+            assertThat(entry.afterValue())
+                    .isEqualTo("{\"reason\":\"password_change\",\"families\":3}");
+        });
+    }
+
+    /** Scenario I125, first half: the entry exists even when nothing was revoked. */
+    @Test
+    void theRevocationEntryIsWrittenEvenWhenNoFamilyWasRevoked() {
+        seedLiveTokenFor(false);
+        revoker.revoked = 0;
+
+        useCase().runWithinTransaction(INSTITUTION, "",
+                command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None()));
+
+        assertThat(revoker.calls).isEqualTo(1);
+        assertThat(audit.get(0).afterValue())
+                .isEqualTo("{\"reason\":\"password_change\",\"families\":0}");
+    }
+
+    /** Scenario I124 at the unit level: only Completed revokes. */
+    @Test
+    void noRejectionRevokesAnything() {
+        // A token that does not exist.
+        useCase().runWithinTransaction(INSTITUTION, "",
+                command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None()));
+        // A live token with a password of the wrong length.
+        seedLiveTokenFor(false);
+        useCase().runWithinTransaction(INSTITUTION, "",
+                command(TOKEN, "a".repeat(11), new SecondFactorProof.None()));
+        // A live token that loses the consumption race.
+        tokens.consumeWins = false;
+        useCase().runWithinTransaction(INSTITUTION, "",
+                command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None()));
+        tokens.consumeWins = true;
+        // A live token of an account with active MFA and no proof.
+        seedLiveTokenFor(true);
+        totpCredentials.enrolled = true;
+        ResetPasswordDecision missing = useCase().runWithinTransaction(INSTITUTION, "",
+                command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None()));
+
+        assertThat(missing.outcome()).isInstanceOf(SecondFactorMissing.class);
+        assertThat(audit).hasSize(4).extracting(AuditEntry::action)
+                .containsOnly("identity.password_reset.rejected");
+        assertThat(revoker.calls).as("none of the four rejections reached the revoker").isZero();
+    }
+
+    /** Scenario I123 at the unit level: a failing revocation never reports the reset as done. */
+    @Test
+    void aFailingRevocationPropagatesAndWritesNoCompletionEntry() {
+        seedLiveTokenFor(false);
+        revoker.failure = new IllegalStateException("revocation unavailable");
+
+        assertThatThrownBy(() -> useCase().runWithinTransaction(INSTITUTION, "",
+                command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None())))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("revocation unavailable");
+
+        assertThat(audit).isEmpty();
     }
 
     @Test
@@ -193,7 +277,8 @@ class ResetPasswordWithTokenTest {
         ConsumeRecoveryCode consumeRecoveryCode = new ConsumeRecoveryCode(runner,
                 new UnusedRecoveryCodes(), new UnusedRecoveryCodeHasher(), audit::add, clock);
         return new ResetPasswordWithToken(runner, () -> INSTITUTION, tokens, accounts,
-                totpCredentials, verifyTotp, consumeRecoveryCode, hasher, audit::add, clock);
+                totpCredentials, verifyTotp, consumeRecoveryCode, hasher, revoker, audit::add,
+                clock);
     }
 
     private static TransactionRunner neverConnectingRunner() {
@@ -300,6 +385,37 @@ class ResetPasswordWithTokenTest {
         @Override
         public StoredPasswordHash decoyHash() {
             throw new UnsupportedOperationException();
+        }
+    }
+
+    private static final class FakeRevoker implements AccountSessionRevoker {
+        private final FakeAccounts accounts;
+        int revoked;
+        RuntimeException failure;
+        int calls;
+        InstitutionId institution;
+        StaffAccountId account;
+        SessionRevocationReason reason;
+        Instant at;
+        boolean hashWasReplacedBeforeTheCall;
+
+        FakeRevoker(FakeAccounts accounts) {
+            this.accounts = accounts;
+        }
+
+        @Override
+        public int revokeAllLive(InstitutionId i, StaffAccountId a, SessionRevocationReason r,
+                Instant now) {
+            calls++;
+            institution = i;
+            account = a;
+            reason = r;
+            at = now;
+            hashWasReplacedBeforeTheCall = accounts.replacedWith != null;
+            if (failure != null) {
+                throw failure;
+            }
+            return revoked;
         }
     }
 

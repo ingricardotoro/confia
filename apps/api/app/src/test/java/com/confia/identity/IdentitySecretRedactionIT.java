@@ -35,6 +35,7 @@ import com.confia.identity.infrastructure.Argon2Profile;
 import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
 import com.confia.identity.infrastructure.BouncyCastleRecoveryCodeHasher;
 import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
+import com.confia.identity.infrastructure.JooqAccountSessionRevoker;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqPasswordResetTokenRepository;
 import com.confia.identity.infrastructure.JooqRecoveryCodeRepository;
@@ -345,7 +346,7 @@ class IdentitySecretRedactionIT extends CommittingPostgresIntegrationTest {
                 new ConsumeRecoveryCode(transactionRunner(), new JooqRecoveryCodeRepository(dsl),
                         new BouncyCastleRecoveryCodeHasher(Argon2Profile.floor(), pepper),
                         new JooqAuditLogWriter(dsl), clock),
-                hasher, new JooqAuditLogWriter(dsl), clock);
+                hasher, new JooqAccountSessionRevoker(dsl), new JooqAuditLogWriter(dsl), clock);
         ResetPasswordCommand command = new ResetPasswordCommand(token.value(), newPasswordLiteral,
                 new SecondFactorProof.None());
         ResetPasswordDecision decision = reset.execute(contextOf(institutionId), command);

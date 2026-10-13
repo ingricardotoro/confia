@@ -1,12 +1,15 @@
 package com.confia.identity.testsupport.fixture;
 
+import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.PasswordResetIssuanceScheduler;
 import com.confia.identity.application.PasswordResetLinkSender;
+import com.confia.identity.application.SessionRevocationReason;
 import com.confia.identity.application.StaffAccountRepository;
 import com.confia.identity.domain.PlainPasswordResetToken;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.StoredPasswordHash;
 import com.confia.kernel.InstitutionId;
+import java.time.Instant;
 
 /**
  * Permanent, deliberately violating fixtures for the absence rules of {@code
@@ -54,11 +57,41 @@ public final class PasswordRecoveryScopeViolationFixtures {
         }
     }
 
-    /** Something that mentions a refresh token, which no identity class may do yet. */
-    public static final class RefreshTokenFamilyRevoker {
+    /**
+     * A password reset that replaces the stored hash and never revokes the account's session
+     * families (hard condition H2): it breaks both the rule that the reset revokes and the rule
+     * that no hash is replaced without a revocation.
+     */
+    public static final class ResetWithoutRevocation {
 
-        public int revokeAllRefreshTokensOf(StaffAccountId accountId) {
-            return 0;
+        private final StaffAccountRepository accounts;
+
+        public ResetWithoutRevocation(StaffAccountRepository accounts) {
+            this.accounts = accounts;
+        }
+
+        public boolean reset(InstitutionId institutionId, StaffAccountId accountId,
+                StoredPasswordHash hash) {
+            return accounts.replacePasswordHash(institutionId, accountId, hash);
+        }
+    }
+
+    /** The same defect with the revocation present, as the control that a rule is not a blanket ban. */
+    public static final class ResetWithRevocation {
+
+        private final StaffAccountRepository accounts;
+        private final AccountSessionRevoker revoker;
+
+        public ResetWithRevocation(StaffAccountRepository accounts, AccountSessionRevoker revoker) {
+            this.accounts = accounts;
+            this.revoker = revoker;
+        }
+
+        public int reset(InstitutionId institutionId, StaffAccountId accountId,
+                StoredPasswordHash hash, Instant now) {
+            accounts.replacePasswordHash(institutionId, accountId, hash);
+            return revoker.revokeAllLive(institutionId, accountId,
+                    SessionRevocationReason.PASSWORD_CHANGE, now);
         }
     }
 }
