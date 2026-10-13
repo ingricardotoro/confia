@@ -409,7 +409,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     692. El índice `identity_refresh_token_family_idx` se eliminó porque el nuevo índice único `(institution_id, family_id, id)` lo
     cubre. El árbol endurecido y verificado está en la rama local `wip/session-tokens-refresh-store-hardened` (e591b19).
 
-- [ ] 3.2 **PR 9 `revoke-sessions-on-reset`: H2 (decisión 12).**
+- [x] 3.2 **PR 9 `revoke-sessions-on-reset`: H2 (decisión 12).**
   - **ROJO.** Crear `test/java/com/confia/identity/infrastructure/PasswordResetRevokesSessionsIT.java` (**I24:** el restablecimiento revoca
     todas las familias vivas con `password_change`, conserva el motivo de una ya revocada, no toca otra cuenta, escribe
     `identity.session.revoked` con `{"reason":"password_change","families":n}` también con `n = 0`; **control negativo:** un escritor de
