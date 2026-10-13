@@ -386,7 +386,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
 - [x] 3.1a **PR 8a `refresh-token-tables`.** La migración V8 endurecida tras la revisión (I1, I2, S2 y S3),
   `RefreshTokenStateIntegrityIT` (sucesor en la misma familia, disparadores de solo avance, cotas) y `RevocationReasonCatalogIT`. Así cada
   regla de la base de datos entra probada en el mismo PR que la introduce. 777 líneas.
-- [ ] 3.1b **PR 8b `refresh-token-privileges`.** La ampliación de `RolePrivilegeMatrixIT` (cinco roles, nivel de columna), la de
+- [x] 3.1b **PR 8b `refresh-token-privileges`.** La ampliación de `RolePrivilegeMatrixIT` (cinco roles, nivel de columna), la de
   `MultiTenantSchemaIT` (las dos tablas, sin lista de exclusión) y la nota fechada de `docs/08`. Unas 218 líneas. Necesita 3.1a.
 - [ ] 3.1c **PR 8c `refresh-token-schema-behaviour`.** `RefreshTokenSchemaIT` (34 casos con el rol real `confia_admin_app`), con el ajuste
   de la nota del 2026-10-12, y la demostración deliberada de conceder `DELETE` o un `UPDATE` completo. Unas 692 líneas. Necesita 3.1b. Al
