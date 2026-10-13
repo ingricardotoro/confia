@@ -1024,3 +1024,145 @@ seguía adjunta en la línea de acceso a datos. El orquestador la detectó al re
   - Un primer intento lo detuvo Claude Code por falta de memoria en el equipo. Se relanzó con autorización del propietario.
 
 **Tamaño:** 183 líneas efectivas.
+
+### PR 8 `refresh-token-store-v8`, tarea 3.1 (2026-10-11)
+
+**Estado: construida y verificada, pero NO comprometida.** Mide 1 067 líneas efectivas, por encima de 800. Por la regla del propietario,
+el árbol completo y verificado se conserva en la rama local `wip/session-tokens-refresh-store-full` y se propone una partición (abajo).
+La casilla 3.1 sigue sin marcar.
+
+**Cambio.**
+
+- `V8__create_identity_refresh_token_tables.sql`, exactamente como la decisión 8: dos tablas, RLS `ENABLE` y `FORCE`, `REVOKE ALL FROM PUBLIC`,
+  `UPDATE` por columna, ningún `DELETE`, nada para el portal, motivos `reuse_detected` y `password_change`, clave foránea diferida del
+  sucesor, índices únicos parciales, columnas de huella de consumo y del sucesor cifrado con prefijo `v1:`.
+- `RefreshTokenSchemaIT` (34 casos, rol `confia_admin_app` real, cada rechazo afirma SQLState y nombre de la restricción).
+- `RolePrivilegeMatrixIT` (6 casos nuevos, cinco roles, nivel de columna leído de `pg_attribute`), `MultiTenantSchemaIT` (1 caso: las dos
+  tablas pasan las puertas genéricas sin exclusión) y `RevocationReasonCatalogIT` (1 caso).
+- Nota fechada en `docs/08` (IP en claro y huella del agente hasta la purga del cambio 9).
+
+**Rojo observado** (árbol sin `V8`, comando de integración focalizado sobre `RefreshTokenSchemaIT`, `RolePrivilegeMatrixIT`, `MultiTenantSchemaIT`
+y `RevocationReasonCatalogIT`): 85 pruebas, 6 fallos y 35 errores. Todos con la causa esperada: `relation "identity_refresh_token_family" does not
+exist` (o `identity_refresh_token`), y los 6 fallos son aserciones que esperaban un SQLState distinto de `42P01`.
+(Un primer intento no llegó a ejecutarse por un error de compilación propio de la prueba, `assertThat` ambiguo, corregido antes del rojo real.)
+
+**Verde.** Las mismas cuatro clases: 85 pruebas, 0 fallos (34 + 40 + 10 + 1). Dos ajustes de la propia prueba durante el verde, sin tocar
+producción: el caso de contexto vacío usaba `executeUpdate` sobre un `select`, y mi expectativa de al menos dos índices únicos en la familia
+era incorrecta (solo tiene la clave primaria).
+
+**Ruptura deliberada** (en una copia local no comprometida de `V8`: `GRANT DELETE ON identity_refresh_token` y `GRANT UPDATE ON
+identity_refresh_token_family` completo para `confia_admin_app`). `RefreshTokenSchemaIT`: 34 pruebas, 8 fallos
+(`confiaAdminAppCanNeverDeleteFromEitherTable` y siete casos de `confiaAdminAppCannotUpdateAnImmutableColumn`: `created_at`,
+`second_factor_verified`, `absolute_expires_at`, `user_agent_fingerprint`, `ip_first_seen`, y dos más que no se atribuyeron a una columna en el informe (uno falló por la clave foránea de la cuenta y no por privilegio, lo que indica que un `UPDATE` de la
+familia llegó a ejecutarse). `RolePrivilegeMatrixIT`: 40 pruebas, 1 fallo
+(`confiaAdminAppUpdatesOnlyTheStateColumnsAndNeverDeletesOnTheRefreshTokenTables`: «UPDATE on identity_refresh_token_family must be granted per
+column»). Revertida y `cmp` confirmó el archivo idéntico a la copia buena; ninguna ruptura queda en el árbol.
+
+**`./mvnw verify -Pmutation-gate`:** Surefire 186 + 1 755, Failsafe 292, 0 fallos, `BUILD SUCCESS`. PIT: 99 % (194 mutaciones) y 93 %
+(481 mutaciones, `shared.security.token`). La instantánea de OpenAPI no cambia (`git status` no muestra `apps/api/openapi/*`).
+
+**Tamaño:** `git add -N . && git diff --numstat main -- . ':!openspec' ':!**/generated/**'`: **1 067 líneas** (V8 111, `RefreshTokenSchemaIT` 692,
+`RolePrivilegeMatrixIT` 167, `MultiTenantSchemaIT` 31, `RevocationReasonCatalogIT` 46, `docs/08` 20). El código de jOOQ se genera en
+`target/generated-sources/jooq` y no se versiona, así que no cuenta.
+
+**Partición propuesta.**
+
+| Parte | Contenido | Tamaño |
+|---|---|---|
+| 3.1a `refresh-token-tables` | `V8`, `RolePrivilegeMatrixIT`, `MultiTenantSchemaIT`, `RevocationReasonCatalogIT`, nota de `docs/08` | unas 375 |
+| 3.1b `refresh-token-schema-behaviour` | `RefreshTokenSchemaIT` completa y su ruptura deliberada | unas 692 |
+
+En 3.1a el rojo es el de las tres clases de esquema sobre tablas inexistentes; 3.1b se apoya en `V8` y se verifica con la ruptura deliberada.
+
+**Límite de reversión.** Se elimina `V8` (antes de producción) y se regenera jOOQ; las pruebas nuevas se retiran con ella.
+
+### Partición de 3.1 y PR 8a `refresh-token-tables` (2026-10-11)
+
+La sección «PR 8» describe el árbol completo: 1 067 líneas, más que el tope, por lo que no se confirmó. Ese árbol está en la rama local
+`wip/session-tokens-refresh-store-full` (1182136). Según la regla general del propietario, se parte por archivos completos:
+
+- **3.1a, 375 líneas:** V8, `RolePrivilegeMatrixIT`, `MultiTenantSchemaIT`, `RevocationReasonCatalogIT` y la nota de `docs/08`.
+- **3.1b, unas 692 líneas:** `RefreshTokenSchemaIT`.
+
+**Rojo y ruptura.** Son los de la sección «PR 8».
+
+- El rojo, sin V8, dio 85 pruebas con 6 fallos y 35 errores, todos por `relation ... does not exist`.
+- La ruptura deliberada, que concede `DELETE` y un `UPDATE` completo, hace fallar `RolePrivilegeMatrixIT` en 1 prueba y
+  `RefreshTokenSchemaIT` en 8. Esta segunda parte se repite al entregar 3.1b.
+
+**Verificación del árbol de 3.1a.** `./mvnw verify -Pmutation-gate`: Surefire 186 + 1 755, Failsafe 258, 0 fallos, cobertura cumplida y
+`BUILD SUCCESS`. Mutación: 99 % y 93 %. La instantánea OpenAPI no cambia.
+
+### Revisión de V8 y endurecimiento (I1, I2, S2, S3) (2026-10-12)
+
+Decisión del propietario tras la revisión independiente de V8 (aún sin fusionar ni aplicar en ningún entorno, por lo que se edita en su
+sitio, dentro de 3.1a). Modo: Strict TDD.
+
+**Cambios en `V8__create_identity_refresh_token_tables.sql`.**
+
+- **I1.** `UNIQUE (institution_id, family_id, id)` en el token; `identity_refresh_token_successor_fk` pasa a
+  `(institution_id, family_id, replaced_by)` hacia `(institution_id, family_id, id)`, diferida; `CHECK (replaced_by IS DISTINCT FROM id)`
+  (`identity_refresh_token_not_self_successor_chk`). El índice `one_predecessor` no necesitó cambios. Se retiró
+  `identity_refresh_token_family_idx` (su nombre inducía a error y la nueva restricción única empieza por las mismas columnas, así que era
+  redundante); cada índice restante lleva una línea con su razón.
+- **I2.** Dos funciones `plpgsql` `SECURITY INVOKER` con un disparador `BEFORE UPDATE` cada una, que lanzan `check_violation` (`23514`) con el
+  nombre de la regla como `CONSTRAINT`: `identity_refresh_token_family_revocation_final`, `identity_refresh_token_family_last_used_forward`,
+  `identity_refresh_token_consumption_final` e `identity_refresh_token_ciphertext_forward`. El sucesor cifrado solo se escribe cuando el token
+  aún no estaba consumido (misma sentencia que lo consume) y después solo puede vaciarse. Se revisaron las decisiones 8, 10, 11 y 12:
+  rotación, revocación por reutilización, revocación de todas las familias, vaciado en el siguiente uso y avance de `last_used_at` pasan sin
+  cambios. **No hay conflicto de diseño.**
+- **S2.** `revoked_at >= created_at` (`..._family_revoked_after_created_chk`), `consumed_at >= issued_at` (`..._consumed_after_issued_chk`) y el
+  texto cifrado con `~ '^v1:.+'` (se mantiene el nombre `identity_refresh_token_successor_chk`).
+- **S3.** `identity_refresh_token_family_ip_host_chk`: máscara 32 en IPv4 y 128 en IPv6.
+- **S1 y S4.** Nota en el encabezado: `token.expires_at <= family.absolute_expires_at` solo se garantiza en código. Una línea de razón por índice.
+
+**`RefreshTokenStateIntegrityIT`** (nueva, 15 casos, rol `confia_admin_app` real, JDBC con punto de guardado por rechazo, cada rechazo afirma
+SQLState y nombre): sucesor de otra familia (rechazado al confirmar) y de la misma (aceptado), sucesor de sí mismo, familia sin revocar o con
+otro motivo, `last_used_at` hacia atrás (rechazado) y hacia delante (aceptado), token consumido sin reabrir ni redirigir (siete sentencias),
+texto cifrado reescrito, vaciado una vez y no volver a fijarlo, los tres flujos legítimos (rotar y vaciar; revocar por `reuse_detected`;
+revocar todas por `password_change`), S2 (revocación antes de la creación, consumo antes de la emisión, `v1:` sin contenido) y S3.
+
+**Rojo observado** (V8 sin cambios, solo `RefreshTokenStateIntegrityIT`, `-Dit.test`): 15 pruebas, **10 fallos**, 0 errores. Fallaron los casos
+de sucesor de otra familia, sucesor de sí mismo, familia sin revocar, `last_used_at`, token reabierto, texto cifrado reescrito y las tres
+reglas S2/S3 (revocación antes de la creación, consumo antes de la emisión, `v1:` vacío, máscara de red). Los 5 casos de flujo legítimo
+pasan en rojo, como corresponde: son la red contra un disparador demasiado estricto.
+
+**Verde.** `RefreshTokenStateIntegrityIT` 15, `RolePrivilegeMatrixIT` 40, `MultiTenantSchemaIT` 10, `RevocationReasonCatalogIT` 1: 66 pruebas, 0 fallos.
+
+**Rupturas deliberadas** (sobre `RefreshTokenStateIntegrityIT`, cada una revertida y confirmada con `cmp`):
+
+| Ruptura | Resultado |
+|---|---|
+| Se comentan los dos `CREATE TRIGGER` | 15 pruebas, 4 fallos: `aRevokedFamilyCannotBeUnrevokedOrChangeItsReason`, `lastUsedAtNeverMovesBackwardsButMayAdvance`, `aConsumedTokenCannotBeReopenedOrRedirected`, `theSuccessorCiphertextCannotBeRewrittenButMayBeClearedOnceAndStaysCleared` |
+| Clave del sucesor de vuelta a `(institution_id, replaced_by)` y sin el `CHECK` de sucesor de sí mismo | 15 pruebas, 2 fallos: `aSuccessorMustLiveInTheSameFamilyAsItsPredecessor`, `aTokenCannotBeItsOwnSuccessor` |
+
+**`RefreshTokenSchemaIT` del respaldo contra el V8 nuevo** (copiada de `wip/session-tokens-refresh-store-full`, ejecutada y retirada; no se
+confirma en 3.1a): 34 pruebas, 1 fallo, `anEncryptedSuccessorNeedsTheVersionPrefixAndAConsumedToken`. Escribe el texto cifrado en una sentencia
+aparte sobre un token ya consumido y el disparador lo rechaza antes que el `CHECK`. 3.1b debe aplicar el ajuste descrito en `tasks.md`.
+Los otros 33 casos pasan sin cambios (incluidos los nombres de restricción, `one_predecessor` y la clave diferida).
+
+**Verificación.** `./mvnw verify -Pmutation-gate`: Surefire 186 + 1 755, Failsafe 273 (258 + 15), 0 fallos, cobertura cumplida, `BUILD SUCCESS`
+(15 min). Mutación: 99 % (194) y 93 % (481). La instantánea de OpenAPI no cambia.
+
+**Tamaño de 3.1a** (`git add -N . && git diff --numstat main -- . ':!openspec'`): **995 líneas** (V8 201, `RefreshTokenStateIntegrityIT` 530,
+`RolePrivilegeMatrixIT` 167, `MultiTenantSchemaIT` 31, `RevocationReasonCatalogIT` 46, `docs/08` 20). **Supera el tope de 800 fijado por el
+propietario**; no se recortaron pruebas ni comentarios para ajustarlo. Queda para decisión del propietario: aceptar `size:exception` para
+3.1a o mover `RefreshTokenStateIntegrityIT` a una parte propia.
+
+**Límite de reversión.** Los cambios de V8 y `RefreshTokenStateIntegrityIT`; el resto de 3.1a no depende de ellos.
+
+### Nueva partición de 3.1 y entrega de 3.1a (2026-10-12)
+
+Con el endurecimiento (I1, I2, S2 y S3), 3.1a midió 995 líneas. Según la regla general del propietario, se volvió a partir de modo que
+cada regla del motor entre probada en el mismo PR que la introduce:
+
+- **3.1a, 777 líneas.** V8 endurecida, `RefreshTokenStateIntegrityIT` (15 casos) y `RevocationReasonCatalogIT`.
+- **3.1b, unas 218 líneas.** `RolePrivilegeMatrixIT`, `MultiTenantSchemaIT` y la nota de `docs/08`.
+- **3.1c, unas 692 líneas.** `RefreshTokenSchemaIT`, con el ajuste de la nota del 2026-10-12.
+
+El árbol completo endurecido está en la rama local `wip/session-tokens-refresh-store-hardened` (e591b19). Las ramas de esta parte se
+reorganizaron en local, sin subir nada. El rojo y las rupturas de I1 e I2 son los de la sección «Revisión de V8 y endurecimiento».
+
+**Verificación del árbol de 3.1a.** `./mvnw verify -Pmutation-gate`: Surefire 186 + 1 755, Failsafe 266, 0 fallos, cobertura cumplida y
+`BUILD SUCCESS`; mutación del 99 % y el 93 %; la instantánea OpenAPI no cambia. Claude Code detuvo dos veces este cambio por falta de
+memoria en el equipo, y se relanzó con autorización del propietario.

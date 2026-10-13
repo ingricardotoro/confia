@@ -516,6 +516,28 @@ GRANT SELECT ON identity_refresh_token        TO confia_readonly;
 `TEXT` (V5, V7). **Descartado:** marcar como consumidos los tokens al revocar la familia: la vigencia
 se deriva de la familia, y el `CHECK` de consumo exige sucesor.
 
+> **Nota fechada 2026-10-12: endurecimiento de V8 tras la revisión independiente (I1, I2, S2, S3).** V8 no se había fusionado ni aplicado, por
+> lo que se corrige en su sitio. El bloque de SQL de arriba conserva su forma original; los cambios son:
+>
+> - **Sucesor en la misma familia (I1).** `UNIQUE (institution_id, family_id, id)` en el token y
+>   `identity_refresh_token_successor_fk` pasa a `FOREIGN KEY (institution_id, family_id, replaced_by) REFERENCES identity_refresh_token
+>   (institution_id, family_id, id) DEFERRABLE INITIALLY DEFERRED`. Un sucesor de otra familia de la misma institución ya no es posible. Se
+>   añade `CHECK (replaced_by IS DISTINCT FROM id)` (ningún token es su propio sucesor). El índice `one_predecessor` no cambia. Se retira
+>   `identity_refresh_token_family_idx` porque la nueva restricción única empieza por las mismas columnas y lo hacía redundante.
+> - **El estado solo avanza (I2).** Un disparador `BEFORE UPDATE` por tabla (`plpgsql`, `SECURITY INVOKER`) que lanza `check_violation`
+>   (`23514`) con el nombre de la regla: en la familia, `revocation_final` (`revoked_at` y `revoked_reason` no cambian ni vuelven a `NULL`
+>   una vez fijados) y `last_used_at_forward` (`last_used_at` no retrocede); en el token, `consumption_final` (`consumed_at`, `replaced_by` y
+>   la huella de consumo no cambian ni vuelven a `NULL`) y `ciphertext_forward` (el sucesor cifrado se escribe una sola vez, en la misma
+>   sentencia que consume el token, y después solo puede vaciarse, nunca reescribirse ni volver a fijarse). Cada transición de las decisiones
+>   10 a 12 sigue permitida: rotación (un solo `UPDATE` que consume y fija el sucesor cifrado), revocación por reutilización o por
+>   restablecimiento, vaciado del sucesor en el siguiente uso y avance de `last_used_at`. Ninguna exige reescribir un sucesor ya consumido, así
+>   que el diseño no cambia. El disparador se ejecuta antes que los `CHECK` y por eso su mensaje es el que se informa cuando una sentencia
+>   rompe ambos.
+> - **Coherencia temporal y de formato (S2, S3).** `revoked_at >= created_at` en la familia, `consumed_at >= issued_at` en el token,
+>   sucesor cifrado con contenido tras `v1:` (`~ '^v1:.+'`) e `ip_first_seen` solo como dirección de host (máscara 32 en IPv4 y 128 en IPv6).
+> - **Solo en código (S1).** `token.expires_at <= family.absolute_expires_at` no tiene restricción en V8: compara una fila con su padre y la
+>   garantiza `SessionLifetimePolicy`. Queda anotado en el encabezado de la migración.
+
 ### Decisión 9 — Emisión de una familia
 
 `IssueSession` en `identity.application`, con `execute` (abre su transacción) y
