@@ -208,8 +208,13 @@ public final class ResetPasswordWithToken {
         }
 
         // 7-9. Only the winner pays Argon2id.
-        accounts.replacePasswordHash(institutionId, row.accountId(),
-                passwordHasher.hash(newPassword));
+        if (!accounts.replacePasswordHash(institutionId, row.accountId(),
+                passwordHasher.hash(newPassword))) {
+            // The account row was locked above, so no row affected is a defect, not a rejection:
+            // the exception rolls the consumption back (review of PR 9, S-3).
+            throw new IllegalStateException(
+                    "the password hash of a locked account could not be replaced");
+        }
         // H2: the same transaction, after the new hash, and the entry exists even for zero families.
         int revokedFamilies = sessionRevoker.revokeAllLive(institutionId, row.accountId(),
                 SessionRevocationReason.PASSWORD_CHANGE, now);

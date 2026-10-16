@@ -428,7 +428,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     costura 9a/9b (decisión 12). **Este PR se fusiona antes que cualquier emisión.** — Escenarios I24, I122 a I125, BI16 y las ausencias de IP, de
     restablecimiento administrativo, de enumeración, de envío real y de notificación.
 
-- [ ] 3.3 **PR 10 `session-issuance`: emisión de una familia (decisión 9).**
+- [x] 3.3 **PR 10 `session-issuance`: emisión de una familia (decisión 9).**
   - **ROJO.** Crear `test/java/com/confia/identity/infrastructure/IssueSessionIT.java` (familia y token en una transacción con
     `identity.session.started`; `token_hash` es el SHA-256 y no el valor entregado (ADR-0005, prueba 5); vigencias de 12 h y `min(8 h, absoluta)`;
     emisión y asiento se confirman o revierten juntos; asiento sin secretos; sin origen se acepta; huella y IP; origen en el asiento con el decorador

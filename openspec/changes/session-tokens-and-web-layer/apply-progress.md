@@ -1332,3 +1332,39 @@ pasan al archivo nuevo `IssueSessionOriginAndSecondFactorIT`; y de `SessionIssua
 (`someBackendWaitsForTheAccountLock`, `holdsWithin`, `SteppedClock`).
 
 **Medición:** 698 líneas efectivas (`git diff --numstat change/session-tokens-and-web-layer-10a-session-domain...HEAD -- . ':!openspec'`).
+
+### PR 10c `issuance-concurrency`, tarea 3.3 parte 3 y cierre (2026-10-15, modo TDD estricto)
+
+Tercera rebanada, apilada sobre 10b. Contiene `SessionIssuanceResetConcurrencyIT` (2), los ayudantes de concurrencia de
+`SessionIssuanceIntegrationTest` (`someBackendWaitsForTheAccountLock`, `holdsWithin`, `SteppedClock`), `IssueSessionOriginAndSecondFactorIT`
+(5: los dos escenarios de segundo factor y los tres de origen en la bitácora, con 50 emisiones concurrentes), **S-3**, **I-1** y su fixture.
+
+**Rojo observado.**
+
+1. S-3, con la producción sin la comprobación: `ResetPasswordWithTokenTest` 12 pruebas, 1 fallo,
+   `aPasswordHashThatAffectedNoRowFailsTheResetBeforeRevokingOrAuditing`: `Expecting code to raise a throwable`.
+2. Concurrencia (I-2): con `lockById` quitado, `anIssuanceStartedWhileTheResetIsRunningWaitsForItAndIsNotRevoked` falla
+   (`the instant of that session is read after the lock`: esperado 2026-10-15T15:06:00Z, obtuvo 15:04; y la emisión no espera sobre la cuenta).
+3. I-1, con una escritura de `PASSWORD_HASH` añadida a `JooqAccountSessionRevoker`: `onlyReplacePasswordHashOfTheRepositoryWritesThePasswordHashColumn`
+   falla y nombra `JooqAccountSessionRevoker.revokeAllLive`. Las rupturas se revirtieron.
+4. En el primer verde, el `jsonb` de la auditoría devolvía `"families": 1` con espacio: se corrigió en el test, no en producción.
+
+**Concurrencia de I-2 (condición de cierre).** Dos transacciones reales retenidas con `CountDownLatch` y liberadas cuando `pg_stat_activity` muestra
+una espera de bloqueo sobre `identity_staff_account` (condición con límite de 20 s, sin esperas fijas): *emisión primero* (el restablecimiento espera
+y revoca la familia emitida con `password_change`, sin familias vivas al confirmar) y *restablecimiento primero* (la emisión espera, su familia queda
+viva y con `created_at` posterior). **Hallazgo aceptado por el propietario el 2026-10-15:** la clave foránea de la familia toma `FOR KEY SHARE` sobre
+la cuenta, que choca con el `FOR UPDATE` del restablecimiento, así que la base ya serializa «emisión primero» y quitar `lockById` solo pone en
+rojo «restablecimiento primero». El propietario acepta que eso satisface la condición de cierre.
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-Dit.test='SessionIssuanceResetConcurrencyIT,IssueSessionOriginAndSecondFactorIT'` y `-Dtest='ResetPasswordWithTokenTest,IdentityScopeExclusionInventoryTest'`: 0 fallos |
+| Arnés de ejecución | Dos transacciones reales contra PostgreSQL con `CountDownLatch` y `pg_stat_activity`; 50 emisiones con `CyclicBarrier` |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 790, Failsafe 332, 0 fallos; cobertura cumplida; mutación del 99 % (kernel) y el 93 % (497 de 533, app); `BUILD SUCCESS` |
+| Frontera de reversión | La prueba de concurrencia, la regla I-1 con su fixture y las pruebas de origen y de segundo factor; la comprobación de S-3 es independiente |
+
+**Cierre de 3.3.** Con las tres rebanadas: 1 934 líneas en total (688 + 698 + 548 por rebanada, medidas contra su base; 41 más que el árbol sin partir por el encabezado del archivo nuevo). Lo movido entre rebanadas
+respecto de la propuesta: nada de dominio; las pruebas de origen y de segundo factor salieron de `IssueSessionIT` a un archivo nuevo en 10c, y
+los ayudantes de concurrencia del soporte pasaron a 10c.
+
+**Medición:** **548 líneas efectivas** (`git diff --numstat change/session-tokens-and-web-layer-10b-session-issuance...HEAD -- . ':!openspec'`).

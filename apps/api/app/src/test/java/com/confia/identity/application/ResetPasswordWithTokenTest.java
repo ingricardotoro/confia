@@ -204,6 +204,23 @@ class ResetPasswordWithTokenTest {
         assertThat(audit).isEmpty();
     }
 
+    /**
+     * Review of PR 9, S-3: a hash replacement that affected no row is a failure of the reset, not a
+     * result to ignore. Nothing is revoked or audited, and the exception rolls the transaction back.
+     */
+    @Test
+    void aPasswordHashThatAffectedNoRowFailsTheResetBeforeRevokingOrAuditing() {
+        seedLiveTokenFor(false);
+        accounts.replaceAffectsARow = false;
+
+        assertThatThrownBy(() -> useCase().runWithinTransaction(INSTITUTION, "",
+                command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None())))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(revoker.calls).isZero();
+        assertThat(audit).isEmpty();
+    }
+
     @Test
     void aLostConsumptionRaceIsATokenRejectionAndPaysNoArgon2id() {
         seedLiveTokenFor(false);
@@ -325,6 +342,7 @@ class ResetPasswordWithTokenTest {
         StaffAccount account;
         int locks;
         StoredPasswordHash replacedWith;
+        boolean replaceAffectsARow = true;
 
         @Override
         public Optional<StaffAccount> findBy(InstitutionId i, LoginIdentifier identifier) {
@@ -341,7 +359,7 @@ class ResetPasswordWithTokenTest {
         public boolean replacePasswordHash(InstitutionId i, StaffAccountId a,
                 StoredPasswordHash newHash) {
             replacedWith = newHash;
-            return true;
+            return replaceAffectsARow;
         }
     }
 

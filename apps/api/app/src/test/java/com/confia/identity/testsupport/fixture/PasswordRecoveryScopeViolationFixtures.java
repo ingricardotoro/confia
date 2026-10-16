@@ -1,5 +1,7 @@
 package com.confia.identity.testsupport.fixture;
 
+import static confia.generated.jooq.tables.IdentityStaffAccount.IDENTITY_STAFF_ACCOUNT;
+
 import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.PasswordResetIssuanceScheduler;
 import com.confia.identity.application.PasswordResetLinkSender;
@@ -10,6 +12,7 @@ import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.StoredPasswordHash;
 import com.confia.kernel.InstitutionId;
 import java.time.Instant;
+import org.jooq.DSLContext;
 
 /**
  * Permanent, deliberately violating fixtures for the absence rules of {@code
@@ -54,6 +57,29 @@ public final class PasswordRecoveryScopeViolationFixtures {
         public boolean overwrite(InstitutionId institutionId, StaffAccountId accountId,
                 StoredPasswordHash hash) {
             return accounts.replacePasswordHash(institutionId, accountId, hash);
+        }
+    }
+
+    /**
+     * A second writer of the {@code password_hash} column that goes around the repository port: it
+     * sets the column itself with jOOQ (review of PR 9, I-1), so neither the rule on callers of {@code
+     * replacePasswordHash} nor the revocation rules would ever see it.
+     */
+    public static final class PasswordHashColumnWriter {
+
+        private final DSLContext dsl;
+
+        public PasswordHashColumnWriter(DSLContext dsl) {
+            this.dsl = dsl;
+        }
+
+        public int overwrite(InstitutionId institutionId, StaffAccountId accountId,
+                StoredPasswordHash hash) {
+            return dsl.update(IDENTITY_STAFF_ACCOUNT)
+                    .set(IDENTITY_STAFF_ACCOUNT.PASSWORD_HASH, hash.value())
+                    .where(IDENTITY_STAFF_ACCOUNT.INSTITUTION_ID.eq(institutionId.value()))
+                    .and(IDENTITY_STAFF_ACCOUNT.ID.eq(accountId.value()))
+                    .execute();
         }
     }
 
