@@ -456,6 +456,19 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
       (dos transacciones reales con `CountDownLatch`: un restablecimiento y una emisión simultáneos, sin familia viva emitida con la
       contraseña antigua tras confirmar el restablecimiento) ni sin su demostración deliberada: quitar `lockById` de la emisión la pone en rojo.
 
+  - **Nota fechada 2026-10-15: partición de 3.3 aprobada por el propietario.** La tarea verificada midió **1 893 líneas efectivas** (673 de
+    producción y 1 220 de pruebas), por encima de las 800. Se partió por archivos completos en tres PR apilados contra `main`:
+    - **3.3a PR 10a `session-domain`:** los seis tipos de dominio y sus cinco pruebas de unidad (688 líneas).
+    - **3.3b PR 10b `session-issuance`:** `IssueSession`, comando, resultado, puertos, adaptadores jOOQ, cableado, la entrada de
+      `NoUnapprovedPlainSqlTest` e `IssueSessionIT` sin las pruebas de origen ni de segundo factor.
+    - **3.3c PR 10c `issuance-concurrency`:** `SessionIssuanceResetConcurrencyIT`, S-3, la regla I-1 con su fixture y las pruebas de origen
+      y de segundo factor. **3.3 se marca `[x]` solo en esta parte.**
+    El árbol completo y verificado antes de partir está en la rama local `change/session-tokens-and-web-layer-10-session-issuance` (91801a2).
+  - **Decisión del propietario 2026-10-15 sobre la condición de cierre de I-2.** La clave foránea de la familia toma `FOR KEY SHARE` sobre la
+    cuenta, que choca con el `FOR UPDATE` del restablecimiento: la base ya serializa el orden «emisión primero», y quitar `lockById` no deja una
+    familia viva con la contraseña antigua. La demostración deliberada pone en rojo la prueba de «restablecimiento primero» (la emisión no espera
+    sobre la cuenta y su instante se lee antes del bloqueo). El propietario acepta que eso satisface la condición de cierre.
+
 ## Fase 4: rotación, reutilización y gracia
 
 - [ ] 4.1 **PR 11 `refresh-rotation`: rotación fresca, vigencias y rechazos (decisión 10).**
