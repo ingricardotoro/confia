@@ -1282,3 +1282,24 @@ de `consume` y de `replacePasswordHash`, en el camino `Completed`, y que no qued
   `replacePasswordHash` escribe `PASSWORD_HASH`) y S-3 (fallar si `replacePasswordHash` devuelve `false`);
 - a 4.1: volver a leer `revoked_at` tras bloquear la familia, y la prueba de concurrencia con la rotación;
 - a 4.2: S-2 (la revocación por reutilización vacía el sucesor cifrado).
+
+### PR 10a `session-domain`, tarea 3.3 parte 1 (2026-10-15, modo TDD estricto)
+
+Primera de tres rebanadas apiladas de 3.3 (costura aprobada por el propietario el 2026-10-15; ver la nota fechada de `tasks.md`). Contiene los
+tipos de dominio de la emisión y sus pruebas de unidad: `PlainRefreshToken`, `RefreshTokenHash`, `UserAgentFingerprint`,
+`SessionLifetimePolicy`, `RefreshTokenFamily`, `RefreshTokenRow`, con `PlainRefreshTokenTest` (7), `RefreshTokenHashTest` (5),
+`UserAgentFingerprintTest` (5), `SessionLifetimePolicyTest` (6) y `RefreshTokenRecordsTest` (4). Ningún consumidor todavía.
+
+**Rojo observado.** Con las pruebas escritas y sin producción, `test-compile` falló con `cannot find symbol` sobre `PlainRefreshToken`,
+`RefreshTokenHash`, `RefreshTokenFamily`, `RefreshTokenRow`, `UserAgentFingerprint` y `SessionLifetimePolicy`. Ruptura deliberada: calcular el
+hash como los bytes del token en hexadecimal en lugar de su SHA-256 puso en rojo `RefreshTokenHashTest.ofComputesTheSha256OfTheAsciiTextOfTheToken`;
+se revirtió.
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-Dtest='PlainRefreshTokenTest,RefreshTokenHashTest,UserAgentFingerprintTest,SessionLifetimePolicyTest,RefreshTokenRecordsTest'`: 27 pruebas, 0 fallos |
+| Arnés de ejecución | N/A: dominio puro, sin frontera de ejecución |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 787, Failsafe 315, 0 fallos; cobertura cumplida (`identity.domain` ≥ 95); mutación del 99 % (kernel) y el 93 % (497 de 533, app); `BUILD SUCCESS` |
+| Frontera de reversión | Los seis archivos de dominio y sus cinco pruebas |
+
+**Medición:** 688 líneas efectivas (`git diff --numstat main...HEAD -- . ':!openspec'`).
