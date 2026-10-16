@@ -12,12 +12,15 @@ import com.confia.identity.application.StaffAccountRepository;
 import com.confia.identity.domain.BackoffPolicy;
 import com.confia.identity.domain.BackoffState;
 import com.confia.identity.infrastructure.Argon2Profile;
+import com.confia.identity.infrastructure.JooqStaffAccountRepository;
 import com.confia.identity.testsupport.fixture.PasswordRecoveryScopeViolationFixtures;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.crypto.DataEncryptionKeyRepository;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaFieldAccess;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import java.io.IOException;
@@ -34,6 +37,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
@@ -54,6 +58,11 @@ import org.junit.jupiter.api.Test;
  * AuthenticateWithPasswordIT}'s own job (task 4.1).
  */
 class IdentityScopeExclusionInventoryTest {
+
+    private static final String STAFF_ACCOUNT_TABLE =
+            "confia.generated.jooq.tables.IdentityStaffAccount";
+    private static final String STAFF_ACCOUNT_RECORD =
+            "confia.generated.jooq.tables.records.IdentityStaffAccountRecord";
 
     @Test
     void noIpAddressDimensionAppliesYetAcrossTenSimulatedAttemptsAgainstFiveAccounts() {
@@ -366,6 +375,53 @@ class IdentityScopeExclusionInventoryTest {
         assertThat(replacingTheHashWithoutRevoking(compliant))
                 .as("the control that replacing the hash and revoking satisfies rule (b)")
                 .isEmpty();
+    }
+
+    /**
+     * Review of PR 9, I-1: the rule on callers of {@code replacePasswordHash} would not see a class
+     * that sets the column itself with jOOQ. Across the whole production tree, the only code that
+     * touches the {@code password_hash} column of the generated table, or the setter of its record,
+     * is {@code JooqStaffAccountRepository.replacePasswordHash}. Readers use the getter of the
+     * record, which this rule does not forbid.
+     */
+    @Test
+    void onlyReplacePasswordHashOfTheRepositoryWritesThePasswordHashColumn() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+
+        assertThat(writersOfThePasswordHashColumn(production))
+                .as("exactly one code unit writes the column, and it is the repository method; "
+                        + "a non-empty expectation, so a renamed column cannot pass vacuously")
+                .containsExactly(JooqStaffAccountRepository.class.getName()
+                        + ".replacePasswordHash");
+    }
+
+    @Test
+    void thePasswordHashColumnRuleRejectsAFixtureThatSetsTheColumnItself() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(
+                PasswordRecoveryScopeViolationFixtures.PasswordHashColumnWriter.class);
+
+        assertThat(writersOfThePasswordHashColumn(fixtures))
+                .containsExactly(PasswordRecoveryScopeViolationFixtures.PasswordHashColumnWriter
+                        .class.getName() + ".overwrite");
+    }
+
+    private static List<String> writersOfThePasswordHashColumn(JavaClasses classes) {
+        Set<String> writers = new TreeSet<>();
+        for (JavaClass javaClass : classes) {
+            for (JavaFieldAccess access : javaClass.getFieldAccessesFromSelf()) {
+                if (access.getTarget().getOwner().getFullName().equals(STAFF_ACCOUNT_TABLE)
+                        && access.getTarget().getName().equals("PASSWORD_HASH")) {
+                    writers.add(access.getOrigin().getFullName().replaceAll("\\(.*\\)", ""));
+                }
+            }
+            for (JavaMethodCall call : javaClass.getMethodCallsFromSelf()) {
+                if (call.getTarget().getOwner().getFullName().equals(STAFF_ACCOUNT_RECORD)
+                        && call.getTarget().getName().equals("setPasswordHash")) {
+                    writers.add(call.getOrigin().getFullName().replaceAll("\\(.*\\)", ""));
+                }
+            }
+        }
+        return List.copyOf(writers);
     }
 
     private static List<String> implementationsOf(JavaClasses classes, Class<?> port) {

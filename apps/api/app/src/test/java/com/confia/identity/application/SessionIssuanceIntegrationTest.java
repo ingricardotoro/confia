@@ -12,11 +12,22 @@ import com.confia.shared.security.token.AccessTokenVerifier;
 import com.confia.shared.security.token.CompactJws;
 import com.confia.shared.security.token.SigningKey;
 import com.confia.shared.security.token.SigningKeyRing;
+import com.confia.support.SharedPostgresContainer;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 /**
  * Shared set-up for the session-issuance integration tests (session-tokens-and-web-layer tasks.md
@@ -63,6 +74,73 @@ abstract class SessionIssuanceIntegrationTest extends PasswordResetIntegrationTe
             String userAgent, String address) {
         return new IssueSessionCommand(account, secondFactor, userAgent,
                 address == null ? null : ClientAddress.parseLiteral(address));
+    }
+
+    /**
+     * Whether a backend of the database is waiting for a row lock on the account table, read as the
+     * superuser through its own connection. It is a condition, never a pause: callers poll it with a
+     * bound, and the test goes on the moment it holds.
+     */
+    static boolean someBackendWaitsForTheAccountLock() {
+        try (Connection connection = SharedPostgresContainer.connectionAs("postgres");
+                PreparedStatement statement = connection.prepareStatement("""
+                        select count(*) from pg_stat_activity
+                         where datname = current_database() and pid <> pg_backend_pid()
+                           and wait_event_type = 'Lock' and query ilike '%identity_staff_account%'
+                        """);
+                ResultSet resultSet = statement.executeQuery()) {
+            resultSet.next();
+            return resultSet.getLong(1) > 0;
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** Polls {@code condition} until it holds or {@code limitMillis} pass; reports which. */
+    static boolean holdsWithin(long limitMillis, BooleanSupplier condition) {
+        long deadline = System.nanoTime() + limitMillis * 1_000_000L;
+        CountDownLatch never = new CountDownLatch(1);
+        while (System.nanoTime() < deadline) {
+            if (condition.getAsBoolean()) {
+                return true;
+            }
+            try {
+                never.await(5, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+        }
+        return condition.getAsBoolean();
+    }
+
+    /** A clock a test moves by hand, readable from any thread: no test of time sleeps or reads a clock. */
+    static final class SteppedClock extends Clock {
+
+        private volatile Instant now;
+
+        SteppedClock(String instant) {
+            this.now = Instant.parse(instant);
+        }
+
+        void set(String instant) {
+            this.now = Instant.parse(instant);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
     }
 
     private static KeyPair generatedPair() {
