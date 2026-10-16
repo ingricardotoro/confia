@@ -1207,3 +1207,78 @@ columnas de la familia que debían ser inmutables). Se restauró V8 y `cmp` conf
 cobertura cumplida, `BUILD SUCCESS`; mutación del 99 % y el 93 %. La instantánea OpenAPI no cambia.
 
 **Tamaño:** 698 líneas efectivas. Con esto 3.1 queda hecha.
+
+### PR 9 `revoke-sessions-on-reset`, tarea 3.2 (2026-10-12)
+
+Condición dura H2 (decisión 12). El restablecimiento con token revoca todas las familias vivas de la cuenta en la misma transacción que
+consume el token y sustituye el hash, y escribe `identity.session.revoked` con `{"reason":"password_change","families":n}`, también con
+`n = 0`. Este PR se fusiona antes que cualquier emisión.
+
+**Rojo observado (modo estricto, tres pasos).**
+
+1. Con las pruebas escritas y sin código de producción: la compilación de pruebas falla con `cannot find symbol` sobre
+   `AccountSessionRevoker`, `SessionRevocationReason` y `JooqAccountSessionRevoker` (`IdentityScopeExclusionInventoryTest`,
+   `IdentitySecretRedactionIT`, `PasswordResetIntegrationTest`, `PasswordResetRevokesSessionsIT`, `ResetPasswordWithTokenTest`, los fixtures).
+2. Con el puerto, el enum y el adaptador creados y el caso de uso intacto: falla la compilación con `constructor ResetPasswordWithToken ...
+   cannot be applied to given types` (constructor viejo, sin el revocador) en tres clases de prueba.
+3. Con un constructor provisional que recibe el revocador y no lo llama (la fase «fingir»): `ResetPasswordWithTokenTest` 11 pruebas, 4 fallos;
+   `IdentityScopeExclusionInventoryTest` 13 pruebas, 2 fallos (`resetPasswordWithTokenRevokesEveryLiveSessionFamily` y
+   `noProductionClassReplacesAPasswordHashWithoutRevokingTheSessions`); `PasswordResetRevokesSessionsIT` 8 pruebas, 6 fallos
+   (ninguna familia revocada; `the revoker did revoke three families before the rollback`). Las dos que pasaban (los rechazos y la inscripción
+   del segundo factor) solo pueden fallar con la ruptura deliberada.
+
+**Verde.** `ResetPasswordWithTokenTest` 11, `IdentityScopeExclusionInventoryTest` 13, `PasswordResetRevokesSessionsIT` 8: 0 fallos.
+
+**Ruptura deliberada.** Se añadió una llamada a `revokeAllLive` en `passwordRejection` (fuera de la rama `Completed`).
+`ResetPasswordWithTokenTest.noRejectionRevokesAnything` falló (`none of the four rejections reached the revoker`) y
+`PasswordResetRevokesSessionsIT.noRejectionRevokesAnyFamily` también. Se restauró `ResetPasswordWithToken.java` y no queda ninguna ruptura aplicada.
+
+**Garantía de la misma transacción.** El adaptador no abre transacción: corre dentro de la de `TransactionRunner`.
+- `aTransactionThatRollsBackAfterRevokingLeavesEveryFamilyLive` (I122): un escritor de auditoría que falla en `identity.password_reset.completed`,
+  que el caso de uso escribe después de consumir, sustituir el hash y revocar; un espía del revocador prueba que revocó tres familias antes
+  de la reversión; después las tres siguen vivas, con sus sucesores cifrados, el token abierto, la contraseña anterior vigente y sin asiento de revocación.
+- `aFailingRevocationEntryRollsBackTheWholeReset`: si falla el asiento `identity.session.revoked`, no hay restablecimiento ni revocación.
+- `aRevokerThatFailsLeavesThePasswordAndTheTokenUntouched` (I123): un revocador que lanza deja la contraseña y el token como estaban.
+
+**Cambios respecto del texto de la tarea.**
+- `PasswordResetRevokesSessionsIT` está en `identity.application`, no en `identity.infrastructure`: reutiliza `PasswordResetIntegrationTest`, que es
+  privada del paquete.
+- Dos pruebas existentes cambiaron su aserción de asientos, además del constructor, porque un restablecimiento completado ahora escribe dos
+  (`identity.session.revoked` y `identity.password_reset.completed`): `ResetPasswordWithTokenTest.aSecondFactorPresentedToAnAccountWithoutActiveMfaIsIgnored`
+  y `ResetPasswordWithTokenIT.aCompletedResetOnlyConsumesChangesTheHashAndAuditsWithoutNotifyingAnyone` (esta última se detectó en la primera
+  corrida completa de `verify`, con 1 fallo en 315). La parte «no notifica» de la segunda no cambió.
+- Una familia está «viva» si `revoked_at IS NULL`; la caducidad ociosa o absoluta se deriva y no se escribe.
+- Inventario: `ResetWithoutRevocation` (restablecimiento sin revocar) y `SecondPasswordWriter` (reemplaza el hash sin revocar) fallan las reglas;
+  `ResetWithRevocation` es el control de que revocar las satisface. Se retiraron `noClassOfIdentityReferencesSessionsOrRefreshTokens`,
+  su prueba de fixture y `RefreshTokenFamilyRevoker`.
+
+**Verificación.** `./mvnw verify -Pmutation-gate`: Surefire 186 + 1 760, Failsafe 315, 0 fallos, cobertura cumplida, `BUILD SUCCESS`;
+mutación del 99 % (194) y el 93 % (481). La instantánea de OpenAPI no cambia.
+
+**Tamaño:** 795 líneas efectivas (`git add -N . && git diff --numstat main -- . ':!openspec'`), dentro del tope de 800; no hubo que usar la costura 9a/9b.
+
+**Límite de reversión.** Revertir este PR devuelve el constructor viejo de `ResetPasswordWithToken`; exige haber revertido antes 3.3 a 5.2, porque
+ninguna emisión puede existir sin esta revocación.
+
+### Revisión independiente de 3.2 (2026-10-12)
+
+Veredicto: aprobado para fusionar, sin bloqueantes. **H2 se cumple tal como está redactada.** La revisión confirmó:
+
+- una sola transacción, con la cuenta bloqueada (`lockById`) antes de consumir el token, cambiar el hash, revocar y auditar;
+- el revocador no abre una transacción propia y revoca exactamente las filas bloqueadas;
+- las familias ya revocadas conservan su motivo;
+- el vaciado del sucesor es compatible con los disparadores de V8;
+- los rechazos y la inscripción de MFA no revocan nada;
+- en la auditoría solo se interpolan una constante de enum y un entero, así que no admite inyección;
+- la retirada de la regla de ausencia es segura, porque la sustituyen las reglas (a) y (b), que no son vacías.
+
+**Corrección de la evidencia del agente.** El agente informó con honestidad que su `cmp` tras la ruptura comparaba el archivo con la copia
+que acababa de hacer, así que no probaba nada. El orquestador comprobó leyendo el código que hay una sola llamada a `revokeAllLive`, después
+de `consume` y de `replacePasswordHash`, en el camino `Completed`, y que no queda ninguna ruptura.
+
+**Pasan a otras tareas** (notas fechadas en `tasks.md`):
+
+- a 3.3: I-2 (la emisión toma el bloqueo de la cuenta, con una prueba de concurrencia frente al restablecimiento), I-1 (solo
+  `replacePasswordHash` escribe `PASSWORD_HASH`) y S-3 (fallar si `replacePasswordHash` devuelve `false`);
+- a 4.1: volver a leer `revoked_at` tras bloquear la familia, y la prueba de concurrencia con la rotación;
+- a 4.2: S-2 (la revocación por reutilización vacía el sucesor cifrado).

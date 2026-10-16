@@ -3,6 +3,7 @@ package com.confia.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.AuthenticationCommand;
 import com.confia.identity.application.PasswordResetIssuanceScheduler;
 import com.confia.identity.application.PasswordResetLinkSender;
@@ -27,14 +28,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
@@ -308,30 +307,65 @@ class IdentityScopeExclusionInventoryTest {
     }
 
     /**
-     * Scenario I23, first half (design.md decision 11): nothing in {@code com.confia.identity..}
-     * mentions a session or a refresh token, whether in a class name, a member name or a type it
-     * depends on, so a reset can only change the password. The second half, that the gap closes
-     * with the first refresh-token issuance (I24), is a written condition of {@code
-     * session-tokens-and-web-layer} with no test in this change.
+     * Hard condition H2, rule (a) (session-tokens-and-web-layer design.md decision 12; scenario
+     * BI16). It replaces the former absence "no class of identity mentions a session or a refresh
+     * token", which this change breaks on purpose: the password reset calls {@code
+     * AccountSessionRevoker.revokeAllLive}. The rule looks for the real call, so a renamed method
+     * cannot make it pass vacuously.
      */
     @Test
-    void noClassOfIdentityReferencesSessionsOrRefreshTokens() {
-        JavaClasses classes = assertNonEmptyIdentityProductionClasses();
+    void resetPasswordWithTokenRevokesEveryLiveSessionFamily() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+        assertThat(production.contain(AccountSessionRevoker.class)
+                && production.contain(ResetPasswordWithToken.class))
+                .as("the port and the reset must be part of the scanned production tree")
+                .isTrue();
 
-        assertThat(sessionOrRefreshTokenReferences(classes))
-                .as("no session or refresh-token concept exists in the identity module yet "
-                        + "(brecha con destino: session-tokens-and-web-layer, cuarta parte del cambio 7)")
-                .isEmpty();
+        assertThat(callsRevokeAllLive(production.get(ResetPasswordWithToken.class)))
+                .as("the password reset must call AccountSessionRevoker.revokeAllLive "
+                        + "(hard condition H2)")
+                .isTrue();
+    }
+
+    /**
+     * H2, rule (b): no production class replaces a stored password hash without also calling the
+     * revocation. Together with {@link #onlyResetPasswordWithTokenCallsReplacePasswordHash} it
+     * means a future second path to change a password inherits the obligation to revoke.
+     */
+    @Test
+    void noProductionClassReplacesAPasswordHashWithoutRevokingTheSessions() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+
+        assertThat(callersOfReplacePasswordHash(production))
+                .as("the rule must evaluate a real caller, not an empty set")
+                .containsExactly(ResetPasswordWithToken.class.getName());
+        assertThat(replacingTheHashWithoutRevoking(production)).isEmpty();
     }
 
     @Test
-    void theSessionReferenceRuleRejectsAFixtureThatMentionsARefreshToken() {
-        JavaClasses fixtures = new ClassFileImporter().importClasses(
-                PasswordRecoveryScopeViolationFixtures.RefreshTokenFamilyRevoker.class);
+    void theRevocationRulesRejectTheFixturesThatSkipTheRevocation() {
+        JavaClasses violating = new ClassFileImporter().importClasses(
+                PasswordRecoveryScopeViolationFixtures.ResetWithoutRevocation.class,
+                PasswordRecoveryScopeViolationFixtures.SecondPasswordWriter.class);
+        JavaClasses compliant = new ClassFileImporter().importClasses(
+                PasswordRecoveryScopeViolationFixtures.ResetWithRevocation.class);
 
-        assertThat(sessionOrRefreshTokenReferences(fixtures))
-                .anyMatch(reference -> reference.contains("RefreshTokenFamilyRevoker"))
-                .anyMatch(reference -> reference.contains("revokeAllRefreshTokensOf"));
+        assertThat(callsRevokeAllLive(violating.get(
+                PasswordRecoveryScopeViolationFixtures.ResetWithoutRevocation.class)))
+                .as("rule (a) fails on a reset that never calls the revocation").isFalse();
+        assertThat(replacingTheHashWithoutRevoking(violating))
+                .as("rule (b) names each class that replaces the hash without revoking")
+                .containsExactly(
+                        PasswordRecoveryScopeViolationFixtures.ResetWithoutRevocation.class
+                                .getName(),
+                        PasswordRecoveryScopeViolationFixtures.SecondPasswordWriter.class
+                                .getName());
+        assertThat(callsRevokeAllLive(compliant.get(
+                PasswordRecoveryScopeViolationFixtures.ResetWithRevocation.class)))
+                .as("the control that revoking satisfies rule (a)").isTrue();
+        assertThat(replacingTheHashWithoutRevoking(compliant))
+                .as("the control that replacing the hash and revoking satisfies rule (b)")
+                .isEmpty();
     }
 
     private static List<String> implementationsOf(JavaClasses classes, Class<?> port) {
@@ -353,29 +387,21 @@ class IdentityScopeExclusionInventoryTest {
                 .toList();
     }
 
-    /** Every class, member or dependency name under {@code com.confia.identity} that says session
-     * or refresh token, each as "owner: name" so a failure points at the offender. */
-    private static List<String> sessionOrRefreshTokenReferences(JavaClasses classes) {
-        Pattern sessionOrRefreshToken =
-                Pattern.compile("session|refresh[_-]?token", Pattern.CASE_INSENSITIVE);
-        List<String> references = new ArrayList<>();
-        for (JavaClass javaClass : classes) {
-            if (!javaClass.getPackageName().startsWith("com.confia.identity")) {
-                continue;
-            }
-            List<String> names = new ArrayList<>();
-            names.add(javaClass.getName());
-            javaClass.getFields().forEach(field -> names.add(field.getName()));
-            javaClass.getMethods().forEach(method -> names.add(method.getName()));
-            javaClass.getDirectDependenciesFromSelf()
-                    .forEach(dependency -> names.add(dependency.getTargetClass().getFullName()));
-            for (String name : names) {
-                if (sessionOrRefreshToken.matcher(name).find()) {
-                    references.add(javaClass.getFullName() + ": " + name);
-                }
-            }
-        }
-        return references;
+    private static boolean callsRevokeAllLive(JavaClass javaClass) {
+        return javaClass.getMethodCallsFromSelf().stream()
+                .anyMatch(call -> call.getTarget().getName().equals("revokeAllLive")
+                        && call.getTarget().getOwner().isAssignableTo(AccountSessionRevoker.class));
+    }
+
+    /** Classes that call {@code replacePasswordHash} and never {@code revokeAllLive}. */
+    private static List<String> replacingTheHashWithoutRevoking(JavaClasses classes) {
+        return classes.stream()
+                .filter(javaClass -> callersOfReplacePasswordHash(classes)
+                        .contains(javaClass.getFullName()))
+                .filter(javaClass -> !callsRevokeAllLive(javaClass))
+                .map(JavaClass::getFullName)
+                .sorted()
+                .toList();
     }
 
     private static JavaClasses assertNonEmptyProductionClasses() {

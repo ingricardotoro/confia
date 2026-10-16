@@ -42,8 +42,13 @@ import java.util.UUID;
  *   <li>when the account has active MFA, check the second factor; otherwise ignore any proof;</li>
  *   <li>consume the token with one conditional update: a lost race is a token rejection, and only
  *       the winner pays Argon2id;</li>
- *   <li>hash the new password, replace it, and audit.</li>
+ *   <li>hash the new password, replace it, revoke every live session family of the account
+ *       (hard condition H2, session-tokens-and-web-layer design.md decision 12) and audit both.</li>
  * </ol>
+ *
+ * <p>The revocation happens only on the {@code Completed} path, in the same transaction as the
+ * consumption and the new hash: if the revocation or either audit entry fails, the exception
+ * rolls back the whole reset, and a rejection never reaches it.
  *
  * <p>Every rejection is a returned value, never an exception, so {@link TransactionRunner} commits
  * it: a wrong second factor keeps its backoff and its audit entry, and the token stays alive.
@@ -52,6 +57,7 @@ public final class ResetPasswordWithToken {
 
     private static final String ACTION_COMPLETED = "identity.password_reset.completed";
     private static final String ACTION_REJECTED = "identity.password_reset.rejected";
+    private static final String ACTION_SESSIONS_REVOKED = "identity.session.revoked";
     private static final String TOKEN_ENTITY_TYPE = "identity.password_reset_token";
     private static final String STAFF_ACCOUNT_ENTITY_TYPE = "identity.staff_account";
     private static final String UNKNOWN_TOKEN_LABEL = "unknown-token";
@@ -70,6 +76,7 @@ public final class ResetPasswordWithToken {
     private final VerifyTotpCode verifyTotp;
     private final ConsumeRecoveryCode consumeRecoveryCode;
     private final PasswordHasher passwordHasher;
+    private final AccountSessionRevoker sessionRevoker;
     private final AuditLogWriter auditLogWriter;
     private final Clock clock;
     private final PasswordResetTokenPolicy tokenPolicy;
@@ -79,7 +86,8 @@ public final class ResetPasswordWithToken {
             LoginInstitutionProvider institutionProvider, PasswordResetTokenRepository tokens,
             StaffAccountRepository accounts, TotpCredentialRepository totpCredentials,
             VerifyTotpCode verifyTotp, ConsumeRecoveryCode consumeRecoveryCode,
-            PasswordHasher passwordHasher, AuditLogWriter auditLogWriter, Clock clock) {
+            PasswordHasher passwordHasher, AccountSessionRevoker sessionRevoker,
+            AuditLogWriter auditLogWriter, Clock clock) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.institutionProvider = Objects.requireNonNull(institutionProvider, "institutionProvider");
         this.tokens = Objects.requireNonNull(tokens, "tokens");
@@ -88,6 +96,7 @@ public final class ResetPasswordWithToken {
         this.verifyTotp = Objects.requireNonNull(verifyTotp, "verifyTotp");
         this.consumeRecoveryCode = Objects.requireNonNull(consumeRecoveryCode, "consumeRecoveryCode");
         this.passwordHasher = Objects.requireNonNull(passwordHasher, "passwordHasher");
+        this.sessionRevoker = Objects.requireNonNull(sessionRevoker, "sessionRevoker");
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.tokenPolicy = new PasswordResetTokenPolicy();
@@ -201,6 +210,15 @@ public final class ResetPasswordWithToken {
         // 7-9. Only the winner pays Argon2id.
         accounts.replacePasswordHash(institutionId, row.accountId(),
                 passwordHasher.hash(newPassword));
+        // H2: the same transaction, after the new hash, and the entry exists even for zero families.
+        int revokedFamilies = sessionRevoker.revokeAllLive(institutionId, row.accountId(),
+                SessionRevocationReason.PASSWORD_CHANGE, now);
+        auditLogWriter.append(new AuditEntry(institutionId.value(), row.accountId().value(),
+                ACTOR_KIND_STAFF, row.accountId().value().toString(), null, null, auditRequestId,
+                null, ACTION_SESSIONS_REVOKED, STAFF_ACCOUNT_ENTITY_TYPE,
+                row.accountId().value().toString(), OUTCOME_SUCCESS, null,
+                "{\"reason\":\"" + SessionRevocationReason.PASSWORD_CHANGE.code()
+                        + "\",\"families\":" + revokedFamilies + "}", null, null));
         auditLogWriter.append(new AuditEntry(institutionId.value(), row.accountId().value(),
                 ACTOR_KIND_STAFF, row.accountId().value().toString(), null, null, auditRequestId,
                 null, ACTION_COMPLETED, STAFF_ACCOUNT_ENTITY_TYPE,

@@ -1,5 +1,6 @@
 package com.confia.identity.infrastructure.wiring;
 
+import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.AuthenticateWithPassword;
 import com.confia.identity.application.ConsumeRecoveryCode;
 import com.confia.identity.application.EnrollTotpSecondFactor;
@@ -21,6 +22,7 @@ import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
 import com.confia.identity.infrastructure.BouncyCastleRecoveryCodeHasher;
 import com.confia.identity.infrastructure.ConfiguredLoginInstitutionProvider;
 import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
+import com.confia.identity.infrastructure.JooqAccountSessionRevoker;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqPasswordResetTokenRepository;
 import com.confia.identity.infrastructure.JooqRecoveryCodeRepository;
@@ -111,6 +113,11 @@ public class IdentityConfiguration {
     }
 
     @Bean
+    AccountSessionRevoker accountSessionRevoker(DSLContext dsl) {
+        return new JooqAccountSessionRevoker(dsl);
+    }
+
+    @Bean
     StaffAccountRepository staffAccountRepository(DSLContext dsl) {
         return new JooqStaffAccountRepository(dsl);
     }
@@ -180,9 +187,10 @@ public class IdentityConfiguration {
             LoginInstitutionProvider institutionProvider, PasswordResetTokenRepository tokens,
             StaffAccountRepository accounts, TotpCredentialRepository totpCredentials,
             VerifyTotpCode verifyTotp, ConsumeRecoveryCode consumeRecoveryCode,
-            PasswordHasher passwordHasher, AuditLogWriter auditLogWriter, Clock clock) {
+            PasswordHasher passwordHasher, AccountSessionRevoker sessionRevoker,
+            AuditLogWriter auditLogWriter, Clock clock) {
         return new ResetPasswordWithToken(runner, institutionProvider, tokens, accounts,
-                totpCredentials, verifyTotp, consumeRecoveryCode, passwordHasher, auditLogWriter,
-                clock);
+                totpCredentials, verifyTotp, consumeRecoveryCode, passwordHasher, sessionRevoker,
+                auditLogWriter, clock);
     }
 }
