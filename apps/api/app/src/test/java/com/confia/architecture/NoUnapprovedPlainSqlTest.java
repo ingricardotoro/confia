@@ -44,11 +44,16 @@ import org.junit.jupiter.api.Test;
 class NoUnapprovedPlainSqlTest {
 
     /**
-     * One entry, added and justified above (task 3.1): {@code JooqAuditLogWriter}'s single {@code
-     * cast(... as inet)} template for a PostgreSQL type jOOQ does not model.
+     * Two entries, each a single {@code cast(... as inet)} template for a PostgreSQL type jOOQ does
+     * not model. The first was added and justified above (task 3.1). The second is {@code
+     * JooqRefreshTokenFamilyRepository} (session-tokens-and-web-layer task 3.3): {@code
+     * identity_refresh_token_family.ip_first_seen} is {@code INET} too, the open-source {@code
+     * PostgresDataType} has no {@code INET} to cast to, and the address is one bind value through
+     * jOOQ's own substitution, never concatenated.
      */
     private static final Set<String> APPROVED_PLAIN_SQL_CALLERS =
-            Set.of("com.confia.shared.infrastructure.JooqAuditLogWriter");
+            Set.of("com.confia.shared.infrastructure.JooqAuditLogWriter",
+                    "com.confia.identity.infrastructure.JooqRefreshTokenFamilyRepository");
 
     private static final String DSL_TYPE = "org.jooq.impl.DSL";
     private static final Set<String> FORBIDDEN_DSL_STATIC_METHODS =

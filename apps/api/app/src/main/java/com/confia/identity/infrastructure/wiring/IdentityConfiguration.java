@@ -4,6 +4,7 @@ import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.AuthenticateWithPassword;
 import com.confia.identity.application.ConsumeRecoveryCode;
 import com.confia.identity.application.EnrollTotpSecondFactor;
+import com.confia.identity.application.IssueSession;
 import com.confia.identity.application.LoginBackoffStore;
 import com.confia.identity.application.LoginIdentifierFingerprinter;
 import com.confia.identity.application.LoginInstitutionProvider;
@@ -11,6 +12,8 @@ import com.confia.identity.application.PasswordHasher;
 import com.confia.identity.application.PasswordResetTokenRepository;
 import com.confia.identity.application.RecoveryCodeHasher;
 import com.confia.identity.application.RecoveryCodeRepository;
+import com.confia.identity.application.RefreshTokenFamilyRepository;
+import com.confia.identity.application.RefreshTokenRepository;
 import com.confia.identity.application.ResetPasswordWithToken;
 import com.confia.identity.application.StaffAccountRepository;
 import com.confia.identity.application.TotpCredentialRepository;
@@ -26,12 +29,16 @@ import com.confia.identity.infrastructure.JooqAccountSessionRevoker;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqPasswordResetTokenRepository;
 import com.confia.identity.infrastructure.JooqRecoveryCodeRepository;
+import com.confia.identity.infrastructure.JooqRefreshTokenFamilyRepository;
+import com.confia.identity.infrastructure.JooqRefreshTokenRepository;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
 import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.identity.infrastructure.JooqTotpVerificationBackoffStore;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.security.TransactionRunner;
+import com.confia.shared.security.token.AccessTokenIssuer;
+import java.security.SecureRandom;
 import java.time.Clock;
 import org.jooq.DSLContext;
 import org.springframework.context.annotation.Bean;
@@ -45,7 +52,8 @@ import org.springframework.core.env.Environment;
  * RequestPasswordReset} and {@code IssuePasswordResetToken} are not registered because their
  * scheduler and link-sender ports have no adapter until changes 9 and 14, and registering them
  * would take a fake adapter or a lambda. No identity class changes behavior; they are only
- * registered.
+ * registered. {@code IssueSession} is registered with the access-token issuer of the administrative
+ * process; nothing in production calls it until {@code session-endpoints-cookie-and-csrf}.
  *
  * <p><b>Secrets fail at startup, never at the first login.</b> The two identity secrets are read
  * with {@link Environment#getProperty(String)}, never bound with {@code @ConfigurationProperties}
@@ -145,6 +153,24 @@ public class IdentityConfiguration {
     @Bean
     PasswordResetTokenRepository passwordResetTokenRepository(DSLContext dsl) {
         return new JooqPasswordResetTokenRepository(dsl);
+    }
+
+    @Bean
+    RefreshTokenFamilyRepository refreshTokenFamilyRepository(DSLContext dsl) {
+        return new JooqRefreshTokenFamilyRepository(dsl);
+    }
+
+    @Bean
+    RefreshTokenRepository refreshTokenRepository(DSLContext dsl) {
+        return new JooqRefreshTokenRepository(dsl);
+    }
+
+    @Bean
+    IssueSession issueSession(TransactionRunner runner, StaffAccountRepository accounts,
+            RefreshTokenFamilyRepository families, RefreshTokenRepository tokens,
+            AccessTokenIssuer accessTokens, AuditLogWriter auditLogWriter, Clock clock) {
+        return new IssueSession(runner, accounts, families, tokens, accessTokens, auditLogWriter,
+                clock, new SecureRandom());
     }
 
     @Bean
