@@ -1303,3 +1303,32 @@ se revirtió.
 | Frontera de reversión | Los seis archivos de dominio y sus cinco pruebas |
 
 **Medición:** 688 líneas efectivas (`git diff --numstat main...HEAD -- . ':!openspec'`).
+
+### PR 10b `session-issuance`, tarea 3.3 parte 2 (2026-10-15, modo TDD estricto)
+
+Segunda rebanada, apilada sobre 10a. Contiene `IssueSession` (con `execute` y `runWithinTransaction` de paquete), `IssueSessionCommand`,
+`IssuedSession`, `RefreshTokenFamilyRepository`, `RefreshTokenRepository`, `JooqRefreshTokenFamilyRepository`, `JooqRefreshTokenRepository`,
+tres beans en `IdentityConfiguration`, la entrada de `JooqRefreshTokenFamilyRepository` en la lista aprobada de `NoUnapprovedPlainSqlTest`
+(el mismo `cast(? as inet)` de `JooqAuditLogWriter`; el `PostgresDataType` de código abierto no tiene `INET`), `SessionIssuanceIntegrationTest`
+(soporte) e `IssueSessionIT` (10 pruebas: I87 a I90, I119, I120, I126, reversión de la familia y del token, cuenta inexistente, IPv6).
+**I-2 en su parte de producción:** la emisión toma `lockById` antes de escribir y lee el reloj después del bloqueo; su prueba de
+concurrencia llega en 10c.
+
+**Rojo observado.** Con las pruebas escritas y sin producción, `test-compile` falló con `cannot find symbol` sobre `IssueSession`,
+`IssueSessionCommand`, `IssuedSession`, `RefreshTokenRepository` y `JooqRefreshTokenRepository`. Dos fallos del primer verde fueron del test:
+`cast(inet as text)` devuelve `203.0.113.9/32` (se lee con `host(...)`). Ruptura deliberada (ADR-0005, prueba 5): guardar los bytes del token
+en hexadecimal en lugar de su SHA-256 puso en rojo `IssueSessionIT.theStoredValueIsTheSha256OfTheDeliveredTokenAndNoColumnHoldsTheToken`
+(el SHA-256 lo calcula el propio PostgreSQL); se revirtió.
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-Dit.test=IssueSessionIT`: 10 pruebas, 0 fallos |
+| Arnés de ejecución | `IssueSession` contra PostgreSQL real con los adaptadores jOOQ reales y un par Ed25519 generado en la prueba |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 787, Failsafe 325, 0 fallos; cobertura cumplida; mutación del 99 % (kernel) y el 93 % (497 de 533, app); `BUILD SUCCESS` |
+| Frontera de reversión | Caso de uso, puertos, adaptadores, cableado, la entrada de la lista aprobada y las dos pruebas de integración |
+
+**Movido a 10c respecto del árbol de 91801a2:** de `IssueSessionIT`, las pruebas de segundo factor (2) y de origen en la bitácora (3), que
+pasan al archivo nuevo `IssueSessionOriginAndSecondFactorIT`; y de `SessionIssuanceIntegrationTest`, los ayudantes de concurrencia
+(`someBackendWaitsForTheAccountLock`, `holdsWithin`, `SteppedClock`).
+
+**Medición:** 698 líneas efectivas (`git diff --numstat change/session-tokens-and-web-layer-10a-session-domain...HEAD -- . ':!openspec'`).
