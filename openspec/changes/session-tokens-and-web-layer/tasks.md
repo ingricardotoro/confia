@@ -452,6 +452,10 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
       `replacePasswordHash`. La nueva regla de ArchUnit establece que solo `JooqStaffAccountRepository.replacePasswordHash` puede escribir
       el campo `PASSWORD_HASH`, y tiene un fixture que lo viola.
     - **S-3.** `ResetPasswordWithToken` falla si `replacePasswordHash` devuelve `false`, en lugar de ignorar el resultado.
+    - **Condición de cierre (revisión del PR 9, 2026-10-15).** 3.3 no se marca `[x]` sin la prueba de concurrencia de I-2 en verde
+      (dos transacciones reales con `CountDownLatch`: un restablecimiento y una emisión simultáneos, sin familia viva emitida con la
+      contraseña antigua tras confirmar el restablecimiento) ni sin su demostración deliberada: quitar `lockById` de la emisión la pone en rojo.
+
 ## Fase 4: rotación, reutilización y gracia
 
 - [ ] 4.1 **PR 11 `refresh-rotation`: rotación fresca, vigencias y rechazos (decisión 10).**
@@ -473,6 +477,9 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   - **Nota fechada 2026-10-12 (revisión de 3.2, I-2).** La rotación vuelve a leer `revoked_at` después de bloquear la fila de la familia y
     no bloquea la cuenta después de la familia, para que el orden de bloqueo cuenta → familias no forme ciclos con el restablecimiento.
     S-1: añadir la prueba de concurrencia entre un restablecimiento y una rotación simultáneos.
+  - **Condición de cierre (revisión del PR 9, 2026-10-15).** 4.1 no se marca `[x]` sin esa prueba en verde: una rotación que espera el
+    bloqueo de una familia revocada por un restablecimiento devuelve `REJECT_FAMILY_REVOKED`, no consume el token ni inserta un sucesor.
+    Su demostración deliberada: quitar la relectura de `revoked_at` tras el bloqueo la pone en rojo.
 - [ ] 4.2 **PR 12 `reuse-detection`: reutilización confirmada y concurrencia (b) y (c).**
   - **ROJO.** Ampliar `RotateRefreshTokenIT.java` (ADR-0005, prueba 1: reutilización fuera de la gracia revoca la familia con `reuse_detected`,
     deja cero tokens vigentes y escribe `identity.session.reuse_detected`; **la revocación se lee en una transacción nueva tras el
