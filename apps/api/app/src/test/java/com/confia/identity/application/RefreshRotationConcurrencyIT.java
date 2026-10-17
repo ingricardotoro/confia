@@ -12,6 +12,7 @@ import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.infrastructure.JooqAccountSessionRevoker;
 import com.confia.identity.infrastructure.JooqPasswordResetTokenRepository;
 import com.confia.identity.infrastructure.JooqRefreshTokenFamilyRepository;
+import com.confia.identity.infrastructure.JooqRefreshTokenRepository;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import java.time.Instant;
 import java.util.List;
@@ -112,6 +113,13 @@ class RefreshRotationConcurrencyIT extends RotationIntegrationTest {
      * first transaction owns the lock of the family and is held right after taking it; the second is
      * started and observed waiting. When the first goes on it rotates, and the second, reading the
      * consumed token under the lock, finds a token that was consumed by another agent: a reuse.
+     *
+     * <p><b>What it proves.</b> Held right after the lock and before the re-read of the token, the
+     * outcome (one fresh rotation, one reuse, one successor, a revoked family) is the same in either
+     * order, and with the lock removed only the roles swap (observed, 2026-10-16): the "waited" assertion
+     * and the roles tie the test to the lock, the final state does not. The test that reaches an outcome
+     * assertion when the lock is removed is the next one, which holds the first transaction after its
+     * re-read.
      */
     @Test
     void theSameTokenFromTwoDevicesIsOneFreshRotationAndOneReuseWithExactlyOneSuccessor()
@@ -148,9 +156,51 @@ class RefreshRotationConcurrencyIT extends RotationIntegrationTest {
     }
 
     /**
+     * Case (b) held one step later, where the family lock is the only thing in the way: the first
+     * transaction has already locked the family and read the token again, and is held before it
+     * decides. A second one that was not kept out by the lock would read the same open token, rotate it
+     * and commit; the first would then act on a state that is no longer true and meet the conditional
+     * update of {@code consume} (an exception, never a reuse). With the lock, the second waits, and the
+     * outcome assertions below (both transactions finish, one fresh rotation and one reuse, one
+     * successor, a revoked family) hold. Removing the lock turns this test red on the exception.
+     */
+    @Test
+    void whenTheFirstTransactionHasAlreadyReadTheTokenTheSecondOneStillWaitsAndTheOutcomeIsTheSame()
+            throws Exception {
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        IssuedSession session = issue("2026-10-15T15:00:00Z", ana);
+        String token = session.refreshToken().value();
+        CountDownLatch reread = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        RotateRefreshToken holding = rotation(fixedClock("2026-10-15T15:05:00Z"),
+                new JooqAuditLogWriter(dsl), institutionId,
+                new JooqRefreshTokenFamilyRepository(dsl),
+                new HoldingTokensAfterReread(new JooqRefreshTokenRepository(dsl), reread, release));
+
+        Race<RefreshOutcome, RefreshOutcome> race = race(reread, release,
+                () -> holding.execute(context(), new RotateRefreshTokenCommand(token, AGENT_ONE)),
+                () -> rotate("2026-10-15T15:05:00Z", token, AGENT_TWO));
+
+        assertThat(race.waiterWaited())
+                .as("the second presentation waited for the family lock the first held").isTrue();
+        assertThat(race.holder()).isInstanceOf(Rotated.class);
+        assertThat(race.waiter()).isEqualTo(new Rejected(RefreshRejection.REUSE_DETECTED));
+        assertThat(tokensOf(session.sessionId())).as("exactly one successor").hasSize(2);
+        assertThat(familyRow(session.sessionId()).get("revoked_reason", String.class))
+                .isEqualTo("reuse_detected");
+        assertThat(liveTokenCount()).isZero();
+    }
+
+    /**
      * Case (c), the order the closing condition of 4.1 did not cover: the rotation owns the lock and
      * the reset arrives second. The reset waits, the rotation completes and inserts its successor, and
      * the reset then revokes the family, so the successor is born into a family that ends revoked.
+     *
+     * <p><b>What it proves.</b> The final-state assertions hold in any interleaving (a revocation is
+     * final and liveness is derived from the family); with the family lock removed they all stay green
+     * (observed, 2026-10-16). Only the "waited" assertion ties this test to the lock, so it fixes the
+     * order of the serialization, not the final state. The orders where the lock changes the outcome are
+     * the reset holding first (above) and the reuse holding first (I108, second order).
      */
     @Test
     void aResetThatWaitsForARotationRevokesTheFamilyAndLeavesNoLiveToken() throws Exception {
@@ -186,6 +236,12 @@ class RefreshRotationConcurrencyIT extends RotationIntegrationTest {
      * Scenario I108, the rotation owning the lock: the consumed token is presented while the open
      * successor is being rotated. The rotation completes first; the reuse then revokes the family and
      * the successor of that rotation is born dead.
+     *
+     * <p><b>What it proves.</b> The final-state assertions hold in any interleaving, because a revocation
+     * is final (V8 trigger) and a token is live only while its family is not revoked; with the family
+     * lock removed this test stays green on every outcome assertion (observed, 2026-10-16). Only the
+     * "waited" assertion ties it to the lock, so what it fixes is the order of the serialization, not
+     * the final state.
      */
     @Test
     void aReuseThatWaitsForARotationOfTheSuccessorRevokesTheFamilyAndLeavesNoLiveToken()

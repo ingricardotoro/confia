@@ -4,6 +4,8 @@ import com.confia.identity.domain.PlainRefreshToken;
 import com.confia.identity.domain.RefreshTokenFamily;
 import com.confia.identity.domain.RefreshTokenFamilyState;
 import com.confia.identity.domain.RefreshTokenHash;
+import com.confia.identity.domain.RefreshTokenRow;
+import com.confia.identity.domain.RefreshTokenState;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.UserAgentFingerprint;
 import com.confia.identity.infrastructure.JooqRefreshTokenFamilyRepository;
@@ -53,9 +55,16 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
     /** The rotation over a family repository of the test's own, to hold it where a lock was taken. */
     RotateRefreshToken rotation(Clock clock, AuditLogWriter auditLogWriter,
             InstitutionId configuredInstitution, RefreshTokenFamilyRepository families) {
+        return rotation(clock, auditLogWriter, configuredInstitution, families,
+                new JooqRefreshTokenRepository(dsl));
+    }
+
+    /** The rotation over a family repository and a token repository of the test's own. */
+    RotateRefreshToken rotation(Clock clock, AuditLogWriter auditLogWriter,
+            InstitutionId configuredInstitution, RefreshTokenFamilyRepository families,
+            RefreshTokenRepository tokens) {
         return new RotateRefreshToken(transactionRunner(), () -> configuredInstitution, families,
-                new JooqRefreshTokenRepository(dsl), accessTokenIssuer(clock), auditLogWriter,
-                clock, new SecureRandom());
+                tokens, accessTokenIssuer(clock), auditLogWriter, clock, new SecureRandom());
     }
 
     RefreshOutcome rotate(String instant, String presentedToken, String userAgent) {
@@ -209,6 +218,56 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
         @Override
         public boolean revokeForReuse(InstitutionId institutionId, UUID familyId, Instant now) {
             return real.revokeForReuse(institutionId, familyId, now);
+        }
+    }
+
+    /**
+     * A token repository that reads the token again as the real one does and then holds the
+     * transaction: it reports that the re-read happened and waits to be released, before the decision
+     * is taken. Held there, the first transaction has already looked at the token, so a second one that
+     * is not kept out by the family lock would act on the same state and meet the first at the write.
+     */
+    static final class HoldingTokensAfterReread implements RefreshTokenRepository {
+
+        private final RefreshTokenRepository real;
+        private final CountDownLatch reread;
+        private final CountDownLatch release;
+
+        HoldingTokensAfterReread(RefreshTokenRepository real, CountDownLatch reread,
+                CountDownLatch release) {
+            this.real = real;
+            this.reread = reread;
+            this.release = release;
+        }
+
+        @Override
+        public void insert(InstitutionId institutionId, RefreshTokenRow row) {
+            real.insert(institutionId, row);
+        }
+
+        @Override
+        public Optional<RefreshTokenState> findByHash(InstitutionId institutionId,
+                RefreshTokenHash hash) {
+            return real.findByHash(institutionId, hash);
+        }
+
+        @Override
+        public Optional<RefreshTokenState> findById(InstitutionId institutionId, UUID tokenId) {
+            Optional<RefreshTokenState> state = real.findById(institutionId, tokenId);
+            reread.countDown();
+            awaitRelease(release);
+            return state;
+        }
+
+        @Override
+        public boolean consume(InstitutionId institutionId, UUID tokenId, Instant now,
+                UserAgentFingerprint presenter, UUID successorId) {
+            return real.consume(institutionId, tokenId, now, presenter, successorId);
+        }
+
+        @Override
+        public void clearSuccessors(InstitutionId institutionId, UUID familyId) {
+            real.clearSuccessors(institutionId, familyId);
         }
     }
 
