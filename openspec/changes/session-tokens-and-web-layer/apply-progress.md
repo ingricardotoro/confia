@@ -1476,3 +1476,57 @@ familia) no está en este PR: ningún escenario de 4.1 lo observa y su primera p
 vaciado por familia vencida (I142), que es de 4.1.
 
 **Medición:** 753 líneas efectivas (`git diff --numstat change/session-tokens-and-web-layer-11b-rotation-store...HEAD -- . ':!openspec'`, antes de este commit de documentación).
+
+### PR 11d `rotation-reset-concurrency`, tarea 4.1 parte 4 y cierre (2026-10-16, modo TDD estricto)
+
+Cuarta rebanada, apilada sobre 11c, y la que cierra 4.1. Contiene `RefreshRotationConcurrencyIT`, la condición de cierre del 2026-10-15 (revisión
+del PR 9, I-2): dos transacciones reales, un restablecimiento y una rotación simultáneos. El restablecimiento se retiene con un `CountDownLatch` en un
+revocador decorado, justo después de haber revocado la familia y sin confirmar; la rotación se lanza entonces, y la prueba continúa cuando
+`pg_stat_activity` muestra un servidor esperando un bloqueo de fila cuya sentencia nombra `identity_refresh_token_family` (condición con límite de 20 s,
+sin esperas por reloj). Al soltar el restablecimiento, la rotación devuelve `Rejected(FAMILY_REVOKED)`, el token queda sin consumir y sin sucesor, la
+familia conserva `password_change` y su instante, `last_used_at` no avanza y el asiento es `refresh_rejected` con `family_revoked`. No hay código de
+producción en esta rebanada: 4.1c ya lo contiene.
+
+**Rojo observado.** La prueba se escribió con el resto de la tarea; su rojo es el de la ruptura deliberada, repetida sobre el árbol de esta rebanada.
+
+**Ruptura deliberada de la condición de cierre.** En `READ COMMITTED`, `SELECT ... FOR UPDATE` que esperó el bloqueo devuelve la versión confirmada por
+quien lo tenía, con sus columnas ya actualizadas: la relectura posterior al bloqueo *es* esa sentencia, así que no puede quitarse sin más. «Quitarla» es
+decidir sobre un estado leído **antes** del bloqueo: en `JooqRefreshTokenFamilyRepository.lockById` se leyó el estado con un `SELECT` sin bloqueo, se bloqueó la fila
+con un `SELECT id ... FOR UPDATE` aparte y se devolvió el estado previo. Resultado: `RefreshRotationConcurrencyIT` 1 prueba, 1 fallo, en la aserción del
+desenlace, **después** de que `rotationWaited` y `Completed` pasaron: `expected: Rejected[reason=FAMILY_REVOKED] but was: Rotated[...]`. Es decir, la rotación sí
+esperó el bloqueo de la familia que el restablecimiento había revocado, y aun así consumió el token e insertó un sucesor en una familia revocada. Se restauró
+el archivo desde una copia anterior a la ruptura y `cmp` confirmó que es idéntico. Ninguna ruptura queda en el árbol.
+
+**Por qué el rojo es real y no un bloqueo redundante** (la lección de 3.3): a diferencia de la emisión, donde la clave foránea ya serializaba un orden, aquí la
+rotación nunca toca la cuenta ni inserta nada antes de decidir, y entre la búsqueda del token (sin bloqueo) y el bloqueo de la familia no hay ninguna otra
+sentencia que la proteja; el único mecanismo que distingue «familia viva» de «familia revocada» es el estado leído por la sentencia que bloquea. La
+demostración lo prueba en el orden que la condición nombra. El otro orden (la rotación retiene primero y el restablecimiento espera) no está cubierto aquí:
+es la prueba (c) de 4.2, y allí el restablecimiento sí puede estar protegido por su propio `FOR UPDATE` ordenado por `id`.
+
+| Tarea | Archivo de prueba | Capa | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 4.1d | `RefreshRotationConcurrencyIT` | Integración, dos transacciones reales | N/A (archivo nuevo, ningún archivo de producción tocado) | Ruptura deliberada (ver arriba) | 1/1 | Un solo orden, el de la condición de cierre; el otro, en 4.2 | Sin cambios |
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-Dit.test=RefreshRotationConcurrencyIT`: 1 prueba, 0 fallos |
+| Arnés de ejecución | Dos hilos con transacciones y conexiones propias contra PostgreSQL real; restablecimiento retenido con `CountDownLatch`; espera de bloqueo leída de `pg_stat_activity` como el rol `postgres`; reloj fijo, sin esperas fijas |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 816, Failsafe 358, 0 fallos; cobertura cumplida; mutación del 99 % (192 de 194, kernel) y el 94 % (547 de 583, app); `BUILD SUCCESS` en 9 min 55 s |
+| Frontera de reversión | `RefreshRotationConcurrencyIT` (la condición de cierre deja de tener prueba, no se retira producción) |
+
+**Medición:** 103 líneas efectivas (`git diff --numstat change/session-tokens-and-web-layer-11c-refresh-rotation...HEAD -- . ':!openspec'`, antes de este commit de documentación).
+
+**Cierre de 4.1.** Con las cuatro rebanadas: 2 166 líneas en total (620 + 690 + 753 + 103, medidas cada una contra su base; 2 158 contra `main` por las
+líneas que dos rebanadas tocan en común). El árbol sin partir midió 1 974: las 192 de diferencia son la prueba de integración propia de los adaptadores
+(`RefreshTokenStoreIT`, 10 casos en lugar de 4), que cada rebanada necesitaba para cumplir por sí sola el TDD estricto, la cobertura y la mutación.
+Ninguna rebanada superó 800. Lo movido o diferido respecto de la tarea:
+
+- el paso 5 de la decisión 10 (vaciar los sucesores consumidos hace 10 s o más en cada rotación) pasa a 4.3, donde está su primera prueba en rojo; el
+  vaciado por familia vencida (I142) sí está en 4.1;
+- `RotationDecisionPropertiesTest` en lugar de `RotationDecisionProperties` (Surefire solo ejecuta `*Test`);
+- la dirección del cliente no es una entrada de la rotación, así que la ausencia de vinculación por IP se prueba cambiando el agente (la IP no puede
+  cambiar un resultado que no recibe);
+- la rama de reutilización y la de gracia devuelven `Rejected(REUSE_DETECTED)` sin efecto, para que 4.2 y 4.3 las prueben en rojo; `RotationDecision` ya las
+  distingue y las prueba (`GRACE_REPLAY` y `REUSE_DETECTED`), de modo que 4.3 solo conecta la rama de gracia.
+
+La rama local `wip/session-tokens-refresh-rotation-full` (8cfd177) conserva el árbol completo antes de partir.

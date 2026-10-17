@@ -471,7 +471,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
 
 ## Fase 4: rotación, reutilización y gracia
 
-- [ ] 4.1 **PR 11 `refresh-rotation`: rotación fresca, vigencias y rechazos (decisión 10).**
+- [x] 4.1 **PR 11 `refresh-rotation`: rotación fresca, vigencias y rechazos (decisión 10).**
   - **ROJO.** Crear `test/java/com/confia/identity/domain/RotationDecisionTest.java` y `RotationDecisionProperties.java` (tabla completa de la
     decisión 10 con bordes exactos: 10 s, 8 h, 12 h, 30 min, `expires_at` recortado por la absoluta; orden de evaluación; propiedad «nunca
     `GRACE_REPLAY` con `now - consumed_at >= 10 s`») y `test/java/com/confia/identity/infrastructure/RotateRefreshTokenIT.java` (rotación
@@ -506,6 +506,15 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
       deliberada. **4.1 se marca `[x]` solo en esta parte.**
     La propiedad se llama `RotationDecisionPropertiesTest` y no `RotationDecisionProperties`: Surefire solo ejecuta clases `*Test`, como
     `Base64UrlPropertiesTest`. El árbol completo está en la rama local `wip/session-tokens-refresh-rotation-full` (8cfd177).
+    Medidas finales contra su base: 620, 690, 753 y 103 líneas efectivas (2 166 en total; 192 más que el árbol sin partir porque el
+    adaptador pasó a tener su prueba de integración propia en 4.1b, en lugar de probarse solo a través del caso de uso).
+  - **Nota fechada 2026-10-16: condición de cierre de I-2 cumplida en 4.1d.** `RefreshRotationConcurrencyIT` retiene un restablecimiento que
+    ya revocó la familia, sin confirmar; la rotación espera el bloqueo de la familia (condición con límite sobre `pg_stat_activity`, sin
+    esperas por reloj) y, al confirmar el restablecimiento, devuelve `REJECT_FAMILY_REVOKED`, no consume el token, no inserta sucesor y no
+    cuenta como uso. La relectura posterior al bloqueo es la propia sentencia `SELECT ... FOR UPDATE` que bloquea (en `READ COMMITTED` la
+    sentencia que esperó ve lo que confirmó quien tenía el bloqueo), así que su demostración deliberada es decidir sobre un estado leído
+    antes del bloqueo: la prueba pasa a rojo (`Rotated` en lugar de `Rejected`, con el sucesor insertado en una familia revocada). Solo
+    cubre el orden «el restablecimiento retiene primero»; el orden inverso y la prueba (b) quedan en 4.2.
 - [ ] 4.2 **PR 12 `reuse-detection`: reutilización confirmada y concurrencia (b) y (c).**
   - **ROJO.** Ampliar `RotateRefreshTokenIT.java` (ADR-0005, prueba 1: reutilización fuera de la gracia revoca la familia con `reuse_detected`,
     deja cero tokens vigentes y escribe `identity.session.reuse_detected`; **la revocación se lee en una transacción nueva tras el
