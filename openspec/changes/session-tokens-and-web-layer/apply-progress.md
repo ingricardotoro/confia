@@ -1368,3 +1368,38 @@ respecto de la propuesta: nada de dominio; las pruebas de origen y de segundo fa
 los ayudantes de concurrencia del soporte pasaron a 10c.
 
 **Medición:** **548 líneas efectivas** (`git diff --numstat change/session-tokens-and-web-layer-10b-session-issuance...HEAD -- . ':!openspec'`).
+
+### PR 11a `rotation-decision`, tarea 4.1 parte 1 (2026-10-16, modo TDD estricto)
+
+Primera de cuatro rebanadas apiladas de 4.1 (decisión del propietario del 2026-10-16, «partir solo si hace falta, sin preguntar»; ver la nota
+fechada de `tasks.md`). El árbol completo, implementado y verificado antes de partir, midió 1 974 líneas efectivas y está en la rama local
+`wip/session-tokens-refresh-rotation-full` (8cfd177). Esta rebanada contiene la decisión de rotación como función pura de dominio:
+`RotationDecision` (seis decisiones en el orden fijo de la decisión 10), `RefreshRejection` (vocabulario cerrado del asiento),
+`RefreshTokenFamilyState` y `RefreshTokenState` (lo que la rotación lee de una familia y de un token), y `SessionLifetimePolicy` con
+`GRACE_WINDOW`, `isWithinGraceWindow` e `isAbsolutelyExpired`. Ningún consumidor todavía.
+
+**Rojo observado.** Con las pruebas escritas y sin producción, `./mvnw -pl app -am verify -DskipITs -Dtest=...` falló en la compilación de
+pruebas con `cannot find symbol` sobre `RefreshTokenFamilyState`, `RefreshTokenState`, `RotationDecision`, `RefreshRejection` y los
+miembros nuevos de `SessionLifetimePolicy`. Verde: `RotationDecisionTest` 14, `RotationDecisionPropertiesTest` 3 (jqwik, 1 000 intentos las
+dos primeras), `RefreshTokenStateRecordsTest` 7 y `SessionLifetimePolicyTest` 8: 32 pruebas, 0 fallos.
+
+**Ruptura deliberada** (la de la tarea: el borde de 30 minutos). En el código el `>=` se escribe `!now.isBefore(...)`; se cambió a
+`now.isAfter(...)` en `SessionLifetimePolicy.isIdle`. Resultado: 25 pruebas, 3 fallos:
+`RotationDecisionTest.aFamilyIsIdleExactlyThirtyMinutesAfterItsLastUse` (`scenario I109: the border is already expired`),
+`RotationDecisionTest.aConsumedTokenPresentedToAnExpiredFamilyIsAnExpiryAndNotAReuse` y
+`SessionLifetimePolicyTest.aSessionIsIdleExactlyThirtyMinutesAfterItsLastUse`. Se restauró desde una copia anterior a la ruptura y `cmp`
+confirmó el archivo idéntico.
+
+| Tarea | Archivo de prueba | Capa | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 4.1a | `RotationDecisionTest`, `RotationDecisionPropertiesTest` | Unidad y propiedad | No se corrió por separado antes de editar `SessionLifetimePolicy`: las 6 pruebas previas (verdes en 10a) pasan en el verde final, que suma 2 nuevas | Escrita (clases inexistentes) | 32/32 | Cada borde por ambos lados (10 s, 30 min, 12 h, 8 h) y cada condición de la gracia por separado | Sin cambios |
+| 4.1a | `RefreshTokenStateRecordsTest`, `SessionLifetimePolicyTest` | Unidad | Igual | Escrita | 15/15 | Cada invariante con su caso contrario | Sin cambios |
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-pl app -am verify -DskipITs -Dtest='RotationDecisionTest,RotationDecisionPropertiesTest,RefreshTokenStateRecordsTest,SessionLifetimePolicyTest'`: 32 pruebas, 0 fallos (el `BUILD FAILURE` de JaCoCo de una orden acotada no cuenta, regla común) |
+| Arnés de ejecución | N/A: dominio puro, sin frontera de ejecución |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 816, Failsafe 332, 0 fallos; cobertura cumplida (`identity.domain` ≥ 95); mutación del 99 % (kernel) y el 94 % (547 de 583, app); `BUILD SUCCESS` en 13 min 06 s |
+| Frontera de reversión | Los cuatro tipos nuevos de dominio, los tres miembros de `SessionLifetimePolicy` y las cuatro pruebas |
+
+**Medición:** 620 líneas efectivas (`git diff --numstat main...HEAD -- . ':!openspec'`, antes de este commit de documentación).
