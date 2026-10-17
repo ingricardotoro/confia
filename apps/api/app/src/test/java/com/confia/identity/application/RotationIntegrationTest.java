@@ -1,6 +1,8 @@
 package com.confia.identity.application;
 
 import com.confia.identity.domain.PlainRefreshToken;
+import com.confia.identity.domain.RefreshTokenFamily;
+import com.confia.identity.domain.RefreshTokenFamilyState;
 import com.confia.identity.domain.RefreshTokenHash;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.UserAgentFingerprint;
@@ -19,6 +21,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -43,9 +46,16 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
 
     RotateRefreshToken rotation(Clock clock, AuditLogWriter auditLogWriter,
             InstitutionId configuredInstitution) {
-        return new RotateRefreshToken(transactionRunner(), () -> configuredInstitution,
-                new JooqRefreshTokenFamilyRepository(dsl), new JooqRefreshTokenRepository(dsl),
-                accessTokenIssuer(clock), auditLogWriter, clock, new SecureRandom());
+        return rotation(clock, auditLogWriter, configuredInstitution,
+                new JooqRefreshTokenFamilyRepository(dsl));
+    }
+
+    /** The rotation over a family repository of the test's own, to hold it where a lock was taken. */
+    RotateRefreshToken rotation(Clock clock, AuditLogWriter auditLogWriter,
+            InstitutionId configuredInstitution, RefreshTokenFamilyRepository families) {
+        return new RotateRefreshToken(transactionRunner(), () -> configuredInstitution, families,
+                new JooqRefreshTokenRepository(dsl), accessTokenIssuer(clock), auditLogWriter,
+                clock, new SecureRandom());
     }
 
     RefreshOutcome rotate(String instant, String presentedToken, String userAgent) {
@@ -131,6 +141,19 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
                 """, institutionId.value(), familyId));
     }
 
+    /**
+     * How many tokens could still be presented with success: unconsumed tokens of a family that is not
+     * revoked. A token of a revoked family is dead whatever its own row says.
+     */
+    long liveTokenCount() {
+        return transactionRunner().execute(context(), () -> dsl.fetchSingle("""
+                select count(*) from identity_refresh_token t
+                  join identity_refresh_token_family f
+                    on f.institution_id = t.institution_id and f.id = t.family_id
+                 where t.institution_id = ? and t.consumed_at is null and f.revoked_at is null
+                """, institutionId.value()).get(0, Long.class));
+    }
+
     /** Both tables as text, the way a dump would show them: equal before and after means unchanged. */
     String storedSessions() {
         return transactionRunner().execute(context(), () -> dsl.fetch("""
@@ -143,6 +166,50 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
 
     static Instant instantOf(Record record, String column) {
         return record.get(column, OffsetDateTime.class).toInstant();
+    }
+
+    /**
+     * A family repository that takes the real lock and then holds the transaction there: it reports
+     * that the lock is taken and waits to be released, before anything is decided or written. This is
+     * how a test makes the first of two transactions the one that owns the family while the second one
+     * is started and observed waiting.
+     */
+    static final class HoldingFamilies implements RefreshTokenFamilyRepository {
+
+        private final RefreshTokenFamilyRepository real;
+        private final CountDownLatch locked;
+        private final CountDownLatch release;
+
+        HoldingFamilies(RefreshTokenFamilyRepository real, CountDownLatch locked,
+                CountDownLatch release) {
+            this.real = real;
+            this.locked = locked;
+            this.release = release;
+        }
+
+        @Override
+        public void insert(InstitutionId institutionId, RefreshTokenFamily family) {
+            real.insert(institutionId, family);
+        }
+
+        @Override
+        public Optional<RefreshTokenFamilyState> lockById(InstitutionId institutionId,
+                UUID familyId) {
+            Optional<RefreshTokenFamilyState> state = real.lockById(institutionId, familyId);
+            locked.countDown();
+            awaitRelease(release);
+            return state;
+        }
+
+        @Override
+        public void recordUse(InstitutionId institutionId, UUID familyId, Instant now) {
+            real.recordUse(institutionId, familyId, now);
+        }
+
+        @Override
+        public boolean revokeForReuse(InstitutionId institutionId, UUID familyId, Instant now) {
+            return real.revokeForReuse(institutionId, familyId, now);
+        }
     }
 
     /** Waits, with a bound, for a test to let go of a transaction it is holding at a chosen point. */

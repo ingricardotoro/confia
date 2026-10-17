@@ -213,6 +213,45 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
         })).hasMessageContaining("identity_refresh_token_family_last_used_forward");
     }
 
+    @Test
+    void revokingForReuseMarksOnlyThatFamilyOnceAndNeverChangesAnEarlierRevocation() {
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
+        UUID bystander = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
+        UUID alreadyRevoked = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, "2026-10-12T08:30:00Z",
+                "password_change");
+        String bystanderBefore = familyRow(bystander).formatCSV();
+
+        boolean first = revokeForReuse(family, "2026-10-12T09:00:00Z");
+        boolean again = revokeForReuse(family, "2026-10-12T09:05:00Z");
+        boolean earlier = revokeForReuse(alreadyRevoked, "2026-10-12T09:10:00Z");
+
+        assertThat(first).isTrue();
+        assertThat(again).as("a family is revoked once").isFalse();
+        assertThat(earlier).as("an earlier revocation is left as it was").isFalse();
+        assertThat(familyRow(family).get("revoked_reason", String.class)).isEqualTo("reuse_detected");
+        assertThat(instantOf(familyRow(family), "revoked_at"))
+                .isEqualTo(Instant.parse("2026-10-12T09:00:00Z"));
+        assertThat(familyRow(alreadyRevoked).get("revoked_reason", String.class))
+                .isEqualTo("password_change");
+        assertThat(instantOf(familyRow(alreadyRevoked), "revoked_at"))
+                .isEqualTo(Instant.parse("2026-10-12T08:30:00Z"));
+        assertThat(familyRow(bystander).formatCSV()).isEqualTo(bystanderBefore);
+    }
+
+    @Test
+    void aFamilyOfAnotherInstitutionIsNotRevokedForReuse() {
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
+        InstitutionId other = new InstitutionId(UUID.randomUUID());
+
+        boolean revoked = transactionRunner().execute(contextOf(other),
+                () -> families().revokeForReuse(other, family, Instant.parse(EIGHT)));
+
+        assertThat(revoked).isFalse();
+        assertThat(familyRow(family).get("revoked_at")).isNull();
+    }
+
     /** The lock is the point of serialization of the family: a second locker waits for the first. */
     @Test
     void lockingAFamilyMakesASecondLockerWaitUntilTheFirstTransactionEnds() throws Exception {
@@ -262,6 +301,11 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
     private Optional<RefreshTokenFamilyState> lock(UUID familyId) {
         return transactionRunner().execute(context(),
                 () -> families().lockById(institutionId, familyId));
+    }
+
+    private boolean revokeForReuse(UUID familyId, String at) {
+        return transactionRunner().execute(context(),
+                () -> families().revokeForReuse(institutionId, familyId, Instant.parse(at)));
     }
 
     private RefreshTokenRow rowOf(UUID tokenId, UUID familyId, String issuedAt) {
