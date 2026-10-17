@@ -63,11 +63,11 @@ class SessionIssuanceResetConcurrencyIT extends SessionIssuanceIntegrationTest {
         CountDownLatch written = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         JooqRefreshTokenRepository real = new JooqRefreshTokenRepository(dsl);
-        RefreshTokenRepository holdingBeforeCommit = (institution, row) -> {
+        RefreshTokenRepository holdingBeforeCommit = withInsert(real, (institution, row) -> {
             real.insert(institution, row);
             written.countDown();
             awaitRelease(release);
-        };
+        });
 
         IssuedSession issued;
         ResetPasswordDecision decision;
