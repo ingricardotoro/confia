@@ -515,7 +515,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     sentencia que esperó ve lo que confirmó quien tenía el bloqueo), así que su demostración deliberada es decidir sobre un estado leído
     antes del bloqueo: la prueba pasa a rojo (`Rotated` en lugar de `Rejected`, con el sucesor insertado en una familia revocada). Solo
     cubre el orden «el restablecimiento retiene primero»; el orden inverso y la prueba (b) quedan en 4.2.
-- [ ] 4.2 **PR 12 `reuse-detection`: reutilización confirmada y concurrencia (b) y (c).**
+- [x] 4.2 **PR 12 `reuse-detection`: reutilización confirmada y concurrencia (b) y (c).**
   - **ROJO.** Ampliar `RotateRefreshTokenIT.java` (ADR-0005, prueba 1: reutilización fuera de la gracia revoca la familia con `reuse_detected`,
     deja cero tokens vigentes y escribe `identity.session.reuse_detected`; **la revocación se lee en una transacción nueva tras el
     rechazo**; solo la familia afectada; presentar un token de familia ya revocada no la modifica; cada rechazo deja un asiento `denied` sin
@@ -531,6 +531,15 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
 
   - **Nota fechada 2026-10-12 (revisión de 3.2, S-2).** La revocación por reutilización (`reuse_detected`) también vacía los
     `successor_token_ciphertext` de la familia, como hace el revocador del restablecimiento.
+
+  - **Nota fechada 2026-10-16: 4.2 entra completa en una sola rama, sin costura.** La decisión del propietario («partir solo si hace falta,
+    sin preguntar») se aplicó midiendo primero: el árbol completo y verificado mide **558 líneas efectivas** (551 añadidas y 7 retiradas,
+    `git diff --numstat main...HEAD -- . ':!openspec'`), por debajo de las 800, así que no se parte y la costura «concurrencia a 12b» del diseño
+    §8 no se usa. Rama `change/session-tokens-and-web-layer-12-reuse-detection`. Producción: el puerto `revokeForReuse` (actualización condicionada
+    a que la familia siga viva, con su adaptador jOOQ) y la rama `REUSE_DETECTED` de `RotateRefreshToken` (revoca, vacía sucesores y audita en la
+    misma transacción, devolviendo un valor). Pruebas: las de reutilización en `RotateRefreshTokenIT`, las de `RefreshRotationConcurrencyIT`
+    ((b), (c) en el orden que dejó abierto 4.1 y los dos órdenes de I108) y dos de `RefreshTokenStoreIT`. La rama de gracia (`GRACE_REPLAY`)
+    sigue devolviendo `Rejected(REUSE_DETECTED)` sin efecto hasta 4.3.
 - [ ] 4.3 **PR 13 `grace-window`: sucesor cifrado y ventana de 10 s (decisión 11, D-N1).**
   - **ROJO.** Crear `test/java/com/confia/identity/infrastructure/RefreshGraceWindowIT.java` (ADR-0005, prueba 2: reintento dentro de 10 s desde el
     mismo dispositivo devuelve el mismo refresco sucesor y un acceso **nuevo** con mismos `sid`, `sub`, `tenant`, `amr` y otro `jti`, sin revocar;
