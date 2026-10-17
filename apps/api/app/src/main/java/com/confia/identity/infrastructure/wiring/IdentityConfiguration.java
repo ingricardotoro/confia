@@ -15,6 +15,7 @@ import com.confia.identity.application.RecoveryCodeRepository;
 import com.confia.identity.application.RefreshTokenFamilyRepository;
 import com.confia.identity.application.RefreshTokenRepository;
 import com.confia.identity.application.ResetPasswordWithToken;
+import com.confia.identity.application.RotateRefreshToken;
 import com.confia.identity.application.StaffAccountRepository;
 import com.confia.identity.application.TotpCredentialRepository;
 import com.confia.identity.application.TotpVerificationBackoffStore;
@@ -171,6 +172,15 @@ public class IdentityConfiguration {
             AccessTokenIssuer accessTokens, AuditLogWriter auditLogWriter, Clock clock) {
         return new IssueSession(runner, accounts, families, tokens, accessTokens, auditLogWriter,
                 clock, new SecureRandom());
+    }
+
+    @Bean
+    RotateRefreshToken rotateRefreshToken(TransactionRunner runner,
+            LoginInstitutionProvider institutionProvider, RefreshTokenFamilyRepository families,
+            RefreshTokenRepository tokens, AccessTokenIssuer accessTokens,
+            AuditLogWriter auditLogWriter, Clock clock) {
+        return new RotateRefreshToken(runner, institutionProvider, families, tokens, accessTokens,
+                auditLogWriter, clock, new SecureRandom());
     }
 
     @Bean

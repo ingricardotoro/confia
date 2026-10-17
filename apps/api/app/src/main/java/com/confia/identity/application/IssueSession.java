@@ -89,7 +89,8 @@ public final class IssueSession {
 
         // After the commit: nothing is signed for a family that did not commit.
         AccessToken access = accessTokens.issueAccess(command.accountId().value(),
-                institutionId.value(), stored.familyId(), methodsOf(command));
+                institutionId.value(), stored.familyId(),
+                methodsOf(command.secondFactorVerified()));
         return new IssuedSession(stored.familyId(), stored.refreshToken(), stored.refreshExpiresAt(),
                 access, access.expiresAt());
     }
@@ -129,8 +130,9 @@ public final class IssueSession {
         return new Stored(familyId, refreshToken, refreshExpiresAt);
     }
 
-    private static Set<AuthenticationMethod> methodsOf(IssueSessionCommand command) {
-        return command.secondFactorVerified()
+    /** The {@code amr} of a family, shared with the rotation that signs for the same family. */
+    static Set<AuthenticationMethod> methodsOf(boolean secondFactorVerified) {
+        return secondFactorVerified
                 ? EnumSet.of(AuthenticationMethod.PASSWORD, AuthenticationMethod.ONE_TIME_PASSWORD)
                 : EnumSet.of(AuthenticationMethod.PASSWORD);
     }

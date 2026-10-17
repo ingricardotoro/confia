@@ -105,6 +105,10 @@ abstract class SessionIssuanceIntegrationTest extends PasswordResetIntegrationTe
         };
     }
 
+    AccessTokenIssuer accessTokenIssuer(Clock clock) {
+        return new AccessTokenIssuer(JWS, clock);
+    }
+
     AccessTokenVerifier verifierAt(String instant) {
         return new AccessTokenVerifier(JWS, fixedClock(instant));
     }
