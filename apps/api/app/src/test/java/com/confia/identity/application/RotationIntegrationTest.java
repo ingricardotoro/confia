@@ -4,12 +4,18 @@ import com.confia.identity.domain.PlainRefreshToken;
 import com.confia.identity.domain.RefreshTokenHash;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.UserAgentFingerprint;
+import com.confia.identity.infrastructure.JooqRefreshTokenFamilyRepository;
+import com.confia.identity.infrastructure.JooqRefreshTokenRepository;
+import com.confia.kernel.InstitutionId;
+import com.confia.shared.audit.AuditLogWriter;
+import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.support.SharedPostgresContainer;
 import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -20,10 +26,11 @@ import org.jooq.Record;
 
 /**
  * Shared set-up for the refresh-token integration tests (session-tokens-and-web-layer tasks.md 4.1):
- * families and tokens seeded with SQL when a scenario needs a window or a state a real issuance could
- * not reach (an absolute end at 20:00 with the last use at 19:50, a token consumed with its encrypted
- * successor), raw readers of what is stored, and the lock-wait condition of the concurrency tests.
- * Abstract, so the {@code *IT} naming rule does not apply to it.
+ * the real rotation over the real adapters, families and tokens seeded with SQL when a scenario needs
+ * a window or a state a real issuance could not reach (an absolute end at 20:00 with the last use at
+ * 19:50, a token consumed with its encrypted successor), raw readers of what is stored, and the
+ * lock-wait condition of the concurrency tests. Abstract, so the {@code *IT} naming rule does not
+ * apply to it.
  */
 abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
 
@@ -32,6 +39,18 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
 
     /** A token that was consumed, and the successor that replaced it. */
     record ConsumedSeed(PlainRefreshToken consumed, PlainRefreshToken successor) {
+    }
+
+    RotateRefreshToken rotation(Clock clock, AuditLogWriter auditLogWriter,
+            InstitutionId configuredInstitution) {
+        return new RotateRefreshToken(transactionRunner(), () -> configuredInstitution,
+                new JooqRefreshTokenFamilyRepository(dsl), new JooqRefreshTokenRepository(dsl),
+                accessTokenIssuer(clock), auditLogWriter, clock, new SecureRandom());
+    }
+
+    RefreshOutcome rotate(String instant, String presentedToken, String userAgent) {
+        return rotation(fixedClock(instant), new JooqAuditLogWriter(dsl), institutionId)
+                .execute(context(), new RotateRefreshTokenCommand(presentedToken, userAgent));
     }
 
     /** A family of {@code account}, with the window and the revocation the scenario names. */
