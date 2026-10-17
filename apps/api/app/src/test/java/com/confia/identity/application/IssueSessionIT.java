@@ -140,9 +140,10 @@ class IssueSessionIT extends SessionIssuanceIntegrationTest {
     @Test
     void aFailureWhileWritingTheTokenTakesTheFamilyWithIt() {
         StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
-        RefreshTokenRepository failing = (institution, row) -> {
-            throw new IllegalStateException("the token could not be written");
-        };
+        RefreshTokenRepository failing = withInsert(new JooqRefreshTokenRepository(dsl),
+                (institution, row) -> {
+                    throw new IllegalStateException("the token could not be written");
+                });
 
         assertThatThrownBy(() -> issueSession(EIGHT, new JooqAuditLogWriter(dsl), failing)
                 .execute(context(), commandFrom(ana, false, null, null)))

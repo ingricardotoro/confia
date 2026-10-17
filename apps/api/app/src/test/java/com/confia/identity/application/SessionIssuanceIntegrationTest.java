@@ -1,9 +1,14 @@
 package com.confia.identity.application;
 
+import com.confia.identity.domain.RefreshTokenHash;
+import com.confia.identity.domain.RefreshTokenRow;
+import com.confia.identity.domain.RefreshTokenState;
 import com.confia.identity.domain.StaffAccountId;
+import com.confia.identity.domain.UserAgentFingerprint;
 import com.confia.identity.infrastructure.JooqRefreshTokenFamilyRepository;
 import com.confia.identity.infrastructure.JooqRefreshTokenRepository;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
+import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.shared.security.ClientAddress;
@@ -25,8 +30,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -59,6 +67,42 @@ abstract class SessionIssuanceIntegrationTest extends PasswordResetIntegrationTe
         return new IssueSession(transactionRunner(), new JooqStaffAccountRepository(dsl),
                 new JooqRefreshTokenFamilyRepository(dsl), tokens,
                 new AccessTokenIssuer(JWS, clock), auditLogWriter, clock, new SecureRandom());
+    }
+
+    /**
+     * A token repository whose insert is the test's own and whose other operations are those of
+     * {@code real}: the way a test holds or fails the write of a token without re-implementing the rest.
+     */
+    static RefreshTokenRepository withInsert(RefreshTokenRepository real,
+            BiConsumer<InstitutionId, RefreshTokenRow> insert) {
+        return new RefreshTokenRepository() {
+            @Override
+            public void insert(InstitutionId institutionId, RefreshTokenRow row) {
+                insert.accept(institutionId, row);
+            }
+
+            @Override
+            public Optional<RefreshTokenState> findByHash(InstitutionId institutionId,
+                    RefreshTokenHash hash) {
+                return real.findByHash(institutionId, hash);
+            }
+
+            @Override
+            public Optional<RefreshTokenState> findById(InstitutionId institutionId, UUID tokenId) {
+                return real.findById(institutionId, tokenId);
+            }
+
+            @Override
+            public boolean consume(InstitutionId institutionId, UUID tokenId, Instant now,
+                    UserAgentFingerprint presenter, UUID successorId) {
+                return real.consume(institutionId, tokenId, now, presenter, successorId);
+            }
+
+            @Override
+            public void clearSuccessors(InstitutionId institutionId, UUID familyId) {
+                real.clearSuccessors(institutionId, familyId);
+            }
+        };
     }
 
     AccessTokenVerifier verifierAt(String instant) {
