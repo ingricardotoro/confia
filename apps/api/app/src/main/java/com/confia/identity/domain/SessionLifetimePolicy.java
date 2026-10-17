@@ -16,6 +16,7 @@ public final class SessionLifetimePolicy {
     public static final Duration ABSOLUTE_LIFETIME = Duration.ofHours(12);
     public static final Duration REFRESH_LIFETIME = Duration.ofHours(8);
     public static final Duration IDLE_TIMEOUT = Duration.ofMinutes(30);
+    public static final Duration GRACE_WINDOW = Duration.ofSeconds(10);
 
     /** When a family created at {@code createdAt} ends, whatever its use. */
     public Instant absoluteExpiresAt(Instant createdAt) {
@@ -37,6 +38,23 @@ public final class SessionLifetimePolicy {
         }
         Instant byLifetime = issuedAt.plus(REFRESH_LIFETIME);
         return byLifetime.isBefore(absoluteExpiresAt) ? byLifetime : absoluteExpiresAt;
+    }
+
+    /** Whether a family that ends at {@code absoluteExpiresAt} has ended at {@code now}; the end itself has. */
+    public boolean isAbsolutelyExpired(Instant absoluteExpiresAt, Instant now) {
+        Objects.requireNonNull(absoluteExpiresAt, "absoluteExpiresAt");
+        Objects.requireNonNull(now, "now");
+        return !now.isBefore(absoluteExpiresAt);
+    }
+
+    /**
+     * Whether a token consumed at {@code consumedAt} is still inside its grace window at {@code now}:
+     * strictly less than ten seconds, so the tenth second exactly is already outside.
+     */
+    public boolean isWithinGraceWindow(Instant consumedAt, Instant now) {
+        Objects.requireNonNull(consumedAt, "consumedAt");
+        Objects.requireNonNull(now, "now");
+        return now.isBefore(consumedAt.plus(GRACE_WINDOW));
     }
 
     /** Whether a session last used at {@code lastUsedAt} is idle at {@code now}; the border is idle. */

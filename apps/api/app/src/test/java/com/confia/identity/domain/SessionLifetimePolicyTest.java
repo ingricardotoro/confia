@@ -67,4 +67,25 @@ class SessionLifetimePolicyTest {
         assertThat(policy.isIdle(EIGHT, Instant.parse("2026-10-12T08:30:01Z"))).isTrue();
         assertThat(policy.isIdle(EIGHT, EIGHT)).isFalse();
     }
+
+    @Test
+    void theGraceWindowIsTenSecondsAndEndsExactlyAtTheTenth() {
+        assertThat(SessionLifetimePolicy.GRACE_WINDOW).isEqualTo(Duration.ofSeconds(10));
+        assertThat(policy.isWithinGraceWindow(EIGHT, EIGHT)).isTrue();
+        assertThat(policy.isWithinGraceWindow(EIGHT, Instant.parse("2026-10-12T08:00:09.999Z")))
+                .isTrue();
+        assertThat(policy.isWithinGraceWindow(EIGHT, Instant.parse("2026-10-12T08:00:10Z")))
+                .isFalse();
+        assertThat(policy.isWithinGraceWindow(EIGHT, Instant.parse("2026-10-12T08:01:00Z")))
+                .isFalse();
+    }
+
+    @Test
+    void aFamilyIsAbsolutelyExpiredAtItsEndAndNotBefore() {
+        Instant end = Instant.parse("2026-10-12T20:00:00Z");
+
+        assertThat(policy.isAbsolutelyExpired(end, Instant.parse("2026-10-12T19:59:59Z"))).isFalse();
+        assertThat(policy.isAbsolutelyExpired(end, end)).isTrue();
+        assertThat(policy.isAbsolutelyExpired(end, Instant.parse("2026-10-12T20:00:01Z"))).isTrue();
+    }
 }

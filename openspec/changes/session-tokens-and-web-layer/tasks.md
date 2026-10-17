@@ -493,6 +493,19 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   - **Condición de cierre (revisión del PR 9, 2026-10-15).** 4.1 no se marca `[x]` sin esa prueba en verde: una rotación que espera el
     bloqueo de una familia revocada por un restablecimiento devuelve `REJECT_FAMILY_REVOKED`, no consume el token ni inserta un sucesor.
     Su demostración deliberada: quitar la relectura de `revoked_at` tras el bloqueo la pone en rojo.
+
+  - **Nota fechada 2026-10-16: partición de 4.1 por decisión del propietario («partir solo si hace falta, sin preguntar»).** El árbol
+    completo y verificado antes de partir midió **1 974 líneas efectivas** (1 955 añadidas y 19 retiradas), por encima de las 800. Se
+    partió por archivos completos en cuatro PR apilados contra `main`, cada uno con su `./mvnw verify -Pmutation-gate` completo:
+    - **4.1a PR 11a `rotation-decision`:** la decisión pura (`RotationDecision`, `RefreshRejection`, los dos estados leídos y los
+      bordes nuevos de `SessionLifetimePolicy`) con sus cuatro pruebas de unidad (620 líneas).
+    - **4.1b PR 11b `rotation-store`:** los puertos de familia y de token con sus adaptadores jOOQ y su prueba de integración propia
+      (`RefreshTokenStoreIT`), y el soporte de pruebas.
+    - **4.1c PR 11c `refresh-rotation`:** `RotateRefreshToken`, su comando, `RefreshOutcome`, el cableado y `RotateRefreshTokenIT`.
+    - **4.1d PR 11d `rotation-reset-concurrency`:** `RefreshRotationConcurrencyIT`, la condición de cierre de I-2 con su demostración
+      deliberada. **4.1 se marca `[x]` solo en esta parte.**
+    La propiedad se llama `RotationDecisionPropertiesTest` y no `RotationDecisionProperties`: Surefire solo ejecuta clases `*Test`, como
+    `Base64UrlPropertiesTest`. El árbol completo está en la rama local `wip/session-tokens-refresh-rotation-full` (8cfd177).
 - [ ] 4.2 **PR 12 `reuse-detection`: reutilización confirmada y concurrencia (b) y (c).**
   - **ROJO.** Ampliar `RotateRefreshTokenIT.java` (ADR-0005, prueba 1: reutilización fuera de la gracia revoca la familia con `reuse_detected`,
     deja cero tokens vigentes y escribe `identity.session.reuse_detected`; **la revocación se lee en una transacción nueva tras el
