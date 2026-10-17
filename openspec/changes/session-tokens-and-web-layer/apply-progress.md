@@ -1437,3 +1437,42 @@ rechaza el segundo consumo, que sin la condición ya no devuelve `false`), `aCon
 | Frontera de reversión | Las seis operaciones nuevas de los dos puertos y de los dos adaptadores, `RefreshTokenStoreIT`, `RotationIntegrationTest` y `withInsert` (con las dos lambdas de vuelta) |
 
 **Medición:** 690 líneas efectivas (`git diff --numstat change/session-tokens-and-web-layer-11a-rotation-decision...HEAD -- . ':!openspec'`, antes de este commit de documentación).
+
+### PR 11c `refresh-rotation`, tarea 4.1 parte 3 (2026-10-16, modo TDD estricto)
+
+Tercera rebanada, apilada sobre 11b. Contiene el caso de uso `RotateRefreshToken` con los pasos 1 a 8 de la decisión 10 (búsqueda por hash sin
+bloqueo, bloqueo de la familia, relectura del token con una sentencia nueva, decisión pura, `UPDATE` condicional y sucesor insertado después,
+`last_used_at`, asiento en la misma transacción y firma del acceso tras confirmar), `RotateRefreshTokenCommand` (clase final con `toString()`
+redactado), `RefreshOutcome` (`Rotated` con `FRESH` o `GRACE`, y `Rejected`; todo rechazo es un valor devuelto), el cableado en
+`IdentityConfiguration`, `IssueSession.methodsOf(boolean)` compartido para el `amr` y `RotateRefreshTokenIT` (15 pruebas: I91 a I94, I109 a I114,
+I121, I142 e I145, y las ausencias de conservación de filas y de vinculación por agente). Asientos `identity.session.refreshed` y
+`identity.session.refresh_rejected` sin ningún secreto. Las ramas de reutilización y de gracia devuelven `Rejected(REUSE_DETECTED)` sin
+efecto, para que 4.2 y 4.3 las prueben en rojo.
+
+**Rojo observado.** Con `RotateRefreshTokenIT` y el soporte escritos y sin los tres tipos de aplicación, `test-compile` falló con `cannot find
+symbol` sobre `RefreshOutcome`, `Rotated`, `Rejected`, `RotationKind`, `RotateRefreshToken` y `RotateRefreshTokenCommand`. Verde: `RotateRefreshTokenIT`
+15, `IssueSessionIT` 10 e `IssueSessionOriginAndSecondFactorIT` 5 (la red de seguridad de `IssueSession`, que cambió `methodsOf`), 30 pruebas, 0 fallos.
+
+**Rupturas deliberadas** (las tres a la vez sobre `RotateRefreshToken`, revertidas y confirmadas con `cmp` contra la copia previa): comentar
+`families.recordUse`, comentar `tokens.clearSuccessors` y añadir el hash del sucesor al `afterValue` del asiento de rotación.
+`RotateRefreshTokenIT`: 15 pruebas, 4 fallos: `aFreshRotationConsumesTheTokenAndLeavesExactlyOneSuccessor` (`last_used_at`),
+`aRotationCanFollowARotationAndTheNewTokenCarriesTheSecondFactorOfTheFamily` (`last_used_at`),
+`aConsumedTokenPresentedToAnExpiredFamilyIsAnExpiryAndEmptiesTheEncryptedSuccessor` (el sucesor cifrado sigue en la fila) y
+`theEntriesOfARotationAndOfARejectionCarryNoSecret` (el hash en el asiento). La ruptura del borde de 30 minutos que pide la tarea está en 11a.
+
+| Tarea | Archivo de prueba | Capa | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 4.1c | `RotateRefreshTokenIT` | Integración (PostgreSQL real, adaptadores reales) | `IssueSessionIT` 10 e `IssueSessionOriginAndSecondFactorIT` 5, verdes después del cambio de `IssueSession` | Escrita (clases inexistentes) | 15/15 | Rotación simple, encadenada y con segundo factor; seis formas de token desconocido; cada rechazo (revocada, otra institución, inactiva en ambos lados del borde, absoluta, vencimiento propio, consumido en familia vencida, reutilización) | Sin cambios |
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-Dit.test='RotateRefreshTokenIT,IssueSessionIT,IssueSessionOriginAndSecondFactorIT'`: 30 pruebas, 0 fallos |
+| Arnés de ejecución | `RotateRefreshToken` contra PostgreSQL real con los adaptadores jOOQ reales, el escritor de auditoría real y un par Ed25519 generado en la prueba; familias con ventanas sembradas por SQL |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 816, Failsafe 357, 0 fallos; cobertura cumplida; mutación del 99 % (192 de 194, kernel) y el 94 % (547 de 583, app); `BUILD SUCCESS` en 9 min 57 s |
+| Frontera de reversión | `RotateRefreshToken`, su comando y su resultado, el bean de `IdentityConfiguration`, `IssueSession.methodsOf` (de vuelta a privado) y `RotateRefreshTokenIT` |
+
+**Desviación respecto de la tarea.** El paso 5 de la decisión 10 (vaciar los sucesores cifrados consumidos hace 10 s o más en cada rotación de la
+familia) no está en este PR: ningún escenario de 4.1 lo observa y su primera prueba en rojo es la de 4.3 («se vacía en el siguiente uso»). Sí está el
+vaciado por familia vencida (I142), que es de 4.1.
+
+**Medición:** 753 líneas efectivas (`git diff --numstat change/session-tokens-and-web-layer-11b-rotation-store...HEAD -- . ':!openspec'`, antes de este commit de documentación).
