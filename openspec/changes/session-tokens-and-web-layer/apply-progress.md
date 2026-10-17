@@ -1589,3 +1589,31 @@ Verde: `RotateRefreshTokenIT` 23, `RefreshRotationConcurrencyIT` 5 y `RefreshTok
 **Desviaciones y pendientes.** Ninguna respecto del diseño. El dominio no cambia (la decisión pura estaba completa desde 11a) y PIT no se mueve (547 de 583). La condición «ningún token
 vigente» se define como «ningún token sin consumir de una familia no revocada»: tras revocar, los tokens abiertos de la familia siguen sin consumir en su fila pero ya no pueden presentarse (la
 prueba comprueba además que presentarlos da `FAMILY_REVOKED`). Pendiente para 4.3: la rama de gracia, el paso 5 de la decisión 10 y la concurrencia (a).
+
+#### PR 12, refuerzo de la demostración de concurrencia (2026-10-16, a petición del coordinador)
+
+La demostración 2 de arriba (quitar `.forUpdate()` de `lockById`) solo ponía en rojo la aserción de espera, es decir, el tiempo y no el estado final. Se repitió quitando
+también esa aserción (copia previa de la prueba con las aserciones de espera anuladas, copias previas de cada archivo de producción roto, todo revertido y confirmado con `cmp`),
+para ver qué aserción de **desenlace** falla.
+
+| Prueba | Sin `forUpdate` en `lockById`, sin aserción de espera | Conclusión |
+|---|---|---|
+| 4.1d: el restablecimiento retiene primero | **Rojo de desenlace:** `expected Rejected[FAMILY_REVOKED] but was Rotated[... FRESH]` | El bloqueo es el mecanismo: sin él la rotación decide sobre una familia viva que el restablecimiento ya revocó sin confirmar |
+| I108, la reutilización retiene primero | **Rojo de desenlace:** igual, `Rotated` en lugar de `Rejected(FAMILY_REVOKED)` | Igual |
+| (b), retenida tras el bloqueo (la committed) | Rojo solo por los **papeles** (el retenido recibe `REUSE_DETECTED`, el otro `Rotated`). Con aserciones agnósticas al papel (una `Rotated`, una `REUSE_DETECTED`, un sucesor, familia revocada, ningún token vivo) queda **verde** | El estado final no depende del bloqueo en esa posición de retención: la releída del token tras la retención y el `UPDATE` condicional ya serializan. El bloqueo fija quién gana |
+| (c), la rotación retiene primero | **Verde** en todo desenlace | La revocación es final (disparador de V8) y «vigente» se deriva de la familia revocada: el sucesor nace muerto en cualquier orden. El bloqueo fija el orden de serialización, no el estado final |
+| I108, la rotación retiene primero | **Verde** en todo desenlace | Igual que (c) |
+
+*Mecanismos que serializan cuando el bloqueo no lo hace (probados con rupturas añadidas):*
+- Ruptura B, además de A: decidir sobre el token leído **antes** del bloqueo (sin la releída). (b) pasa a rojo con
+  `IllegalStateException: a token that is open under the lock of its family could not be consumed`: el `UPDATE ... consumed_at IS NULL` de `consume` es la red de seguridad primaria contra dos sucesores, y la transacción se revierte (un solo sucesor), pero el perdedor recibe una excepción y no un `REUSE_DETECTED`.
+- Ruptura C, además de A y B: quitar `consumed_at IS NULL` de `consume`. (b) sigue en rojo, ahora con `IntegrityConstraintViolationException: identity_refresh_token_consumption_final: a consumed token keeps its consumption`: el disparador de V8 impide reconsumir. No se probó una tercera ruptura (el índice único de un token abierto por familia) ni la clave foránea.
+- Ruptura D, solo el `FOR UPDATE ... ORDER BY id` del revocador (con el bloqueo de `lockById` intacto): las 5 pruebas quedan **verdes**, también sin la aserción de espera. En las pruebas de una sola familia es redundante, porque el `UPDATE` toma el bloqueo de fila por sí mismo; su razón de ser es el orden de bloqueo entre varias familias (evitar ciclos), que 4.2 no ejercita y no se afirma probada aquí.
+
+**Conclusión honesta.** El bloqueo `FOR UPDATE` de la familia es lo que convierte los conflictos en resultados limpios (`REUSE_DETECTED`, `FAMILY_REVOKED`) en lugar de excepciones o de rotaciones sobre una familia revocada; es el mecanismo primario en los dos órdenes donde el desenlace cambia (4.1d e I108 con la reutilización primero). Para la integridad de los datos es defensa en profundidad: el `UPDATE` condicional de `consume` (primario), el disparador de consumo final y la revocación final de V8 la sostienen aunque el bloqueo falle.
+
+**Cambio en las pruebas (sin debilitar ni borrar ninguna aserción).** Se añadió `whenTheFirstTransactionHasAlreadyReadTheTokenTheSecondOneStillWaitsAndTheOutcomeIsTheSame`, con `HoldingTokensAfterReread` (decorador de `findById` que retiene tras releer el token): sin el bloqueo, la segunda transacción lee el mismo token abierto y la primera llega a `consume` con un estado ya falso. Verde con el bloqueo; sin el, rojo de desenlace (excepción) aun sin la aserción de espera (comprobado con la copia previa). Los Javadoc de (b), (c) e I108 con la rotación primero dicen ahora qué prueban y qué no.
+
+**Verificación completa:** `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 816, Failsafe 373, 0 fallos; cobertura cumplida; mutación 99 % (192 de 194, kernel) y 94 % (547 de 583, app); `BUILD SUCCESS` en 12 min 24 s.
+
+**Revisión contra las skills** (`confia-testing-playbook` y `confia-security-checklist`, leídas completas en este refuerzo; antes solo había leído `confia-audit-logging` en parte): cumple concurrencia con hilos y conexiones independientes (§5), mutación y demostraciones con reversión (§10, paso 7), parámetros enlazados, auditoría en la misma transacción, sin secretos en bitácora ni logs, prueba de la política de fila con otra institución (`RefreshTokenStoreIT`). **Incumplimiento a declarar:** el playbook §1 pide, para un caso de uso de `application`, prueba unitaria con dobles de los puertos además de la de integración; `RotateRefreshToken` (4.1 y 4.2) solo tiene integración. No se añadió aquí; queda como deuda propuesta.
