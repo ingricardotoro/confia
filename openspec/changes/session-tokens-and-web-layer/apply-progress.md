@@ -1403,3 +1403,37 @@ confirmó el archivo idéntico.
 | Frontera de reversión | Los cuatro tipos nuevos de dominio, los tres miembros de `SessionLifetimePolicy` y las cuatro pruebas |
 
 **Medición:** 620 líneas efectivas (`git diff --numstat main...HEAD -- . ':!openspec'`, antes de este commit de documentación).
+
+### PR 11b `rotation-store`, tarea 4.1 parte 2 (2026-10-16, modo TDD estricto)
+
+Segunda rebanada, apilada sobre 11a. Contiene los puertos y los adaptadores jOOQ que la rotación necesita, con su prueba de integración propia,
+antes de que ningún caso de uso los consuma: `RefreshTokenFamilyRepository.lockById` (un solo `SELECT ... FOR UPDATE` que bloquea y lee, de modo
+que el estado devuelto es el que se ve después de esperar el bloqueo, sin filtrar por `revoked_at`) y `recordUse`; `RefreshTokenRepository.findByHash`,
+`findById`, `consume` (actualización condicionada a que el token siga abierto) y `clearSuccessors`. Soporte de pruebas: `RotationIntegrationTest`
+(siembra por SQL de familias y tokens con ventanas que una emisión real no alcanza, lectores crudos y la condición de espera de bloqueo) y
+`withInsert` en `SessionIssuanceIntegrationTest`, que sustituye a las dos lambdas de `IssueSessionIT` y `SessionIssuanceResetConcurrencyIT`
+(el puerto dejó de ser una interfaz de un solo método). Ningún consumidor de producción todavía.
+
+**Rojo observado.** Con `RefreshTokenStoreIT` y el soporte escritos y los cuatro archivos de producción del árbol de 11a, `test-compile` falló con
+`cannot find symbol` sobre `findByHash`, `findById`, `consume`, `clearSuccessors`, `lockById` y `recordUse`. Verde: `RefreshTokenStoreIT` 10,
+`IssueSessionIT` 10 y `SessionIssuanceResetConcurrencyIT` 2 (las dos últimas, la red de seguridad de los archivos tocados), 22 pruebas, 0 fallos.
+
+**Rupturas deliberadas** (las tres a la vez sobre los adaptadores, revertidas y confirmadas con `cmp` contra la copia previa): quitar `.forUpdate()` de
+`lockById`, quitar la condición `consumed_at IS NULL` de `consume` y cambiar a `isNull()` la condición del sucesor consumido. `RefreshTokenStoreIT`:
+10 pruebas, 3 fallos y 1 error, a saber `lockingAFamilyMakesASecondLockerWaitUntilTheFirstTransactionEnds` («the second locker waited for the row
+lock of the first»), `aTokenIsConsumedOnceWithWhoPresentedItAndItsSuccessorAndNeverTwice` (error: el disparador `identity_refresh_token_consumption_final`
+rechaza el segundo consumo, que sin la condición ya no devuelve `false`), `aConsumedTokenSaysWhoPresentedItAndWhetherItsEncryptedSuccessorIsStillThere` y
+`aTokenWhoseSuccessorWasConsumedInTurnSaysSo`.
+
+| Tarea | Archivo de prueba | Capa | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 4.1b | `RefreshTokenStoreIT` | Integración (PostgreSQL real, rol `confia_admin_app`) | `IssueSessionIT` 10 y `SessionIssuanceResetConcurrencyIT` 2, verdes después del cambio de `withInsert` | Escrita (métodos inexistentes) | 10/10 | Token abierto y consumido, con y sin sucesor cifrado, sucesor abierto y consumido; familia viva y revocada; otra institución en cada operación | Sin cambios |
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-Dit.test='RefreshTokenStoreIT,IssueSessionIT,SessionIssuanceResetConcurrencyIT'`: 22 pruebas, 0 fallos |
+| Arnés de ejecución | Los adaptadores reales contra PostgreSQL con el rol `confia_admin_app`, RLS y los disparadores de `V8`; dos transacciones con `CountDownLatch` y `pg_stat_activity` para el bloqueo |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 816, Failsafe 342, 0 fallos; cobertura cumplida; mutación del 99 % (192 de 194, kernel) y el 94 % (547 de 583, app); `BUILD SUCCESS` en 9 min 37 s |
+| Frontera de reversión | Las seis operaciones nuevas de los dos puertos y de los dos adaptadores, `RefreshTokenStoreIT`, `RotationIntegrationTest` y `withInsert` (con las dos lambdas de vuelta) |
+
+**Medición:** 690 líneas efectivas (`git diff --numstat change/session-tokens-and-web-layer-11a-rotation-decision...HEAD -- . ':!openspec'`, antes de este commit de documentación).
