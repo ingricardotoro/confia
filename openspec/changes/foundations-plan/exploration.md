@@ -261,6 +261,17 @@ a quince cambios:
 | 14 | `transactional-email-adapter` | Puerto de envío de correo y su adaptador por SMTP (SES, ADR-0014). Entrega el enlace de recuperación de contraseña y el aviso de códigos de recuperación de MFA bajos, que hoy no tienen dueño | 9 (el envío corre en el trabajador) | Respuestas del propietario a `password-recovery-token` |
 | 15 | `process-entry-point-isolation` | Que cada proceso cargue solo lo suyo. `AdminApplication`, `PortalApplication` y `WorkerApplication` comparten el paquete `com.confia.bootstrap` y cada uno lo escanea, así que el contexto de un proceso carga también la configuración de los otros dos. Hoy no tiene efecto, porque ninguno registra módulos de negocio, pero el día que `AdminApplication` escanee un módulo administrativo, el portal lo cargaría también, contra ADR-0003. Debe incluir una prueba que falle si el contexto del portal contiene un bean o un paquete administrativo | 1. **Debe fusionarse antes del primer punto de entrada que registre un módulo de negocio**, es decir, antes de `session-tokens-and-web-layer` | Hallazgo de `frontend-monorepo-and-contracts-pipeline`, corte 3a (`apply-progress.md`, tarea 1.3) |
 
+**Nota (2026-10-16, alcance del cambio 14 por una revisión de `session-tokens-and-web-layer`).** Se añade
+al alcance del cambio 14, `transactional-email-adapter`, el **aviso al titular cuando la detección de
+reutilización revoca una familia de sesión**. Lo exigen `docs/03-seguridad.md` (fila del token de
+refresco: «se revoca toda la familia de sesión y se notifica al usuario») y ADR-0005 (línea 219: la
+reutilización invalida la sesión, se audita y se notifica), y `session-tokens-and-web-layer`
+(`design.md`, línea 740) ya lo asigna al cambio 14 y no lo entrega: ese cambio solo revoca y audita
+(`identity.session.reuse_detected`). La fila 14 de la tabla anterior no lo enumera, así que sin esta nota
+la brecha no tenía dueño. La fila no se reescribe: esta nota amplía su alcance. Cuando el cambio 14 lo
+entregue, deja de ser cierto el escenario «Una reutilización detectada no notifica a nadie» de
+`session-tokens-and-web-layer`.
+
 **Hallazgo.** `docs/09-roadmap-y-fases.md` §3 no incluye el módulo `organization` en F0, pero
 ADR-0009 exige `institution_id NOT NULL` desde la primera migración y ADR-0017 asigna la tabla raíz
 de institución a ese módulo. Se recomienda incorporar el cambio 4, con la entidad raíz mínima, al
