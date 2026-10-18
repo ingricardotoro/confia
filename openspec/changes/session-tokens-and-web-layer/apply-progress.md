@@ -1617,3 +1617,32 @@ para ver qué aserción de **desenlace** falla.
 **Verificación completa:** `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 816, Failsafe 373, 0 fallos; cobertura cumplida; mutación 99 % (192 de 194, kernel) y 94 % (547 de 583, app); `BUILD SUCCESS` en 12 min 24 s.
 
 **Revisión contra las skills** (`confia-testing-playbook` y `confia-security-checklist`, leídas completas en este refuerzo; antes solo había leído `confia-audit-logging` en parte): cumple concurrencia con hilos y conexiones independientes (§5), mutación y demostraciones con reversión (§10, paso 7), parámetros enlazados, auditoría en la misma transacción, sin secretos en bitácora ni logs, prueba de la política de fila con otra institución (`RefreshTokenStoreIT`). **Incumplimiento a declarar:** el playbook §1 pide, para un caso de uso de `application`, prueba unitaria con dobles de los puertos además de la de integración; `RotateRefreshToken` (4.1 y 4.2) solo tiene integración. No se añadió aquí; queda como deuda propuesta.
+
+#### PR 12b `reuse-hardening` (2026-10-16, modo TDD estricto; apilada sobre 12a)
+
+La revisión de 12a halló tres puntos. Sumados a 12a, el árbol medía 1 153 líneas efectivas, por encima de 800, y por la regla del propietario («partir solo si hace falta, sin preguntar»)
+se parte en el límite de commits: 12a queda como está en origin (`af76d12`, 673 líneas) y 12b (`change/session-tokens-and-web-layer-12b-reuse-hardening`) lleva lo siguiente. 4.2 sigue `[x]` desde 12a.
+
+1. **`RotateRefreshTokenTest` (playbook §1), 11 pruebas, `2907c8d`.** `RotateRefreshToken` con dobles en memoria de familias, tokens y bitácora, y el `TransactionRunner` real sobre un stub JDBC
+   que solo registra `commit` y `rollback` (así se distingue un rechazo confirmado de un fallo revertido). Cubre FRESH, token desconocido y mal formado, familia revocada, familia inactiva (vacía
+   sucesores), token vencido, REUSE_DETECTED (orden `revokeForReuse`, `clearSuccessors`, auditoría, `commit`; devuelto como valor, sin `rollback`), revocación imposible bajo el bloqueo, fallo de
+   auditoría que se propaga con `rollback`, la rama de gracia aún sin efecto y la institución distinta.
+   **Rojo, con honestidad:** las 11 empezaron en **verde** al primer intento, porque el código de 4.1 y 4.2 ya existía y se escribieron contra él. Su rojo es el de las demostraciones deliberadas
+   (copia previa, revertidas y confirmadas con `cmp`): (a) comentar `tokens.clearSuccessors` en la rama de reutilización puso en rojo `aReuseRevokesThenEmptiesTheSuccessors...` y
+   `anAuditFailureAfterTheRevocation...`; (b) auditar antes de revocar puso en rojo esas dos y `aFamilyThatCannotBeRevokedUnderItsOwnLockFailsBeforeAnythingIsAudited`.
+2. **Motivo desde el catálogo (revisor S1), `be3fc3c`.** `SessionRevocationReason.REUSE_DETECTED("reuse_detected")` con su Javadoc, y `revokeForReuse` escribe `SessionRevocationReason.REUSE_DETECTED.code()`
+   en lugar del código de auditoría del rechazo. Prueba de contrato en `RevocationReasonCatalogIT`: lee `pg_get_constraintdef` en PostgreSQL real y exige que la restricción de V8 admita exactamente
+   los `code()` del enum. **Rojo observado antes de añadir la constante:** `expected: ["password_change"] but was: ["reuse_detected", "password_change"]`.
+   **Demostración:** `reuse_detected` cambiado a `reuse_detectd` (copia previa, `cmp`): falla la prueba de contrato y 9 pruebas de integración (`RefreshTokenStoreIT`, `RotateRefreshTokenIT`) con
+   `IntegrityConstraintViolation` del CHECK real.
+3. **Aviso al titular (sugerencia 2 de seguridad), `6d832be`.** Nota fechada 2026-10-16 en `foundations-plan/exploration.md`, tras la del 2026-09-30, que añade al alcance del cambio 14 el aviso al titular
+   cuando la reutilización revoca una familia (`docs/03-seguridad.md`, ADR-0005 línea 219, `design.md` línea 740). No reescribe la tabla.
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `RotateRefreshTokenTest` 11; `-Dit.test='RevocationReasonCatalogIT,RefreshTokenStoreIT,RotateRefreshTokenIT'`: 2 + 12 + 23, 0 fallos |
+| Arnés de ejecución | Unidad: `TransactionRunner` real sobre JDBC stub; contrato: PostgreSQL real con `pg_get_constraintdef` |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25) sobre este árbol de código: Surefire 186 + 1 827, Failsafe 374, 0 fallos; cobertura cumplida; mutación 99 % (192 de 194, kernel) y 94 % (547 de 583, app); `BUILD SUCCESS` en 14 min 01 s. Los commits de documentación posteriores no tocan código |
+| Frontera de reversión | `RotateRefreshTokenTest`, la constante y el cambio de `revokeForReuse`, la prueba de contrato y la nota |
+
+**Medición de 12b:** 486 líneas efectivas (`git diff --numstat af76d12...HEAD -- . ':!openspec'`). 12a: 673 contra `main`. Total 1 153, partido por la regla del propietario.

@@ -540,6 +540,16 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     misma transacción, devolviendo un valor). Pruebas: las de reutilización en `RotateRefreshTokenIT`, las de `RefreshRotationConcurrencyIT`
     ((b), (c) en el orden que dejó abierto 4.1 y los dos órdenes de I108) y dos de `RefreshTokenStoreIT`. La rama de gracia (`GRACE_REPLAY`)
     sigue devolviendo `Rejected(REUSE_DETECTED)` sin efecto hasta 4.3.
+
+  - **Nota fechada 2026-10-16: costura 12a/12b por la regla del propietario («partir solo si hace falta, sin preguntar»).** Tras la revisión
+    de 12a se añadió el endurecimiento que halló, y el árbol completo pasó a **1 153 líneas efectivas** contra `main` (673 de 12a más 480), por
+    encima de las 800. Se parte en el límite de commits existente, en dos PR apilados contra `main`, cada uno con su verificación completa:
+    - **12a** `change/session-tokens-and-web-layer-12-reuse-detection` (673 líneas, hasta `af76d12`): la reutilización, la concurrencia (b),
+      (c) e I108 y la prueba de dependencia del bloqueo. Aquí se marcó 4.2 `[x]`, y así se queda.
+    - **12b** `change/session-tokens-and-web-layer-12b-reuse-hardening` (apilada sobre 12a): la prueba unitaria de `RotateRefreshToken` con dobles
+      (playbook §1), el motivo `REUSE_DETECTED` en `SessionRevocationReason` con su prueba de contrato contra la restricción de V8, y la
+      nota que mueve el aviso al titular por reutilización al alcance del cambio 14 (`foundations-plan/exploration.md`).
+    No es una tarea nueva: 4.2 sigue siendo una sola tarea y el total de 15 no cambia.
 - [ ] 4.3 **PR 13 `grace-window`: sucesor cifrado y ventana de 10 s (decisión 11, D-N1).**
   - **ROJO.** Crear `test/java/com/confia/identity/infrastructure/RefreshGraceWindowIT.java` (ADR-0005, prueba 2: reintento dentro de 10 s desde el
     mismo dispositivo devuelve el mismo refresco sucesor y un acceso **nuevo** con mismos `sid`, `sub`, `tenant`, `amr` y otro `jti`, sin revocar;
