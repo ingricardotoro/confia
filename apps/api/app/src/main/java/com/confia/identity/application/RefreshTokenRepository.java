@@ -12,8 +12,9 @@ import java.util.UUID;
 /**
  * Where refresh tokens are written and read (session-tokens-and-web-layer design.md decisions 9 and
  * 10). It never opens a transaction: it runs inside the one the use case opened. {@link
- * com.confia.identity.infrastructure.JooqRefreshTokenRepository} is its adapter. The grace window
- * adds its own operations in the change that delivers it.
+ * com.confia.identity.infrastructure.JooqRefreshTokenRepository} is its adapter. It stores and reads
+ * the encrypted successor as an opaque string and never decrypts it: that is {@link RotateRefreshToken}'s,
+ * and only inside the grace window (decision 11).
  */
 public interface RefreshTokenRepository {
 
@@ -33,10 +34,27 @@ public interface RefreshTokenRepository {
      * Consumes an open token at {@code now}, recording who presented it and which token replaced it,
      * and reports whether a row was affected. The update is conditional on the token being open, so
      * under the lock of the family {@code false} cannot happen; it is the safety net, not the
-     * mechanism. The successor is inserted afterwards: its key is deferred.
+     * mechanism. The successor is inserted afterwards: its key is deferred. The encrypted successor is
+     * written by this same statement, and the V8 trigger lets it be written only once.
+     *
+     * @param successorCiphertext the successor's text, encrypted with the row of {@code tokenId} as
+     *     its additional authenticated data; never {@code null}
      */
     boolean consume(InstitutionId institutionId, UUID tokenId, Instant now,
-            UserAgentFingerprint presenter, UUID successorId);
+            UserAgentFingerprint presenter, UUID successorId, String successorCiphertext);
+
+    /**
+     * Reads the encrypted successor of a consumed token together with the expiry of the token that
+     * replaced it, or nothing when the token has none (it is open, or the value was emptied). It
+     * reads a value only; whether it may be decrypted is the decision's, not the adapter's.
+     */
+    Optional<EncryptedSuccessor> findEncryptedSuccessor(InstitutionId institutionId, UUID tokenId);
+
+    /**
+     * Empties the encrypted successor of every token of the family that was consumed at or before
+     * {@code cutoff}, which the caller derives from the grace window; later ones are kept.
+     */
+    void clearSuccessorsConsumedAtOrBefore(InstitutionId institutionId, UUID familyId, Instant cutoff);
 
     /** Empties the encrypted successor of every token of the family that still holds one. */
     void clearSuccessors(InstitutionId institutionId, UUID familyId);

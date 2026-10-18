@@ -87,7 +87,8 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
                 .isEqualTo(Instant.parse("2026-10-12T09:15:00Z"));
         assertThat(instantOf(successor, "expires_at"))
                 .isEqualTo(Instant.parse("2026-10-12T17:15:00Z"));
-        assertThat(consumed.get("successor_token_ciphertext")).isNull();
+        assertThat(consumed.get("successor_token_ciphertext", String.class))
+                .as("the successor is stored encrypted for the grace window of 4.3").startsWith("v1:");
         assertThat(instantOf(familyRow(first.sessionId()), "last_used_at"))
                 .isEqualTo(Instant.parse("2026-10-12T09:15:00Z"));
 

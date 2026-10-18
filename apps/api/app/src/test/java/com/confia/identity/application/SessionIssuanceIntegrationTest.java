@@ -94,8 +94,21 @@ abstract class SessionIssuanceIntegrationTest extends PasswordResetIntegrationTe
 
             @Override
             public boolean consume(InstitutionId institutionId, UUID tokenId, Instant now,
-                    UserAgentFingerprint presenter, UUID successorId) {
-                return real.consume(institutionId, tokenId, now, presenter, successorId);
+                    UserAgentFingerprint presenter, UUID successorId, String successorCiphertext) {
+                return real.consume(institutionId, tokenId, now, presenter, successorId,
+                        successorCiphertext);
+            }
+
+            @Override
+            public Optional<EncryptedSuccessor> findEncryptedSuccessor(InstitutionId institutionId,
+                    UUID tokenId) {
+                return real.findEncryptedSuccessor(institutionId, tokenId);
+            }
+
+            @Override
+            public void clearSuccessorsConsumedAtOrBefore(InstitutionId institutionId,
+                    UUID familyId, Instant cutoff) {
+                real.clearSuccessorsConsumedAtOrBefore(institutionId, familyId, cutoff);
             }
 
             @Override

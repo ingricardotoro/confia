@@ -57,6 +57,16 @@ public final class SessionLifetimePolicy {
         return now.isBefore(consumedAt.plus(GRACE_WINDOW));
     }
 
+    /**
+     * The latest consumption instant whose grace window is already closed at {@code now}: a token
+     * consumed at or before it was consumed ten seconds ago or more, so its encrypted successor can no
+     * longer be replayed and is emptied (design.md decision 10, step 5). It is the same border as
+     * {@link #isWithinGraceWindow}: the instant itself is outside.
+     */
+    public Instant latestConsumptionOutsideGraceWindow(Instant now) {
+        return Objects.requireNonNull(now, "now").minus(GRACE_WINDOW);
+    }
+
     /** Whether a session last used at {@code lastUsedAt} is idle at {@code now}; the border is idle. */
     public boolean isIdle(Instant lastUsedAt, Instant now) {
         Objects.requireNonNull(lastUsedAt, "lastUsedAt");

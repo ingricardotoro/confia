@@ -30,8 +30,8 @@ import org.junit.jupiter.api.Test;
  * 10), tested on their own against a real PostgreSQL before any use case consumes them: what they
  * read of a stored token and family, the conditional consumption, the emptying of the encrypted
  * successors, the row lock of a family and the forward-only use of a family. The two facts about a
- * token's successor are the ones only the grace window of task 4.3 acts on. Tokens and families are
- * seeded with SQL.
+ * token's successor are the ones the grace window acts on, and 4.3 adds the stored encrypted successor,
+ * its reading and the emptying by age. Tokens and families are seeded with SQL.
  */
 class RefreshTokenStoreIT extends RotationIntegrationTest {
 
@@ -39,6 +39,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
     private static final String TWENTY = "2026-10-12T20:00:00Z";
     private static final String SIXTEEN = "2026-10-12T16:00:00Z";
     private static final long LIMIT_MILLIS = 20_000;
+    private static final String CIPHERTEXT = "v1:AAAA";
 
     @Test
     void anOpenTokenIsReadWithItsWindowAndNothingConsumed() {
@@ -122,7 +123,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
                 () -> tokens().findByHash(other, RefreshTokenHash.of(token)))).isEmpty();
         assertThat(transactionRunner().execute(contextOf(other),
                 () -> tokens().consume(other, tokenId, Instant.parse(EIGHT),
-                        UserAgentFingerprint.of(AGENT_ONE), UUID.randomUUID()))).isFalse();
+                        UserAgentFingerprint.of(AGENT_ONE), UUID.randomUUID(), CIPHERTEXT))).isFalse();
         assertThat(transactionRunner().execute(contextOf(other),
                 () -> families().lockById(other, family))).isEmpty();
         assertThat(findByText(token).orElseThrow().isConsumed()).isFalse();
@@ -138,13 +139,13 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
         boolean first = transactionRunner().execute(context(), () -> {
             boolean consumed = tokens().consume(institutionId, open.id(),
                     Instant.parse("2026-10-12T08:05:00Z"), UserAgentFingerprint.of(AGENT_TWO),
-                    successorId);
+                    successorId, CIPHERTEXT);
             tokens().insert(institutionId, rowOf(successorId, family, "2026-10-12T08:05:00Z"));
             return consumed;
         });
         boolean second = transactionRunner().execute(context(), () -> tokens().consume(
                 institutionId, open.id(), Instant.parse("2026-10-12T08:06:00Z"),
-                UserAgentFingerprint.of(AGENT_ONE), UUID.randomUUID()));
+                UserAgentFingerprint.of(AGENT_ONE), UUID.randomUUID(), CIPHERTEXT));
 
         assertThat(first).isTrue();
         assertThat(second).as("a consumed token is not consumed again").isFalse();
@@ -154,6 +155,85 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
         assertThat(consumed.get("consumed_user_agent_fingerprint", String.class))
                 .isEqualTo(UserAgentFingerprint.of(AGENT_TWO).value());
         assertThat(consumed.get("replaced_by", UUID.class)).isEqualTo(successorId);
+    }
+
+    /** The encrypted successor is written by the very statement that consumes the token (V8 trigger). */
+    @Test
+    void consumingATokenStoresItsEncryptedSuccessorInTheSameStatement() {
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
+        RefreshTokenState open = findByText(seedOpenToken(family, EIGHT, SIXTEEN)).orElseThrow();
+        UUID successorId = UUID.randomUUID();
+
+        transactionRunner().execute(context(), () -> {
+            tokens().consume(institutionId, open.id(), Instant.parse("2026-10-12T08:05:00Z"),
+                    UserAgentFingerprint.of(AGENT_ONE), successorId, CIPHERTEXT);
+            tokens().insert(institutionId, rowOf(successorId, family, "2026-10-12T08:05:00Z"));
+            return null;
+        });
+
+        assertThat(tokensOf(family).get(0).get("successor_token_ciphertext", String.class))
+                .isEqualTo(CIPHERTEXT);
+        assertThat(tokensOf(family).get(1).get("successor_token_ciphertext"))
+                .as("the successor itself has none until it is consumed").isNull();
+        assertThat(findByText(PlainRefreshToken.generate(new SecureRandom()))).isEmpty();
+    }
+
+    @Test
+    void theEncryptedSuccessorIsReadWithTheExpiryOfTheTokenThatReplacedItWhileItIsStillThere() {
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
+        ConsumedSeed seed = seedConsumedToken(family, EIGHT, SIXTEEN, "2026-10-12T08:05:00Z",
+                AGENT_ONE, true);
+        UUID consumedId = findByText(seed.consumed()).orElseThrow().id();
+        UUID openId = findByText(seed.successor()).orElseThrow().id();
+        InstitutionId other = new InstitutionId(UUID.randomUUID());
+
+        Optional<EncryptedSuccessor> read = transactionRunner().execute(context(),
+                () -> tokens().findEncryptedSuccessor(institutionId, consumedId));
+
+        assertThat(read).isPresent();
+        assertThat(read.get().ciphertext()).isEqualTo(CIPHERTEXT);
+        assertThat(read.get().expiresAt()).isEqualTo(Instant.parse(SIXTEEN));
+        assertThat(transactionRunner().execute(context(),
+                () -> tokens().findEncryptedSuccessor(institutionId, openId)))
+                .as("an open token has no successor").isEmpty();
+        assertThat(transactionRunner().execute(contextOf(other),
+                () -> tokens().findEncryptedSuccessor(other, consumedId)))
+                .as("another institution does not see it").isEmpty();
+        transactionRunner().execute(context(), () -> {
+            tokens().clearSuccessors(institutionId, family);
+            return null;
+        });
+        assertThat(transactionRunner().execute(context(),
+                () -> tokens().findEncryptedSuccessor(institutionId, consumedId)))
+                .as("once emptied there is nothing to read").isEmpty();
+    }
+
+    /** The cutoff is inclusive, as the window is strict: a token consumed exactly at it is outside. */
+    @Test
+    void emptyingByAgeTouchesOnlyTheSuccessorsConsumedAtOrBeforeTheCutoffOfThatFamily() {
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
+        ConsumedSeed seed = seedConsumedToken(family, "2026-10-12T07:00:00Z", SIXTEEN,
+                "2026-10-12T08:00:00Z", AGENT_ONE, true);
+        consumeAndReplace(institutionId, findByText(seed.successor()).orElseThrow().id(),
+                "2026-10-12T08:00:10Z", family);
+        UUID bystander = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
+        seedConsumedToken(bystander, EIGHT, SIXTEEN, "2026-10-12T08:00:00Z", AGENT_ONE, true);
+
+        clearConsumedAtOrBefore(family, "2026-10-11T23:59:59.999Z");
+        assertThat(ciphertextsOf(family)).as("nothing is old enough").containsExactly(CIPHERTEXT,
+                "v1:BBBB", null);
+
+        clearConsumedAtOrBefore(family, "2026-10-12T08:00:00Z");
+        assertThat(ciphertextsOf(family)).as("the border itself is emptied, the later one kept")
+                .containsExactly(null, "v1:BBBB", null);
+
+        clearConsumedAtOrBefore(family, "2026-10-12T08:00:10Z");
+        assertThat(ciphertextsOf(family)).containsExactly(null, null, null);
+        assertThat(ciphertextsOf(bystander)).as("another family is not reached")
+                .containsExactlyInAnyOrder(CIPHERTEXT, null);
     }
 
     @Test
@@ -285,6 +365,19 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     // ---------------------------------------------------------------------------------------------
 
+    private void clearConsumedAtOrBefore(UUID familyId, String cutoff) {
+        transactionRunner().execute(context(), () -> {
+            tokens().clearSuccessorsConsumedAtOrBefore(institutionId, familyId,
+                    Instant.parse(cutoff));
+            return null;
+        });
+    }
+
+    private java.util.List<String> ciphertextsOf(UUID familyId) {
+        return tokensOf(familyId).stream()
+                .map(token -> token.get("successor_token_ciphertext", String.class)).toList();
+    }
+
     private JooqRefreshTokenRepository tokens() {
         return new JooqRefreshTokenRepository(dsl);
     }
@@ -320,7 +413,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
         UUID replacement = UUID.randomUUID();
         transactionRunner().execute(context(), () -> {
             tokens().consume(institution, tokenId, Instant.parse(at),
-                    UserAgentFingerprint.of(AGENT_ONE), replacement);
+                    UserAgentFingerprint.of(AGENT_ONE), replacement, "v1:BBBB");
             tokens().insert(institution, rowOf(replacement, familyId, at));
             return null;
         });

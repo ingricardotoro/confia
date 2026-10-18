@@ -80,6 +80,22 @@ class SessionLifetimePolicyTest {
                 .isFalse();
     }
 
+    /**
+     * The border that empties an encrypted successor (design.md decision 10, step 5) is the same one
+     * that closes the window: a token consumed exactly ten seconds ago is no longer replayable, so its
+     * successor is emptied; one consumed a millisecond later than that is still replayable and is kept.
+     */
+    @Test
+    void theLatestConsumptionWhoseWindowIsClosedIsExactlyTenSecondsBeforeNow() {
+        Instant now = Instant.parse("2026-10-12T08:00:30Z");
+        Instant cutoff = policy.latestConsumptionOutsideGraceWindow(now);
+
+        assertThat(cutoff).isEqualTo(Instant.parse("2026-10-12T08:00:20Z"));
+        assertThat(policy.isWithinGraceWindow(cutoff, now)).as("the border itself is outside").isFalse();
+        assertThat(policy.isWithinGraceWindow(cutoff.plusMillis(1), now))
+                .as("a millisecond later is still inside").isTrue();
+    }
+
     @Test
     void aFamilyIsAbsolutelyExpiredAtItsEndAndNotBefore() {
         Instant end = Instant.parse("2026-10-12T20:00:00Z");
