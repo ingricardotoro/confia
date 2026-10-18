@@ -1646,3 +1646,30 @@ se parte en el límite de commits: 12a queda como está en origin (`af76d12`, 67
 | Frontera de reversión | `RotateRefreshTokenTest`, la constante y el cambio de `revokeForReuse`, la prueba de contrato y la nota |
 
 **Medición de 12b:** 486 líneas efectivas (`git diff --numstat af76d12...HEAD -- . ':!openspec'`). 12a: 673 contra `main`. Total 1 153, partido por la regla del propietario.
+
+### PR 13a `grace-core`, tarea 4.3 parte 1 (2026-10-17, modo TDD estricto)
+
+Primera de tres rebanadas apiladas de 4.3 (regla del propietario del 2026-10-16, «partir solo si hace falta, sin preguntar»; ver la nota fechada de `tasks.md`). El árbol completo, implementado y verificado antes de partir, midió **1 693 líneas efectivas** (1 589 añadidas y 104 retiradas, contando el ADR) y se conserva en la rama local `wip/session-tokens-grace-full`. Esta rebanada contiene la producción y sus pruebas de unidad y de adaptador: `EncryptedSuccessor` (clase final con `toString()` redactado), `consume` con el sucesor cifrado en la misma sentencia, `findEncryptedSuccessor`, `clearSuccessorsConsumedAtOrBefore`, `SessionLifetimePolicy.latestConsumptionOutsideGraceWindow`, el paso 5 de la decisión 10, la rama `GRACE_REPLAY` real de `RotateRefreshToken` (descifra solo dentro de la ventana, no emite token, avanza `last_used_at`, audita `{"rotation":"grace"}`) y el cifrado con `ColumnEncryptionService.encryptForNewValue("identity_refresh_token","successor_token_ciphertext", institutionId, <id del token consumido>, bytes)`. Un valor que no autentica (copiado a otra fila) es un fallo de la petición (`IllegalStateException`, sin valor en el mensaje, reversión), no un rechazo. Vaciado en revocación y en vencimiento ya existían (4.1/4.2).
+
+**Rojo observado.** Con las pruebas escritas y sin producción, `test-compile` falló solo por los símbolos nuevos: `EncryptedSuccessor`, `latestConsumptionOutsideGraceWindow`, `findEncryptedSuccessor`, `clearSuccessorsConsumedAtOrBefore`, `consume(...)` con seis argumentos («method consume ... cannot be applied», «does not override abstract method consume») y el constructor nuevo de `RotateRefreshToken`. Las pruebas de integración no pudieron ejecutarse en rojo por esa razón (convención de 4.1 a 4.2). Tras el verde hubo dos correcciones de prueba, no de producción: `RotateRefreshTokenIT` afirmaba `successor_token_ciphertext` nulo (cierto solo sin cifrado) y ahora exige el prefijo `v1:`; y una prueba de `RefreshTokenStoreIT` dependía del orden de dos tokens con el mismo `issued_at` (falló de forma intermitente en una verificación completa; se ordenó por instante de emisión y el control del otro grupo no depende del orden).
+
+**Desviación respecto de la tarea:** `RefreshGraceWindowIT` vive en el paquete `identity.application` (como el resto de las pruebas de integración de rotación), no en `identity.infrastructure`.
+
+**Demostraciones deliberadas** (copia previa de cada archivo, revertido y confirmado con `cmp`; las dos primeras se hicieron sobre el árbol completo, con `RefreshGraceWindowIT` presente en 13b):
+1. *La de la tarea, quitar la AAD de la fila* (cifrar y descifrar con `""` en lugar del id del token): `aCiphertextCopiedToAnotherRowDoesNotDecryptAndTheRequestFailsWithoutWritingAnything` pasa a rojo en su aserción de desenlace (`Expecting code to raise a throwable`: el valor copiado a otra fila se descifra y la petición devuelve la gracia de otra sesión), y `theSuccessorIsStoredEncryptedAndAuthenticatesOnlyForTheRowThatHoldsIt` falla con `AeadIntegrityException`.
+2. *Concurrencia (a), quitar `.forUpdate()` de `lockById`* (en 13b): `whenTheFirstTransactionHasAlreadyReadTheTokenTheSameDeviceStillGetsTheGraceReplay` pasa a **error de desenlace**: `IllegalStateException: a token that is open under the lock of its family could not be consumed` en lugar de un `FRESH` y un `GRACE` con el mismo sucesor; además cinco pruebas más fallan en su aserción de espera. Es la diferencia real de resultado que 4.2 no pudo observar en (b): aquí la prueba retenida tras la relectura convierte la falta del bloqueo en una excepción.
+3. *Paso 5, quitar `clearSuccessorsConsumedAtOrBefore`*: `RotateRefreshTokenTest` 17 pruebas, 8 fallos (secuencias de llamadas y `everyContactEmptiesTheSuccessorsConsumedTenSecondsAgoOrMoreBeforeItDecides`) y, en integración, `rotatingTheFamilyEmptiesTheSuccessorsConsumedTenSecondsAgoOrMore` (`consumed exactly 10 s ago: emptied`).
+
+| Tarea | Archivo de prueba | Capa | RED | GREEN |
+|---|---|---|---|---|
+| 4.3a | `RotateRefreshTokenTest` (+6, fakes con sucesor cifrado real) | Unidad con dobles (playbook §1) | `test-compile` | 17/17 |
+| 4.3a | `RefreshTokenStoreIT` (+3), `SessionLifetimePolicyTest` (+1) | Adaptador contra PostgreSQL y dominio | `test-compile` | 15/15 y 9/9 |
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-Dtest='RotateRefreshTokenTest,SessionLifetimePolicyTest'` y `-Dit.test='RefreshTokenStoreIT,RotateRefreshTokenIT'`: 0 fallos |
+| Arnés de ejecución | Unidad: `TransactionRunner` real sobre JDBC stub (`JdbcStubTransactions`, extraído) y `ColumnEncryptionService` real con clave en memoria; adaptador: PostgreSQL real con el rol `confia_admin_app` |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 834, Failsafe 377, 0 fallos; cobertura cumplida (`identity.domain` ≥ 95); mutación 99 % (192 de 194, kernel) y 94 % (548 de 584, app); `BUILD SUCCESS` en 11 min 28 s |
+| Frontera de reversión | La rama de gracia, el paso 5, el puerto ampliado con su adaptador y las pruebas; `consume` vuelve a cinco argumentos |
+
+**Medición:** 746 líneas efectivas (`git diff --numstat main...HEAD -- . ':!openspec'`, antes de este commit de documentación).
