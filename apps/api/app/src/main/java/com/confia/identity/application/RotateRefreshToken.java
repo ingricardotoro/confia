@@ -53,13 +53,16 @@ import java.util.UUID;
  *
  * <p><b>Every rejection is a returned value.</b> The transaction commits, with the entry that says
  * why. The access token is signed after the commit, so a token for a rotation that did not commit is
- * never handed out. The reuse and grace branches return a rejection with no effect until the changes
- * that deliver them (tasks 4.2 and 4.3), so their tests start red.
+ * never handed out. A confirmed reuse revokes the family, empties its encrypted successors and is
+ * audited in that same transaction; it notifies nobody (the notice to the holder is change 14's). The
+ * grace branch returns a rejection with no effect until the change that delivers it (task 4.3), so
+ * its tests start red.
  */
 public final class RotateRefreshToken {
 
     private static final String ACTION_REFRESHED = "identity.session.refreshed";
     private static final String ACTION_REJECTED = "identity.session.refresh_rejected";
+    private static final String ACTION_REUSE_DETECTED = "identity.session.reuse_detected";
     private static final String FAMILY_ENTITY_TYPE = "identity.refresh_token_family";
     private static final String UNKNOWN_TOKEN_LABEL = "unknown-token";
     private static final String ACTOR_KIND_STAFF = "staff";
@@ -157,8 +160,9 @@ public final class RotateRefreshToken {
             }
             case REJECT_FAMILY_REVOKED, REJECT_TOKEN_EXPIRED ->
                     rejection(institutionId, auditRequestId, family, decision);
-            // No effect until tasks 4.2 (reuse) and 4.3 (grace) give these branches theirs.
-            case REUSE_DETECTED, GRACE_REPLAY -> new Attempt.Rejected(RefreshRejection.REUSE_DETECTED);
+            case REUSE_DETECTED -> revokeForReuse(institutionId, auditRequestId, family, now);
+            // No effect until task 4.3 gives this branch its own.
+            case GRACE_REPLAY -> new Attempt.Rejected(RefreshRejection.REUSE_DETECTED);
         };
     }
 
@@ -182,6 +186,26 @@ public final class RotateRefreshToken {
                 OUTCOME_SUCCESS, "{\"rotation\":\"fresh\"}"));
         return new Attempt.Rotated(family.id(), family.accountId(), family.secondFactorVerified(),
                 successor, expiresAt, RotationKind.FRESH);
+    }
+
+    /**
+     * A consumed token outside the grace window: the family is revoked with {@code reuse_detected},
+     * the encrypted successors of its tokens are emptied and the entry of a possible leak is written,
+     * all in the transaction the caller opened. The outcome is a returned value, so that transaction
+     * commits and the revocation survives the rejection. Only this family is touched, and the family
+     * is known to be live (the decision rejects a revoked one before it reaches here), so the
+     * conditional update cannot miss under the lock.
+     */
+    private Attempt revokeForReuse(InstitutionId institutionId, UUID auditRequestId,
+            RefreshTokenFamilyState family, Instant now) {
+        if (!families.revokeForReuse(institutionId, family.id(), now)) {
+            throw new IllegalStateException("a family that is live under its own lock could not "
+                    + "be revoked");
+        }
+        tokens.clearSuccessors(institutionId, family.id());
+        auditLogWriter.append(entry(institutionId, auditRequestId, family, ACTION_REUSE_DETECTED,
+                OUTCOME_DENIED, "{\"familyRevoked\":true}"));
+        return new Attempt.Rejected(RefreshRejection.REUSE_DETECTED);
     }
 
     private Attempt rejection(InstitutionId institutionId, UUID auditRequestId,

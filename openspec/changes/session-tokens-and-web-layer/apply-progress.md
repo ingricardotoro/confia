@@ -1530,3 +1530,90 @@ Ninguna rebanada superó 800. Lo movido o diferido respecto de la tarea:
   distingue y las prueba (`GRACE_REPLAY` y `REUSE_DETECTED`), de modo que 4.3 solo conecta la rama de gracia.
 
 La rama local `wip/session-tokens-refresh-rotation-full` (8cfd177) conserva el árbol completo antes de partir.
+
+### PR 12 `reuse-detection`, tarea 4.2 (2026-10-16, modo TDD estricto)
+
+Una sola rama, `change/session-tokens-and-web-layer-12-reuse-detection`, sobre `main` (8c6866d). Por la decisión del propietario («partir solo si hace falta,
+sin preguntar») se implementó y verificó primero y se midió después: 558 líneas efectivas, por debajo de las 800, así que no hay costura y 4.2 se marca `[x]` aquí.
+
+Contiene la rama `REUSE_DETECTED` de `RotateRefreshToken`: revoca la familia con `reuse_detected`, vacía los sucesores cifrados (nota S-2 de la revisión de 3.2) y
+escribe `identity.session.reuse_detected` (`denied`, `{"familyRevoked":true}`, entidad la familia) en la misma transacción, y devuelve `Rejected(REUSE_DETECTED)`
+como valor, de modo que la transacción confirma y la revocación sobrevive al rechazo. Solo se toca la familia afectada. El puerto nuevo es
+`RefreshTokenFamilyRepository.revokeForReuse` (actualización condicionada a `revoked_at IS NULL`; si no afecta una fila bajo el bloqueo lanza
+`IllegalStateException`, la red de seguridad, como `consume`). `RotationDecision` ya devolvía `REUSE_DETECTED` desde 11a: no se tocó el dominio. No se envía ningún
+aviso al titular (el caso de uso no recibe ningún emisor y la prueba lo comprueba sobre el constructor y sobre los asientos). La rama de gracia sigue sin efecto (4.3).
+
+Pruebas nuevas: `RotateRefreshTokenIT` +8 (I104, I105, atomicidad, I106, I107, S-2, I144, ausencia de aviso; 23 en total), `RefreshRotationConcurrencyIT` +4 (b = I143;
+(c) con la rotación primero, el orden que 4.1d no cubría = I128; I108 en sus dos órdenes; 5 en total) y `RefreshTokenStoreIT` +2 (`revokeForReuse`; 12 en total).
+Soporte: `RotationIntegrationTest.HoldingFamilies` (repositorio de familias que toma el bloqueo real y retiene la transacción justo después, con `CountDownLatch`),
+`rotation(..., families)` y `liveTokenCount()` (tokens sin consumir de familias no revocadas: «vigente»). La segunda transacción se libera cuando
+`pg_stat_activity` muestra un servidor esperando un bloqueo de fila sobre `identity_refresh_token_family` (condición con límite de 20 s, sin esperas por reloj).
+
+**Rojo observado.** (1) Con las pruebas de caso de uso y de concurrencia escritas y sin tocar producción, `RotateRefreshTokenIT` + `RefreshRotationConcurrencyIT`:
+28 pruebas, 10 fallos, todos por la causa esperada, la reutilización no revoca: `expected: "reuse_detected" but was: null` en I104, I105, la de una sola familia (I106),
+(b) y los dos órdenes de I108 (en uno de ellos, `Rotated` en lugar de `Rejected(FAMILY_REVOKED)`); `Expected size: 1 but was: 0` (ningún asiento de reutilización) en I144; el cifrado
+sigue en la fila en la de S-2; `Expecting code to raise a throwable` (no hay asiento de reutilización que falle) en la atomicidad; y `expected FAMILY_REVOKED but was REUSE_DETECTED` en I107.
+Pasaron en verde desde el primer momento la ausencia de aviso (una ausencia) y la prueba (c) con la rotación primero (ver la demostración 2).
+(2) `RefreshTokenStoreIT` con `revokeForReuse`: `test-compile` falló con `cannot find symbol ... method revokeForReuse(InstitutionId,UUID,Instant)`.
+Verde: `RotateRefreshTokenIT` 23, `RefreshRotationConcurrencyIT` 5 y `RefreshTokenStoreIT` 12, 40 pruebas, 0 fallos.
+
+**Demostraciones deliberadas** (cada una sobre una copia hecha ANTES de la ruptura; revertida y confirmada con `cmp`):
+1. *La de la tarea:* `throw new IllegalStateException` tras el asiento de reutilización. `RotateRefreshTokenIT` + `RefreshRotationConcurrencyIT`: 28 pruebas, 1 fallo y 10 errores.
+   El lanzamiento revierte la transacción (la prueba de atomicidad sigue en verde) y el caso de uso deja de devolver un valor: `theRevocationAndItsEntrySurviveTheRejection...`
+   falla en su primera aserción («a reuse is a value, never an exception») y las demás por la excepción en `rotate`. Dicho con exactitud: la lectura en transacción nueva no llega a
+   ejecutarse, porque la excepción cruza antes de ella; el efecto observable es el que la tarea nombra (nada confirmado, prueba en rojo).
+2. *(b), (c) e I108:* quitar `.forUpdate()` de `JooqRefreshTokenFamilyRepository.lockById`. Las cinco pruebas de `RefreshRotationConcurrencyIT` (la de 4.1d y las cuatro nuevas) fallan en
+   su aserción de espera («the second presentation waited for the family lock the first held», «the reset waited for the family lock the rotation held», etc.): sin el bloqueo, la segunda
+   transacción no espera. Es la diferencia real que esta ruptura permite observar en el orden «la rotación retiene primero», porque el sucesor nace en una familia que el restablecimiento
+   revoca de todos modos; por eso la aserción de espera es la que ancla la prueba (c) nueva. No se probó, y no se afirma, si el `FOR UPDATE` del revocador es o no redundante en ese orden.
+3. *I106, S-2 e I144:* quitar la condición `ID = familyId` de `revokeForReuse` y comentar `tokens.clearSuccessors` a la vez. `RotateRefreshTokenIT` + `RefreshTokenStoreIT`: 35 pruebas,
+   2 fallos y 2 errores: la de S-2 (el cifrado sigue en la fila), `revokingForReuseMarksOnlyThatFamily...` (revocó otras familias), y las de I106 e I144 con
+   `IllegalStateException` («a family that is live under its own lock could not be revoked»), porque la actualización sin filtro revocó también las otras familias y la condicional de la
+   siguiente ya no afectó una fila.
+
+| Tarea | Archivo de prueba | Capa | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 4.2 | `RotateRefreshTokenIT` | Integración (PostgreSQL real, adaptadores reales) | Las 15 pruebas previas, verdes en el mismo arnés después del cambio | 7 fallos por causa esperada (ver arriba) | 23/23 | Reutilización real (emisión y rotación) y sembrada; con y sin cifrado; otro agente; familia ya revocada; cinco rechazos | Sin cambios |
+| 4.2 | `RefreshRotationConcurrencyIT` | Integración, dos transacciones reales | La prueba de 4.1d, verde en el mismo arnés | 3 de 4 nuevas fallan por causa esperada; (c) con la rotación primero nace en verde (demostración 2) | 5/5 | (b); (c) en el orden de 4.1d y en el inverso; I108 en sus dos órdenes | Sin cambios |
+| 4.2 | `RefreshTokenStoreIT` | Integración (rol `confia_admin_app`, RLS) | Las 10 pruebas previas | `test-compile` (`cannot find symbol`) | 12/12 | Revocar una vez, dos veces, una ya revocada y otra institución | Sin cambios |
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-Dit.test='RotateRefreshTokenIT,RefreshRotationConcurrencyIT,RefreshTokenStoreIT'`: 40 pruebas, 0 fallos |
+| Arnés de ejecución | `RotateRefreshToken` y los adaptadores reales contra PostgreSQL con el rol `confia_admin_app`; dos hilos con transacciones y conexiones propias; primera transacción retenida con `CountDownLatch` justo tras tomar el bloqueo; espera de la segunda leída de `pg_stat_activity` como `postgres`; relojes fijos, sin esperas fijas |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 816, Failsafe 372, 0 fallos; cobertura cumplida (`identity.domain` ≥ 95, sin cambios en dominio); mutación del 99 % (192 de 194, kernel) y el 94 % (547 de 583, app); `BUILD SUCCESS` en 13 min 10 s |
+| Frontera de reversión | `RotateRefreshToken.revokeForReuse` y su `case`, `RefreshTokenFamilyRepository.revokeForReuse` con su adaptador, y las pruebas nuevas; con eso la rama vuelve a `Rejected(REUSE_DETECTED)` sin efecto |
+
+**Medición:** 558 líneas efectivas (551 añadidas y 7 retiradas; `git diff --numstat main...HEAD -- . ':!openspec'`, antes de este commit de documentación). Sin `size:exception`.
+
+**Desviaciones y pendientes.** Ninguna respecto del diseño. El dominio no cambia (la decisión pura estaba completa desde 11a) y PIT no se mueve (547 de 583). La condición «ningún token
+vigente» se define como «ningún token sin consumir de una familia no revocada»: tras revocar, los tokens abiertos de la familia siguen sin consumir en su fila pero ya no pueden presentarse (la
+prueba comprueba además que presentarlos da `FAMILY_REVOKED`). Pendiente para 4.3: la rama de gracia, el paso 5 de la decisión 10 y la concurrencia (a).
+
+#### PR 12, refuerzo de la demostración de concurrencia (2026-10-16, a petición del coordinador)
+
+La demostración 2 de arriba (quitar `.forUpdate()` de `lockById`) solo ponía en rojo la aserción de espera, es decir, el tiempo y no el estado final. Se repitió quitando
+también esa aserción (copia previa de la prueba con las aserciones de espera anuladas, copias previas de cada archivo de producción roto, todo revertido y confirmado con `cmp`),
+para ver qué aserción de **desenlace** falla.
+
+| Prueba | Sin `forUpdate` en `lockById`, sin aserción de espera | Conclusión |
+|---|---|---|
+| 4.1d: el restablecimiento retiene primero | **Rojo de desenlace:** `expected Rejected[FAMILY_REVOKED] but was Rotated[... FRESH]` | El bloqueo es el mecanismo: sin él la rotación decide sobre una familia viva que el restablecimiento ya revocó sin confirmar |
+| I108, la reutilización retiene primero | **Rojo de desenlace:** igual, `Rotated` en lugar de `Rejected(FAMILY_REVOKED)` | Igual |
+| (b), retenida tras el bloqueo (la committed) | Rojo solo por los **papeles** (el retenido recibe `REUSE_DETECTED`, el otro `Rotated`). Con aserciones agnósticas al papel (una `Rotated`, una `REUSE_DETECTED`, un sucesor, familia revocada, ningún token vivo) queda **verde** | El estado final no depende del bloqueo en esa posición de retención: la releída del token tras la retención y el `UPDATE` condicional ya serializan. El bloqueo fija quién gana |
+| (c), la rotación retiene primero | **Verde** en todo desenlace | La revocación es final (disparador de V8) y «vigente» se deriva de la familia revocada: el sucesor nace muerto en cualquier orden. El bloqueo fija el orden de serialización, no el estado final |
+| I108, la rotación retiene primero | **Verde** en todo desenlace | Igual que (c) |
+
+*Mecanismos que serializan cuando el bloqueo no lo hace (probados con rupturas añadidas):*
+- Ruptura B, además de A: decidir sobre el token leído **antes** del bloqueo (sin la releída). (b) pasa a rojo con
+  `IllegalStateException: a token that is open under the lock of its family could not be consumed`: el `UPDATE ... consumed_at IS NULL` de `consume` es la red de seguridad primaria contra dos sucesores, y la transacción se revierte (un solo sucesor), pero el perdedor recibe una excepción y no un `REUSE_DETECTED`.
+- Ruptura C, además de A y B: quitar `consumed_at IS NULL` de `consume`. (b) sigue en rojo, ahora con `IntegrityConstraintViolationException: identity_refresh_token_consumption_final: a consumed token keeps its consumption`: el disparador de V8 impide reconsumir. No se probó una tercera ruptura (el índice único de un token abierto por familia) ni la clave foránea.
+- Ruptura D, solo el `FOR UPDATE ... ORDER BY id` del revocador (con el bloqueo de `lockById` intacto): las 5 pruebas quedan **verdes**, también sin la aserción de espera. En las pruebas de una sola familia es redundante, porque el `UPDATE` toma el bloqueo de fila por sí mismo; su razón de ser es el orden de bloqueo entre varias familias (evitar ciclos), que 4.2 no ejercita y no se afirma probada aquí.
+
+**Conclusión honesta.** El bloqueo `FOR UPDATE` de la familia es lo que convierte los conflictos en resultados limpios (`REUSE_DETECTED`, `FAMILY_REVOKED`) en lugar de excepciones o de rotaciones sobre una familia revocada; es el mecanismo primario en los dos órdenes donde el desenlace cambia (4.1d e I108 con la reutilización primero). Para la integridad de los datos es defensa en profundidad: el `UPDATE` condicional de `consume` (primario), el disparador de consumo final y la revocación final de V8 la sostienen aunque el bloqueo falle.
+
+**Cambio en las pruebas (sin debilitar ni borrar ninguna aserción).** Se añadió `whenTheFirstTransactionHasAlreadyReadTheTokenTheSecondOneStillWaitsAndTheOutcomeIsTheSame`, con `HoldingTokensAfterReread` (decorador de `findById` que retiene tras releer el token): sin el bloqueo, la segunda transacción lee el mismo token abierto y la primera llega a `consume` con un estado ya falso. Verde con el bloqueo; sin el, rojo de desenlace (excepción) aun sin la aserción de espera (comprobado con la copia previa). Los Javadoc de (b), (c) e I108 con la rotación primero dicen ahora qué prueban y qué no.
+
+**Verificación completa:** `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 816, Failsafe 373, 0 fallos; cobertura cumplida; mutación 99 % (192 de 194, kernel) y 94 % (547 de 583, app); `BUILD SUCCESS` en 12 min 24 s.
+
+**Revisión contra las skills** (`confia-testing-playbook` y `confia-security-checklist`, leídas completas en este refuerzo; antes solo había leído `confia-audit-logging` en parte): cumple concurrencia con hilos y conexiones independientes (§5), mutación y demostraciones con reversión (§10, paso 7), parámetros enlazados, auditoría en la misma transacción, sin secretos en bitácora ni logs, prueba de la política de fila con otra institución (`RefreshTokenStoreIT`). **Incumplimiento a declarar:** el playbook §1 pide, para un caso de uso de `application`, prueba unitaria con dobles de los puertos además de la de integración; `RotateRefreshToken` (4.1 y 4.2) solo tiene integración. No se añadió aquí; queda como deuda propuesta.
