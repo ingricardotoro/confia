@@ -2,7 +2,9 @@ package com.confia.schema;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.confia.identity.application.SessionRevocationReason;
 import com.confia.support.TransactionalPostgresIntegrationTest;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,22 +27,45 @@ class RevocationReasonCatalogIT extends TransactionalPostgresIntegrationTest {
 
     private static final Pattern QUOTED_LITERAL = Pattern.compile("'([a-z_]+)'");
 
+    /**
+     * The contract between the application and the schema: the words of {@link
+     * SessionRevocationReason} are exactly the words the check constraint admits. A reason added to
+     * the enum without a migration, a migration that widens the constraint without a reason in the
+     * enum, or a misspelling on either side, breaks the build here and not at the first revocation.
+     */
+    @Test
+    void everyRevocationReasonOfTheApplicationIsAdmittedByTheConstraintAndNothingElseIs() {
+        Set<String> codes = Arrays.stream(SessionRevocationReason.values())
+                .map(SessionRevocationReason::code).collect(Collectors.toUnmodifiableSet());
+
+        assertThat(admittedReasons())
+                .as("the reasons the V8 constraint admits, against SessionRevocationReason.code()")
+                .isEqualTo(codes);
+    }
+
     @Test
     void theRevocationReasonConstraintAdmitsExactlyTheReasonsThatHaveAProducer() {
-        String definition = dsl.fetchOne("""
-                select pg_get_constraintdef(oid) as definition
-                  from pg_constraint
-                 where conname = 'identity_refresh_token_family_reason_chk'
-                   and conrelid = 'identity_refresh_token_family'::regclass
-                """).get("definition", String.class);
-
-        Matcher matcher = QUOTED_LITERAL.matcher(definition);
-        Set<String> reasons = matcher.results().map(result -> result.group(1))
-                .collect(Collectors.toUnmodifiableSet());
+        String definition = constraintDefinition();
+        Set<String> reasons = admittedReasons();
 
         assertThat(definition).as("the definition read from the catalogue").contains("revoked_reason");
         assertThat(reasons)
                 .as("only reasons with a producer in this change: no logout, no admin_revoke")
                 .containsExactlyInAnyOrder("reuse_detected", "password_change");
+    }
+
+    private String constraintDefinition() {
+        return dsl.fetchOne("""
+                select pg_get_constraintdef(oid) as definition
+                  from pg_constraint
+                 where conname = 'identity_refresh_token_family_reason_chk'
+                   and conrelid = 'identity_refresh_token_family'::regclass
+                """).get("definition", String.class);
+    }
+
+    private Set<String> admittedReasons() {
+        Matcher matcher = QUOTED_LITERAL.matcher(constraintDefinition());
+        return matcher.results().map(result -> result.group(1))
+                .collect(Collectors.toUnmodifiableSet());
     }
 }

@@ -33,7 +33,8 @@ public interface RefreshTokenFamilyRepository {
 
     /**
      * Revokes one family because a consumed token of it was presented outside the grace window
-     * (reason {@code reuse_detected}, design.md decision 10), and reports whether this call did it.
+     * (reason {@link SessionRevocationReason#REUSE_DETECTED}, design.md decision 10), and reports
+     * whether this call did it.
      * The update is conditional on the family not being revoked yet, so an earlier revocation keeps
      * its instant and its reason (the engine refuses to change them anyway). Under the lock of the
      * family {@code false} cannot happen; it is the safety net, as in {@link

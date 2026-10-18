@@ -3,7 +3,7 @@ package com.confia.identity.infrastructure;
 import static confia.generated.jooq.tables.IdentityRefreshTokenFamily.IDENTITY_REFRESH_TOKEN_FAMILY;
 
 import com.confia.identity.application.RefreshTokenFamilyRepository;
-import com.confia.identity.domain.RefreshRejection;
+import com.confia.identity.application.SessionRevocationReason;
 import com.confia.identity.domain.RefreshTokenFamily;
 import com.confia.identity.domain.RefreshTokenFamilyState;
 import com.confia.identity.domain.StaffAccountId;
@@ -96,7 +96,7 @@ public final class JooqRefreshTokenFamilyRepository implements RefreshTokenFamil
         return dsl.update(IDENTITY_REFRESH_TOKEN_FAMILY)
                 .set(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT, now.atOffset(ZoneOffset.UTC))
                 .set(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_REASON,
-                        RefreshRejection.REUSE_DETECTED.auditCode())
+                        SessionRevocationReason.REUSE_DETECTED.code())
                 .where(IDENTITY_REFRESH_TOKEN_FAMILY.INSTITUTION_ID.eq(institutionId.value()))
                 .and(IDENTITY_REFRESH_TOKEN_FAMILY.ID.eq(familyId))
                 .and(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT.isNull())
