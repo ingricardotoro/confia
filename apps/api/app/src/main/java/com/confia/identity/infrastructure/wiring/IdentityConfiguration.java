@@ -16,6 +16,7 @@ import com.confia.identity.application.RefreshTokenFamilyRepository;
 import com.confia.identity.application.RefreshTokenRepository;
 import com.confia.identity.application.ResetPasswordWithToken;
 import com.confia.identity.application.RotateRefreshToken;
+import com.confia.identity.application.SessionLiveness;
 import com.confia.identity.application.StaffAccountRepository;
 import com.confia.identity.application.TotpCredentialRepository;
 import com.confia.identity.application.TotpVerificationBackoffStore;
@@ -181,6 +182,17 @@ public class IdentityConfiguration {
             AccessTokenIssuer accessTokens, AuditLogWriter auditLogWriter, Clock clock) {
         return new RotateRefreshToken(runner, institutionProvider, families, tokens, encryption,
                 accessTokens, auditLogWriter, clock, new SecureRandom());
+    }
+
+    /**
+     * The adapter of the session validity port, which the authentication filter asks for the routes
+     * that declare a live-session check. The factory returns the adapter's own type and not the port,
+     * so no method of production returns the port and no adapter can hide in a lambda.
+     */
+    @Bean
+    SessionLiveness sessionLiveness(TransactionRunner runner,
+            RefreshTokenFamilyRepository families, Clock clock) {
+        return new SessionLiveness(runner, families, clock);
     }
 
     @Bean

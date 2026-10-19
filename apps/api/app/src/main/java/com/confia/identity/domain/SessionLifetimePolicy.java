@@ -67,6 +67,20 @@ public final class SessionLifetimePolicy {
         return Objects.requireNonNull(now, "now").minus(GRACE_WINDOW);
     }
 
+    /**
+     * Whether a family is a live session of {@code owner} at {@code now} (design.md decision 7): it
+     * belongs to that account, has not been revoked, has not reached its absolute end and has not been
+     * idle for the whole inactivity period. Every border is the one of the method that owns it.
+     */
+    public boolean isLive(RefreshTokenFamilyState family, StaffAccountId owner, Instant now) {
+        Objects.requireNonNull(family, "family");
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(now, "now");
+        return family.accountId().equals(owner) && !family.isRevoked()
+                && !isAbsolutelyExpired(family.absoluteExpiresAt(), now)
+                && !isIdle(family.lastUsedAt(), now);
+    }
+
     /** Whether a session last used at {@code lastUsedAt} is idle at {@code now}; the border is idle. */
     public boolean isIdle(Instant lastUsedAt, Instant now) {
         Objects.requireNonNull(lastUsedAt, "lastUsedAt");

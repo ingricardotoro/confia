@@ -28,6 +28,14 @@ public interface RefreshTokenFamilyRepository {
      */
     Optional<RefreshTokenFamilyState> lockById(InstitutionId institutionId, UUID familyId);
 
+    /**
+     * Reads the state of the family without locking it, for the check that only asks whether a
+     * session is still valid (design.md decision 7). Unlike {@link #lockById} it takes no row lock, so
+     * it works in a read-only transaction and never waits for a rotation. A family that was revoked
+     * comes back revoked, not missing. Empty when the family does not exist for the institution.
+     */
+    Optional<RefreshTokenFamilyState> readById(InstitutionId institutionId, UUID familyId);
+
     /** Records a use of the family: {@code last_used_at} moves to {@code now}. */
     void recordUse(InstitutionId institutionId, UUID familyId, Instant now);
 

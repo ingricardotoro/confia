@@ -2,6 +2,7 @@ package com.confia.shared.security;
 
 import static confia.generated.jooq.tables.OrganizationInstitution.ORGANIZATION_INSTITUTION;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.support.PostgresIntegrationTest;
 import java.sql.Connection;
@@ -129,6 +130,37 @@ class TransactionRunnerContextIT extends PostgresIntegrationTest {
                 this::currentIsolation);
 
         assertThat(isolation).isEqualToIgnoringCase("serializable");
+    }
+
+    /**
+     * The read-only variant (session-tokens-and-web-layer design.md decision 7): the same context and
+     * the same {@code READ COMMITTED}, with the engine refusing a write, and a connection that goes back
+     * to the pool read-write. The pool holds a single connection, so the last assertion runs on the very
+     * connection that was read-only.
+     */
+    @Test
+    void aReadOnlyTransactionKeepsTheContextRefusesAWriteAndLeavesNoReadOnlyConnectionBehind()
+            throws SQLException {
+        UUID institutionA = UUID.randomUUID();
+        seedCommittedInstitution(institutionA);
+        TransactionRunner runner = new TransactionRunner(transactionManager, dataSource);
+
+        List<String> observed = runner.executeReadOnly(contextOf(institutionA), () -> List.of(
+                dsl.selectFrom(ORGANIZATION_INSTITUTION).fetch(ORGANIZATION_INSTITUTION.ID)
+                        .toString(),
+                currentIsolation(), readOnlyFlag()));
+
+        assertThat(observed).containsExactly("[" + institutionA + "]", "read committed", "on");
+        assertThatThrownBy(() -> runner.executeReadOnly(contextOf(institutionA),
+                () -> dsl.execute("create temp table not_allowed_here (i int)")))
+                .hasMessageContaining("read-only transaction");
+        assertThat(runner.execute(contextOf(institutionA), this::readOnlyFlag))
+                .as("the next transaction on the same connection is read-write again")
+                .isEqualTo("off");
+    }
+
+    private String readOnlyFlag() {
+        return dsl.fetchOne("show transaction_read_only").get(0, String.class);
     }
 
     private String currentIsolation() {

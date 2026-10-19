@@ -9,11 +9,15 @@ import com.confia.identity.domain.RefreshTokenFamilyState;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.kernel.InstitutionId;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.Record;
+import org.jooq.Record6;
+import org.jooq.SelectConditionStep;
 import org.jooq.impl.DSL;
 
 /**
@@ -63,6 +67,22 @@ public final class JooqRefreshTokenFamilyRepository implements RefreshTokenFamil
      */
     @Override
     public Optional<RefreshTokenFamilyState> lockById(InstitutionId institutionId, UUID familyId) {
+        return stateQuery(institutionId, familyId).forUpdate()
+                .fetchOptional(JooqRefreshTokenFamilyRepository::stateOf);
+    }
+
+    /**
+     * The same statement without the lock: it neither waits for a rotation nor needs a writable
+     * transaction, which is what the check of a live session asks for (design.md decision 7).
+     */
+    @Override
+    public Optional<RefreshTokenFamilyState> readById(InstitutionId institutionId, UUID familyId) {
+        return stateQuery(institutionId, familyId)
+                .fetchOptional(JooqRefreshTokenFamilyRepository::stateOf);
+    }
+
+    private SelectConditionStep<Record6<UUID, UUID, Boolean, OffsetDateTime, OffsetDateTime,
+            OffsetDateTime>> stateQuery(InstitutionId institutionId, UUID familyId) {
         return dsl.select(IDENTITY_REFRESH_TOKEN_FAMILY.ID, IDENTITY_REFRESH_TOKEN_FAMILY.ACCOUNT_ID,
                         IDENTITY_REFRESH_TOKEN_FAMILY.SECOND_FACTOR_VERIFIED,
                         IDENTITY_REFRESH_TOKEN_FAMILY.LAST_USED_AT,
@@ -70,16 +90,17 @@ public final class JooqRefreshTokenFamilyRepository implements RefreshTokenFamil
                         IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT)
                 .from(IDENTITY_REFRESH_TOKEN_FAMILY)
                 .where(IDENTITY_REFRESH_TOKEN_FAMILY.INSTITUTION_ID.eq(institutionId.value()))
-                .and(IDENTITY_REFRESH_TOKEN_FAMILY.ID.eq(familyId))
-                .forUpdate()
-                .fetchOptional(row -> new RefreshTokenFamilyState(
-                        row.get(IDENTITY_REFRESH_TOKEN_FAMILY.ID),
-                        new StaffAccountId(row.get(IDENTITY_REFRESH_TOKEN_FAMILY.ACCOUNT_ID)),
-                        row.get(IDENTITY_REFRESH_TOKEN_FAMILY.SECOND_FACTOR_VERIFIED),
-                        row.get(IDENTITY_REFRESH_TOKEN_FAMILY.LAST_USED_AT).toInstant(),
-                        row.get(IDENTITY_REFRESH_TOKEN_FAMILY.ABSOLUTE_EXPIRES_AT).toInstant(),
-                        row.get(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT) == null ? null
-                                : row.get(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT).toInstant()));
+                .and(IDENTITY_REFRESH_TOKEN_FAMILY.ID.eq(familyId));
+    }
+
+    private static RefreshTokenFamilyState stateOf(Record row) {
+        return new RefreshTokenFamilyState(row.get(IDENTITY_REFRESH_TOKEN_FAMILY.ID),
+                new StaffAccountId(row.get(IDENTITY_REFRESH_TOKEN_FAMILY.ACCOUNT_ID)),
+                row.get(IDENTITY_REFRESH_TOKEN_FAMILY.SECOND_FACTOR_VERIFIED),
+                row.get(IDENTITY_REFRESH_TOKEN_FAMILY.LAST_USED_AT).toInstant(),
+                row.get(IDENTITY_REFRESH_TOKEN_FAMILY.ABSOLUTE_EXPIRES_AT).toInstant(),
+                row.get(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT) == null ? null
+                        : row.get(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT).toInstant());
     }
 
     @Override
