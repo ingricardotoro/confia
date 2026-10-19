@@ -177,10 +177,10 @@ public class IdentityConfiguration {
     @Bean
     RotateRefreshToken rotateRefreshToken(TransactionRunner runner,
             LoginInstitutionProvider institutionProvider, RefreshTokenFamilyRepository families,
-            RefreshTokenRepository tokens, AccessTokenIssuer accessTokens,
-            AuditLogWriter auditLogWriter, Clock clock) {
-        return new RotateRefreshToken(runner, institutionProvider, families, tokens, accessTokens,
-                auditLogWriter, clock, new SecureRandom());
+            RefreshTokenRepository tokens, ColumnEncryptionService encryption,
+            AccessTokenIssuer accessTokens, AuditLogWriter auditLogWriter, Clock clock) {
+        return new RotateRefreshToken(runner, institutionProvider, families, tokens, encryption,
+                accessTokens, auditLogWriter, clock, new SecureRandom());
     }
 
     @Bean

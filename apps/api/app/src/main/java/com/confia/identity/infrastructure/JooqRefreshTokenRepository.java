@@ -2,6 +2,7 @@ package com.confia.identity.infrastructure;
 
 import static confia.generated.jooq.tables.IdentityRefreshToken.IDENTITY_REFRESH_TOKEN;
 
+import com.confia.identity.application.EncryptedSuccessor;
 import com.confia.identity.application.RefreshTokenRepository;
 import com.confia.identity.domain.RefreshTokenHash;
 import com.confia.identity.domain.RefreshTokenRow;
@@ -11,6 +12,7 @@ import com.confia.kernel.InstitutionId;
 import confia.generated.jooq.tables.IdentityRefreshToken;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.Condition;
@@ -67,15 +69,45 @@ public final class JooqRefreshTokenRepository implements RefreshTokenRepository 
 
     @Override
     public boolean consume(InstitutionId institutionId, UUID tokenId, Instant now,
-            UserAgentFingerprint presenter, UUID successorId) {
+            UserAgentFingerprint presenter, UUID successorId, String successorCiphertext) {
         return dsl.update(IDENTITY_REFRESH_TOKEN)
                 .set(IDENTITY_REFRESH_TOKEN.CONSUMED_AT, now.atOffset(ZoneOffset.UTC))
                 .set(IDENTITY_REFRESH_TOKEN.CONSUMED_USER_AGENT_FINGERPRINT, presenter.value())
                 .set(IDENTITY_REFRESH_TOKEN.REPLACED_BY, successorId)
+                .set(IDENTITY_REFRESH_TOKEN.SUCCESSOR_TOKEN_CIPHERTEXT,
+                        Objects.requireNonNull(successorCiphertext, "successorCiphertext"))
                 .where(IDENTITY_REFRESH_TOKEN.INSTITUTION_ID.eq(institutionId.value()))
                 .and(IDENTITY_REFRESH_TOKEN.ID.eq(tokenId))
                 .and(IDENTITY_REFRESH_TOKEN.CONSUMED_AT.isNull())
                 .execute() == 1;
+    }
+
+    @Override
+    public Optional<EncryptedSuccessor> findEncryptedSuccessor(InstitutionId institutionId,
+            UUID tokenId) {
+        return dsl.select(IDENTITY_REFRESH_TOKEN.SUCCESSOR_TOKEN_CIPHERTEXT, SUCCESSOR.EXPIRES_AT)
+                .from(IDENTITY_REFRESH_TOKEN)
+                .join(SUCCESSOR)
+                .on(SUCCESSOR.INSTITUTION_ID.eq(IDENTITY_REFRESH_TOKEN.INSTITUTION_ID))
+                .and(SUCCESSOR.ID.eq(IDENTITY_REFRESH_TOKEN.REPLACED_BY))
+                .where(IDENTITY_REFRESH_TOKEN.INSTITUTION_ID.eq(institutionId.value()))
+                .and(IDENTITY_REFRESH_TOKEN.ID.eq(tokenId))
+                .and(IDENTITY_REFRESH_TOKEN.SUCCESSOR_TOKEN_CIPHERTEXT.isNotNull())
+                .fetchOptional(row -> new EncryptedSuccessor(
+                        row.get(IDENTITY_REFRESH_TOKEN.SUCCESSOR_TOKEN_CIPHERTEXT),
+                        row.get(SUCCESSOR.EXPIRES_AT).toInstant()));
+    }
+
+    @Override
+    public void clearSuccessorsConsumedAtOrBefore(InstitutionId institutionId, UUID familyId,
+            Instant cutoff) {
+        dsl.update(IDENTITY_REFRESH_TOKEN)
+                .setNull(IDENTITY_REFRESH_TOKEN.SUCCESSOR_TOKEN_CIPHERTEXT)
+                .where(IDENTITY_REFRESH_TOKEN.INSTITUTION_ID.eq(institutionId.value()))
+                .and(IDENTITY_REFRESH_TOKEN.FAMILY_ID.eq(familyId))
+                .and(IDENTITY_REFRESH_TOKEN.SUCCESSOR_TOKEN_CIPHERTEXT.isNotNull())
+                .and(IDENTITY_REFRESH_TOKEN.CONSUMED_AT.le(cutoff.atOffset(ZoneOffset.UTC)))
+                .execute();
     }
 
     @Override

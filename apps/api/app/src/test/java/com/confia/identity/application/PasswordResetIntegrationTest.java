@@ -28,6 +28,7 @@ import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.audit.AuditRowSnapshot;
 import com.confia.shared.crypto.ColumnEncryptionMasterKey;
 import com.confia.shared.crypto.ColumnEncryptionService;
+import com.confia.shared.crypto.DataEncryptionKeyRepository;
 import com.confia.shared.infrastructure.JooqAuditLogReader;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.shared.infrastructure.JooqDataEncryptionKeyRepository;
@@ -213,9 +214,12 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
     }
 
     ColumnEncryptionService encryptionService() {
-        return new ColumnEncryptionService(
-                new JooqDataEncryptionKeyRepository(dsl, new AesGcmCipher(), masterKey),
-                new AesGcmCipher());
+        return new ColumnEncryptionService(keyRepository(), new AesGcmCipher());
+    }
+
+    /** The data-encryption keys of this test's institution, wrapped under its own random master key. */
+    DataEncryptionKeyRepository keyRepository() {
+        return new JooqDataEncryptionKeyRepository(dsl, new AesGcmCipher(), masterKey);
     }
 
     static Clock fixedClock(String instant) {

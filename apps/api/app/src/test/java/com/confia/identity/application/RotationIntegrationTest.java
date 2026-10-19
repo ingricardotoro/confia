@@ -12,6 +12,7 @@ import com.confia.identity.infrastructure.JooqRefreshTokenFamilyRepository;
 import com.confia.identity.infrastructure.JooqRefreshTokenRepository;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditLogWriter;
+import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.support.SharedPostgresContainer;
 import java.security.SecureRandom;
@@ -63,8 +64,17 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
     RotateRefreshToken rotation(Clock clock, AuditLogWriter auditLogWriter,
             InstitutionId configuredInstitution, RefreshTokenFamilyRepository families,
             RefreshTokenRepository tokens) {
+        return rotation(clock, auditLogWriter, configuredInstitution, families, tokens,
+                encryptionService());
+    }
+
+    /** The rotation over an encryption service of the test's own, to count what it is asked to decrypt. */
+    RotateRefreshToken rotation(Clock clock, AuditLogWriter auditLogWriter,
+            InstitutionId configuredInstitution, RefreshTokenFamilyRepository families,
+            RefreshTokenRepository tokens, ColumnEncryptionService encryption) {
         return new RotateRefreshToken(transactionRunner(), () -> configuredInstitution, families,
-                tokens, accessTokenIssuer(clock), auditLogWriter, clock, new SecureRandom());
+                tokens, encryption, accessTokenIssuer(clock), auditLogWriter, clock,
+                new SecureRandom());
     }
 
     RefreshOutcome rotate(String instant, String presentedToken, String userAgent) {
@@ -102,6 +112,13 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
      */
     ConsumedSeed seedConsumedToken(UUID familyId, String issuedAt, String expiresAt,
             String consumedAt, String consumedByAgent, boolean ciphertext) {
+        return seedConsumedToken(familyId, issuedAt, expiresAt, consumedAt, consumedByAgent,
+                ciphertext ? "v1:AAAA" : null);
+    }
+
+    /** As above, with the exact stored value of the encrypted successor, or {@code null} for none. */
+    ConsumedSeed seedConsumedToken(UUID familyId, String issuedAt, String expiresAt,
+            String consumedAt, String consumedByAgent, String ciphertext) {
         PlainRefreshToken consumed = PlainRefreshToken.generate(new SecureRandom());
         PlainRefreshToken successor = PlainRefreshToken.generate(new SecureRandom());
         UUID consumedId = UUID.randomUUID();
@@ -117,7 +134,7 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
                     """, institutionId.value(), consumedId, familyId,
                     RefreshTokenHash.of(consumed).value(), issuedAt, expiresAt, consumedAt,
                     UserAgentFingerprint.of(consumedByAgent).value(), successorId,
-                    ciphertext ? "v1:AAAA" : null);
+                    ciphertext);
             return insertToken(successorId, familyId, successor, consumedAt, expiresAt);
         });
         return new ConsumedSeed(consumed, successor);
@@ -261,8 +278,21 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
 
         @Override
         public boolean consume(InstitutionId institutionId, UUID tokenId, Instant now,
-                UserAgentFingerprint presenter, UUID successorId) {
-            return real.consume(institutionId, tokenId, now, presenter, successorId);
+                UserAgentFingerprint presenter, UUID successorId, String successorCiphertext) {
+            return real.consume(institutionId, tokenId, now, presenter, successorId,
+                    successorCiphertext);
+        }
+
+        @Override
+        public Optional<EncryptedSuccessor> findEncryptedSuccessor(InstitutionId institutionId,
+                UUID tokenId) {
+            return real.findEncryptedSuccessor(institutionId, tokenId);
+        }
+
+        @Override
+        public void clearSuccessorsConsumedAtOrBefore(InstitutionId institutionId, UUID familyId,
+                Instant cutoff) {
+            real.clearSuccessorsConsumedAtOrBefore(institutionId, familyId, cutoff);
         }
 
         @Override
