@@ -1,5 +1,6 @@
 package com.confia.shared.web.edge;
 
+import com.confia.shared.security.SessionValidity;
 import com.confia.shared.security.token.AccessTokenVerifier;
 import com.confia.shared.web.authentication.AccessTokenAuthenticationFilter;
 import com.confia.shared.web.authentication.AuthenticatedEndpoints;
@@ -30,12 +31,13 @@ public class AdminSecurityConfiguration {
 
     @Bean
     SecurityFilterChain adminSecurityFilterChain(HttpSecurity http, Environment environment,
-            ProblemResponses problems, AccessTokenVerifier verifier) throws Exception {
+            ProblemResponses problems, AccessTokenVerifier verifier,
+            SessionValidity sessionValidity) throws Exception {
         AuthenticatedEndpoints authenticated = AuthenticatedEndpoints.forAdmin();
         return SecurityChains
                 .denyByDefault(http, PublicEndpoints.forAdmin(environment), authenticated, problems)
                 .addFilterBefore(new AccessTokenAuthenticationFilter(verifier, authenticated,
-                        new ProblemAuthenticationEntryPoint(problems)),
+                        sessionValidity, new ProblemAuthenticationEntryPoint(problems)),
                         AnonymousAuthenticationFilter.class)
                 .build();
     }

@@ -66,8 +66,14 @@ class WebEdgeHarness {
     }
 
     @Bean
+    RecordingSessionValidity sessionValidity() {
+        return new RecordingSessionValidity();
+    }
+
+    @Bean
     SecurityFilterChain harnessChain(HttpSecurity http, Environment environment,
-            ProblemResponses problems, HarnessTokens tokens) throws Exception {
+            ProblemResponses problems, HarnessTokens tokens,
+            RecordingSessionValidity sessionValidity) throws Exception {
         boolean portal = "portal".equals(environment.getProperty(PROCESS_PROPERTY));
         PublicEndpoints real = portal
                 ? PublicEndpoints.forPortal(environment)
@@ -104,7 +110,8 @@ class WebEdgeHarness {
         return SecurityChains
                 .denyByDefault(http, new PublicEndpoints(endpoints), authenticated, problems)
                 .addFilterBefore(new AccessTokenAuthenticationFilter(tokens.verifier(),
-                        authenticated, new ProblemAuthenticationEntryPoint(problems)),
+                        authenticated, sessionValidity,
+                        new ProblemAuthenticationEntryPoint(problems)),
                         AnonymousAuthenticationFilter.class)
                 .addFilterBefore(new TestPrincipalFilter(), AuthorizationFilter.class)
                 .build();
