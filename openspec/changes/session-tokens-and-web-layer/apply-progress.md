@@ -1740,3 +1740,33 @@ Revertido y confirmado con `cmp` contra la copia previa (idénticos). Las dos ú
 **Medición:** 790 líneas efectivas (738 añadidas y 52 retiradas, `git diff --numstat main...HEAD -- . ':!openspec'`, antes de este commit de documentación).
 
 **Desviaciones respecto de la tarea:** (1) `SessionLivenessIT` vive en `identity.application` y no en `identity.infrastructure`, porque el adaptador está allí y la base de pruebas de rotación es de paquete (precedente de 13a). (2) Se añadió `TransactionRunner.executeReadOnly`, que la decisión 7 exige («transacción de solo lectura») y el ejecutor no ofrecía. (3) `readById` en lugar de un `findById`. (4) La inversión de `WebEdgeScopeExclusionInventoryTest` se aplica entera en 14a, salvo la aserción positiva «el filtro llama al puerto», que solo puede cumplirse cuando el filtro lo consulta (14b).
+
+### PR 14b `live-session-check`, tarea 5.1 parte 2 y cierre (2026-10-18, modo TDD estricto; apilada sobre 14a)
+
+Segunda rebanada y la que cierra 5.1 (se marca `[x]` en `tasks.md`, con la nota fechada de la costura 14a/14b). Activa el paso 3 de la decisión 5: `AccessTokenAuthenticationFilter` recibe el `SessionValidity` y lo consulta solo cuando la ruta coincide con una entrada `LIVE_SESSION` (token válido ya verificado); un `false` es `AccessTokenRejectedException` (`401 token-invalid`, nunca `403`) y un fallo del puerto se propaga (el último recurso responde `500 internal-error`, falla cerrado). `AdminSecurityConfiguration` inyecta el bean `SessionLiveness` por el puerto. El filtro no usa el puerto en rutas `TOKEN_ONLY` ni con un token roto o vencido.
+
+**Rojo observado.** Escrito antes que la producción, y ya visto en el `test-compile` de 14a (los dos archivos de 14b estaban en el árbol completo): `WebEdgeHarness` y `AccessTokenAuthenticationFilterContextTest` fallaron con «constructor `AccessTokenAuthenticationFilter` ... cannot be applied to given types» (el constructor de cuatro argumentos no existía) y `RecordingSessionValidity` con «does not override abstract method `isActive(java.util.UUID)`». Es el rojo esperado, el puerto sin consumidor. Lo que no se pudo ver en rojo de comportamiento por esa razón se ve en la demostración deliberada de 14a, hecha sobre el árbol completo: sin la comprobación de `revoked_at`, `aTokenOfAFamilyRevokedByAPasswordResetFailsTheCheckOfTheSession` (I127) y `aLiveSessionRouteRejectsAnUnexpiredTokenOfARevokedFamilyAndALiveOneIsServed` (I117) fallan en su aserción de desenlace (`Expecting actual not to be null`: el filtro no rechazó).
+
+**Contenido.**
+- `RecordingSessionValidity` (doble del arnés): cuenta las invocaciones, recuerda el actor de cada una y responde lo que la prueba le indique o falla como una base de datos caída.
+- `AccessTokenAuthenticationFilterTest` (+4, por HTTP real con el arnés): WE28 (la ruta que declara la comprobación consulta una vez, con el actor cuyos datos son los del token; la otra, ninguna); `401 token-invalid` con el controlador sin invocar cuando el doble responde `false` mientras la ruta sin la comprobación sigue aceptando el token (I118); `500 internal-error` sin eco del mensaje y sin invocar el controlador cuando el doble falla (I146); un token roto o vencido no llega al puerto. Sustituye a `theLiveSessionCheckIsNotAnsweredYet...`.
+- `SessionLivenessIT` (+3, el filtro real delante del adaptador real y PostgreSQL real, con relojes fijos): I117 (token vigente de una familia revocada hace un minuto: rechazado, el controlador no corre; el de una familia viva, servido con el `sid` de su familia), I127 (token de una familia revocada por restablecimiento: aceptado antes, rechazado después), I118 (el token de una familia revocada se acepta en una ruta `TOKEN_ONLY` hasta su `exp` y luego da `AccessTokenExpiredException`).
+- `IdempotencyScopeExclusionInventoryTest`: `SessionValidity` entra en la lista cerrada de tipos de `shared.security` que puede nombrar una clase `..web..`.
+- `WebEdgeScopeExclusionInventoryTest`: la aserción positiva de que el único consumidor del puerto, fuera de su adaptador, es el filtro (WE27, BI17).
+
+| Tarea | Archivo de prueba | Capa | RED | GREEN |
+|---|---|---|---|---|
+| 5.1b | `AccessTokenAuthenticationFilterTest` (+4), `AccessTokenAuthenticationFilterContextTest` | HTTP real con doble del puerto | `test-compile` | 32/32 y 10/10 |
+| 5.1b | `SessionLivenessIT` (+3) | Filtro real y adaptador real contra PostgreSQL | demostración de 14a | 12/12 |
+| 5.1b | `WebEdgeScopeExclusionInventoryTest` (+1 aserción positiva) | Arquitectura | n/a (se cumple solo con el filtro cableado) | 25/25 |
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-Dtest='AccessTokenAuthenticationFilterTest,AccessTokenAuthenticationFilterContextTest,WebEdgeScopeExclusionInventoryTest'` (32 + 10 + 25) y `-Dit.test=SessionLivenessIT` (12): 0 fallos |
+| Arnés de ejecución | Proceso HTTP del arnés con la cadena de seguridad real y el filtro real; y el filtro real sobre `MockHttpServletRequest` con el adaptador real y PostgreSQL real |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 850, Failsafe 408, 0 fallos; cobertura cumplida; mutación 99 % (192 de 194, kernel) y 94 % (557 de 593, app); `BUILD SUCCESS` en 18 min 27 s. Una primera verificación completa falló en `IdempotencyScopeExclusionInventoryTest` (la lista cerrada de tipos de `shared.security` que una clase `..web..` puede nombrar no incluía `SessionValidity`, que ahora nombran el filtro y `AdminSecurityConfiguration`); se añadió el tipo a la lista, con su nota, y se repitió la verificación completa |
+| Frontera de reversión | El paso 3 del filtro, el parámetro de `AdminSecurityConfiguration`, el doble del arnés y las pruebas; el adaptador de 14a queda sin consumidor |
+
+**Medición:** 273 líneas efectivas (255 añadidas y 18 retiradas) (`git diff --numstat 14a...HEAD -- . ':!openspec'`). Total de 5.1: 790 + 273 = 1 063 (1 048 medidas en el árbol completo antes de partir; las 15 líneas de diferencia son las que la costura cuenta dos veces: la Javadoc de `SessionLivenessIT` y la aserción positiva del inventario, que 14a deja en su forma reducida y 14b restituye, y la lista de `IdempotencyScopeExclusionInventoryTest`, que solo 14b necesita).
+
+**Cierre de 5.1.** Escenarios I115 a I118, I127, I146, WE27, WE28, BI17 y «El puerto no arrastra a `identity`» cubiertos. Sin 5.2: la lista de producción de `AuthenticatedEndpoints.forAdmin()` sigue vacía, así que en producción nada declara aún `LIVE_SESSION`; la ruta de la sesión actual llega en 5.2. Ningún token, cabecera de autorización ni secreto se escribe en registros (el fallo del puerto se prueba con un mensaje que no debe aparecer en la respuesta).
