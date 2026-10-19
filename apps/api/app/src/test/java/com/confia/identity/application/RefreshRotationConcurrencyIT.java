@@ -8,6 +8,7 @@ import com.confia.identity.application.RefreshOutcome.RotationKind;
 import com.confia.identity.application.ResetOutcome.Completed;
 import com.confia.identity.domain.PlainPasswordResetToken;
 import com.confia.identity.domain.RefreshRejection;
+import com.confia.identity.domain.RefreshTokenHash;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.infrastructure.JooqAccountSessionRevoker;
 import com.confia.identity.infrastructure.JooqPasswordResetTokenRepository;
@@ -189,6 +190,93 @@ class RefreshRotationConcurrencyIT extends RotationIntegrationTest {
         assertThat(familyRow(session.sessionId()).get("revoked_reason", String.class))
                 .isEqualTo("reuse_detected");
         assertThat(liveTokenCount()).isZero();
+    }
+
+    /**
+     * Scenario I95, case (a): the same token with the same fingerprint at the same instant. The first
+     * transaction owns the lock of the family and is held right after taking it; the second is started
+     * and observed waiting. When the first goes on it rotates, and the second, reading the consumed
+     * token under the lock, finds it inside the window and from the same device: it gets the same
+     * successor. Exactly one successor exists and it is the only open token.
+     *
+     * <p><b>What it proves.</b> The roles (which transaction is fresh and which is grace) and the
+     * "waited" assertion tie the test to the lock. As in (b), the final state alone does not: the test
+     * that reaches an outcome assertion when the lock is removed is the next one.
+     */
+    @Test
+    void theSameTokenFromTheSameDeviceIsOneFreshRotationAndOneGraceReplayWithTheSameSuccessor()
+            throws Exception {
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        IssuedSession session = issue("2026-10-15T15:00:00Z", ana);
+        String token = session.refreshToken().value();
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        RotateRefreshToken holding = rotation(fixedClock("2026-10-15T15:05:00Z"),
+                new JooqAuditLogWriter(dsl), institutionId,
+                new HoldingFamilies(new JooqRefreshTokenFamilyRepository(dsl), locked, release));
+
+        Race<RefreshOutcome, RefreshOutcome> race = race(locked, release,
+                () -> holding.execute(context(), new RotateRefreshTokenCommand(token, AGENT_ONE)),
+                () -> rotate("2026-10-15T15:05:00Z", token, AGENT_ONE));
+
+        assertThat(race.waiterWaited())
+                .as("the second presentation waited for the family lock the first held").isTrue();
+        assertOneFreshAndOneGraceWithTheSameSuccessor(session, race);
+    }
+
+    /**
+     * Case (a) held one step later, where the family lock is the only thing in the way: the first
+     * transaction has already locked the family and read the token again, and is held before it
+     * decides. A second one that was not kept out by the lock would read the same open token, rotate it
+     * and commit, and the first would then meet the conditional update of {@code consume} with the
+     * token already consumed: an exception, never a grace replay. With the lock, the second waits, and
+     * the outcome assertions (one fresh, one grace with the same successor, one open token) hold.
+     */
+    @Test
+    void whenTheFirstTransactionHasAlreadyReadTheTokenTheSameDeviceStillGetsTheGraceReplay()
+            throws Exception {
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        IssuedSession session = issue("2026-10-15T15:00:00Z", ana);
+        String token = session.refreshToken().value();
+        CountDownLatch reread = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        RotateRefreshToken holding = rotation(fixedClock("2026-10-15T15:05:00Z"),
+                new JooqAuditLogWriter(dsl), institutionId,
+                new JooqRefreshTokenFamilyRepository(dsl),
+                new HoldingTokensAfterReread(new JooqRefreshTokenRepository(dsl), reread, release));
+
+        Race<RefreshOutcome, RefreshOutcome> race = race(reread, release,
+                () -> holding.execute(context(), new RotateRefreshTokenCommand(token, AGENT_ONE)),
+                () -> rotate("2026-10-15T15:05:00Z", token, AGENT_ONE));
+
+        assertThat(race.waiterWaited())
+                .as("the second presentation waited for the family lock the first held").isTrue();
+        assertOneFreshAndOneGraceWithTheSameSuccessor(session, race);
+    }
+
+    private void assertOneFreshAndOneGraceWithTheSameSuccessor(IssuedSession session,
+            Race<RefreshOutcome, RefreshOutcome> race) {
+        assertThat(race.holder()).isInstanceOf(Rotated.class);
+        assertThat(race.waiter()).isInstanceOf(Rotated.class);
+        Rotated fresh = (Rotated) race.holder();
+        Rotated grace = (Rotated) race.waiter();
+        assertThat(fresh.kind()).isEqualTo(RotationKind.FRESH);
+        assertThat(grace.kind()).isEqualTo(RotationKind.GRACE);
+        assertThat(grace.session().refreshToken()).as("the same successor")
+                .isEqualTo(fresh.session().refreshToken());
+        assertThat(grace.session().accessToken().compact())
+                .as("but a new access token").isNotEqualTo(fresh.session().accessToken().compact());
+        List<Record> tokens = tokensOf(session.sessionId());
+        assertThat(tokens).as("exactly one successor of the presented token").hasSize(2);
+        assertThat(tokens.get(0).get("replaced_by", UUID.class))
+                .isEqualTo(tokens.get(1).get("id", UUID.class));
+        assertThat(tokens.get(1).get("token_hash", String.class))
+                .isEqualTo(RefreshTokenHash.of(fresh.session().refreshToken()).value());
+        assertThat(liveTokenCount()).as("a single open token").isEqualTo(1);
+        assertThat(familyRow(session.sessionId()).get("revoked_at")).isNull();
+        assertThat(auditRows("identity.session.refreshed")).hasSize(2);
+        assertThat(auditRows("identity.session.reuse_detected")).isEmpty();
+        assertThat(auditRows("identity.session.refresh_rejected")).isEmpty();
     }
 
     /**
