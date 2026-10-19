@@ -494,3 +494,15 @@ mediante Testcontainers, según ADR-0008.
 - ADR-0009: multitenencia
 - ADR-0012: contenerización
 - ADR-0013: backend en Java con Spring Boot
+
+## Notas fechadas
+
+Estas notas se añaden sin modificar el texto original de este ADR.
+
+### Nota fechada 2026-10-17: vigencias, vocabulario `password_change` y gracia con acceso nuevo
+
+Registra tres precisiones del cambio `session-tokens-and-web-layer` (decisiones 8, 11 y 12 de su diseño y decisión D-N1 del propietario).
+
+1. **Vigencias.** La familia de sesión dura 12 horas desde su creación (`absolute_expires_at`). Cada token de refresco dura 8 horas y nunca supera el fin de su familia. Una sesión sin uso durante 30 minutos está inactiva. Los bordes son exactos: en el instante límite la familia ya venció. `SessionLifetimePolicy` es la única fuente de estas duraciones.
+2. **Vocabulario de revocación.** El motivo de la revocación de todas las familias vivas de una cuenta al restablecer su contraseña es `password_change`. La revocación por reutilización confirmada usa `reuse_detected`. Ambos pertenecen al catálogo cerrado `SessionRevocationReason`, que una prueba de contrato compara con la restricción de la base de datos.
+3. **Gracia con refresco igual y acceso nuevo (D-N1).** El punto 4 y la verificación 2 de este ADR dicen que el reintento recibe «el mismo par». Se precisa así: dentro de la ventana de 10 segundos (estricta: a los 10 segundos exactos ya es reutilización), desde la misma huella de agente de usuario que presentó el consumo y con la familia sin avanzar, el reintento recibe **el mismo token de refresco sucesor** y **un token de acceso nuevo** (otro `jti` e `iat`; mismos `sid`, `sub`, `tenant` y `amr`). El token de acceso del primer intento no se conserva. Como solo se guarda el SHA-256 de cada token, el sucesor se guarda cifrado con el servicio de cifrado de columna, con datos adicionales autenticados que lo ligan a la fila que lo contiene (`identity_refresh_token`, `successor_token_ciphertext`, institución e identificador del token consumido): copiado a otra fila no se descifra. No se descifra fuera de la ventana. Se vacía en el siguiente uso de la familia (en la rotación de cualquiera de sus tokens, para los consumidos hace 10 segundos o más, en toda revocación y en el rechazo por familia vencida). Limitación declarada: hasta que el cambio 9 entregue la purga, el valor residual de una familia que nadie vuelve a tocar permanece en la base de datos, cifrado e indescifrable por regla.

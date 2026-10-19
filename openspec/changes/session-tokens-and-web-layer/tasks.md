@@ -550,7 +550,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
       (playbook §1), el motivo `REUSE_DETECTED` en `SessionRevocationReason` con su prueba de contrato contra la restricción de V8, y la
       nota que mueve el aviso al titular por reutilización al alcance del cambio 14 (`foundations-plan/exploration.md`).
     No es una tarea nueva: 4.2 sigue siendo una sola tarea y el total de 15 no cambia.
-- [ ] 4.3 **PR 13 `grace-window`: sucesor cifrado y ventana de 10 s (decisión 11, D-N1).**
+- [x] 4.3 **PR 13 `grace-window`: sucesor cifrado y ventana de 10 s (decisión 11, D-N1).**
   - **ROJO.** Crear `test/java/com/confia/identity/infrastructure/RefreshGraceWindowIT.java` (ADR-0005, prueba 2: reintento dentro de 10 s desde el
     mismo dispositivo devuelve el mismo refresco sucesor y un acceso **nuevo** con mismos `sid`, `sub`, `tenant`, `amr` y otro `jti`, sin revocar;
     otra huella dentro de la ventana es reutilización; a los 10 s exactos es reutilización; el sucesor se guarda con AAD ligada a la fila y
@@ -566,6 +566,20 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   - **Cierre.** `./mvnw verify`; `identity.domain` en 95 y PIT en 80. Commits: `feat(identity): return the encrypted successor inside the grace window` y
     `docs(adr): note session lifetimes, password_change and the grace window`. Tamaño: nominal 330, realista 730. — Escenarios I85, I86, I95 a I103, I141, I148
     y la ausencia de purga del sucesor residual.
+
+  - **Nota fechada 2026-10-17: costura 13a/13b/13c por la regla del propietario («partir solo si hace falta, sin preguntar»).** El árbol completo,
+    implementado y verificado antes de partir, midió **1 693 líneas efectivas** (1 589 añadidas y 104 retiradas, `git diff --numstat`
+    excluyendo `openspec/`), por encima de las 800. Se partió por archivos completos en tres PR apilados, cada uno con su
+    `./mvnw verify -Pmutation-gate` completo y cumpliendo JaCoCo y PIT por sí solo:
+    - **13a** `change/session-tokens-and-web-layer-13a-grace-core` (746 líneas): la producción (sucesor cifrado con AAD de la fila, rama
+      `GRACE_REPLAY`, paso 5, puertos y adaptador jOOQ) con sus pruebas de unidad con dobles y de adaptador.
+    - **13b** `change/session-tokens-and-web-layer-13b-grace-window-it` (486 líneas): `RefreshGraceWindowIT` y la concurrencia (a) de
+      `RefreshRotationConcurrencyIT`.
+    - **13c** `change/session-tokens-and-web-layer-13c-secrets-and-adr` (461 líneas): `SessionSecretsNotObservableTest` con su
+      fixture de control negativo y la nota fechada de ADR-0005 (vigencias, `password_change`, gracia con acceso nuevo). **4.3 se marca
+      `[x]` solo en esta parte.**
+    No es una tarea nueva: el total de 15 no cambia. `RefreshGraceWindowIT` vive en `identity.application`, como el resto de las pruebas de
+    integración de la rotación. El árbol completo está en la rama local `wip/session-tokens-grace-full` (9e55553).
 
 ## Fase 5: vigencia de sesión y ruta de la sesión actual
 

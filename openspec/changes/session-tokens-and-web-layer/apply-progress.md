@@ -1690,3 +1690,20 @@ Segunda rebanada. Solo pruebas de integración contra PostgreSQL real y el cifra
 | Frontera de reversión | Los dos archivos de prueba; la producción de 13a no cambia |
 
 **Medición:** 486 líneas efectivas (`git diff --numstat 13a...HEAD -- . ':!openspec'`).
+
+### PR 13c `secrets-and-adr`, tarea 4.3 parte 3 y cierre (2026-10-17, modo TDD estricto; apilada sobre 13b)
+
+Tercera rebanada y la que cierra 4.3 (se marca `[x]` en `tasks.md`, con la nota fechada de la costura 13a/13b/13c). Contiene `SessionSecretsNotObservableTest` (2 pruebas, unidad: almacén en memoria con la semántica de los adaptadores reales, `TransactionRunner` real sobre JDBC stub, `ColumnEncryptionService` real) con su fixture permanente `LeakingRefreshTokenFixture`, y la nota fechada de `docs/adr/ADR-0005-*.md` (vigencias, vocabulario `password_change`, gracia con refresco igual y acceso nuevo, D-N1). La prueba ejecuta una emisión, una rotación fresca, un reintento en gracia, un fallo de autenticación del sucesor almacenado y una reutilización confirmada con todos los registros capturados (Logback `ListAppender` en la raíz), y barre los mensajes de registro y sus trazas, el mensaje y la traza de cada excepción, el `toString()` de cada objeto que carga un secreto y los asientos de auditoría, buscando: tokens de acceso y de refresco, el sucesor cifrado, los dos hashes, la huella del agente, la clave de firma y la clave de datos (base64 y hexadecimal). El fallo del barrido informa la etiqueta y la longitud, nunca el valor (I85). El control negativo (I86) alimenta el mismo barrido con el texto de `LeakingRefreshTokenFixture` y exige que falle, y una segunda prueba comprueba que el barrido falla ante una fuga y no repite el valor en su mensaje.
+
+**Rojo.** Escrita antes de la producción (rojo de compilación en 13a). Su rojo de comportamiento es la ruptura deliberada, con copia previa y `cmp`: `EncryptedSuccessor.toString()` pasó a imprimir el texto cifrado y `noLogNorExceptionNorToStringNorAuditEntryExposesATokenAKeyTheSuccessorOrAHash` falló con `produced text unexpectedly contains the stored encrypted successor (142 characters); the value itself is deliberately withheld from this failure message`.
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-Dtest=SessionSecretsNotObservableTest`: 2 pruebas, 0 fallos |
+| Arnés de ejecución | Unidad con dobles de los puertos y cifrado real; el barrido de bitácora real contra PostgreSQL está en `RefreshGraceWindowIT.theAuditTrailOfARotationAndOfItsRetryCarriesNoSecret` (13b) |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 836, Failsafe 393, 0 fallos; cobertura cumplida; mutación 99 % (192 de 194) y 94 % (548 de 584); `BUILD SUCCESS` en 11 min 16 s |
+| Frontera de reversión | La prueba, su fixture y la nota de ADR-0005 |
+
+**Medición:** 461 líneas efectivas (`git diff --numstat 13b...HEAD -- . ':!openspec'`). Total de 4.3: 746 + 486 + 461 = 1 693.
+
+**Cierre de 4.3.** Escenarios I85, I86, I95 a I103, I141, I148 y la ausencia de purga del sucesor residual cubiertos. Sin endpoint, sin 5.1 ni 5.2. Ningún token, hash, texto cifrado, clave ni huella en registros ni bitácora (probado en 13b y 13c). Pendiente fuera de alcance: aviso al titular por reutilización (cambio 14) y purga (cambio 9). **Nota de proceso:** una verificación completa de 13a falló dos veces por una prueba de `RefreshTokenStoreIT` que dependía del orden de dos filas con el mismo `issued_at`; se corrigió en la prueba y se repitió la verificación completa de 13a hasta `BUILD SUCCESS`.
