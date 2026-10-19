@@ -1673,3 +1673,20 @@ Primera de tres rebanadas apiladas de 4.3 (regla del propietario del 2026-10-16,
 | Frontera de reversión | La rama de gracia, el paso 5, el puerto ampliado con su adaptador y las pruebas; `consume` vuelve a cinco argumentos |
 
 **Medición:** 746 líneas efectivas (`git diff --numstat main...HEAD -- . ':!openspec'`, antes de este commit de documentación).
+
+### PR 13b `grace-window-it`, tarea 4.3 parte 2 (2026-10-17, modo TDD estricto; apilada sobre 13a)
+
+Segunda rebanada. Solo pruebas de integración contra PostgreSQL real y el cifrado real, sobre la producción de 13a: `RefreshGraceWindowIT` (14 pruebas: I96/I141 mismo refresco y acceso nuevo con otro `jti` e `iat` y mismos `sid`, `sub`, `tenant`, `amr`, `exp - iat` de 600 s; I97 a 9,999 s gracia y a los 10 s exactos reutilización sin descifrar; I98 otra huella; I99 almacenado cifrado y ligado a la fila, y copiado a otra fila no descifra y la petición falla sin escribir nada; I100 pasados 10 s el valor sigue en la fila, no se descifra y el contacto lo vacía; I101 vaciado en la rotación (9,999 s se conserva, 10 s se vacía) y en la revocación; I102 familia que avanzó; I103 sin agente en ambas presentaciones y agente ausente frente a presente; el sucesor residual se conserva sin contacto de su familia; la bitácora no contiene secretos) y `RefreshRotationConcurrencyIT` +2 (I95, caso (a)).
+
+**Rojo.** Las pruebas se escribieron antes que la producción (rojo de compilación registrado en 13a). Su rojo de comportamiento es el de las demostraciones deliberadas, hechas sobre el árbol completo con copia previa y `cmp` tras revertir:
+1. *Quitar la AAD de la fila* (la de la tarea): 14 pruebas, 1 fallo y 1 error. El fallo es de desenlace: `aCiphertextCopiedToAnotherRowDoesNotDecryptAndTheRequestFailsWithoutWritingAnything` → `Expecting code to raise a throwable` (la petición devolvió la gracia con el sucesor de otra sesión); el error es `AeadIntegrityException` en la lectura de la propia fila.
+2. *Concurrencia (a), quitar `.forUpdate()` de `lockById`* (copia previa, `cmp`): `RefreshRotationConcurrencyIT` 8 pruebas, 6 fallos y 2 errores. **La diferencia de desenlace**: `whenTheFirstTransactionHasAlreadyReadTheTokenTheSameDeviceStillGetsTheGraceReplay` termina con `ExecutionException: IllegalStateException: a token that is open under the lock of its family could not be consumed` en lugar de un `FRESH` y un `GRACE` con el mismo sucesor y un solo token abierto. La variante retenida justo tras el bloqueo (`theSameTokenFromTheSameDeviceIsOneFreshRotation...`) falla solo en su aserción de espera, como (b) en 4.2: ahí el bloqueo fija quién gana, no el estado final. Se dice con exactitud: es el `UPDATE` condicional de `consume` el que impide dos sucesores; el bloqueo es lo que convierte ese conflicto en una gracia limpia en lugar de una excepción.
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-Dit.test='RefreshGraceWindowIT,RefreshRotationConcurrencyIT'`: 14 + 8 pruebas, 0 fallos |
+| Arnés de ejecución | Rotación y adaptadores reales contra PostgreSQL con el rol `confia_admin_app`; `ColumnEncryptionService` real con una clave de datos real de la base; el repositorio de claves contabiliza los descifrados; dos hilos con conexiones propias, retención con `CountDownLatch` y espera leída de `pg_stat_activity`; relojes fijos |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 834, Failsafe 393, 0 fallos; cobertura cumplida; mutación 99 % (192 de 194) y 94 % (548 de 584); `BUILD SUCCESS` en 11 min 51 s |
+| Frontera de reversión | Los dos archivos de prueba; la producción de 13a no cambia |
+
+**Medición:** 486 líneas efectivas (`git diff --numstat 13a...HEAD -- . ':!openspec'`).
