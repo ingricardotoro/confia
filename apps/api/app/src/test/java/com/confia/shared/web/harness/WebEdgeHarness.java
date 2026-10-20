@@ -44,7 +44,8 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
 @Import({WebEdgeConfiguration.class, RateLimiterConfiguration.class,
         ThrottlingConfiguration.class, ObservabilityMetricsConfiguration.class,
         OrganizationConfiguration.class, HarnessController.class, LimitedController.class,
-        UnknownPolicyController.class})
+        UnknownPolicyController.class, DocumentedProbeController.class,
+        DocumentedProbeController.ProbeAdvice.class})
 class WebEdgeHarness {
 
     /** {@code admin} (the default) or {@code portal}: which real allow-list the chain starts from. */
@@ -85,6 +86,7 @@ class WebEdgeHarness {
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/fail-open"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/origin"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/institution-open"));
+        endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/documented"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/limited"));
         endpoints.add(new PublicEndpoint(HttpMethod.HEAD, "/test/limited"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/unlimited"));

@@ -24,6 +24,24 @@
           "detail" : {
             "type" : "string"
           },
+          "errors" : {
+            "description" : "The violated constraints of a validation failure, at most fifty",
+            "items" : {
+              "properties" : {
+                "field" : {
+                  "description" : "Path of the field in the request",
+                  "type" : "string"
+                },
+                "reason" : {
+                  "description" : "The constraint that was broken, in kebab case",
+                  "type" : "string"
+                }
+              },
+              "required" : [ "field", "reason" ],
+              "type" : "object"
+            },
+            "type" : "array"
+          },
           "instance" : {
             "format" : "uri",
             "type" : "string"
@@ -45,6 +63,14 @@
           }
         },
         "type" : "object"
+      }
+    },
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "bearerFormat" : "JWT",
+        "description" : "Access token of a staff session",
+        "scheme" : "bearer",
+        "type" : "http"
       }
     }
   },
