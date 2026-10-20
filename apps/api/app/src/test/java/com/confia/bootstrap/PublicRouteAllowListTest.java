@@ -38,7 +38,9 @@ import org.springframework.web.util.pattern.PathPatternParser;
  * process registers, an anonymous request must be answered {@code 401}, unless the route is on the
  * allow-list; and every entry of the allow-list must be a route the process registers. A new
  * public route therefore needs an edit of {@code PublicEndpoints}, visible in review. The
- * production configuration (no Spring profile) registers no route at all in either process.
+ * production configuration (no Spring profile) registers no route in the portal and, in the
+ * administrative process, only the authenticated route of the current session
+ * (session-tokens-and-web-layer, design.md decision 13).
  */
 class PublicRouteAllowListTest {
 
@@ -126,6 +128,11 @@ class PublicRouteAllowListTest {
                 : PublicEndpoints.forPortal(environment);
     }
 
+    /** The routes production registers in a process, written as {@code METHOD pattern}. */
+    private static List<String> authenticatedRoutesOf(String process) {
+        return "admin".equals(process) ? List.of("GET /api/v1/auth/sessions/current") : List.of();
+    }
+
     @ParameterizedTest
     @CsvSource({"admin, default", "portal, default", "admin, local", "portal, local"})
     void everyRegisteredRouteIsDeniedToAnAnonymousRequestUnlessItIsListedAndEveryEntryIsServed(
@@ -137,7 +144,9 @@ class PublicRouteAllowListTest {
             List<Route> routes = RegisteredRoutes.of(context);
 
             if ("default".equals(profile)) {
-                assertThat(routes).as("production registers no route in %s", process).isEmpty();
+                assertThat(routes).as("production registers only the authenticated routes of %s",
+                        process).extracting(Route::toString)
+                        .containsExactlyElementsOf(authenticatedRoutesOf(process));
                 assertThat(allowed.endpoints()).isEmpty();
             } else {
                 assertThat(routes).as("non-vacuous: springdoc registers its routes in local")

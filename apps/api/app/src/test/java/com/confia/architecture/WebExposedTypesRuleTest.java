@@ -14,6 +14,7 @@ import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.domain.JavaType;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
@@ -36,9 +37,10 @@ import org.springframework.stereotype.Controller;
  *
  * <p><b>W2a</b> evaluates the public methods of classes meta-annotated with {@code @Controller}
  * (so {@code @RestController} too), over the return type, every parameter type and the type
- * arguments of both. No production class is a controller yet, so its production half declares the
- * empty-set exception of ADR-0018, listed in {@link EmptyShouldExceptionInventoryTest} with its
- * owner, {@code session-tokens-and-web-layer}. Its fixture half never does.
+ * arguments of both. Since session-tokens-and-web-layer (task 5.2, scenario BI34) a production class
+ * is a controller, {@code com.confia.identity.web.CurrentSessionController}, so the rule evaluates a
+ * real one and neither half declares an empty-set exception: the entry that ADR-0018 allowed was
+ * retired from {@link EmptyShouldExceptionInventoryTest}.
  *
  * <p><b>W2b</b> evaluates every field of every class in a {@code ..web..} package, which includes
  * the private final fields that a record's components are. It carries no exception: {@code
@@ -84,9 +86,27 @@ class WebExposedTypesRuleTest {
 
     @Test
     void productionControllersExposeNoDomainOrPersistenceType() {
-        // ADR-0018: no production class is a controller yet. Owner: session-tokens-and-web-layer
-        // (first production endpoint). Declared in EmptyShouldExceptionInventoryTest.
-        controllerSignatureRule().allowEmptyShould(true).check(productionClasses());
+        controllerSignatureRule().check(productionClasses());
+    }
+
+    /**
+     * BI34, non-vacuity: the public methods the rule evaluates in production belong to the
+     * controller of the current session, so the rule passes because it looked at a real controller
+     * and not at an empty set.
+     */
+    @Test
+    void theControllerRuleEvaluatesTheRealCurrentSessionController() {
+        Set<String> evaluated = new TreeSet<>();
+        for (JavaClass javaClass : productionClasses()) {
+            if (javaClass.isMetaAnnotatedWith(Controller.class)) {
+                javaClass.getMethods().stream().filter(method -> method.getModifiers()
+                        .contains(JavaModifier.PUBLIC))
+                        .forEach(method -> evaluated.add(method.getFullName()));
+            }
+        }
+
+        assertThat(evaluated).anyMatch(name -> name.startsWith(
+                "com.confia.identity.web.CurrentSessionController.current("));
     }
 
     @Test
@@ -124,6 +144,8 @@ class WebExposedTypesRuleTest {
         assertThat(owners).contains("com.confia.shared.web.problem.ProblemBody",
                 "com.confia.shared.web.problem.FieldViolation",
                 "com.confia.shared.web.edge.PublicEndpoint");
+        assertThat(owners).as("BI35: the DTO of the current session is among the classes evaluated")
+                .contains("com.confia.identity.web.CurrentSessionResponse");
         for (String name : List.of("com.confia.shared.web.problem.ProblemBody",
                 "com.confia.shared.web.problem.FieldViolation",
                 "com.confia.shared.web.edge.PublicEndpoint")) {

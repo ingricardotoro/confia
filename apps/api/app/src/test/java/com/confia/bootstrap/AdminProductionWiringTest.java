@@ -8,12 +8,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
 import com.confia.identity.application.AuthenticateWithPassword;
 import com.confia.identity.application.ConsumeRecoveryCode;
+import com.confia.identity.application.DescribeCurrentSession;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.IssuePasswordResetToken;
 import com.confia.identity.application.LoginInstitutionProvider;
 import com.confia.identity.application.RequestPasswordReset;
 import com.confia.identity.application.ResetPasswordWithToken;
 import com.confia.identity.application.VerifyTotpCode;
+import com.confia.identity.web.CurrentSessionController;
 import com.confia.kernel.InstitutionId;
 import com.zaxxer.hikari.HikariDataSource;
 import com.confia.shared.audit.AuditLogWriter;
@@ -81,6 +83,25 @@ class AdminProductionWiringTest {
      * instances ({@code getBeanNamesForType} with eager initialization allowed), so a lazy or
      * prototype definition cannot hide.
      */
+    /**
+     * BI21 (task 5.2): the administrative process holds the controller of the current session and
+     * its use case, each exactly once, and the web configuration registers the controller (the
+     * controller is not registered from the infrastructure configuration of identity).
+     */
+    @Test
+    void theAdminContextHoldsTheCurrentSessionControllerAndItsUseCase() {
+        ConfigurableApplicationContext context = start("admin");
+        try {
+            assertThat(context.getBeansOfType(DescribeCurrentSession.class)).hasSize(1);
+            assertThat(context.getBeansOfType(CurrentSessionController.class)).hasSize(1);
+            assertThat(context.getBeanFactory().getBeanDefinition("currentSessionController").getResourceDescription())
+                    .as("registered by the web configuration of identity")
+                    .contains("IdentityWebConfiguration");
+        } finally {
+            context.close();
+        }
+    }
+
     @Test
     void theTwoPasswordResetIssuingUseCasesAreNotBeans() {
         ConfigurableApplicationContext context = start("admin");
@@ -168,6 +189,9 @@ class AdminProductionWiringTest {
             assertThat(context.getBeansOfType(AuthenticateWithPassword.class)).isEmpty();
             assertThat(context.getBeansOfType(ResetPasswordWithToken.class)).isEmpty();
             assertThat(context.getBeansOfType(LoginInstitutionProvider.class)).isEmpty();
+            assertThat(context.getBeansOfType(DescribeCurrentSession.class)).isEmpty();
+            assertThat(context.getBeanNamesForType(CurrentSessionController.class, true, true))
+                    .isEmpty();
         } finally {
             context.close();
         }

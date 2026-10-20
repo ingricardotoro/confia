@@ -4,7 +4,9 @@ import static com.confia.architecture.ArchitectureTestSupport.fixtureClasses;
 import static com.confia.architecture.ArchitectureTestSupport.productionClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
 import java.util.List;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
@@ -31,12 +33,16 @@ class EmptyShouldExceptionInventoryTest {
     }
 
     /**
-     * Package-visible for {@link SuppressionCitesAdrTest}'s count check. <b>One entry today</b>:
-     * the production half of {@code WebExposedTypesRuleTest}'s controller signature rule (rule
-     * W2a, web-edge-foundations design.md, decision 20) evaluates against no class at all, because
-     * no production class is a controller yet. Its owner is {@code session-tokens-and-web-layer},
-     * whose first production endpoint ends the condition, and the build fails that day until the
-     * exception is removed from the rule together with this entry (ADR-0018, section 2).
+     * Package-visible for {@link SuppressionCitesAdrTest}'s count check. <b>No entry today</b>. The
+     * last one, on the production half of {@code WebExposedTypesRuleTest}'s controller signature rule
+     * (rule W2a, web-edge-foundations design.md, decision 20), expired in
+     * session-tokens-and-web-layer, task 5.2 (design.md, decision 13), when {@code
+     * com.confia.identity.web.CurrentSessionController} became the first production class
+     * meta-annotated with {@code @Controller}: the rule now evaluates a real controller, the
+     * suppression marker left the rule and this entry left the list. {@link
+     * #aRestoredControllerEntryFailsBecauseItsConditionNoLongerHolds()} keeps the entry as a fixture,
+     * so the expiry check is proven to fail on the condition that ended, and
+     * {@link #theControllerConditionIsARealCheck()} proves the condition is not always false.
      *
      * <p>History: the last {@link Marker#OPTIONAL_LAYER} exception, on {@code
      * LayeredArchitectureTest.productionLayeringRule}, layer {@code Web} (ADR-0020 §2), expired in F0
@@ -51,16 +57,19 @@ class EmptyShouldExceptionInventoryTest {
      * organization.domain} added its first production class (change 4). The mechanism itself stays
      * in place for whichever future exception needs it.
      */
-    static final List<ExpiringException> EXCEPTIONS = List.of(
-            new ExpiringException(Marker.ALLOW_EMPTY_SHOULD,
-                    "WebExposedTypesRuleTest.productionControllersExposeNoDomainOrPersistenceType"
-                            + " (rule W2a, the public signature of controllers)",
-                    "ADR-0018",
-                    "no production class is meta-annotated with @Controller (owner: "
-                            + "session-tokens-and-web-layer, whose first production endpoint "
-                            + "ends this exception)",
-                    production -> production.stream()
-                            .noneMatch(javaClass -> javaClass.isMetaAnnotatedWith(Controller.class))));
+    static final List<ExpiringException> EXCEPTIONS = List.of();
+
+    /**
+     * The entry that ended, kept as a fixture: no production class is a controller.
+     */
+    private static final ExpiringException RETIRED_CONTROLLER_ENTRY = new ExpiringException(
+            Marker.ALLOW_EMPTY_SHOULD,
+            "WebExposedTypesRuleTest.productionControllersExposeNoDomainOrPersistenceType"
+                    + " (rule W2a, the public signature of controllers)",
+            "ADR-0018",
+            "no production class is a controller",
+            production -> production.stream()
+                    .noneMatch(javaClass -> javaClass.isMetaAnnotatedWith(Controller.class)));
 
     @Test
     void everyExceptionsConditionStillHolds() {
@@ -76,18 +85,40 @@ class EmptyShouldExceptionInventoryTest {
     }
 
     /**
-     * The controller condition is a real check: it holds over production today and stops holding as
-     * soon as a class is a controller, which the permanent fixture of rule W2a is. Without this,
-     * an expiry predicate that always answered {@code true} would pass the test above forever.
+     * BI18: the entry restored in a fixture fails. The condition it declares ("no production class is
+     * a controller") is false over production since the current-session controller exists, so the
+     * suppression it would justify is declared without need, and the expiry check says so.
      */
     @Test
-    void theControllerConditionStopsHoldingWhenAControllerExists() {
-        ExpiringException controllers = EXCEPTIONS.stream()
-                .filter(exception -> exception.marker() == Marker.ALLOW_EMPTY_SHOULD)
-                .findFirst().orElseThrow();
+    void aRestoredControllerEntryFailsBecauseItsConditionNoLongerHolds() {
+        assertThat(RETIRED_CONTROLLER_ENTRY.stillJustified().test(productionClasses()))
+                .as("%s's %s exception would be declared without need: a production controller "
+                        + "exists", RETIRED_CONTROLLER_ENTRY.rule(), RETIRED_CONTROLLER_ENTRY.adr())
+                .isFalse();
+        assertThat(productionClasses().stream().filter(javaClass -> javaClass
+                .isMetaAnnotatedWith(Controller.class)).map(JavaClass::getName))
+                .contains("com.confia.identity.web.CurrentSessionController");
+    }
 
-        assertThat(controllers.stillJustified().test(productionClasses())).isTrue();
-        assertThat(controllers.stillJustified().test(fixtureClasses())).isFalse();
+    /**
+     * The condition is a real check, not a predicate that is always false: it holds over a set of
+     * classes with no controller, and does not over the permanent fixture, which has one.
+     */
+    @Test
+    void theControllerConditionIsARealCheck() {
+        JavaClasses withoutControllers = new ClassFileImporter()
+                .importPackages("com.confia.shared.web.problem");
+
+        assertThat(withoutControllers).isNotEmpty();
+        assertThat(RETIRED_CONTROLLER_ENTRY.stillJustified().test(withoutControllers)).isTrue();
+        assertThat(RETIRED_CONTROLLER_ENTRY.stillJustified().test(fixtureClasses())).isFalse();
+    }
+
+    /** The inventory is empty, so no rule carries a suppression marker. */
+    @Test
+    void noRuleIsSuppressedAnymoreForWantOfAController() {
+        assertThat(EXCEPTIONS).isEmpty();
+        assertThat(countOf(Marker.ALLOW_EMPTY_SHOULD)).isZero();
     }
 
     /** Package-visible for {@link SuppressionCitesAdrTest}'s per-marker count check. */

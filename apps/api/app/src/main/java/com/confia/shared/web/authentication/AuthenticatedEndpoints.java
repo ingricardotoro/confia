@@ -1,6 +1,7 @@
 package com.confia.shared.web.authentication;
 
 import java.util.List;
+import org.springframework.http.HttpMethod;
 
 /**
  * The closed, immutable list of routes of the administrative chain that need an authenticated actor
@@ -9,7 +10,7 @@ import java.util.List;
  * a controller never opens a route by itself. The matrix of roles and permissions replaces this list
  * in change 8.
  *
- * <p>In production the list is empty until the session endpoint arrives (task 5.2); the public
+ * <p>In production the list holds the one route of the current session (task 5.2); the public
  * constructor exists for the test harnesses, which add routes of their own and nothing else.
  */
 public final class AuthenticatedEndpoints {
@@ -20,9 +21,13 @@ public final class AuthenticatedEndpoints {
         this.endpoints = List.copyOf(endpoints);
     }
 
-    /** The list of the administrative process: empty until the session endpoint exists. */
+    /**
+     * The list of the administrative process: the current session, which asks for the live-session
+     * check (design.md decisions 7 and 13).
+     */
     public static AuthenticatedEndpoints forAdmin() {
-        return new AuthenticatedEndpoints(List.of());
+        return new AuthenticatedEndpoints(List.of(new AuthenticatedEndpoint(HttpMethod.GET,
+                "/api/v1/auth/sessions/current", SessionCheck.LIVE_SESSION)));
     }
 
     /** The routes, in a list that cannot be modified. */

@@ -33,12 +33,16 @@ class IdempotencyDemoAbsentFromProcessesTest {
             assertThat(RegisteredRoutes.of(admin.context()))
                     .extracting(Route::pattern)
                     .noneMatch(pattern -> pattern.startsWith(DEMO_ROUTE_PREFIX));
+            assertThat(RegisteredRoutes.of(admin.context())).extracting(Route::toString)
+                    .as("non-vacuous: the one production route is there, and it is not the demo")
+                    .contains("GET /api/v1/auth/sessions/current");
             assertThat(admin.context().getBeanNamesForType(demoController())).isEmpty();
 
             HttpResponse<String> document = admin.get(OpenApiProcess.API_DOCS_PATH);
             assertThat(document.statusCode()).isEqualTo(200);
             assertThat(document.body()).as("non-vacuous: the document is the real one")
-                    .contains("\"openapi\"").doesNotContain(DEMO_ROUTE_PREFIX);
+                    .contains("\"openapi\"").contains("/api/v1/auth/sessions/current")
+                    .doesNotContain(DEMO_ROUTE_PREFIX);
         }
     }
 
