@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.bootstrap.RegisteredRoutes.Route;
+import com.confia.shared.web.authentication.AuthenticatedEndpoint;
+import com.confia.shared.web.authentication.AuthenticatedEndpoints;
+import com.confia.shared.web.authentication.SessionCheck;
 import com.confia.shared.web.edge.PublicEndpoint;
 import com.confia.shared.web.edge.PublicEndpoints;
 import com.confia.shared.web.harness.HarnessProcess;
@@ -40,7 +43,9 @@ import org.springframework.web.util.pattern.PathPatternParser;
  * public route therefore needs an edit of {@code PublicEndpoints}, visible in review. The
  * production configuration (no Spring profile) registers no route in the portal and, in the
  * administrative process, only the authenticated route of the current session
- * (session-tokens-and-web-layer, design.md decision 13).
+ * (session-tokens-and-web-layer, design.md decision 13). Since that change the enumerator also
+ * distinguishes the two lists (BI20): an authenticated entry must be served by a route and must
+ * answer {@code 401} to an anonymous request, and in production no route is on neither list.
  */
 class PublicRouteAllowListTest {
 
@@ -83,6 +88,83 @@ class PublicRouteAllowListTest {
         return orphans;
     }
 
+    /** The authenticated entries with no registered route that serves them (BI20). */
+    static List<String> authenticatedEntriesWithoutARoute(ApplicationContext context,
+            AuthenticatedEndpoints authenticated) {
+        List<Route> routes = RegisteredRoutes.of(context);
+        List<String> orphans = new ArrayList<>();
+        for (AuthenticatedEndpoint entry : authenticated.endpoints()) {
+            boolean served = routes.stream().anyMatch(route -> route.pattern()
+                    .equals(entry.pattern()) && (RegisteredRoutes.ANY_METHOD.equals(route.method())
+                    || route.method().equals(entry.method().name())));
+            if (!served) {
+                orphans.add(entry.method() + " " + entry.pattern()
+                        + " is on the authenticated list and no route serves it");
+            }
+        }
+        return orphans;
+    }
+
+    /**
+     * The authenticated entries that answer an anonymous request with anything but {@code 401}
+     * (BI20): a route on the authenticated list that runs without a credential is a hole, whatever
+     * its controller does.
+     */
+    static List<String> authenticatedRoutesThatAnswerWithoutACredential(int port,
+            AuthenticatedEndpoints authenticated) {
+        List<String> holes = new ArrayList<>();
+        for (AuthenticatedEndpoint entry : authenticated.endpoints()) {
+            int status = anonymous(entry.method().name(), sample(entry.pattern()), port);
+            if (status != 401) {
+                holes.add(entry.method() + " " + entry.pattern() + " is on the authenticated list "
+                        + "and answered " + status + " to an anonymous request");
+            }
+        }
+        return holes;
+    }
+
+    /**
+     * The registered routes that are on neither list (BI20 and the decision 13 inversion: the
+     * routes of a process are exactly the public ones plus the authenticated ones).
+     */
+    static List<Route> routesOnNeitherList(ApplicationContext context, PublicEndpoints allowed,
+            AuthenticatedEndpoints authenticated) {
+        return RegisteredRoutes.of(context).stream()
+                .filter(route -> allowed.endpoints().stream().noneMatch(entry ->
+                        entry.pattern().equals(route.pattern()) && (RegisteredRoutes.ANY_METHOD
+                                .equals(route.method()) || route.method().equals(
+                                        entry.method().name()))))
+                .filter(route -> authenticated.endpoints().stream().noneMatch(entry ->
+                        entry.pattern().equals(route.pattern()) && (RegisteredRoutes.ANY_METHOD
+                                .equals(route.method()) || route.method().equals(
+                                        entry.method().name()))))
+                .toList();
+    }
+
+    /**
+     * The routes on neither list that do not answer {@code 403} to a request that carries {@code
+     * bearerToken}, a valid one: an authenticated actor on a route nobody listed is denied, not
+     * served.
+     */
+    static List<String> routesOnNeitherListThatServeAnAuthenticatedActor(ApplicationContext context,
+            int port, PublicEndpoints allowed, AuthenticatedEndpoints authenticated,
+            String bearerToken) {
+        List<String> served = new ArrayList<>();
+        for (Route route : routesOnNeitherList(context, allowed, authenticated)) {
+            if (RegisteredRoutes.FUNCTIONAL_ROUTER.equals(route.pattern())) {
+                continue;
+            }
+            String method = RegisteredRoutes.ANY_METHOD.equals(route.method()) ? "GET"
+                    : route.method();
+            int status = authenticatedRequest(method, sample(route.pattern()), port, bearerToken);
+            if (status != 403) {
+                served.add(method + " " + route.pattern() + " answered " + status
+                        + " to an authenticated actor and is on neither list");
+            }
+        }
+        return served;
+    }
+
     /**
      * A functional router is registered as one opaque entry, so neither the anonymous request nor
      * the snapshot can see what it serves. Until its predicates are enumerated, any is a failure.
@@ -109,10 +191,19 @@ class PublicRouteAllowListTest {
     }
 
     private static int anonymous(String method, String path, int port) {
-        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return authenticatedRequest(method, path, port, null);
+    }
+
+    private static int authenticatedRequest(String method, String path, int port,
+            String bearerToken) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + path))
                 .timeout(Duration.ofSeconds(30))
-                .method(method, HttpRequest.BodyPublishers.noBody())
-                .build();
+                .method(method, HttpRequest.BodyPublishers.noBody());
+        if (bearerToken != null) {
+            builder.header("Authorization", "Bearer " + bearerToken);
+        }
+        HttpRequest request = builder.build();
         try {
             return HTTP.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
         } catch (IOException e) {
@@ -126,11 +217,6 @@ class PublicRouteAllowListTest {
     private static PublicEndpoints allowListOf(String process, Environment environment) {
         return "admin".equals(process) ? PublicEndpoints.forAdmin(environment)
                 : PublicEndpoints.forPortal(environment);
-    }
-
-    /** The routes production registers in a process, written as {@code METHOD pattern}. */
-    private static List<String> authenticatedRoutesOf(String process) {
-        return "admin".equals(process) ? List.of("GET /api/v1/auth/sessions/current") : List.of();
     }
 
     @ParameterizedTest
@@ -153,9 +239,77 @@ class PublicRouteAllowListTest {
                         .isNotEmpty();
                 assertThat(allowed.endpoints()).as("non-vacuous: and lists them").isNotEmpty();
             }
+            AuthenticatedEndpoints authenticated = authenticatedListOf(process);
             assertThat(unenumerableRoutes(context)).isEmpty();
             assertThat(leaks(context, running.port(), allowed)).isEmpty();
             assertThat(entriesWithoutARoute(context, allowed)).isEmpty();
+            assertThat(authenticatedEntriesWithoutARoute(context, authenticated)).isEmpty();
+            assertThat(authenticatedRoutesThatAnswerWithoutACredential(running.port(),
+                    authenticated)).isEmpty();
+            if ("default".equals(profile)) {
+                assertThat(routesOnNeitherList(context, allowed, authenticated))
+                        .as("in production the routes of a process are exactly its public ones "
+                                + "plus its authenticated ones").isEmpty();
+            }
+            // The local profile also registers routes of springdoc that no list admits (the YAML
+            // document, the per-group documents). The chain denies them, which the anonymous check
+            // above proves, so they are not a hole and the exact-lists check is for production.
+        }
+    }
+
+    private static AuthenticatedEndpoints authenticatedListOf(String process) {
+        return "admin".equals(process) ? AuthenticatedEndpoints.forAdmin()
+                : new AuthenticatedEndpoints(List.of());
+    }
+
+    /** The routes production registers in a process, written as {@code METHOD pattern}. */
+    private static List<String> authenticatedRoutesOf(String process) {
+        return "admin".equals(process) ? List.of("GET /api/v1/auth/sessions/current") : List.of();
+    }
+
+    /** BI20, the first control: an authenticated entry whose route answers {@code 200} to anyone. */
+    @Test
+    void anAuthenticatedEntryThatAnswersWithoutACredentialFailsNamingTheRoute() {
+        try (HarnessProcess harness = HarnessProcess.start()) {
+            AuthenticatedEndpoints listsAnOpenRoute = new AuthenticatedEndpoints(List.of(
+                    new AuthenticatedEndpoint(HttpMethod.GET, "/test/open",
+                            SessionCheck.TOKEN_ONLY),
+                    new AuthenticatedEndpoint(HttpMethod.GET, "/x", SessionCheck.TOKEN_ONLY)));
+
+            List<String> holes = authenticatedRoutesThatAnswerWithoutACredential(harness.port(),
+                    listsAnOpenRoute);
+
+            assertThat(holes).containsExactly("GET /test/open is on the authenticated list and "
+                    + "answered 200 to an anonymous request");
+            assertThat(authenticatedEntriesWithoutARoute(harness.context(),
+                    new AuthenticatedEndpoints(List.of(new AuthenticatedEndpoint(HttpMethod.GET,
+                            "/ghost", SessionCheck.LIVE_SESSION)))))
+                    .containsExactly("GET /ghost is on the authenticated list and no route "
+                            + "serves it");
+        }
+    }
+
+    /**
+     * BI20, the second control, and the inversion of the enumerator: a route on neither list that
+     * a chain serves to an authenticated actor is named, and one the chain denies with {@code 403}
+     * is not. The harness registers many routes that are on neither real list.
+     */
+    @Test
+    void aRouteOnNeitherListThatServesAnAuthenticatedActorFailsNamingTheRoute() {
+        try (HarnessProcess harness = HarnessProcess.start()) {
+            PublicEndpoints realList = PublicEndpoints.forAdmin(
+                    harness.context().getEnvironment());
+            AuthenticatedEndpoints realAuthenticated = AuthenticatedEndpoints.forAdmin();
+
+            assertThat(routesOnNeitherList(harness.context(), realList, realAuthenticated))
+                    .extracting(Route::pattern).contains("/x", "/test/open", "/test/whoami");
+            List<String> served = routesOnNeitherListThatServeAnAuthenticatedActor(
+                    harness.context(), harness.port(), realList, realAuthenticated,
+                    harness.tokens().access());
+
+            assertThat(served).anyMatch(line -> line.startsWith("GET /test/open answered 200"));
+            assertThat(served).anyMatch(line -> line.startsWith("GET /test/whoami answered 200"));
+            assertThat(served).noneMatch(line -> line.contains(" /x "));
         }
     }
 

@@ -272,6 +272,40 @@ la brecha no tenía dueño. La fila no se reescribe: esta nota amplía su alcanc
 entregue, deja de ser cierto el escenario «Una reutilización detectada no notifica a nadie» de
 `session-tokens-and-web-layer`.
 
+**Nota (2026-10-06, quinto corte: la parte 4b se parte en tres cambios y las condiciones duras se
+reparten; registrada el 2026-10-19 al cerrar la tarea 5.2 de `session-tokens-and-web-layer`, PR 15).**
+Por decisión del propietario del 2026-10-06 (DA-1 y DA-6 de la exploración de `session-tokens-and-web-layer`),
+la parte 4b, que la nota del cuarto corte llamaba `session-tokens-and-web-layer`, se ejecuta como **tres**
+cambios SDD secuenciales, con el cambio 9 entre el segundo y el tercero:
+
+| Orden | Cambio | Entrega | Condiciones duras que cierra |
+|---|---|---|---|
+| 1 | `session-tokens-and-web-layer` (S1) | Núcleo de tokens, anillo de claves, filtro de autenticación, principal, adaptadores de `CurrentInstitutionProvider` y `SessionValidity`, migración V8, emisión, rotación, ventana de gracia y reutilización de familias, revocación de todas las familias al restablecer y la ruta `GET /api/v1/auth/sessions/current` | **H2** |
+| 2 | `session-endpoints-cookie-and-csrf` (S2, identificador propuesto) | Inicio de sesión con limitador y materializador del retardo, verificación e inscripción de MFA, refresco, cierre de sesión, cookie de sesión y CSRF de doble envío con `Origin` | **H1** y **condición 3** |
+| 3 | `background-jobs-with-db-scheduler` (cambio 9) | Ejecutor de db-scheduler en el trabajador, adaptador de programación de la emisión de recuperación y purgas | condición 4 (propia, sin cambio) |
+| 4 | `password-recovery-endpoints` (S3, identificador propuesto) | `reset/request` y `reset/confirm`, respuesta uniforme, límite de 10 por hora por IP y puerta de tiempo sobre HTTP | **H3** y **H4** |
+
+En esta nota, H1 es la condición dura del 2026-09-25 (control por IP antes del inicio de sesión), H2 la
+condición 1 del 2026-10-03 (revocar todas las familias al restablecer), H3 la condición 2 del mismo día
+(10 solicitudes por hora por IP), H4 la respuesta HTTP uniforme de la recuperación con su puerta de
+tiempo (inventario de `web-edge-foundations`), y la condición 3 la del 2026-10-04 (CSRF antes de la
+primera cookie). Las cinco nombraban como dueño a `session-tokens-and-web-layer` y heredan ese
+identificador así:
+
+- **H2 se cierra en `session-tokens-and-web-layer`**, con la prueba I24 (`PasswordResetRevokesSessionsIT`):
+  un restablecimiento revoca todas las familias vivas de la cuenta, en la misma transacción, con un
+  asiento de auditoría y sin tocar otra cuenta.
+- **H1 y la condición 3 obligan a `session-endpoints-cookie-and-csrf`.** `session-tokens-and-web-layer`
+  no entrega ningún endpoint de inicio de sesión ni ninguna cookie, así que ninguna de las dos se activa
+  en él; no las cierra.
+- **H3 y H4 obligan a `password-recovery-endpoints`.** `session-tokens-and-web-layer` no entrega ningún
+  endpoint de recuperación; no las cierra.
+
+El archivo de `session-tokens-and-web-layer` no puede declarar cerrada ninguna de las otras cuatro
+(H1, H3, H4 y la condición 3): las lista como abiertas y transferidas, cada una con su nuevo dueño. Los
+textos originales de H1, H2, H3, H4 y de la condición 3, arriba, no se modifican: esta nota solo
+registra la partición y el reparto.
+
 **Hallazgo.** `docs/09-roadmap-y-fases.md` §3 no incluye el módulo `organization` en F0, pero
 ADR-0009 exige `institution_id NOT NULL` desde la primera migración y ADR-0017 asigna la tabla raíz
 de institución a ese módulo. Se recomienda incorporar el cambio 4, con la entidad raíz mínima, al

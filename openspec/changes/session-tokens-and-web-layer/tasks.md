@@ -610,7 +610,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     de sesiones, y no en `identity.infrastructure`. El método de lectura sin bloqueo se llama `readById` y no `findById`, porque un doble de pruebas
     implementa a la vez los repositorios de familias y de tokens.
 
-- [ ] 5.2 **PR 15 `current-session-endpoint`: ruta, DTO, OpenAPI, contratos y notas de transferencia (decisión 13).**
+- [x] 5.2 **PR 15 `current-session-endpoint`: ruta, DTO, OpenAPI, contratos y notas de transferencia (decisión 13).**
   - **ROJO, primero la sonda S-4.** Una prueba con `springdoc.override-with-generic-response` por omisión que registre las respuestas añadidas por el traductor
     global; esperado: con `true` aparecen respuestas no aprobadas, con `false` solo las declaradas. Después crear `test/java/com/confia/identity/web/CurrentSessionEndpointIT.java`
     (`200` con el DTO exacto y sin campos de más; `401` en sus tres variantes con `WWW-Authenticate`; restringido, revocada y desconocida no la abren; solo lectura;
@@ -634,6 +634,28 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
     `feat(identity): add the current session read endpoint` y `docs(sdd): record the transfer of the hard conditions to S2 and S3`. Tamaño: nominal 360, realista 790;
     costura, notas documentales a 15b. — Escenarios I129 a I137, WE29, WE32, WE38, WE39, BI15, BI18, BI20, BI24 a BI27, BI34, BI35 y los siete escenarios sin identificador de validación, de
     la ruta de demostración y de las reglas de `web`.
+
+  - **Nota fechada 2026-10-19: costura 15a/15b/15c por la regla del propietario («partir solo si hace falta, sin preguntar»).** El árbol
+    completo, implementado y verificado con sus pruebas antes de partir, midió **2 026 líneas efectivas** (1 963 añadidas y 63 retiradas,
+    `git diff --numstat` excluyendo `openspec/`; 150 son las dos instantáneas OpenAPI), por encima de las 800. Se partió por archivos completos
+    en tres PR apilados, cada uno con su `./mvnw verify -Pmutation-gate` completo y cumpliendo JaCoCo y PIT por sí solo:
+    - **15a** `change/session-tokens-and-web-layer-15a-session-read-contract` (646 líneas): el caso de uso `DescribeCurrentSession` con su
+      vista y `SessionLifetimePolicy.idleExpiresAt`, `errors` y `bearerAuth` en `ContractSchemas`, `override-with-generic-response: false`, la
+      sonda S-4 como prueba permanente y las dos instantáneas con esos cambios y sin ninguna operación.
+    - **15b** `change/session-tokens-and-web-layer-15b-current-session-route` (725 líneas): el controlador, el DTO, `IdentityWebConfiguration`,
+      la entrada `LIVE_SESSION` de la lista autenticada, los `@ApiResponse`, la instantánea con la operación y las inversiones de los inventarios
+      (W2a, `ProcessBeanPolicy`, enumerador de rutas de producción).
+    - **15c** `change/session-tokens-and-web-layer-15c-session-endpoint-it-and-notes` (684 líneas): `CurrentSessionEndpointIT` sobre el proceso
+      administrativo real y PostgreSQL real, con las pruebas por HTTP de OR05 y OR10, el enumerador completo de rutas públicas y autenticadas
+      (BI20) con sus controles negativos, las notas fechadas de transferencia y la nota de `docs/ui-ux/04`. **5.2 se marca `[x]` solo en esta parte.**
+    No es una tarea nueva: el total de 15 no cambia. Dos desviaciones respecto del texto de la tarea: la sonda S-4 mostró
+    que el traductor de hoy no añade respuestas con la propiedad en `true` (ver `apply-progress.md`), así que la demostración de la tarea necesitó una
+    ruptura temporal adicional para verse; y las notas documentales no van en 15b sino en 15c, porque 15b ya llena su cupo con el código y las inversiones.
+    El árbol completo está en la rama local `wip/session-tokens-current-session-full` (14064b6). La rama `change/session-tokens-and-web-layer-15-current-session-endpoint`,
+    cortada de `main` antes de la partición, queda sin commits propios.
+    La nota fechada del 2026-10-07 (OR05 y OR10 por HTTP) queda cumplida en 15c: `CurrentSessionEndpointIT` envía a la ruta un token con `tenant` de A y
+    el `sid` de una familia de B (`401 token-invalid`, y con la cuenta de A también) y comprueba que, bajo el rol real `confia_admin_app`, la misma
+    lectura abre cada sesión solo con el token de su institución.
 
 ---
 
