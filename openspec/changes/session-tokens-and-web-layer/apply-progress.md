@@ -1830,3 +1830,77 @@ Inversiones del mismo PR (decisiones 13 y 17): la entrada W2a sale de `EmptyShou
 **Medición:** 725 líneas efectivas (679 añadidas y 46 retiradas; `git diff --numstat 15a...HEAD -- . ':!openspec'`, antes de este commit de documentación). Acumulado con 15a: 1 371. Sin `size:exception`.
 
 **Desviaciones y pendientes.** (1) La demostración 1 de la tarea no se produce con el traductor de hoy y necesitó una ruptura temporal adicional (arriba). (2) `PublicRouteAllowListTest` recibe aquí solo el cambio mínimo que la ruta exige; el enumerador completo de rutas públicas y autenticadas (BI20) con sus controles negativos entra en 15c. (3) En el perfil `local`, springdoc registra rutas (el documento en YAML, los documentos por grupo) que ninguna de las dos listas admite: la cadena las deniega con `401`, que la prueba comprueba, así que la igualdad exacta «rutas = públicas más autenticadas» se afirma para la configuración de producción. Pendiente: la prueba de integración con el proceso real y PostgreSQL real (WE29, I129 a I134, OR05, OR10), el enumerador BI20, las notas de transferencia y el cierre (15c).
+
+### PR 15c `session-endpoint-it-and-notes`, tarea 5.2 parte 3 y cierre (2026-10-19, modo TDD estricto; apilada sobre 15b)
+
+Tercera rebanada y la que cierra 5.2 (se marca `[x]` en `tasks.md`, con la nota fechada de la costura 15a/15b/15c). Contiene la prueba de integración de la ruta sobre el proceso administrativo **real** y PostgreSQL real, el enumerador completo de rutas públicas y autenticadas, y las notas documentales.
+
+`CurrentSessionEndpointIT` (12 pruebas) arranca `AdminApplication` por el lanzador de producción con una clave Ed25519 generada para la ejecución, el rol `confia_admin_app` y el contenedor compartido; los tokens los emite el `AccessTokenIssuer` de producción con la misma clave y las familias se siembran con SQL, para que cada ventana sea exactamente la del escenario. `AdminProcessLauncher` (árbol de pruebas, público) es la única puerta pública a `ConfiaApplication.launch`, que sigue siendo privado del paquete, y al enumerador de rutas. Cubre: I129 y I130 (`200` con los siete miembros en su orden, `sessionId` igual al `sid`, métodos `["pwd","otp"]` y `["pwd"]`, `accessTokenExpiresAt` igual a `exp`, `sessionExpiresAt` igual al fin absoluto, `idleExpiresAt` igual al último uso más 30 minutos, `Cache-Control: no-store`, sin correo ni nombre en el cuerpo ni en las cabeceras); I131 y I132 (`401` sin credencial con `Bearer`, vencido con `token-expired`, alterado y restringido con `token-invalid`, los tres con `WWW-Authenticate`); I133 (sesión revocada, desconocida y token alterado: cuerpos idénticos salvo `traceId` e `instance`, y las mismas cabeceras; además inactiva, vencida en términos absolutos y de otra cuenta, con el control de que la familia viva de la cuenta sí abre); I134 (diez lecturas no cambian ninguna fila de V8 ni añaden ningún asiento); WE29 (las rutas del proceso son exactamente `GET /api/v1/auth/sessions/current`, y cualquier otra petición sin credencial es `401 authentication-required`; `POST`, `PUT`, `PATCH` y `DELETE` sobre la ruta con un token válido son `403 forbidden`); y la nota fechada del 2026-10-07: **OR05 por HTTP** (token con `tenant` de A y `sid` de una familia de B: `401 token-invalid`, también con la cuenta de A; con el `tenant` de B abre) y **OR10 por HTTP** (el proceso se conecta como `confia_admin_app`, nunca como propietario, y cada token lee solo la sesión de su institución).
+
+`PublicRouteAllowListTest` recibe el enumerador completo (BI20): una entrada autenticada debe tener una ruta que la sirva, debe responder `401` a una petición anónima, y en producción ninguna ruta registrada queda fuera de las dos listas; con sus dos controles negativos sobre el arnés del borde (una entrada autenticada que responde `200` sin credencial se reporta nombrando la ruta, y las rutas fuera de las listas que un actor autenticado sí alcanza se reportan, mientras `/x`, que la cadena deniega con `403`, no).
+
+**Notas documentales** (fechadas, sin reescribir ningún texto): bloque «quinto corte» en `openspec/changes/foundations-plan/exploration.md` (I135, WE32: la partición, H2 cerrada en S1, H1 y la condición 3 a S2, H3 y H4 a S3, sin tocar sus textos) y nota en `docs/ui-ux/04-patrones-de-interaccion.md` §7 (I136: la SPA refresca solo ante actividad del usuario, porque la lectura de la sesión no mueve el último uso; `idleExpiresAt` sirve para el aviso de los 25 minutos). Las demás notas de I136 e I148 ya estaban hechas: `docs/03` en el PR 4 (1.4), `docs/05` en el PR 2 (1.2), `docs/08` con la migración V8 (3.1) y ADR-0005 en 13c (4.3).
+
+**Contratos (BI26).** La instantánea comprometida es la que se regeneró con `-Dconfia.openapi.update=true` y se revisó como contrato (diff de `admin.openapi.json`: el esquema `CurrentSessionResponse` de siete miembros requeridos, `errors` en `ProblemDetail`, `securitySchemes.bearerAuth`, y el camino `GET /api/v1/auth/sessions/current` con `200`, `401` con su cabecera `WWW-Authenticate` y `500`; el del portal solo gana `errors` y `bearerAuth`). `pnpm --filter @confia/contracts generate` **no pudo ejecutarse tal cual**: el espacio de trabajo exige Node `>=24 <25` con `engineStrict: true` (`pnpm-workspace.yaml`) y esta máquina tiene Node 22.16.0, así que pnpm se niega (`ERR_PNPM_UNSUPPORTED_ENGINE`). No se tocó la configuración; se ejecutaron los mismos tres programas directamente con Node 22: `node node_modules/orval/dist/bin/orval.mjs --config orval.config.ts` (genera `admin` y `portal`), `node node_modules/typescript/bin/tsc --noEmit` (código de salida 0) y `node node_modules/vitest/vitest.mjs run` (2 archivos, 8 pruebas, 0 errores de tipos). El código generado declara `errors` como `zod.array(zod.object({field, reason})).optional()` y `CurrentSessionResponse` con `uuid` y `datetime`; `git status` queda limpio tras generar (el código está ignorado por Git). `apps/admin-web` y `apps/portal-web` son directorios sin `package.json` todavía, así que «las aplicaciones web compilan contra el contrato» no tiene objeto que comprobar en este cambio. Conviene repetir la generación bajo Node 24 en CI.
+
+| Tarea | Archivo de prueba | Capa | RED | GREEN |
+|---|---|---|---|---|
+| 5.2c | `CurrentSessionEndpointIT` (12) | Proceso administrativo real, PostgreSQL real, rol restringido | «ruta inexistente»: 8 fallos y 1 error de 12 (`expected: 200 but was: 403`) sobre el árbol sin producción | 12/12 |
+| 5.2c | `PublicRouteAllowListTest` (+2: BI20) | Arquitectura de rutas | sin los ayudantes | 13/13 |
+
+#### Barrido de trazabilidad de los 247 escenarios (2026-10-19)
+
+Hecho con las tablas de `tasks.md` y las cuatro especificaciones: 124 + 68 + 43 + 12 = **247** escenarios en las especificaciones y **247** filas en las tablas de trazabilidad, una por escenario; los identificadores coinciden uno a uno por capítulo (identity 104, web-edge 42, build-integrity 38, organization 11, más los 52 sin identificador, cuyo número de filas también coincide); cada fila tiene una tarea dueña y las 15 tareas de la cadena (con sus costuras) están `[x]`. Los 29 escenarios de 5.2 y su prueba:
+
+| Escenario | Prueba o evidencia |
+|---|---|
+| I129, I130 | `CurrentSessionEndpointIT.aValidTokenOfALiveSessionAnswers200WithTheExactSessionAndNothingMore`, `aPasswordOnlySessionListsOnlyThePasswordMethod`, `noPersonalDatumReachesTheBodyOrTheHeaders`; `DescribeCurrentSessionTest`; `CurrentSessionControllerTest.theResponseHasExactlyTheSevenApprovedMembersInTheirOrder`; `OpenApiContractSnapshotTest.theDtoSchemaIsTheClosedListOfSevenRequiredMembers` |
+| I131 | `noCredentialAnswers401AuthenticationRequiredWithTheBearerChallenge` |
+| I132 | `anExpiredAnAlteredAndARestrictedTokenAnswer401WithTheirOwnCode` |
+| I133 | `aRevokedAndAnUnknownSessionWithAnUnexpiredTokenAreIdenticalToAnAlteredToken`, `anIdleAnAbsolutelyExpiredAndAForeignAccountSessionDoNotOpenTheRoute` |
+| I134 | `tenSuccessfulReadsChangeNothingAndAuditNothing`; `DescribeCurrentSessionTest.itReadsInATransactionTheEngineRefusesToWriteIn` |
+| I135, WE32 | documentales: bloque «quinto corte» de `foundations-plan/exploration.md` (por lectura del diff, revisión humana) |
+| I136 | documental: `docs/ui-ux/04` §7 (esta rebanada) y las notas de `docs/03` (PR 4), `docs/05` (PR 2) y `docs/08` (3.1) |
+| I137 | documental: la lista de «Condiciones duras para el informe de archivo», abajo |
+| WE29 | `theOnlyProductionRouteIsTheCurrentSessionAndEveryOtherAnonymousRequestIs401`, `PublicRouteAllowListTest`, `AuthenticatedEndpointsTest` |
+| WE38 | `ProblemTranslationTest.theMembersOfAValidationFailureAreExactlyTheOnesTheApprovedContractDeclares`, `OpenApiContractSnapshotTest.problemDetailDeclaresErrorsAsAnOptionalArrayOfFieldAndReason` |
+| WE39 | `OpenApiContractSnapshotTest.eachProcessPublishesExactlyItsApprovedSnapshot`, `IdempotencyDemoAbsentFromProcessesTest` |
+| BI15 | `WebLayerTokenIsolationTest.theRuleEvaluatesTheRealCurrentSessionControllerAndItNamesNothingOfTheTokenPackage` |
+| BI18 | `EmptyShouldExceptionInventoryTest.aRestoredControllerEntryFailsBecauseItsConditionNoLongerHolds`, `theControllerConditionIsARealCheck` |
+| BI20 | `PublicRouteAllowListTest` (tres controles negativos y la verificación de producción) |
+| BI24, BI27 | `OpenApiContractSnapshotTest.eachProcessPublishesExactlyItsApprovedSnapshot`, `theAdministrativeDocumentHoldsExactlyTheCurrentSessionOperation`, `thePortalDocumentStillHoldsNoOperation` |
+| BI25 | `anUnapprovedResponseOfTheTranslatorFailsNamingTheAddedResponse` (`403` y `429`) y la demostración 1 |
+| BI26 | `problemDetailDeclaresErrorsAsAnOptionalArrayOfFieldAndReason` y la regeneración con orval (arriba) |
+| BI34, BI35 | `WebExposedTypesRuleTest.theControllerRuleEvaluatesTheRealCurrentSessionController`, `theRecordRuleEvaluatesTheRealRecords`, `productionWebClassesCarryNoDomainOrPersistenceField`, `productionControllersExposeNoDomainOrPersistenceType` |
+| Campo inválido, El valor rechazado no se repite, Cuerpo mal formado | `ProblemTranslationTest` (las pruebas de validación existentes y la nueva que las ata al contrato) |
+| El controlador de demostración no está en los procesos reales | `IdempotencyDemoAbsentFromProcessesTest` |
+| Fixture con controlador que devuelve registro de jOOQ; Fixture con DTO que contiene tipo de `domain`; La regla sobre registros de `web` evalúa clases reales | `WebExposedTypesRuleTest.rejectsTheFixtureControllerThatExposesARecordAndADomainType`, `rejectsTheFixtureDtoThatCarriesADomainTypeAndARecord`, `theRecordRuleEvaluatesTheRealRecords` |
+
+**Huérfanos: ninguno.** Cinco escenarios de tareas anteriores no nombran su identificador en ninguna prueba ni en este archivo, y se comprobó por lectura que cada uno tiene su prueba: BI12 (`SigningAndHashingConfinementTest.productionCodeOutsideIdentityAndSharedSecurityNeitherSignsNorHashes` y `theRuleEvaluatesRealProductionClassesOutsideTheTwoPackages`), WE30 (`WebEdgeScopeExclusionInventoryTest.noProductionClassUsesTheServletCookie`, `BearerCredentialConfinementTest.noRequestCreatesASessionOrACookie` y `StatelessChainTest`), WE31 (`WebEdgeScopeExclusionInventoryTest.noProductionClassOutsideTheEdgeUsesTheLimiter` y `...UsesTheDelayMaterializer`), WE36 (`ProblemTranslationTest.anUntranslatedUniqueViolationLeavesOneLineWithClassNamesAndSqlStateOnly`) y WE37 (`ProblemTranslationTest.theVerifierReportsADetailLoggedOnPurpose`).
+
+#### Condiciones duras para el informe de archivo (I137)
+
+Texto original de cada una en `openspec/changes/foundations-plan/exploration.md`, sin modificar; el reparto, en su nota «quinto corte».
+
+| Condición | Estado al cerrar `session-tokens-and-web-layer` | Dueño |
+|---|---|---|
+| **H1**: control por IP antes del inicio de sesión (2026-09-25) | **Abierta, transferida** | `session-endpoints-cookie-and-csrf` |
+| **H2**: revocar todas las familias al restablecer (2026-10-03) | **Cerrada** en este cambio, con la prueba **I24** (`PasswordResetRevokesSessionsIT`) | este cambio |
+| **H3**: 10 solicitudes por hora por IP en la solicitud de restablecimiento (2026-10-03) | **Abierta, transferida** | `password-recovery-endpoints` |
+| **H4**: respuesta HTTP uniforme de la recuperación y puerta de tiempo | **Abierta, transferida** | `password-recovery-endpoints` |
+| **Condición 3**: CSRF de doble envío antes de la primera cookie (2026-10-04) | **Abierta, transferida** | `session-endpoints-cookie-and-csrf` |
+
+Este cambio no entrega ningún endpoint de inicio de sesión, de recuperación ni ninguna cookie, de modo que H1, H3, H4 y la condición 3 no se activan en él y **no se declaran cerradas**. La condición 4 (`background-jobs-with-db-scheduler`, cambio 9) no era de este cambio y sigue como estaba.
+
+| Evidencia | Valor |
+|---|---|
+| Prueba enfocada | `-Dit.test=CurrentSessionEndpointIT` (12) y `-Dtest='PublicRouteAllowListTest'` (13): 0 fallos |
+| Arnés de ejecución | `AdminApplication` por `ConfiaApplication.launch` con `confia_admin_app` contra el PostgreSQL compartido; dos instituciones; un cliente HTTP del JDK; tokens del emisor de producción con la clave generada para la ejecución |
+| Verificación completa | `./mvnw verify -Pmutation-gate` (JDK 25): Surefire 186 + 1 883, Failsafe 420, 0 fallos; cobertura cumplida (global 98,1 % de líneas y 94,0 % de ramas, mínimo 80; `identity.domain` 98,2 % y 100 %, mínimo 95); mutación 99 % (192 de 194, kernel) y 94 % (558 de 594, app); `BUILD SUCCESS` en 10 min 56 s |
+| Frontera de reversión | `CurrentSessionEndpointIT`, `AdminProcessLauncher`, el enumerador de `PublicRouteAllowListTest` y las notas; la ruta de 15b no depende de ellos |
+
+**Medición:** 684 líneas efectivas (675 añadidas y 9 retiradas; `git diff --numstat 15b...HEAD -- . ':!openspec'`). Total de 5.2: 646 + 725 + 684 = 2 055 (2 026 medidas en el árbol completo; las 29 líneas de diferencia son lo que la costura cuenta dos veces: la Javadoc de `PublicRouteAllowListTest` y el cambio mínimo que 15b le hace y 15c reescribe). Sin `size:exception`.
+
+**Desviaciones respecto del diseño.** Ninguna de diseño. Respecto del texto de la tarea: (1) la sonda S-4 y la demostración 1 (ver 15a y 15b); (2) el controlador sale con la cabecera `WWW-Authenticate` documentada en el `401` y con `tags = "auth-sessions"`, que el texto no pedía; (3) `JdbcStubTransactions` es público; (4) `pnpm` no se pudo usar por la versión de Node (arriba); (5) «Dejar en `apply-progress.md` la lista de las cuatro condiciones» queda en este bloque; (6) la rama `change/session-tokens-and-web-layer-15-current-session-endpoint` queda sin commits propios, porque se partió en 15a, 15b y 15c.
+
+**Cierre de 5.2.** Escenarios I129 a I137, WE29, WE32, WE38, WE39, BI15, BI18, BI20, BI24 a BI27, BI34, BI35 y los siete sin identificador cubiertos; OR05 y OR10 por HTTP. Ninguna cabecera de autorización, token ni secreto se escribe en registros (la ruta no registra nada; los fallos de la base de datos usan el traductor de 4a, que no repite el mensaje). Sin `Idempotency-Key` (es una lectura), sin limitador (decisión 13) y sin auditoría (no escribe; I134 lo prueba). **Quedan 0 tareas de las 15 (con sus costuras): el cambio está listo para el archivo.**
