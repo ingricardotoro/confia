@@ -616,6 +616,16 @@ control adicional de `docs/03-seguridad.md`, sección 4.5, compatible con la vid
 refresco de 8 horas de ADR-0005: reduce la ventana de exposición de una estación de caja
 desatendida, sin cambiar la revocación por familia que ADR-0005 ya especifica.
 
+> **Nota fechada 2026-10-19 (cambio `session-tokens-and-web-layer`, PR 15 `current-session-endpoint`).**
+> La inactividad se mide al refrescar la sesión: el sistema mueve el último uso de la sesión
+> (`last_used_at`) solo cuando rota el token de refresco, y la lectura de la sesión actual
+> (`GET /api/v1/auth/sessions/current`) no lo mueve. Por eso la SPA refresca la sesión **solo ante
+> actividad del usuario** y nunca con un temporizador automático: un refresco periódico mantendría
+> viva una estación de caja desatendida y anularía el cierre por inactividad descrito arriba. El aviso
+> «Su sesión se cerrará en 5 minutos por inactividad» puede calcularse con `idleExpiresAt`, el instante en
+> que la sesión vencería por inactividad (último uso más 30 minutos), que la misma ruta devuelve; leerlo
+> no extiende la sesión.
+
 Reglas adicionales:
 
 1. Una notificación emergente **nunca** informa de un error que requiere una decisión. Si hay que
