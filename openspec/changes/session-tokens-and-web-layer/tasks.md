@@ -583,7 +583,7 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
 
 ## Fase 5: vigencia de sesión y ruta de la sesión actual
 
-- [ ] 5.1 **PR 14 `session-validity`: `SessionLiveness` y comprobación `LIVE_SESSION` (decisión 7).**
+- [x] 5.1 **PR 14 `session-validity`: `SessionLiveness` y comprobación `LIVE_SESSION` (decisión 7).**
   - **ROJO.** Crear `test/java/com/confia/identity/infrastructure/SessionLivenessIT.java` (viva → verdadero; revocada, vencida absoluta, inactiva, de otra
     cuenta, de otra institución e inexistente → falso; no escribe ni audita ni actualiza `last_used_at`; un fallo de base de datos se propaga y falla cerrado;
     ruta `LIVE` con familia revocada → `401 token-invalid` aunque el token no haya vencido; token de una familia revocada por restablecimiento falla; una
@@ -596,6 +596,19 @@ ruta de la sesión actual va **última** (nota N-1). Los PR 3, 6 y 7 podrían re
   - **Demostración deliberada.** Quitar la comprobación de `revoked_at` pone en rojo `SessionLivenessIT`; se revierte.
   - **Cierre.** `./mvnw verify`. Commit: `feat(identity): check the session family on live-session routes`. Tamaño: nominal 260, realista 570. — Escenarios I115 a I118, I127, I146,
     WE27, WE28, BI17 y «El puerto no arrastra a identity».
+
+  - **Nota fechada 2026-10-18: costura 14a/14b por la regla del propietario («partir solo si hace falta, sin preguntar»).** El árbol completo,
+    implementado y verificado antes de partir, midió **1 048 líneas efectivas** (`git diff --numstat` excluyendo `openspec/`), por encima de las 800.
+    Se partió por archivos completos en dos PR apilados, cada uno con su `./mvnw verify -Pmutation-gate` completo y cumpliendo JaCoCo y PIT por sí solo:
+    - **14a** `change/session-tokens-and-web-layer-14a-session-liveness` (790 líneas): el puerto con su forma nueva, `SessionLiveness`,
+      `SessionLifetimePolicy.isLive`, `RefreshTokenFamilyRepository.readById`, `TransactionRunner.executeReadOnly`, el bean, la inversión de
+      `WebEdgeScopeExclusionInventoryTest` y las pruebas de unidad, de adaptador y de integración del adaptador. El filtro no cambia.
+    - **14b** `change/session-tokens-and-web-layer-14b-live-session-check` (273 líneas): el paso 3 del filtro y su cableado en
+      `AdminSecurityConfiguration`, el doble del arnés, las pruebas del filtro (WE28, I117, I118, I127, I146) y la aserción positiva de
+      que el filtro es el único que consulta el puerto. **5.1 se marca `[x]` solo en esta parte.**
+    No es una tarea nueva: el total de 15 no cambia. `SessionLivenessIT` vive en `identity.application`, como el resto de las pruebas de integración
+    de sesiones, y no en `identity.infrastructure`. El método de lectura sin bloqueo se llama `readById` y no `findById`, porque un doble de pruebas
+    implementa a la vez los repositorios de familias y de tokens.
 
 - [ ] 5.2 **PR 15 `current-session-endpoint`: ruta, DTO, OpenAPI, contratos y notas de transferencia (decisión 13).**
   - **ROJO, primero la sonda S-4.** Una prueba con `springdoc.override-with-generic-response` por omisión que registre las respuestas añadidas por el traductor

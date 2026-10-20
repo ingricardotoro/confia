@@ -1,6 +1,7 @@
 package com.confia.shared.web.authentication;
 
 import com.confia.shared.security.AuthenticatedActor;
+import com.confia.shared.security.SessionValidity;
 import com.confia.shared.security.token.AccessTokenVerifier;
 import com.confia.shared.security.token.TokenRejectedException;
 import com.confia.shared.security.token.TokenRejection;
@@ -34,6 +35,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *       point answers {@code token-expired} for an intact token whose time has passed and {@code
  *       token-invalid} for everything else, on a public route as much as on a protected one, because
  *       a client that sent a broken credential should hear the cause.
+ *   <li>A valid token on a route that declares a live-session check, whose session the {@link
+ *       SessionValidity} port says is no longer active: the same {@code token-invalid} answer.
  *   <li>A valid token: Spring's context holds an {@link ActorAuthentication} for the authorization
  *       rule, and the rest of the chain runs with {@link AuthenticatedActor#CURRENT} bound, exactly
  *       as the request filter binds the request origin.
@@ -54,12 +57,15 @@ public final class AccessTokenAuthenticationFilter extends OncePerRequestFilter 
     private static final Pattern TOKEN68 = Pattern.compile("[A-Za-z0-9._~+/-]+=*");
 
     private final AccessTokenVerifier verifier;
+    private final SessionValidity sessionValidity;
     private final List<RequestMatcher> liveSessionRoutes;
     private final AuthenticationEntryPoint entryPoint;
 
     public AccessTokenAuthenticationFilter(AccessTokenVerifier verifier,
-            AuthenticatedEndpoints endpoints, AuthenticationEntryPoint entryPoint) {
+            AuthenticatedEndpoints endpoints, SessionValidity sessionValidity,
+            AuthenticationEntryPoint entryPoint) {
         this.verifier = Objects.requireNonNull(verifier, "verifier");
+        this.sessionValidity = Objects.requireNonNull(sessionValidity, "sessionValidity");
         this.entryPoint = Objects.requireNonNull(entryPoint, "entryPoint");
         PathPatternRequestMatcher.Builder matchers = PathPatternRequestMatcher.withDefaults();
         this.liveSessionRoutes = endpoints.endpoints().stream()
@@ -140,10 +146,11 @@ public final class AccessTokenAuthenticationFilter extends OncePerRequestFilter 
     }
 
     /**
-     * Verifies the token and applies the session check of the route.
-     *
-     * <p>A route that asks for a live session is refused until the check exists (task 5.1): the
-     * alternative, trusting a token whose session nobody looked at, is the unsafe direction.
+     * Verifies the token and, for a route whose entry declares a live-session check, asks the port
+     * whether the session behind it is still valid (decision 7). An inactive session is a credential
+     * that no longer holds: {@code token-invalid}, never {@code 403}. A route without the check never
+     * reaches the port, so it accepts the token until it expires. A failure of the port is not caught
+     * here: it propagates and the request ends in {@code 500}, which fails closed.
      */
     private AuthenticatedActor authenticate(String token, HttpServletRequest request) {
         AuthenticatedActor actor;
@@ -153,7 +160,8 @@ public final class AccessTokenAuthenticationFilter extends OncePerRequestFilter 
             throw e.rejection() == TokenRejection.EXPIRED ? new AccessTokenExpiredException()
                     : new AccessTokenRejectedException();
         }
-        if (liveSessionRoutes.stream().anyMatch(route -> route.matches(request))) {
+        if (liveSessionRoutes.stream().anyMatch(route -> route.matches(request))
+                && !sessionValidity.isActive(actor)) {
             throw new AccessTokenRejectedException();
         }
         return actor;

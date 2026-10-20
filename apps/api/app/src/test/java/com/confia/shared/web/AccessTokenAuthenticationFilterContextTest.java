@@ -9,6 +9,7 @@ import com.confia.shared.web.authentication.ActorAuthentication;
 import com.confia.shared.web.authentication.AuthenticatedEndpoints;
 import com.confia.shared.web.authentication.AccessTokenRejectedException;
 import com.confia.shared.web.harness.HarnessTokens;
+import com.confia.shared.web.harness.RecordingSessionValidity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +38,7 @@ class AccessTokenAuthenticationFilterContextTest {
     private final List<String> entryPointCalls = new ArrayList<>();
     private final AccessTokenAuthenticationFilter filter = new AccessTokenAuthenticationFilter(
             tokens.verifier(), new AuthenticatedEndpoints(List.of()),
+            new RecordingSessionValidity(),
             (request, response, exception) -> entryPointCalls
                     .add(exception.getClass().getSimpleName()));
 

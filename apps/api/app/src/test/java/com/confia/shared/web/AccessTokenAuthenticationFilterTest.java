@@ -3,8 +3,10 @@ package com.confia.shared.web;
 import static com.confia.shared.web.harness.ProblemAssertions.assertProblem;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.web.harness.HarnessProcess;
 import com.confia.shared.web.harness.HarnessTokens;
+import com.confia.shared.web.harness.RecordingSessionValidity;
 import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -34,6 +36,7 @@ class AccessTokenAuthenticationFilterTest {
 
     @BeforeEach
     void remember() {
+        process.bean(RecordingSessionValidity.class).answer(true);
         authenticatedBefore = process.calls().authenticatedInvocations();
         openBefore = process.calls().openInvocations();
     }
@@ -227,12 +230,65 @@ class AccessTokenAuthenticationFilterTest {
         assertThat(process.calls().authenticatedInvocations()).isEqualTo(authenticatedBefore);
     }
 
+    // --- The session check of the routes that declare it (decision 7; scenarios WE28, I117, I118, I146) ---
+
+    private RecordingSessionValidity validity() {
+        return process.bean(RecordingSessionValidity.class);
+    }
+
     @Test
-    void theLiveSessionCheckIsNotAnsweredYetSoItDeniesInsteadOfTrusting() {
+    void onlyTheRouteThatDeclaresTheCheckAsksThePortAndItReceivesTheActorOfTheToken() {
+        String token = process.tokens().access();
+        int asked = validity().invocations();
+
+        HttpResponse<String> live = process.get("/test/live", "Authorization", bearer(token));
+        assertThat(live.statusCode()).isEqualTo(200);
+        assertThat(validity().invocations()).as("the declaring route asks once").isEqualTo(asked + 1);
+        AuthenticatedActor actor = validity().actors().get(validity().actors().size() - 1);
+        assertThat(actor.accountId()).isEqualTo(HarnessTokens.ACCOUNT);
+        assertThat(actor.institutionId()).isEqualTo(HarnessTokens.INSTITUTION);
+        assertThat(actor.sessionId()).isEqualTo(HarnessTokens.SESSION);
+
+        HttpResponse<String> tokenOnly = process.get("/test/whoami", "Authorization", bearer(token));
+        assertThat(tokenOnly.statusCode()).isEqualTo(200);
+        assertThat(validity().invocations()).as("the other route does not ask")
+                .isEqualTo(asked + 1);
+    }
+
+    @Test
+    void whenThePortSaysTheSessionIsNotActiveTheLiveRouteIsTokenInvalidAndTheControllerNeverRuns() {
+        String token = process.tokens().access();
+        validity().answer(false);
+
+        assertInvalid(process.get("/test/live", "Authorization", bearer(token)));
+
+        assertThat(process.calls().authenticatedInvocations()).isEqualTo(authenticatedBefore);
+        assertThat(process.get("/test/whoami", "Authorization", bearer(token)).statusCode())
+                .as("a route that does not declare the check still accepts the unexpired token")
+                .isEqualTo(200);
+    }
+
+    @Test
+    void aFailureOfThePortFailsClosedWith500AndTheControllerNeverRuns() {
+        validity().fail(new IllegalStateException("the database is not there"));
+
         HttpResponse<String> response = process.get("/test/live", "Authorization",
                 bearer(process.tokens().access()));
 
-        assertInvalid(response);
+        assertProblem(response, 500, "internal-error");
+        assertThat(response.body()).doesNotContain("the database is not there");
         assertThat(process.calls().authenticatedInvocations()).isEqualTo(authenticatedBefore);
+    }
+
+    @Test
+    void aTokenThatIsBrokenOrExpiredNeverReachesThePort() {
+        int asked = validity().invocations();
+
+        assertInvalid(process.get("/test/live", "Authorization", bearer("not.a.token")));
+        assertProblem(process.get("/test/live", "Authorization",
+                bearer(process.tokens().accessAt(Instant.now().minus(1, ChronoUnit.HOURS)))),
+                401, "token-expired");
+
+        assertThat(validity().invocations()).isEqualTo(asked);
     }
 }

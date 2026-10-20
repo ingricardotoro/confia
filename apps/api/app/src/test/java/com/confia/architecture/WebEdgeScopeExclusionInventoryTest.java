@@ -150,6 +150,10 @@ class WebEdgeScopeExclusionInventoryTest {
     void theAuthenticationFilterIsTheOnlyProductionConsumerOfThePort() {
         JavaClasses production = assertNonEmptyProductionClasses();
 
+        assertThat(classesCallingThePort(production))
+                .as("the scan sees the call the filter makes, so an empty result elsewhere means "
+                        + "nobody else calls")
+                .containsExactly(FILTER);
         assertThat(consumerViolations(production)).isEmpty();
     }
 
