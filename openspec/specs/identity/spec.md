@@ -1764,7 +1764,7 @@ abrevia `Rejected` con motivo `reuse_detected`.
 #### Escenario: [I95] Dos rotaciones concurrentes del mismo token producen exactamente un sucesor
 
 - **DADO** el token vigente `RT-4001`, y dos transacciones reales y sincronizadas con
-  `CyclicBarrier` que lo presentan en el mismo instante del reloj inyectado, con el mismo agente de
+  `CountDownLatch` y una espera acotada sobre `pg_stat_activity` que lo presentan en el mismo instante del reloj inyectado, con el mismo agente de
   usuario
 - **CUANDO** terminan las dos
 - **ENTONCES** existe exactamente un token sucesor de `RT-4001`
