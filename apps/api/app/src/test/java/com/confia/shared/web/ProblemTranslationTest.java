@@ -101,6 +101,38 @@ class ProblemTranslationTest {
         assertBaseSecurityHeaders(response);
     }
 
+    /**
+     * WE38 and the scenarios "Campo inválido", "El valor rechazado no se repite" and "Cuerpo mal
+     * formado", read against the contract: every member of a real validation failure, and of each
+     * entry of its {@code errors}, is declared by the {@code ProblemDetail} schema of the approved
+     * snapshot, and the schema declares no member the response can never carry for a validation
+     * failure. The body is what the server sends; the schema is what the web applications are
+     * generated from.
+     */
+    @Test
+    void theMembersOfAValidationFailureAreExactlyTheOnesTheApprovedContractDeclares()
+            throws IOException {
+        JsonNode problem = assertProblem(postJson("{\"name\":\"\"}"), 400, "validation-failed");
+        JsonNode contract = HarnessProcess.json(Files.readString(
+                Path.of("..", "openapi", "admin.openapi.json")));
+        JsonNode schema = contract.get("components").get("schemas").get("ProblemDetail");
+        JsonNode declared = schema.get("properties");
+
+        List<String> responseMembers = new ArrayList<>();
+        problem.propertyNames().forEach(responseMembers::add);
+        List<String> schemaMembers = new ArrayList<>();
+        declared.propertyNames().forEach(schemaMembers::add);
+        assertThat(responseMembers).containsExactlyInAnyOrderElementsOf(schemaMembers);
+
+        List<String> entryMembers = new ArrayList<>();
+        problem.get("errors").get(0).propertyNames().forEach(entryMembers::add);
+        List<String> declaredEntryMembers = new ArrayList<>();
+        declared.get("errors").get("items").get("properties").propertyNames()
+                .forEach(declaredEntryMembers::add);
+        assertThat(entryMembers).containsExactlyInAnyOrderElementsOf(declaredEntryMembers);
+        assertThat(entryMembers).containsExactlyInAnyOrder("field", "reason");
+    }
+
     @Test
     void theValueAtTheExactMaximumLengthIsAccepted() {
         assertThat(postJson("{\"name\":\"abcdefghij\"}").statusCode()).isEqualTo(200);
@@ -473,8 +505,13 @@ class ProblemTranslationTest {
 
     // ---- the contract ---------------------------------------------------------------------------
 
+    /**
+     * Inverted by session-tokens-and-web-layer, task 5.2 (WE38): until the first operation of
+     * production the schema declared its six members and not {@code errors}, because the snapshot was
+     * frozen with no operation; it declares {@code errors} since the first endpoint with validation.
+     */
     @Test
-    void theProblemDetailSchemaOfTheContractStillDeclaresItsSixPropertiesAndNotErrors()
+    void theProblemDetailSchemaOfTheContractDeclaresItsSixPropertiesAndTheErrorsExtension()
             throws IOException {
         for (String document : List.of("admin", "portal")) {
             JsonNode schema = HarnessProcess.json(Files.readString(
@@ -483,7 +520,7 @@ class ProblemTranslationTest {
             List<String> properties = new ArrayList<>(schema.get("properties").propertyNames());
 
             assertThat(properties).as("%s snapshot", document).containsExactlyInAnyOrder("type",
-                    "title", "status", "detail", "instance", "traceId");
+                    "title", "status", "detail", "instance", "traceId", "errors");
         }
     }
 }

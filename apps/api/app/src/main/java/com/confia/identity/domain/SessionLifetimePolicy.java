@@ -83,8 +83,16 @@ public final class SessionLifetimePolicy {
 
     /** Whether a session last used at {@code lastUsedAt} is idle at {@code now}; the border is idle. */
     public boolean isIdle(Instant lastUsedAt, Instant now) {
-        Objects.requireNonNull(lastUsedAt, "lastUsedAt");
         Objects.requireNonNull(now, "now");
-        return !now.isBefore(lastUsedAt.plus(IDLE_TIMEOUT));
+        return !now.isBefore(idleExpiresAt(lastUsedAt));
+    }
+
+    /**
+     * The instant a session last used at {@code lastUsedAt} becomes idle if it is not used again:
+     * thirty minutes later. It is the instant the current-session read reports (design.md decision
+     * 13), so the report and the check of {@link #isIdle} cannot drift apart.
+     */
+    public Instant idleExpiresAt(Instant lastUsedAt) {
+        return Objects.requireNonNull(lastUsedAt, "lastUsedAt").plus(IDLE_TIMEOUT);
     }
 }

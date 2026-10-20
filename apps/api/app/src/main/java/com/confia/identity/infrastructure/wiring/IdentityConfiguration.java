@@ -3,6 +3,7 @@ package com.confia.identity.infrastructure.wiring;
 import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.AuthenticateWithPassword;
 import com.confia.identity.application.ConsumeRecoveryCode;
+import com.confia.identity.application.DescribeCurrentSession;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.IssueSession;
 import com.confia.identity.application.LoginBackoffStore;
@@ -193,6 +194,16 @@ public class IdentityConfiguration {
     SessionLiveness sessionLiveness(TransactionRunner runner,
             RefreshTokenFamilyRepository families, Clock clock) {
         return new SessionLiveness(runner, families, clock);
+    }
+
+    /**
+     * The use case behind the current-session route. Registered here with the other use cases of the
+     * module; the controller that calls it is registered by {@code IdentityWebConfiguration}.
+     */
+    @Bean
+    DescribeCurrentSession describeCurrentSession(TransactionRunner runner,
+            RefreshTokenFamilyRepository families, Clock clock) {
+        return new DescribeCurrentSession(runner, families, clock);
     }
 
     @Bean

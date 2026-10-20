@@ -152,4 +152,13 @@ class SessionLifetimePolicyTest {
 
         assertThat(policy.isLive(other, OWNER, NOON)).isFalse();
     }
+
+    @Test
+    void aSessionWouldBecomeIdleThirtyMinutesAfterItsLastUse() {
+        assertThat(policy.idleExpiresAt(EIGHT)).isEqualTo(Instant.parse("2026-10-12T08:30:00Z"));
+        assertThat(policy.isIdle(EIGHT, policy.idleExpiresAt(EIGHT).minusNanos(1))).isFalse();
+        assertThat(policy.isIdle(EIGHT, policy.idleExpiresAt(EIGHT))).as("the instant itself is idle")
+                .isTrue();
+        assertThatThrownBy(() -> policy.idleExpiresAt(null)).isInstanceOf(NullPointerException.class);
+    }
 }

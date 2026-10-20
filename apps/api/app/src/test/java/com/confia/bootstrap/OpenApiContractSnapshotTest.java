@@ -180,8 +180,42 @@ class OpenApiContractSnapshotTest {
         Map<String, Object> problemDetail = schemaOf(parse(normalizedDocumentOf(appProfile)),
                 ContractSchemas.PROBLEM_DETAIL);
 
-        assertThat(asMap(problemDetail.get("properties")))
-                .containsOnlyKeys("type", "title", "status", "detail", "instance", "traceId");
+        assertThat(asMap(problemDetail.get("properties"))).containsOnlyKeys("type", "title",
+                "status", "detail", "instance", "traceId", "errors");
+    }
+
+    /**
+     * WE38 and BI26: {@code errors}, the RFC 9457 extension member of a {@code validation-failed}
+     * response, is declared by the schema in both documents: an optional array of objects with a
+     * {@code field} and a {@code reason}, both text, and nothing else.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"admin", "portal"})
+    void problemDetailDeclaresErrorsAsAnOptionalArrayOfFieldAndReason(String appProfile) {
+        Map<String, Object> problemDetail = schemaOf(parse(normalizedDocumentOf(appProfile)),
+                ContractSchemas.PROBLEM_DETAIL);
+
+        Map<String, Object> errors = asMap(asMap(problemDetail.get("properties")).get("errors"));
+        assertThat(typeOf(errors)).isEqualTo("array");
+        Map<String, Object> item = asMap(errors.get("items"));
+        assertThat(typeOf(item)).isEqualTo("object");
+        Map<String, Object> itemProperties = asMap(item.get("properties"));
+        assertThat(itemProperties).containsOnlyKeys("field", "reason");
+        assertThat(typeOf(asMap(itemProperties.get("field")))).isEqualTo("string");
+        assertThat(typeOf(asMap(itemProperties.get("reason")))).isEqualTo("string");
+        assertThat(asList(item.get("required"))).containsExactlyInAnyOrder("field", "reason");
+        assertThat(problemDetail.get("required"))
+                .as("errors is optional: only a validation failure carries it").isNull();
+    }
+
+    @Test
+    void theBearerSchemeIsDeclaredAsHttpBearerJwtInTheAdministrativeDocument() {
+        Map<String, Object> components = asMap(parse(normalizedDocumentOf("admin"))
+                .get("components"));
+
+        assertThat(asMap(asMap(components.get("securitySchemes")).get("bearerAuth")))
+                .containsEntry("type", "http").containsEntry("scheme", "bearer")
+                .containsEntry("bearerFormat", "JWT");
     }
 
     private static String normalizedDocumentOf(String appProfile) {

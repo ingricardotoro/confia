@@ -15,7 +15,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
  * playbook, section 1). That is how a test tells a rejection that is committed, because it is a
  * returned value, from a failure that is rolled back.
  */
-final class JdbcStubTransactions {
+public final class JdbcStubTransactions {
 
     private JdbcStubTransactions() {
     }
@@ -24,11 +24,20 @@ final class JdbcStubTransactions {
      * Every JDBC call does nothing and returns the default of its type, except that {@code commit}
      * and {@code rollback} are added to {@code calls}.
      */
-    static TransactionRunner runner(List<String> calls) {
+    public static TransactionRunner runner(List<String> calls) {
+        return runner(calls, new java.util.ArrayList<>());
+    }
+
+    /**
+     * As above, and every value the transaction passes to {@code setReadOnly} is added, as text, to
+     * {@code readOnlyFlags}: how a unit test tells a read-only transaction from a read-write one.
+     */
+    public static TransactionRunner runner(List<String> calls, List<String> readOnlyFlags) {
         PreparedStatement statement = stub(PreparedStatement.class, (proxy, method, args) -> null);
         Connection connection = stub(Connection.class, (proxy, method, args) -> {
             switch (method.getName()) {
                 case "commit", "rollback" -> calls.add(method.getName());
+                case "setReadOnly" -> readOnlyFlags.add(String.valueOf(args[0]));
                 case "prepareStatement" -> {
                     return statement;
                 }
