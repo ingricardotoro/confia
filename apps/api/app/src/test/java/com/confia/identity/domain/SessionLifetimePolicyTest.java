@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -103,5 +104,52 @@ class SessionLifetimePolicyTest {
         assertThat(policy.isAbsolutelyExpired(end, Instant.parse("2026-10-12T19:59:59Z"))).isFalse();
         assertThat(policy.isAbsolutelyExpired(end, end)).isTrue();
         assertThat(policy.isAbsolutelyExpired(end, Instant.parse("2026-10-12T20:00:01Z"))).isTrue();
+    }
+
+    // --- Whether a family is live (decision 7; scenarios I115 and I116) ---
+
+    private static final StaffAccountId OWNER = new StaffAccountId(UUID.randomUUID());
+    private static final Instant NOON = Instant.parse("2026-10-12T12:00:00Z");
+
+    private static RefreshTokenFamilyState family(StaffAccountId account, Instant lastUsedAt,
+            Instant absoluteEnd, Instant revokedAt) {
+        return new RefreshTokenFamilyState(UUID.randomUUID(), account, false, lastUsedAt,
+                absoluteEnd, revokedAt);
+    }
+
+    @Test
+    void aFamilyOfTheOwnerThatIsNotRevokedNotEndedAndNotIdleIsLive() {
+        RefreshTokenFamilyState live = family(OWNER, NOON.minus(Duration.ofMinutes(29)),
+                NOON.plusSeconds(1), null);
+
+        assertThat(policy.isLive(live, OWNER, NOON)).isTrue();
+    }
+
+    @Test
+    void aRevokedFamilyIsNeverLiveWhateverItsWindow() {
+        RefreshTokenFamilyState revoked = family(OWNER, NOON, NOON.plus(Duration.ofHours(1)),
+                NOON.minusSeconds(60));
+
+        assertThat(policy.isLive(revoked, OWNER, NOON)).isFalse();
+    }
+
+    @Test
+    void aFamilyIsNotLiveAtItsAbsoluteEndNorAtThirtyMinutesWithoutUse() {
+        assertThat(policy.isLive(family(OWNER, NOON, NOON, null), OWNER, NOON))
+                .as("the absolute end itself").isFalse();
+        assertThat(policy.isLive(family(OWNER, NOON.minus(Duration.ofMinutes(30)),
+                NOON.plus(Duration.ofHours(1)), null), OWNER, NOON))
+                .as("exactly thirty minutes without use").isFalse();
+        assertThat(policy.isLive(family(OWNER, NOON.minus(Duration.ofMinutes(30)).plusMillis(1),
+                NOON.plus(Duration.ofHours(1)), null), OWNER, NOON))
+                .as("a millisecond short of that").isTrue();
+    }
+
+    @Test
+    void aFamilyOfAnotherAccountIsNotLiveForTheActor() {
+        RefreshTokenFamilyState other = family(new StaffAccountId(UUID.randomUUID()), NOON,
+                NOON.plus(Duration.ofHours(1)), null);
+
+        assertThat(policy.isLive(other, OWNER, NOON)).isFalse();
     }
 }

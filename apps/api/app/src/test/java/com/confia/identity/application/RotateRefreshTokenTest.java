@@ -458,6 +458,12 @@ class RotateRefreshTokenTest {
         }
 
         @Override
+        public Optional<RefreshTokenFamilyState> readById(InstitutionId institutionId,
+                UUID familyId) {
+            throw new UnsupportedOperationException("the rotation locks its family, it never peeks");
+        }
+
+        @Override
         public void recordUse(InstitutionId institutionId, UUID familyId, Instant now) {
             calls.add("recordUse");
             usedAt = now;

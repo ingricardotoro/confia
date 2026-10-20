@@ -363,6 +363,55 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
         assertThat(waited).as("the second locker waited for the row lock of the first").isTrue();
     }
 
+    @Test
+    void aFamilyIsReadWithoutALockWithItsRevocationAndOnlyForItsOwnInstitution() {
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        UUID live = seedFamily(ana, true, EIGHT, SIXTEEN, TWENTY, null, null);
+        UUID revoked = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, SIXTEEN, "password_change");
+        InstitutionId other = new InstitutionId(UUID.randomUUID());
+
+        RefreshTokenFamilyState read = peek(live).orElseThrow();
+        RefreshTokenFamilyState gone = peek(revoked).orElseThrow();
+
+        assertThat(read.accountId()).isEqualTo(ana);
+        assertThat(read.secondFactorVerified()).isTrue();
+        assertThat(read.lastUsedAt()).isEqualTo(Instant.parse(SIXTEEN));
+        assertThat(read.absoluteExpiresAt()).isEqualTo(Instant.parse(TWENTY));
+        assertThat(read.isRevoked()).isFalse();
+        assertThat(gone.revokedAt()).as("a revoked family comes back revoked, not missing")
+                .isEqualTo(Instant.parse(SIXTEEN));
+        assertThat(peek(UUID.randomUUID())).isEmpty();
+        assertThat(transactionRunner().execute(contextOf(other),
+                () -> families().readById(other, live))).isEmpty();
+    }
+
+    /** Asking is not locking: a reader is not kept waiting by the holder of the lock of the family. */
+    @Test
+    void readingAFamilyDoesNotWaitForTheTransactionThatHoldsItsLock() throws Exception {
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<Boolean> holder = pool.submit(() -> transactionRunner().execute(context(), () -> {
+                boolean found = families().lockById(institutionId, family).isPresent();
+                locked.countDown();
+                awaitRelease(release);
+                return found;
+            }));
+            assertThat(locked.await(30, TimeUnit.SECONDS)).isTrue();
+
+            Future<Optional<RefreshTokenFamilyState>> reader = pool.submit(() -> peek(family));
+
+            assertThat(reader.get(LIMIT_MILLIS, TimeUnit.MILLISECONDS))
+                    .as("answered while the lock was still held").isPresent();
+            release.countDown();
+            assertThat(holder.get(60, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            release.countDown();
+        }
+    }
+
     // ---------------------------------------------------------------------------------------------
 
     private void clearConsumedAtOrBefore(UUID familyId, String cutoff) {
@@ -394,6 +443,11 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
     private Optional<RefreshTokenFamilyState> lock(UUID familyId) {
         return transactionRunner().execute(context(),
                 () -> families().lockById(institutionId, familyId));
+    }
+
+    private Optional<RefreshTokenFamilyState> peek(UUID familyId) {
+        return transactionRunner().execute(context(),
+                () -> families().readById(institutionId, familyId));
     }
 
     private boolean revokeForReuse(UUID familyId, String at) {

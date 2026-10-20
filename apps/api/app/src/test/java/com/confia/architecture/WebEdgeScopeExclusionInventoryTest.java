@@ -3,6 +3,7 @@ package com.confia.architecture;
 import static com.confia.architecture.ArchitectureTestSupport.productionClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.confia.identity.application.SessionLiveness;
 import com.confia.shared.security.RateLimiter;
 import com.confia.shared.security.SessionValidity;
 import com.confia.shared.web.testsupport.fixture.WebEdgeScopeViolationFixtures;
@@ -27,8 +28,9 @@ import org.springframework.security.authentication.AuthenticationProvider;
  * instituciones..."):
  *
  * <ul>
- *   <li>the session validity port has no implementation and no bean, and does not reach {@code
- *       identity} (owner: {@code session-tokens-and-web-layer}, slice C5b);
+ *   <li>the session validity port has exactly one implementation, in {@code identity}, is asked by
+ *       the authentication filter alone, is never returned by a lambda-backed factory and does not
+ *       reach {@code identity} (closed by {@code session-tokens-and-web-layer}, task 5.1);
  *   <li>no class is an {@code AuthenticationProvider} and none uses {@code
  *       jakarta.servlet.http.Cookie} (owner: {@code session-tokens-and-web-layer});
  *   <li>no authorization rule on a route beyond the public allow-list, the authenticated list (any
@@ -90,10 +92,13 @@ class WebEdgeScopeExclusionInventoryTest {
     private static final List<String> REDIS_CLIENT_PACKAGES = List.of("io.lettuce",
             "redis.clients", "org.redisson", "org.springframework.data.redis");
 
-    // --- The session validity port has no adapter (owner: session-tokens-and-web-layer, C5b) ---
+    // --- The session validity port has exactly one adapter, in identity (session-tokens-and-web-layer, 5.1) ---
+
+    private static final String FILTER = "com.confia.shared.web.authentication"
+            + ".AccessTokenAuthenticationFilter";
 
     @Test
-    void theSessionValidityPortIsAnInterfaceWithNoDependencyOnIdentityAndNoImplementation() {
+    void theSessionValidityPortIsAnInterfaceThatDoesNotDependOnIdentity() {
         JavaClasses production = assertNonEmptyProductionClasses();
 
         JavaClass port = production.get(SessionValidity.class);
@@ -109,50 +114,79 @@ class WebEdgeScopeExclusionInventoryTest {
                 .as("shared must not depend on identity: the port is what lets identity implement "
                         + "it without the arrow pointing back")
                 .isEmpty();
-
-        assertThat(implementationsOf(production, SessionValidity.class))
-                .as("no production class implements the session validity port: the "
-                        + "implementation is session-tokens-and-web-layer's (slice C5b)")
-                .isEmpty();
     }
 
     @Test
-    void theImplementationDetectorFindsAFixtureThatImplementsThePort() {
-        JavaClasses fixtures = new ClassFileImporter().importClasses(
+    void theSessionValidityPortHasExactlyOneProductionAdapterAndItBelongsToIdentity() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+
+        assertThat(implementationsOf(production, SessionValidity.class))
+                .containsExactly("com.confia.identity.application.SessionLiveness");
+        assertThat(adapterViolations(production)).isEmpty();
+    }
+
+    @Test
+    void theAdapterDetectorFindsAFixtureThatAddsASecondAdapterAndOneOutsideIdentity() {
+        JavaClasses withASecondOne = new ClassFileImporter().importClasses(
+                SessionLiveness.class, WebEdgeScopeViolationFixtures.SessionValidityAdapter.class);
+        JavaClasses outsideIdentity = new ClassFileImporter().importClasses(
                 WebEdgeScopeViolationFixtures.SessionValidityAdapter.class);
 
-        assertThat(implementationsOf(fixtures, SessionValidity.class))
-                .containsExactly(WebEdgeScopeViolationFixtures.SessionValidityAdapter.class
-                        .getName());
+        assertThat(implementationsOf(withASecondOne, SessionValidity.class)).hasSize(2);
+        assertThat(adapterViolations(withASecondOne))
+                .as("two adapters are not exactly one")
+                .anyMatch(violation -> violation.contains("exactly one"));
+        assertThat(adapterViolations(outsideIdentity))
+                .as("an adapter outside identity")
+                .anyMatch(violation -> violation.contains("outside com.confia.identity"));
     }
 
     /**
-     * The port has a single abstract method, so a lambda is an implementation that no class
-     * declares: a factory method that returns {@code SessionValidity} would be a bean with no
-     * implementing class. Any dependency on the port from another class (field, parameter,
-     * return type or call) is therefore forbidden until its owner closes the gap.
+     * The only production class that calls the port, besides the adapter that implements it, is the
+     * authentication filter. The wiring that hands the adapter to the filter holds the port in a
+     * parameter and never asks it anything, so it is not a consumer.
      */
     @Test
-    void noProductionClassOtherThanThePortItselfDependsOnIt() {
+    void theAuthenticationFilterIsTheOnlyProductionConsumerOfThePort() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+
+        assertThat(consumerViolations(production)).isEmpty();
+    }
+
+    @Test
+    void theConsumerDetectorFindsAFixtureThatAsksThePortOutsideTheFilter() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(
+                WebEdgeScopeViolationFixtures.SessionValidityConsumer.class);
+
+        assertThat(consumerViolations(fixtures)).containsExactly(
+                WebEdgeScopeViolationFixtures.SessionValidityConsumer.class.getName());
+    }
+
+    /**
+     * The port has a single abstract method, so a lambda is an adapter that no class declares: a
+     * factory method that returns {@code SessionValidity} would be a bean with no implementing class,
+     * which the adapter check cannot see. No production method returns the port.
+     */
+    @Test
+    void noProductionMethodReturnsThePortSoNoAdapterHidesInALambda() {
         JavaClasses production = assertNonEmptyProductionClasses();
 
         assertThat(production.stream().filter(javaClass -> javaClass.getName()
                 .equals(SessionValidity.class.getName())))
-                .as("the scanned set holds the port itself, which the scan must skip, so the "
-                        + "scan runs over a populated tree")
+                .as("the scanned set holds the port itself, so the scan runs over a populated tree")
                 .hasSize(1);
-        assertThat(classesDependingOnThePort(production))
-                .as("no production class holds, returns, takes or calls the session validity "
-                        + "port, which also rules out a lambda-backed bean")
+        assertThat(classesReturningThePort(production))
+                .as("no production class returns the session validity port, which rules out a "
+                        + "lambda-backed bean")
                 .isEmpty();
     }
 
     @Test
-    void theDependencyDetectorFindsAFixtureThatReturnsALambdaBackedPort() {
+    void theFactoryDetectorFindsAFixtureThatReturnsALambdaBackedPort() {
         JavaClasses fixtures = new ClassFileImporter().importClasses(
                 WebEdgeScopeViolationFixtures.LambdaSessionValidityFactory.class);
 
-        assertThat(classesDependingOnThePort(fixtures))
+        assertThat(classesReturningThePort(fixtures))
                 .containsExactly(WebEdgeScopeViolationFixtures.LambdaSessionValidityFactory
                         .class.getName());
     }
@@ -428,12 +462,42 @@ class WebEdgeScopeExclusionInventoryTest {
                 .toList();
     }
 
-    private static List<String> classesDependingOnThePort(JavaClasses classes) {
+    /** Why the classes do not hold exactly one adapter of the port, and in {@code identity}. */
+    private static List<String> adapterViolations(JavaClasses classes) {
+        List<String> adapters = implementationsOf(classes, SessionValidity.class);
+        List<String> violations = new java.util.ArrayList<>();
+        if (adapters.size() != 1) {
+            violations.add("expected exactly one adapter of the port and found " + adapters);
+        }
+        adapters.stream().filter(name -> !name.startsWith("com.confia.identity."))
+                .forEach(name -> violations.add(name + " is outside com.confia.identity"));
+        return violations;
+    }
+
+    /** The classes, other than the port, that call the method of the port. */
+    private static List<String> classesCallingThePort(JavaClasses classes) {
         return classes.stream()
                 .filter(javaClass -> !javaClass.getName().equals(SessionValidity.class.getName()))
-                .filter(javaClass -> javaClass.getDirectDependenciesFromSelf().stream()
-                        .anyMatch(dependency -> dependency.getTargetClass().getName()
+                .filter(javaClass -> javaClass.getMethodCallsFromSelf().stream()
+                        .anyMatch(call -> call.getTargetOwner().getName()
                                 .equals(SessionValidity.class.getName())))
+                .map(JavaClass::getName)
+                .sorted()
+                .toList();
+    }
+
+    /** The classes that call the port without being the authentication filter. */
+    private static List<String> consumerViolations(JavaClasses classes) {
+        return classesCallingThePort(classes).stream()
+                .filter(name -> !name.equals(FILTER))
+                .toList();
+    }
+
+    private static List<String> classesReturningThePort(JavaClasses classes) {
+        return classes.stream()
+                .filter(javaClass -> javaClass.getMethods().stream().anyMatch(method ->
+                        method.getRawReturnType().getName().equals(SessionValidity.class.getName())
+                                && !method.getOwner().isInterface()))
                 .map(JavaClass::getName)
                 .sorted()
                 .toList();

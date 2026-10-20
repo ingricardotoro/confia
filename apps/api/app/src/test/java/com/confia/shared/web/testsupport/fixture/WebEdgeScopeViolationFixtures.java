@@ -2,6 +2,7 @@ package com.confia.shared.web.testsupport.fixture;
 
 import com.confia.shared.security.ClientAddress;
 import com.confia.shared.security.RateLimitDecision;
+import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.RateLimiter;
 import com.confia.shared.security.SessionValidity;
 import com.confia.shared.web.delay.Delayed;
@@ -11,7 +12,6 @@ import jakarta.servlet.http.Cookie;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.time.Duration;
-import java.util.UUID;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -36,12 +36,26 @@ public final class WebEdgeScopeViolationFixtures {
     private WebEdgeScopeViolationFixtures() {
     }
 
-    /** An implementation of the session validity port, which has none in production. */
+    /** A second implementation of the session validity port, outside {@code identity}. */
     public static final class SessionValidityAdapter implements SessionValidity {
 
         @Override
-        public boolean isActive(UUID sessionId) {
+        public boolean isActive(AuthenticatedActor actor) {
             return false;
+        }
+    }
+
+    /** A class other than the authentication filter that asks the session validity port. */
+    public static final class SessionValidityConsumer {
+
+        private final SessionValidity validity;
+
+        public SessionValidityConsumer(SessionValidity validity) {
+            this.validity = validity;
+        }
+
+        public boolean stillValid(AuthenticatedActor actor) {
+            return validity.isActive(actor);
         }
     }
 
@@ -120,7 +134,7 @@ public final class WebEdgeScopeViolationFixtures {
     public static final class LambdaSessionValidityFactory {
 
         public SessionValidity alwaysActive() {
-            return sessionId -> true;
+            return actor -> true;
         }
     }
 

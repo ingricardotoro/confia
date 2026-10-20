@@ -56,6 +56,7 @@ public final class TransactionRunner {
     private final DataSource dataSource;
     private final TransactionTemplate readCommittedTemplate;
     private final TransactionTemplate serializableTemplate;
+    private final TransactionTemplate readOnlyTemplate;
     private final int maxRetries;
     private final Duration backoffBase;
 
@@ -73,6 +74,9 @@ public final class TransactionRunner {
                 newTemplate(transactionManager, TransactionDefinition.ISOLATION_READ_COMMITTED);
         this.serializableTemplate =
                 newTemplate(transactionManager, TransactionDefinition.ISOLATION_SERIALIZABLE);
+        this.readOnlyTemplate =
+                newTemplate(transactionManager, TransactionDefinition.ISOLATION_READ_COMMITTED);
+        this.readOnlyTemplate.setReadOnly(true);
     }
 
     /** {@code READ COMMITTED}, the default for every use case that does not require otherwise. */
@@ -82,10 +86,23 @@ public final class TransactionRunner {
 
     /** Explicit isolation level, for the use cases ADR-0010 requires {@code SERIALIZABLE} for. */
     public <T> T execute(SecurityContext context, IsolationLevel isolation, Supplier<T> useCase) {
-        Objects.requireNonNull(context, "context");
         Objects.requireNonNull(isolation, "isolation");
+        return execute(context, templateFor(isolation), useCase);
+    }
+
+    /**
+     * {@code READ COMMITTED} in a transaction the engine refuses to write in, for a check that only
+     * reads: it sets the same security context, so row-level security applies exactly as it does
+     * everywhere else, and the connection goes back to the pool read-write.
+     */
+    public <T> T executeReadOnly(SecurityContext context, Supplier<T> useCase) {
+        return execute(context, readOnlyTemplate, useCase);
+    }
+
+    private <T> T execute(SecurityContext context, TransactionTemplate template,
+            Supplier<T> useCase) {
+        Objects.requireNonNull(context, "context");
         Objects.requireNonNull(useCase, "useCase");
-        TransactionTemplate template = templateFor(isolation);
         int retriesUsed = 0;
         while (true) {
             try {

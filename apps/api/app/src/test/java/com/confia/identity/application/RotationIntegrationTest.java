@@ -228,6 +228,12 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
         }
 
         @Override
+        public Optional<RefreshTokenFamilyState> readById(InstitutionId institutionId,
+                UUID familyId) {
+            return real.readById(institutionId, familyId);
+        }
+
+        @Override
         public void recordUse(InstitutionId institutionId, UUID familyId, Instant now) {
             real.recordUse(institutionId, familyId, now);
         }
