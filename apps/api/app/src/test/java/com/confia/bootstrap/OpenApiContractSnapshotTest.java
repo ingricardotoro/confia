@@ -143,9 +143,11 @@ class OpenApiContractSnapshotTest {
         assertThat(portal).isNotEqualTo(admin);
         assertThat(titleOf(admin)).isEqualTo(ConfiaApplication.ADMIN_API_TITLE);
         assertThat(titleOf(portal)).isEqualTo(ConfiaApplication.PORTAL_API_TITLE);
-        // Disjointness, not doesNotContainAnyElementsOf: AssertJ rejects an empty iterable there,
-        // and today both documents have zero paths. The check becomes meaningful with the first
-        // controller, and until then it is vacuous by construction, which is said here.
+        // Disjointness, not doesNotContainAnyElementsOf: AssertJ rejects an empty iterable there.
+        // Non-vacuous since the first controller: the administrative document holds a path (the
+        // portal still holds none, so the check says that no path of the one is in the other).
+        assertThat(pathsOf(admin)).as("non-vacuous: the administrative document has its operation")
+                .isNotEmpty();
         assertThat(Collections.disjoint(pathsOf(portal), pathsOf(admin)))
                 .as("no operation of the administrative process may be served by the portal")
                 .isTrue();
@@ -208,6 +210,63 @@ class OpenApiContractSnapshotTest {
                 .as("errors is optional: only a validation failure carries it").isNull();
     }
 
+    // --- The first operation of production (decision 13; BI24 to BI27, WE39) ---
+
+    private static final String SESSION_PATH = "/api/v1/auth/sessions/current";
+
+    @Test
+    void theAdministrativeDocumentHoldsExactlyTheCurrentSessionOperation() {
+        Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
+
+        assertThat(pathsOf(admin)).containsExactly(SESSION_PATH);
+        Map<String, Object> path = asMap(asMap(admin.get("paths")).get(SESSION_PATH));
+        assertThat(path).as("one operation: GET, and no other method").containsOnlyKeys("get");
+        Map<String, Object> operation = asMap(path.get("get"));
+        assertThat(asMap(operation.get("responses")))
+                .as("exactly the approved responses: no 403, no 429, nothing the translator adds")
+                .containsOnlyKeys("200", "401", "500");
+        assertThat(asList(operation.get("security"))).hasSize(1);
+        assertThat(asMap(asList(operation.get("security")).get(0))).containsOnlyKeys("bearerAuth");
+        assertThat(operation.get("parameters")).as("no parameter: the actor is the token").isNull();
+        assertThat(operation.get("requestBody")).as("a read has no body").isNull();
+    }
+
+    @Test
+    void theErrorResponsesArePlainProblemDetailsAndTheSuccessIsTheDtoInJson() {
+        Map<String, Object> responses = asMap(asMap(asMap(asMap(parse(
+                normalizedDocumentOf("admin")).get("paths")).get(SESSION_PATH)).get("get"))
+                .get("responses"));
+
+        for (String code : List.of("401", "500")) {
+            Map<String, Object> content = asMap(asMap(responses.get(code)).get("content"));
+            assertThat(content).as("the %s response", code).containsOnlyKeys("application/problem+json");
+            assertThat(asMap(asMap(content.get("application/problem+json")).get("schema")))
+                    .containsEntry("$ref", "#/components/schemas/ProblemDetail");
+        }
+        Map<String, Object> success = asMap(asMap(responses.get("200")).get("content"));
+        assertThat(success).containsOnlyKeys("application/json");
+        assertThat(asMap(asMap(success.get("application/json")).get("schema")))
+                .containsEntry("$ref", "#/components/schemas/CurrentSessionResponse");
+    }
+
+    @Test
+    void theDtoSchemaIsTheClosedListOfSevenRequiredMembers() {
+        Map<String, Object> dto = schemaOf(parse(normalizedDocumentOf("admin")),
+                "CurrentSessionResponse");
+
+        Map<String, Object> properties = asMap(dto.get("properties"));
+        assertThat(properties).containsOnlyKeys("sessionId", "accountId", "institutionId",
+                "authenticationMethods", "accessTokenExpiresAt", "sessionExpiresAt",
+                "idleExpiresAt");
+        assertThat(asList(dto.get("required"))).containsExactlyInAnyOrder("sessionId", "accountId",
+                "institutionId", "authenticationMethods", "accessTokenExpiresAt",
+                "sessionExpiresAt", "idleExpiresAt");
+        for (String instant : List.of("accessTokenExpiresAt", "sessionExpiresAt", "idleExpiresAt")) {
+            assertThat(asMap(properties.get(instant))).containsEntry("format", "date-time");
+        }
+        assertThat(asMap(properties.get("authenticationMethods"))).containsEntry("type", "array");
+    }
+
     @Test
     void theBearerSchemeIsDeclaredAsHttpBearerJwtInTheAdministrativeDocument() {
         Map<String, Object> components = asMap(parse(normalizedDocumentOf("admin"))
@@ -216,6 +275,39 @@ class OpenApiContractSnapshotTest {
         assertThat(asMap(asMap(components.get("securitySchemes")).get("bearerAuth")))
                 .containsEntry("type", "http").containsEntry("scheme", "bearer")
                 .containsEntry("bearerFormat", "JWT");
+    }
+
+    /** BI27. */
+    @Test
+    void thePortalDocumentStillHoldsNoOperation() {
+        assertThat(pathsOf(parse(normalizedDocumentOf("portal")))).isEmpty();
+    }
+
+    /**
+     * BI25, the negative control: the document of a route to which the translator added a response
+     * nobody approved (a {@code 403} and a {@code 429} here) fails the comparison naming that
+     * response, so a response that appears without a visible edit of the snapshot cannot pass.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"403", "429"})
+    void anUnapprovedResponseOfTheTranslatorFailsNamingTheAddedResponse(String code,
+            @TempDir Path temporary) throws IOException {
+        Map<String, Object> altered = parse(Files.readString(
+                SNAPSHOT_DIRECTORY.resolve(fileNameOf("admin")), StandardCharsets.UTF_8));
+        asMap(asMap(asMap(asMap(altered.get("paths")).get(SESSION_PATH)).get("get"))
+                .get("responses")).put(code, new TreeMap<String, Object>(
+                        Map.of("description", "added by the translator")));
+        String generated = JSON.writerWithDefaultPrettyPrinter()
+                .writeValueAsString(sorted(altered)).replace("\r\n", "\n") + "\n";
+        Path snapshotDirectory = Files.createDirectories(temporary.resolve("openapi"));
+        Files.writeString(snapshotDirectory.resolve(fileNameOf("admin")),
+                Files.readString(SNAPSHOT_DIRECTORY.resolve(fileNameOf("admin")),
+                        StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+
+        assertThatThrownBy(() -> verifyAgainstSnapshot("admin", generated, snapshotDirectory,
+                temporary.resolve("generated"), false))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("first at $.paths." + SESSION_PATH + ".get.responses." + code);
     }
 
     private static String normalizedDocumentOf(String appProfile) {

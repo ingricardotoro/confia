@@ -84,6 +84,23 @@ class WebLayerTokenIsolationTest {
                 "com.confia.shared.web.problem.ProblemBody");
     }
 
+    /**
+     * BI15: the rule evaluates the real controller of the current session, in a business module's
+     * web package, and the controller depends on nothing of the token package: it reads the
+     * principal the filter already authenticated.
+     */
+    @Test
+    void theRuleEvaluatesTheRealCurrentSessionControllerAndItNamesNothingOfTheTokenPackage() {
+        JavaClass controller = productionClasses().get(
+                "com.confia.identity.web.CurrentSessionController");
+
+        assertThat(controller.getPackageName()).contains(".web");
+        assertThat(controller.getDirectDependenciesFromSelf().stream()
+                .map(dependency -> dependency.getTargetClass().getPackageName()))
+                .noneMatch(name -> name.startsWith("com.confia.shared.security.token"));
+        assertThat(isExempt(controller.getName())).isFalse();
+    }
+
     /** The exemption is by complete class name: an inner class follows its outer, nothing else does. */
     @Test
     void theExemptionNamesTheTwoClassesCompletelyAndNothingElse() {

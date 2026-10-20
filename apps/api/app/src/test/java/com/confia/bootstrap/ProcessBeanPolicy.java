@@ -80,6 +80,10 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // Each entry is exact because the non-vacuity check compares by equality.
                     "com.confia.identity.application", "com.confia.identity.infrastructure",
                     "com.confia.identity.infrastructure.wiring",
+                    // The web layer of identity (session-tokens-and-web-layer, task 5.2): the
+                    // controller of the current session and the named-interface package of the
+                    // configuration that registers it. Administrative only, each exact.
+                    "com.confia.identity.web", "com.confia.identity.web.wiring",
                     // The organization module as the two packages its beans come from: the
                     // adapter that resolves the current institution from the token, and the
                     // named-interface package of its configuration. Administrative only (a staff

@@ -1,6 +1,7 @@
 package com.confia.bootstrap.admin;
 
 import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
+import com.confia.identity.web.wiring.IdentityWebConfiguration;
 import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
 import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
 import com.confia.shared.platform.infrastructure.SharedPlatformConfiguration;
@@ -54,7 +55,7 @@ import org.springframework.context.annotation.Import;
 @EnableAutoConfiguration(exclude = {UserDetailsServiceAutoConfiguration.class,
         ErrorMvcAutoConfiguration.class})
 @Import({ContractSchemas.class, ProcessApiInfo.class, SharedPlatformConfiguration.class,
-        IdentityConfiguration.class, OrganizationConfiguration.class,
+        IdentityConfiguration.class, IdentityWebConfiguration.class, OrganizationConfiguration.class,
         WebEdgeConfiguration.class, AdminSecurityConfiguration.class,
         ObservabilityMetricsConfiguration.class, RateLimiterConfiguration.class,
         ThrottlingConfiguration.class, RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,

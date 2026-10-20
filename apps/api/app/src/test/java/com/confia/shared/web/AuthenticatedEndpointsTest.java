@@ -13,8 +13,8 @@ import org.springframework.http.HttpMethod;
 
 /**
  * Specs/web-edge, "La lista de rutas autenticadas es cerrada" (session-tokens-and-web-layer
- * design.md, decision 5): the list is defined in one place, parallel to {@code PublicEndpoints}, is
- * empty in production until the session endpoint arrives, and cannot be changed after it is built.
+ * design.md, decision 5): the list is defined in one place, parallel to {@code PublicEndpoints}, holds
+ * the one route of the current session in production, and cannot be changed after it is built.
  */
 class AuthenticatedEndpointsTest {
 
@@ -24,8 +24,10 @@ class AuthenticatedEndpointsTest {
             "/test/live", SessionCheck.LIVE_SESSION);
 
     @Test
-    void theProductionListIsEmptyUntilTheSessionEndpointArrives() {
-        assertThat(AuthenticatedEndpoints.forAdmin().endpoints()).isEmpty();
+    void theProductionListHoldsExactlyTheCurrentSessionRouteWithTheLiveSessionCheck() {
+        assertThat(AuthenticatedEndpoints.forAdmin().endpoints()).containsExactly(
+                new AuthenticatedEndpoint(HttpMethod.GET, "/api/v1/auth/sessions/current",
+                        SessionCheck.LIVE_SESSION));
     }
 
     @Test
