@@ -577,6 +577,15 @@ de un cajero. La acción se audita siempre.
 > - **Pendiente con dueño, cambio de correo posterior al cambio 9:** el envío real del enlace y el
 >   aviso al titular tras el restablecimiento, con IP y momento; la IP la aporta además
 >   `session-tokens-and-web-layer`.
+>
+> **Nota editorial, 2026-10-19 (`session-tokens-and-web-layer`, archivo).** La cláusula «cierra todas las
+> sesiones activas» de la fila «Efecto» debe leerse con una precisión. Al restablecer la contraseña se
+> revocan en la misma transacción todas las familias de refresco vivas de la cuenta (prueba I24). Un token
+> de acceso ya emitido, en cambio, sigue aceptándose en las rutas que no declaran la comprobación de sesión
+> `LIVE_SESSION`: esas rutas solo verifican la firma, el emisor, la audiencia y la vigencia, así que el
+> token puede seguir valiendo hasta 10 minutos después del cambio de contraseña (decisión 7 y escenario I118
+> de `identity`). Las rutas `LIVE_SESSION` consultan la familia en cada petición y rechazan el token en
+> cuanto la familia está revocada (I117). Esta ventana no la cierra el cambio `session-tokens-and-web-layer`.
 
 ---
 
