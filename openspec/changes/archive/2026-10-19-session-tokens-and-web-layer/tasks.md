@@ -3,7 +3,7 @@
 - **Cambio:** `session-tokens-and-web-layer` (F0, cambio 7, parte 4b, primer cambio de tres)
 - **Fase:** tareas
 - **Fecha:** 2026-10-06
-- **Estado:** pendiente de aprobación del propietario
+- **Estado:** completado y archivado el 2026-10-19 (corrección de archivo: la línea original, «pendiente de aprobación del propietario», era de la fase de tareas y quedó obsoleta al cerrar el cambio; el resto del documento no se modifica)
 - **Entradas aprobadas:** `proposal.md` (con «Decisiones del propietario»), `design.md` (secciones 3, 7, 8, 9 y 14, y las
   notas fechadas de 2.1) y los deltas `specs/identity/spec.md` (124 escenarios), `specs/web-edge/spec.md` (68),
   `specs/build-integrity/spec.md` (43) y `specs/organization/spec.md` (12): **247 escenarios**
