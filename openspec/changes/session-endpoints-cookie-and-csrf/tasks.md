@@ -125,7 +125,7 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
 
 ## Fase 1: defensa del borde antes de cualquier cookie
 
-- [ ] 1.1 **PR 1 `csrf-and-origin-protection`: CSRF de doble envío vinculado al refresco, `Origin` obligatorio, clave y condición 3 sobre arnés (decisiones 2, 3 y 4 del diseño).**
+- [x] 1.1 **PR 1 `csrf-and-origin-protection`: CSRF de doble envío vinculado al refresco, `Origin` obligatorio, clave y condición 3 sobre arnés (decisiones 2, 3 y 4 del diseño).**
   - **ROJO, ataques primero.** Crear en `test/java/com/confia/shared/security/csrf/`: `CsrfTokensTest.java` (ida y vuelta; un bit alterado en
     el aleatorio y en el MAC; MAC de otro refresco; clave anterior acepta y emite con la actual; longitud, relleno `=`, `+`, `/` y bits de cola
     rechazados; todo rechazo es `false`, nunca excepción) y `CsrfTokensProperties.java` (jqwik: todo token alterado en una posición se rechaza).
@@ -178,6 +178,16 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
     1a `csrf-token-and-keys` (`CsrfTokens`, `CsrfKeys`, `CsrfConfiguration`, guardián, pruebas de arranque y de token) y 1b `csrf-origin-filter`
     (`AllowedOrigins`, `CsrfOriginFilter`, arnés, orden de filtros, códigos y documentación); la condición 3 se cierra en 1b. — Escenarios WE43 a
     WE50, WE53, WE55, WE57 a WE61, WE89 a WE91, «Recurso inexistente bajo un prefijo de documentación», «Un código desconocido no se filtra», BI55 y BI58.
+  - **Nota fechada 2026-10-21 (partición de 1.1 en 01a, 01b y 01c).** La medición de la tarea completa fue de 2 489 líneas efectivas
+    (`git diff --numstat` sin `openspec/`), frente a 730 estimadas. Se partió sin consulta por archivos completos: 01a
+    `csrf-token-and-keys` (1 049), 01b `allowed-origins-and-csrf-code` (457) y 01c `csrf-origin-filter` (983). La costura nombrada
+    1a/1b dejaba 1b en unas 1 440 líneas, de modo que se separó además la validación de `confia.web.allowed-origins`, el código
+    `csrf-invalid`, el escaneo de claves (WE61) y las notas de `docs/03` y `docs/05`. 01a y 01c quedan por encima de 800 (la primera por
+    el peso de sus pruebas de ataque y de arranque, la segunda por el arnés de cookie y la condición 3); no hay una costura nombrada
+    que las reduzca sin separar una prueba de lo que prueba. La casilla se marca en 01c; la condición 3, parte del arnés, se cierra allí
+    (`CsrfOriginFilterTest` en verde, su variante con el filtro deshabilitado fallando y `rg` sin resultados en `src/main`).
+    El filtro lee las cookies de la cabecera `Cookie` y no con `jakarta.servlet.http.Cookie`, porque la inversión del inventario
+    («exactamente `SessionCookies`») llega en 1.3; 1.3 puede sustituir esa lectura por `SessionCookies.read`.
 
 - [ ] 1.2 **PR 2 `audit-json-serializer`: constructor tipado del JSON de auditoría y migración de los 16 sitios (F1c, decisión 17, DA-13 *a*).**
   - **ROJO.** Crear `test/java/com/confia/shared/audit/AuditJsonTest.java` (escape de comillas, barra inversa, rango C0 y no ASCII; ida y vuelta
