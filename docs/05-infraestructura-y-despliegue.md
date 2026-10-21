@@ -872,6 +872,26 @@ nunca en el repositorio, conforme a `CLAUDE.md`, regla 13.
 > anulando la lista. El agente de usuario se guarda truncado a `confia.web.user-agent-max-length`
 > caracteres (512 por omisión).
 
+> **Nota fechada 2026-10-21 (cambio `session-endpoints-cookie-and-csrf`, PR 1 `csrf-and-origin-protection`):
+> orígenes permitidos y clave CSRF del proceso administrativo.**
+>
+> | Variable de entorno | Propiedad | Formato | Obligatoria |
+> |---|---|---|---|
+> | `CONFIA_WEB_ALLOWEDORIGINS` | `confia.web.allowed-origins` | Orígenes `esquema://host[:puerto]` separados por comas, en minúsculas, sin ruta, sin barra final, sin comodines ni usuario; `https`, salvo `http` para `localhost` y `127.0.0.1`. **Vacía por omisión** | No, pero con ella vacía ninguna petición mutadora pasa |
+> | `CONFIA_SECURITY_CSRF_KEY` | `confia.security.csrf.key` | Base64 estándar de al menos 32 bytes | Sí, solo en `admin` |
+> | `CONFIA_SECURITY_CSRF_PREVIOUSKEY` | `confia.security.csrf.previous-key` | Igual que la vigente, distinta de ella; solo verifica | No, solo durante una rotación |
+>
+> Una entrada inválida de la lista, una clave ausente, corta, que no sea Base64 o una clave anterior
+> igual a la vigente detienen el arranque con un mensaje que nombra la propiedad (y la posición de la
+> entrada) y nunca repite el valor. El portal y el trabajador abortan si aparece cualquiera de las dos
+> claves. Ningún archivo del repositorio fija una clave; solo `application-local.yml` fija un origen,
+> el del servidor de Vite (`http://localhost:5173`). Las pruebas generan su clave en cada ejecución.
+>
+> La fila `SESSION_COOKIE_DOMAIN` de la tabla de variables queda **sin efecto**: las cookies de sesión
+> y CSRF usan prefijos `__Secure-` y `__Host-` y la segunda **prohíbe** el atributo `Domain`, de modo
+> que ningún dominio de cookie se configura (ver `docs/03-seguridad.md` §8.3). La fila se conserva
+> sin reescribir; esta nota la retira de uso.
+
 > **Nota fechada 2026-10-07 (cambio `session-tokens-and-web-layer`, PR 2 `signing-key-ring`): claves
 > de firma del proceso administrativo.** El proceso `admin` firma y verifica el token de acceso con
 > un anillo de claves Ed25519: una clave vigente (`current`), que firma y verifica, y, durante una

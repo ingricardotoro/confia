@@ -42,7 +42,7 @@ class RequestContextFilterUnitTest {
     private static final String SECRET_MESSAGE = "jdbc:postgresql://host/db password=hunter2";
 
     private final RequestContextFilter filter = new RequestContextFilter(writer(),
-            new WebEdgeProperties(List.of("10.0.0.1"), 20));
+            new WebEdgeProperties(List.of("10.0.0.1"), 20, List.of()));
     private final Logger logger = (Logger) LoggerFactory.getLogger(RequestContextFilter.class);
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
 

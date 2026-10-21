@@ -1152,6 +1152,32 @@ Este control no aplica a la API consumida por la futura app móvil, que usa toke
 válida y sin cabecera `X-CSRF-Token`, y espera 403. Otra que envía un token CSRF válido de otra
 sesión y espera 403.
 
+> **Nota fechada 2026-10-21 (cambio `session-endpoints-cookie-and-csrf`, PR 1 `csrf-and-origin-protection`):
+> alcance, formato del token, clave anterior y orden de las reglas.**
+>
+> - **Alcance (decisión DA-4 *a*).** El token de doble envío se exige solo en las rutas cuya credencial
+>   es una cookie que el navegador envía por sí mismo: el refresco (`POST /api/v1/auth/sessions/refresh`)
+>   y el cierre de la sesión actual (`DELETE /api/v1/auth/sessions/current`). El inicio de sesión no
+>   lleva token CSRF previo: lo protegen la regla de `Origin`, el tipo de contenido `application/json`
+>   y `SameSite=Strict`. Las rutas con `Bearer` solo pasan la regla de `Origin`.
+> - **Formato.** `B64U(r) "." B64U(HMAC-SHA256(k, r || SHA-256(refresco)))`, con `r` de 32 bytes
+>   aleatorios y cada parte de 43 caracteres en base64url sin relleno, canónico. El vínculo es el hash
+>   del refresco y no el identificador de sesión: se verifica sin leer la base de datos ni exigir un
+>   token de acceso, que el refresco no trae. El token se reemite con cada emisión o rotación de la
+>   cookie de sesión.
+> - **Clave anterior.** `confia.security.csrf.key` (Base64 estándar, al menos 32 bytes, obligatoria en
+>   el proceso administrativo) y, durante una rotación, `confia.security.csrf.previous-key`, que solo
+>   verifica. El siguiente refresco acepta el token firmado con la anterior y lo reemite con la
+>   vigente; la anterior se retira pasada la vida absoluta de una sesión (12 horas). El portal y el
+>   trabajador abortan si cualquiera de las dos aparece en su entorno.
+> - **Orden de las reglas (paso 4 del esquema).** (1) Un método seguro pasa. (2) Todo método no seguro
+>   exige exactamente un `Origin` igual a uno de `confia.web.allowed-origins`; vacía por omisión, con
+>   ella vacía ninguna petición mutadora pasa. (3) Una ruta de cookie **con** cookie de sesión exige una
+>   sola cookie CSRF, una sola cabecera `X-CSRF-Token`, iguales entre sí, con HMAC válido para ese
+>   refresco; dos cookies de sesión se rechazan sin elegir ninguna. (4) Una ruta de cookie **sin**
+>   cookie de sesión no exige token (no hay credencial ambiental que proteger) pero sí `Origin`. El
+>   rechazo es siempre `403 csrf-invalid`, sin distinguir la causa.
+
 ### 8.4 Configuración nginx de ejemplo
 
 Configuración del portal público. La del panel administrativo agrega restricción por IP y omite

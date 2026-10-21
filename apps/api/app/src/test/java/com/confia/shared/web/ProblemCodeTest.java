@@ -32,7 +32,7 @@ class ProblemCodeTest {
                         "idempotency-conflict", "unsupported-media-type",
                         "idempotency-key-missing", "idempotency-payload-mismatch",
                         "too-many-requests", "internal-error", "capacity-exceeded", "token-invalid",
-                        "token-expired");
+                        "token-expired", "csrf-invalid");
     }
 
     @Test
@@ -48,7 +48,7 @@ class ProblemCodeTest {
             "resource-not-found, 404", "method-not-allowed, 405", "idempotency-conflict, 409",
             "unsupported-media-type, 415", "idempotency-payload-mismatch, 422",
             "too-many-requests, 429", "internal-error, 500", "capacity-exceeded, 503",
-            "token-invalid, 401", "token-expired, 401"})
+            "token-invalid, 401", "token-expired, 401", "csrf-invalid, 403"})
     void eachCodeCarriesItsHttpStatus(String code, int status) {
         assertThat(ProblemCode.ofCode(code)).get().extracting(ProblemCode::status)
                 .isEqualTo(status);
@@ -59,7 +59,7 @@ class ProblemCodeTest {
             "resource-not-found", "method-not-allowed", "unsupported-media-type",
             "too-many-requests", "internal-error", "capacity-exceeded", "idempotency-conflict",
             "idempotency-payload-mismatch", "idempotency-key-missing", "token-invalid",
-            "token-expired"})
+            "token-expired", "csrf-invalid"})
     void theTypeIsTheStableBaseFollowedByTheCodeAndNothingElse(String code) {
         ProblemCode problem = ProblemCode.ofCode(code).orElseThrow();
         assertThat(problem.type()).isEqualTo(URI.create("https://confia.hn/problems/" + code));

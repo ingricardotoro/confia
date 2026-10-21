@@ -42,6 +42,7 @@ public enum ProblemCode {
     AUTHENTICATION_REQUIRED("authentication-required", 401),
     TOKEN_INVALID("token-invalid", 401),
     TOKEN_EXPIRED("token-expired", 401),
+    CSRF_INVALID("csrf-invalid", 403),
     FORBIDDEN("forbidden", 403),
     RESOURCE_NOT_FOUND("resource-not-found", 404),
     METHOD_NOT_ALLOWED("method-not-allowed", 405),

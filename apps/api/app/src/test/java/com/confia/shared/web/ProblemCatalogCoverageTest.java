@@ -157,6 +157,20 @@ class ProblemCatalogCoverageTest {
     }
 
     @Test
+    void theCsrfCodeHasItsOwnEntriesInTheCatalogAndACatalogWithoutThemFails() {
+        Properties catalog = loadCatalog();
+
+        assertThat(ProblemCode.ofCode("csrf-invalid")).isPresent();
+        assertThat(catalog.getProperty("problem.csrf-invalid.title")).isNotBlank();
+        assertThat(catalog.getProperty("problem.csrf-invalid.detail")).isNotBlank();
+        catalog.remove("problem.csrf-invalid.title");
+        catalog.remove("problem.csrf-invalid.detail");
+        assertThat(codesWithoutAMessage(catalog)).containsExactlyInAnyOrder(
+                "csrf-invalid (problem.csrf-invalid.title)",
+                "csrf-invalid (problem.csrf-invalid.detail)");
+    }
+
+    @Test
     void aCatalogWithoutTheSpanishEntryOfTokenExpiredFailsNamingIt() {
         Properties catalog = loadCatalog();
         catalog.remove("problem.token-expired.title");
