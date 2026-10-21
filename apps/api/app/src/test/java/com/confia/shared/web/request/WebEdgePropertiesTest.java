@@ -122,6 +122,49 @@ class WebEdgePropertiesTest {
                 assertThat(messagesOf(failure)).contains("confia.web.user-agent-max-length"));
     }
 
+    @Test
+    void theAllowedOriginsAreEmptyWhenAbsentAndBoundAsWrittenOtherwise() {
+        assertThat(bind().allowedOrigins()).isEmpty();
+        assertThat(bind(properties(Map.of("confia.web.allowed-origins",
+                "https://admin.colegio.edu.hn,http://localhost:5173"))).allowedOrigins())
+                .containsExactly("https://admin.colegio.edu.hn", "http://localhost:5173");
+    }
+
+    @Test
+    void anInvalidAllowedOriginStopsTheStartNamingThePropertyAndThePositionButNotTheEntry() {
+        MapPropertySource source = properties(Map.of("confia.web.allowed-origins[0]",
+                "https://admin.colegio.edu.hn", "confia.web.allowed-origins[1]",
+                "https://admin.colegio.edu.hn/ruta"));
+
+        assertThatThrownBy(() -> bind(source)).satisfies(failure ->
+                assertThat(messagesOf(failure)).contains("confia.web.allowed-origins[1]")
+                        .doesNotContain("allowed-origins[0]").doesNotContain("/ruta"));
+    }
+
+    @Test
+    void theEnvironmentVariableFeedsTheAllowedOrigins() {
+        String name = "test-" + StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME;
+        SystemEnvironmentPropertySource environment = new SystemEnvironmentPropertySource(name,
+                Map.of("CONFIA_WEB_ALLOWEDORIGINS", "https://admin.colegio.edu.hn"));
+
+        assertThat(bind(environment).allowedOrigins()).containsExactly("https://admin.colegio.edu.hn");
+    }
+
+    @Test
+    void onlyTheLocalProfileFixesAnAllowedOriginAndItIsTheViteServer() throws IOException {
+        for (String name : PROFILES) {
+            for (PropertySource<?> source : new YamlPropertySourceLoader()
+                    .load(name, new ClassPathResource(name))) {
+                Object value = ((MapPropertySource) source).getProperty("confia.web.allowed-origins");
+                if (name.equals("application-local.yml")) {
+                    assertThat(value).as(name).isEqualTo("http://localhost:5173");
+                } else {
+                    assertThat(value).as(name).isNull();
+                }
+            }
+        }
+    }
+
     /** Every message of the cause chain, which is what a start failure prints. */
     private static String messagesOf(Throwable failure) {
         List<String> messages = new ArrayList<>();

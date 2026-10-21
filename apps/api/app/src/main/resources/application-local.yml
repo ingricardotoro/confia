@@ -6,3 +6,11 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
+
+confia:
+  web:
+    # The origin of the Vite dev server, the one the CSRF and Origin filter of the administrative
+    # chain accepts locally. No other file of the repository sets an allowed origin: every other
+    # environment sets CONFIA_WEB_ALLOWEDORIGINS, and with it empty no unsafe request passes
+    # (session-endpoints-cookie-and-csrf design.md, decision 4).
+    allowed-origins: http://localhost:5173
