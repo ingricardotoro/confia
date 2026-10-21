@@ -54,7 +54,7 @@ public final class HarnessProcess implements AutoCloseable {
      * that file also sets, such as {@code confia.web.user-agent-max-length}, would otherwise win.
      */
     public static HarnessProcess start(String... properties) {
-        String[] arguments = Arrays.stream(properties).map(property -> "--" + property)
+        String[] arguments = Arrays.stream(withCsrfKey(properties)).map(property -> "--" + property)
                 .toArray(String[]::new);
         return new HarnessProcess(new SpringApplicationBuilder(WebEdgeHarness.class)
                 .web(WebApplicationType.SERVLET)
@@ -69,13 +69,42 @@ public final class HarnessProcess implements AutoCloseable {
      */
     public static HarnessProcess startObserved(ApplicationListener<?> listener,
             String... properties) {
-        String[] arguments = Arrays.stream(properties).map(property -> "--" + property)
+        String[] arguments = Arrays.stream(withCsrfKey(properties)).map(property -> "--" + property)
                 .toArray(String[]::new);
         return new HarnessProcess(new SpringApplicationBuilder(WebEdgeHarness.class)
                 .web(WebApplicationType.SERVLET)
                 .properties("server.port=0")
                 .listeners(listener)
                 .run(arguments));
+    }
+
+    /** The property of the CSRF key; every harness process gets a fresh generated one unless a test sets it. */
+    public static final String CSRF_KEY_PROPERTY = "confia.security.csrf.key";
+
+    /** A fresh random 32-byte key in standard Base64, never written down (CLAUDE.md, regla 13). */
+    public static String newCsrfKey() {
+        byte[] key = new byte[32];
+        new java.security.SecureRandom().nextBytes(key);
+        return java.util.Base64.getEncoder().encodeToString(key);
+    }
+
+    /** The one origin the harness allows unless a test sets {@code confia.web.allowed-origins}. */
+    public static final String ALLOWED_ORIGIN = "https://admin.colegio.edu.hn";
+
+    /** The property of the allowed origins. */
+    public static final String ALLOWED_ORIGINS_PROPERTY = "confia.web.allowed-origins";
+
+    private static String[] withCsrfKey(String[] properties) {
+        String[] all = properties;
+        if (Arrays.stream(all).noneMatch(p -> p.startsWith(CSRF_KEY_PROPERTY + "="))) {
+            all = Arrays.copyOf(all, all.length + 1);
+            all[all.length - 1] = CSRF_KEY_PROPERTY + "=" + newCsrfKey();
+        }
+        if (Arrays.stream(all).noneMatch(p -> p.startsWith(ALLOWED_ORIGINS_PROPERTY + "="))) {
+            all = Arrays.copyOf(all, all.length + 1);
+            all[all.length - 1] = ALLOWED_ORIGINS_PROPERTY + "=" + ALLOWED_ORIGIN;
+        }
+        return all;
     }
 
     /** Starts the harness with the portal allow-list. */
@@ -94,6 +123,11 @@ public final class HarnessProcess implements AutoCloseable {
     /** The tokens this harness's chain accepts, and the ones it must refuse. */
     public HarnessTokens tokens() {
         return context.getBean(HarnessTokens.class);
+    }
+
+    /** The double of the session-validity port, which the token filter asks after verifying a token. */
+    public RecordingSessionValidity sessionValidity() {
+        return context.getBean(RecordingSessionValidity.class);
     }
 
     /** What the harness controllers observed. */

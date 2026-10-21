@@ -26,6 +26,14 @@ class LimitedController {
         return useCase();
     }
 
+    /** The same limit on an unsafe method, for the tests that prove a CSRF rejection spends no quota. */
+    @RateLimited(policy = "admin-login")
+    @org.springframework.web.bind.annotation.PostMapping("/test/limited")
+    String limitedPost() {
+        calls.limitedInvoked();
+        return useCase();
+    }
+
     /** The use case of the stand-in: it only records that it ran. */
     private String useCase() {
         calls.useCaseInvoked();

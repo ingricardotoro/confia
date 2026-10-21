@@ -78,7 +78,7 @@ class AdminSecurityChainTest {
                 .as("non-vacuous: the route is public for GET").isEqualTo(200);
         assertThat(process.calls().openInvocations()).isEqualTo(before + 1);
 
-        assertProblem(process.send(method, "/test/open"), 401, "authentication-required");
+        assertProblem(process.send(method, "/test/open", "Origin", HarnessProcess.ALLOWED_ORIGIN), 401, "authentication-required");
         assertThat(process.calls().openInvocations())
                 .as("the denied %s never reached the controller", method).isEqualTo(before + 1);
     }
@@ -197,7 +197,7 @@ class AdminSecurityChainTest {
         int before = process.calls().authenticatedInvocations();
 
         assertProblem(process.get("/test/whoami"), 401, "authentication-required");
-        assertProblem(process.send("POST", "/test/whoami"), 401, "authentication-required");
+        assertProblem(process.send("POST", "/test/whoami", "Origin", HarnessProcess.ALLOWED_ORIGIN), 401, "authentication-required");
 
         assertThat(process.calls().authenticatedInvocations()).isEqualTo(before);
     }

@@ -240,7 +240,7 @@ class HarnessController {
     }
 
     /** On the authenticated list for {@code GET}, with the live-session check. */
-    @GetMapping("/test/live")
+    @RequestMapping(path = "/test/live", method = {RequestMethod.GET, RequestMethod.POST})
     String live() {
         calls.authenticatedInvoked();
         return "live";

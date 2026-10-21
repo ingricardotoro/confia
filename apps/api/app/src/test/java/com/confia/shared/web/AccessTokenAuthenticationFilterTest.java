@@ -211,7 +211,7 @@ class AccessTokenAuthenticationFilterTest {
         String token = process.tokens().access();
 
         assertProblem(process.get("/x", "Authorization", bearer(token)), 403, "forbidden");
-        assertProblem(process.send("POST", "/test/whoami", "Authorization", bearer(token)), 403,
+        assertProblem(process.send("POST", "/test/whoami", "Authorization", bearer(token), "Origin", HarnessProcess.ALLOWED_ORIGIN), 403,
                 "forbidden");
         assertProblem(process.get("/does/not/exist", "Authorization", bearer(token)), 403,
                 "forbidden");

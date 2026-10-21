@@ -5,10 +5,17 @@ import com.confia.shared.web.authentication.AccessTokenAuthenticationFilter;
 import com.confia.shared.web.authentication.AuthenticatedEndpoint;
 import com.confia.shared.web.authentication.AuthenticatedEndpoints;
 import com.confia.shared.web.authentication.SessionCheck;
+import com.confia.shared.security.csrf.CsrfConfiguration;
+import com.confia.shared.security.csrf.CsrfTokens;
+import com.confia.shared.web.csrf.AllowedOrigins;
+import com.confia.shared.web.csrf.CookieCredentialRoute;
+import com.confia.shared.web.csrf.CsrfOriginFilter;
+import com.confia.shared.web.request.WebEdgeProperties;
 import com.confia.shared.web.edge.PublicEndpoint;
 import com.confia.shared.web.edge.PublicEndpoints;
 import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
 import com.confia.shared.security.RateLimiterConfiguration;
+import com.confia.shared.web.edge.AdminSecurityConfiguration;
 import com.confia.shared.web.edge.SecurityChains;
 import com.confia.shared.web.edge.ThrottlingConfiguration;
 import com.confia.shared.web.edge.WebEdgeConfiguration;
@@ -43,13 +50,17 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
         UserDetailsServiceAutoConfiguration.class, ErrorMvcAutoConfiguration.class})
 @Import({WebEdgeConfiguration.class, RateLimiterConfiguration.class,
         ThrottlingConfiguration.class, ObservabilityMetricsConfiguration.class,
-        OrganizationConfiguration.class, HarnessController.class, LimitedController.class,
+        OrganizationConfiguration.class, CsrfConfiguration.class, HarnessController.class,
+        CookieHarnessController.class, LimitedController.class,
         UnknownPolicyController.class, DocumentedProbeController.class,
         DocumentedProbeController.ProbeAdvice.class})
 class WebEdgeHarness {
 
     /** {@code admin} (the default) or {@code portal}: which real allow-list the chain starts from. */
     static final String PROCESS_PROPERTY = "harness.process";
+
+    /** {@code off} leaves the CSRF filter out of the administrative chain (the control of WE55). */
+    static final String CSRF_FILTER_PROPERTY = "harness.csrf-filter";
 
     @Bean
     Calls calls() {
@@ -74,7 +85,8 @@ class WebEdgeHarness {
     @Bean
     SecurityFilterChain harnessChain(HttpSecurity http, Environment environment,
             ProblemResponses problems, HarnessTokens tokens,
-            RecordingSessionValidity sessionValidity) throws Exception {
+            RecordingSessionValidity sessionValidity, CsrfTokens csrfTokens,
+            WebEdgeProperties webEdge) throws Exception {
         boolean portal = "portal".equals(environment.getProperty(PROCESS_PROPERTY));
         PublicEndpoints real = portal
                 ? PublicEndpoints.forPortal(environment)
@@ -91,6 +103,13 @@ class WebEdgeHarness {
         endpoints.add(new PublicEndpoint(HttpMethod.HEAD, "/test/limited"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/unlimited"));
         endpoints.add(new PublicEndpoint(HttpMethod.POST, "/test/validated"));
+        endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/cookie/issue"));
+        endpoints.add(new PublicEndpoint(HttpMethod.POST, "/test/cookie/refresh"));
+        endpoints.add(new PublicEndpoint(HttpMethod.DELETE, "/test/cookie/current"));
+        endpoints.add(new PublicEndpoint(HttpMethod.POST, "/test/limited"));
+        for (HttpMethod method : List.of(HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE)) {
+            endpoints.add(new PublicEndpoint(method, "/test/cookie/other"));
+        }
         for (String path : List.of("/test/bounded", "/test/constraint-violation", "/test/required", "/test/sql-reset", "/test/data-access-sql", "/test/data-access-spring",
                 "/test/data-access-jooq", "/test/data-access-bare", "/test/post-only", "/test/status", "/test/access-denied",
                 "/test/unmapped",
@@ -105,17 +124,33 @@ class WebEdgeHarness {
         AuthenticatedEndpoints authenticated = new AuthenticatedEndpoints(List.of(
                 new AuthenticatedEndpoint(HttpMethod.GET, "/test/whoami", SessionCheck.TOKEN_ONLY),
                 new AuthenticatedEndpoint(HttpMethod.GET, "/test/live", SessionCheck.LIVE_SESSION),
+                new AuthenticatedEndpoint(HttpMethod.POST, "/test/live", SessionCheck.LIVE_SESSION),
                 new AuthenticatedEndpoint(HttpMethod.GET, "/test/institution", SessionCheck.TOKEN_ONLY),
                 new AuthenticatedEndpoint(HttpMethod.POST, "/test/institution", SessionCheck.TOKEN_ONLY),
                 new AuthenticatedEndpoint(HttpMethod.GET, "/test/fail-authenticated",
                         SessionCheck.TOKEN_ONLY)));
-        return SecurityChains
-                .denyByDefault(http, new PublicEndpoints(endpoints), authenticated, problems)
-                .addFilterBefore(new AccessTokenAuthenticationFilter(tokens.verifier(),
-                        authenticated, sessionValidity,
-                        new ProblemAuthenticationEntryPoint(problems)),
-                        AnonymousAuthenticationFilter.class)
-                .addFilterBefore(new TestPrincipalFilter(), AuthorizationFilter.class)
-                .build();
+        AccessTokenAuthenticationFilter tokenFilter = new AccessTokenAuthenticationFilter(
+                tokens.verifier(), authenticated, sessionValidity,
+                new ProblemAuthenticationEntryPoint(problems));
+        HttpSecurity chain = SecurityChains.denyByDefault(http, new PublicEndpoints(endpoints),
+                authenticated, problems);
+        if ("off".equals(environment.getProperty(CSRF_FILTER_PROPERTY))) {
+            // The control variant of WE55: the same chain with the CSRF filter left out.
+            chain.addFilterBefore(tokenFilter, AnonymousAuthenticationFilter.class);
+        } else {
+            CsrfOriginFilter csrfFilter = new CsrfOriginFilter(
+                    AllowedOrigins.parse(webEdge.allowedOrigins()), harnessRoutes(), csrfTokens,
+                    problems);
+            AdminSecurityConfiguration.addAuthenticationFilters(chain, tokenFilter, csrfFilter);
+        }
+        return chain.addFilterBefore(new TestPrincipalFilter(), AuthorizationFilter.class).build();
+    }
+
+    /** The production cookie routes plus the two stand-ins of the cookie harness. */
+    private static List<CookieCredentialRoute> harnessRoutes() {
+        List<CookieCredentialRoute> routes = new ArrayList<>(CookieCredentialRoute.forAdmin());
+        routes.add(new CookieCredentialRoute(HttpMethod.POST, "/test/cookie/refresh"));
+        routes.add(new CookieCredentialRoute(HttpMethod.DELETE, "/test/cookie/current"));
+        return routes;
     }
 }

@@ -121,7 +121,7 @@ class CurrentInstitutionFromTokenTest {
     @Test
     void theInstitutionHeadersAreIgnored() {
         HttpResponse<String> response = process.get(ROUTE,
-                "Authorization", bearer(process.tokens().access()),
+                "Authorization", bearer(process.tokens().access()), "Origin", HarnessProcess.ALLOWED_ORIGIN,
                 "X-Institution-Id", OTHER.toString(),
                 "Institution-Id", OTHER.toString(),
                 "X-Tenant-Id", OTHER.toString(),
@@ -146,7 +146,7 @@ class CurrentInstitutionFromTokenTest {
     void theQueryParametersAndTheCookieOfAnInstitutionAreIgnored() {
         HttpResponse<String> response = process.get(
                 ROUTE + "?institutionId=" + OTHER + "&tenant=" + OTHER,
-                "Authorization", bearer(process.tokens().access()),
+                "Authorization", bearer(process.tokens().access()), "Origin", HarnessProcess.ALLOWED_ORIGIN,
                 "Cookie", "institution=" + OTHER + "; tenant=" + OTHER);
 
         assertThat(resolved(response)).isEqualTo(HarnessTokens.INSTITUTION.toString());
@@ -159,7 +159,7 @@ class CurrentInstitutionFromTokenTest {
     void anInstitutionFieldInTheBodyIsIgnored() {
         HttpResponse<String> response = process.sendWithBody("POST", ROUTE,
                 "{\"institutionId\":\"" + OTHER + "\",\"tenant\":\"" + OTHER + "\"}",
-                "Authorization", bearer(process.tokens().access()),
+                "Authorization", bearer(process.tokens().access()), "Origin", HarnessProcess.ALLOWED_ORIGIN,
                 "Content-Type", "application/json");
 
         assertThat(resolved(response)).isEqualTo(HarnessTokens.INSTITUTION.toString());
@@ -173,7 +173,7 @@ class CurrentInstitutionFromTokenTest {
             "d290f1ee-6c54-4b01-90e6-d701748f085"})
     void aMalformedInstitutionHeaderNeitherChangesTheResolutionNorFails(String value) {
         HttpResponse<String> response = process.get(ROUTE + "?tenant=%00&institutionId=%27%20OR%201",
-                "Authorization", bearer(process.tokens().access()),
+                "Authorization", bearer(process.tokens().access()), "Origin", HarnessProcess.ALLOWED_ORIGIN,
                 "X-Institution-Id", value);
 
         assertThat(resolved(response)).isEqualTo(HarnessTokens.INSTITUTION.toString());
@@ -183,7 +183,7 @@ class CurrentInstitutionFromTokenTest {
     void aMalformedBodyInstitutionNeitherChangesTheResolutionNorFails() {
         HttpResponse<String> response = process.sendWithBody("POST", ROUTE,
                 "{\"institutionId\":\"no-es-un-uuid\",\"tenant\":null}",
-                "Authorization", bearer(process.tokens().access()),
+                "Authorization", bearer(process.tokens().access()), "Origin", HarnessProcess.ALLOWED_ORIGIN,
                 "Content-Type", "application/json");
 
         assertThat(resolved(response)).isEqualTo(HarnessTokens.INSTITUTION.toString());
