@@ -193,7 +193,7 @@ public class CanonicalAuditRowSerializer {
      * escape (U+0000-U+001F)
      * for the characters with no short form).
      */
-    private static String canonString(String value) {
+    static String canonString(String value) {
         StringBuilder result = new StringBuilder(value.length() + 2).append('"');
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
