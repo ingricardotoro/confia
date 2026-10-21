@@ -21,7 +21,8 @@ import java.util.UUID;
  * <p>The two web processes bind to a random port. The administrative process also receives a
  * JDBC URL that nothing listens on, which is enough because the connection pool is lazy, and the
  * three secrets of decision 3 (the column-encryption master key, the Argon2id pepper and the login
- * institution id), generated at runtime, and an Ed25519 signing key pair generated the same way
+ * institution id) and the CSRF key of session-endpoints-cookie-and-csrf (decision 3), generated at
+ * runtime, and an Ed25519 signing key pair generated the same way
  * (session-tokens-and-web-layer design.md, decision 3): no secret value and no key is ever written
  * in the repository (CLAUDE.md, regla 13).
  */
@@ -35,6 +36,10 @@ final class TestProcessArguments {
 
     /** The property the administrative process reads its login institution id from. */
     static final String INSTITUTION_PROPERTY = "confia.identity.login-institution-id";
+
+    /** The properties of the administrative CSRF key and of the optional previous one. */
+    static final String CSRF_KEY_PROPERTY = "confia.security.csrf.key";
+    static final String CSRF_PREVIOUS_KEY_PROPERTY = "confia.security.csrf.previous-key";
 
     /** The kid of the signing key every administrative test process starts with. */
     static final String SIGNING_KID = "test-admin-key";
@@ -63,6 +68,7 @@ final class TestProcessArguments {
 
     private static final int MASTER_KEY_BYTES = 32;
     private static final int PEPPER_BYTES = 32;
+    private static final int CSRF_KEY_BYTES = 32;
 
     private TestProcessArguments() {
     }
@@ -112,6 +118,7 @@ final class TestProcessArguments {
         properties.put(MASTER_KEY_PROPERTY, newMasterKey());
         properties.put(PEPPER_PROPERTY, newPepper());
         properties.put(INSTITUTION_PROPERTY, UUID.randomUUID().toString());
+        properties.put(CSRF_KEY_PROPERTY, newCsrfKey());
         properties.putAll(newSigningKeyProperties());
         overrides.forEach((property, value) -> {
             if (value == null) {
@@ -183,6 +190,11 @@ final class TestProcessArguments {
     /** A fresh random 32-byte key in Base64, different on every call. */
     static String newMasterKey() {
         return randomBase64(MASTER_KEY_BYTES);
+    }
+
+    /** A fresh random 32-byte CSRF key in Base64, different on every call and never written down. */
+    static String newCsrfKey() {
+        return randomBase64(CSRF_KEY_BYTES);
     }
 
     /** A fresh random 32-byte Argon2id pepper in Base64, different on every call. */

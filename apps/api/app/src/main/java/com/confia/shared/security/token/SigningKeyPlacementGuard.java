@@ -52,8 +52,9 @@ public final class SigningKeyPlacementGuard
     /** The guard of the portal and of the worker: the administrative private key names. */
     public static SigningKeyPlacementGuard forNonAdministrativeProcess() {
         return new SigningKeyPlacementGuard(
-                List.of(ADMIN_PREFIX + CURRENT_PRIVATE, ADMIN_PREFIX + PREVIOUS_PRIVATE),
-                "holds an administrative signing private key and must not be set in the portal "
+                List.of(ADMIN_PREFIX + CURRENT_PRIVATE, ADMIN_PREFIX + PREVIOUS_PRIVATE,
+                        "confia.security.csrf.key", "confia.security.csrf.previous-key"),
+                "holds an administrative secret (a signing private key or a CSRF key) and must not be set in the portal "
                         + "or the worker process (ADR-0005, check 14)");
     }
 
