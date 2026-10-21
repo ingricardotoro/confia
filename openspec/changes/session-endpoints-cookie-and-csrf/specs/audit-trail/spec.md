@@ -16,9 +16,11 @@
 ### Requisito: El JSON de detalle de un asiento se construye con un constructor tipado común y es igual byte a byte al anterior
 
 El sistema DEBE proveer en `com.confia.shared.audit` un constructor tipado del JSON de detalle de un asiento de
-auditoría, que escape correctamente todo valor, emita las claves en un orden determinista y no permita
-construir el documento por concatenación. Todo sitio de producción que escribe un asiento con detalle (al menos
-dieciséis sitios en ocho clases de `identity`) DEBE usarlo. La migración de los sitios existentes NO DEBE cambiar
+auditoría, que escape correctamente todo valor, emita los miembros en el orden de inserción (determinista y
+elegido por el llamador, para conservar el orden de los bytes que cada sitio escribía) y no permita construir el
+documento por concatenación. Los nombres de miembro DEBEN cumplir `^[a-z][A-Za-z0-9]*$` y no repetirse; un nombre
+inválido o repetido DEBE fallar con `IllegalArgumentException`. Todo sitio de producción que escribe un asiento
+con detalle (exactamente dieciséis sitios en ocho clases de `identity` a la fecha de `6a8c61f`) DEBE usarlo. La migración de los sitios existentes NO DEBE cambiar
 los bytes del detalle que cada uno escribía: para las mismas entradas, el JSON escrito DEBE ser idéntico byte a
 byte, de modo que `row_hash` de los asientos nuevos sea el que habría resultado antes y la verificación de la
 cadena no cambie. Los asientos nuevos de este cambio DEBEN usar el constructor desde su primer uso.
@@ -36,11 +38,12 @@ cadena no cambie. Los asientos nuevos de este cambio DEBEN usar el constructor d
 - **CUANDO** el constructor lo serializa
 - **ENTONCES** el resultado es JSON válido que, al leerse, devuelve el valor original
 
-#### Escenario: [AT03] El orden de claves es determinista
+#### Escenario: [AT03] El orden de los miembros es el de inserción y es determinista
 
-- **DADO** el mismo conjunto de claves añadido en dos órdenes distintos
-- **CUANDO** el constructor serializa ambos
-- **ENTONCES** producen los mismos bytes
+- **DADO** el mismo conjunto de miembros añadido dos veces en el mismo orden, y en otro orden distinto
+- **CUANDO** el constructor serializa cada documento
+- **ENTONCES** las dos primeras serializaciones producen los mismos bytes, sin espacios
+- **Y** la del otro orden emite los miembros en ese orden de inserción (no se reordenan alfabéticamente)
 
 #### Escenario: [AT04] La cadena verifica tras la migración
 
@@ -52,4 +55,10 @@ cadena no cambie. Los asientos nuevos de este cambio DEBEN usar el constructor d
 
 - **DADO** un intento de añadir un objeto arbitrario al constructor
 - **CUANDO** se compila o se ejecuta
-- **ENTONCES** no se admite: solo cadenas, enteros, booleanos, nulos e instantes en una forma fija
+- **ENTONCES** no se admite: solo texto, enteros, booleanos e instantes en una forma fija (`Instant.toString()`)
+
+#### Escenario: [AT06] Nombres de miembro inválidos o repetidos
+
+- **DADO** un nombre con mayúscula inicial, uno con guion, uno vacío y un nombre añadido dos veces
+- **CUANDO** se intenta añadirlos al constructor
+- **ENTONCES** cada uno falla con `IllegalArgumentException` y ningún documento se construye

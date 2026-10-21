@@ -547,9 +547,11 @@ respuesta de la inscripción. Es la decisión D-N3.
 - `RefreshRejection.BINDING_CHANGED` (`auditCode` `binding_changed`); asiento
   `identity.session.binding_changed` con `{"familyRevoked":true}`, sin huella ni dirección.
 - **Respuesta:** `Refreshed` → `SessionCookies.issue(response, refresco)` (también en la gracia: mismo
-  refresco sucesor, CSRF nuevo ligado a él) y `200` con el DTO de sesión. Todo `Rejected`, cookie ausente o
-  repetida → `SessionCookies.clear`, `RateLimitFailures.record("admin-session")` y
-  `401 session-expired` uniforme.
+  refresco sucesor, CSRF nuevo ligado a él) y `200` con el DTO de sesión. Todo `Rejected` o cookie
+  ausente → `SessionCookies.clear`, `RateLimitFailures.record("admin-session")` y
+  `401 session-expired` uniforme. Una cookie de sesión repetida no llega al controlador: el filtro la
+  rechaza antes con `403 csrf-invalid` (decisión 2, regla 5; corrección del 2026-10-20 al alinear la
+  especificación).
 
 **Descartado:** la vinculación antes de la reutilización: un token robado presentado desde otro equipo y
 otra red se auditaría como cambio de vinculación en lugar de reutilización.

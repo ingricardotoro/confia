@@ -56,8 +56,10 @@ regenerarse desde las migraciones. La migración DEBE conservar la regla `revoke
 El sistema DEBE romper la construcción si una clase de producción construye el JSON de detalle de un asiento de
 auditoría por concatenación o interpolación de cadenas en lugar de usar el constructor tipado de
 `com.confia.shared.audit` (seguimiento F1c; `CLAUDE.md`, regla 12 por analogía). La regla DEBE tener su propio
-fixture permanente con la convención de dos mitades y NO DEBE evaluar un conjunto vacío. Los dieciséis o más
-sitios de las ocho clases que concatenaban DEBEN estar migrados.
+fixture permanente con la convención de dos mitades y NO DEBE evaluar un conjunto vacío. Los dieciséis sitios de
+las ocho clases que concatenaban (inventario a la fecha de `6a8c61f`) DEBEN estar migrados, y la regla impide que
+aparezcan más; los JSON de claims y de cabecera de `shared.security.token` no son de auditoría y quedan fuera de
+la regla.
 
 #### Escenario: [BI43] Fixture con un asiento armado por concatenación
 
@@ -95,10 +97,12 @@ regresar. La regla DEBE tener su propio fixture permanente con la convención de
 ### Requisito: El HMAC de CSRF vive en `shared.security` y el uso de `Cookie` se confina al ayudante de cookies
 
 El cálculo del HMAC de CSRF DEBE vivir en `com.confia.shared.security`, de modo que la regla «Ninguna clase fuera
-de `identity` y `shared.security` usa utilidades de firma ni de hash» siga sin lista de permitidos. El uso de
-`jakarta.servlet.http.Cookie` y la escritura de `Set-Cookie` DEBEN confinarse al ayudante de cookies de
-`com.confia.shared.web` y al filtro de CSRF, y ningún controlador de `identity.web` DEBE depender de tipos de
-servlet. La regla DEBE tener su propio fixture permanente con la convención de dos mitades.
+de `identity` y `shared.security` usa utilidades de firma ni de hash» siga sin lista de permitidos (el HMAC no
+vive en `shared.security.token`, para no ampliar la exención de la regla de aislamiento de tokens, ni en
+`shared.web`). El uso de `jakarta.servlet.http.Cookie` DEBE confinarse a **una sola clase**, el ayudante de
+cookies `SessionCookies` de `com.confia.shared.web.session`; la escritura de `Set-Cookie` pasa por ella, y ningún
+controlador de `identity.web` DEBE depender de tipos de servlet. La regla DEBE tener su propio fixture permanente
+con la convención de dos mitades.
 
 #### Escenario: [BI47] Fixture con un controlador que escribe una cookie
 
@@ -110,27 +114,31 @@ servlet. La regla DEBE tener su propio fixture permanente con la convención de 
 
 - **DADO** el código de producción real
 - **CUANDO** se ejecutan la regla de utilidades de firma y hash y la de cookies
-- **ENTONCES** ambas pasan evaluando clases reales, el componente de HMAC pertenece a `shared.security` y el
-  único uso de `Cookie` está en el ayudante y el filtro
+- **ENTONCES** ambas pasan evaluando clases reales, el componente de HMAC pertenece a `shared.security.csrf` y el
+  único uso de `Cookie` está en `SessionCookies`
 
 ### Requisito: Los inventarios de ausencia que este cambio rompe se invierten, cada uno con su control negativo
 
 El sistema DEBE invertir, en el mismo cambio que rompe cada ausencia, las pruebas de inventario que la
 declaraban, y cada inversión DEBE fallar con su control negativo:
-`WebEdgeScopeExclusionInventoryTest` (la prohibición de `jakarta.servlet.http.Cookie` y de la configuración de
-CSRF pasa a permitir solo el ayudante de cookies y el filtro de CSRF; el limitador y el materializador pasan a
-usarse solo desde los seis manejadores de sesión), `ProblemCatalogCoverageTest` y `ProblemCodeTest` (la negación
+`WebEdgeScopeExclusionInventoryTest` (la prohibición de `jakarta.servlet.http.Cookie` pasa a «exactamente
+`SessionCookies`»; el limitador y el materializador pasan a permitirse además en `com.confia.identity.web` (los
+controladores con `@RateLimited`, `RateLimitFailures` y el materializador) y siguen detectándose en un paquete
+ajeno; la regla sobre las reglas de ruta, que solo admite `permitAll`, `authenticated` y `denyAll`, no cambia), `ProblemCatalogCoverageTest` y `ProblemCodeTest` (la negación
 de `authentication-failed` se sustituye por la exigencia de los cinco códigos; siguen negados
 `institution-not-found` e `institution-inactive`), `PublicRouteAllowListTest` con el enumerador de rutas (que
-DEBE distinguir las clases pública, autenticada y restringida) y la regla de la cadena administrativa de CSRF.
+DEBE distinguir las clases pública, autenticada y restringida: rutas registradas = públicas ∪ autenticadas ∪
+restringidas). La prueba de orden de filtros de la cadena administrativa (filtro propio de CSRF y `Origin` antes
+del de tokens) se añade; el `CsrfFilter` de Spring sigue deshabilitado.
 Las ausencias que siguen ciertas (recuperación de contraseña por HTTP, códigos de institución, adaptador de
 Redis) DEBEN conservarse en esos mismos inventarios.
 
 #### Escenario: [BI49] Cookie, limitador y materializador solo en los lugares permitidos
 
 - **DADO** `WebEdgeScopeExclusionInventoryTest` actualizado
-- **CUANDO** se ejecuta con el código real, con un fixture que usa `Cookie` en un controlador, con otro que
-  aplica el limitador fuera de los seis manejadores y con otro que deshabilita CSRF en la cadena
+- **CUANDO** se ejecuta con el código real, con un fixture que usa `Cookie` fuera de `SessionCookies`, con otro
+  que aplica el limitador o el materializador en un paquete ajeno a los permitidos y con otro que declara una regla
+  de ruta distinta de `permitAll`, `authenticated` y `denyAll`
 - **ENTONCES** pasa con el código real y falla en los tres fixtures
 
 #### Escenario: [BI50] El catálogo exige los cinco códigos y sigue negando los de institución
@@ -166,8 +174,8 @@ bean o el controlador que la requiere.
 
 - **DADO** el proceso administrativo arrancado por su camino de producción con claves generadas por la prueba
 - **CUANDO** se inspecciona su contexto
-- **ENTONCES** contiene el componente de HMAC, el ayudante de cookies, los seis controladores de sesión y las
-  tres políticas, todos dentro de su lista de permitidos, y el filtro de CSRF no es un bean
+- **ENTONCES** contiene el componente de HMAC, el ayudante de cookies, los controladores de sesión (inicio de
+  sesión, segundo factor, refresco y cierres, que sirven las seis rutas) y las tres políticas, todos dentro de su lista de permitidos, y el filtro de CSRF no es un bean
 
 #### Escenario: [BI54] El portal y el trabajador no contienen nada de sesión nuevo
 
@@ -184,8 +192,8 @@ bean o el controlador que la requiere.
 ### Requisito: La puerta de tiempo del inicio de sesión corre en `verify` y falla la construcción
 
 La construcción DEBE ejecutar en `./mvnw verify` la puerta de tiempo del inicio de sesión (200 intentos con
-cuenta existente y 200 con inexistente, diferencia de medianas de 50 ms como máximo) y la igualdad exacta del
-`401` (ADR-0005, verificación 7), con un control negativo, dentro del presupuesto de tiempo de las pruebas `*IT`.
+cuenta existente y 200 con inexistente, diferencia de medianas de 50 ms como máximo) y la igualdad del `401`
+(cuerpo salvo `traceId`, cabeceras salvo `Date`; ADR-0005, verificación 7), con un control negativo, dentro del presupuesto de tiempo de las pruebas `*IT`.
 
 #### Escenario: [BI56] La puerta falla ante una diferencia mayor
 

@@ -38,7 +38,10 @@ familia ni token de refresco. El cuerpo NO DEBE contener datos personales. La in
 configuración del proceso. La validación DEBE limitarse a la longitud máxima de cada campo y NO DEBE imponer la
 longitud mínima de la contraseña. Las propiedades desconocidas del cuerpo DEBEN rechazarse con `400` y
 `validation-failed`. Un tipo de contenido distinto de JSON DEBE responder `415`. Toda respuesta DEBE llevar
-`Cache-Control: no-store`. La ruta NO DEBE usar `Idempotency-Key`.
+`Cache-Control: no-store`. La ruta NO DEBE usar `Idempotency-Key`. El inicio de sesión no es una ruta de cookie: NO
+DEBE leer la cookie de sesión ni exigir el token CSRF (la protegen el `Origin` obligatorio, el tipo de contenido
+JSON y `SameSite=Strict`); si el navegador ya traía una cookie de sesión anterior, la respuesta con sesión la
+sobrescribe.
 
 #### Escenario: [I149] Credenciales correctas sin segundo factor emiten sesión y cookies
 
@@ -100,6 +103,14 @@ longitud mínima de la contraseña. Las propiedades desconocidas del cuerpo DEBE
 - **CUANDO** se inicia sesión
 - **ENTONCES** la cuenta se resuelve en la institución de la configuración y la cabecera se ignora
 
+#### Escenario: [I228] El inicio de sesión no exige CSRF y sobrescribe una cookie anterior
+
+- **DADO** un navegador con una cookie de sesión anterior, sin cabecera `X-CSRF-Token`, y un `Origin` permitido
+- **CUANDO** inicia sesión con credenciales correctas de una cuenta sin segundo factor
+- **ENTONCES** la respuesta es `200` y los dos `Set-Cookie` sustituyen a las cookies anteriores
+- **Y** la petición no se rechazó por falta de token CSRF
+- **Y** la familia anterior no se revoca por este inicio de sesión
+
 #### Escenario: [I156] El retardo del retroceso se materializa después de confirmar y no deniega
 
 - **DADO** la cuenta `carlos.ramirez@colegio.edu.hn` con tres fallos consecutivos y la contraseña correcta
@@ -109,25 +120,29 @@ longitud mínima de la contraseña. Las propiedades desconocidas del cuerpo DEBE
 
 ### Requisito: El `401 authentication-failed` es idéntico para cuenta existente e inexistente y su tiempo no distingue la cuenta
 
-La respuesta `401 authentication-failed` DEBE ser idéntica en estado, cuerpo, `type`, `title`, `detail` y
-cabeceras (salvo `instance` y el identificador de traza) para una contraseña incorrecta de una cuenta existente
-y para un identificador inexistente, incluidos los casos con retardo cero. La diferencia entre las medianas del
+La respuesta `401 authentication-failed` DEBE ser idéntica en estado, cuerpo y cabeceras para una contraseña
+incorrecta de una cuenta existente y para un identificador inexistente, incluidos los casos con retardo cero. La
+comparación del cuerpo DEBE excluir únicamente `traceId` (distinto en cada petición por diseño) y la de las
+cabeceras DEBE excluir únicamente `Date`; ninguna otra diferencia es admisible. La diferencia entre las medianas del
 tiempo de respuesta de 200 intentos con cuenta existente y 200 con cuenta inexistente NO DEBE superar 50 ms
 (`docs/03-seguridad.md` §4.6; ADR-0005, verificación 7). Ningún cuerpo, cabecera ni `Set-Cookie` DEBE revelar el
 motivo interno del rechazo.
 
-#### Escenario: [I157] Igualdad exacta de la respuesta
+#### Escenario: [I157] Igualdad de la respuesta
 
 - **DADO** un intento con contraseña incorrecta contra `maria.lopez@colegio.edu.hn` y otro contra
   `nadie.registrado@colegio.edu.hn`, ambos sin fallos previos
 - **CUANDO** se comparan las dos respuestas
-- **ENTONCES** estado, cuerpo y cabeceras son idénticos salvo `instance` y el identificador de traza
+- **ENTONCES** el estado es el mismo, el cuerpo es idéntico una vez excluido `traceId` y las cabeceras son
+  idénticas una vez excluida `Date`
+- **Y** la prueba falla si cualquier otro miembro del cuerpo o cualquier otra cabecera difiere (control negativo)
 
 #### Escenario: [I158] Igualdad con retardo
 
 - **DADO** las mismas dos identidades con tres fallos previos cada una
 - **CUANDO** se envía el cuarto intento a cada una
-- **ENTONCES** ambas respuestas son idénticas en forma y esperan el mismo retardo de 2 segundos
+- **ENTONCES** ambas respuestas son idénticas con la misma exclusión de `traceId` y de `Date`, y esperan el mismo
+  retardo de 2 segundos
 
 #### Escenario: [I159] Puerta de tiempo de 200 más 200 intentos
 
@@ -180,16 +195,24 @@ y su llenado es del cambio 11.
 El sistema DEBE emitir una señal cuando una misma IP registra fallos `Rejected` contra cinco identificadores
 distintos (por su huella con llave, sea o no una cuenta existente) dentro de 10 minutos, tomando un fallo como
 vigente mientras su antigüedad sea estrictamente menor que 10 minutos. La señal DEBE ser un evento `WARN`
-estructurado y un asiento de auditoría, ambos sin identificadores en claro. La señal NO DEBE bloquear a la IP ni
-alterar la respuesta de ningún intento (el bloqueo de 1 hora es del cambio 11). Cuatro identificadores distintos,
-o cinco fallos contra el mismo identificador, NO DEBEN producir la señal.
+estructurado y un asiento de auditoría. El asiento (`identity.login.failure_spread_detected`, resultado `denied`)
+DEBE escribirse en la misma transacción del intento que alcanza el umbral, con la dirección canónica del cliente
+como identificador de la entidad y `{"distinctIdentifiers":5,"windowSeconds":600}` como detalle. El `WARN` DEBE
+llevar solo el identificador de la petición y el nombre del evento, sin dirección ni identificador. Ni el `WARN`
+ni el asiento DEBEN contener el identificador ni su huella. La señal se emite solo en la llamada en que el
+número de identificadores distintos llega al umbral; la misma huella repetida no suma. La señal NO DEBE bloquear a
+la IP ni alterar la respuesta de ningún intento (el bloqueo de 1 hora es del cambio 11). Cuatro identificadores
+distintos, o cinco fallos contra el mismo identificador, NO DEBEN producir la señal.
 
 #### Escenario: [I164] El quinto identificador distinto dispara la señal
 
 - **DADO** una IP con fallos contra cuatro identificadores distintos entre las 10:00:00 y las 10:05:00
 - **CUANDO** falla un quinto identificador distinto a las 10:06:00
-- **ENTONCES** se emite el `WARN` estructurado y se escribe el asiento de auditoría, ambos con la huella y sin el
-  identificador en claro
+- **ENTONCES** se emite el `WARN` estructurado, con el identificador de la petición y el nombre del evento y sin
+  dirección ni identificador
+- **Y** se escribe en la misma transacción el asiento `identity.login.failure_spread_detected` con la dirección
+  canónica como entidad y el detalle `{"distinctIdentifiers":5,"windowSeconds":600}`
+- **Y** ni el `WARN` ni el asiento contienen el identificador ni su huella
 - **Y** la respuesta de ese intento es el `401 authentication-failed` habitual
 
 #### Escenario: [I165] Cuatro identificadores o cinco fallos del mismo no la disparan
@@ -204,6 +227,12 @@ o cinco fallos contra el mismo identificador, NO DEBEN producir la señal.
 - **CUANDO** se evalúa la señal
 - **ENTONCES** el fallo de las 10:00:00 ya no cuenta, no hay señal
 - **Y** en el caso con señal emitida, un intento posterior con contraseña correcta sigue autenticando
+
+#### Escenario: [I224] El sexto identificador y la repetición de una huella no vuelven a señalar
+
+- **DADO** una IP que ya disparó la señal con cinco identificadores distintos dentro de la ventana
+- **CUANDO** falla un sexto identificador distinto, y luego se repite el fallo de una huella ya contada
+- **ENTONCES** no se emite una segunda señal ni se escribe otro asiento mientras la ventana siga vigente
 
 ### Requisito: Una credencial TOTP está verificada solo tras aceptar un código TOTP, y «MFA activa» significa secreto verificado
 
@@ -233,16 +262,22 @@ código.
 
 - **DADO** una credencial con contador -1 y diez códigos de recuperación sin usar
 - **CUANDO** se presenta un código de recuperación a la verificación
-- **ENTONCES** se rechaza como `second-factor-invalid`, el contador sigue en -1 y el código sigue sin usar
+- **ENTONCES** se rechaza como `second-factor-invalid` (la primera verificación, con el token `mfa-enroll`,
+  acepta solo un código TOTP), el contador sigue en -1 y el código sigue sin usar
 
 ### Requisito: La verificación del segundo factor se ofrece en `POST /api/v1/auth/mfa/verifications` con un token restringido
 
 El sistema DEBE ofrecer `POST /api/v1/auth/mfa/verifications`, autenticada con `Authorization: Bearer` de un
 token restringido, bajo la política `admin-mfa` y con el retardo del retroceso TOTP materializado tras confirmar.
-El cuerpo DEBE contener exactamente uno de `code` o `recoveryCode`. La ruta DEBE aceptar el token con uso
-`mfa-verify` y, mientras la credencial de la cuenta no esté verificada, también el token con uso `mfa-enroll`;
-con una credencial verificada, el token `mfa-enroll` DEBE rechazarse con `401 token-invalid`. Una verificación
-correcta DEBE emitir una familia con `second_factor_verified` en `true` (`amr` igual a `[pwd, otp]`) y responder
+El cuerpo DEBE contener exactamente uno de `code` o `recoveryCode`. La ruta DEBE admitir en el borde tanto el
+token con uso `mfa-verify` como el de uso `mfa-enroll`, y el caso de uso DEBE decidir según el uso y el estado de
+la credencial: con `mfa-verify` y credencial verificada, se acepta un código TOTP o un código de recuperación; con
+`mfa-enroll` y credencial sin verificar (la primera verificación), se acepta **solo** un código TOTP y un código
+de recuperación DEBE rechazarse como `second-factor-invalid` sin consumirse; con `mfa-enroll` y credencial ya
+verificada (la inscripción ya se completó), toda prueba DEBE rechazarse como `second-factor-invalid`; con
+`mfa-verify` y credencial sin verificar (imposible por construcción), también `second-factor-invalid`. Un código
+de recuperación incorrecto en esta ruta DEBE sumar al mismo retroceso de la cuenta que los fallos TOTP. Una
+verificación correcta DEBE emitir una familia con `second_factor_verified` en `true` (`amr` igual a `[pwd, otp]`) y responder
 `200` con la respuesta de sesión y las dos cookies. Una verificación incorrecta DEBE responder
 `401 second-factor-invalid` sin cookies, con el avance del retroceso TOTP de la cuenta. Un token de acceso
 presentado a la ruta DEBE rechazarse por su audiencia con `401 token-invalid`.
@@ -276,13 +311,38 @@ presentado a la ruta DEBE rechazarse por su audiencia con `401 token-invalid`.
 - **CUANDO** se envían
 - **ENTONCES** ambos responden `400` con `validation-failed`
 
-#### Escenario: [I174] Token vencido, de acceso, de otro uso o con credencial verificada
+#### Escenario: [I174] Token vencido o de acceso
 
-- **DADO** un token restringido vencido, un token de acceso vigente, y un token `mfa-enroll` de una cuenta con
-  credencial verificada
+- **DADO** un token restringido vencido y un token de acceso vigente
 - **CUANDO** se presenta cada uno
-- **ENTONCES** el primero recibe `401 token-expired` y los otros dos `401 token-invalid`, y ninguno produce
+- **ENTONCES** el primero recibe `401 token-expired` y el segundo `401 token-invalid`, y ninguno produce
   cookies
+
+#### Escenario: [I221] Con el token `mfa-enroll` un código de recuperación no activa la credencial
+
+- **DADO** un token `mfa-enroll` de `jorge.aguilar@colegio.edu.hn`, con credencial recién inscrita (contador -1) y
+  diez códigos de recuperación sin usar
+- **CUANDO** se envía `recoveryCode` con uno de ellos a la verificación
+- **ENTONCES** la respuesta es `401` con `second-factor-invalid`, sin `Set-Cookie`
+- **Y** la credencial sigue sin verificar (contador -1), el código sigue sin usar y no se emitió ninguna familia
+- **Y** el rechazo cuenta como `second-factor-invalid` para la política `admin-mfa`
+
+#### Escenario: [I222] Con la credencial ya verificada, el token `mfa-enroll` recibe `second-factor-invalid`
+
+- **DADO** una cuenta con credencial verificada y un token `mfa-enroll` vigente
+- **CUANDO** se envía a la verificación un código TOTP válido, y en otra ejecución un código de recuperación
+  válido
+- **ENTONCES** ambas respuestas son `401` con `second-factor-invalid`, no `token-invalid`, sin `Set-Cookie`
+- **Y** no se emitió ninguna familia, el código de recuperación sigue sin usar y no se revocó ninguna familia
+
+#### Escenario: [I223] Un código de recuperación incorrecto suma al retroceso TOTP
+
+- **DADO** un token `mfa-verify` de `sofia.mejia@colegio.edu.hn` con credencial verificada y dos fallos TOTP
+  previos
+- **CUANDO** se envía un `recoveryCode` incorrecto
+- **ENTONCES** la respuesta es `401 second-factor-invalid` y el contador de fallos del retroceso TOTP de la cuenta
+  pasa a tres
+- **Y** la respuesta espera el retardo exigible tras confirmar
 
 #### Escenario: [I175] Un código reutilizado en la misma ventana se rechaza
 
@@ -297,7 +357,9 @@ sistema DEBE, en una única transacción, activar la credencial, emitir la famil
 familias vivas de la cuenta con el motivo `mfa_change` (`docs/03-seguridad.md` §4.5; obligación O10). La familia
 emitida por esa verificación NO DEBE revocarse. Las familias de otra cuenta o de otra institución NO DEBEN
 tocarse y las ya revocadas conservan su motivo y su instante. El sistema DEBE escribir un asiento de revocación
-con el número de familias revocadas, también cero. Las verificaciones posteriores de una credencial ya
+con el número de familias revocadas, también cero (`identity.session.revoked`, motivo `mfa_change`), y un asiento
+`identity.mfa.activated`. La revocación DEBE ejecutarse antes de emitir la familia nueva, de modo que esta nunca
+se revoque. Las verificaciones posteriores de una credencial ya
 verificada NO DEBEN revocar ninguna familia. Si algún paso falla, ningún efecto DEBE sobrevivir.
 
 #### Escenario: [I176] Activación con dos sesiones previas
@@ -337,9 +399,13 @@ credencial previa, DEBE crearla y responder `201` con el secreto en base32 de 32
 códigos de recuperación, con `Cache-Control: no-store`, sin cookies y sin emitir sesión. Con una credencial
 nunca verificada, DEBE reemplazar el secreto y dejar inutilizados los códigos de recuperación previos,
 devolviendo secreto y códigos nuevos. Con una credencial verificada, DEBE responder `409` con
-`mfa-already-enrolled` sin modificar nada. Cada inscripción o reinscripción DEBE auditarse (`identity.mfa.enrolled`).
-Una violación de unicidad por inscripción concurrente DEBE responder `409` y nunca `500`. El secreto y los
-códigos NO DEBEN aparecer en registros. La inscripción no activa la credencial.
+`mfa-already-enrolled` sin modificar nada salvo el asiento `identity.mfa.enrollment_rejected`. Cada inscripción o
+reinscripción DEBE auditarse (`identity.mfa.enrolled`); la reinscripción lleva el detalle
+`{"replacedUnverified":true,"invalidatedRecoveryCodes":n}` y la primera inscripción conserva el detalle actual.
+La inscripción DEBE ejecutarse bajo el bloqueo de la cuenta: dos inscripciones concurrentes de la misma cuenta
+sin credencial verificada se serializan y la segunda es una reinscripción, de modo que ambas responden `201`, el
+secreto y los códigos vigentes son los de la última, y ninguna responde `409` ni `500` ni viola la unicidad. El
+secreto y los códigos NO DEBEN aparecer en registros. La inscripción no activa la credencial.
 
 #### Escenario: [I180] Primera inscripción
 
@@ -354,21 +420,30 @@ códigos NO DEBEN aparecer en registros. La inscripción no activa la credencial
 - **DADO** la inscripción anterior sin verificar y el secreto `S1` ya entregado
 - **CUANDO** se inscribe de nuevo con un token `mfa-enroll`
 - **ENTONCES** la respuesta es `201` con un secreto `S2` distinto de `S1`
-- **Y** los diez códigos de recuperación previos quedan inutilizados y un código de `S1` ya no se acepta
-- **Y** existen dos asientos `identity.mfa.enrolled`
+- **Y** los diez códigos de recuperación previos quedan inutilizados (con su instante de uso fijado) y un código
+  de `S1` ya no se acepta
+- **Y** existen dos asientos `identity.mfa.enrolled`, y el segundo lleva
+  `{"replacedUnverified":true,"invalidatedRecoveryCodes":10}`
 
 #### Escenario: [I182] Credencial verificada responde `409`
 
 - **DADO** una cuenta con credencial verificada y un token `mfa-enroll` vigente
 - **CUANDO** se envía la inscripción
 - **ENTONCES** la respuesta es `409` con `mfa-already-enrolled` y el secreto almacenado no cambia
+- **Y** lo único que se escribe es el asiento `identity.mfa.enrollment_rejected` con el detalle
+  `{"reason":"already_enrolled"}`
 
-#### Escenario: [I183] Dos inscripciones concurrentes no producen `500`
+#### Escenario: [I183] Dos inscripciones concurrentes son una inscripción y una reinscripción
 
-- **DADO** una cuenta sin credencial y dos peticiones sincronizadas con `CountDownLatch`
+- **DADO** una cuenta sin credencial y dos peticiones de inscripción sincronizadas con `CountDownLatch`, con
+  transacciones reales
 - **CUANDO** terminan las dos
-- **ENTONCES** ninguna responde `500`, existe exactamente una credencial, y la respuesta que perdió fue `409` o
-  una reinscripción coherente con un único secreto vigente
+- **ENTONCES** las dos responden `201`; ninguna responde `409` ni `500`
+- **Y** existe exactamente una credencial, cuyo secreto vigente es el de la última petición en tomar el bloqueo
+  de la cuenta, y los códigos de recuperación sin usar son solo los de esa misma petición
+- **Y** los códigos entregados a la primera quedan inutilizados, y se registran un asiento de inscripción y uno de
+  reinscripción
+- **Y** la credencial sigue sin verificar
 
 #### Escenario: [I184] Un token `mfa-verify` no inscribe
 
@@ -386,14 +461,19 @@ códigos NO DEBEN aparecer en registros. La inscripción no activa la credencial
 ### Requisito: El refresco se ofrece en `POST /api/v1/auth/sessions/refresh` con la cookie de sesión, CSRF y `Origin`
 
 El sistema DEBE ofrecer `POST /api/v1/auth/sessions/refresh`, que lee el refresco únicamente de la cookie de
-sesión, exige `X-CSRF-Token` y un `Origin` permitido, y está bajo la política `admin-session`. Una rotación
+sesión, exige siempre un `Origin` permitido, exige `X-CSRF-Token` cuando la petición trae la cookie de sesión, y
+está bajo la política `admin-session`. Una rotación
 `Rotated` (de tipo `fresh` o `grace`) DEBE responder `200` con la respuesta de sesión y reemitir las dos cookies;
 en la gracia, la cookie de sesión lleva el mismo refresco sucesor y la cookie CSRF se reemite con el vínculo de
 ese mismo refresco. Todo desenlace `Rejected` (`unknown_token`, `family_revoked`, `family_expired`,
-`token_expired`, `reuse_detected`) DEBE responder `401 session-expired` uniforme y borrar las dos cookies; la
-reutilización detectada conserva su revocación y su asiento. Sin cookie de sesión la petición no puede presentar
-un vínculo CSRF válido y DEBE responder `403 csrf-invalid`. La respuesta NO DEBE contener datos personales ni el
-`sid`.
+`token_expired`, `reuse_detected`, `binding_changed`) DEBE responder `401 session-expired` uniforme y borrar las
+dos cookies; la reutilización detectada conserva su revocación y su asiento. Cada rechazo del refresco DEBE
+registrar un fallo de la IP en la política `admin-session`. Una petición **sin cookie de sesión** pero con
+`Origin` permitido NO exige token CSRF (no hay credencial ambiental que proteger): supera el filtro, el caso de
+uso la trata como rechazo y la respuesta es `401 session-expired` con las dos cookies de borrado, igual que
+cualquier otro rechazo, y registra el fallo de la IP. Una petición sin cookie de sesión y sin `Origin` permitido
+responde `403 csrf-invalid`. Una petición con dos cookies de sesión (repetidas) responde `403 csrf-invalid` sin
+elegir ninguna. La respuesta NO DEBE contener datos personales ni el `sid`.
 
 #### Escenario: [I186] Refresco normal
 
@@ -419,11 +499,28 @@ un vínculo CSRF válido y DEBE responder `403 csrf-invalid`. La respuesta NO DE
 - **Y** cada una contiene los dos `Set-Cookie` de borrado
 - **Y** el de reutilización deja la familia revocada con `reuse_detected`
 
-#### Escenario: [I189] Sin cookie o sin cabecera CSRF
+#### Escenario: [I189] Con cookie de sesión y sin cabecera CSRF, o sin `Origin`
 
-- **DADO** una petición sin cookie de sesión y otra con cookie y sin `X-CSRF-Token`
-- **CUANDO** se envían
+- **DADO** una petición con cookie de sesión, `Origin` permitido y sin `X-CSRF-Token`, y otra con cookie de
+  sesión y cookie CSRF válidas, cabecera `X-CSRF-Token` igual a la cookie, pero sin `Origin`
+- **CUANDO** se envían al refresco
 - **ENTONCES** ambas responden `403 csrf-invalid` y el caso de uso registra cero invocaciones
+
+#### Escenario: [I219] Sin cookie de sesión y con `Origin` permitido, el refresco es `401 session-expired`
+
+- **DADO** una petición de refresco sin cookie de sesión, sin `X-CSRF-Token` y con `Origin` permitido
+- **CUANDO** se envía
+- **ENTONCES** la respuesta es `401` con `session-expired` (no `403`), idéntica a la de cualquier otro rechazo
+  del refresco, con los dos `Set-Cookie` de borrado y `WWW-Authenticate: Bearer`
+- **Y** el filtro no exigió token CSRF y el fallo cuenta para la política `admin-session`
+- **Y** la misma petición sin `Origin` responde `403 csrf-invalid`
+
+#### Escenario: [I220] Dos cookies de sesión repetidas se rechazan sin elegir una
+
+- **DADO** una petición de refresco con dos cookies `__Secure-confia_admin_sid` (por ejemplo, inyectada desde un
+  subdominio), `Origin` permitido y un token CSRF válido para una de ellas
+- **CUANDO** se envía
+- **ENTONCES** la respuesta es `403 csrf-invalid` y el caso de uso registra cero invocaciones
 
 ### Requisito: Si cambian a la vez el agente y la IP respecto de la creación, el refresco se rechaza y la familia se revoca con `binding_changed`
 
@@ -431,9 +528,12 @@ Al refrescar, el sistema DEBE comparar la huella del agente de usuario y la IP d
 registradas en la familia al crearse. Si **ambas** difieren, DEBE rechazar el refresco como `401 session-expired`,
 revocar la familia con el motivo `binding_changed`, vaciar sus sucesores cifrados, escribir un asiento de
 auditoría y borrar las cookies. Si solo una difiere, o si el valor registrado de alguna de las dos es nulo, el
-refresco NO DEBE rechazarse por este motivo. La comprobación se aplica a toda presentación que de otro modo
-produciría `Rotated`; un rechazo previo (familia revocada o vencida, reutilización) conserva su desenlace. La
-revocación NO DEBE afectar a otras familias.
+refresco NO DEBE rechazarse por este motivo. La dirección se compara como dirección (un IPv6 comprimido y el mismo
+expandido son iguales), nunca como texto. La comprobación se evalúa en este orden fijo: familia revocada, familia
+vencida o inactiva y reutilización detectada conservan su desenlace y se evalúan antes; después va la vinculación;
+y solo después la gracia y el vencimiento del token. Por tanto, se aplica a toda presentación que de otro modo
+rotaría y también a un token propio vencido; un token ya consumido y no apto para gracia sigue siendo
+`reuse_detected`. La revocación NO DEBE afectar a otras familias.
 
 #### Escenario: [I190] Cambian agente e IP
 
@@ -462,14 +562,33 @@ revocación NO DEBE afectar a otras familias.
 - **CUANDO** se refresca `F-1`
 - **ENTONCES** `F-1` queda revocada y `F-2` sigue viva
 
+#### Escenario: [I225] El orden de decisión: reutilización antes que vinculación, vinculación antes que vencimiento del token
+
+- **DADO** una familia creada con `agente-uno` desde `203.0.113.9`, y presentaciones desde `agente-dos` y
+  `198.51.100.7` de: un token ya consumido y no apto para la gracia, y un token propio vencido y sin consumir
+- **CUANDO** se presenta cada uno (en familias distintas con la misma configuración)
+- **ENTONCES** el primero produce `reuse_detected` y la familia queda revocada con ese motivo
+- **Y** el segundo produce `binding_changed` y la familia queda revocada con ese motivo
+- **Y** en ambos casos la respuesta es `401 session-expired` con las cookies borradas
+
+#### Escenario: [I226] La dirección se compara como dirección
+
+- **DADO** una familia con `ip_first_seen` igual a `2001:db8::1` y un refresco con otro agente desde
+  `2001:0db8:0000:0000:0000:0000:0000:0001`
+- **CUANDO** se refresca
+- **ENTONCES** la dirección se considera sin cambio, el refresco rota con `200` y la familia sigue viva
+
 ### Requisito: El cierre de la sesión actual se ofrece en `DELETE /api/v1/auth/sessions/current` con la cookie, aun con el acceso vencido
 
 El sistema DEBE ofrecer `DELETE /api/v1/auth/sessions/current`, que lee el refresco de la cookie de sesión, exige
-`X-CSRF-Token` y un `Origin` permitido, no exige token de acceso y está bajo la política `admin-session`. DEBE
-localizar la familia por el hash del refresco presentado, aunque esté consumido, tomar el bloqueo de esa familia
-y revocarla con el motivo `logout`. DEBE responder `204` ante toda petición que supere CSRF y `Origin`, también
-con un refresco desconocido, de otra institución o de una familia ya revocada, y borrar las dos cookies. Una
-familia ya revocada NO DEBE cambiar su motivo ni su instante. Ninguna otra familia de la cuenta DEBE tocarse. El
+`X-CSRF-Token` cuando trae la cookie de sesión, exige siempre un `Origin` permitido, no exige token de acceso y
+está bajo la política `admin-session`. DEBE localizar la familia por el hash del refresco presentado, aunque esté
+consumido, tomar el bloqueo de esa familia (y no el de la cuenta) y revocarla con el motivo `logout`. DEBE
+responder `204` ante toda petición que supere CSRF y `Origin`, también sin cookie de sesión (no hay nada que
+cerrar y no se exige token CSRF), con un refresco desconocido o mal formado, de otra institución, de una familia
+vencida o de una familia ya revocada, y borrar las dos cookies. Una familia ya revocada o vencida, o un refresco
+desconocido, NO DEBE producir efecto ni asiento; en particular, una familia ya revocada NO DEBE cambiar su motivo
+ni su instante. Ninguna otra familia de la cuenta DEBE tocarse. El
 cierre y una rotación concurrentes DEBEN serializarse por el bloqueo de la familia y dejar la familia revocada
 sin token vigente. Revocar DEBE escribir un asiento de auditoría sin secretos.
 
@@ -507,11 +626,19 @@ sin token vigente. Revocar DEBE escribir un asiento de auditoría sin secretos.
 - **ENTONCES** la familia está revocada con `logout` y ningún token suyo está vigente, sea cual sea el orden del
   bloqueo
 
-#### Escenario: [I199] Sin cabecera CSRF no hay cierre
+#### Escenario: [I199] Con cookie de sesión y sin cabecera CSRF no hay cierre
 
-- **DADO** una petición con cookie y sin `X-CSRF-Token`
+- **DADO** una petición con cookie de sesión, `Origin` permitido y sin `X-CSRF-Token`
 - **CUANDO** se envía
 - **ENTONCES** responde `403 csrf-invalid` y la familia sigue viva
+
+#### Escenario: [I227] Sin cookie de sesión el cierre responde `204`
+
+- **DADO** una petición de cierre sin cookie de sesión, sin `X-CSRF-Token` y con `Origin` permitido (un cliente
+  que ya cerró sesión)
+- **CUANDO** se envía
+- **ENTONCES** responde `204` (no `403`) con los dos `Set-Cookie` de borrado, sin efecto ni asiento
+- **Y** la misma petición sin `Origin` permitido responde `403 csrf-invalid`
 
 ### Requisito: «Cerrar todas» se ofrece en `DELETE /api/v1/auth/sessions` con el token de acceso y revoca todas las familias vivas de la cuenta
 
