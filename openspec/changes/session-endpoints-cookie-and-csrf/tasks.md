@@ -189,7 +189,7 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
     El filtro lee las cookies de la cabecera `Cookie` y no con `jakarta.servlet.http.Cookie`, porque la inversión del inventario
     («exactamente `SessionCookies`») llega en 1.3; 1.3 puede sustituir esa lectura por `SessionCookies.read`.
 
-- [ ] 1.2 **PR 2 `audit-json-serializer`: constructor tipado del JSON de auditoría y migración de los 16 sitios (F1c, decisión 17, DA-13 *a*).**
+- [x] 1.2 **PR 2 `audit-json-serializer`: constructor tipado del JSON de auditoría y migración de los 16 sitios (F1c, decisión 17, DA-13 *a*).**
   - **ROJO.** Crear `test/java/com/confia/shared/audit/AuditJsonTest.java` (escape de comillas, barra inversa, rango C0 y no ASCII; ida y vuelta
     por un analizador JSON; mismo orden de inserción produce los mismos bytes sin espacios y otro orden respeta su orden de inserción; nombres con
     mayúscula inicial, con guion, vacíos y repetidos fallan con `IllegalArgumentException`; solo texto, entero, booleano e instante) [AT02, AT03,
@@ -214,6 +214,16 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
   - **Cierre.** `./mvnw verify -Pmutation-gate`; `AuditChainVerifier` verifica la cadena después de la suite. Commit:
     `refactor(shared): add a typed audit JSON builder and migrate the string-concatenating sites`. Tamaño: nominal 150, realista 330. — Escenarios
     AT01 a AT06, BI43 y BI44.
+  - **Nota fechada 2026-10-21 (partición de 1.2 en 02a y 02b).** La medición de la tarea completa fue de 1 057 líneas efectivas
+    (`git diff --numstat` sin `openspec/`), frente a 330 estimadas. Se partió sin consulta, por archivos completos, en la costura entre el
+    constructor y su uso: 02a `audit-json-builder` (348: `AuditJson`, la extracción de `canonString` y las pruebas del constructor y de la
+    cadena) y 02b `audit-json-sites` (709: los 16 sitios, la igualdad por sitio y la guardia con sus fixtures). Ninguna prueba queda separada
+    de lo que prueba. Para que la igualdad compare los sitios reales y no una copia, cada expresión migrada vive en un método (o constante)
+    estático de paquete de su clase (`backoffCycleAfterValue`, `lowCodesAfterValue`, `rateLimitedAfterValue`, `issuedAfterValue`,
+    `startedAfterValue`, `sessionsRevokedAfterValue`, `completedAfterValue`, `reasonJson`, `AFTER_*`). La guardia lee el código fuente
+    porque javac pliega la concatenación en `invokedynamic` y ArchUnit no ve el literal. Desviación de la demostración 3: `RotateRefreshToken.reasonJson`
+    tiene un solo miembro y no admite inversión; se invirtió el orden en `ResetPasswordWithToken.sessionsRevokedAfterValue`
+    (`reason`, `families`), con el mismo efecto sobre la igualdad. La casilla se marca en 02b.
 
 - [ ] 1.3 **PR 3 `edge-policies-and-delay-cap`: tres políticas de tasa, tope de la espera, sonda S-5 y `SessionCookies` sin llamador (decisiones 5, 7, 8 y 9).**
   - **ROJO.** Crear en `test/java/com/confia/shared/web/`: `ratelimit/RateLimitPropertiesTest.java` (valores por omisión de las tres políticas
