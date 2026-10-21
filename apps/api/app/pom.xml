@@ -428,10 +428,12 @@
           <targetClasses>
             <param>com.confia.*.domain.*</param>
             <param>com.confia.shared.security.token.*</param>
+            <param>com.confia.shared.security.csrf.*</param>
           </targetClasses>
           <targetTests>
             <param>com.confia.*.domain.*</param>
             <param>com.confia.shared.security.token.*</param>
+            <param>com.confia.shared.security.csrf.*</param>
           </targetTests>
         </configuration>
       </plugin>

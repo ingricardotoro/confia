@@ -33,6 +33,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
             "the worker has no security chain and no security bean (web-edge-foundations "
                     + "decision 4)";
     private static final String TOKEN_PACKAGE = "com.confia.shared.security.token";
+    private static final String CSRF_PACKAGE = "com.confia.shared.security.csrf";
+    private static final String CSRF_REASON =
+            "the CSRF token key and component belong to the administrative cookie routes only";
     private static final String ADMIN_SIGNING_KEYS =
             "administrative signing keys, ADR-0005 check 14 (the portal and the worker never hold a "
                     + "signing key ring)";
@@ -52,6 +55,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // check 14). A parent entry already covers it by sub-package; it is listed so
                     // the non-vacuity check fails if the import is ever lost (exact, like every entry).
                     "com.confia.shared.security.token",
+                    // The CSRF token component (session-endpoints-cookie-and-csrf decision 3):
+                    // administrative only, exact like every entry.
+                    "com.confia.shared.security.csrf",
                     "com.confia.shared.infrastructure",
                     // The audit writer is the decorator that adds the request origin; it is the
                     // first bean whose class lives in this package (exact, like every entry).
@@ -99,7 +105,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
             Set.of("com.confia.bootstrap.portal", "com.confia.shared.web.openapi",
                     "com.confia.shared.web.edge", "com.confia.shared.web.request",
                     "com.confia.shared.web.problem"),
-            Map.of("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
+            forbidden("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     "com.confia.invoicing", ADMIN_MODULE,
                     "com.confia.cashbox", ADMIN_MODULE,
@@ -112,6 +118,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                             + "subdomain (ADR-0003)",
                     SCHEDULER_PACKAGE, SCHEDULER_REASON,
                     TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
+                    CSRF_PACKAGE, CSRF_REASON,
                     // The adapter reads the institution of a staff token, which the portal never
                     // verifies (decision 6 of session-tokens-and-web-layer).
                     "com.confia.organization", STAFF_INSTITUTION));
@@ -127,7 +134,17 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "org.springframework.security", SPRING_SECURITY,
                     "org.springframework.boot.security", SPRING_SECURITY,
                     TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
+                    CSRF_PACKAGE, CSRF_REASON,
                     "com.confia.organization", STAFF_INSTITUTION));
+
+    /** A forbidden-package map from key, reason pairs: {@code Map.of} stops at ten entries. */
+    private static Map<String, String> forbidden(String... pairs) {
+        Map<String, String> map = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < pairs.length; i += 2) {
+            map.put(pairs[i], pairs[i + 1]);
+        }
+        return Map.copyOf(map);
+    }
 
     static Stream<ProcessBeanPolicy> all() {
         return Stream.of(ADMIN, PORTAL, WORKER);
