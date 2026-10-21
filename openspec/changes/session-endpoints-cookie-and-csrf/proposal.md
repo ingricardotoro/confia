@@ -10,9 +10,9 @@
   DA-12 de su sección 5, tomadas por el propietario el 2026-10-20, son vinculantes y esta propuesta no
   las reabre.
 - **Línea base:** rama `change/session-endpoints-cookie-and-csrf` en `663331c` (sobre `main` en `dafabf3`).
-- **Estado:** propuesta, pendiente de aprobación del propietario. Las decisiones DA-6, DA-8, DA-9,
+- **Estado:** propuesta aprobada por el propietario el 2026-10-20 (nota final). Las decisiones DA-6, DA-8, DA-9,
   DA-10, DA-11, DA-13, DA-14 y DA-15 se redactan con la recomendación de la exploración como posición de
-  trabajo y quedan pendientes de confirmación (sección final).
+  trabajo, confirmada por el propietario (sección final).
 
 ## Intención
 
