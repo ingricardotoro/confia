@@ -14,6 +14,7 @@ import com.confia.identity.domain.PlainPassword;
 import com.confia.identity.domain.StaffAccount;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
+import com.confia.shared.audit.AuditJson;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.SecurityContext;
 import com.confia.shared.security.TransactionRunner;
@@ -263,18 +264,23 @@ public final class AuthenticateWithPassword {
     private static AuditEntry backoffCycleEntry(InstitutionId institutionId, UUID actorId,
             String actorLabel, IdentifierFingerprint fingerprint, UUID requestId, int attemptOrdinal,
             Duration requiredDelay) {
-        String afterValue = "{\"consecutiveFailures\":" + attemptOrdinal + ",\"delaySeconds\":"
-                + requiredDelay.toSeconds() + "}";
+        String afterValue = backoffCycleAfterValue(attemptOrdinal, requiredDelay);
         return new AuditEntry(institutionId.value(), actorId, ACTOR_KIND_STAFF, actorLabel, null,
                 null, requestId, null, ACTION_BACKOFF_APPLIED, LOGIN_BACKOFF_ENTITY_TYPE,
                 fingerprint.value(), OUTCOME_SUCCESS, null, afterValue, null, null);
     }
 
-    private static String rejectionReasonJson(RejectionReason reason) {
+    /** The {@code after_value} of the backoff-cycle row. */
+    static String backoffCycleAfterValue(int attemptOrdinal, Duration requiredDelay) {
+        return AuditJson.object().number("consecutiveFailures", attemptOrdinal)
+                .number("delaySeconds", requiredDelay.toSeconds()).toJson();
+    }
+
+    static String rejectionReasonJson(RejectionReason reason) {
         String kebabCase = switch (reason) {
             case INVALID_PASSWORD -> "invalid-password";
             case ACCOUNT_NOT_FOUND -> "account-not-found";
         };
-        return "{\"reason\":\"" + kebabCase + "\"}";
+        return AuditJson.object().text("reason", kebabCase).toJson();
     }
 }

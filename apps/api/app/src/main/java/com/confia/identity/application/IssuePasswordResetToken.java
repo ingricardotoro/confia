@@ -6,6 +6,7 @@ import com.confia.identity.domain.PlainPasswordResetToken;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
+import com.confia.shared.audit.AuditJson;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.SecurityContext;
 import com.confia.shared.security.TransactionRunner;
@@ -89,7 +90,7 @@ public final class IssuePasswordResetToken {
         if (!policy.allowsAnotherIssuance(issuedInWindow)) {
             auditLogWriter.append(entry(institutionId, auditRequestId, ACTION_ISSUANCE_SKIPPED,
                     STAFF_ACCOUNT_ENTITY_TYPE, accountId.value().toString(), OUTCOME_DENIED,
-                    "{\"reason\":\"rate-limit\",\"issuedInWindow\":" + issuedInWindow + "}"));
+                    rateLimitedAfterValue(issuedInWindow)));
             return new Issuance(IssuePasswordResetTokenDecision.SKIPPED, Optional.empty());
         }
 
@@ -101,9 +102,20 @@ public final class IssuePasswordResetToken {
                 expiresAt);
         auditLogWriter.append(entry(institutionId, auditRequestId, ACTION_ISSUED,
                 TOKEN_ENTITY_TYPE, tokenId.toString(), OUTCOME_SUCCESS,
-                "{\"expiresAt\":\"" + expiresAt + "\",\"supersededCount\":" + supersededCount
-                        + "}"));
+                issuedAfterValue(expiresAt, supersededCount)));
         return new Issuance(IssuePasswordResetTokenDecision.ISSUED, Optional.of(token));
+    }
+
+    /** The {@code after_value} of the skipped-issuance row. */
+    static String rateLimitedAfterValue(long issuedInWindow) {
+        return AuditJson.object().text("reason", "rate-limit")
+                .number("issuedInWindow", issuedInWindow).toJson();
+    }
+
+    /** The {@code after_value} of the issued row. */
+    static String issuedAfterValue(Instant expiresAt, int supersededCount) {
+        return AuditJson.object().instant("expiresAt", expiresAt)
+                .number("supersededCount", supersededCount).toJson();
     }
 
     private static AuditEntry entry(InstitutionId institutionId, UUID requestId, String action,

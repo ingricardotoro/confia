@@ -10,6 +10,7 @@ import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.UserAgentFingerprint;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
+import com.confia.shared.audit.AuditJson;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.AuthenticationMethod;
 import com.confia.shared.security.SecurityContext;
@@ -126,7 +127,7 @@ public final class IssueSession {
         auditLogWriter.append(new AuditEntry(institutionId.value(), accountId.value(),
                 ACTOR_KIND_STAFF, accountId.value().toString(), null, null, auditRequestId, null,
                 ACTION_STARTED, FAMILY_ENTITY_TYPE, familyId.toString(), OUTCOME_SUCCESS, null,
-                "{\"secondFactor\":" + command.secondFactorVerified() + "}", null, null));
+                startedAfterValue(command.secondFactorVerified()), null, null));
         return new Stored(familyId, refreshToken, refreshExpiresAt);
     }
 
@@ -135,6 +136,11 @@ public final class IssueSession {
         return secondFactorVerified
                 ? EnumSet.of(AuthenticationMethod.PASSWORD, AuthenticationMethod.ONE_TIME_PASSWORD)
                 : EnumSet.of(AuthenticationMethod.PASSWORD);
+    }
+
+    /** The {@code after_value} of the session-started row. */
+    static String startedAfterValue(boolean secondFactorVerified) {
+        return AuditJson.object().bool("secondFactor", secondFactorVerified).toJson();
     }
 
     /** What the transaction leaves behind; the access token is signed from it after the commit. */

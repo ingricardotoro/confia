@@ -9,6 +9,7 @@ import com.confia.identity.domain.TotpVerificationPolicy;
 import com.confia.kernel.AeadIntegrityException;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
+import com.confia.shared.audit.AuditJson;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.security.SecurityContext;
@@ -164,12 +165,17 @@ public final class VerifyTotpCode {
                 null);
     }
 
+    /** The {@code after_value} of the backoff-cycle row. */
+    static String backoffCycleAfterValue(int attemptOrdinal, Duration requiredDelay) {
+        return AuditJson.object().number("consecutiveFailures", attemptOrdinal)
+                .number("delaySeconds", requiredDelay.toSeconds()).toJson();
+    }
+
     /** Design.md, §4.2 step 8: the backoff-cycle audit row, written only when {@code requiredDelay
      * > 0}. */
     private static AuditEntry backoffCycleEntry(InstitutionId institutionId, StaffAccountId accountId,
             UUID requestId, int attemptOrdinal, Duration requiredDelay) {
-        String afterValue = "{\"consecutiveFailures\":" + attemptOrdinal + ",\"delaySeconds\":"
-                + requiredDelay.toSeconds() + "}";
+        String afterValue = backoffCycleAfterValue(attemptOrdinal, requiredDelay);
         return new AuditEntry(institutionId.value(), accountId.value(), ACTOR_KIND_STAFF,
                 accountId.value().toString(), null, null, requestId, null, ACTION_BACKOFF_APPLIED,
                 BACKOFF_ENTITY_TYPE, accountId.value().toString(), OUTCOME_SUCCESS, null,
