@@ -88,7 +88,7 @@ public class SensitiveDataLoggingTest {
         try {
             process.sendWithBody("GET", "/test/open", BODY, "Authorization", "Bearer " + BEARER,
                     "Cookie", "sid=" + COOKIE);
-            process.sendWithBody("POST", "/x", BODY, "Authorization", "Bearer " + BEARER,
+            process.sendWithBody("POST", "/x", BODY, "Authorization", "Bearer " + BEARER, "Origin", HarnessProcess.ALLOWED_ORIGIN,
                     "Cookie", "sid=" + COOKIE);
             process.sendWithBody("GET", "/test/boom", BODY,
                     "Cookie", "sid=" + COOKIE);

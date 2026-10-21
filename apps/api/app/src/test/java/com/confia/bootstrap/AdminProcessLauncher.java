@@ -20,6 +20,9 @@ import org.springframework.context.ConfigurableApplicationContext;
  */
 public final class AdminProcessLauncher {
 
+    /** The one origin the process started by {@link #launch} allows. */
+    public static final String ALLOWED_ORIGIN = "https://admin.colegio.edu.hn";
+
     private AdminProcessLauncher() {
     }
 
@@ -30,6 +33,7 @@ public final class AdminProcessLauncher {
     public static ConfigurableApplicationContext launch(String jdbcUrl, String username,
             String password, KeyPair signingKeys) {
         Map<String, String> overrides = new LinkedHashMap<>();
+        overrides.put("confia.web.allowed-origins", ALLOWED_ORIGIN);
         overrides.put("spring.datasource.url", jdbcUrl);
         overrides.put("spring.datasource.username", username);
         overrides.put("spring.datasource.password", password);
@@ -39,6 +43,20 @@ public final class AdminProcessLauncher {
                 .encodeToString(signingKeys.getPublic().getEncoded()));
         ConfiaApplication.LaunchOutcome outcome = ConfiaApplication.launch(
                 TestProcessArguments.adminWith(overrides), "admin");
+        if (outcome.context() == null) {
+            throw new IllegalStateException("the administrative process did not start");
+        }
+        return outcome.context();
+    }
+
+    /**
+     * Starts the administrative process with a JDBC URL nothing listens on, which is enough
+     * because the pool connects lazily, for the tests that inspect the real security chain
+     * without a database. Every secret, including the CSRF key, is generated for the run.
+     */
+    public static ConfigurableApplicationContext launchWithoutDatabase() {
+        ConfiaApplication.LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.adminWith(Map.of()), "admin");
         if (outcome.context() == null) {
             throw new IllegalStateException("the administrative process did not start");
         }

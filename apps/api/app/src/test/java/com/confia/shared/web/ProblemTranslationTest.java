@@ -52,7 +52,8 @@ class ProblemTranslationTest {
     }
 
     private static HttpResponse<String> post(String body, String contentType) {
-        return process.sendWithBody("POST", "/test/validated", body, "Content-Type", contentType);
+        return process.sendWithBody("POST", "/test/validated", body, "Content-Type", contentType,
+                "Origin", HarnessProcess.ALLOWED_ORIGIN);
     }
 
     private static HttpResponse<String> postJson(String body) {

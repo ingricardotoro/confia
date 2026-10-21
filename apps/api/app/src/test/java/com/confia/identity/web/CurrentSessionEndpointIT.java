@@ -426,7 +426,8 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
 
         assertProblem(get("/api/v1/auth/sessions"), 401, "authentication-required");
         assertProblem(get("/api/v1/anything"), 401, "authentication-required");
-        assertProblem(send("POST", ROUTE), 401, "authentication-required");
+        assertProblem(send("POST", ROUTE, "Origin", AdminProcessLauncher.ALLOWED_ORIGIN), 401,
+                "authentication-required");
     }
 
     @Test
@@ -437,7 +438,8 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
                 Set.of(AuthenticationMethod.PASSWORD), now()).compact();
 
         for (String method : List.of("POST", "PUT", "PATCH", "DELETE")) {
-            assertProblem(send(method, ROUTE, "Authorization", "Bearer " + token), 403,
+            assertProblem(send(method, ROUTE, "Authorization", "Bearer " + token, "Origin",
+                    AdminProcessLauncher.ALLOWED_ORIGIN), 403,
                     "forbidden");
         }
     }
