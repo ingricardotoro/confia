@@ -189,16 +189,20 @@ class RefreshTokenSchemaIT extends CommittingPostgresIntegrationTest {
         try (Session session = new Session("confia_admin_app")) {
             UUID accountId = session.seedAccount(institution);
 
+            // Scenario BI39 (V9): the five reasons with a producer are accepted, a reason without
+            // one and the empty string are refused by the same constraint.
             session.assertRejected(CHECK_VIOLATION, "identity_refresh_token_family_reason_chk",
                     revokedFamilyInsert("'admin_revoke'"), institution, UUID.randomUUID(),
                     accountId, ZERO_FINGERPRINT);
             session.assertRejected(CHECK_VIOLATION, "identity_refresh_token_family_reason_chk",
-                    revokedFamilyInsert("'logout'"), institution, UUID.randomUUID(), accountId,
+                    revokedFamilyInsert("''"), institution, UUID.randomUUID(), accountId,
                     ZERO_FINGERPRINT);
-            assertThat(session.execute(revokedFamilyInsert("'reuse_detected'"), institution,
-                    UUID.randomUUID(), accountId, ZERO_FINGERPRINT)).isEqualTo(1);
-            assertThat(session.execute(revokedFamilyInsert("'password_change'"), institution,
-                    UUID.randomUUID(), accountId, ZERO_FINGERPRINT)).isEqualTo(1);
+            for (String reason : new String[] {"reuse_detected", "password_change", "logout",
+                    "mfa_change", "binding_changed"}) {
+                assertThat(session.execute(revokedFamilyInsert("'" + reason + "'"), institution,
+                        UUID.randomUUID(), accountId, ZERO_FINGERPRINT))
+                        .as("the reason %s has a producer and is accepted", reason).isEqualTo(1);
+            }
 
             session.assertRejected(CHECK_VIOLATION, "identity_refresh_token_family_revoked_chk",
                     """
