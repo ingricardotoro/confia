@@ -475,6 +475,12 @@ class RotateRefreshTokenTest {
             revokedAt = now;
             return revokeResult;
         }
+
+        @Override
+        public boolean revoke(InstitutionId institutionId, UUID familyId,
+                SessionRevocationReason reason, Instant now) {
+            throw new UnsupportedOperationException("the rotation revokes for reuse, never by reason");
+        }
     }
 
     private static final class FakeTokens implements RefreshTokenRepository {

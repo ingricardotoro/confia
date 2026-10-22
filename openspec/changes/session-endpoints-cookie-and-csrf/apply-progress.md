@@ -282,3 +282,17 @@ La demostración 3 de la tarea (revocador desactivado en `PasswordResetLeavesNoV
 
 - `MultiTenantSchemaIT` y `RolePrivilegeMatrixIT` se re-ejecutan sin cambios y pasan: `V9` no añade política ni concesión, y la ausencia de ambas la fija `V9SchemaDiffIT` (privilegios por tabla y por columna, políticas, disparadores, índices). No se ampliaron porque no hay nada nuevo que afirmar en ellas.
 - `StepwiseDatabase` crea una base de datos desechable en el contenedor compartido y migra con Flyway por pasos (`V8`, después `V9`); no existía un auxiliar así y las dos pruebas de esquema no se pueden escribir sin él.
+
+### Rebanada 04b `end-current-session`
+
+Apilada sobre 04a. **775 líneas efectivas** (769 añadidas, 6 borradas; `git diff --numstat 04a...HEAD -- . ':!openspec'`): `RefreshTokenFamilyRepository.revoke` y su
+adaptador, `EndCurrentSession`, `SessionRevocationAudit` (el asiento compartido con 04c), el bean, el motivo `logout` en el comentario de la enumeración, `revoke` en
+los seis dobles de prueba y en `HoldingFamilies`, `RevocationIntegrationTest`, `EndSessionIT` (17 pruebas del cierre actual: I195 a I197, mal formado o ausente, desconocido,
+revocada, vencida, bordes exactos de fin e inactividad, otra institución, asiento que falla, identificador de petición) y `RefreshTokenFamilyRevokeIT` (10).
+
+La evidencia de rojo y de verde es la del árbol completo (ver arriba): las pruebas de esta rebanada fueron las que fallaron por el `CHECK` de `V8` y por las clases
+inexistentes. Las demostraciones 1, 1b y 4 de arriba se aplicaron sobre este código (la 4, sobre `EndAllSessions`, vive en 04c).
+
+Cierre: `./mvnw -o verify -Pmutation-gate` desde un árbol limpio, `BUILD SUCCESS` en 15 min 58 s: Surefire 186 + 2 163, Failsafe 454 (427 + 27), 0 fallos. PIT: 631 de 673 mutantes muertos (94 %), fuerza de prueba 95 %, núcleo 192 de 194 (99 %). JaCoCo: «All coverage checks have been met».
+
+Desviaciones: `EndCurrentSession` abre su propio `SecurityContext` de actor `system` con la institución de `LoginInstitutionProvider` (como la rotación, cuyo contexto lo arma el controlador); el diseño fija `execute(String presentedRefreshToken, String requestId)` sin contexto, de modo que el caso de uso lo construye. Un texto `null` se trata como «nada que hacer» y no abre transacción (la rotación lanzaría `NullPointerException`): el controlador pasará lo que `SessionCookies.read` devuelva.
