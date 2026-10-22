@@ -1,5 +1,6 @@
 package com.confia.shared.security;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -19,9 +20,27 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 public class RateLimiterConfiguration {
 
-    /** The limiter of the administrative login, named after its policy. */
+    /**
+     * The limiter of the administrative login, named after its policy. The policies are told apart
+     * by their bean name, which a qualifier states because the build does not keep parameter names.
+     */
     @Bean("admin-login")
-    RateLimiter adminLoginRateLimiter(RateLimitPolicy adminLoginRateLimitPolicy) {
+    RateLimiter adminLoginRateLimiter(
+            @Qualifier("adminLoginRateLimitPolicy") RateLimitPolicy adminLoginRateLimitPolicy) {
         return new InMemoryRateLimiter(adminLoginRateLimitPolicy);
+    }
+
+    /** The limiter of the verification and enrollment of the second factor. */
+    @Bean("admin-mfa")
+    RateLimiter adminMfaRateLimiter(
+            @Qualifier("adminMfaRateLimitPolicy") RateLimitPolicy adminMfaRateLimitPolicy) {
+        return new InMemoryRateLimiter(adminMfaRateLimitPolicy);
+    }
+
+    /** The limiter of the refresh and the two ends of a session. */
+    @Bean("admin-session")
+    RateLimiter adminSessionRateLimiter(
+            @Qualifier("adminSessionRateLimitPolicy") RateLimitPolicy adminSessionRateLimitPolicy) {
+        return new InMemoryRateLimiter(adminSessionRateLimitPolicy);
     }
 }

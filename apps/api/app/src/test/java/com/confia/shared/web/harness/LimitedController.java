@@ -34,6 +34,20 @@ class LimitedController {
         return useCase();
     }
 
+    /** The policy of the second factor, for the tests that show each policy counts on its own. */
+    @RateLimited(policy = "admin-mfa")
+    @GetMapping("/test/limited-mfa")
+    String limitedMfa() {
+        return useCase();
+    }
+
+    /** The policy of the session routes, for the same tests. */
+    @RateLimited(policy = "admin-session")
+    @GetMapping("/test/limited-session")
+    String limitedSession() {
+        return useCase();
+    }
+
     /** The use case of the stand-in: it only records that it ran. */
     private String useCase() {
         calls.useCaseInvoked();

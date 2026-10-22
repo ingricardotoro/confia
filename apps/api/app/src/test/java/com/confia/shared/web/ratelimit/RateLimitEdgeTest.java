@@ -217,7 +217,7 @@ class RateLimitEdgeTest {
     @Test
     void withNothingSetTheEffectiveValuesAreTheOnesOfLayersOneAndTwo() {
         try (HarnessProcess process = start()) {
-            RateLimitPolicy policy = process.bean(RateLimitProperties.class).policy();
+            RateLimitPolicy policy = process.bean(RateLimitProperties.class).adminLogin().policy();
 
             assertThat(policy).isEqualTo(new RateLimitPolicy(10, Duration.ofMinutes(1), 10,
                     Duration.ofMinutes(10), Duration.ofMinutes(1), Duration.ofHours(1), 50_000));
