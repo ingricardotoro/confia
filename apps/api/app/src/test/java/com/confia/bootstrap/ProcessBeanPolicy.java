@@ -36,6 +36,10 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
     private static final String CSRF_PACKAGE = "com.confia.shared.security.csrf";
     private static final String CSRF_REASON =
             "the CSRF token key and component belong to the administrative cookie routes only";
+    private static final String SESSION_PACKAGE = "com.confia.shared.web.session";
+    private static final String SESSION_COOKIE_REASON =
+            "credential in a cookie of the administrative domain: only the administrative process "
+                    + "issues or reads the session cookie";
     private static final String ADMIN_SIGNING_KEYS =
             "administrative signing keys, ADR-0005 check 14 (the portal and the worker never hold a "
                     + "signing key ring)";
@@ -58,6 +62,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // The CSRF token component (session-endpoints-cookie-and-csrf decision 3):
                     // administrative only, exact like every entry.
                     "com.confia.shared.security.csrf",
+                    // The cookie helper of the session (session-endpoints-cookie-and-csrf decision
+                    // 5): administrative only, exact like every entry.
+                    "com.confia.shared.web.session",
                     "com.confia.shared.infrastructure",
                     // The audit writer is the decorator that adds the request origin; it is the
                     // first bean whose class lives in this package (exact, like every entry).
@@ -119,6 +126,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     SCHEDULER_PACKAGE, SCHEDULER_REASON,
                     TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
                     CSRF_PACKAGE, CSRF_REASON,
+                    SESSION_PACKAGE, SESSION_COOKIE_REASON,
                     // The adapter reads the institution of a staff token, which the portal never
                     // verifies (decision 6 of session-tokens-and-web-layer).
                     "com.confia.organization", STAFF_INSTITUTION));
@@ -135,6 +143,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "org.springframework.boot.security", SPRING_SECURITY,
                     TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
                     CSRF_PACKAGE, CSRF_REASON,
+                    SESSION_PACKAGE, SESSION_COOKIE_REASON,
                     "com.confia.organization", STAFF_INSTITUTION));
 
     /** A forbidden-package map from key, reason pairs: {@code Map.of} stops at ten entries. */
