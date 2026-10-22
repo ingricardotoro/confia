@@ -281,7 +281,7 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
 
 ## Fase 2: revocación y migración
 
-- [ ] 2.1 **PR 4 `session-revocation-v9`: `V9`, revocación por familia y por cuenta, F1a, F1b y concurrencia (decisiones 15 y 16, O10 parte datos).**
+- [x] 2.1 **PR 4 `session-revocation-v9`: `V9`, revocación por familia y por cuenta, F1a, F1b y concurrencia (decisiones 15 y 16, O10 parte datos).**
   - **ROJO.** Crear (los paquetes de las pruebas de integración se confirman contra el árbol): `RevocationReasonCatalogIT.java` y ampliar
     `RefreshTokenSchemaIT.java`, `MultiTenantSchemaIT.java` y `RolePrivilegeMatrixIT.java` (cada motivo nuevo aceptado, `admin_revoke` y la cadena
     vacía rechazados, `revoked_at` con motivo y viceversa; enumeración `SessionRevocationReason` igual a la restricción y una **variante que añade
@@ -313,6 +313,28 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
     nominal 400, realista 880; costura nombrada: 4a `v9-and-revocation-use-cases` (`V9`, enumeración, `revoke`, `EndCurrentSession`,
     `EndAllSessions`, `RevocationReasonCatalogIT`, `V9SchemaDiffIT`, `V9ExistingRowsIT`, `EndSessionIT`) y 4b `revocation-follow-ups` (F1a, F1b y
     las dos pruebas de concurrencia). — Escenarios I195 a I198, I200, I204, I207, I208, BI01 a BI06, BI36, BI37 y BI39 a BI42.
+  - **Nota fechada 2026-10-22 (partición de 2.1 en 04a, 04b, 04c y 04d).** La medición de la tarea completa, construida en un árbol temporal local
+    antes de partirla, fue de 1 552 líneas efectivas solo para `V9` y los casos de uso (`git diff --numstat` sin `openspec/`), frente a 880
+    estimadas, y la tarea cerrada suma 2 178 repartidas en cuatro ramas apiladas, partidas sin consulta y por archivos completos: 04a
+    `v9-revocation-reasons` (541: `V9`, la enumeración con los tres motivos, `RevocationReasonCatalogIT`, la ampliación de `RefreshTokenSchemaIT`,
+    `StepwiseDatabase`, `V9SchemaDiffIT` y `V9ExistingRowsIT`), 04b `end-current-session` (775: `RefreshTokenFamilyRepository.revoke`,
+    `EndCurrentSession`, `SessionRevocationAudit`, `EndSessionIT` en su parte de cierre actual y `RefreshTokenFamilyRevokeIT`), 04c
+    `end-all-sessions` (272: `EndAllSessions` y su parte de `EndSessionIT`) y 04d `revocation-follow-ups` (590: F1a, F1b y las dos pruebas de
+    concurrencia). Ninguna prueba queda separada de lo que prueba. Desviaciones: (1) la costura nombrada (4a casos de uso, 4b seguimientos)
+    no bastaba, porque 4a ya pasaba de 1 500 líneas. (2) La demostración 1 de la tarea no produce rojo en `EndSessionIT`: los casos de uso
+    comprueban la vigencia antes de llamar a `revoke`, de modo que `revoked_at IS NULL` es una red de seguridad que esa prueba no alcanza;
+    se añadió `RefreshTokenFamilyRevokeIT`, que la ejerce directamente (dos aserciones de resultado en rojo y el disparador de `V8` como
+    segunda defensa), y la ruptura equivalente en el caso de uso (quitar la comprobación de vigencia) sí pone en rojo `EndSessionIT`. (3) La
+    demostración 3 se aplicó en el adaptador `JooqAccountSessionRevoker` (devolver cero sin revocar), no en el caso de uso: el efecto es el
+    mismo y no rompe el inventario de `IdentityScopeExclusionInventoryTest`. (4) `MultiTenantSchemaIT` y `RolePrivilegeMatrixIT` se
+    re-ejecutan sin cambios: `V9` no añade política ni concesión y `V9SchemaDiffIT` fija esa ausencia. (5) `EndCurrentSession` arma su propio
+    contexto de seguridad de actor `system` con la institución de `LoginInstitutionProvider`, y trata un texto `null` como «nada que hacer»
+    sin abrir transacción. (6) `EndAllSessions.execute` devuelve el número de familias revocadas y falla con `IllegalStateException` si la
+    cuenta del actor no existe. (7) F1a (`PasswordResetLeavesNoValidTokenIT`) arranca el proceso administrativo real con un par de claves
+    generado para la ejecución y emite las sesiones con el reloj real, porque el proceso lee el suyo; su control negativo restablece con un
+    revocador que no revoca nada y demuestra que entonces las seis comprobaciones encuentran todo vivo. (8) La demostración de bloqueo de las dos pruebas de
+    concurrencia (quitar `FOR UPDATE` de `lockById`) pone en rojo la aserción de espera y no el estado final, que es el mismo en cualquier
+    orden, como ya documentan las pruebas de rotación de S1.
 
 ---
 
