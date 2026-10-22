@@ -236,3 +236,49 @@ mutantes aislados sin afectar al resultado); no son comparables entre sí para e
 - `AuditJson` y `SessionCookies` no entran en el alcance de PIT (la tarea no lo pide).
 
 Estado final: tarea 1.3 marcada `[x]` en `tasks.md` (casilla en 03c, con nota fechada de la partición). Pendiente de 1.3: nada.
+
+## Tarea 2.1: `session-revocation-v9`, partida en 04a, 04b, 04c y 04d
+
+La tarea se construyó completa en un árbol temporal local (rama `tmp-revocation-all`, nunca publicada) antes de partirla: solo las
+rebanadas de `V9` y de los casos de uso ya sumaban 1 552 líneas efectivas (`git diff --numstat`, sin `openspec/`) frente a las 880 de la
+estimación realista, de modo que se parte sin consultar, por archivos completos y sin separar ninguna prueba de su código. Cada rebanada se apila
+sobre la anterior.
+
+| Rama | Contenido | Líneas efectivas |
+|---|---|---|
+| `...-04a-v9-revocation-reasons` | `V9`, `SessionRevocationReason` con los tres motivos nuevos, `RevocationReasonCatalogIT` (BI39 y BI40), ampliación de `RefreshTokenSchemaIT` (BI39, I204), `StepwiseDatabase`, `V9SchemaDiffIT` (BI41) y `V9ExistingRowsIT` (BI42) | 541 |
+| `...-04b-end-current-session` | (pendiente de medir) `RefreshTokenFamilyRepository.revoke`, `EndCurrentSession`, `SessionRevocationAudit`, `EndSessionIT` (parte de cierre actual), `RefreshTokenFamilyRevokeIT` | |
+| `...-04c-end-all-sessions` | (pendiente de medir) `EndAllSessions` y su parte de `EndSessionIT` | |
+| `...-04d-revocation-follow-ups` | (pendiente de medir) F1a, F1b y las dos pruebas de concurrencia | |
+
+### Evidencia del ciclo TDD (árbol completo, antes de partir)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO (compilación) | `./mvnw -q -o -pl app -am test-compile` con `EndSessionIT`, `RevocationReasonCatalogIT`, `V9*IT` y el resto escritos y sin `EndCurrentSession` ni `EndAllSessions` | `exit=1`, 36 líneas `ERROR`: `cannot find symbol` para `EndCurrentSession` (3) y `EndAllSessions` (3). Causa: clases inexistentes, la esperada |
+| ROJO (comportamiento) | Producción completa **sin** `V9`: `-Dit.test='RevocationReasonCatalogIT,RefreshTokenSchemaIT,EndSessionIT,V9SchemaDiffIT,V9ExistingRowsIT'` | 64 pruebas, 6 fallos y 11 errores. Causa observada: `violates check constraint "identity_refresh_token_family_reason_chk"` (el `CHECK` de `V8` rechaza `logout`) en 7 pruebas de `EndSessionIT` y en `RefreshTokenSchemaIT`; `RevocationReasonCatalogIT` 3 de 4 fallan (el catálogo tiene dos motivos y no cinco); `No migration with a target version 9 could be found` en `V9ExistingRowsIT` y `V9SchemaDiffIT`. Dos pruebas de `EndSessionIT` fallaron por mi propia aserción (el `after_value` vuelve de `jsonb` normalizado, `{"reason": "logout", ...}`, y se compara ahora como documento) y `V9SchemaDiffIT` por un defecto de mi consulta (`"char" \|\| unknown`); ambos se corrigieron antes del verde |
+| VERDE | Mismo comando con `V9` | 74 pruebas, 0 fallos (`EndSessionIT` 22, `RefreshTokenFamilyRevokeIT` 10, `RefreshTokenSchemaIT` 34, `RevocationReasonCatalogIT` 4, `V9ExistingRowsIT` 1, `V9SchemaDiffIT` 3). La suma de verificación de `V8` se fijó en `1681600631` leyéndola de la historia de Flyway con `V8` sin cambios respecto de `origin/main` |
+
+### Demostraciones deliberadas (árbol completo)
+
+Cada una sobre una copia guardada (`pre-break-4a-N.*` en el directorio de la sesión), revertida y confirmada con `cmp`. No queda ninguna ruptura en el árbol.
+
+| # | Ruptura | Resultado observado | Revertida |
+|---|---|---|---|
+| 1 | Quitar `revoked_at IS NULL` de `JooqRefreshTokenFamilyRepository.revoke` [I196] | `EndSessionIT` **sigue en verde** (el caso de uso comprueba la vigencia antes de llamar a `revoke`, de modo que la condición es una red de seguridad que esa prueba no alcanza; es el rojo que la tarea prometía y no se produce). Por eso se añadió `RefreshTokenFamilyRevokeIT`, que ejerce la red directamente: 2 fallos de aserción (`the call did nothing, so it does not claim to have revoked`: `true` en lugar de `false`; el segundo revocamiento por reutilización devuelve `true`) y 1 error del motor (`identity_refresh_token_family_revocation_final: a revoked family keeps its revocation`, el disparador de `V8` como segunda defensa) | Sí, `cmp` idéntico |
+| 1b | (Adicional) Sustituir la comprobación de vigencia de `EndCurrentSession` por `if (false)` [I196] | `EndSessionIT`: 3 de 22 fallan, `aFamilyThatHasEndedByTimeIsNotRevokedAndWritesNoEntry`, `aFamilyAtTheExactEndOfItsLifeAndOneAtTheExactIdleBorderAreNotRevoked` y `anAlreadyRevokedFamilyKeepsItsReasonAndItsInstantAndWritesNoEntry` (`a family that is live under its own lock could not be revoked`) | Sí, `cmp` idéntico |
+| 2 | Quitar `binding_changed` del `CHECK` de `V9` [BI39] | `RevocationReasonCatalogIT` 3 de 4 (`reasons the application declares that the constraint does not admit`), `V9SchemaDiffIT.v9ChangesTheRevocationReasonConstraintAndNothingElse` (línea 51) y `RefreshTokenSchemaIT.theRevocationReasonCatalogueIsClosedAndRevokedAtNeedsItsReason` (`violates check constraint ..._reason_chk`) | Sí, `cmp` idéntico |
+| 4 | (Adicional) `EndAllSessions` toma el bloqueo de la cuenta después de revocar | `EndSessionIT.theAccountIsLockedBeforeTheFamiliesAndTheRevocationCarriesTheLogoutReason` (línea 345): el orden de llamadas no es `lock-account`, `revoke-logout` | Sí, `cmp` idéntico |
+
+La demostración 3 de la tarea (revocador desactivado en `PasswordResetLeavesNoValidTokenIT`) pertenece a 04d.
+
+### Cierre de 04a
+
+`./mvnw -o verify -Pmutation-gate` desde un árbol de trabajo limpio de la rama, `BUILD SUCCESS` en 15 min 36 s: Surefire 186 (núcleo) + 2 163, Failsafe 427
+(421 anteriores más 6: `RevocationReasonCatalogIT` 4 en lugar de 2, `V9SchemaDiffIT` 3, `V9ExistingRowsIT` 1 y la ampliación de `RefreshTokenSchemaIT` no suma pruebas),
+0 fallos. PIT: 631 de 673 mutantes muertos (94 %), fuerza de prueba 95 %, núcleo 192 de 194 (99 %). JaCoCo: «All coverage checks have been met».
+
+### Desviaciones de 04a
+
+- `MultiTenantSchemaIT` y `RolePrivilegeMatrixIT` se re-ejecutan sin cambios y pasan: `V9` no añade política ni concesión, y la ausencia de ambas la fija `V9SchemaDiffIT` (privilegios por tabla y por columna, políticas, disparadores, índices). No se ampliaron porque no hay nada nuevo que afirmar en ellas.
+- `StepwiseDatabase` crea una base de datos desechable en el contenedor compartido y migra con Flyway por pasos (`V8`, después `V9`); no existía un auxiliar así y las dos pruebas de esquema no se pueden escribir sin él.
