@@ -3,6 +3,7 @@ package com.confia.architecture;
 import static com.confia.architecture.ArchitectureTestSupport.productionClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.confia.architecture.fixture.cookie.identity.web.BadControllerUsingCookie;
 import com.confia.identity.application.SessionLiveness;
 import com.confia.shared.security.RateLimiter;
 import com.confia.shared.security.SessionValidity;
@@ -31,8 +32,9 @@ import org.springframework.security.authentication.AuthenticationProvider;
  *   <li>the session validity port has exactly one implementation, in {@code identity}, is asked by
  *       the authentication filter alone, is never returned by a lambda-backed factory and does not
  *       reach {@code identity} (closed by {@code session-tokens-and-web-layer}, task 5.1);
- *   <li>no class is an {@code AuthenticationProvider} and none uses {@code
- *       jakarta.servlet.http.Cookie} (owner: {@code session-tokens-and-web-layer});
+ *   <li>no class is an {@code AuthenticationProvider} (owner: {@code session-tokens-and-web-layer})
+ *       and exactly one, the cookie helper {@code SessionCookies}, uses {@code
+ *       jakarta.servlet.http.Cookie} (session-endpoints-cookie-and-csrf, BI47);
  *   <li>no authorization rule on a route beyond the public allow-list, the authenticated list (any
  *       authenticated actor, no role) and the final denial, and no
  *       method-level permission annotation (owner: change 8, RBAC);
@@ -54,6 +56,9 @@ import org.springframework.security.authentication.AuthenticationProvider;
  * scans.
  */
 class WebEdgeScopeExclusionInventoryTest {
+
+    /** The one class that may use the servlet cookie: it writes and reads the session cookies. */
+    private static final String COOKIE_HELPER = "com.confia.shared.web.session.SessionCookies";
 
     private static final String AUTHORIZED_URL =
             "org.springframework.security.config.annotation.web.configurers"
@@ -217,8 +222,12 @@ class WebEdgeScopeExclusionInventoryTest {
                         .class.getName());
     }
 
+    /**
+     * The inversion of "no production class uses the servlet cookie" (session-endpoints-cookie-and-
+     * csrf, BI47): exactly one class does, the cookie helper, and it is the only one that may.
+     */
     @Test
-    void noProductionClassUsesTheServletCookie() {
+    void onlyTheCookieHelperUsesTheServletCookie() {
         JavaClasses production = assertNonEmptyProductionClasses();
 
         assertThat(production.stream().filter(WebEdgeScopeExclusionInventoryTest::dependsOnServlet))
@@ -226,9 +235,18 @@ class WebEdgeScopeExclusionInventoryTest {
                         + "looking at real dependencies")
                 .isNotEmpty();
         assertThat(classesUsingTheServletCookie(production))
-                .as("no production class creates or reads a session cookie: the cookie is "
-                        + "session-tokens-and-web-layer's")
-                .isEmpty();
+                .as("exactly the cookie helper reads the cookies of a request: the attributes of a "
+                        + "cookie are written in one place")
+                .containsExactly(COOKIE_HELPER);
+        assertThat(classesUsingTheServletCookieOutsideTheHelper(production)).isEmpty();
+    }
+
+    @Test
+    void aControllerOfIdentityWebThatUsesTheServletCookieIsFlaggedByTheConfinement() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(BadControllerUsingCookie.class);
+
+        assertThat(classesUsingTheServletCookieOutsideTheHelper(fixtures))
+                .containsExactly(BadControllerUsingCookie.class.getName());
     }
 
     @Test
@@ -511,6 +529,11 @@ class WebEdgeScopeExclusionInventoryTest {
         return javaClass.getDirectDependenciesFromSelf().stream()
                 .map(Dependency::getTargetClass)
                 .anyMatch(target -> target.getPackageName().equals("jakarta.servlet.http"));
+    }
+
+    private static List<String> classesUsingTheServletCookieOutsideTheHelper(JavaClasses classes) {
+        return classesUsingTheServletCookie(classes).stream()
+                .filter(name -> !name.equals(COOKIE_HELPER)).toList();
     }
 
     private static List<String> classesUsingTheServletCookie(JavaClasses classes) {

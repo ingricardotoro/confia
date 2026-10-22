@@ -52,7 +52,7 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
         ThrottlingConfiguration.class, ObservabilityMetricsConfiguration.class,
         OrganizationConfiguration.class, CsrfConfiguration.class, HarnessController.class,
         CookieHarnessController.class, LimitedController.class,
-        UnknownPolicyController.class, DocumentedProbeController.class,
+        UnknownPolicyController.class, SingleFieldController.class, DocumentedProbeController.class,
         DocumentedProbeController.ProbeAdvice.class})
 class WebEdgeHarness {
 
@@ -105,6 +105,7 @@ class WebEdgeHarness {
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/limited-session"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/unlimited"));
         endpoints.add(new PublicEndpoint(HttpMethod.POST, "/test/validated"));
+        endpoints.add(new PublicEndpoint(HttpMethod.POST, "/test/single-field"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/cookie/issue"));
         endpoints.add(new PublicEndpoint(HttpMethod.POST, "/test/cookie/refresh"));
         endpoints.add(new PublicEndpoint(HttpMethod.DELETE, "/test/cookie/current"));

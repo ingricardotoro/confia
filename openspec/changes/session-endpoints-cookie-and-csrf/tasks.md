@@ -225,7 +225,7 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
     tiene un solo miembro y no admite inversión; se invirtió el orden en `ResetPasswordWithToken.sessionsRevokedAfterValue`
     (`reason`, `families`), con el mismo efecto sobre la igualdad. La casilla se marca en 02b.
 
-- [ ] 1.3 **PR 3 `edge-policies-and-delay-cap`: tres políticas de tasa, tope de la espera, sonda S-5 y `SessionCookies` sin llamador (decisiones 5, 7, 8 y 9).**
+- [x] 1.3 **PR 3 `edge-policies-and-delay-cap`: tres políticas de tasa, tope de la espera, sonda S-5 y `SessionCookies` sin llamador (decisiones 5, 7, 8 y 9).**
   - **ROJO.** Crear en `test/java/com/confia/shared/web/`: `ratelimit/RateLimitPropertiesTest.java` (valores por omisión de las tres políticas
     desde `application.yml`, la capa 2 con 1 intento por minuto y tope de 1 hora; componente `admin-session` ausente, componente `admin-otro`
     desconocido y valor no positivo detienen el arranque nombrando la propiedad completa) [WE70, WE73, WE93], `ratelimit/RateLimitIndependenceTest.java`
@@ -261,6 +261,21 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
   - **Cierre.** `./mvnw verify -Pmutation-gate`. Commits: `feat(web): add per-policy rate limits, a wait cap and the session cookie helper` y
     `docs(security): note the admin-mfa and admin-session policies and the wait cap`. Tamaño: nominal 280, realista 620. — Escenarios WE52, WE65,
     WE70, WE71, WE73, WE75 a WE78, WE93, BI47 y BI48.
+  - **Nota fechada 2026-10-21 (partición de 1.3 en 03a, 03b y 03c).** La medición de la tarea completa fue de 1 775 líneas efectivas
+    (`git diff --numstat` sin `openspec/`; 1 634 añadidas y 141 borradas), frente a 620 estimadas. Se partió sin consulta, por archivos
+    completos, en tres costuras: 03a `delay-cap` (268: `max-wait` en `DelayProperties` y en el materializador, su prueba y la nota de
+    `docs/03` sobre el tope), 03b `rate-policies` (732: las tres políticas bajo `confia.web.rate-limit.<política>.*`, los tres limitadores,
+    `RateLimitFailures`, los valores por omisión en `application.yml` y la nota de las filas `admin-mfa` y `admin-session`) y 03c
+    `session-cookies-and-unknown-properties` (775: la sonda S-5, `SessionCookies` sin llamador, la inversión del inventario de `Cookie` y
+    la línea de `ProcessBeanPolicy`). Ninguna prueba queda separada de lo que prueba. Desviaciones: (1) `NoStraySetCookieTest` vive en
+    `com.confia.bootstrap` y no en `shared.web.session`, porque usa el proceso administrativo real (`OpenApiProcess` es de ese paquete); el
+    `200` de `GET /api/v1/auth/sessions/current` sin `Set-Cookie` se afirma en `CurrentSessionEndpointIT`. (2) El escenario WE73 nombra la
+    propiedad `...admin-session.requests`; la propiedad existente es `request-limit` y es la que la prueba usa. (3) R-2: la propiedad
+    `spring.jackson.deserialization.fail-on-unknown-properties: true` **sí** la honra el autoconfigurador de Spring Boot 4.1.1 (la sonda S-5
+    dio `200` sin ella y `400 validation-failed` con ella), de modo que no hizo falta el `JsonMapperBuilderCustomizer`. (4) `CsrfOriginFilter`
+    conserva la lectura de la cabecera `Cookie`: sustituirla por `SessionCookies.read` no se pidió y movería el filtro a depender de un bean.
+    (5) `RateLimitFailures.record` con una política que ningún limitador tiene lanza `IllegalArgumentException` en lugar de no hacer nada,
+    porque un no-op silencioso apagaría la capa 2. La casilla se marca en 03c.
 
 ---
 

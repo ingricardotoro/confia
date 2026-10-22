@@ -135,6 +135,24 @@ class SigningAndHashingConfinementTest {
                 .doesNotContain("java.security.MessageDigest");
     }
 
+    /**
+     * BI48: the HMAC of the CSRF token lives in {@code shared.security.csrf} and the web layer, which
+     * holds the filter that calls it, never touches a signing utility itself. The cookie rule is the
+     * confinement of {@code WebEdgeScopeExclusionInventoryTest}.
+     */
+    @Test
+    void theCsrfHmacLivesInSharedSecurityCsrfAndNotInTheWebLayer() {
+        assertThat(usersInside("com.confia.shared.security.csrf."))
+                .as("the component of the CSRF token really uses the HMAC")
+                .contains("com.confia.shared.security.csrf.CsrfTokens");
+        assertThat(usersInside("com.confia.shared.web."))
+                .as("no class of the web layer signs or hashes by itself").isEmpty();
+        assertThat(productionClasses().stream().map(JavaClass::getName)
+                .filter(name -> name.startsWith("com.confia.shared.web.csrf.")))
+                .as("the filter that uses the token component is evaluated by the rule")
+                .contains("com.confia.shared.web.csrf.CsrfOriginFilter");
+    }
+
     private static List<String> usersInside(String packagePrefix) {
         return productionClasses().stream()
                 .filter(javaClass -> javaClass.getName().startsWith(packagePrefix))

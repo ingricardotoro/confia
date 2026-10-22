@@ -67,6 +67,13 @@ confia:
       max-wait: 30s
 
 spring:
+  jackson:
+    deserialization:
+      # A JSON property the body does not declare is refused with 400 validation-failed and is never
+      # ignored (session-endpoints-cookie-and-csrf design.md, decision 9; probe S-5: Spring Boot 4.1.1
+      # ignores it by default). A client that sends an extra field is either wrong or probing, and a
+      # silent ignore would hide a field a future endpoint starts to read.
+      fail-on-unknown-properties: true
   threads:
     virtual:
       # Every request runs on a virtual thread, so the required delay of an answer waits without

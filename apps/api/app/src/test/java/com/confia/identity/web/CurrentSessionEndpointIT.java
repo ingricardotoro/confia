@@ -194,6 +194,8 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.headers().firstValue("Content-Type")).hasValueSatisfying(
                 type -> assertThat(type).startsWith("application/json"));
+        assertThat(response.headers().firstValue("Set-Cookie"))
+                .as("the answer of the current session sets no cookie (WE65)").isEmpty();
         assertThat(response.headers().allValues("Cache-Control")).containsExactly("no-store");
         JsonNode body = HarnessProcess.json(response);
         List<String> fields = new ArrayList<>();
