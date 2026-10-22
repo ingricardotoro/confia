@@ -8,12 +8,13 @@ package com.confia.identity.application;
  * {@code RevocationReasonCatalogIT} reads the constraint from PostgreSQL and fails the build if this
  * enum and the constraint ever differ. {@code admin_revoke} has no producer and is not a reason.
  *
- * <p>{@link #PASSWORD_CHANGE} is requested through {@link AccountSessionRevoker}, which revokes every
- * live family of an account. {@link #LOGOUT} revokes one family through {@link
- * RefreshTokenFamilyRepository#revoke}. {@link #REUSE_DETECTED} is decided by the rotation and revokes
- * one family through {@link RefreshTokenFamilyRepository#revokeForReuse}; it is never a reason for
- * {@link AccountSessionRevoker}. {@link #MFA_CHANGE} and {@link #BINDING_CHANGED} are the reasons the
- * session endpoints add; each gets its producer in the slice that delivers it.
+ * <p>{@link #PASSWORD_CHANGE} and {@link #LOGOUT} are requested for a whole account through {@link
+ * AccountSessionRevoker}, which revokes every live family of it, and {@link #LOGOUT} also for one
+ * family through {@link RefreshTokenFamilyRepository#revoke}. {@link #REUSE_DETECTED} is decided by
+ * the rotation and revokes one family through {@link RefreshTokenFamilyRepository#revokeForReuse}; it
+ * is never a reason for {@link AccountSessionRevoker}. {@link #MFA_CHANGE} and {@link
+ * #BINDING_CHANGED} are the reasons the session endpoints add; each gets its producer in the slice
+ * that delivers it.
  */
 public enum SessionRevocationReason {
 
