@@ -3,7 +3,7 @@
 - **Cambio:** `session-endpoints-cookie-and-csrf` (F0, cambio 7, parte 4b, segundo cambio de tres)
 - **Modo:** TDD estricto (`./mvnw verify -Pmutation-gate` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `stacked-to-main`, tope de 800 líneas efectivas por PR (DA-1 *a*)
-- **Última actualización:** 2026-10-21 (tarea 1.2 completa: rebanadas 02a y 02b)
+- **Última actualización:** 2026-10-21 (tarea 1.3 completa: rebanadas 03a, 03b y 03c)
 - **Regla de este archivo:** solo se añade; no se reescriben secciones existentes.
 
 ## Estado de las tareas
@@ -12,6 +12,7 @@
 |---|---|---|---|
 | 1.1 | PR 1 `csrf-and-origin-protection`, partido en 01a, 01b y 01c (ver «Tarea 1.1: medición y partición») | Completa y verificada | 01a: `2cce1be`; 01b: `0bfeb27`; 01c: ver el historial de la rama |
 | 1.2 | PR 2 `audit-json-serializer`, partido en 02a y 02b (ver «Tarea 1.2») | Completa y verificada | 02a: `bf2778d`; 02b: ver el historial de la rama |
+| 1.3 | PR 3 `edge-policies-and-delay-cap`, partido en 03a, 03b y 03c (ver «Tarea 1.3») | Completa y verificada | 03a: `dc6025b`; 03b: `fa04cee`; 03c: ver el historial de la rama |
 
 ## Tarea 1.1: medición y partición
 
@@ -172,3 +173,66 @@ Desviación de la demostración 3: la tarea nombra `RotateRefreshToken.reasonJso
 `./mvnw -o verify -Pmutation-gate` sobre la rama 02b (árbol final de la tarea 1.2), `BUILD SUCCESS` en 14 min 51 s: Surefire 186 (núcleo) + 2 074, Failsafe 421, 0 fallos. PIT: 631 de 673 mutantes muertos (94 %), fuerza de prueba 95 %, cobertura de líneas de las clases mutadas 895 de 925 (97 %). JaCoCo: «All coverage checks have been met». `AuditChainAfterAuditJsonIT` verifica la cadena de asientos escritos con el constructor [AT04]; `CanonicalSerializationCrossCheckIT` sigue en verde sin cambios. `AuditJsonOnlySourceTest` evalúa las ocho clases migradas sin conjunto vacío y no halla ninguna concatenación [BI44]; los tres fixtures malos fallan y el de `shared.security.token` no [BI43].
 
 Estado final: tarea 1.2 marcada `[x]` en `tasks.md` (casilla en 02b, con nota fechada de la partición). Pendiente de 1.2: nada.
+
+## Tarea 1.3: `edge-policies-and-delay-cap`, partida en 03a, 03b y 03c
+
+Medida con `git diff --numstat origin/main...HEAD` sin `openspec/`: **1 775 líneas efectivas** (1 634 añadidas, 141 borradas) frente a
+620 estimadas. Se partió sin consultar, por archivos completos, y cada rebanada se apila sobre la anterior.
+
+| Rama | Contenido | Líneas efectivas |
+|---|---|---|
+| `...-03a-delay-cap` | `max-wait` en `DelayProperties` y en el materializador, `DelayPropertiesTest`, ampliaciones de `RequiredDelayMaterializerTest` y `RequiredDelayConfigurationTest`, `application.yml` (`confia.web.delay.max-wait`), nota de `docs/03` §10 sobre el tope | 268 |
+| `...-03b-rate-policies` | `RateLimitProperties` con tres componentes `PolicyValues`, tres limitadores y tres políticas, `RateLimitFailures`, valores por omisión en `application.yml`, `RateLimitPropertiesTest` reescrita, `RateLimitIndependenceTest`, `RateLimitFailuresTest`, rutas `admin-mfa` y `admin-session` del arnés, nota de `docs/03` §10 | 732 |
+| `...-03c-session-cookies-and-unknown-properties` | Sonda S-5 y `fail-on-unknown-properties`, `SessionCookies`, `SessionCookie`, `SessionCookieConfiguration`, `@Import`, `ProcessBeanPolicy`, inversión del inventario de `Cookie` con su fixture, BI48, `NoStraySetCookieTest` | 775 |
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO (compilación, 03a y 03b) | `./mvnw -q -o -pl app -am test-compile` con las pruebas escritas y sin código de producción | `exit=1`, 144 líneas `ERROR`: `cannot find symbol` para `RateLimitFailures` (8), los métodos `adminLogin()` (10), `adminMfa()` (6), `adminSession()` (8) de `RateLimitProperties` y `maxWait()` (12), más el constructor del materializador con tope. Causa: clases y métodos inexistentes, la esperada |
+| ROJO (comportamiento, 03b) | Con `RateLimitProperties`, `RateLimitFailures` y el tope presentes pero **sin** los valores en `application.yml` ni los limitadores nuevos: `-Dtest='RateLimitPropertiesTest,RateLimitIndependenceTest,RateLimitFailuresTest,RateLimitEdgeTest,...'` | `RateLimitPropertiesTest` 19 fallos y 8 errores; `RateLimitEdgeTest` 8 errores y 2 fallos; `RateLimitIndependenceTest` 4 errores; `RateLimitFailuresTest` 1 error. Causa observada: `APPLICATION FAILED TO START ... confia.web.rate-limit.admin-login.request-limit must be positive` y `confia.web.rate-limit.admin-login is not configured`, es decir, los componentes sin valores por omisión detienen el arranque nombrando la propiedad |
+| ROJO (S-5, primer rojo de 03c) | `-Dtest=UnknownJsonPropertyTest` sin `spring.jackson.deserialization.fail-on-unknown-properties` | 3 pruebas, 2 fallos: `expected: 400 but was: 200`. **La sonda confirma que Spring Boot 4.1.1 ignora las propiedades desconocidas por omisión** |
+| ROJO (compilación, 03c) | `test-compile` con `SessionCookiesTest` y la inversión del inventario sin `SessionCookies` | `exit=1`, 52 líneas `ERROR`: `cannot find symbol` para `SessionCookie` (10) y `SessionCookies` (4) |
+| ROJO (lista de permitidos, 03c) | Con `SessionCookieConfiguration` en el `@Import` de `AdminApplication` y sin la línea de `ProcessBeanPolicy` | `ProcessBeanIsolationTest.registersOnlyItsAllowedBeans`: `process 'admin': bean 'sessionCookies' from package 'com.confia.shared.web.session' - not in the allow-list`. Aquí sí falla por la lista de permitidos, porque `com.confia.shared.web.session` no es subpaquete de ninguna entrada |
+| VERDE | 03a: `DelayPropertiesTest` 11, `RequiredDelayConfigurationTest` 18, `RequiredDelayMaterializerTest` 29. 03b: `RateLimitPropertiesTest` 30, `RateLimitIndependenceTest` 4, `RateLimitFailuresTest` 6, `RateLimitEdgeTest` 11, `RateLimitInterceptorTest` 16, `ProcessBeanIsolationTest` 13. 03c: `UnknownJsonPropertyTest` 3, `SessionCookiesTest` 26, `NoStraySetCookieTest` 12, `WebEdgeScopeExclusionInventoryTest` 26, `SigningAndHashingConfinementTest` 7 | 0 fallos |
+| Corrección de una prueba propia | `RateLimitFailuresTest` esperaba `429` en el primer intento tras el décimo fallo; la capa 2 admite un intento por minuto a un cliente restringido | La prueba ahora afirma `200` para ese único intento y `429` para el siguiente. `ProcessBeanIsolationTest` esperaba un solo limitador (`admin-login`) y ahora espera los tres |
+
+### Demostraciones deliberadas
+
+Cada una sobre una copia guardada (`pre-break-N.*` en el directorio de la sesión), revertida y confirmada con `cmp`. No queda ninguna ruptura en el árbol.
+
+| # | Ruptura | Resultado observado | Revertida |
+|---|---|---|---|
+| 1 | El materializador ignora `max-wait` (`waitFor(delay)` en lugar de `waitFor(min(delay, maxWait))`) [WE75] | `RequiredDelayMaterializerTest.aDelayOfNineHundredSecondsWaitsTheCapAndTheDelayedKeepsTheWholeDelay` (`[the wait asked of the timer is the cap]`, `Expecting actual: [15M]`, 900 s en lugar de 30 s) y `aDelayOneNanosecondOverTheCapWaitsTheCap` | Sí, `cmp` idéntico |
+| 2 | (Adicional) La política `admin-mfa` toma los valores de `admin-login` | `RateLimitIndependenceTest.eachPolicyAppliesItsOwnConfiguredLimit` (`expected: 2 but was: 1`) y `aClientWhoseSecondFactorQuotaIsSpentIsStillAdmittedByTheOtherTwoPolicies` (`expected: 429 but was: 200`) [WE70, WE71] | Sí, `cmp` idéntico |
+| 3 | Se quita `.sameSite(SAME_SITE)` de `SessionCookies` [WE52] | `SessionCookiesTest`: 3 fallos (`theSessionCookieCarriesTheRefreshTokenWithTheExactAttributes`, `theCsrfCookieCarriesATokenBoundToTheRefreshWithTheExactAttributes`, `clearingWritesBothNamesEmptyWithMaxAgeZeroAndTheSameAttributes`); por ejemplo `Expecting actual: ["Path=/", "Secure"] to contain exactly in any order: ["Path=/", "Secure", "SameSite=Strict"]`. Una primera pasada con `SameSite=None` dio los mismos tres fallos | Sí, `cmp` idéntico |
+| 4 | `spring.jackson.deserialization.fail-on-unknown-properties: false` [WE78] | `UnknownJsonPropertyTest`: 2 de 3 fallos, `expected: 400 but was: 200` | Sí, `cmp` idéntico |
+
+### Cierre de cada rebanada
+
+`./mvnw -o verify -Pmutation-gate` desde un árbol de trabajo limpio de la rama (sin cambios sin comprometer), `BUILD SUCCESS` en las tres:
+
+| Rebanada | Duración | Surefire (núcleo + aplicación) | Failsafe | PIT (aplicación) | JaCoCo |
+|---|---|---|---|---|---|
+| 03a | 16 min 00 s | 186 + 2 101, 0 fallos | 421, 0 fallos | 631 de 673 mutantes muertos (94 %), fuerza de prueba 95 %; núcleo 192 de 194 (99 %) | «All coverage checks have been met» |
+| 03b | 11 min 34 s | 186 + 2 120, 0 fallos | 421, 0 fallos | 631 de 673 (94 %), fuerza 95 %; núcleo 192 de 194 | «All coverage checks have been met» |
+| 03c | 10 min 47 s | 186 + 2 163, 0 fallos | 421, 0 fallos | 631 de 673 (94 %), fuerza 95 %; núcleo 192 de 194 | «All coverage checks have been met» |
+
+Las duraciones de 03b y 03c se midieron con otra construcción corriendo en paralelo en la misma máquina (y PIT informó `Minion exited abnormally due to TIMED_OUT` en
+mutantes aislados sin afectar al resultado); no son comparables entre sí para el presupuesto de 8 minutos (R-9). La de 03a corrió casi sola.
+
+### Condiciones de cierre de la tarea
+
+- `rg -n "SessionCookies" apps/api/app/src/main`: solo el paquete `shared.web.session`, `SessionCookieConfiguration` y el `@Import` de `AdminApplication`; ningún controlador lo llama.
+- `jakarta.servlet.http.Cookie` en producción: exactamente `com.confia.shared.web.session.SessionCookies` (`WebEdgeScopeExclusionInventoryTest.onlyTheCookieHelperUsesTheServletCookie` [BI47]); el fixture permanente `fixture/cookie/identity/web/BadControllerUsingCookie` es señalado por la misma regla.
+- El HMAC de CSRF está en `shared.security.csrf` y ninguna clase de `shared.web` usa utilidades de firma ni de hash [BI48].
+- La medición G-4 de la puerta de tiempo de inicio de sesión no corresponde a 1.3 (es de 3.1 y 4.1): no se midió aquí.
+
+### Desviaciones
+
+- Ver la nota fechada de la tarea 1.3 en `tasks.md` (cinco puntos): ubicación de `NoStraySetCookieTest`, propiedad `request-limit` frente a `requests` en WE73, R-2 sin necesidad del `JsonMapperBuilderCustomizer`, el filtro CSRF conserva la lectura de la cabecera `Cookie`, y `RateLimitFailures.record` con política desconocida lanza excepción.
+- `RequiredDelayMaterializer(int, DelayTimer)` (de pruebas) conserva su firma y usa el tope por omisión de 30 s; el constructor de producción es ahora `(int, Duration)`.
+- Las tres políticas se resuelven por `@Qualifier` en `RateLimiterConfiguration`, porque la construcción no conserva los nombres de parámetros.
+- `AuditJson` y `SessionCookies` no entran en el alcance de PIT (la tarea no lo pide).
+
+Estado final: tarea 1.3 marcada `[x]` en `tasks.md` (casilla en 03c, con nota fechada de la partición). Pendiente de 1.3: nada.
