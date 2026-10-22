@@ -1448,6 +1448,25 @@ operativo: un pico de 429 legítimos indica un límite mal calibrado, no un ataq
 > `503` vienen del limitador; su ausencia sostenida, junto con el registro de errores del servidor,
 > indica que vienen del marco (nota fechada de `docs/07-observabilidad-y-operaciones.md` §5.4).
 
+> **Nota fechada 2026-10-21 (cambio `session-endpoints-cookie-and-csrf`, tarea 1.3): las políticas
+> `admin-mfa` y `admin-session`.** Además de `admin-login`, el proceso administrativo registra dos
+> políticas con el mismo puerto `RateLimiter` y un limitador propio cada una, de modo que el
+> contador de una no altera el de otra. Valores por omisión, declarados en `application.yml` bajo
+> `confia.web.rate-limit.<política>.*` (un componente por política; uno ausente, o uno que no sea de
+> los tres, detiene el arranque nombrando la propiedad completa):
+>
+> | Política | Rutas (cuando existan) | Capa 1, por IP | Capa 2 |
+> |---|---|---|---|
+> | `admin-login` | `POST /api/v1/auth/sessions` | 10 por minuto | 10 fallos en 10 minutos |
+> | `admin-mfa` | verificación e inscripción del segundo factor | 20 por minuto | 10 fallos en 10 minutos |
+> | `admin-session` | refresco, cierre actual y cerrar todas | 120 por minuto | 30 fallos en 10 minutos |
+>
+> En las tres, la capa 2, una vez activada, admite un intento por minuto con un tope de una hora.
+> Las tres políticas están registradas y ninguna se aplica todavía a una ruta de producción; la
+> primera que se aplica es `admin-login`, en el mismo PR que expone el inicio de sesión. Los
+> controladores informan un fallo con `RateLimitFailures.record(política)`, que toma la dirección de
+> la petición en curso y nunca nombra el puerto.
+
 > **Nota fechada 2026-10-21 (cambio `session-endpoints-cookie-and-csrf`, tarea 1.3): tope de la
 > espera materializada.** El retardo que una política de retroceso exige (hasta 900 segundos) se
 > materializa como máximo durante `confia.web.delay.max-wait`: 30 segundos por omisión, positivo y

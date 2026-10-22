@@ -101,6 +101,8 @@ class WebEdgeHarness {
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/documented"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/limited"));
         endpoints.add(new PublicEndpoint(HttpMethod.HEAD, "/test/limited"));
+        endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/limited-mfa"));
+        endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/limited-session"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/unlimited"));
         endpoints.add(new PublicEndpoint(HttpMethod.POST, "/test/validated"));
         endpoints.add(new PublicEndpoint(HttpMethod.GET, "/test/cookie/issue"));
