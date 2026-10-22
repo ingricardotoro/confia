@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.confia.identity.application.DescribeCurrentSession;
 import com.confia.identity.application.JdbcStubTransactions;
 import com.confia.identity.application.RefreshTokenFamilyRepository;
+import com.confia.identity.application.SessionRevocationReason;
 import com.confia.identity.domain.RefreshTokenFamily;
 import com.confia.identity.domain.RefreshTokenFamilyState;
 import com.confia.identity.domain.StaffAccountId;
@@ -142,6 +143,12 @@ class CurrentSessionControllerTest {
 
         @Override
         public boolean revokeForReuse(InstitutionId institutionId, UUID familyId, Instant now) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean revoke(InstitutionId institutionId, UUID familyId,
+                SessionRevocationReason reason, Instant now) {
             throw new UnsupportedOperationException();
         }
     }

@@ -50,4 +50,16 @@ public interface RefreshTokenFamilyRepository {
      * encrypted successors is {@link RefreshTokenRepository#clearSuccessors}.
      */
     boolean revokeForReuse(InstitutionId institutionId, UUID familyId, Instant now);
+
+    /**
+     * Revokes one family for {@code reason} and reports whether this call did it
+     * (session-endpoints-cookie-and-csrf design.md decision 15). The update is conditional on the
+     * family not being revoked yet, so a family that was already revoked keeps its instant and its
+     * reason, whatever {@code reason} is here, and the answer is {@code false}. Called under the lock
+     * of the family ({@link #lockById}) {@code false} means it was revoked before the caller got the
+     * lock. It touches no other family and no token: emptying the encrypted successors is {@link
+     * RefreshTokenRepository#clearSuccessors}.
+     */
+    boolean revoke(InstitutionId institutionId, UUID familyId, SessionRevocationReason reason,
+            Instant now);
 }

@@ -242,6 +242,12 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
         public boolean revokeForReuse(InstitutionId institutionId, UUID familyId, Instant now) {
             return real.revokeForReuse(institutionId, familyId, now);
         }
+
+        @Override
+        public boolean revoke(InstitutionId institutionId, UUID familyId,
+                SessionRevocationReason reason, Instant now) {
+            return real.revoke(institutionId, familyId, reason, now);
+        }
     }
 
     /**

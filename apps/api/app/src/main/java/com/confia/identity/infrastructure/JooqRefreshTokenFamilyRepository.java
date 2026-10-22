@@ -114,10 +114,19 @@ public final class JooqRefreshTokenFamilyRepository implements RefreshTokenFamil
 
     @Override
     public boolean revokeForReuse(InstitutionId institutionId, UUID familyId, Instant now) {
+        return revoke(institutionId, familyId, SessionRevocationReason.REUSE_DETECTED, now);
+    }
+
+    /**
+     * Conditional on {@code revoked_at IS NULL}: the engine refuses to change an instant or a reason
+     * once set, and this statement does not try, so a family revoked earlier is left as it was.
+     */
+    @Override
+    public boolean revoke(InstitutionId institutionId, UUID familyId,
+            SessionRevocationReason reason, Instant now) {
         return dsl.update(IDENTITY_REFRESH_TOKEN_FAMILY)
                 .set(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT, now.atOffset(ZoneOffset.UTC))
-                .set(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_REASON,
-                        SessionRevocationReason.REUSE_DETECTED.code())
+                .set(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_REASON, reason.code())
                 .where(IDENTITY_REFRESH_TOKEN_FAMILY.INSTITUTION_ID.eq(institutionId.value()))
                 .and(IDENTITY_REFRESH_TOKEN_FAMILY.ID.eq(familyId))
                 .and(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT.isNull())

@@ -355,6 +355,12 @@ class SessionSecretsNotObservableTest {
         }
 
         @Override
+        public boolean revoke(InstitutionId institutionId, UUID familyId,
+                SessionRevocationReason reason, Instant now) {
+            return revokeForReuse(institutionId, familyId, now);
+        }
+
+        @Override
         public void insert(InstitutionId institutionId, RefreshTokenRow row) {
             Token token = new Token();
             token.row = row;

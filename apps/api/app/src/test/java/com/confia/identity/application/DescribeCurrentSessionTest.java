@@ -185,5 +185,11 @@ class DescribeCurrentSessionTest {
         public boolean revokeForReuse(InstitutionId institutionId, UUID familyId, Instant now) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public boolean revoke(InstitutionId institutionId, UUID familyId,
+                SessionRevocationReason reason, Instant now) {
+            throw new UnsupportedOperationException();
+        }
     }
 }
