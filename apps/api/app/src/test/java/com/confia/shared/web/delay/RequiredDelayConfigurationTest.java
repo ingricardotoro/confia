@@ -3,6 +3,7 @@ package com.confia.shared.web.delay;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.confia.shared.web.edge.RequiredDelayConfiguration;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -20,6 +21,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 class RequiredDelayConfigurationTest {
 
     private static final String WAITS = "confia.web.delay.max-concurrent-waits";
+    private static final String MAX_WAIT = "confia.web.delay.max-wait";
     private static final String CONNECTIONS = "server.tomcat.max-connections";
     private static final String VIRTUAL = "spring.threads.virtual.enabled";
 
@@ -45,6 +47,34 @@ class RequiredDelayConfigurationTest {
     void aNumberOfWaitsThatIsNotPositiveStopsTheStartAndNamesTheProperty(String value) {
         runner.withPropertyValues(WAITS + "=" + value)
                 .run(context -> assertThat(messagesOfTheFailure(context)).contains(WAITS));
+    }
+
+    // --- The cap of the wait (session-endpoints-cookie-and-csrf design.md, decision 8) ---
+
+    @Test
+    void withNothingSetTheWaitIsCappedAtThirtySeconds() {
+        runner.run(context -> assertThat(context.getBean(RequiredDelayMaterializer.class)
+                .maxWait()).isEqualTo(Duration.ofSeconds(30)));
+    }
+
+    @Test
+    void theCapCanBeChangedWithoutRecompiling() {
+        runner.withPropertyValues(MAX_WAIT + "=5s").run(context -> assertThat(
+                context.getBean(RequiredDelayMaterializer.class).maxWait())
+                .isEqualTo(Duration.ofSeconds(5)));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"0s", "-1s", "61s", "1h"})
+    void aCapThatIsNotValidStopsTheStartAndNamesTheProperty(String value) {
+        runner.withPropertyValues(MAX_WAIT + "=" + value)
+                .run(context -> assertThat(messagesOfTheFailure(context)).contains(MAX_WAIT));
+    }
+
+    @Test
+    void aCapOfSixtySecondsIsTheLargestThatStarts() {
+        runner.withPropertyValues(MAX_WAIT + "=60s").run(context -> assertThat(context)
+                .hasNotFailed());
     }
 
     @Test

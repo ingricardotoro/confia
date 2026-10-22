@@ -196,7 +196,7 @@ class RequiredDelayMaterializerTest {
 
     @Test
     void theProductionTimerWaitsAtLeastTheRequestedTime() throws Exception {
-        RequiredDelayMaterializer materializer = new RequiredDelayMaterializer(1);
+        RequiredDelayMaterializer materializer = new RequiredDelayMaterializer(1, Duration.ofSeconds(30));
         Duration delay = Duration.ofMillis(25);
 
         long elapsed = run(() -> {
@@ -305,6 +305,82 @@ class RequiredDelayMaterializerTest {
     void aNumberOfPermitsThatIsNotPositiveIsRefusedNamingTheProperty(int permits) {
         assertThatThrownBy(() -> new RequiredDelayMaterializer(permits, GatedTimer.immediate()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining(PROPERTY);
+    }
+
+    // --- The cap of the wait (session-endpoints-cookie-and-csrf, decision 8; WE75 to WE77) ---
+
+    private static final Duration CAP = Duration.ofSeconds(30);
+
+    @Test
+    void aDelayOfNineHundredSecondsWaitsTheCapAndTheDelayedKeepsTheWholeDelay() throws Exception {
+        GatedTimer timer = GatedTimer.immediate();
+        RequiredDelayMaterializer materializer = new RequiredDelayMaterializer(1, CAP, timer);
+        Delayed<String> fromThePolicy = new Delayed<>("done", Duration.ofSeconds(900));
+
+        String answer = run(() -> materializer.execute(() -> fromThePolicy));
+
+        assertThat(answer).isEqualTo("done");
+        assertThat(timer.requested()).as("the wait asked of the timer is the cap")
+                .containsExactly(CAP);
+        assertThat(fromThePolicy.requiredDelay()).as("the delay of the policy is not rewritten")
+                .isEqualTo(Duration.ofSeconds(900));
+    }
+
+    @Test
+    void aDelayShorterThanTheCapIsWaitedInFull() throws Exception {
+        GatedTimer timer = GatedTimer.immediate();
+        RequiredDelayMaterializer materializer = new RequiredDelayMaterializer(1, CAP, timer);
+
+        run(() -> materializer.execute(() -> new Delayed<>("done", Duration.ofSeconds(2))));
+
+        assertThat(timer.requested()).containsExactly(Duration.ofSeconds(2));
+    }
+
+    @Test
+    void aDelayEqualToTheCapIsWaitedInFull() throws Exception {
+        GatedTimer timer = GatedTimer.immediate();
+        RequiredDelayMaterializer materializer = new RequiredDelayMaterializer(1, CAP, timer);
+
+        run(() -> materializer.execute(() -> new Delayed<>("done", CAP)));
+
+        assertThat(timer.requested()).containsExactly(CAP);
+    }
+
+    @Test
+    void aDelayOneNanosecondOverTheCapWaitsTheCap() throws Exception {
+        GatedTimer timer = GatedTimer.immediate();
+        RequiredDelayMaterializer materializer = new RequiredDelayMaterializer(1, CAP, timer);
+
+        run(() -> materializer.execute(() -> new Delayed<>("done", CAP.plusNanos(1))));
+
+        assertThat(timer.requested()).containsExactly(CAP);
+    }
+
+    @Test
+    void theCapAppliesToTheWaitAndNeverToTheDecisionToWait() throws Exception {
+        GatedTimer timer = GatedTimer.immediate();
+        RequiredDelayMaterializer materializer = new RequiredDelayMaterializer(1, CAP, timer);
+
+        run(() -> materializer.execute(() -> new Delayed<>("zero", Duration.ZERO)));
+        run(() -> materializer.execute(() -> new Delayed<>("negative", Duration.ofSeconds(-5))));
+
+        assertThat(timer.requested()).as("a delay of zero or less still waits nothing").isEmpty();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"PT0S", "PT-1S", "PT1M1S"})
+    void aCapThatIsNotPositiveOrAboveSixtySecondsIsRefusedNamingTheProperty(String cap) {
+        Duration invalid = Duration.parse(cap);
+
+        assertThatThrownBy(() -> new RequiredDelayMaterializer(1, invalid, GatedTimer.immediate()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("confia.web.delay.max-wait");
+    }
+
+    @Test
+    void aCapOfExactlySixtySecondsIsAccepted() {
+        assertThat(new RequiredDelayMaterializer(1, Duration.ofSeconds(60), GatedTimer.immediate())
+                .maxWait()).isEqualTo(Duration.ofSeconds(60));
     }
 
     // --- The client that leaves ---

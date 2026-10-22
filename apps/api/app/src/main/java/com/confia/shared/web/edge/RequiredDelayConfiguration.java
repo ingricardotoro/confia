@@ -48,6 +48,6 @@ public class RequiredDelayConfiguration {
                     + MAX_CONNECTIONS + " (" + maxConnections + "): the waits would use up the "
                     + "connections of the requests that do not wait");
         }
-        return new RequiredDelayMaterializer(properties.maxConcurrentWaits());
+        return new RequiredDelayMaterializer(properties.maxConcurrentWaits(), properties.maxWait());
     }
 }

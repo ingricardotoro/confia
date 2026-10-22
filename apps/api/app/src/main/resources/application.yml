@@ -27,6 +27,13 @@ confia:
     # address.
     user-agent-max-length: 512
 
+    delay:
+      # The longest the answer of an authentication route is held back for its required delay
+      # (session-endpoints-cookie-and-csrf design.md, decision 8). It stays below the time at which
+      # the proxy in front of the process cuts a connection; the delay the policy computed is
+      # counted and audited whole, only this wait is capped. Positive and at most 60s.
+      max-wait: 30s
+
 spring:
   threads:
     virtual:
