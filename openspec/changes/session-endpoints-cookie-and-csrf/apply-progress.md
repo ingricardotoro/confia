@@ -309,3 +309,47 @@ La evidencia de rojo y de verde es la del árbol completo; la demostración 4 (o
 Cierre: `./mvnw -o verify -Pmutation-gate` desde un árbol limpio, `BUILD SUCCESS` en 19 min 16 s: Surefire 186 + 2 163, Failsafe 459 (454 + 5), 0 fallos. PIT: 631 de 673 mutantes muertos (94 %), fuerza de prueba 95 %, núcleo 192 de 194 (99 %). JaCoCo: «All coverage checks have been met».
 
 Desviación: `EndAllSessions.execute` devuelve el número de familias revocadas (el diseño fija `int execute(AuthenticatedActor, String requestId)`), y falla con `IllegalStateException` si la cuenta del actor no existe, como `IssueSession`.
+
+### Rebanada 04d `revocation-follow-ups` (cierra la tarea 2.1)
+
+Apilada sobre 04c. **590 líneas efectivas** (589 añadidas, 1 borrada), solo pruebas más los auxiliares de `RevocationIntegrationTest` (`seedStaffAccountIn` con el identificador de la cuenta elegido, `rotateIn`, `Race` y `race`):
+
+- `AccountSessionRevokerCrossInstitutionIT` (F1b, I208; 3 pruebas): la institución A con una cuenta y dos familias; la B con la **misma cuenta** (mismo identificador, la clave de una cuenta es el par institución e identificador) y dos familias, y otra cuenta con dos más; una familia de cada una rotada para que haya un sucesor cifrado que vaciar. Revocar y cerrar todas en A no cambia nada en B (motivo, instante, tokens vigentes, sucesores). La tercera prueba nombra B en una transacción abierta para A y al revés: devuelve cero, de modo que el argumento de institución del revocador no queda a merced solo de la seguridad por filas.
+- `PasswordResetLeavesNoValidTokenIT` (F1a, I207; 2 pruebas): tres familias de la cuenta con refresco y acceso vigentes y una cuenta ajena, contra el proceso administrativo real; antes del restablecimiento los tres accesos dan `200`; después los tres refrescos dan `Rejected(FAMILY_REVOKED)` y los tres accesos `401 token-invalid`, y la cuenta ajena rota y responde `200`. Control negativo: con un revocador que no revoca, los seis resultados son los contrarios.
+- `LogoutVersusRotationConcurrencyIT` y `CloseAllVersusRotationConcurrencyIT` (I198; 2 pruebas cada una): dos transacciones reales, la primera retenida con `CountDownLatch` justo después de tomar el bloqueo de la familia (o, en el cierre de todas, después de revocar y antes de confirmar) y la segunda observada esperando con la condición `pg_stat_activity` de S1 (límite de 20 s, sin esperas por reloj). En ambos órdenes la familia queda revocada con `logout`, sin token vigente; con la rotación primera nace un sucesor en una familia revocada y el cierre vacía su sucesor cifrado; con el cierre primero la rotación da `Rejected(FAMILY_REVOKED)`, no consume nada y no inserta sucesor.
+
+### Evidencia del ciclo TDD (04d)
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO (compilación) | `./mvnw -q -o -pl app -am test-compile` con las cuatro clases escritas y sin los auxiliares | `exit=1`, 63 líneas `ERROR`: `cannot find symbol` para `Race` (4), `race` (4), `rotateIn` y la sobrecarga de `seedStaffAccountIn`. Causa: auxiliares y fixture de la segunda institución inexistentes, la esperada |
+| VERDE | `-Dit.test='AccountSessionRevokerCrossInstitutionIT,PasswordResetLeavesNoValidTokenIT,LogoutVersusRotationConcurrencyIT,CloseAllVersusRotationConcurrencyIT'` | 9 pruebas (3 + 2 + 2 + 2), 0 fallos. F1a y F1b describen comportamiento que ya existía, de modo que no hay rojo de comportamiento: su prueba de que no son vacías es el control negativo y las demostraciones |
+| Estabilidad | Las dos pruebas de concurrencia otras dos veces, aisladas (`stab-4d-1` y `stab-4d-2`) y una más dentro del `verify` completo | 4 de 4 en verde cada vez |
+
+### Demostraciones deliberadas (04d)
+
+Cada una sobre una copia guardada (`pre-break-4d-N.java` en el directorio de la sesión), revertida y confirmada con `cmp`. No queda ninguna ruptura en el árbol.
+
+| # | Ruptura | Resultado observado | Revertida |
+|---|---|---|---|
+| 3 de la tarea | `JooqAccountSessionRevoker.revokeAllLive` devuelve cero sin revocar [I207] | `PasswordResetLeavesNoValidTokenIT.afterTheResetNoRefreshTokenRotatesAndNoAccessTokenOfTheAccountIsAccepted` (línea 104): `expected: Rejected[reason=FAMILY_REVOKED] but was: Rotated[session=..., kind=FRESH]`; el control negativo sigue en verde | Sí, `cmp` idéntico |
+| 5 | Quitar el filtro de institución del revocador (queda solo la cuenta) [I208] | `AccountSessionRevokerCrossInstitutionIT.theInstitutionArgumentOfTheRevokerIsNotLeftToRowLevelSecurityAlone` (línea 100): `[A's families are visible, but the argument names B] expected: 0 but was: 2`. Las otras dos pruebas siguen en verde: la seguridad por filas sola ya oculta B, que es justo lo que la tercera prueba existe para no dar por suficiente | Sí, `cmp` idéntico |
+| 6 | `lockById` sin `FOR UPDATE` [I198] | `LogoutVersusRotationConcurrencyIT`, las dos pruebas, en la aserción de espera: `[the closing waited for the family lock the rotation held]` y `[the rotation waited for the family lock the closing held]`, `expected true but was false`. El estado final es el mismo en cualquier orden (como documentan las pruebas de rotación de S1), de modo que la aserción de espera es lo que ata la prueba al bloqueo | Sí, `cmp` idéntico |
+| 7 | El revocador deja de vaciar los sucesores cifrados | `CloseAllVersusRotationConcurrencyIT.aClosingOfEverySessionThatWaitsForARotationRevokesTheFamilyAndLeavesNoLiveToken` (línea 69): `[the successor the rotation stored was emptied by the closing]`, y `AccountSessionRevokerCrossInstitutionIT.revokingEveryFamilyOfAnAccountOfInstitutionALeavesInstitutionBUntouched` (línea 68) | Sí, `cmp` idéntico |
+
+Cierre: `./mvnw -o verify -Pmutation-gate` sobre el árbol final de la tarea (con los documentos comprometidos), `BUILD SUCCESS` en 25 min 26 s: Surefire 186 + 2 163, Failsafe 468 (459 + 9), 0 fallos. PIT: 631 de 673 mutantes muertos (94 %), fuerza de prueba 95 %, núcleo 192 de 194 (99 %). JaCoCo: «All coverage checks have been met». Las dos pruebas de concurrencia pasaron en las tres ejecuciones (dos aisladas y el `verify`).
+
+### Estado final de la tarea 2.1
+
+Marcada `[x]` en `tasks.md` (casilla en 04d, con nota fechada de la partición). Pendiente de 2.1: nada. La tarea no añade controlador, ruta ni cookie.
+
+### Cuadro final de la tarea 2.1
+
+| Rama | Líneas efectivas | Duración del `verify -Pmutation-gate` | Surefire (núcleo + aplicación) | Failsafe | PIT (aplicación) |
+|---|---|---|---|---|---|
+| `...-04a-v9-revocation-reasons` | 541 | 15 min 36 s | 186 + 2 163 | 427 | 631 de 673 (94 %) |
+| `...-04b-end-current-session` | 775 | 15 min 58 s | 186 + 2 163 | 454 | 631 de 673 (94 %) |
+| `...-04c-end-all-sessions` | 272 | 19 min 16 s | 186 + 2 163 | 459 | 631 de 673 (94 %) |
+| `...-04d-revocation-follow-ups` | 590 | 25 min 26 s | 186 + 2 163 | 468 | 631 de 673 (94 %) |
+
+Las tres últimas duraciones crecen con las pruebas nuevas y con otras construcciones de la máquina en las demostraciones; no son comparables entre sí para el presupuesto de 8 minutos (R-9). Los casos de uso no tienen llamador HTTP (`rg -n "EndCurrentSession|EndAllSessions" apps/api/app/src/main` solo muestra sus clases y `IdentityConfiguration`).
