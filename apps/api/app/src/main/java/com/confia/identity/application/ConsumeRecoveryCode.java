@@ -5,6 +5,7 @@ import com.confia.identity.domain.RecoveryCodeRow;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
+import com.confia.shared.audit.AuditJson;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.SecurityContext;
 import com.confia.shared.security.TransactionRunner;
@@ -114,12 +115,17 @@ public final class ConsumeRecoveryCode {
                 ENTITY_TYPE, accountId.value().toString(), outcome, null, null, null, null);
     }
 
+    /** The {@code after_value} of the low-recovery-codes row. */
+    static String lowCodesAfterValue(long remainingUnusedCodes) {
+        return AuditJson.object().number("remainingUnusedCodes", remainingUnusedCodes).toJson();
+    }
+
     /** Design.md, §4.3 step 7: the low-recovery-codes signal, calculated and audited only — this
      * change delivers no email or notification adapter of any kind (specs/identity/spec.md,
      * "Ausencia de envío real del aviso..."). */
     private static AuditEntry lowCodesEntry(InstitutionId institutionId, StaffAccountId accountId,
             UUID requestId, long remainingUnusedCodes) {
-        String afterValue = "{\"remainingUnusedCodes\":" + remainingUnusedCodes + "}";
+        String afterValue = lowCodesAfterValue(remainingUnusedCodes);
         return new AuditEntry(institutionId.value(), accountId.value(), ACTOR_KIND_STAFF,
                 accountId.value().toString(), null, null, requestId, null, ACTION_LOW,
                 ENTITY_TYPE, accountId.value().toString(), OUTCOME_SUCCESS, null, afterValue, null,

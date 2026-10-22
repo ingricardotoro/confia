@@ -3,7 +3,7 @@
 - **Cambio:** `session-endpoints-cookie-and-csrf` (F0, cambio 7, parte 4b, segundo cambio de tres)
 - **Modo:** TDD estricto (`./mvnw verify -Pmutation-gate` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `stacked-to-main`, tope de 800 líneas efectivas por PR (DA-1 *a*)
-- **Última actualización:** 2026-10-21 (tarea 1.1 completa: rebanadas 01a, 01b y 01c)
+- **Última actualización:** 2026-10-21 (tarea 1.2 completa: rebanadas 02a y 02b)
 - **Regla de este archivo:** solo se añade; no se reescriben secciones existentes.
 
 ## Estado de las tareas
@@ -11,6 +11,7 @@
 | Tarea | PR | Estado | Commits |
 |---|---|---|---|
 | 1.1 | PR 1 `csrf-and-origin-protection`, partido en 01a, 01b y 01c (ver «Tarea 1.1: medición y partición») | Completa y verificada | 01a: `2cce1be`; 01b: `0bfeb27`; 01c: ver el historial de la rama |
+| 1.2 | PR 2 `audit-json-serializer`, partido en 02a y 02b (ver «Tarea 1.2») | Completa y verificada | 02a: `bf2778d`; 02b: ver el historial de la rama |
 
 ## Tarea 1.1: medición y partición
 
@@ -123,3 +124,51 @@ la semántica comprobada no cambia. `HarnessProcess` fija por omisión una clave
 `./mvnw -o verify -Pmutation-gate` completo sobre 01c (árbol final de la tarea 1.1), `BUILD SUCCESS` en 26 min 56 s: Surefire 186 (núcleo) + 2 018, Failsafe 420, 0 fallos. PIT: 631 de 673 mutantes muertos (94 %), fuerza de prueba 95 %, cobertura de líneas de las clases mutadas 895 de 925 (97 %). Escaneo de secretos: sin claves versionadas [WE61].
 
 Estado final: tarea 1.1 marcada `[x]` en `tasks.md` (casilla en 01c, con nota fechada de la partición). Pendiente de 1.1: nada; la parte de rutas reales [WE54] se cierra en 3.3b.
+
+## Tarea 1.2: `audit-json-serializer`, partida en 02a y 02b
+
+Medida con `git diff --numstat` sin `openspec/`: **1 057 líneas efectivas** (1 033 añadidas, 24 borradas) frente a 330 estimadas. Se partió
+sin consultar en la costura entre el constructor y su uso.
+
+| Rama | Contenido | Líneas efectivas |
+|---|---|---|
+| `...-02a-audit-json-builder` | `AuditJson`, `canonString` de paquete, `AuditJsonTest`, `AuditChainAfterAuditJsonIT` | 348 |
+| `...-02b-audit-json-sites` | Migración de los 16 sitios, `AuditJsonSiteEqualityTest`, `AuditJsonOnlySourceTest` y los fixtures `fixture/auditjson/` | 709 |
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO (compilación) | `./mvnw -q -o -pl app -am test-compile` con las cuatro pruebas escritas y sin `AuditJson` | `exit=1`, 178 líneas `ERROR`: `cannot find symbol` para `AuditJson` (23 variables y 2 clases) y para los métodos y constantes de paquete que la igualdad por sitio invoca (`backoffCycleAfterValue`, `lowCodesAfterValue`, `rateLimitedAfterValue`, `issuedAfterValue`, `startedAfterValue`, `sessionsRevokedAfterValue`, `completedAfterValue`, `AFTER_FRESH`, `AFTER_GRACE`, `AFTER_FAMILY_REVOKED`). Causa: clases inexistentes, la esperada |
+| ROJO (comportamiento) | Con `AuditJson` creado y cada sitio extraído a su método de paquete **todavía con la concatenación antigua**: `-Dtest='AuditJsonTest,AuditJsonSiteEqualityTest,AuditJsonOnlySourceTest'` | 56 pruebas, 1 fallo: `AuditJsonOnlySourceTest.noProductionSourceBuildsAnAuditDocumentByHand` señala exactamente los 16 sitios en las 8 clases: `AuthenticateWithPassword` (2), `ConsumeRecoveryCode` (1), `IssueSession` (1), `VerifyTotpCode` (1), `RequestPasswordReset` (2), `IssuePasswordResetToken` (2), `ResetPasswordWithToken` (3) y `RotateRefreshToken` (4). La igualdad pasa en este punto por construcción (expresión antigua contra sí misma): es la línea base que la migración debe conservar |
+| VERDE | Mismo comando tras migrar los 16 sitios | 56 pruebas, 0 fallos; con las pruebas existentes de los ocho casos de uso, 234 pruebas, 0 fallos |
+| Refactor | Los sitios con un solo miembro quedan como una línea; `canonString` pasa de `private` a paquete sin cambiar su cuerpo | Sin cambio de comportamiento |
+
+### Demostraciones deliberadas
+
+Cada una sobre una copia guardada (`pre-break-N.java` en el directorio de la sesión), revertida y confirmada con `cmp`. No queda ninguna ruptura en el árbol.
+
+| # | Ruptura | Resultado observado | Revertida |
+|---|---|---|---|
+| 1 | `AuditJson.Builder.number` emite el valor entre comillas [AT01] | `AuditJsonSiteEqualityTest`: 6 de 17 fallos, los seis sitios con contadores (`ResetPasswordWithToken.sessionsRevokedAfterValue`, `AuthenticateWithPassword.backoffCycleAfterValue`, `ConsumeRecoveryCode.lowCodesAfterValue`, `IssuePasswordResetToken.rateLimitedAfterValue` y `.issuedAfterValue`, `VerifyTotpCode.backoffCycleAfterValue`); además 10 de 29 en `AuditJsonTest` | Sí, `cmp` idéntico |
+| 2 | Literal `"{\"` concatenado de nuevo en `IssueSession.startedAfterValue` [BI43] | `AuditJsonOnlySourceTest.noProductionSourceBuildsAnAuditDocumentByHand`: `Expecting empty but was: [com.confia.identity.application.IssueSession:143]` | Sí, `cmp` idéntico |
+| 3 | Orden de `reason` y `families` invertido en `ResetPasswordWithToken.sessionsRevokedAfterValue` | `AuditJsonSiteEqualityTest`: `expected: {"reason":"password_change","families":0} but was: {"families":0,"reason":"password_change"}` | Sí, `cmp` idéntico |
+
+Desviación de la demostración 3: la tarea nombra `RotateRefreshToken.reasonJson`, que tiene un solo miembro y no admite inversión; se usó el sitio de dos miembros de `ResetPasswordWithToken`.
+
+### Desviaciones
+
+- Los sitios son métodos o constantes estáticos de paquete (antes privados) para que la igualdad por sitio ejerza el código real. No cambia ninguna API pública.
+- La guardia lee el código fuente (comentarios y literales de carácter excluidos), no el código compilado: javac pliega la concatenación en `invokedynamic`.
+- `RequestPasswordReset` y `RotateRefreshToken` evalúan sus documentos constantes una vez, al cargar la clase.
+- `AuditJson` no entra en el alcance de PIT (`com.confia.*.domain.*`, `shared.security.token.*`, `shared.security.csrf.*`); la tarea no lo pide.
+
+### Cierre de 02a
+
+`./mvnw -o verify -Pmutation-gate` sobre la rama 02a, `BUILD SUCCESS` en 19 min 05 s: Surefire 186 (núcleo) + 2 047, Failsafe 421, 0 fallos. PIT: 631 de 673 mutantes muertos (94 %), fuerza de prueba 95 %, cobertura de líneas de las clases mutadas 895 de 925 (97 %); núcleo 192 de 194 (99 %). JaCoCo: «All coverage checks have been met».
+
+### Cierre de 02b (cierra la tarea 1.2)
+
+`./mvnw -o verify -Pmutation-gate` sobre la rama 02b (árbol final de la tarea 1.2), `BUILD SUCCESS` en 14 min 51 s: Surefire 186 (núcleo) + 2 074, Failsafe 421, 0 fallos. PIT: 631 de 673 mutantes muertos (94 %), fuerza de prueba 95 %, cobertura de líneas de las clases mutadas 895 de 925 (97 %). JaCoCo: «All coverage checks have been met». `AuditChainAfterAuditJsonIT` verifica la cadena de asientos escritos con el constructor [AT04]; `CanonicalSerializationCrossCheckIT` sigue en verde sin cambios. `AuditJsonOnlySourceTest` evalúa las ocho clases migradas sin conjunto vacío y no halla ninguna concatenación [BI44]; los tres fixtures malos fallan y el de `shared.security.token` no [BI43].
+
+Estado final: tarea 1.2 marcada `[x]` en `tasks.md` (casilla en 02b, con nota fechada de la partición). Pendiente de 1.2: nada.

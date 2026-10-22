@@ -5,6 +5,7 @@ import com.confia.identity.domain.LoginIdentifier;
 import com.confia.identity.domain.StaffAccount;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
+import com.confia.shared.audit.AuditJson;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.SecurityContext;
 import com.confia.shared.security.TransactionRunner;
@@ -35,8 +36,10 @@ public final class RequestPasswordReset {
     private static final String ACTOR_KIND_STAFF = "staff";
     private static final String UNKNOWN_ACCOUNT_ACTOR_LABEL = "unknown-account";
     private static final String OUTCOME_SUCCESS = "success";
-    private static final String AFTER_ISSUANCE_SCHEDULED = "{\"outcome\":\"issuance-scheduled\"}";
-    private static final String AFTER_ACCOUNT_NOT_FOUND = "{\"outcome\":\"account-not-found\"}";
+    static final String AFTER_ISSUANCE_SCHEDULED =
+            AuditJson.object().text("outcome", "issuance-scheduled").toJson();
+    static final String AFTER_ACCOUNT_NOT_FOUND =
+            AuditJson.object().text("outcome", "account-not-found").toJson();
 
     private final TransactionRunner transactionRunner;
     private final LoginInstitutionProvider institutionProvider;

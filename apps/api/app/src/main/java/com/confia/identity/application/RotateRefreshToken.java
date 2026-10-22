@@ -14,6 +14,7 @@ import com.confia.identity.domain.UserAgentFingerprint;
 import com.confia.kernel.AeadIntegrityException;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
+import com.confia.shared.audit.AuditJson;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.security.SecurityContext;
@@ -81,6 +82,10 @@ public final class RotateRefreshToken {
     private static final String UNKNOWN_TOKEN_LABEL = "unknown-token";
     private static final String ACTOR_KIND_STAFF = "staff";
     private static final String OUTCOME_SUCCESS = "success";
+    static final String AFTER_FRESH = AuditJson.object().text("rotation", "fresh").toJson();
+    static final String AFTER_GRACE = AuditJson.object().text("rotation", "grace").toJson();
+    static final String AFTER_FAMILY_REVOKED =
+            AuditJson.object().bool("familyRevoked", true).toJson();
     private static final String OUTCOME_DENIED = "denied";
 
     private final TransactionRunner transactionRunner;
@@ -208,7 +213,7 @@ public final class RotateRefreshToken {
         families.recordUse(institutionId, family.id(), now);
 
         auditLogWriter.append(entry(institutionId, auditRequestId, family, ACTION_REFRESHED,
-                OUTCOME_SUCCESS, "{\"rotation\":\"fresh\"}"));
+                OUTCOME_SUCCESS, AFTER_FRESH));
         return new Attempt.Rotated(family.id(), family.accountId(), family.secondFactorVerified(),
                 successor, expiresAt, RotationKind.FRESH);
     }
@@ -229,7 +234,7 @@ public final class RotateRefreshToken {
         families.recordUse(institutionId, family.id(), now);
 
         auditLogWriter.append(entry(institutionId, auditRequestId, family, ACTION_REFRESHED,
-                OUTCOME_SUCCESS, "{\"rotation\":\"grace\"}"));
+                OUTCOME_SUCCESS, AFTER_GRACE));
         return new Attempt.Rotated(family.id(), family.accountId(), family.secondFactorVerified(),
                 successor, stored.expiresAt(), RotationKind.GRACE);
     }
@@ -268,7 +273,7 @@ public final class RotateRefreshToken {
         }
         tokens.clearSuccessors(institutionId, family.id());
         auditLogWriter.append(entry(institutionId, auditRequestId, family, ACTION_REUSE_DETECTED,
-                OUTCOME_DENIED, "{\"familyRevoked\":true}"));
+                OUTCOME_DENIED, AFTER_FAMILY_REVOKED));
         return new Attempt.Rejected(RefreshRejection.REUSE_DETECTED);
     }
 
@@ -298,8 +303,8 @@ public final class RotateRefreshToken {
         }
     }
 
-    private static String reasonJson(RefreshRejection reason) {
-        return "{\"reason\":\"" + reason.auditCode() + "\"}";
+    static String reasonJson(RefreshRejection reason) {
+        return AuditJson.object().text("reason", reason.auditCode()).toJson();
     }
 
     /** What the transaction leaves behind; the access token is signed from it after the commit. */

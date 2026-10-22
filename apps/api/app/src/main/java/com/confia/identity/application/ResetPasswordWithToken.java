@@ -18,6 +18,7 @@ import com.confia.identity.domain.StaffPasswordLengthPolicy.TooLong;
 import com.confia.identity.domain.StaffPasswordLengthPolicy.TooShort;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
+import com.confia.shared.audit.AuditJson;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.SecurityContext;
 import com.confia.shared.security.TransactionRunner;
@@ -222,13 +223,12 @@ public final class ResetPasswordWithToken {
                 ACTOR_KIND_STAFF, row.accountId().value().toString(), null, null, auditRequestId,
                 null, ACTION_SESSIONS_REVOKED, STAFF_ACCOUNT_ENTITY_TYPE,
                 row.accountId().value().toString(), OUTCOME_SUCCESS, null,
-                "{\"reason\":\"" + SessionRevocationReason.PASSWORD_CHANGE.code()
-                        + "\",\"families\":" + revokedFamilies + "}", null, null));
+                sessionsRevokedAfterValue(revokedFamilies), null, null));
         auditLogWriter.append(new AuditEntry(institutionId.value(), row.accountId().value(),
                 ACTOR_KIND_STAFF, row.accountId().value().toString(), null, null, auditRequestId,
                 null, ACTION_COMPLETED, STAFF_ACCOUNT_ENTITY_TYPE,
                 row.accountId().value().toString(), OUTCOME_SUCCESS, null,
-                "{\"secondFactor\":\"" + secondFactorUsed + "\"}", null, null));
+                completedAfterValue(secondFactorUsed), null, null));
         return new ResetPasswordDecision(new Completed(), requiredDelay);
     }
 
@@ -277,7 +277,18 @@ public final class ResetPasswordWithToken {
                 null, null);
     }
 
-    private static String reasonJson(PasswordResetRejectionReason reason) {
-        return "{\"reason\":\"" + reason.auditCode() + "\"}";
+    /** The {@code after_value} of the sessions-revoked row. */
+    static String sessionsRevokedAfterValue(int revokedFamilies) {
+        return AuditJson.object().text("reason", SessionRevocationReason.PASSWORD_CHANGE.code())
+                .number("families", revokedFamilies).toJson();
+    }
+
+    /** The {@code after_value} of the completed row. */
+    static String completedAfterValue(String secondFactorUsed) {
+        return AuditJson.object().text("secondFactor", secondFactorUsed).toJson();
+    }
+
+    static String reasonJson(PasswordResetRejectionReason reason) {
+        return AuditJson.object().text("reason", reason.auditCode()).toJson();
     }
 }
