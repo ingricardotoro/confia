@@ -20,6 +20,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.jooq.Record;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -69,7 +75,15 @@ abstract class RevocationIntegrationTest extends RotationIntegrationTest {
 
     /** An account of {@code institution} with the shared test password. */
     StaffAccountId seedStaffAccountIn(InstitutionId institution, String email) {
-        StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
+        return seedStaffAccountIn(institution, new StaffAccountId(UUID.randomUUID()), email);
+    }
+
+    /**
+     * The same, with the identifier of the account chosen by the test: the key of an account is the
+     * pair institution and identifier, so two institutions can hold the same identifier.
+     */
+    StaffAccountId seedStaffAccountIn(InstitutionId institution, StaffAccountId accountId,
+            String email) {
         String hash = HASHER.hash(PlainPassword.of(CURRENT_PASSWORD)).value();
         transactionRunner().execute(contextOf(institution), () -> dsl.execute("""
                 insert into identity_staff_account
@@ -84,6 +98,13 @@ abstract class RevocationIntegrationTest extends RotationIntegrationTest {
     IssuedSession issueIn(InstitutionId institution, String instant, StaffAccountId account) {
         return issueSession(instant).execute(contextOf(institution),
                 new IssueSessionCommand(account, false, AGENT_ONE, null));
+    }
+
+    /** A real rotation in {@code institution}, with the first test agent. */
+    RefreshOutcome rotateIn(InstitutionId institution, String instant, String presentedToken) {
+        return rotation(fixedClock(instant), new JooqAuditLogWriter(dsl), institution)
+                .execute(contextOf(institution),
+                        new RotateRefreshTokenCommand(presentedToken, AGENT_ONE));
     }
 
     Record familyIn(InstitutionId institution, UUID familyId) {
@@ -140,5 +161,34 @@ abstract class RevocationIntegrationTest extends RotationIntegrationTest {
                 .isEqualTo(families);
         assertThat(after.size())
                 .as("nothing but the reason and the count").isEqualTo(2);
+    }
+
+    /** What two transactions leave: both results and whether the second really waited for the first. */
+    record Race<A, B>(A holder, B waiter, boolean waiterWaited) {
+    }
+
+    /**
+     * Runs {@code holder}, which must count {@code locked} down once it owns the lock of the family
+     * and then wait for {@code release}; starts {@code waiter} once that happened; goes on when the
+     * database reports a backend waiting for a row lock on the family (a condition with a bound, never
+     * a pause); and releases the holder.
+     */
+    <A, B> Race<A, B> race(CountDownLatch locked, CountDownLatch release, Callable<A> holder,
+            Callable<B> waiter) throws Exception {
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            try {
+                Future<A> first = pool.submit(holder);
+                assertThat(locked.await(30, TimeUnit.SECONDS)).isTrue();
+                Future<B> second = pool.submit(waiter);
+                boolean waited = holdsWithin(20_000, () -> second.isDone()
+                        || someBackendWaitsForALockOn("identity_refresh_token_family"))
+                        && !second.isDone();
+                release.countDown();
+                return new Race<>(first.get(60, TimeUnit.SECONDS), second.get(60, TimeUnit.SECONDS),
+                        waited);
+            } finally {
+                release.countDown();
+            }
+        }
     }
 }
