@@ -4,6 +4,7 @@ import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.AuthenticateWithPassword;
 import com.confia.identity.application.ConsumeRecoveryCode;
 import com.confia.identity.application.DescribeCurrentSession;
+import com.confia.identity.application.EndAllSessions;
 import com.confia.identity.application.EndCurrentSession;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.IssueSession;
@@ -208,9 +209,9 @@ public class IdentityConfiguration {
     }
 
     /**
-     * The use case that ends the session of a refresh token (session-endpoints-cookie-and-csrf
-     * design.md decision 15). Registered here with the other use cases of the module; no controller
-     * calls it until the endpoint that exposes it.
+     * The two ways a session is ended on purpose (session-endpoints-cookie-and-csrf design.md
+     * decision 15). Registered here with the other use cases of the module; no controller calls them
+     * until the endpoints that expose them.
      */
     @Bean
     EndCurrentSession endCurrentSession(TransactionRunner runner,
@@ -218,6 +219,12 @@ public class IdentityConfiguration {
             RefreshTokenRepository tokens, AuditLogWriter auditLogWriter, Clock clock) {
         return new EndCurrentSession(runner, institutionProvider, families, tokens, auditLogWriter,
                 clock);
+    }
+
+    @Bean
+    EndAllSessions endAllSessions(TransactionRunner runner, StaffAccountRepository accounts,
+            AccountSessionRevoker sessionRevoker, AuditLogWriter auditLogWriter, Clock clock) {
+        return new EndAllSessions(runner, accounts, sessionRevoker, auditLogWriter, clock);
     }
 
     @Bean

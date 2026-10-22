@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.confia.identity.domain.LoginIdentifier;
 import com.confia.identity.domain.PlainPassword;
 import com.confia.identity.domain.StaffAccountId;
+import com.confia.identity.infrastructure.JooqAccountSessionRevoker;
 import com.confia.identity.infrastructure.JooqRefreshTokenFamilyRepository;
 import com.confia.identity.infrastructure.JooqRefreshTokenRepository;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
@@ -13,7 +14,11 @@ import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.audit.AuditRowSnapshot;
 import com.confia.shared.infrastructure.JooqAuditLogReader;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
+import com.confia.shared.security.AuthenticatedActor;
+import com.confia.shared.security.AuthenticationMethod;
+import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.jooq.Record;
 import tools.jackson.databind.JsonNode;
@@ -21,7 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Shared set-up for the revocation integration tests (session-endpoints-cookie-and-csrf tasks.md
- * 2.1): the revocation use cases over the real adapters, and the helpers that let a test seed,
+ * 2.1): the two revocation use cases over the real adapters, and the helpers that let a test seed,
  * issue and read in an institution other than the fixture's own, which is what the cross-institution
  * scenarios (I196 for another institution's refresh token, I208) need. A fresh institution per test
  * is a random identifier: identity tables carry no foreign key to the institution table. Abstract, so
@@ -41,6 +46,25 @@ abstract class RevocationIntegrationTest extends RotationIntegrationTest {
         return new EndCurrentSession(transactionRunner(), () -> configured,
                 new JooqRefreshTokenFamilyRepository(dsl), new JooqRefreshTokenRepository(dsl),
                 auditLogWriter, fixedClock(instant));
+    }
+
+    EndAllSessions endAllSessions(String instant) {
+        return endAllSessions(instant, new JooqStaffAccountRepository(dsl),
+                new JooqAccountSessionRevoker(dsl), new JooqAuditLogWriter(dsl));
+    }
+
+    EndAllSessions endAllSessions(String instant, StaffAccountRepository accounts,
+            AccountSessionRevoker revoker, AuditLogWriter auditLogWriter) {
+        return new EndAllSessions(transactionRunner(), accounts, revoker, auditLogWriter,
+                fixedClock(instant));
+    }
+
+    /** The actor an access token of {@code sessionId} would bind, with a made-up token identifier. */
+    static AuthenticatedActor actorOf(InstitutionId institution, StaffAccountId account,
+            UUID sessionId) {
+        return new AuthenticatedActor(account.value(), institution.value(), sessionId,
+                UUID.randomUUID(), Set.of(AuthenticationMethod.PASSWORD),
+                Instant.parse("2026-10-15T15:00:00Z"), Instant.parse("2026-10-15T15:15:00Z"));
     }
 
     /** An account of {@code institution} with the shared test password. */

@@ -296,3 +296,16 @@ inexistentes. Las demostraciones 1, 1b y 4 de arriba se aplicaron sobre este có
 Cierre: `./mvnw -o verify -Pmutation-gate` desde un árbol limpio, `BUILD SUCCESS` en 15 min 58 s: Surefire 186 + 2 163, Failsafe 454 (427 + 27), 0 fallos. PIT: 631 de 673 mutantes muertos (94 %), fuerza de prueba 95 %, núcleo 192 de 194 (99 %). JaCoCo: «All coverage checks have been met».
 
 Desviaciones: `EndCurrentSession` abre su propio `SecurityContext` de actor `system` con la institución de `LoginInstitutionProvider` (como la rotación, cuyo contexto lo arma el controlador); el diseño fija `execute(String presentedRefreshToken, String requestId)` sin contexto, de modo que el caso de uso lo construye. Un texto `null` se trata como «nada que hacer» y no abre transacción (la rotación lanzaría `NullPointerException`): el controlador pasará lo que `SessionCookies.read` devuelva.
+
+### Rebanada 04c `end-all-sessions`
+
+Apilada sobre 04b. **272 líneas efectivas** (256 añadidas, 16 borradas): `EndAllSessions`, su bean, el motivo `logout` para toda la cuenta en el comentario de la enumeración, el
+auxiliar `endAllSessions` y `actorOf` en `RevocationIntegrationTest` y las 5 pruebas de «cerrar todas» añadidas a `EndSessionIT`, que queda en 22: I200 (tres vivas, una
+revocada que conserva motivo e instante, dos de otra cuenta que siguen vivas, sucesores cifrados vaciados, asiento con `3`), recuento cero con asiento, orden
+bloqueo de la cuenta y después revocación con `logout`, asiento que falla sin dejar ninguna familia revocada, y un actor cuya cuenta no existe (falla, no devuelve cero en silencio).
+
+La evidencia de rojo y de verde es la del árbol completo; la demostración 4 (orden del bloqueo) se aplicó sobre este código.
+
+Cierre: `./mvnw -o verify -Pmutation-gate` desde un árbol limpio, `BUILD SUCCESS` en 19 min 16 s: Surefire 186 + 2 163, Failsafe 459 (454 + 5), 0 fallos. PIT: 631 de 673 mutantes muertos (94 %), fuerza de prueba 95 %, núcleo 192 de 194 (99 %). JaCoCo: «All coverage checks have been met».
+
+Desviación: `EndAllSessions.execute` devuelve el número de familias revocadas (el diseño fija `int execute(AuthenticatedActor, String requestId)`), y falla con `IllegalStateException` si la cuenta del actor no existe, como `IssueSession`.
