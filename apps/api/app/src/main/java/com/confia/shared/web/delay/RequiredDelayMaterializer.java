@@ -23,7 +23,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  *       no transaction, no pooled connection and no row lock, which {@link
  *       TransactionSynchronizationManager#isActualTransactionActive()} guards a second time.
  *   <li>A delay of zero or less answers at once. A positive one is waited in full from this
- *       instant: it adds to the processing time and never absorbs it.
+ *       instant: it adds to the processing time and never absorbs it. The wait is at most
+ *       {@code maxWait} (decision 8 of session-endpoints-cookie-and-csrf): a longer delay of the
+ *       policy is not shortened for the counter or the audit, only the wait of the answer is.
  *   <li>The permit is released in a {@code finally}, whatever happened: a failing use case, an
  *       interrupted wait, or an answer that cannot be written because the client left.
  * </ol>
@@ -41,20 +43,28 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public final class RequiredDelayMaterializer {
 
     private final Semaphore permits;
+    private final Duration maxWait;
     private final DelayTimer timer;
 
-    /** The materializer of production: its wait is {@link Thread#sleep(Duration)}. */
-    public RequiredDelayMaterializer(int maxConcurrentWaits) {
-        this(maxConcurrentWaits, delay -> Thread.sleep(delay));
+    /** The materializer of production: its wait is {@link Thread#sleep(Duration)}, at most {@code maxWait}. */
+    public RequiredDelayMaterializer(int maxConcurrentWaits, Duration maxWait) {
+        this(maxConcurrentWaits, maxWait, delay -> Thread.sleep(delay));
     }
 
-    /** For tests, which hold and release the wait by hand. */
+    /** For tests, which hold and release the wait by hand; the cap is the default of the property. */
     public RequiredDelayMaterializer(int maxConcurrentWaits, DelayTimer timer) {
+        this(maxConcurrentWaits, DelayProperties.DEFAULT_MAX_WAIT, timer);
+    }
+
+    /** For tests, which hold and release the wait by hand and choose the cap. */
+    public RequiredDelayMaterializer(int maxConcurrentWaits, Duration maxWait, DelayTimer timer) {
         if (maxConcurrentWaits <= 0) {
             throw new IllegalArgumentException(
                     DelayProperties.MAX_CONCURRENT_WAITS + " must be positive");
         }
+        DelayProperties.requireValidCap(maxWait);
         this.permits = new Semaphore(maxConcurrentWaits);
+        this.maxWait = maxWait;
         this.timer = Objects.requireNonNull(timer, "timer");
     }
 
@@ -81,12 +91,19 @@ public final class RequiredDelayMaterializer {
             Duration delay = answer.requiredDelay();
             if (!delay.isZero() && !delay.isNegative()) {
                 requireNoTransaction();
-                waitFor(delay);
+                // The cap is on the wait, not on the delay of the policy: the use case already
+                // counted and audited the whole delay, and a proxy cuts the connection sooner.
+                waitFor(delay.compareTo(maxWait) > 0 ? maxWait : delay);
             }
             return answer.value();
         } finally {
             permits.release();
         }
+    }
+
+    /** The longest this materializer waits for one answer. */
+    public Duration maxWait() {
+        return maxWait;
     }
 
     /** The permits not in use, which is all of them when nothing is waiting. */

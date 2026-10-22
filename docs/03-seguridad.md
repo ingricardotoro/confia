@@ -1448,6 +1448,16 @@ operativo: un pico de 429 legítimos indica un límite mal calibrado, no un ataq
 > `503` vienen del limitador; su ausencia sostenida, junto con el registro de errores del servidor,
 > indica que vienen del marco (nota fechada de `docs/07-observabilidad-y-operaciones.md` §5.4).
 
+> **Nota fechada 2026-10-21 (cambio `session-endpoints-cookie-and-csrf`, tarea 1.3): tope de la
+> espera materializada.** El retardo que una política de retroceso exige (hasta 900 segundos) se
+> materializa como máximo durante `confia.web.delay.max-wait`: 30 segundos por omisión, positivo y
+> no mayor de 60 (un valor fuera de ese rango detiene el arranque nombrando la propiedad). El tope
+> queda por debajo del corte de un proxy por omisión (60 segundos en nginx, 100 en Cloudflare, ambos
+> sin verificar aquí; los valores reales son del cambio 11) para que un retardo calculado en minutos
+> no termine en una conexión cortada. El tope acota solo la espera de la respuesta: el contador de
+> retroceso y la bitácora conservan el retardo completo que calculó la política. El tope vive en el
+> materializador, el único lugar que espera.
+
 ---
 
 ## 11. Gestión de secretos
