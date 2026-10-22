@@ -337,6 +337,19 @@ Cada una sobre una copia guardada (`pre-break-4d-N.java` en el directorio de la 
 | 6 | `lockById` sin `FOR UPDATE` [I198] | `LogoutVersusRotationConcurrencyIT`, las dos pruebas, en la aserción de espera: `[the closing waited for the family lock the rotation held]` y `[the rotation waited for the family lock the closing held]`, `expected true but was false`. El estado final es el mismo en cualquier orden (como documentan las pruebas de rotación de S1), de modo que la aserción de espera es lo que ata la prueba al bloqueo | Sí, `cmp` idéntico |
 | 7 | El revocador deja de vaciar los sucesores cifrados | `CloseAllVersusRotationConcurrencyIT.aClosingOfEverySessionThatWaitsForARotationRevokesTheFamilyAndLeavesNoLiveToken` (línea 69): `[the successor the rotation stored was emptied by the closing]`, y `AccountSessionRevokerCrossInstitutionIT.revokingEveryFamilyOfAnAccountOfInstitutionALeavesInstitutionBUntouched` (línea 68) | Sí, `cmp` idéntico |
 
+Cierre: `./mvnw -o verify -Pmutation-gate` sobre el árbol final de la tarea (con los documentos comprometidos), `BUILD SUCCESS` en 25 min 26 s: Surefire 186 + 2 163, Failsafe 468 (459 + 9), 0 fallos. PIT: 631 de 673 mutantes muertos (94 %), fuerza de prueba 95 %, núcleo 192 de 194 (99 %). JaCoCo: «All coverage checks have been met». Las dos pruebas de concurrencia pasaron en las tres ejecuciones (dos aisladas y el `verify`).
+
 ### Estado final de la tarea 2.1
 
 Marcada `[x]` en `tasks.md` (casilla en 04d, con nota fechada de la partición). Pendiente de 2.1: nada. La tarea no añade controlador, ruta ni cookie.
+
+### Cuadro final de la tarea 2.1
+
+| Rama | Líneas efectivas | Duración del `verify -Pmutation-gate` | Surefire (núcleo + aplicación) | Failsafe | PIT (aplicación) |
+|---|---|---|---|---|---|
+| `...-04a-v9-revocation-reasons` | 541 | 15 min 36 s | 186 + 2 163 | 427 | 631 de 673 (94 %) |
+| `...-04b-end-current-session` | 775 | 15 min 58 s | 186 + 2 163 | 454 | 631 de 673 (94 %) |
+| `...-04c-end-all-sessions` | 272 | 19 min 16 s | 186 + 2 163 | 459 | 631 de 673 (94 %) |
+| `...-04d-revocation-follow-ups` | 590 | 25 min 26 s | 186 + 2 163 | 468 | 631 de 673 (94 %) |
+
+Las tres últimas duraciones crecen con las pruebas nuevas y con otras construcciones de la máquina en las demostraciones; no son comparables entre sí para el presupuesto de 8 minutos (R-9). Los casos de uso no tienen llamador HTTP (`rg -n "EndCurrentSession|EndAllSessions" apps/api/app/src/main` solo muestra sus clases y `IdentityConfiguration`).
