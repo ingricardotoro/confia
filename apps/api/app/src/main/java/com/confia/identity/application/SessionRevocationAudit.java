@@ -26,11 +26,21 @@ final class SessionRevocationAudit {
 
     static AuditEntry logout(InstitutionId institutionId, StaffAccountId accountId,
             UUID requestId, int families) {
+        return entry(SessionRevocationReason.LOGOUT, institutionId, accountId, requestId, families);
+    }
+
+    /** The entry of the first verification of a second factor, which ends the other sessions of the account. */
+    static AuditEntry mfaChange(InstitutionId institutionId, StaffAccountId accountId,
+            UUID requestId, int families) {
+        return entry(SessionRevocationReason.MFA_CHANGE, institutionId, accountId, requestId, families);
+    }
+
+    private static AuditEntry entry(SessionRevocationReason reason, InstitutionId institutionId,
+            StaffAccountId accountId, UUID requestId, int families) {
         String account = accountId.value().toString();
         return new AuditEntry(institutionId.value(), accountId.value(), ACTOR_KIND_STAFF, account,
                 null, null, requestId, null, ACTION_REVOKED, STAFF_ACCOUNT_ENTITY_TYPE, account,
-                OUTCOME_SUCCESS, null, afterValue(SessionRevocationReason.LOGOUT, families), null,
-                null);
+                OUTCOME_SUCCESS, null, afterValue(reason, families), null, null);
     }
 
     /** The {@code after_value} of the entry: why, and how many families. */
