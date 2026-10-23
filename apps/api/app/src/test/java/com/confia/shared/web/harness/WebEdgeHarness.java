@@ -4,7 +4,9 @@ import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
 import com.confia.shared.web.authentication.AccessTokenAuthenticationFilter;
 import com.confia.shared.web.authentication.AuthenticatedEndpoint;
 import com.confia.shared.web.authentication.AuthenticatedEndpoints;
+import com.confia.shared.web.authentication.SecondFactorEndpoint;
 import com.confia.shared.web.authentication.SessionCheck;
+import com.confia.shared.security.SecondFactorPurpose;
 import com.confia.shared.security.csrf.CsrfConfiguration;
 import com.confia.shared.security.csrf.CsrfTokens;
 import com.confia.shared.web.csrf.AllowedOrigins;
@@ -23,6 +25,7 @@ import com.confia.shared.web.problem.ProblemAuthenticationEntryPoint;
 import com.confia.shared.web.problem.ProblemResponses;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
@@ -53,6 +56,7 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
         OrganizationConfiguration.class, CsrfConfiguration.class, HarnessController.class,
         CookieHarnessController.class, LimitedController.class,
         UnknownPolicyController.class, SingleFieldController.class, DocumentedProbeController.class,
+        SecondFactorHarnessController.class,
         DocumentedProbeController.ProbeAdvice.class})
 class WebEdgeHarness {
 
@@ -131,7 +135,13 @@ class WebEdgeHarness {
                 new AuthenticatedEndpoint(HttpMethod.GET, "/test/institution", SessionCheck.TOKEN_ONLY),
                 new AuthenticatedEndpoint(HttpMethod.POST, "/test/institution", SessionCheck.TOKEN_ONLY),
                 new AuthenticatedEndpoint(HttpMethod.GET, "/test/fail-authenticated",
-                        SessionCheck.TOKEN_ONLY)));
+                        SessionCheck.TOKEN_ONLY),
+                new AuthenticatedEndpoint(HttpMethod.DELETE, "/test/sessions",
+                        SessionCheck.TOKEN_ONLY)),
+                List.of(new SecondFactorEndpoint(HttpMethod.POST, "/test/second-factor/verify",
+                                Set.of(SecondFactorPurpose.VERIFY, SecondFactorPurpose.ENROLL)),
+                        new SecondFactorEndpoint(HttpMethod.POST, "/test/second-factor/enroll",
+                                Set.of(SecondFactorPurpose.ENROLL))));
         AccessTokenAuthenticationFilter tokenFilter = new AccessTokenAuthenticationFilter(
                 tokens.verifier(), authenticated, sessionValidity,
                 new ProblemAuthenticationEntryPoint(problems));

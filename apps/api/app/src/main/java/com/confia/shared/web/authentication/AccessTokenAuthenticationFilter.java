@@ -1,8 +1,12 @@
 package com.confia.shared.web.authentication;
 
 import com.confia.shared.security.AuthenticatedActor;
+import com.confia.shared.security.PendingSecondFactor;
+import com.confia.shared.security.SecondFactorPurpose;
 import com.confia.shared.security.SessionValidity;
 import com.confia.shared.security.token.AccessTokenVerifier;
+import com.confia.shared.security.token.MfaPurpose;
+import com.confia.shared.security.token.MfaTokenClaims;
 import com.confia.shared.security.token.TokenRejectedException;
 import com.confia.shared.security.token.TokenRejection;
 import jakarta.servlet.FilterChain;
@@ -14,6 +18,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -40,6 +45,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *   <li>A valid token: Spring's context holds an {@link ActorAuthentication} for the authorization
  *       rule, and the rest of the chain runs with {@link AuthenticatedActor#CURRENT} bound, exactly
  *       as the request filter binds the request origin.
+ *   <li>A request for a route of the restricted class ({@link AuthenticatedEndpoints#secondFactorEndpoints()}):
+ *       the token is verified as a restricted second-factor token and as nothing else, so a token of
+ *       access fails by its audience, and a purpose the route does not admit is the same {@code
+ *       token-invalid}. Success puts a {@link SecondFactorAuthentication} in Spring's context and
+ *       binds {@link PendingSecondFactor#CURRENT}, never {@link AuthenticatedActor#CURRENT}, so
+ *       nothing that reads the session actor ever sees a restricted token. On every other route a
+ *       restricted token still fails by its audience in {@code verifyAccess}, unchanged.
  * </ol>
  *
  * <p>A credential in the query string, a cookie, the body or another header is never looked at. The
@@ -59,6 +71,7 @@ public final class AccessTokenAuthenticationFilter extends OncePerRequestFilter 
     private final AccessTokenVerifier verifier;
     private final SessionValidity sessionValidity;
     private final List<RequestMatcher> liveSessionRoutes;
+    private final List<RestrictedRoute> restrictedRoutes;
     private final AuthenticationEntryPoint entryPoint;
 
     public AccessTokenAuthenticationFilter(AccessTokenVerifier verifier,
@@ -73,6 +86,15 @@ public final class AccessTokenAuthenticationFilter extends OncePerRequestFilter 
                 .<RequestMatcher>map(endpoint -> matchers.matcher(endpoint.method(),
                         endpoint.pattern()))
                 .toList();
+        this.restrictedRoutes = endpoints.secondFactorEndpoints().stream()
+                .map(endpoint -> new RestrictedRoute(
+                        matchers.matcher(endpoint.method(), endpoint.pattern()),
+                        endpoint.purposes()))
+                .toList();
+    }
+
+    /** A route of the restricted class with the purposes of restricted token it admits. */
+    private record RestrictedRoute(RequestMatcher matcher, Set<SecondFactorPurpose> purposes) {
     }
 
     @Override
@@ -80,23 +102,35 @@ public final class AccessTokenAuthenticationFilter extends OncePerRequestFilter 
             FilterChain chain) throws ServletException, IOException {
         try {
             AuthenticatedActor actor = null;
+            PendingSecondFactor pending = null;
             try {
                 Optional<String> token = bearerTokenOf(request);
                 if (token.isPresent()) {
-                    actor = authenticate(token.get(), request);
+                    Optional<RestrictedRoute> restricted = restrictedRouteOf(request);
+                    if (restricted.isPresent()) {
+                        pending = authenticateRestricted(token.get(), restricted.get());
+                    } else {
+                        actor = authenticate(token.get(), request);
+                    }
                 }
             } catch (AccessTokenRejectedException rejection) {
                 entryPoint.commence(request, response, rejection);
                 return;
             }
-            if (actor == null) {
+            if (actor == null && pending == null) {
                 chain.doFilter(request, response);
                 return;
             }
             SecurityContext context = SecurityContextHolder.createEmptyContext();
-            context.setAuthentication(new ActorAuthentication(actor));
-            SecurityContextHolder.setContext(context);
-            callWithActor(actor, request, response, chain);
+            if (pending != null) {
+                context.setAuthentication(new SecondFactorAuthentication(pending));
+                SecurityContextHolder.setContext(context);
+                callWith(PendingSecondFactor.CURRENT, pending, request, response, chain);
+            } else {
+                context.setAuthentication(new ActorAuthentication(actor));
+                SecurityContextHolder.setContext(context);
+                callWith(AuthenticatedActor.CURRENT, actor, request, response, chain);
+            }
         } finally {
             // The filter owns what it put on the thread: a pooled worker never starts the next
             // request with this caller's principal, whatever else clears the context.
@@ -167,14 +201,51 @@ public final class AccessTokenAuthenticationFilter extends OncePerRequestFilter 
         return actor;
     }
 
+    /** The route of the restricted class this request is for, if it is for one. */
+    private Optional<RestrictedRoute> restrictedRouteOf(HttpServletRequest request) {
+        return restrictedRoutes.stream().filter(route -> route.matcher().matches(request))
+                .findFirst();
+    }
+
     /**
-     * Runs the rest of the chain with {@code actor} bound, and only for the length of that call.
-     * Checked exceptions of the chain come out as they went in.
+     * Verifies the token as a restricted token and nothing else: a token of access fails by its
+     * audience, and a purpose the route does not admit fails like any other broken credential. The
+     * state of the credential behind the account is not consulted here; what a purpose may prove is
+     * the use case's decision. The session-validity port is never asked, because a restricted token
+     * is not a session.
      */
-    private static void callWithActor(AuthenticatedActor actor, HttpServletRequest request,
+    private PendingSecondFactor authenticateRestricted(String token, RestrictedRoute route) {
+        MfaTokenClaims claims;
+        try {
+            claims = verifier.verifyMfa(token);
+        } catch (TokenRejectedException e) {
+            throw e.rejection() == TokenRejection.EXPIRED ? new AccessTokenExpiredException()
+                    : new AccessTokenRejectedException();
+        }
+        SecondFactorPurpose purpose = purposeOf(claims.purpose());
+        if (!route.purposes().contains(purpose)) {
+            throw new AccessTokenRejectedException();
+        }
+        return new PendingSecondFactor(claims.accountId(), claims.institutionId(),
+                claims.tokenId(), purpose, claims.issuedAt(), claims.expiresAt());
+    }
+
+    /** The one place the claim of the token becomes the purpose the web layer knows. */
+    private static SecondFactorPurpose purposeOf(MfaPurpose claim) {
+        return switch (claim) {
+            case MFA_VERIFY -> SecondFactorPurpose.VERIFY;
+            case MFA_ENROLL -> SecondFactorPurpose.ENROLL;
+        };
+    }
+
+    /**
+     * Runs the rest of the chain with {@code principal} bound to {@code scoped}, and only for the
+     * length of that call. Checked exceptions of the chain come out as they went in.
+     */
+    private static <T> void callWith(ScopedValue<T> scoped, T principal, HttpServletRequest request,
             HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
         try {
-            ScopedValue.where(AuthenticatedActor.CURRENT, actor).call(() -> {
+            ScopedValue.where(scoped, principal).call(() -> {
                 chain.doFilter(request, response);
                 return null;
             });

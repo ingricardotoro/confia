@@ -69,6 +69,9 @@ public final class SecurityChains {
                     authenticated.endpoints().forEach(endpoint -> requests
                             .requestMatchers(endpoint.method(), endpoint.pattern())
                             .authenticated());
+                    authenticated.secondFactorEndpoints().forEach(endpoint -> requests
+                            .requestMatchers(endpoint.method(), endpoint.pattern())
+                            .authenticated());
                     requests.anyRequest().denyAll();
                 });
     }

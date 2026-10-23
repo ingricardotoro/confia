@@ -16,6 +16,7 @@ public final class Calls {
     private final AtomicInteger useCase = new AtomicInteger();
     private final AtomicInteger authenticatedRoute = new AtomicInteger();
     private final AtomicInteger cookieRoute = new AtomicInteger();
+    private final AtomicInteger secondFactorRoute = new AtomicInteger();
     private final AtomicReference<String> requestIdAttribute = new AtomicReference<>();
     private final AtomicReference<String> requestIdInMdc = new AtomicReference<>();
 
@@ -32,6 +33,11 @@ public final class Calls {
     /** Invocations of the routes the harness added to the authenticated list. */
     public int authenticatedInvocations() {
         return authenticatedRoute.get();
+    }
+
+    /** Invocations of the routes the harness added to the restricted second-factor class. */
+    public int secondFactorInvocations() {
+        return secondFactorRoute.get();
     }
 
     /** Invocations of the cookie harness routes (the stand-in for a use case behind a cookie). */
@@ -65,6 +71,10 @@ public final class Calls {
 
     void cookieRouteInvoked() {
         cookieRoute.incrementAndGet();
+    }
+
+    void secondFactorInvoked() {
+        secondFactorRoute.incrementAndGet();
     }
 
     void authenticatedInvoked() {
