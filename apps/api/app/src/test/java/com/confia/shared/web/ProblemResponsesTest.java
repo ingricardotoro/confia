@@ -63,7 +63,8 @@ class ProblemResponsesTest {
 
     @ParameterizedTest
     @CsvSource({"AUTHENTICATION_REQUIRED, Bearer", "TOKEN_INVALID, Bearer error=\"invalid_token\"",
-            "TOKEN_EXPIRED, Bearer error=\"invalid_token\"", "AUTHENTICATION_FAILED, Bearer"})
+            "TOKEN_EXPIRED, Bearer error=\"invalid_token\"", "AUTHENTICATION_FAILED, Bearer",
+            "SECOND_FACTOR_INVALID, Bearer"})
     void every401CarriesTheChallengeOfItsCodeAndNothingElse(ProblemCode code, String challenge)
             throws IOException {
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -76,7 +77,7 @@ class ProblemResponsesTest {
 
     @ParameterizedTest
     @CsvSource({"VALIDATION_FAILED", "FORBIDDEN", "CSRF_INVALID", "RESOURCE_NOT_FOUND", "TOO_MANY_REQUESTS",
-            "INTERNAL_ERROR", "CAPACITY_EXCEEDED"})
+            "INTERNAL_ERROR", "CAPACITY_EXCEEDED", "MFA_ALREADY_ENROLLED"})
     void noOtherStatusCarriesAChallenge(ProblemCode code) throws IOException {
         MockHttpServletResponse response = new MockHttpServletResponse();
 
