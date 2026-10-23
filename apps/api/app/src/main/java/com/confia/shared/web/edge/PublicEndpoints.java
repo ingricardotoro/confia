@@ -10,7 +10,8 @@ import org.springframework.http.HttpMethod;
  * without a credential, defined in this one place (web-edge-foundations design.md, decision 5).
  * Everything not listed is denied, whether or not a controller serves it.
  *
- * <p>The administrative list holds the login, always (session-endpoints-cookie-and-csrf design.md
+ * <p>The administrative list holds the login and the refresh, always
+ * (session-endpoints-cookie-and-csrf design.md
  * decision 11), and the API documentation, only when springdoc is switched on, which the {@code
  * local} and {@code preprod} profiles do and nothing else does; the portal list holds only the
  * documentation. The condition is the
@@ -35,6 +36,15 @@ public final class PublicEndpoints {
      */
     static final PublicEndpoint LOGIN = new PublicEndpoint(HttpMethod.POST, "/api/v1/auth/sessions");
 
+    /**
+     * The refresh (session-endpoints-cookie-and-csrf design.md decision 14). Its credential is the
+     * session cookie, so the chain lets it through and what protects it is the CSRF filter (the
+     * double-submit token with the cookie, an allowed Origin always) and the limiter its handler
+     * declares.
+     */
+    static final PublicEndpoint REFRESH =
+            new PublicEndpoint(HttpMethod.POST, "/api/v1/auth/sessions/refresh");
+
     private final List<PublicEndpoint> endpoints;
 
     public PublicEndpoints(List<PublicEndpoint> endpoints) {
@@ -45,6 +55,7 @@ public final class PublicEndpoints {
     public static PublicEndpoints forAdmin(Environment environment) {
         List<PublicEndpoint> entries = new ArrayList<>();
         entries.add(LOGIN);
+        entries.add(REFRESH);
         entries.addAll(documentation(environment).endpoints());
         return new PublicEndpoints(entries);
     }

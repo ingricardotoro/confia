@@ -4,9 +4,11 @@ import com.confia.identity.application.CompleteSecondFactor;
 import com.confia.identity.application.DescribeCurrentSession;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.LogIn;
+import com.confia.identity.application.RefreshSession;
 import com.confia.identity.web.CurrentSessionController;
 import com.confia.identity.web.LoginController;
 import com.confia.identity.web.SecondFactorController;
+import com.confia.identity.web.SessionRefreshController;
 import com.confia.shared.web.delay.RequiredDelayMaterializer;
 import com.confia.shared.web.ratelimit.RateLimitFailures;
 import com.confia.shared.web.session.SessionCookies;
@@ -46,5 +48,11 @@ public class IdentityWebConfiguration {
             EnrollTotpSecondFactor enroll, RequiredDelayMaterializer delays,
             RateLimitFailures failures, SessionCookies cookies) {
         return new SecondFactorController(complete, enroll, delays, failures, cookies);
+    }
+
+    @Bean
+    SessionRefreshController sessionRefreshController(RefreshSession refresh,
+            RateLimitFailures failures, SessionCookies cookies) {
+        return new SessionRefreshController(refresh, failures, cookies);
     }
 }
