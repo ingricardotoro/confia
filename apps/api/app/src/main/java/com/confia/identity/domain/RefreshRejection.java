@@ -18,7 +18,9 @@ public enum RefreshRejection {
     /** The token reached its own expiry while its family was alive. */
     TOKEN_EXPIRED("token_expired"),
     /** A consumed token was presented outside the grace window. */
-    REUSE_DETECTED("reuse_detected");
+    REUSE_DETECTED("reuse_detected"),
+    /** The agent and the address both changed since the family was created; the family was revoked. */
+    BINDING_CHANGED("binding_changed");
 
     private final String auditCode;
 

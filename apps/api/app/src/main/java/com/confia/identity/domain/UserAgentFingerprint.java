@@ -18,6 +18,9 @@ public final class UserAgentFingerprint {
 
     private static final Pattern SIXTY_FOUR_LOWERCASE_HEX = Pattern.compile("^[0-9a-f]{64}$");
 
+    /** The fingerprint of no agent at all: what a session opened with no agent records. */
+    public static final UserAgentFingerprint NO_AGENT = of(null);
+
     private final String value;
 
     /**
