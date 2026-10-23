@@ -98,19 +98,21 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
      * verified secret (session-endpoints-cookie-and-csrf design.md, decision 13). The counter
      * is far in the past, so any code of the tests that follow is still newer.
      */
-    EnrollTotpSecondFactorResult enroll(StaffAccountId accountId) {
-        EnrollTotpSecondFactorResult enrolled = enrollWithoutVerifying(accountId);
+    EnrollTotpSecondFactorResult.Enrolled enroll(StaffAccountId accountId) {
+        EnrollTotpSecondFactorResult.Enrolled enrolled = enrollWithoutVerifying(accountId);
         transactionRunner().execute(context(), () -> new JooqTotpCredentialRepository(dsl)
                 .acceptCounter(institutionId, accountId, 1L));
         return enrolled;
     }
 
     /** Enrolls and stops there: the credential is as a new enrollment leaves it, never verified. */
-    EnrollTotpSecondFactorResult enrollWithoutVerifying(StaffAccountId accountId) {
-        return new EnrollTotpSecondFactor(transactionRunner(),
+    EnrollTotpSecondFactorResult.Enrolled enrollWithoutVerifying(StaffAccountId accountId) {
+        return (EnrollTotpSecondFactorResult.Enrolled) new EnrollTotpSecondFactor(
+                transactionRunner(), new JooqStaffAccountRepository(dsl),
                 new JooqTotpCredentialRepository(dsl), new JooqRecoveryCodeRepository(dsl),
                 new BouncyCastleRecoveryCodeHasher(Argon2Profile.floor(), PEPPER),
-                encryptionService(), new JooqAuditLogWriter(dsl))
+                encryptionService(), new JooqAuditLogWriter(dsl),
+                Clock.fixed(Instant.parse("2026-05-01T00:00:00Z"), ZoneOffset.UTC))
                 .execute(context(), accountId);
     }
 

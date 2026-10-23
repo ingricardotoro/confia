@@ -1,38 +1,46 @@
 package com.confia.identity.application;
 
+import com.confia.identity.application.EnrollTotpSecondFactorResult.AlreadyEnrolled;
+import com.confia.identity.application.EnrollTotpSecondFactorResult.Enrolled;
 import com.confia.identity.domain.PlainRecoveryCode;
 import com.confia.identity.domain.PlainTotpSecret;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.StoredRecoveryCodeHash;
+import com.confia.identity.domain.TotpCredential;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
+import com.confia.shared.audit.AuditJson;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.security.SecurityContext;
 import com.confia.shared.security.TransactionRunner;
 import java.security.SecureRandom;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Enrolls the TOTP second factor of an account: a fresh encrypted secret and exactly ten hashed
- * MFA recovery codes, in one transaction with a single audit event
- * (column-encryption-and-mfa-totp design.md, §4.1; specs/identity/spec.md, requirements
- * "Inscripción y verificación del segundo factor TOTP..." and "Diez códigos de recuperación de
- * MFA..."). The five steps design.md §4.1 draws inside one transaction: generate and encrypt the
- * secret, insert the credential, generate and hash ten recovery codes, insert all ten, and audit
- * once.
+ * Enrolls the TOTP second factor of an account: a fresh encrypted secret and exactly ten hashed MFA
+ * recovery codes, in one transaction with one audit entry (column-encryption-and-mfa-totp design.md,
+ * §4.1; session-endpoints-cookie-and-csrf design.md, decision 13; specs/identity/spec.md,
+ * requirements "Inscripción y verificación del segundo factor TOTP...", "Diez códigos de recuperación
+ * de MFA..." and "La inscripción del segundo factor ... es repetible hasta la primera verificación").
  *
- * <p><b>Built entire, in this cut (C3), never split across C2 and C3</b> — the tasks.md
- * discrepancy resolution this change's own apply-progress.md records: generating the ten recovery
- * codes needs {@link RecoveryCodeHasher}, which design.md assigns to C3, so this class could not
- * exist complete before this cut's own {@link RecoveryCodeRepository} and hasher were built.
+ * <p><b>Repeatable until the first verification.</b> Under the lock of the account, in the order
+ * account, credential, families that issuance and reset use as well: no credential is inserted; a
+ * credential that was never verified has its secret replaced and the codes handed out with the
+ * previous one retired (they were shown once, to a screen that may be lost); a verified credential is
+ * never replaced, and the refusal writes only {@code identity.mfa.enrollment_rejected}. The lock is
+ * what turns two concurrent enrollments of one account into an enrollment and a re-enrollment, one
+ * after the other, instead of a uniqueness violation. Enrolling never activates the credential.
  *
- * <p><b>Never opens a transaction of its own</b> (ADR-0015 rule 7, R3): {@link #execute} delegates
- * the whole body to {@link TransactionRunner#execute(SecurityContext, java.util.function.Supplier)},
- * the same pattern {@link VerifyTotpCode} already establishes.
+ * <p><b>Never opens a transaction of its own</b> (ADR-0015 rule 7, R3): {@link #execute} delegates the
+ * whole body to {@link TransactionRunner#execute(SecurityContext, java.util.function.Supplier)}, the
+ * same pattern {@link VerifyTotpCode} establishes.
  */
 public final class EnrollTotpSecondFactor {
 
@@ -42,38 +50,42 @@ public final class EnrollTotpSecondFactor {
     private static final String ACTOR_KIND_STAFF = "staff";
     private static final String CREDENTIAL_ENTITY_TYPE = "identity.mfa_totp_credential";
     private static final String ACTION_ENROLLED = "identity.mfa.enrolled";
+    private static final String ACTION_REJECTED = "identity.mfa.enrollment_rejected";
     private static final String OUTCOME_SUCCESS = "success";
+    private static final String OUTCOME_DENIED = "denied";
 
     private final TransactionRunner transactionRunner;
+    private final StaffAccountRepository accounts;
     private final TotpCredentialRepository credentials;
     private final RecoveryCodeRepository recoveryCodes;
     private final RecoveryCodeHasher recoveryCodeHasher;
     private final ColumnEncryptionService encryption;
     private final AuditLogWriter auditLogWriter;
+    private final Clock clock;
     private final SecureRandom secureRandom;
 
     public EnrollTotpSecondFactor(TransactionRunner transactionRunner,
-            TotpCredentialRepository credentials, RecoveryCodeRepository recoveryCodes,
-            RecoveryCodeHasher recoveryCodeHasher, ColumnEncryptionService encryption,
-            AuditLogWriter auditLogWriter) {
-        this(transactionRunner, credentials, recoveryCodes, recoveryCodeHasher, encryption,
-                auditLogWriter, new SecureRandom());
+            StaffAccountRepository accounts, TotpCredentialRepository credentials,
+            RecoveryCodeRepository recoveryCodes, RecoveryCodeHasher recoveryCodeHasher,
+            ColumnEncryptionService encryption, AuditLogWriter auditLogWriter, Clock clock) {
+        this(transactionRunner, accounts, credentials, recoveryCodes, recoveryCodeHasher, encryption,
+                auditLogWriter, clock, new SecureRandom());
     }
 
-    /** Package-private: {@code secureRandom} is the same kind of testing seam {@code
-     * BouncyCastleArgon2PasswordHasher} already establishes for its own {@code SecureRandom} —
-     * here only for constructor symmetry, since no test in this cut needs a deterministic secret
-     * or a deterministic set of ten codes. */
-    EnrollTotpSecondFactor(TransactionRunner transactionRunner, TotpCredentialRepository credentials,
-            RecoveryCodeRepository recoveryCodes, RecoveryCodeHasher recoveryCodeHasher,
-            ColumnEncryptionService encryption, AuditLogWriter auditLogWriter,
-            SecureRandom secureRandom) {
+    /** Package-private: the same kind of testing seam {@code BouncyCastleArgon2PasswordHasher}
+     * establishes for its own {@code SecureRandom}. */
+    EnrollTotpSecondFactor(TransactionRunner transactionRunner, StaffAccountRepository accounts,
+            TotpCredentialRepository credentials, RecoveryCodeRepository recoveryCodes,
+            RecoveryCodeHasher recoveryCodeHasher, ColumnEncryptionService encryption,
+            AuditLogWriter auditLogWriter, Clock clock, SecureRandom secureRandom) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
+        this.accounts = Objects.requireNonNull(accounts, "accounts");
         this.credentials = Objects.requireNonNull(credentials, "credentials");
         this.recoveryCodes = Objects.requireNonNull(recoveryCodes, "recoveryCodes");
         this.recoveryCodeHasher = Objects.requireNonNull(recoveryCodeHasher, "recoveryCodeHasher");
         this.encryption = Objects.requireNonNull(encryption, "encryption");
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
+        this.clock = Objects.requireNonNull(clock, "clock");
         this.secureRandom = Objects.requireNonNull(secureRandom, "secureRandom");
     }
 
@@ -86,14 +98,36 @@ public final class EnrollTotpSecondFactor {
                 () -> runWithinTransaction(institutionId, accountId, context.requestId()));
     }
 
-    /** Package-private so a future {@code EnrollTotpSecondFactorTest} could exercise this exact
-     * sequence with the ports doubled, mirroring {@link VerifyTotpCode}'s own split. */
+    /** Package-private so the sequence can be exercised with the ports doubled. */
     EnrollTotpSecondFactorResult runWithinTransaction(InstitutionId institutionId,
             StaffAccountId accountId, String requestId) {
+        accounts.lockById(institutionId, accountId).orElseThrow(() -> new IllegalStateException(
+                "the account of an enrollment does not exist"));
+        Instant now = clock.instant();
+        UUID auditRequestId = requestId.isBlank() ? UUID.randomUUID() : UUID.fromString(requestId);
+
+        Optional<TotpCredential> existing = credentials.findByAccountId(institutionId, accountId);
+        if (existing.isPresent() && existing.get().isVerified()) {
+            auditLogWriter.append(entry(institutionId, accountId, auditRequestId, ACTION_REJECTED,
+                    OUTCOME_DENIED, rejectionAfterValue()));
+            return new AlreadyEnrolled();
+        }
+
         PlainTotpSecret secret = PlainTotpSecret.generate(secureRandom);
         String encryptedSecret = encryption.encryptForNewValue(TABLE, COLUMN, institutionId,
                 rowIdOf(institutionId, accountId), secret.value());
-        credentials.insert(institutionId, accountId, encryptedSecret);
+        boolean replacedUnverified = existing.isPresent();
+        int invalidatedCodes = 0;
+        if (replacedUnverified) {
+            if (!credentials.replaceUnverifiedSecret(institutionId, accountId, encryptedSecret, now)) {
+                // The account is locked and the credential was read as unverified a moment ago.
+                throw new IllegalStateException(
+                        "the unverified secret of a locked account could not be replaced");
+            }
+            invalidatedCodes = recoveryCodes.invalidateUnused(institutionId, accountId, now);
+        } else {
+            credentials.insert(institutionId, accountId, encryptedSecret);
+        }
 
         List<PlainRecoveryCode> plainCodes = new ArrayList<>(RECOVERY_CODE_COUNT);
         for (int i = 0; i < RECOVERY_CODE_COUNT; i++) {
@@ -103,26 +137,35 @@ public final class EnrollTotpSecondFactor {
             plainCodes.add(code);
         }
 
-        UUID auditRequestId = requestId.isBlank() ? UUID.randomUUID() : UUID.fromString(requestId);
-        auditLogWriter.append(enrolledEntry(institutionId, accountId, auditRequestId));
-
-        return new EnrollTotpSecondFactorResult(secret, plainCodes);
+        auditLogWriter.append(entry(institutionId, accountId, auditRequestId, ACTION_ENROLLED,
+                OUTCOME_SUCCESS, replacedUnverified ? reenrollmentAfterValue(invalidatedCodes) : null));
+        return new Enrolled(secret, plainCodes, replacedUnverified);
     }
 
     /** {@code institutionId:accountId} (design.md, decision 5): the credential row's own composite
-     * key, the same row-identifier shape {@link VerifyTotpCode} already uses. */
+     * key, the same row-identifier shape {@link VerifyTotpCode} already uses. The additional data of
+     * the secret does not change when it is replaced. */
     private static String rowIdOf(InstitutionId institutionId, StaffAccountId accountId) {
         return institutionId.value() + ":" + accountId.value();
     }
 
-    /** Design.md, §4.1 step 6: the single enrollment audit row covering both the credential and
-     * the ten recovery codes — never one row per recovery code, per the escenario publicado
-     * "un único evento identity.mfa.enrolled auditado". */
-    private static AuditEntry enrolledEntry(InstitutionId institutionId, StaffAccountId accountId,
-            UUID requestId) {
+    /** The detail of a re-enrollment: that it replaced an unverified credential, and how many codes it retired. */
+    static String reenrollmentAfterValue(int invalidatedRecoveryCodes) {
+        return AuditJson.object().bool("replacedUnverified", true)
+                .number("invalidatedRecoveryCodes", invalidatedRecoveryCodes).toJson();
+    }
+
+    /** The detail of a refusal: the credential is already verified. */
+    static String rejectionAfterValue() {
+        return AuditJson.object().text("reason", "already_enrolled").toJson();
+    }
+
+    /** One entry covering the credential and the ten recovery codes, never one entry per code. */
+    private static AuditEntry entry(InstitutionId institutionId, StaffAccountId accountId,
+            UUID requestId, String action, String outcome, String afterValue) {
         return new AuditEntry(institutionId.value(), accountId.value(), ACTOR_KIND_STAFF,
-                accountId.value().toString(), null, null, requestId, null, ACTION_ENROLLED,
-                CREDENTIAL_ENTITY_TYPE, accountId.value().toString(), OUTCOME_SUCCESS, null, null,
+                accountId.value().toString(), null, null, requestId, null, action,
+                CREDENTIAL_ENTITY_TYPE, accountId.value().toString(), outcome, null, afterValue,
                 null, null);
     }
 }

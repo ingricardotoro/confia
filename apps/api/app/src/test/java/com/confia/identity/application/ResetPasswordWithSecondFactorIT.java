@@ -34,7 +34,7 @@ class ResetPasswordWithSecondFactorIT extends PasswordResetIntegrationTest {
     @Test
     void withoutASecondFactorThereIsNoResetAndWithAValidTotpCodeThereIs() {
         StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, true);
-        EnrollTotpSecondFactorResult enrollment = enroll(sofia);
+        EnrollTotpSecondFactorResult.Enrolled enrollment = enroll(sofia);
         PlainPasswordResetToken token = issueTokenAt(sofia, "2026-10-12T09:00:00Z");
 
         ResetPasswordDecision withoutCode = resetAt(token.value(), NEW,
@@ -57,7 +57,7 @@ class ResetPasswordWithSecondFactorIT extends PasswordResetIntegrationTest {
     @Test
     void aRecoveryCodeReplacesTheTotpCodeAndIsUsedUp() {
         StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, true);
-        EnrollTotpSecondFactorResult enrollment = enroll(sofia);
+        EnrollTotpSecondFactorResult.Enrolled enrollment = enroll(sofia);
         PlainRecoveryCode code = enrollment.recoveryCodes().get(0);
         PlainPasswordResetToken token = issueTokenAt(sofia, "2026-10-12T11:00:00Z");
 
@@ -82,7 +82,7 @@ class ResetPasswordWithSecondFactorIT extends PasswordResetIntegrationTest {
     @Test
     void consumingOneOfThreeRemainingCodesInAResetAuditsTheLowCodesSignal() {
         StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, true);
-        EnrollTotpSecondFactorResult enrollment = enroll(sofia);
+        EnrollTotpSecondFactorResult.Enrolled enrollment = enroll(sofia);
         List<PlainRecoveryCode> codes = enrollment.recoveryCodes();
         leaveOnlyTheFirstThreeUnused(sofia, codes);
         PlainPasswordResetToken token = issueTokenAt(sofia, "2026-10-12T11:00:00Z");

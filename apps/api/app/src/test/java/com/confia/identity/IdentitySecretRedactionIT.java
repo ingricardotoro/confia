@@ -185,10 +185,12 @@ class IdentitySecretRedactionIT extends CommittingPostgresIntegrationTest {
         seedMfaStaffAccount(institutionId, accountId, "sofia.mejia@colegio.edu.hn");
         ColumnEncryptionService encryption = encryptionServiceFor(masterKey);
 
-        EnrollTotpSecondFactorResult enrollment = new EnrollTotpSecondFactor(transactionRunner(),
+        EnrollTotpSecondFactorResult.Enrolled enrollment = (EnrollTotpSecondFactorResult.Enrolled)
+                new EnrollTotpSecondFactor(transactionRunner(),
+                new com.confia.identity.infrastructure.JooqStaffAccountRepository(dsl),
                 new JooqTotpCredentialRepository(dsl), new JooqRecoveryCodeRepository(dsl),
                 new BouncyCastleRecoveryCodeHasher(Argon2Profile.floor(), pepper), encryption,
-                new JooqAuditLogWriter(dsl))
+                new JooqAuditLogWriter(dsl), java.time.Clock.systemUTC())
                 .execute(contextOf(institutionId), accountId);
         PlainTotpSecret totpSecret = enrollment.secret();
 
