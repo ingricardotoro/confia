@@ -16,6 +16,7 @@ import com.confia.identity.domain.StaffPasswordLengthPolicy;
 import com.confia.identity.domain.StaffPasswordLengthPolicy.Accepted;
 import com.confia.identity.domain.StaffPasswordLengthPolicy.TooLong;
 import com.confia.identity.domain.StaffPasswordLengthPolicy.TooShort;
+import com.confia.identity.domain.TotpCredential;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
 import com.confia.shared.audit.AuditJson;
@@ -234,7 +235,8 @@ public final class ResetPasswordWithToken {
 
     private boolean mfaActive(InstitutionId institutionId, StaffAccount account) {
         return account.mfaRequired()
-                && totpCredentials.findByAccountId(institutionId, account.id()).isPresent();
+                && totpCredentials.findByAccountId(institutionId, account.id())
+                        .map(TotpCredential::isVerified).orElse(false);
     }
 
     /** A malformed token is simply not found: it cannot be the text of any issued token. */

@@ -273,6 +273,31 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
     }
 
     /**
+     * [I167] and [I217]: "MFA activa" is a verified secret. A credential that was enrolled and
+     * never verified (counter -1) is, for the login, the same as no secret at all: the outcome is
+     * {@code SecondFactorEnrollmentRequired}, so the user is never handed an {@code mfa-verify} token
+     * for a first code that no check could accept, and the attempt is no failure.
+     */
+    @Test
+    void mfaRequiredAccountWithAnEnrolledButNeverVerifiedSecretProducesSecondFactorEnrollmentRequired() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        LoginIdentifier identifier = LoginIdentifier.of(EXISTING_EMAIL);
+        StaffAccountId accountId = seedStaffAccount(institutionId, identifier, true);
+        seedUnverifiedTotpCredential(institutionId, accountId);
+
+        AuthenticationDecision decision = attempt(institutionId, identifier.value(),
+                CORRECT_PASSWORD_RAW, "2026-03-10T13:20:00Z");
+
+        assertThat(decision.result()).isInstanceOf(SecondFactorEnrollmentRequired.class);
+        assertThat(((SecondFactorEnrollmentRequired) decision.result()).userId()).isEqualTo(accountId);
+        assertThat(decision.requiredDelay()).isEqualTo(Duration.ZERO);
+        assertThat(auditRowsFor(institutionId, fingerprintOf(identifier)))
+                .noneMatch(row -> row.action().equals("identity.login.failed"));
+        assertThat(persistedConsecutiveFailures(institutionId, fingerprintOf(identifier),
+                Instant.parse("2026-03-10T13:20:05Z"))).isZero();
+    }
+
+    /**
      * specs/identity/spec.md, "MFA obligatoria para cuentas marcadas con mfa_required", escenario
      * "Cuenta con mfa_required en true sin ningún secreto TOTP inscrito".
      */
@@ -365,6 +390,15 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
      * {@link AuthenticateWithPassword} only checks whether the row exists.
      */
     private void seedTotpCredential(InstitutionId institutionId, StaffAccountId accountId) {
+        seedUnverifiedTotpCredential(institutionId, accountId);
+        transactionRunner().execute(contextOf(institutionId), () -> {
+            new JooqTotpCredentialRepository(dsl).acceptCounter(institutionId, accountId, 58_204L);
+            return null;
+        });
+    }
+
+    /** A credential that was enrolled and never verified: the counter is still -1 (design.md, decision 13). */
+    private void seedUnverifiedTotpCredential(InstitutionId institutionId, StaffAccountId accountId) {
         transactionRunner().execute(contextOf(institutionId), () -> {
             new JooqTotpCredentialRepository(dsl)
                     .insert(institutionId, accountId, DUMMY_ENCRYPTED_TOTP_SECRET);

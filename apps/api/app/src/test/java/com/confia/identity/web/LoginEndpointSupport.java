@@ -66,7 +66,10 @@ abstract class LoginEndpointSupport extends CommittingPostgresIntegrationTest {
                     """, of.value(), account.value(), LoginIdentifier.of(email).value(), hash,
                     mfaRequired);
             if (secretEnrolled) {
-                new JooqTotpCredentialRepository(dsl).insert(of, account, DUMMY_ENCRYPTED_TOTP_SECRET);
+                // A verified secret: "MFA active" is a credential that accepted a code (design.md, decision 13).
+                JooqTotpCredentialRepository credentials = new JooqTotpCredentialRepository(dsl);
+                credentials.insert(of, account, DUMMY_ENCRYPTED_TOTP_SECRET);
+                credentials.acceptCounter(of, account, 58_204L);
             }
             return null;
         });
