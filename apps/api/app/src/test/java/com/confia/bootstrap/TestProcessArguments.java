@@ -119,6 +119,7 @@ final class TestProcessArguments {
         properties.put(PEPPER_PROPERTY, newPepper());
         properties.put(INSTITUTION_PROPERTY, UUID.randomUUID().toString());
         properties.put(CSRF_KEY_PROPERTY, newCsrfKey());
+        properties.put("confia.web.allowed-origins", "https://admin.colegio.edu.hn");
         properties.putAll(newSigningKeyProperties());
         overrides.forEach((property, value) -> {
             if (value == null) {

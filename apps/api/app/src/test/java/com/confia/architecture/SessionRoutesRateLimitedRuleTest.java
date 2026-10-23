@@ -72,6 +72,18 @@ class SessionRoutesRateLimitedRuleTest {
     }
 
     @Test
+    void theRuleEvaluatesTheEnrollmentHandlerAndItDeclaresTheMfaPolicy() {
+        JavaClasses production = productionClasses();
+
+        assertThat(production.get("com.confia.identity.web.SecondFactorController").getMethods().stream()
+                .filter(CHANGES_STATE)).extracting(JavaMethod::getName)
+                .containsExactly("enroll");
+        production.get("com.confia.identity.web.SecondFactorController").getMethods().stream()
+                .filter(CHANGES_STATE).forEach(method -> assertThat(
+                        method.getAnnotationOfType(RateLimited.class).policy()).isEqualTo("admin-mfa"));
+    }
+
+    @Test
     void theRuleRejectsAHandlerOfIdentityWebThatDeclaresNoPolicy() {
         assertRuleRejects(RULE, fixtureClasses(), "BadLoginHandlerWithoutPolicy.login");
     }

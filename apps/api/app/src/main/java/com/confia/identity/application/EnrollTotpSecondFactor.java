@@ -12,6 +12,7 @@ import com.confia.shared.audit.AuditEntry;
 import com.confia.shared.audit.AuditJson;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionService;
+import com.confia.shared.security.PendingSecondFactor;
 import com.confia.shared.security.SecurityContext;
 import com.confia.shared.security.TransactionRunner;
 import java.security.SecureRandom;
@@ -87,6 +88,15 @@ public final class EnrollTotpSecondFactor {
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.secureRandom = Objects.requireNonNull(secureRandom, "secureRandom");
+    }
+
+    /**
+     * The enrollment of the account the restricted token names, for the layer that holds the principal
+     * of a restricted route and has no business with a domain identifier.
+     */
+    public EnrollTotpSecondFactorResult execute(PendingSecondFactor pending, String requestId) {
+        Objects.requireNonNull(pending, "pending");
+        return execute(pending.securityContext(requestId), new StaffAccountId(pending.accountId()));
     }
 
     public EnrollTotpSecondFactorResult execute(SecurityContext context, StaffAccountId accountId) {

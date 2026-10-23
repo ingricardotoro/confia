@@ -72,8 +72,10 @@ class AuthenticatedEndpointsTest {
             "/test/second-factor/enroll", Set.of(SecondFactorPurpose.ENROLL));
 
     @Test
-    void theProductionRestrictedListIsEmptyUntilTheEndpointsExist() {
-        assertThat(AuthenticatedEndpoints.forAdmin().secondFactorEndpoints()).isEmpty();
+    void theProductionRestrictedListHoldsTheEnrollmentRouteUntilTheVerificationExists() {
+        assertThat(AuthenticatedEndpoints.forAdmin().secondFactorEndpoints()).containsExactly(
+                new SecondFactorEndpoint(HttpMethod.POST, "/api/v1/auth/mfa/enrollments",
+                        Set.of(SecondFactorPurpose.ENROLL)));
         assertThat(new AuthenticatedEndpoints(List.of(WHOAMI)).secondFactorEndpoints()).isEmpty();
     }
 
