@@ -41,4 +41,14 @@ public interface RecoveryCodeRepository {
     /** The account's remaining unused-code count, read after a successful consumption (design.md,
      * §4.3, step 5). */
     long countUnusedByAccountId(InstitutionId institutionId, StaffAccountId accountId);
+
+    /**
+     * Retires the codes of the account that are still unused, by fixing their {@code used_at}:
+     * {@code UPDATE ... SET used_at = now WHERE ... AND used_at IS NULL}. Nothing is deleted, and a
+     * code already used keeps its own instant. It is the other half of the re-enrollment of an
+     * unverified credential: the codes handed out with the previous secret stop working.
+     *
+     * @return how many codes this call retired
+     */
+    int invalidateUnused(InstitutionId institutionId, StaffAccountId accountId, Instant now);
 }

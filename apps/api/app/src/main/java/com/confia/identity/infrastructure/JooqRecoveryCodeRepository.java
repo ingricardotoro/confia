@@ -80,6 +80,17 @@ public final class JooqRecoveryCodeRepository implements RecoveryCodeRepository 
                 .fetchOne(0, long.class);
     }
 
+    @Override
+    public int invalidateUnused(InstitutionId institutionId, StaffAccountId accountId,
+            Instant now) {
+        return dsl.update(IDENTITY_MFA_RECOVERY_CODE)
+                .set(IDENTITY_MFA_RECOVERY_CODE.USED_AT, toOffsetDateTime(now))
+                .where(IDENTITY_MFA_RECOVERY_CODE.INSTITUTION_ID.eq(institutionId.value()))
+                .and(IDENTITY_MFA_RECOVERY_CODE.ACCOUNT_ID.eq(accountId.value()))
+                .and(IDENTITY_MFA_RECOVERY_CODE.USED_AT.isNull())
+                .execute();
+    }
+
     private static OffsetDateTime toOffsetDateTime(Instant instant) {
         return instant.atOffset(ZoneOffset.UTC);
     }

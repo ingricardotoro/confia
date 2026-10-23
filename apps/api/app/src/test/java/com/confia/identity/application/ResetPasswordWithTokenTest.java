@@ -384,6 +384,12 @@ class ResetPasswordWithTokenTest {
         public boolean acceptCounter(InstitutionId i, StaffAccountId a, long candidateCounter) {
             throw new UnsupportedOperationException("never verified in this unit test");
         }
+
+        @Override
+        public boolean replaceUnverifiedSecret(InstitutionId i, StaffAccountId a,
+                String encryptedSecret, Instant now) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static final class CountingHasher implements PasswordHasher {
@@ -470,6 +476,11 @@ class ResetPasswordWithTokenTest {
 
         @Override
         public long countUnusedByAccountId(InstitutionId i, StaffAccountId a) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int invalidateUnused(InstitutionId i, StaffAccountId a, Instant now) {
             throw new UnsupportedOperationException();
         }
     }

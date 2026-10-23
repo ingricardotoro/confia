@@ -3,6 +3,7 @@ package com.confia.identity.application;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.TotpCredential;
 import com.confia.kernel.InstitutionId;
+import java.time.Instant;
 import java.util.Optional;
 
 /**
@@ -33,4 +34,16 @@ public interface TotpCredentialRepository {
      */
     boolean acceptCounter(InstitutionId institutionId, StaffAccountId accountId,
             long candidateCounter);
+
+    /**
+     * Replaces the secret of a credential that was never verified and restarts its enrollment
+     * instant: {@code UPDATE ... SET encrypted_secret, enrolled_at WHERE ... AND
+     * last_accepted_counter = -1} (session-endpoints-cookie-and-csrf design.md, decision 13). The
+     * predicate is what keeps a verified secret from being replaced. Returns {@code true} when the
+     * row was replaced, {@code false} when it affected no row: no credential, or one already
+     * verified. The caller holds the lock of the account, so under it the row cannot change
+     * between its read and this statement.
+     */
+    boolean replaceUnverifiedSecret(InstitutionId institutionId, StaffAccountId accountId,
+            String encryptedSecret, Instant now);
 }

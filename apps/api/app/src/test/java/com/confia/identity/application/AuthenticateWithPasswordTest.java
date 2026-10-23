@@ -369,6 +369,12 @@ class AuthenticateWithPasswordTest {
                 long candidateCounter) {
             throw new UnsupportedOperationException("not exercised by this unit test");
         }
+
+        @Override
+        public boolean replaceUnverifiedSecret(InstitutionId institutionId, StaffAccountId accountId,
+                String encryptedSecret, Instant now) {
+            throw new UnsupportedOperationException("not exercised by this unit test");
+        }
     }
 
     private static final class FakeLoginBackoffStore implements LoginBackoffStore {
