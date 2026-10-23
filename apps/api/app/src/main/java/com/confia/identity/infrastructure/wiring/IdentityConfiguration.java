@@ -2,6 +2,7 @@ package com.confia.identity.infrastructure.wiring;
 
 import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.AuthenticateWithPassword;
+import com.confia.identity.application.CompleteSecondFactor;
 import com.confia.identity.application.ConsumeRecoveryCode;
 import com.confia.identity.application.DescribeCurrentSession;
 import com.confia.identity.application.EndAllSessions;
@@ -295,6 +296,17 @@ public class IdentityConfiguration {
             ColumnEncryptionService encryption, AuditLogWriter auditLogWriter, Clock clock) {
         return new EnrollTotpSecondFactor(runner, accounts, credentials, recoveryCodes,
                 recoveryCodeHasher, encryption, auditLogWriter, clock);
+    }
+
+    @Bean
+    CompleteSecondFactor completeSecondFactor(TransactionRunner runner,
+            StaffAccountRepository accounts, TotpCredentialRepository credentials,
+            VerifyTotpCode verifyTotp, ConsumeRecoveryCode consumeRecoveryCode,
+            TotpVerificationBackoffStore backoffStore, AccountSessionRevoker sessionRevoker,
+            IssueSession issueSession, AuditLogWriter auditLogWriter, Clock clock) {
+        return new CompleteSecondFactor(runner, accounts, credentials, verifyTotp,
+                consumeRecoveryCode, backoffStore, sessionRevoker, issueSession, auditLogWriter,
+                clock);
     }
 
     @Bean
