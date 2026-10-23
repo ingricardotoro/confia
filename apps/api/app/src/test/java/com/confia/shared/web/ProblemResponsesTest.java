@@ -64,7 +64,7 @@ class ProblemResponsesTest {
     @ParameterizedTest
     @CsvSource({"AUTHENTICATION_REQUIRED, Bearer", "TOKEN_INVALID, Bearer error=\"invalid_token\"",
             "TOKEN_EXPIRED, Bearer error=\"invalid_token\"", "AUTHENTICATION_FAILED, Bearer",
-            "SECOND_FACTOR_INVALID, Bearer"})
+            "SECOND_FACTOR_INVALID, Bearer", "SESSION_EXPIRED, Bearer"})
     void every401CarriesTheChallengeOfItsCodeAndNothingElse(ProblemCode code, String challenge)
             throws IOException {
         MockHttpServletResponse response = new MockHttpServletResponse();

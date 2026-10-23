@@ -220,6 +220,23 @@ class ProblemCatalogCoverageTest {
                 "mfa-already-enrolled (problem.mfa-already-enrolled.detail)");
     }
 
+
+    @Test
+    void theSessionExpiredCodeHasItsSpanishEntryThatNamesNoCauseAndACatalogWithoutItFails() {
+        Properties catalog = loadCatalog();
+
+        assertThat(ProblemCode.ofCode("session-expired")).isPresent();
+        assertThat(catalog.getProperty("problem.session-expired.title"))
+                .isEqualTo("La sesión terminó");
+        assertThat(catalog.getProperty("problem.session-expired.detail")).isEqualTo(
+                "Su sesión terminó o ya no es válida. Inicie sesión de nuevo.");
+        assertThat(catalog.getProperty("problem.session-expired.detail"))
+                .doesNotContainIgnoringCase("reutiliz").doesNotContainIgnoringCase("desconocid")
+                .doesNotContainIgnoringCase("revoc");
+        catalog.remove("problem.session-expired.detail");
+        assertThat(codesWithoutAMessage(catalog))
+                .containsExactly("session-expired (problem.session-expired.detail)");
+    }
     @Test
     void aCatalogEntryOfAnotherChangesCodeIsAnOrphanForThisOne() {
         Properties catalog = loadCatalog();
