@@ -7,6 +7,7 @@ import com.confia.identity.application.SessionRevocationReason;
 import com.confia.identity.domain.RefreshTokenFamily;
 import com.confia.identity.domain.RefreshTokenFamilyState;
 import com.confia.identity.domain.StaffAccountId;
+import com.confia.identity.domain.UserAgentFingerprint;
 import com.confia.kernel.InstitutionId;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -16,7 +17,7 @@ import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record;
-import org.jooq.Record6;
+import org.jooq.Record8;
 import org.jooq.SelectConditionStep;
 import org.jooq.impl.DSL;
 
@@ -81,13 +82,16 @@ public final class JooqRefreshTokenFamilyRepository implements RefreshTokenFamil
                 .fetchOptional(JooqRefreshTokenFamilyRepository::stateOf);
     }
 
-    private SelectConditionStep<Record6<UUID, UUID, Boolean, OffsetDateTime, OffsetDateTime,
-            OffsetDateTime>> stateQuery(InstitutionId institutionId, UUID familyId) {
+    private SelectConditionStep<Record8<UUID, UUID, Boolean, OffsetDateTime, OffsetDateTime,
+            OffsetDateTime, String, String>> stateQuery(InstitutionId institutionId,
+            UUID familyId) {
         return dsl.select(IDENTITY_REFRESH_TOKEN_FAMILY.ID, IDENTITY_REFRESH_TOKEN_FAMILY.ACCOUNT_ID,
                         IDENTITY_REFRESH_TOKEN_FAMILY.SECOND_FACTOR_VERIFIED,
                         IDENTITY_REFRESH_TOKEN_FAMILY.LAST_USED_AT,
                         IDENTITY_REFRESH_TOKEN_FAMILY.ABSOLUTE_EXPIRES_AT,
-                        IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT)
+                        IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT,
+                        IDENTITY_REFRESH_TOKEN_FAMILY.USER_AGENT_FINGERPRINT,
+                        IDENTITY_REFRESH_TOKEN_FAMILY.IP_FIRST_SEEN)
                 .from(IDENTITY_REFRESH_TOKEN_FAMILY)
                 .where(IDENTITY_REFRESH_TOKEN_FAMILY.INSTITUTION_ID.eq(institutionId.value()))
                 .and(IDENTITY_REFRESH_TOKEN_FAMILY.ID.eq(familyId));
@@ -100,7 +104,10 @@ public final class JooqRefreshTokenFamilyRepository implements RefreshTokenFamil
                 row.get(IDENTITY_REFRESH_TOKEN_FAMILY.LAST_USED_AT).toInstant(),
                 row.get(IDENTITY_REFRESH_TOKEN_FAMILY.ABSOLUTE_EXPIRES_AT).toInstant(),
                 row.get(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT) == null ? null
-                        : row.get(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT).toInstant());
+                        : row.get(IDENTITY_REFRESH_TOKEN_FAMILY.REVOKED_AT).toInstant(),
+                new UserAgentFingerprint(
+                        row.get(IDENTITY_REFRESH_TOKEN_FAMILY.USER_AGENT_FINGERPRINT)),
+                row.get(IDENTITY_REFRESH_TOKEN_FAMILY.IP_FIRST_SEEN));
     }
 
     @Override

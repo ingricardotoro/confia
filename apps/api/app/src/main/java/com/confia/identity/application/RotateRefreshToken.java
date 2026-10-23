@@ -17,6 +17,7 @@ import com.confia.shared.audit.AuditEntry;
 import com.confia.shared.audit.AuditJson;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionService;
+import com.confia.shared.security.ClientAddress;
 import com.confia.shared.security.SecurityContext;
 import com.confia.shared.security.TransactionRunner;
 import com.confia.shared.security.token.AccessToken;
@@ -62,6 +63,13 @@ import java.util.UUID;
  * never handed out. A confirmed reuse revokes the family, empties its encrypted successors and is
  * audited in that same transaction; it notifies nobody (the notice to the holder is change 14's).
  *
+ * <p><b>The binding of the session</b> (session-endpoints-cookie-and-csrf design.md decision 14). A
+ * presentation that would hand credentials out, or answer on the expiry of the token itself, is
+ * rejected and the family revoked with {@code binding_changed} when both the agent and the address
+ * differ from the ones recorded when the family was created; only one differing, or an unknown side,
+ * is not a change. A consumed token that cannot be replayed is still a reuse. The entry says only
+ * that the family was revoked: it holds neither a fingerprint nor an address.
+ *
  * <p><b>The grace window</b> (decision 11, D-N1). A normal rotation stores the successor encrypted
  * with {@link ColumnEncryptionService}, bound to the row of the token it consumes (the additional
  * authenticated data names that row, so a ciphertext copied to another row does not authenticate). A
@@ -75,6 +83,8 @@ public final class RotateRefreshToken {
     private static final String ACTION_REFRESHED = "identity.session.refreshed";
     private static final String ACTION_REJECTED = "identity.session.refresh_rejected";
     private static final String ACTION_REUSE_DETECTED = "identity.session.reuse_detected";
+    private static final String ACTION_BINDING_CHANGED = "identity.session.binding_changed";
+    private static final String SYSTEM_ACTOR_KIND = "system";
     private static final String FAMILY_ENTITY_TYPE = "identity.refresh_token_family";
     /** The table and column of the encrypted successor: the first two parts of its additional authenticated data. */
     private static final String SUCCESSOR_TABLE = "identity_refresh_token";
@@ -116,6 +126,21 @@ public final class RotateRefreshToken {
         this.lifetimes = new SessionLifetimePolicy();
     }
 
+    /**
+     * Rotates a token presented by a client that is not authenticated: the institution is the
+     * configured one and the context is built here, with the identifier of the request of the command
+     * (a blank one gets a fresh identifier). The guard of {@link #execute(SecurityContext,
+     * RotateRefreshTokenCommand)} stays in force.
+     */
+    public RefreshOutcome execute(RotateRefreshTokenCommand command) {
+        Objects.requireNonNull(command, "command");
+        String requestId = command.requestId().isBlank() ? UUID.randomUUID().toString()
+                : command.requestId();
+        SecurityContext context = new SecurityContext("", SYSTEM_ACTOR_KIND,
+                institutionProvider.loginInstitutionId().value().toString(), requestId);
+        return execute(context, command);
+    }
+
     public RefreshOutcome execute(SecurityContext context, RotateRefreshTokenCommand command) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(command, "command");
@@ -139,7 +164,8 @@ public final class RotateRefreshToken {
                         IssueSession.methodsOf(rotated.secondFactorVerified()));
                 yield new RefreshOutcome.Rotated(new IssuedSession(rotated.familyId(),
                         rotated.refreshToken(), rotated.refreshExpiresAt(), access,
-                        access.expiresAt()), rotated.kind());
+                        access.expiresAt()), rotated.kind(), rotated.sessionExpiresAt(),
+                        rotated.idleExpiresAt());
             }
         };
     }
@@ -176,7 +202,8 @@ public final class RotateRefreshToken {
 
         // 6. The decision is a pure function.
         UserAgentFingerprint presenter = UserAgentFingerprint.of(command.userAgent());
-        RotationDecision decision = RotationDecision.decide(family, token, presenter, now, lifetimes);
+        RotationDecision decision = RotationDecision.decide(family, token, presenter,
+                addressChanged(family, command.clientAddress()), now, lifetimes);
 
         // 7. Carry it out and audit it, in the same transaction.
         return switch (decision) {
@@ -188,6 +215,8 @@ public final class RotateRefreshToken {
             case REJECT_FAMILY_REVOKED, REJECT_TOKEN_EXPIRED ->
                     rejection(institutionId, auditRequestId, family, decision);
             case REUSE_DETECTED -> revokeForReuse(institutionId, auditRequestId, family, now);
+            case REJECT_BINDING_CHANGED ->
+                    revokeForBinding(institutionId, auditRequestId, family, now);
             case GRACE_REPLAY -> graceReplay(institutionId, auditRequestId, family, token, now);
         };
     }
@@ -215,7 +244,8 @@ public final class RotateRefreshToken {
         auditLogWriter.append(entry(institutionId, auditRequestId, family, ACTION_REFRESHED,
                 OUTCOME_SUCCESS, AFTER_FRESH));
         return new Attempt.Rotated(family.id(), family.accountId(), family.secondFactorVerified(),
-                successor, expiresAt, RotationKind.FRESH);
+                successor, expiresAt, RotationKind.FRESH, family.absoluteExpiresAt(),
+                lifetimes.idleExpiresAt(now));
     }
 
     /**
@@ -236,7 +266,8 @@ public final class RotateRefreshToken {
         auditLogWriter.append(entry(institutionId, auditRequestId, family, ACTION_REFRESHED,
                 OUTCOME_SUCCESS, AFTER_GRACE));
         return new Attempt.Rotated(family.id(), family.accountId(), family.secondFactorVerified(),
-                successor, stored.expiresAt(), RotationKind.GRACE);
+                successor, stored.expiresAt(), RotationKind.GRACE, family.absoluteExpiresAt(),
+                lifetimes.idleExpiresAt(now));
     }
 
     /**
@@ -277,6 +308,44 @@ public final class RotateRefreshToken {
         return new Attempt.Rejected(RefreshRejection.REUSE_DETECTED);
     }
 
+    /**
+     * The agent and the address both changed since the family was created: the family is revoked with
+     * {@code binding_changed}, the encrypted successors of its tokens are emptied and the entry is
+     * written, all in the transaction the caller opened, so the revocation survives the rejection.
+     * The entry says only that the family was revoked: neither the fingerprint nor the address, of the
+     * family or of the presenter, is written. The family is live under its own lock, so the
+     * conditional update cannot miss.
+     */
+    private Attempt revokeForBinding(InstitutionId institutionId, UUID auditRequestId,
+            RefreshTokenFamilyState family, Instant now) {
+        if (!families.revoke(institutionId, family.id(), SessionRevocationReason.BINDING_CHANGED,
+                now)) {
+            throw new IllegalStateException("a family that is live under its own lock could not "
+                    + "be revoked");
+        }
+        tokens.clearSuccessors(institutionId, family.id());
+        auditLogWriter.append(entry(institutionId, auditRequestId, family, ACTION_BINDING_CHANGED,
+                OUTCOME_DENIED, AFTER_FAMILY_REVOKED));
+        return new Attempt.Rejected(RefreshRejection.BINDING_CHANGED);
+    }
+
+    /**
+     * Whether the address of the presenter differs from the one the family was opened from, compared
+     * as addresses (a compressed IPv6 address and the same one expanded are equal). When either is
+     * unknown, or the stored text is not an address literal, it cannot be said to have changed: the
+     * rule needs both the agent and the address to change.
+     */
+    private static boolean addressChanged(RefreshTokenFamilyState family, ClientAddress presenter) {
+        if (presenter == null || family.ipFirstSeen() == null) {
+            return false;
+        }
+        try {
+            return !ClientAddress.parseLiteral(family.ipFirstSeen()).equals(presenter);
+        } catch (IllegalArgumentException notAnAddress) {
+            return false;
+        }
+    }
+
     private Attempt rejection(InstitutionId institutionId, UUID auditRequestId,
             RefreshTokenFamilyState family, RotationDecision decision) {
         RefreshRejection reason = decision.rejection().orElseThrow();
@@ -314,7 +383,8 @@ public final class RotateRefreshToken {
         }
 
         record Rotated(UUID familyId, StaffAccountId accountId, boolean secondFactorVerified,
-                PlainRefreshToken refreshToken, Instant refreshExpiresAt, RotationKind kind)
+                PlainRefreshToken refreshToken, Instant refreshExpiresAt, RotationKind kind,
+                Instant sessionExpiresAt, Instant idleExpiresAt)
                 implements Attempt {
         }
     }

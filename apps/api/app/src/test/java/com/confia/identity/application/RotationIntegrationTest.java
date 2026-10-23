@@ -85,16 +85,25 @@ abstract class RotationIntegrationTest extends SessionIssuanceIntegrationTest {
     /** A family of {@code account}, with the window and the revocation the scenario names. */
     UUID seedFamily(StaffAccountId account, boolean secondFactor, String createdAt,
             String lastUsedAt, String absoluteEnd, String revokedAt, String revokedReason) {
+        return seedFamilyFrom(account, secondFactor, createdAt, lastUsedAt, absoluteEnd, revokedAt,
+                revokedReason, null);
+    }
+
+    /** As above, opened from {@code ipFirstSeen} (an address literal) by {@link #AGENT_ONE}, or from no address. */
+    UUID seedFamilyFrom(StaffAccountId account, boolean secondFactor, String createdAt,
+            String lastUsedAt, String absoluteEnd, String revokedAt, String revokedReason,
+            String ipFirstSeen) {
         UUID familyId = UUID.randomUUID();
         transactionRunner().execute(context(), () -> dsl.execute("""
                 insert into identity_refresh_token_family
                     (institution_id, id, account_id, second_factor_verified, user_agent_fingerprint,
-                     created_at, last_used_at, absolute_expires_at, revoked_at, revoked_reason)
-                values (?, ?, ?, ?, ?, cast(? as timestamptz), cast(? as timestamptz),
-                        cast(? as timestamptz), cast(? as timestamptz), ?)
+                     ip_first_seen, created_at, last_used_at, absolute_expires_at, revoked_at,
+                     revoked_reason)
+                values (?, ?, ?, ?, ?, cast(? as inet), cast(? as timestamptz),
+                        cast(? as timestamptz), cast(? as timestamptz), cast(? as timestamptz), ?)
                 """, institutionId.value(), familyId, account.value(), secondFactor,
-                UserAgentFingerprint.of(AGENT_ONE).value(), createdAt, lastUsedAt, absoluteEnd,
-                revokedAt, revokedReason));
+                UserAgentFingerprint.of(AGENT_ONE).value(), ipFirstSeen, createdAt, lastUsedAt,
+                absoluteEnd, revokedAt, revokedReason));
         return familyId;
     }
 

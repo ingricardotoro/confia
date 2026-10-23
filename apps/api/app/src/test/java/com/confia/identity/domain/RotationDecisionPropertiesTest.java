@@ -38,7 +38,7 @@ class RotationDecisionPropertiesTest {
             @ForAll boolean successorConsumed) {
         RefreshTokenState token = consumed(sameDevice ? ONE : TWO, ciphertext, successorConsumed);
 
-        RotationDecision decision = RotationDecision.decide(LIVE, token, ONE,
+        RotationDecision decision = RotationDecision.decide(LIVE, token, ONE, false,
                 CONSUMED_AT.plusMillis(millisAfter), POLICY);
 
         assertThat(decision).isNotEqualTo(RotationDecision.GRACE_REPLAY);
@@ -53,7 +53,7 @@ class RotationDecisionPropertiesTest {
         RefreshTokenState token = consumed(sameDevice ? ONE : TWO, ciphertext, successorConsumed);
         boolean expected = millisAfter < 10_000 && sameDevice && ciphertext && !successorConsumed;
 
-        RotationDecision decision = RotationDecision.decide(LIVE, token, ONE,
+        RotationDecision decision = RotationDecision.decide(LIVE, token, ONE, false,
                 CONSUMED_AT.plusMillis(millisAfter), POLICY);
 
         Statistics.collect(expected ? "grace" : "reuse");
@@ -69,8 +69,9 @@ class RotationDecisionPropertiesTest {
                 true, CONSUMED_AT, CONSUMED_AT.plus(Duration.ofHours(12)),
                 CONSUMED_AT.plusSeconds(1));
 
-        assertThat(RotationDecision.decide(revoked, token, ONE, CONSUMED_AT.plusMillis(millisAfter),
-                POLICY)).isEqualTo(RotationDecision.REJECT_FAMILY_REVOKED);
+        assertThat(RotationDecision.decide(revoked, token, ONE, false,
+                CONSUMED_AT.plusMillis(millisAfter), POLICY))
+                .isEqualTo(RotationDecision.REJECT_FAMILY_REVOKED);
     }
 
     @Provide

@@ -17,6 +17,7 @@ import com.confia.identity.application.PasswordHasher;
 import com.confia.identity.application.PasswordResetTokenRepository;
 import com.confia.identity.application.RecoveryCodeHasher;
 import com.confia.identity.application.RecoveryCodeRepository;
+import com.confia.identity.application.RefreshSession;
 import com.confia.identity.application.RefreshTokenFamilyRepository;
 import com.confia.identity.application.RefreshTokenRepository;
 import com.confia.identity.application.ResetPasswordWithToken;
@@ -196,6 +197,11 @@ public class IdentityConfiguration {
             AccessTokenIssuer accessTokens, AuditLogWriter auditLogWriter, Clock clock) {
         return new RotateRefreshToken(runner, institutionProvider, families, tokens, encryption,
                 accessTokens, auditLogWriter, clock, new SecureRandom());
+    }
+
+    @Bean
+    RefreshSession refreshSession(RotateRefreshToken rotation) {
+        return new RefreshSession(rotation);
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.confia.identity.application;
 
 import com.confia.identity.domain.RefreshRejection;
+import java.time.Instant;
 import java.util.Objects;
 
 /**
@@ -18,12 +19,20 @@ public sealed interface RefreshOutcome {
         GRACE
     }
 
-    /** The token rotated; the session carries the successor token and a new access token. */
-    record Rotated(IssuedSession session, RotationKind kind) implements RefreshOutcome {
+    /**
+     * The token rotated; the session carries the successor token and a new access token.
+     *
+     * @param sessionExpiresAt the absolute end of the family, whatever its use
+     * @param idleExpiresAt when the family becomes idle if it is not used again
+     */
+    record Rotated(IssuedSession session, RotationKind kind, Instant sessionExpiresAt,
+            Instant idleExpiresAt) implements RefreshOutcome {
 
         public Rotated {
             Objects.requireNonNull(session, "session");
             Objects.requireNonNull(kind, "kind");
+            Objects.requireNonNull(sessionExpiresAt, "sessionExpiresAt");
+            Objects.requireNonNull(idleExpiresAt, "idleExpiresAt");
         }
     }
 

@@ -8,8 +8,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * The whole table of {@link RotationDecision} (session-tokens-and-web-layer design.md decision 10;
- * scenarios I91, I109 to I112, I142 and I145): the six decisions, the fixed order they are evaluated
+ * The whole table of {@link RotationDecision} (session-tokens-and-web-layer design.md decision 10 and
+ * session-endpoints-cookie-and-csrf design.md decision 14, which adds the binding; scenarios I91, I109
+ * to I112, I142, I145, I190 to I192 and I225): the seven decisions, the fixed order they are evaluated
  * in, and the exact instant at which each border flips. The decision is a pure function, so every
  * instant is given and nothing here reads a clock.
  */
@@ -22,7 +23,7 @@ class RotationDecisionTest {
     private static final UserAgentFingerprint TWO = UserAgentFingerprint.of("agente-dos");
     private static final SessionLifetimePolicy POLICY = new SessionLifetimePolicy();
 
-    // --- Order 6: a fresh rotation -----------------------------------------------------------
+    // --- Order 7: a fresh rotation -----------------------------------------------------------
 
     @Test
     void anOpenTokenOfALiveFamilyRotates() {
@@ -37,7 +38,7 @@ class RotationDecisionTest {
                 .isEqualTo(RotationDecision.ROTATE);
     }
 
-    // --- Order 5: the token's own expiry (8 hours, clipped to the family) --------------------
+    // --- Order 6: the token's own expiry (8 hours, clipped to the family) --------------------
 
     @Test
     void aTokenIsAcceptedUntilEightHoursAfterItsIssuanceAndRejectedAtThatInstant() {
@@ -114,7 +115,7 @@ class RotationDecisionTest {
                 .isEqualTo(RotationDecision.REJECT_FAMILY_REVOKED);
     }
 
-    // --- Orders 3 and 4: a consumed token, grace or reuse ------------------------------------
+    // --- Orders 3 and 5: a consumed token, reuse or grace ------------------------------------
 
     @Test
     void aRetryFromTheSameDeviceInsideTenSecondsReplaysTheGrace() {
@@ -168,7 +169,77 @@ class RotationDecisionTest {
                 .isEqualTo(RotationDecision.REUSE_DETECTED);
     }
 
+    // --- Order 4: the binding of the session (agent and address both changed) ----------------
+
+    @Test
+    void anAgentAndAnAddressThatBothChangedRejectAnOpenToken() {
+        // Scenario I190.
+        assertThat(decideFromAnotherAddress(live(EIGHT), open(EIGHT), TWO, "2026-10-12T08:15:00Z"))
+                .isEqualTo(RotationDecision.REJECT_BINDING_CHANGED);
+    }
+
+    @Test
+    void onlyOneOfTheTwoChangingStillRotates() {
+        // Scenarios I121 and I191.
+        assertThat(decide(live(EIGHT), open(EIGHT), TWO, "2026-10-12T08:15:00Z"))
+                .as("only the agent changed").isEqualTo(RotationDecision.ROTATE);
+        assertThat(decideFromAnotherAddress(live(EIGHT), open(EIGHT), ONE, "2026-10-12T08:15:00Z"))
+                .as("only the address changed").isEqualTo(RotationDecision.ROTATE);
+    }
+
+    @Test
+    void aFamilyOpenedWithoutAnAgentHasNoAgentToCompareAgainst() {
+        // Scenario I192: the stored fingerprint is that of no text, so it is not a binding.
+        assertThat(decideFromAnotherAddress(liveWithoutOrigin(EIGHT), open(EIGHT), TWO,
+                "2026-10-12T08:15:00Z")).isEqualTo(RotationDecision.ROTATE);
+    }
+
+    @Test
+    void aPresenterWithoutAnAgentDiffersFromAnAgentThatWasRecorded() {
+        assertThat(decideFromAnotherAddress(live(EIGHT), open(EIGHT), UserAgentFingerprint.of(null),
+                "2026-10-12T08:15:00Z")).isEqualTo(RotationDecision.REJECT_BINDING_CHANGED);
+    }
+
+    @Test
+    void theBindingIsEvaluatedAfterTheStateOfTheFamilyAndAfterReuse() {
+        // Scenario I225: reuse before binding, and the state of the family before both.
+        RefreshTokenState consumedOutsideGrace = consumed(EIGHT, ONE, true, false);
+        assertThat(decideFromAnotherAddress(live(EIGHT), consumedOutsideGrace, TWO,
+                "2026-10-12T08:00:30Z")).isEqualTo(RotationDecision.REUSE_DETECTED);
+
+        RefreshTokenFamilyState revoked = new RefreshTokenFamilyState(UUID.randomUUID(), ACCOUNT,
+                false, EIGHT, ABSOLUTE_END, Instant.parse("2026-10-12T08:05:00Z"), ONE,
+                "203.0.113.9");
+        assertThat(decideFromAnotherAddress(revoked, open(EIGHT), TWO, "2026-10-12T08:10:00Z"))
+                .isEqualTo(RotationDecision.REJECT_FAMILY_REVOKED);
+        assertThat(decideFromAnotherAddress(live(EIGHT), open(EIGHT), TWO, "2026-10-12T08:30:00Z"))
+                .isEqualTo(RotationDecision.REJECT_FAMILY_EXPIRED);
+    }
+
+    @Test
+    void theBindingIsEvaluatedBeforeTheGraceAndBeforeTheExpiryOfTheToken() {
+        // Scenario I225: a token that would be replayed, or that only expired, is a change of binding.
+        RefreshTokenState replayable = consumed(EIGHT, TWO, true, false);
+        assertThat(decide(live(EIGHT), replayable, TWO, "2026-10-12T08:00:03Z"))
+                .as("without the change of address it is a grace replay")
+                .isEqualTo(RotationDecision.GRACE_REPLAY);
+        assertThat(decideFromAnotherAddress(live(EIGHT), replayable, TWO, "2026-10-12T08:00:03Z"))
+                .isEqualTo(RotationDecision.REJECT_BINDING_CHANGED);
+
+        RefreshTokenFamilyState family = live(Instant.parse("2026-10-12T15:59:30Z"));
+        assertThat(decideFromAnotherAddress(family, open(EIGHT), TWO, "2026-10-12T16:00:00Z"))
+                .as("the token expired at 16:00 and the binding changed")
+                .isEqualTo(RotationDecision.REJECT_BINDING_CHANGED);
+    }
+
     // --- What each decision becomes for the caller -------------------------------------------
+
+    @Test
+    void aChangedBindingIsReportedAsBindingChanged() {
+        assertThat(RotationDecision.REJECT_BINDING_CHANGED.rejection())
+                .contains(RefreshRejection.BINDING_CHANGED);
+        assertThat(RefreshRejection.BINDING_CHANGED.auditCode()).isEqualTo("binding_changed");
+    }
 
     @Test
     void everyRejectionNamesItsReasonAndThePassingDecisionsNameNone() {
@@ -193,13 +264,25 @@ class RotationDecisionTest {
 
     private static RotationDecision decide(RefreshTokenFamilyState family, RefreshTokenState token,
             UserAgentFingerprint presenter, Instant now) {
-        return RotationDecision.decide(family, token, presenter, now, POLICY);
+        return RotationDecision.decide(family, token, presenter, false, now, POLICY);
     }
 
-    /** A live family that ends at 20:00 and was last used at {@code lastUsedAt}. */
+    /** The address of the presenter differs from the one the family was opened from. */
+    private static RotationDecision decideFromAnotherAddress(RefreshTokenFamilyState family,
+            RefreshTokenState token, UserAgentFingerprint presenter, String now) {
+        return RotationDecision.decide(family, token, presenter, true, Instant.parse(now), POLICY);
+    }
+
+    /** A live family opened by agent one from an address, that ends at 20:00. */
     private static RefreshTokenFamilyState live(Instant lastUsedAt) {
         return new RefreshTokenFamilyState(UUID.randomUUID(), ACCOUNT, false, lastUsedAt,
-                ABSOLUTE_END, null);
+                ABSOLUTE_END, null, ONE, "203.0.113.9");
+    }
+
+    /** A live family opened with no agent and no address, as an issuance without a request leaves it. */
+    private static RefreshTokenFamilyState liveWithoutOrigin(Instant lastUsedAt) {
+        return new RefreshTokenFamilyState(UUID.randomUUID(), ACCOUNT, false, lastUsedAt,
+                ABSOLUTE_END, null, UserAgentFingerprint.of(null), null);
     }
 
     /** An unconsumed token issued at {@code issuedAt}, with the 8 hours of the policy. */

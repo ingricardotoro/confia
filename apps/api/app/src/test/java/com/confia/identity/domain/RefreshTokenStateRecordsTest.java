@@ -77,7 +77,7 @@ class RefreshTokenStateRecordsTest {
     void aRejectionSpeaksTheClosedVocabularyOfTheAuditEntry() {
         assertThat(RefreshRejection.values()).extracting(RefreshRejection::auditCode)
                 .containsExactly("unknown_token", "family_revoked", "family_expired",
-                        "token_expired", "reuse_detected");
+                        "token_expired", "reuse_detected", "binding_changed");
     }
 
     @Test
@@ -86,5 +86,28 @@ class RefreshTokenStateRecordsTest {
                 ISSUED, EXPIRES, ISSUED.plusSeconds(5), FINGERPRINT, true, false);
 
         assertThat(state.toString()).doesNotContain(FINGERPRINT.value());
+    }
+
+    @Test
+    void aFamilyStateKeepsItsOriginAndPrintsNeitherTheAddressNorTheFingerprint() {
+        RefreshTokenFamilyState state = new RefreshTokenFamilyState(UUID.randomUUID(), ACCOUNT,
+                false, ISSUED, EXPIRES, null, FINGERPRINT, "203.0.113.9");
+
+        assertThat(state.creationFingerprint()).isEqualTo(FINGERPRINT);
+        assertThat(state.ipFirstSeen()).isEqualTo("203.0.113.9");
+        assertThat(state.toString()).contains(state.id().toString())
+                .doesNotContain("203.0.113.9").doesNotContain(FINGERPRINT.value());
+    }
+
+    @Test
+    void aFamilyStateBuiltWithoutAnOriginRecordsNoAgentAndNoAddress() {
+        RefreshTokenFamilyState state = new RefreshTokenFamilyState(UUID.randomUUID(), ACCOUNT,
+                false, ISSUED, EXPIRES, null);
+
+        assertThat(state.creationFingerprint()).isEqualTo(UserAgentFingerprint.of(null))
+                .isEqualTo(UserAgentFingerprint.NO_AGENT);
+        assertThat(state.ipFirstSeen()).isNull();
+        assertThatThrownBy(() -> new RefreshTokenFamilyState(UUID.randomUUID(), ACCOUNT, false,
+                ISSUED, EXPIRES, null, null, null)).isInstanceOf(NullPointerException.class);
     }
 }
