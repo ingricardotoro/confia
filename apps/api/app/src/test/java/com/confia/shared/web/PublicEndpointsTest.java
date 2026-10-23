@@ -26,6 +26,9 @@ class PublicEndpointsTest {
     /** The one public route of production in the administrative process: the login (H1). */
     private static final PublicEndpoint LOGIN = new PublicEndpoint(HttpMethod.POST,
             "/api/v1/auth/sessions");
+    /** The refresh, public to the chain and protected by the CSRF filter and its limiter. */
+    private static final PublicEndpoint REFRESH = new PublicEndpoint(HttpMethod.POST,
+            "/api/v1/auth/sessions/refresh");
 
     private static MockEnvironment springdoc(boolean apiDocs, boolean swaggerUi) {
         return new MockEnvironment()
@@ -34,30 +37,30 @@ class PublicEndpointsTest {
     }
 
     @Test
-    void withNothingConfiguredTheAdministrativeAllowListHoldsOnlyTheLoginAndThePortalOneIsEmpty() {
-        assertThat(PublicEndpoints.forAdmin(new MockEnvironment()).endpoints()).containsExactly(LOGIN);
+    void withNothingConfiguredTheAdministrativeAllowListHoldsOnlyTheLoginAndTheRefreshAndThePortalOneIsEmpty() {
+        assertThat(PublicEndpoints.forAdmin(new MockEnvironment()).endpoints()).containsExactly(LOGIN, REFRESH);
         assertThat(PublicEndpoints.forPortal(new MockEnvironment()).endpoints()).isEmpty();
     }
 
     @Test
-    void withSpringdocOffTheAdministrativeAllowListHoldsOnlyTheLogin() {
+    void withSpringdocOffTheAdministrativeAllowListHoldsOnlyTheLoginAndTheRefresh() {
         assertThat(PublicEndpoints.forAdmin(springdoc(false, false)).endpoints())
-                .containsExactly(LOGIN);
+                .containsExactly(LOGIN, REFRESH);
     }
 
     @Test
     void withBothSpringdocSwitchesOnTheAllowListHoldsTheFourDocumentationEntriesAndTheLogin() {
         assertThat(PublicEndpoints.forAdmin(springdoc(true, true)).endpoints())
                 .containsExactlyInAnyOrder(API_DOCS, SWAGGER_CONFIG, SWAGGER_PAGE,
-                        SWAGGER_ASSETS, LOGIN);
+                        SWAGGER_ASSETS, LOGIN, REFRESH);
     }
 
     @Test
     void eachSwitchOpensOnlyItsOwnEntries() {
         assertThat(PublicEndpoints.forAdmin(springdoc(true, false)).endpoints())
-                .containsExactlyInAnyOrder(API_DOCS, SWAGGER_CONFIG, LOGIN);
+                .containsExactlyInAnyOrder(API_DOCS, SWAGGER_CONFIG, LOGIN, REFRESH);
         assertThat(PublicEndpoints.forAdmin(springdoc(false, true)).endpoints())
-                .containsExactlyInAnyOrder(SWAGGER_PAGE, SWAGGER_ASSETS, LOGIN);
+                .containsExactlyInAnyOrder(SWAGGER_PAGE, SWAGGER_ASSETS, LOGIN, REFRESH);
     }
 
     @Test
@@ -65,7 +68,7 @@ class PublicEndpointsTest {
         MockEnvironment local = springdoc(true, true);
         assertThat(PublicEndpoints.forPortal(local).endpoints())
                 .containsExactlyInAnyOrderElementsOf(PublicEndpoints.forAdmin(local).endpoints().stream()
-                        .filter(entry -> !entry.equals(LOGIN)).toList());
+                        .filter(entry -> !entry.equals(LOGIN) && !entry.equals(REFRESH)).toList());
         assertThat(PublicEndpoints.forPortal(springdoc(false, false)).endpoints()).isEmpty();
     }
 
@@ -73,7 +76,7 @@ class PublicEndpointsTest {
     void everyDocumentationEntryIsGetOnlyAndTheLoginIsTheOnlyPost() {
         assertThat(PublicEndpoints.forAdmin(springdoc(true, true)).endpoints())
                 .isNotEmpty()
-                .filteredOn(entry -> !entry.equals(LOGIN))
+                .filteredOn(entry -> !entry.equals(LOGIN) && !entry.equals(REFRESH))
                 .isNotEmpty()
                 .allSatisfy(entry -> assertThat(entry.method()).isEqualTo(HttpMethod.GET));
         assertThat(PublicEndpoints.forPortal(springdoc(true, true)).endpoints())

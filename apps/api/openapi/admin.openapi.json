@@ -626,6 +626,115 @@
         "summary" : "Reads the session of the bearer token",
         "tags" : [ "auth-sessions" ]
       }
+    },
+    "/api/v1/auth/sessions/refresh" : {
+      "post" : {
+        "description" : "Reads the refresh token only from the session cookie. With the cookie it needs the CSRF cookie repeated in the X-CSRF-Token header; without it, only an allowed Origin. Answers with a new access token and writes both cookies again, or, for any token that is not accepted, with session-expired and the deletion of both cookies, without saying why.",
+        "operationId" : "refreshSession",
+        "parameters" : [ {
+          "description" : "The session cookie: the refresh token",
+          "in" : "cookie",
+          "name" : "__Secure-confia_admin_sid",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "The value of the CSRF cookie, required with the session cookie",
+          "in" : "header",
+          "name" : "X-CSRF-Token",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthenticatedSessionResponse"
+                }
+              }
+            },
+            "description" : "The session was refreshed",
+            "headers" : {
+              "Set-Cookie" : {
+                "description" : "The session cookie and the CSRF cookie, two headers",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The refresh token was not accepted (session-expired), whatever the reason; both cookies are deleted",
+            "headers" : {
+              "Set-Cookie" : {
+                "description" : "The deletion of the session cookie and the CSRF cookie",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              },
+              "WWW-Authenticate" : {
+                "description" : "The Bearer challenge",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The Origin is missing or not allowed, or the CSRF token does not match the session cookie (csrf-invalid)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No capacity to count the client (capacity-exceeded)"
+          }
+        },
+        "summary" : "Rotates the refresh token of the session cookie",
+        "tags" : [ "auth-sessions" ]
+      }
     }
   }
 }

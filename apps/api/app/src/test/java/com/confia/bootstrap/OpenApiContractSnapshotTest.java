@@ -214,13 +214,22 @@ class OpenApiContractSnapshotTest {
 
     private static final String SESSION_PATH = "/api/v1/auth/sessions/current";
     private static final String LOGIN_PATH = "/api/v1/auth/sessions";
+    private static final String REFRESH_PATH = "/api/v1/auth/sessions/refresh";
 
     @Test
     void theAdministrativeDocumentHoldsExactlyTheLoginTheCurrentSessionAndTheSecondFactorOperations() {
         Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
 
         assertThat(pathsOf(admin)).containsExactlyInAnyOrder(LOGIN_PATH, SESSION_PATH,
-                "/api/v1/auth/mfa/verifications", "/api/v1/auth/mfa/enrollments");
+                "/api/v1/auth/mfa/verifications", "/api/v1/auth/mfa/enrollments", REFRESH_PATH);
+        Map<String, Object> refresh = asMap(asMap(asMap(admin.get("paths")).get(REFRESH_PATH))
+                .get("post"));
+        assertThat(asMap(refresh.get("responses"))).containsOnlyKeys("200", "401", "403", "429", "503");
+        assertThat(asList(refresh.get("parameters"))).as("the session cookie and the CSRF header")
+                .extracting(parameter -> asMap(parameter).get("name"))
+                .containsExactlyInAnyOrder("__Secure-confia_admin_sid", "X-CSRF-Token");
+        assertThat(refresh).as("the credential is the cookie, not a bearer token")
+                .doesNotContainKey("security");
         for (String route : List.of("/api/v1/auth/mfa/verifications", "/api/v1/auth/mfa/enrollments")) {
             Map<String, Object> post = asMap(asMap(asMap(admin.get("paths")).get(route)).get("post"));
             assertThat(asList(post.get("security"))).as("a restricted token in the bearer header").hasSize(1);
