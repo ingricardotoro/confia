@@ -236,7 +236,20 @@ class OpenApiContractSnapshotTest {
             assertThat(asMap(post.get("responses"))).containsKeys("401", "403", "429");
         }
         Map<String, Object> path = asMap(asMap(admin.get("paths")).get(SESSION_PATH));
-        assertThat(path).as("one operation: GET, and no other method").containsOnlyKeys("get");
+        assertThat(path).as("the read and the closing of the current session, and no other method")
+                .containsOnlyKeys("get", "delete");
+        Map<String, Object> closing = asMap(path.get("delete"));
+        assertThat(asMap(closing.get("responses"))).containsOnlyKeys("204", "403", "429", "503");
+        assertThat(asList(closing.get("parameters")))
+                .extracting(parameter -> asMap(parameter).get("name"))
+                .containsExactlyInAnyOrder("__Secure-confia_admin_sid", "X-CSRF-Token");
+        assertThat(closing).as("the credential is the cookie").doesNotContainKey("security");
+        Map<String, Object> closingAll = asMap(asMap(asMap(admin.get("paths")).get(LOGIN_PATH))
+                .get("delete"));
+        assertThat(asMap(closingAll.get("responses")))
+                .containsOnlyKeys("204", "401", "403", "429", "503");
+        assertThat(asList(closingAll.get("security"))).as("a bearer token, and no CSRF token").hasSize(1);
+        assertThat(closingAll.get("parameters")).isNull();
         Map<String, Object> operation = asMap(path.get("get"));
         assertThat(asMap(operation.get("responses")))
                 .as("exactly the approved responses: no 403, no 429, nothing the translator adds")
@@ -299,7 +312,8 @@ class OpenApiContractSnapshotTest {
         Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
         Map<String, Object> path = asMap(asMap(admin.get("paths")).get(LOGIN_PATH));
 
-        assertThat(path).as("one operation: POST, and no other method").containsOnlyKeys("post");
+        assertThat(path).as("the login and the closing of every session, and no other method")
+                .containsOnlyKeys("post", "delete");
         Map<String, Object> operation = asMap(path.get("post"));
         assertThat(asMap(operation.get("responses")))
                 .as("exactly the approved responses: no 500, nothing the translator adds")

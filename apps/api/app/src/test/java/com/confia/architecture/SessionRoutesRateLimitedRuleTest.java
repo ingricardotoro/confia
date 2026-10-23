@@ -96,6 +96,23 @@ class SessionRoutesRateLimitedRuleTest {
                         method.getAnnotationOfType(RateLimited.class).policy())
                         .isEqualTo("admin-session"));
     }
+
+    @Test
+    void theRuleEvaluatesTheTwoClosingHandlersAndSixRealRoutesDeclareTheirPolicy() {
+        JavaClasses production = productionClasses();
+
+        assertThat(production.get("com.confia.identity.web.SessionEndController").getMethods().stream()
+                .filter(CHANGES_STATE)).extracting(JavaMethod::getName)
+                .containsExactlyInAnyOrder("endCurrent", "endAll");
+        production.get("com.confia.identity.web.SessionEndController").getMethods().stream()
+                .filter(CHANGES_STATE).forEach(method -> assertThat(
+                        method.getAnnotationOfType(RateLimited.class).policy())
+                        .isEqualTo("admin-session"));
+        // [BI46] the six routes: login, the two of the second factor, the refresh and the two closings.
+        assertThat(production.stream().filter(type -> type.getPackageName().endsWith("identity.web"))
+                .flatMap(type -> type.getMethods().stream()).filter(CHANGES_STATE).count())
+                .isEqualTo(6);
+    }
     @Test
     void theRuleRejectsAHandlerOfIdentityWebThatDeclaresNoPolicy() {
         assertRuleRejects(RULE, fixtureClasses(), "BadLoginHandlerWithoutPolicy.login");

@@ -514,3 +514,11 @@ Registra tres precisiones del cambio `session-endpoints-cookie-and-csrf` (decisi
 1. **Inscripción de dos momentos, sin migración.** Inscribir crea la credencial con el contador en `-1`; la primera verificación con un código TOTP la activa. Mientras no se verifica, inscribir de nuevo reemplaza el secreto e inutiliza los códigos de recuperación previos. Con la credencial verificada se responde `mfa-already-enrolled`.
 2. **«MFA activa» es secreto verificado.** El inicio de sesión y el restablecimiento de contraseña tratan una credencial nunca verificada como la ausencia de secreto.
 3. **Ventana de la primera inscripción (DA-15).** Hasta la primera verificación, quien conozca la contraseña puede reemplazar el secreto. El riesgo está aceptado, cada reinscripción queda auditada y se revisa en el cambio 8. La primera verificación revoca las demás familias de la cuenta con el motivo `mfa_change`.
+
+### Nota fechada 2026-10-23: cookie de sesión, vinculación y motivos nuevos de revocación
+
+Registra tres precisiones del cambio `session-endpoints-cookie-and-csrf` (decisiones 5, 14 y 15 de su diseño, DA-8 *b*).
+
+1. **Cookie y CSRF.** El refresco viaja solo en la cookie `__Secure-confia_admin_sid`, con el token CSRF ligado por HMAC al refresco en `__Host-confia_csrf`. Cada rotación, también la de la gracia, reemite las dos con el CSRF calculado para el refresco que se entrega. Todo rechazo del refresco es un único `401 session-expired` que borra las dos cookies.
+2. **Vinculación (DA-8 *b*).** La huella del agente y la IP de la primera vez se comparan al refrescar. Si ambas cambian, la familia se revoca con el motivo `binding_changed` y el refresco se rechaza; si cambia solo una, o falta el registro de alguna, rota. Un token ya consumido y no apto para la gracia sigue siendo `reuse_detected`: la vinculación solo decide cuando el token entregaría credenciales o respondería por su propio vencimiento.
+3. **Motivos de revocación.** El catálogo cerrado tiene cinco motivos, cada uno con su productor: `reuse_detected` (reutilización), `password_change` (restablecimiento), `logout` (cierre de la sesión actual y de todas), `mfa_change` (primera verificación de una credencial TOTP) y `binding_changed` (vinculación). `admin_revoke` no existe.
