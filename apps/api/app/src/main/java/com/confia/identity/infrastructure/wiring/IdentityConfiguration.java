@@ -8,6 +8,7 @@ import com.confia.identity.application.EndAllSessions;
 import com.confia.identity.application.EndCurrentSession;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.IssueSession;
+import com.confia.identity.application.LogIn;
 import com.confia.identity.application.LoginBackoffStore;
 import com.confia.identity.application.LoginIdentifierFingerprinter;
 import com.confia.identity.application.LoginInstitutionProvider;
@@ -30,6 +31,7 @@ import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
 import com.confia.identity.infrastructure.BouncyCastleRecoveryCodeHasher;
 import com.confia.identity.infrastructure.ConfiguredLoginInstitutionProvider;
 import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
+import com.confia.identity.infrastructure.InMemoryLoginFailureSpread;
 import com.confia.identity.infrastructure.JooqAccountSessionRevoker;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqPasswordResetTokenRepository;
@@ -41,6 +43,7 @@ import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.identity.infrastructure.JooqTotpVerificationBackoffStore;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionService;
+import com.confia.shared.observability.events.SecurityEventLog;
 import com.confia.shared.security.TransactionRunner;
 import com.confia.shared.security.token.AccessTokenIssuer;
 import java.security.SecureRandom;
@@ -86,6 +89,13 @@ public class IdentityConfiguration {
     /** The property the login institution id is read from (environment variable {@code
      * CONFIA_IDENTITY_LOGININSTITUTIONID}). */
     static final String INSTITUTION_PROPERTY = "confia.identity.login-institution-id";
+
+    /** The property that bounds the client keys the failure-spread signal tracks. */
+    static final String FAILURE_SPREAD_MAX_CLIENTS_PROPERTY =
+            "confia.identity.failure-spread.max-clients";
+
+    /** The bound used when the property is not set: one window per address, a few bytes each. */
+    static final int DEFAULT_FAILURE_SPREAD_MAX_CLIENTS = 10_000;
 
     @Bean
     Argon2Pepper argon2Pepper(Environment environment) {
@@ -235,6 +245,31 @@ public class IdentityConfiguration {
             AuditLogWriter auditLogWriter, Clock clock) {
         return new AuthenticateWithPassword(runner, institutionProvider, accounts, totpCredentials,
                 backoffStore, passwordHasher, fingerprinter, auditLogWriter, clock);
+    }
+
+    /**
+     * The signal of five distinct identifiers failing from one address (session-endpoints-cookie-and-csrf
+     * design.md decision 12). In memory and bounded; the bound is read with a default so a process
+     * needs no property for it.
+     */
+    @Bean
+    InMemoryLoginFailureSpread loginFailureSpread(Environment environment) {
+        return new InMemoryLoginFailureSpread(environment.getProperty(
+                FAILURE_SPREAD_MAX_CLIENTS_PROPERTY, Integer.class, DEFAULT_FAILURE_SPREAD_MAX_CLIENTS));
+    }
+
+    /**
+     * The login: the authentication and the issuance of the session in one transaction (decision
+     * 11). Registered with the other use cases of the module; no controller calls it until the
+     * endpoint that exposes it.
+     */
+    @Bean
+    LogIn logIn(TransactionRunner runner, LoginInstitutionProvider institutionProvider,
+            AuthenticateWithPassword authenticate, IssueSession issueSession,
+            AccessTokenIssuer accessTokens, LoginIdentifierFingerprinter fingerprinter,
+            InMemoryLoginFailureSpread failureSpread, AuditLogWriter auditLogWriter, Clock clock) {
+        return new LogIn(runner, institutionProvider, authenticate, issueSession, accessTokens,
+                fingerprinter, failureSpread, auditLogWriter, new SecurityEventLog(), clock);
     }
 
     @Bean

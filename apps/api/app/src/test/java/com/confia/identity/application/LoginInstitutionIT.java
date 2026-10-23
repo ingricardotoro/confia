@@ -37,8 +37,9 @@ import org.junit.jupiter.api.Test;
  * <p><b>Why there is no scenario literally titled "a request declaring a different institution in
  * its own body is ignored", beyond {@link
  * #theConfiguredProcessInstitutionIsAlwaysUsedRegardlessOfTheRequest}.</b> {@link
- * AuthenticationCommand} has exactly two fields, {@code presentedIdentifier} and {@code
- * presentedPassword} — it carries no institution field at all, so a caller has no channel through
+ * AuthenticationCommand} has four fields, {@code presentedIdentifier}, {@code presentedPassword} and
+ * (since session-endpoints-cookie-and-csrf) the origin of the request, {@code clientAddress} and
+ * {@code userAgent} — it carries no institution field at all, so a caller has no channel through
  * which to declare one. That is the strongest form design.md decision 11's "NO DEBE provenir del
  * cuerpo de la solicitud" can take: not a rule that is checked and rejected, but a shape that makes
  * the violation impossible to construct in the first place.

@@ -88,7 +88,16 @@ public final class IssueSession {
         Stored stored = transactionRunner.execute(context,
                 () -> runWithinTransaction(institutionId, context.requestId(), command));
 
-        // After the commit: nothing is signed for a family that did not commit.
+        return signAfterCommit(institutionId, command, stored);
+    }
+
+    /**
+     * The signing half of the issuance, for the caller that composes the stored half with its own
+     * transaction. Run it only after that transaction committed: nothing is signed for a family that
+     * did not commit.
+     */
+    IssuedSession signAfterCommit(InstitutionId institutionId, IssueSessionCommand command,
+            Stored stored) {
         AccessToken access = accessTokens.issueAccess(command.accountId().value(),
                 institutionId.value(), stored.familyId(),
                 methodsOf(command.secondFactorVerified()));
@@ -128,7 +137,8 @@ public final class IssueSession {
                 ACTOR_KIND_STAFF, accountId.value().toString(), null, null, auditRequestId, null,
                 ACTION_STARTED, FAMILY_ENTITY_TYPE, familyId.toString(), OUTCOME_SUCCESS, null,
                 startedAfterValue(command.secondFactorVerified()), null, null));
-        return new Stored(familyId, refreshToken, refreshExpiresAt);
+        return new Stored(familyId, refreshToken, refreshExpiresAt, absoluteExpiresAt,
+                lifetimes.idleExpiresAt(now));
     }
 
     /** The {@code amr} of a family, shared with the rotation that signs for the same family. */
@@ -143,7 +153,13 @@ public final class IssueSession {
         return AuditJson.object().bool("secondFactor", secondFactorVerified).toJson();
     }
 
-    /** What the transaction leaves behind; the access token is signed from it after the commit. */
-    record Stored(UUID familyId, PlainRefreshToken refreshToken, Instant refreshExpiresAt) {
+    /**
+     * What the transaction leaves behind; the access token is signed from it after the commit. The
+     * two instants are the end of the session and the end of its idle period at the moment of the
+     * issuance, which the caller that shows them to the client needs and the family row alone does
+     * not state.
+     */
+    record Stored(UUID familyId, PlainRefreshToken refreshToken, Instant refreshExpiresAt,
+            Instant absoluteExpiresAt, Instant idleExpiresAt) {
     }
 }
