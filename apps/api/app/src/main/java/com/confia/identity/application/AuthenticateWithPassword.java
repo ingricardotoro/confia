@@ -180,11 +180,11 @@ public final class AuthenticateWithPassword {
         backoffStore.save(institutionId, fingerprint, newState);
 
         UUID auditRequestId = requestId.isBlank() ? UUID.randomUUID() : UUID.fromString(requestId);
-        auditLogWriter.append(outcomeEntry(institutionId, actorId, actorLabel, fingerprint,
+        auditLogWriter.append(outcomeEntry(institutionId, actorId, actorLabel, fingerprint, command,
                 auditRequestId, result));
         if (requiredDelay.compareTo(Duration.ZERO) > 0) {
             auditLogWriter.append(backoffCycleEntry(institutionId, actorId, actorLabel, fingerprint,
-                    auditRequestId, attemptOrdinal, requiredDelay));
+                    command, auditRequestId, attemptOrdinal, requiredDelay));
         }
 
         return new AuthenticationDecision(result, requiredDelay);
@@ -228,11 +228,12 @@ public final class AuthenticateWithPassword {
 
     /** Design.md, decision 8: the login-succeeded, login-failed or pending-second-factor audit row. */
     private static AuditEntry outcomeEntry(InstitutionId institutionId, UUID actorId,
-            String actorLabel, IdentifierFingerprint fingerprint, UUID requestId,
-            AuthenticationResult result) {
+            String actorLabel, IdentifierFingerprint fingerprint, AuthenticationCommand command,
+            UUID requestId, AuthenticationResult result) {
         AuditOutcome auditOutcome = auditOutcomeOf(result);
-        return new AuditEntry(institutionId.value(), actorId, ACTOR_KIND_STAFF, actorLabel, null,
-                null, requestId, null, auditOutcome.action(), STAFF_ACCOUNT_ENTITY_TYPE,
+        return new AuditEntry(institutionId.value(), actorId, ACTOR_KIND_STAFF, actorLabel,
+                sourceIpOf(command), command.userAgent(), requestId, null,
+                auditOutcome.action(), STAFF_ACCOUNT_ENTITY_TYPE,
                 fingerprint.value(), auditOutcome.outcome(), null, auditOutcome.afterValue(), null,
                 null);
     }
@@ -262,12 +263,18 @@ public final class AuthenticateWithPassword {
 
     /** Design.md, decision 8: the backoff-cycle audit row, written only when {@code requiredDelay > 0}. */
     private static AuditEntry backoffCycleEntry(InstitutionId institutionId, UUID actorId,
-            String actorLabel, IdentifierFingerprint fingerprint, UUID requestId, int attemptOrdinal,
-            Duration requiredDelay) {
+            String actorLabel, IdentifierFingerprint fingerprint, AuthenticationCommand command,
+            UUID requestId, int attemptOrdinal, Duration requiredDelay) {
         String afterValue = backoffCycleAfterValue(attemptOrdinal, requiredDelay);
-        return new AuditEntry(institutionId.value(), actorId, ACTOR_KIND_STAFF, actorLabel, null,
-                null, requestId, null, ACTION_BACKOFF_APPLIED, LOGIN_BACKOFF_ENTITY_TYPE,
-                fingerprint.value(), OUTCOME_SUCCESS, null, afterValue, null, null);
+        return new AuditEntry(institutionId.value(), actorId, ACTOR_KIND_STAFF, actorLabel,
+                sourceIpOf(command), command.userAgent(), requestId, null, ACTION_BACKOFF_APPLIED,
+                LOGIN_BACKOFF_ENTITY_TYPE, fingerprint.value(), OUTCOME_SUCCESS, null, afterValue,
+                null, null);
+    }
+
+    /** The canonical text of the client address of the command, or {@code null} without one. */
+    private static String sourceIpOf(AuthenticationCommand command) {
+        return command.clientAddress() == null ? null : command.clientAddress().canonical();
     }
 
     /** The {@code after_value} of the backoff-cycle row. */
