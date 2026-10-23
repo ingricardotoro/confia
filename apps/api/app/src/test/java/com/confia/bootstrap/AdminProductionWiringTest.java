@@ -9,6 +9,8 @@ import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
 import com.confia.identity.application.AuthenticateWithPassword;
 import com.confia.identity.application.ConsumeRecoveryCode;
 import com.confia.identity.application.DescribeCurrentSession;
+import com.confia.identity.application.LogIn;
+import com.confia.identity.application.LoginFailureSpread;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.IssuePasswordResetToken;
 import com.confia.identity.application.LoginInstitutionProvider;
@@ -16,6 +18,7 @@ import com.confia.identity.application.RequestPasswordReset;
 import com.confia.identity.application.ResetPasswordWithToken;
 import com.confia.identity.application.VerifyTotpCode;
 import com.confia.identity.web.CurrentSessionController;
+import com.confia.identity.web.LoginController;
 import com.confia.kernel.InstitutionId;
 import com.zaxxer.hikari.HikariDataSource;
 import com.confia.shared.audit.AuditLogWriter;
@@ -97,6 +100,26 @@ class AdminProductionWiringTest {
             assertThat(context.getBeanFactory().getBeanDefinition("currentSessionController").getResourceDescription())
                     .as("registered by the web configuration of identity")
                     .contains("IdentityWebConfiguration");
+        } finally {
+            context.close();
+        }
+    }
+
+    /**
+     * The administrative process holds the login use case, its signal of failures spread and its
+     * controller, each exactly once, and the controller is registered by the web configuration of
+     * identity (session-endpoints-cookie-and-csrf design.md decision 11). The portal and the worker
+     * hold none of them ({@link #portalAndWorkerHoldNoIdentityUseCase}).
+     */
+    @Test
+    void theAdminContextHoldsTheLoginUseCaseItsSignalAndItsController() {
+        ConfigurableApplicationContext context = start("admin");
+        try {
+            assertThat(context.getBeansOfType(LogIn.class)).hasSize(1);
+            assertThat(context.getBeansOfType(LoginFailureSpread.class)).hasSize(1);
+            assertThat(context.getBeansOfType(LoginController.class)).hasSize(1);
+            assertThat(context.getBeanFactory().getBeanDefinition("loginController")
+                    .getResourceDescription()).contains("IdentityWebConfiguration");
         } finally {
             context.close();
         }
@@ -190,6 +213,8 @@ class AdminProductionWiringTest {
             assertThat(context.getBeansOfType(ResetPasswordWithToken.class)).isEmpty();
             assertThat(context.getBeansOfType(LoginInstitutionProvider.class)).isEmpty();
             assertThat(context.getBeansOfType(DescribeCurrentSession.class)).isEmpty();
+            assertThat(context.getBeansOfType(LogIn.class)).isEmpty();
+            assertThat(context.getBeansOfType(LoginController.class)).isEmpty();
             assertThat(context.getBeanNamesForType(CurrentSessionController.class, true, true))
                     .isEmpty();
         } finally {

@@ -9,6 +9,7 @@ import com.confia.identity.domain.AuthenticationResult.SecondFactorRequired;
 import com.confia.identity.domain.FailureSpreadWindow;
 import com.confia.identity.domain.IdentifierFingerprint;
 import com.confia.identity.domain.LoginIdentifier;
+import com.confia.identity.domain.PlainPassword;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
@@ -22,6 +23,7 @@ import com.confia.shared.security.token.AccessToken;
 import com.confia.shared.security.token.AccessTokenIssuer;
 import com.confia.shared.security.token.MfaPurpose;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -97,6 +99,12 @@ public final class LogIn {
 
     public LoginDecision execute(LoginCommand command) {
         Objects.requireNonNull(command, "command");
+        if (!namesAnAccountAtAll(command)) {
+            // Nothing to look up, to count or to audit, and no wait: the answer is the one of any
+            // other rejection. It tells nothing about accounts, because no account can have such an
+            // identifier.
+            return new LoginDecision(new LoginOutcome.Failed(), Duration.ZERO);
+        }
         UUID requestId = command.requestId().isBlank() ? UUID.randomUUID()
                 : UUID.fromString(command.requestId());
         InstitutionId institutionId = institutionProvider.loginInstitutionId();
@@ -116,6 +124,23 @@ public final class LogIn {
         }
         return new LoginDecision(outcomeOf(institutionId, command, committed),
                 committed.authentication().requiredDelay());
+    }
+
+    /**
+     * Whether the identifier and the password survive their own normalization: an identifier of the
+     * length of an account after trimming and folding, and a password that is not empty and not too
+     * long once folded. The edge limits the raw lengths, but normalization can shrink an identifier
+     * under its minimum or grow a password over its maximum, and the domain types refuse both with an
+     * exception that must never become a {@code 500}.
+     */
+    private static boolean namesAnAccountAtAll(LoginCommand command) {
+        try {
+            LoginIdentifier.of(command.identifier());
+            PlainPassword.of(command.password());
+            return true;
+        } catch (IllegalArgumentException unusable) {
+            return false;
+        }
     }
 
     private Committed runWithinTransaction(InstitutionId institutionId, UUID requestId,

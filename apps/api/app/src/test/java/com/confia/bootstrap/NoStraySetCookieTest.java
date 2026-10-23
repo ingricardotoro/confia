@@ -17,9 +17,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Specs/web-edge, scenario "Ninguna otra respuesta emite cookies" [WE65] (session-endpoints-cookie-
- * and-csrf design.md, decision 5): the cookie helper exists in this change and no route calls it
- * yet, so no response of the real administrative process carries a {@code Set-Cookie}, and none
- * creates an HTTP session (a session would announce itself with a {@code JSESSIONID} cookie). It
+ * and-csrf design.md, decision 5): the only caller of the cookie helper is the login on success
+ * (asserted next to its other answers in {@code LoginEndpointIT}), so no other response of the real
+ * administrative process carries a {@code Set-Cookie}, and none creates an HTTP session (a
+ * session would announce itself with a {@code JSESSIONID} cookie). It
  * covers the public documentation routes (the {@code local} profile publishes them), the routes
  * the chain denies, and the {@code 401} answers of {@code GET /api/v1/auth/sessions/current}. The
  * {@code 200} of that route is asserted next to its other answers in {@code
@@ -111,6 +112,19 @@ class NoStraySetCookieTest {
 
         assertThat(response.statusCode()).isEqualTo(401);
         assertNoCookie(response);
+    }
+
+    @Test
+    void aLoginRefusedBeforeTheUseCaseSetsNoCookie() {
+        HttpResponse<String> withoutOrigin = send("POST", "/api/v1/auth/sessions", "Content-Type",
+                "application/json");
+        HttpResponse<String> foreignOrigin = send("POST", "/api/v1/auth/sessions", "Content-Type",
+                "application/json", "Origin", "https://evil.example");
+
+        assertThat(withoutOrigin.statusCode()).isEqualTo(403);
+        assertThat(foreignOrigin.statusCode()).isEqualTo(403);
+        assertNoCookie(withoutOrigin);
+        assertNoCookie(foreignOrigin);
     }
 
     @Test

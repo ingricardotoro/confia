@@ -10,8 +10,10 @@ import org.springframework.http.HttpMethod;
  * without a credential, defined in this one place (web-edge-foundations design.md, decision 5).
  * Everything not listed is denied, whether or not a controller serves it.
  *
- * <p>Today the list holds only the API documentation, and only when springdoc is switched on, which
- * the {@code local} and {@code preprod} profiles do and nothing else does. The condition is the
+ * <p>The administrative list holds the login, always (session-endpoints-cookie-and-csrf design.md
+ * decision 11), and the API documentation, only when springdoc is switched on, which the {@code
+ * local} and {@code preprod} profiles do and nothing else does; the portal list holds only the
+ * documentation. The condition is the
  * very property that enables springdoc, not the name of a profile: one source decides both whether
  * the documentation exists and whether it is public, and a new or misspelled profile leaves it
  * closed. There are no health or readiness routes because there is no actuator; the change that
@@ -25,6 +27,14 @@ public final class PublicEndpoints {
     static final String API_DOCS_ENABLED = "springdoc.api-docs.enabled";
     static final String SWAGGER_UI_ENABLED = "springdoc.swagger-ui.enabled";
 
+    /**
+     * The login, the one public route of production in the administrative process
+     * (session-endpoints-cookie-and-csrf design.md decision 11). It carries no credential by
+     * definition, so it is public to the chain; what protects it is the limiter its handler declares
+     * (condition H1), the allowed origin the CSRF filter demands and the JSON content type.
+     */
+    static final PublicEndpoint LOGIN = new PublicEndpoint(HttpMethod.POST, "/api/v1/auth/sessions");
+
     private final List<PublicEndpoint> endpoints;
 
     public PublicEndpoints(List<PublicEndpoint> endpoints) {
@@ -33,7 +43,10 @@ public final class PublicEndpoints {
 
     /** The allow-list of the administrative process. */
     public static PublicEndpoints forAdmin(Environment environment) {
-        return documentation(environment);
+        List<PublicEndpoint> entries = new ArrayList<>();
+        entries.add(LOGIN);
+        entries.addAll(documentation(environment).endpoints());
+        return new PublicEndpoints(entries);
     }
 
     /**

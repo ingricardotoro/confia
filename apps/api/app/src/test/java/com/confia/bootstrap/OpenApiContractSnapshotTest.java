@@ -213,12 +213,13 @@ class OpenApiContractSnapshotTest {
     // --- The first operation of production (decision 13; BI24 to BI27, WE39) ---
 
     private static final String SESSION_PATH = "/api/v1/auth/sessions/current";
+    private static final String LOGIN_PATH = "/api/v1/auth/sessions";
 
     @Test
-    void theAdministrativeDocumentHoldsExactlyTheCurrentSessionOperation() {
+    void theAdministrativeDocumentHoldsExactlyTheLoginAndTheCurrentSessionOperations() {
         Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
 
-        assertThat(pathsOf(admin)).containsExactly(SESSION_PATH);
+        assertThat(pathsOf(admin)).containsExactlyInAnyOrder(LOGIN_PATH, SESSION_PATH);
         Map<String, Object> path = asMap(asMap(admin.get("paths")).get(SESSION_PATH));
         assertThat(path).as("one operation: GET, and no other method").containsOnlyKeys("get");
         Map<String, Object> operation = asMap(path.get("get"));
@@ -275,6 +276,72 @@ class OpenApiContractSnapshotTest {
         assertThat(asMap(asMap(components.get("securitySchemes")).get("bearerAuth")))
                 .containsEntry("type", "http").containsEntry("scheme", "bearer")
                 .containsEntry("bearerFormat", "JWT");
+    }
+
+    /** BI25 and BI27: the login is one POST with exactly the seven approved responses. */
+    @Test
+    void theLoginIsOnePostWithExactlyTheSevenApprovedResponsesAndNoSecurityRequirement() {
+        Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
+        Map<String, Object> path = asMap(asMap(admin.get("paths")).get(LOGIN_PATH));
+
+        assertThat(path).as("one operation: POST, and no other method").containsOnlyKeys("post");
+        Map<String, Object> operation = asMap(path.get("post"));
+        assertThat(asMap(operation.get("responses")))
+                .as("exactly the approved responses: no 500, nothing the translator adds")
+                .containsOnlyKeys("200", "400", "401", "403", "415", "429", "503");
+        assertThat(operation.get("security")).as("the login needs no credential").isNull();
+        assertThat(operation.get("parameters")).as("no header and no parameter").isNull();
+        Map<String, Object> body = asMap(asMap(asMap(operation.get("requestBody")).get("content"))
+                .get("application/json"));
+        assertThat(asMap(body.get("schema")))
+                .containsEntry("$ref", "#/components/schemas/LoginRequest");
+        assertThat(asMap(asMap(operation.get("requestBody")).get("content")))
+                .containsOnlyKeys("application/json");
+    }
+
+    @Test
+    void theLoginErrorsArePlainProblemDetailsAndTheSuccessIsAOneOfOnTheStatusDiscriminator() {
+        Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
+        Map<String, Object> responses = asMap(asMap(asMap(asMap(admin.get("paths"))
+                .get(LOGIN_PATH)).get("post")).get("responses"));
+
+        for (String code : List.of("400", "401", "403", "415", "429", "503")) {
+            Map<String, Object> content = asMap(asMap(responses.get(code)).get("content"));
+            assertThat(content).as("the %s response", code)
+                    .containsOnlyKeys("application/problem+json");
+            assertThat(asMap(asMap(content.get("application/problem+json")).get("schema")))
+                    .containsEntry("$ref", "#/components/schemas/ProblemDetail");
+        }
+        assertThat(asMap(asMap(responses.get("401")).get("headers"))).containsOnlyKeys("WWW-Authenticate");
+        assertThat(asMap(asMap(responses.get("429")).get("headers"))).containsOnlyKeys("Retry-After");
+        Map<String, Object> success = asMap(asMap(responses.get("200")).get("content"));
+        assertThat(success).containsOnlyKeys("application/json");
+        assertThat(asMap(asMap(success.get("application/json")).get("schema")))
+                .containsEntry("$ref", "#/components/schemas/LoginResponse");
+        Map<String, Object> login = schemaOf(admin, "LoginResponse");
+        assertThat(asList(login.get("oneOf"))).extracting(item -> asMap(item).get("$ref"))
+                .containsExactlyInAnyOrder("#/components/schemas/AuthenticatedSessionResponse",
+                        "#/components/schemas/SecondFactorPendingResponse");
+        assertThat(asMap(login.get("discriminator"))).containsEntry("propertyName", "status");
+    }
+
+    @Test
+    void theLoginSchemasAreTheClosedListsOfMembersTheContractDeclares() {
+        Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
+
+        assertThat(asMap(schemaOf(admin, "LoginRequest").get("properties")))
+                .containsOnlyKeys("identifier", "password");
+        assertThat(asList(schemaOf(admin, "LoginRequest").get("required")))
+                .containsExactlyInAnyOrder("identifier", "password");
+        assertThat(asMap(schemaOf(admin, "AuthenticatedSessionResponse").get("properties")))
+                .containsOnlyKeys("status", "accessToken", "accessTokenExpiresAt",
+                        "sessionExpiresAt", "idleExpiresAt");
+        assertThat(asMap(schemaOf(admin, "SecondFactorPendingResponse").get("properties")))
+                .containsOnlyKeys("status", "secondFactorToken", "secondFactorTokenExpiresAt");
+        assertThat(asList(asMap(asMap(schemaOf(admin, "SecondFactorPendingResponse")
+                .get("properties")).get("status")).get("enum")))
+                .containsExactlyInAnyOrder("second-factor-required",
+                        "second-factor-enrollment-required");
     }
 
     /** BI27. */
