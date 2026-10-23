@@ -340,7 +340,7 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
 
 ## Fase 3: endpoints que emiten credenciales
 
-- [ ] 3.1 **PR 5 `login-endpoint`: inicio de sesión, señal de cinco cuentas y `authentication-failed`; cierra H1 (decisiones 10, 11 y 12).**
+- [x] 3.1 **PR 5 `login-endpoint`: inicio de sesión, señal de cinco cuentas y `authentication-failed`; cierra H1 (decisiones 10, 11 y 12).**
   - **ROJO, primero la parte 5a.** Crear `test/java/com/confia/identity/domain/FailureSpreadWindowTest.java` y `FailureSpreadWindowProperties.java`
     (cuatro huellas distintas no señalan, la quinta sí, la misma huella no suma, el borde de 10 minutos es estricto —el fallo de las 10:00:00 ya no
     cuenta a las 10:10:00—, la sexta no vuelve a señalar dentro de la ventana, cinco fallos del mismo identificador no señalan) [I165, I166] y
@@ -853,3 +853,5 @@ Por especificación: `identity` 103 (1.1: 0, 2.1: 8, 3.1: 29, 3.2: 38, 3.3: 19, 
 - **Jackson 3.** La sonda S-5 es el primer rojo de 1.3 y puede obligar a un `JsonMapperBuilderCustomizer`.
 - **Ventana de primera inscripción.** Quien conozca la contraseña puede reemplazar el secreto hasta la primera verificación (DA-15, DA-7 *c*); queda auditada
   y se revisa en el cambio 8.
+
+> **Nota fechada 2026-10-22 (tarea 3.1 en seis ramas apiladas 05a a 05f).** 05a `failure-spread-window` (572), 05b `login-views-and-event-log` (551), 05c `login-use-case` (788), 05d `authentication-failed-problem-code` (174), 05e `login-controller-and-h1` (1 469: indivisible por la condición H1, controlador, limitador, regla, prueba de H1, instantánea OpenAPI y inventarios deben ir juntos; requiere `size:exception`) y 05f `login-endpoint-behaviour` (742). Desviaciones: la seña de cinco cuentas usa `shared.observability.events.SecurityEventLog` porque `identity` no puede depender de slf4j; `LogIn` rechaza sin tocar tablas un identificador o contraseña que la normalización deja inválidos (antes habría sido un 500). G-4: ver `apply-progress.md`.

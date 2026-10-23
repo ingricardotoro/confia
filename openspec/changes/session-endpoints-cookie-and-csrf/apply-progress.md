@@ -353,3 +353,24 @@ Marcada `[x]` en `tasks.md` (casilla en 04d, con nota fechada de la partición).
 | `...-04d-revocation-follow-ups` | 590 | 25 min 26 s | 186 + 2 163 | 468 | 631 de 673 (94 %) |
 
 Las tres últimas duraciones crecen con las pruebas nuevas y con otras construcciones de la máquina en las demostraciones; no son comparables entre sí para el presupuesto de 8 minutos (R-9). Los casos de uso no tienen llamador HTTP (`rg -n "EndCurrentSession|EndAllSessions" apps/api/app/src/main` solo muestra sus clases y `IdentityConfiguration`).
+
+## Tarea 3.1 `login-endpoint` (2026-10-22)
+
+Seis ramas apiladas sobre `main` 3e4e201, cada una con `./mvnw -o verify -Pmutation-gate` en verde (PIT 648/690, núcleo 192/194, JaCoCo cumplido):
+
+| Rama | Líneas | verify | Surefire núcleo + app | Failsafe |
+|---|---|---|---|---|
+| 05a `failure-spread-window` (210432e) | 572 | 13 min 36 s | 186 + 2 187 | 468 |
+| 05b `login-views-and-event-log` (4f189d8) | 551 | 14 min 29 s | 186 + 2 203 | 468 |
+| 05c `login-use-case` (7a79477) | 788 | 15 min 57 s | 186 + 2 203 | 486 |
+| 05d `authentication-failed-problem-code` (09e41ee) | 174 | 14 min 19 s | 186 + 2 232 | 486 |
+| 05e `login-controller-and-h1` (0f0683e) | 1 469 | 10 min 38 s | 186 + 2 241 | 491 |
+| 05f `login-endpoint-behaviour` (e3da4f1) | 742 | 10 min 56 s | 186 + 2 248 | 512 |
+
+RED: clases inexistentes (`cannot find symbol` LoginDecision, SessionGrant, LogIn...; 05a-05c); `ProblemCodeException` y `AUTHENTICATION_FAILED` inexistentes (05d); `LoginController` inexistente; con 05d y sin controlador, `LoginEndpointIT` 16 de 18 en 401 y `LoginRateLimitClosesH1IT` 4 de 4 en rojo (05e/05f); `IllegalArgumentException: a normalized login identifier must be between 3 and 320` para un identificador de 2 caracteres (habría sido 500) antes de la guardia de `LogIn`.
+
+Demostraciones (copia previa, ruptura, `cmp` idéntico): (1) quitar `@RateLimited`: `SessionRoutesRateLimitedRuleTest` señala `LoginController.login` y `LoginRateLimitClosesH1IT` da `expected 429 but was 200/401`. (2) contar `ChallengeIssued` como fallo: la prueba de I162 da `expected 200 but was 429`. (3) `TOKEN_INVALID` solo para identificador `nadie*`: la igualdad de I157 enumera diferencias de cuerpo y cabeceras. (4) emitir cookie en el segundo factor: las dos pruebas de I150/I151 reciben `Set-Cookie`. Además: `LogInIT` (origen sin enviar, `Set-Cookie` en las pruebas de señal) con dos rupturas en `LogIn`/`AuthenticateWithPassword`, ambas en rojo y revertidas.
+
+G-4 (BI57): sonda desechable con 200 + 200 intentos Argon2id (perfil piso) sobre PostgreSQL real: 15,7 s + 13,6 s = 29,3 s, más la igualdad del 401 (`LoginEndpointIT` completo 11 s). La puerta de tiempo costaría unos 30 s extra en `verify`. El `verify -Pmutation-gate` completo ya dura 10-16 min en esta máquina, así que el presupuesto de 8 minutos de BI57 ya no se cumple por la construcción entera, no por la puerta. DECISIÓN DEL PROPIETARIO PENDIENTE (tarea 4.1): reescribir BI57 (medir solo sin mutación) o mover la puerta al perfil de mutación (R-9). No se movió nada.
+
+Reserva H1: con `confia.web.trusted-proxies` vacío el tráfico tras un proxy comparte un cubo; su llenado es del cambio 11. `packages/contracts` se regeneró con `orval` directo (pnpm exige Node 24) y `tsc --noEmit` pasó; no se compromete.
