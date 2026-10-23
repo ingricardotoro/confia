@@ -51,7 +51,9 @@ class IdempotencyScopeExclusionInventoryTest {
      * {@code RateLimitPolicy}, a plain value that the properties and the throttling configuration
      * hand to the limiter; 2.1 of session-tokens-and-web-layer added {@code AuthenticatedActor}, the
      * principal the bearer filter binds and Spring's view of it carries; 5.1 added {@code
-     * SessionValidity}, the port the filter asks and the security configuration hands it.
+     * SessionValidity}, the port the filter asks and the security configuration hands it; 6 of
+     * session-endpoints-cookie-and-csrf added {@code SecondFactorPurpose}, the purposes of a restricted
+     * route, and {@code PendingSecondFactor}, the principal of such a route.
      * {@code InMemoryRateLimiter}
      * stays out on purpose: a shared.security
      * configuration builds it and exposes only the port, so the web layer never names the
@@ -66,7 +68,9 @@ class IdempotencyScopeExclusionInventoryTest {
             "com.confia.shared.security.RateLimitDecision$CapacityExhausted",
             "com.confia.shared.security.RateLimitPolicy",
             "com.confia.shared.security.AuthenticatedActor",
-            "com.confia.shared.security.SessionValidity");
+            "com.confia.shared.security.SessionValidity",
+            "com.confia.shared.security.SecondFactorPurpose",
+            "com.confia.shared.security.PendingSecondFactor");
 
     private static final String EXECUTOR = "com.confia.shared.security.IdempotentExecutor";
 

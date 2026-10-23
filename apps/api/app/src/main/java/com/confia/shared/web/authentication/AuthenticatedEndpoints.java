@@ -16,9 +16,16 @@ import org.springframework.http.HttpMethod;
 public final class AuthenticatedEndpoints {
 
     private final List<AuthenticatedEndpoint> endpoints;
+    private final List<SecondFactorEndpoint> secondFactorEndpoints;
 
     public AuthenticatedEndpoints(List<AuthenticatedEndpoint> endpoints) {
+        this(endpoints, List.of());
+    }
+
+    public AuthenticatedEndpoints(List<AuthenticatedEndpoint> endpoints,
+            List<SecondFactorEndpoint> secondFactorEndpoints) {
         this.endpoints = List.copyOf(endpoints);
+        this.secondFactorEndpoints = List.copyOf(secondFactorEndpoints);
     }
 
     /**
@@ -33,5 +40,14 @@ public final class AuthenticatedEndpoints {
     /** The routes, in a list that cannot be modified. */
     public List<AuthenticatedEndpoint> endpoints() {
         return endpoints;
+    }
+
+    /**
+     * The routes of the restricted class, which take a restricted second-factor token and no other
+     * (session-endpoints-cookie-and-csrf design.md, decision 6), in a list that cannot be modified.
+     * In production the list is empty until the two second-factor endpoints exist.
+     */
+    public List<SecondFactorEndpoint> secondFactorEndpoints() {
+        return secondFactorEndpoints;
     }
 }
