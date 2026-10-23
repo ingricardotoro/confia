@@ -6,6 +6,8 @@ import com.confia.identity.application.TotpCredentialRepository;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.TotpCredential;
 import com.confia.kernel.InstitutionId;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import org.jooq.DSLContext;
 
@@ -70,6 +72,19 @@ public final class JooqTotpCredentialRepository implements TotpCredentialReposit
                 .where(IDENTITY_MFA_TOTP_CREDENTIAL.INSTITUTION_ID.eq(institutionId.value()))
                 .and(IDENTITY_MFA_TOTP_CREDENTIAL.ACCOUNT_ID.eq(accountId.value()))
                 .and(IDENTITY_MFA_TOTP_CREDENTIAL.LAST_ACCEPTED_COUNTER.lt(candidateCounter))
+                .execute();
+        return updatedRows > 0;
+    }
+
+    @Override
+    public boolean replaceUnverifiedSecret(InstitutionId institutionId, StaffAccountId accountId,
+            String encryptedSecret, Instant now) {
+        int updatedRows = dsl.update(IDENTITY_MFA_TOTP_CREDENTIAL)
+                .set(IDENTITY_MFA_TOTP_CREDENTIAL.ENCRYPTED_SECRET, encryptedSecret)
+                .set(IDENTITY_MFA_TOTP_CREDENTIAL.ENROLLED_AT, now.atOffset(ZoneOffset.UTC))
+                .where(IDENTITY_MFA_TOTP_CREDENTIAL.INSTITUTION_ID.eq(institutionId.value()))
+                .and(IDENTITY_MFA_TOTP_CREDENTIAL.ACCOUNT_ID.eq(accountId.value()))
+                .and(IDENTITY_MFA_TOTP_CREDENTIAL.LAST_ACCEPTED_COUNTER.eq(-1L))
                 .execute();
         return updatedRows > 0;
     }

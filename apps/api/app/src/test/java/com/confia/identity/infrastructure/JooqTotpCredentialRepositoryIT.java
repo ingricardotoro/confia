@@ -15,6 +15,7 @@ import com.confia.shared.security.SecurityContext;
 import com.confia.support.CommittingPostgresIntegrationTest;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
@@ -94,6 +95,84 @@ class JooqTotpCredentialRepositoryIT extends CommittingPostgresIntegrationTest {
                 () -> repository.findByAccountId(institutionId, accountId));
         assertThat(found).isPresent();
         assertThat(found.get().lastAcceptedCounter()).isEqualTo(10L);
+    }
+
+    /**
+     * design.md decision 13, step 3: the replacement is one conditional {@code UPDATE ... WHERE
+     * last_accepted_counter = -1}. It swaps the secret and restarts {@code enrolled_at} on a
+     * credential that was never verified, and says so.
+     */
+    @Test
+    void replacingTheSecretOfAnUnverifiedCredentialSwapsTheSecretAndRestartsTheEnrollmentInstant() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
+        TotpCredentialRepository repository = repositoryFor();
+        String replacement = "v1:" + UUID.randomUUID() + ":cmVw:Y3Q=:dGFn";
+        Instant now = Instant.parse("2026-10-22T09:30:00Z");
+        transactionRunner().execute(contextOf(institutionId), () -> {
+            seedAccount(institutionId, accountId);
+            repository.insert(institutionId, accountId, "v1:" + UUID.randomUUID() + ":aXY=:Y3Q=:dGFn");
+            return null;
+        });
+
+        boolean replaced = transactionRunner().execute(contextOf(institutionId),
+                () -> repository.replaceUnverifiedSecret(institutionId, accountId, replacement, now));
+
+        assertThat(replaced).isTrue();
+        TotpCredential found = transactionRunner().execute(contextOf(institutionId),
+                () -> repository.findByAccountId(institutionId, accountId)).orElseThrow();
+        assertThat(found.encryptedSecret()).isEqualTo(replacement);
+        assertThat(found.lastAcceptedCounter()).isEqualTo(-1L);
+        assertThat(found.isVerified()).isFalse();
+        assertThat(transactionRunner().execute(contextOf(institutionId), () -> dsl.fetchOne(
+                "select enrolled_at from identity_mfa_totp_credential where institution_id = ? and account_id = ?",
+                institutionId.value(), accountId.value()).get("enrolled_at", java.time.OffsetDateTime.class)
+                .toInstant())).isEqualTo(now);
+    }
+
+    /**
+     * The same statement never touches a verified credential: the predicate is what keeps a
+     * verified secret from being replaced, whatever the caller believed it read.
+     */
+    @Test
+    void replacingTheSecretOfAVerifiedCredentialAffectsZeroRowsAndChangesNothing() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
+        TotpCredentialRepository repository = repositoryFor();
+        String original = "v1:" + UUID.randomUUID() + ":aXY=:Y3Q=:dGFn";
+        transactionRunner().execute(contextOf(institutionId), () -> {
+            seedAccount(institutionId, accountId);
+            repository.insert(institutionId, accountId, original);
+            repository.acceptCounter(institutionId, accountId, 0L);
+            return null;
+        });
+
+        boolean replaced = transactionRunner().execute(contextOf(institutionId),
+                () -> repository.replaceUnverifiedSecret(institutionId, accountId,
+                        "v1:" + UUID.randomUUID() + ":cmVw:Y3Q=:dGFn", Instant.parse("2026-10-22T09:30:00Z")));
+
+        assertThat(replaced).as("counter 0 is verified: the first possible period is a valid acceptance")
+                .isFalse();
+        TotpCredential found = transactionRunner().execute(contextOf(institutionId),
+                () -> repository.findByAccountId(institutionId, accountId)).orElseThrow();
+        assertThat(found.encryptedSecret()).isEqualTo(original);
+        assertThat(found.lastAcceptedCounter()).isZero();
+        assertThat(found.isVerified()).isTrue();
+    }
+
+    @Test
+    void replacingTheSecretOfAnAccountWithoutACredentialAffectsZeroRows() {
+        InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+        StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
+        transactionRunner().execute(contextOf(institutionId), () -> {
+            seedAccount(institutionId, accountId);
+            return null;
+        });
+
+        assertThat(transactionRunner().execute(contextOf(institutionId),
+                () -> repositoryFor().replaceUnverifiedSecret(institutionId, accountId,
+                        "v1:" + UUID.randomUUID() + ":cmVw:Y3Q=:dGFn", Instant.parse("2026-10-22T09:30:00Z"))))
+                .isFalse();
     }
 
     private TotpCredentialRepository repositoryFor() {
