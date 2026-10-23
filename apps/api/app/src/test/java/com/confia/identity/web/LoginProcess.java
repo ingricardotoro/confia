@@ -3,8 +3,10 @@ package com.confia.identity.web;
 import com.confia.bootstrap.AdminProcessLauncher;
 import com.confia.identity.infrastructure.Argon2Pepper;
 import com.confia.kernel.InstitutionId;
+import com.confia.shared.security.token.AccessTokenIssuer;
 import com.confia.shared.security.token.AccessTokenVerifier;
 import com.confia.shared.security.token.CompactJws;
+import com.confia.shared.security.token.MfaPurpose;
 import com.confia.shared.security.token.SigningKey;
 import com.confia.shared.security.token.SigningKeyRing;
 import com.confia.support.SharedPostgresContainer;
@@ -20,9 +22,12 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.catalina.Context;
 import org.apache.catalina.Container;
@@ -56,9 +61,11 @@ final class LoginProcess implements AutoCloseable {
     private final AccessTokenVerifier verifier;
     private final Argon2Pepper pepper;
     private final InstitutionId institution;
+    private final CompactJws jws;
 
     private LoginProcess(ConfigurableApplicationContext context, AccessTokenVerifier verifier,
-            Argon2Pepper pepper, InstitutionId institution) {
+            Argon2Pepper pepper, InstitutionId institution, CompactJws jws) {
+        this.jws = jws;
         this.context = context;
         this.port = ((WebServerApplicationContext) context).getWebServer().getPort();
         this.verifier = verifier;
@@ -86,7 +93,7 @@ final class LoginProcess implements AutoCloseable {
                 properties);
         return new LoginProcess(context, new AccessTokenVerifier(jws, Clock.systemUTC()),
                 Argon2Pepper.fromBase64(Base64.getEncoder().encodeToString(pepperBytes)),
-                institution);
+                institution, jws);
     }
 
     static byte[] newPepperBytes() {
@@ -146,8 +153,41 @@ final class LoginProcess implements AutoCloseable {
     }
 
     HttpResponse<String> send(String method, String body, Map<String, String> headers) {
+        return send(method, ROUTE, body, headers);
+    }
+
+    /**
+     * Posts {@code body} to {@code path} with the allowed {@code Origin}, {@code Content-Type:
+     * application/json} and the bearer {@code token} when it is not {@code null}; the extra headers
+     * come after and win.
+     */
+    HttpResponse<String> postTo(String path, String token, String body, String... headers) {
+        Map<String, String> all = new LinkedHashMap<>();
+        all.put("Origin", ORIGIN);
+        all.put("Content-Type", "application/json");
+        if (token != null) {
+            all.put("Authorization", "Bearer " + token);
+        }
+        for (int i = 0; i < headers.length; i += 2) {
+            all.put(headers[i], headers[i + 1]);
+        }
+        return send("POST", path, body, all);
+    }
+
+    /** A valid restricted token of {@code purpose} for {@code account} of the institution of the process, issued now. */
+    String restrictedToken(UUID account, MfaPurpose purpose) {
+        return restrictedTokenAt(account, purpose, Instant.now());
+    }
+
+    /** The same, issued at {@code issuedAt}: expired once five minutes passed. */
+    String restrictedTokenAt(UUID account, MfaPurpose purpose, Instant issuedAt) {
+        return new AccessTokenIssuer(jws, Clock.fixed(issuedAt, ZoneOffset.UTC))
+                .issueMfa(account, institution.value(), purpose).compact();
+    }
+
+    HttpResponse<String> send(String method, String path, String body, Map<String, String> headers) {
         HttpRequest.Builder request = HttpRequest
-                .newBuilder(URI.create("http://localhost:" + port + ROUTE))
+                .newBuilder(URI.create("http://localhost:" + port + path))
                 .timeout(Duration.ofSeconds(60))
                 .method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                         : HttpRequest.BodyPublishers.ofString(body));

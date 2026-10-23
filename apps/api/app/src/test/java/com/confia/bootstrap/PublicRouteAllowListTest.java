@@ -354,6 +354,9 @@ class PublicRouteAllowListTest {
     private static List<String> productionRoutesOf(String process) {
         List<String> all = new java.util.ArrayList<>(publicRoutesOf(process));
         all.addAll(authenticatedRoutesOf(process));
+        if ("admin".equals(process)) {
+            all.add("POST /api/v1/auth/mfa/enrollments");
+        }
         return all;
     }
 

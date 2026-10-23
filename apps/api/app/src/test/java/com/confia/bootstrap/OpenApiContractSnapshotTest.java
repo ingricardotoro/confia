@@ -216,10 +216,16 @@ class OpenApiContractSnapshotTest {
     private static final String LOGIN_PATH = "/api/v1/auth/sessions";
 
     @Test
-    void theAdministrativeDocumentHoldsExactlyTheLoginAndTheCurrentSessionOperations() {
+    void theAdministrativeDocumentHoldsExactlyTheLoginTheCurrentSessionAndTheEnrollmentOperations() {
         Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
 
-        assertThat(pathsOf(admin)).containsExactlyInAnyOrder(LOGIN_PATH, SESSION_PATH);
+        assertThat(pathsOf(admin)).containsExactlyInAnyOrder(LOGIN_PATH, SESSION_PATH,
+                "/api/v1/auth/mfa/enrollments");
+        for (String route : List.of("/api/v1/auth/mfa/enrollments")) {
+            Map<String, Object> post = asMap(asMap(asMap(admin.get("paths")).get(route)).get("post"));
+            assertThat(asList(post.get("security"))).as("a restricted token in the bearer header").hasSize(1);
+            assertThat(asMap(post.get("responses"))).containsKeys("401", "403", "429");
+        }
         Map<String, Object> path = asMap(asMap(admin.get("paths")).get(SESSION_PATH));
         assertThat(path).as("one operation: GET, and no other method").containsOnlyKeys("get");
         Map<String, Object> operation = asMap(path.get("get"));

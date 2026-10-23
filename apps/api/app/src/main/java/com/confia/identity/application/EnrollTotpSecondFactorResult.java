@@ -40,6 +40,16 @@ public sealed interface EnrollTotpSecondFactorResult {
             Objects.requireNonNull(recoveryCodes, "recoveryCodes");
             recoveryCodes = List.copyOf(recoveryCodes);
         }
+
+        /** The secret as the authenticator application takes it, for the layer that answers the client. */
+        public String secretBase32() {
+            return secret.base32();
+        }
+
+        /** The ten codes as text, for the layer that answers the client. */
+        public List<String> recoveryCodeTexts() {
+            return recoveryCodes.stream().map(PlainRecoveryCode::value).toList();
+        }
     }
 
     /** The account has a verified credential: nothing was written but the entry that says so. */
