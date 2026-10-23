@@ -121,6 +121,29 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
                 .isInstanceOf(SecondFactorEnrollmentRequired.class);
     }
 
+    /**
+     * Scenario I218: "MFA active" is a verified secret. An account whose credential was enrolled and
+     * never verified resets with the link alone, as the account with no secret does, and its next
+     * login owes the enrollment: it is never handed a token to verify a first code.
+     */
+    @Test
+    void mfaRequiredWithASecretNeverVerifiedResetsWithTheLinkAloneAndEnrollmentIsStillRequired() {
+        String jorge = "jorge.aguilar@colegio.edu.hn";
+        StaffAccountId account = seedStaffAccount(jorge, CURRENT, true);
+        enrollWithoutVerifying(account);
+        PlainPasswordResetToken token = issueTokenAt(account, "2026-10-13T08:00:00Z");
+
+        ResetPasswordDecision decision = resetAt(token.value(), "Semana Morazánica 2026", NONE,
+                "2026-10-13T08:10:00Z");
+
+        assertThat(decision.outcome()).isInstanceOf(Completed.class);
+        assertThat(auditRows()).as("no second factor was asked for, so none was verified")
+                .noneMatch(row -> row.action().startsWith("identity.mfa.totp_verification"))
+                .noneMatch(row -> row.action().equals("identity.mfa.recovery_code.used"));
+        assertThat(loginAt(jorge, "Semana Morazánica 2026", "2026-10-13T08:12:00Z"))
+                .isInstanceOf(SecondFactorEnrollmentRequired.class);
+    }
+
     /** Scenario I12: mfa_required false with a secret needs no code and verifies none. */
     @Test
     void mfaNotRequiredWithAnEnrolledSecretResetsWithoutAnyTotpVerification() {

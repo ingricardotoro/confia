@@ -12,6 +12,7 @@ import com.confia.identity.domain.IdentifierFingerprint;
 import com.confia.identity.domain.LoginIdentifier;
 import com.confia.identity.domain.PlainPassword;
 import com.confia.identity.domain.StaffAccount;
+import com.confia.identity.domain.TotpCredential;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
 import com.confia.shared.audit.AuditJson;
@@ -201,9 +202,12 @@ public final class AuthenticateWithPassword {
         if (!staffAccount.mfaRequired()) {
             return new Authenticated(staffAccount.id(), institutionId);
         }
-        boolean secretAlreadyEnrolled =
-                totpCredentials.findByAccountId(institutionId, staffAccount.id()).isPresent();
-        return secretAlreadyEnrolled
+        // "MFA active" is a verified secret (session-endpoints-cookie-and-csrf design.md, decision
+        // 13): a credential that was enrolled and never verified owes the enrollment again, so the
+        // user is never handed a token to verify a first code no check could accept.
+        boolean secretVerified = totpCredentials.findByAccountId(institutionId, staffAccount.id())
+                .map(TotpCredential::isVerified).orElse(false);
+        return secretVerified
                 ? new SecondFactorRequired(staffAccount.id(), institutionId)
                 : new SecondFactorEnrollmentRequired(staffAccount.id(), institutionId);
     }

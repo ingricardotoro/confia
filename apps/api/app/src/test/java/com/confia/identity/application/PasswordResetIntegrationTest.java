@@ -92,8 +92,21 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
         return accountId;
     }
 
-    /** Enrolls TOTP and ten recovery codes through the real enrollment use case. */
+    /**
+     * Enrolls TOTP and ten recovery codes through the real enrollment use case and leaves the
+     * credential verified, as it is once the user has accepted a first code: "MFA active" is a
+     * verified secret (session-endpoints-cookie-and-csrf design.md, decision 13). The counter
+     * is far in the past, so any code of the tests that follow is still newer.
+     */
     EnrollTotpSecondFactorResult enroll(StaffAccountId accountId) {
+        EnrollTotpSecondFactorResult enrolled = enrollWithoutVerifying(accountId);
+        transactionRunner().execute(context(), () -> new JooqTotpCredentialRepository(dsl)
+                .acceptCounter(institutionId, accountId, 1L));
+        return enrolled;
+    }
+
+    /** Enrolls and stops there: the credential is as a new enrollment leaves it, never verified. */
+    EnrollTotpSecondFactorResult enrollWithoutVerifying(StaffAccountId accountId) {
         return new EnrollTotpSecondFactor(transactionRunner(),
                 new JooqTotpCredentialRepository(dsl), new JooqRecoveryCodeRepository(dsl),
                 new BouncyCastleRecoveryCodeHasher(Argon2Profile.floor(), PEPPER),
