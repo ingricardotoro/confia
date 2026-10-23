@@ -558,6 +558,25 @@ este control.
 > de emitir la familia nueva y en la misma transacción (obligación O10); el asiento
 > `identity.session.revoked` existe también con cero familias.
 
+> **Nota fechada 2026-10-23 (cambio `session-endpoints-cookie-and-csrf`, tarea 3.3): cookie de sesión,
+> vinculación y cierres.** La credencial del refresco es la cookie `__Secure-confia_admin_sid`
+> (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/v1/auth/sessions`, sin `Max-Age`) acompañada de
+> `__Host-confia_csrf`; ambas se escriben juntas y se borran juntas. `POST /api/v1/auth/sessions/refresh`
+> y `DELETE /api/v1/auth/sessions/current` exigen siempre un `Origin` permitido y, si la petición trae la
+> cookie de sesión, el doble envío del token CSRF; una petición sin la cookie no exige token (no hay
+> credencial ambiental que proteger) y termina como cualquier otro rechazo (`401 session-expired` en el
+> refresco, `204` en el cierre). Todo rechazo del refresco, sea cual sea su causa, responde igual
+> (`401 session-expired`, `WWW-Authenticate: Bearer`), borra las dos cookies y cuenta como un fallo de la
+> IP en la política `admin-session` (120 por minuto; 30 rechazos en 10 minutos activan la restricción);
+> los cierres no cuentan. **Vinculación (DA-8 *b*):** si cambian a la vez la huella del agente y la IP
+> respecto de la creación de la familia, el refresco se rechaza, la familia se revoca con el motivo
+> `binding_changed` y se vacían sus sucesores; si solo cambia uno, o el valor registrado es nulo, rota. La
+> dirección se compara como dirección. El orden es: familia revocada, familia vencida o inactiva,
+> reutilización, vinculación, gracia, vencimiento del token y rotación. Cerrar la sesión actual
+> (`logout`) no necesita token de acceso, de modo que funciona con el acceso vencido; cerrar todas
+> (`DELETE /api/v1/auth/sessions`) usa el token de acceso y revoca con `logout` todas las familias vivas de
+> la cuenta.
+
 ### 4.6 Prevención de enumeración de usuarios
 
 La enumeración es el paso previo de todo ataque de relleno de credenciales, y en este sistema

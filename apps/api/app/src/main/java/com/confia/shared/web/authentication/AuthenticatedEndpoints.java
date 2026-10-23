@@ -12,7 +12,8 @@ import org.springframework.http.HttpMethod;
  * a controller never opens a route by itself. The matrix of roles and permissions replaces this list
  * in change 8.
  *
- * <p>In production the list holds the one route of the current session (task 5.2); the public
+ * <p>In production the list holds the two routes of the session read and of the end of every
+ * session (tasks 5.2 and 7b); the public
  * constructor exists for the test harnesses, which add routes of their own and nothing else.
  */
 public final class AuthenticatedEndpoints {
@@ -31,12 +32,16 @@ public final class AuthenticatedEndpoints {
     }
 
     /**
-     * The list of the administrative process: the current session, which asks for the live-session
+     * The list of the administrative process: the current session and the end of every session, both of
+     * which ask for the live-session
      * check (design.md decisions 7 and 13).
      */
     public static AuthenticatedEndpoints forAdmin() {
-        return new AuthenticatedEndpoints(List.of(new AuthenticatedEndpoint(HttpMethod.GET,
-                "/api/v1/auth/sessions/current", SessionCheck.LIVE_SESSION)),
+        return new AuthenticatedEndpoints(List.of(
+                new AuthenticatedEndpoint(HttpMethod.GET, "/api/v1/auth/sessions/current",
+                        SessionCheck.LIVE_SESSION),
+                new AuthenticatedEndpoint(HttpMethod.DELETE, "/api/v1/auth/sessions",
+                        SessionCheck.LIVE_SESSION)),
                 List.of(new SecondFactorEndpoint(HttpMethod.POST, "/api/v1/auth/mfa/verifications",
                                 Set.of(SecondFactorPurpose.VERIFY, SecondFactorPurpose.ENROLL)),
                         new SecondFactorEndpoint(HttpMethod.POST, "/api/v1/auth/mfa/enrollments",

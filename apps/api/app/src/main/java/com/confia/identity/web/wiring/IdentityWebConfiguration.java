@@ -2,12 +2,15 @@ package com.confia.identity.web.wiring;
 
 import com.confia.identity.application.CompleteSecondFactor;
 import com.confia.identity.application.DescribeCurrentSession;
+import com.confia.identity.application.EndAllSessions;
+import com.confia.identity.application.EndCurrentSession;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.LogIn;
 import com.confia.identity.application.RefreshSession;
 import com.confia.identity.web.CurrentSessionController;
 import com.confia.identity.web.LoginController;
 import com.confia.identity.web.SecondFactorController;
+import com.confia.identity.web.SessionEndController;
 import com.confia.identity.web.SessionRefreshController;
 import com.confia.shared.web.delay.RequiredDelayMaterializer;
 import com.confia.shared.web.ratelimit.RateLimitFailures;
@@ -54,5 +57,11 @@ public class IdentityWebConfiguration {
     SessionRefreshController sessionRefreshController(RefreshSession refresh,
             RateLimitFailures failures, SessionCookies cookies) {
         return new SessionRefreshController(refresh, failures, cookies);
+    }
+
+    @Bean
+    SessionEndController sessionEndController(EndCurrentSession endCurrent, EndAllSessions endAll,
+            SessionCookies cookies) {
+        return new SessionEndController(endCurrent, endAll, cookies);
     }
 }

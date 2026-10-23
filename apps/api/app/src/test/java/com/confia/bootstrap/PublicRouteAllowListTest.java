@@ -342,13 +342,15 @@ class PublicRouteAllowListTest {
 
     /** The authenticated routes production registers in a process, as {@code METHOD pattern}. */
     private static List<String> authenticatedRoutesOf(String process) {
-        return "admin".equals(process) ? List.of("GET /api/v1/auth/sessions/current") : List.of();
+        return "admin".equals(process) ? List.of("GET /api/v1/auth/sessions/current",
+                "DELETE /api/v1/auth/sessions") : List.of();
     }
 
     /** The public routes production registers in a process: the login and the refresh, in the administrative one. */
     private static List<String> publicRoutesOf(String process) {
         return "admin".equals(process) ? List.of("POST /api/v1/auth/sessions",
-                "POST /api/v1/auth/sessions/refresh") : List.of();
+                "POST /api/v1/auth/sessions/refresh", "DELETE /api/v1/auth/sessions/current")
+                : List.of();
     }
 
     /** Every route production registers in a process: its public ones plus its authenticated ones. */

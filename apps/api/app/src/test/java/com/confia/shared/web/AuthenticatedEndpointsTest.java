@@ -28,9 +28,11 @@ class AuthenticatedEndpointsTest {
             "/test/live", SessionCheck.LIVE_SESSION);
 
     @Test
-    void theProductionListHoldsExactlyTheCurrentSessionRouteWithTheLiveSessionCheck() {
+    void theProductionListHoldsExactlyTheTwoSessionRoutesWithTheLiveSessionCheck() {
         assertThat(AuthenticatedEndpoints.forAdmin().endpoints()).containsExactly(
                 new AuthenticatedEndpoint(HttpMethod.GET, "/api/v1/auth/sessions/current",
+                        SessionCheck.LIVE_SESSION),
+                new AuthenticatedEndpoint(HttpMethod.DELETE, "/api/v1/auth/sessions",
                         SessionCheck.LIVE_SESSION));
     }
 

@@ -10,7 +10,7 @@ import org.springframework.http.HttpMethod;
  * without a credential, defined in this one place (web-edge-foundations design.md, decision 5).
  * Everything not listed is denied, whether or not a controller serves it.
  *
- * <p>The administrative list holds the login and the refresh, always
+ * <p>The administrative list holds the login, the refresh and the end of the current session, always
  * (session-endpoints-cookie-and-csrf design.md
  * decision 11), and the API documentation, only when springdoc is switched on, which the {@code
  * local} and {@code preprod} profiles do and nothing else does; the portal list holds only the
@@ -45,6 +45,14 @@ public final class PublicEndpoints {
     static final PublicEndpoint REFRESH =
             new PublicEndpoint(HttpMethod.POST, "/api/v1/auth/sessions/refresh");
 
+    /**
+     * The end of the current session (decision 15). It takes no access token, so a client whose access
+     * expired can still end its session; what protects it is the CSRF filter (the double-submit token
+     * with the session cookie, an allowed Origin always) and the limiter its handler declares.
+     */
+    static final PublicEndpoint END_CURRENT_SESSION =
+            new PublicEndpoint(HttpMethod.DELETE, "/api/v1/auth/sessions/current");
+
     private final List<PublicEndpoint> endpoints;
 
     public PublicEndpoints(List<PublicEndpoint> endpoints) {
@@ -56,6 +64,7 @@ public final class PublicEndpoints {
         List<PublicEndpoint> entries = new ArrayList<>();
         entries.add(LOGIN);
         entries.add(REFRESH);
+        entries.add(END_CURRENT_SESSION);
         entries.addAll(documentation(environment).endpoints());
         return new PublicEndpoints(entries);
     }

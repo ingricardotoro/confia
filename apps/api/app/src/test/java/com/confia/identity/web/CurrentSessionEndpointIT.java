@@ -422,11 +422,12 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
     // --- WE29 ---
 
     @Test
-    void theProductionRoutesAreTheSessionRoutesServedSoFarAndEveryOtherAnonymousRequestIs401() {
+    void theProductionRoutesAreExactlyTheSevenSessionRoutesAndEveryOtherAnonymousRequestIs401() {
         assertThat(AdminProcessLauncher.routesOf(process))
                 .containsExactlyInAnyOrder("POST /api/v1/auth/sessions",
                         "GET /api/v1/auth/sessions/current", "POST /api/v1/auth/mfa/enrollments",
-                        "POST /api/v1/auth/mfa/verifications", "POST /api/v1/auth/sessions/refresh");
+                        "POST /api/v1/auth/mfa/verifications", "POST /api/v1/auth/sessions/refresh",
+                        "DELETE /api/v1/auth/sessions/current", "DELETE /api/v1/auth/sessions");
 
         assertProblem(get("/api/v1/auth/sessions"), 401, "authentication-required");
         assertProblem(get("/api/v1/anything"), 401, "authentication-required");
@@ -435,13 +436,14 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
     }
 
     @Test
-    void anotherMethodOnTheRouteIsForbiddenToAnAuthenticatedActor() {
+    void anotherMethodOnTheRouteThatIsNotTheEndOfTheSessionIsForbiddenToAnAuthenticatedActor() {
         StaffAccountId ana = seedAccount(institution, ANA);
         UUID family = seedLiveFamily(institution, ana, false);
         String token = accessToken(ana, institution, family,
                 Set.of(AuthenticationMethod.PASSWORD), now()).compact();
 
-        for (String method : List.of("POST", "PUT", "PATCH", "DELETE")) {
+        // DELETE is no longer among them: it is the end of the current session, a public cookie route.
+        for (String method : List.of("POST", "PUT", "PATCH")) {
             assertProblem(send(method, ROUTE, "Authorization", "Bearer " + token, "Origin",
                     AdminProcessLauncher.ALLOWED_ORIGIN), 403,
                     "forbidden");

@@ -39,7 +39,8 @@ class ProductionEdgeDefaultsTest {
             assertThat(environment.getProperty("spring.mvc.log-request-details"))
                     .isEqualTo("false");
             assertThat(PublicEndpoints.forAdmin(environment).endpoints()).extracting(PublicEndpoint::pattern)
-                    .containsExactly("/api/v1/auth/sessions", "/api/v1/auth/sessions/refresh");
+                    .containsExactly("/api/v1/auth/sessions", "/api/v1/auth/sessions/refresh",
+                            "/api/v1/auth/sessions/current");
             assertThat(PublicEndpoints.forPortal(environment).endpoints()).isEmpty();
         }
     }
@@ -91,11 +92,13 @@ class ProductionEdgeDefaultsTest {
             assertThat(endpoints).as("SPRINGDOC_API_DOCS_ENABLED=true").containsExactly(
                     new PublicEndpoint(HttpMethod.POST, "/api/v1/auth/sessions"),
                     new PublicEndpoint(HttpMethod.POST, "/api/v1/auth/sessions/refresh"),
+                    new PublicEndpoint(HttpMethod.DELETE, "/api/v1/auth/sessions/current"),
                     new PublicEndpoint(HttpMethod.GET, "/v3/api-docs"),
                     new PublicEndpoint(HttpMethod.GET, "/v3/api-docs/swagger-config"));
         } else {
             assertThat(endpoints).as("SPRINGDOC_API_DOCS_ENABLED=false").extracting(PublicEndpoint::pattern)
-                    .containsExactly("/api/v1/auth/sessions", "/api/v1/auth/sessions/refresh");
+                    .containsExactly("/api/v1/auth/sessions", "/api/v1/auth/sessions/refresh",
+                            "/api/v1/auth/sessions/current");
         }
     }
 

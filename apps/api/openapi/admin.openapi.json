@@ -459,6 +459,87 @@
       }
     },
     "/api/v1/auth/sessions" : {
+      "delete" : {
+        "description" : "Revokes with the reason logout every live family of the account, the current one included, and writes one entry with their number. Needs the access token of a live session and an allowed Origin, and no CSRF token. Answers 204 and deletes both cookies.",
+        "operationId" : "endAllSessions",
+        "responses" : {
+          "204" : {
+            "description" : "Every session of the account ended",
+            "headers" : {
+              "Set-Cookie" : {
+                "description" : "The deletion of the session cookie and the CSRF cookie",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted: expired (token-expired), or altered, restricted, of a revoked or unknown session (token-invalid)",
+            "headers" : {
+              "WWW-Authenticate" : {
+                "description" : "The Bearer challenge",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The Origin is missing or not allowed (csrf-invalid)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No capacity to count the client (capacity-exceeded)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Ends every live session of the account of the access token",
+        "tags" : [ "auth-sessions" ]
+      },
       "post" : {
         "description" : "Starts a session (status authenticated, with the session cookie and the CSRF cookie) or, when the account owes a second factor, answers with a restricted token and no cookie (status second-factor-required or second-factor-enrollment-required). Needs no credential, an allowed Origin and a JSON body. The answer for a wrong password is the same for an account that exists and one that does not.",
         "operationId" : "logIn",
@@ -576,6 +657,80 @@
       }
     },
     "/api/v1/auth/sessions/current" : {
+      "delete" : {
+        "description" : "Reads the refresh token only from the session cookie and revokes its family with the reason logout. Needs no access token. With the session cookie it needs the CSRF cookie repeated in the X-CSRF-Token header; always an allowed Origin. Answers 204 and deletes both cookies whatever the token was, also with no cookie at all.",
+        "operationId" : "endCurrentSession",
+        "parameters" : [ {
+          "description" : "The session cookie: the refresh token",
+          "in" : "cookie",
+          "name" : "__Secure-confia_admin_sid",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "The value of the CSRF cookie, required with the session cookie",
+          "in" : "header",
+          "name" : "X-CSRF-Token",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "The session ended, or there was none to end",
+            "headers" : {
+              "Set-Cookie" : {
+                "description" : "The deletion of the session cookie and the CSRF cookie",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The Origin is missing or not allowed, or the CSRF token does not match the session cookie (csrf-invalid)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No capacity to count the client (capacity-exceeded)"
+          }
+        },
+        "summary" : "Ends the session of the session cookie",
+        "tags" : [ "auth-sessions" ]
+      },
       "get" : {
         "description" : "Returns the session the access token belongs to and when each of its three ends comes. Needs an access token of a live session and no permission of any role. Reads only: it does not extend the session.",
         "operationId" : "getCurrentSession",

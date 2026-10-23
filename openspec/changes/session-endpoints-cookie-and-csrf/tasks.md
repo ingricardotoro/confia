@@ -471,7 +471,7 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
     Tamaño: nominal 650, realista 1 430; costura nombrada: 6a `restricted-route-class` y 6b `enrollment-and-verification`. — Escenarios I76, I77, I129 a
     I134, I167 a I185, I217, I218, I221 a I223, los seis escenarios sin identificador de la obligación de MFA y del restablecimiento, WE09, WE10, WE66 a WE69 y WE72.
 
-- [ ] 3.3 **PR 7 `refresh-and-logout-endpoints`: vinculación, refresco con cookie, cierres, OpenAPI y condición 3 sobre rutas reales (decisiones 14 y 15).**
+- [x] 3.3 **PR 7 `refresh-and-logout-endpoints`: vinculación, refresco con cookie, cierres, OpenAPI y condición 3 sobre rutas reales (decisiones 14 y 15).**
   - **ROJO, parte 7a.** Crear `test/java/com/confia/identity/domain/RotationDecisionTest.java` y `RotationDecisionProperties.java` (orden fijo:
     revocada, vencida o inactiva, consumido no apto para gracia es `REUSE_DETECTED`, vinculación, gracia, token vencido, rotación; la propiedad
     «con la vinculación sin cambio el resultado es el de S1»), `test/java/com/confia/identity/application/RefreshBindingIT.java` (cambian agente e IP:
@@ -525,6 +525,7 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
     revoke a session whose agent and address both changed on refresh`; 7b `feat(identity): expose the refresh and logout endpoints with cookie CSRF
     protection`, `feat(web): add the session-expired problem code` y `docs(security): note the session cookie, the binding and the new revocation reasons`.
     Tamaño: nominal 550, realista 1 210; costura nombrada: 7a `refresh-binding` y 7b `refresh-logout-http`. — Escenarios I121, I186 a I194, I199, I201 a
+    **Nota 2026-10-23 (aplicada):** partida en cuatro ramas apiladas, 07a `refresh-binding`, 07b `session-expired-code`, 07c `refresh-endpoint` y 07d `logout-endpoints`; la condición 3 sobre rutas reales quedó cerrada con `SessionCookieRoutesCsrfIT` y su demostración (ver `apply-progress.md`, tarea 3.3).
     I203, I219, I220, I225 a I227, WE18 a WE23, WE33, WE35, WE51, WE54, WE63, WE74, WE79 a WE85, WE88, WE92, «Cada código tiene su estado», BI24, BI46, BI50,
     BI51, BI53, BI54 y BI59.
 
