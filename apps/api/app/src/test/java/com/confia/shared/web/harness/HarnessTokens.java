@@ -87,6 +87,17 @@ public final class HarnessTokens {
                 .issueMfa(ACCOUNT, INSTITUTION, MfaPurpose.MFA_VERIFY).compact();
     }
 
+    /** A restricted MFA token of the given purpose, valid, issued now. */
+    public String restricted(MfaPurpose purpose) {
+        return restrictedAt(purpose, Instant.now());
+    }
+
+    /** A restricted MFA token of the given purpose issued at {@code issuedAt}; expired after five minutes. */
+    public String restrictedAt(MfaPurpose purpose, Instant issuedAt) {
+        return new AccessTokenIssuer(jws, Clock.fixed(issuedAt, java.time.ZoneOffset.UTC))
+                .issueMfa(ACCOUNT, INSTITUTION, purpose).compact();
+    }
+
     /** A well-formed access token under the administrative kid, signed by a key that is not the ring's. */
     public String signedByAStranger() {
         return strangerJws.sign(claims(Map.of()).getBytes(StandardCharsets.UTF_8));
