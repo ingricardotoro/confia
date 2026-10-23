@@ -32,6 +32,16 @@ public final class AdminProcessLauncher {
      */
     public static ConfigurableApplicationContext launch(String jdbcUrl, String username,
             String password, KeyPair signingKeys) {
+        return launch(jdbcUrl, username, password, signingKeys, Map.of());
+    }
+
+    /**
+     * The same, with properties of its own: the login institution, the trusted proxies, a rate-limit
+     * policy, the Spring profile. They are applied after the ones above, so a caller can also replace
+     * one of them.
+     */
+    public static ConfigurableApplicationContext launch(String jdbcUrl, String username,
+            String password, KeyPair signingKeys, Map<String, String> extra) {
         Map<String, String> overrides = new LinkedHashMap<>();
         overrides.put("confia.web.allowed-origins", ALLOWED_ORIGIN);
         overrides.put("spring.datasource.url", jdbcUrl);
@@ -41,6 +51,7 @@ public final class AdminProcessLauncher {
                 .encodeToString(signingKeys.getPrivate().getEncoded()));
         overrides.put(TestProcessArguments.CURRENT_PUBLIC_KEY_PROPERTY, Base64.getEncoder()
                 .encodeToString(signingKeys.getPublic().getEncoded()));
+        overrides.putAll(extra);
         ConfiaApplication.LaunchOutcome outcome = ConfiaApplication.launch(
                 TestProcessArguments.adminWith(overrides), "admin");
         if (outcome.context() == null) {

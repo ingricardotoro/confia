@@ -101,6 +101,30 @@ class WebLayerTokenIsolationTest {
         assertThat(isExempt(controller.getName())).isFalse();
     }
 
+    /**
+     * BI15 for the login (session-endpoints-cookie-and-csrf design.md decision 20): the controller
+     * and the three types of its answer are classes of the web package the rule evaluates, and none
+     * of them depends on the token package or on the domain of identity. They read the plain views of
+     * {@code identity.application}, which is why no token type reaches the web layer.
+     */
+    @Test
+    void theRuleEvaluatesTheRealLoginControllerAndItsDtosAndTheyNameNeitherTokensNorTheDomain() {
+        for (String name : List.of("com.confia.identity.web.LoginController",
+                "com.confia.identity.web.LoginRequest", "com.confia.identity.web.LoginResponse",
+                "com.confia.identity.web.AuthenticatedSessionResponse",
+                "com.confia.identity.web.SecondFactorPendingResponse")) {
+            JavaClass webClass = productionClasses().get(name);
+
+            assertThat(webClass.getPackageName()).as(name).contains(".web");
+            assertThat(isExempt(name)).as(name).isFalse();
+            assertThat(webClass.getDirectDependenciesFromSelf().stream()
+                    .map(dependency -> dependency.getTargetClass().getPackageName()))
+                    .as("dependencies of %s", name)
+                    .noneMatch(packageName -> packageName.startsWith("com.confia.shared.security.token"))
+                    .noneMatch(packageName -> packageName.startsWith("com.confia.identity.domain"));
+        }
+    }
+
     /** The exemption is by complete class name: an inner class follows its outer, nothing else does. */
     @Test
     void theExemptionNamesTheTwoClassesCompletelyAndNothingElse() {

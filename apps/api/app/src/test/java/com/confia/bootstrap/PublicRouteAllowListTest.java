@@ -230,10 +230,12 @@ class PublicRouteAllowListTest {
             List<Route> routes = RegisteredRoutes.of(context);
 
             if ("default".equals(profile)) {
-                assertThat(routes).as("production registers only the authenticated routes of %s",
-                        process).extracting(Route::toString)
-                        .containsExactlyElementsOf(authenticatedRoutesOf(process));
-                assertThat(allowed.endpoints()).isEmpty();
+                assertThat(routes).as("production registers only the public and the authenticated "
+                        + "routes of %s", process).extracting(Route::toString)
+                        .containsExactlyInAnyOrderElementsOf(productionRoutesOf(process));
+                assertThat(allowed.endpoints()).as("the one public route of production")
+                        .extracting(entry -> entry.method() + " " + entry.pattern())
+                        .containsExactlyElementsOf(publicRoutesOf(process));
             } else {
                 assertThat(routes).as("non-vacuous: springdoc registers its routes in local")
                         .isNotEmpty();
@@ -262,9 +264,21 @@ class PublicRouteAllowListTest {
                 : new AuthenticatedEndpoints(List.of());
     }
 
-    /** The routes production registers in a process, written as {@code METHOD pattern}. */
+    /** The authenticated routes production registers in a process, as {@code METHOD pattern}. */
     private static List<String> authenticatedRoutesOf(String process) {
         return "admin".equals(process) ? List.of("GET /api/v1/auth/sessions/current") : List.of();
+    }
+
+    /** The public routes production registers in a process: the login, in the administrative one. */
+    private static List<String> publicRoutesOf(String process) {
+        return "admin".equals(process) ? List.of("POST /api/v1/auth/sessions") : List.of();
+    }
+
+    /** Every route production registers in a process: its public ones plus its authenticated ones. */
+    private static List<String> productionRoutesOf(String process) {
+        List<String> all = new java.util.ArrayList<>(publicRoutesOf(process));
+        all.addAll(authenticatedRoutesOf(process));
+        return all;
     }
 
     /** BI20, the first control: an authenticated entry whose route answers {@code 200} to anyone. */

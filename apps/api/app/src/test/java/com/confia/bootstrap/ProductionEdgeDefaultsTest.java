@@ -38,7 +38,8 @@ class ProductionEdgeDefaultsTest {
             assertThat(environment.getProperty("springdoc.swagger-ui.enabled")).isEqualTo("false");
             assertThat(environment.getProperty("spring.mvc.log-request-details"))
                     .isEqualTo("false");
-            assertThat(PublicEndpoints.forAdmin(environment).endpoints()).isEmpty();
+            assertThat(PublicEndpoints.forAdmin(environment).endpoints()).extracting(PublicEndpoint::pattern)
+                    .containsExactly("/api/v1/auth/sessions");
             assertThat(PublicEndpoints.forPortal(environment).endpoints()).isEmpty();
         }
     }
@@ -88,10 +89,12 @@ class ProductionEdgeDefaultsTest {
 
         if ("true".equals(value)) {
             assertThat(endpoints).as("SPRINGDOC_API_DOCS_ENABLED=true").containsExactly(
+                    new PublicEndpoint(HttpMethod.POST, "/api/v1/auth/sessions"),
                     new PublicEndpoint(HttpMethod.GET, "/v3/api-docs"),
                     new PublicEndpoint(HttpMethod.GET, "/v3/api-docs/swagger-config"));
         } else {
-            assertThat(endpoints).as("SPRINGDOC_API_DOCS_ENABLED=false").isEmpty();
+            assertThat(endpoints).as("SPRINGDOC_API_DOCS_ENABLED=false").extracting(PublicEndpoint::pattern)
+                    .containsExactly("/api/v1/auth/sessions");
         }
     }
 

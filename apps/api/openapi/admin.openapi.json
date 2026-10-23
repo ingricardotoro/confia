@@ -1,6 +1,37 @@
 {
   "components" : {
     "schemas" : {
+      "AuthenticatedSessionResponse" : {
+        "properties" : {
+          "accessToken" : {
+            "description" : "The access token, for the Authorization header",
+            "format" : "password",
+            "type" : "string"
+          },
+          "accessTokenExpiresAt" : {
+            "description" : "When the access token stops being valid",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "idleExpiresAt" : {
+            "description" : "When the session becomes idle if it is not used again",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "sessionExpiresAt" : {
+            "description" : "The absolute end of the session, whatever its use",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "description" : "Always authenticated: a session was started",
+            "enum" : [ "authenticated" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "accessToken", "accessTokenExpiresAt", "idleExpiresAt", "sessionExpiresAt", "status" ],
+        "type" : "object"
+      },
       "CurrentSessionResponse" : {
         "properties" : {
           "accessTokenExpiresAt" : {
@@ -43,6 +74,40 @@
         },
         "required" : [ "accessTokenExpiresAt", "accountId", "authenticationMethods", "idleExpiresAt", "institutionId", "sessionExpiresAt", "sessionId" ],
         "type" : "object"
+      },
+      "LoginRequest" : {
+        "properties" : {
+          "identifier" : {
+            "description" : "The identifier of the staff account, as typed",
+            "maxLength" : 320,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "password" : {
+            "description" : "The password, as typed",
+            "format" : "password",
+            "maxLength" : 1024,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "identifier", "password" ],
+        "type" : "object"
+      },
+      "LoginResponse" : {
+        "discriminator" : {
+          "mapping" : {
+            "authenticated" : "#/components/schemas/AuthenticatedSessionResponse",
+            "second-factor-enrollment-required" : "#/components/schemas/SecondFactorPendingResponse",
+            "second-factor-required" : "#/components/schemas/SecondFactorPendingResponse"
+          },
+          "propertyName" : "status"
+        },
+        "oneOf" : [ {
+          "$ref" : "#/components/schemas/AuthenticatedSessionResponse"
+        }, {
+          "$ref" : "#/components/schemas/SecondFactorPendingResponse"
+        } ]
       },
       "Money" : {
         "description" : "A monetary amount as it travels over the API: never a JSON number",
@@ -106,6 +171,27 @@
           }
         },
         "type" : "object"
+      },
+      "SecondFactorPendingResponse" : {
+        "properties" : {
+          "secondFactorToken" : {
+            "description" : "The restricted token, for the routes of the second factor only",
+            "format" : "password",
+            "type" : "string"
+          },
+          "secondFactorTokenExpiresAt" : {
+            "description" : "When the restricted token stops being valid",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "description" : "Whether the account must present a code or must enroll a second factor",
+            "enum" : [ "second-factor-required", "second-factor-enrollment-required" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "secondFactorToken", "secondFactorTokenExpiresAt", "status" ],
+        "type" : "object"
       }
     },
     "securitySchemes" : {
@@ -123,6 +209,123 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/v1/auth/sessions" : {
+      "post" : {
+        "description" : "Starts a session (status authenticated, with the session cookie and the CSRF cookie) or, when the account owes a second factor, answers with a restricted token and no cookie (status second-factor-required or second-factor-enrollment-required). Needs no credential, an allowed Origin and a JSON body. The answer for a wrong password is the same for an account that exists and one that does not.",
+        "operationId" : "logIn",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description" : "A session was started, or a second factor is owed",
+            "headers" : {
+              "Set-Cookie" : {
+                "description" : "Only with status authenticated: the session cookie and the CSRF cookie, two headers",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not valid (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The credentials were not accepted (authentication-failed)",
+            "headers" : {
+              "WWW-Authenticate" : {
+                "description" : "The Bearer challenge",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The Origin is missing or not allowed (csrf-invalid)"
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The content type is not JSON (unsupported-media-type)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No capacity to count the client or to hold one more waiting request (capacity-exceeded)"
+          }
+        },
+        "summary" : "Logs in with an identifier and a password",
+        "tags" : [ "auth-sessions" ]
+      }
+    },
     "/api/v1/auth/sessions/current" : {
       "get" : {
         "description" : "Returns the session the access token belongs to and when each of its three ends comes. Needs an access token of a live session and no permission of any role. Reads only: it does not extend the session.",

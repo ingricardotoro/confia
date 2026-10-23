@@ -181,6 +181,27 @@ class LogInIT extends SessionIssuanceIntegrationTest {
         assertThat(decision.requiredDelay()).isEqualTo(Duration.ofSeconds(2));
     }
 
+    @Test
+    void anIdentifierOrAPasswordThatCannotBeNormalizedFailsAtOnceAndTouchesNoTable() {
+        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        List<LoginCommand> unusable = List.of(
+                new LoginCommand("ab", CURRENT_PASSWORD, ClientAddress.parseLiteral(CLIENT_IP), AGENT, ""),
+                new LoginCommand("   ab   ", CURRENT_PASSWORD, null, null, ""),
+                new LoginCommand("x".repeat(321), CURRENT_PASSWORD, null, null, ""),
+                new LoginCommand(ANA, "", null, null, ""),
+                new LoginCommand(ANA, "p".repeat(1025), null, null, ""));
+
+        for (LoginCommand command : unusable) {
+            LoginDecision decision = logIn(EIGHT).execute(command);
+
+            assertThat(decision.outcome()).as("%s", command).isEqualTo(new LoginOutcome.Failed());
+            assertThat(decision.requiredDelay()).isEqualTo(Duration.ZERO);
+        }
+        assertThat(auditRows()).as("nothing was written for an input that names no account").isEmpty();
+        assertThat(count("identity_login_backoff")).isZero();
+        assertThat(count("identity_refresh_token_family")).isZero();
+    }
+
     // --- One transaction ---
 
     @Test

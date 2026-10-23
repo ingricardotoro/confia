@@ -422,9 +422,10 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
     // --- WE29 ---
 
     @Test
-    void theOnlyProductionRouteIsTheCurrentSessionAndEveryOtherAnonymousRequestIs401() {
+    void theProductionRoutesAreTheLoginAndTheCurrentSessionAndEveryOtherAnonymousRequestIs401() {
         assertThat(AdminProcessLauncher.routesOf(process))
-                .containsExactly("GET /api/v1/auth/sessions/current");
+                .containsExactlyInAnyOrder("POST /api/v1/auth/sessions",
+                        "GET /api/v1/auth/sessions/current");
 
         assertProblem(get("/api/v1/auth/sessions"), 401, "authentication-required");
         assertProblem(get("/api/v1/anything"), 401, "authentication-required");

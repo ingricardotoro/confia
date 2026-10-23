@@ -41,8 +41,9 @@ import org.springframework.security.authentication.AuthenticationProvider;
  *   <li>no class of a {@code ..web..} package has {@code Institution} in its name (owner: the first
  *       endpoint of institution administration);
  *   <li>the limiter and the delay materializer are used by no production class outside their own
- *       packages and {@code shared.web.edge}, which wires them (owner: slice C6a, the first
- *       endpoint that applies them);
+ *       packages, {@code shared.web.edge}, which wires them, and the web layer of {@code identity},
+ *       whose login endpoint is the first to apply them (condition H1; inverted by
+ *       session-endpoints-cookie-and-csrf, build-integrity BI49);
  *   <li>the limiter port has one implementation, the in-memory one, and no Redis client is on the
  *       class path (owner: change 11, containerization-and-cicd-pipeline).
  * </ul>
@@ -79,15 +80,15 @@ class WebEdgeScopeExclusionInventoryTest {
             "com.confia.shared.web.ratelimit.RateLimiterRegistry",
             "com.confia.shared.web.ratelimit.RateLimitInterceptor");
     private static final Set<String> LIMITER_PACKAGES = Set.of("com.confia.shared.web.ratelimit",
-            "com.confia.shared.security", "com.confia.shared.web.edge");
+            "com.confia.shared.security", "com.confia.shared.web.edge", "com.confia.identity.web");
 
     /** The types through which a class asks for a delay, and the packages that may. */
     private static final Set<String> MATERIALIZER_TYPES = Set.of(
             "com.confia.shared.web.delay.RequiredDelayMaterializer",
             "com.confia.shared.web.delay.Delayed", "com.confia.shared.web.delay.DelayTimer",
             "com.confia.shared.web.delay.DelayProperties");
-    private static final Set<String> MATERIALIZER_PACKAGES =
-            Set.of("com.confia.shared.web.delay", "com.confia.shared.web.edge");
+    private static final Set<String> MATERIALIZER_PACKAGES = Set.of("com.confia.shared.web.delay",
+            "com.confia.shared.web.edge", "com.confia.identity.web", "com.confia.identity.web.wiring");
 
     /** A class of each Redis client library the project could pick, as a class path resource. */
     private static final List<String> REDIS_CLIENT_RESOURCES = List.of(
@@ -348,10 +349,11 @@ class WebEdgeScopeExclusionInventoryTest {
                 .as("non-vacuous: the edge configuration and the startup check really use the "
                         + "limiter types, so the check below looks at real dependencies")
                 .contains("com.confia.shared.web.edge.ThrottlingConfiguration",
-                        "com.confia.shared.web.ratelimit.RateLimitPolicyCheck");
+                        "com.confia.shared.web.ratelimit.RateLimitPolicyCheck",
+                        "com.confia.identity.web.LoginController");
         assertThat(usesOf(production, LIMITER_TYPES, LIMITER_PACKAGES))
-                .as("only the limiter's own packages and the edge use it: no production "
-                        + "endpoint applies it, and H1 stays open for slice C6a")
+                .as("only the limiter's own packages, the edge and the web layer of identity use it: the "
+                        + "login endpoint applies it (condition H1), and no other package does")
                 .isEmpty();
     }
 
@@ -370,10 +372,11 @@ class WebEdgeScopeExclusionInventoryTest {
 
         assertThat(usesOf(production, MATERIALIZER_TYPES, Set.of()))
                 .as("non-vacuous: the edge configuration really uses the materializer types")
-                .contains("com.confia.shared.web.edge.RequiredDelayConfiguration");
+                .contains("com.confia.shared.web.edge.RequiredDelayConfiguration",
+                        "com.confia.identity.web.LoginController");
         assertThat(usesOf(production, MATERIALIZER_TYPES, MATERIALIZER_PACKAGES))
-                .as("only the materializer's own package and the edge use it: no production "
-                        + "endpoint asks it for a delay, and H1 stays open for slice C6a")
+                .as("only the materializer's own package, the edge and the web layer of identity (the login "
+                        + "endpoint and the configuration that registers it) use it, and no other does")
                 .isEmpty();
     }
 
