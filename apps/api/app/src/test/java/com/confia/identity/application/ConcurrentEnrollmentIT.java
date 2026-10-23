@@ -3,12 +3,9 @@ package com.confia.identity.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.confia.identity.application.EnrollTotpSecondFactorResult.Enrolled;
-import com.confia.identity.domain.LoginIdentifier;
 import com.confia.identity.domain.PlainTotpSecret;
 import com.confia.identity.domain.RecoveryCodeRow;
-import com.confia.identity.domain.StaffAccount;
 import com.confia.identity.domain.StaffAccountId;
-import com.confia.identity.domain.StoredPasswordHash;
 import com.confia.identity.infrastructure.BouncyCastleRecoveryCodeHasher;
 import com.confia.identity.infrastructure.JooqRecoveryCodeRepository;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
@@ -23,7 +20,6 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
@@ -189,42 +185,5 @@ class ConcurrentEnrollmentIT extends PasswordResetIntegrationTest {
         return transactionRunner().execute(context(), () -> dsl.fetchOne(
                 "select count(*) as n from " + table + " where institution_id = ? and account_id = ?",
                 institutionId.value(), account.value()).get("n", Long.class));
-    }
-
-    /**
-     * The real repository, with a pause right after the lock is taken: the test counts {@code locked}
-     * down and the transaction waits for {@code release}, so the other enrollment is started while it
-     * holds the lock of the account.
-     */
-    private static final class HoldingAccounts implements StaffAccountRepository {
-
-        private final StaffAccountRepository real;
-        private final CountDownLatch locked;
-        private final CountDownLatch release;
-
-        HoldingAccounts(StaffAccountRepository real, CountDownLatch locked, CountDownLatch release) {
-            this.real = real;
-            this.locked = locked;
-            this.release = release;
-        }
-
-        @Override
-        public Optional<StaffAccount> findBy(InstitutionId institutionId, LoginIdentifier identifier) {
-            return real.findBy(institutionId, identifier);
-        }
-
-        @Override
-        public Optional<StaffAccount> lockById(InstitutionId institutionId, StaffAccountId accountId) {
-            Optional<StaffAccount> account = real.lockById(institutionId, accountId);
-            locked.countDown();
-            RotationIntegrationTest.awaitRelease(release);
-            return account;
-        }
-
-        @Override
-        public boolean replacePasswordHash(InstitutionId institutionId, StaffAccountId accountId,
-                StoredPasswordHash newHash) {
-            return real.replacePasswordHash(institutionId, accountId, newHash);
-        }
     }
 }
