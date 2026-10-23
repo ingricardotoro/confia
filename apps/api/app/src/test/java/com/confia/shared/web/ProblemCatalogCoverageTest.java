@@ -30,7 +30,7 @@ class ProblemCatalogCoverageTest {
     private static final String CATALOG = "/i18n/problems.properties";
     private static final Pattern ENTRY = Pattern.compile("problem\\.(.+)\\.(title|detail)");
 
-    private static final Set<String> CODES_OF_LATER_CHANGES = Set.of("authentication-failed",
+    private static final Set<String> CODES_OF_LATER_CHANGES = Set.of(
             "institution-not-found", "institution-inactive");
 
     /** Codes that have no non-blank {@code title} or {@code detail} in {@code catalog}. */
@@ -182,16 +182,32 @@ class ProblemCatalogCoverageTest {
     }
 
     @Test
-    void aCatalogEntryOfAnotherChangesCodeIsAnOrphanForThisOne() {
+    void theAuthenticationFailedCodeHasItsSpanishEntriesAndACatalogWithoutThemFails() {
         Properties catalog = loadCatalog();
-        catalog.setProperty("problem.authentication-failed.title", "x");
 
-        assertThat(entriesWithoutACode(catalog))
-                .containsExactly("problem.authentication-failed.title");
+        assertThat(ProblemCode.ofCode("authentication-failed")).isPresent();
+        assertThat(catalog.getProperty("problem.authentication-failed.title"))
+                .isEqualTo("Credenciales inválidas");
+        assertThat(catalog.getProperty("problem.authentication-failed.detail")).isEqualTo(
+                "El identificador o la contraseña no son correctos. Revíselos e inténtelo de nuevo.");
+        catalog.remove("problem.authentication-failed.title");
+        catalog.remove("problem.authentication-failed.detail");
+        assertThat(codesWithoutAMessage(catalog)).containsExactlyInAnyOrder(
+                "authentication-failed (problem.authentication-failed.title)",
+                "authentication-failed (problem.authentication-failed.detail)");
     }
 
     @Test
-    void theSignInAndInstitutionCodesOfTheSessionChangeDoNotExistYet() {
+    void aCatalogEntryOfAnotherChangesCodeIsAnOrphanForThisOne() {
+        Properties catalog = loadCatalog();
+        catalog.setProperty("problem.institution-inactive.title", "x");
+
+        assertThat(entriesWithoutACode(catalog))
+                .containsExactly("problem.institution-inactive.title");
+    }
+
+    @Test
+    void theInstitutionCodesOfALaterChangeDoNotExistYet() {
         Properties catalog = loadCatalog();
         for (String later : CODES_OF_LATER_CHANGES) {
             assertThat(ProblemCode.ofCode(later)).as("code %s", later).isEmpty();

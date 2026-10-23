@@ -26,9 +26,10 @@ import java.util.Optional;
  * chain owns {@link #TOKEN_INVALID} (a credential that is present and not good, including a session
  * that is over) and {@link #TOKEN_EXPIRED} (an intact token whose time has passed), and the
  * {@code WWW-Authenticate} challenge of each {@code 401} follows from its code
- * (session-tokens-and-web-layer design.md, decision 5). The sign-in code
- * ({@code authentication-failed}) and the
- * institution codes belong to the session change and do not exist yet. {@link
+ * (session-tokens-and-web-layer design.md, decision 5). The login endpoint owns
+ * {@link #AUTHENTICATION_FAILED} (credentials that were not accepted, the same for an account that
+ * exists and one that does not; session-endpoints-cookie-and-csrf design.md, decision 18). The
+ * institution codes belong to a later change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
  *
@@ -42,6 +43,7 @@ public enum ProblemCode {
     AUTHENTICATION_REQUIRED("authentication-required", 401),
     TOKEN_INVALID("token-invalid", 401),
     TOKEN_EXPIRED("token-expired", 401),
+    AUTHENTICATION_FAILED("authentication-failed", 401),
     CSRF_INVALID("csrf-invalid", 403),
     FORBIDDEN("forbidden", 403),
     RESOURCE_NOT_FOUND("resource-not-found", 404),

@@ -116,7 +116,7 @@ class WebEdgeHarness {
         for (String path : List.of("/test/bounded", "/test/constraint-violation", "/test/required", "/test/sql-reset", "/test/data-access-sql", "/test/data-access-spring",
                 "/test/data-access-jooq", "/test/data-access-bare", "/test/post-only", "/test/status", "/test/access-denied",
                 "/test/unmapped",
-                "/test/domain-known", "/test/domain-unknown", "/test/disconnected")) {
+                "/test/domain-known", "/test/domain-unknown", "/test/problem-code", "/test/disconnected")) {
             endpoints.add(new PublicEndpoint(HttpMethod.GET, path));
         }
         if (portal) {
