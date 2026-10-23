@@ -187,11 +187,15 @@ class ConsumeRecoveryCodeIT extends CommittingPostgresIntegrationTest {
                 .toList();
     }
 
-    private EnrollTotpSecondFactorResult enroll(InstitutionId institutionId, StaffAccountId accountId) {
+    private EnrollTotpSecondFactorResult.Enrolled enroll(InstitutionId institutionId,
+            StaffAccountId accountId) {
         EnrollTotpSecondFactor useCase = new EnrollTotpSecondFactor(transactionRunner(),
+                new com.confia.identity.infrastructure.JooqStaffAccountRepository(dsl),
                 new JooqTotpCredentialRepository(dsl), new JooqRecoveryCodeRepository(dsl),
-                recoveryCodeHasher(), encryptionService(), new JooqAuditLogWriter(dsl));
-        return useCase.execute(contextOf(institutionId), accountId);
+                recoveryCodeHasher(), encryptionService(), new JooqAuditLogWriter(dsl),
+                Clock.fixed(NOW, ZoneOffset.UTC));
+        return (EnrollTotpSecondFactorResult.Enrolled) useCase.execute(contextOf(institutionId),
+                accountId);
     }
 
     private ConsumeRecoveryCodeDecision consume(InstitutionId institutionId, StaffAccountId accountId,

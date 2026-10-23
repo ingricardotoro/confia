@@ -290,11 +290,11 @@ public class IdentityConfiguration {
 
     @Bean
     EnrollTotpSecondFactor enrollTotpSecondFactor(TransactionRunner runner,
-            TotpCredentialRepository credentials, RecoveryCodeRepository recoveryCodes,
-            RecoveryCodeHasher recoveryCodeHasher, ColumnEncryptionService encryption,
-            AuditLogWriter auditLogWriter) {
-        return new EnrollTotpSecondFactor(runner, credentials, recoveryCodes, recoveryCodeHasher,
-                encryption, auditLogWriter);
+            StaffAccountRepository accounts, TotpCredentialRepository credentials,
+            RecoveryCodeRepository recoveryCodes, RecoveryCodeHasher recoveryCodeHasher,
+            ColumnEncryptionService encryption, AuditLogWriter auditLogWriter, Clock clock) {
+        return new EnrollTotpSecondFactor(runner, accounts, credentials, recoveryCodes,
+                recoveryCodeHasher, encryption, auditLogWriter, clock);
     }
 
     @Bean

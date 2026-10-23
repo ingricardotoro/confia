@@ -257,7 +257,7 @@ class PasswordResetRevokesSessionsIT extends PasswordResetIntegrationTest {
             seedFamily(sofia, "2026-10-15T09:00:00Z", null, null, true);
         }
 
-        EnrollTotpSecondFactorResult enrollment = enroll(sofia);
+        EnrollTotpSecondFactorResult.Enrolled enrollment = enroll(sofia);
 
         assertThat(enrollment.secret()).isNotNull();
         assertThat(families(sofia)).hasSize(2)
