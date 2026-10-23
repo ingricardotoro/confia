@@ -470,6 +470,28 @@ retardos y el bloqueo por IP contra múltiples cuentas.
 > puerto no tiene operación de éxito. El adaptador de Redis del cambio 11 sustituye a este detrás
 > del mismo puerto y debe conservar esta semántica.
 
+> **Nota fechada 2026-10-22 (cambio `session-endpoints-cookie-and-csrf`, tarea 3.1): control por IP
+> aplicado al inicio de sesión y señal de cinco cuentas, sin bloqueo.** El control por dirección IP
+> descrito arriba **ya se aplica** a una ruta de producción: `POST /api/v1/auth/sessions` declara
+> `@RateLimited(policy = "admin-login")` (10 solicitudes por minuto por IP y la capa 2 desde el décimo
+> fallo en 10 minutos). El limitador responde `429` con `Retry-After` antes de abrir ninguna
+> transacción y antes de Argon2id, y una regla de arquitectura (`SessionRoutesRateLimitedRuleTest`)
+> hace fallar la construcción si un manejador de `identity.web` que cambia estado no declara su
+> política: así queda cerrada la condición H1. Solo cuenta como fallo de la IP el desenlace
+> `Rejected`; una contraseña correcta con segundo factor pendiente no cuenta. Reserva declarada: con
+> `confia.web.trusted-proxies` vacío, el tráfico detrás de un proxy comparte un cubo; su llenado es
+> del cambio 11.
+>
+> La fila «Por IP contra cuentas distintas» queda cumplida **solo como señal, sin bloqueo**: cuando una
+> IP acumula fallos `Rejected` contra cinco identificadores distintos (por su huella con llave, exista
+> o no la cuenta) en una ventana de 10 minutos (un fallo cuenta mientras su antigüedad sea
+> estrictamente menor que 10 minutos), se escribe en la misma transacción el asiento
+> `identity.login.failure_spread_detected` y, tras confirmar, un `WARN` que lleva solo el identificador
+> de la petición y el nombre del evento. La señal no cambia la respuesta de ningún intento. El bloqueo
+> de 1 hora y la alerta al canal de seguridad que la tabla describe **siguen siendo del cambio 11**,
+> junto con el estado compartido: el contador de la señal vive en memoria del proceso y comparte las
+> tres limitaciones de arriba.
+
 ### 4.5 Sesiones y tokens
 
 | Aspecto | Decisión |
