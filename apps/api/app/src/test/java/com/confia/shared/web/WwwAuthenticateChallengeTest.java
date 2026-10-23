@@ -9,6 +9,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -45,6 +46,38 @@ class WwwAuthenticateChallengeTest {
 
         assertProblem(response, 401, "authentication-required");
         assertThat(response.headers().allValues("WWW-Authenticate")).containsExactly("Bearer");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"authentication-required, Bearer", "authentication-failed, Bearer",
+            "token-invalid, 'Bearer error=\"invalid_token\"'",
+            "token-expired, 'Bearer error=\"invalid_token\"'"})
+    void aControllerThatEndsTheRequestWithA401CodeGetsTheChallengeOfThatCode(String code,
+            String challenge) {
+        HttpResponse<String> response = process.get("/test/problem-code?code=" + code);
+
+        assertProblem(response, 401, code);
+        assertThat(response.headers().allValues("WWW-Authenticate")).containsExactly(challenge);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"csrf-invalid", "forbidden"})
+    void aControllerThatEndsTheRequestWithA403CodeGetsNoChallenge(String code) {
+        HttpResponse<String> response = process.get("/test/problem-code?code=" + code);
+
+        assertProblem(response, 403, code);
+        assertThat(response.headers().firstValue("WWW-Authenticate")).isEmpty();
+    }
+
+    @Test
+    void theAuthenticationFailedAnswerIsTheCatalogsAndNeverTheInternalMessage() {
+        HttpResponse<String> response = process.get("/test/problem-code?code=authentication-failed");
+
+        assertThat(HarnessProcess.json(response).get("title").asString())
+                .isEqualTo("Credenciales inválidas");
+        assertThat(HarnessProcess.json(response).get("detail").asString()).isEqualTo(
+                "El identificador o la contraseña no son correctos. Revíselos e inténtelo de nuevo.");
+        assertThat(response.body()).doesNotContain("the request ended with");
     }
 
     @Test

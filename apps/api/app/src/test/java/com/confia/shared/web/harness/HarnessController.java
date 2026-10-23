@@ -5,6 +5,8 @@ import com.confia.organization.application.CurrentInstitutionProvider;
 import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.RequestOrigin;
 import com.confia.shared.web.authentication.ActorAuthentication;
+import com.confia.shared.web.problem.ProblemCode;
+import com.confia.shared.web.problem.ProblemCodeException;
 import com.confia.shared.web.problem.ProblemResponses;
 import com.confia.shared.web.request.RequestContextFilter;
 import jakarta.servlet.http.HttpServletRequest;
@@ -162,6 +164,12 @@ class HarnessController {
     @GetMapping("/test/domain-unknown")
     String domainUnknown() {
         throw new UnknownDomainFailure();
+    }
+
+    /** Public for {@code GET}: ends the request with the given code of the catalog, as a controller of the session routes does. */
+    @GetMapping("/test/problem-code")
+    String problemCode(@RequestParam(name = "code") String code) {
+        throw new ProblemCodeException(ProblemCode.ofCode(code).orElseThrow());
     }
 /** Public for {@code GET}: a database failure whose root cause carries a socket's words. */    @GetMapping("/test/sql-reset")    String sqlReset() throws SQLException {        throw new SQLException("could not read the ledger",                new SocketException("Connection reset by peer"));    }    /** Registered for {@code POST} only and public for {@code GET}: a method the route does not serve. */    @PostMapping("/test/post-only")    String postOnly() {        return "posted";    }    /** Public for {@code GET}: fails the way a controller does with {@code ResponseStatusException}. */    @GetMapping("/test/status")    String status(@RequestParam(name = "code") int code) {        throw new ResponseStatusException(HttpStatusCode.valueOf(code), "secret reason");    }    /** Public for {@code GET}: a security exception raised inside the MVC layer. */    @GetMapping("/test/access-denied")    String accessDenied() {        throw new AccessDeniedException("secret reason");    }
 
