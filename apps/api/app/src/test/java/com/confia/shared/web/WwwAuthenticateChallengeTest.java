@@ -50,7 +50,7 @@ class WwwAuthenticateChallengeTest {
 
     @ParameterizedTest
     @CsvSource({"authentication-required, Bearer", "authentication-failed, Bearer",
-            "second-factor-invalid, Bearer",
+            "second-factor-invalid, Bearer", "session-expired, Bearer",
             "token-invalid, 'Bearer error=\"invalid_token\"'",
             "token-expired, 'Bearer error=\"invalid_token\"'"})
     void aControllerThatEndsTheRequestWithA401CodeGetsTheChallengeOfThatCode(String code,
@@ -80,6 +80,18 @@ class WwwAuthenticateChallengeTest {
                 .isEqualTo("El segundo factor ya está configurado");
     }
 
+
+    @Test
+    void theSessionExpiredAnswerIsTheCatalogsAndNeverTheInternalMessage() {
+        HttpResponse<String> response = process.get("/test/problem-code?code=session-expired");
+
+        assertProblem(response, 401, "session-expired");
+        assertThat(HarnessProcess.json(response).get("title").asString())
+                .isEqualTo("La sesión terminó");
+        assertThat(HarnessProcess.json(response).get("detail").asString())
+                .isEqualTo("Su sesión terminó o ya no es válida. Inicie sesión de nuevo.");
+        assertThat(response.body()).doesNotContain("the request ended with");
+    }
     @Test
     void theSecondFactorInvalidAnswerIsTheCatalogsAndNeverTheInternalMessage() {
         HttpResponse<String> response = process.get("/test/problem-code?code=second-factor-invalid");

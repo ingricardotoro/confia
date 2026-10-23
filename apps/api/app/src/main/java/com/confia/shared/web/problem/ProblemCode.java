@@ -31,7 +31,8 @@ import java.util.Optional;
  * exists and one that does not; session-endpoints-cookie-and-csrf design.md, decision 18). The
  * second-factor endpoints own {@link #SECOND_FACTOR_INVALID} (a proof that was not accepted, with no
  * word about why) and {@link #MFA_ALREADY_ENROLLED} (an enrollment of a credential that is already
- * verified). The
+ * verified). The refresh endpoint owns {@link #SESSION_EXPIRED} (a refresh token that was not
+ * accepted, whatever the reason: unknown, revoked, expired, reused or bound elsewhere). The
  * institution codes belong to a later change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
@@ -48,6 +49,7 @@ public enum ProblemCode {
     TOKEN_EXPIRED("token-expired", 401),
     AUTHENTICATION_FAILED("authentication-failed", 401),
     SECOND_FACTOR_INVALID("second-factor-invalid", 401),
+    SESSION_EXPIRED("session-expired", 401),
     CSRF_INVALID("csrf-invalid", 403),
     FORBIDDEN("forbidden", 403),
     RESOURCE_NOT_FOUND("resource-not-found", 404),
