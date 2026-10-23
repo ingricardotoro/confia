@@ -19,6 +19,8 @@ import com.confia.identity.domain.RefreshTokenHash;
 import com.confia.identity.domain.RefreshTokenRow;
 import com.confia.identity.domain.RefreshTokenState;
 import com.confia.identity.domain.StaffAccount;
+import com.confia.identity.domain.PlainRecoveryCode;
+import com.confia.identity.domain.PlainTotpSecret;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.StoredPasswordHash;
 import com.confia.identity.domain.UserAgentFingerprint;
@@ -27,6 +29,7 @@ import com.confia.identity.testsupport.fixture.LeakingRefreshTokenFixture;
 import com.confia.kernel.AesGcmCipher;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
+import com.confia.shared.security.SecondFactorPurpose;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.crypto.DataEncryptionKeyId;
 import com.confia.shared.crypto.DataEncryptionKeyMaterial;
@@ -78,6 +81,8 @@ class SessionSecretsNotObservableTest {
     private static final InstitutionId INSTITUTION = new InstitutionId(UUID.randomUUID());
     private static final StaffAccountId ACCOUNT = new StaffAccountId(UUID.randomUUID());
     private static final String AGENT = "agente-uno";
+    private static final String PRESENTED_TOTP = "739201";
+    private static final String PRESENTED_RECOVERY_CODE = "QWERTYUIOP";
     private static final String OTHER_AGENT = "agente-dos";
     private static final String START = "2026-10-12T09:00:00Z";
     private static final String ROTATED_AT = "2026-10-12T09:15:00Z";
@@ -138,6 +143,12 @@ class SessionSecretsNotObservableTest {
             secrets.put("the data-encryption key (base64)", Base64.getEncoder().encodeToString(DEK));
             secrets.put("the data-encryption key (hex)", HexFormat.of().formatHex(DEK));
             secrets.put("the fingerprint of the agent", UserAgentFingerprint.of(AGENT).value());
+            secrets.put("the TOTP code presented to the second factor", PRESENTED_TOTP);
+            secrets.put("the recovery code presented to the second factor", PRESENTED_RECOVERY_CODE);
+            PlainTotpSecret enrolledSecret = PlainTotpSecret.generate(new SecureRandom());
+            PlainRecoveryCode enrolledCode = PlainRecoveryCode.generate(new SecureRandom());
+            secrets.put("the TOTP secret of an enrollment (base32)", enrolledSecret.base32());
+            secrets.put("a recovery code of an enrollment", enrolledCode.value());
 
             produced.addAll(textOf(unauthenticated));
             for (Object holder : List.<Object>of(first, fresh, grace, reuse, first.refreshToken(),
@@ -149,7 +160,18 @@ class SessionSecretsNotObservableTest {
                             RefreshTokenHash.of(first.refreshToken()), Instant.parse(START),
                             Instant.parse(ROTATED_AT)),
                     UserAgentFingerprint.of(AGENT), new SecurityContext("", "system",
-                            INSTITUTION.value().toString(), UUID.randomUUID().toString()))) {
+                            INSTITUTION.value().toString(), UUID.randomUUID().toString()),
+                    new CompleteSecondFactorCommand(ACCOUNT.value(), INSTITUTION.value(),
+                            SecondFactorPurpose.VERIFY, PRESENTED_TOTP, null, null, AGENT, "req"),
+                    new CompleteSecondFactorCommand(ACCOUNT.value(), INSTITUTION.value(),
+                            SecondFactorPurpose.VERIFY, null, PRESENTED_RECOVERY_CODE, null, AGENT,
+                            "req"),
+                    new SecondFactorOutcome.Started(new SessionGrant(
+                            first.accessToken().compact(), Instant.parse(ROTATED_AT),
+                            first.refreshToken().value(), Instant.parse(ROTATED_AT),
+                            Instant.parse(ROTATED_AT))),
+                    new EnrollTotpSecondFactorResult.Enrolled(enrolledSecret,
+                            List.of(enrolledCode), false))) {
                 produced.add(String.valueOf(holder));
             }
             for (AuditEntry entry : audited) {
