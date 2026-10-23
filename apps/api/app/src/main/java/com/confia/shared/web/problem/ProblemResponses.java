@@ -96,7 +96,7 @@ public final class ProblemResponses {
      */
     private static String challengeOf(ProblemCode code) {
         return switch (code) {
-            case AUTHENTICATION_REQUIRED, AUTHENTICATION_FAILED -> BEARER;
+            case AUTHENTICATION_REQUIRED, AUTHENTICATION_FAILED, SECOND_FACTOR_INVALID -> BEARER;
             case TOKEN_INVALID, TOKEN_EXPIRED -> BEARER_INVALID_TOKEN;
             default -> null;
         };

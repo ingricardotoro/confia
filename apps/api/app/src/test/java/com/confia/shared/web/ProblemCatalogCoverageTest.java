@@ -198,6 +198,29 @@ class ProblemCatalogCoverageTest {
     }
 
     @Test
+    void theTwoSecondFactorCodesHaveTheirSpanishEntriesAndACatalogWithoutThemFails() {
+        Properties catalog = loadCatalog();
+
+        assertThat(ProblemCode.ofCode("second-factor-invalid")).isPresent();
+        assertThat(ProblemCode.ofCode("mfa-already-enrolled")).isPresent();
+        assertThat(catalog.getProperty("problem.second-factor-invalid.title"))
+                .isEqualTo("Código de verificación no válido");
+        assertThat(catalog.getProperty("problem.second-factor-invalid.detail")).isEqualTo(
+                "El código ingresado no es válido o ya se usó. Ingrese el código actual de su aplicación "
+                        + "de autenticación o un código de recuperación.");
+        assertThat(catalog.getProperty("problem.mfa-already-enrolled.title"))
+                .isEqualTo("El segundo factor ya está configurado");
+        assertThat(catalog.getProperty("problem.mfa-already-enrolled.detail")).isEqualTo(
+                "La cuenta ya tiene un segundo factor activo. Inicie sesión con el código de su aplicación "
+                        + "de autenticación.");
+        catalog.remove("problem.second-factor-invalid.title");
+        catalog.remove("problem.mfa-already-enrolled.detail");
+        assertThat(codesWithoutAMessage(catalog)).containsExactlyInAnyOrder(
+                "second-factor-invalid (problem.second-factor-invalid.title)",
+                "mfa-already-enrolled (problem.mfa-already-enrolled.detail)");
+    }
+
+    @Test
     void aCatalogEntryOfAnotherChangesCodeIsAnOrphanForThisOne() {
         Properties catalog = loadCatalog();
         catalog.setProperty("problem.institution-inactive.title", "x");

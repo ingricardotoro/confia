@@ -50,6 +50,7 @@ class WwwAuthenticateChallengeTest {
 
     @ParameterizedTest
     @CsvSource({"authentication-required, Bearer", "authentication-failed, Bearer",
+            "second-factor-invalid, Bearer",
             "token-invalid, 'Bearer error=\"invalid_token\"'",
             "token-expired, 'Bearer error=\"invalid_token\"'"})
     void aControllerThatEndsTheRequestWithA401CodeGetsTheChallengeOfThatCode(String code,
@@ -67,6 +68,28 @@ class WwwAuthenticateChallengeTest {
 
         assertProblem(response, 403, code);
         assertThat(response.headers().firstValue("WWW-Authenticate")).isEmpty();
+    }
+
+    @Test
+    void aControllerThatRefusesAnEnrollmentOfAVerifiedCredentialGetsA409WithNoChallenge() {
+        HttpResponse<String> response = process.get("/test/problem-code?code=mfa-already-enrolled");
+
+        assertProblem(response, 409, "mfa-already-enrolled");
+        assertThat(response.headers().firstValue("WWW-Authenticate")).isEmpty();
+        assertThat(HarnessProcess.json(response).get("title").asString())
+                .isEqualTo("El segundo factor ya está configurado");
+    }
+
+    @Test
+    void theSecondFactorInvalidAnswerIsTheCatalogsAndNeverTheInternalMessage() {
+        HttpResponse<String> response = process.get("/test/problem-code?code=second-factor-invalid");
+
+        assertThat(HarnessProcess.json(response).get("title").asString())
+                .isEqualTo("Código de verificación no válido");
+        assertThat(HarnessProcess.json(response).get("detail").asString()).isEqualTo(
+                "El código ingresado no es válido o ya se usó. Ingrese el código actual de su aplicación "
+                        + "de autenticación o un código de recuperación.");
+        assertThat(response.body()).doesNotContain("the request ended with");
     }
 
     @Test

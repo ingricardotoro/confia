@@ -29,6 +29,9 @@ import java.util.Optional;
  * (session-tokens-and-web-layer design.md, decision 5). The login endpoint owns
  * {@link #AUTHENTICATION_FAILED} (credentials that were not accepted, the same for an account that
  * exists and one that does not; session-endpoints-cookie-and-csrf design.md, decision 18). The
+ * second-factor endpoints own {@link #SECOND_FACTOR_INVALID} (a proof that was not accepted, with no
+ * word about why) and {@link #MFA_ALREADY_ENROLLED} (an enrollment of a credential that is already
+ * verified). The
  * institution codes belong to a later change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
@@ -44,11 +47,13 @@ public enum ProblemCode {
     TOKEN_INVALID("token-invalid", 401),
     TOKEN_EXPIRED("token-expired", 401),
     AUTHENTICATION_FAILED("authentication-failed", 401),
+    SECOND_FACTOR_INVALID("second-factor-invalid", 401),
     CSRF_INVALID("csrf-invalid", 403),
     FORBIDDEN("forbidden", 403),
     RESOURCE_NOT_FOUND("resource-not-found", 404),
     METHOD_NOT_ALLOWED("method-not-allowed", 405),
     IDEMPOTENCY_CONFLICT("idempotency-conflict", 409),
+    MFA_ALREADY_ENROLLED("mfa-already-enrolled", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
     IDEMPOTENCY_PAYLOAD_MISMATCH("idempotency-payload-mismatch", 422),
     TOO_MANY_REQUESTS("too-many-requests", 429),
