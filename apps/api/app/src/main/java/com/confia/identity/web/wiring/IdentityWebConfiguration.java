@@ -1,5 +1,6 @@
 package com.confia.identity.web.wiring;
 
+import com.confia.identity.application.CompleteSecondFactor;
 import com.confia.identity.application.DescribeCurrentSession;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.LogIn;
@@ -41,7 +42,9 @@ public class IdentityWebConfiguration {
     }
 
     @Bean
-    SecondFactorController secondFactorController(EnrollTotpSecondFactor enroll) {
-        return new SecondFactorController(enroll);
+    SecondFactorController secondFactorController(CompleteSecondFactor complete,
+            EnrollTotpSecondFactor enroll, RequiredDelayMaterializer delays,
+            RateLimitFailures failures, SessionCookies cookies) {
+        return new SecondFactorController(complete, enroll, delays, failures, cookies);
     }
 }

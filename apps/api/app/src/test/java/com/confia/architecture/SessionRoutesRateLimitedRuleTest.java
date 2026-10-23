@@ -72,12 +72,12 @@ class SessionRoutesRateLimitedRuleTest {
     }
 
     @Test
-    void theRuleEvaluatesTheEnrollmentHandlerAndItDeclaresTheMfaPolicy() {
+    void theRuleEvaluatesTheTwoSecondFactorHandlersAndBothDeclareTheMfaPolicy() {
         JavaClasses production = productionClasses();
 
         assertThat(production.get("com.confia.identity.web.SecondFactorController").getMethods().stream()
                 .filter(CHANGES_STATE)).extracting(JavaMethod::getName)
-                .containsExactly("enroll");
+                .containsExactlyInAnyOrder("verify", "enroll");
         production.get("com.confia.identity.web.SecondFactorController").getMethods().stream()
                 .filter(CHANGES_STATE).forEach(method -> assertThat(
                         method.getAnnotationOfType(RateLimited.class).policy()).isEqualTo("admin-mfa"));
