@@ -411,7 +411,7 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
     regla, H1, OpenAPI, documentación). — Escenarios I74, I75, I87 a I90, I119, I120, I149 a I166, I205, I206, I224, I228, WE11 a WE14, WE41, WE62, WE64,
     WE87, «Ninguna respuesta crea sesión», «Tipo de contenido no admitido», los tres escenarios del origen de la petición en la bitácora, BI25, BI27, BI45 y BI49.
 
-- [ ] 3.2 **PR 6 `second-factor-endpoints`: clase de ruta restringida, inscripción repetible, verificación y revocación `mfa_change` (decisiones 6 y 13, DA-7 *c*, O10, D-N2, D-N3).**
+- [x] 3.2 **PR 6 `second-factor-endpoints`: clase de ruta restringida, inscripción repetible, verificación y revocación `mfa_change` (decisiones 6 y 13, DA-7 *c*, O10, D-N2, D-N3).**
   - **ROJO, parte 6a.** Crear `test/java/com/confia/shared/web/authentication/SecondFactorRouteTest.java` (arnés con una ruta restringida de
     `{VERIFY, ENROLL}` y otra de `{ENROLL}`: el principal restringido está presente y `AuthenticatedActor.current()` está vacío, y
     `TokenCurrentInstitutionProvider` lanza [WE66]; el acceso, `mfa-verify` y `mfa-enroll` abren solo lo suyo y el resto responde `401 token-invalid`,
@@ -855,3 +855,5 @@ Por especificación: `identity` 103 (1.1: 0, 2.1: 8, 3.1: 29, 3.2: 38, 3.3: 19, 
   y se revisa en el cambio 8.
 
 > **Nota fechada 2026-10-22 (tarea 3.1 en seis ramas apiladas 05a a 05f).** 05a `failure-spread-window` (572), 05b `login-views-and-event-log` (551), 05c `login-use-case` (788), 05d `authentication-failed-problem-code` (174), 05e `login-controller-and-h1` (1 469: indivisible por la condición H1, controlador, limitador, regla, prueba de H1, instantánea OpenAPI y inventarios deben ir juntos; requiere `size:exception`) y 05f `login-endpoint-behaviour` (742). Desviaciones: la seña de cinco cuentas usa `shared.observability.events.SecurityEventLog` porque `identity` no puede depender de slf4j; `LogIn` rechaza sin tocar tablas un identificador o contraseña que la normalización deja inválidos (antes habría sido un 500). G-4: ver `apply-progress.md`.
+
+> **Nota fechada 2026-10-23 (tarea 3.2 en doce ramas apiladas 06a a 06l).** La tarea completa superaba 4 000 líneas efectivas frente a las 1 430 de la estimación realista; se partió por costuras de código completo: 06a y 06b (clase de ruta restringida), 06c a 06e (credencial verificada e inscripción repetible), 06f a 06h (finalización del segundo factor y su concurrencia), 06i (códigos de problema), 06j y 06k (las dos rutas, cada una con su limitador `admin-mfa`) y 06l (documentación). Desviaciones y evidencia en `apply-progress.md`.

@@ -410,6 +410,20 @@ Prueba de integración que reutiliza un código ya consumido y espera rechazo.
 > tercero, 2^(n−3) segundos con tope de 900; y el contador se reinicia tras 30 minutos sin intentos.
 > Es más estricta en los primeros intentos, y evita mantener dos políticas de retroceso distintas.
 
+> **Nota fechada 2026-10-23 (cambio `session-endpoints-cookie-and-csrf`, tarea 3.2): inscripción de dos
+> momentos y «MFA activa».** «MFA activa» significa `mfa_required` en `true` y una credencial
+> **verificada**, es decir, que aceptó al menos un código TOTP (contador aceptado mayor o igual que
+> cero). Una credencial inscrita y nunca verificada equivale, para el inicio de sesión y para el
+> restablecimiento de contraseña, a no tener secreto: el inicio de sesión pide la inscripción y el
+> restablecimiento acepta solo el enlace. Un código de recuperación nunca verifica una credencial. La
+> inscripción (`POST /api/v1/auth/mfa/enrollments`) es repetible mientras la credencial no se haya
+> verificado: reemplaza el secreto, inutiliza los diez códigos previos y se audita cada vez; con una
+> credencial verificada responde `409 mfa-already-enrolled`. **Riesgo declarado de la ventana de
+> primera inscripción (DA-15, a revisar en el cambio 8):** hasta la primera verificación, quien conozca
+> la contraseña puede reemplazar el secreto; cada reinscripción queda auditada
+> (`identity.mfa.enrolled` con `replacedUnverified`). No hay migración: la inscripción en dos momentos
+> usa el contador `-1` como marca de «sin verificar».
+
 ### 4.4 Bloqueo con retroceso exponencial
 
 No se usa bloqueo permanente de cuenta: es un vector de denegación de servicio contra usuarios
@@ -532,6 +546,17 @@ este control.
 > claves» se cumple, hasta el cambio 11, con las variables de entorno de `docs/05` y un anillo de dos
 > claves, `current` y `previous`, descrito en 11.2. La publicación por JWKS queda diferida: el único
 > verificador es el propio proceso, con el anillo en memoria.
+
+> **Nota fechada 2026-10-23 (cambio `session-endpoints-cookie-and-csrf`, tarea 3.2): rutas restringidas y
+> revocación por MFA.** El token restringido de MFA solo abre las dos rutas de la clase restringida,
+> `POST /api/v1/auth/mfa/verifications` (usos `mfa-verify` y `mfa-enroll`) y
+> `POST /api/v1/auth/mfa/enrollments` (uso `mfa-enroll`); en cualquier otra ruta se rechaza por su
+> audiencia con `token-invalid`. Su principal es de un tipo propio y nunca puebla el actor de sesión.
+> Ambas rutas están bajo la política `admin-mfa` (20 por minuto por IP; 10 `second-factor-invalid` en 10
+> minutos activan la restricción). La primera verificación correcta, que solo acepta un código TOTP,
+> activa la credencial y revoca las demás familias vivas de la cuenta con el motivo `mfa_change`, antes
+> de emitir la familia nueva y en la misma transacción (obligación O10); el asiento
+> `identity.session.revoked` existe también con cero familias.
 
 ### 4.6 Prevención de enumeración de usuarios
 
