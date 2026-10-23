@@ -213,6 +213,23 @@
         },
         "required" : [ "secondFactorToken", "secondFactorTokenExpiresAt", "status" ],
         "type" : "object"
+      },
+      "SecondFactorVerificationRequest" : {
+        "properties" : {
+          "code" : {
+            "description" : "The current code of the authenticator application. Exactly one of code and recoveryCode is sent",
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "recoveryCode" : {
+            "description" : "A recovery code of the enrollment. Exactly one of code and recoveryCode is sent; the first verification of a credential does not accept it",
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "type" : "object"
       }
     },
     "securitySchemes" : {
@@ -318,6 +335,126 @@
           "bearerAuth" : [ ]
         } ],
         "summary" : "Enrolls the TOTP second factor, or replaces the secret of one never verified",
+        "tags" : [ "auth-mfa" ]
+      }
+    },
+    "/api/v1/auth/mfa/verifications" : {
+      "post" : {
+        "description" : "Takes the restricted token of the login (mfa-verify, or mfa-enroll for the first verification) and exactly one of a TOTP code or a recovery code. The first verification of a credential accepts only a TOTP code, activates the credential and ends the other sessions of the account. Answers with a session and the two cookies, or with second-factor-invalid, which does not say why the proof was refused.",
+        "operationId" : "completeSecondFactor",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SecondFactorVerificationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthenticatedSessionResponse"
+                }
+              }
+            },
+            "description" : "A session was started",
+            "headers" : {
+              "Set-Cookie" : {
+                "description" : "The session cookie and the CSRF cookie, two headers",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not valid, or does not carry exactly one proof (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), a restricted token that is expired (token-expired) or not accepted by this route (token-invalid), or a proof that was not accepted (second-factor-invalid)",
+            "headers" : {
+              "WWW-Authenticate" : {
+                "description" : "The Bearer challenge",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The Origin is missing or not allowed (csrf-invalid)"
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The content type is not JSON (unsupported-media-type)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No capacity to count the client or to hold one more waiting request (capacity-exceeded)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Verifies a second-factor proof and starts the session",
         "tags" : [ "auth-mfa" ]
       }
     },

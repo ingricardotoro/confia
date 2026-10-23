@@ -37,8 +37,10 @@ public final class AuthenticatedEndpoints {
     public static AuthenticatedEndpoints forAdmin() {
         return new AuthenticatedEndpoints(List.of(new AuthenticatedEndpoint(HttpMethod.GET,
                 "/api/v1/auth/sessions/current", SessionCheck.LIVE_SESSION)),
-                List.of(new SecondFactorEndpoint(HttpMethod.POST, "/api/v1/auth/mfa/enrollments",
-                        Set.of(SecondFactorPurpose.ENROLL))));
+                List.of(new SecondFactorEndpoint(HttpMethod.POST, "/api/v1/auth/mfa/verifications",
+                                Set.of(SecondFactorPurpose.VERIFY, SecondFactorPurpose.ENROLL)),
+                        new SecondFactorEndpoint(HttpMethod.POST, "/api/v1/auth/mfa/enrollments",
+                                Set.of(SecondFactorPurpose.ENROLL))));
     }
 
     /** The routes, in a list that cannot be modified. */
