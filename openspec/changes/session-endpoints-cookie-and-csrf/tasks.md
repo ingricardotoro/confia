@@ -533,7 +533,7 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
 
 ## Fase 4: cierre y seguimientos
 
-- [ ] 4.1 **PR 8 `closing-and-follow-ups`: F2, F3, O9, puerta de tiempo, ausencias, contratos y notas documentales.**
+- [x] 4.1 **PR 8 `closing-and-follow-ups`: F2, F3, O9, puerta de tiempo, ausencias, contratos y notas documentales.**
   - **ROJO.** Crear `test/java/com/confia/shared/security/token/ClaimReaderTest.java` (`epochSecond` −1, 0, `LAST_EPOCH_SECOND`, `LAST_EPOCH_SECOND + 1`,
     `Long.MAX_VALUE`, decimales `1.5` y `1760263800.0` y la cadena `"1760263800"`; los ocho mutantes de PIT eliminados) [I212, I213]; ampliar
     `SessionSecretsNotObservableTest.java` con el `jti` del acceso y del restringido en el mapa `secrets`, y una variante que lo expone en `toString()` que
@@ -567,6 +567,7 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
     (solo si supera 800): 8a pruebas y código, 8b notas documentales. — Escenarios I159, I209 a I216, WE56, WE86, BI26, BI52, BI56 y BI57.
 
   > **Nota fechada 2026-10-23 (tarea 4.1 en tres ramas apiladas 08a a 08c; sin marcar).** Hecho: F2, F3, O9, puerta de tiempo, ausencias, BI52, notas documentales, barrido de trazabilidad de 216 escenarios y `verify -Pmutation-gate` en verde (15 min 52 s). **Actualización 2026-10-24:** el presupuesto de BI57 sube a 15 minutos por decisión del propietario y 11 min 46 s lo cumple. **Pendiente, por eso la casilla sigue vacía, solo BI26:** `packages/contracts` no se pudo regenerar (Node 22 frente a Node 24). Detalle y evidencia en `apply-progress.md`.
+  > **Nota fechada 2026-10-24 (BI26 cumplido; casilla marcada).** Con Node v24.22.1 (fnm) y pnpm 12.8.1: `pnpm install --frozen-lockfile`, `pnpm --filter @confia/contracts generate` (orval 8.38.0, admin y portal), `typecheck`, `lint` y `test` (2 archivos, 8 pruebas) en verde. `errors` figura en `ProblemDetail` como arreglo de objetos con `field` y `reason`. `git status` limpio tras regenerar: el código generado no se compromete. `apps/admin-web` y `apps/portal-web` aún no tienen `package.json`, así que no hay aplicación web que compilar contra el contrato.
 
 ---
 
