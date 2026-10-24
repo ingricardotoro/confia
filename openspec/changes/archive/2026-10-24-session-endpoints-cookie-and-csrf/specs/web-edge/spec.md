@@ -382,9 +382,11 @@ propiedad completa. El rechazo DEBE responder `429` con `too-many-requests` y `R
 
 #### Escenario: [WE73] Valor no positivo en una política nueva
 
-- **DADO** `confia.web.rate-limit.admin-session.requests` en 0
+- **DADO** `confia.web.rate-limit.admin-session.request-limit` en 0
 - **CUANDO** arranca el proceso
 - **ENTONCES** el arranque falla con un mensaje que nombra esa propiedad
+
+> **Corrección del 2026-10-24 (`verify-report.md`, W3).** La propiedad real se llama `request-limit`; el texto decía `requests`, nombre que no existe en `application.yml` ni en `RateLimitPropertiesTest`.
 
 #### Escenario: [WE74] Cada ruta aplica su política
 
