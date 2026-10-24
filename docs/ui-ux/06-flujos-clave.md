@@ -43,6 +43,16 @@ en la bitácora de auditoría con dirección de origen y agente.
 **Criterios de aceptación.** El recorrido completo se puede hacer solo con teclado. El campo de
 código admite pegar. La respuesta ante credenciales inválidas tarda lo mismo exista o no la cuenta.
 
+> **Nota fechada 2026-10-23 (cambio `session-endpoints-cookie-and-csrf`, tarea 4.1).** El texto de
+> arriba no se reescribe. Lo que el backend entrega hoy: los fallos repetidos **no bloquean la cuenta
+> ni la dirección**; cada intento fallido de una misma cuenta aumenta un retardo de la respuesta (con
+> tope de 30 s) y la dirección tiene un límite de solicitudes por minuto que responde `429` con
+> `Retry-After`. Por eso «Cuenta bloqueada indica el tiempo restante» no se aplica todavía: la
+> interfaz muestra el mensaje de `authentication-failed`, o el de `too-many-requests` con la cuenta
+> regresiva de `Retry-After`. El código de segundo factor incorrecto es `second-factor-invalid` y no
+> hay código de «intentos excedidos». El catálogo completo está en `04-patrones-de-interaccion.md`
+> §9, nota del 2026-10-23.
+
 ---
 
 ## 2. Apertura de sesión de caja

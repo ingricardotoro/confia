@@ -1154,6 +1154,15 @@ Content-Security-Policy:
   report-uri /api/v1/csp-report
 ```
 
+> **Nota fechada 2026-10-23 (cambio `session-endpoints-cookie-and-csrf`, tarea 4.1).** El bloque de
+> arriba no se reescribe. Desde este cambio el panel llama a la API **desde su propio origen**: las
+> rutas de sesión (`/api/v1/auth/...`) llegan por el mismo origen que sirve la aplicación y las cookies
+> de sesión y de CSRF (`__Secure-confia_admin_sid`, `__Host-confia_csrf`) no cruzan orígenes. Por eso
+> `connect-src 'self'` basta para el panel y el origen `https://api-admin.confia.example` del ejemplo
+> no es necesario mientras API y aplicación compartan origen. Si el despliegue los separara, esa
+> decisión se toma con su propio cambio: la cookie de CSRF `__Host-` no admite `Domain`, y la lista de
+> orígenes permitidos (`confia.web.allowed-origins`) debe actualizarse a la vez que la política.
+
 Política del **portal de encargados**, que además debe permitir el marco de la pasarela cuando se
 usen campos alojados:
 
