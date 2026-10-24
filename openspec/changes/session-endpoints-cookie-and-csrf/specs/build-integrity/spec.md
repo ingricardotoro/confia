@@ -206,10 +206,12 @@ cuenta existente y 200 con inexistente, diferencia de medianas de 50 ms como má
 - **DADO** el código real
 - **CUANDO** se ejecuta `./mvnw verify`
 - **ENTONCES** la puerta pasa
-- **Y** la duración de la construcción **sin mutación** (`./mvnw verify` sin `-Pmutation-gate`) se mide y se registra, y su presupuesto es de 8 minutos
+- **Y** la duración de la construcción **sin mutación** (`./mvnw verify` sin `-Pmutation-gate`) se mide y se registra, y su presupuesto es de 15 minutos
 - **Y** el perfil de mutación (`-Pmutation-gate`, PIT) tiene su propio tiempo, que se declara por separado y no cuenta contra ese presupuesto
 
 > **Decisión del propietario 2026-10-23 (brecha G-4, opción a).** BI57 se reescribe: el presupuesto de 8 minutos mide solo la construcción sin mutación. La puerta de tiempo permanece en la construcción normal (`verify`) y no se mueve al perfil de mutación. El texto anterior («la construcción sin mutación se mantiene dentro del presupuesto de 8 minutos» como única condición de la puerta) queda sustituido por esta redacción.
+
+> **Decisión del propietario 2026-10-24 (BI57, segunda parte): el presupuesto de la construcción sin mutación sube de 8 a 15 minutos. Medición que la motiva: 11 min 46 s al cierre de la tarea 4.1, 5 min 24 s al inicio del cambio, y unos 70 s de la puerta de tiempo dentro de esa cifra. Seguimiento registrado: recortar el tiempo de las pruebas de integración (dueño: un cambio futuro).**
 
 ### Requisito: Las pruebas de arranque `*Test` no necesitan la clave CSRF versionada
 
