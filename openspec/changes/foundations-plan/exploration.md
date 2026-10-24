@@ -306,6 +306,14 @@ El archivo de `session-tokens-and-web-layer` no puede declarar cerrada ninguna d
 textos originales de H1, H2, H3, H4 y de la condición 3, arriba, no se modifican: esta nota solo
 registra la partición y el reparto.
 
+> **Nota fechada 2026-10-23 (cambio `session-endpoints-cookie-and-csrf`, tarea 4.1).** Esta nota no
+> modifica el texto original de ninguna condición. Estado al cierre de ese cambio: **H1 cerrada**, con
+> el control por IP aplicado antes del caso de uso en el inicio de sesión (referencia a los escenarios
+> [I160] e [I161]). La **condición 3 cerrada**: el CSRF de doble envío con `Origin` protege las rutas
+> de cookie, con las pruebas de la parte de filtro [WE53] y de rutas reales [WE54]. **H3 y H4 siguen
+> abiertas**, con dueño `password-recovery-endpoints`; este cambio no entrega ninguna ruta de
+> recuperación y lo comprueba con una prueba de ausencia vigente [BI52].
+
 **Hallazgo.** `docs/09-roadmap-y-fases.md` §3 no incluye el módulo `organization` en F0, pero
 ADR-0009 exige `institution_id NOT NULL` desde la primera migración y ADR-0017 asigna la tabla raíz
 de institución a ese módulo. Se recomienda incorporar el cambio 4, con la entidad raíz mínima, al

@@ -427,3 +427,81 @@ Desviaciones y notas:
 - Un token de acceso vencido enviado a `DELETE /api/v1/auth/sessions/current` recibe `401 token-expired` del filtro de tokens, porque el filtro verifica toda cabecera `Bearer` aun en rutas públicas (decisión de S1). El cierre «con el acceso vencido» [I194] se prueba sin enviar token de acceso, como hace un cliente que ya no tiene uno válido; la SPA no debe enviar el vencido. Seguimiento posible para el cambio del cliente.
 - `DELETE` sobre `/api/v1/auth/sessions/current` ya no es 403 para un actor autenticado ([WE20] se acota a los demás métodos): es el cierre actual, ruta pública de cookie.
 - `packages/contracts` no se regeneró ni se compromete (pnpm exige Node 24; Node 22 local). Las instantáneas OpenAPI sí se actualizaron.
+
+## Tarea 4.1 `closing-and-follow-ups` (2026-10-23)
+
+Tres ramas apiladas sobre `main` 0282e6a. La tarea completa medía 1 041 líneas efectivas (más de 800), así que se partió sin consultar por la costura entre «pruebas de F2, F3 y O9» y «puerta de tiempo y ausencias»; ninguna prueba se separó de su código y no hay código de producción nuevo.
+
+| Rama | Contenido | Líneas efectivas (sin `openspec/`) |
+|---|---|---|
+| 08a `claim-and-redaction` | `ClaimReaderTest` (25 pruebas, F2), ampliación de `SessionSecretsNotObservableTest` con el `jti` (F3, 3 pruebas en total) y `SessionFlowRedactionIT` (3, O9) | 475 |
+| 08b `timing-gate-and-absences` | `LoginTimingGateIT` (2, I159, BI56), `IpBlockAbsenceIT` (I214), `AccountDeactivationAbsenceTest` (I215), `NoFullSessionMfaRoutesTest` (I216), `RouteInventory` y tres fixtures de ausencia, y BI52 en `WebEdgeScopeExclusionInventoryTest` y `PublicRouteAllowListTest` | 566 |
+| 08c `closing-notes` | Notas fechadas de `docs/03` §8.1, `docs/ui-ux/04` y `06` y `foundations-plan/exploration.md`; decisión G-4 en BI57, R-9 y tareas; este informe | solo documentación |
+
+### Evidencia del ciclo TDD (4.1)
+
+| Paso | Observado |
+|---|---|
+| ROJO de F2 | El informe de PIT de la construcción anterior (`app/target/pit-reports/mutations.xml`) lista exactamente los ocho mutantes vivos de `ClaimReader` (líneas 38, 51, 81, 85 dos veces, 94 dos veces y 99). `ClaimReaderTest` nace en verde porque describe un comportamiento que ya existía; su rojo es la ruptura 1 de abajo y la desaparición de los ocho mutantes: en el `verify -Pmutation-gate` final todos los mutantes de `ClaimReader` están muertos. |
+| ROJO de F3 | El barrido con el `jti` en el mapa `secrets` y la prueba de control (`aVariantThatExposesTheTokenIdentifierInItsToStringFailsTheSweep`) se afirman contra la ruptura 3. |
+| ROJO de O9 e I210 | El control negativo corre primero (`@Order(1)`): un token CSRF registrado a propósito a `TRACE` hace fallar el barrido nombrando solo la etiqueta. |
+| Puerta de tiempo | `LoginTimingGateIT`: verde con el código real; el control (respuesta inmediata en lugar de la verificación señuelo) pasa solo si la diferencia supera 50 ms; la ruptura 4 (código real sin señuelo) la pone en rojo. |
+| Ausencias | `IpBlockAbsenceIT`, `AccountDeactivationAbsenceTest`, `NoFullSessionMfaRoutesTest` y la extensión de BI52 describen comportamiento que ya existe y nacen en verde; su prueba de que no son vacías es el conjunto base no vacío y el fixture permanente de cada una (`BadSessionListingController`, `BadMfaDisableController`, `BadPasswordRecoveryController`, y entradas de lista añadidas en la propia prueba). |
+
+### Demostraciones deliberadas (4.1)
+
+Cada una sobre una copia guardada (`pre-break-8a-N.java` en el directorio de la sesión), revertida y confirmada idéntica (`cmp`, y `git status` sin cambios de producción). No queda ninguna ruptura en el árbol.
+
+| # | Ruptura | Resultado observado |
+|---|---|---|
+| 1 | `ClaimReader`: `value > LAST_EPOCH_SECOND` por `>=` | `ClaimReaderTest`: `anIntegralNumberInsideTheRangeIsRead` (el último segundo) y `theTwoEdgesOfTheRangeAreExact` fallan con `TokenRejected CLAIMS_INVALID` [I212] |
+| 2 | `CsrfOriginFilter` registra el encabezado CSRF a `TRACE` | `SessionFlowRedactionIT.theWholeFlowLeavesNoSecretInTheStructuredLog`: `captured log unexpectedly contains a CSRF token (15) (87 characters); the value itself is deliberately withheld` [I209] |
+| 3 | `AuthenticatedActor.toString()` expone el `jti` (la tarea dice `AccessToken.toString()`, pero `AccessToken` no lleva el `jti`: lo lleva el actor verificado) | `SessionSecretsNotObservableTest`: dos pruebas en rojo con `produced text unexpectedly contains the jti of the access token (36 characters)` [I211] |
+| 4 | `AuthenticateWithPassword` sin la verificación señuelo del identificador inexistente | `LoginTimingGateIT`: `[median of the existing account: 84 ms, median of the unknown identifier: 21 ms]` [I159, BI56] |
+
+### Decisión del propietario G-4 / BI57 (2026-10-23, opción a) y medición
+
+Se reescribió BI57 en `specs/build-integrity/spec.md`: el presupuesto de 8 minutos mide solo la construcción sin mutación (`./mvnw verify` sin `-Pmutation-gate`); la puerta de tiempo permanece en la construcción normal y el perfil de mutación declara su propio tiempo. Quedó registrado también en `design.md` (R-9) y en `tasks.md` (G-4).
+
+Mediciones en la cabeza de la cadena (misma máquina, sin otra construcción en paralelo):
+
+| Construcción | Duración | Detalle |
+|---|---|---|
+| `./mvnw verify` (sin mutación) | **11 min 46 s** | Surefire núcleo 186 y aplicación 2 374; Failsafe 598; 0 fallos |
+| `./mvnw verify -Pmutation-gate` | **15 min 52 s** | PIT del núcleo 1 min 11 s y PIT de la aplicación 3 min 34 s; por diferencia, la parte sin mutación son unos 11 min 07 s |
+
+La puerta de tiempo (`LoginTimingGateIT`) tarda unos 70 s dentro de esos tiempos. **La condición de cierre «`verify` sin mutación dentro de 8 minutos» NO se cumple:** el presupuesto ya estaba rebasado por el crecimiento de las pruebas de integración de todo el cambio (5 min 24 s al inicio, 11 min 46 s ahora), no por la puerta. Con la opción (a) la puerta no se mueve, pero la cifra de 8 minutos necesita una decisión del propietario (subir el presupuesto o reducir el tiempo de las pruebas `*IT`). Por eso la tarea 4.1 queda sin marcar.
+
+PIT (perfil de mutación): aplicación 676 de 710 mutantes muertos (670 muertos y 6 por tiempo; 95 %), núcleo 192 de 194. JaCoCo: «All coverage checks have been met» (aplicación 80 % global e `identity.domain` 95 %).
+
+### Barrido de trazabilidad de los 216 escenarios
+
+Script desechable sobre `specs/*/spec.md` y la tabla de `tasks.md`: 216 escenarios (identity 103, web-edge 74, build-integrity 33, audit-trail 6), 206 con identificador y 10 citados por título; sin identificadores repetidos en las especificaciones, **cada uno con exactamente una fila de tarea dueña**, sin filas repetidas y sin filas huérfanas (las diez filas sin identificador corresponden una a una a los diez escenarios por título).
+
+### Contratos (BI26)
+
+`packages/contracts` no se regeneró: `pnpm --filter @confia/contracts generate` exige Node 24 y la máquina tiene Node 22.16. **Pendiente**, no simulado; las instantáneas OpenAPI del backend están al día desde 3.1 a 3.3. Debe regenerarse y pasar `typecheck` y `test` en una máquina con Node 24 antes de archivar.
+
+### Material para el informe de archivo
+
+**Condiciones cerradas.**
+- **H1** (control por IP antes del inicio de sesión): `LoginRateLimitClosesH1IT` [I160, I161] y `SessionRoutesRateLimitedRuleTest` [BI45, BI46].
+- **Condición 3** (CSRF antes de cualquier `Set-Cookie`): filtro [WE53] y rutas reales [WE54] (`SessionCookieRoutesCsrfIT`).
+- H3 y H4 siguen abiertas, con dueño `password-recovery-endpoints`; su ausencia se vigila [BI52] (`WebEdgeScopeExclusionInventoryTest`, `PublicRouteAllowListTest`).
+
+**Seguimientos.**
+- F1a: `PasswordResetLeavesNoValidTokenIT`. F1b: `AccountSessionRevokerCrossInstitutionIT`.
+- F2: `ClaimReaderTest` (los ocho mutantes muertos). F3: `SessionSecretsNotObservableTest` (`jti` del acceso y del restringido).
+- Ausencias vigentes con dueño: dimensión por IP del cambio 11 (`IpBlockAbsenceIT`), desactivación de cuenta y `admin_revoke` del cambio 8 (`AccountDeactivationAbsenceTest`), inscripción o baja con sesión completa y listado de sesiones (`NoFullSessionMfaRoutesTest`).
+
+**Obligaciones.**
+- O2 (tope de la espera): `RequiredDelayMaterializerTest` (tope) y `DelayPropertiesTest`.
+- O6 (origen en los comandos): `RefreshBindingIT`, `RefreshSessionIT`, `LogInIT`.
+- O9 (nada observable en el registro): `SessionFlowRedactionIT` con control negativo.
+- O10 (cambio de MFA cierra las demás sesiones): `CompleteSecondFactorIT` y `SecondFactorEndpointsIT` (motivo `mfa_change`).
+
+Desviaciones: la puerta de tiempo reduce la espera materializada con `confia.web.delay.max-wait=1ms` y sube los límites de la política `admin-login` al máximo permitido (10 000) por propiedades de la prueba, en lugar de inyectar un temporizador de prueba en el materializador: el proceso se arranca por el lanzador de producción, que no admite beans de prueba, y el efecto sobre la medición es el mismo (el retardo creciente de la única cuenta existente no entra en la comparación). El control negativo sustituye el camino del identificador inexistente por una respuesta inmediata (malformación rechazada en el borde), como dice I159; la ruptura 4 prueba además la variante real sin señuelo. `AccountDeactivationAbsenceTest` afirma la ausencia de `admin_revoke` en la enumeración de la aplicación; que la base rechaza el motivo lo prueba `RevocationReasonCatalogIT`.
+
+### Presupuesto de BI57 subido a 15 minutos (2026-10-24)
+
+Decisión del propietario 2026-10-24 (BI57, segunda parte): el presupuesto de la construcción sin mutación sube de 8 a 15 minutos. Medición que la motiva: 11 min 46 s al cierre de la tarea 4.1, 5 min 24 s al inicio del cambio, y unos 70 s de la puerta de tiempo dentro de esa cifra. Seguimiento registrado: recortar el tiempo de las pruebas de integración (dueño: un cambio futuro). La condición de cierre «`verify` sin mutación dentro del presupuesto» queda cumplida con 11 min 46 s contra 15 minutos. Ningún test ni configuración impone la cifra (se revisaron el `README` y el `pom.xml` de `apps/api` y las pruebas: solo la menciona un comentario de `PostgresIntegrationTest`, que cita el documento de pruebas). **Seguimiento F-IT-TIME:** reducir la duración de las pruebas de integración, con dueño en un cambio futuro. **De 4.1 solo queda BI26:** regenerar `packages/contracts` con Node 24 (`pnpm --filter @confia/contracts generate`, `typecheck` y `test`); la casilla sigue sin marcar hasta entonces.

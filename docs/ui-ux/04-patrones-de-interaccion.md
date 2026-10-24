@@ -766,6 +766,18 @@ Reglas de presentación del error:
 > `ProblemDetail` del contrato OpenAPI todavía no declara; la declara el primer endpoint de
 > producción con validación.
 
+> **Nota fechada 2026-10-23 (cambio `session-endpoints-cookie-and-csrf`, tarea 4.1).** La tabla no se
+> reescribe. Los endpoints de sesión publican **cinco códigos** que la interfaz debe mapear a su propia
+> clave: `authentication-failed` (401, credenciales no aceptadas; es el mismo mensaje exista o no la
+> cuenta), `second-factor-invalid` (401, una prueba del segundo factor no aceptada, sin decir por qué),
+> `session-expired` (401, un token de refresco que no se acepta; es el de la fila de la tabla),
+> `csrf-invalid` (403, falla de la doble entrega del token CSRF o del `Origin`) y `mfa-already-enrolled`
+> (409, una inscripción sobre una credencial ya verificada). `mfa-attempts-exceeded` **no existe**: el
+> segundo factor no bloquea la cuenta ni responde 429 por intentos; cada fallo aumenta un **retardo**
+> de la respuesta (con tope) y la limitación por dirección usa `too-many-requests` (429) con
+> `Retry-After`. La fila de la tabla describe una intención de diseño que este cambio no entrega y se
+> reevalúa cuando exista un bloqueo.
+
 ---
 
 ## 10. Búsqueda y filtrado

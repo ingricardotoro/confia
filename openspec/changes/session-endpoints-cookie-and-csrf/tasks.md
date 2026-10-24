@@ -566,6 +566,8 @@ cinco PR) hace probable que 1.1, 3.1, 3.2 y 3.3 pidan más de dos partes.
     `docs(sdd): record the closing of H1 and condition 3 and the session documentation notes`. Tamaño: nominal 350, realista 770; costura nombrada
     (solo si supera 800): 8a pruebas y código, 8b notas documentales. — Escenarios I159, I209 a I216, WE56, WE86, BI26, BI52, BI56 y BI57.
 
+  > **Nota fechada 2026-10-23 (tarea 4.1 en tres ramas apiladas 08a a 08c; sin marcar).** Hecho: F2, F3, O9, puerta de tiempo, ausencias, BI52, notas documentales, barrido de trazabilidad de 216 escenarios y `verify -Pmutation-gate` en verde (15 min 52 s). **Actualización 2026-10-24:** el presupuesto de BI57 sube a 15 minutos por decisión del propietario y 11 min 46 s lo cumple. **Pendiente, por eso la casilla sigue vacía, solo BI26:** `packages/contracts` no se pudo regenerar (Node 22 frente a Node 24). Detalle y evidencia en `apply-progress.md`.
+
 ---
 
 ## Trazabilidad: escenarios de `specs/identity/spec.md` (103)
@@ -837,6 +839,10 @@ Por especificación: `identity` 103 (1.1: 0, 2.1: 8, 3.1: 29, 3.2: 38, 3.3: 19, 
   dentro de 8 minutos; el diseño (R-9) permite moverla al perfil de mutación «con decisión registrada» si `verify` supera el presupuesto. Mover la puerta
   incumpliría BI57. Se mide la duración en 3.1 y en 4.1 (hoy 5 min 24 s sin mutación, más unas 400 verificaciones Argon2id); si no cabe, hace falta una
   decisión del propietario que reescriba BI57 antes de mover la puerta.
+  **Resuelta el 2026-10-23 por el propietario, opción (a):** BI57 se reescribe para que su presupuesto de 8 minutos mida solo la construcción sin mutación
+  (`./mvnw verify` sin `-Pmutation-gate`); la puerta de tiempo permanece en la construcción normal y el perfil de mutación (PIT) declara su propio tiempo.
+  Se registra en la especificación de `build-integrity` (BI57), en el diseño (R-9) y en `apply-progress.md`.
+  **Decisión del propietario 2026-10-24 (BI57, segunda parte): el presupuesto de la construcción sin mutación sube de 8 a 15 minutos. Medición que la motiva: 11 min 46 s al cierre de la tarea 4.1, 5 min 24 s al inicio del cambio, y unos 70 s de la puerta de tiempo dentro de esa cifra. Seguimiento registrado: recortar el tiempo de las pruebas de integración (dueño: un cambio futuro).**
 - **G-5. Perfil `prod` en WE64.** El escenario arranca el proceso administrativo con `local`, `preprod` y `prod` en un mismo IT; el perfil `prod` puede
   exigir propiedades adicionales (Swagger apagado, proxies). `TestProcessArguments` debe cubrirlas; si no basta, se parametriza la prueba por perfil.
 - **G-6. Tamaño real.** El historial de S1 (1,5 a 3,8 veces el realista) sugiere que 3.1, 3.2 y 3.3 pidan tres o más PR cada una. S1 contó cada parte como
