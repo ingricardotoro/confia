@@ -35,7 +35,12 @@ import com.confia.shared.crypto.DataEncryptionKeyId;
 import com.confia.shared.crypto.DataEncryptionKeyMaterial;
 import com.confia.shared.crypto.DataEncryptionKeyRepository;
 import com.confia.shared.security.SecurityContext;
+import com.confia.shared.security.AuthenticatedActor;
+import com.confia.shared.security.PendingSecondFactor;
 import com.confia.shared.security.token.AccessTokenIssuer;
+import com.confia.shared.security.token.AccessTokenVerifier;
+import com.confia.shared.security.token.MfaPurpose;
+import com.confia.shared.security.token.MfaTokenClaims;
 import com.confia.shared.security.token.CompactJws;
 import com.confia.shared.security.token.SigningKey;
 import com.confia.shared.security.token.SigningKeyRing;
@@ -150,6 +155,21 @@ class SessionSecretsNotObservableTest {
             secrets.put("the TOTP secret of an enrollment (base32)", enrolledSecret.base32());
             secrets.put("a recovery code of an enrollment", enrolledCode.value());
 
+            // The token identifier (jti) of the access token and of the restricted token is watched [I211].
+            Clock startClock = Clock.fixed(Instant.parse(START), ZoneOffset.UTC);
+            AccessTokenVerifier verifier = new AccessTokenVerifier(jws(), startClock);
+            AuthenticatedActor actor = verifier.verifyAccess(first.accessToken().compact());
+            String restrictedCompact = new AccessTokenIssuer(jws(), startClock).issueMfa(
+                    ACCOUNT.value(), INSTITUTION.value(), MfaPurpose.MFA_VERIFY).compact();
+            MfaTokenClaims restricted = verifier.verifyMfa(restrictedCompact);
+            secrets.put("the jti of the access token", actor.tokenId().toString());
+            secrets.put("the jti of the restricted token", restricted.tokenId().toString());
+            secrets.put("the restricted token", restrictedCompact);
+            produced.add(String.valueOf(actor));
+            produced.add(String.valueOf(restricted));
+            produced.add(String.valueOf(new PendingSecondFactor(restricted.accountId(),
+                    restricted.institutionId(), restricted.tokenId(), SecondFactorPurpose.VERIFY,
+                    restricted.issuedAt(), restricted.expiresAt())));
             produced.addAll(textOf(unauthenticated));
             for (Object holder : List.<Object>of(first, fresh, grace, reuse, first.refreshToken(),
                     first.accessToken(), fresh.session(), grace.session(),
@@ -200,6 +220,26 @@ class SessionSecretsNotObservableTest {
                 secrets)).isInstanceOf(AssertionError.class)
                 .hasMessageContaining("the first refresh token")
                 .hasMessageNotContaining(secrets.get("the first refresh token"));
+    }
+
+    /**
+     * The control of the {@code jti} [I211]: a variant of the actor that exposes the identifier of its
+     * token in {@code toString()} fails the same sweep, naming the label and never the value.
+     */
+    @Test
+    void aVariantThatExposesTheTokenIdentifierInItsToStringFailsTheSweep() {
+        UUID jti = UUID.randomUUID();
+        Map<String, String> secrets = Map.of("the jti of the access token", jti.toString());
+        record LeakingActor(UUID tokenId) {
+        }
+
+        assertNothingLeaks(String.valueOf(new AuthenticatedActor(UUID.randomUUID(), INSTITUTION.value(),
+                UUID.randomUUID(), jti, java.util.Set.of(com.confia.shared.security.AuthenticationMethod
+                        .PASSWORD), Instant.parse(START), Instant.parse(START))), secrets);
+        assertThatThrownBy(() -> assertNothingLeaks(String.valueOf(new LeakingActor(jti)), secrets))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("the jti of the access token")
+                .hasMessageNotContaining(jti.toString());
     }
 
     /** The sweep demands what it is meant to find: a secret in the text fails it, naming only its label. */
