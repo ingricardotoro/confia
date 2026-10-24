@@ -548,4 +548,42 @@ class PublicRouteAllowListTest {
     void aPatternBecomesAConcretePath(String pattern, String path) {
         assertThat(sample(pattern)).isEqualTo(path);
     }
+
+    @Test
+    void noListOfAnyProcessHoldsARouteThatRecoversAPassword() {
+        org.springframework.mock.env.MockEnvironment production = new org.springframework.mock.env.MockEnvironment();
+        org.springframework.mock.env.MockEnvironment documented = new org.springframework.mock.env.MockEnvironment()
+                .withProperty("springdoc.api-docs.enabled", "true")
+                .withProperty("springdoc.swagger-ui.enabled", "true");
+
+        for (PublicEndpoints list : List.of(PublicEndpoints.forAdmin(production),
+                PublicEndpoints.forAdmin(documented), PublicEndpoints.forPortal(documented))) {
+            assertThat(list.endpoints()).as("the list is not empty, so the absence is not vacuous")
+                    .isNotEmpty();
+            assertThat(recoveryEntries(list)).isEmpty();
+        }
+        AuthenticatedEndpoints authenticated = AuthenticatedEndpoints.forAdmin();
+        assertThat(authenticated.endpoints().stream()
+                .filter(entry -> RECOVERY.matcher(entry.pattern()).matches())).isEmpty();
+        assertThat(authenticated.secondFactorEndpoints().stream()
+                .filter(entry -> RECOVERY.matcher(entry.pattern()).matches())).isEmpty();
+    }
+
+    @Test
+    void aFixtureThatAddsAPasswordRecoveryEntryFailsTheInventory() {
+        PublicEndpoints withRecovery = new PublicEndpoints(List.of(
+                new PublicEndpoint(HttpMethod.POST, "/api/v1/auth/sessions"),
+                new PublicEndpoint(HttpMethod.POST, "/api/v1/auth/password-recovery")));
+
+        assertThat(recoveryEntries(withRecovery)).containsExactly(
+                "POST /api/v1/auth/password-recovery");
+    }
+
+    private static final java.util.regex.Pattern RECOVERY = java.util.regex.Pattern.compile(
+            "(?i).*(password|passwd|recover|forgot|reset).*");
+
+    private static List<String> recoveryEntries(PublicEndpoints list) {
+        return list.endpoints().stream().filter(entry -> RECOVERY.matcher(entry.pattern()).matches())
+                .map(entry -> entry.method() + " " + entry.pattern()).toList();
+    }
 }
