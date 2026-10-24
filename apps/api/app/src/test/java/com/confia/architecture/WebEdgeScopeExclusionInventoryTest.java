@@ -617,4 +617,24 @@ class WebEdgeScopeExclusionInventoryTest {
                         "com.confia.shared.web.problem.ProblemBody");
         return classes;
     }
+
+    // --- No recovery of a password over HTTP (password-recovery-endpoints owns it; BI52) ---
+
+    @Test
+    void noProductionHandlerDeclaresARouteThatRecoversAPassword() {
+        List<String> routes = RouteInventory.routesOf(assertNonEmptyProductionClasses());
+
+        assertThat(routes).as("the scan sees the real routes, so the absence is not vacuous")
+                .contains("POST /api/v1/auth/sessions", "POST /api/v1/auth/sessions/refresh");
+        assertThat(RouteInventory.passwordRecoveryRoutes(routes)).isEmpty();
+    }
+
+    @Test
+    void theRecoveryDetectorFindsAFixtureThatAddsAPasswordRecoveryRoute() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(
+                com.confia.architecture.fixture.sessionroutes.BadPasswordRecoveryController.class);
+
+        assertThat(RouteInventory.passwordRecoveryRoutes(RouteInventory.routesOf(fixtures)))
+                .containsExactly("POST /api/v1/auth/password-recovery");
+    }
 }
