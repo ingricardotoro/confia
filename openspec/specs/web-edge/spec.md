@@ -123,8 +123,10 @@ lista ni responder.
 
 ### Requisito: La cadena administrativa no tiene estado
 
-La cadena administrativa NO DEBE crear sesión HTTP ni enviar cookies en ninguna respuesta,
-incluidas las respuestas de error.
+La cadena administrativa NO DEBE crear sesión HTTP ni enviar cookies en ninguna respuesta, incluidas las
+respuestas de error, con la única excepción de las cookies de sesión y CSRF que emiten y borran los endpoints de
+inicio de sesión, verificación del segundo factor, refresco y cierres, según el requisito de la cookie de sesión.
+(Previously: ninguna respuesta podía enviar cookies.)
 
 #### Escenario: Ninguna respuesta crea sesión
 
@@ -133,6 +135,13 @@ incluidas las respuestas de error.
 - **CUANDO** se inspeccionan las tres respuestas
 - **ENTONCES** ninguna contiene la cabecera `Set-Cookie` y el contenedor no registra ninguna sesión
   HTTP creada
+
+#### Escenario: [WE87] Las cookies de los endpoints de sesión no crean una sesión HTTP
+
+- **DADO** un inicio de sesión con éxito
+- **CUANDO** se inspecciona la respuesta
+- **ENTONCES** contiene solo las dos cookies de sesión y CSRF, ninguna cookie `JSESSIONID` y el contenedor no
+  registra ninguna sesión HTTP
 
 ### Requisito: Cabeceras de seguridad base en toda respuesta de la cadena administrativa
 
@@ -278,20 +287,23 @@ y la cadena solo conocía `authentication-required`.)
 
 El traductor DEBE producir, para cada código del subconjunto con productor, el estado HTTP siguiente:
 `validation-failed` con `400`; `idempotency-key-missing` con `400`; `authentication-required` con
-`401`; `token-invalid` con `401`; `token-expired` con `401`; `forbidden` con `403`;
-`resource-not-found` con `404`; `idempotency-conflict` con `409`; `unsupported-media-type` con `415`;
+`401`; `token-invalid` con `401`; `token-expired` con `401`; `authentication-failed` con `401`;
+`second-factor-invalid` con `401`; `session-expired` con `401`; `forbidden` con `403`; `csrf-invalid` con `403`;
+`resource-not-found` con `404`; `method-not-allowed` con `405`; `idempotency-conflict` con `409`;
+`mfa-already-enrolled` con `409`; `unsupported-media-type` con `415`;
 `idempotency-payload-mismatch` con `422`; `too-many-requests` con `429` y `Retry-After`;
 `capacity-exceeded` con `503`; `internal-error` con `500`. `resource-not-found` solo tiene productor
 bajo los prefijos públicos de springdoc, con los perfiles `local` y `preprod`. `token-invalid` y
-`token-expired` los produce el filtro de autenticación. El código de autenticación propio del inicio de
-sesión (`authentication-failed`) y los de institución (`institution-not-found`,
-`institution-inactive`) NO DEBEN existir en este cambio (brecha con destino:
-`session-endpoints-cookie-and-csrf` y la primera ruta que resuelva la institución contra `organization`).
-(Previously: once códigos; `token-invalid` y `token-expired` no debían existir.)
+`token-expired` los produce el filtro de autenticación. `authentication-failed`, `second-factor-invalid`,
+`session-expired`, `csrf-invalid` y `mfa-already-enrolled` los producen los endpoints de sesión y el filtro de
+CSRF. Los códigos de institución (`institution-not-found`, `institution-inactive`) NO DEBEN existir en este
+cambio (brecha con destino: la primera ruta que resuelva la institución contra `organization`).
+(Previously: trece códigos listados; `authentication-failed` NO DEBÍA existir. `method-not-allowed` ya existe en
+el código y se incorpora a la lista.)
 
 #### Escenario: Cada código tiene su estado
 
-- **DADO** un productor de prueba para cada uno de los trece códigos
+- **DADO** un productor de prueba para cada uno de los diecinueve códigos
 - **CUANDO** cada uno lanza su error en el borde
 - **ENTONCES** el estado HTTP es el indicado en el requisito y `type` corresponde a ese código
 
@@ -317,13 +329,14 @@ sesión (`authentication-failed`) y los de institución (`institution-not-found`
 - **ENTONCES** la respuesta es `500` con el código `internal-error`, y el código desconocido no
   aparece en el cuerpo
 
-#### Escenario: [WE35] Los códigos de token existen y los de inicio de sesión y de institución no
+#### Escenario: [WE35] Los códigos de token y de sesión existen y los de institución no
 
 - **DADO** el catálogo de códigos de error entregado y su catálogo de mensajes es-HN
 - **CUANDO** se enumeran sus entradas y se ejecuta la prueba de cobertura del catálogo
-- **ENTONCES** contiene `authentication-required`, `token-invalid` y `token-expired`, cada uno con su
-  entrada es-HN
-- **Y** no contiene `authentication-failed`, `institution-not-found` ni `institution-inactive`
+- **ENTONCES** contiene `authentication-required`, `token-invalid`, `token-expired`, `authentication-failed`,
+  `second-factor-invalid`, `session-expired`, `csrf-invalid` y `mfa-already-enrolled`, cada uno con su entrada
+  es-HN
+- **Y** no contiene `institution-not-found` ni `institution-inactive`
 
 ### Requisito: Las respuestas de error no exponen detalles internos
 
@@ -606,9 +619,9 @@ Un asiento de auditoría escrito durante una petición servida por la cadena DEB
 con la IP del cliente resuelta y `userAgent` con el agente de usuario capturado. Un asiento escrito
 fuera de una petición (trabajo en segundo plano, prueba sin cadena) DEBE conservar ambos campos
 nulos. El origen de una petición NO DEBE filtrarse a otra, incluso con peticiones concurrentes. La
-propagación del origen a los comandos de identidad es de `session-endpoints-cookie-and-csrf` (brecha con
-destino: `session-endpoints-cookie-and-csrf`).
-(Previously: el destino de la propagación era `session-tokens-and-web-layer`.)
+propagación del origen a los comandos de identidad la entrega `session-endpoints-cookie-and-csrf`.
+(Previously: la propagación del origen a los comandos de identidad era una brecha con destino
+`session-endpoints-cookie-and-csrf`.)
 
 #### Escenario: Asiento durante una petición
 
@@ -1351,40 +1364,15 @@ aparecer en ningún registro.
 - **CUANDO** el servidor las procesa
 - **ENTONCES** el valor `SECRETO-TOKEN` y el token completo no aparecen en ningún registro
 
-### Requisito: Solo un token de acceso completo del dominio administrativo autentica; el restringido y los de otros dominios se rechazan en toda ruta
-
-La cadena administrativa DEBE rechazar con `401` y el código `token-invalid` todo token restringido de
-MFA, en toda ruta, porque en este cambio ninguna ruta lo acepta (las rutas que lo aceptan son de
-`session-endpoints-cookie-and-csrf`), y todo token firmado por otro dominio de identidad o con
-audiencia distinta de la administrativa. El rechazo del token restringido DEBE producirse por su
-audiencia (`confia-admin-mfa`, distinta de `confia-admin`), sin depender de que se consulte su claim de
-uso. El rechazo NO DEBE depender de que la ruta exista ni de que esté en alguna de las listas, y NO DEBE
-evaluar ningún permiso.
-
-#### Escenario: [WE09] El token restringido no abre ninguna ruta
-
-- **DADO** un token restringido de MFA vigente, con uso `mfa-verify`
-- **CUANDO** se presenta a una ruta de la lista autenticada, a una ruta registrada fuera de las listas
-  y a una ruta no registrada
-- **ENTONCES** las tres respuestas son `401` con el código `token-invalid`
-- **Y** ningún controlador registra invocaciones
-- **Y** el rechazo se debe a la audiencia `confia-admin-mfa`, no al uso: un token con la audiencia
-  administrativa y la claim de uso `mfa-verify` es rechazado igualmente por la lista cerrada de claims
-
-#### Escenario: [WE10] El token del portal se rechaza
-
-- **DADO** un token vigente firmado con la clave del portal y con `aud` igual a `confia-portal`
-- **CUANDO** se presenta a una ruta de la lista autenticada
-- **ENTONCES** la respuesta es `401` con el código `token-invalid` y no se evalúa ningún permiso
-
 ### Requisito: Toda respuesta `401` de las cadenas lleva `WWW-Authenticate`
 
 Toda respuesta `401` DEBE incluir la cabecera `WWW-Authenticate` con el esquema `Bearer` (RFC 9110 y
 RFC 6750), tanto si la produce la cadena administrativa, la cadena del portal, el traductor de errores o
-la válvula de último recurso. Los valores DEBEN ser exactamente estos y ningún otro: para el código
-`authentication-required`, `Bearer`; para `token-invalid` y para `token-expired`,
-`Bearer error="invalid_token"`. La cabecera NO DEBE llevar `realm` ni `error_description`. Una respuesta
-distinta de `401` NO DEBE incluirla.
+la válvula de último recurso. Los valores DEBEN ser exactamente estos y ningún otro: para los códigos
+`authentication-required`, `authentication-failed`, `second-factor-invalid` y `session-expired`, `Bearer`; para
+`token-invalid` y para `token-expired`, `Bearer error="invalid_token"`. La cabecera NO DEBE llevar `realm` ni
+`error_description`. Una respuesta distinta de `401` NO DEBE incluirla.
+(Previously: solo `authentication-required`, `token-invalid` y `token-expired` existían.)
 
 #### Escenario: [WE11] Sin credencial
 
@@ -1420,6 +1408,12 @@ distinta de `401` NO DEBE incluirla.
 - **DADO** una respuesta `403` por principal sin permiso, una `429` y una `503`
 - **CUANDO** se inspeccionan sus cabeceras
 - **ENTONCES** ninguna contiene `WWW-Authenticate`
+
+#### Escenario: [WE88] Los tres códigos `401` del flujo de sesión llevan `Bearer`
+
+- **DADO** respuestas `401` con `authentication-failed`, `second-factor-invalid` y `session-expired`
+- **CUANDO** se leen sus cabeceras
+- **ENTONCES** el valor de `WWW-Authenticate` de las tres es exactamente `Bearer`
 
 ### Requisito: `token-invalid` y `token-expired` no revelan la causa del rechazo
 
@@ -1468,19 +1462,21 @@ El proceso administrativo DEBE declarar las rutas autenticadas sin permiso de ro
 definido en un único lugar, paralelo a la lista blanca pública, y evaluado antes de la regla final de
 denegación (decisión 2 del propietario; DA-7). Cada entrada DEBE identificar el método y la ruta, y
 DEBE declarar si exige comprobar la vigencia de la sesión. La lista DEBE contener exactamente
-`GET /api/v1/auth/sessions/current`, con comprobación de la vigencia de la sesión. Una petición con un
-principal autenticado a un método y ruta fuera de ambas listas DEBE recibir `403` con `forbidden`. Una
+`GET /api/v1/auth/sessions/current` y `DELETE /api/v1/auth/sessions`, ambas con comprobación de la vigencia de
+la sesión. Una petición con un principal autenticado a un método y ruta fuera de las tres clases de rutas DEBE
+recibir `403` con `forbidden`. Una
 prueba DEBE enumerar todas las rutas registradas y DEBE fallar si una ruta responde sin credencial y no
 figura en la lista pública, si una ruta figura en la lista autenticada y responde sin credencial algo
 distinto de `401`, o si una entrada de ambas listas no corresponde a una ruta registrada ni a una
 condición de perfil declarada. El cambio 8 sustituye esta lista por la matriz de roles.
+(Previously: la lista contenía exactamente `GET /api/v1/auth/sessions/current`.)
 
-#### Escenario: [WE18] La lista contiene solo la ruta de la sesión actual
+#### Escenario: [WE18] La lista contiene solo las dos rutas de sesión
 
 - **DADO** la lista cerrada de rutas autenticadas tal como la entrega este cambio
 - **CUANDO** se enumeran sus entradas
-- **ENTONCES** contiene exactamente `GET /api/v1/auth/sessions/current`, con comprobación de la
-  vigencia de la sesión
+- **ENTONCES** contiene exactamente `GET /api/v1/auth/sessions/current` y `DELETE /api/v1/auth/sessions`, ambas
+  con comprobación de la vigencia de la sesión
 
 #### Escenario: [WE19] Una ruta registrada fuera de las listas recibe `403` con un principal
 
@@ -1493,8 +1489,10 @@ condición de perfil declarada. El cambio 8 sustituye esta lista por la matriz d
 #### Escenario: [WE20] Otro método sobre una ruta autenticada también es `403`
 
 - **DADO** un token de acceso vigente y la ruta `/api/v1/auth/sessions/current`
-- **CUANDO** se envía `POST`, `PUT`, `PATCH` y `DELETE` a esa ruta con el token
-- **ENTONCES** las cuatro respuestas son `403` con el código `forbidden`
+- **CUANDO** se envía `POST`, `PUT` y `PATCH` a esa ruta con el token
+- **ENTONCES** las tres respuestas son `403` con el código `forbidden`
+- **Y** `DELETE` a esa ruta no es una ruta autenticada sino la de cierre por cookie, y sin `Origin` permitido
+  responde `403` con `csrf-invalid`
 
 #### Escenario: [WE21] Las variantes de la ruta autenticada no eluden la autenticación
 
@@ -1516,6 +1514,13 @@ condición de perfil declarada. El cambio 8 sustituye esta lista por la matriz d
 - **DADO** una ruta de la lista autenticada configurada, a propósito, para responder `200` sin credencial
 - **CUANDO** se ejecuta la prueba que enumera las rutas registradas
 - **ENTONCES** la prueba falla señalando la ruta
+
+#### Escenario: [WE33] Una ruta de la lista autenticada sin credencial
+
+- **DADO** las rutas `GET /api/v1/auth/sessions/current` y `DELETE /api/v1/auth/sessions`
+- **CUANDO** se envían sin credencial
+- **ENTONCES** la respuesta es `401` con el código `authentication-required`, no `403`, y el
+  controlador registra cero invocaciones
 
 ### Requisito: El principal autenticado vive en `shared.security` y no lleva datos personales ni permisos
 
@@ -1593,47 +1598,528 @@ El filtro central es del **cambio 10** (observabilidad).
 - **ENTONCES** la entrada de error contiene la excepción con su mensaje, como antes de este cambio
 - **Y** este escenario deja de ser cierto el día que el cambio 10 entregue el filtro central
 
-### Requisito: Ausencia de endpoints de inicio de sesión, MFA, refresco, cierre de sesión y recuperación, de cookie de sesión y de CSRF (brecha con destino: `session-endpoints-cookie-and-csrf` y `password-recovery-endpoints`)
+### Requisito: `Origin` es obligatorio en todo método no seguro de la cadena administrativa y se compara con una lista configurada
 
-El sistema NO DEBE incluir, en este cambio, ningún endpoint de inicio de sesión, MFA, refresco, cierre
-de sesión o recuperación, ninguna cookie de sesión ni de refresco, ninguna protección CSRF de doble
-envío, ningún adaptador de `CurrentInstitutionProvider` fuera del principal autenticado, ni ningún
-código de Problem Details `authentication-failed`, `institution-not-found` o `institution-inactive`.
-Tampoco DEBE aplicar el limitador ni el materializador del retardo a ningún endpoint de producción. La
-única ruta de producción es `GET /api/v1/auth/sessions/current`. Las condiciones duras H1 y la condición
-3 obligan a **`session-endpoints-cookie-and-csrf`**; H3 y H4, a **`password-recovery-endpoints`**; H2 se
-cierra en este cambio. Este cambio NO DEBE declarar cerrada ninguna de las otras cuatro.
+La cadena administrativa DEBE rechazar con `403` y el código `csrf-invalid` toda petición con método no seguro
+(distinto de `GET`, `HEAD`, `OPTIONS` y `TRACE`) cuyo `Origin` falte, esté repetido o no figure en
+`confia.web.allowed-origins`. La lista DEBE ser una propiedad por entorno, vacía por defecto (con la lista vacía
+ninguna petición mutadora pasa), cuyas entradas DEBEN ser orígenes serializados `esquema://host[:puerto]`
+válidos, en minúsculas, sin ruta, sin barra final, sin comodines, sin usuario y sin repetirse, con esquema
+`https` salvo `http` con host `localhost` o `127.0.0.1` (la regla es la misma en todos los perfiles; no depende
+del perfil `prod`). Una entrada inválida DEBE impedir el arranque con un mensaje que nombre la propiedad y la
+posición de la entrada, sin repetir su valor. La comparación DEBE ser exacta, sin tratar `null` como permitido. El
+rechazo NO DEBE distinguir la causa (falta, discrepancia u origen no permitido).
 
-#### Escenario: [WE29] La única ruta de producción es la sesión actual
+#### Escenario: [WE43] Sin `Origin` en un método no seguro
+
+- **DADO** `allowed-origins` con `https://admin.colegio.edu.hn`
+- **CUANDO** se envía `POST`, `PUT`, `PATCH` y `DELETE` a una ruta de la cadena sin cabecera `Origin`
+- **ENTONCES** las cuatro responden `403` con `csrf-invalid` y el controlador registra cero invocaciones
+
+#### Escenario: [WE44] `Origin` no permitido, parecido o repetido
+
+- **DADO** la misma lista
+- **CUANDO** se envía `Origin: https://evil.example`, `Origin: http://admin.colegio.edu.hn`,
+  `Origin: https://admin.colegio.edu.hn.evil.example`, `Origin: null` y dos cabeceras `Origin`
+- **ENTONCES** las cinco responden `403` con `csrf-invalid`, idénticas salvo `instance` y traza
+
+#### Escenario: [WE45] `Origin` permitido y métodos seguros
+
+- **DADO** la misma lista
+- **CUANDO** se envía `POST` con `Origin: https://admin.colegio.edu.hn` y `GET` sin `Origin`
+- **ENTONCES** ninguna se rechaza por esta causa
+
+#### Escenario: [WE46] Lista vacía o inválida
+
+- **DADO** `allowed-origins` vacía, y otras ejecuciones con `https://admin.colegio.edu.hn/ruta`, con
+  `https://admin.colegio.edu.hn/`, con `*`, con `HTTPS://Admin.Colegio.edu.hn`, con
+  `http://admin.colegio.edu.hn` (esquema `http` con un host que no es `localhost` ni `127.0.0.1`, en cualquier
+  perfil), con `https://usuario@admin.colegio.edu.hn` y con la misma entrada repetida
+- **CUANDO** se envía un `POST` con cualquier `Origin` con la lista vacía, y se arranca con cada entrada
+  inválida
+- **ENTONCES** el `POST` responde `403` con `csrf-invalid` y los siete arranques fallan con un mensaje que
+  nombra la propiedad y la posición de la entrada, sin su valor
+- **Y** `http://localhost:5173` se acepta
+
+
+### Requisito: Las rutas de cookie exigen un token CSRF de doble envío vinculado al refresco con HMAC
+
+El filtro DEBE aplicar estas reglas, en este orden, y la primera que falla decide con `403` y `csrf-invalid`:
+(1) un método seguro (`GET`, `HEAD`, `OPTIONS`, `TRACE`) pasa sin comprobación; (2) todo método no seguro exige un
+`Origin` permitido (requisito anterior); (3) una ruta de cookie **con** cookie de sesión exige exactamente una
+cookie `__Host-confia_csrf`, exactamente una cabecera `X-CSRF-Token`, ambas con el mismo valor (comparación en
+tiempo constante), y un HMAC válido vinculado al refresco de la cookie de sesión; (4) una ruta de cookie **sin**
+cookie de sesión NO DEBE exigir token CSRF (no hay credencial ambiental que proteger) y pasa al controlador,
+que responde `401 session-expired` en el refresco y `204` en el cierre actual; (5) una cookie de sesión repetida
+(dos cookies con el mismo nombre) DEBE rechazarse en la regla 3 sin elegir ninguna. Se rechaza, por tanto, si
+falta la cookie CSRF o la cabecera, si difieren, si el HMAC no valida o si el token está vinculado a otro
+refresco, siempre que la petición traiga la cookie de sesión. El token DEBE tener la forma `<32 bytes aleatorios
+en base64url>.<HMAC-SHA256(clave, aleatorio || SHA-256(refresco))>`, con el cálculo y la comparación en tiempo
+constante dentro de `shared.security`. La verificación DEBE probar la clave actual y, si falla, la clave anterior
+configurada (ver el requisito de la clave); la emisión usa siempre la actual. El token DEBE reemitirse con cada
+emisión o rotación de la cookie de sesión, incluida la gracia, con el vínculo del refresco que se entrega. Las
+demás rutas (`Bearer`) NO DEBEN exigir el token CSRF aunque el navegador envíe la cookie; el inicio de sesión
+tampoco es ruta de cookie. La cookie CSRF DEBE llevar `Secure`, `Path=/`, `SameSite=Strict`, ningún
+`Domain`, ningún `Max-Age` ni `Expires` y NO DEBE llevar `HttpOnly`, porque la SPA la lee. El rechazo NO DEBE
+distinguir entre falta, discrepancia y origen no permitido.
+
+#### Escenario: [WE47] Cookie sin cabecera `X-CSRF-Token`
+
+- **DADO** una petición a una ruta de cookie con la cookie de sesión y la cookie CSRF válidas, `Origin` permitido
+  y sin `X-CSRF-Token`
+- **CUANDO** se envía
+- **ENTONCES** responde `403` con `csrf-invalid` y el caso de uso registra cero invocaciones
+
+#### Escenario: [WE48] Token CSRF de otra sesión
+
+- **DADO** el token CSRF válido de la sesión A y la cookie de sesión de la sesión B
+- **CUANDO** ambos se envían con el token en la cabecera y en la cookie CSRF
+- **ENTONCES** responde `403` con `csrf-invalid`
+
+#### Escenario: [WE49] Cabecera distinta de la cookie, HMAC alterado o aleatorio alterado
+
+- **DADO** un token válido, y variantes con un bit alterado en el primer byte y en el último byte del HMAC, con
+  el aleatorio alterado y con la cabecera distinta de la cookie CSRF
+- **CUANDO** se envía cada una
+- **ENTONCES** las cuatro responden `403` con `csrf-invalid` idénticas, y la comparación usa un método de
+  tiempo constante
+
+#### Escenario: [WE50] Token válido
+
+- **DADO** la cookie de sesión y el token CSRF emitidos juntos, con `Origin` permitido
+- **CUANDO** se envía el refresco con la cabecera igual a la cookie CSRF
+- **ENTONCES** la petición llega al caso de uso
+
+#### Escenario: [WE89] Una ruta de cookie sin cookie de sesión no exige token CSRF, pero sí `Origin`
+
+- **DADO** el refresco y el cierre actual sin cookie de sesión, sin cookie CSRF y sin `X-CSRF-Token`
+- **CUANDO** se envía cada uno con un `Origin` permitido, y por separado sin `Origin`
+- **ENTONCES** con `Origin` permitido ambas llegan al controlador: el refresco responde `401 session-expired` y el
+  cierre actual responde `204`, y no se responde `403`
+- **Y** sin `Origin` ambas responden `403` con `csrf-invalid` y el controlador registra cero invocaciones
+
+#### Escenario: [WE90] Cookie de sesión repetida, cookie CSRF repetida o cabecera repetida
+
+- **DADO** una petición a una ruta de cookie con dos cookies de sesión, otra con dos cookies CSRF y otra con dos
+  cabeceras `X-CSRF-Token`, todas con `Origin` permitido y, en cada una, un token CSRF válido para una de las
+  cookies de sesión
+- **CUANDO** se envían
+- **ENTONCES** las tres responden `403` con `csrf-invalid` y el caso de uso registra cero invocaciones
+
+#### Escenario: [WE91] Un token emitido con la clave anterior se acepta una vez y se reemite con la actual
+
+- **DADO** una clave actual `K2` y una clave anterior `K1` configuradas, y un token CSRF emitido con `K1` para el
+  refresco de la sesión
+- **CUANDO** se envía el refresco con ese token en cabecera y cookie y `Origin` permitido
+- **ENTONCES** la petición llega al caso de uso y la respuesta reemite la cookie CSRF calculada con `K2`
+- **Y** un token emitido con una clave que no es `K1` ni `K2` responde `403` con `csrf-invalid`
+- **Y** sin clave anterior configurada, un token emitido con `K1` responde `403` con `csrf-invalid`
+
+#### Escenario: [WE51] Una ruta `Bearer` no exige el token CSRF
+
+- **DADO** `DELETE /api/v1/auth/sessions` con un token de acceso vivo, `Origin` permitido, la cookie de sesión y
+  sin `X-CSRF-Token`
+- **CUANDO** se envía
+- **ENTONCES** la petición no se rechaza por CSRF
+
+#### Escenario: [WE52] Atributos de la cookie CSRF
+
+- **DADO** una respuesta que emite la cookie CSRF
+- **CUANDO** se inspecciona su `Set-Cookie`
+- **ENTONCES** el nombre es `__Host-confia_csrf`, con `Secure`, `Path=/` y `SameSite=Strict`, sin `Domain`,
+  `Max-Age`, `Expires` ni `HttpOnly`
+
+### Requisito: Condición dura 3: ninguna cookie se emite antes del mecanismo CSRF y una prueba sobre el arnés lo demuestra
+
+El mecanismo de `Origin` y CSRF DEBE existir, estar activo y probado antes de que ningún código de producción
+emita `Set-Cookie`, incluido el borrado de cookies. Una prueba sobre un arnés de cookie DEBE demostrar que una
+petición mutadora con la cookie y sin `X-CSRF-Token` recibe `403`, y la misma prueba DEBE repetirse contra las
+rutas reales de refresco y de cierre actual cuando existan. El informe de archivo DEBE declarar cerrada la
+condición con referencia a esas pruebas.
+
+#### Escenario: [WE53] Con cookie y sin cabecera, `403`
+
+- **DADO** el arnés de cookie con una cookie de sesión y una CSRF válidas
+- **CUANDO** se envía una petición mutadora con cookie y sin `X-CSRF-Token`, otra con token CSRF de otra sesión
+  y otra sin `Origin`
+- **ENTONCES** las tres responden `403` con `csrf-invalid`
+
+#### Escenario: [WE54] Las mismas tres pruebas contra las rutas reales
+
+- **DADO** las rutas reales de refresco y de cierre actual, con la cookie de sesión presente en la petición
+- **CUANDO** se repiten los tres casos
+- **ENTONCES** los seis resultados son `403` con `csrf-invalid` y el caso de uso registra cero invocaciones
+
+#### Escenario: [WE55] El arnés se desactiva y el mecanismo falla la prueba
+
+- **DADO** una variante de control en la que el filtro de CSRF está deshabilitado
+- **CUANDO** se ejecuta la prueba del arnés
+- **ENTONCES** falla, de modo que no pase de vacío
+
+#### Escenario: [WE56] Cierre de la condición 3 (solo documental)
+
+- **DADO** el informe de archivo de este cambio y la nota fechada de `foundations-plan`
+- **CUANDO** se leen
+- **ENTONCES** declaran cerrada la condición 3 con referencia a [WE53] y [WE54], y el texto original de la
+  condición no fue modificado
+
+### Requisito: El filtro de CSRF y `Origin` va después del origen de la petición y antes del filtro de token y del limitador
+
+La cadena administrativa DEBE construir, sin declararlo bean (como el filtro de autenticación), el filtro de CSRF
+y `Origin` después del filtro del origen de la petición y antes del filtro de tokens y del limitador, de modo que
+una petición rechazada por CSRF o `Origin` NO DEBE consumir cupo del limitador, ni autenticar, ni llegar al
+controlador.
+
+#### Escenario: [WE57] Orden de los filtros
+
+- **DADO** la cadena administrativa
+- **CUANDO** se inspecciona el orden
+- **ENTONCES** es: cabeceras de seguridad, origen de la petición, CSRF y `Origin`, tokens, limitador,
+  controlador
+
+#### Escenario: [WE58] El rechazo no consume cupo ni verifica el token
+
+- **DADO** una IP con 9 peticiones admitidas y un doble del verificador con contador
+- **CUANDO** envía una petición con `Origin` no permitido y un token válido
+- **ENTONCES** responde `403` con `csrf-invalid`, el cupo sigue en 9 y el verificador registra cero invocaciones
+
+### Requisito: La clave CSRF es un secreto de entorno exclusivo del proceso administrativo
+
+El sistema DEBE leer la clave del HMAC de CSRF de la propiedad `confia.security.csrf.key`, inyectable por
+variable de entorno, en Base64 estándar de al menos 32 bytes, y DEBE aceptar una clave anterior opcional en
+`confia.security.csrf.previous-key`, usada solo para verificar. El proceso administrativo DEBE fallar al arrancar
+si la clave falta, es más corta que 32 bytes o no es Base64 válido, si la clave anterior es inválida, o si la
+clave anterior es igual a la actual, con un mensaje que nombre la propiedad y NO repita el valor. Los procesos
+del portal y del trabajador NO DEBEN tener ninguna de las dos claves ni el componente que las usa, y DEBEN
+abortar si cualquiera de las dos propiedades aparece. Ningún valor de las claves DEBE versionarse. Rotar la clave
+(moviendo la actual a la anterior) NO invalida las sesiones vigentes: el siguiente refresco verifica su token CSRF
+con la clave anterior y lo reemite con la actual; la clave anterior se retira pasada la vida absoluta de una
+sesión (12 horas).
+
+#### Escenario: [WE59] Administración sin clave o con clave corta no arranca
+
+- **DADO** el proceso administrativo sin `confia.security.csrf.key`, otro con una clave de 16 bytes, otro con una
+  clave que no es Base64 válido y otro con una clave anterior igual a la actual
+- **CUANDO** arranca cada uno
+- **ENTONCES** los cuatro fallan con un mensaje que nombra la propiedad y no contiene el valor
+
+#### Escenario: [WE60] El portal y el trabajador no la tienen
+
+- **DADO** los procesos del portal y del trabajador con y sin `confia.security.csrf.key` ni
+  `confia.security.csrf.previous-key` en su entorno
+- **CUANDO** se construye cada contexto
+- **ENTONCES** sin las propiedades arrancan sin ningún componente de CSRF, y con cualquiera de las dos abortan
+  nombrando la propiedad sin su valor
+
+#### Escenario: [WE61] Ninguna clave CSRF versionada
+
+- **DADO** el repositorio con todas sus pruebas y recursos
+- **CUANDO** se ejecuta el escaneo de secretos
+- **ENTONCES** no encuentra ningún valor para `confia.security.csrf.key`
+
+### Requisito: Las cookies tienen atributos fijos, siempre `Secure` y con prefijo, y se emiten y se borran desde un único ayudante
+
+El sistema DEBE emitir la cookie de sesión `__Secure-confia_admin_sid` con `HttpOnly`, `Secure`,
+`SameSite=Strict`, `Path=/api/v1/auth/sessions`, ningún `Domain` y ningún `Max-Age` ni `Expires` (cookie de
+sesión del navegador, DA-2 *a*), con el texto del refresco como valor. Para borrarla DEBE emitir el mismo nombre
+con los mismos atributos y `Max-Age=0`; igual para la cookie CSRF. La emisión y el borrado DEBEN vivir en un
+único ayudante de `shared.web` (`SessionCookies`), la única clase de producción que usa
+`jakarta.servlet.http.Cookie`. Las dos cookies DEBEN ser **siempre** `Secure` y conservar su prefijo
+(`__Secure-` y `__Host-`) en todos los perfiles, incluido el local: NO DEBE existir ningún indicador ni
+propiedad de configuración que desactive `Secure` ni que cambie los nombres de las cookies. El desarrollo local
+usa un navegador que trate `http://localhost` como origen de confianza, o HTTPS local. Ninguna respuesta de la cadena administrativa distinta de las de inicio de sesión, verificación de segundo factor,
+refresco y cierres DEBE llevar `Set-Cookie`.
+
+#### Escenario: [WE62] Atributos de la cookie de sesión
+
+- **DADO** una respuesta de inicio de sesión con éxito
+- **CUANDO** se inspecciona el `Set-Cookie` de sesión
+- **ENTONCES** el nombre es `__Secure-confia_admin_sid`, con `HttpOnly`, `Secure`, `SameSite=Strict` y
+  `Path=/api/v1/auth/sessions`, sin `Domain`, `Max-Age` ni `Expires`
+- **Y** el valor tiene 43 caracteres base64url
+
+#### Escenario: [WE63] Borrado de las dos cookies
+
+- **DADO** un cierre de sesión o un refresco rechazado
+- **CUANDO** se inspeccionan los `Set-Cookie`
+- **ENTONCES** hay dos, uno por cookie, con valor vacío, el mismo nombre y los mismos atributos (`Path`,
+  `Secure`, `HttpOnly` en la de sesión, `SameSite=Strict`) y `Max-Age=0`
+
+#### Escenario: [WE64] Las cookies son `Secure` y con prefijo en todos los perfiles
+
+- **DADO** el proceso administrativo arrancado con los perfiles `local`, `preprod` y `prod`
+- **CUANDO** se inspeccionan los `Set-Cookie` de un inicio de sesión con éxito en cada perfil
+- **ENTONCES** en los tres las dos cookies llevan `Secure` y los nombres `__Secure-confia_admin_sid` y
+  `__Host-confia_csrf`
+- **Y** el conjunto de propiedades de configuración del ayudante de cookies no contiene ninguna que desactive
+  `Secure` ni que cambie los nombres (una prueba lo comprueba y falla ante un fixture que la añade)
+
+#### Escenario: [WE65] Ninguna otra respuesta emite cookies
+
+- **DADO** respuestas de rutas públicas de documentación, denegadas, de `GET /api/v1/auth/sessions/current` y
+  de errores `401`
+- **CUANDO** se inspeccionan
+- **ENTONCES** ninguna contiene `Set-Cookie` ni crea sesión HTTP
+
+### Requisito: Las rutas restringidas aceptan solo un token restringido de su uso y su principal es de otro tipo que `AuthenticatedActor`
+
+La cadena administrativa DEBE declarar una clase de ruta restringida, distinta de las rutas autenticadas y de las
+públicas, con exactamente `POST /api/v1/auth/mfa/verifications` (usos `mfa-verify` y `mfa-enroll`) y `POST /api/v1/auth/mfa/enrollments`
+(uso `mfa-enroll`). El filtro admite el uso por ruta y no consulta el estado de la credencial: qué pruebas acepta
+cada uso, y el rechazo `second-factor-invalid` de un `mfa-enroll` con la credencial ya verificada, lo decide el
+caso de uso (`identity`). En esas rutas el filtro
+DEBE verificar el token con el verificador restringido y establecer un principal restringido de tipo y
+`ScopedValue` distintos de `AuthenticatedActor`, con el identificador de la cuenta, la institución, el uso, el
+identificador del token y su vencimiento. Un token restringido NO DEBE poblar nunca `AuthenticatedActor.current()`
+ni ser visto por `TokenCurrentInstitutionProvider` ni por `SessionValidity`. Un token de acceso completo
+presentado a una ruta restringida DEBE rechazarse con `401 token-invalid`; un token restringido presentado a
+cualquier otra ruta, también.
+
+#### Escenario: [WE66] El token restringido no puebla el actor de sesión
+
+- **DADO** un controlador de prueba en una ruta restringida que lee `AuthenticatedActor.current()` y el
+  principal restringido
+- **CUANDO** se envía un token restringido válido
+- **ENTONCES** el principal restringido está presente y `AuthenticatedActor.current()` está vacío
+
+#### Escenario: [WE67] Cada token abre solo lo suyo
+
+- **DADO** un token de acceso, un `mfa-verify` y un `mfa-enroll` (cualquiera que sea el estado de la credencial)
+- **CUANDO** se presenta cada uno a `GET /api/v1/auth/sessions/current`, a las verificaciones y a las
+  inscripciones
+- **ENTONCES** el acceso solo abre la sesión actual y «cerrar todas»; `mfa-verify` solo abre las verificaciones;
+  `mfa-enroll` abre las inscripciones y las verificaciones (el filtro lo admite aunque la credencial ya esté
+  verificada; ese caso lo rechaza después el caso de uso con `second-factor-invalid`); el resto responde
+  `401 token-invalid`
+
+#### Escenario: [WE68] Una ruta restringida nueva sin editar la lista rompe la prueba
+
+- **DADO** un controlador de prueba que acepta un token restringido sin figurar en la clase restringida
+- **CUANDO** se ejecuta la prueba que enumera las rutas
+- **ENTONCES** falla señalando la ruta
+
+#### Escenario: [WE69] Un token restringido no autoriza nada fuera de su ruta
+
+- **DADO** un token `mfa-verify` vigente
+- **CUANDO** se presenta a `DELETE /api/v1/auth/sessions` y a una ruta no registrada
+- **ENTONCES** ambas responden `401 token-invalid` y ningún controlador se invoca
+
+### Requisito: Existen tres políticas de límite de tasa configuradas por `confia.web.rate-limit.<política>.*`
+
+El sistema DEBE generalizar la configuración del limitador al prefijo `confia.web.rate-limit.<política>.*` y
+registrar tres políticas con el mismo puerto `RateLimiter`, con estos valores por defecto (declarados en
+`application.yml`, no en anotaciones):
+
+| Política | Peticiones por IP | Umbral de fallos (capa 2) | Rutas |
+|---|---|---|---|
+| `admin-login` | 10 por minuto | 10 fallos en 10 minutos | `POST /api/v1/auth/sessions` |
+| `admin-mfa` | 20 por minuto | 10 fallos en 10 minutos | verificación e inscripción del segundo factor |
+| `admin-session` | 120 por minuto | 30 fallos en 10 minutos | refresco, cierre actual y cerrar todas |
+
+En las tres, la capa 2, una vez activada, admite 1 intento por minuto con un tope de 1 hora (los valores de
+`admin-login` no cambian). Los fallos de `admin-login` son los desenlaces `Rejected`; los de `admin-mfa`, los
+`second-factor-invalid`; los de `admin-session`, los rechazos del refresco (`session-expired`, incluida la
+petición sin cookie de sesión). Los cierres no registran fallos. Cada política DEBE tener su propio contador por
+IP. La configuración DEBE vivir bajo `confia.web.rate-limit.<política>.*` con un componente por política; un
+componente ausente o desconocido DEBE impedir el arranque con un mensaje que nombre la propiedad. Los valores
+DEBEN poder ajustarse sin recompilar y un valor no positivo DEBE impedir el arranque con un mensaje que nombre la
+propiedad completa. El rechazo DEBE responder `429` con `too-many-requests` y `Retry-After`.
+
+#### Escenario: [WE70] Valores por defecto de las tres políticas
+
+- **DADO** el proceso arrancado sin sobrescribir las políticas
+- **CUANDO** se consultan los valores efectivos
+- **ENTONCES** `admin-login` es 10 por minuto con umbral de 10 fallos en 10 minutos, `admin-mfa` es 20 por
+  minuto con umbral de 10 fallos en 10 minutos y `admin-session` es 120 por minuto con umbral de 30 fallos en 10
+  minutos
+- **Y** en las tres, la capa 2 admite 1 intento por minuto con un tope de 1 hora
+
+#### Escenario: [WE71] Los contadores de las políticas son independientes
+
+- **DADO** una IP con su cupo de `admin-login` agotado
+- **CUANDO** envía un refresco y una verificación del segundo factor
+- **ENTONCES** ambos se admiten, porque cada política tiene su propio contador
+
+#### Escenario: [WE72] El décimo fallo del segundo factor activa la restricción de `admin-mfa`
+
+- **DADO** una IP con 9 `second-factor-invalid` en 10 minutos
+- **CUANDO** el décimo fallo se registra y la IP envía otra verificación a los 30 segundos
+- **ENTONCES** recibe `429` con `Retry-After` de 30 segundos
+
+#### Escenario: [WE92] El trigésimo rechazo del refresco activa la restricción de `admin-session`
+
+- **DADO** una IP con 29 rechazos del refresco (`session-expired`) en 10 minutos, sin agotar la capa 1
+- **CUANDO** se registra el trigésimo rechazo y la IP envía otro refresco a los 30 segundos
+- **ENTONCES** recibe `429` con `Retry-After`
+- **Y** con 29 rechazos y un refresco correcto, la IP no está restringida
+- **Y** los cierres (`204`) no cuentan como fallos
+
+#### Escenario: [WE93] Un componente de política ausente o desconocido detiene el arranque
+
+- **DADO** la configuración sin el componente `admin-session`, y otra con un componente `admin-otro`
+- **CUANDO** arranca el proceso
+- **ENTONCES** los dos arranques fallan con un mensaje que nombra la propiedad
+
+#### Escenario: [WE73] Valor no positivo en una política nueva
+
+- **DADO** `confia.web.rate-limit.admin-session.request-limit` en 0
+- **CUANDO** arranca el proceso
+- **ENTONCES** el arranque falla con un mensaje que nombra esa propiedad
+
+> **Corrección del 2026-10-24 (`verify-report.md`, W3).** La propiedad real se llama `request-limit`; el texto decía `requests`, nombre que no existe en `application.yml` ni en `RateLimitPropertiesTest`.
+
+#### Escenario: [WE74] Cada ruta aplica su política
+
+- **DADO** las seis rutas de sesión
+- **CUANDO** se inspeccionan sus políticas
+- **ENTONCES** el inicio de sesión usa `admin-login`; las verificaciones y las inscripciones, `admin-mfa`; y el
+  refresco y los dos cierres, `admin-session`; `GET /api/v1/auth/sessions/current` no usa ninguna
+
+### Requisito: La espera materializada del retardo tiene un tope configurable
+
+El materializador DEBE acotar la espera materializada de un `Delayed` a un tope configurable por
+`confia.web.delay.max-wait`, positivo y como máximo de 60 segundos, con valor de partida de 30 segundos. El
+tope vive en el materializador (el único que espera); el retardo que lleva `Delayed` no cambia. El contador de retroceso y la
+auditoría DEBEN conservar el retardo que calculó la política (hasta 900 segundos); solo se acota la espera de la
+respuesta. Un tope no positivo o mayor que 60 segundos DEBE impedir el arranque con un mensaje que nombre la propiedad. El retardo menor
+que el tope se materializa completo.
+
+#### Escenario: [WE75] Un retardo de 900 segundos espera el tope
+
+- **DADO** un caso de uso que devuelve un retardo de 900 segundos y un tope de 30 segundos
+- **CUANDO** el borde lo procesa con el temporizador de prueba
+- **ENTONCES** la espera solicitada es de 30 segundos
+- **Y** el contador y el asiento de auditoría registran 900 segundos
+
+#### Escenario: [WE76] Un retardo menor que el tope no se acorta
+
+- **DADO** un retardo de 2 segundos y el tope de 30 segundos
+- **CUANDO** el borde lo procesa
+- **ENTONCES** la espera solicitada es de 2 segundos
+
+#### Escenario: [WE77] Tope no válido
+
+- **DADO** el tope en 0, en un valor negativo o en 61 segundos
+- **CUANDO** arranca el proceso
+- **ENTONCES** el arranque falla con un mensaje que nombra la propiedad
+
+### Requisito: Las propiedades desconocidas del cuerpo JSON se rechazan con `validation-failed`
+
+La deserialización de cuerpos JSON de la cadena administrativa DEBE rechazar toda propiedad desconocida con `400`
+y `validation-failed`, sin repetir el nombre ni el valor rechazado. Una sonda con Jackson 3 y Spring Boot 4 DEBE
+confirmar la configuración, y una prueba en rojo DEBE existir antes del controlador de inicio de sesión.
+
+#### Escenario: [WE78] Propiedad desconocida
+
+- **DADO** un endpoint de prueba con un cuerpo de un campo y una petición con un campo adicional `x` con el valor
+  `VALOR-SENSIBLE-123`
+- **CUANDO** se envía
+- **ENTONCES** responde `400` con `validation-failed` y el texto no aparece en el cuerpo ni en las cabeceras
+
+### Requisito: Las rutas públicas y las listas de rutas autenticadas y restringidas son cerradas y una prueba las hace cumplir
+
+La lista blanca pública DEBE contener, además de la documentación de springdoc, `POST /api/v1/auth/sessions`
+(inicio de sesión), `POST /api/v1/auth/sessions/refresh` y `DELETE /api/v1/auth/sessions/current` (estas dos se
+autentican por cookie y CSRF dentro del borde, no por `Bearer`). La lista cerrada de rutas autenticadas DEBE
+contener exactamente `GET /api/v1/auth/sessions/current` y `DELETE /api/v1/auth/sessions`, ambas con comprobación
+de la vigencia de la sesión. La clase restringida DEBE contener exactamente las dos rutas de MFA. Ninguna ruta
+fuera de las tres clases DEBE responder sin credencial, y la prueba de enumeración DEBE distinguir las tres
+clases y fallar si una ruta no figura o si una entrada no corresponde a una ruta registrada.
+
+#### Escenario: [WE79] Contenido exacto de las tres clases
+
+- **DADO** las listas tal como las entrega este cambio
+- **CUANDO** se enumeran
+- **ENTONCES** la pública añade las tres rutas, la autenticada tiene dos entradas con comprobación de sesión y
+  la restringida tiene dos
+
+#### Escenario: [WE80] Una ruta de la lista pública que exige credencial rota falla la prueba
+
+- **DADO** una ruta pública de sesión configurada, a propósito, para responder `200` a un método no declarado
+- **CUANDO** se ejecuta la prueba de enumeración
+- **ENTONCES** falla señalando la ruta
+
+#### Escenario: [WE81] Otro método sobre una ruta de sesión no se sirve
+
+- **DADO** `GET`, `PUT` y `PATCH` sobre `/api/v1/auth/sessions`, `/api/v1/auth/sessions/refresh` y
+  `/api/v1/auth/mfa/verifications`
+- **CUANDO** se envían sin credencial
+- **ENTONCES** ninguna responde `2xx` y el controlador registra cero invocaciones
+
+### Requisito: Los cinco códigos de Problem Details del flujo de sesión existen con su estado y su texto es-HN
+
+El catálogo DEBE incluir `authentication-failed` (401), `second-factor-invalid` (401), `session-expired` (401),
+`csrf-invalid` (403) y `mfa-already-enrolled` (409), cada uno con su entrada es-HN. Los tres `401` DEBEN llevar
+`WWW-Authenticate: Bearer`. Los textos NO DEBEN revelar la causa del rechazo: `authentication-failed` no
+distingue cuenta de contraseña, `csrf-invalid` no distingue falta de discrepancia de origen, y
+`session-expired` no distingue desconocido de vencido ni de reutilizado.
+
+#### Escenario: [WE82] Cada código tiene su estado
+
+- **DADO** un productor de prueba para cada uno de los cinco códigos
+- **CUANDO** lanza su error en el borde
+- **ENTONCES** el estado es 401, 401, 401, 403 y 409 respectivamente y el `type` corresponde a cada código
+
+#### Escenario: [WE83] Los textos no nombran la causa
+
+- **DADO** los `detail` es-HN de los cinco códigos
+- **CUANDO** se leen
+- **ENTONCES** ninguno contiene «contraseña incorrecta», «no existe», «origen», «reutilizado» ni «token CSRF»
+
+#### Escenario: [WE84] El catálogo exige los cinco y `institution-*` sigue sin existir
+
+- **DADO** `ProblemCatalogCoverageTest` y `ProblemCodeTest` actualizados
+- **CUANDO** se ejecutan con el catálogo real, con uno sin la entrada es-HN de `csrf-invalid` y con uno que
+  añade `institution-not-found`
+- **ENTONCES** pasa con el real y falla en los otros dos
+
+### Requisito: Ausencia de recuperación de contraseña por HTTP (brecha con destino: `password-recovery-endpoints`)
+
+El sistema NO DEBE incluir, en este cambio, ningún endpoint de solicitud ni de confirmación de recuperación de
+contraseña, ni los códigos `institution-not-found` o `institution-inactive`. Las condiciones duras H3 y H4 obligan
+a **`password-recovery-endpoints`**. Este cambio cierra H1 y la condición 3; H2 se cerró en
+`session-tokens-and-web-layer`.
+
+#### Escenario: [WE85] Las rutas de producción son exactamente las siete de sesión
 
 - **DADO** el proceso administrativo arrancado por su camino de producción
 - **CUANDO** se enumeran las rutas registradas por controladores de producción
-- **ENTONCES** el conjunto es exactamente `GET /api/v1/auth/sessions/current`
+- **ENTONCES** el conjunto es exactamente `GET /api/v1/auth/sessions/current`, `POST /api/v1/auth/sessions`,
+  `DELETE /api/v1/auth/sessions`, `POST /api/v1/auth/sessions/refresh`,
+  `DELETE /api/v1/auth/sessions/current`, `POST /api/v1/auth/mfa/verifications` y
+  `POST /api/v1/auth/mfa/enrollments`
 - **Y** toda petición a otra ruta de aplicación sin credencial recibe `401`
 
-#### Escenario: [WE30] Ninguna cookie y CSRF sigue desactivado
+#### Escenario: [WE86] Cierre de H1 (solo documental)
 
-- **DADO** el código de producción de `apps/api`
-- **CUANDO** se busca el uso de `jakarta.servlet.http.Cookie`, de `Set-Cookie` y de la configuración
-  de CSRF de la cadena
-- **ENTONCES** no hay ningún uso de cookies y la protección CSRF sigue desactivada, porque ninguna
-  credencial viaja en una cookie
-- **Y** este escenario deja de ser cierto el día que `session-endpoints-cookie-and-csrf` entregue la
-  cookie de refresco con su protección CSRF
-
-#### Escenario: [WE31] El limitador y el materializador no están aplicados a un endpoint de producción
-
-- **DADO** el código de producción de `apps/api`
-- **CUANDO** se inspeccionan los usos del limitador y del materializador
-- **ENTONCES** solo se usan desde el árbol de pruebas, y H1 queda abierta con destino a
-  `session-endpoints-cookie-and-csrf`
-
-#### Escenario: [WE32] H1, H3, H4 y la condición 3 siguen abiertas con su nuevo dueño (solo documental)
-
-- **DADO** la nota fechada de transferencia de `openspec/changes/foundations-plan/exploration.md` y el
-  informe de archivo de este cambio
+- **DADO** el informe de archivo de este cambio y la nota fechada de `foundations-plan`
 - **CUANDO** se leen
-- **ENTONCES** declaran H1 y la condición 3 abiertas con dueño `session-endpoints-cookie-and-csrf`, y H3
-  y H4 abiertas con dueño `password-recovery-endpoints`
-- **Y** declaran H2 cerrada en este cambio
+- **ENTONCES** declaran cerrada H1 con referencia a [I160] y [I161], H3 y H4 abiertas con dueño
+  `password-recovery-endpoints`, y el texto original de las condiciones no fue modificado
+
+### Requisito: Un token de acceso completo autentica las rutas autenticadas; el restringido solo abre las rutas restringidas de su uso, y los de otros dominios se rechazan en toda ruta
+
+La cadena administrativa DEBE rechazar con `401` y el código `token-invalid` todo token restringido de
+MFA presentado a una ruta que no sea una ruta restringida de su uso, y todo token firmado por otro dominio de
+identidad o con audiencia distinta de la administrativa. El rechazo del token restringido DEBE producirse por su
+audiencia (`confia-admin-mfa`, distinta de `confia-admin`) en las rutas autenticadas, sin depender de que se
+consulte su claim de uso; en las rutas restringidas se verifica con el verificador restringido y su uso. El
+rechazo NO DEBE depender de que la ruta exista ni de que esté en alguna de las listas, y NO DEBE evaluar ningún
+permiso.
+
+#### Escenario: [WE09] El token restringido no abre ninguna ruta autenticada
+
+- **DADO** un token restringido de MFA vigente, con uso `mfa-verify`
+- **CUANDO** se presenta a una ruta de la lista autenticada, a una ruta registrada fuera de las listas
+  y a una ruta no registrada
+- **ENTONCES** las tres respuestas son `401` con el código `token-invalid`
+- **Y** ningún controlador registra invocaciones
+- **Y** el rechazo se debe a la audiencia `confia-admin-mfa`, no al uso: un token con la audiencia
+  administrativa y la claim de uso `mfa-verify` es rechazado igualmente por la lista cerrada de claims
+
+#### Escenario: [WE10] El token del portal se rechaza en rutas autenticadas y restringidas
+
+- **DADO** un token vigente firmado con la clave del portal y con `aud` igual a `confia-portal`
+- **CUANDO** se presenta a una ruta de la lista autenticada y a una restringida
+- **ENTONCES** ambas responden `401` con el código `token-invalid` y no se evalúa ningún permiso
 
