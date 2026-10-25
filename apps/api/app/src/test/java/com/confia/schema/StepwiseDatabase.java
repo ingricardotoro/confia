@@ -6,7 +6,9 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
  * A throw-away database of the shared PostgreSQL container, migrated by the real Flyway migrations
@@ -50,13 +52,25 @@ final class StepwiseDatabase implements AutoCloseable {
         flyway(null).migrate();
     }
 
-    /** Checks the history against the files on the classpath, as a deployment does. */
-    void validate() {
-        flyway(null).validate();
+    /**
+     * Checks the history against the migrations up to {@code version} only: a database migrated to
+     * an earlier version has later migrations on the classpath that are pending, not wrong.
+     */
+    void validateUpTo(String version) {
+        flyway(version).validate();
     }
 
     Connection connectionAs(String role) throws SQLException {
         return DriverManager.getConnection(url, role, PASSWORD);
+    }
+
+    /** A pooled-less {@link DataSource} authenticated as {@code role}, in autocommit. */
+    DataSource dataSourceAs(String role) {
+        DriverManagerDataSource dataSource = new DriverManagerDataSource();
+        dataSource.setUrl(url);
+        dataSource.setUsername(role);
+        dataSource.setPassword(PASSWORD);
+        return dataSource;
     }
 
     private Flyway flyway(String target) {

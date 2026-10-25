@@ -777,6 +777,12 @@ Reglas de los indicadores propios, independientes del mecanismo:
   `SELECT` sobre `scheduled_tasks` porque el cliente de programación lo exige (validado en F0):
   ADR-0017 no concede ese privilegio para la salud, de modo que, si no lo tiene, el grupo de
   preparación del portal no incluye `backgroundJobs`.
+
+  _Nota (2026-10-24, `background-jobs-with-db-scheduler`, sonda P-6):_ el cliente de programación real conectado como
+  `confia_portal_app` falla con `INSERT` solo, tanto en `scheduleIfNotExists` como en `schedule` (que en 16.12.0 se apoya en el
+  primero), porque lee la fila antes de insertar. `V10` concede por eso `SELECT` e `INSERT` al portal sobre `scheduled_tasks`
+  (nunca `UPDATE` ni `DELETE`). El privilegio se justifica por el cliente y no por la salud: que el grupo de preparación del
+  portal incluya `backgroundJobs` sigue siendo decisión de los cambios 10 y 11.
 - **Migraciones.** El arranque no se completa hasta que el esquema coincide con las migraciones
   de Flyway esperadas por el artefacto. La comprobación lee `flyway_schema_history` con el
   `SELECT` que ADR-0017 concede a `confia_admin_app` y a `confia_portal_app`, mediante una

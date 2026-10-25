@@ -3,7 +3,7 @@
 - **Cambio:** `background-jobs-with-db-scheduler` (F0, cambio 9; entregable 12, criterio de salida 5)
 - **Modo:** TDD estricto (`./mvnw verify -Pmutation-gate` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `stacked-to-main`, tope de 800 líneas efectivas por PR; prevalece sobre `single-pr` con 400 de la preflight (ver `tasks.md`)
-- **Última actualización:** 2026-10-24 (rebanada 01a: tareas 1.1 y 1.2)
+- **Última actualización:** 2026-10-24 (rebanada 1 completa: tareas 1.1, 1.2 y 1.3)
 - **Regla de este archivo:** solo se añade; no se reescriben secciones existentes.
 
 ## Estado de las tareas
@@ -12,7 +12,7 @@
 |---|---|---|---|
 | 1.1 | PR 1 / 01a `01-scheduler-dependency-and-table` | Completa y verificada | `17bcae6` |
 | 1.2 | PR 1 / 01a (condicional) | **No aplica**: P-1, P-2 y P-3 pasaron | — |
-| 1.3 | PR 1 / 01b `01b-scheduled-tasks-table` | Pendiente: va en la rama 01b, apilada sobre esta | — |
+| 1.3 | PR 1 / 01b `01b-scheduled-tasks-table` | Completa y verificada (ver «Cierre de 01b» y «Desviaciones») | `cf4bfdf` |
 
 ## Nota de entorno (2026-10-24)
 
@@ -102,3 +102,70 @@ archivo de PIT); se borraron `kernel/target` y `app/target` a mano y la construc
 3. **`IdentityScopeExclusionInventoryTest`** perdió su afirmación de ausencia de la biblioteca en el classpath (ver «Pruebas existentes tocadas»).
 4. **P-2 solo parcialmente sondada**: se observó que el iniciador carga y arranca con Spring Boot 4.1.1, pero el reemplazo por el `Scheduler` propio del
    trabajador se prueba en 1.6.
+
+## Tarea 1.3 (rebanada 01b)
+
+### Sonda P-6 y su decisión
+
+| Paso | Resultado observado |
+|---|---|
+| `V10` con `GRANT INSERT` solo para el portal | `PortalSchedulingPrivilegeIT`: `scheduleIfNotExists` falla con `permission denied for table scheduled_tasks` (`JdbcTaskRepository.getExecution`, línea 771, llamado desde `createIfNotExists`, línea 187) |
+| Aislar `schedule` con `INSERT` solo (rol sin `SELECT`) | **También falla**: en el cliente estándar `schedule` llama a `scheduleIfNotExists` (`SchedulerClient.java`, líneas 441 y 447) |
+| Decisión | `V10` concede `SELECT, INSERT` a `confia_portal_app`. Con ambos, el cliente programa; `UPDATE` y `DELETE` quedan denegados (`permission denied for table scheduled_tasks`) y las filas siguen ahí. Consecuencia anotada en `design.md` §2.1, en el comentario de `V10` y en `docs/07` §9: el privilegio lo justifica el cliente y no la salud; incluir `backgroundJobs` en el grupo de preparación del portal queda para los cambios 10 y 11 |
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO | `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test='ScheduledTasksSchemaIT,ScheduledTasksNotCreatedAtRuntimeIT,PortalSchedulingPrivilegeIT,RolePrivilegeMatrixIT,V10SchemaDiffIT,MultiTenantSchemaIT' -Dfailsafe.failIfNoSpecifiedTests=false` sin `V10` | 68 pruebas, 2 fallos y 13 errores. Errores: `relation "scheduled_tasks" does not exist` (matriz, catálogo, comentario, columnas, índices) y `Flyway No migration with a target version 10 could be found` (`V10SchemaDiffIT`, `PortalSchedulingPrivilegeIT`, `aPrivilegeOfMore…`); `migration not found: V10__create_scheduled_tasks.sql`. Fallos de aserción: `MultiTenantSchemaIT` (la membresía exige `scheduled_tasks` y la tabla no existe). `AuditScopeExclusionInventoryTest.scheduledTasksAppearsOnlyInV10…`: «V10 is the migration of the scheduler table». Causa esperada |
+| Sin rojo propio | `ScheduledTasksNotCreatedAtRuntimeIT` (3 pruebas) y `theReferenceDdlIsTheOneOfThePinnedLibraryVersion` | En verde sin `V10`: protegen contra una regresión y no contra una ausencia. La capacidad de fallar de la primera la da el fixture que crea la tabla (`aFixtureThatCreatesTheTableAtStartIsDetected`) |
+| VERDE | Las mismas, con `V10` | 69 pruebas (con `AuditScopeExclusionInventoryTest`), 0 fallos tras ajustar la sonda P-6 (ver arriba) y un `GRANT USAGE` de la prueba sobre su esquema de trabajo |
+| Refactor | `StepwiseDatabase.dataSourceAs`, `V9SchemaDiffIT.snapshot` y `Difference` pasan a visibilidad de paquete para reutilizarlos | Sin cambio de comportamiento |
+
+Los checksums de Flyway de `V1` a `V9` registrados en `V10SchemaDiffIT` se calcularon con el algoritmo de Flyway (CRC32 de las líneas en UTF-8) sobre los
+archivos sin cambios; el de `V8` (1681600631) coincide con el que `V9SchemaDiffIT` ya registraba, lo que valida el método.
+
+### Demostraciones deliberadas (con `cmp`)
+
+| Ruptura en `V10` | Prueba que falló | Aserción | `cmp` |
+|---|---|---|---|
+| `GRANT SELECT` en vez de `GRANT SELECT, INSERT` para `confia_portal_app` | `PortalSchedulingPrivilegeIT.thePortalRoleSchedules…` | El cliente no puede programar: `Failed to add new execution (task name: probe.portal-p6, instance id: if-not-exists)`. Además `RolePrivilegeMatrixIT` (2 fallos: «scheduled_tasks privileges that differ from the matrix») | sin salida |
+| Agregar `DELETE` a `confia_portal_app` | `RolePrivilegeMatrixIT.scheduledTasksPrivilegesAreExactlyTheMatrixForTheFiveRoles` y `aPrivilegeOfMore…` (privilegio de más, nombra rol y `DELETE`); `PortalSchedulingPrivilegeIT` (el `DELETE` ya no se deniega) | Aserción de privilegio de más | sin salida |
+
+**Nota sobre el primer caso.** La falla de `PortalSchedulingPrivilegeIT` ocurre como error del cliente (`SQLRuntimeException` por `permission denied … INSERT`) y no
+como una aserción de AssertJ: es el comportamiento que la prueba debe detectar («el rol no puede programar»), pero no es una aserción de resultado en sentido
+estricto; la de la matriz sí lo es.
+
+### Desviaciones y precisiones respecto de `tasks.md` y el diseño
+
+1. **P-6 difiere de lo esperado:** `schedule` también exige `SELECT` (ver arriba). `V10` concede `SELECT` al portal, como la tarea prevé para ese caso.
+2. **`V10SchemaDiffIT`** (no nombrada en la tarea) cubre BI64 con el mismo método que `V9SchemaDiffIT`, y registra los checksums de `V1` a `V9`.
+3. **`ScheduledTasksNotCreatedAtRuntimeIT`** no se apoya en una opción de creación automática, porque la biblioteca no tiene ninguna: el control negativo es
+   un fixture que crea la tabla con el DDL de la biblioteca y debe ser detectado por el mismo registrador de sentencias y la misma comprobación de catálogo.
+4. **`MultiTenantSchemaIT`** no necesitaba cambiar su lista de excepciones (ya nombra las cuatro tablas); se extrajo `isCovered` para probar con un fixture que
+   una tabla que no es del catálogo y no tiene `institution_id` se rechaza (BI99).
+5. **`AuditScopeExclusionInventoryTest`**: se invirtió solo la mitad de migraciones (BI97). La regla de confinamiento de la dependencia (BI97, tercera parte) llega
+   con `DbSchedulerConfinementTest` en la tarea 2.5, como dice el diseño.
+
+### Cierre de 01b
+
+Primera ejecución de `./mvnw verify -Pmutation-gate` sobre 01b: **falló** en Failsafe (617 pruebas, 1 error): `V9SchemaDiffIT.v8WasNotEditedItsChecksum…`,
+`FlywayValidate: Migrations have failed validation`. Causa: la prueba migra una base de datos hasta `V9` y valida contra todo el classpath, donde `V10` figura como
+migración pendiente. Corrección: `StepwiseDatabase.validateUpTo(version)` (validación contra las migraciones hasta esa versión) en `V9SchemaDiffIT` y `V10SchemaDiffIT`,
+y se retiró `validate()`, sin otros usuarios. Se detectó en el `verify` completo y no en la ejecución acotada, porque esta no incluía `V9SchemaDiffIT`.
+
+Segunda ejecución, sobre la rama con la corrección, `BUILD SUCCESS` en **16 min 46 s** (1 006 s; «Total time 16:40 min» de Maven):
+
+| Etapa | Resultado |
+|---|---|
+| Surefire | núcleo 186; aplicación 2 385; 0 fallos, 0 errores |
+| Failsafe | 617; 0 fallos, 0 errores |
+| JaCoCo | «All coverage checks have been met» |
+| PIT | núcleo: 192 de 194 (99 %), fuerza de prueba 99 %, 229 de 233 líneas (98 %). Aplicación: 676 de 710 (95 %), fuerza de prueba 96 %, 928 de 959 líneas (97 %): sin cambio respecto de 01a, porque no se añadieron clases de producción mutadas |
+
+**Presupuesto de BI57 (15 minutos): superado por 1 min 46 s en 01b** (13 min 48 s en 01a). Las 19 pruebas de integración añadidas (arranques de bases de datos
+aisladas con `StepwiseDatabase`, cada una con su Flyway completo) son la causa probable de la diferencia (no se aisló con una medición); las rebanadas siguientes
+(dos contextos reales por prueba, riesgo R-9) la presionarán más. Se informa al orquestador. Esta ejecución no se hizo con `clean` previo (el estado previo del
+directorio `target` venía de ejecuciones acotadas de la misma rama).
+
+Medida final de 01b: **936 líneas efectivas** (918 de código y pruebas más 18 de la nota de `docs/07` §9), 136 por encima de 800 (ver «Medición y partición»).

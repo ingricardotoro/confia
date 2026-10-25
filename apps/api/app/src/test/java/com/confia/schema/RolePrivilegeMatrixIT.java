@@ -7,9 +7,11 @@ import com.confia.support.SharedPostgresContainer;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -766,6 +768,103 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
                 statement.execute("drop role if exists " + scratchRole);
             }
         }
+    }
+
+    /**
+     * The five roles against {@code scheduled_tasks} (background-jobs-with-db-scheduler design.md
+     * decision 15; specs/build-integrity/spec.md, scenarios BI65 and BI67), exact, with no privilege
+     * more and none less: {@code confia_admin_app} operates the table (the worker connects with that
+     * role); {@code confia_portal_app} inserts and reads (probe P-6: {@code scheduleIfNotExists}
+     * reads before it inserts) but never changes or deletes a task; {@code confia_readonly} holds
+     * nothing (docs/03 section 6.1: a task row can carry business identifiers); {@code
+     * confia_backup} reads through {@code pg_read_all_data}; {@code confia_owner} retains all four
+     * by definition.
+     */
+    private static final Map<String, Set<String>> SCHEDULED_TASKS_MATRIX = Map.of(
+            "confia_owner", Set.of("SELECT", "INSERT", "UPDATE", "DELETE"),
+            "confia_admin_app", Set.of("SELECT", "INSERT", "UPDATE", "DELETE"),
+            "confia_portal_app", Set.of("SELECT", "INSERT"),
+            "confia_readonly", Set.of(),
+            "confia_backup", Set.of("SELECT"));
+
+    @Test
+    void scheduledTasksPrivilegesAreExactlyTheMatrixForTheFiveRoles() throws SQLException {
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres")) {
+            assertThat(scheduledTasksMatrixViolations(superuser))
+                    .as("scheduled_tasks privileges that differ from the matrix").isEmpty();
+        }
+        assertThat(SCHEDULED_TASKS_MATRIX.keySet()).as("non-vacuous: all five roles are covered")
+                .containsExactlyInAnyOrderElementsOf(FIVE_ROLES);
+    }
+
+    @Test
+    void aPrivilegeOfMoreOnScheduledTasksBreaksTheMatrix() throws SQLException {
+        try (StepwiseDatabase database = StepwiseDatabase.migratedTo("10")) {
+            try (Connection superuser = database.connectionAs("postgres")) {
+                assertThat(scheduledTasksMatrixViolations(superuser))
+                        .as("the fixture starts from the exact matrix").isEmpty();
+            }
+            try (Connection owner = database.connectionAs("confia_owner");
+                    Statement statement = owner.createStatement()) {
+                statement.execute("GRANT DELETE ON scheduled_tasks TO confia_portal_app");
+            }
+            try (Connection superuser = database.connectionAs("postgres")) {
+                assertThat(scheduledTasksMatrixViolations(superuser))
+                        .singleElement().asString().contains("confia_portal_app", "DELETE");
+            }
+        }
+    }
+
+    @Test
+    void publicAndAnyRoleOutsideTheFiveInheritNoPrivilegeOnScheduledTasks() throws SQLException {
+        for (String privilege : ALL_PRIVILEGES) {
+            assertThat(hasTablePrivilege("public", "scheduled_tasks", privilege))
+                    .as("PUBLIC must hold no %s on scheduled_tasks", privilege).isFalse();
+        }
+
+        String scratchRole = "probe_role_outside_the_five_scheduler";
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres");
+                Statement statement = superuser.createStatement()) {
+            statement.execute("drop role if exists " + scratchRole);
+            statement.execute("create role " + scratchRole + " nosuperuser nobypassrls");
+            try {
+                for (String privilege : ALL_PRIVILEGES) {
+                    assertThat(hasTablePrivilege(scratchRole, "scheduled_tasks", privilege))
+                            .as("a role that is none of the five must inherit no %s", privilege)
+                            .isFalse();
+                }
+            } finally {
+                statement.execute("drop role if exists " + scratchRole);
+            }
+        }
+    }
+
+    /** One line per role whose held privileges on scheduled_tasks differ from the matrix. */
+    private static List<String> scheduledTasksMatrixViolations(Connection connection)
+            throws SQLException {
+        List<String> violations = new ArrayList<>();
+        for (var expected : SCHEDULED_TASKS_MATRIX.entrySet()) {
+            Set<String> held = new TreeSet<>();
+            for (String privilege : ALL_PRIVILEGES) {
+                try (var statement = connection.prepareStatement(
+                        "select has_table_privilege(?, 'scheduled_tasks', ?)")) {
+                    statement.setString(1, expected.getKey());
+                    statement.setString(2, privilege);
+                    try (var result = statement.executeQuery()) {
+                        result.next();
+                        if (result.getBoolean(1)) {
+                            held.add(privilege);
+                        }
+                    }
+                }
+            }
+            if (!held.equals(new TreeSet<>(expected.getValue()))) {
+                violations.add("%s holds %s on scheduled_tasks but the matrix says %s"
+                        .formatted(expected.getKey(), held,
+                                new TreeSet<>(expected.getValue())));
+            }
+        }
+        return violations;
     }
 
     /** Real, non-dropped columns of a public table, read from {@code pg_attribute}. */

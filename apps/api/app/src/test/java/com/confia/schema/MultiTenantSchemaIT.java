@@ -28,10 +28,10 @@ import org.junit.jupiter.api.Test;
  * extend this class.
  *
  * <p>Assertions are membership-based against ADR-0017's closed catalogue, never presence-based
- * (tasks.md task 3.5, point 1): only two of the four closed-catalogue tables exist today (
- * {@code flyway_schema_history} and the root table {@code organization_institution}); {@code
- * scheduled_tasks} and {@code event_publication} arrive with change 9. A table belongs to the
- * catalogue only by exact name match, never by a heuristic such as "looks technical".
+ * (tasks.md task 3.5, point 1): three of the four closed-catalogue tables exist today
+ * ({@code flyway_schema_history}, the root table {@code organization_institution} and, since V10 of
+ * change 9, {@code scheduled_tasks}); {@code event_publication} is still to come. A table belongs to
+ * the catalogue only by exact name match, never by a heuristic such as "looks technical".
  */
 class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
 
@@ -51,8 +51,7 @@ class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
     void everyBusinessTableHasInstitutionIdOrBelongsToTheClosedCatalogueByExactName() {
         List<BaseTable> tables = baseTablesInPublicSchema();
         for (BaseTable table : tables) {
-            assertThat(table.hasNotNullInstitutionId()
-                    || CLOSED_CATALOGUE_TABLES.contains(table.name()))
+            assertThat(isCovered(table))
                     .as("table %s must have institution_id NOT NULL or belong to the closed "
                             + "catalogue by exact name", table.name())
                     .isTrue();
@@ -60,7 +59,38 @@ class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
         // Membership, not presence (task 3.5, point 1): confirms the loop above actually ran
         // over real rows, without asserting that all four catalogue tables exist yet.
         assertThat(tables).extracting(BaseTable::name)
-                .contains(ROOT_TABLE, "flyway_schema_history");
+                .contains(ROOT_TABLE, "flyway_schema_history", "scheduled_tasks");
+    }
+
+    /**
+     * Scenario BI99 (background-jobs-with-db-scheduler specs/build-integrity/spec.md): the closed
+     * catalogue is still four exact names, and since V10 one of them is a real table that the
+     * generic gates evaluate instead of skipping: it exists, carries no institution discriminator and
+     * no row security, and nothing else is exempted. A fixture that is a business table without
+     * {@code institution_id} and is not one of the four names is rejected by the same rule.
+     */
+    @Test
+    void theClosedCatalogueStaysFourNamesAndScheduledTasksIsARealTableOfIt() {
+        assertThat(CLOSED_CATALOGUE_TABLES).containsExactlyInAnyOrder("scheduled_tasks",
+                "event_publication", "flyway_schema_history", ROOT_TABLE);
+        assertThat(baseTablesInPublicSchema()).filteredOn(table -> table.name().equals("scheduled_tasks"))
+                .singleElement().satisfies(table -> {
+                    assertThat(table.hasNotNullInstitutionId()).isFalse();
+                    assertThat(isCovered(table)).as("covered by exact name only").isTrue();
+                });
+        RowSecurityFlags flags = rowSecurityFlagsOf("scheduled_tasks");
+        assertThat(flags.rowSecurity()).isFalse();
+        assertThat(flags.forceRowSecurity()).isFalse();
+
+        assertThat(isCovered(new BaseTable("tmp_import", false)))
+                .as("a business table without institution_id that is not in the catalogue")
+                .isFalse();
+        assertThat(isCovered(new BaseTable("scheduled_tasks_copy", false)))
+                .as("a name that merely starts like a catalogue name").isFalse();
+    }
+
+    private static boolean isCovered(BaseTable table) {
+        return table.hasNotNullInstitutionId() || CLOSED_CATALOGUE_TABLES.contains(table.name());
     }
 
     @Test
