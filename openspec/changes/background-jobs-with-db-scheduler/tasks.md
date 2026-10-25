@@ -208,7 +208,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
   - **Resultado (2026-10-24): no aplica.** P-1 (16.12.0 resuelta), P-2 (el iniciador carga y arranca con Spring Boot 4.1.1) y P-3 (`dependencyConvergence` en
     verde) pasaron en 1.1; no se ejecutó nada de esta tarea. Evidencia en `apply-progress.md` y nota fechada en `design.md` §2.1.
 
-- [ ] 1.3 **PR 1 / 1b `01-scheduler-table`: `V10__create_scheduled_tasks.sql`, permisos exactos, matriz de cinco roles y sonda P-6 (decisión 15).**
+- [x] 1.3 **PR 1 / 1b `01-scheduler-table`: `V10__create_scheduled_tasks.sql`, permisos exactos, matriz de cinco roles y sonda P-6 (decisión 15).**
   - **ROJO.** Crear `test/java/com/confia/schema/ScheduledTasksSchemaIT.java` (el catálogo de `scheduled_tasks` coincide con el DDL de PostgreSQL de la
     versión fijada, leído del jar de pruebas de la biblioteca o copiado en un recurso de prueba con su suma de verificación: columnas `task_name`,
     `task_instance`, `task_data`, `execution_time`, `picked`, `picked_by`, `last_success`, `last_failure`, `consecutive_failures`, `last_heartbeat`,
@@ -232,6 +232,9 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     Se revierten y se confirman con `cmp`.
   - **Cierre.** `./mvnw verify -Pmutation-gate`. Commit: `feat(db): create the scheduled_tasks table with its role grants`. Tamaño: nominal 200,
     realista 450. — Escenarios BI62 a BI67, BI97, BI99 y los vigentes BI07 a BI10 sin cambios.
+  - **Resultado (2026-10-24): hecha.** Rojos, sonda P-6 (difiere: `schedule` también exige `SELECT`; `V10` concede `SELECT, INSERT` al portal), demostraciones con `cmp` y
+    `verify -Pmutation-gate` en verde (`BUILD SUCCESS`, 16 min 46 s) en `apply-progress.md`, «Tarea 1.3» y «Cierre de 01b». Tamaño medido de 01b: 936 líneas efectivas
+    (por encima de 800: ver «Medición y partición»).
 
 - [ ] 1.4 **PR 2a `02a-neutral-log-guard`: guardia neutral de registros instalada antes del primer bean en los tres procesos (decisión 13).**
   - **ROJO.** Mover `test/java/com/confia/shared/web/request/SensitiveLogGuardPrefixesTest.java` a `test/java/com/confia/shared/logging/` y ampliar su
