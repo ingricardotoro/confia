@@ -1,22 +1,36 @@
 package com.confia.bootstrap.worker;
 
+import com.confia.shared.jobs.infrastructure.wiring.WorkerPlatformConfiguration;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
 import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
+import org.springframework.context.annotation.Import;
 
 /**
  * Background worker process entry point (ADR-0003, ADR-0013, ADR-0024), started without an HTTP
- * server ({@code ConfiaApplication} forces {@code WebApplicationType.NONE}). It imports nothing:
- * the worker declares its own modules here and never inherits the administrative bean graph, so
- * it carries none of the OpenAPI surface the web processes import. No business module or
- * background job is registered yet (db-scheduler tasks arrive with the modules that need them,
- * ADR-0016).
+ * server ({@code ConfiaApplication} forces {@code WebApplicationType.NONE}). It declares its own
+ * wiring here and never inherits the administrative bean graph, so it carries none of the OpenAPI
+ * surface the web processes import. No business module or background job is registered yet
+ * (db-scheduler tasks arrive with the modules that need them, ADR-0016).
  *
- * <p>{@link DataSourceAutoConfiguration} stays excluded (decision D5 of web-edge-foundations): the
- * worker has no database until the db-scheduler jobs of ADR-0016 arrive with change 9. Only the
- * administrative process has a {@code DataSource}.
+ * <p>The worker has a {@code DataSource} (background-jobs-with-db-scheduler design.md decision 12,
+ * which reverses decision D5 of web-edge-foundations for this process): Spring Boot's pool, with the
+ * role {@code confia_admin_app} (owner decision P7) from {@code SPRING_DATASOURCE_URL},
+ * {@code SPRING_DATASOURCE_USERNAME} and {@code SPRING_DATASOURCE_PASSWORD}. The pool is lazy, so
+ * the process starts with the database down and reports the failure on first use; it never
+ * migrates. {@link WorkerPlatformConfiguration} is its whole data access: a {@code DSLContext} with
+ * statement logging off, the transactional component, the clock and the plain audit writer. The
+ * sensitive log guard is installed by an initializer of {@code ConfiaApplication} before the
+ * context creates its first bean, so no bean can log a bound value before the guard exists
+ * (condition 4). The worker still has no web edge, no security chain, no master key and no pepper.
+ *
+
+ * <p>The three auto-configurations of the db-scheduler starter are excluded here for now: the
+ * worker has a {@code DataSource}, and the starter would start an executor with its default settings
+ * on it. The worker's single executor, with the settings of design.md decision 1, is the work of
+ * task 1.6, which stops excluding the main auto-configuration (its own {@code Scheduler} then
+ * displaces the starter's).
  *
  * <p>{@link SecurityAutoConfiguration} and {@link UserDetailsServiceAutoConfiguration} are
  * excluded (decision 4 of web-edge-foundations): the worker has no web edge, and Spring
@@ -28,7 +42,11 @@ import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoCon
  * may reference it (enforced by ArchUnit).
  */
 @SpringBootConfiguration
-@EnableAutoConfiguration(exclude = {DataSourceAutoConfiguration.class,
-        SecurityAutoConfiguration.class, UserDetailsServiceAutoConfiguration.class})
+@EnableAutoConfiguration(exclude = {SecurityAutoConfiguration.class,
+        UserDetailsServiceAutoConfiguration.class}, excludeName = {
+        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration",
+        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerMetricsAutoConfiguration",
+        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerActuatorAutoConfiguration"})
+@Import(WorkerPlatformConfiguration.class)
 public class WorkerApplication {
 }

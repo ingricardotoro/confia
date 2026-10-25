@@ -81,6 +81,11 @@ public final class SensitiveLogGuard extends TurboFilter {
     static final List<String> INFO_PROTECTED_LOGGERS =
             List.of("org.apache.coyote.http11.Http11Processor");
 
+    /** The protected prefixes, for the tests that raise each of those loggers to {@code TRACE}. */
+    public static List<String> protectedPrefixes() {
+        return PROTECTED_PREFIXES;
+    }
+
     /** Whether an event of {@code level} from {@code loggerName} must be dropped. */
     static boolean denies(Level level, String loggerName) {
         if (level.toInt() <= Level.DEBUG_INT && isProtected(loggerName)) {

@@ -41,8 +41,9 @@ import org.springframework.context.ConfigurableApplicationContext;
 /**
  * Specs/build-integrity of web-edge-foundations: the administrative process registers its
  * production data access (decision 2) and its identity use cases (decision 3), starts with a
- * database nothing listens on, and never runs a migration at startup; the portal and the worker
- * still have no {@code DataSource}. Every context is started through the production launcher with
+ * database nothing listens on, and never runs a migration at startup; the portal still has no
+ * {@code DataSource} (the worker has had one since background-jobs-with-db-scheduler, see {@link
+ * WorkerProductionWiringTest}). Every context is started through the production launcher with
  * {@link TestProcessArguments}, so no container is needed and this stays a {@code *Test}.
  */
 class AdminProductionWiringTest {
@@ -192,8 +193,8 @@ class AdminProductionWiringTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {"portal", "worker"})
-    void portalAndWorkerHoldNoDataSource(String process) {
+    @ValueSource(strings = {"portal"})
+    void thePortalStillHoldsNoDataSource(String process) {
         ConfigurableApplicationContext context = start(process);
         try {
             assertThat(context.getBeansOfType(DataSource.class)).isEmpty();

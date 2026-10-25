@@ -46,6 +46,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
     private static final String ADMIN_WIRING =
             "the production data access wiring is administrative only (web-edge-foundations D5)";
 
+    private static final String WORKER_NO_COLUMN_KEY =
+            "the worker holds no column-encryption key";
+
     private static final String STAFF_INSTITUTION =
             "the institution is resolved from an administrative token, which only the "
                     + "administrative process verifies (ADR-0009)";
@@ -137,9 +140,15 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
 
     static final ProcessBeanPolicy WORKER = new ProcessBeanPolicy("worker",
             "com.confia.bootstrap.worker",
-            Set.of("com.confia.bootstrap.worker", "com.confia.shared.logging"),
-            Map.of("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
+            Set.of("com.confia.bootstrap.worker", "com.confia.shared.logging",
+                    // The worker's own data access (background-jobs-with-db-scheduler decision 12):
+                    // the transactional component and its proxy, the plain audit writer, and the
+                    // configuration that declares them. Each is exact and contributes a bean.
+                    "com.confia.shared.security", "com.confia.shared.infrastructure",
+                    "com.confia.shared.jobs.infrastructure.wiring"),
+            forbidden("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
+                    "com.confia.shared.crypto", WORKER_NO_COLUMN_KEY,
                     // The whole web package: the OpenAPI surface and every part of the edge.
                     "com.confia.shared.web", WEB_EDGE,
                     "com.confia.shared.platform", ADMIN_WIRING,

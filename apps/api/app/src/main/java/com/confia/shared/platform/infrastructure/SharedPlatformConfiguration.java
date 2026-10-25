@@ -14,6 +14,7 @@ import com.confia.shared.security.IdempotentExecutor;
 import com.confia.shared.security.RequestPayloadHasher;
 import com.confia.shared.security.TransactionRunner;
 import com.confia.shared.security.TransactionRunnerConfiguration;
+import com.confia.shared.security.TransactionalDataSource;
 import java.time.Clock;
 import javax.sql.DataSource;
 import org.jooq.DSLContext;
@@ -26,7 +27,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
-import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 
 /**
  * The production wiring of the shared platform for the administrative process only
@@ -62,9 +62,10 @@ public class SharedPlatformConfiguration {
     static final String MASTER_KEY_PROPERTY = "confia.crypto.column-master-key";
 
     @Bean
-    DSLContext dslContext(DataSource dataSource) {
+    DSLContext dslContext(TransactionalDataSource transactionalDataSource) {
+        // The one transaction-aware proxy of the process (BJ46), shared with the job client.
         DataSourceConnectionProvider connectionProvider =
-                new DataSourceConnectionProvider(new TransactionAwareDataSourceProxy(dataSource));
+                new DataSourceConnectionProvider(transactionalDataSource.proxy());
         // jOOQ logs each statement with its bind values inlined at DEBUG; a document number or a
         // token must never reach a log (regla 11), so the statement logging is off in the
         // settings, whatever level any logger has.

@@ -9,6 +9,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.confia.shared.security.TransactionalDataSource;
 import java.sql.SQLException;
 import java.util.List;
 import javax.sql.DataSource;
@@ -61,7 +62,8 @@ class SqlLoggingTest {
 
     @Test
     void theProductionDslContextLogsNoStatementWithItsBindValues() throws SQLException {
-        DSLContext production = new SharedPlatformConfiguration().dslContext(mockDatabase());
+        DSLContext production = new SharedPlatformConfiguration()
+                .dslContext(new TransactionalDataSource(mockDatabase()));
 
         assertThat(eventsOf(production)).noneMatch(message -> message.contains(BIND_VALUE));
         assertThat(production.settings().isExecuteLogging()).isFalse();
