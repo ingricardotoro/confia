@@ -1,5 +1,6 @@
 package com.confia.shared.web.harness;
 
+import com.confia.shared.logging.SensitiveLogGuardInitializer;
 import jakarta.servlet.Filter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -59,6 +60,7 @@ public final class HarnessProcess implements AutoCloseable {
         return new HarnessProcess(new SpringApplicationBuilder(WebEdgeHarness.class)
                 .web(WebApplicationType.SERVLET)
                 .properties("server.port=0")
+                .initializers(new SensitiveLogGuardInitializer())
                 .run(arguments));
     }
 
@@ -74,6 +76,7 @@ public final class HarnessProcess implements AutoCloseable {
         return new HarnessProcess(new SpringApplicationBuilder(WebEdgeHarness.class)
                 .web(WebApplicationType.SERVLET)
                 .properties("server.port=0")
+                .initializers(new SensitiveLogGuardInitializer())
                 .listeners(listener)
                 .run(arguments));
     }

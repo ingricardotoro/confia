@@ -53,6 +53,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
     static final ProcessBeanPolicy ADMIN = new ProcessBeanPolicy("admin",
             "com.confia.bootstrap.admin",
             Set.of("com.confia.bootstrap.admin", "com.confia.shared.web.openapi",
+                    // The sensitive log guard, installed before the first bean by the initializer
+                    // every entry point adds (background-jobs-with-db-scheduler decision 13).
+                    "com.confia.shared.logging",
                     "com.confia.kernel", "com.confia.shared.platform.infrastructure",
                     "com.confia.shared.security", "com.confia.shared.crypto",
                     // The administrative signing key ring and its configuration (ADR-0005
@@ -110,6 +113,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
     static final ProcessBeanPolicy PORTAL = new ProcessBeanPolicy("portal",
             "com.confia.bootstrap.portal",
             Set.of("com.confia.bootstrap.portal", "com.confia.shared.web.openapi",
+                    "com.confia.shared.logging",
                     "com.confia.shared.web.edge", "com.confia.shared.web.request",
                     "com.confia.shared.web.problem"),
             forbidden("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
@@ -133,7 +137,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
 
     static final ProcessBeanPolicy WORKER = new ProcessBeanPolicy("worker",
             "com.confia.bootstrap.worker",
-            Set.of("com.confia.bootstrap.worker"),
+            Set.of("com.confia.bootstrap.worker", "com.confia.shared.logging"),
             Map.of("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     // The whole web package: the OpenAPI surface and every part of the edge.

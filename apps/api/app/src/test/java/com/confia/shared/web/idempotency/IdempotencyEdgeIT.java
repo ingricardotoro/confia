@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.confia.kernel.InstitutionId;
+import com.confia.shared.logging.SensitiveLogGuard;
 import com.confia.shared.platform.infrastructure.SharedPlatformConfiguration;
 import com.confia.shared.security.IdempotencyKey;
 import com.confia.shared.security.IdempotencyRecord;
@@ -348,6 +350,12 @@ class IdempotencyEdgeIT extends CommittingPostgresIntegrationTest {
         Level webBefore = web.getLevel();
         ours.setLevel(Level.DEBUG);
         web.setLevel(Level.DEBUG);
+        // The sensitive log guard is installed by the initializer of each process entry point, not by
+        // this harness's web edge since it moved to com.confia.shared.logging; this test puts a copy in
+        // the chain, as the processes do, so DEBUG of the web layer is read under the same denial.
+        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+        SensitiveLogGuard guard = new SensitiveLogGuard();
+        loggerContext.addTurboFilter(guard);
         ListAppender<ILoggingEvent> logged = new ListAppender<>();
         logged.start();
         root.addAppender(logged);
@@ -364,6 +372,7 @@ class IdempotencyEdgeIT extends CommittingPostgresIntegrationTest {
             post(IdempotencyDemoController.PAYMENTS, institution, BODY, KEY_HEADER, key + " x");
         } finally {
             root.detachAppender(logged);
+            loggerContext.getTurboFilterList().remove(guard);
             ours.setLevel(oursBefore);
             web.setLevel(webBefore);
         }
