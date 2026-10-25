@@ -21,7 +21,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -76,19 +80,64 @@ class AuditScopeExclusionInventoryTest {
         }
     }
 
+    /**
+     * Scenario BI97 (background-jobs-with-db-scheduler specs/build-integrity/spec.md): the absence
+     * this test used to assert is inverted. {@code scheduled_tasks} is db-scheduler's table
+     * (ADR-0016) and appears in exactly one migration, {@code V10}; any other migration naming it,
+     * and any table of another scheduling library, still breaks the build.
+     */
     @Test
-    void scheduledTasksDoesNotAppearInTheDeliveredSchemasMigrations() {
-        String migrationSql = concatenatedMigrationSql();
-        assertThat(migrationSql)
-                .as("the base scan must be the real migration SQL text, or the absence check "
-                        + "below would pass vacuously")
+    void scheduledTasksAppearsOnlyInV10AndNoOtherSchedulingTableExists() {
+        Map<String, String> migrations = migrationSqlByFile();
+        assertThat(String.join("", migrations.values()))
+                .as("the base scan must be the real migration SQL text, or the checks below "
+                        + "would pass vacuously")
                 .contains("shared_audit_log")
                 .contains("organization_institution");
+        assertThat(migrations).as("V10 is the migration of the scheduler table")
+                .containsKey("V10__create_scheduled_tasks.sql");
+        assertThat(migrations.get("V10__create_scheduled_tasks.sql").toLowerCase(Locale.ROOT))
+                .contains("create table scheduled_tasks");
 
-        assertThat(migrationSql.toLowerCase(Locale.ROOT))
-                .as("no delivered migration creates scheduled_tasks yet: db-scheduler (ADR-0016) "
-                        + "arrives with cambio 9, not this cut")
-                .doesNotContain("scheduled_tasks");
+        assertThat(schedulingTableViolations(migrations)).isEmpty();
+    }
+
+    @Test
+    void aMigrationOtherThanV10NamingScheduledTasksIsRejected() {
+        Map<String, String> fixture = new TreeMap<>(migrationSqlByFile());
+        fixture.put("V99__alter_scheduler.sql", "ALTER TABLE scheduled_tasks ADD COLUMN x integer;");
+
+        assertThat(schedulingTableViolations(fixture)).singleElement().asString()
+                .contains("V99__alter_scheduler.sql", "scheduled_tasks");
+    }
+
+    @Test
+    void aTableOfAnotherSchedulingLibraryIsRejected() {
+        for (String table : List.of("qrtz_triggers", "jobrunr_jobs", "shedlock", "batch_job_instance")) {
+            Map<String, String> fixture = new TreeMap<>(migrationSqlByFile());
+            fixture.put("V99__other_scheduler.sql", "CREATE TABLE " + table + " (id integer);");
+
+            assertThat(schedulingTableViolations(fixture)).as(table).singleElement().asString()
+                    .contains("V99__other_scheduler.sql", table);
+        }
+    }
+
+    private static final Pattern OTHER_SCHEDULING_TABLE =
+            Pattern.compile("\\b(qrtz_\\w*|jobrunr_\\w*|shedlock|batch_job_\\w*)\\b");
+
+    private static List<String> schedulingTableViolations(Map<String, String> migrations) {
+        List<String> violations = new ArrayList<>();
+        migrations.forEach((file, sql) -> {
+            String text = sql.toLowerCase(Locale.ROOT);
+            if (text.contains("scheduled_tasks") && !file.startsWith("V10__")) {
+                violations.add(file + " names scheduled_tasks but only V10 may");
+            }
+            Matcher other = OTHER_SCHEDULING_TABLE.matcher(text);
+            while (other.find()) {
+                violations.add(file + " names the scheduling table " + other.group());
+            }
+        });
+        return violations;
     }
 
     @Test
@@ -173,11 +222,11 @@ class AuditScopeExclusionInventoryTest {
     }
 
     /**
-     * Every {@code .sql} file under the real {@code db/migration} classpath directory, concatenated
-     * — never a hand-written list of migration names, so a future {@code V4} is included
+     * Every {@code .sql} file under the real {@code db/migration} classpath directory, by file name
+     * — never a hand-written list of migration names, so a future {@code V11} is included
      * automatically.
      */
-    private static String concatenatedMigrationSql() {
+    private static Map<String, String> migrationSqlByFile() {
         URL directoryUrl =
                 AuditScopeExclusionInventoryTest.class.getClassLoader().getResource("db/migration");
         if (directoryUrl == null) {
@@ -185,13 +234,14 @@ class AuditScopeExclusionInventoryTest {
         }
         try {
             Path directory = Path.of(directoryUrl.toURI());
-            StringBuilder builder = new StringBuilder();
+            Map<String, String> byFile = new TreeMap<>();
             try (var sqlFiles = Files.list(directory)) {
                 for (Path file : sqlFiles.filter(p -> p.toString().endsWith(".sql")).toList()) {
-                    builder.append(Files.readString(file, StandardCharsets.UTF_8));
+                    byFile.put(file.getFileName().toString(),
+                            Files.readString(file, StandardCharsets.UTF_8));
                 }
             }
-            return builder.toString();
+            return byFile;
         } catch (URISyntaxException e) {
             throw new IllegalStateException("malformed db/migration classpath URL", e);
         } catch (IOException e) {

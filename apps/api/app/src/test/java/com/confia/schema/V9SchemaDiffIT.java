@@ -95,11 +95,12 @@ class V9SchemaDiffIT {
             assertThat(history.next()).as("the history has a row for V8").isTrue();
             assertThat(history.getInt("checksum")).isEqualTo(V8_CHECKSUM);
             assertThat(history.getBoolean("success")).isTrue();
-            database.validate();
+            database.validateUpTo("9");
         }
     }
 
-    private static Map<String, String> snapshot(StepwiseDatabase database) throws SQLException {
+    /** Shared with {@link V10SchemaDiffIT}: one catalogue snapshot, two migrations compared. */
+    static Map<String, String> snapshot(StepwiseDatabase database) throws SQLException {
         Map<String, String> definitions = new TreeMap<>();
         try (Connection connection = database.connectionAs("postgres");
                 Statement statement = connection.createStatement()) {
@@ -179,7 +180,7 @@ class V9SchemaDiffIT {
         }
     }
 
-    private record Difference(Set<String> added, Set<String> removed, Set<String> changed) {
+    record Difference(Set<String> added, Set<String> removed, Set<String> changed) {
 
         static Difference between(Map<String, String> before, Map<String, String> after) {
             Set<String> added = new TreeSet<>(after.keySet());
