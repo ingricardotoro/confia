@@ -1,4 +1,4 @@
-package com.confia.shared.web.request;
+package com.confia.shared.logging;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -6,11 +6,8 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.turbo.TurboFilter;
 import ch.qos.logback.core.spi.FilterReply;
 import java.util.List;
-import org.slf4j.ILoggerFactory;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Marker;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.InitializingBean;
 
 /**
  * Denies the {@code DEBUG} and {@code TRACE} events of the few loggers that write raw request
@@ -31,20 +28,23 @@ import org.springframework.beans.factory.InitializingBean;
  * @RequestBody} endpoint, so the message converters never run).
  *
  * <p><b>What is not covered.</b> Anything that is not a logger of that list: another library, or
- * code that logs a value at {@code INFO} or above. jOOQ statements, which carry bind values at
- * {@code DEBUG}, are not handled here but by {@code Settings.withExecuteLogging(false)} on the
- * production {@code DSLContext}, which holds whatever the logger. The worker process has neither
- * this guard nor a {@code DataSource} yet; the change that gives it one must carry the protection
- * with it (foundations-plan, acceptance condition owned by change 9).
+ * code that logs a value at {@code INFO} or above. jOOQ statements also carry bind values at
+ * {@code DEBUG}: {@code org.jooq} is in the list as defence in depth, and {@code
+ * Settings.withExecuteLogging(false)} on the production {@code DSLContext} is what holds whatever
+ * the logger. The data-access stack (driver, pool, Spring JDBC and transactions, db-scheduler) is
+ * listed because the worker process receives a {@code DataSource} right after this guard exists
+ * (background-jobs-with-db-scheduler, condition 4 of the foundations plan).
  *
  * <p>It is a Logback turbo filter, which is consulted before an event exists, so a denied event is
- * never formatted. It installs itself when its bean is created, which is after Spring Boot's
- * logging system is initialized, and removes itself when the context closes, so a second context
- * in the same JVM does not stack a second copy. With another logging backend it does nothing, and
- * the test that proves the guard fails there.
+ * never formatted. It is installed by {@link SensitiveLogGuardInitializer}, an application context
+ * initializer that every process entry point adds: that runs after Spring Boot's logging system is
+ * initialized (which resets the filters) and before the context creates its first bean, so no bean,
+ * a {@code DataSource} included, can log before the guard exists. It is withdrawn when the context
+ * closes, and installing it removes any copy a context that never closed left behind, so a second
+ * context in the same JVM does not stack a second copy. With another logging backend it does
+ * nothing, and the test that proves the guard fails there.
  */
-public final class SensitiveLogGuard extends TurboFilter implements InitializingBean,
-        DisposableBean {
+public final class SensitiveLogGuard extends TurboFilter {
 
     /** The closed list of logger prefixes that record headers, bodies or query strings. */
     static final List<String> PROTECTED_PREFIXES = List.of(
@@ -63,7 +63,13 @@ public final class SensitiveLogGuard extends TurboFilter implements Initializing
             // exception with its rejected values, or the arguments of the call, at DEBUG and TRACE.
             "org.springframework.web.servlet.mvc.support",
             "org.springframework.web.servlet.mvc.annotation",
-            "org.springframework.web.servlet.handler", "org.springframework.web.method");
+            "org.springframework.web.servlet.handler", "org.springframework.web.method",
+            // The data-access stack (design.md decision 13; probe P-11). The PostgreSQL driver
+            // writes the bound parameters of a statement at FINEST, so a value passed to
+            // set_config or to a query can reach a log; WorkerSensitiveLoggingIT proves which of
+            // these really leak and which are preventive.
+            "org.jooq", "org.postgresql", "com.zaxxer.hikari", "org.springframework.jdbc",
+            "org.springframework.transaction", "com.github.kagkarlsson");
 
     /**
      * The exact loggers whose {@code INFO} is denied as well (review S-3 of the close of
@@ -99,17 +105,20 @@ public final class SensitiveLogGuard extends TurboFilter implements Initializing
                 : FilterReply.NEUTRAL;
     }
 
-    @Override
-    public void afterPropertiesSet() {
-        ILoggerFactory factory = LoggerFactory.getILoggerFactory();
-        if (factory instanceof LoggerContext context && !context.getTurboFilterList().contains(this)) {
-            setContext(context);
-            context.addTurboFilter(this);
+    /** Puts this guard in the Logback filter chain, replacing any copy a late-closed context left. */
+    void install() {
+        if (LoggerFactory.getILoggerFactory() instanceof LoggerContext context) {
+            context.getTurboFilterList().removeIf(
+                    filter -> filter instanceof SensitiveLogGuard && filter != this);
+            if (!context.getTurboFilterList().contains(this)) {
+                setContext(context);
+                context.addTurboFilter(this);
+            }
         }
     }
 
-    @Override
-    public void destroy() {
+    /** Withdraws this guard from the Logback filter chain. */
+    void uninstall() {
         if (LoggerFactory.getILoggerFactory() instanceof LoggerContext context) {
             context.getTurboFilterList().remove(this);
         }

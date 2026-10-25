@@ -1,4 +1,4 @@
-package com.confia.shared.web.request;
+package com.confia.shared.logging;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -3,6 +3,7 @@ package com.confia.bootstrap;
 import com.confia.bootstrap.admin.AdminApplication;
 import com.confia.bootstrap.portal.PortalApplication;
 import com.confia.bootstrap.worker.WorkerApplication;
+import com.confia.shared.logging.SensitiveLogGuardInitializer;
 import com.confia.shared.security.token.SigningKeyPlacementGuard;
 import com.confia.shared.web.openapi.ProcessApiInfo;
 import org.slf4j.Logger;
@@ -28,6 +29,11 @@ import org.springframework.context.ConfigurableApplicationContext;
  * portal and the worker refuse to start with the administrative signing private key in their
  * environment, and the administrative process refuses the name reserved for the portal's
  * (ADR-0005, check 14; session-tokens-and-web-layer design.md, decision 3).
+ *
+ * <p>All three also get a {@link SensitiveLogGuardInitializer}: the sensitive log guard is installed
+ * when the context is prepared, before its first bean exists, so no bean (the worker's future
+ * {@code DataSource} included) can log a bound value before the guard does
+ * (background-jobs-with-db-scheduler design.md decision 13; condition 4).
  */
 public final class ConfiaApplication {
 
@@ -72,16 +78,19 @@ public final class ConfiaApplication {
             case ADMIN -> LaunchOutcome.running(
                     new SpringApplicationBuilder(AdminApplication.class)
                             .properties(ProcessApiInfo.TITLE_PROPERTY + "=" + ADMIN_API_TITLE)
+                            .initializers(new SensitiveLogGuardInitializer())
                             .listeners(SigningKeyPlacementGuard.forAdministrativeProcess())
                             .run(args));
             case PORTAL -> LaunchOutcome.running(
                     new SpringApplicationBuilder(PortalApplication.class)
                             .properties(ProcessApiInfo.TITLE_PROPERTY + "=" + PORTAL_API_TITLE)
+                            .initializers(new SensitiveLogGuardInitializer())
                             .listeners(SigningKeyPlacementGuard.forNonAdministrativeProcess())
                             .run(args));
             case WORKER -> LaunchOutcome.running(
                     new SpringApplicationBuilder(WorkerApplication.class)
                             .web(WebApplicationType.NONE)
+                            .initializers(new SensitiveLogGuardInitializer())
                             .listeners(SigningKeyPlacementGuard.forNonAdministrativeProcess())
                             .run(args));
             // Recognized only: applying Flyway migrations and exiting arrives with change 11

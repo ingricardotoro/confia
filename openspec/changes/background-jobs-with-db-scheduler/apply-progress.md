@@ -3,7 +3,7 @@
 - **Cambio:** `background-jobs-with-db-scheduler` (F0, cambio 9; entregable 12, criterio de salida 5)
 - **Modo:** TDD estricto (`./mvnw verify -Pmutation-gate` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `stacked-to-main`, tope de 800 líneas efectivas por PR; prevalece sobre `single-pr` con 400 de la preflight (ver `tasks.md`)
-- **Última actualización:** 2026-10-24 (rebanada 1 completa: tareas 1.1, 1.2 y 1.3)
+- **Última actualización:** 2026-10-24 (rebanada 2a: tarea 1.4)
 - **Regla de este archivo:** solo se añade; no se reescriben secciones existentes.
 
 ## Estado de las tareas
@@ -169,3 +169,52 @@ aisladas con `StepwiseDatabase`, cada una con su Flyway completo) son la causa p
 directorio `target` venía de ejecuciones acotadas de la misma rama).
 
 Medida final de 01b: **936 líneas efectivas** (918 de código y pruebas más 18 de la nota de `docs/07` §9), 136 por encima de 800 (ver «Medición y partición»).
+
+## Tarea 1.4 (rebanada 02a `neutral-log-guard`, 2026-10-24)
+
+Rama `change/background-jobs-with-db-scheduler-02a-neutral-log-guard`, desde `main` en `2bc0621`. Commit de código `9825ec6`. **364 líneas efectivas**
+(medidas con `git diff --numstat main...HEAD -- . ':!openspec'`), dentro de 800: no hay partición. Este PR no da `DataSource` a ningún proceso.
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO (compilación) | `./mvnw -pl app -am test-compile` con las pruebas movidas a `shared/logging`, ampliadas y nuevas, y la producción sin tocar | `exit=1`, 62 líneas `ERROR`: `cannot find symbol` / `package SensitiveLogGuard does not exist` en `SensitiveLogGuardPrefixesTest`, `SensitiveDataLoggingTest`, `MalformedRequestLoggingTest` y `SensitiveLogGuardInstallationTest` (clase en `com.confia.shared.logging`, inexistente). Causa esperada |
+| ROJO (comportamiento) | Misma forma unitaria con la guardia movida e instalada por el inicializador, **sin** la línea `com.confia.shared.logging` en `ProcessBeanPolicy` | `ProcessBeanIsolationTest.registersOnlyItsAllowedBeans`: 3 fallos, uno por proceso: `process '<p>': bean 'sensitiveLogGuard' from package 'com.confia.shared.logging' - not in the allow-list`. Causa esperada |
+| ROJO (observador) | `SensitiveLogGuardInstallationTest` con `--context.initializer.classes` | 3 fallos «non-vacuous: the observer ran»: en Spring Boot 4 esa propiedad no activó el inicializador. **Desviación:** el observador se registra en `src/test/resources/META-INF/spring.factories` y actúa solo si el contexto fija `confia.test.observe-log-guard=true` |
+| VERDE | Línea de política en los tres procesos | 118 pruebas, 0 fallos (prefijos 22, instalación 4, aislamiento 14, `SensitiveDataLoggingTest` 4, `MalformedRequestLoggingTest` 3, modulith, capas, inventarios, traducción de problemas) |
+| Refactor | Una sola lista `PROTECTED_PREFIXES` (verificada por una prueba de ArchUnit); `afterPropertiesSet`/`destroy` pasan a `install`/`uninstall` | Sin cambio de comportamiento |
+
+### Demostraciones deliberadas (con `cmp`)
+
+| Ruptura | Prueba que falló | Aserción | `cmp` |
+|---|---|---|---|
+| Instalar la guardia en `ContextRefreshedEvent` en vez de en el inicializador | `SensitiveLogGuardInstallationTest` (3 fallos) | «exactly one guard in the chain when bean creation begins in admin / portal / worker» | sin salida |
+| Quitar `org.postgresql` de `PROTECTED_PREFIXES` | `SensitiveLogGuardPrefixesTest.theDataAccessStackNeverLogsBelowInfo` | «[DEBUG org.postgresql]» | sin salida |
+
+### Verificación completa
+
+Todas con `MAVEN_OPTS="-Djavax.net.ssl.trustStoreType=Windows-ROOT"` y `kernel/target` y `app/target` borrados antes.
+
+| Orden | Resultado |
+|---|---|
+| `./mvnw verify` (sin perfil), primera ejecución | 8 min 8 s (488 s). **Falló** en `IdempotencyEdgeIT.noLogLineCarriesTheKeyOrThePayloadWhateverTheOutcome`: ver «Prueba existente tocada» |
+| `./mvnw verify` (sin perfil), tras la corrección | **`BUILD SUCCESS` en 11 min 13 s (681 s)**: Surefire 186 + 2 404, Failsafe 617, 0 fallos. Dentro del presupuesto de 15 min de BI57. La diferencia con la primera ejecución (488 s, con el mismo número de pruebas) es ruido de la máquina; no se aisló |
+| `./mvnw verify -Pmutation-gate` | **`BUILD SUCCESS` en 14 min 59 s (904 s)**. Surefire 186 + 2 404, Failsafe 617, 0 fallos. JaCoCo: «All coverage checks have been met». PIT: núcleo 192 de 194 (99 %), fuerza 99 %, 229 de 233 líneas; aplicación 676 de 710 (95 %), fuerza 96 %, 928 de 959 líneas. Sin cambio: no hay clases mutadas nuevas |
+
+Una primera ejecución del `mutation-gate` se interrumpió a propósito al descubrir el fallo de `IdempotencyEdgeIT`, y no cuenta.
+
+### Prueba existente tocada
+
+`IdempotencyEdgeIT` armaba su contexto con `WebEdgeConfiguration`, que declaraba la guardia como bean. Con la guardia fuera de ese bean, `org.springframework.web` en `DEBUG`
+registró el cuerpo (`Read "application/json" to [{"note":"SECRET-PAYLOAD-…"}]`) y la prueba de «ninguna línea lleva la clave ni la carga» falló. Corrección: la prueba pone una
+copia de `SensitiveLogGuard` en la cadena de Logback durante su captura, como hace el inicializador en los procesos, y la retira al terminar. Las otras dos pruebas con
+`WebEdgeConfiguration` (`RequestOriginAuditIT`, `RequiredDelayMaterializerIT`) no leen registros y pasaron sin cambio.
+
+### Desviaciones y precisiones
+
+1. **El inicializador del observador** (arriba): `spring.factories` de pruebas con propiedad de activación, porque `context.initializer.classes` no funcionó.
+2. **`SensitiveLogGuardInstallationTest` vive en `com.confia.bootstrap`**, no en `shared/logging`: necesita `ConfiaApplication.launch` y `TestProcessArguments`, de visibilidad de paquete.
+3. **`com.confia.shared.logging` en la lista de permitidos de los tres procesos ya en este PR** (la tarea lo escribe en 1.5 para el trabajador): el singleton de la guardia existe en los tres desde ahora.
+4. **El arnés de pruebas web** (`HarnessProcess`) añade el mismo inicializador; la guardia sigue disponible como bean por `registerSingleton`.
+5. **Instalar elimina copias anteriores** de la guardia en la cadena (un contexto que falla en el arranque no emite `ContextClosedEvent` y dejaría una copia).

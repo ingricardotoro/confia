@@ -236,7 +236,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     `verify -Pmutation-gate` en verde (`BUILD SUCCESS`, 16 min 46 s) en `apply-progress.md`, «Tarea 1.3» y «Cierre de 01b». Tamaño medido de 01b: 936 líneas efectivas
     (por encima de 800: ver «Medición y partición»).
 
-- [ ] 1.4 **PR 2a `02a-neutral-log-guard`: guardia neutral de registros instalada antes del primer bean en los tres procesos (decisión 13).**
+- [x] 1.4 **PR 2a `02a-neutral-log-guard`: guardia neutral de registros instalada antes del primer bean en los tres procesos (decisión 13).**
   - **ROJO.** Mover `test/java/com/confia/shared/web/request/SensitiveLogGuardPrefixesTest.java` a `test/java/com/confia/shared/logging/` y ampliar su
     tabla con `org.jooq`, `org.postgresql`, `com.zaxxer.hikari`, `org.springframework.jdbc`, `org.springframework.transaction` y
     `com.github.kagkarlsson`: `DEBUG` y `TRACE` bloqueados, `INFO` y superiores pasan, un prefijo parecido no cubierto pasa [BI88, BI110]. Crear
@@ -257,6 +257,8 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     `SensitiveLogGuardPrefixesTest` en `DEBUG` [BI110]. Se revierten y se confirman con `cmp`.
   - **Cierre.** `./mvnw verify -Pmutation-gate`. Commit: `refactor(logging): move the sensitive log guard to a neutral package and install it before
     any bean`. Tamaño: nominal 300, realista 650. Este PR no da `DataSource` a ningún proceso. — Escenarios BI87, BI88, BI109 y BI110.
+  - **Resultado (2026-10-24): hecha.** Rojos, demostraciones con `cmp`, `verify` (11 min 13 s) y `verify -Pmutation-gate` (14 min 59 s) en verde en `apply-progress.md`,
+    «Tarea 1.4». Commit `9825ec6`. Tamaño medido: 364 líneas efectivas. No se empezó 1.5: el PR de 1.4 debe fusionarse antes.
 
 - [ ] 1.5 **PR 2b / 2b-1 `02b-worker-datasource-and-condition-4`: `TransactionalDataSource`, trabajador con `DataSource` y condición 4 sobre el proceso real (decisiones 5, 12 y 13).**
   - **Precondición dura.** 1.4 fusionado en `main`. Verificarlo con `git log` antes de empezar; sin la guardia no se escribe ninguna línea con
