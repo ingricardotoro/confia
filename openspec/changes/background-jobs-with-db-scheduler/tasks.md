@@ -155,7 +155,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
 
 ## Fase 1: dependencia, tabla, guardia y trabajador con base de datos
 
-- [ ] 1.1 **PR 1 / 1a `01-scheduler-dependency`: sondas P-1 a P-3, versión fijada, iniciador y exclusión total en administración y portal (decisiones 1, 2 y 4; riesgos R-1 y R-2).**
+- [x] 1.1 **PR 1 / 1a `01-scheduler-dependency`: sondas P-1 a P-3, versión fijada, iniciador y exclusión total en administración y portal (decisiones 1, 2 y 4; riesgos R-1 y R-2).**
   - **Paso 0, riesgo R-2 (brecha del almacén de confianza).** La máquina de desarrollo tiene una brecha conocida del almacén de confianza de Windows
     (PKIX) que bloquea las descargas **nuevas** de Maven Central (`apps/api/pom.xml`, comentario sobre `archunit` 1.5.0: el POM se descargó, el jar no).
     Antes de escribir nada, intentar resolver `com.github.kagkarlsson:db-scheduler-spring-boot-4-starter` y su núcleo en un directorio de trabajo
@@ -187,8 +187,10 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
   - **Cierre.** `./mvnw validate` y `./mvnw verify -Pmutation-gate` en verde. Commit: `build(deps): add the db-scheduler starter and exclude its
     auto-configuration in the admin and portal processes`. Tamaño: nominal 150, realista 350. — Escenarios BJ06, BJ08, BJ48, BI59 a BI61, BI93,
     BI100, BI102 y BI114.
+  - **Resultado (2026-10-24): hecha.** Rojos, verde, demostraciones con `cmp` y `verify -Pmutation-gate` en verde (`BUILD SUCCESS`, 13 min 48 s) en
+    `apply-progress.md`, «Tarea 1.1» y «Cierre de 01a». Commit `17bcae6`. Tamaño medido de 01a: 376 líneas efectivas.
 
-- [ ] 1.2 **[CONDICIONAL: solo si P-1, P-2 o P-3 fallan en 1.1] PR 1 / 1a `01-scheduler-dependency`: alternativa B, solo el núcleo (decisión 1).**
+- [x] 1.2 **[CONDICIONAL: solo si P-1, P-2 o P-3 fallan en 1.1] PR 1 / 1a `01-scheduler-dependency`: alternativa B, solo el núcleo (decisión 1).**
   - **Disparador.** El iniciador no arranca con Spring Boot 4.1.1, no pasa `dependencyConvergence` o el `Scheduler` propio no lo desplaza. En ese caso
     no se avanza a 1.3: se escribe una **nota fechada en `design.md`** con el resultado observado, se informa al propietario y se aplica esta tarea.
     Si 1.1 pasa las tres sondas, esta tarea se marca «no aplica» con la evidencia de las sondas y no se ejecuta.
@@ -203,6 +205,8 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     revierte y se confirma con `cmp`.
   - **Cierre.** `./mvnw verify -Pmutation-gate`. Commit: `build(deps): fall back to the db-scheduler core without the Spring Boot starter`. — Escenarios
     BI60 y BJ47 (reinterpretado para el núcleo; se registra la desviación).
+  - **Resultado (2026-10-24): no aplica.** P-1 (16.12.0 resuelta), P-2 (el iniciador carga y arranca con Spring Boot 4.1.1) y P-3 (`dependencyConvergence` en
+    verde) pasaron en 1.1; no se ejecutó nada de esta tarea. Evidencia en `apply-progress.md` y nota fechada en `design.md` §2.1.
 
 - [ ] 1.3 **PR 1 / 1b `01-scheduler-table`: `V10__create_scheduled_tasks.sql`, permisos exactos, matriz de cinco roles y sonda P-6 (decisión 15).**
   - **ROJO.** Crear `test/java/com/confia/schema/ScheduledTasksSchemaIT.java` (el catálogo de `scheduled_tasks` coincide con el DDL de PostgreSQL de la
