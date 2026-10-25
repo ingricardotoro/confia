@@ -147,6 +147,14 @@
       <groupId>org.springdoc</groupId>
       <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
     </dependency>
+    <!-- db-scheduler (ADR-0016; background-jobs-with-db-scheduler design.md decision 1): the Spring
+         Boot 4 starter. The three processes share this artifact, so it is on every class path but
+         active only in the worker: the administrative and portal entry points exclude its whole
+         auto-configuration (decision 4). Version managed in the parent dependencyManagement. -->
+    <dependency>
+      <groupId>com.github.kagkarlsson</groupId>
+      <artifactId>db-scheduler-spring-boot-4-starter</artifactId>
+    </dependency>
     <!-- @NamedInterface (ADR-0022; design.md decision 12) is org.springframework.modulith.
          NamedInterface, which lives in spring-modulith-api, NOT in spring-modulith-core (S1b probe,
          apply-progress.md): a same-simple-name org.springframework.modulith.core.NamedInterface
@@ -383,7 +391,9 @@
               <database>
                 <name>org.jooq.meta.postgres.PostgresDatabase</name>
                 <inputSchema>public</inputSchema>
-                <excludes>flyway_schema_history</excludes>
+                <!-- scheduled_tasks is db-scheduler's own technical table (ADR-0016): ADR-0017 rule 6
+                     keeps it out of the generated code, because only the library touches it. -->
+                <excludes>flyway_schema_history|scheduled_tasks</excludes>
                 <!-- jOOQ 3.21 has no built-in mapping for PostgreSQL's inet: without this, the
                      generated field type is the deprecated, unusable Object (sonda S9, task 5.1;
                      design.md §10). shared_audit_log.source_ip is the only inet column today. -->

@@ -27,12 +27,22 @@ import org.springframework.context.annotation.Import;
  * and {@link ErrorMvcAutoConfiguration} are excluded for the reasons {@code AdminApplication}
  * gives: no generated password in the log and no {@code /error} route.
  *
+ * <p>The three auto-configurations of the db-scheduler starter are excluded by name
+ * (background-jobs-with-db-scheduler decision 4), even though the excluded {@code DataSource}
+ * keeps the main one inert today: the exclusion is the guard that survives the day this process
+ * receives a {@code DataSource} (decision 14), and only the worker runs jobs (ADR-0016).
+ * {@code StarterAutoConfigurationExcludedTest} fails the build naming any starter entry missing
+ * here.
+ *
  * <p>The class is public only so the launcher in the parent package can start it; nothing else
  * may reference it (enforced by ArchUnit).
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {DataSourceAutoConfiguration.class,
-        UserDetailsServiceAutoConfiguration.class, ErrorMvcAutoConfiguration.class})
+        UserDetailsServiceAutoConfiguration.class, ErrorMvcAutoConfiguration.class}, excludeName = {
+        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration",
+        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerMetricsAutoConfiguration",
+        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerActuatorAutoConfiguration"})
 @Import({ContractSchemas.class, ProcessApiInfo.class, WebEdgeConfiguration.class,
         PortalSecurityConfiguration.class})
 public class PortalApplication {

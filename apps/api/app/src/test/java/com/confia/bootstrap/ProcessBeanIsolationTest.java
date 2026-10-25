@@ -19,8 +19,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Stream;
 import org.assertj.core.api.SoftAssertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -213,27 +213,49 @@ class ProcessBeanIsolationTest {
     }
 
     /**
-     * The db-scheduler prohibition for the admin and portal processes passes vacuously while the
-     * library is not on the classpath (ADR-0018). This test says so out loud and fails the day
-     * change 9 (background-jobs-with-db-scheduler) adds it: that change replaces it with the
-     * positive worker assertion. The prohibition itself needs no rewrite, because the inspector
-     * already evaluates it on every bean.
+     * The administrative and portal halves of "only the worker holds an executor"
+     * (background-jobs-with-db-scheduler design.md decisions 1 and 4; specs BJ06 and BI93). The
+     * library is on the class path of every process, because the three share one artifact, so the
+     * prohibition of {@code com.github.kagkarlsson} beans is no longer vacuous: neither process may
+     * hold a {@code Scheduler}, any other bean of the library, or a {@code db-scheduler-*} thread.
+     * The worker half (exactly one {@code Scheduler}) arrives with the worker executor.
      */
-    @Test
-    void dbSchedulerAbsenceIsVacuousUntilChange9() {
-        assertThat(isOnClasspath("com.github.kagkarlsson.scheduler.Scheduler"))
-                .as("db-scheduler is now on the classpath: the forbidden com.github.kagkarlsson "
-                        + "package is no longer vacuous in admin and portal (ADR-0018). Replace "
-                        + "this test with the positive worker assertion (change 9)")
-                .isFalse();
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("adminAndPortal")
+    void administrationAndPortalHoldNoSchedulerAndNoExecutorThread(ProcessBeanPolicy policy)
+            throws ClassNotFoundException {
+        Class<?> schedulerType = Class.forName(SCHEDULER_CLASS);
+        LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.forProcess(policy.process()), policy.process());
+        ConfigurableApplicationContext context = outcome.context();
+        try {
+            assertThat(context).as("the %s process must start", policy.process()).isNotNull();
+            SoftAssertions softly = new SoftAssertions();
+            softly.assertThat(context.getBeanNamesForType(schedulerType, true, false))
+                    .as("no Scheduler bean in the %s process", policy.process()).isEmpty();
+            softly.assertThat(beanNamesOfTypesIn(context, "com.github.kagkarlsson"))
+                    .as("no bean of the library in the %s process", policy.process()).isEmpty();
+            softly.assertThat(executorThreadNames())
+                    .as("no db-scheduler thread in the %s process", policy.process()).isEmpty();
+            softly.assertThat(ProcessBeanInspector.confiaBeans(context))
+                    .as("non-vacuous: the %s context must hold real beans", policy.process())
+                    .isNotEmpty();
+            softly.assertAll();
+        } finally {
+            if (context != null) {
+                context.close();
+            }
+        }
     }
 
-    private static boolean isOnClasspath(String className) {
-        try {
-            Class.forName(className, false, ProcessBeanIsolationTest.class.getClassLoader());
-            return true;
-        } catch (ClassNotFoundException ex) {
-            return false;
-        }
+    private static final String SCHEDULER_CLASS = "com.github.kagkarlsson.scheduler.Scheduler";
+
+    private static Stream<ProcessBeanPolicy> adminAndPortal() {
+        return ProcessBeanPolicy.all().filter(policy -> !"worker".equals(policy.process()));
+    }
+
+    private static List<String> executorThreadNames() {
+        return Thread.getAllStackTraces().keySet().stream().map(Thread::getName)
+                .filter(name -> name.startsWith("db-scheduler")).sorted().toList();
     }
 }

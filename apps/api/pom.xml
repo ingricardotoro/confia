@@ -96,6 +96,13 @@
          line this build runs on. Not managed by the Spring Boot BOM. -->
     <springdoc.version>3.1.1</springdoc.version>
 
+    <!-- db-scheduler (background-jobs-with-db-scheduler, design.md decisions 1 and 2; ADR-0016): the
+         Spring Boot 4 starter, pinned once here and declared without a version in app/pom.xml.
+         16.12.0 is the latest release on Maven Central (probe P-1, read 2026-10-24: both the starter
+         and the core list 16.12.0 as latest and release; no 16.13.x is published). Not managed by
+         the Spring Boot BOM. -->
+    <db-scheduler.version>16.12.0</db-scheduler.version>
+
     <!-- confia.pit.phase=none: PIT never runs on a plain ./mvnw verify with no profile active
          (design.md, decision 9). The mutation-report and mutation-gate profiles below rebind it to
          verify and choose the effective threshold; declared in this order on purpose so that
@@ -171,6 +178,14 @@
         <groupId>org.springdoc</groupId>
         <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         <version>${springdoc.version}</version>
+      </dependency>
+      <!-- db-scheduler starter (ADR-0016): the one admitted scheduling library. Active only in the
+           worker; the administrative and portal entry points exclude its auto-configuration
+           (design.md decision 4). Quartz and JobRunr stay banned by the enforcer below. -->
+      <dependency>
+        <groupId>com.github.kagkarlsson</groupId>
+        <artifactId>db-scheduler-spring-boot-4-starter</artifactId>
+        <version>${db-scheduler.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

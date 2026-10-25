@@ -50,12 +50,23 @@ import org.springframework.context.annotation.Import;
  * the chain would have to authorize; without it the route map of the process holds no route that
  * this change did not choose.
  *
+ * <p>The three auto-configurations of the db-scheduler starter are excluded by name
+ * (background-jobs-with-db-scheduler decision 4): the three processes share one artifact, so the
+ * library is on this class path, but only the worker runs jobs (ADR-0016). Names, not classes, so
+ * that {@code com.github.kagkarlsson} stays confined to {@code shared.jobs.infrastructure}.
+ * {@code StarterAutoConfigurationExcludedTest} reads the starter's own list and fails the build
+ * naming any entry missing here. A property such as {@code db-scheduler.enabled=false} is not
+ * used: an environment can flip a property, not the code of an entry point.
+ *
  * <p>The class is public only so the launcher in the parent package can start it; nothing else
  * may reference it (enforced by ArchUnit).
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {UserDetailsServiceAutoConfiguration.class,
-        ErrorMvcAutoConfiguration.class})
+        ErrorMvcAutoConfiguration.class}, excludeName = {
+        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration",
+        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerMetricsAutoConfiguration",
+        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerActuatorAutoConfiguration"})
 @Import({ContractSchemas.class, ProcessApiInfo.class, SharedPlatformConfiguration.class,
         IdentityConfiguration.class, IdentityWebConfiguration.class, OrganizationConfiguration.class,
         WebEdgeConfiguration.class, AdminSecurityConfiguration.class,

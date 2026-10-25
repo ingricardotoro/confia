@@ -1,7 +1,6 @@
 package com.confia.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.AuthenticationCommand;
@@ -198,8 +197,8 @@ class IdentityScopeExclusionInventoryTest {
      * The absence half of the escenario publicado "Ninguna DEK retirada se recifra
      * automáticamente" (specs/identity/spec.md, requirement "Ausencia de ejecución real de la
      * rotación de la llave de datos (brecha con destino: cambio 9)"; column-encryption-and-mfa-totp
-     * task 5.2). No job can re-encrypt anything yet because nothing can run a job: db-scheduler
-     * (ADR-0016) is not even on the classpath, no production class depends on any scheduling API,
+     * task 5.2). No job can re-encrypt anything yet because nothing registers one: db-scheduler
+     * (ADR-0016) is on the classpath but no production class depends on any scheduling API,
      * and the key-management surface offers no rotation operation to schedule. The behavioral half
      * — a retired key keeps decrypting — needs PostgreSQL, so it lives in {@code
      * ColumnEncryptionIT}, never in this container-free class. This test stops being true the day
@@ -207,11 +206,10 @@ class IdentityScopeExclusionInventoryTest {
      */
     @Test
     void noScheduledJobReencryptsARetiredDataEncryptionKeyYet() {
-        assertThatThrownBy(() -> Class.forName("com.github.kagkarlsson.scheduler.Scheduler"))
-                .as("db-scheduler, the only permitted job runner (ADR-0016), is not on the "
-                        + "classpath yet: it arrives with change 9")
-                .isInstanceOf(ClassNotFoundException.class);
-
+        // db-scheduler (ADR-0016) is on the class path since change 9 (the three processes share
+        // one artifact), so its absence is no longer asserted. What stays true here is that no
+        // com.confia production class depends on it; the rotation job itself is asserted over the
+        // registered job definitions once they exist (background-jobs-with-db-scheduler task 2.1).
         JavaClasses classes = new ClassFileImporter()
                 .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
                 .importPackages("com.confia");
