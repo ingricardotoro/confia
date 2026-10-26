@@ -66,7 +66,31 @@ confia:
       # counted and audited whole, only this wait is capped. Positive and at most 60s.
       max-wait: 30s
 
+# The executor of the worker process (background-jobs-with-db-scheduler design.md decision 1; ADR-0016).
+# These keys are read only by the worker: the administrative and portal entry points exclude the whole
+# db-scheduler auto-configuration, so here they are inert. confia.jobs.executor.autostart is never set
+# in a versioned file (JobsConfigurationGuardTest); confia.jobs.institutions comes from the
+# environment (CONFIA_JOBS_INSTITUTIONS) and has no default on purpose.
+db-scheduler:
+  # Volume of one institution; leaves room in the default connection pool (10).
+  threads: 4
+  # The longest a due task waits to be picked.
+  polling-interval: 10s
+  # A dead execution is noticed after missed-heartbeats-limit heartbeats, about six minutes, below
+  # the 900 s goal of the QueueStalled alert.
+  heartbeat-interval: 1m
+  # Tolerates a long garbage-collection pause without reviving a live execution.
+  missed-heartbeats-limit: 6
+  # The library default is 30 minutes, which would hold a container stop and every test.
+  shutdown-max-wait: 30s
+  # No task runs before the context is complete.
+  delay-startup-until-context-ready: true
+
 spring:
+  main:
+    # The worker has no web server, so without this the JVM would end when main returns (probe P-10;
+    # WorkerStaysAliveTest). Inert in the web processes, whose server threads keep them alive.
+    keep-alive: true
   jackson:
     deserialization:
       # A JSON property the body does not declare is refused with 400 validation-failed and is never
@@ -88,8 +112,8 @@ spring:
   datasource:
     hikari:
       # -1 never fails the context at startup when the database is down: the pool connects on first
-      # use. Only the administrative process has a DataSource; it is inert in the portal and the
-      # worker, which exclude DataSourceAutoConfiguration (web-edge-foundations design.md, decision 2).
+      # use. The administrative process and the worker have a DataSource; it is inert in the portal,
+      # which still excludes DataSourceAutoConfiguration until task 2.6 of background-jobs-with-db-scheduler.
       initialization-fail-timeout: -1
   web:
     resources:

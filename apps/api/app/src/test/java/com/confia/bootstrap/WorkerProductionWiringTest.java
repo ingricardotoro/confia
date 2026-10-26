@@ -149,27 +149,6 @@ class WorkerProductionWiringTest {
                 : List.of("the context has a DataSource but the sensitive log guard is not active in it");
     }
 
-    // --- no executor until task 1.6 ---
-
-    /**
-     * The worker has a {@code DataSource} from this task on, and the db-scheduler starter would turn
-     * that into a running executor with its default settings. The executor is the work of task 1.6
-     * (one {@code Scheduler}, built by the worker itself), so until then the entry point excludes
-     * the starter; task 1.6 inverts this test into "exactly one {@code Scheduler}".
-     */
-    @Test
-    void theWorkerHasNoSchedulerAndNoExecutorThreadYet() throws ClassNotFoundException {
-        Class<?> scheduler = Class.forName("com.github.kagkarlsson.scheduler.Scheduler");
-        ConfigurableApplicationContext context = start("worker");
-        try {
-            assertThat(context.getBeanNamesForType(scheduler, true, false)).isEmpty();
-            assertThat(Thread.getAllStackTraces().keySet().stream().map(Thread::getName)
-                    .filter(name -> name.startsWith("db-scheduler")).toList()).isEmpty();
-        } finally {
-            context.close();
-        }
-    }
-
     // --- BI115: no entry point excludes the DataSource ---
 
     /**
