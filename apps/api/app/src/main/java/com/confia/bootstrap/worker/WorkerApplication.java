@@ -1,5 +1,6 @@
 package com.confia.bootstrap.worker;
 
+import com.confia.shared.jobs.infrastructure.wiring.WorkerJobsConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.WorkerPlatformConfiguration;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -47,6 +48,6 @@ import org.springframework.context.annotation.Import;
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration",
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerMetricsAutoConfiguration",
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerActuatorAutoConfiguration"})
-@Import(WorkerPlatformConfiguration.class)
+@Import({WorkerPlatformConfiguration.class, WorkerJobsConfiguration.class})
 public class WorkerApplication {
 }
