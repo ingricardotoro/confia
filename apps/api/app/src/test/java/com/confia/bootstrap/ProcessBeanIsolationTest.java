@@ -1,9 +1,11 @@
 package com.confia.bootstrap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
 import com.confia.shared.observability.metrics.LogRateLimitMetrics;
+import com.github.kagkarlsson.scheduler.Scheduler;
 import com.confia.shared.security.RateLimiter;
 import com.confia.shared.security.token.SessionTokenConfiguration;
 import com.confia.shared.security.token.SigningKeyRing;
@@ -21,11 +23,13 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Stream;
 import org.assertj.core.api.SoftAssertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
@@ -105,7 +109,7 @@ class ProcessBeanIsolationTest {
         try {
             assertThat(context).as("the %s process must start", policy.process()).isNotNull();
             List<String> held = beanNamesOfTypesIn(context, "com.confia.shared.web.ratelimit",
-                    "com.confia.shared.observability");
+                    "com.confia.shared.observability.metrics");
             if ("admin".equals(policy.process())) {
                 assertThat(held).anyMatch(bean -> bean.endsWith(RateLimitInterceptor.class.getName()))
                         .anyMatch(bean -> bean.endsWith(RateLimiterRegistry.class.getName()))
@@ -246,6 +250,60 @@ class ProcessBeanIsolationTest {
                 context.close();
             }
         }
+    }
+
+    /**
+     * Scenarios BI95 and BI96 (background-jobs-with-db-scheduler design.md decision 1): only the worker
+     * holds an executor, exactly one; administration and the portal hold none. The rule is a
+     * function of the process name and the context, so a fixture can show it fails in both
+     * directions: an executor where none belongs, and a worker without one.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("com.confia.bootstrap.ProcessBeanPolicy#all")
+    void onlyTheWorkerHoldsAScheduler(ProcessBeanPolicy policy) {
+        LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.forProcess(policy.process()), policy.process());
+        ConfigurableApplicationContext context = outcome.context();
+        try {
+            assertThat(context).as("the %s process must start", policy.process()).isNotNull();
+            assertThat(schedulerViolations(policy.process(), context)).isEmpty();
+        } finally {
+            if (context != null) {
+                context.close();
+            }
+        }
+    }
+
+    @Test
+    void aSchedulerInTheAdministrativeProcessIsReportedNamingProcessAndBean() {
+        try (AnnotationConfigApplicationContext fixture = new AnnotationConfigApplicationContext()) {
+            fixture.registerBean("rogueScheduler", Scheduler.class, () -> mock(Scheduler.class));
+            fixture.refresh();
+
+            assertThat(schedulerViolations("admin", fixture)).singleElement().asString()
+                    .contains("process 'admin'").contains("rogueScheduler");
+        }
+    }
+
+    @Test
+    void aWorkerWithoutASchedulerIsReportedNamingTheProcess() {
+        try (AnnotationConfigApplicationContext fixture = new AnnotationConfigApplicationContext()) {
+            fixture.refresh();
+
+            assertThat(schedulerViolations("worker", fixture)).singleElement().asString()
+                    .contains("process 'worker'").contains("expected exactly one");
+        }
+    }
+
+    /** One line when the number of {@code Scheduler} beans is not the one the process must hold. */
+    static List<String> schedulerViolations(String process, ConfigurableApplicationContext context) {
+        int expected = "worker".equals(process) ? 1 : 0;
+        String[] names = context.getBeanNamesForType(Scheduler.class, true, false);
+        if (names.length == expected) {
+            return List.of();
+        }
+        return List.of("process '%s': expected %s Scheduler bean(s) but found %d %s".formatted(process,
+                expected == 1 ? "exactly one" : "no", names.length, Arrays.toString(names)));
     }
 
     private static final String SCHEDULER_CLASS = "com.github.kagkarlsson.scheduler.Scheduler";

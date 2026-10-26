@@ -13,6 +13,7 @@ import com.confia.identity.domain.BackoffState;
 import com.confia.identity.infrastructure.Argon2Profile;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
 import com.confia.identity.testsupport.fixture.PasswordRecoveryScopeViolationFixtures;
+import com.confia.shared.audit.AuditScopeExclusionInventoryTest;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.crypto.DataEncryptionKeyRepository;
 import com.tngtech.archunit.core.domain.Dependency;
@@ -222,9 +223,12 @@ class IdentityScopeExclusionInventoryTest {
             for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
                 String targetPackage = dependency.getTargetClass().getPackageName() + ".";
                 assertThat(forbiddenSchedulingPackagePrefixes.stream()
-                        .anyMatch(targetPackage::startsWith))
+                        .anyMatch(targetPackage::startsWith)
+                        && !AuditScopeExclusionInventoryTest.isTheConfinedUseOfDbScheduler(
+                                javaClass.getPackageName(), targetPackage))
                         .as("%s must not depend on a scheduling API (%s): no job of any kind "
-                                        + "exists in this change",
+                                        + "exists in this change; db-scheduler is admitted only in the "
+                                        + "jobs infrastructure package",
                                 javaClass.getFullName(), dependency.getTargetClass().getFullName())
                         .isFalse();
             }

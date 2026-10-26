@@ -866,11 +866,16 @@ nunca en el repositorio, conforme a `CLAUDE.md`, regla 13.
 > ellas. La variable `CONFIA_JOBS_INSTITUTIONS` (lista de UUID de las instituciones que atiende) llega
 > con la tarea 1.6, junto con su ejecutor. El portal sigue sin conexión hasta la tarea 2.6.
 
-> **Nota fechada 2026-10-25 (cambio `background-jobs-with-db-scheduler`, tarea 1.6): instituciones del
-> trabajador.** El trabajador necesita además `CONFIA_JOBS_INSTITUTIONS` (`confia.jobs.institutions`):
-> lista de UUID de las instituciones sobre las que actúa, separados por comas. Es obligatoria, no puede
-> estar vacía ni repetir entradas, y si falla el proceso se detiene antes de arrancar con un mensaje que
-> nombra la propiedad y la posición de la entrada inválida sin repetir la lista. No es un secreto.
+> **Nota fechada 2026-10-25 (cambio `background-jobs-with-db-scheduler`, tarea 1.6): instituciones y
+> ejecutor del trabajador.** El trabajador necesita además `CONFIA_JOBS_INSTITUTIONS`
+> (`confia.jobs.institutions`): lista de UUID de las instituciones sobre las que actúa, separados por
+> comas. Es obligatoria, no puede estar vacía ni repetir entradas, y si falla el proceso se detiene
+> antes de arrancar con un mensaje que nombra la propiedad y la posición de la entrada inválida sin
+> repetir la lista. No es un secreto. El trabajador arranca su único ejecutor (db-scheduler) al estar
+> el contexto listo; sus ajustes (`db-scheduler.threads`, `polling-interval`, `heartbeat-interval`,
+> `missed-heartbeats-limit` y `shutdown-max-wait`) viven en `application.yml` y se pueden sobrescribir
+> con las variables `DB_SCHEDULER_*`. Sin servidor web, `spring.main.keep-alive: true` mantiene viva la
+> JVM. La propiedad de prueba `confia.jobs.executor.autostart` no debe fijarse en ningún entorno.
 
 > **Nota fechada 2026-10-05 (cambio `web-edge-foundations`, PR 7 `request-origin`): proxies de
 > confianza.** Los procesos `admin` y `portal` deciden la IP del cliente así: es la dirección de la

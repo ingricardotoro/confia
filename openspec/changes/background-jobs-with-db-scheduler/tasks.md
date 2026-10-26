@@ -298,7 +298,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     orden de commits y fusiones (guardia en `14e9922` antes de `2c4d733`), `verify` (8 min 8 s) y `verify -Pmutation-gate` (13 min 19 s) en verde: `apply-progress.md`, «Tarea 1.5».
     Commits `2c4d733` y `0b83744`. Tamaño: 764 líneas efectivas.
 
-- [ ] 1.6 **PR 2b / 2b-2 `02b-worker-scheduler-shell`: `Scheduler` único del trabajador sin tareas, instituciones configuradas y ciclo de vida (decisiones 1, 10 y 12).**
+- [x] 1.6 **PR 2b / 2b-2 `02b-worker-scheduler-shell`: `Scheduler` único del trabajador sin tareas, instituciones configuradas y ciclo de vida (decisiones 1, 10 y 12).**
   - **ROJO.** Crear `test/java/com/confia/shared/jobs/infrastructure/ConfiguredInstitutionsStartupTest.java` (el trabajador no arranca sin
     `confia.jobs.institutions`, con un UUID inválido, con repetidos o vacío; el mensaje nombra la propiedad y la posición de la entrada inválida sin
     repetir la lista) [BJ31, BJ64]; `SchedulerStarterCompatibilityTest.java` (**sonda P-2**: el trabajador arranca con un `Scheduler` propio y el del
@@ -323,6 +323,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
   - **Cierre.** `./mvnw verify -Pmutation-gate`; se mide la duración de `verify` contra el presupuesto de 15 minutos (BI57, riesgo R-9). Commit:
     `feat(worker): add the single db-scheduler executor with no registered tasks`. Tamaño: nominal 150, realista 500. — Escenarios BJ31, BJ47, BJ49,
     BJ50, BJ64, BI95, BI96 y BI113 (afirmación estrechada), más la mitad del trabajador de BJ06.
+- **Resultado (2026-10-25): hecha.** Rojos, dos demostraciones con `cmp`, `verify` (11 min 48 s) y `verify -Pmutation-gate` en verde: `apply-progress.md`, «Tarea 1.6». Commits `c6f64ae` y `c554b29`. Tamaño: 937 líneas efectivas sobre 2b-1.
 
 ---
 

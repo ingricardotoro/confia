@@ -13,7 +13,8 @@ import org.springframework.context.annotation.Import;
  * server ({@code ConfiaApplication} forces {@code WebApplicationType.NONE}). It declares its own
  * wiring here and never inherits the administrative bean graph, so it carries none of the OpenAPI
  * surface the web processes import. No business module or background job is registered yet
- * (db-scheduler tasks arrive with the modules that need them, ADR-0016).
+ * (db-scheduler tasks arrive with the modules that need them, ADR-0016); the executor runs with an
+ * empty set of tasks.
  *
  * <p>The worker has a {@code DataSource} (background-jobs-with-db-scheduler design.md decision 12,
  * which reverses decision D5 of web-edge-foundations for this process): Spring Boot's pool, with the
@@ -26,12 +27,12 @@ import org.springframework.context.annotation.Import;
  * context creates its first bean, so no bean can log a bound value before the guard exists
  * (condition 4). The worker still has no web edge, no security chain, no master key and no pepper.
  *
-
- * <p>The three auto-configurations of the db-scheduler starter are excluded here for now: the
- * worker has a {@code DataSource}, and the starter would start an executor with its default settings
- * on it. The worker's single executor, with the settings of design.md decision 1, is the work of
- * task 1.6, which stops excluding the main auto-configuration (its own {@code Scheduler} then
- * displaces the starter's).
+ * <p>The auto-configuration of the db-scheduler starter is active here, and it is the only process
+ * where it is: the administrative and portal entry points exclude it. The worker declares its own
+ * {@code Scheduler} and its own starter in {@link WorkerJobsConfiguration}, and the library's
+ * versions of both are conditional on the absence of those, so the context holds exactly one
+ * executor and it is ours (probe P-2). Its settings are the {@code db-scheduler.*} properties of
+ * {@code application.yml}; {@code spring.main.keep-alive} keeps the JVM running without a web server.
  *
  * <p>{@link SecurityAutoConfiguration} and {@link UserDetailsServiceAutoConfiguration} are
  * excluded (decision 4 of web-edge-foundations): the worker has no web edge, and Spring
@@ -44,10 +45,7 @@ import org.springframework.context.annotation.Import;
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {SecurityAutoConfiguration.class,
-        UserDetailsServiceAutoConfiguration.class}, excludeName = {
-        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration",
-        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerMetricsAutoConfiguration",
-        "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerActuatorAutoConfiguration"})
+        UserDetailsServiceAutoConfiguration.class})
 @Import({WorkerPlatformConfiguration.class, WorkerJobsConfiguration.class})
 public class WorkerApplication {
 }

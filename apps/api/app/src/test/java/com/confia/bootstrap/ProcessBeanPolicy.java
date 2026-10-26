@@ -146,7 +146,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // configuration that declares them. Each is exact and contributes a bean.
                     "com.confia.shared.security", "com.confia.shared.infrastructure",
                     "com.confia.shared.jobs.infrastructure.wiring",
-                    // The institutions the worker acts on (decision 12).
+                    // The worker's executor and the institutions it acts on (decision 12).
                     "com.confia.shared.jobs.infrastructure"),
             forbidden("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.portal", OTHER_ENTRY_POINT,

@@ -47,7 +47,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * sobre el que iteran no está vacío"): a loop over an accidentally empty collection would let an
  * absence assertion pass without ever checking anything real.
  */
-class AuditScopeExclusionInventoryTest {
+public class AuditScopeExclusionInventoryTest {
 
     private static final Set<String> SCHEDULING_PACKAGE_PREFIXES =
             Set.of("org.springframework.scheduling.", "com.github.kagkarlsson.");
@@ -55,6 +55,29 @@ class AuditScopeExclusionInventoryTest {
     private static final Set<Class<? extends Annotation>> MAPPING_ANNOTATIONS =
             Set.of(RequestMapping.class, GetMapping.class, PostMapping.class, PutMapping.class,
                     DeleteMapping.class, PatchMapping.class);
+
+    /**
+     * db-scheduler is admitted, and only from the package that confines it
+     * (background-jobs-with-db-scheduler design.md decisions 3 and 21; ADR-0016 rule 1). The full
+     * confinement rule, with its fixtures, is {@code DbSchedulerConfinementTest} (task 2.5); this
+     * inventory keeps denying every other scheduling API and db-scheduler outside that package.
+     */
+    public static boolean isTheConfinedUseOfDbScheduler(String classPackage, String targetPackage) {
+        return targetPackage.startsWith("com.github.kagkarlsson.")
+                && (classPackage + ".").startsWith("com.confia.shared.jobs.infrastructure.");
+    }
+
+    @Test
+    void theConfinementExemptionAdmitsOnlyDbSchedulerFromTheJobsInfrastructurePackage() {
+        assertThat(isTheConfinedUseOfDbScheduler("com.confia.shared.jobs.infrastructure.wiring",
+                "com.github.kagkarlsson.scheduler.")).isTrue();
+        assertThat(isTheConfinedUseOfDbScheduler("com.confia.identity.application",
+                "com.github.kagkarlsson.scheduler.")).isFalse();
+        assertThat(isTheConfinedUseOfDbScheduler("com.confia.bootstrap.admin",
+                "com.github.kagkarlsson.scheduler.")).isFalse();
+        assertThat(isTheConfinedUseOfDbScheduler("com.confia.shared.jobs.infrastructure",
+                "org.springframework.scheduling.annotation.")).isFalse();
+    }
 
     @Test
     void noProductionClassDependsOnATaskSchedulingTypeAndNoScheduledMethodExists() {
@@ -64,7 +87,8 @@ class AuditScopeExclusionInventoryTest {
             for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
                 String targetPackage = dependency.getTargetClass().getPackageName() + ".";
                 boolean dependsOnScheduling = SCHEDULING_PACKAGE_PREFIXES.stream()
-                        .anyMatch(targetPackage::startsWith);
+                        .anyMatch(targetPackage::startsWith)
+                        && !isTheConfinedUseOfDbScheduler(javaClass.getPackageName(), targetPackage);
                 assertThat(dependsOnScheduling)
                         .as("%s must not depend on a task-scheduling type (%s): db-scheduler "
                                         + "(ADR-0016) is cambio 9's own responsibility, not this cut's",

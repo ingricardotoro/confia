@@ -3,7 +3,7 @@
 - **Cambio:** `background-jobs-with-db-scheduler` (F0, cambio 9; entregable 12, criterio de salida 5)
 - **Modo:** TDD estricto (`./mvnw verify -Pmutation-gate` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `stacked-to-main`, tope de 800 líneas efectivas por PR; prevalece sobre `single-pr` con 400 de la preflight (ver `tasks.md`)
-- **Última actualización:** 2026-10-25 (rebanada 2b-1: tarea 1.5)
+- **Última actualización:** 2026-10-25 (rebanada 2b: tareas 1.5 y 1.6)
 - **Regla de este archivo:** solo se añade; no se reescriben secciones existentes.
 
 ## Estado de las tareas
@@ -285,3 +285,65 @@ Se corrigió la prueba para obtener el bean solo en el control negativo y se rep
 5. **No se añadieron** `confia.jobs.institutions` ni `confia.jobs.executor.autostart` a `TestProcessArguments` todavía: los lee la tarea 1.6.
 6. **`package-info` con `@NamedInterface`** en `shared.jobs.infrastructure.wiring` (consumidor: `bootstrap`), porque un punto de entrada lo importa (ADR-0022).
 7. **`SqlLoggingTest`** pasa a construir el `DSLContext` de producción con `TransactionalDataSource`; `AdminProductionWiringTest.portalAndWorkerHoldNoDataSource` queda solo para el portal.
+
+## Tarea 1.6 (rebanada 2b-2 `worker-scheduler-shell`, 2026-10-25)
+
+Rama `change/background-jobs-with-db-scheduler-02b2-worker-scheduler-shell`, apilada sobre 2b-1. Commits `c6f64ae` (ejecutor) y `c554b29` (nota de `docs/05`).
+**937 líneas efectivas** sobre 2b-1 (código 926, `docs/05` 11), 137 por encima de 800: la tarea 1.6 no tiene costura nombrada propia y sus pruebas no se separan de su código; se informa al orquestador.
+Total de 2b: 764 + 937 = 1 701.
+
+### Evidencia del ciclo TDD
+
+| Paso | Resultado observado |
+|---|---|
+| ROJO (compilación) | `test-compile` con `ConfiguredInstitutionsTest`, `WorkerSchedulerStarterTest`, `ConfiguredInstitutionsStartupTest` y `SchedulerStarterCompatibilityTest`: `cannot find symbol` para `ConfiguredInstitutions` y `WorkerSchedulerStarter`. Causa esperada |
+| ROJO (lista de permitidos) | `ProcessBeanIsolationTest.registersOnlyItsAllowedBeans` [worker]: `configuredInstitutions` y `workerSchedulerStarter` «not in the allow-list», paquete `shared.jobs.infrastructure`; se añadió la línea |
+| ROJO (captura de registros) | `JobsConfigurationGuardTest` sin eventos: Boot reinicia Logback al arrancar y desprende el appender previo. Desviación: un inicializador de prueba (`spring.factories`) instala la captura tras ese reinicio |
+| ROJO (inventarios) | En el `verify` completo: `AuditScopeExclusionInventoryTest` e `IdentityScopeExclusionInventoryTest` fallaron porque `WorkerJobsConfiguration` depende de db-scheduler. Se admite solo desde `com.confia.shared.jobs.infrastructure..` (con su prueba de la exención); el resto de la regla sigue |
+| VERDE | `WorkerStaysAliveTest` ejecuta el lanzador real en una JVM hija: sigue viva tras estar lista y, con `keep-alive=false`, termina sola. Inversión de `theWorkerHasNoScheduler…` en `ProcessBeanIsolationTest.onlyTheWorkerHoldsAScheduler` (exactamente uno en el trabajador, cero en los otros) con fixtures de un ejecutor sobrante y de uno ausente |
+
+### Demostraciones deliberadas (con `cmp`)
+
+| Ruptura | Prueba que falló | Aserción | `cmp` |
+|---|---|---|---|
+| Declarar un segundo `Scheduler` en `WorkerJobsConfiguration` | `SchedulerStarterCompatibilityTest` y `ProcessBeanIsolationTest.onlyTheWorkerHoldsAScheduler` | «exactly one Scheduler» / «expected exactly one Scheduler bean(s) but found 2 [scheduler, secondScheduler]» [BJ47, BI96] | sin salida |
+| Quitar `spring.main.keep-alive` de `application.yml` | `WorkerStaysAliveTest.theWorkerJvmKeepsRunningWithoutAWebServer` | «the worker JVM must still be running» [BJ50] | sin salida |
+
+La primera ejecución de la segunda ruptura borró de más líneas del YAML y falló por otra causa; se restauró con `cmp` y se repitió con la ruptura exacta.
+
+### Desviaciones
+
+1. El `Scheduler` se construye sin `@ConfigurationProperties` propio: usa `DbSchedulerProperties` de la biblioteca (el iniciador sigue activo en el trabajador). El dialecto PostgreSQL se fija explícito para no abrir una conexión al construirlo (sin eso, 30 s de espera por arranque con la base caída).
+2. La exclusión temporal del iniciador en `WorkerApplication` (1.5) se retira aquí.
+3. `TestProcessArguments` pasa `confia.jobs.institutions` y `confia.jobs.executor.autostart=false` al trabajador.
+4. `ProcessBeanIsolationTest`: la afirmación de observabilidad se estrechó a `shared.observability.metrics`.
+
+### Verificación completa (árbol `target` borrado antes de cada una)
+
+| Rama | `./mvnw verify` | `./mvnw verify -Pmutation-gate` |
+|---|---|---|
+| 2b-1 (tarea 1.5) | **8 min 8 s (488 s)**, Surefire 186 + 2 421, Failsafe 619, 0 fallos | 13 min 19 s (799 s), verde |
+| 2b-2 (tarea 1.6) | **11 min 48 s (708 s)**, Surefire 186 + 2 454, Failsafe 619, 0 fallos | `BUILD SUCCESS` en 21 min 10 s (1 270 s), que incluye una pausa de la máquina durante la interrupción 429; Surefire/Failsafe iguales, JaCoCo cumplido, PIT núcleo 192/194 (99 %), aplicación 676/710 (95 %), fuerza 96 % |
+
+El presupuesto de 15 min de BI57 (decisión G-4) aplica solo a `verify` sin perfil: 8 min y 11 min 48 s, dentro.
+
+### Partición de 2b-2 en 02b2 y 02b3 (2026-10-25, decisión del propietario)
+
+La rama `...-02b2-worker-scheduler-shell` (937 líneas) se rehízo en dos PR apilados sobre 2b-1; la rama antigua y la referencia local `backup/02b2-before-split` se conservan.
+Las cifras de arriba (937 líneas, tiempos de 2b-2) describen la rama antigua; las de las ramas nuevas son estas.
+
+| Rama | Contenido | Líneas efectivas |
+|---|---|---|
+| `change/background-jobs-with-db-scheduler-02b2-configured-institutions` (`52d3958`, `c4e96b7`) | `ConfiguredInstitutions`, su bean en `WorkerJobsConfiguration`, línea de política y argumentos de prueba, `ConfiguredInstitutionsTest`, `ConfiguredInstitutionsStartupTest`, nota de `docs/05` | 276 |
+| `change/background-jobs-with-db-scheduler-02b3-worker-scheduler-shell` (`90cc7fc` y el commit de estos registros) | `Scheduler`, `WorkerSchedulerStarter`, `application.yml`, resto de pruebas e inventarios | 683 |
+
+La costura es limpia: 02b2 compila y pasa sola sobre 2b-1, sin `Scheduler` (el iniciador de db-scheduler sigue excluido en el trabajador, como en 1.5).
+
+| Rama | `verify` | `verify -Pmutation-gate` |
+|---|---|---|
+| 02b2 | `BUILD SUCCESS` en 1 305 s; Surefire 186 + 2 437, Failsafe 619 | `BUILD SUCCESS` en 1 117 s; JaCoCo cumplido; PIT 192/194 y 676/710 |
+| 02b3 | `BUILD SUCCESS` en 665 s (11 min 5 s); Surefire 186 + 2 454, Failsafe 619 | `BUILD SUCCESS` en 979 s (16 min 19 s); JaCoCo cumplido; PIT 192/194 y 676/710 |
+
+Los 1 305 s y 1 117 s de 02b2 son atípicos frente a ejecuciones equivalentes (488 s y 799 s en 2b-1): la máquina estuvo lenta durante esas corridas; no se aisló la causa. El presupuesto de 15 min (G-4) aplica solo a `verify` sin perfil: 02b3 cumple (665 s); 02b2 lo excedió por esa lentitud y conviene repetirla antes de fusionar.
+
+Prueba de igualdad de árbol: `git diff backup/02b2-before-split change/background-jobs-with-db-scheduler-02b3-worker-scheduler-shell -- . ':!openspec'` no produce salida.

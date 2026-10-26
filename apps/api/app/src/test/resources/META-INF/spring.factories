@@ -1,3 +1,6 @@
-# Registers the observer of SensitiveLogGuardInstallationTest. It acts only in a context whose
-# environment sets confia.test.observe-log-guard=true; in every other test context it does nothing.
-org.springframework.context.ApplicationContextInitializer=com.confia.bootstrap.SensitiveLogGuardInstallationTest$Observer
+# Test-only initializers. Each acts only in a context whose environment sets its own property to
+# true (confia.test.observe-log-guard, confia.test.capture-worker-log); in every other test
+# context it does nothing.
+org.springframework.context.ApplicationContextInitializer=\
+  com.confia.bootstrap.SensitiveLogGuardInstallationTest$Observer,\
+  com.confia.bootstrap.JobsConfigurationGuardTest$Capture
