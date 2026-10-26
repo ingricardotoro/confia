@@ -82,6 +82,8 @@ final class TestProcessArguments {
             // The worker has a DataSource since background-jobs-with-db-scheduler task 1.5; its
             // pool is lazy, so an address nothing listens on is enough to start it.
             arguments.add("--spring.datasource.url=" + UNREACHABLE_JDBC_URL);
+            // The institutions the worker acts on are mandatory (P5).
+            arguments.add("--confia.jobs.institutions=" + UUID.randomUUID());
         } else {
             arguments.add("--server.port=0");
         }
@@ -96,7 +98,8 @@ final class TestProcessArguments {
     static String[] workerAgainst(String jdbcUrl, String username, String password) {
         return new String[] {"--spring.datasource.url=" + jdbcUrl,
                 "--spring.datasource.username=" + username,
-                "--spring.datasource.password=" + password};
+                "--spring.datasource.password=" + password,
+                "--confia.jobs.institutions=" + UUID.randomUUID()};
     }
 
     /** The administrative arguments with no master key, to prove the process refuses to start. */
