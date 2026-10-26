@@ -17,6 +17,12 @@ import org.springframework.transaction.PlatformTransactionManager;
 @Configuration(proxyBeanMethods = false)
 public class TransactionRunnerConfiguration {
 
+    /** The one transaction-aware proxy of the process's {@code DataSource} (BJ46). */
+    @Bean
+    TransactionalDataSource transactionalDataSource(DataSource dataSource) {
+        return new TransactionalDataSource(dataSource);
+    }
+
     @Bean
     TransactionRunner transactionRunner(PlatformTransactionManager transactionManager,
             DataSource dataSource) {

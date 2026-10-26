@@ -850,6 +850,22 @@ nunca en el repositorio, conforme a `CLAUDE.md`, regla 13.
 > en el primer uso. Los casos de uso `RequestPasswordReset` e `IssuePasswordResetToken` no se
 > registran hasta que existan sus adaptadores (cambios 9 y 14).
 
+> **Nota fechada 2026-10-25 (cambio `background-jobs-with-db-scheduler`, tarea 1.5): el trabajador abre
+> una conexión.** Esta nota revierte, solo para el proceso `worker`, la frase de la nota del 2026-10-04 «`portal` y
+> `worker` no los leen ni abren conexión a la base de datos». Desde este cambio el trabajador tiene un
+> `DataSource` (el grupo perezoso de Spring Boot: con la base de datos caída arranca y reporta el
+> fallo en el primer uso) y necesita:
+>
+> | Variable de entorno | Valor |
+> |---|---|
+> | `SPRING_DATASOURCE_URL` | URL JDBC de PostgreSQL |
+> | `SPRING_DATASOURCE_USERNAME` | `confia_admin_app` (decisión P7 del propietario) |
+> | `SPRING_DATASOURCE_PASSWORD` | Contraseña del rol, del almacén de secretos |
+>
+> El trabajador no recibe la llave maestra de columnas ni la pimienta de Argon2id, y arranca sin
+> ellas. La variable `CONFIA_JOBS_INSTITUTIONS` (lista de UUID de las instituciones que atiende) llega
+> con la tarea 1.6, junto con su ejecutor. El portal sigue sin conexión hasta la tarea 2.6.
+
 > **Nota fechada 2026-10-05 (cambio `web-edge-foundations`, PR 7 `request-origin`): proxies de
 > confianza.** Los procesos `admin` y `portal` deciden la IP del cliente así: es la dirección de la
 > conexión, salvo que esa dirección pertenezca a la lista de proxies de confianza; solo entonces se

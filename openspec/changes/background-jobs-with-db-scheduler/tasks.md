@@ -260,7 +260,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
   - **Resultado (2026-10-24): hecha.** Rojos, demostraciones con `cmp`, `verify` (11 min 13 s) y `verify -Pmutation-gate` (14 min 59 s) en verde en `apply-progress.md`,
     «Tarea 1.4». Commit `9825ec6`. Tamaño medido: 364 líneas efectivas. No se empezó 1.5: el PR de 1.4 debe fusionarse antes.
 
-- [ ] 1.5 **PR 2b / 2b-1 `02b-worker-datasource-and-condition-4`: `TransactionalDataSource`, trabajador con `DataSource` y condición 4 sobre el proceso real (decisiones 5, 12 y 13).**
+- [x] 1.5 **PR 2b / 2b-1 `02b-worker-datasource-and-condition-4`: `TransactionalDataSource`, trabajador con `DataSource` y condición 4 sobre el proceso real (decisiones 5, 12 y 13).**
   - **Precondición dura.** 1.4 fusionado en `main`. Verificarlo con `git log` antes de empezar; sin la guardia no se escribe ninguna línea con
     `DataSource` para el trabajador.
   - **ROJO, control negativo primero.** Crear `test/java/com/confia/shared/logging/WorkerSensitiveLoggingIT.java`: trabajador arrancado con
@@ -294,6 +294,9 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     `apply-progress.md`). `./mvnw verify -Pmutation-gate`. Commits: `feat(worker): give the worker process a data source behind the sensitive log
     guard` y `docs(infra): note the worker data source variables`. Tamaño: nominal 200, realista 600. — Escenarios BI89 a BI92, BI94, BI111, BI115, BJ46
     y los vigentes de «El trabajador arranca sin servidor web y con su cableado de base de datos» y «Las pruebas de arranque no necesitan Docker».
+  - **Resultado (2026-10-25): hecha; condición 4 cerrada.** `WorkerSensitiveLoggingIT` en verde con su control negativo (probado: `org.postgresql`), dos demostraciones con `cmp`,
+    orden de commits y fusiones (guardia en `14e9922` antes de `2c4d733`), `verify` (8 min 8 s) y `verify -Pmutation-gate` (13 min 19 s) en verde: `apply-progress.md`, «Tarea 1.5».
+    Commits `2c4d733` y `0b83744`. Tamaño: 764 líneas efectivas.
 
 - [ ] 1.6 **PR 2b / 2b-2 `02b-worker-scheduler-shell`: `Scheduler` único del trabajador sin tareas, instituciones configuradas y ciclo de vida (decisiones 1, 10 y 12).**
   - **ROJO.** Crear `test/java/com/confia/shared/jobs/infrastructure/ConfiguredInstitutionsStartupTest.java` (el trabajador no arranca sin

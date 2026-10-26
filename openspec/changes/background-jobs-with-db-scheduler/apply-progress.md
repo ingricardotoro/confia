@@ -3,7 +3,7 @@
 - **Cambio:** `background-jobs-with-db-scheduler` (F0, cambio 9; entregable 12, criterio de salida 5)
 - **Modo:** TDD estricto (`./mvnw verify -Pmutation-gate` en `apps/api`, JDK 25, Docker en ejecución)
 - **Estrategia de entrega:** `stacked-to-main`, tope de 800 líneas efectivas por PR; prevalece sobre `single-pr` con 400 de la preflight (ver `tasks.md`)
-- **Última actualización:** 2026-10-24 (rebanada 2a: tarea 1.4)
+- **Última actualización:** 2026-10-25 (rebanada 2b-1: tarea 1.5)
 - **Regla de este archivo:** solo se añade; no se reescriben secciones existentes.
 
 ## Estado de las tareas
@@ -218,3 +218,70 @@ copia de `SensitiveLogGuard` en la cadena de Logback durante su captura, como ha
 3. **`com.confia.shared.logging` en la lista de permitidos de los tres procesos ya en este PR** (la tarea lo escribe en 1.5 para el trabajador): el singleton de la guardia existe en los tres desde ahora.
 4. **El arnés de pruebas web** (`HarnessProcess`) añade el mismo inicializador; la guardia sigue disponible como bean por `registerSingleton`.
 5. **Instalar elimina copias anteriores** de la guardia en la cadena (un contexto que falla en el arranque no emite `ContextClosedEvent` y dejaría una copia).
+
+## Tarea 1.5 (rebanada 2b-1 `worker-datasource-and-condition-4`, 2026-10-25)
+
+Rama `change/background-jobs-with-db-scheduler-02b-worker-datasource-and-condition-4`, desde `main` en `14e9922`. Commits de código `2c4d733` (trabajador con
+`DataSource`) y `0b83744` (nota de `docs/05` §6). **764 líneas efectivas** medidas con `git diff --numstat main...HEAD -- . ':!openspec'`.
+
+### Partición de la rebanada 2b
+
+La tarea 1.6 se estimó en 500 líneas realistas; con 764 de 1.5 el total pasaría de 800, de modo que se parte **sin consultar** en la costura nombrada:
+2b-1 = tarea 1.5 (esta rama) y 2b-2 = tarea 1.6 (`...-02b2-worker-scheduler-shell`, apilada sobre esta).
+
+### Condición 4: orden de commits y fusiones
+
+La guardia (tarea 1.4) se fusionó en `main` en `14e9922` (PR #191) **antes** de que existiera una sola línea con `DataSource` del trabajador. El primer commit con ese
+`DataSource` es `2c4d733`, sobre `14e9922`. Ningún commit de `main` da un `DataSource` al trabajador sin la guardia.
+
+### Evidencia del ciclo TDD
+
+| Paso | Orden | Resultado observado |
+|---|---|---|
+| ROJO (compilación) | `./mvnw -pl app -am test-compile` con las pruebas nuevas | `exit=1`, 30 líneas `ERROR`: `cannot find symbol` para `TransactionalDataSource` (clase y variable) en `TransactionalDataSourceTest` y `WorkerProductionWiringTest`. Causa esperada |
+| ROJO (lista de permitidos) | Pruebas con el trabajador ya cableado y **sin** las líneas del trabajador en `ProcessBeanPolicy` | `ProcessBeanIsolationTest.registersOnlyItsAllowedBeans` [worker]: 8 beans `not in the allow-list` nombrando bean y paquete (`shared.security`: `TransactionRunnerConfiguration`, `transactionalDataSource`, `transactionRunner`; `shared.jobs.infrastructure.wiring`: `WorkerPlatformConfiguration`, `dslContext`, `clock`, `auditLogWriter`; `shared.infrastructure`: `auditLogWriter`). Y `WorkerProductionWiringTest.aCryptoBeanInTheWorker…`: sin la prohibición de `shared.crypto` no aparece «the worker holds no column-encryption key». Causa esperada |
+| ROJO (ejecutor) | `WorkerProductionWiringTest#theWorkerHasNoSchedulerAndNoExecutorThreadYet` con el trabajador ya con `DataSource` | Falla: «Expecting empty but was: ["scheduler"]». El iniciador de db-scheduler, al ver un `DataSource`, creó su `Scheduler` con valores por omisión (y 30 s de espera de conexión por arranque en `ProcessBeanIsolationTest`). Se excluyen sus tres autoconfiguraciones en `WorkerApplication` hasta la tarea 1.6 (desviación) |
+| VERDE | Las mismas pruebas con la política, el cableado y la exclusión | 85 pruebas unitarias en verde y `WorkerSensitiveLoggingIT` (2) en verde |
+| Refactor | `SensitiveLogGuard.protectedPrefixes()` público para la prueba de proceso real; `TestProcessArguments.workerAgainst` | Sin cambio de comportamiento |
+
+### Condición 4: resultado de `WorkerSensitiveLoggingIT`
+
+Trabajador real arrancado por `ConfiaApplication.launch` contra PostgreSQL real (rol `confia_admin_app`, URL sin el `loggerLevel=OFF` que Testcontainers añade), con la raíz y
+**cada** prefijo protegido en `TRACE`; un valor distintivo (`valor-distintivo-7f3a`) pasa por `set_config` (el actor del contexto de seguridad) y por una consulta del `DSLContext` real.
+
+- Con la guardia: ningún evento de ningún campo (mensaje, plantilla, argumentos, MDC, traza) contiene el valor [BI89].
+- Sin la guardia (control negativo): el valor aparece [BI90]. **Probado:** `org.postgresql` (el controlador registra los parámetros de `Bind` en `QueryExecutorImpl`
+  a `TRACE`). **Preventivos** (sin fuga observada): `org.jooq` (la ejecución ya está apagada con `withExecuteLogging(false)`), `com.zaxxer.hikari`,
+  `org.springframework.jdbc`, `org.springframework.transaction`, `com.github.kagkarlsson` y los prefijos web. Cierra la sonda P-11.
+
+### Demostraciones deliberadas (con `cmp`)
+
+| Ruptura | Prueba que falló | Aserción | `cmp` |
+|---|---|---|---|
+| Quitar `.initializers(new SensitiveLogGuardInitializer())` del trabajador en `ConfiaApplication` | `WorkerSensitiveLoggingIT.theBoundValueNeverAppears…` | «Expecting empty but was: org.postgresql.core.v3.QueryExecutorImpl TRACE message contains valor-distintivo-7f3a» [BI89, BI91] | sin salida |
+| Quitar el mismo inicializador (otra prueba) | `WorkerProductionWiringTest.theRealWorkerHasADataSourceAndTheGuardIsActive…` | La regla de «DataSource sin guardia activa» informa la violación [BI91] | sin salida |
+| Construir el `DSLContext` del trabajador sobre un segundo `TransactionAwareDataSourceProxy` | `WorkerProductionWiringTest.theDslContextAndTheTransactionalDataSourceShareTheOneProxy[worker]` y `WorkerPlatformConfigurationTest` | «does not use the transaction-aware proxy» [BJ46] | sin salida |
+
+La primera ejecución de la primera demostración no fue válida: la prueba pedía el bean de la guardia sin haberlo y fallaba con `NoSuchBeanDefinition`, no por el valor.
+Se corrigió la prueba para obtener el bean solo en el control negativo y se repitió.
+
+### Verificación completa (árbol `target` borrado antes de cada una)
+
+| Orden | Resultado |
+|---|---|
+| `./mvnw verify` | **`BUILD SUCCESS` en 8 min 8 s (488 s)**: Surefire 186 + 2 421, Failsafe 619, 0 fallos. Dentro del presupuesto de 15 min de BI57 |
+| `./mvnw verify -Pmutation-gate` | `BUILD SUCCESS` en 13 min 19 s (799 s): mismas pruebas; JaCoCo cumplido; PIT núcleo 192/194 (99 %), aplicación 676/710 (95 %), fuerza 96 %. Sin clases mutadas nuevas |
+
+### Desviaciones y precisiones de 1.5
+
+1. **Pruebas de proceso en `com.confia.bootstrap`**, no en `shared/logging`: necesitan `ConfiaApplication.launch` y `TestProcessArguments`, de visibilidad de paquete.
+2. **El iniciador de db-scheduler sigue excluido en el trabajador** (tres autoconfiguraciones por nombre) hasta la tarea 1.6, que retira la exclusión de la principal. La tarea no lo
+   preveía; sin ello el trabajador arrancaba un ejecutor con valores por omisión al tener `DataSource`.
+3. **`ProcessBeanPolicy.WORKER` solo trae las líneas que contribuyen un bean hoy** (`shared.security`, `shared.infrastructure`, `shared.jobs.infrastructure.wiring`, además de
+   `shared.logging` de 1.4): la comprobación de no vacuidad exige que cada paquete permitido aporte un bean. `shared.audit`, `shared.infrastructure.wiring` y las capas de `identity`
+   llegan con el primer bean que las use. Se añadió la prohibición `com.confia.shared.crypto`.
+4. **BI115 se aplica al trabajador y a administración; el portal queda exento de forma explícita** (`STILL_EXCLUDING`) hasta que la tarea 2.6 le dé su `DataSource` (D-N1); la prueba afirma
+   que sigue excluyéndolo, para que la exención se retire a propósito.
+5. **No se añadieron** `confia.jobs.institutions` ni `confia.jobs.executor.autostart` a `TestProcessArguments` todavía: los lee la tarea 1.6.
+6. **`package-info` con `@NamedInterface`** en `shared.jobs.infrastructure.wiring` (consumidor: `bootstrap`), porque un punto de entrada lo importa (ADR-0022).
+7. **`SqlLoggingTest`** pasa a construir el `DSLContext` de producción con `TransactionalDataSource`; `AdminProductionWiringTest.portalAndWorkerHoldNoDataSource` queda solo para el portal.

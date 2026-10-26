@@ -78,11 +78,25 @@ final class TestProcessArguments {
         List<String> arguments = new ArrayList<>();
         if ("admin".equals(process)) {
             arguments.addAll(List.of(adminWith(Map.of())));
-        } else if (!"worker".equals(process)) {
+        } else if ("worker".equals(process)) {
+            // The worker has a DataSource since background-jobs-with-db-scheduler task 1.5; its
+            // pool is lazy, so an address nothing listens on is enough to start it.
+            arguments.add("--spring.datasource.url=" + UNREACHABLE_JDBC_URL);
+        } else {
             arguments.add("--server.port=0");
         }
         arguments.addAll(List.of(extra));
         return arguments.toArray(String[]::new);
+    }
+
+    /**
+     * The worker arguments against a real database: the JDBC URL and the credentials of the role the
+     * worker connects as, for the tests that run statements through the real process.
+     */
+    static String[] workerAgainst(String jdbcUrl, String username, String password) {
+        return new String[] {"--spring.datasource.url=" + jdbcUrl,
+                "--spring.datasource.username=" + username,
+                "--spring.datasource.password=" + password};
     }
 
     /** The administrative arguments with no master key, to prove the process refuses to start. */
