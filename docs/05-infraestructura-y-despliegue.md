@@ -866,6 +866,12 @@ nunca en el repositorio, conforme a `CLAUDE.md`, regla 13.
 > ellas. La variable `CONFIA_JOBS_INSTITUTIONS` (lista de UUID de las instituciones que atiende) llega
 > con la tarea 1.6, junto con su ejecutor. El portal sigue sin conexión hasta la tarea 2.6.
 
+> **Nota fechada 2026-10-25 (cambio `background-jobs-with-db-scheduler`, tarea 1.6): instituciones del
+> trabajador.** El trabajador necesita además `CONFIA_JOBS_INSTITUTIONS` (`confia.jobs.institutions`):
+> lista de UUID de las instituciones sobre las que actúa, separados por comas. Es obligatoria, no puede
+> estar vacía ni repetir entradas, y si falla el proceso se detiene antes de arrancar con un mensaje que
+> nombra la propiedad y la posición de la entrada inválida sin repetir la lista. No es un secreto.
+
 > **Nota fechada 2026-10-05 (cambio `web-edge-foundations`, PR 7 `request-origin`): proxies de
 > confianza.** Los procesos `admin` y `portal` deciden la IP del cliente así: es la dirección de la
 > conexión, salvo que esa dirección pertenezca a la lista de proxies de confianza; solo entonces se
