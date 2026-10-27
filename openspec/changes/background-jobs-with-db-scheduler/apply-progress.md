@@ -357,8 +357,8 @@ costura de PR dentro de la tarea; se partió por archivos completos, con sus pru
 | Rama | Contenido | Líneas efectivas |
 |---|---|---|
 | `change/background-jobs-with-db-scheduler-03a1a-jobs-value-types` | `JobType`, `RetryPolicy`, `JobMeta`, `ActorKind`, `TracedJob`, `JobInstanceId`, sus pruebas, PIT sobre `shared.jobs.*` | 579 |
-| `...-03a1b-jobs-declarations` | `JobPayloadRules`, puerto, manejadores, calendarios, definiciones, `package-info` | por medir |
-| `...-03a1c-task-data-serializer` | `TracedJobSerializer`, `JobDataRejectedException`, nota de `docs/07` §3.3 | por medir |
+| `...-03a1b-jobs-declarations` | `JobPayloadRules`, puerto, manejadores, calendarios, definiciones, `package-info` | 639 |
+| `...-03a1c-task-data-serializer` | `TracedJobSerializer`, `JobDataRejectedException`, nota de `docs/07` §3.3 | 639 |
 
 ### 03a1a: evidencia
 
@@ -368,3 +368,11 @@ costura de PR dentro de la tarea; se partió por archivos completos, con sus pru
 - `./mvnw verify` (target borrado): `BUILD SUCCESS` en **1 119 s (18 min 39 s)**; Surefire 186 + 2 491, Failsafe 619, 0 fallos. **Supera el presupuesto de 15 min de BI57**; la máquina estuvo lenta (la misma suite medía 665 s en 02b3) y no se aisló la causa.
 - `./mvnw verify -Pmutation-gate` (target borrado): `BUILD SUCCESS` en **905 s (15 min)**; JaCoCo cumplido; PIT núcleo 192/194 (99 %), aplicación 733/777 (94 %), fuerza 96 %.
 - Una primera ejecución del `mutation-gate` coincidió con otra lanzada tras una interrupción y falló por borrado cruzado de `target`; no cuenta.
+
+### 03a1b: evidencia (639 líneas efectivas)
+
+- ROJO: `test-compile` sin producción (rama completa): `cannot find symbol` para `JobDefinition`, `OneTimeJob`, `RecurringJob`, `JobContext`, `RecurringRun`, `JobCalendar`; `JobPayloadRules` inexistente. Causa esperada.
+- VERDE: 40 pruebas (`JobPayloadRulesTest` 26, `JobDefinitionsTest` 14).
+- Demostración deliberada (mismo archivo, sobre la rama completa; restaurado con `cmp` sin salida): admitir `String.class` en `JobPayloadRules` pone en rojo `JobPayloadRulesTest` (3 fallos: «Expecting code to raise a throwable» en el componente `email`, y el recuento de violaciones) [BJ52].
+- `./mvnw verify`: `BUILD SUCCESS` en **772 s**, Surefire 186 + 2 531, Failsafe 619, dentro del presupuesto de 15 min.
+- `./mvnw verify -Pmutation-gate`: `BUILD SUCCESS` en **1 046 s**; JaCoCo cumplido; PIT núcleo 192/194 (99 %), aplicación 765/816 (94 %).
