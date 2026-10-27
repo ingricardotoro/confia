@@ -459,3 +459,12 @@ Demostraciones deliberadas (restauradas con `cmp` sin salida):
 | `JobRunner` pone `actorKind=staff` en el MDC | `JobContextIT` | `actorKind="staff" (expected: "system")` [BJ16] |
 
 - `./mvnw verify`: `BUILD SUCCESS` en **683 s**, Surefire 186 + 2 577, Failsafe 640. `./mvnw verify -Pmutation-gate`: `BUILD SUCCESS` en **1 360 s**; JaCoCo cumplido; PIT aplicación 854/901 (95 %).
+
+### 03a3c `revival-and-idempotence` (costura nombrada de `tasks.md`; 2.3 completa)
+
+Rama `change/background-jobs-with-db-scheduler-03a3c-revival-and-idempotence`, apilada sobre 03a3b. Commit `93055df`: `DeadExecutionRevivalIT` (2) y `HandlerIdempotenceIT` (2, con el manejador que duplica como control negativo).
+
+- Demostración deliberada (restaurada con `cmp` sin salida): `missed-heartbeats-limit: 100000` en `application.yml` pone en rojo `DeadExecutionRevivalIT.anExecutionHeldByADeadWorker...` (la fila sigue tomada tras 120 s) [BJ25].
+- `./mvnw verify`: `BUILD SUCCESS` en **756 s**, Surefire 186 + 2 577, Failsafe 644. `./mvnw verify -Pmutation-gate`: `BUILD SUCCESS` en **2 016 s** (la máquina estuvo en pausa durante parte de la ejecución); JaCoCo cumplido; PIT aplicación 854/901 (95 %).
+- **Desviación:** `HandlerIdempotenceIT` evalúa hoy solo un manejador de prueba, porque el trabajador de producción aún no registra ningún `OneTimeJob`; la tarea 3.2 añade el suyo al conjunto evaluado.
+- **Desviación:** `DeadExecutionRevivalIT` simula al trabajador muerto con un `UPDATE` de la fila (tomada, latido de hace 10 minutos) en vez de matar un proceso.
