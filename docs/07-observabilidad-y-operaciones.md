@@ -348,6 +348,17 @@ con un `payload` que contenga campos no permitidos falla la validación de quien
 integración que programa una tarea desde una petición HTTP y verifica que el log del trabajador
 contiene el mismo `correlationId` que el log de la petición.
 
+> **Nota fechada 2026-10-26 (cambio `background-jobs-with-db-scheduler`, tarea 2.1): ubicación y forma
+> final de `TracedJob`.** La envoltura vive en `com.confia.shared.jobs`, junto al puerto que la usa
+> (`JobScheduler`), y no en `shared/observability/context`; la ruta del bloque de código de arriba queda
+> como historia. `JobMeta` es un registro propio de ese paquete con `correlationId`, `requestId`,
+> `actorId` y `institutionId` como `UUID`, `actorKind` como `ActorKind` y `traceparent` como `String`
+> (solo `actorId` y `traceparent` pueden ser nulos). El documento en la tabla es
+> `{"payload":{…},"meta":{…}}` en UTF-8, con fechas ISO-8601, de **4 KiB como máximo**, y se lee con
+> `FAIL_ON_UNKNOWN_PROPERTIES`; nunca es un objeto de Java serializado. La carga es un `record` cuyos
+> componentes son solo `UUID`, `Instant`, `LocalDate`, `boolean`, `int`, `long` o un `enum` del mismo
+> módulo (`JobPayloadRules`).
+
 ### 3.4 Propagación en trabajos programados
 
 Una tarea recurrente (generación de cargos, integridad nocturna del libro mayor, purga de tokens de

@@ -329,7 +329,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
 
 ## Fase 2: programación transaccional y ejecución
 
-- [ ] 2.1 **PR 3a-1 `03a-jobs-port-and-serializer`: puerto `shared.jobs`, envoltura `TracedJob`, serializador estricto y reglas de carga (decisiones 3, 6, 7, 8 y 9).**
+- [x] 2.1 **PR 3a-1 `03a-jobs-port-and-serializer`: puerto `shared.jobs`, envoltura `TracedJob`, serializador estricto y reglas de carga (decisiones 3, 6, 7, 8 y 9).**
   - **ROJO, ataques primero.** Crear en `test/java/com/confia/shared/jobs/`: `TracedJobSerializationTest.java` (ida y vuelta de una carga y su `meta`;
     campo desconocido rechazado; bytes `0xACED…` de `ObjectOutputStream` rechazados **sin instanciar nada**; más de 4 KiB rechazado al
     serializar; el mensaje de `JobDataRejectedException` nombra la tarea y la clase de la excepción original y **no contiene la carga ni la causa
@@ -354,6 +354,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
   - **Cierre.** `./mvnw verify -Pmutation-gate`; PIT sobre `shared.jobs.*` en al menos 80. Commits: `feat(jobs): add the job scheduling port, the traced
     job envelope and rules for payload types` y `feat(jobs): add the strict task data serializer`. Tamaño: nominal 150, realista 550. — Escenarios
     BJ10, BJ11, BJ15, BJ22, BJ52 a BJ56.
+  - **Resultado (2026-10-26): hecha, en tres PR.** Ramas `03a1a` (579 líneas), `03a1b` (639) y `03a1c` (544); ver `apply-progress.md`, «Rebanada 3a, tarea 2.1». Costura 03a1a/03a1b no nombrada.
 
 - [ ] 2.2 **PR 3a-2 `03a-scheduler-client-and-atomicity`: cliente transaccional en administración, `scheduleIfNotExists` y criterio 5 (decisiones 5, 6 y 14).**
   - **ROJO, control negativo primero.** Crear `test/java/com/confia/shared/jobs/JobSchedulingAtomicityIT.java` (transacción confirmada: la fila existe con
