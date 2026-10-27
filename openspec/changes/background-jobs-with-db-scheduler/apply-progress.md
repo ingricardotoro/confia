@@ -347,3 +347,24 @@ La costura es limpia: 02b2 compila y pasa sola sobre 2b-1, sin `Scheduler` (el i
 Los 1 305 s y 1 117 s de 02b2 son atípicos frente a ejecuciones equivalentes (488 s y 799 s en 2b-1): la máquina estuvo lenta durante esas corridas; no se aisló la causa. El presupuesto de 15 min (G-4) aplica solo a `verify` sin perfil: 02b3 cumple (665 s); 02b2 lo excedió por esa lentitud y conviene repetirla antes de fusionar.
 
 Prueba de igualdad de árbol: `git diff backup/02b2-before-split change/background-jobs-with-db-scheduler-02b3-worker-scheduler-shell -- . ':!openspec'` no produce salida.
+
+## Rebanada 3a, tarea 2.1: partición en tres PR (2026-10-26)
+
+La tarea 2.1 midió **1 725 líneas efectivas** en una sola rama (puerto y reglas 1 192, serializador 533). Supera 800 y `tasks.md` nombra dos commits pero ninguna
+costura de PR dentro de la tarea; se partió por archivos completos, con sus pruebas, en tres ramas apiladas. **La costura entre 03a1a y 03a1b no está nombrada en
+`tasks.md`: se informa al propietario.** La rama completa se conserva como `backup/03a1-before-split`.
+
+| Rama | Contenido | Líneas efectivas |
+|---|---|---|
+| `change/background-jobs-with-db-scheduler-03a1a-jobs-value-types` | `JobType`, `RetryPolicy`, `JobMeta`, `ActorKind`, `TracedJob`, `JobInstanceId`, sus pruebas, PIT sobre `shared.jobs.*` | 579 |
+| `...-03a1b-jobs-declarations` | `JobPayloadRules`, puerto, manejadores, calendarios, definiciones, `package-info` | por medir |
+| `...-03a1c-task-data-serializer` | `TracedJobSerializer`, `JobDataRejectedException`, nota de `docs/07` §3.3 | por medir |
+
+### 03a1a: evidencia
+
+- ROJO: `test-compile` sin producción: `cannot find symbol` para `RetryPolicy`, `JobMeta`, `JobInstanceId`, `JobType`, `TracedJob` (causa esperada: paquete `com.confia.shared.jobs` inexistente).
+- VERDE: 47 pruebas (`RetryPolicyTest` 13, `JobInstanceIdProperties` 6 con vector fijo, `JobTypeTest` 20, `JobMetaTest` 4).
+- Demostración deliberada (en la rama completa, restaurada con `cmp` sin salida): cambiar `"v1|"` por `"v2|"` en `JobInstanceId.derive` pone en rojo `theDerivationMatchesTheFixedVector` y `theVersionTwoPrefixWouldProduceADifferentValue`.
+- `./mvnw verify` (target borrado): `BUILD SUCCESS` en **1 119 s (18 min 39 s)**; Surefire 186 + 2 491, Failsafe 619, 0 fallos. **Supera el presupuesto de 15 min de BI57**; la máquina estuvo lenta (la misma suite medía 665 s en 02b3) y no se aisló la causa.
+- `./mvnw verify -Pmutation-gate` (target borrado): `BUILD SUCCESS` en **905 s (15 min)**; JaCoCo cumplido; PIT núcleo 192/194 (99 %), aplicación 733/777 (94 %), fuerza 96 %.
+- Una primera ejecución del `mutation-gate` coincidió con otra lanzada tras una interrupción y falló por borrado cruzado de `target`; no cuenta.
