@@ -439,3 +439,23 @@ Rama `change/background-jobs-with-db-scheduler-03a3a-one-time-runner`, apilada s
 
 - `./mvnw verify`: `BUILD SUCCESS` en **660 s**, Surefire 186 + 2 577, Failsafe 632. `./mvnw verify -Pmutation-gate`: `BUILD SUCCESS` en **1 151 s**; JaCoCo cumplido; PIT aplicación 835/901 (93 %).
 - Nota de orden: por un descuido las pruebas de integración de 03a3b se escribieron junto con la producción y se corrieron en verde a la primera tras corregir sus propias aserciones; el rojo de esas pruebas se documenta en 03a3b con las demostraciones deliberadas.
+
+### 03a3b `one-time-execution-its` (668 líneas efectivas)
+
+Rama `change/background-jobs-with-db-scheduler-03a3b-one-time-execution-its`, apilada sobre 03a3a. Contenido: `WorkerHarness` (el trabajador real con `WorkerApplication`, sondeo y latido de 1 s, más una configuración de pruebas con los tipos de prueba),
+`Eventually` (espera acotada por condición, nunca un `sleep` fijo), `WorkerJobIT`, `OnlyWorkerExecutesIT` (2), `FailedExecutionIsParkedIT` (3), `JobFailureSanitizationIT` (1) y `JobContextIT` (2).
+
+| Paso | Resultado observado |
+|---|---|
+| ROJO (verde a la primera, sin rojo propio) | Las pruebas de integración se escribieron tras la producción de 03a3a (ver la nota de orden de 03a3a). Su capacidad de fallar se demuestra con las rupturas de abajo. Primeras ejecuciones: 3 fallos por aserciones de las propias pruebas, corregidos: la política de la biblioteca hace 4 ejecuciones con `maxRetries(3)` (3 reintentos más la primera), el recuento de filas visibles incluye el génesis de la cadena de auditoría, y Spring Boot reinicia Logback al arrancar y desprende un `Appender` añadido antes (se adjunta después de arrancar) |
+| VERDE | 8 pruebas de integración en verde |
+
+Demostraciones deliberadas (restauradas con `cmp` sin salida):
+
+| Ruptura | Prueba que falló | Aserción |
+|---|---|---|
+| `BoundedRetryFailureHandler` reemplazado por `maxRetries(...).thenRemove()` de la biblioteca en `WorkerJobsConfiguration` | `FailedExecutionIsParkedIT.aJobThatAlwaysFailsIsAttemptedThreeTimesAndParkedNeverDeleted` | «Expecting actual not to be null»: la fila ya no existe [BJ23, BJ59] |
+| `JobRunner` relanza la excepción original en vez de `JobExecutionFailedException` | `JobFailureSanitizationIT` | «Expecting no elements»: el valor distintivo aparece en un evento [BJ60] |
+| `JobRunner` pone `actorKind=staff` en el MDC | `JobContextIT` | `actorKind="staff" (expected: "system")` [BJ16] |
+
+- `./mvnw verify`: `BUILD SUCCESS` en **683 s**, Surefire 186 + 2 577, Failsafe 640. `./mvnw verify -Pmutation-gate`: `BUILD SUCCESS` en **1 360 s**; JaCoCo cumplido; PIT aplicación 854/901 (95 %).
