@@ -72,6 +72,11 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // 5): administrative only, exact like every entry.
                     "com.confia.shared.web.session",
                     "com.confia.shared.infrastructure",
+                    // The job scheduling client (background-jobs-with-db-scheduler decision 14):
+                    // the port adapter, the strict serializer and the configuration that declares
+                    // them. Administrative here; the worker has its own executor. Each is exact.
+                    "com.confia.shared.jobs.infrastructure",
+                    "com.confia.shared.jobs.infrastructure.wiring",
                     // The audit writer is the decorator that adds the request origin; it is the
                     // first bean whose class lives in this package (exact, like every entry).
                     "com.confia.shared.audit",

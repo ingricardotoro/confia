@@ -11,6 +11,8 @@ import com.confia.bootstrap.worker.WorkerApplication;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionMasterKey;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
+import com.confia.shared.jobs.infrastructure.DbSchedulerJobScheduler;
+import com.confia.shared.jobs.infrastructure.TracedJobSerializer;
 import com.confia.shared.logging.SensitiveLogGuard;
 import com.confia.shared.security.TransactionRunner;
 import com.confia.shared.security.TransactionalDataSource;
@@ -230,6 +232,29 @@ class WorkerProductionWiringTest {
         }
     }
 
+    @Test
+    void theAdministrativeJobSchedulerSitsOnTheOneProxyAndASecondOneIsReported() {
+        ConfigurableApplicationContext admin = start("admin");
+        try {
+            assertThat(admin.getBeansOfType(DbSchedulerJobScheduler.class)).as("non-vacuous").hasSize(1);
+            assertThat(proxyViolations(admin)).isEmpty();
+        } finally {
+            admin.close();
+        }
+
+        try (AnnotationConfigApplicationContext fixture = new AnnotationConfigApplicationContext()) {
+            DataSource raw = new DriverManagerDataSource("jdbc:postgresql://127.0.0.1:1/never");
+            fixture.registerBean("transactionalDataSource", TransactionalDataSource.class,
+                    () -> new TransactionalDataSource(raw));
+            fixture.registerBean("jobScheduler", DbSchedulerJobScheduler.class,
+                    () -> new DbSchedulerJobScheduler(new TransactionalDataSource(raw), new TracedJobSerializer()));
+            fixture.refresh();
+
+            assertThat(proxyViolations(fixture)).singleElement().asString()
+                    .contains("job scheduler").contains("not the one");
+        }
+    }
+
     /** One line per {@link DSLContext} that does not sit on the process's single proxy. */
     static List<String> proxyViolations(ConfigurableApplicationContext context) {
         List<TransactionalDataSource> holders =
@@ -244,6 +269,13 @@ class WorkerProductionWiringTest {
                     && provider.dataSource() == holders.get(0).proxy();
             if (!shared) {
                 violations.add("the DSLContext '" + name
+                        + "' does not use the transaction-aware proxy; its proxy is not the one of "
+                        + "the process");
+            }
+        });
+        context.getBeansOfType(DbSchedulerJobScheduler.class).forEach((name, scheduler) -> {
+            if (scheduler.dataSource() != holders.get(0).proxy()) {
+                violations.add("the job scheduler '" + name
                         + "' does not use the transaction-aware proxy; its proxy is not the one of "
                         + "the process");
             }
