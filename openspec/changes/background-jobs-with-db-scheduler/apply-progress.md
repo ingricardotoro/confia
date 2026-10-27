@@ -389,3 +389,39 @@ costura de PR dentro de la tarea; se partió por archivos completos, con sus pru
 1. Partición en tres PR (costura entre 03a1a y 03a1b no nombrada en `tasks.md`).
 2. El serializador del iniciador no conoce la tarea cuando la biblioteca lo llama: ese camino nombra la tarea `(unresolved)`; `serialize(taskName, job)`, `deserialize(taskName, bytes)` y `payloadOf` sí la nombran y los usan el adaptador y `JobRunner`.
 3. `package-info` de `shared.jobs` lleva `@NamedInterface` sin consumidor externo todavía (`identity` y `shared.audit` llegan en los cambios siguientes).
+
+## Tarea 2.2 (rebanada 03a2 `scheduler-client-and-atomicity`, 2026-10-26)
+
+Rama `change/background-jobs-with-db-scheduler-03a2-scheduler-client-and-atomicity`, apilada sobre 03a1c. Commit de código `d062346`. **793 líneas efectivas** (dentro de 800).
+
+### Evidencia del ciclo TDD
+
+| Paso | Resultado observado |
+|---|---|
+| ROJO (compilación) | `test-compile` con las pruebas y sin producción: 24 errores `cannot find symbol` para `DbSchedulerJobScheduler`. Causa esperada |
+| ROJO (lista de permitidos) | `ProcessBeanIsolationTest.registersOnlyItsAllowedBeans` [admin] con `JobSchedulingConfiguration` importada y sin las líneas de política: 5 beans «not in the allow-list» (`JobSchedulingConfiguration`, `tracedJobSerializer` y `jobScheduler`, en `shared.jobs.infrastructure` y `.wiring`). Causa esperada |
+| VERDE | `JobSchedulingGuardsTest` 6, `JobSchedulingAtomicityIT` 4, `JobSchedulingGuardsIT` 7, `JobSchedulingRetriedTransactionIT` 2; aislamiento, cableado y modulith en verde (76 pruebas unitarias dirigidas) |
+
+Sonda P-7: con el constructor del cliente de 16.12.0 (el `Builder` no ofrece la opción y fija `commitWhenAutocommitDisabled=false`), otra conexión no ve la fila antes de la confirmación y una reversión la elimina; no hay nada que fijar.
+
+### Demostraciones deliberadas (con `cmp`)
+
+| Ruptura en `DbSchedulerJobScheduler` | Prueba que falló | Aserción | `cmp` |
+|---|---|---|---|
+| Cliente sobre el `DataSource` crudo en vez del proxy | `JobSchedulingAtomicityIT` (2 fallos: `aRolledBack...` y `theTaskIsInvisible...`) | `expected: 0L` (la fila persiste tras el `ROLLBACK` / es visible antes de confirmar) [BJ02, BJ03, BJ05] | sin salida |
+| `schedule` en vez de `scheduleIfNotExists` | `JobSchedulingGuardsIT` (2 fallos) | el resultado esperado `ALREADY_SCHEDULED` no aparece | sin salida |
+
+**Desviación.** En 16.12.0 `schedule` delega en `scheduleIfNotExists` (sonda P-6), así que la ruptura 2 no aborta la transacción como supone `tasks.md`: falla por la aserción del resultado (`ALREADY_SCHEDULED`), que es la observable.
+
+### Verificación completa (target borrado antes de cada una)
+
+| Orden | Resultado |
+|---|---|
+| `./mvnw verify` | `BUILD SUCCESS` en **959 s (16 min)**; Surefire 186 + 2 563, Failsafe 632. **Supera 15 min de BI57** (máquina lenta; 03a1c midió 680 s) |
+| `./mvnw verify -Pmutation-gate` | `BUILD SUCCESS` en **1 245 s**; JaCoCo cumplido; PIT núcleo 192/194, aplicación 808/866 (93 %) |
+
+### Desviaciones de 2.2
+
+1. La comprobación de institución lee `app.institution_id` de la propia transacción (`current_setting`), como pide el diseño, y no del llamador.
+2. `JobSchedulingGuardsTest` (sin base de datos) cubre BJ43 y los rechazos previos; BJ44/BJ45/BJ14/BJ53 están en `JobSchedulingGuardsIT`, que necesita el motor.
+3. `WorkerProductionWiringTest` gana la comprobación de que el planificador de administración usa el mismo proxy (BJ46).

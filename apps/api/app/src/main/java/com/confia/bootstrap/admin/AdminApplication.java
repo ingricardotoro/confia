@@ -3,6 +3,7 @@ package com.confia.bootstrap.admin;
 import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
 import com.confia.identity.web.wiring.IdentityWebConfiguration;
 import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
+import com.confia.shared.jobs.infrastructure.wiring.JobSchedulingConfiguration;
 import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
 import com.confia.shared.platform.infrastructure.SharedPlatformConfiguration;
 import com.confia.shared.security.RateLimiterConfiguration;
@@ -73,6 +74,6 @@ import org.springframework.context.annotation.Import;
         ObservabilityMetricsConfiguration.class, RateLimiterConfiguration.class,
         ThrottlingConfiguration.class, RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,
         SessionTokenConfiguration.class, CsrfConfiguration.class,
-        SessionCookieConfiguration.class})
+        SessionCookieConfiguration.class, JobSchedulingConfiguration.class})
 public class AdminApplication {
 }

@@ -356,7 +356,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     BJ10, BJ11, BJ15, BJ22, BJ52 a BJ56.
   - **Resultado (2026-10-26): hecha, en tres PR.** Ramas `03a1a` (579 líneas), `03a1b` (639) y `03a1c` (544); ver `apply-progress.md`, «Rebanada 3a, tarea 2.1». Costura 03a1a/03a1b no nombrada.
 
-- [ ] 2.2 **PR 3a-2 `03a-scheduler-client-and-atomicity`: cliente transaccional en administración, `scheduleIfNotExists` y criterio 5 (decisiones 5, 6 y 14).**
+- [x] 2.2 **PR 3a-2 `03a-scheduler-client-and-atomicity`: cliente transaccional en administración, `scheduleIfNotExists` y criterio 5 (decisiones 5, 6 y 14).**
   - **ROJO, control negativo primero.** Crear `test/java/com/confia/shared/jobs/JobSchedulingAtomicityIT.java` (transacción confirmada: la fila existe con
     el JSON esperado [BJ01]; revertida: no existe ninguna fila [BJ02]; la fila no es visible desde otra conexión antes de la confirmación [BJ03];
     **sonda P-7**: con `commitWhenAutocommitDisabled` en su valor por omisión el cliente no confirma por su cuenta; **control negativo**: un cliente
@@ -376,6 +376,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     llamada aborta la transacción [BJ44]. Se revierten y se confirman con `cmp`.
   - **Cierre (criterio 5, parte de atomicidad).** `./mvnw verify -Pmutation-gate`. Commit: `feat(jobs): schedule tasks inside the business transaction
     through a transaction-aware client`. Tamaño: nominal 150, realista 600. — Escenarios BJ01 a BJ05, BJ14, BJ43 a BJ46.
+  - **Resultado (2026-10-26): hecha.** Rojos, dos demostraciones con `cmp`, `verify` (959 s) y `verify -Pmutation-gate` (1 245 s) en verde: `apply-progress.md`, «Tarea 2.2». Commit `d062346`. Tamaño: 793 líneas efectivas.
 
 - [ ] 2.3 **PR 3a-3 `03a-one-time-execution`: ejecución única, reintentos acotados, estacionamiento y saneo de fallos (decisiones 7, 9 y 10).**
   - **ROJO.** Crear `test/java/com/confia/shared/jobs/` (con un tipo de tarea de prueba registrado solo en el arnés del trabajador):
