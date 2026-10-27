@@ -378,7 +378,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     through a transaction-aware client`. Tamaño: nominal 150, realista 600. — Escenarios BJ01 a BJ05, BJ14, BJ43 a BJ46.
   - **Resultado (2026-10-26): hecha.** Rojos, dos demostraciones con `cmp`, `verify` (959 s) y `verify -Pmutation-gate` (1 245 s) en verde: `apply-progress.md`, «Tarea 2.2». Commit `d062346`. Tamaño: 793 líneas efectivas.
 
-- [ ] 2.3 **PR 3a-3 `03a-one-time-execution`: ejecución única, reintentos acotados, estacionamiento y saneo de fallos (decisiones 7, 9 y 10).**
+- [x] 2.3 **PR 3a-3 `03a-one-time-execution`: ejecución única, reintentos acotados, estacionamiento y saneo de fallos (decisiones 7, 9 y 10).**
   - **ROJO.** Crear `test/java/com/confia/shared/jobs/` (con un tipo de tarea de prueba registrado solo en el arnés del trabajador):
     `OnlyWorkerExecutesIT.java` (administración y trabajador sobre la misma base: la tarea programada desde administración la toma el trabajador, con
     `picked_by`; con solo administración nunca se toma durante N sondeos de 1 s) [BJ07, BJ06]; `FailedExecutionIsParkedIT.java` (un tipo que siempre
@@ -403,6 +403,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
   - **Cierre (criterio 5, parte de ejecución).** `./mvnw verify -Pmutation-gate`; se anota la duración de `verify`. Commit: `feat(jobs): run one-time tasks in
     the worker with bounded retries, parked failures and sanitized errors`. Tamaño: nominal 150, realista 800 a 900; costura nombrada: separar
     `DeadExecutionRevivalIT` y `HandlerIdempotenceIT` en un PR 3a-3b si se pasa. — Escenarios BJ06, BJ07, BJ16 a BJ21, BJ23, BJ25, BJ26, BJ57 a BJ60, BJ63.
+  - **Resultado (2026-10-26): hecha, en tres PR.** 03a3a (523 líneas), 03a3b (668) y 03a3c (costura nombrada); rupturas con `cmp`, `verify` y `verify -Pmutation-gate` en verde en cada una: `apply-progress.md`, «Tarea 2.3».
 
 - [ ] 2.4 **PR 3a-4 `03a-recurring-execution`: tareas recurrentes por institución configurada, calendario y réplicas (decisiones 7, 10 y 11).**
   - **ROJO.** Crear `test/java/com/confia/shared/jobs/RecurringJobCalendarTest.java` (**sonda P-5**: cada `JobCalendar` se traduce a
