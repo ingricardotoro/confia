@@ -424,7 +424,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     Tamaño: nominal 100, realista 500. — Escenarios BJ24, BJ27 a BJ30, BJ61, BJ62, BJ65 y BJ66.
   - **Resultado (2026-10-26): hecha.** Rojos, dos demostraciones con `cmp`, `verify` (925 s) y `verify -Pmutation-gate` (2 599 s) en verde: `apply-progress.md`, «Tarea 2.4». Commit `e3edf2a`. Tamaño: 770 líneas efectivas (2.5 en rama aparte).
 
-- [ ] 2.5 **PR 3a-5 `03a-scheduling-architecture-rules`: reglas de ArchUnit, lista aprobada de campos e inversiones de inventario (decisión 21).**
+- [x] 2.5 **PR 3a-5 `03a-scheduling-architecture-rules`: reglas de ArchUnit, lista aprobada de campos e inversiones de inventario (decisión 21).**
   - **ROJO, un fixture por regla.** Crear en `test/java/com/confia/architecture/`: `NoInMemorySchedulingTest.java` (ninguna clase de producción usa
     `@Scheduled`, `@Schedules`, `@EnableScheduling`, `@Async`, `@EnableAsync`, `org.springframework.scheduling..`, `java.util.Timer` ni
     `ScheduledExecutorService`; evalúa clases reales y no admite conjunto vacío; una clase por anotación y por tipo en
@@ -442,6 +442,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     `cmp`.
   - **Cierre.** `./mvnw verify -Pmutation-gate`. Commit: `test(architecture): forbid in-memory scheduling and confine the db-scheduler types to shared jobs`.
     Tamaño: nominal 50, realista 350. — Escenarios BI85, BI86, BI98, BI100, BJ12 y BJ13.
+  - **Resultado (2026-10-27): hecha.** Fixtures rechazados, dos demostraciones, `verify` (779 s) y `verify -Pmutation-gate` (1 895 s) en verde: `apply-progress.md`, «Tarea 2.5». Commit `732b87e`. Tamaño: 476 líneas efectivas. Conjunto vacío de tipos reales hasta 3.1.
 
 - [ ] 2.6 **PR 3b `03b-portal-scheduling-client`: el portal recibe su primer `DataSource` y el cliente de programación (decisión 14, D-N1, P6).**
   - **ROJO.** Crear `test/java/com/confia/bootstrap/PortalSchedulingIT.java` (portal real con `confia_portal_app`: programa una tarea por el bean
