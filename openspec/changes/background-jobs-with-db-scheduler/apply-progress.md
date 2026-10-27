@@ -425,3 +425,17 @@ Sonda P-7: con el constructor del cliente de 16.12.0 (el `Builder` no ofrece la 
 1. La comprobación de institución lee `app.institution_id` de la propia transacción (`current_setting`), como pide el diseño, y no del llamador.
 2. `JobSchedulingGuardsTest` (sin base de datos) cubre BJ43 y los rechazos previos; BJ44/BJ45/BJ14/BJ53 están en `JobSchedulingGuardsIT`, que necesita el motor.
 3. `WorkerProductionWiringTest` gana la comprobación de que el planificador de administración usa el mismo proxy (BJ46).
+
+## Tarea 2.3 (rebanadas 03a3a, 03a3b y 03a3c, 2026-10-26)
+
+La tarea midió 1 191 líneas efectivas sin `DeadExecutionRevivalIT` ni `HandlerIdempotenceIT`; la costura nombrada (esos dos a su rama) no alcanza. Se partió por archivos
+completos en tres ramas apiladas: **03a3a** = producción y pruebas unitarias; **03a3b** = arnés del trabajador y las pruebas de integración de ejecución, estacionamiento,
+saneo y contexto; **03a3c** = `DeadExecutionRevivalIT` y `HandlerIdempotenceIT`. La costura 03a3a/03a3b (unidad frente a integración sobre el proceso real) no está nombrada en `tasks.md`: se informa al propietario.
+
+### 03a3a `one-time-runner` (523 líneas efectivas)
+
+Rama `change/background-jobs-with-db-scheduler-03a3a-one-time-runner`, apilada sobre 03a2. Contenido: `JobRunner`, `JobExecutionFailedException`, `BoundedRetryFailureHandler`, `ParkedExecutions`, `WorkerJobsConfiguration`
+(serializador, `JobRunner`, una tarea por `OneTimeJob`, nombres repetidos prohibidos [BJ63]) y sus pruebas unitarias (`JobRunnerTest` 7, `BoundedRetryFailureHandlerTest` 4, `WorkerJobsTasksTest` 3).
+
+- `./mvnw verify`: `BUILD SUCCESS` en **660 s**, Surefire 186 + 2 577, Failsafe 632. `./mvnw verify -Pmutation-gate`: `BUILD SUCCESS` en **1 151 s**; JaCoCo cumplido; PIT aplicación 835/901 (93 %).
+- Nota de orden: por un descuido las pruebas de integración de 03a3b se escribieron junto con la producción y se corrieron en verde a la primera tras corregir sus propias aserciones; el rojo de esas pruebas se documenta en 03a3b con las demostraciones deliberadas.
