@@ -468,3 +468,19 @@ Rama `change/background-jobs-with-db-scheduler-03a3c-revival-and-idempotence`, a
 - `./mvnw verify`: `BUILD SUCCESS` en **756 s**, Surefire 186 + 2 577, Failsafe 644. `./mvnw verify -Pmutation-gate`: `BUILD SUCCESS` en **2 016 s** (la máquina estuvo en pausa durante parte de la ejecución); JaCoCo cumplido; PIT aplicación 854/901 (95 %).
 - **Desviación:** `HandlerIdempotenceIT` evalúa hoy solo un manejador de prueba, porque el trabajador de producción aún no registra ningún `OneTimeJob`; la tarea 3.2 añade el suyo al conjunto evaluado.
 - **Desviación:** `DeadExecutionRevivalIT` simula al trabajador muerto con un `UPDATE` de la fila (tomada, latido de hace 10 minutos) en vez de matar un proceso.
+
+## Tarea 2.4 (rebanada 03a4 `recurring-execution`, 2026-10-26)
+
+Rama `change/background-jobs-with-db-scheduler-03a4-recurring-execution`, apilada sobre 03a3c. Commit de código `e3edf2a`. **770 líneas efectivas** (2.5 va en su propia rama: juntas pasarían de 800).
+
+| Paso | Resultado observado |
+|---|---|
+| ROJO (compilación) | `test-compile` sin producción: `cannot find symbol` para `JobCalendars` (6 referencias). Causa esperada |
+| ROJO (integración) | Primeras ejecuciones: el arnés repetía la institución («entry 2 … repeats entry 1», corregido en el arnés); el serializador rechazaba `null` y `Void` que usa la tarea recurrente sin datos («only the task envelope is serialized», corregido en `TracedJobSerializer` con su prueba); la ocurrencia de arranque (el retardo fijo ejecuta una vez al iniciar) contaminaba las aserciones, por lo que las pruebas esperan primero esa ocurrencia (`settleStartupRun`) |
+| VERDE | `RecurringJobCalendarTest` 6, `RecurringJobRunnerTest` 4, `RecurringJobPerInstitutionIT` 3, `RecurringJobSingleRunIT` 2, `RecurringFailureStateIT` 1 |
+
+Demostraciones deliberadas (restauradas con `cmp` sin salida): `ZoneId.systemDefault()` en `JobCalendars` pone en rojo `RecurringJobCalendarTest` (4 fallos: «expected: 2026-10-25T09:30:00Z», «expected: America/Tegucigalpa») [BJ27]; relanzar el primer fallo en `RecurringJobRunner` pone en rojo `RecurringJobRunnerTest` (2) y `RecurringJobPerInstitutionIT.aFailureInTheFirstInstitution...` (la segunda institución no corrió) [BJ65].
+
+- `./mvnw verify`: `BUILD SUCCESS` en **925 s**, Surefire 186 + 2 587, Failsafe 650 (supera 15 min de BI57; máquina lenta). `./mvnw verify -Pmutation-gate`: `BUILD SUCCESS` en **2 599 s**; JaCoCo cumplido; PIT aplicación 871/919 (95 %).
+- **Desviación:** el retardo fijo (`Every`) ejecuta una vez al arrancar el trabajador (comportamiento de la biblioteca: la primera ocurrencia es «ahora»); los calendarios diario y semanal no. Las pruebas lo esperan y lo documentan.
+- **Desviación:** BJ29 («reiniciar no duplica el ciclo») se prueba con una tarea de cadencia de una hora: el reinicio no repite la ocurrencia ya cumplida ni duplica la fila.

@@ -405,7 +405,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     `DeadExecutionRevivalIT` y `HandlerIdempotenceIT` en un PR 3a-3b si se pasa. — Escenarios BJ06, BJ07, BJ16 a BJ21, BJ23, BJ25, BJ26, BJ57 a BJ60, BJ63.
   - **Resultado (2026-10-26): hecha, en tres PR.** 03a3a (523 líneas), 03a3b (668) y 03a3c (costura nombrada); rupturas con `cmp`, `verify` y `verify -Pmutation-gate` en verde en cada una: `apply-progress.md`, «Tarea 2.3».
 
-- [ ] 2.4 **PR 3a-4 `03a-recurring-execution`: tareas recurrentes por institución configurada, calendario y réplicas (decisiones 7, 10 y 11).**
+- [x] 2.4 **PR 3a-4 `03a-recurring-execution`: tareas recurrentes por institución configurada, calendario y réplicas (decisiones 7, 10 y 11).**
   - **ROJO.** Crear `test/java/com/confia/shared/jobs/RecurringJobCalendarTest.java` (**sonda P-5**: cada `JobCalendar` se traduce a
     `Schedules.cron(…, America/Tegucigalpa)` o `fixedDelay`; próxima ejecución exacta desde un instante fijo, con una JVM cuya zona por defecto es
     otra; ninguna alcanza `PARKED_AT`, riesgo R-13) [BJ27, BJ62], `RecurringJobPerInstitutionIT.java` (dos instituciones configuradas: el ciclo corre
@@ -422,6 +422,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     corrió [BJ65]. Se revierten y se confirman con `cmp`.
   - **Cierre.** `./mvnw verify -Pmutation-gate`. Commit: `feat(jobs): run recurring tasks per configured institution in the Tegucigalpa time zone`.
     Tamaño: nominal 100, realista 500. — Escenarios BJ24, BJ27 a BJ30, BJ61, BJ62, BJ65 y BJ66.
+  - **Resultado (2026-10-26): hecha.** Rojos, dos demostraciones con `cmp`, `verify` (925 s) y `verify -Pmutation-gate` (2 599 s) en verde: `apply-progress.md`, «Tarea 2.4». Commit `e3edf2a`. Tamaño: 770 líneas efectivas (2.5 en rama aparte).
 
 - [ ] 2.5 **PR 3a-5 `03a-scheduling-architecture-rules`: reglas de ArchUnit, lista aprobada de campos e inversiones de inventario (decisión 21).**
   - **ROJO, un fixture por regla.** Crear en `test/java/com/confia/architecture/`: `NoInMemorySchedulingTest.java` (ninguna clase de producción usa
