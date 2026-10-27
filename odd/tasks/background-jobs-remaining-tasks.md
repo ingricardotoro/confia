@@ -47,7 +47,7 @@ Hard order: 3.3 (V11) before 3.6 (V12).
 
 | Task | Route | Branch | Commit | Lines | Plain verify | Mutation verify | Review |
 |---|---|---|---|---|---|---|---|
-| T2.6 | delegated writer; parent ran both verifies after the writer's runs were killed (shell exit, then low memory) | `03b-portal-scheduling-client` | `c945478` | 390 | BUILD SUCCESS 19 min 17 s; Surefire 186 + 2 604, Failsafe 652 | BUILD SUCCESS 39 min 30 s; PIT kernel 192/194, app 871/919; JaCoCo met | not run (RDD not started for this candidate) |
+| T2.6 | delegated writer; parent ran both verifies after the writer's runs were killed (shell exit, then low memory) | `03b-portal-scheduling-client` | `c945478` | 390 | BUILD SUCCESS 19 min 17 s; Surefire 186 + 2 604, Failsafe 652 | BUILD SUCCESS 39 min 30 s; PIT kernel 192/194, app 871/919; JaCoCo met | granted; approved (reliability lens, lineage `review-832c56f64b018968`, acknowledged) |
 
 T2.6 evidence:
 
@@ -58,6 +58,9 @@ T2.6 evidence:
     It needed a runtime-generated `confia.crypto.column-master-key` (never recorded) to fail on assertions instead of at startup.
   - An extra `UPDATE` grant to `confia_portal_app`, simulated with `ALTER DEFAULT PRIVILEGES` in `create-test-roles.sql` because V10
     cannot be edited, fails `PortalSchedulingIT` and `RolePrivilegeMatrixIT` (8 failures, since the grant is broad).
+- Review advisory findings (non-blocking, follow-up only): committed probe rows left by `PortalSchedulingIT`; its negative
+  DML checks are scoped by task name only; the portal database health indicator is not proved; generic JDBC access in the
+  portal context is not asserted absent.
 - No new migration: V10 already grants the portal `SELECT` and `INSERT` on `scheduled_tasks`.
 
 ## Next step
