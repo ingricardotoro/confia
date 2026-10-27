@@ -2,16 +2,20 @@ package com.confia.shared.jobs.infrastructure.wiring;
 
 import com.confia.shared.jobs.JobDefinition;
 import com.confia.shared.jobs.OneTimeJob;
+import com.confia.shared.jobs.RecurringJob;
 import com.confia.shared.jobs.TracedJob;
 import com.confia.shared.jobs.infrastructure.BoundedRetryFailureHandler;
 import com.confia.shared.jobs.infrastructure.ConfiguredInstitutions;
+import com.confia.shared.jobs.infrastructure.JobCalendars;
 import com.confia.shared.jobs.infrastructure.JobRunner;
+import com.confia.shared.jobs.infrastructure.RecurringJobRunner;
 import com.confia.shared.jobs.infrastructure.TracedJobSerializer;
 import com.confia.shared.jobs.infrastructure.WorkerSchedulerStarter;
 import com.github.kagkarlsson.scheduler.Scheduler;
 import com.github.kagkarlsson.scheduler.boot.config.DbSchedulerProperties;
 import com.github.kagkarlsson.scheduler.jdbc.PostgreSqlJdbcCustomization;
 import com.github.kagkarlsson.scheduler.task.Task;
+import com.github.kagkarlsson.scheduler.task.helper.RecurringTask;
 import com.github.kagkarlsson.scheduler.task.helper.Tasks;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -63,14 +67,33 @@ public class WorkerJobsConfiguration {
     }
 
     @Bean
+    RecurringJobRunner recurringJobRunner(ConfiguredInstitutions institutions, Clock clock) {
+        return new RecurringJobRunner(institutions, clock);
+    }
+
+    @Bean
     JobRunner jobRunner(TracedJobSerializer serializer) {
         return new JobRunner(serializer);
     }
 
     @Bean
     Scheduler scheduler(DbSchedulerProperties properties, DataSource dataSource, TracedJobSerializer serializer,
-            JobRunner runner, Clock clock, ObjectProvider<JobDefinition> definitions) {
-        return Scheduler.create(dataSource, tasksOf(definitions.orderedStream().toList(), runner, clock))
+            JobRunner runner, RecurringJobRunner recurringRunner, Clock clock,
+            ObjectProvider<JobDefinition> definitions) {
+        List<Task<?>> tasks = tasksOf(definitions.orderedStream().toList(), runner, recurringRunner, clock);
+        List<RecurringTask<Void>> recurring = new ArrayList<>();
+        List<Task<?>> oneTime = new ArrayList<>();
+        for (Task<?> task : tasks) {
+            if (task instanceof RecurringTask<?>) {
+                @SuppressWarnings("unchecked")
+                RecurringTask<Void> cast = (RecurringTask<Void>) task;
+                recurring.add(cast);
+            } else {
+                oneTime.add(task);
+            }
+        }
+        return Scheduler.create(dataSource, oneTime)
+                .startTasks(recurring)
                 .serializer(serializer)
                 .jdbcCustomization(
                         new PostgreSqlJdbcCustomization(false, properties.isAlwaysPersistTimestampInUtc()))
@@ -83,7 +106,8 @@ public class WorkerJobsConfiguration {
     }
 
     /** One task per definition; a repeated name stops the start (scenario BJ63). */
-    static List<Task<?>> tasksOf(List<JobDefinition> definitions, JobRunner runner, Clock clock) {
+    static List<Task<?>> tasksOf(List<JobDefinition> definitions, JobRunner runner,
+            RecurringJobRunner recurringRunner, Clock clock) {
         Set<String> names = new HashSet<>();
         List<Task<?>> tasks = new ArrayList<>();
         for (JobDefinition definition : definitions) {
@@ -92,6 +116,9 @@ public class WorkerJobsConfiguration {
             }
             if (definition instanceof OneTimeJob<?> oneTime) {
                 tasks.add(oneTimeTask(oneTime, runner, clock));
+            } else if (definition instanceof RecurringJob recurring) {
+                tasks.add(Tasks.recurring(recurring.name(), JobCalendars.scheduleOf(recurring.calendar()))
+                        .execute((instance, context) -> recurringRunner.run(recurring)));
             }
         }
         return tasks;
