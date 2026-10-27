@@ -246,6 +246,25 @@ class IdentityScopeExclusionInventoryTest {
                 .as("and it offers no operation a rotation job could call")
                 .noneMatch(name -> name.contains("reencrypt") || name.contains("rotate")
                         || name.contains("retire"));
+
+        assertThat(rotationJobsAmong(com.confia.shared.jobs.RegisteredJobs.ofTheWorker().stream()
+                .map(com.confia.shared.jobs.JobDefinition::name).toList()))
+                .as("data-encryption-key-batch-rotation: no registered job definition re-encrypts or rotates"
+                        + " a data encryption key")
+                .isEmpty();
+    }
+
+    /** The names that look like a data-encryption-key rotation job, among the registered definitions. */
+    static java.util.List<String> rotationJobsAmong(java.util.List<String> jobNames) {
+        return jobNames.stream().filter(name -> name.contains("rotat") || name.contains("reencrypt")
+                || name.contains("re-encrypt") || name.contains("dek")).toList();
+    }
+
+    @Test
+    void aRegisteredJobThatRotatesADataEncryptionKeyIsDetected() {
+        assertThat(rotationJobsAmong(java.util.List.of("identity.purge-refresh-tokens",
+                "identity.dek-rotation", "shared.reencrypt-columns")))
+                .containsExactly("identity.dek-rotation", "shared.reencrypt-columns");
     }
 
     /**
