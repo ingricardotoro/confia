@@ -376,3 +376,16 @@ costura de PR dentro de la tarea; se partió por archivos completos, con sus pru
 - Demostración deliberada (mismo archivo, sobre la rama completa; restaurado con `cmp` sin salida): admitir `String.class` en `JobPayloadRules` pone en rojo `JobPayloadRulesTest` (3 fallos: «Expecting code to raise a throwable» en el componente `email`, y el recuento de violaciones) [BJ52].
 - `./mvnw verify`: `BUILD SUCCESS` en **772 s**, Surefire 186 + 2 531, Failsafe 619, dentro del presupuesto de 15 min.
 - `./mvnw verify -Pmutation-gate`: `BUILD SUCCESS` en **1 046 s**; JaCoCo cumplido; PIT núcleo 192/194 (99 %), aplicación 765/816 (94 %).
+
+### 03a1c: evidencia (544 líneas efectivas)
+
+- ROJO: `test-compile` sin producción (rama completa): `cannot find symbol` para `TracedJobSerializer` y `JobDataRejectedException`. Causa esperada.
+- VERDE: 24 pruebas de `TracedJobSerializationTest`, a la primera. Sondas: P-4 pasa (`Jackson3Serializer` acepta un `JsonMapper`); en Jackson 3 `WRITE_DATES_AS_TIMESTAMPS` está en `tools.jackson.databind.cfg.DateTimeFeature`.
+- Demostración deliberada (restaurada con `cmp` sin salida): quitar `FAIL_ON_UNKNOWN_PROPERTIES` pone en rojo 3 pruebas (`anUnknownFieldInTheEnvelopeIsRejected`, `...InThePayload...`, `...InMeta...`): «Expecting code to raise a throwable» [BJ54]. La demostración 1 de la tarea (`String` en `JobPayloadRules`) y la 3 (`"v2|"`) están en 03a1b y 03a1a.
+- `./mvnw verify`: `BUILD SUCCESS` en **680 s**, Surefire 186 + 2 556, Failsafe 619. `./mvnw verify -Pmutation-gate`: `BUILD SUCCESS` en **1 017 s**; JaCoCo cumplido; PIT aplicación 796/850 (94 %).
+
+### Desviaciones de la tarea 2.1
+
+1. Partición en tres PR (costura entre 03a1a y 03a1b no nombrada en `tasks.md`).
+2. El serializador del iniciador no conoce la tarea cuando la biblioteca lo llama: ese camino nombra la tarea `(unresolved)`; `serialize(taskName, job)`, `deserialize(taskName, bytes)` y `payloadOf` sí la nombran y los usan el adaptador y `JobRunner`.
+3. `package-info` de `shared.jobs` lleva `@NamedInterface` sin consumidor externo todavía (`identity` y `shared.audit` llegan en los cambios siguientes).
