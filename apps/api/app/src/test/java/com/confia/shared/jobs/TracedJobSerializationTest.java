@@ -160,7 +160,8 @@ class TracedJobSerializationTest {
         assertThatThrownBy(() -> serializer.serialize(new HashMap<String, String>()))
                 .isInstanceOf(JobDataRejectedException.class);
         assertThatThrownBy(() -> serializer.serialize(new Trap())).isInstanceOf(JobDataRejectedException.class);
-        assertThatThrownBy(() -> serializer.serialize(null)).isInstanceOf(JobDataRejectedException.class);
+        assertThat(serializer.serialize((Object) null)).as("a task without data stores no bytes").isNull();
+        assertThat(serializer.deserialize(Void.class, null)).as("and reads back as no data").isNull();
     }
 
     @Test

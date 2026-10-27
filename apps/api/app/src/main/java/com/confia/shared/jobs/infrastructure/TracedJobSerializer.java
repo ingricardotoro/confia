@@ -113,9 +113,16 @@ public final class TracedJobSerializer implements Serializer {
         }
     }
 
-    /** The library's entry point: it does not know the task, so the error cannot name it. */
+    /**
+     * The library's entry point: it does not know the task, so the error cannot name it. A recurring
+     * task carries no data: {@code null} is stored as no bytes and a {@code Void} type reads back as
+     * {@code null}; anything else other than the envelope is refused.
+     */
     @Override
     public byte[] serialize(Object data) {
+        if (data == null) {
+            return null;
+        }
         if (!(data instanceof TracedJob<?> job)) {
             throw JobDataRejectedException.because(UNRESOLVED_TASK, JobDataRejectedException.UNSUPPORTED_TYPE);
         }
@@ -125,6 +132,9 @@ public final class TracedJobSerializer implements Serializer {
     /** The library's entry point: it does not know the task, so the error cannot name it. */
     @Override
     public <T> T deserialize(Class<T> clazz, byte[] serializedData) {
+        if (clazz == Void.class) {
+            return null;
+        }
         if (clazz != TracedJob.class) {
             throw JobDataRejectedException.because(UNRESOLVED_TASK, JobDataRejectedException.UNSUPPORTED_TYPE);
         }
