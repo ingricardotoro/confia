@@ -1,13 +1,25 @@
 package com.confia.shared.jobs.infrastructure.wiring;
 
+import com.confia.shared.jobs.JobDefinition;
+import com.confia.shared.jobs.OneTimeJob;
+import com.confia.shared.jobs.TracedJob;
+import com.confia.shared.jobs.infrastructure.BoundedRetryFailureHandler;
 import com.confia.shared.jobs.infrastructure.ConfiguredInstitutions;
+import com.confia.shared.jobs.infrastructure.JobRunner;
+import com.confia.shared.jobs.infrastructure.TracedJobSerializer;
 import com.confia.shared.jobs.infrastructure.WorkerSchedulerStarter;
 import com.github.kagkarlsson.scheduler.Scheduler;
 import com.github.kagkarlsson.scheduler.boot.config.DbSchedulerProperties;
 import com.github.kagkarlsson.scheduler.jdbc.PostgreSqlJdbcCustomization;
 import com.github.kagkarlsson.scheduler.task.Task;
+import com.github.kagkarlsson.scheduler.task.helper.Tasks;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.sql.DataSource;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -46,8 +58,20 @@ public class WorkerJobsConfiguration {
     }
 
     @Bean
-    Scheduler scheduler(DbSchedulerProperties properties, DataSource dataSource) {
-        return Scheduler.create(dataSource, List.<Task<?>>of())
+    TracedJobSerializer tracedJobSerializer() {
+        return new TracedJobSerializer();
+    }
+
+    @Bean
+    JobRunner jobRunner(TracedJobSerializer serializer) {
+        return new JobRunner(serializer);
+    }
+
+    @Bean
+    Scheduler scheduler(DbSchedulerProperties properties, DataSource dataSource, TracedJobSerializer serializer,
+            JobRunner runner, Clock clock, ObjectProvider<JobDefinition> definitions) {
+        return Scheduler.create(dataSource, tasksOf(definitions.orderedStream().toList(), runner, clock))
+                .serializer(serializer)
                 .jdbcCustomization(
                         new PostgreSqlJdbcCustomization(false, properties.isAlwaysPersistTimestampInUtc()))
                 .threads(properties.getThreads())
@@ -56,6 +80,28 @@ public class WorkerJobsConfiguration {
                 .missedHeartbeatsLimit(properties.getMissedHeartbeatsLimit())
                 .shutdownMaxWait(properties.getShutdownMaxWait())
                 .build();
+    }
+
+    /** One task per definition; a repeated name stops the start (scenario BJ63). */
+    static List<Task<?>> tasksOf(List<JobDefinition> definitions, JobRunner runner, Clock clock) {
+        Set<String> names = new HashSet<>();
+        List<Task<?>> tasks = new ArrayList<>();
+        for (JobDefinition definition : definitions) {
+            if (!names.add(definition.name())) {
+                throw new IllegalStateException("two job definitions share the name '" + definition.name() + "'");
+            }
+            if (definition instanceof OneTimeJob<?> oneTime) {
+                tasks.add(oneTimeTask(oneTime, runner, clock));
+            }
+        }
+        return tasks;
+    }
+
+    private static <T extends Record> Task<TracedJob> oneTimeTask(OneTimeJob<T> job, JobRunner runner, Clock clock) {
+        return Tasks.oneTime(job.name(), TracedJob.class)
+                .onFailure(new BoundedRetryFailureHandler<>(job.name(), job.type().retry(), clock))
+                .execute((instance, context) -> runner.run(job, instance.getId(), instance.getData(),
+                        context.getExecution().consecutiveFailures + 1));
     }
 
     @Bean
