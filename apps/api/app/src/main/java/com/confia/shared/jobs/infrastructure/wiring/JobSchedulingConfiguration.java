@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * The job scheduling client of the processes that schedule but never execute: the administrative
- * process and, from the next slice, the portal (background-jobs-with-db-scheduler design.md decision
+ * process and the portal (background-jobs-with-db-scheduler design.md decision
  * 14; ADR-0016 rule 1). It declares the {@link JobScheduler} port and the strict serializer of the
  * task data, and nothing else. The library's {@code SchedulerClient} is built inside {@link
  * DbSchedulerJobScheduler} and is not a bean, so no bean of {@code com.github.kagkarlsson} exists in

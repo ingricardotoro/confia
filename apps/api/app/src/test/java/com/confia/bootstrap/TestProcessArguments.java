@@ -88,6 +88,9 @@ final class TestProcessArguments {
             arguments.add("--confia.jobs.executor.autostart=false");
         } else {
             arguments.add("--server.port=0");
+            // The portal has a DataSource since background-jobs-with-db-scheduler task 2.6 (D-N1),
+            // lazy like the others: an address nothing listens on is enough to start it.
+            arguments.add("--spring.datasource.url=" + UNREACHABLE_JDBC_URL);
         }
         arguments.addAll(List.of(extra));
         return arguments.toArray(String[]::new);
@@ -103,6 +106,17 @@ final class TestProcessArguments {
                 "--spring.datasource.password=" + password,
                 "--confia.jobs.institutions=" + UUID.randomUUID(),
                 "--confia.jobs.executor.autostart=false"};
+    }
+
+    /**
+     * The portal arguments against a real database: the JDBC URL and the credentials of the role the
+     * portal connects as ({@code confia_portal_app}), for the tests that schedule through the real
+     * process.
+     */
+    static String[] portalAgainst(String jdbcUrl, String username, String password) {
+        return new String[] {"--server.port=0", "--spring.datasource.url=" + jdbcUrl,
+                "--spring.datasource.username=" + username,
+                "--spring.datasource.password=" + password};
     }
 
     /** The administrative arguments with no master key, to prove the process refuses to start. */

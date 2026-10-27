@@ -153,25 +153,10 @@ class WorkerProductionWiringTest {
 
     // --- BI115: no entry point excludes the DataSource ---
 
-    /**
-     * The portal still excludes {@code DataSourceAutoConfiguration} until it receives its own
-     * {@code DataSource} (decision D-N1, task 2.6); that task removes this exemption and the
-     * assertion that it still holds.
-     */
-    private static final Set<Class<?>> STILL_EXCLUDING = Set.of(PortalApplication.class);
-
     @Test
-    void theWorkerAndTheAdministrationEntryPointsDoNotExcludeTheDataSource() {
+    void noEntryPointExcludesTheDataSource() {
         assertThat(entryPointsExcludingTheDataSource(List.of(AdminApplication.class,
-                WorkerApplication.class))).isEmpty();
-    }
-
-    @Test
-    void thePortalIsTheOnlyEntryPointStillExcludingItAndTheExemptionIsExplicit() {
-        assertThat(entryPointsExcludingTheDataSource(List.of(PortalApplication.class)))
-                .as("remove PortalApplication from STILL_EXCLUDING when task 2.6 gives it a DataSource")
-                .containsExactly(PortalApplication.class.getName());
-        assertThat(STILL_EXCLUDING).containsExactly(PortalApplication.class);
+                WorkerApplication.class, PortalApplication.class))).isEmpty();
     }
 
     @Test

@@ -112,8 +112,8 @@ spring:
   datasource:
     hikari:
       # -1 never fails the context at startup when the database is down: the pool connects on first
-      # use. The administrative process and the worker have a DataSource; it is inert in the portal,
-      # which still excludes DataSourceAutoConfiguration until task 2.6 of background-jobs-with-db-scheduler.
+      # use. All three processes have a DataSource (the portal since task 2.6 of
+      # background-jobs-with-db-scheduler, decision 14), so none of them fails to start with the database down.
       initialization-fail-timeout: -1
   web:
     resources:
