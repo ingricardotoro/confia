@@ -358,7 +358,7 @@ costura de PR dentro de la tarea; se partió por archivos completos, con sus pru
 |---|---|---|
 | `change/background-jobs-with-db-scheduler-03a1a-jobs-value-types` | `JobType`, `RetryPolicy`, `JobMeta`, `ActorKind`, `TracedJob`, `JobInstanceId`, sus pruebas, PIT sobre `shared.jobs.*` | 579 |
 | `...-03a1b-jobs-declarations` | `JobPayloadRules`, puerto, manejadores, calendarios, definiciones, `package-info` | 639 |
-| `...-03a1c-task-data-serializer` | `TracedJobSerializer`, `JobDataRejectedException`, nota de `docs/07` §3.3 | 639 |
+| `...-03a1c-task-data-serializer` | `TracedJobSerializer`, `JobDataRejectedException`, nota de `docs/07` §3.3 | 544 |
 
 ### 03a1a: evidencia
 
