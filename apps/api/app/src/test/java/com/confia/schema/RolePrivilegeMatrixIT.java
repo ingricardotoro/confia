@@ -866,6 +866,135 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
         }
         return violations;
     }
+    /**
+     * The two purge functions of {@code V11} (background-jobs-with-db-scheduler design.md decision
+     * 16; specs/build-integrity/spec.md, scenarios BI68, BI69, BI72, BI83 and BI84), by the argument
+     * list that identifies each: the only way to remove the rows they purge, because no role holds
+     * {@code DELETE} on the tables.
+     */
+    private static final List<String> PURGE_FUNCTIONS =
+            List.of("identity_purge_password_reset_tokens(timestamptz, integer)",
+                    "identity_purge_refresh_token_families(timestamptz, integer)");
+
+    private static final List<String> PURGED_TABLES = List.of("identity_password_reset_token",
+            "identity_refresh_token_family", "identity_refresh_token");
+
+    @Test
+    void executeOnThePurgeFunctionsIsHeldByTheAdministrativeRoleAndTheOwnerOnly()
+            throws SQLException {
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres")) {
+            assertThat(purgeExecuteViolations(superuser))
+                    .as("EXECUTE grants that differ from the matrix").isEmpty();
+        }
+    }
+
+    @Test
+    void anExecuteGrantOfMoreOnAPurgeFunctionBreaksTheMatrix() throws SQLException {
+        try (StepwiseDatabase database = StepwiseDatabase.migratedTo("11")) {
+            try (Connection superuser = database.connectionAs("postgres")) {
+                assertThat(purgeExecuteViolations(superuser))
+                        .as("the fixture starts from the exact matrix").isEmpty();
+            }
+            try (Connection owner = database.connectionAs("confia_owner");
+                    Statement statement = owner.createStatement()) {
+                statement.execute("GRANT EXECUTE ON FUNCTION "
+                        + "identity_purge_refresh_token_families(timestamptz, integer) "
+                        + "TO confia_readonly");
+            }
+            try (Connection superuser = database.connectionAs("postgres")) {
+                assertThat(purgeExecuteViolations(superuser))
+                        .singleElement().asString().contains("confia_readonly");
+            }
+        }
+    }
+
+    @Test
+    void publicAndAnyRoleOutsideTheFiveCannotExecuteThePurgeFunctions() throws SQLException {
+        for (String function : PURGE_FUNCTIONS) {
+            assertThat(hasFunctionPrivilege("public", function))
+                    .as("PUBLIC must not execute %s", function).isFalse();
+            assertThat(dsl.fetchOne("""
+                    select count(*) as entries from pg_proc p, aclexplode(p.proacl) a
+                     where p.oid = ?::regprocedure and a.grantee = 0
+                    """, function).get("entries", Long.class))
+                    .as("the ACL of %s has no entry for PUBLIC", function).isZero();
+        }
+
+        String scratchRole = "probe_role_outside_the_five_purge";
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres");
+                Statement statement = superuser.createStatement()) {
+            statement.execute("drop role if exists " + scratchRole);
+            statement.execute("create role " + scratchRole + " nosuperuser nobypassrls");
+            try {
+                for (String function : PURGE_FUNCTIONS) {
+                    assertThat(hasFunctionPrivilege(scratchRole, function))
+                            .as("a role that is none of the five must not execute %s", function)
+                            .isFalse();
+                }
+            } finally {
+                statement.execute("drop role if exists " + scratchRole);
+            }
+        }
+    }
+
+    @Test
+    void thePurgeFunctionsAreOwnedByTheOwnerRunWithItsRightsAndPinTheirSearchPath() {
+        for (String function : PURGE_FUNCTIONS) {
+            var row = dsl.fetchOne("""
+                    select pg_get_userbyid(p.proowner) as owner, p.prosecdef as definer,
+                           p.proconfig as settings
+                      from pg_proc p where p.oid = ?::regprocedure
+                    """, function);
+            assertThat(row.get("owner", String.class)).as("owner of %s", function)
+                    .isEqualTo("confia_owner");
+            assertThat(row.get("definer", Boolean.class)).as("%s is SECURITY DEFINER", function)
+                    .isTrue();
+            assertThat(row.get("settings", String[].class)).as("settings of %s", function)
+                    .containsExactly("search_path=pg_catalog, public");
+        }
+    }
+
+    @Test
+    void noRoleOtherThanTheOwnerCanDeleteFromTheTablesThePurgeFunctionsServe() {
+        for (String table : PURGED_TABLES) {
+            for (String role : List.of("confia_admin_app", "confia_portal_app",
+                    "confia_readonly", "confia_backup", "public")) {
+                assertThat(hasTablePrivilege(role, table, "DELETE"))
+                        .as("%s must not delete from %s", role, table).isFalse();
+            }
+        }
+    }
+
+    /** One line per role whose EXECUTE on a purge function differs from the matrix. */
+    private static List<String> purgeExecuteViolations(Connection connection)
+            throws SQLException {
+        List<String> violations = new ArrayList<>();
+        for (String function : PURGE_FUNCTIONS) {
+            for (String role : FIVE_ROLES) {
+                boolean expected = role.equals("confia_admin_app") || role.equals("confia_owner");
+                try (var statement = connection.prepareStatement(
+                        "select has_function_privilege(?, ?, 'EXECUTE')")) {
+                    statement.setString(1, role);
+                    statement.setString(2, function);
+                    try (var result = statement.executeQuery()) {
+                        result.next();
+                        if (result.getBoolean(1) != expected) {
+                            violations.add("%s %s EXECUTE on %s but the matrix says %s"
+                                    .formatted(role, result.getBoolean(1) ? "holds" : "lacks",
+                                            function, expected ? "held" : "not held"));
+                        }
+                    }
+                }
+            }
+        }
+        return violations;
+    }
+
+    private boolean hasFunctionPrivilege(String role, String function) {
+        return dsl.fetchOne("select has_function_privilege(?, ?, 'EXECUTE') as has_priv", role,
+                function).get("has_priv", Boolean.class);
+    }
+
 
     /** Real, non-dropped columns of a public table, read from {@code pg_attribute}. */
     private List<String> columnsOf(String table) {
