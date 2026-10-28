@@ -122,10 +122,19 @@ class RefreshTokenFamilyPurgeFunctionIT extends PostgresIntegrationTest {
         try (PurgeSession session = PurgeSession.open(ADMIN).asSystemOf(institution)) {
             OffsetDateTime now = session.now();
             UUID account = session.seedAccount(institution);
-            UUID big = session.seedFamily(institution, account, now.minusDays(40),
+            UUID first = session.seedFamily(institution, account, now.minusDays(40),
                     now.plusDays(300), now.minusDays(40));
+            UUID other = session.seedFamily(institution, account, now.minusDays(41),
+                    now.plusDays(300), now.minusDays(41));
+            // The function takes families in database id order, and the ids are random, so the
+            // long chain goes to whichever family PostgreSQL sorts first: the test stays deterministic.
+            boolean firstSortsFirst = session.count(
+                    "select count(*) from identity_refresh_token_family where id < ? and id = ?",
+                    other, first) == 1;
+            UUID big = firstSortsFirst ? first : other;
+            UUID second = firstSortsFirst ? other : first;
             seedChain(session, institution, big, 5);
-            UUID second = revokedFamily(session, institution, account, now.minusDays(41));
+            session.seedOpenToken(institution, second);
 
             long[] purged = purge(session, now.plusDays(1), 1);
 
