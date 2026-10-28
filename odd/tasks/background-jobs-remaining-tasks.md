@@ -28,7 +28,7 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 ## Checklist
 
 - [x] T2.6 Slice 3b `03b-portal-scheduling-client`: portal DataSource and `JobScheduler` (D-N1, P6).
-- [ ] T3.1 Slice 4a `04-reset-issuance-scheduler`.
+- [x] T3.1 Slice 4a `04-reset-issuance-scheduler`.
 - [ ] T3.2 Slice 4b `04-reset-issuance-handler`.
 - [ ] T3.3 Slice 5a-1 `05a-v11-purge-functions`.
 - [ ] T3.4 Slice 5a-2 `05a-identity-purge-jobs`.
@@ -48,6 +48,7 @@ Hard order: 3.3 (V11) before 3.6 (V12).
 | Task | Route | Branch | Commit | Lines | Plain verify | Mutation verify | Review |
 |---|---|---|---|---|---|---|---|
 | T2.6 | delegated writer; parent ran both verifies after the writer's runs were killed (shell exit, then low memory) | `03b-portal-scheduling-client` | `c945478` | 390 | BUILD SUCCESS 19 min 17 s; Surefire 186 + 2 604, Failsafe 652 | BUILD SUCCESS 39 min 30 s; PIT kernel 192/194, app 871/919; JaCoCo met | granted; approved (reliability lens, lineage `review-832c56f64b018968`, acknowledged) |
+| T3.1 | delegated writer; parent ran the mutation verify after the writer's run was reaped for low memory | `04a-reset-issuance-scheduler` | `8714325` | 491 | BUILD SUCCESS 20 min 4 s; Surefire 186 + 2 610, Failsafe 656 | BUILD SUCCESS 42 min 43 s; PIT kernel 192/194, app 871/919; JaCoCo met | granted; approved (reliability lens, lineage `review-0c6ba0db28ada475`, acknowledged) |
 
 T2.6 evidence:
 
@@ -63,6 +64,19 @@ T2.6 evidence:
   portal context is not asserted absent.
 - No new migration: V10 already grants the portal `SELECT` and `INSERT` on `scheduled_tasks`.
 
+T3.1 evidence:
+
+- RED: `test-compile` failed on the old port signature `schedule(InstitutionId, StaffAccountId)` and on the missing job type,
+  job payload and adapter.
+- Deliberate breaks, reverted and confirmed with `cmp`:
+  - Scheduling outside the use case transaction, through a raw `SchedulerClient` over the plain `DataSource` in the test wiring,
+    fails `RequestPasswordResetSchedulingIT` (the task survives a failing audit writer). A production `afterCommit` cannot
+    show this, because it never runs after a rollback.
+  - Deriving the instance id without `requestId` fails 2 of 4 tests in `JobPasswordResetIssuanceSchedulerTest`.
+- `RequestPasswordReset` now computes `auditRequestId` before the account lookup, so the task and the audit entry share it.
+- Review advisory findings (non-blocking, follow-up only): the idempotent-repeat check uses a no-op audit writer; the job type
+  has no handler yet (task 3.2); `PasswordResetRequestTimingReportIT` does not use the real adapter.
+
 ## Next step
 
-T3.1, slice 4a `04-reset-issuance-scheduler`, delegated to one writer.
+T3.2, slice 4b `04-reset-issuance-handler`, delegated to one writer.
