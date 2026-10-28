@@ -12,6 +12,7 @@ import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.StoredPasswordHash;
 import com.confia.kernel.InstitutionId;
 import java.time.Instant;
+import java.util.UUID;
 import org.jooq.DSLContext;
 
 /**
@@ -30,7 +31,8 @@ public final class PasswordRecoveryScopeViolationFixtures {
     public static final class SchedulerAdapter implements PasswordResetIssuanceScheduler {
 
         @Override
-        public void schedule(InstitutionId institutionId, StaffAccountId accountId) {
+        public void schedule(InstitutionId institutionId, StaffAccountId accountId,
+                UUID requestId) {
             // Deliberately empty: only the shape matters to the rule.
         }
     }
