@@ -49,8 +49,8 @@ Hard order: 3.3 (V11) before 3.6 (V12).
 |---|---|---|---|---|---|---|---|
 | T2.6 | delegated writer; parent ran both verifies after the writer's runs were killed (shell exit, then low memory) | `03b-portal-scheduling-client` | `c945478` | 390 | BUILD SUCCESS 19 min 17 s; Surefire 186 + 2 604, Failsafe 652 | BUILD SUCCESS 39 min 30 s; PIT kernel 192/194, app 871/919; JaCoCo met | granted; approved (reliability lens, lineage `review-832c56f64b018968`, acknowledged) |
 | T3.1 | delegated writer; parent ran the mutation verify after the writer's run was reaped for low memory | `04a-reset-issuance-scheduler` | `8714325` | 491 | BUILD SUCCESS 20 min 4 s; Surefire 186 + 2 610, Failsafe 656 | BUILD SUCCESS 42 min 43 s; PIT kernel 192/194, app 871/919; JaCoCo met | granted; approved (reliability lens, lineage `review-0c6ba0db28ada475`, acknowledged) |
-| T3.2 (4b) | delegated writer; builds on a copy outside OneDrive, see the T3.2 evidence | `04b-reset-issuance-handler` | `10cbd8a` | 779 | BUILD SUCCESS 21 min 3 s; Surefire 186 + 2 611, Failsafe 663 | not run (last branch of the task is 4c) | pending parent |
-| T3.2 (4c) | delegated writer; builds on a copy outside OneDrive, see the T3.2 evidence | `04c-reset-issuance-double-execution-and-isolation` | `a8b93b1` | 113 | BUILD SUCCESS 23 min 50 s; Surefire 186 + 2 611, Failsafe 667 | BUILD SUCCESS 44 min 48 s; PIT kernel 192/194, app 871/919; JaCoCo met (identity.domain 95, PIT 80) | pending parent |
+| T3.2 (4b) | delegated writer; builds on a copy outside OneDrive, see the T3.2 evidence | `04b-reset-issuance-handler` | `10cbd8a` | 779 | BUILD SUCCESS 21 min 3 s; Surefire 186 + 2 611, Failsafe 663 | not run (last branch of the task is 4c) | granted; approved together (reliability lens, lineage `review-c21140583d88afc7`, acknowledged) |
+| T3.2 (4c) | delegated writer; builds on a copy outside OneDrive, see the T3.2 evidence | `04c-reset-issuance-double-execution-and-isolation` | `a8b93b1` | 113 | BUILD SUCCESS 23 min 50 s; Surefire 186 + 2 611, Failsafe 667 | BUILD SUCCESS 44 min 48 s; PIT kernel 192/194, app 871/919; JaCoCo met (identity.domain 95, PIT 80) | granted; approved together (reliability lens, lineage `review-c21140583d88afc7`, acknowledged) |
 
 T2.6 evidence:
 
@@ -93,6 +93,11 @@ T3.2 evidence:
   policy values separately. The parked row itself is covered by `FailedExecutionIsParkedIT`.
 - `WorkerHarness` is now public so the identity test can start the real worker; the audit log is append-only, so the new ITs
   read only the entries after their own start.
+- Inactive account (I236): the schema has no active flag, so the test covers an account that no longer exists.
+- The owner accepted these deviations on 2026-10-28: the build on a copy outside OneDrive, the `supersedeOpen` break failing on
+  the unique index instead of an assertion, the five attempts driven without real waits, and I236 as a missing account.
+- Review advisory finding (non-blocking, follow-up only): the handler Javadoc says two runs leave one open token, but in production
+  the sender fails in `ensureAvailable()`, so no token is issued yet; reword it when a real sender exists.
 
 T3.1 evidence:
 
