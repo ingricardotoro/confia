@@ -49,7 +49,7 @@ class PasswordResetRequestTimingReportIT extends CommittingPostgresIntegrationTe
                 () -> institutionId, new JooqStaffAccountRepository(dsl),
                 new HmacLoginIdentifierFingerprinter(Argon2Pepper.fromBase64(
                         Base64.getEncoder().encodeToString(new byte[32]))),
-                (institution, account) -> { }, new JooqAuditLogWriter(dsl));
+                (institution, account, request) -> { }, new JooqAuditLogWriter(dsl));
 
         List<Long> existingNanos = measure(useCase, context, EXISTING_EMAIL);
         List<Long> nonexistentNanos = measure(useCase, context, NONEXISTENT_EMAIL);

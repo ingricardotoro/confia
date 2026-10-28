@@ -34,6 +34,7 @@ import com.confia.identity.infrastructure.BouncyCastleRecoveryCodeHasher;
 import com.confia.identity.infrastructure.ConfiguredLoginInstitutionProvider;
 import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.InMemoryLoginFailureSpread;
+import com.confia.identity.infrastructure.JobPasswordResetIssuanceScheduler;
 import com.confia.identity.infrastructure.JooqAccountSessionRevoker;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqPasswordResetTokenRepository;
@@ -45,6 +46,7 @@ import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.identity.infrastructure.JooqTotpVerificationBackoffStore;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionService;
+import com.confia.shared.jobs.JobScheduler;
 import com.confia.shared.observability.events.SecurityEventLog;
 import com.confia.shared.security.TransactionRunner;
 import com.confia.shared.security.token.AccessTokenIssuer;
@@ -59,9 +61,10 @@ import org.springframework.core.env.Environment;
  * The public configuration of the {@code identity} module for the administrative process
  * (web-edge-foundations design.md, decisions 1 and 3; ADR-0024). It registers the five use cases
  * whose ports have a production adapter, with those adapters, and nothing else: {@code
- * RequestPasswordReset} and {@code IssuePasswordResetToken} are not registered because their
- * scheduler and link-sender ports have no adapter until changes 9 and 14, and registering them
- * would take a fake adapter or a lambda. No identity class changes behavior; they are only
+ * RequestPasswordReset} is not registered yet (its endpoint registers it) and {@code
+ * IssuePasswordResetToken} is not registered because its link-sender port has no adapter until
+ * change 14, and registering them would take a fake adapter or a lambda. The issuance scheduling
+ * port has its adapter here, the job scheduler of change 9. No identity class changes behavior; they are only
  * registered. {@code IssueSession} is registered with the access-token issuer of the administrative
  * process; nothing in production calls it until {@code session-endpoints-cookie-and-csrf}.
  *
@@ -180,6 +183,16 @@ public class IdentityConfiguration {
     @Bean
     RefreshTokenRepository refreshTokenRepository(DSLContext dsl) {
         return new JooqRefreshTokenRepository(dsl);
+    }
+
+    /**
+     * The adapter of the issuance scheduling port: it schedules a one-time job inside the
+     * request's transaction (background-jobs-with-db-scheduler design.md decision 18). The factory
+     * returns the adapter's own type, so no method of production returns the port.
+     */
+    @Bean
+    JobPasswordResetIssuanceScheduler passwordResetIssuanceScheduler(JobScheduler jobs, Clock clock) {
+        return new JobPasswordResetIssuanceScheduler(jobs, clock);
     }
 
     @Bean

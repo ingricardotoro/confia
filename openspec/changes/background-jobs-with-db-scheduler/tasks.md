@@ -470,7 +470,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
 
 ## Fase 3: manejadores, purgas y cadencias
 
-- [ ] 3.1 **PR 4 / 4a `04-reset-issuance-scheduler`: puerto ampliado y adaptador de programación de la emisión de recuperación (decisión 18, deuda *a*, P4).**
+- [x] 3.1 **PR 4 / 4a `04-reset-issuance-scheduler`: puerto ampliado y adaptador de programación de la emisión de recuperación (decisión 18, deuda *a*, P4).**
   - **ROJO.** Ampliar `RequestPasswordResetTest.java` (el caso de uso pasa el `auditRequestId` que ya calcula como tercer argumento del puerto) y crear
     `JobPasswordResetIssuanceSchedulerTest.java` (deriva `JobInstanceId.derive(TYPE.name(), institution, account, requestId)`; la meta exacta:
     `correlationId = requestId`, `actorKind = STAFF`, `actorId = null`, `traceparent = null`; la carga es solo `accountId`) [I229]; crear

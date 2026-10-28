@@ -84,17 +84,17 @@ public final class RequestPasswordReset {
         IdentifierFingerprint fingerprint = fingerprinter.fingerprintOf(identifier);
         Optional<StaffAccount> account = accounts.findBy(institutionId, identifier);
 
+        UUID auditRequestId = requestId.isBlank() ? UUID.randomUUID() : UUID.fromString(requestId);
         UUID actorId = null;
         String actorLabel = UNKNOWN_ACCOUNT_ACTOR_LABEL;
         String afterValue = AFTER_ACCOUNT_NOT_FOUND;
         if (account.isPresent()) {
-            scheduler.schedule(institutionId, account.get().id());
+            scheduler.schedule(institutionId, account.get().id(), auditRequestId);
             actorId = account.get().id().value();
             actorLabel = identifier.value();
             afterValue = AFTER_ISSUANCE_SCHEDULED;
         }
 
-        UUID auditRequestId = requestId.isBlank() ? UUID.randomUUID() : UUID.fromString(requestId);
         auditLogWriter.append(new AuditEntry(institutionId.value(), actorId, ACTOR_KIND_STAFF,
                 actorLabel, null, null, auditRequestId, null, ACTION_REQUESTED,
                 STAFF_ACCOUNT_ENTITY_TYPE, fingerprint.value(), OUTCOME_SUCCESS, null, afterValue,

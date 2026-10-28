@@ -76,13 +76,16 @@ class RequestPasswordResetTest {
                 () -> CONFIGURED, accounts, RequestPasswordResetTest::fingerprint, scheduler,
                 audit::add);
 
-        RequestPasswordResetDecision forExisting = useCase.runWithinTransaction(CONFIGURED, "",
-                new RequestPasswordResetCommand("Ana.Martinez@Colegio.edu.hn"));
-        RequestPasswordResetDecision forMissing = useCase.runWithinTransaction(CONFIGURED, "",
+        UUID requestId = UUID.randomUUID();
+        RequestPasswordResetDecision forExisting = useCase.runWithinTransaction(CONFIGURED,
+                requestId.toString(), new RequestPasswordResetCommand("Ana.Martinez@Colegio.edu.hn"));
+        RequestPasswordResetDecision forMissing = useCase.runWithinTransaction(CONFIGURED,
+                UUID.randomUUID().toString(),
                 new RequestPasswordResetCommand("nadie.registrado@colegio.edu.hn"));
 
         assertThat(forExisting).isEqualTo(forMissing);
-        assertThat(scheduler.calls).containsExactly(new ScheduledIssuance(CONFIGURED, existingId));
+        assertThat(scheduler.calls)
+                .containsExactly(new ScheduledIssuance(CONFIGURED, existingId, requestId));
         assertThat(audit).hasSize(2).allSatisfy(entry -> {
             assertThat(entry.action()).isEqualTo("identity.password_reset.requested");
             assertThat(entry.entityType()).isEqualTo("identity.staff_account");
@@ -96,6 +99,28 @@ class RequestPasswordResetTest {
         assertThat(audit.get(1).actorLabel()).isEqualTo("unknown-account");
         assertThat(audit.get(1).actorId()).isNull();
         assertThat(audit.get(1).toString()).doesNotContain("nadie.registrado");
+    }
+
+    /** Scenario I229: the scheduler gets the very request id the audit entry carries (decision 18). */
+    @Test
+    void theSchedulerReceivesTheSameRequestIdAsTheAuditEntry() {
+        RecordingScheduler scheduler = new RecordingScheduler();
+        RecordingAccounts accounts = new RecordingAccounts();
+        StaffAccountId existingId = new StaffAccountId(UUID.randomUUID());
+        accounts.existing = new StaffAccount(existingId, CONFIGURED,
+                LoginIdentifier.of("ana.martinez@colegio.edu.hn"), new StoredPasswordHash(
+                        "$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aGFzaA"), false);
+        List<AuditEntry> audit = new ArrayList<>();
+        RequestPasswordReset useCase = new RequestPasswordReset(neverConnectingRunner(),
+                () -> CONFIGURED, accounts, RequestPasswordResetTest::fingerprint, scheduler,
+                audit::add);
+
+        useCase.runWithinTransaction(CONFIGURED, "", new RequestPasswordResetCommand(
+                "ana.martinez@colegio.edu.hn"));
+
+        assertThat(scheduler.calls).singleElement().satisfies(call -> assertThat(call.requestId())
+                .as("a blank request id gets one generated id, shared by the job and the audit entry")
+                .isEqualTo(audit.get(0).requestId()));
     }
 
     @Test
@@ -122,15 +147,15 @@ class RequestPasswordResetTest {
         return new TransactionRunner(new DataSourceTransactionManager(dataSource), dataSource);
     }
 
-    record ScheduledIssuance(InstitutionId institutionId, StaffAccountId accountId) {
+    record ScheduledIssuance(InstitutionId institutionId, StaffAccountId accountId, UUID requestId) {
     }
 
     static final class RecordingScheduler implements PasswordResetIssuanceScheduler {
         final List<ScheduledIssuance> calls = new ArrayList<>();
 
         @Override
-        public void schedule(InstitutionId institutionId, StaffAccountId accountId) {
-            calls.add(new ScheduledIssuance(institutionId, accountId));
+        public void schedule(InstitutionId institutionId, StaffAccountId accountId, UUID requestId) {
+            calls.add(new ScheduledIssuance(institutionId, accountId, requestId));
         }
     }
 

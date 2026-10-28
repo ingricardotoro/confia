@@ -269,14 +269,14 @@ class IdentityScopeExclusionInventoryTest {
 
     /**
      * Scenarios I25 and I27 (password-recovery-token design.md decision 11; specs/identity/spec.md,
-     * "Ausencia de programación real" and "Ausencia de envío"): the issuance scheduler and the link
-     * sender are ports without a production adapter. The db-scheduler adapter arrives with change
-     * 9 and the email adapter with change 14; this test fails the day either lands, which is when
-     * its owner rewrites it. It sees implementing classes, so a lambda in a configuration class is
-     * outside its reach; the first adapter that matters will be a named class.
+     * "Ausencia de programación real" and "Ausencia de envío"), as change 9 left them: the issuance
+     * scheduling port has exactly one production adapter, the db-scheduler one ({@code
+     * JobPasswordResetIssuanceScheduler}, background-jobs-with-db-scheduler decision 18), and the
+     * link sender still has none, because the email adapter arrives with change 14. It sees
+     * implementing classes, so a lambda in a configuration class is outside its reach.
      */
     @Test
-    void noProductionClassImplementsTheIssuanceSchedulerOrTheLinkSender() {
+    void theIssuanceSchedulerHasOnlyTheJobAdapterAndTheLinkSenderHasNone() {
         JavaClasses production = assertNonEmptyProductionClasses();
         assertThat(production.contain(PasswordResetIssuanceScheduler.class)
                 && production.contain(PasswordResetLinkSender.class))
@@ -285,9 +285,9 @@ class IdentityScopeExclusionInventoryTest {
                 .isTrue();
 
         assertThat(implementationsOf(production, PasswordResetIssuanceScheduler.class))
-                .as("no production adapter of the issuance scheduling port exists yet "
-                        + "(brecha con destino: cambio 9, background-jobs-with-db-scheduler)")
-                .isEmpty();
+                .as("the only adapter of the issuance scheduling port is the one that schedules "
+                        + "a transactional job")
+                .containsExactly("com.confia.identity.infrastructure.JobPasswordResetIssuanceScheduler");
         assertThat(implementationsOf(production, PasswordResetLinkSender.class))
                 .as("no production adapter of the reset link delivery port exists yet "
                         + "(brecha con destino: cambio 14, transactional-email-adapter)")

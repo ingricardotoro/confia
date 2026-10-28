@@ -34,8 +34,9 @@ import org.junit.jupiter.api.Test;
 /**
  * {@link RequestPasswordReset} through the real transaction, against a real PostgreSQL and the real
  * fingerprint, audit and account adapters (password-recovery-token design.md decisions 6 and 9;
- * tasks.md task 3.1). The scheduling port has no production adapter until change 9, so a double
- * that only records the call stands in for it: a request can never produce a token by itself.
+ * tasks.md task 3.1). A double that only records the call stands in for the scheduling port; the
+ * real adapter and its transaction are {@code RequestPasswordResetSchedulingIT}'s. A request can
+ * never produce a token by itself.
  */
 class RequestPasswordResetIT extends CommittingPostgresIntegrationTest {
 
@@ -61,7 +62,11 @@ class RequestPasswordResetIT extends CommittingPostgresIntegrationTest {
 
         RequestPasswordResetDecision decision = request(EXISTING_EMAIL);
 
-        assertThat(scheduler.calls).containsExactly(new ScheduledIssuance(institutionId, accountId));
+        assertThat(scheduler.calls).singleElement().satisfies(call -> {
+            assertThat(call.institutionId()).isEqualTo(institutionId);
+            assertThat(call.accountId()).isEqualTo(accountId);
+            assertThat(call.requestId()).isNotNull();
+        });
         assertThat(scheduler.calls.get(0).toString()).doesNotContain(EXISTING_EMAIL);
         assertThat(tokenCount()).isZero();
         assertThat(decision).isEqualTo(new RequestPasswordResetDecision());

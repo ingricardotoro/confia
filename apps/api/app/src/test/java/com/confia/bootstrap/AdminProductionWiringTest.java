@@ -13,9 +13,11 @@ import com.confia.identity.application.LogIn;
 import com.confia.identity.application.LoginFailureSpread;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.IssuePasswordResetToken;
+import com.confia.identity.application.PasswordResetIssuanceScheduler;
 import com.confia.identity.application.LoginInstitutionProvider;
 import com.confia.identity.application.RequestPasswordReset;
 import com.confia.identity.application.ResetPasswordWithToken;
+import com.confia.identity.infrastructure.JobPasswordResetIssuanceScheduler;
 import com.confia.identity.application.VerifyTotpCode;
 import com.confia.identity.web.CurrentSessionController;
 import com.confia.identity.web.LoginController;
@@ -139,6 +141,18 @@ class AdminProductionWiringTest {
             assertThat(context.getBeanNamesForType(IssuePasswordResetToken.class, true, true))
                     .as("IssuePasswordResetToken waits for PasswordResetLinkSender")
                     .isEmpty();
+        } finally {
+            context.close();
+        }
+    }
+
+    /** Decision 18: the administrative process schedules the issuance through the job adapter. */
+    @Test
+    void theIssuanceSchedulingPortIsTheJobAdapterInTheAdministrativeProcess() {
+        ConfigurableApplicationContext context = start("admin");
+        try {
+            assertThat(context.getBeansOfType(PasswordResetIssuanceScheduler.class).values())
+                    .singleElement().isInstanceOf(JobPasswordResetIssuanceScheduler.class);
         } finally {
             context.close();
         }
