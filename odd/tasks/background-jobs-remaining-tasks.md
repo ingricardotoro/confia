@@ -29,7 +29,7 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 
 - [x] T2.6 Slice 3b `03b-portal-scheduling-client`: portal DataSource and `JobScheduler` (D-N1, P6).
 - [x] T3.1 Slice 4a `04-reset-issuance-scheduler`.
-- [ ] T3.2 Slice 4b `04-reset-issuance-handler`.
+- [x] T3.2 Slice 4b `04-reset-issuance-handler` (split: 4b and 4c).
 - [ ] T3.3 Slice 5a-1 `05a-v11-purge-functions`.
 - [ ] T3.4 Slice 5a-2 `05a-identity-purge-jobs`.
 - [ ] T3.5 Slice 5a-3 `05a-adr-0025-and-retention-notes`.
@@ -49,6 +49,8 @@ Hard order: 3.3 (V11) before 3.6 (V12).
 |---|---|---|---|---|---|---|---|
 | T2.6 | delegated writer; parent ran both verifies after the writer's runs were killed (shell exit, then low memory) | `03b-portal-scheduling-client` | `c945478` | 390 | BUILD SUCCESS 19 min 17 s; Surefire 186 + 2 604, Failsafe 652 | BUILD SUCCESS 39 min 30 s; PIT kernel 192/194, app 871/919; JaCoCo met | granted; approved (reliability lens, lineage `review-832c56f64b018968`, acknowledged) |
 | T3.1 | delegated writer; parent ran the mutation verify after the writer's run was reaped for low memory | `04a-reset-issuance-scheduler` | `8714325` | 491 | BUILD SUCCESS 20 min 4 s; Surefire 186 + 2 610, Failsafe 656 | BUILD SUCCESS 42 min 43 s; PIT kernel 192/194, app 871/919; JaCoCo met | granted; approved (reliability lens, lineage `review-0c6ba0db28ada475`, acknowledged) |
+| T3.2 (4b) | delegated writer; builds on a copy outside OneDrive, see the T3.2 evidence | `04b-reset-issuance-handler` | `10cbd8a` | 779 | BUILD SUCCESS 21 min 3 s; Surefire 186 + 2 611, Failsafe 663 | not run (last branch of the task is 4c) | pending parent |
+| T3.2 (4c) | delegated writer; builds on a copy outside OneDrive, see the T3.2 evidence | `04c-reset-issuance-double-execution-and-isolation` | `a8b93b1` | 113 | BUILD SUCCESS 23 min 50 s; Surefire 186 + 2 611, Failsafe 667 | BUILD SUCCESS 44 min 48 s; PIT kernel 192/194, app 871/919; JaCoCo met (identity.domain 95, PIT 80) | pending parent |
 
 T2.6 evidence:
 
@@ -63,6 +65,34 @@ T2.6 evidence:
   DML checks are scoped by task name only; the portal database health indicator is not proved; generic JDBC access in the
   portal context is not asserted absent.
 - No new migration: V10 already grants the portal `SELECT` and `INSERT` on `scheduled_tasks`.
+
+T3.2 evidence:
+
+- Split by the seam named in `tasks.md`: the whole task measured 892 effective lines, over the 800 limit. Branch 4b holds the
+  handler, the sender that fails explicitly, the worker wiring and every test except two; branch 4c (created from 4b) holds
+  `PasswordResetIssuanceDoubleExecutionIT` and `PasswordResetIssuanceInstitutionIsolationIT`. Each passes on its own.
+- Build environment: in-place builds under OneDrive failed deterministically at `testCompile` (`EnrollVersusVerifyConcurrencyIT.class`
+  "used by another process", held by a process outside this run, probably the IDE or the antivirus). All focused and full runs
+  were made on a one-way copy of the working tree outside OneDrive, with the same JDK and options. The copy has no `.git`.
+- RED, observed before the last production line: `ProcessBeanIsolationTest` (worker), `JobPayloadAllowListTest` and
+  `WorkerProductionWiringTest` failed on assertions once the worker registered the job; `UnavailableSenderLeavesNoTokenIT`
+  failed on three assertions while `IssuePasswordResetToken` did not call `ensureAvailable()`: `expected: 0L` orphan tokens
+  for the account below its limit, and the fourth attempt of the account at its limit completed ("Expecting code to raise a
+  throwable") instead of failing. The first compile with the handler class missing was not observed, because the handler was
+  written before the first run. The new `WORKER` entry `com.confia.shared.jobs` was seen failing first
+  (`bean 'passwordResetIssuanceJob' from package 'com.confia.shared.jobs' - not in the allow-list`).
+- Deliberate breaks, each reverted and confirmed with `cmp` against a copy kept outside the repository:
+  - `ensureAvailable()` moved after the transaction: `UnavailableSenderLeavesNoTokenIT` fails 2 of 4 on assertions (orphan token).
+  - `supersedeOpen` removed: both tests of `PasswordResetIssuanceDoubleExecutionIT` fail, but with
+    `IntegrityConstraintViolationException` from `identity_password_reset_token_one_open_per_account`, not on an assertion. The
+    database refuses the second open token, so "two open tokens" cannot be observed. The unique index is a second line of defence.
+  - Handler run in another institution's context (temporary system property, never committed): both tests of
+    `PasswordResetIssuanceInstitutionIsolationIT` fail on assertions (`no token in B`, `the task's institution`).
+- The real executor was not run for the five attempts: the waits are 30, 60, 120 and 240 s. The test drives the real worker's
+  `JobRunner` and `OneTimeJob` five times for an account below its limit and five for one at its limit, and asserts the retry
+  policy values separately. The parked row itself is covered by `FailedExecutionIsParkedIT`.
+- `WorkerHarness` is now public so the identity test can start the real worker; the audit log is append-only, so the new ITs
+  read only the entries after their own start.
 
 T3.1 evidence:
 
@@ -79,4 +109,4 @@ T3.1 evidence:
 
 ## Next step
 
-T3.2, slice 4b `04-reset-issuance-handler`, delegated to one writer.
+T3.3, slice 5a-1 `05a-v11-purge-functions`, delegated to one writer.
