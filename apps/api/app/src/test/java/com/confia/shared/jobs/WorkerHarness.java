@@ -16,7 +16,7 @@ import org.springframework.context.ConfigurableApplicationContext;
  * the test job types. Only the worker harness holds them: the production configuration registers no
  * job, and the fixture types never exist in any other process (scenarios BJ06 and BJ07).
  */
-final class WorkerHarness {
+public final class WorkerHarness {
 
     private WorkerHarness() {
     }
@@ -48,7 +48,7 @@ final class WorkerHarness {
                 .run(argumentsFor(joined));
     }
 
-    static ConfigurableApplicationContext start(Class<?> fixtures, UUID institution, String... extra) {
+    public static ConfigurableApplicationContext start(Class<?> fixtures, UUID institution, String... extra) {
         return new SpringApplicationBuilder(WorkerApplication.class, fixtures)
                 .web(WebApplicationType.NONE)
                 .initializers(new SensitiveLogGuardInitializer())

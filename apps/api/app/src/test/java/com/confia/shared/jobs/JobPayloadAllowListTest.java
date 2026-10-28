@@ -25,14 +25,16 @@ import tools.jackson.databind.json.JsonMapper;
  * and {@code meta} has its own list. A new field with no entry breaks the test; so does a registered
  * type with no entry. The registry is read from the real worker context.
  *
- * <p>No one-time job is registered yet; the first, {@code identity.password-reset-issuance}, adds its
- * entry (task 3.1). The fixtures below prove the check can fail: a type that declares {@code email} and
+ * <p>The first one-time job, {@code identity.password-reset-issuance}, has its entry here (task 3.2,
+ * scenarios I237 and BJ13). The fixtures below prove the check can fail: a type that declares {@code email} and
  * another that declares an amount.
  */
 class JobPayloadAllowListTest {
 
     /** The approved payload keys of each registered type; the only place the list is written. */
-    static final Map<String, Set<String>> APPROVED = Map.of();
+    static final Map<String, Set<String>> APPROVED = Map.of(
+            // The internal identifier of the account, and nothing else (decision 18; scenario I237).
+            "identity.password-reset-issuance", Set.of("accountId"));
 
     static final Set<String> APPROVED_META = Set.of("correlationId", "requestId", "actorId", "actorKind",
             "institutionId", "traceparent");

@@ -8,6 +8,10 @@ import com.confia.bootstrap.ProcessBeanInspector.InspectedBean;
 import com.confia.bootstrap.admin.AdminApplication;
 import com.confia.bootstrap.portal.PortalApplication;
 import com.confia.bootstrap.worker.WorkerApplication;
+import com.confia.identity.application.PasswordResetLinkSender;
+import com.confia.identity.infrastructure.Argon2Pepper;
+import com.confia.identity.infrastructure.UnavailablePasswordResetLinkSender;
+import com.confia.identity.infrastructure.wiring.IdentityWorkerConfiguration;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionMasterKey;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
@@ -73,10 +77,10 @@ class WorkerProductionWiringTest {
         }
     }
 
-    // --- BI111: no master key, no pepper, nothing of crypto or identity ---
+    // --- BI111: no master key, no pepper, nothing of crypto, and of identity only the issuance ---
 
     @Test
-    void theWorkerStartsWithoutTheMasterKeyOrThePepperAndHoldsNoCryptoOrIdentityBean() {
+    void theWorkerStartsWithoutTheMasterKeyOrThePepperAndHoldsNoCryptoBeanAndOnlyTheIssuanceOfIdentity() {
         String[] arguments = TestProcessArguments.forProcess("worker");
         assertThat(Arrays.toString(arguments))
                 .doesNotContain(TestProcessArguments.MASTER_KEY_PROPERTY)
@@ -86,10 +90,23 @@ class WorkerProductionWiringTest {
         try {
             List<InspectedBean> confiaBeans = ProcessBeanInspector.confiaBeans(context);
             assertThat(confiaBeans).as("non-vacuous: the worker holds beans of its own").isNotEmpty();
-            assertThat(confiaBeans).as("no bean of crypto or identity in the worker")
+            assertThat(confiaBeans).as("no bean of crypto in the worker")
                     .noneMatch(bean -> bean.originPackages().stream()
-                            .anyMatch(pkg -> ProcessBeanPolicy.matches(pkg, "com.confia.shared.crypto")
-                                    || ProcessBeanPolicy.matches(pkg, "com.confia.identity")));
+                            .anyMatch(pkg -> ProcessBeanPolicy.matches(pkg, "com.confia.shared.crypto")));
+            assertThat(context.getBeansOfType(ColumnEncryptionMasterKey.class)).isEmpty();
+            assertThat(context.getBeansOfType(Argon2Pepper.class)).isEmpty();
+            assertThat(confiaBeans).as("the exact beans of identity in the worker")
+                    .filteredOn(bean -> bean.originPackages().stream()
+                            .anyMatch(pkg -> ProcessBeanPolicy.matches(pkg, "com.confia.identity")))
+                    .extracting(InspectedBean::name)
+                    .containsExactlyInAnyOrder(IdentityWorkerConfiguration.class.getName(),
+                            "staffAccountRepository", "passwordResetTokenRepository",
+                            "passwordResetLinkSender", "passwordResetSecureRandom",
+                            "issuePasswordResetToken", "passwordResetIssuanceJobHandler",
+                            "passwordResetIssuanceJob");
+            assertThat(context.getBeansOfType(PasswordResetLinkSender.class).values())
+                    .as("the only sender of the worker fails explicitly")
+                    .singleElement().isExactlyInstanceOf(UnavailablePasswordResetLinkSender.class);
         } finally {
             context.close();
         }

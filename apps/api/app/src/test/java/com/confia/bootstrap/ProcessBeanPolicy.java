@@ -159,7 +159,16 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.shared.security", "com.confia.shared.infrastructure",
                     "com.confia.shared.jobs.infrastructure.wiring",
                     // The worker's executor and the institutions it acts on (decision 12).
-                    "com.confia.shared.jobs.infrastructure"),
+                    "com.confia.shared.jobs.infrastructure",
+                    // The job definition a module registers is a bean of the port package itself:
+                    // the one-time job of the password-reset issuance (exact, like every entry).
+                    "com.confia.shared.jobs",
+                    // The identity module's password-reset issuance (decision 18): the use case and
+                    // the handler, the two repositories and the sender that fails explicitly, and
+                    // the configuration that declares them. No master key, no pepper, no request
+                    // origin. Each is exact and contributes a bean.
+                    "com.confia.identity.application", "com.confia.identity.infrastructure",
+                    "com.confia.identity.infrastructure.wiring"),
             forbidden("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     "com.confia.shared.crypto", WORKER_NO_COLUMN_KEY,
