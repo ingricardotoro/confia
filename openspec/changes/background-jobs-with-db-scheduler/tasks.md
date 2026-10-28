@@ -489,7 +489,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
   - **Cierre.** `./mvnw verify -Pmutation-gate`; `identity.domain` en 95 y PIT en 80. Commit: `feat(identity): schedule the password reset issuance as a
     transactional job`. Tamaño: nominal 150, realista 400. — Escenarios I229 a I231.
 
-- [ ] 3.2 **PR 4 / 4b `04-reset-issuance-handler`: manejador, emisor que falla de forma explícita y doble ejecución (decisión 18, P4).**
+- [x] 3.2 **PR 4 / 4b `04-reset-issuance-handler`: manejador, emisor que falla de forma explícita y doble ejecución (decisión 18, P4).**
   - **ROJO, ataques primero.** Crear `PasswordResetIssuanceInstitutionIsolationIT.java` (la tarea de la institución A con una cuenta de la B termina
     `ACCOUNT_NOT_FOUND`, sin token ni asiento en B) [I268, I233], `PasswordResetIssuanceDoubleExecutionIT.java` (dos ejecuciones con los mismos datos
     y un emisor que registra dejan **un** token abierto y el último enviado es el único válido; la cuarta emisión dentro de la hora se omite sin
