@@ -23,7 +23,9 @@ import java.util.UUID;
  * SecurityContext} with actor kind {@code system} and the institution taken from the task (ADR-0016
  * rule 4), so it applies no {@link LoginInstitutionProvider} guard: the row policy scopes it.
  *
- * <p>Inside one transaction it locks the account row first, which serializes every issuance and
+ * <p>It first asks the sender whether delivery is available ({@link
+ * PasswordResetLinkSender#ensureAvailable()}), outside any transaction. Then, inside one
+ * transaction, it locks the account row first, which serializes every issuance and
  * reset of that account (decision 2); counts the issuances in the rolling sixty-minute window and
  * skips at three; otherwise supersedes every open token, inserts the new one with the expiry from
  * {@link PasswordResetTokenPolicy}, and audits. <b>Only after the transaction commits, and outside
@@ -70,6 +72,9 @@ public final class IssuePasswordResetToken {
         Objects.requireNonNull(accountId, "accountId");
         InstitutionId institutionId = new InstitutionId(UUID.fromString(context.institutionId()));
 
+        // Before the transaction, so a sender that cannot deliver stops the attempt with no token
+        // issued, no entry written and the hourly limit untouched (decision 18, owner decision P4).
+        linkSender.ensureAvailable();
         Issuance issuance = transactionRunner.execute(context,
                 () -> runWithinTransaction(institutionId, context.requestId(), accountId));
 

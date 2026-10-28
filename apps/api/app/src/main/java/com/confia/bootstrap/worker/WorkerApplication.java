@@ -1,5 +1,6 @@
 package com.confia.bootstrap.worker;
 
+import com.confia.identity.infrastructure.wiring.IdentityWorkerConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.WorkerJobsConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.WorkerPlatformConfiguration;
 import org.springframework.boot.SpringBootConfiguration;
@@ -12,9 +13,10 @@ import org.springframework.context.annotation.Import;
  * Background worker process entry point (ADR-0003, ADR-0013, ADR-0024), started without an HTTP
  * server ({@code ConfiaApplication} forces {@code WebApplicationType.NONE}). It declares its own
  * wiring here and never inherits the administrative bean graph, so it carries none of the OpenAPI
- * surface the web processes import. No business module or background job is registered yet
- * (db-scheduler tasks arrive with the modules that need them, ADR-0016); the executor runs with an
- * empty set of tasks.
+ * surface the web processes import. The only business module it registers is {@code identity},
+ * through {@link IdentityWorkerConfiguration}, for the password-reset issuance job (ADR-0016;
+ * background-jobs-with-db-scheduler design.md decision 18); the other jobs arrive with the modules
+ * that need them.
  *
  * <p>The worker has a {@code DataSource} (background-jobs-with-db-scheduler design.md decision 12,
  * which reverses decision D5 of web-edge-foundations for this process): Spring Boot's pool, with the
@@ -46,6 +48,7 @@ import org.springframework.context.annotation.Import;
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {SecurityAutoConfiguration.class,
         UserDetailsServiceAutoConfiguration.class})
-@Import({WorkerPlatformConfiguration.class, WorkerJobsConfiguration.class})
+@Import({WorkerPlatformConfiguration.class, WorkerJobsConfiguration.class,
+        IdentityWorkerConfiguration.class})
 public class WorkerApplication {
 }

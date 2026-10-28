@@ -1,9 +1,11 @@
 package com.confia.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.AuthenticationCommand;
+import com.confia.identity.application.PasswordResetDeliveryUnavailableException;
 import com.confia.identity.application.PasswordResetIssuanceScheduler;
 import com.confia.identity.application.PasswordResetLinkSender;
 import com.confia.identity.application.ResetPasswordWithToken;
@@ -11,8 +13,12 @@ import com.confia.identity.application.StaffAccountRepository;
 import com.confia.identity.domain.BackoffPolicy;
 import com.confia.identity.domain.BackoffState;
 import com.confia.identity.infrastructure.Argon2Profile;
+import com.confia.identity.domain.PlainPasswordResetToken;
+import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
+import com.confia.identity.infrastructure.UnavailablePasswordResetLinkSender;
 import com.confia.identity.testsupport.fixture.PasswordRecoveryScopeViolationFixtures;
+import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditScopeExclusionInventoryTest;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.shared.crypto.DataEncryptionKeyRepository;
@@ -25,10 +31,13 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
@@ -38,6 +47,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
@@ -272,11 +282,14 @@ class IdentityScopeExclusionInventoryTest {
      * "Ausencia de programación real" and "Ausencia de envío"), as change 9 left them: the issuance
      * scheduling port has exactly one production adapter, the db-scheduler one ({@code
      * JobPasswordResetIssuanceScheduler}, background-jobs-with-db-scheduler decision 18), and the
-     * link sender still has none, because the email adapter arrives with change 14. It sees
-     * implementing classes, so a lambda in a configuration class is outside its reach.
+     * link sender has exactly one, the one that fails explicitly ({@code
+     * UnavailablePasswordResetLinkSender}, owner decision P4; scenario BI98), because the email
+     * adapter arrives with change 14. A second adapter, or one that delivers, breaks this test
+     * until the change that adds it replaces it. It sees implementing classes, so a lambda in a
+     * configuration class is outside its reach.
      */
     @Test
-    void theIssuanceSchedulerHasOnlyTheJobAdapterAndTheLinkSenderHasNone() {
+    void theIssuanceSchedulerHasOnlyTheJobAdapterAndTheLinkSenderHasOnlyTheOneThatFailsExplicitly() {
         JavaClasses production = assertNonEmptyProductionClasses();
         assertThat(production.contain(PasswordResetIssuanceScheduler.class)
                 && production.contain(PasswordResetLinkSender.class))
@@ -289,9 +302,41 @@ class IdentityScopeExclusionInventoryTest {
                         + "a transactional job")
                 .containsExactly("com.confia.identity.infrastructure.JobPasswordResetIssuanceScheduler");
         assertThat(implementationsOf(production, PasswordResetLinkSender.class))
-                .as("no production adapter of the reset link delivery port exists yet "
-                        + "(brecha con destino: cambio 14, transactional-email-adapter)")
-                .isEmpty();
+                .as("the only implementation of the reset link delivery port is the sender that "
+                        + "fails explicitly (brecha con destino: cambio 14, transactional-email-adapter)")
+                .containsExactly("com.confia.identity.infrastructure.UnavailablePasswordResetLinkSender");
+        UnavailablePasswordResetLinkSender sender = new UnavailablePasswordResetLinkSender();
+        assertThatThrownBy(sender::ensureAvailable)
+                .isInstanceOf(PasswordResetDeliveryUnavailableException.class);
+        assertThatThrownBy(() -> sender.send(new InstitutionId(UUID.randomUUID()),
+                new StaffAccountId(UUID.randomUUID()), PlainPasswordResetToken.generate(new SecureRandom())))
+                .as("it never delivers, nor pretends to")
+                .isInstanceOf(PasswordResetDeliveryUnavailableException.class)
+                .hasMessageNotContaining("http");
+    }
+
+    /**
+     * A completed reset notifies no one (specs/identity/spec.md, "Un restablecimiento completado no
+     * notifica a nadie"): the use case has no dependency on the link-sender port, and none of the
+     * action names it audits speaks of a notification, a mail or a delivery.
+     */
+    @Test
+    void aCompletedResetNotifiesNoOneAndAuditsNoDelivery() throws IllegalAccessException {
+        JavaClasses production = assertNonEmptyProductionClasses();
+        JavaClass reset = production.get(ResetPasswordWithToken.class);
+
+        assertThat(reset.getDirectDependenciesFromSelf())
+                .as("ResetPasswordWithToken does not depend on the link-sender port")
+                .noneMatch(dependency -> dependency.getTargetClass().isAssignableTo(PasswordResetLinkSender.class));
+        for (Field field : ResetPasswordWithToken.class.getDeclaredFields()) {
+            if (Modifier.isStatic(field.getModifiers()) && field.getType() == String.class) {
+                field.setAccessible(true);
+                assertThat(String.valueOf(field.get(null)).toLowerCase(Locale.ROOT))
+                        .as("constant " + field.getName())
+                        .doesNotContain("notif").doesNotContain("mail").doesNotContain("deliver")
+                        .doesNotContain("send");
+            }
+        }
     }
 
     @Test
