@@ -123,7 +123,14 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
             Set.of("com.confia.bootstrap.portal", "com.confia.shared.web.openapi",
                     "com.confia.shared.logging",
                     "com.confia.shared.web.edge", "com.confia.shared.web.request",
-                    "com.confia.shared.web.problem"),
+                    "com.confia.shared.web.problem",
+                    // The portal's first data access (background-jobs-with-db-scheduler decision
+                    // 14, D-N1): the transactional component with its one proxy, and the job
+                    // scheduling client with its serializer. Nothing else of the administrative
+                    // wiring comes with them: no jOOQ context, no repository, no business module.
+                    // Each is exact and contributes a bean.
+                    "com.confia.shared.security", "com.confia.shared.jobs.infrastructure",
+                    "com.confia.shared.jobs.infrastructure.wiring"),
             forbidden("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     "com.confia.invoicing", ADMIN_MODULE,

@@ -4,9 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
+import com.confia.shared.jobs.infrastructure.DbSchedulerJobScheduler;
+import com.confia.shared.jobs.infrastructure.TracedJobSerializer;
 import com.confia.shared.observability.metrics.LogRateLimitMetrics;
 import com.github.kagkarlsson.scheduler.Scheduler;
 import com.confia.shared.security.RateLimiter;
+import com.confia.shared.security.TransactionRunner;
+import com.confia.shared.security.TransactionalDataSource;
 import com.confia.shared.security.token.SessionTokenConfiguration;
 import com.confia.shared.security.token.SigningKeyRing;
 import com.confia.shared.web.delay.DelayProperties;
@@ -22,6 +26,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Stream;
+import javax.sql.DataSource;
+import org.jooq.DSLContext;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -193,6 +199,58 @@ class ProcessBeanIsolationTest {
             if (context != null) {
                 context.close();
             }
+        }
+    }
+
+    /**
+     * Specs BJ51 and BI112 (background-jobs-with-db-scheduler design.md decision 14, D-N1): the
+     * portal does not inherit the administrative wiring, but it does have its scheduling wiring.
+     * Neither the platform configuration nor the administrative audit decorator is in its context,
+     * while the transactional component and the job scheduling client are.
+     */
+    @Test
+    void thePortalDoesNotInheritTheAdministrativeWiringButHasItsSchedulingWiring() {
+        LaunchOutcome outcome = ConfiaApplication.launch(TestProcessArguments.forProcess("portal"),
+                "portal");
+        ConfigurableApplicationContext context = outcome.context();
+        try {
+            assertThat(context).as("the portal process must start").isNotNull();
+            assertThat(beanNamesOfTypesIn(context, "com.confia.shared.platform",
+                    "com.confia.shared.infrastructure", "com.confia.shared.audit",
+                    "com.confia.shared.crypto"))
+                    .as("no administrative data access wiring in the portal").isEmpty();
+            assertThat(beanNamesOfTypesIn(context, "com.confia.shared.jobs.infrastructure"))
+                    .as("the portal's job scheduling client")
+                    .anyMatch(bean -> bean.endsWith(DbSchedulerJobScheduler.class.getName()))
+                    .anyMatch(bean -> bean.endsWith(TracedJobSerializer.class.getName()));
+            assertThat(context.getBeansOfType(TransactionRunner.class)).hasSize(1);
+            assertThat(context.getBeansOfType(TransactionalDataSource.class)).hasSize(1);
+        } finally {
+            context.close();
+        }
+    }
+
+    /**
+     * The worker and the portal have a {@code DataSource}; only the worker has a {@code DSLContext}
+     * (modified scenario of process-entry-point-isolation, decision D-N1). The administrative
+     * process has both.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("com.confia.bootstrap.ProcessBeanPolicy#all")
+    void theWorkerAndThePortalHaveADataSourceAndOnlyTheWorkerAndAdminHaveADslContext(
+            ProcessBeanPolicy policy) {
+        LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.forProcess(policy.process()), policy.process());
+        ConfigurableApplicationContext context = outcome.context();
+        try {
+            assertThat(context).as("the %s process must start", policy.process()).isNotNull();
+            assertThat(context.getBeansOfType(DataSource.class))
+                    .as("every process has its own data source").hasSize(1);
+            assertThat(context.getBeansOfType(DSLContext.class))
+                    .as("jOOQ context in the %s process", policy.process())
+                    .hasSize("portal".equals(policy.process()) ? 0 : 1);
+        } finally {
+            context.close();
         }
     }
 

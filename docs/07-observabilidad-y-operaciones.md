@@ -794,6 +794,12 @@ Reglas de los indicadores propios, independientes del mecanismo:
   primero), porque lee la fila antes de insertar. `V10` concede por eso `SELECT` e `INSERT` al portal sobre `scheduled_tasks`
   (nunca `UPDATE` ni `DELETE`). El privilegio se justifica por el cliente y no por la salud: que el grupo de preparación del
   portal incluya `backgroundJobs` sigue siendo decisión de los cambios 10 y 11.
+
+  _Nota (2026-10-27, `background-jobs-with-db-scheduler`, tarea 2.6):_ el portal tiene ya su `DataSource` y su cliente de
+  programación, conectado como `confia_portal_app`, que tiene `SELECT` sobre `scheduled_tasks` (`V10`). El grupo de preparación
+  del portal incluye `backgroundJobs` solo si el portal obtuvo ese `SELECT` para el indicador de salud: el privilegio actual se
+  concedió por el cliente de programación, no por la salud, y la decisión de añadir el indicador al grupo del portal sigue
+  siendo de los cambios 10 y 11. Hasta entonces el grupo de preparación del portal no incluye `backgroundJobs`.
 - **Migraciones.** El arranque no se completa hasta que el esquema coincide con las migraciones
   de Flyway esperadas por el artefacto. La comprobación lee `flyway_schema_history` con el
   `SELECT` que ADR-0017 concede a `confia_admin_app` y a `confia_portal_app`, mediante una
