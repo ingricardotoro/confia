@@ -2,6 +2,8 @@ package com.confia.identity.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.confia.identity.domain.PlainPassword;
+import com.confia.identity.domain.StoredPasswordHash;
 import com.confia.kernel.InstitutionId;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -30,6 +32,16 @@ import org.junit.jupiter.api.Test;
  * kinds of attempt alternate, and a slow machine slows both. Its negative control (BI56) is the
  * same gate with the unknown-account branch replaced by an immediate answer, which is what omitting
  * the decoy verification amounts to: it must fail, naming the difference it measured.
+ *
+ * <p>The limit the gate applies is the 50 ms of the specification or half of what one Argon2id
+ * verification costs on the machine that runs it, whichever is smaller. A fixed 50 ms alone can only
+ * see an omitted decoy that costs more than 50 ms: on a runner where the floor profile verifies in
+ * 43 ms, the negative control measured 43 ms and the gate would have let the omission through. The
+ * cost is measured on its own, in this JVM, with the same profile and pepper the process uses, and
+ * never from the two series the gate compares, so the negative control is not true by construction.
+ * The limit is never wider than 50 ms, so every run that passes also meets I159 as written, and half
+ * the cost leaves the same margin to the equal answer of the real code and to the immediate answer
+ * of the variant.
  */
 class LoginTimingGateIT extends LoginEndpointSupport {
 
@@ -39,8 +51,10 @@ class LoginTimingGateIT extends LoginEndpointSupport {
     private static final int ATTEMPTS = 200;
     private static final int WARM_UP = 10;
     private static final Duration LIMIT = Duration.ofMillis(50);
+    private static final int VERIFICATIONS = 30;
 
     private static LoginProcess process;
+    private static Duration limit;
 
     @BeforeAll
     static void startTheProcess() {
@@ -48,6 +62,7 @@ class LoginTimingGateIT extends LoginEndpointSupport {
                 "confia.web.delay.max-wait", "1ms",
                 "confia.web.rate-limit.admin-login.request-limit", "10000",
                 "confia.web.rate-limit.admin-login.failure-threshold", "10000"));
+        limit = limitFor(verificationCost());
     }
 
     @AfterAll
@@ -67,9 +82,10 @@ class LoginTimingGateIT extends LoginEndpointSupport {
         Gate gate = measure(this::existingAccount, this::unknownIdentifier);
 
         assertThat(gate.difference())
-                .as("median of the existing account: %d ms, median of the unknown identifier: %d ms",
-                        gate.first().toMillis(), gate.second().toMillis())
-                .isLessThanOrEqualTo(LIMIT);
+                .as("median of the existing account: %d ms, median of the unknown identifier: %d ms, "
+                        + "limit %d ms", gate.first().toMillis(), gate.second().toMillis(),
+                        limit.toMillis())
+                .isLessThanOrEqualTo(limit);
     }
 
     /** BI56: an unknown identifier answered at once, which is what omitting the decoy amounts to. */
@@ -81,9 +97,10 @@ class LoginTimingGateIT extends LoginEndpointSupport {
 
         assertThat(gate.difference())
                 .as("the difference the gate measured: %d ms (median of the existing account %d ms, "
-                        + "median of the immediate answer %d ms)", gate.difference().toMillis(),
-                        gate.first().toMillis(), gate.second().toMillis())
-                .isGreaterThan(LIMIT);
+                        + "median of the immediate answer %d ms, limit %d ms)",
+                        gate.difference().toMillis(), gate.first().toMillis(),
+                        gate.second().toMillis(), limit.toMillis())
+                .isGreaterThan(limit);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -93,6 +110,29 @@ class LoginTimingGateIT extends LoginEndpointSupport {
         Duration difference() {
             return first.minus(second).abs();
         }
+    }
+
+    /** The specified 50 ms, narrowed to half the cost of one verification when that is smaller. */
+    private static Duration limitFor(Duration verificationCost) {
+        Duration half = verificationCost.dividedBy(2);
+        return half.compareTo(LIMIT) < 0 ? half : LIMIT;
+    }
+
+    /** The median cost of one Argon2id verification of a wrong password, after a warm-up. */
+    private static Duration verificationCost() {
+        StoredPasswordHash stored = HASHER.hash(PlainPassword.of(PASSWORD));
+        PlainPassword wrong = PlainPassword.of(WRONG_PASSWORD);
+        for (int i = 0; i < WARM_UP; i++) {
+            HASHER.matches(wrong, stored);
+        }
+        List<Long> times = new ArrayList<>();
+        for (int i = 0; i < VERIFICATIONS; i++) {
+            long start = System.nanoTime();
+            boolean matched = HASHER.matches(wrong, stored);
+            times.add(System.nanoTime() - start);
+            assertThat(matched).isFalse();
+        }
+        return median(times);
     }
 
     private long existingAccount() {
