@@ -7,6 +7,7 @@
   },
   "include": [
     "src",
-    "eslint.d.ts"
+    "eslint.d.ts",
+    "vitest.d.ts"
   ]
 }

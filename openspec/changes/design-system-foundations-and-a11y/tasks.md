@@ -212,7 +212,7 @@ contra `main` antes del PR 3.
     `docs(openspec): record the design-system probe results`. Tamaño: 0 líneas efectivas (todo bajo `openspec/`). — Cubre S1 a S5 y habilita
     DS29 a DS39, DS43 a DS46 y DS66 a DS71.
 
-- [ ] 1.2 **PR 1 / 1a `01-package-and-tokens`: paquete `@confia/ui`, catálogo de versiones, cableado de Vitest, ESLint, tsconfig y cobertura (decisiones 1 y 13).**
+- [x] 1.2 **PR 1 / 1a `01-package-and-tokens`: paquete `@confia/ui`, catálogo de versiones, cableado de Vitest, ESLint, tsconfig y cobertura (decisiones 1 y 13).**
   - **Paso 0.** Crear la rama `change/design-system-foundations-and-a11y-01-package-and-tokens` desde el HEAD de la rama de artefactos y confirmar los
     artefactos del cambio como primer commit (`docs(openspec): add the design-system-foundations-and-a11y change artifacts`).
   - **ROJO.** (1) `packages/ui/src/render-smoke.test.tsx`: renderiza un componente trivial con Testing Library en jsdom y afirma su rol; el rojo
