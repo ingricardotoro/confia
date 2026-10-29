@@ -104,7 +104,8 @@ class WorkerProductionWiringTest {
                             "passwordResetLinkSender", "passwordResetSecureRandom",
                             "issuePasswordResetToken", "passwordResetIssuanceJobHandler",
                             "passwordResetIssuanceJob", "identityRetentionPurges",
-                            "purgeExpiredPasswordResetTokens", "passwordResetTokenPurgeJob");
+                            "purgeExpiredPasswordResetTokens", "purgeExpiredRefreshTokens",
+                            "passwordResetTokenPurgeJob", "refreshTokenPurgeJob");
             assertThat(context.getBeansOfType(PasswordResetLinkSender.class).values())
                     .as("the only sender of the worker fails explicitly")
                     .singleElement().isExactlyInstanceOf(UnavailablePasswordResetLinkSender.class);
