@@ -181,7 +181,7 @@ contra `main` antes del PR 3.
 
 ## Fase 1: sondas, paquete y tokens (PR 1, corte 13a-1)
 
-- [ ] 1.1 **Compuerta de sondas S1 a S5 (design §7; riesgos de la propuesta). No escribe código del repositorio.**
+- [x] 1.1 **Compuerta de sondas S1 a S5 (design §7; riesgos de la propuesta). No escribe código del repositorio.**
   - **Paso 0, directorio de trabajo.** Crear fuera del repositorio (en el directorio temporal de la sesión) un proyecto pnpm mínimo con una copia de
     `pnpm-workspace.yaml` (catálogo con TypeScript 6.0.3, Vitest 5.0.2, ESLint 10.11.0; `strictDepBuilds: true`; `allowBuilds` vigente) y de `.nvmrc`.
     Prohibido cambiar `pnpm-workspace.yaml` del repositorio en esta tarea.
