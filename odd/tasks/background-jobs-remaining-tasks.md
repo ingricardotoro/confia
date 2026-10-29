@@ -51,9 +51,9 @@ Hard order: 3.3 (V11) before 3.6 (V12).
 | T3.1 | delegated writer; parent ran the mutation verify after the writer's run was reaped for low memory | `04a-reset-issuance-scheduler` | `8714325` | 491 | BUILD SUCCESS 20 min 4 s; Surefire 186 + 2 610, Failsafe 656 | BUILD SUCCESS 42 min 43 s; PIT kernel 192/194, app 871/919; JaCoCo met | granted; approved (reliability lens, lineage `review-0c6ba0db28ada475`, acknowledged) |
 | T3.2 (4b) | delegated writer; builds on a copy outside OneDrive, see the T3.2 evidence | `04b-reset-issuance-handler` | `10cbd8a` | 779 | BUILD SUCCESS 21 min 3 s; Surefire 186 + 2 611, Failsafe 663 | not run (last branch of the task is 4c) | granted; approved together (reliability lens, lineage `review-c21140583d88afc7`, acknowledged) |
 | T3.2 (4c) | delegated writer; builds on a copy outside OneDrive, see the T3.2 evidence | `04c-reset-issuance-double-execution-and-isolation` | `a8b93b1` | 113 | BUILD SUCCESS 23 min 50 s; Surefire 186 + 2 611, Failsafe 667 | BUILD SUCCESS 44 min 48 s; PIT kernel 192/194, app 871/919; JaCoCo met (identity.domain 95, PIT 80) | granted; approved together (reliability lens, lineage `review-c21140583d88afc7`, acknowledged) |
-| T3.3 (5a-1) | delegated writer | `05a1-v11-purge-functions` | `04489e0` | 573 | pending | not run (last branch of the task is 5a-1c) | pending |
-| T3.3 (5a-1b) | delegated writer | `05a1b-purge-function-behaviour` | `4e7ffc7` | 450 | pending | not run (last branch of the task is 5a-1c) | pending |
-| T3.3 (5a-1c) | delegated writer; parent ran both verifies on the build copy outside the repo | `05a1c-refresh-purge-and-rotation` | `8ad7539`, `0b7a789` | 461 | BUILD SUCCESS 24 min 20 s; Surefire 186 + 2 611, Failsafe 704 | BUILD SUCCESS 43 min 26 s; PIT kernel 192/194, app 871/919; JaCoCo met | pending |
+| T3.3 (5a-1) | delegated writer | `05a1-v11-purge-functions` | `04489e0` | 573 | pending | not run (last branch of the task is 5a-1c) | granted; approved together (reliability lens, lineage `review-97b5fa12d1cc1d77`, acknowledged) |
+| T3.3 (5a-1b) | delegated writer | `05a1b-purge-function-behaviour` | `4e7ffc7` | 450 | pending | not run (last branch of the task is 5a-1c) | granted; approved together (reliability lens, lineage `review-97b5fa12d1cc1d77`, acknowledged) |
+| T3.3 (5a-1c) | delegated writer; parent ran both verifies on the build copy outside the repo | `05a1c-refresh-purge-and-rotation` | `8ad7539`, `0b7a789` | 461 | BUILD SUCCESS 24 min 20 s; Surefire 186 + 2 611, Failsafe 704 | BUILD SUCCESS 43 min 26 s; PIT kernel 192/194, app 871/919; JaCoCo met | granted; approved together (reliability lens, lineage `review-97b5fa12d1cc1d77`, acknowledged) |
 
 T2.6 evidence:
 
@@ -102,6 +102,15 @@ T3.2 evidence:
 - Review advisory finding (non-blocking, follow-up only): the handler Javadoc says two runs leave one open token, but in production
   the sender fails in `ensureAvailable()`, so no token is issued yet; reword it when a real sender exists.
 
+T3.3 review advisory findings (non-blocking, follow-up only):
+
+- `R3-floor-timezone-dependent` (warning): the refresh-family floor `now() - interval '30 days'` is calendar arithmetic in the
+  session `TimeZone`, which the function does not pin. Under daylight saving time the floor could be 29 days 23 hours. Honduras
+  has no daylight saving time and the tests pin UTC; fix with `SET TimeZone = 'UTC'` or `interval '720 hours'` in a later
+  migration, since V11 cannot change once merged.
+- `R3-lockwait-probe-unscoped` (suggestion): `RefreshPurgeVersusRotationConcurrencyIT` detects the lock wait by query text over
+  all backends; filter on the test session's `pg_backend_pid()`.
+
 T3.1 evidence:
 
 - RED: `test-compile` failed on the old port signature `schedule(InstitutionId, StaffAccountId)` and on the missing job type,
@@ -118,5 +127,5 @@ T3.1 evidence:
 ## Next step
 
 T3.3 closing checks, still pending: the deliberate breaks (`LEAST` floor, context check, `EXECUTE` granted to `PUBLIC`),
-`./mvnw verify` on `05a1` and `05a1b`, the native review, and updating `tasks.md`. Then T3.4, slice 5a-2
+`./mvnw verify` on `05a1` and `05a1b`, and updating `tasks.md`. Then T3.4, slice 5a-2
 `05a-identity-purge-jobs`.
