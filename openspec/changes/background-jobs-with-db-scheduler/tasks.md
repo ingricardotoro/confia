@@ -516,7 +516,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     a sender that fails explicitly`. Tamaño: nominal 300, realista 700 a 900; costura nombrada: la doble ejecución y el aislamiento por institución van a
     un PR 4c si se pasa. — Escenarios I232 a I237, I265 a I269, I277, BJ13, BJ19, BI98 y los escenarios del emisor y del restablecimiento completado.
 
-- [ ] 3.3 **PR 5a / 5a-1 `05a-v11-purge-functions`: `V11` con las funciones de purga de recuperación y de refresco, y su matriz (decisión 16, P2, P3).**
+- [x] 3.3 **PR 5a / 5a-1 `05a-v11-purge-functions`: `V11` con las funciones de purga de recuperación y de refresco, y su matriz (decisión 16, P2, P3).**
   - **ROJO.** Crear `test/java/com/confia/schema/RetentionPurgeFunctionsIT.java` por función
     (`identity_purge_password_reset_tokens` e `identity_purge_refresh_token_families`) con las **reglas de reloj de la base de datos** de este
     documento: una fila en el corte exacto se conserva y un segundo después se elimina [I239, I245, BI73]; un corte en el futuro no elimina una fila
