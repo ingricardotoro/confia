@@ -938,7 +938,7 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
     }
 
     @Test
-    void thePurgeFunctionsAreOwnedByTheOwnerRunWithItsRightsAndPinTheirSearchPath() {
+    void thePurgeFunctionsAreOwnedByTheOwnerRunWithItsRightsAndPinTheirSearchPathAndTimeZone() {
         for (String function : PURGE_FUNCTIONS) {
             var row = dsl.fetchOne("""
                     select pg_get_userbyid(p.proowner) as owner, p.prosecdef as definer,
@@ -950,7 +950,7 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
             assertThat(row.get("definer", Boolean.class)).as("%s is SECURITY DEFINER", function)
                     .isTrue();
             assertThat(row.get("settings", String[].class)).as("settings of %s", function)
-                    .containsExactly("search_path=pg_catalog, public");
+                    .containsExactly("search_path=pg_catalog, public", "TimeZone=UTC");
         }
     }
 

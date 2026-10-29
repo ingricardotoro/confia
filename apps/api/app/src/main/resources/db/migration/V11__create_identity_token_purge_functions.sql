@@ -10,7 +10,9 @@
 --   * SECURITY DEFINER, owned by confia_owner (the role Flyway migrates as; no explicit OWNER TO is
 --     needed, the same precedent as V3) with search_path pinned to pg_catalog, public. Every object
 --     is also qualified with public., because pg_temp is searched first for relations unless it is
---     named, and a caller could otherwise shadow a table with a temporary one.
+--     named, and a caller could otherwise shadow a table with a temporary one. TimeZone is pinned
+--     to UTC, because timestamptz minus a day interval is calendar arithmetic in the session time
+--     zone: under daylight saving time '30 days' could otherwise be 29 days 23 hours.
 --   * A hard-coded floor: the effective cut-off is LEAST(p_cutoff, now() - floor). The caller passes
 --     its own cut-off, computed from its Clock, so the boundary is testable to the second; the floor
 --     means a caller can only move the cut-off backwards, never delete a row younger than the floor,
@@ -30,6 +32,7 @@ CREATE FUNCTION identity_purge_password_reset_tokens(p_cutoff timestamptz, p_lim
     LANGUAGE plpgsql
     SECURITY DEFINER
     SET search_path = pg_catalog, public
+    SET TimeZone = 'UTC'
 AS $$
 DECLARE
     v_institution uuid := NULLIF(current_setting('app.institution_id', true), '')::uuid;
@@ -81,6 +84,7 @@ CREATE FUNCTION identity_purge_refresh_token_families(
     LANGUAGE plpgsql
     SECURITY DEFINER
     SET search_path = pg_catalog, public
+    SET TimeZone = 'UTC'
 AS $$
 DECLARE
     v_institution uuid := NULLIF(current_setting('app.institution_id', true), '')::uuid;
