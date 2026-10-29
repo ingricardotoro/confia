@@ -142,3 +142,45 @@ T3.1 evidence:
 
 T3.4, slice 5a-2 `05a-identity-purge-jobs`, delegated to one writer, on branch `05a2-identity-purge-jobs` from `05a1c`.
 In parallel: change 13 `design-system-foundations-and-a11y` (SDD explore and propose) in the worktree `C:\dev\confia-frontend`.
+
+T3.4 evidence:
+
+- Split by the seam named in `tasks.md`: the whole task measured about 1 250 effective lines. Branch `05a2` (commit `4bafbb3`,
+  798 effective lines) holds the reset-token purge: `IdentityRetentionPurges` (one operation), `PurgeExpiredPasswordResetTokens`,
+  `RetentionPurgeBatches`, the Jooq adapter, the worker registration, `IdentityTokenPurgeJobsIT`, `AuditChainAfterPurgeIT`,
+  `IdentityPurgeJobsOnWorkerIT`, `RecurringJobCatalogTest` (one job). Branch `05a2b-refresh-successor-clearing` (created from `05a2`,
+  commit `7537337`, 536 effective lines) holds the successor clearing and the family purge with `RefreshTokenPurgeIT`.
+- RED: the first compile of the new tests failed on the missing `PurgeExpiredPasswordResetTokens`, `PurgeExpiredRefreshTokens`,
+  `IdentityRetentionPurges` and `JooqIdentityRetentionPurges` (cannot find symbol). The first run with the use cases in place failed
+  13 of 22 tests only because the tests compared `after_value` as text and the column is `jsonb` (members reordered and spaced);
+  the tests now compare trees (`IdentityPurgeFixtures.detail`). That was a defect of the tests, not of the code.
+- Deliberate breaks, each reverted and confirmed with `cmp` against a copy kept outside the repository:
+  - Entry written in a transaction other than the purge: a nested `runner.execute` has no effect (it joins the outer transaction,
+    so the test still passed); the break that works holds the entries and writes them in a second transaction after the loop. It fails
+    `anEntryThatFailsAfterTheDeletionRollsTheBatchBack` and `aFailureInTheSecondBatchLeavesTheFirstCommittedWithItsEntry` [AT21].
+  - No entry when the count is zero: `aPurgeThatFoundNothingStillLeavesItsEntryWithCountZero` and `aSecondRunChangesNothingReportsZeroAndDoesNotFail` fail [AT19].
+  - Clearing without the `GRACE_WINDOW` guard: `RefreshTokenPurgeIT` fails 4 of 11, among them both cases of
+    `insideTheWindowAndAtTheExactBorderTheSuccessorIsKept` (the 10:00:10 border included) [I253].
+- Owner decision 2026-10-28 (option B), replacing the slf4j exemption: the backlog `WARN` goes through the new
+  `com.confia.shared.observability.events.OperationalEventLog`, sibling of `SecurityEventLog`. Correction after the coordinator's
+  check against the spec (identity spec I275, design.md decision 17): the event is again exactly `retention_purge_backlog` and the
+  line carries `runId`, `task` and `institution`. `warn(event, runId, taskName, institutionId)` accepts only a closed event
+  identifier (`[a-z][a-z0-9_.]{0,79}`), a closed task identifier (`[a-z][a-z0-9_.-]{0,79}`, the real task names contain dots and
+  dashes) and two `UUID`s; no free text. `RetentionPurgeBatches` no longer imports slf4j and `IdentityScopeExclusionInventoryTest`
+  again forbids slf4j in the whole identity module (no diff against `f94557a`). The handlers build `new OperationalEventLog()` in
+  `IdentityWorkerConfiguration`: a bean is rejected by `ProcessBeanIsolationTest`, like `SecurityEventLog` in `LogIn`.
+  `shared/observability/events/package-info.java` names `RetentionPurgeBatches` as its consumer (ADR-0022).
+- Slicing (local, unpushed): `05a2a-operational-event-log` (`6ba0082`, 184 effective lines, from `f94557a`: class, test, package-info);
+  `05a2` (`9e2a09d`, 799); `05a2b` (`7b38d07` plus this document, 539). Additions plus deletions, excluding `openspec` and `odd`;
+  no comment, Javadoc or assertion was cut to fit.
+- RED of `OperationalEventLog`: the first compile failed on the missing class; after the correction, `OperationalEventLogTest`
+  failed to compile against the old two-argument `warn` (cannot apply to given types), then 6 of 6 passed.
+- Deliberate break: a real use of `org.slf4j.Logger`/`LoggerFactory` in `RetentionPurgeBatches` fails
+  `noProductionClassOfIdentityDependsOnAnyLoggingFramework` (17 tests, 1 failure); a bare import does not (no bytecode
+  dependency). Reverted and confirmed with `cmp`.
+- The backlog test asserts the `WARN` through the real class: message `retention_purge_backlog`, no arguments, and exactly the
+  pairs `runId`, `task`, `institution`.
+- `./mvnw -B verify`: 05a2a green (kernel 186, unit 2 617, integration 704; 9 min 3 s, after one rerun because
+  `LoginTimingGateIT` measured 49 ms once, a timing flake unrelated to this change); 05a2 green (186, 2 619, 715; 9 min 36 s);
+  05a2b green (186, 2 619, 726; 9 min 8 s). `-Pmutation-gate` on 05a2b green in 28 min 51 s.
+- Mutation gate (re-run after the decision): PIT kernel 192/194, app 872/919; JaCoCo met.
