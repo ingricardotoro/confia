@@ -51,9 +51,9 @@ Hard order: 3.3 (V11) before 3.6 (V12).
 | T3.1 | delegated writer; parent ran the mutation verify after the writer's run was reaped for low memory | `04a-reset-issuance-scheduler` | `8714325` | 491 | BUILD SUCCESS 20 min 4 s; Surefire 186 + 2 610, Failsafe 656 | BUILD SUCCESS 42 min 43 s; PIT kernel 192/194, app 871/919; JaCoCo met | granted; approved (reliability lens, lineage `review-0c6ba0db28ada475`, acknowledged) |
 | T3.2 (4b) | delegated writer; builds on a copy outside OneDrive, see the T3.2 evidence | `04b-reset-issuance-handler` | `10cbd8a` | 779 | BUILD SUCCESS 21 min 3 s; Surefire 186 + 2 611, Failsafe 663 | not run (last branch of the task is 4c) | granted; approved together (reliability lens, lineage `review-c21140583d88afc7`, acknowledged) |
 | T3.2 (4c) | delegated writer; builds on a copy outside OneDrive, see the T3.2 evidence | `04c-reset-issuance-double-execution-and-isolation` | `a8b93b1` | 113 | BUILD SUCCESS 23 min 50 s; Surefire 186 + 2 611, Failsafe 667 | BUILD SUCCESS 44 min 48 s; PIT kernel 192/194, app 871/919; JaCoCo met (identity.domain 95, PIT 80) | granted; approved together (reliability lens, lineage `review-c21140583d88afc7`, acknowledged) |
-| T3.3 (5a-1) | delegated writer; parent added the UTC fix inline | `05a1-v11-purge-functions` | `04489e0`, `3d25139` | 577 | BUILD SUCCESS 12 min 56 s; Surefire 186 + 2 611, Failsafe 674 | not run (last branch of the task is 5a-1c) | earlier code approved twice (reliability lens, lineages `review-97b5fa12d1cc1d77` and `review-e27cce41c1db52d5`, acknowledged); the stack with the UTC fix is reviewed after this record |
-| T3.3 (5a-1b) | delegated writer | `05a1b-purge-function-behaviour` | `422d9a3` | 450 | BUILD SUCCESS 11 min 48 s; Surefire 186 + 2 611, Failsafe 694 | not run (last branch of the task is 5a-1c) | earlier code approved twice (reliability lens, lineages `review-97b5fa12d1cc1d77` and `review-e27cce41c1db52d5`, acknowledged); the stack with the UTC fix is reviewed after this record |
-| T3.3 (5a-1c) | delegated writer; parent ran the verifies | `05a1c-refresh-purge-and-rotation` | `bcabd7d`, `4ba3460` | 461 | BUILD SUCCESS 10 min 10 s; Surefire 186 + 2 611, Failsafe 704 | BUILD SUCCESS 27 min 47 s; PIT kernel 192/194, app 871/919; JaCoCo met | earlier code approved twice (reliability lens, lineages `review-97b5fa12d1cc1d77` and `review-e27cce41c1db52d5`, acknowledged); the stack with the UTC fix is reviewed after this record |
+| T3.3 (5a-1) | delegated writer; parent added the UTC fix inline | `05a1-v11-purge-functions` | `04489e0`, `3d25139` | 577 | BUILD SUCCESS 12 min 56 s; Surefire 186 + 2 611, Failsafe 674 | not run (last branch of the task is 5a-1c) | earlier code approved twice (reliability lens, lineages `review-97b5fa12d1cc1d77` and `review-e27cce41c1db52d5`, acknowledged); the stack with the UTC fix approved (reliability lens, lineage `review-25ef682b35bc1ba4`, acknowledged); PRs #208, #209, #210 |
+| T3.3 (5a-1b) | delegated writer | `05a1b-purge-function-behaviour` | `422d9a3` | 450 | BUILD SUCCESS 11 min 48 s; Surefire 186 + 2 611, Failsafe 694 | not run (last branch of the task is 5a-1c) | earlier code approved twice (reliability lens, lineages `review-97b5fa12d1cc1d77` and `review-e27cce41c1db52d5`, acknowledged); the stack with the UTC fix approved (reliability lens, lineage `review-25ef682b35bc1ba4`, acknowledged); PRs #208, #209, #210 |
+| T3.3 (5a-1c) | delegated writer; parent ran the verifies | `05a1c-refresh-purge-and-rotation` | `bcabd7d`, `4ba3460` | 461 | BUILD SUCCESS 10 min 10 s; Surefire 186 + 2 611, Failsafe 704 | BUILD SUCCESS 27 min 47 s; PIT kernel 192/194, app 871/919; JaCoCo met | earlier code approved twice (reliability lens, lineages `review-97b5fa12d1cc1d77` and `review-e27cce41c1db52d5`, acknowledged); the stack with the UTC fix approved (reliability lens, lineage `review-25ef682b35bc1ba4`, acknowledged); PRs #208, #209, #210 |
 
 T2.6 evidence:
 
@@ -122,6 +122,8 @@ T3.3 evidence:
   - `R3-reset-batch-short-under-concurrency` (suggestion): two concurrent password-reset purges can return a short batch, which
     delays the rest to the next run; `FOR UPDATE SKIP LOCKED` in the subquery would keep batches full.
   - `R3-floor-timezone-dependent` (warning): fixed in `3d25139`, see above.
+  - `R3-null-cutoff-silently-uses-floor` (suggestion): `LEAST` ignores NULL, so a NULL `p_cutoff` becomes the floor and a NULL
+    `p_limit` becomes 1; refuse NULL or pin the behaviour with a test.
 
 T3.1 evidence:
 
@@ -138,4 +140,5 @@ T3.1 evidence:
 
 ## Next step
 
-T3.4, slice 5a-2 `05a-identity-purge-jobs`, delegated to one writer, on a branch from `05a1c`.
+T3.4, slice 5a-2 `05a-identity-purge-jobs`, delegated to one writer, on branch `05a2-identity-purge-jobs` from `05a1c`.
+In parallel: change 13 `design-system-foundations-and-a11y` (SDD explore and propose) in the worktree `C:\dev\confia-frontend`.
