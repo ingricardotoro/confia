@@ -19,7 +19,11 @@
     --color-border-interactive: var(--dark-border-interactive);
     --color-border-focus: var(--dark-border-focus);
 
+    --color-primary-soft-bg: var(--dark-primary-soft-bg);
     --color-primary-soft-fg: var(--dark-primary-soft-fg);
+
+    --shadow-md: var(--shadow-dark-md);
+    --shadow-xl: var(--shadow-dark-xl);
 
     --color-status-paid: #4ADE80;
     --color-status-paid-bg: #0F2A1B;
@@ -72,7 +76,11 @@
   --color-border-interactive: var(--dark-border-interactive);
   --color-border-focus: var(--dark-border-focus);
 
+  --color-primary-soft-bg: var(--dark-primary-soft-bg);
   --color-primary-soft-fg: var(--dark-primary-soft-fg);
+
+  --shadow-md: var(--shadow-dark-md);
+  --shadow-xl: var(--shadow-dark-xl);
 
   --color-status-paid: #4ADE80;
   --color-status-paid-bg: #0F2A1B;
