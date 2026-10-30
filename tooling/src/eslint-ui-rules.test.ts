@@ -15,11 +15,11 @@ interface Finding {
   readonly column: number;
 }
 
-async function lint(code: string, filePath: string): Promise<Finding[]> {
+async function lint(code: string, filePath: string, options?: { portal: boolean }): Promise<Finding[]> {
   const eslint = new ESLint({
     cwd: UI_ROOT,
     overrideConfigFile: true,
-    overrideConfig: uiSourceRules(),
+    overrideConfig: uiSourceRules(options),
   });
   const [result] = await eslint.lintText(code, { filePath: join(UI_ROOT, filePath) });
   return result?.messages ?? [];
@@ -71,6 +71,20 @@ describe("text in JSX (ADR-0011)", () => {
   );
 });
 
+describe("text in JSX inside the money scopes", () => {
+  it.each(["src/format/Bad.tsx", "src/domain/money-amount/Bad.tsx"])(
+    "keeps both text controls on a component in %s",
+    async (filePath) => {
+      const code = 'export const Bad = () => <button aria-label="Cerrar">Guardar</button>;';
+      const found = (await syntax(code, filePath)).sort();
+      expect(found).toEqual([
+        expect.stringContaining("Hard-coded accessible text"),
+        expect.stringContaining("Hard-coded interface text"),
+      ]);
+    },
+  );
+});
+
 describe("manual number formatting", () => {
   it("BX03: rejects toFixed outside src/format", async () => {
     const found = await syntax("export const text = (x: string) => x.toFixed(2);", "src/atoms/amount/a.ts");
@@ -104,13 +118,19 @@ describe("money is never converted or computed with (CLAUDE.md rules 1 and 3)", 
     ["division", "export const a = (money: { amount: string }) => money.amount / 2;"],
     ["remainder", "export const a = (money: { amount: string }) => money.amount % 2;"],
     ["compound assignment", "export let a = 0; a += 1;"],
+    ["new Number()", "export const a = (money: { amount: string }) => new Number(money.amount);"],
+    ["toPrecision", "export const a = (n: number) => n.toPrecision(4);"],
+    ["unary minus on a non-literal", "export const a = (money: { amount: string }) => -money.amount;"],
+    ["increment", "export let a = 0; a++;"],
+    ["exponentiation", "export const a = (money: { amount: string }) => money.amount ** 2;"],
+    ["division assignment", "export let a = 8; a /= 2;"],
   ] as const;
 
   describe.each(MONEY_SCOPES)("in %s", (filePath) => {
     it.each(arithmetic)("BX09 BX10 DS40 DS41: rejects %s", async (_name, code) => {
       const found = await syntax(code, filePath);
       expect(found).toHaveLength(1);
-      expect(found[0]).toMatch(/money|number|arithmetic/i);
+      expect(found[0]).toMatch(/^Money arithmetic or conversion/);
     });
 
     it("accepts a template literal and RegExp.test", async () => {
@@ -131,17 +151,17 @@ describe("money is never converted or computed with (CLAUDE.md rules 1 and 3)", 
 describe("primitive tokens and visual literals (design.md decisions 6 and 7)", () => {
   const BAD = "src/molecules/card/bad.ts";
   const violations = [
-    ["a --palette- reference", 'export const css = "var(--palette-blue-600)";', 'export const css = "var(--palette-blue-600)";'.indexOf('"') + 1],
-    ["a --palette- reference in a template", "export const css = `var(--palette-${n})`;", 0],
-    ["a hexadecimal colour", 'export const c = "#2563EB";', 0],
-    ["a short hexadecimal colour", 'export const c = "#fff";', 0],
-    ["rgb()", 'export const c = "rgb(37, 99, 235)";', 0],
-    ["hsl()", 'export const c = "hsl(221 83% 53%)";', 0],
-    ["an arbitrary Tailwind colour", 'export const c = "bg-[#2563EB] p-2";', 0],
-    ["a default palette variable", 'export const c = "var(--color-blue-600)";', 0],
-    ["a default palette class", 'export const c = "bg-blue-600";', 0],
-    ["a default palette text class", 'export const c = "p-2 text-red-500";', 0],
-    ["a default palette class with a variant", 'export const c = "hover:dark:bg-slate-900/50";', 0],
+    ["a --palette- reference", 'export const css = "var(--palette-blue-600)";'],
+    ["a --palette- reference in a template", "export const css = `var(--palette-${n})`;"],
+    ["a hexadecimal colour", 'export const c = "#2563EB";'],
+    ["a short hexadecimal colour", 'export const c = "#fff";'],
+    ["rgb()", 'export const c = "rgb(37, 99, 235)";'],
+    ["hsl()", 'export const c = "hsl(221 83% 53%)";'],
+    ["an arbitrary Tailwind colour", 'export const c = "bg-[#2563EB] p-2";'],
+    ["a default palette variable", 'export const c = "var(--color-blue-600)";'],
+    ["a default palette class", 'export const c = "bg-blue-600";'],
+    ["a default palette text class", 'export const c = "p-2 text-red-500";'],
+    ["a default palette class with a variant", 'export const c = "hover:dark:bg-slate-900/50";'],
   ] as const;
 
   it.each(violations)("DS04 DS05: rejects %s", async (_name, code) => {
@@ -151,7 +171,7 @@ describe("primitive tokens and visual literals (design.md decisions 6 and 7)", (
     expect(hits[0]?.message).toMatch(/primitive|visual literal/i);
     // The finding points at the literal itself, on the line of the violation.
     expect(hits[0]?.line).toBe(1);
-    expect(hits[0]?.column).toBeGreaterThan(0);
+    expect(hits[0]?.column).toBe(code.search(/["`]/) + 1);
   });
 
   it.each([
@@ -226,6 +246,15 @@ describe("layers and data access, mirrored from dependency-cruiser (BX28 to BX34
     for (const filePath of ["src/atoms/button/Bad.ts", "src/molecules/row/Bad.ts", "src/domain/money-amount/Bad.ts", "src/lib/bad.ts"]) {
       expect(await imports(code, filePath), filePath).toHaveLength(2);
     }
+  });
+
+  it("keeps the portal ban on the administrative contract when the UI rules are composed with it", async () => {
+    const code = 'import type { Money } from "@confia/contracts/admin";';
+    const found = (await lint(code, "src/domain/money-amount/Bad.ts", { portal: true })).filter(
+      (m) => m.ruleId === "no-restricted-imports",
+    );
+    expect(found.map((m) => m.message)).toEqual([expect.stringContaining("ADR-0003")]);
+    expect(await imports(code, "src/domain/money-amount/Bad.ts")).toEqual([]);
   });
 
   it("accepts the public entry point of the contracts", async () => {

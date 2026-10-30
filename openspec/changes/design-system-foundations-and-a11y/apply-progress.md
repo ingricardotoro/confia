@@ -202,3 +202,12 @@ depende de él; se incorpora con el primer componente que use ganchos (3.1).
 (f) `window.fetch` y `globalThis.fetch` no se cubren (la regla de globales solo ve la referencia directa); queda como posible endurecimiento con `no-restricted-properties`.
 
 Cierre: ver la entrada de cierre del commit; `pnpm turbo run lint typecheck test build --filter=!@confia/api` 14 de 14 y `pnpm audit --audit-level high` sin altas.
+
+### Corrección de la revisión nativa en 13a-2b, 2026-10-29
+
+Dos huecos reales de la puerta, corregidos con rojo previo. (1) Un `.tsx` no de prueba bajo `src/format/` perdía `JSX_TEXT` y `JSX_ACCESSIBLE_TEXT` porque las entradas de
+`src/format` reemplazaban a la de `src/**/*.tsx`; rojo observado: el código con texto y `aria-label` literales devolvía `[]`. Ahora hay una entrada `src/format/**/*.tsx` que
+los compone. (2) `importRules` fijaba `contractPatterns(false)`: con `confiaEslint({ portal: true, ui: true })` se perdía la prohibición del contrato administrativo en
+`src/**`; rojo observado: la prueba con `{ portal: true }` no devolvió ningún hallazgo. `uiSourceRules({ portal })` lo propaga. Opcionales hechos: la aserción de columna usa
+la posición real del literal en todos los casos, y la cobertura de importes añade `new Number`, `toPrecision`, `-` sobre un no literal, `++`, `**` y `/=`, cada una con el
+mensaje propio del control. Cierre: `tooling` 92 pruebas en las dos suites de la tarea; `pnpm turbo run lint typecheck test build --filter=!@confia/api` 14 de 14.

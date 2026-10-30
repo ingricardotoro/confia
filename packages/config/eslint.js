@@ -144,6 +144,11 @@ const SYNTAX_SCOPES = [
     controls: [MONEY_ARITHMETIC, PRIMITIVE_TOKEN, VISUAL_LITERAL],
   },
   {
+    files: [`${FORMAT_SCOPE}/*.tsx`],
+    ignores: [...TESTS, ...STORIES, ...FIXTURES],
+    controls: [JSX_TEXT, JSX_ACCESSIBLE_TEXT, MONEY_ARITHMETIC, PRIMITIVE_TOKEN, VISUAL_LITERAL],
+  },
+  {
     files: ["src/domain/money-amount/**/*.{ts,tsx}"],
     ignores: [...TESTS, ...STORIES, ...FIXTURES],
     controls: [MONEY_ARITHMETIC, PRIMITIVE_TOKEN, VISUAL_LITERAL],
@@ -174,11 +179,11 @@ const NO_MOLECULES = {
 };
 
 /** The single `no-restricted-imports` entry of a group: contract mirror + data access + its layers. */
-function importRules(layerPatterns) {
+function importRules(portal, layerPatterns) {
   return {
     "no-restricted-imports": [
       "error",
-      { paths: NO_DATA_ACCESS, patterns: [...contractPatterns(false), ...layerPatterns] },
+      { paths: NO_DATA_ACCESS, patterns: [...contractPatterns(portal), ...layerPatterns] },
     ],
   };
 }
@@ -192,9 +197,11 @@ const NO_REQUESTS = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource"].map(
  * The static rules of packages/ui. Core ESLint rules only (`no-restricted-syntax`,
  * `no-restricted-globals`, `no-restricted-imports`).
  *
+ * @param {{ portal?: boolean }} [options] `portal` keeps the ban on the administrative contract
+ * (ADR-0003), because the composed import entries replace the one from `contractImportRestrictions`.
  * @returns {import("eslint").Linter.Config[]}
  */
-export function uiSourceRules() {
+export function uiSourceRules({ portal = false } = {}) {
   return [
     { files: ["**/*.ts", "**/*.tsx"], languageOptions: { parser: tseslint.parser } },
     { files: ["**/*.{ts,tsx,js,mjs}"], rules: { "no-restricted-globals": ["error", ...NO_REQUESTS] } },
@@ -204,9 +211,9 @@ export function uiSourceRules() {
       // A bare ["error"] would inherit the options of the previous entry, so "no controls" is "off".
       rules: { "no-restricted-syntax": controls.length === 0 ? "off" : ["error", ...controls] },
     })),
-    { files: ["src/**/*.{ts,tsx}"], rules: importRules([]) },
-    { files: ["src/atoms/**"], rules: importRules([NO_MOLECULES, NO_DOMAIN]) },
-    { files: ["src/molecules/**"], rules: importRules([NO_DOMAIN]) },
+    { files: ["src/**/*.{ts,tsx}"], rules: importRules(portal, []) },
+    { files: ["src/atoms/**"], rules: importRules(portal, [NO_MOLECULES, NO_DOMAIN]) },
+    { files: ["src/molecules/**"], rules: importRules(portal, [NO_DOMAIN]) },
   ];
 }
 
@@ -224,7 +231,7 @@ export function confiaEslint({ tsconfigRootDir, ignores = [], portal = false, ui
       },
     },
     contractImportRestrictions({ portal }),
-    ...(ui ? uiSourceRules() : []),
+    ...(ui ? uiSourceRules({ portal }) : []),
     {
       files: ["**/*.js"],
       ...tseslint.configs.disableTypeChecked,
