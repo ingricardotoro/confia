@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineBrowserCommand, playwright } from "@vitest/browser-playwright";
 import { configDefaults, defineConfig } from "vitest/config";
 import { confiaVitest } from "@confia/config/vitest";
+import { parseApiPort } from "./src/test/api-port.ts";
 
 // Two projects. "unit" runs in jsdom and is what `test` and CI's frontend job run, so a clean machine
 // without a browser stays green. "a11y" is the accessibility gate (design.md decision 8): it runs the
@@ -14,7 +15,8 @@ export default defineConfig({
   test: {
     // Vitest's default API port (63315) falls in a range Windows reserves on some machines (listen
     // EACCES), so the port is set here: outside every excluded range seen so far, and overridable.
-    api: { port: Number(process.env["CONFIA_VITEST_API_PORT"] ?? 51730) },
+    // An unusable override throws instead of falling back to that default (src/test/api-port.ts).
+    api: { port: parseApiPort(process.env["CONFIA_VITEST_API_PORT"]) },
     coverage: {
       provider: "v8",
       // Every source file counts in the denominator, tested or not (build-integrity, BX22 and BX24).

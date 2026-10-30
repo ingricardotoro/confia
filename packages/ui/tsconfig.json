@@ -5,7 +5,8 @@
     "jsx": "react-jsx",
     "module": "Preserve",
     "moduleResolution": "Bundler",
-    "types": ["node", "vitest/importMeta", "vite/client"]
+    "types": ["node", "vitest/importMeta", "vite/client"],
+    "allowImportingTsExtensions": true
   },
   "include": ["src", ".storybook/**/*", "vitest.config.ts"]
 }

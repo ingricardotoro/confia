@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   THEMES,
   checkStoryAccessibility,
@@ -50,6 +50,57 @@ describe("the gate plumbing", () => {
     await checkStoryAccessibility(storyRendering("fixtures--clean", "<p>Texto</p>"), "light");
 
     expect(document.body.children).toHaveLength(before);
+  });
+
+  describe("leaves the page as it found it", () => {
+    afterEach(() => {
+      delete document.documentElement.dataset["theme"];
+    });
+
+    it("restores the data-theme the page had before the check", async () => {
+      document.documentElement.dataset["theme"] = "dark";
+
+      await checkStoryAccessibility(storyRendering("fixtures--clean", "<p>Texto</p>"), "light");
+
+      expect(document.documentElement.dataset["theme"]).toBe("dark");
+    });
+
+    it("removes the data-theme when the page had none", async () => {
+      await checkStoryAccessibility(storyRendering("fixtures--clean", "<p>Texto</p>"), "dark");
+
+      expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+    });
+
+    it("restores the page, and removes the container, when the story throws", async () => {
+      document.documentElement.dataset["theme"] = "light";
+      const before = document.body.children.length;
+      const broken: GateStory = { id: "fixtures--broken", run: () => Promise.reject(new Error("play failed")) };
+
+      await expect(checkStoryAccessibility(broken, "dark")).rejects.toThrow("play failed");
+
+      expect(document.documentElement.dataset["theme"]).toBe("light");
+      expect(document.body.children).toHaveLength(before);
+    });
+
+    it("lets the story release what it rendered while its container is still attached", async () => {
+      let container: HTMLElement | undefined;
+      let attachedOnLoad: boolean | undefined;
+      const story: GateStory = {
+        id: "fixtures--root",
+        run: ({ canvasElement } = {}) => {
+          container = canvasElement;
+          return Promise.resolve();
+        },
+        load: () => {
+          attachedOnLoad = container?.isConnected;
+          return Promise.resolve();
+        },
+      };
+
+      await checkStoryAccessibility(story, "light");
+
+      expect(attachedOnLoad).toBe(true);
+    });
   });
 
   it("blocks a story with an image that has no alternative text, in every theme", async () => {

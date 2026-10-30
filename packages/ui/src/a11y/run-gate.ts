@@ -13,6 +13,11 @@ export type Theme = (typeof THEMES)[number];
 export interface GateStory {
   readonly id: string;
   run(context?: { canvasElement?: HTMLElement; globals?: Record<string, unknown> }): Promise<void>;
+  /**
+   * Composed stories keep the unmount of what they rendered in a list that only runs at the start of
+   * the next `run` or `load`. Calling it is how the gate releases the React root right away.
+   */
+  load?(): Promise<void>;
 }
 
 export interface GateResult {
@@ -24,16 +29,28 @@ export interface GateResult {
   readonly reported: Result[];
 }
 
-/** Renders the story in the theme, waits for its `play`, and evaluates it with the tags of the policy. */
+/**
+ * Renders the story in the theme, waits for its `play`, and evaluates it with the tags of the policy.
+ * Whatever happens, the React root is unmounted, the container removed and the `data-theme` the page
+ * had before the check put back, so one story can never leak into the next.
+ */
 export async function checkStoryAccessibility(story: GateStory, theme: Theme): Promise<GateResult> {
-  document.documentElement.dataset["theme"] = theme;
+  const root = document.documentElement;
+  const previousTheme = root.dataset["theme"];
+  root.dataset["theme"] = theme;
   const canvas = document.body.appendChild(document.createElement("div"));
   try {
     await story.run({ canvasElement: canvas, globals: { theme } });
     const outcome = await axe.run(canvas, axeRunOptions);
     return { storyId: story.id, theme, ...partitionViolations(outcome.violations, outcome.incomplete) };
   } finally {
-    canvas.remove();
+    try {
+      await story.load?.();
+    } finally {
+      canvas.remove();
+      if (previousTheme === undefined) delete root.dataset["theme"];
+      else root.dataset["theme"] = previousTheme;
+    }
   }
 }
 

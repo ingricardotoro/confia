@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -13,7 +13,8 @@ const sharedFolders = ["dist", "coverage", "reports"].map((name) => join(reposit
 describe("the generated-output probe tree", () => {
   it("lives in the OS temporary directory, outside the repository", () => {
     withProbeTree("dist", (root) => {
-      expect(root.startsWith(tmpdir())).toBe(true);
+      // withProbeTree resolves symlinks, so the comparison must too: TMPDIR may be a link (macOS, a junction).
+      expect(root.startsWith(realpathSync(tmpdir()))).toBe(true);
       expect(relative(repositoryRoot, root).startsWith(`..${sep}`) || relative(repositoryRoot, root) === "..").toBe(true);
       expect(existsSync(join(root, "packages", "ui", "dist", "cruise-probe.js"))).toBe(true);
     });

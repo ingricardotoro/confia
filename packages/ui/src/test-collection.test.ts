@@ -1,7 +1,8 @@
-import { globSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import config from "../vitest.config";
+import { collectedFiles } from "./test/collection";
 
 const packageRoot = join(import.meta.dirname, "..");
 const normalize = (path: string) => path.replaceAll("\\", "/");
@@ -16,23 +17,20 @@ const projects = (config.test?.projects ?? []).filter(
   (project): project is { test: { name: string; include?: string[]; exclude?: string[] } } =>
     typeof project === "object" && "test" in project,
 );
+// Every file under src, relative to the package. Patterns are matched against this list (never
+// expanded on disk), so the node_modules and dist excludes of Vitest's defaults cost nothing.
+const filesUnderSrc = readdirSync(join(packageRoot, "src"), { recursive: true }).map((entry) =>
+  normalize(`src/${entry.toString()}`),
+);
 const collectedBy = (name: string) => {
   const test = projects.find((project) => project.test.name === name)?.test;
-  const excluded = new Set(test?.exclude?.flatMap((pattern) => globSync(pattern, { cwd: packageRoot })).map(normalize));
-  return new Set(
-    test?.include
-      ?.flatMap((pattern) => globSync(pattern, { cwd: packageRoot }))
-      .map(normalize)
-      .filter((path) => !excluded.has(path)),
-  );
+  return collectedFiles(filesUnderSrc, test?.include, test?.exclude);
 };
 
 describe("the test collection", () => {
   const unit = collectedBy("unit");
   const browser = collectedBy("a11y");
-  const onDisk = readdirSync(join(packageRoot, "src"), { recursive: true })
-    .map((entry) => normalize(`src/${entry.toString()}`))
-    .filter((path) => /\.test\.tsx?$/.test(path) && !path.includes("/__fixtures__/"));
+  const onDisk = filesUnderSrc.filter((path) => /\.test\.tsx?$/.test(path) && !path.includes("/__fixtures__/"));
 
   it("evaluates a real set of test files", () => {
     expect(onDisk.length).toBeGreaterThan(0);
