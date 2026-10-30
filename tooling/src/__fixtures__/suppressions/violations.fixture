@@ -1,0 +1,10 @@
+// eslint-disable-next-line no-console
+console.log("uncited disable");
+// @ts-ignore
+const ignored: number = "uncited ignore";
+// @ts-expect-error
+const expected: number = "uncited expect";
+// @ts-expect-error ADR-9999: this decision record does not exist
+const unknown: number = "cites a missing ADR";
+export const config = { a11y: { disable: true } };
+export const vitest = { test: "off" };

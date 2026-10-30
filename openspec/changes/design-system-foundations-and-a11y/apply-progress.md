@@ -162,3 +162,43 @@ constante) y nombra `UiKey` y el archivo cuando se concatena con un `string` (Ap
 
 Cierre: `pnpm install --frozen-lockfile` y `pnpm turbo run lint typecheck test build --filter=!@confia/api` 14 de 14; `pnpm audit --audit-level high` sin altas
 (2 bajas y 2 moderadas).
+
+## Tarea 2.2, reglas de ESLint de ADR-0011 y escáner de supresiones (13a-2, parte 2b), 2026-10-29
+
+Rama `change/design-system-foundations-and-a11y-13a-2b-lint-rules-and-suppressions`, apilada sobre 13a-2a (`155512d`). Commit:
+`feat(config): enforce the ADR-0011 and design-token rules on packages/ui`. Sin dependencias nuevas (solo reglas del núcleo de ESLint).
+
+**Reglas** (`packages/config/eslint.js`, `uiSourceRules()`; `confiaEslint({ ui: true })` las activa en `packages/ui/eslint.config.js`):
+- `no-restricted-syntax`, una lista completa de selectores por grupo de archivos (una entrada posterior reemplaza a la anterior): texto en JSX y atributos accesibles
+  (`aria-label`, `aria-description`, `title`, `alt`, `placeholder`, `label`, también dentro de `{}`), `toFixed`/`toLocaleString` fuera de `src/format/**`, aritmética y
+  conversión de importes en `src/format/**` y `src/domain/money-amount/**` (`Number`, `parseFloat`, `parseInt`, `Math.*`, `+` unario, `- * / % **` y sus asignaciones, `++`),
+  cadenas `--palette-` fuera de `src/tokens/**` y literales visuales (hexadecimal, `rgb()`/`hsl()`/…, `--color-<paleta>-N`, clases de la paleta predeterminada).
+- `no-restricted-globals`: `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource` en todo `packages/ui`.
+- `no-restricted-imports`, **compuesta** con `contractImportRestrictions` en una entrada por grupo (`src/**`, `src/atoms/**`, `src/molecules/**`): bibliotecas de datos
+  (`@tanstack/react-query`, `@tanstack/query-core`, `axios`, `ky`, `swr`) y espejo de capas (átomos sin moléculas ni dominio; moléculas sin dominio).
+- `tooling/src/suppression-scanner.ts`: `eslint-disable`, `@ts-expect-error`, `@ts-ignore`, `@ts-nocheck`, `a11y: { disable`, `test: "off"` sin `ADR-NNNN` en la misma
+  línea o la anterior, o con un ADR que no existe en `docs/adr/`.
+
+**Rojo observado** (`pnpm --filter @confia/tooling exec vitest run src/eslint-ui-rules.test.ts src/suppression-citations.test.ts`, antes de crear nada): 2 archivos
+fallidos; `eslint-ui-rules.test.ts` 72 pruebas en rojo y 1 en verde (`TypeError: uiSourceRules is not a function`); `suppression-citations.test.ts`
+`Cannot find module './suppression-scanner'`.
+**Verde:** 2 archivos, 77 pruebas; luego `tooling` 5 archivos y 89 pruebas. El recorrido real de `packages/ui` evalúa más de un archivo, incluye `src/format/money.ts` y
+`src/i18n/*.ts`, y termina sin errores; el escáner ve `src/i18n/keys.test-d.ts` con su cita `ADR-0011`.
+
+**Demostraciones deliberadas**, revertidas y verificadas con `cmp` contra una copia:
+1. Quitar `toLocaleString` del selector de formato manual: rojo `BX04`.
+2. Ampliar la excepción de formato de `src/format/**` a todo `src/**`: rojo `BX03` y `BX04`.
+3. Quitar `contractPatterns` de la entrada compuesta: rojo `BX34` (dos errores esperados).
+
+**Desviaciones.**
+(a) Las reglas de núcleo no pueden imprimir el literal: el hallazgo nombra el archivo y apunta a línea y columna del literal con un mensaje por control; la prueba afirma
+línea y columna.
+(b) Una entrada de `no-restricted-syntax` con solo `["error"]` hereda las opciones de la anterior; un grupo sin controles se escribe `"off"` (fixtures y pruebas de `src/tokens`).
+(c) Las pruebas de `src/tokens/**` (`tokens.contrast.test.ts` usa `toFixed(2)` en sus diagnósticos de contraste) quedan exentas de la regla de formato; el código de
+`src/tokens/**` no. No se editó ningún archivo de `packages/ui/src`.
+(d) Las pruebas, historias y `__fixtures__` quedan fuera de las reglas de aritmética de importes y de texto en JSX; los fixtures, de todas las de sintaxis.
+(e) Pendiente: `eslint-plugin-react-hooks` 7.1.1 (S1 confirmó ESLint 10) no se añade todavía: `packages/ui/src/hooks/index.ts` está vacío y ninguna regla de la propuesta
+depende de él; se incorpora con el primer componente que use ganchos (3.1).
+(f) `window.fetch` y `globalThis.fetch` no se cubren (la regla de globales solo ve la referencia directa); queda como posible endurecimiento con `no-restricted-properties`.
+
+Cierre: ver la entrada de cierre del commit; `pnpm turbo run lint typecheck test build --filter=!@confia/api` 14 de 14 y `pnpm audit --audit-level high` sin altas.
