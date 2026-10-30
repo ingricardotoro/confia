@@ -567,6 +567,26 @@ capas mayores deja margen para casos intermedios sin renumerar toda la escala.
 Archivo de referencia: `packages/ui/src/styles/tokens.css`. Se importa una sola vez en el punto de
 entrada de cada aplicación (`apps/admin-web` y `apps/portal-web`).
 
+> **Nota fechada 2026-10-28 (cambio `design-system-foundations-and-a11y`).** El bloque de abajo es la
+> referencia de valores; la implementación real difiere en la forma, no en los valores:
+>
+> - La ruta real es `packages/ui/src/tokens/`, dividida en `index.css` (punto de entrada, que las
+>   aplicaciones importan como `@confia/ui/styles.css`), `primitives.css`, `semantic.css`,
+>   `themes.css`, `components.css` y `base.css`.
+> - Los primitivos pasan de `--color-neutral-*` y `--color-primary-*` a `--palette-neutral-*` y
+>   `--palette-primary-*`, dentro de `@theme static`. `palette` no es un espacio de nombres de
+>   Tailwind, así que no genera utilidades: la regla dura del §1 («un componente nunca consume un
+>   primitivo») deja de depender de la disciplina porque `bg-primary-600` ni siquiera existe. Los
+>   valores y los tokens semánticos no cambian.
+> - `index.css` borra el tema predeterminado de Tailwind (`@theme { --*: initial; }`), así que
+>   `bg-red-500` y las demás utilidades de su paleta tampoco existen.
+> - Los bloques oscuros no nombran primitivos (una prueba lo vigila): los cuatro valores que siguen
+>   la marca (`--color-text-link`, `--color-border-interactive`, `--color-border-focus`,
+>   `--color-primary-soft-fg`) pasan por los alias `--dark-*` de `semantic.css`.
+> - Inter se declara con dos `@font-face` (`latin` y `latin-ext`) sobre los archivos de
+>   `@fontsource-variable/inter`; `'Inter Variable'` encabeza la pila de §7.1.
+> - La clase `.money-amount` (§7.5) llega con el componente `MoneyAmount`.
+
 ```css
 /* ==========================================================================
    CONFIA — Design tokens

@@ -25,7 +25,7 @@
 | Estimated changed lines (additions + deletions, sin `openspec/`, sin `pnpm-lock.yaml` y sin código generado) | **nominal unas 3 950 (diseño §8); realista entre 4 300 y 4 600** (cada componente con historia y prueba mide de 60 a 260; el código adaptado de shadcn/ui cuenta como línea de autor) |
 | 400-line budget risk | **High** frente a las 400 líneas de la preflight; **medio a alto por PR** frente al presupuesto del proyecto de 800 y la banda del propietario de 450 a 750 |
 | Chained PRs recommended | Yes |
-| Suggested split | **6 PR apilados a `main`** (13a-1 a 13a-6), 15 tareas en 6 fases |
+| Suggested split | **7 PR apilados a `main`** (13a-1, 13a-1b y 13a-2 a 13a-6), 15 tareas en 6 fases; el séptimo PR (13a-1b) lo autorizó el propietario el 2026-10-29 al partir 1.3 (ver nota de la tarea 1.3) |
 | Delivery strategy | `auto-chain` con la estrategia fijada por el propietario el 2026-10-28 |
 | Chain strategy | `stacked-to-main`: cada PR se fusiona a `main` en orden y el siguiente parte de `main` actualizado |
 | Presupuesto por PR | Banda del propietario 450 a 750; límite duro del proyecto 800 de cambio efectivo (`docs/15-flujo-de-trabajo-git.md` §3). Las pruebas y la documentación nunca se separan de su código |
@@ -49,7 +49,8 @@ resuelve el exceso o si la proyección total supera el umbral de la Pregunta abi
 
 | PR (corte del diseño) | Tareas | Nominal (diseño) | Realista | Costura nombrada si supera 800 |
 |---|---|---|---|---|
-| **PR 1** `01-package-and-tokens` (13a-1) | 1.1, 1.2, 1.3 | 700 | 700 a 760 | **1a** 1.2 (paquete y cableado, ~150) / **1b** 1.3 (tokens y sus pruebas, ~580) |
+| **PR 1** `01-package-and-tokens` (13a-1) | 1.1, 1.2, 1.3 (parte A) | 700 | **738 medidas** | Partido el 2026-10-29: 13a-1 conserva 1.1, 1.2 y de 1.3 los archivos CSS, `tokens.build.test.ts` y el módulo de utilidades mínimo |
+| **PR 1b** `01b-token-parity-and-contrast` (13a-1b) | 1.3 (parte B) | — | **473 medidas** | Pruebas de paridad, contraste, cadena, recorrido y fuentes con sus fixtures y las utilidades de lectura que solo ellas usan |
 | **PR 2** `02-texts-and-static-analysis` (13a-2) | 2.1, 2.2 | 650 | 650 a 720 | **2a** 2.1 (catálogo y `formatMoney`) / **2b** 2.2 (reglas de ESLint y escáner de supresiones) |
 | **PR 3** `03-storybook-and-axe-gate` (13a-3) | 3.1, 3.2, 3.3 | 700 | **750 a 810** | **3a** 3.1 (Storybook, política, `Spinner`) / **3b** 3.2 (puerta en Chromium y comprobación de historias) / **3c** 3.3 (CI, ADR-0026, documentación del stack; la parte documental, ~125 líneas, es la primera en moverse al inicio del PR 4) |
 | **PR 4** `04-atoms-buttons-labels` (13a-4) | 4.1, 4.2 | 450 | 700 a 760 | **4a** 4.1 (`Button`, `IconButton`, `Label`, `Badge`, `cn`) / **4b** 4.2 (`Separator`, `Skeleton`, `Input`) |
@@ -245,7 +246,7 @@ contra `main` antes del PR 3.
     @confia/ui workspace package with its test, lint and coverage wiring`. Tamaño: nominal 150, realista 150. — Escenarios BX20 a BX24 y DS01 (parcial:
     la importación desde otra ruta del espacio de trabajo se cierra en 6.3).
 
-- [ ] 1.3 **PR 1 / 1b `01-package-and-tokens`: tokens en tres niveles, temas claro y oscuro, Inter y sus pruebas (decisiones 2 a 5).**
+- [ ] 1.3 **PR 1 (parte A) y PR 1b (parte B) `01-package-and-tokens`: tokens en tres niveles, temas claro y oscuro, Inter y sus pruebas (decisiones 2 a 5).**
   - **ROJO.** Crear, en `packages/ui/src/tokens/`: `tokens.build.test.ts` (compila `index.css` con `compile()` de Tailwind v4: `bg-primary` genera
     regla; **violación deliberada** `bg-palette-primary-600` y `bg-red-500` no generan ninguna; los tokens de espaciado, radio y tamaño de texto de
     `docs/ui-ux/01` resuelven) [DS04, DS06]; `tokens.parity.test.ts` (los dos bloques oscuros —`@media (prefers-color-scheme: dark)` sobre
@@ -274,6 +275,14 @@ contra `main` antes del PR 3.
     por la aserción de que `bg-primary-600` no debe generar regla [DS04]. (2) Borrar el valor base de `--color-bg` en `semantic.css` dejando el del
     bloque oscuro pone en rojo `tokens.parity.test.ts` nombrando `--color-bg` [DS11]. (3) Bajar el contraste de `--color-text-secondary` en el tema
     claro pone en rojo `tokens.contrast.test.ts` nombrando el par. Se revierten y se confirman con `cmp`.
+  - **Partición (2026-10-29, decisión del propietario).** 1.3 midió 1 008 líneas y el PR 1 completo 1 202, por encima de 800; el propietario autorizó
+    un séptimo PR. **Parte A (13a-1, esta rama):** los seis archivos CSS, `tokens.build.test.ts`, `__fixtures__/css.ts` reducido a `tokensDirectory`,
+    `readToken`, `readFile` y `buildCss`, `exports["./styles.css"]` con su prueba y la nota de `docs/ui-ux/01`. **Parte B (13a-1b):**
+    `tokens.parity.test.ts`, `tokens.contrast.test.ts`, `tokens.chain.test.ts`, `tokens.scan.test.ts`, `tokens.fonts.test.ts`, sus fixtures
+    (`dark-only.css`, `dark-drift.css`, `low-contrast.css`, `palette-leak.css`) y el resto de `__fixtures__/css.ts` (análisis de reglas, `var()`,
+    paridad, recorrido). Se movieron las cinco pruebas y no solo paridad y contraste porque con la costura inicial la parte A seguía en unas 850
+    líneas; las utilidades viajan con la prueba que las usa. Las demostraciones 2 y 3 y los rojos de paridad, contraste, cadena, recorrido y fuentes
+    pertenecen a la parte B. La tarea se marca hecha en la rama 13a-1b.
   - **Cierre.** `pnpm turbo run lint typecheck test build --filter=!@confia/api` y `pnpm audit --audit-level high` en verde; medición del PR 1. Commit:
     `feat(ui): add the three-level design tokens with light and dark themes`. Tamaño: nominal 550, realista 580. — Escenarios DS04, DS06 a DS14 (DS08 a
     DS10 y DS13 se confirman en navegador en 3.2).

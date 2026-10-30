@@ -1,0 +1,30 @@
+/* Level 1: primitives (docs/ui-ux/01 sections 1, 2.1 and 2.2; design-system-foundations-and-a11y,
+   design decision 3). The palette namespace has no Tailwind utility, so no component can consume a
+   primitive: only semantic.css references these variables. Provisional brand: changing it means
+   editing this file only. */
+@theme static {
+  /* Neutral base */
+  --palette-neutral-50: #F8FAFC;
+  --palette-neutral-100: #F1F5F9;
+  --palette-neutral-200: #E2E8F0;
+  --palette-neutral-300: #CBD5E1;
+  --palette-neutral-400: #94A3B8;
+  --palette-neutral-500: #64748B;
+  --palette-neutral-600: #475569;
+  --palette-neutral-700: #334155;
+  --palette-neutral-800: #1E293B;
+  --palette-neutral-900: #0F172A;
+  --palette-neutral-950: #020617;
+
+  /* Institutional primary */
+  --palette-primary-50: #EFF6FF;
+  --palette-primary-100: #DBEAFE;
+  --palette-primary-200: #BFDBFE;
+  --palette-primary-300: #93C5FD;
+  --palette-primary-400: #60A5FA;
+  --palette-primary-500: #3B82F6;
+  --palette-primary-600: #2563EB;
+  --palette-primary-700: #1D4ED8;
+  --palette-primary-800: #1E40AF;
+  --palette-primary-900: #1E3A8A;
+}

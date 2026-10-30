@@ -4,7 +4,8 @@
   "description": "CONFIA design system: tokens, atoms, molecules and domain components. Pure presentation, no requests.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./styles.css": "./src/tokens/index.css"
   },
   "scripts": {
     "lint": "eslint .",
@@ -13,8 +14,10 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "tailwindcss": "catalog:"
   },
   "devDependencies": {
     "@confia/config": "workspace:*",
