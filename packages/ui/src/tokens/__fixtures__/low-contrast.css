@@ -1,0 +1,5 @@
+/* Deliberate violation (docs/ui-ux/01 section 5.1): secondary text at 2.56:1 on the surface. */
+@theme static {
+  --color-bg-surface: #FFFFFF;
+  --color-text-secondary: #94A3B8;
+}

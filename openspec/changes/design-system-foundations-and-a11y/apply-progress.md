@@ -94,3 +94,5 @@ fixtures. Se usó una costura más amplia, por archivos completos y con las prue
 `tokens.build.test.ts` y las utilidades mínimas de `css.ts`; 13a-1b recibe las cinco pruebas restantes y las utilidades que solo ellas usan.
 Medida: 13a-1 con 738 líneas (734 añadidas y 4 borradas); 13a-1b con 470 (total 1 208). En 13a-1 la tarea 1.3 queda abierta
 (parte A hecha); se cierra en 13a-1b.
+
+En 13a-1b se cierra la tarea 1.3 (`[x]`): `pnpm turbo run lint typecheck test build --filter=!@confia/api` en verde, 14 de 14 tareas, `ui` 34 pruebas. Los tokens de paridad, contraste, cadena, recorrido y fuentes se verifican aquí.

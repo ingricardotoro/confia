@@ -1,0 +1,4 @@
+/* Deliberate violation (design decision 3): a stylesheet outside the token files naming a primitive. */
+.leaky {
+  background-color: var(--palette-primary-600);
+}
