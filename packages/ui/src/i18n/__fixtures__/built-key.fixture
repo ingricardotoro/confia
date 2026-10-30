@@ -1,0 +1,13 @@
+import { useUiText } from "./use-ui-text";
+
+// ADR-0011 violation: a key built at run time, by template literal or by concatenation.
+export function BuiltKey({ suffix }: { suffix: string }) {
+  const { t } = useUiText();
+  const part = "inexistente";
+  return (
+    <span>
+      {t(`common.status.${part}`)}
+      {t("common.status." + suffix)}
+    </span>
+  );
+}

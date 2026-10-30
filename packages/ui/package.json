@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./i18n": "./src/i18n/resources.ts",
     "./styles.css": "./src/tokens/index.css"
   },
   "scripts": {
@@ -15,8 +16,12 @@
   },
   "dependencies": {
     "@fontsource-variable/inter": "catalog:",
+    "i18next": "catalog:",
+    "i18next-icu": "catalog:",
+    "intl-messageformat": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-i18next": "catalog:",
     "tailwindcss": "catalog:"
   },
   "devDependencies": {
