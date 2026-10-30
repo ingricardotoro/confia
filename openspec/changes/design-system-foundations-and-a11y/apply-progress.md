@@ -113,3 +113,16 @@ Revisión de confiabilidad (aprobada con observaciones), tres correcciones en 13
    hace fallar la guarda; restaurado con `cmp`.
 
 Cierre: `pnpm turbo run lint typecheck test build --filter=!@confia/api` 14 de 14; `ui` 4 archivos y 16 pruebas.
+
+## Corrección de la revisión en 13a-1b, 2026-10-29
+
+Tras fusionar 13a-1 (`e514310`), `tokens.contrast.test.ts` mide ahora el par `--color-primary-soft-fg` sobre `--color-primary-soft-bg` en el tema claro y en
+los dos bloques oscuros (`themeDeclarations` acepta `"dark-media"`, además de `"dark"`). `primary-300` sobre `primary-900` da 5,74:1. Pares añadidos:
+`--color-text-primary`, `-secondary`, `-tertiary` y `--color-text-link` sobre `bg-canvas` y `bg-surface-elevated` (la superficie ya estaba, salvo el enlace);
+`--color-feedback-success|warning|danger|info` sobre la superficie (3:1); `--color-primary-fg` sobre `--color-primary-hover` y `-active`. Sin cubrir a propósito:
+`--color-text-inverse` (no tiene fondo propio en `semantic.css`), `--color-text-disabled` y `--color-border-subtle` (exentos, `01` §5).
+Rojo observado: quitar el alias `--dark-primary-soft-bg` de los dos bloques falla las pruebas con `"--color-primary-soft-fg on --color-primary-soft-bg:
+1.66:1, needs 4.5:1"`; quitarlo solo del bloque de `prefers-color-scheme` falla únicamente la prueba `dark-media`. `themes.css` restaurado y verificado con `cmp`.
+La prueba de paridad sigue en verde con el nuevo valor en ambos bloques.
+
+Cierre: `pnpm turbo run lint typecheck test build --filter=!@confia/api` 14 de 14; `ui` 9 archivos y 39 pruebas.

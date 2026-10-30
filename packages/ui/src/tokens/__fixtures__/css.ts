@@ -97,11 +97,14 @@ export function darkBlocks(sources: string[]): DarkBlocks {
   };
 }
 
-/** Declarations in force for a theme: the base values, with the attribute dark block on top for dark. */
-export function themeDeclarations(sources: string[], theme: "light" | "dark"): Map<string, string> {
+export type Theme = "light" | "dark" | "dark-media";
+
+/** Declarations in force for a theme: the base values, with the matching dark block on top for either dark. */
+export function themeDeclarations(sources: string[], theme: Theme): Map<string, string> {
   const merged = baseDeclarations(sources);
-  if (theme === "dark") {
-    for (const [name, value] of darkBlocks(sources).attribute ?? []) merged.set(name, value);
+  if (theme !== "light") {
+    const blocks = darkBlocks(sources);
+    for (const [name, value] of (theme === "dark" ? blocks.attribute : blocks.media) ?? []) merged.set(name, value);
   }
   return merged;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFixture, realTokenSources, resolveToken, themeDeclarations } from "./__fixtures__/css";
+import { readFixture, realTokenSources, resolveToken, themeDeclarations, type Theme } from "./__fixtures__/css";
 
 // WCAG 2.1 contrast over the pairs of docs/ui-ux/01 section 5, computed from the stylesheets
 // themselves (docs/ui-ux/03 section 2: automatic over the tokens). 4.5:1 for text, 3:1 for the
@@ -15,6 +15,7 @@ interface Pair {
 
 const STATES = ["paid", "pending", "partial", "overdue", "void", "promised", "refunded"] as const;
 const SURFACE = "--color-bg-surface";
+const SOFT = { foreground: "--color-primary-soft-fg", background: "--color-primary-soft-bg", minimum: TEXT };
 
 // Not enforced, each with its citation. Listed here so the exemption has one home.
 const EXEMPT = [
@@ -22,32 +23,38 @@ const EXEMPT = [
   { token: "--color-border-subtle", reason: "decorative divider, WCAG 1.4.11 does not apply; docs/ui-ux/01 section 5.2" },
 ];
 
+// Every foreground and background token pair declared in semantic.css that a theme can render. The
+// text and link tokens are measured on the three surfaces; the brand soft pair and the feedback
+// colours (icons, borders) on the base surface.
 const sharedPairs: Pair[] = [
-  { foreground: "--color-text-primary", background: SURFACE, minimum: TEXT },
-  { foreground: "--color-text-secondary", background: SURFACE, minimum: TEXT },
-  { foreground: "--color-text-tertiary", background: SURFACE, minimum: TEXT },
+  ...["--color-bg-surface", "--color-bg-canvas", "--color-bg-surface-elevated"].flatMap((background) => [
+    { foreground: "--color-text-primary", background, minimum: TEXT },
+    { foreground: "--color-text-secondary", background, minimum: TEXT },
+    { foreground: "--color-text-tertiary", background, minimum: TEXT },
+    { foreground: "--color-text-link", background, minimum: TEXT },
+  ]),
   { foreground: "--color-border-interactive", background: SURFACE, minimum: COMPONENT },
   { foreground: "--color-border-focus", background: SURFACE, minimum: COMPONENT },
+  SOFT,
+  ...["success", "warning", "danger", "info"].map((kind) => ({
+    foreground: `--color-feedback-${kind}`,
+    background: SURFACE,
+    minimum: COMPONENT,
+  })),
+  ...["--color-primary", "--color-primary-hover", "--color-primary-active"].map((background) => ({
+    foreground: "--color-primary-fg",
+    background,
+    minimum: TEXT,
+  })),
   ...STATES.flatMap((state) => [
     { foreground: `--color-status-${state}-fg`, background: `--color-status-${state}-bg`, minimum: TEXT },
     { foreground: `--color-status-${state}-border`, background: SURFACE, minimum: COMPONENT },
+    { foreground: "--color-primary-fg", background: `--color-status-${state}-solid-bg`, minimum: TEXT },
   ]),
 ];
 
-const lightPairs: Pair[] = [
-  ...sharedPairs,
-  ...STATES.map((state) => ({
-    foreground: "--color-primary-fg",
-    background: `--color-status-${state}-solid-bg`,
-    minimum: TEXT,
-  })),
-  { foreground: "--color-primary-fg", background: "--color-primary", minimum: TEXT },
-];
-
-const darkPairs: Pair[] = [
-  ...sharedPairs,
-  { foreground: "--color-text-primary", background: "--color-bg-surface-elevated", minimum: TEXT },
-];
+const lightPairs: Pair[] = sharedPairs;
+const darkPairs: Pair[] = sharedPairs;
 
 function luminance(hex: string): number {
   const channels = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16) / 255);
@@ -79,8 +86,8 @@ describe("the contrast of the token pairs", () => {
     expect(failingPairs(lightPairs, declarations)).toEqual([]);
   });
 
-  it("meets the same minimums in the dark theme", () => {
-    const declarations = themeDeclarations(realTokenSources(), "dark");
+  it.each<Theme>(["dark", "dark-media"])("meets the same minimums in the dark theme, %s block", (theme) => {
+    const declarations = themeDeclarations(realTokenSources(), theme);
 
     expect(darkPairs.length).toBeGreaterThan(0);
     expect(failingPairs(darkPairs, declarations)).toEqual([]);
