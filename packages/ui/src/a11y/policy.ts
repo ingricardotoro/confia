@@ -11,6 +11,12 @@ export const A11Y_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"
 export const BLOCKING_IMPACTS = ["critical", "serious"] as const;
 
 /**
+ * The only impacts that are reported and do not fail the build. An allow-list, so an impact this
+ * policy does not know (a new axe level, an empty string, null) fails closed instead of passing.
+ */
+export const REPORTED_IMPACTS = ["moderate", "minor"] as const;
+
+/**
  * Rules whose `incomplete` result still blocks. axe reports `incomplete` when it could not decide;
  * for color-contrast that means it could not measure the text, so a pass would be a guess.
  */
@@ -26,9 +32,10 @@ export interface PartitionedViolations {
   readonly reported: Result[];
 }
 
-// An impact axe did not assign (undefined, or null in older results) is unknown, and unknown fails closed.
+// Anything that is not an explicitly reported impact blocks: critical and serious by name, and every
+// impact axe did not assign or this policy does not recognize (undefined, null, any other string).
 const isBlockingImpact = (impact: string | null | undefined): boolean =>
-  impact === null || impact === undefined || (BLOCKING_IMPACTS as readonly string[]).includes(impact);
+  impact === null || impact === undefined || !(REPORTED_IMPACTS as readonly string[]).includes(impact);
 
 const isBlockingIncomplete = (result: Result): boolean =>
   (BLOCKING_INCOMPLETE_RULES as readonly string[]).includes(result.id);
