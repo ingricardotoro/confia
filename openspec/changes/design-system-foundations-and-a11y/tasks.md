@@ -25,7 +25,7 @@
 | Estimated changed lines (additions + deletions, sin `openspec/`, sin `pnpm-lock.yaml` y sin código generado) | **nominal unas 3 950 (diseño §8); realista entre 4 300 y 4 600** (cada componente con historia y prueba mide de 60 a 260; el código adaptado de shadcn/ui cuenta como línea de autor) |
 | 400-line budget risk | **High** frente a las 400 líneas de la preflight; **medio a alto por PR** frente al presupuesto del proyecto de 800 y la banda del propietario de 450 a 750 |
 | Chained PRs recommended | Yes |
-| Suggested split | **8 PR apilados a `main`** (13a-1, 13a-1b, 13a-2a, 13a-2b y 13a-3 a 13a-6), 15 tareas en 6 fases; el séptimo PR (13a-1b) lo autorizó el propietario el 2026-10-29 al partir 1.3 (ver nota de la tarea 1.3), y el octavo (13a-2b) el 2026-10-30, porque 2.1 sola midió 761 líneas efectivas frente a las 300 a 370 previstas |
+| Suggested split | **9 PR apilados a `main`** (13a-1, 13a-1b, 13a-2a, 13a-2b, 13a-3a, 13a-3b y 13a-4 a 13a-6), 15 tareas en 6 fases; el séptimo PR (13a-1b) lo autorizó el propietario el 2026-10-29 al partir 1.3 (ver nota de la tarea 1.3), el octavo (13a-2b) el 2026-10-30, porque 2.1 sola midió 761 líneas efectivas frente a las 300 a 370 previstas, y el noveno (13a-3b, con 3.2 y 3.3) el 2026-10-30, porque 3.1 sola midió 538 líneas efectivas |
 | Delivery strategy | `auto-chain` con la estrategia fijada por el propietario el 2026-10-28 |
 | Chain strategy | `stacked-to-main`: cada PR se fusiona a `main` en orden y el siguiente parte de `main` actualizado |
 | Presupuesto por PR | Banda del propietario 450 a 750; límite duro del proyecto 800 de cambio efectivo (`docs/15-flujo-de-trabajo-git.md` §3). Las pruebas y la documentación nunca se separan de su código |
