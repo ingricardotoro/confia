@@ -20,20 +20,22 @@ import org.junit.jupiter.api.Test;
 class AuditChainAfterPurgeIT extends IdentityPurgeFixtures {
 
     @Test
-    void theChainStillVerifiesAfterTheEntriesOfTheBatchesOfThePurge() {
+    void theChainStillVerifiesAfterTheEntriesOfBothPurgesAndTheClearing() {
         Instant now = databaseNow();
         UUID account = seedPlainAccount(institutionId);
         seedResetTokens(institutionId, account, 6_000, now.minus(Duration.ofHours(24)).minusSeconds(1));
+        seedConsumedWithResidualSuccessor(institutionId, now.minus(Duration.ofHours(1)));
 
         resetPurge(fixedAt(now)).runFor(institutionId, runOf(PurgeExpiredPasswordResetTokens.TASK_NAME));
+        refreshPurge(fixedAt(now)).runFor(institutionId, runOf(PurgeExpiredRefreshTokens.TASK_NAME));
 
-        assertThat(auditRows()).as("a full batch and a short one").hasSize(2);
+        assertThat(auditRows()).as("two reset batches, the clearing and one family batch").hasSize(4);
         AuditChainVerification result = new DefaultAuditChainVerifier(transactionRunner(),
                 new JooqAuditLogReader(dsl), new CanonicalAuditRowSerializer())
                 .verifyChainOf(institutionId);
         assertThat(result).asInstanceOf(type(AuditChainVerification.Intact.class)).satisfies(intact -> {
             assertThat(intact.institutionId()).isEqualTo(institutionId);
-            assertThat(intact.verifiedRows()).isEqualTo(2L);
+            assertThat(intact.verifiedRows()).isEqualTo(4L);
         });
     }
 }

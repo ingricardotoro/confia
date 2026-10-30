@@ -1,8 +1,12 @@
 package com.confia.identity.infrastructure;
 
+import static confia.generated.jooq.tables.IdentityRefreshToken.IDENTITY_REFRESH_TOKEN;
+
 import com.confia.identity.application.IdentityRetentionPurges;
+import com.confia.identity.application.RefreshTokenPurgeCount;
 import com.confia.kernel.InstitutionId;
 import confia.generated.jooq.routines.IdentityPurgePasswordResetTokens;
+import confia.generated.jooq.routines.IdentityPurgeRefreshTokenFamilies;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Objects;
@@ -16,7 +20,8 @@ import org.jooq.DSLContext;
  * <p><b>Never opens a transaction of its own</b> (ADR-0015 rule 7): it runs inside the one the use case
  * opened, whose context holds the institution and the {@code system} actor the functions require. The
  * deletes go only through the generated routines of the {@code SECURITY DEFINER} functions, with every
- * value bound; no role has {@code DELETE} on these tables.
+ * value bound; no role has {@code DELETE} on these tables. The one update is of a column the role
+ * already holds {@code UPDATE} on, which the trigger of {@code V8} lets be emptied.
  */
 public final class JooqIdentityRetentionPurges implements IdentityRetentionPurges {
 
@@ -33,5 +38,25 @@ public final class JooqIdentityRetentionPurges implements IdentityRetentionPurge
         routine.setPLimit(limit);
         routine.execute(dsl.configuration());
         return routine.getReturnValue();
+    }
+
+    @Override
+    public RefreshTokenPurgeCount purgeRefreshTokenFamilies(InstitutionId institution, Instant cutoff,
+            int limit) {
+        IdentityPurgeRefreshTokenFamilies routine = new IdentityPurgeRefreshTokenFamilies();
+        routine.setPCutoff(cutoff.atOffset(ZoneOffset.UTC));
+        routine.setPLimit(limit);
+        routine.execute(dsl.configuration());
+        return new RefreshTokenPurgeCount(routine.getPurgedFamilies(), routine.getPurgedTokens());
+    }
+
+    @Override
+    public long clearResidualSuccessors(InstitutionId institution, Instant cutoff) {
+        return dsl.update(IDENTITY_REFRESH_TOKEN)
+                .set(IDENTITY_REFRESH_TOKEN.SUCCESSOR_TOKEN_CIPHERTEXT, (String) null)
+                .where(IDENTITY_REFRESH_TOKEN.INSTITUTION_ID.eq(institution.value()))
+                .and(IDENTITY_REFRESH_TOKEN.SUCCESSOR_TOKEN_CIPHERTEXT.isNotNull())
+                .and(IDENTITY_REFRESH_TOKEN.CONSUMED_AT.lt(cutoff.atOffset(ZoneOffset.UTC)))
+                .execute();
     }
 }

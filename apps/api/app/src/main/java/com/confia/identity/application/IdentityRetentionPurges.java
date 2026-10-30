@@ -8,7 +8,7 @@ import java.time.Instant;
  * decision 17; ADR-0015). Every operation runs inside the transaction the caller opened, with the
  * {@code system} actor and the institution of the task in its context. The adapter is the only place that
  * names the {@code SECURITY DEFINER} functions of the purge, which are the only way to delete a row of
- * these tables.
+ * these tables, and the one column it empties by update.
  *
  * <p>The caller computes every cutoff from its clock. The functions also keep a floor of their own
  * and never delete a row younger than it, whatever cutoff they are given.
@@ -20,4 +20,16 @@ public interface IdentityRetentionPurges {
      * {@code cutoff}, and returns how many it deleted.
      */
     long purgePasswordResetTokens(InstitutionId institution, Instant cutoff, int limit);
+
+    /**
+     * Deletes at most {@code limit} refresh-token families of {@code institution} that were revoked, or
+     * reached their absolute end, before {@code cutoff}, with all their tokens.
+     */
+    RefreshTokenPurgeCount purgeRefreshTokenFamilies(InstitutionId institution, Instant cutoff, int limit);
+
+    /**
+     * Empties the encrypted successor of every token of {@code institution} consumed strictly before
+     * {@code cutoff}, and returns how many it emptied. It deletes nothing.
+     */
+    long clearResidualSuccessors(InstitutionId institution, Instant cutoff);
 }

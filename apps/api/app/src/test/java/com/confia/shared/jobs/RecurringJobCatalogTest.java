@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Scenarios I262 and BJ62 of background-jobs-with-db-scheduler (design.md decisions 7 and 17), for the
- * recurring jobs the worker registers so far: the identity purges, with the names and the daily
+ * recurring jobs the worker registers so far: the two identity purges, with the names and the daily
  * times written in the change, and the exact next execution of each from the fixed reference instant
  * (Sunday 2026-10-25 at 00:00 in Tegucigalpa, 06:00 UTC), none of them a year away or more, so none
  * reaches the parking instant. That they run for the configured institution is proved against a real
@@ -29,18 +29,20 @@ class RecurringJobCatalogTest {
     }
 
     @Test
-    void theWorkerRegistersExactlyTheIdentityPurgesAtTheirDailyTimes() {
+    void theWorkerRegistersExactlyTheTwoIdentityPurgesAtTheirDailyTimes() {
         assertThat(identityJobs()).extracting(RecurringJob::name, RecurringJob::calendar)
                 .containsExactlyInAnyOrder(
-                        tuple("identity.purge-password-reset-tokens", new JobCalendar.DailyAt(LocalTime.of(4, 30))));
+                        tuple("identity.purge-password-reset-tokens", new JobCalendar.DailyAt(LocalTime.of(4, 30))),
+                        tuple("identity.purge-refresh-tokens", new JobCalendar.DailyAt(LocalTime.of(4, 35))));
     }
 
     @Test
     void eachPurgeRunsAtItsExactNextInstantInTegucigalpaAndWithinTheYear() {
-        assertThat(identityJobs()).as("non-vacuous").hasSize(1).allSatisfy(job -> {
+        assertThat(identityJobs()).as("non-vacuous").hasSize(2).allSatisfy(job -> {
             Instant next = JobCalendars.scheduleOf(job.calendar())
                     .getNextExecutionTime(ExecutionComplete.simulatedSuccess(SUNDAY_MIDNIGHT));
-            assertThat(next).isEqualTo(Instant.parse("2026-10-25T10:30:00Z"));
+            assertThat(next).isEqualTo(job.name().equals("identity.purge-password-reset-tokens")
+                    ? Instant.parse("2026-10-25T10:30:00Z") : Instant.parse("2026-10-25T10:35:00Z"));
             assertThat(Duration.between(SUNDAY_MIDNIGHT, next)).isLessThan(Duration.ofDays(365));
         });
     }

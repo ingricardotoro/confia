@@ -7,6 +7,7 @@ import com.confia.identity.application.PasswordResetIssuanceJobHandler;
 import com.confia.identity.application.PasswordResetIssuanceJobs;
 import com.confia.identity.application.PasswordResetTokenRepository;
 import com.confia.identity.application.PurgeExpiredPasswordResetTokens;
+import com.confia.identity.application.PurgeExpiredRefreshTokens;
 import com.confia.identity.application.StaffAccountRepository;
 import com.confia.identity.infrastructure.JooqIdentityRetentionPurges;
 import com.confia.identity.infrastructure.JooqPasswordResetTokenRepository;
@@ -28,10 +29,10 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * The registration of the {@code identity} module for the worker process (background-jobs-with-db-scheduler
- * design.md decisions 17 and 18). It declares what the password-reset issuance and the daily purge of
- * expired reset tokens need and nothing else: the two repositories, the link sender that fails explicitly, a source of
- * randomness, the use case, the handler and the job of the issuance, and the purge adapter, the purge
- * use case and its recurring job. It has no column-encryption master key, no Argon2id pepper and no
+ * design.md decisions 17 and 18). It declares what the password-reset issuance and the two daily token
+ * purges need and nothing else: the two repositories, the link sender that fails explicitly, a source of
+ * randomness, the use case, the handler and the job of the issuance, and the purge adapter, the two purge
+ * use cases and their recurring jobs. It has no column-encryption master key, no Argon2id pepper and no
  * request origin; the worker has none of them, and none of these needs one.
  *
  * <p>Like {@link IdentityConfiguration}, it lives in the {@code infrastructure.wiring} package
@@ -94,10 +95,23 @@ public class IdentityWorkerConfiguration {
                 clock);
     }
 
+    @Bean
+    PurgeExpiredRefreshTokens purgeExpiredRefreshTokens(TransactionRunner runner,
+            IdentityRetentionPurges purges, AuditLogWriter auditLogWriter, Clock clock) {
+        return new PurgeExpiredRefreshTokens(runner, purges, auditLogWriter, new OperationalEventLog(), clock);
+    }
+
     /** Every day at 04:30 in Tegucigalpa, for each configured institution. */
     @Bean
     JobDefinition passwordResetTokenPurgeJob(PurgeExpiredPasswordResetTokens purge) {
         return new RecurringJob(PurgeExpiredPasswordResetTokens.TASK_NAME,
                 new JobCalendar.DailyAt(LocalTime.of(4, 30)), purge);
+    }
+
+    /** Every day at 04:35 in Tegucigalpa, for each configured institution. */
+    @Bean
+    JobDefinition refreshTokenPurgeJob(PurgeExpiredRefreshTokens purge) {
+        return new RecurringJob(PurgeExpiredRefreshTokens.TASK_NAME,
+                new JobCalendar.DailyAt(LocalTime.of(4, 35)), purge);
     }
 }
