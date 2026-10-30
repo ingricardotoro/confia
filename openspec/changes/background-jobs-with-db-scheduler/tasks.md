@@ -542,7 +542,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     Tamaño: nominal 250, realista 750 a 850; costura nombrada: la función de refresco con `RefreshPurgeVersusRotationConcurrencyIT` va a 5a-1b si se
     pasa. — Escenarios I238 a I251, I270 a I273, BI68 a BI77, BI83, BI84, BI104 a BI107.
 
-- [ ] 3.4 **PR 5a / 5a-2 `05a-identity-purge-jobs`: casos de uso de purga de identidad, lotes, auditoría y tareas recurrentes (decisión 17).**
+- [x] 3.4 **PR 5a / 5a-2 `05a-identity-purge-jobs`: casos de uso de purga de identidad, lotes, auditoría y tareas recurrentes (decisión 17).**
   - **ROJO.** Crear `IdentityTokenPurgeJobsIT.java` (un asiento por lote con el conteo, **también con cero**; lotes hasta vaciar lo purgable
     [I274]; 200 lotes agotados dejan 200 asientos y el `WARN` `retention_purge_backlog`, el resto sigue al día siguiente [I275, AT29]; los lotes
     llaman a la función con el corte calculado por el llamador desde el `Clock` [I276]; la doble ejecución no cambia nada y no falla [I256, I263];

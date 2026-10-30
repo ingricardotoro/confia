@@ -31,7 +31,7 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 - [x] T3.1 Slice 4a `04-reset-issuance-scheduler`.
 - [x] T3.2 Slice 4b `04-reset-issuance-handler` (split: 4b and 4c).
 - [x] T3.3 Slice 5a-1 `05a-v11-purge-functions`.
-- [ ] T3.4 Slice 5a-2 `05a-identity-purge-jobs`.
+- [x] T3.4 Slice 5a-2 `05a-identity-purge-jobs` (split: 5a-2a, 5a-2 and 5a-2b).
 - [ ] T3.5 Slice 5a-3 `05a-adr-0025-and-retention-notes`.
 - [ ] T3.6 Slice 5b-1 `05b-v12-purge-functions`.
 - [ ] T3.7 Slice 5b-2 `05b-idempotency-and-backoff-jobs`.
@@ -54,6 +54,11 @@ Hard order: 3.3 (V11) before 3.6 (V12).
 | T3.3 (5a-1) | delegated writer; parent added the UTC fix inline | `05a1-v11-purge-functions` | `04489e0`, `3d25139` | 577 | BUILD SUCCESS 12 min 56 s; Surefire 186 + 2 611, Failsafe 674 | not run (last branch of the task is 5a-1c) | earlier code approved twice (reliability lens, lineages `review-97b5fa12d1cc1d77` and `review-e27cce41c1db52d5`, acknowledged); the stack with the UTC fix approved (reliability lens, lineage `review-25ef682b35bc1ba4`, acknowledged); PRs #208, #209, #210 |
 | T3.3 (5a-1b) | delegated writer | `05a1b-purge-function-behaviour` | `422d9a3` | 450 | BUILD SUCCESS 11 min 48 s; Surefire 186 + 2 611, Failsafe 694 | not run (last branch of the task is 5a-1c) | earlier code approved twice (reliability lens, lineages `review-97b5fa12d1cc1d77` and `review-e27cce41c1db52d5`, acknowledged); the stack with the UTC fix approved (reliability lens, lineage `review-25ef682b35bc1ba4`, acknowledged); PRs #208, #209, #210 |
 | T3.3 (5a-1c) | delegated writer; parent ran the verifies | `05a1c-refresh-purge-and-rotation` | `bcabd7d`, `4ba3460` | 461 | BUILD SUCCESS 10 min 10 s; Surefire 186 + 2 611, Failsafe 704 | BUILD SUCCESS 27 min 47 s; PIT kernel 192/194, app 871/919; JaCoCo met | earlier code approved twice (reliability lens, lineages `review-97b5fa12d1cc1d77` and `review-e27cce41c1db52d5`, acknowledged); the stack with the UTC fix approved (reliability lens, lineage `review-25ef682b35bc1ba4`, acknowledged); PRs #208, #209, #210 |
+| T3.4 (5a-2a) | delegated writer; owner decision option B (2026-10-28) | `05a2a-operational-event-log` | `6ba0082`; merged by `3e93e1b` | 184 | BUILD SUCCESS 9 min 3 s; Surefire 186 + 2 617, Failsafe 704 | not run (last branch of the task is 5a-2b) | PR #212 |
+| T3.4 (5a-2) | delegated writer | `05a2-identity-purge-jobs` | `9e2a09d`; merged by `b400eb6` | 799 | BUILD SUCCESS 9 min 36 s; Surefire 186 + 2 619, Failsafe 715 | not run (last branch of the task is 5a-2b) | PR #213 |
+| T3.4 (5a-2b) | delegated writer | `05a2b-refresh-successor-clearing` | `7b38d07` plus the evidence commit `226350a`; merged by `2936620` | 539 | BUILD SUCCESS 9 min 8 s; Surefire 186 + 2 619, Failsafe 726 | BUILD SUCCESS 28 min 51 s; PIT kernel 192/194, app 872/919; JaCoCo met | PR #214 |
+
+Main CI: PR #211 (merge `972beae`) fixed the failing CI on `main` before PRs #212 to #214 were merged.
 
 T2.6 evidence:
 
@@ -140,8 +145,9 @@ T3.1 evidence:
 
 ## Next step
 
-T3.4, slice 5a-2 `05a-identity-purge-jobs`, delegated to one writer, on branch `05a2-identity-purge-jobs` from `05a1c`.
-In parallel: change 13 `design-system-foundations-and-a11y` (SDD explore and propose) in the worktree `C:\dev\confia-frontend`.
+T3.5, slice 5a-3 `05a-adr-0025-and-retention-notes`, delegated to one writer, on branch
+`change/background-jobs-with-db-scheduler-05a3-adr-0025-and-retention-notes` from `main` `2936620`: ADR-0025 «Propuesto», dated
+note in ADR-0017, notes in `docs/03` §6.1 and `docs/08` §6.2. ADR-0026 is reserved by frontend change 13a (Storybook).
 
 T3.4 evidence:
 
