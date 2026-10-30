@@ -1,0 +1,6 @@
+// @ts-expect-error ADR-0011: cited on the same line
+const sameLine: number = "ok";
+// ADR-0018: cited on the line before
+// eslint-disable-next-line no-console
+console.log("ok");
+export const config = { a11y: { test: "error" }, mode: "off" };

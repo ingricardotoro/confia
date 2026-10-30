@@ -329,7 +329,7 @@ contra `main` antes del PR 3.
     función), DS43 a DS46, DS49, DS51 (nivel de función), DS57 a DS60, BX06 y BX07. Desviación a registrar: el diagnóstico de `tsc` nombra la clave y
     el archivo; el catálogo `es-HN` se nombra a través del tipo `UiKey` derivado de `locales/es-HN/ui.json` (ver Apéndice B, R-1).
 
-- [ ] 2.2 **PR 2 / 2b `02-texts-and-static-analysis`: reglas de ESLint de ADR-0011, de primitivos y literales visuales, de peticiones y de capas (espejo), y escáner de supresiones (decisión 7).**
+- [x] 2.2 **PR 2 / 2b `02-texts-and-static-analysis`: reglas de ESLint de ADR-0011, de primitivos y literales visuales, de peticiones y de capas (espejo), y escáner de supresiones (decisión 7).**
   - **ROJO.** Crear `tooling/src/eslint-ui-rules.test.ts` con `ESLint.lintText` y la ruta de archivo que activa cada ámbito, siguiendo el patrón de
     `tooling/src/eslint-restrictions.test.ts`; cada control con su violación deliberada **y** su caso aceptado:
     (1) texto en JSX: `<button>Guardar</button>` en `packages/ui/src/atoms/button/Bad.tsx` falla con la regla de literales [BX01]; `aria-label="Cerrar"`
