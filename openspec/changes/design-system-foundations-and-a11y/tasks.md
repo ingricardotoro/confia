@@ -50,7 +50,7 @@ resuelve el exceso o si la proyección total supera el umbral de la Pregunta abi
 | PR (corte del diseño) | Tareas | Nominal (diseño) | Realista | Costura nombrada si supera 800 |
 |---|---|---|---|---|
 | **PR 1** `01-package-and-tokens` (13a-1) | 1.1, 1.2, 1.3 (parte A) | 700 | **738 medidas** | Partido el 2026-10-29: 13a-1 conserva 1.1, 1.2 y de 1.3 los archivos CSS, `tokens.build.test.ts` y el módulo de utilidades mínimo |
-| **PR 1b** `01b-token-parity-and-contrast` (13a-1b) | 1.3 (parte B) | — | **473 medidas** | Pruebas de paridad, contraste, cadena, recorrido y fuentes con sus fixtures y las utilidades de lectura que solo ellas usan |
+| **PR 1b** `01b-token-parity-and-contrast` (13a-1b) | 1.3 (parte B) | — | **470 medidas** | Pruebas de paridad, contraste, cadena, recorrido y fuentes con sus fixtures y las utilidades de lectura que solo ellas usan |
 | **PR 2** `02-texts-and-static-analysis` (13a-2) | 2.1, 2.2 | 650 | 650 a 720 | **2a** 2.1 (catálogo y `formatMoney`) / **2b** 2.2 (reglas de ESLint y escáner de supresiones) |
 | **PR 3** `03-storybook-and-axe-gate` (13a-3) | 3.1, 3.2, 3.3 | 700 | **750 a 810** | **3a** 3.1 (Storybook, política, `Spinner`) / **3b** 3.2 (puerta en Chromium y comprobación de historias) / **3c** 3.3 (CI, ADR-0026, documentación del stack; la parte documental, ~125 líneas, es la primera en moverse al inicio del PR 4) |
 | **PR 4** `04-atoms-buttons-labels` (13a-4) | 4.1, 4.2 | 450 | 700 a 760 | **4a** 4.1 (`Button`, `IconButton`, `Label`, `Badge`, `cn`) / **4b** 4.2 (`Separator`, `Skeleton`, `Input`) |
@@ -246,7 +246,7 @@ contra `main` antes del PR 3.
     @confia/ui workspace package with its test, lint and coverage wiring`. Tamaño: nominal 150, realista 150. — Escenarios BX20 a BX24 y DS01 (parcial:
     la importación desde otra ruta del espacio de trabajo se cierra en 6.3).
 
-- [ ] 1.3 **PR 1 (parte A) y PR 1b (parte B) `01-package-and-tokens`: tokens en tres niveles, temas claro y oscuro, Inter y sus pruebas (decisiones 2 a 5).**
+- [x] 1.3 **PR 1 (parte A) y PR 1b (parte B) `01-package-and-tokens`: tokens en tres niveles, temas claro y oscuro, Inter y sus pruebas (decisiones 2 a 5).**
   - **ROJO.** Crear, en `packages/ui/src/tokens/`: `tokens.build.test.ts` (compila `index.css` con `compile()` de Tailwind v4: `bg-primary` genera
     regla; **violación deliberada** `bg-palette-primary-600` y `bg-red-500` no generan ninguna; los tokens de espaciado, radio y tamaño de texto de
     `docs/ui-ux/01` resuelven) [DS04, DS06]; `tokens.parity.test.ts` (los dos bloques oscuros —`@media (prefers-color-scheme: dark)` sobre
@@ -282,7 +282,7 @@ contra `main` antes del PR 3.
     (`dark-only.css`, `dark-drift.css`, `low-contrast.css`, `palette-leak.css`) y el resto de `__fixtures__/css.ts` (análisis de reglas, `var()`,
     paridad, recorrido). Se movieron las cinco pruebas y no solo paridad y contraste porque con la costura inicial la parte A seguía en unas 850
     líneas; las utilidades viajan con la prueba que las usa. Las demostraciones 2 y 3 y los rojos de paridad, contraste, cadena, recorrido y fuentes
-    pertenecen a la parte B. La tarea se marca hecha en la rama 13a-1b.
+    pertenecen a la parte B. La tarea se marca hecha en esta rama (13a-1b), con las dos partes presentes.
   - **Cierre.** `pnpm turbo run lint typecheck test build --filter=!@confia/api` y `pnpm audit --audit-level high` en verde; medición del PR 1. Commit:
     `feat(ui): add the three-level design tokens with light and dark themes`. Tamaño: nominal 550, realista 580. — Escenarios DS04, DS06 a DS14 (DS08 a
     DS10 y DS13 se confirman en navegador en 3.2).

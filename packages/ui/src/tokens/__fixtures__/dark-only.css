@@ -1,0 +1,16 @@
+/* Deliberate violation (docs/ui-ux/01 section 6): --color-dark-only exists only in the dark blocks. */
+@theme static {
+  --color-bg-surface: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg-surface: #0b1220;
+    --color-dark-only: #123456;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-bg-surface: #0b1220;
+  --color-dark-only: #123456;
+}
