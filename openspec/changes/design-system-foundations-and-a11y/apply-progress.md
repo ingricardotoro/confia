@@ -211,3 +211,45 @@ los compone. (2) `importRules` fijaba `contractPatterns(false)`: con `confiaEsli
 `src/**`; rojo observado: la prueba con `{ portal: true }` no devolvió ningún hallazgo. `uiSourceRules({ portal })` lo propaga. Opcionales hechos: la aserción de columna usa
 la posición real del literal en todos los casos, y la cobertura de importes añade `new Number`, `toPrecision`, `-` sobre un no literal, `++`, `**` y `/=`, cada una con el
 mensaje propio del control. Cierre: `tooling` 92 pruebas en las dos suites de la tarea; `pnpm turbo run lint typecheck test build --filter=!@confia/api` 14 de 14.
+
+## Tarea 3.1, Storybook, política de axe, guardia de MDX, `cn` y `Spinner` (13a-3, parte 3a), 2026-10-30
+
+Rama `change/design-system-foundations-and-a11y-13a-3-storybook-and-a11y-gate`, desde `main` 8ad309a. Commit:
+`feat(ui): add Storybook, the accessibility policy and the Spinner atom`. Medida: 538 líneas efectivas (526 añadidas y 12 borradas, sin `openspec` ni
+`pnpm-lock.yaml`), por encima de las ~400 previstas; la costura natural si hay que partir es Storybook y política frente a `Spinner`.
+
+**Implementado.** `.storybook/main.ts` (solo `../src/**/*.stories.tsx`, solo `addon-a11y`, telemetría desactivada, `@tailwindcss/vite` cargado en `viteFinal`),
+`.storybook/preview.tsx` (tokens, i18n, barra de herramientas `light`/`dark` sobre `data-theme`, `axeRunOptions`), `src/a11y/policy.ts`, `src/lib/cn.ts`
+(`extendTailwindMerge` con `font-weight` y `ease` propios), `Spinner` con `cva`, `build` = `storybook build --output-dir dist/storybook`. Catálogo: `storybook`,
+`@storybook/react-vite`, `@storybook/addon-a11y` 10.6.2, `vite` 8.3.4, `@vitejs/plugin-react` 6.1.2, `@tailwindcss/vite` 4.3.3, `axe-core` 4.14.0,
+`class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`, `eslint-plugin-react-hooks` 7.1.1 (activo con la opción nueva `react` de `confiaEslint`;
+verificado con un gancho condicional que da `react-hooks/rules-of-hooks`).
+
+**Rojo observado** (`vitest run --project unit src/a11y src/lib src/atoms/spinner src/tokens/tokens.motion.test.ts`, con las dependencias ya instaladas): 4 archivos
+fallidos por `Failed to resolve import "./policy"`, `"../../.storybook/main"`, `"./cn"` y `"./Spinner"`; `tokens.motion.test.ts` falla con
+`expected 0 to be greater than 0`. **Verde:** `ui` 19 archivos y 151 pruebas, cobertura 100 %.
+
+**Demostraciones deliberadas**, revertidas y verificadas con `cmp` (sin salida):
+1. `"moderate"` en `BLOCKING_IMPACTS`: 3 pruebas en rojo ("blocks critical and serious impacts only", DS69 y "splits a mixed list").
+2. `incomplete` tratado como aprobado (se elimina su recorrido): 3 pruebas en rojo, entre ellas "blocks an incomplete color-contrast result".
+3. `src/Intro.mdx`: rojo en "has no MDX file anywhere in the package" (`expected [ 'src/Intro.mdx' ] to deeply equal []`); el archivo se borró.
+
+**Medidas.** `storybook build` 9 s en local (límite del trabajo `frontend verify`: 10 min). `pnpm audit --audit-level high`: sin altas (2 bajas, 2 moderadas).
+
+**Regresión hallada y corregida.** `dist/storybook` entraba en el recorrido de dependency-cruiser (69 a 85 módulos) y el caso "finds no violation in the real tree"
+pasó de 2,9 s a 5,3 y 5,9 s bajo `turbo`, superando el límite de 5 s (falló 3 de 3; sin `dist` pasa en 2,9 s). Rojo: `does not cruise generated output under
+dist/|coverage/|reports/` con `expected 17 to be +0`, `expected 4 to be +0` y `expected 1 to be +0`. Corrección: `.dependency-cruiser.cjs` excluye `dist`, `coverage` y
+`reports` (solo exclusión, sin cambio de reglas). Con ella el caso real tarda 3,9 a 4,0 s bajo carga total; el margen frente a 5 s es de 1 s.
+
+**Desviaciones.**
+(a) Se eliminó el override `vite@>=8.3.0 <8.3.3` (de #211, GHSA-587h-7wmj-h5pm): `vite` es ahora dependencia directa en 8.3.4 y el override convertía los pares de
+Vitest, Storybook y Tailwind en `8.3.3` exacto (`pnpm peers check` fallaba). El lockfile contiene una sola `vite`, 8.3.4, y `pnpm audit` no reporta `vite`.
+(b) `createUiI18n` clona los recursos (`structuredClone`): i18next muta el objeto recibido y las instancias se contaminaban.
+(c) `--spinner-animation` y `@keyframes confia-spin` en `components.css`: el tema reseteado no trae `animate-spin`; los documentos no dan valor (se eligió 1 s lineal).
+(d) Bloque `prefers-reduced-motion` de `docs/ui-ux/01` §10 añadido a `base.css` (faltaba), con `tokens.motion.test.ts`.
+(e) `partitionViolations(violations, incomplete = [])`: un impacto desconocido bloquea; solo `color-contrast` incompleto bloquea (Apéndice B, R-3).
+(f) `turbo.json` no se modificó: `dist/**` ya cubre `dist/storybook`. `.gitignore` ya ignora `dist/` y `reports/`.
+(g) `tsconfig` añade `vite/client` y `.storybook/**/*` (el patrón `.storybook` solo no lo encuentra el servicio de proyecto de ESLint).
+(h) Pendiente para 3.2: el patrón `../src/**/*.stories.tsx` mostrará en Storybook los fixtures de `__fixtures__`.
+
+Cierre: `pnpm install --frozen-lockfile` y `pnpm turbo run lint typecheck test build --filter=!@confia/api --force` 14 de 14, tres veces seguidas.

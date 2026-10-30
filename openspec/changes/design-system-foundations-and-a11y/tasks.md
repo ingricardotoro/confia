@@ -368,7 +368,7 @@ contra `main` antes del PR 3.
 
 ## Fase 3: Storybook, puerta de axe y CI (PR 3, corte 13a-3)
 
-- [ ] 3.1 **PR 3 / 3a `03-storybook-and-axe-gate`: Storybook, política de axe, guardia de MDX, `cn` y `Spinner` como primer componente real (decisiones 8, 9 y 11).**
+- [x] 3.1 **PR 3 / 3a `03-storybook-and-axe-gate`: Storybook, política de axe, guardia de MDX, `cn` y `Spinner` como primer componente real (decisiones 8, 9 y 11).**
   - **Precondición.** PR 2 fusionado; rama nueva desde `main`. Sondas S1 y S5 con resultado favorable en 1.1.
   - **ROJO.** `src/a11y/policy.test.ts`: `A11Y_TAGS` es exactamente `wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa`; `partitionViolations` bloquea
     `critical` y `serious` y solo informa `moderate` y `minor` [DS69]; **un resultado `incomplete` de `color-contrast` cuenta como bloqueante, nunca como

@@ -10,6 +10,6 @@ Run from the repository root:
 | `pnpm --filter @confia/ui lint` | ESLint, strict type-checked |
 | `pnpm --filter @confia/ui typecheck` | `tsc --noEmit` |
 | `pnpm --filter @confia/ui test` | Vitest `unit` project (jsdom) with V8 coverage; fails below 80 % |
-| `pnpm --filter @confia/ui build` | `tsc --noEmit` for now; Storybook replaces it later in this change |
+| `pnpm --filter @confia/ui build` | `storybook build --output-dir dist/storybook`: the visual catalog, and proof that every story compiles |
 
 Tests live next to the code as `*.test.ts` and `*.test.tsx`.

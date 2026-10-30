@@ -41,7 +41,8 @@ module.exports = {
   ],
   options: {
     doNotFollow: { path: "node_modules" },
-    exclude: { path: "(^|/)node_modules/" },
+    // Generated output is not authored code: build bundles (dist), coverage and report folders.
+    exclude: { path: "(^|/)(node_modules|dist|coverage|reports)/" },
     tsPreCompilationDeps: true,
     enhancedResolveOptions: {
       exportsFields: ["exports"],

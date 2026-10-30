@@ -27,4 +27,14 @@
   --status-badge-refunded-bg: var(--color-status-refunded-bg);
   --status-badge-refunded-fg: var(--color-status-refunded-fg);
   --status-badge-refunded-border: var(--color-status-refunded-border);
+  --spinner-animation: confia-spin 1s linear infinite;
+}
+
+/* The one keyframe set in the package. It is global on purpose: the Tailwind theme is reset, so the
+   default `spin` keyframes do not exist, and a component reads the animation through the token
+   above (animate-(--spinner-animation)). */
+@keyframes confia-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

@@ -21,7 +21,8 @@ export function createUiI18n({ lng = DEFAULT_UI_LANGUAGE }: CreateUiI18nOptions 
     nonExplicitSupportedLngs: false,
     ns: [UI_NAMESPACE],
     defaultNS: UI_NAMESPACE,
-    resources: uiResources,
+    // A copy: i18next keeps and mutates the object it is given, and instances must not share it.
+    resources: structuredClone(uiResources),
     initAsync: false,
     interpolation: { escapeValue: false },
     returnNull: false,
