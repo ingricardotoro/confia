@@ -566,7 +566,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     institution with a per-batch audit entry`. Tamaño: nominal 300, realista 700 a 850; costura nombrada: el vaciado del sucesor residual con sus
     pruebas va a un PR aparte si se pasa. — Escenarios I252 a I256, I262, I263, I274 a I276, AT18 a AT22, AT27 a AT29 y BJ62 (parte de identidad).
 
-- [ ] 3.5 **PR 5a / 5a-3 `05a-adr-0025-and-retention-notes`: ADR-0025 «Propuesto», nota en ADR-0017 y notas de `docs/03` §6.1 y `docs/08` §6.2 (decisión 22, D-N3, P3).**
+- [x] 3.5 **PR 5a / 5a-3 `05a-adr-0025-and-retention-notes`: ADR-0025 «Propuesto», nota en ADR-0017 y notas de `docs/03` §6.1 y `docs/08` §6.2 (decisión 22, D-N3, P3).**
   - **ROJO.** Crear `test/java/com/confia/architecture/DocumentationNotesTest.java` (o ampliar la prueba de notas documentales vigente): existen el
     archivo `docs/adr/ADR-0025-purga-por-funciones-security-definer.md` con estado «Propuesto» y su fila en `docs/adr/README.md`; ADR-0017 tiene una
     nota fechada que apunta a ADR-0025 y su cuerpo original no cambió (comparación de las líneas originales); `docs/03-seguridad.md` §6.1 y

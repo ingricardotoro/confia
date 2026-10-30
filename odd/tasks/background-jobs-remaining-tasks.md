@@ -32,7 +32,7 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 - [x] T3.2 Slice 4b `04-reset-issuance-handler` (split: 4b and 4c).
 - [x] T3.3 Slice 5a-1 `05a-v11-purge-functions`.
 - [x] T3.4 Slice 5a-2 `05a-identity-purge-jobs` (split: 5a-2a, 5a-2 and 5a-2b).
-- [ ] T3.5 Slice 5a-3 `05a-adr-0025-and-retention-notes`.
+- [x] T3.5 Slice 5a-3 `05a-adr-0025-and-retention-notes`.
 - [ ] T3.6 Slice 5b-1 `05b-v12-purge-functions`.
 - [ ] T3.7 Slice 5b-2 `05b-idempotency-and-backoff-jobs`.
 - [ ] T3.8 Slice 6 `06-audit-chain-verification-cadences`.
@@ -145,9 +145,20 @@ T3.1 evidence:
 
 ## Next step
 
-T3.5, slice 5a-3 `05a-adr-0025-and-retention-notes`, delegated to one writer, on branch
-`change/background-jobs-with-db-scheduler-05a3-adr-0025-and-retention-notes` from `main` `2936620`: ADR-0025 «Propuesto», dated
-note in ADR-0017, notes in `docs/03` §6.1 and `docs/08` §6.2. ADR-0026 is reserved by frontend change 13a (Storybook).
+T3.6, slice 5b-1 `05b-v12-purge-functions` (branch `05b-v12-purge-functions` from `main` once 5a is merged). ADR-0026 is reserved by
+frontend change 13a (Storybook).
+
+T3.5 evidence:
+
+- Commit `5553c22` adds `DocumentationNotesTest` (4 tests) and fixtures under `src/test/resources/documentation-notes` (ADR-0017 whole
+  file, `docs/03` section 6.1 and `docs/08` section 6.2 as they were before the notes). Every fixture line must still appear, in order.
+- RED: with the five docs restored to `942b2e6` (ADR-0025 removed), 4 of 4 tests failed (missing ADR file, missing notes). GREEN: 4 of 4
+  with the real docs.
+- Deliberate demonstration: rewriting the ADR-0017 line "Estos son los únicos `UPDATE` y `DELETE`..." failed
+  `adr0017HasDatedNoteAndUnchangedOriginalBody` ("original body ... changed: original line 136 is missing or out of order"); reverted,
+  `cmp` against the copy in the scratchpad printed nothing, `git status` clean for docs.
+- `./mvnw -B verify -Pmutation-gate`: BUILD SUCCESS, 34:50 min; 2 623 unit tests and 726 integration tests, 0 failures; PIT 192 of 194
+  killed in the last module report, no mutation without coverage.
 
 T3.4 evidence:
 
