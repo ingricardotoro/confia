@@ -833,6 +833,18 @@ crítico: un rol con `BYPASSRLS` anula silenciosamente todas las políticas.
 > `DELETE`; `SELECT` para `confia_readonly`; y **ningún privilegio** para `confia_portal_app`. Al no
 > haber `DELETE`, los tokens vencidos, usados y reemplazados se conservan hasta que el cambio 9
 > entregue la purga.
+>
+> **Nota editorial, 2026-10-29 (`background-jobs-with-db-scheduler`, ADR-0025 en estado «Propuesto»).**
+> La purga de las tablas de retención no concede `DELETE` a ningún rol: el principio de esta sección se
+> mantiene. `confia_admin_app` borra filas vencidas **solo** a través de funciones `SECURITY DEFINER`
+> propiedad de `confia_owner`, con `EXECUTE` exclusivo para `confia_admin_app` y revocado a `PUBLIC`;
+> ningún otro rol, tampoco `confia_portal_app`, puede ejecutarlas. Cada función fija `search_path` y
+> `TimeZone = 'UTC'`, nunca borra una fila más reciente que su piso codificado (24 horas, o 30 días
+> para las familias de refresco), exige `app.institution_id` y el actor `system` (una ruta HTTP con
+> actor `staff` falla) y borra como máximo 10 000 filas por llamada. Desde `V11`:
+> `identity_purge_password_reset_tokens` e `identity_purge_refresh_token_families`; la migración `V12`
+> agregará las de `shared_idempotency_key`, `identity_login_backoff` e `identity_mfa_totp_backoff`. Solo
+> el proceso `confia-worker` las invoca, desde tareas recurrentes diarias.
 
 ### 6.2 Contexto de sesión seguro
 

@@ -393,6 +393,29 @@ funciona así:
    días entre la marca y la ejecución, para que un error de criterio se detecte antes de ser
    irreversible.
 
+> **Nota editorial, 2026-10-29 (`background-jobs-with-db-scheduler`, decisión P3 del propietario del
+> 2026-10-24; ADR-0025 en estado «Propuesto»).** La tarea semanal con marca y gracia de siete días
+> descrita arriba aplica a los **datos de negocio y personales**. No aplica a las tablas técnicas de
+> retención, que se purgan **a diario** (`docs/07-observabilidad-y-operaciones.md` sección 11), sin marca
+> previa ni gracia, porque sus filas solo sirven mientras están vigentes y la vigencia la fija el propio
+> dato. Una fila es purgable cuando el tiempo desde su referencia supera **estrictamente** la ventana;
+> en el borde exacto se conserva. Ventanas:
+>
+> | Tabla | Referencia | Ventana |
+> |---|---|---|
+> | `identity_refresh_token_family` e `identity_refresh_token` | Revocación o expiración absoluta de la familia | 30 días |
+> | `identity_password_reset_token` | `expires_at` | 24 horas |
+> | `shared_idempotency_key` | `expires_at` | 24 horas |
+> | `identity_login_backoff` e `identity_mfa_totp_backoff` | `last_attempt_at` | 24 horas |
+>
+> Las dos primeras filas se purgan desde el cambio 9 (tokens de recuperación a las 04:30 y de refresco a
+> las 04:35, hora de Tegucigalpa, por cada institución configurada); las tres últimas tablas, cuando se
+> entregue la migración `V12` del mismo cambio. Los pasos 4 y 6 de esta sección se cumplen así: cada lote
+> escribe un asiento de auditoría con el conteo y el corte, también cuando no purgó nada, y nunca datos
+> de las filas; y en lugar de la gracia, la función de purga codifica un piso que impide borrar una fila
+> más reciente que la ventana, aunque el llamador pida otro corte. Si una corrida agota sus 200 lotes de
+> 5 000, el resto sigue al día siguiente y se registra el evento `retention_purge_backlog`.
+
 ---
 
 ## 7. Anonimización y seudonimización
