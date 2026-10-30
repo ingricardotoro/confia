@@ -111,6 +111,7 @@ rompe la construcción.
 | Formularios | **TanStack Form** con Zod | Esquemas Zod generados desde el OpenAPI del backend en `packages/contracts`. La validación del cliente mejora la experiencia; la autoridad es la validación del servidor. |
 | Virtualización | **TanStack Virtual** | Listados largos como estados de cuenta y libros de ventas. |
 | UI base | **Tailwind CSS v4** con **shadcn/ui** sobre Radix | Accesibilidad de fábrica y propiedad total del código de los componentes, sin dependencia de un proveedor. |
+| Catálogo de componentes | **Storybook 10** con `@storybook/react-vite` | Catálogo visual de `packages/ui` como sustituto de la revisión de diseño (`docs/ui-ux/02` §8) y banco de la verificación de accesibilidad. Ver `docs/adr/ADR-0026-storybook-y-verificacion-de-accesibilidad.md`. |
 | Gráficos | **Recharts** | Suficiente para los indicadores del dashboard. El estándar de visualización vive en `docs/ui-ux/`. |
 | Internacionalización | **i18next** con `Intl` nativo | Español de Honduras por defecto, inglés preparado. Moneda y fecha siempre por `Intl`. |
 
@@ -126,6 +127,9 @@ Resumen del instrumental:
   propiedad, PIT para pruebas de mutación, JaCoCo para cobertura, ArchUnit y las pruebas de
   Spring Modulith.
 - **Frontend:** Vitest, Testing Library, MSW, Playwright y axe-core.
+- **Accesibilidad de los componentes:** cada historia de Storybook pasa por axe-core en Chromium, en los
+  temas claro y oscuro, con un proyecto de Vitest en modo navegador (`pnpm --filter @confia/ui
+  test:a11y`); crítica y seria bloquean, moderada y menor se registran. ADR-0026.
 - **Rendimiento:** k6.
 
 ---
