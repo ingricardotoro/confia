@@ -32,7 +32,7 @@ catalog:
   orval: 8.38.0
   typescript: 6.0.3
   typescript-eslint: 8.71.0
-  vitest: 5.0.2
+  vitest: 5.0.5
   zod: 4.6.6
 
 # Transitive versions forced past a known vulnerability, each with its advisory. Remove an entry once
