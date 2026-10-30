@@ -570,6 +570,52 @@ export function confiaEslint(options: {
 | **S4** | ¿Qué dependencias nuevas piden guiones de instalación bajo `strictDepBuilds`, y pasa `pnpm audit --audit-level high`? | Cada petición resuelta en `allowBuilds` con su motivo (por ejemplo, `@tailwindcss/oxide: false` si sus binarios llegan como paquetes opcionales); auditoría sin altas | `overrides` documentados uno por uno; la auditoría nunca se desactiva | Corte 13a-1 |
 | **S5** | ¿Funcionan las historias portables en el modo navegador de Vitest 5 con Chromium, carga el CSS real y detecta axe el contraste? | La historia inaccesible deliberada produce `color-contrast`, `image-alt` y `button-name`; se registra si el proveedor permite emular `prefers-color-scheme` | Se detiene y se informa, con el respaldo en jsdom de la decisión 8 como propuesta | Corte 13a-3 |
 
+**Nota fechada 2026-10-28, resultado de las sondas (tarea 1.1): S1 a S5 cumplen su criterio.** Se ejecutaron en un directorio fuera del repositorio
+con Node 24.22.1 y pnpm 12.8.1, `strictDepBuilds: true`, `allowBuilds` vigente y el catálogo actual. context7 no estuvo disponible; las versiones salen
+del registro de npm (`pnpm view`, solo publicadas hasta el 2026-10-14, al menos dos semanas) y los tipos de los propios paquetes.
+
+| Sonda | Resultado | Evidencia breve |
+|---|---|---|
+| S1 | Cumple | `pnpm install` limpio y luego `--frozen-lockfile` sin avisos de pares, sin `overrides`; una sola Vite (8.3.4); `storybook build` correcto; `tsc` correcto con la base del repositorio (`skipLibCheck: true`, `exactOptionalPropertyTypes`); `eslint-plugin-react-hooks` 7.1.1 admite ESLint 10 y rechaza un gancho condicional |
+| S2 | Cumple | `bg-primary` emite regla; `bg-palette-primary-600` y `bg-red-500` no; `--palette-primary-600` se emite aunque nada la use; control: sin `--*: initial`, `bg-red-500` sí se emite |
+| S3 | Cumple | `"12345678901234567.89"` y `"123456789012345678.90"` sin pérdida; Node 24 y Chromium 156 producen salida idéntica; ver notas |
+| S4 | Cumple | Ninguna dependencia pidió guiones de instalación; `allowBuilds` no cambia (`esbuild: false`); `pnpm audit --audit-level high`: 0 altas, 4 moderadas (ver notas) |
+| S5 | Cumple | `image-alt`, `button-name` y `color-contrast` como violaciones (no incompletas); CSS real cargado; `colorScheme` emulable; comando personalizado escribe `reports/a11y/*.json` |
+
+Versiones fijadas (todas con al menos dos semanas, salvo `vitest` que ya estaba en el catálogo): `react` y `react-dom` 19.3.0; `@types/react` y
+`@types/react-dom` 19.3.0; `tailwindcss` y `@tailwindcss/vite` 4.3.3; `vite` 8.3.4; `@vitejs/plugin-react` 6.1.2; `storybook`, `@storybook/react-vite` y
+`@storybook/addon-a11y` 10.6.2; `vitest`, `@vitest/browser-playwright` y `@vitest/coverage-v8` 5.0.2; `playwright` 1.64.1; `axe-core` 4.14.0;
+`i18next` 26.4.4; `react-i18next` 17.0.16; `i18next-icu` 2.5.0; `intl-messageformat` 12.1.3; `@testing-library/react` 16.3.3;
+`@testing-library/dom` 10.4.2; `@testing-library/user-event` 14.6.8; `@testing-library/jest-dom` 7.0.1; `jsdom` 30.1.2; `eslint-plugin-react-hooks` 7.1.1;
+`@fontsource-variable/inter` 5.3.0; `tailwind-merge` 3.7.0; `clsx` 2.1.1; `class-variance-authority` 0.7.1; `lucide-react` 1.57.0; `radix-ui` 1.8.1;
+CLI `shadcn` 4.21.4 (solo para generar fuera del repositorio).
+
+Notas que afectan a tareas posteriores:
+
+- **Pares.** `@vitejs/plugin-react` 6 exige `vite ^8`; Vitest 5.0.2 admite Vite 6.4, 7 y 8, y `@tailwindcss/vite` 4.3.3 hasta 8. `@vitest/coverage-v8`
+  pide `@vitest/browser` como par (pnpm lo instala solo). `@testing-library/jest-dom` 7 pide `@testing-library/dom` 10 (se declara explícito).
+  `react-i18next` 17 pide `i18next >=26.2`.
+- **`compile()` de Tailwind (1.3).** Basta `import { compile } from "tailwindcss"` con un `loadStylesheet` que lea `tailwindcss/index.css`; no hace falta
+  `@tailwindcss/node`.
+- **`Intl` (2.1, 6.1).** `es-HN` da `L 3,200.00` con espacio no separable (U+00A0) y `USD 3,200.00` (no `US$`); el negativo sale `-L 1,500.00`;
+  `currencySign: "accounting"` en `es-HN` **no** da paréntesis (`-L 1,500.00`), así que DS34 (contable con paréntesis) debe construirse sin depender de
+  `Intl` o replantearse; `currencyDisplay: "name"` da `3,200.50 lempiras hondureños` y `3,200.50 dólares estadounidenses`. Cero negativo
+  (`"-0.00"`, `"-0.0000"`): `signDisplay: "auto"` y `"always"` dan `-L 0.00`; `"exceptZero"` y `"negative"` dan `L 0.00` (se usa `"negative"`, o
+  `"exceptZero"` con `sign: "always"`). `"3200.005"` y `"3200.125"` se redondean en silencio (`L 3,200.01`, `L 3,200.13`): la validación previa es
+  obligatoria. `Intl.supportedValuesOf("currency")` tiene 162 entradas en Node y 159 en Chromium (HNL y USD en ambos): la lista blanca de monedas no
+  puede compararse por cantidad entre motores.
+- **Tipos (2.1).** `lib.es2023.intl.d.ts` declara `format(value: number | bigint | StringNumericLiteral)`: acepta literales como
+  `"12345678901234567.89"` pero rechaza un `string` genérico; tras validar por patrón se estrecha con un guardián de tipo a `` `${number}` ``.
+- **Vitest en navegador.** En Vitest 5 el puerto de la API (`test.api.port`) se fija en la raíz; `test.browser.api` está obsoleto. En esta máquina el
+  puerto predeterminado 63315 cae en un rango excluido de Windows (`EACCES`), por lo que la configuración debe poder fijar otro. Las historias con
+  `import "./index.css"` necesitan `types: ["vite/client"]` en `tsconfig`. `page.emulateMedia` no existe en `vitest/browser`: se hace con un comando
+  personalizado (`defineBrowserCommand` y `provider.getPage(sessionId).emulateMedia`).
+- **Auditoría.** Las 4 moderadas son de Vitest 5.0.2 (`@vitest/mocker` <5.0.3, GHSA-qxg6-89mg-rqv8 y GHSA-xp26-3454-mjgp; `@vitest/browser` y
+  `@vitest/ui` <5.0.5, GHSA-p458-7748-mcp3, que sirve archivos privados desde el servidor de desarrollo). Corregidas en 5.0.5 (publicada el
+  2026-10-15, aún sin las dos semanas). No bloquean (el umbral es `high`); se propone subir el catálogo a 5.0.5 como decisión del propietario cuando
+  cumpla la antigüedad.
+- **Chromium.** `playwright install chromium` no ejecutó guiones; se probó con `PLAYWRIGHT_BROWSERS_PATH` fuera del repositorio.
+
 ## 8. División del pull request
 
 Las pruebas y la documentación viajan con su código (`docs/15` §3), así que cuentan dentro de las

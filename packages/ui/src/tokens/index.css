@@ -1,0 +1,31 @@
+/* The single stylesheet entry point of @confia/ui, imported by applications as
+   @confia/ui/styles.css (design-system-foundations-and-a11y, design decision 2). The order matters:
+   the reset of Tailwind's default theme comes before every token file. */
+@import 'tailwindcss';
+
+@theme {
+  --*: initial;
+}
+
+@import './primitives.css';
+@import './semantic.css';
+@import './themes.css';
+@import './components.css';
+@import './base.css';
+
+/* Relative to this file: Tailwind scans the whole package for utility classes. */
+@source '../';
+
+/* Follows both theme mechanisms, so no component needs a dark: prefix; the semantic tokens change
+   value on their own. */
+@custom-variant dark {
+  &:where([data-theme='dark'], [data-theme='dark'] *) {
+    @slot;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    &:where(:not([data-theme='light'], [data-theme='light'] *)) {
+      @slot;
+    }
+  }
+}

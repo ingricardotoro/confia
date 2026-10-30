@@ -9,7 +9,10 @@
       "types": "./eslint.d.ts",
       "default": "./eslint.js"
     },
-    "./vitest": "./vitest.js"
+    "./vitest": {
+      "types": "./vitest.d.ts",
+      "default": "./vitest.js"
+    }
   },
   "scripts": {
     "lint": "eslint .",

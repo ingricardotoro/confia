@@ -1,0 +1,187 @@
+/* Level 2: semantic tokens, light values (docs/ui-ux/01 sections 3, 4, 7 to 10 and 14). Inside
+   @theme static every variable is emitted even when no utility uses it, so the dark blocks in
+   themes.css and the component tokens always find a base value. Components consume these
+   through utilities such as bg-primary and text-status-paid-fg. Financial-state and feedback
+   colors keep the literal hex values of 01 section 4. */
+@theme static {
+  /* Typography */
+  --font-sans:
+    'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 1;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.02em;
+
+  /* Spacing (4 px base, one multiplier) and breakpoints */
+  --spacing: 0.25rem;
+
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+
+  /* Radii */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Shadows, light theme */
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.06);
+  --shadow-md: 0 4px 8px -2px rgb(15 23 42 / 0.10), 0 2px 4px -2px rgb(15 23 42 / 0.06);
+  --shadow-lg: 0 12px 20px -4px rgb(15 23 42 / 0.12), 0 4px 8px -4px rgb(15 23 42 / 0.08);
+  --shadow-xl: 0 24px 36px -8px rgb(15 23 42 / 0.18), 0 8px 12px -6px rgb(15 23 42 / 0.10);
+
+  /* Easing curves */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Surface, text and border */
+  --color-bg-canvas: var(--palette-neutral-50);
+  --color-bg-surface: #FFFFFF;
+  --color-bg-surface-elevated: #FFFFFF;
+  --color-text-primary: var(--palette-neutral-900);
+  --color-text-secondary: var(--palette-neutral-600);
+  --color-text-tertiary: var(--palette-neutral-500);
+  --color-text-disabled: var(--palette-neutral-400);
+  --color-text-inverse: #FFFFFF;
+  --color-text-link: var(--palette-primary-700);
+  --color-border-subtle: var(--palette-neutral-200);
+  --color-border-interactive: var(--palette-neutral-500);
+  --color-border-focus: var(--palette-primary-500);
+
+  /* Primary */
+  --color-primary: var(--palette-primary-600);
+  --color-primary-hover: var(--palette-primary-700);
+  --color-primary-active: var(--palette-primary-800);
+  --color-primary-fg: #FFFFFF;
+  --color-primary-soft-bg: var(--palette-primary-50);
+  --color-primary-soft-fg: var(--palette-primary-700);
+
+  /* Generic interface feedback (01 section 2.3), distinct from the financial states */
+  --color-feedback-success: #16A34A;
+  --color-feedback-warning: #EA580C;
+  --color-feedback-danger: #DC2626;
+  --color-feedback-info: #0284C7;
+
+  /* Financial state: paid */
+  --color-status-paid: #16A34A;
+  --color-status-paid-bg: #F0FDF4;
+  --color-status-paid-fg: #166534;
+  --color-status-paid-border: #16A34A;
+  --color-status-paid-solid-bg: #15803D;
+
+  /* Financial state: pending */
+  --color-status-pending: #0284C7;
+  --color-status-pending-bg: #F0F9FF;
+  --color-status-pending-fg: #075985;
+  --color-status-pending-border: #0284C7;
+  --color-status-pending-solid-bg: #0369A1;
+
+  /* Financial state: partial */
+  --color-status-partial: #EA580C;
+  --color-status-partial-bg: #FFF7ED;
+  --color-status-partial-fg: #9A3412;
+  --color-status-partial-border: #EA580C;
+  --color-status-partial-solid-bg: #C2410C;
+
+  /* Financial state: overdue */
+  --color-status-overdue: #DC2626;
+  --color-status-overdue-bg: #FEF2F2;
+  --color-status-overdue-fg: #B91C1C;
+  --color-status-overdue-border: #DC2626;
+  --color-status-overdue-solid-bg: #B91C1C;
+
+  /* Financial state: void */
+  --color-status-void: #52525B;
+  --color-status-void-bg: #F4F4F5;
+  --color-status-void-fg: #3F3F46;
+  --color-status-void-border: #52525B;
+  --color-status-void-solid-bg: #3F3F46;
+
+  /* Financial state: promised */
+  --color-status-promised: #7C3AED;
+  --color-status-promised-bg: #F5F3FF;
+  --color-status-promised-fg: #6D28D9;
+  --color-status-promised-border: #7C3AED;
+  --color-status-promised-solid-bg: #6D28D9;
+
+  /* Financial state: refunded */
+  --color-status-refunded: #0D9488;
+  --color-status-refunded-bg: #F0FDFA;
+  --color-status-refunded-fg: #0F766E;
+  --color-status-refunded-border: #0D9488;
+  --color-status-refunded-solid-bg: #0F766E;
+}
+
+/* Scales with no Tailwind namespace (01 sections 9.2, 10, 12 and 13). Consumed with the arbitrary
+   syntax, for example z-[var(--z-modal)]. */
+:root {
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-dropdown: 1000;
+  --z-fixed: 1100;
+  --z-overlay: 1200;
+  --z-modal: 1300;
+  --z-popover: 1400;
+  --z-toast: 1500;
+  --z-tooltip: 1600;
+
+  --icon-size-xs: 14px;
+  --icon-size-sm: 16px;
+  --icon-size-md: 20px;
+  --icon-size-lg: 24px;
+  --icon-size-xl: 32px;
+  --icon-size-2xl: 40px;
+  --icon-stroke-fine: 1.5;
+  --icon-stroke-default: 2;
+
+  --border-width-hairline: 1px;
+  --border-width-thick: 2px;
+
+  --duration-fast: 100ms;
+  --duration-base: 150ms;
+  --duration-moderate: 200ms;
+  --duration-slow: 300ms;
+
+  /* Dark-theme shadows replace the light ones only under the dark theme */
+  --shadow-dark-md: 0 4px 12px -2px rgb(0 0 0 / 0.45);
+  --shadow-dark-xl: 0 24px 48px -12px rgb(0 0 0 / 0.60);
+
+  /* Palette anchors for the dark theme. themes.css may not name a primitive, so the five dark
+     values that follow the brand are reached through these aliases and change with it. */
+  --dark-text-link: var(--palette-primary-400);
+  --dark-border-interactive: var(--palette-neutral-400);
+  --dark-border-focus: var(--palette-primary-400);
+  --dark-primary-soft-bg: var(--palette-primary-900);
+  --dark-primary-soft-fg: var(--palette-primary-300);
+}

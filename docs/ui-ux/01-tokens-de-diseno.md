@@ -567,6 +567,32 @@ capas mayores deja margen para casos intermedios sin renumerar toda la escala.
 Archivo de referencia: `packages/ui/src/styles/tokens.css`. Se importa una sola vez en el punto de
 entrada de cada aplicación (`apps/admin-web` y `apps/portal-web`).
 
+> **Nota fechada 2026-10-28 (cambio `design-system-foundations-and-a11y`).** El bloque de abajo es la
+> referencia de valores; la implementación real difiere en la forma, no en los valores:
+>
+> - La ruta real es `packages/ui/src/tokens/`, dividida en `index.css` (punto de entrada, que las
+>   aplicaciones importan como `@confia/ui/styles.css`), `primitives.css`, `semantic.css`,
+>   `themes.css`, `components.css` y `base.css`.
+> - Los primitivos pasan de `--color-neutral-*` y `--color-primary-*` a `--palette-neutral-*` y
+>   `--palette-primary-*`, dentro de `@theme static`. `palette` no es un espacio de nombres de
+>   Tailwind, así que no genera utilidades: la regla dura del §1 («un componente nunca consume un
+>   primitivo») deja de depender de la disciplina porque `bg-primary-600` ni siquiera existe. Los
+>   valores y los tokens semánticos no cambian.
+> - `index.css` borra el tema predeterminado de Tailwind (`@theme { --*: initial; }`), así que
+>   `bg-red-500` y las demás utilidades de su paleta tampoco existen.
+> - Los bloques oscuros no nombran primitivos (una prueba lo vigila): los cinco valores que siguen
+>   la marca (`--color-text-link`, `--color-border-interactive`, `--color-border-focus`,
+>   `--color-primary-soft-bg`, `--color-primary-soft-fg`) pasan por los alias `--dark-*` de
+>   `semantic.css`.
+> - **Corrección fechada 2026-10-29.** Este documento no definía `--color-primary-soft-bg` en modo
+>   oscuro: heredaba `primary-50` (`#EFF6FF`) bajo un texto `primary-300` (`#93C5FD`), cerca de 1,5:1.
+>   Se fija en `primary-900` (`#1E3A8A`, alias `--dark-primary-soft-bg`), que da más de 4,5:1 con el
+>   texto `primary-300` (la guarda de contraste lo mide). Los dos bloques oscuros también asignan
+>   `--shadow-md` y `--shadow-xl` a `--shadow-dark-md` y `--shadow-dark-xl`, según §9.3.
+> - Inter se declara con dos `@font-face` (`latin` y `latin-ext`) sobre los archivos de
+>   `@fontsource-variable/inter`; `'Inter Variable'` encabeza la pila de §7.1.
+> - La clase `.money-amount` (§7.5) llega con el componente `MoneyAmount`.
+
 ```css
 /* ==========================================================================
    CONFIA — Design tokens
@@ -794,7 +820,11 @@ entrada de cada aplicación (`apps/admin-web` y `apps/portal-web`).
     --color-border-interactive: var(--color-neutral-400);
     --color-border-focus: var(--color-primary-400);
 
+    --color-primary-soft-bg: var(--color-primary-900);
     --color-primary-soft-fg: var(--color-primary-300);
+
+    --shadow-md: var(--shadow-dark-md);
+    --shadow-xl: var(--shadow-dark-xl);
 
     --color-status-paid: #4ADE80;
     --color-status-paid-bg: #0F2A1B;
@@ -852,7 +882,11 @@ entrada de cada aplicación (`apps/admin-web` y `apps/portal-web`).
   --color-border-interactive: var(--color-neutral-400);
   --color-border-focus: var(--color-primary-400);
 
+  --color-primary-soft-bg: var(--color-primary-900);
   --color-primary-soft-fg: var(--color-primary-300);
+
+  --shadow-md: var(--shadow-dark-md);
+  --shadow-xl: var(--shadow-dark-xl);
 
   --color-status-paid: #4ADE80;
   --color-status-paid-bg: #0F2A1B;

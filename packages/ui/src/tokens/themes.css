@@ -1,0 +1,119 @@
+/* Dark theme (docs/ui-ux/01 sections 6 and 14, design decision 4). Two mechanisms, both required:
+   the system preference, unless the page chose light, and the data-theme attribute on the root
+   element, which always wins. CSS cannot join a media query and a selector in one block, so the
+   values are written twice and tokens.parity.test.ts keeps them identical. The theme is set on
+   the root only: component tokens are declared on :root, so a data-theme on a subtree would not
+   reach them. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg-canvas: #05080F;
+    --color-bg-surface: #0B1220;
+    --color-bg-surface-elevated: #131C2E;
+    --color-text-primary: #F1F5F9;
+    --color-text-secondary: #CBD5E1;
+    --color-text-tertiary: #94A3B8;
+    --color-text-disabled: #475569;
+    --color-text-inverse: #0B1220;
+    --color-text-link: var(--dark-text-link);
+    --color-border-subtle: #1E293B;
+    --color-border-interactive: var(--dark-border-interactive);
+    --color-border-focus: var(--dark-border-focus);
+
+    --color-primary-soft-bg: var(--dark-primary-soft-bg);
+    --color-primary-soft-fg: var(--dark-primary-soft-fg);
+
+    --shadow-md: var(--shadow-dark-md);
+    --shadow-xl: var(--shadow-dark-xl);
+
+    --color-status-paid: #4ADE80;
+    --color-status-paid-bg: #0F2A1B;
+    --color-status-paid-fg: #4ADE80;
+    --color-status-paid-border: #4ADE80;
+
+    --color-status-pending: #38BDF8;
+    --color-status-pending-bg: #0B2536;
+    --color-status-pending-fg: #38BDF8;
+    --color-status-pending-border: #38BDF8;
+
+    --color-status-partial: #FB923C;
+    --color-status-partial-bg: #2B1608;
+    --color-status-partial-fg: #FB923C;
+    --color-status-partial-border: #FB923C;
+
+    --color-status-overdue: #F87171;
+    --color-status-overdue-bg: #2A0F0F;
+    --color-status-overdue-fg: #F87171;
+    --color-status-overdue-border: #F87171;
+
+    --color-status-void: #A1A1AA;
+    --color-status-void-bg: #1F1F23;
+    --color-status-void-fg: #A1A1AA;
+    --color-status-void-border: #A1A1AA;
+
+    --color-status-promised: #A78BFA;
+    --color-status-promised-bg: #211539;
+    --color-status-promised-fg: #A78BFA;
+    --color-status-promised-border: #A78BFA;
+
+    --color-status-refunded: #2DD4BF;
+    --color-status-refunded-bg: #0B2622;
+    --color-status-refunded-fg: #2DD4BF;
+    --color-status-refunded-border: #2DD4BF;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-bg-canvas: #05080F;
+  --color-bg-surface: #0B1220;
+  --color-bg-surface-elevated: #131C2E;
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #CBD5E1;
+  --color-text-tertiary: #94A3B8;
+  --color-text-disabled: #475569;
+  --color-text-inverse: #0B1220;
+  --color-text-link: var(--dark-text-link);
+  --color-border-subtle: #1E293B;
+  --color-border-interactive: var(--dark-border-interactive);
+  --color-border-focus: var(--dark-border-focus);
+
+  --color-primary-soft-bg: var(--dark-primary-soft-bg);
+  --color-primary-soft-fg: var(--dark-primary-soft-fg);
+
+  --shadow-md: var(--shadow-dark-md);
+  --shadow-xl: var(--shadow-dark-xl);
+
+  --color-status-paid: #4ADE80;
+  --color-status-paid-bg: #0F2A1B;
+  --color-status-paid-fg: #4ADE80;
+  --color-status-paid-border: #4ADE80;
+
+  --color-status-pending: #38BDF8;
+  --color-status-pending-bg: #0B2536;
+  --color-status-pending-fg: #38BDF8;
+  --color-status-pending-border: #38BDF8;
+
+  --color-status-partial: #FB923C;
+  --color-status-partial-bg: #2B1608;
+  --color-status-partial-fg: #FB923C;
+  --color-status-partial-border: #FB923C;
+
+  --color-status-overdue: #F87171;
+  --color-status-overdue-bg: #2A0F0F;
+  --color-status-overdue-fg: #F87171;
+  --color-status-overdue-border: #F87171;
+
+  --color-status-void: #A1A1AA;
+  --color-status-void-bg: #1F1F23;
+  --color-status-void-fg: #A1A1AA;
+  --color-status-void-border: #A1A1AA;
+
+  --color-status-promised: #A78BFA;
+  --color-status-promised-bg: #211539;
+  --color-status-promised-fg: #A78BFA;
+  --color-status-promised-border: #A78BFA;
+
+  --color-status-refunded: #2DD4BF;
+  --color-status-refunded-bg: #0B2622;
+  --color-status-refunded-fg: #2DD4BF;
+  --color-status-refunded-border: #2DD4BF;
+}
