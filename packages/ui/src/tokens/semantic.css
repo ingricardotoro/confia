@@ -177,10 +177,11 @@
   --shadow-dark-md: 0 4px 12px -2px rgb(0 0 0 / 0.45);
   --shadow-dark-xl: 0 24px 48px -12px rgb(0 0 0 / 0.60);
 
-  /* Palette anchors for the dark theme. themes.css may not name a primitive, so the four dark
+  /* Palette anchors for the dark theme. themes.css may not name a primitive, so the five dark
      values that follow the brand are reached through these aliases and change with it. */
   --dark-text-link: var(--palette-primary-400);
   --dark-border-interactive: var(--palette-neutral-400);
   --dark-border-focus: var(--palette-primary-400);
+  --dark-primary-soft-bg: var(--palette-primary-900);
   --dark-primary-soft-fg: var(--palette-primary-300);
 }

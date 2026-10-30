@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCss } from "./__fixtures__/css";
+import { buildCss, readToken } from "./__fixtures__/css";
 
 // design.md decision 3: only semantic tokens generate utilities. Tailwind's own theme is cleared and
 // the primitives live in a namespace Tailwind does not know.
@@ -47,10 +47,34 @@ describe("the utilities Tailwind generates from the token entry point", () => {
     expect(css).toMatch(/--font-weight-semibold:\s*600/);
   });
 
-  it("makes the dark: variant follow both theme mechanisms", async () => {
-    const css = await buildCss(["dark:bg-primary"]);
+  // The two dark blocks of themes.css always emit their selectors, so asserting those proves nothing
+  // about @custom-variant. A utility with the dark: prefix exists only if the variant is defined, and
+  // its rule is scoped by the variant's own selectors.
+  it("scopes the dark: variant by both theme mechanisms [custom-variant]", async () => {
+    const css = await buildCss(["dark:bg-bg-canvas"]);
 
-    expect(css).toContain("prefers-color-scheme: dark");
-    expect(css).toMatch(/data-theme=["']dark["']/);
+    // Without @custom-variant dark, Tailwind has no dark: variant and drops the candidate.
+    expect(css, "the dark:bg-bg-canvas utility was not generated").toContain(String.raw`.dark\:bg-bg-canvas`);
+    expect(css).toMatch(
+      /\.dark\\:bg-bg-canvas:where\(\[data-theme=["']dark["']\], \[data-theme=["']dark["']\] \*\)\s*\{[^}]*var\(--color-bg-canvas\)/,
+    );
+    expect(css).toMatch(
+      /@media \(prefers-color-scheme: dark\)\s*\{\s*\.dark\\:bg-bg-canvas:where\(:not\(\[data-theme=["']light["']\], \[data-theme=["']light["']\] \*\)\)\s*\{[^}]*var\(--color-bg-canvas\)/,
+    );
   });
+
+  // The dark theme must override every token whose light value is a pair with another one, in both
+  // mechanisms: a half-overridden pair is the way a dark theme loses its contrast.
+  it.each(["--color-primary-soft-bg", "--color-primary-soft-fg", "--shadow-md", "--shadow-xl"])(
+    "overrides %s in both dark blocks",
+    (token) => {
+      const themes = readToken("themes.css");
+      const blocks = themes.split(/^:root\[data-theme='dark'\]/m);
+      const media = blocks[0] ?? "";
+      const attribute = blocks[1] ?? "";
+
+      expect(media).toContain(`${token}:`);
+      expect(attribute).toContain(`${token}:`);
+    },
+  );
 });

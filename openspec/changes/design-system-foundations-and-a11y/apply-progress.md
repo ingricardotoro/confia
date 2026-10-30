@@ -94,3 +94,20 @@ fixtures. Se usó una costura más amplia, por archivos completos y con las prue
 `tokens.build.test.ts` y las utilidades mínimas de `css.ts`; 13a-1b recibe las cinco pruebas restantes y las utilidades que solo ellas usan.
 Medida: 13a-1 con 738 líneas (734 añadidas y 4 borradas); 13a-1b con 470 (total 1 208). En 13a-1 la tarea 1.3 queda abierta
 (parte A hecha); se cierra en 13a-1b.
+
+## Corrección de la revisión de 13a-1, 2026-10-29
+
+Revisión de confiabilidad (aprobada con observaciones), tres correcciones en 13a-1; la guarda de contraste de la cuarta va en 13a-1b.
+
+1. `--color-primary-soft-bg` no se redefinía en modo oscuro y heredaba `primary-50` bajo el texto `primary-300` (cerca de 1,5:1). El documento `01` no definía
+   un valor oscuro; se fija en `primary-900` mediante el alias `--dark-primary-soft-bg` de `semantic.css`, conectado en los dos bloques oscuros, y queda
+   anotado con fecha en `docs/ui-ux/01` (nota de §14). El contraste lo mide la guarda de 13a-1b.
+2. `--shadow-md` y `--shadow-xl` pasan a `--shadow-dark-md` y `--shadow-dark-xl` en los dos bloques oscuros (`01` §9.3 pide sombras propias en modo oscuro).
+3. La prueba de la variante `dark:` era vacua (`themes.css` ya emite ambos selectores). Ahora compila `dark:bg-bg-canvas` y exige la regla acotada por
+   `@custom-variant`. Rojo observado: sin el valor de los bloques oscuros fallaron 3 pruebas nuevas (`--color-primary-soft-bg`, `--shadow-md`,
+   `--shadow-xl` en ambos bloques). Ruptura deliberada: borrar `@custom-variant dark` hace fallar la prueba ("the dark:bg-bg-canvas utility was not
+   generated"); `index.css` restaurado y verificado con `cmp`.
+4. `test-collection.test.ts` lee el `include` del proyecto `unit` de `vitest.config.ts` del paquete. Ruptura deliberada (`include` solo con `*.test.ts`)
+   hace fallar la guarda; restaurado con `cmp`.
+
+Cierre: `pnpm turbo run lint typecheck test build --filter=!@confia/api` 14 de 14; `ui` 4 archivos y 16 pruebas.
