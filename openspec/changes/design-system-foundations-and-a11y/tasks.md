@@ -289,7 +289,7 @@ contra `main` antes del PR 3.
 
 ## Fase 2: textos, formato de importes y análisis estático (PR 2, corte 13a-2)
 
-- [ ] 2.1 **PR 2 / 2a `02-texts-and-static-analysis`: catálogo `es-HN` tipado con ICU y `formatMoney` sin aritmética (decisiones 6 y 12; sonda S3).**
+- [x] 2.1 **PR 2 / 2a `02-texts-and-static-analysis`: catálogo `es-HN` tipado con ICU y `formatMoney` sin aritmética (decisiones 6 y 12; sonda S3).**
   - **Precondición.** PR 1 fusionado en `main`; rama nueva desde `main` actualizado.
   - **ROJO, catálogo.** `src/i18n/i18n.test.tsx`: con la instancia de `createUiI18n()`, `useUiText().t("common.status.paid")` devuelve «Pagado» [DS57];
     con `lng: "en"` (sin traducciones reales) devuelve el texto de `es-HN` y no la clave cruda [DS58]; un mensaje ICU con plural se formatea (ADR-0011

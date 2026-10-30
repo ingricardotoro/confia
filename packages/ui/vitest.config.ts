@@ -16,7 +16,14 @@ export default defineConfig({
         "src/test/**",
         "**/*.d.ts",
       ],
-      thresholds: { lines: 80, branches: 80, functions: 80, statements: 80 },
+      thresholds: {
+        lines: 80,
+        branches: 80,
+        functions: 80,
+        statements: 80,
+        // The only financial rule in the front end (design.md decision 12) carries its own bar.
+        "src/format/**": { lines: 95, branches: 95, functions: 95, statements: 95 },
+      },
     },
     passWithNoTests: false,
     projects: [

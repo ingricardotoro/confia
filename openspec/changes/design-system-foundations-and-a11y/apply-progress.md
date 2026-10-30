@@ -126,3 +126,39 @@ Rojo observado: quitar el alias `--dark-primary-soft-bg` de los dos bloques fall
 La prueba de paridad sigue en verde con el nuevo valor en ambos bloques.
 
 Cierre: `pnpm turbo run lint typecheck test build --filter=!@confia/api` 14 de 14; `ui` 9 archivos y 39 pruebas.
+
+## Tarea 2.1, catálogo `es-HN` tipado y `formatMoney` (13a-2, parte 2a), 2026-10-29
+
+Rama `change/design-system-foundations-and-a11y-13a-2-catalog-and-lint-rules`, apilada sobre 13a-1b (`6b967d2`). Commit:
+`feat(ui): add the typed es-HN catalog and the exact money formatter`. Medida: 761 líneas efectivas (757 añadidas y 4 borradas, sin `openspec` ni
+`pnpm-lock.yaml`); la tabla del PR planeaba 300 a 370 para 2.1, así que 2.2 (reglas de ESLint) deberá ir en su propia porción.
+
+**Catálogo.** `i18next` 26.4.4, `react-i18next` 17.0.16, `i18next-icu` 2.5.0 e `intl-messageformat` 12.1.3 en el `catalog:` y en `@confia/ui`;
+`exports` añade `"./i18n"`. `ui.json` anidado, claves en inglés con puntos; `UiKey` se deriva del JSON; `useUiText().t` está restringido a `UiKey`, sin
+`CustomTypeOptions`. `createUiI18n()` inicializa de forma síncrona (`initAsync: false`). `renderWithI18n` en `src/test/render.tsx`.
+
+**`formatMoney`.** Un solo patrón `^-?\d+(?:\.\d{1,2}0*)?$` valida la cadena (como máximo dos decimales significativos, sobrantes ceros) y es el guardián de
+tipo hacia `` `${number}` ``; la moneda debe cumplir `^[A-Z]{3}$` y estar en `Intl.supportedValuesOf("currency")`. Ningún camino llama a `Number`,
+`parseFloat`, `parseInt` ni `Math.round` (la prueba lo espía). El cero negativo usa `signDisplay: "negative"` (`"exceptZero"` con `sign: "always"`).
+DS34: como `es-HN` ignora `currencySign: "accounting"`, el negativo contable se arma como `(` + formato del valor con `signDisplay: "never"` + `)`,
+solo por manipulación de cadenas, y solo si la cadena empieza por `-` y no es cero (`^-?[0.]+$`). Entrada fuera del contrato, objeto ausente o
+configuración regional mal formada devuelven `{ kind: "invalid" }` sin lanzar excepción.
+
+**Rojo observado** (`pnpm exec vitest run --project unit src/i18n src/format`, antes de crear los módulos): 5 archivos fallidos, 5 pruebas fallidas;
+`Cannot find module './money'`, `'./create-ui-i18n'`, `'./resources'`, `'./use-ui-text'` y `Unused '@ts-expect-error' directive` en `keys.test-d.ts:17` y `:22`.
+**Verde:** 5 archivos, 81 pruebas; luego `ui` 14 archivos y 121 pruebas, cobertura 100 % y umbral propio de 95 en `src/format/**`.
+
+**Demostraciones deliberadas**, todas revertidas y verificadas con `cmp`:
+1. `maximumFractionDigits: 0` (con el mínimo en 2, `Intl` lanza `RangeError` y el `catch` lo vuelve `invalid`): 30 pruebas en rojo, entre ellas DS29.
+2. Patrón `(?:\.\d+)?` (sin la comprobación de sobrantes): rojo `DS43` en `"3200.005"`, `"3200.125"`, `"-3200.001"` («expected { kind: 'formatted' } to deeply equal
+   { kind: 'invalid' }») y «never rounds».
+3. Borrar `common.status.paid` de `ui.json`: 7 pruebas de Vitest en rojo (DS57, DS58, DS59 y otras) y `tsc` con TS2345 en `i18n.test.tsx` (28, 34, 40).
+4. Extra: una llamada a `Number(amount)` en `money.ts` pone en rojo la prueba del espía (`[25, 0, 0, 0]`).
+
+**Desviaciones.** (a) La prueba del plural ICU vive en `icu.test.ts` y no en `i18n.test.tsx`, para que el recorrido de DS59 (solo `*.tsx`, claves literales) no vea la
+clave de prueba. (b) Los fixtures de violación son archivos `.fixture` verificados como archivo virtual con la API del compilador (`src/test/text-keys.ts`), de modo
+que no entran en el `tsc` del paquete. (c) El diagnóstico de `tsc` nombra la clave y el archivo cuando TypeScript puede conocer la clave (literal o plantilla con
+constante) y nombra `UiKey` y el archivo cuando se concatena con un `string` (Apéndice B, R-1).
+
+Cierre: `pnpm install --frozen-lockfile` y `pnpm turbo run lint typecheck test build --filter=!@confia/api` 14 de 14; `pnpm audit --audit-level high` sin altas
+(2 bajas y 2 moderadas).

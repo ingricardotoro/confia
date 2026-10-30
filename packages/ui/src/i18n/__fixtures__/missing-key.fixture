@@ -1,0 +1,7 @@
+import { useUiText } from "./use-ui-text";
+
+// ADR-0011 violation: the key is not in the es-HN catalog.
+export function MissingKey() {
+  const { t } = useUiText();
+  return <span>{t("common.status.inexistente")}</span>;
+}

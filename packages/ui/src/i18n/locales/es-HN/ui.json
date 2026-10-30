@@ -1,0 +1,20 @@
+{
+  "common": {
+    "status": {
+      "paid": "Pagado",
+      "pending": "Pendiente",
+      "partial": "Parcial",
+      "overdue": "Vencido",
+      "void": "Anulado",
+      "promised": "En promesa",
+      "refunded": "Reembolsado",
+      "unknown": "Desconocido"
+    },
+    "loading": "Cargando",
+    "retry": "Reintentar",
+    "required": "Obligatorio"
+  },
+  "money": {
+    "unavailable": "Importe no disponible"
+  }
+}
