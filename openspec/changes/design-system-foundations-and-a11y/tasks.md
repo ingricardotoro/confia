@@ -395,7 +395,7 @@ contra `main` antes del PR 3.
     abierta 2 si el `build` de Storybook se acerca al límite). Commit: `feat(ui): add Storybook, the accessibility policy and the Spinner atom`.
     Tamaño: nominal 250, realista 310. — Escenarios DS69 (nivel de política), DS70 (parcial), DS62 (parcial) y la amenaza de MDX.
 
-- [ ] 3.2 **PR 3 / 3b `03-storybook-and-axe-gate`: puerta de axe en Chromium con historias portables, fixtures inaccesibles y comprobación de historias (decisiones 8 y 9; sonda S5).**
+- [x] 3.2 **PR 3 / 3b `03-storybook-and-axe-gate`: puerta de axe en Chromium con historias portables, fixtures inaccesibles y comprobación de historias (decisiones 8 y 9; sonda S5).**
   - **ROJO, la puerta primero en rojo** (propuesta, Enfoque 4). Antes de que exista la puerta, crear `src/a11y/__fixtures__/Inaccessible.stories.tsx`
     (fuera del patrón de descubrimiento): una imagen sin texto alternativo, un botón sin nombre accesible y un texto con contraste insuficiente;
     `DarkOnlyLowContrast.stories.tsx` (contraste suficiente en claro, insuficiente en oscuro, usando tokens semánticos redefinidos solo para el
