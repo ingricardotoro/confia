@@ -36,7 +36,9 @@ jobs:
     # Docker preinstalled, so no extra setup step is needed. Budget: the measured Testcontainers
     # *IT.java suite is well under the 8-minute limit of docs/06-estrategia-de-testing.md (PR A1:
     # 18.2s for DatabasePipelineIT, the suite's only container start; apps/api/README.md); this
-    # timeout covers the whole job, including dependency downloads and every other phase.
+    # timeout covers the whole job, including dependency downloads and every other phase. PIT does
+    # not run here: it needs 30 to 45 minutes on its own, which no 15-minute job can hold, so it runs
+    # in the parallel `backend mutation` job below (ci-green-main, owner decision 2026-10-29).
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -51,23 +53,50 @@ jobs:
       # banned dependencies, kernel purity, and — only on main, see -Dconfia.ci.mainBranch below —
       # no SNAPSHOT), compilation, unit tests (JUnit, AssertJ, jqwik), the ArchUnit + Spring
       # Modulith architecture tests under apps/api/app/src/test/java/com/confia/architecture
-      # (task 2, task 3), JaCoCo coverage on kernel (95 % line+branch, always blocking), and PIT
-      # mutation testing on kernel (score 80): -Dconfia.ci.mainBranch=true on main activates both
-      # no-snapshots-on-main and mutation-gate (blocks below threshold) with a single property;
-      # every other branch and pull request activates mutation-report instead (never blocks, only
-      # informs) (design.md, decisions 10 and 11).
+      # (task 2, task 3) and JaCoCo coverage (always blocking). -Dconfia.ci.mainBranch=true on main
+      # activates no-snapshots-on-main and also mutation-gate, which -P!mutation-gate switches off
+      # here: mutation testing is the job of `backend mutation` (design.md, decisions 10 and 11).
       - name: verify
         working-directory: apps/api
-        run: ./mvnw --batch-mode verify ${{ github.ref == 'refs/heads/main' && '-Dconfia.ci.mainBranch=true' || '-Pmutation-report' }}
-      - name: upload coverage and mutation reports
+        run: ./mvnw --batch-mode verify ${{ github.ref == 'refs/heads/main' && '-Dconfia.ci.mainBranch=true -P!mutation-gate' || '' }}
+      - name: upload coverage reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: backend-reports
           path: |
             apps/api/**/target/site/jacoco/
-            apps/api/**/target/pit-reports/
             apps/api/app/target/openapi/
+          retention-days: 14
+
+  backend-mutation:
+    name: backend mutation
+    runs-on: ubuntu-latest
+    # PIT on kernel and on each module's domain package, after the full suite it needs green. Measured
+    # locally at 28 to 45 minutes; the margin covers a slower runner. It runs in parallel with
+    # `backend verify`, so a pull request still gets the plain verdict within 15 minutes.
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+      # On main -Dconfia.ci.mainBranch=true activates mutation-gate (blocks below threshold); every
+      # other branch and pull request activates mutation-report instead (never blocks, only informs).
+      - name: mutation
+        working-directory: apps/api
+        run: ./mvnw --batch-mode verify ${{ github.ref == 'refs/heads/main' && '-Dconfia.ci.mainBranch=true' || '-Pmutation-report' }}
+      - name: upload mutation reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: backend-mutation-reports
+          path: |
+            apps/api/**/target/pit-reports/
           retention-days: 14
 
   frontend:
