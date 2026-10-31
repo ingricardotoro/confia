@@ -44,6 +44,7 @@ import com.confia.shared.security.token.MfaTokenClaims;
 import com.confia.shared.security.token.CompactJws;
 import com.confia.shared.security.token.SigningKey;
 import com.confia.shared.security.token.SigningKeyRing;
+import com.confia.support.JdbcStubTransactions;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.security.KeyPair;

@@ -1,4 +1,4 @@
-package com.confia.identity.application;
+package com.confia.support;
 
 import com.confia.shared.security.TransactionRunner;
 import java.lang.reflect.InvocationHandler;
