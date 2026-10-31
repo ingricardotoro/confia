@@ -23,6 +23,9 @@ final class PurgeSession implements AutoCloseable {
     /** Hex of a SHA-256 fingerprint, all zeros, valid for the table checks. */
     static final String ZERO_FINGERPRINT = "0".repeat(64);
 
+    /** The endpoint every idempotency key of these tests is recorded under. */
+    static final String IDEMPOTENCY_ENDPOINT = "/api/v1/purge-probe";
+
     private static final String PASSWORD_HASH =
             "$argon2id$v=19$m=19456,t=3,p=1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNoaGFzaGhhc2g";
 
@@ -162,8 +165,45 @@ final class PurgeSession implements AutoCloseable {
         return tokenId;
     }
 
+    /** A completed idempotency key that expires at {@code expiresAt}. */
+    void seedIdempotencyKey(UUID institutionId, String key, OffsetDateTime expiresAt)
+            throws SQLException {
+        execute("""
+                insert into shared_idempotency_key
+                    (institution_id, endpoint, idempotency_key, request_hash, status,
+                     response_status, response_body, created_at, completed_at, expires_at)
+                values (?, ?, ?, ?, 'COMPLETED', 200, '{}'::jsonb, ?, ?, ?)
+                """, institutionId, IDEMPOTENCY_ENDPOINT, key, ZERO_FINGERPRINT,
+                expiresAt.minus(1, ChronoUnit.HOURS), expiresAt.minus(30, ChronoUnit.MINUTES),
+                expiresAt);
+    }
+
+    /** A login backoff row of a random identifier, last attempted at {@code lastAttemptAt}. */
+    String seedLoginBackoff(UUID institutionId, OffsetDateTime lastAttemptAt, int failures)
+            throws SQLException {
+        String identifierHash = hash(UUID.randomUUID());
+        execute("""
+                insert into identity_login_backoff
+                    (institution_id, identifier_hash, consecutive_failures, last_attempt_at)
+                values (?, ?, ?, ?)
+                """, institutionId, identifierHash, failures, lastAttemptAt);
+        return identifierHash;
+    }
+
+    /** A TOTP backoff row of a new account, last attempted at {@code lastAttemptAt}. */
+    UUID seedMfaTotpBackoff(UUID institutionId, OffsetDateTime lastAttemptAt, int failures)
+            throws SQLException {
+        UUID accountId = seedAccount(institutionId);
+        execute("""
+                insert into identity_mfa_totp_backoff
+                    (institution_id, account_id, consecutive_failures, last_attempt_at)
+                values (?, ?, ?, ?)
+                """, institutionId, accountId, failures, lastAttemptAt);
+        return accountId;
+    }
+
     /** A token id as a distinct 64-hex string, unique per token. */
-    private static String hash(UUID tokenId) {
+    static String hash(UUID tokenId) {
         String hex = tokenId.toString().replace("-", "");
         return hex + hex;
     }

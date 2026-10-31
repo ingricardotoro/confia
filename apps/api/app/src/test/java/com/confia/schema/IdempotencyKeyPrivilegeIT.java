@@ -9,6 +9,9 @@ import com.confia.support.SharedPostgresContainer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 import org.jooq.exception.DataAccessException;
 import org.junit.jupiter.api.Test;
@@ -104,6 +107,31 @@ class IdempotencyKeyPrivilegeIT extends CommittingPostgresIntegrationTest {
                     """, institutionId, endpoint, idempotencyKey);
             connection.rollback();
         }
+    }
+
+    /**
+     * Scenarios BI83 and BI84 (background-jobs-with-db-scheduler design.md decision 16): the purge
+     * of {@code V12} is the only way to remove a row, so no role may {@code DELETE} and only the
+     * administrative role (besides the owner, which owns the function) may execute the function.
+     */
+    @Test
+    void noRoleDeletesAndOnlyTheAdministrativeRoleExecutesThePurgeFunction() {
+        String function = "shared_purge_idempotency_keys(timestamptz, integer)";
+        for (String role : List.of("confia_admin_app", "confia_portal_app", "confia_readonly",
+                "confia_backup", "public")) {
+            assertThat(dsl.fetchOne("select has_table_privilege(?, 'shared_idempotency_key', "
+                    + "'DELETE') as held", role).get("held", Boolean.class))
+                    .as("%s must not delete from shared_idempotency_key", role).isFalse();
+        }
+        Map<String, Boolean> execute = new TreeMap<>();
+        for (String role : List.of("confia_owner", "confia_admin_app", "confia_portal_app",
+                "confia_readonly", "confia_backup", "public")) {
+            execute.put(role, dsl.fetchOne("select has_function_privilege(?, ?, 'EXECUTE') "
+                    + "as held", role, function).get("held", Boolean.class));
+        }
+        assertThat(execute).as("EXECUTE on %s, exactly", function)
+                .containsExactlyInAnyOrderEntriesOf(Map.of("confia_owner", true, "confia_admin_app", true, "confia_portal_app", false,
+                        "confia_readonly", false, "confia_backup", false, "public", false));
     }
 
     private void insertOneRow(UUID institutionId, String endpoint, String idempotencyKey) {

@@ -3,13 +3,23 @@ package com.confia.schema;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import confia.generated.jooq.routines.IdentityPurgeLoginBackoff;
+import confia.generated.jooq.routines.IdentityPurgeMfaTotpBackoff;
 import confia.generated.jooq.routines.IdentityPurgePasswordResetTokens;
 import confia.generated.jooq.routines.IdentityPurgeRefreshTokenFamilies;
+import confia.generated.jooq.routines.SharedPurgeIdempotencyKeys;
+import com.confia.kernel.InstitutionId;
+import com.confia.shared.infrastructure.JooqIdempotencyRecordStore;
+import com.confia.shared.security.IdempotencyKey;
+import com.confia.shared.security.IdempotencyRecord;
 import com.confia.support.PostgresIntegrationTest;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.jooq.SQLDialect;
@@ -19,12 +29,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
- * The two {@code SECURITY DEFINER} purge functions of {@code V11} (background-jobs-with-db-scheduler
- * design.md decision 16; specs/build-integrity/spec.md, scenarios BI70 to BI77, BI104 to BI107 and
- * identity scenarios I238 to I251 and I270 to I273), exercised as the real {@code confia_admin_app}
- * role. The behaviour every function shares is written once and run for each of them through
- * {@link Subject}; the rules that belong to refresh-token families alone are in {@link
- * RefreshTokenFamilyPurgeFunctionIT}.
+ * The {@code SECURITY DEFINER} purge functions of {@code V11} and {@code V12}
+ * (background-jobs-with-db-scheduler design.md decision 16; specs/build-integrity/spec.md,
+ * scenarios BI70 to BI82, BI104 to BI108 and identity scenarios I238 to I251, I257 to I261 and
+ * I270 to I273), exercised as the real {@code confia_admin_app} role. The behaviour every function
+ * shares is written once and run for each of them through {@link Subject}; the rules that belong to
+ * refresh-token families alone are in {@link RefreshTokenFamilyPurgeFunctionIT}, and the race of the
+ * login backoff purge with a login is in {@code BackoffPurgeVersusLoginIT}.
  *
  * <p><b>The database clock rules.</b> The floor of each function is {@code now()} of PostgreSQL, so
  * every test reads {@code now()} once, in the same transaction that seeds the rows and calls the
@@ -135,6 +146,140 @@ class RetentionPurgeFunctionsIT extends PostgresIntegrationTest {
                 routine.execute(DSL.using(session.connection(), SQLDialect.POSTGRES)
                         .configuration());
                 return routine.getPurgedFamilies();
+            }
+        },
+        IDEMPOTENCY_KEYS("shared_purge_idempotency_keys", Duration.ofHours(24)) {
+            @Override
+            void seedPurgeableAt(PurgeSession session, UUID institution, OffsetDateTime at)
+                    throws SQLException {
+                session.seedIdempotencyKey(institution, UUID.randomUUID().toString(), at);
+            }
+
+            @Override
+            void seedMany(PurgeSession session, UUID institution, int rows, OffsetDateTime at)
+                    throws SQLException {
+                session.execute("""
+                        insert into shared_idempotency_key
+                            (institution_id, endpoint, idempotency_key, request_hash, status,
+                             expires_at)
+                        select ?, ?, 'many-' || g, ?, 'IN_PROGRESS', ?::timestamptz
+                          from generate_series(1, ?) g
+                        """, institution, PurgeSession.IDEMPOTENCY_ENDPOINT,
+                        PurgeSession.ZERO_FINGERPRINT, at, rows);
+            }
+
+            @Override
+            long remaining(PurgeSession session, UUID institution) throws SQLException {
+                return session.count("select count(*) from shared_idempotency_key "
+                        + "where institution_id = ?", institution);
+            }
+
+            @Override
+            long purgeUsing(String function, PurgeSession session, OffsetDateTime cutoff,
+                    int limit) throws SQLException {
+                return session.count("select " + checked(function) + "(?, ?)", cutoff, limit);
+            }
+
+            @Override
+            long purgeThroughTheGeneratedRoutine(PurgeSession session, OffsetDateTime cutoff,
+                    int limit) {
+                SharedPurgeIdempotencyKeys routine = new SharedPurgeIdempotencyKeys();
+                routine.setPCutoff(cutoff);
+                routine.setPLimit(limit);
+                routine.execute(DSL.using(session.connection(), SQLDialect.POSTGRES)
+                        .configuration());
+                return routine.getReturnValue();
+            }
+        },
+        LOGIN_BACKOFF("identity_purge_login_backoff", Duration.ofHours(24)) {
+            @Override
+            void seedPurgeableAt(PurgeSession session, UUID institution, OffsetDateTime at)
+                    throws SQLException {
+                session.seedLoginBackoff(institution, at, 3);
+            }
+
+            @Override
+            void seedMany(PurgeSession session, UUID institution, int rows, OffsetDateTime at)
+                    throws SQLException {
+                session.execute("""
+                        insert into identity_login_backoff
+                            (institution_id, identifier_hash, consecutive_failures,
+                             last_attempt_at)
+                        select ?, lpad(to_hex(g), 64, '0'), 3, ?::timestamptz
+                          from generate_series(1, ?) g
+                        """, institution, at, rows);
+            }
+
+            @Override
+            long remaining(PurgeSession session, UUID institution) throws SQLException {
+                return session.count("select count(*) from identity_login_backoff "
+                        + "where institution_id = ?", institution);
+            }
+
+            @Override
+            long purgeUsing(String function, PurgeSession session, OffsetDateTime cutoff,
+                    int limit) throws SQLException {
+                return session.count("select " + checked(function) + "(?, ?)", cutoff, limit);
+            }
+
+            @Override
+            long purgeThroughTheGeneratedRoutine(PurgeSession session, OffsetDateTime cutoff,
+                    int limit) {
+                IdentityPurgeLoginBackoff routine = new IdentityPurgeLoginBackoff();
+                routine.setPCutoff(cutoff);
+                routine.setPLimit(limit);
+                routine.execute(DSL.using(session.connection(), SQLDialect.POSTGRES)
+                        .configuration());
+                return routine.getReturnValue();
+            }
+        },
+        MFA_TOTP_BACKOFF("identity_purge_mfa_totp_backoff", Duration.ofHours(24)) {
+            @Override
+            void seedPurgeableAt(PurgeSession session, UUID institution, OffsetDateTime at)
+                    throws SQLException {
+                session.seedMfaTotpBackoff(institution, at, 3);
+            }
+
+            @Override
+            void seedMany(PurgeSession session, UUID institution, int rows, OffsetDateTime at)
+                    throws SQLException {
+                // One row per account (the primary key and the foreign key), so the accounts are
+                // created in the same statement.
+                session.execute("""
+                        with accounts as (
+                            insert into identity_staff_account
+                                (institution_id, id, email, password_hash, mfa_required)
+                            select ?, gen_random_uuid(), 'many.' || g || '.' || ? || '@colegio.edu.hn',
+                                   '$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aGFzaA', true
+                              from generate_series(1, ?) g
+                            returning institution_id, id)
+                        insert into identity_mfa_totp_backoff
+                            (institution_id, account_id, consecutive_failures, last_attempt_at)
+                        select institution_id, id, 3, ?::timestamptz from accounts
+                        """, institution, UUID.randomUUID().toString(), rows, at);
+            }
+
+            @Override
+            long remaining(PurgeSession session, UUID institution) throws SQLException {
+                return session.count("select count(*) from identity_mfa_totp_backoff "
+                        + "where institution_id = ?", institution);
+            }
+
+            @Override
+            long purgeUsing(String function, PurgeSession session, OffsetDateTime cutoff,
+                    int limit) throws SQLException {
+                return session.count("select " + checked(function) + "(?, ?)", cutoff, limit);
+            }
+
+            @Override
+            long purgeThroughTheGeneratedRoutine(PurgeSession session, OffsetDateTime cutoff,
+                    int limit) {
+                IdentityPurgeMfaTotpBackoff routine = new IdentityPurgeMfaTotpBackoff();
+                routine.setPCutoff(cutoff);
+                routine.setPLimit(limit);
+                routine.execute(DSL.using(session.connection(), SQLDialect.POSTGRES)
+                        .configuration());
+                return routine.getReturnValue();
             }
         };
 
@@ -351,6 +496,137 @@ class RetentionPurgeFunctionsIT extends PostgresIntegrationTest {
             assertThat(purged).isEqualTo(1);
             assertThat(subject.remaining(session, institution)).isEqualTo(1);
         }
+    }
+
+    /**
+     * Scenario BI80: a key still valid and one expired 23 hours ago are kept by the purge the job
+     * runs (its cut-off is 24 hours back), and the expired one is still reused by the store, which
+     * updates its row instead of inserting a new one.
+     */
+    @Test
+    void aValidKeyAndOneExpiredLessThanADayAgoAreKeptAndTheExpiredOneIsReused()
+            throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (PurgeSession session = PurgeSession.open(ADMIN).asSystemOf(institution)) {
+            String valid = UUID.randomUUID().toString();
+            String expired = UUID.randomUUID().toString();
+            session.seedIdempotencyKey(institution, valid, session.now().plusHours(1));
+            session.seedIdempotencyKey(institution, expired, session.now().minusHours(23));
+
+            long purged = Subject.IDEMPOTENCY_KEYS.purge(session,
+                    session.now().minusHours(24), 100);
+
+            assertThat(purged).isZero();
+            assertThat(Subject.IDEMPOTENCY_KEYS.remaining(session, institution)).isEqualTo(2);
+            JooqIdempotencyRecordStore store = storeOn(session);
+            IdempotencyKey key = new IdempotencyKey(PurgeSession.IDEMPOTENCY_ENDPOINT, expired);
+            Optional<IdempotencyRecord> existing = store.lockExisting(
+                    new InstitutionId(institution), key);
+            assertThat(existing).as("the expired key is still there to be reused").isPresent();
+            assertThat(existing.get().expiresAt()).isBefore(session.now().toInstant());
+
+            Instant renewed = session.now().plusHours(24).toInstant();
+            store.restartExpired(new InstitutionId(institution), key, "1".repeat(64), renewed);
+
+            assertThat(session.count("""
+                    select count(*) from shared_idempotency_key
+                     where institution_id = ? and idempotency_key = ? and status = 'IN_PROGRESS'
+                       and expires_at = ?
+                    """, institution, expired, renewed.atOffset(ZoneOffset.UTC)))
+                    .as("the same row was updated for the new request").isEqualTo(1);
+            assertThat(Subject.IDEMPOTENCY_KEYS.remaining(session, institution)).isEqualTo(2);
+        }
+    }
+
+    /** Scenario BI82: once its row is purged, the same key is a new key and inserts a row. */
+    @Test
+    void aPurgedKeyIsANewKeyAgain() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (PurgeSession session = PurgeSession.open(ADMIN).asSystemOf(institution)) {
+            String value = UUID.randomUUID().toString();
+            session.seedIdempotencyKey(institution, value, session.now().minusDays(2));
+
+            assertThat(Subject.IDEMPOTENCY_KEYS.purge(session, session.now().minusHours(24), 100))
+                    .isEqualTo(1);
+
+            JooqIdempotencyRecordStore store = storeOn(session);
+            IdempotencyKey key = new IdempotencyKey(PurgeSession.IDEMPOTENCY_ENDPOINT, value);
+            assertThat(store.lockExisting(new InstitutionId(institution), key))
+                    .as("nothing is known of the purged key").isEmpty();
+            store.insertInProgress(new InstitutionId(institution), key, "2".repeat(64),
+                    session.now().toInstant(), session.now().plusHours(24).toInstant());
+            assertThat(store.lockExisting(new InstitutionId(institution), key))
+                    .as("the key was inserted as a new one").get()
+                    .extracting(IdempotencyRecord::status).isEqualTo("IN_PROGRESS");
+        }
+    }
+
+    /**
+     * Scenario I259: a login backoff row attempted ten minutes ago and a TOTP backoff row attempted
+     * 23 hours ago are kept, whatever cut-off the caller passes, and their counters do not move.
+     */
+    @Test
+    void aRecentAttemptIsNeverPurgedAndItsCounterIsUnchanged() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (PurgeSession session = PurgeSession.open(ADMIN).asSystemOf(institution)) {
+            String login = session.seedLoginBackoff(institution, session.now().minusMinutes(10), 4);
+            UUID account = session.seedMfaTotpBackoff(institution, session.now().minusHours(23), 2);
+
+            assertThat(Subject.LOGIN_BACKOFF.purge(session, session.now().plusDays(1), 100))
+                    .isZero();
+            assertThat(Subject.MFA_TOTP_BACKOFF.purge(session, session.now().plusDays(1), 100))
+                    .isZero();
+
+            assertThat(session.count("select consecutive_failures from identity_login_backoff "
+                    + "where institution_id = ? and identifier_hash = ?", institution, login))
+                    .isEqualTo(4);
+            assertThat(session.count("select consecutive_failures from identity_mfa_totp_backoff "
+                    + "where institution_id = ? and account_id = ?", institution, account))
+                    .isEqualTo(2);
+        }
+    }
+
+    /**
+     * Scenarios BI81 and BI108: the indexes the two purges that scan by instant need, by name and
+     * by their columns in order. The TOTP backoff table has one row per account and no new index.
+     */
+    @Test
+    void theIndexesOfTheIdempotencyAndLoginBackoffPurgesExist() throws SQLException {
+        try (PurgeSession session = PurgeSession.open(ADMIN)) {
+            assertThat(indexColumns(session, "shared_idempotency_key",
+                    "shared_idempotency_key_expires_idx"))
+                    .isEqualTo("institution_id,expires_at");
+            assertThat(indexColumns(session, "identity_login_backoff",
+                    "identity_login_backoff_last_attempt_idx"))
+                    .isEqualTo("institution_id,last_attempt_at");
+        }
+    }
+
+    /** The key columns of an index of a public table, in order, or null when it does not exist. */
+    private static String indexColumns(PurgeSession session, String table, String index)
+            throws SQLException {
+        try (var statement = session.connection().prepareStatement("""
+                select string_agg(a.attname, ',' order by k.ord)
+                  from pg_index ix
+                  join pg_class i on i.oid = ix.indexrelid
+                  join pg_class t on t.oid = ix.indrelid
+                 cross join lateral unnest(ix.indkey) with ordinality k(attnum, ord)
+                  join pg_attribute a on a.attrelid = t.oid and a.attnum = k.attnum
+                 where t.relnamespace = 'public'::regnamespace and t.relname = ?
+                   and i.relname = ?
+                """)) {
+            statement.setString(1, table);
+            statement.setString(2, index);
+            try (var result = statement.executeQuery()) {
+                result.next();
+                return result.getString(1);
+            }
+        }
+    }
+
+    private static JooqIdempotencyRecordStore storeOn(PurgeSession session) {
+        return new JooqIdempotencyRecordStore(DSL.using(session.connection(),
+                SQLDialect.POSTGRES));
     }
 
     /**
