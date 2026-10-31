@@ -6,6 +6,7 @@ import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.jobs.RecurringJobHandler;
 import com.confia.shared.jobs.RecurringRun;
 import com.confia.shared.observability.events.OperationalEventLog;
+import com.confia.shared.security.RetentionPurgeBatches;
 import com.confia.shared.security.TransactionRunner;
 import java.time.Clock;
 import java.time.Duration;
