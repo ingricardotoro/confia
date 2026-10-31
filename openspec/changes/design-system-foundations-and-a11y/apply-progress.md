@@ -337,3 +337,15 @@ rojo: `Failed to resolve import "./collection"`.
 **Medidas.** `pnpm turbo run lint typecheck test build --filter=!@confia/api --force` con `PLAYWRIGHT_BROWSERS_PATH` en una carpeta vacía: 14 de 14 en 38 a 41 s. `pnpm turbo run test:a11y --filter=@confia/ui --force`: 3 archivos, 13 pruebas, 6,4 s con Chromium
 instalado. `pnpm audit --audit-level high`: código 0 (2 bajas, 2 moderadas). **Tamaño:** 608 inserciones y 37 eliminaciones = 645 líneas efectivas sobre 13a-3b (sin `openspec` ni lockfile), bajo el tope de 800.
 **Pendiente del propietario:** el empuje; la observación del trabajo nuevo en el remoto y la demostración remota [BX12] requieren que el trabajo corra en GitHub. El tiempo de la descarga en frío de Chromium en CI sigue sin medirse.
+
+## Tarea 4.1 parte A, `Button` e `IconButton` (13a-4a), 2026-10-31
+
+**Costura.** El trabajo de 4.1 completo midió 836 líneas efectivas (> 800). El propietario aprobó el 2026-10-31 mover la costura del PR 4 en lugar de añadir un PR: 4a = `Button` + `IconButton`; 4b = `Label` + `Badge` + 4.2. 4.1 no se marca `[x]` aquí: se cierra en 4b.
+
+**Implementado.** `src/atoms/button` (variantes primary, secondary, subtle, destructive y link; tamaños sm, md y lg; `loading` enfocable con `aria-busy` y `Spinner`, sin `disabled`, sin segunda invocación ni segundo envío), `src/atoms/icon-button` (cuadrado; `label` obligatorio, `aria-label`/`aria-labelledby` omitidos del tipo, ADR-0018), `src/lib/focus-ring.ts` (anillo `--color-border-focus`, compartido), 10 variables `--button-*` en `components.css` (referencian semánticos; sin valor oscuro propio) y `atoms/atoms.lint.test.ts` (DS06: ESLint sobre los átomos presentes, conjunto > 0 e incluye cada componente).
+
+**ROJO.** `vitest run --project unit src/atoms`: `6 failed | 1 passed` (`Cannot find module ./IconButton`, entre otros); `tsc`: TS2307 y dos `TS2578 Unused @ts-expect-error directive` en `IconButton.test-d.ts` (líneas 11 y 20).
+
+**Demostraciones** (revertidas, `cmp` sin diferencias contra copias): (1) `disabled={loading || rest.disabled}` en `Button`: 2 pruebas DS17 en rojo; (2) `label?` opcional en `IconButton`: `tsc` TS2578 sobre el `@ts-expect-error` sin uso; (3) `bg-blue-600` en `Badge.tsx` (aplicada con el conjunto completo; la regla es la misma): ESLint `Visual literal` [DS04]; se repite en 4b con `Badge`.
+
+**Verificación en 4a aislada** (sin `Label` ni `Badge` en el árbol): `pnpm install --frozen-lockfile` sin cambios; `pnpm turbo run lint typecheck test build --filter=!@confia/api`: 14 de 14; ui: 29 archivos y 236 pruebas; `pnpm --filter @confia/ui test:a11y`: 3 archivos y 29 pruebas, 36 entradas (18 historias x 2 temas), cero violaciones; `pnpm audit --audit-level high`: código 0. **Tamaño:** 553 inserciones (sin `openspec` ni lockfile).
