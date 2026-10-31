@@ -542,7 +542,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     Tamaño: nominal 250, realista 750 a 850; costura nombrada: la función de refresco con `RefreshPurgeVersusRotationConcurrencyIT` va a 5a-1b si se
     pasa. — Escenarios I238 a I251, I270 a I273, BI68 a BI77, BI83, BI84, BI104 a BI107.
 
-- [ ] 3.4 **PR 5a / 5a-2 `05a-identity-purge-jobs`: casos de uso de purga de identidad, lotes, auditoría y tareas recurrentes (decisión 17).**
+- [x] 3.4 **PR 5a / 5a-2 `05a-identity-purge-jobs`: casos de uso de purga de identidad, lotes, auditoría y tareas recurrentes (decisión 17).**
   - **ROJO.** Crear `IdentityTokenPurgeJobsIT.java` (un asiento por lote con el conteo, **también con cero**; lotes hasta vaciar lo purgable
     [I274]; 200 lotes agotados dejan 200 asientos y el `WARN` `retention_purge_backlog`, el resto sigue al día siguiente [I275, AT29]; los lotes
     llaman a la función con el corte calculado por el llamador desde el `Clock` [I276]; la doble ejecución no cambia nada y no falla [I256, I263];
@@ -566,7 +566,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     institution with a per-batch audit entry`. Tamaño: nominal 300, realista 700 a 850; costura nombrada: el vaciado del sucesor residual con sus
     pruebas va a un PR aparte si se pasa. — Escenarios I252 a I256, I262, I263, I274 a I276, AT18 a AT22, AT27 a AT29 y BJ62 (parte de identidad).
 
-- [ ] 3.5 **PR 5a / 5a-3 `05a-adr-0025-and-retention-notes`: ADR-0025 «Propuesto», nota en ADR-0017 y notas de `docs/03` §6.1 y `docs/08` §6.2 (decisión 22, D-N3, P3).**
+- [x] 3.5 **PR 5a / 5a-3 `05a-adr-0025-and-retention-notes`: ADR-0025 «Propuesto», nota en ADR-0017 y notas de `docs/03` §6.1 y `docs/08` §6.2 (decisión 22, D-N3, P3).**
   - **ROJO.** Crear `test/java/com/confia/architecture/DocumentationNotesTest.java` (o ampliar la prueba de notas documentales vigente): existen el
     archivo `docs/adr/ADR-0025-purga-por-funciones-security-definer.md` con estado «Propuesto» y su fila en `docs/adr/README.md`; ADR-0017 tiene una
     nota fechada que apunta a ADR-0025 y su cuerpo original no cambió (comparación de las líneas originales); `docs/03-seguridad.md` §6.1 y
@@ -582,7 +582,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
   - **Cierre.** `./mvnw verify -Pmutation-gate`. Commit: `docs(adr): propose ADR-0025 for purging technical tables through security definer functions`.
     Tamaño: nominal 100, realista 250. — Escenarios BJ41 (parte), BJ72.
 
-- [ ] 3.6 **PR 5b / 5b-1 `05b-v12-purge-functions`: `V12` con las funciones de idempotencia y retroceso, y sus índices (decisión 16, P2, P3).**
+- [x] 3.6 **PR 5b / 5b-1 `05b-v12-purge-functions`: `V12` con las funciones de idempotencia y retroceso, y sus índices (decisión 16, P2, P3).**
   - **Precondición dura.** 3.3 (`V11` y la plantilla) fusionada en `main`.
   - **ROJO.** Ampliar `RetentionPurgeFunctionsIT.java` con `shared_purge_idempotency_keys`, `identity_purge_login_backoff` e
     `identity_purge_mfa_totp_backoff`, **con las reglas de reloj de la base de datos** y los mismos casos de la tarea 3.3 (borde exacto, un segundo

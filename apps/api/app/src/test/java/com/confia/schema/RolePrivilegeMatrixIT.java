@@ -867,17 +867,21 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
         return violations;
     }
     /**
-     * The two purge functions of {@code V11} (background-jobs-with-db-scheduler design.md decision
-     * 16; specs/build-integrity/spec.md, scenarios BI68, BI69, BI72, BI83 and BI84), by the argument
-     * list that identifies each: the only way to remove the rows they purge, because no role holds
-     * {@code DELETE} on the tables.
+     * The purge functions of {@code V11} and {@code V12} (background-jobs-with-db-scheduler design.md
+     * decision 16; specs/build-integrity/spec.md, scenarios BI68, BI69, BI72, BI83 and BI84), by the
+     * argument list that identifies each: the only way to remove the rows they purge, because no role
+     * holds {@code DELETE} on the tables.
      */
     private static final List<String> PURGE_FUNCTIONS =
             List.of("identity_purge_password_reset_tokens(timestamptz, integer)",
-                    "identity_purge_refresh_token_families(timestamptz, integer)");
+                    "identity_purge_refresh_token_families(timestamptz, integer)",
+                    "shared_purge_idempotency_keys(timestamptz, integer)",
+                    "identity_purge_login_backoff(timestamptz, integer)",
+                    "identity_purge_mfa_totp_backoff(timestamptz, integer)");
 
     private static final List<String> PURGED_TABLES = List.of("identity_password_reset_token",
-            "identity_refresh_token_family", "identity_refresh_token");
+            "identity_refresh_token_family", "identity_refresh_token", "shared_idempotency_key",
+            "identity_login_backoff", "identity_mfa_totp_backoff");
 
     @Test
     void executeOnThePurgeFunctionsIsHeldByTheAdministrativeRoleAndTheOwnerOnly()
@@ -890,7 +894,7 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
 
     @Test
     void anExecuteGrantOfMoreOnAPurgeFunctionBreaksTheMatrix() throws SQLException {
-        try (StepwiseDatabase database = StepwiseDatabase.migratedTo("11")) {
+        try (StepwiseDatabase database = StepwiseDatabase.migratedTo("12")) {
             try (Connection superuser = database.connectionAs("postgres")) {
                 assertThat(purgeExecuteViolations(superuser))
                         .as("the fixture starts from the exact matrix").isEmpty();

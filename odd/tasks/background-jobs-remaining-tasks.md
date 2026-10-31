@@ -14,7 +14,7 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 
 ## Constraints
 
-- Each task follows its RED, GREEN, deliberate-break and closing steps in `tasks.md`. Merged migrations V1 to V10 are never edited.
+- Each task follows its RED, GREEN, deliberate-break and closing steps in `tasks.md`. Merged migrations V1 to V11 are never edited.
 - PRs over 800 effective lines (without `openspec/` and `odd/`) are split; tests never leave their code (`docs/15` §3).
 - Every branch runs `./mvnw verify`. `./mvnw verify -Pmutation-gate` runs once per task, on the task's last branch (owner
   decision, 2026-10-27). Both use `JAVA_HOME` (Temurin 25) and `MAVEN_OPTS=-Djavax.net.ssl.trustStoreType=Windows-ROOT`, which
@@ -31,9 +31,9 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 - [x] T3.1 Slice 4a `04-reset-issuance-scheduler`.
 - [x] T3.2 Slice 4b `04-reset-issuance-handler` (split: 4b and 4c).
 - [x] T3.3 Slice 5a-1 `05a-v11-purge-functions`.
-- [ ] T3.4 Slice 5a-2 `05a-identity-purge-jobs`.
-- [ ] T3.5 Slice 5a-3 `05a-adr-0025-and-retention-notes`.
-- [ ] T3.6 Slice 5b-1 `05b-v12-purge-functions`.
+- [x] T3.4 Slice 5a-2 `05a-identity-purge-jobs` (split: 5a-2a, 5a-2 and 5a-2b).
+- [x] T3.5 Slice 5a-3 `05a-adr-0025-and-retention-notes`.
+- [x] T3.6 Slice 5b-1 `05b-v12-purge-functions` (split: 5b-1 and 5b-1b).
 - [ ] T3.7 Slice 5b-2 `05b-idempotency-and-backoff-jobs`.
 - [ ] T3.8 Slice 6 `06-audit-chain-verification-cadences`.
 - [ ] T4.1 Slice 7a `07a-queue-observability`.
@@ -54,6 +54,13 @@ Hard order: 3.3 (V11) before 3.6 (V12).
 | T3.3 (5a-1) | delegated writer; parent added the UTC fix inline | `05a1-v11-purge-functions` | `04489e0`, `3d25139` | 577 | BUILD SUCCESS 12 min 56 s; Surefire 186 + 2 611, Failsafe 674 | not run (last branch of the task is 5a-1c) | earlier code approved twice (reliability lens, lineages `review-97b5fa12d1cc1d77` and `review-e27cce41c1db52d5`, acknowledged); the stack with the UTC fix approved (reliability lens, lineage `review-25ef682b35bc1ba4`, acknowledged); PRs #208, #209, #210 |
 | T3.3 (5a-1b) | delegated writer | `05a1b-purge-function-behaviour` | `422d9a3` | 450 | BUILD SUCCESS 11 min 48 s; Surefire 186 + 2 611, Failsafe 694 | not run (last branch of the task is 5a-1c) | earlier code approved twice (reliability lens, lineages `review-97b5fa12d1cc1d77` and `review-e27cce41c1db52d5`, acknowledged); the stack with the UTC fix approved (reliability lens, lineage `review-25ef682b35bc1ba4`, acknowledged); PRs #208, #209, #210 |
 | T3.3 (5a-1c) | delegated writer; parent ran the verifies | `05a1c-refresh-purge-and-rotation` | `bcabd7d`, `4ba3460` | 461 | BUILD SUCCESS 10 min 10 s; Surefire 186 + 2 611, Failsafe 704 | BUILD SUCCESS 27 min 47 s; PIT kernel 192/194, app 871/919; JaCoCo met | earlier code approved twice (reliability lens, lineages `review-97b5fa12d1cc1d77` and `review-e27cce41c1db52d5`, acknowledged); the stack with the UTC fix approved (reliability lens, lineage `review-25ef682b35bc1ba4`, acknowledged); PRs #208, #209, #210 |
+| T3.4 (5a-2a) | delegated writer; owner decision option B (2026-10-28) | `05a2a-operational-event-log` | `6ba0082`; merged by `3e93e1b` | 184 | BUILD SUCCESS 9 min 3 s; Surefire 186 + 2 617, Failsafe 704 | not run (last branch of the task is 5a-2b) | PR #212 |
+| T3.4 (5a-2) | delegated writer | `05a2-identity-purge-jobs` | `9e2a09d`; merged by `b400eb6` | 799 | BUILD SUCCESS 9 min 36 s; Surefire 186 + 2 619, Failsafe 715 | not run (last branch of the task is 5a-2b) | PR #213 |
+| T3.4 (5a-2b) | delegated writer | `05a2b-refresh-successor-clearing` | `7b38d07` plus the evidence commit `226350a`; merged by `2936620` | 539 | BUILD SUCCESS 9 min 8 s; Surefire 186 + 2 619, Failsafe 726 | BUILD SUCCESS 28 min 51 s; PIT kernel 192/194, app 872/919; JaCoCo met | PR #214 |
+| T3.6 (5b-1) | delegated writer | `05b1-v12-purge-functions` | `ae233f0` | 634 | BUILD SUCCESS 13 min 7 s; Surefire 186 + 2 623, Failsafe 760 | not run (last branch of the task is 5b-1b) | pending |
+| T3.6 (5b-1b) | delegated writer | `05b1b-backoff-purge-versus-login` | `5f5108e` | 191 | BUILD SUCCESS 10 min 40 s; Surefire 186 + 2 623, Failsafe 762 | BUILD SUCCESS 31 min 49 s; PIT kernel 192/194, app 872/919; JaCoCo met | pending |
+
+Main CI: PR #211 (merge `972beae`) fixed the failing CI on `main` before PRs #212 to #214 were merged.
 
 T2.6 evidence:
 
@@ -140,8 +147,52 @@ T3.1 evidence:
 
 ## Next step
 
-T3.4, slice 5a-2 `05a-identity-purge-jobs`, delegated to one writer, on branch `05a2-identity-purge-jobs` from `05a1c`.
-In parallel: change 13 `design-system-foundations-and-a11y` (SDD explore and propose) in the worktree `C:\dev\confia-frontend`.
+T3.7, slice 5b-2 `05b-idempotency-and-backoff-jobs`, stacked on `05b1b-backoff-purge-versus-login`. ADR-0026 is reserved by
+frontend change 13a (Storybook).
+
+T3.6 evidence:
+
+- Split: the whole task measured 825 effective lines, over the 800 limit. `tasks.md` names no seam for 3.6, so the V11 precedent
+  was followed (the concurrency test on its own branch): `05b1-v12-purge-functions` (`ae233f0`, 634 lines: `V12`, the extended
+  `RetentionPurgeFunctionsIT`, `RolePrivilegeMatrixIT`, `IdempotencyKeyPrivilegeIT`, `PurgeSession`, new `V12SchemaDiffIT`) and
+  `05b1b-backoff-purge-versus-login` (`5f5108e`, 191 lines: `BackoffPurgeVersusLoginIT`). Each passes on its own. No comment,
+  Javadoc or assertion was cut.
+- RED: the first focused run failed at `testCompile` on the missing generated routines `SharedPurgeIdempotencyKeys`,
+  `IdentityPurgeLoginBackoff` and `IdentityPurgeMfaTotpBackoff` (cannot find symbol), because jOOQ generates them from the
+  migrations and `V12` did not exist.
+- Second RED, which changed the template: with `V12` written exactly as `V11` (the purge condition only in the batch subquery),
+  `BackoffPurgeVersusLoginIT.aPurgeWaitingForALoginThatRefreshedTheRowKeepsIt` failed (`expected: 0L but was: 1L`): a purge that
+  waits for a login holding the row deletes it after the login made it recent, because PostgreSQL re-checks only the conditions on
+  the deleted row and reuses the subquery's earlier answer. `V12` therefore repeats the condition on the deleted row in all three
+  functions (`expires_at < v_cutoff`, `last_attempt_at < v_cutoff`); then 2 of 2 passed. `V11` does not need it: an expired reset
+  token or a revoked family never becomes recent again, and the family purge locks with `FOR UPDATE` in its subquery.
+- GREEN, focused: `RetentionPurgeFunctionsIT` 51, `RolePrivilegeMatrixIT` 48, `IdempotencyKeyPrivilegeIT` 3, `V11SchemaDiffIT` 2,
+  `V12SchemaDiffIT` 2, `BackoffPurgeVersusLoginIT` 2, `RefreshTokenFamilyPurgeFunctionIT` 7,
+  `RefreshPurgeVersusRotationConcurrencyIT` 3: 118 tests, 0 failures (JaCoCo failure of the focused run expected).
+- Deliberate demonstrations, each reverted and confirmed with `cmp` against the copy in the scratchpad:
+  - Index `shared_idempotency_key_expires_idx` removed: `theIndexesOfTheIdempotencyAndLoginBackoffPurgesExist` fails
+    (`expected: "institution_id,expires_at"`) and `V12SchemaDiffIT.v12AddsOnlyTheThreePurgeFunctionsAndTheirTwoIndexes` fails [BI81].
+  - `<` changed to `<=` in the idempotency function (subquery and row condition): `aCutoffInTheFutureNeverDeletesARowYoungerThanTheFloor`
+    (the 24-hour border) and `aRowAtTheExactCutoffIsKeptAndOneSecondEarlierIsPurged` fail for that subject, `expected: 1L but was: 2L` [BI79].
+- BI80 and BI82 are proved with the real `JooqIdempotencyRecordStore` over the purge session (`lockExisting`, `restartExpired`,
+  `insertInProgress`); I259 with counters read back. `BackoffPurgeVersusLoginIT` uses the real `JooqLoginBackoffStore` and applies
+  the two V11 review follow-ups: the lock wait is detected for the recorded `pg_backend_pid()` only, and the pool is declared before
+  the lock-holding session.
+- Kept from V11 for consistency (the spec is silent): a NULL `p_cutoff` becomes the floor and a NULL `p_limit` becomes 1
+  (`R3-null-cutoff-silently-uses-floor`, still a follow-up for both migrations). `EXPLAIN ANALYZE` against a representative volume
+  was not run; the indexes follow design.md decision 16.
+
+T3.5 evidence:
+
+- Commit `5553c22` adds `DocumentationNotesTest` (4 tests) and fixtures under `src/test/resources/documentation-notes` (ADR-0017 whole
+  file, `docs/03` section 6.1 and `docs/08` section 6.2 as they were before the notes). Every fixture line must still appear, in order.
+- RED: with the five docs restored to `942b2e6` (ADR-0025 removed), 4 of 4 tests failed (missing ADR file, missing notes). GREEN: 4 of 4
+  with the real docs.
+- Deliberate demonstration: rewriting the ADR-0017 line "Estos son los únicos `UPDATE` y `DELETE`..." failed
+  `adr0017HasDatedNoteAndUnchangedOriginalBody` ("original body ... changed: original line 136 is missing or out of order"); reverted,
+  `cmp` against the copy in the scratchpad printed nothing, `git status` clean for docs.
+- `./mvnw -B verify -Pmutation-gate`: BUILD SUCCESS, 34:50 min; 2 623 unit tests and 726 integration tests, 0 failures; PIT 192 of 194
+  killed in the last module report, no mutation without coverage.
 
 T3.4 evidence:
 
