@@ -53,7 +53,7 @@ resuelve el exceso o si la proyección total supera el umbral de la Pregunta abi
 | **PR 1b** `01b-token-parity-and-contrast` (13a-1b) | 1.3 (parte B) | — | **470 medidas** | Pruebas de paridad, contraste, cadena, recorrido y fuentes con sus fixtures y las utilidades de lectura que solo ellas usan |
 | **PR 2** `02-texts-and-static-analysis` (13a-2) | 2.1, 2.2 | 650 | 650 a 720 | **2a** 2.1 (catálogo y `formatMoney`) / **2b** 2.2 (reglas de ESLint y escáner de supresiones) |
 | **PR 3** `03-storybook-and-axe-gate` (13a-3) | 3.1, 3.2, 3.3 | 700 | **750 a 810** | **3a** 3.1 (Storybook, política, `Spinner`) / **3b** 3.2 (puerta en Chromium y comprobación de historias) / **3c** 3.3 (CI, ADR-0026, documentación del stack; la parte documental, ~125 líneas, es la primera en moverse al inicio del PR 4) |
-| **PR 4** `04-atoms-buttons-labels` (13a-4) | 4.1, 4.2 | 450 | 700 a 760 (4a **553 medidas**) | Costura movida el 2026-10-31 por aprobación del propietario (4.1 solo medía 836 líneas): **4a** 4.1 parte A (`Button`, `IconButton`, `focus-ring`, variables `--button-*`) / **4b** 4.1 parte B (`Label`, `Badge`, variables `--badge-*`) y 4.2 (`Separator`, `Skeleton`, `Input`) |
+| **PR 4** `04-atoms-buttons-labels` (13a-4) | 4.1, 4.2 | 450 | 700 a 760 (4a **553 medidas**) | Costura movida el 2026-10-31 por aprobación del propietario (4.1 solo medía 836 líneas): **4a** 4.1 parte A (`Button`, `IconButton`, `focus-ring`, variables `--button-*`) / **4b** 4.1 parte B (`Label`, `Badge`, variables `--badge-*`; **289 medidas**) y 4.2 (`Separator`, `Skeleton`, `Input`) |
 | **PR 5** `05-controls-form-and-states` (13a-5) | 5.1, 5.2 | 700 | **750 a 820** | **5a** 5.1 (`Textarea`, `Checkbox`, `RadioGroup`) / **5b** 5.2 (`FormField`, `EmptyState`, `ErrorState`); si 5b sola excede, `ErrorState` pasa al inicio del PR 6 |
 | **PR 6** `06-money-status-and-layers` (13a-6) | 6.1, 6.2, 6.3 | 750 | 680 a 760 | **6a** 6.1 (`MoneyAmount`) / **6b** 6.2 y 6.3 (`StatusBadge`, reglas de capas, inventario, notas) |
 | **Total** | 15 tareas | unas 3 950 | **4 300 a 4 600** | |
@@ -457,7 +457,7 @@ contra `main` antes del PR 3.
 
 ## Fase 4: átomos de presentación (PR 4, corte 13a-4)
 
-- [ ] 4.1 **PR 4 / 4a y 4b `04-atoms-buttons-labels`** (parte A `Button` e `IconButton` en 4a, rama `…-13a-4a-buttons`, 553 líneas; parte B `Label` y `Badge` en 4b, donde se cierra): `Button`, `IconButton`, `Label` y `Badge` (decisión 11; `docs/ui-ux/02` §4 y §6).**
+- [x] 4.1 **PR 4 / 4a y 4b `04-atoms-buttons-labels`** (parte A `Button` e `IconButton` en 4a, rama `…-13a-4a-buttons`, 553 líneas; parte B `Label` y `Badge` en 4b, donde se cierra): `Button`, `IconButton`, `Label` y `Badge` (decisión 11; `docs/ui-ux/02` §4 y §6).**
   - **Precondición.** PR 3 fusionado; rama nueva desde `main`. Dependencias de Radix y `lucide-react` con las versiones de S1.
   - **ROJO.** Por componente, con prueba y historia antes del código: `Button.test.tsx` (variantes de `02` §4; foco por teclado muestra el indicador
     basado en `--color-border-focus` y la clase no contiene `outline-none` sin reemplazo visible [DS16]; **carga**: sigue enfocable, `aria-busy="true"`,

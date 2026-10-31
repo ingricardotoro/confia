@@ -16,6 +16,14 @@
   --button-subtle-bg-active: var(--color-border-subtle);
   --button-destructive-bg: var(--color-status-overdue-solid-bg);
   --button-destructive-fg: var(--color-primary-fg);
+  --badge-neutral-bg: var(--color-bg-canvas);
+  --badge-neutral-fg: var(--color-text-secondary);
+  --badge-neutral-border: var(--color-border-subtle);
+  --badge-primary-bg: var(--color-primary-soft-bg);
+  --badge-primary-fg: var(--color-primary-soft-fg);
+  --badge-primary-border: var(--color-primary-soft-bg);
+  --badge-outline-fg: var(--color-text-primary);
+  --badge-outline-border: var(--color-border-interactive);
   --status-badge-paid-bg: var(--color-status-paid-bg);
   --status-badge-paid-fg: var(--color-status-paid-fg);
   --status-badge-paid-border: var(--color-status-paid-border);

@@ -349,3 +349,11 @@ instalado. `pnpm audit --audit-level high`: código 0 (2 bajas, 2 moderadas). **
 **Demostraciones** (revertidas, `cmp` sin diferencias contra copias): (1) `disabled={loading || rest.disabled}` en `Button`: 2 pruebas DS17 en rojo; (2) `label?` opcional en `IconButton`: `tsc` TS2578 sobre el `@ts-expect-error` sin uso; (3) `bg-blue-600` en `Badge.tsx` (aplicada con el conjunto completo; la regla es la misma): ESLint `Visual literal` [DS04]; se repite en 4b con `Badge`.
 
 **Verificación en 4a aislada** (sin `Label` ni `Badge` en el árbol): `pnpm install --frozen-lockfile` sin cambios; `pnpm turbo run lint typecheck test build --filter=!@confia/api`: 14 de 14; ui: 29 archivos y 236 pruebas; `pnpm --filter @confia/ui test:a11y`: 3 archivos y 29 pruebas, 36 entradas (18 historias x 2 temas), cero violaciones; `pnpm audit --audit-level high`: código 0. **Tamaño:** 553 inserciones (sin `openspec` ni lockfile).
+
+## Tarea 4.1 parte B, `Label` y `Badge` (13a-4b), 2026-10-31
+
+**Implementado.** `src/atoms/label` (`<label>` nativo con `htmlFor`; sin `radix-ui`, que aún no está en el catálogo y solo aportaría evitar la selección por doble clic; entra con 5.1) y `src/atoms/badge` (variantes neutral, primary y outline; tamaños sm y md; ranura `icon` decorativa; siempre texto; `StatusBadge` de 6.2 aportará sus `--status-badge-*` por `className`), 8 variables `--badge-*` en `components.css`, exportes en `src/index.ts` y `atoms.lint.test.ts` ampliada a los cuatro componentes. El hover del destructivo (4a) usa `brightness` por no existir token oscuro de hover rojo. Sin textos de interfaz nuevos.
+
+**Demostración 3** (revertida, `cmp` sin diferencias): `bg-blue-600` en `Badge.tsx`: ESLint `Visual literal ... (design.md decision 6)` en la línea 11 [DS04].
+
+**Verificación en 4b:** `pnpm turbo run lint typecheck test build --filter=!@confia/api`: 14 de 14; ui: 31 archivos y 254 pruebas; `test:a11y`: 3 archivos y 37 pruebas, 52 entradas (26 historias x 2 temas), cero violaciones; `pnpm audit --audit-level high`: código 0. **Tamaño de 4b:** 286 inserciones y 3 eliminaciones (289 efectivas) sobre 4a; el total de 4.1 es de 836 inserciones (553 + 283 netas). Con esto 4.1 queda cerrada.
