@@ -10,6 +10,7 @@ import com.confia.shared.security.IdempotencyMarkerAlreadyExists;
 import com.confia.shared.security.IdempotencyRecord;
 import com.confia.shared.security.IdempotencyRecordStore;
 import com.confia.shared.security.IdempotentResponse;
+import confia.generated.jooq.routines.SharedPurgeIdempotencyKeys;
 import confia.generated.jooq.tables.records.SharedIdempotencyKeyRecord;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -121,6 +122,16 @@ public final class JooqIdempotencyRecordStore implements IdempotencyRecordStore 
         } catch (RuntimeException e) {
             throw translate(e);
         }
+    }
+
+    /** Only the generated routine deletes a row of this table: no role holds {@code DELETE} on it (V12). */
+    @Override
+    public long purgeExpired(Instant cutoff, int limit) {
+        SharedPurgeIdempotencyKeys routine = new SharedPurgeIdempotencyKeys();
+        routine.setPCutoff(toOffsetDateTime(cutoff));
+        routine.setPLimit(limit);
+        routine.execute(dsl.configuration());
+        return routine.getReturnValue();
     }
 
     private static IdempotencyRecord toRecord(SharedIdempotencyKeyRecord row) {

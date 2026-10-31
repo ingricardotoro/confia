@@ -34,4 +34,12 @@ public interface IdempotencyRecordStore {
     /** {@code UPDATE} of the already-locked row: {@code COMPLETED}, the response, and {@code completed_at}. */
     void complete(InstitutionId institutionId, IdempotencyKey key, IdempotentResponse response,
             Instant completedAt);
+
+    /**
+     * Deletes at most {@code limit} keys of the institution of the current transaction's context that expired
+     * before {@code cutoff}, through the {@code SECURITY DEFINER} purge function, and returns how many it
+     * deleted. The institution is not an argument: the function reads it from the context, so it cannot be
+     * pointed at another. The function also keeps a floor of its own and never deletes a younger key.
+     */
+    long purgeExpired(Instant cutoff, int limit);
 }
