@@ -58,21 +58,29 @@ describe("the browser environment", () => {
   });
 
   it("takes the dark values from the system preference when no data-theme is set [DS08]", async () => {
-    const canvas = () => getComputedStyle(document.documentElement).getPropertyValue("--color-bg-canvas").trim();
+    const root = document.documentElement;
+    const previousTheme = root.dataset["theme"];
+    const canvas = () => getComputedStyle(root).getPropertyValue("--color-bg-canvas").trim();
 
-    // The value the data-theme attribute gives, under a light system preference...
-    await commands.emulateColorScheme("light");
-    document.documentElement.dataset["theme"] = "dark";
-    const byAttribute = canvas();
-    document.documentElement.dataset["theme"] = "light";
-    const light = canvas();
-    // ...must equal what a dark system preference gives when no attribute is set.
-    delete document.documentElement.dataset["theme"];
-    await commands.emulateColorScheme("dark");
-    const bySystem = canvas();
-    await commands.emulateColorScheme("light");
+    // Whatever fails below, the emulation and the attribute go back, or the next test inherits them.
+    try {
+      // The value the data-theme attribute gives, under a light system preference...
+      await commands.emulateColorScheme("light");
+      root.dataset["theme"] = "dark";
+      const byAttribute = canvas();
+      root.dataset["theme"] = "light";
+      const light = canvas();
+      // ...must equal what a dark system preference gives when no attribute is set.
+      delete root.dataset["theme"];
+      await commands.emulateColorScheme("dark");
+      const bySystem = canvas();
 
-    expect(byAttribute).not.toBe(light);
-    expect(bySystem).toBe(byAttribute);
+      expect(byAttribute).not.toBe(light);
+      expect(bySystem).toBe(byAttribute);
+    } finally {
+      await commands.emulateColorScheme("light");
+      if (previousTheme === undefined) delete root.dataset["theme"];
+      else root.dataset["theme"] = previousTheme;
+    }
   });
 });

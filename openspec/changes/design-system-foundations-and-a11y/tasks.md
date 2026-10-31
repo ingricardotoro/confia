@@ -431,7 +431,7 @@ contra `main` antes del PR 3.
     nominal 350, realista 350. — Escenarios DS62, DS66 a DS71, DS73 (parcial), BX12 a BX17 (la parte remota se observa tras el empuje que decide el
     propietario), DS08 y DS13 (en navegador).
 
-- [ ] 3.3 **PR 3 / 3c `03-storybook-and-axe-gate`: trabajo de CI aditivo, tarea `test:a11y` de Turbo, ADR-0026 y Storybook en el stack (decisión 8, sección 11).**
+- [x] 3.3 **PR 3 / 3c `03-storybook-and-axe-gate`: trabajo de CI aditivo, tarea `test:a11y` de Turbo, ADR-0026 y Storybook en el stack (decisión 8, sección 11).**
   - **ROJO.** `tooling/src/ci-workflow.test.ts`: lee `.github/workflows/ci.yml` (con el analizador de YAML ya presente en el árbol; si no hay uno,
     aserciones sobre el texto sin añadir dependencia) y afirma: los trabajos `backend`, `frontend` y `security` siguen con los mismos nombres,
     `timeout-minutes` y pasos (en particular el `run` de `frontend` es `pnpm turbo run lint typecheck test build --filter=!@confia/api`) [BX19]; existe

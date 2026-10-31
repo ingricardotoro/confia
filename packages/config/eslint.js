@@ -224,7 +224,7 @@ export function uiSourceRules({ portal = false } = {}) {
  */
 export function confiaEslint({ tsconfigRootDir, ignores = [], portal = false, ui = false, react = false }) {
   return tseslint.config(
-    { ignores: ["node_modules/**", "dist/**", ...ignores] },
+    { ignores: ["node_modules/**", "dist/**", "coverage/**", "reports/**", ...ignores] },
     js.configs.recommended,
     ...tseslint.configs.strictTypeChecked,
     {

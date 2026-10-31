@@ -34,6 +34,15 @@
         "generate"
       ]
     },
+    "test:a11y": {
+      "dependsOn": [
+        "^generate",
+        "generate"
+      ],
+      "outputs": [
+        "reports/a11y/**"
+      ]
+    },
     "build": {
       "dependsOn": [
         "^generate",

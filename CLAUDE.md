@@ -86,9 +86,10 @@ sección 3.
 | Contrato de API | OpenAPI 3.1 generado con springdoc-openapi; Swagger UI solo en local y preproducción |
 | Frontend | React 19, Vite, TanStack Router/Query/Table/Form/Virtual |
 | UI | Tailwind CSS v4, shadcn/ui sobre Radix |
+| Catálogo de componentes | Storybook 10 (`@storybook/react-vite`) en `packages/ui`, con historias portables; es también el banco de la puerta de accesibilidad (ADR-0026) |
 | Validación | Jakarta Bean Validation en el backend; Zod en el frontend, generado con orval en `packages/contracts` |
 | Pruebas del backend | JUnit, AssertJ, Testcontainers, jqwik, PIT, JaCoCo, ArchUnit, pruebas de Spring Modulith |
-| Pruebas del frontend | Vitest, Testing Library, MSW, Playwright, axe-core |
+| Pruebas del frontend | Vitest, Testing Library, MSW, Playwright, axe-core; la puerta de axe corre en Chromium con un proyecto de Vitest en modo navegador (`pnpm --filter @confia/ui test:a11y`, ADR-0026) |
 | Rendimiento | k6 |
 | Observabilidad | Registro estructurado nativo de Spring Boot en JSON, OpenTelemetry, Prometheus, Grafana |
 

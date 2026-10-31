@@ -294,3 +294,46 @@ lucide-react añade `aria-hidden` por defecto (quitarlo del componente no la pon
 **Medidas.** `storybook build` 4,8 s; `pnpm turbo run lint typecheck test build --filter=!@confia/api --force` 14 de 14 en 42 s; `test:a11y` 6 s con Chromium instalado;
 `pnpm test` verde con `PLAYWRIGHT_BROWSERS_PATH` apuntando a una carpeta vacía (sin navegador). `pnpm audit --audit-level high`: sin altas (2 bajas, 2 moderadas).
 **Tamaño:** supera el tope de 800 líneas efectivas desde 13a-3a (ver el informe); 3.3 no se inició.
+
+## Tarea 3.3, trabajo de CI aditivo, tarea `test:a11y`, ADR-0026 y Storybook en el stack (13a-3, parte 3c), 2026-10-30
+
+Rama `change/design-system-foundations-and-a11y-13a-3c-ci-adr-and-stack`, desde 13a-3b (`eec9f02`, PR #224). Commits: `fix(ui): leave the page as the accessibility gate found it and stop expanding excludes on disk`
+(`2291bf9`, correcciones de la revisión de 13a-3b), `ci(ui): add the design system accessibility job` (`5c5e5e8`), `docs(adr): add ADR-0026 on Storybook and the accessibility gate` (`f00c424`) y
+`fix(tooling): stop ESLint walking generated output and give the tooling tests a loaded-runner timeout` (`b7cb5a0`).
+
+**Implementado.** Trabajo `design-system-accessibility` (`design system accessibility`, 15 min) añadido al final de `jobs:` con 36 líneas añadidas y 0 quitadas: `checkout`, `pnpm/action-setup` y `setup-node`
+en los mismos SHA que `frontend`, `pnpm install --frozen-lockfile`, `pnpm --filter @confia/ui exec playwright install --with-deps chromium`, `pnpm turbo run test:a11y --filter=@confia/ui` y subida de
+`packages/ui/reports/a11y/` con `if: always()` (`upload-artifact` con el SHA que ya usa `backend`). Tarea `test:a11y` en `turbo.json` (`dependsOn: ["^generate","generate"]`, `outputs: ["reports/a11y/**"]`).
+`tooling/src/ci-workflow.test.ts` (11 pruebas). ADR-0026 en estado Propuesto, fila en `docs/adr/README.md`, fila de catálogo de componentes en `CLAUDE.md` y en `docs/01-arquitectura.md` §3.3, y línea de accesibilidad en §3.4.
+
+**Rojo observado** (`ci-workflow.test.ts` antes de editar `ci.yml` y `turbo.json`): 6 de 11 en rojo, entre ellas `expected [ 'backend', 'backend-mutation', …(2) ] to deeply equal [ …(3) ]` (falta el trabajo),
+`expected [] to deeply equal [ …(3) ]` (sin comandos del trabajo) y `expected undefined to deeply equal [ '^generate', 'generate' ]` (falta la tarea). Los tres trabajos existentes pasaron desde el inicio (BX19).
+**Verde:** 11 de 11.
+
+**Demostraciones deliberadas**, revertidas y confirmadas con `cmp` (sin salida) contra una copia: (1) quitar `if: always()` del paso de subida: rojo en «uploads the report folder even when the gate fails»
+(`expected undefined to be 'always()'`) [BX14]; (2) cambiar el SHA de `setup-node` solo en el trabajo nuevo: rojo en «checks out, sets up pnpm and Node with the same action SHAs as the frontend job».
+`git diff eec9f02 -- .github/workflows/ci.yml | grep -c '^-[^-]'` = 0 y los bytes previos del archivo son idénticos [BX18]. (`git diff main` da 9 líneas quitadas porque `main` local está atrasado respecto a la base de esta rama; no es una edición de este cambio.)
+
+**ADR-0026.** El borrador se revisó contra design §11 y lo construido en 3.1 y 3.2 (etiquetas y política de `policy.ts`, incompleto de `color-contrast` que bloquea, impacto desconocido que bloquea, cero historias,
+sin MDX, fixtures fuera del patrón, `story-coverage.test.ts` en `frontend verify`). Único cambio: se añadió al cumplimiento el escáner de supresiones (`suppression-citations.test.ts`), que design §11 lista y el borrador omitía
+en esa sección. 0025 no se crea ni se renumera (pertenece a `background-jobs-with-db-scheduler`).
+
+**Correcciones de la revisión de 13a-3b.** (1) `checkStoryAccessibility`: `GateStory.load?()` libera la raíz de React (las historias portables guardan el desmontaje en una lista global que solo corre en el siguiente `run` o
+`load`) y un `finally` restaura `data-theme` y quita el contenedor; rojo: `expected [ 'mounted' ] to deeply equal [ 'mounted', 'unmounted' ]` (Chromium) y 4 rojos en jsdom
+(`expected 'light' to be 'dark'`, `expected true to be false`, `expected 'dark' to be 'light'`, `expected [] to deeply equal [ 'load-while-attached' ]`). Costo aceptado: `load()` vuelve a ejecutar cargadores y `beforeEach` de la historia,
+y sus limpiezas quedan pendientes hasta el siguiente `run`; ninguna historia actual los usa. (2) DS08 con `try/finally`: sin rojo, porque solo se observa si la afirmación falla a mitad; se verificó que la prueba sigue en verde.
+(3) `cruise-probe.test.ts` compara con `realpathSync(tmpdir())`; rojo reproducido con `TEMP` apuntando a una unión de directorios (`expected false to be true`), verde con ella y sin ella. (4) `src/test/api-port.ts` (`parseApiPort`):
+15 pruebas; vacío, NaN, 0, negativo, 65536, decimal y hexadecimal lanzan `CONFIA_VITEST_API_PORT must be a whole number from 1 to 65535`; rojo: `Failed to resolve import "./api-port"`; `vitest.config.ts` importa con extensión `.ts`
+(`allowImportingTsExtensions` en el `tsconfig` de `ui`) para que el cargador nativo de Vite no avise. (5) `src/test/collection.ts` (`collectedFiles`) compara con `path.matchesGlob` contra la lista de candidatos y ya no expande exclusiones con `globSync`;
+rojo: `Failed to resolve import "./collection"`.
+
+**Hallazgos de carrera, corregidos en `b7cb5a0`** (aparecieron al repetir `turbo run lint typecheck test build` con la máquina cargada): (a) `tooling` agotaba los 5 s de Vitest en `dependency-rules.test.ts` y en `cruise-probe.test.ts`
+(la primera tarda 0,8 s sola); `tooling/vitest.config.js` fija `testTimeout: 30_000`. (b) `eslint .` de `ui` abortó una vez con `ENOENT ... packages/ui/coverage/src/i18n` porque `test --coverage` reescribía `coverage/` durante el recorrido;
+`packages/config/eslint.js` ignora ahora `coverage/**` y `reports/**`, con `tooling/src/eslint-ignores.test.ts` (rojo: 2 de 5 antes del cambio). Después de ambos cambios: 3 ejecuciones forzadas seguidas en verde, sin navegador.
+
+**Dependencia.** `tooling` declara `yaml` (catálogo, 2.9.1) para leer el flujo de trabajo: el paquete ya estaba en el lockfile como dependencia transitiva de Vite, así que el `pnpm-lock.yaml` solo gana las 6 líneas de la declaración y ningún paquete nuevo.
+`pnpm install --frozen-lockfile` en verde.
+
+**Medidas.** `pnpm turbo run lint typecheck test build --filter=!@confia/api --force` con `PLAYWRIGHT_BROWSERS_PATH` en una carpeta vacía: 14 de 14 en 38 a 41 s. `pnpm turbo run test:a11y --filter=@confia/ui --force`: 3 archivos, 13 pruebas, 6,4 s con Chromium
+instalado. `pnpm audit --audit-level high`: código 0 (2 bajas, 2 moderadas). **Tamaño:** 608 inserciones y 37 eliminaciones = 645 líneas efectivas sobre 13a-3b (sin `openspec` ni lockfile), bajo el tope de 800.
+**Pendiente del propietario:** el empuje; la observación del trabajo nuevo en el remoto y la demostración remota [BX12] requieren que el trabajo corra en GitHub. El tiempo de la descarga en frío de Chromium en CI sigue sin medirse.
