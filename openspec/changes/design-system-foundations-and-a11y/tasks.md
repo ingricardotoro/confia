@@ -481,7 +481,7 @@ contra `main` antes del PR 3.
     and Badge`. Tamaño: nominal 300, realista 490 (incluye `cn`, que 3.1 ya aportó, y las cuatro historias). — Escenarios DS15 a DS17, DS62, DS65,
     DS70, DS73, DS74 y DS06 (con componentes reales).
 
-- [ ] 4.2 **PR 4 / 4b `04-atoms-buttons-labels`: `Separator`, `Skeleton` e `Input` (decisión 11).**
+- [x] 4.2 **PR 4 / 4b `04-atoms-buttons-labels`: `Separator`, `Skeleton` e `Input` (decisión 11).**
   - **ROJO.** `Separator.test.tsx` (decorativo con `role="none"` y semántico con `role="separator"` y orientación). `Skeleton.test.tsx` (oculto a las
     tecnologías de asistencia; historia `Loading` como su estado de carga). `Input.test.tsx`: **solo lectura frente a deshabilitado** [DS18] — el de
     solo lectura es enfocable y su valor seleccionable y copiable; el deshabilitado no es enfocable; anillo de foco [DS16]; `aria-invalid` cuando se
