@@ -74,7 +74,7 @@ describe("Input", () => {
       renderWithI18n(<Input aria-label="Saldo" />);
 
       const classes = screen.getByRole("textbox", { name: "Saldo" }).className;
-      expect(classes).toContain("read-only:bg-bg-canvas");
+      expect(classes).toContain("read-only:not-disabled:bg-bg-canvas");
       expect(classes).toContain("disabled:cursor-not-allowed");
       expect(classes).toContain("disabled:opacity-50");
     });

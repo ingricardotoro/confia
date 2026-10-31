@@ -43,10 +43,31 @@ describe("Label", () => {
     expect(screen.getByText("Monto a cobrar")).toHaveClass("text-text-primary");
   });
 
-  it("dims itself when the control that follows it is disabled", () => {
+  it("dims itself through the peer when the control that precedes it in the DOM is disabled", () => {
     renderWithI18n(<Label htmlFor="amount">Monto a cobrar</Label>);
 
     expect(screen.getByText("Monto a cobrar")).toHaveClass("peer-disabled:cursor-not-allowed", "peer-disabled:opacity-70");
+  });
+
+  it("R3-label-peer-order: a label followed by a disabled input dims through its disabled prop, not through DOM order", () => {
+    renderWithI18n(
+      <>
+        <Label htmlFor="amount" disabled>
+          Monto a cobrar
+        </Label>
+        <input id="amount" disabled />
+      </>,
+    );
+
+    const label = screen.getByText("Monto a cobrar");
+    expect(label).toHaveAttribute("data-disabled", "true");
+    expect(label).toHaveClass("data-disabled:cursor-not-allowed", "data-disabled:opacity-70");
+  });
+
+  it("carries no data-disabled attribute when it is not disabled", () => {
+    renderWithI18n(<Label htmlFor="amount">Monto a cobrar</Label>);
+
+    expect(screen.getByText("Monto a cobrar")).not.toHaveAttribute("data-disabled");
   });
 
   it("merges the class of the caller over its own", () => {

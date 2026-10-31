@@ -31,3 +31,13 @@ export const WithDisabledControl: Story = {
     </div>
   ),
 };
+
+// The usual order, label then control: the owner of the pair passes `disabled` to the Label.
+export const DisabledInLabelFirstOrder: Story = {
+  render: (args) => (
+    <div className="flex flex-col gap-2">
+      <Label {...args} disabled />
+      <input id="story-amount" disabled className="h-10 rounded-md border border-border-interactive bg-bg-surface px-3 text-text-primary" />
+    </div>
+  ),
+};

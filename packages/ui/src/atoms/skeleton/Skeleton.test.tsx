@@ -17,7 +17,7 @@ describe("Skeleton", () => {
     expect(container.firstElementChild).toHaveClass("h-4", "w-32", "rounded-full");
   });
 
-  it("reads its color and its animation from component tokens, which reduced motion shortens", () => {
+  it("reads its color and its animation from component tokens", () => {
     const { container } = renderWithI18n(<Skeleton />);
 
     expect(container.firstElementChild).toHaveClass("bg-(--skeleton-bg)", "animate-(--skeleton-animation)");

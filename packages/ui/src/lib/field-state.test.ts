@@ -9,10 +9,19 @@ describe("fieldState", () => {
   });
 
   it("keeps read-only selectable: no pointer-events or cursor block, unlike disabled", () => {
-    expect(fieldState).toContain("read-only:bg-bg-canvas");
+    expect(fieldState).toContain("read-only:not-disabled:bg-bg-canvas");
     expect(fieldState).not.toContain("read-only:cursor-not-allowed");
     expect(fieldState).not.toContain("read-only:pointer-events-none");
     expect(fieldState).toContain("disabled:cursor-not-allowed");
+  });
+
+  it("R3-readonly-matches-disabled: never styles read-only without excluding disabled, since :read-only matches both", () => {
+    const readOnlyUtilities = fieldState.split(" ").filter((c) => c.startsWith("read-only:"));
+
+    expect(readOnlyUtilities.length).toBeGreaterThan(0);
+    for (const utility of readOnlyUtilities) {
+      expect(utility).toMatch(/^read-only:not-disabled:/);
+    }
   });
 
   it("draws the error border for aria-invalid, from a component token", () => {
