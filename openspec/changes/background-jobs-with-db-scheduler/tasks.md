@@ -601,7 +601,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
   - **Cierre.** `./mvnw verify -Pmutation-gate`. Commit: `feat(db): add the security definer purge functions for idempotency keys and login backoff`.
     Tamaño: nominal 200, realista 500. — Escenarios I257 a I261, BI78 a BI84, BI108.
 
-- [ ] 3.7 **PR 5b / 5b-2 `05b-idempotency-and-backoff-jobs`: casos de uso, tareas recurrentes y corredor por institución (decisiones 11 y 17).**
+- [x] 3.7 **PR 5b / 5b-2 `05b-idempotency-and-backoff-jobs`: casos de uso, tareas recurrentes y corredor por institución (decisiones 11 y 17).**
   - **ROJO.** Crear `shared/security/PurgeExpiredIdempotencyKeysTest.java` y `IdempotencyPurgeJobsIT.java` (lotes hasta vaciar; un asiento
     `shared.idempotency_key.purged` por lote con el conteo, también con cero; los dos `RecurringJob` de retroceso
     `identity.purge-login-backoff` 04:45 y `identity.purge-mfa-totp-backoff` 04:50, más `shared.purge-idempotency-keys` 04:40; la doble ejecución no
@@ -619,6 +619,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     purgar [I274]. (2) Omitir el asiento cuando el conteo es cero pone en rojo [AT19]. Se revierten y se confirman con `cmp`.
   - **Cierre.** `./mvnw verify -Pmutation-gate`; PIT en 80 sobre `shared.security`. Commit: `feat(jobs): purge idempotency keys and login backoff daily per
     institution`. Tamaño: nominal 250, realista 550. — Escenarios I262, I263, AT18 a AT21, AT27, BJ30, BJ62 y BJ65.
+  - **Resultado (2026-10-30): hecha, en dos PR.** Ramas `05b2` (641 líneas: traslado de `RetentionPurgeBatches` a `shared.security`, purga de idempotencia, `SharedWorkerJobsConfiguration`) y `05b2b` (515: `PurgeStaleBackoff`, los dos métodos del puerto de identidad, los `RecurringJob` de retroceso, `RecurringJobPerInstitutionIT` y la nota de `docs/07`); la medición conjunta fue de 1 156 líneas, sin costura nombrada para 3.7, y se siguió el precedente de 3.4: la purga compartida primero, la de identidad después. `PurgeProbeRows` se queda con 05b2 por archivo completo. Ver `odd/tasks/background-jobs-remaining-tasks.md`.
 
 - [ ] 3.8 **PR 6 `06-audit-chain-verification-cadences`: cadencias diaria y semanal del verificador (decisión 19, P1, D-N2).**
   - **ROJO.** Ampliar `DefaultAuditChainVerifierTest.java` con `verifySince`: empieza en la primera fila con `occurred_at >= since` y toma su `prev_hash`
