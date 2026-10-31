@@ -9,4 +9,5 @@ export function confiaEslint(options: {
   ignores?: string[];
   portal?: boolean;
   ui?: boolean;
+  react?: boolean;
 }): Linter.Config[];

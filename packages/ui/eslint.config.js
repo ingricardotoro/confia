@@ -1,3 +1,3 @@
 import { confiaEslint } from "@confia/config/eslint";
 
-export default confiaEslint({ tsconfigRootDir: import.meta.dirname, ui: true });
+export default confiaEslint({ tsconfigRootDir: import.meta.dirname, ui: true, react: true });

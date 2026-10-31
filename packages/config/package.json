@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@eslint/js": "catalog:",
+    "eslint-plugin-react-hooks": "catalog:",
     "typescript-eslint": "catalog:"
   },
   "devDependencies": {

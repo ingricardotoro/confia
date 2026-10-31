@@ -2,6 +2,7 @@
 // typescript-eslint in its strict, type-checked mode: each package passes its own directory so the
 // project service finds that package's tsconfig.json.
 import js from "@eslint/js";
+import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 /**
@@ -218,9 +219,10 @@ export function uiSourceRules({ portal = false } = {}) {
 }
 
 /**
- * @param {{ tsconfigRootDir: string, ignores?: string[], portal?: boolean, ui?: boolean }} options
+ * @param {{ tsconfigRootDir: string, ignores?: string[], portal?: boolean, ui?: boolean, react?: boolean }} options
+ * `react` turns on the rules of hooks and the React Compiler rules of eslint-plugin-react-hooks.
  */
-export function confiaEslint({ tsconfigRootDir, ignores = [], portal = false, ui = false }) {
+export function confiaEslint({ tsconfigRootDir, ignores = [], portal = false, ui = false, react = false }) {
   return tseslint.config(
     { ignores: ["node_modules/**", "dist/**", ...ignores] },
     js.configs.recommended,
@@ -231,6 +233,7 @@ export function confiaEslint({ tsconfigRootDir, ignores = [], portal = false, ui
       },
     },
     contractImportRestrictions({ portal }),
+    ...(react ? [reactHooks.configs.flat.recommended] : []),
     ...(ui ? uiSourceRules({ portal }) : []),
     {
       files: ["**/*.js"],
