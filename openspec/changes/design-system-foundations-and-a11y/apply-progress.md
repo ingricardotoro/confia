@@ -349,3 +349,27 @@ instalado. `pnpm audit --audit-level high`: código 0 (2 bajas, 2 moderadas). **
 **Demostraciones** (revertidas, `cmp` sin diferencias contra copias): (1) `disabled={loading || rest.disabled}` en `Button`: 2 pruebas DS17 en rojo; (2) `label?` opcional en `IconButton`: `tsc` TS2578 sobre el `@ts-expect-error` sin uso; (3) `bg-blue-600` en `Badge.tsx` (aplicada con el conjunto completo; la regla es la misma): ESLint `Visual literal` [DS04]; se repite en 4b con `Badge`.
 
 **Verificación en 4a aislada** (sin `Label` ni `Badge` en el árbol): `pnpm install --frozen-lockfile` sin cambios; `pnpm turbo run lint typecheck test build --filter=!@confia/api`: 14 de 14; ui: 29 archivos y 236 pruebas; `pnpm --filter @confia/ui test:a11y`: 3 archivos y 29 pruebas, 36 entradas (18 historias x 2 temas), cero violaciones; `pnpm audit --audit-level high`: código 0. **Tamaño:** 553 inserciones (sin `openspec` ni lockfile).
+
+## Tarea 4.1 parte B, `Label` y `Badge` (13a-4b), 2026-10-31
+
+**Implementado.** `src/atoms/label` (`<label>` nativo con `htmlFor`; sin `radix-ui`, que aún no está en el catálogo y solo aportaría evitar la selección por doble clic; entra con 5.1) y `src/atoms/badge` (variantes neutral, primary y outline; tamaños sm y md; ranura `icon` decorativa; siempre texto; `StatusBadge` de 6.2 aportará sus `--status-badge-*` por `className`), 8 variables `--badge-*` en `components.css`, exportes en `src/index.ts` y `atoms.lint.test.ts` ampliada a los cuatro componentes. El hover del destructivo (4a) usa `brightness` por no existir token oscuro de hover rojo. Sin textos de interfaz nuevos.
+
+**Demostración 3** (revertida, `cmp` sin diferencias): `bg-blue-600` en `Badge.tsx`: ESLint `Visual literal ... (design.md decision 6)` en la línea 11 [DS04].
+
+**Verificación en 4b:** `pnpm turbo run lint typecheck test build --filter=!@confia/api`: 14 de 14; ui: 31 archivos y 254 pruebas; `test:a11y`: 3 archivos y 37 pruebas, 52 entradas (26 historias x 2 temas), cero violaciones; `pnpm audit --audit-level high`: código 0. **Tamaño de 4b:** 286 inserciones y 3 eliminaciones (289 efectivas) sobre 4a; el total de 4.1 es de 836 inserciones (553 + 283 netas). Con esto 4.1 queda cerrada.
+
+## Tarea 4.2, `Separator`, `Skeleton` e `Input` (13a-4b), 2026-10-31
+
+Commit `1a4a647` `feat(ui): add Separator, Skeleton and Input`, sobre `079d1db` (4.1 parte B).
+
+**Implementado.** `src/atoms/separator` (nativo, sin Radix: `role="none"` por defecto, `role="separator"` con `aria-orientation` si `decorative={false}`), `src/atoms/skeleton` (bloque `aria-hidden`, la forma la da la clase del llamador, animación `--skeleton-animation`), `src/atoms/input` (`<input>` nativo; `aria-invalid` lo pasa el llamador), `src/lib/field-state.ts` (utilidad compartida de estados de campo que reutilizará `Textarea` en 5.1), variables `--input-*` y `--skeleton-*` y `@keyframes confia-pulse` en `components.css`, exportes en `src/index.ts` y `atoms.lint.test.ts` ampliada a siete componentes. No se añadió `radix-ui`. Sin textos de interfaz nuevos (las historias usan «Nombre» y «Ana Martínez» como datos de ejemplo).
+
+**ROJO.** `vitest run --project unit src/atoms src/lib`: `Test Files 4 failed | 9 passed`, `Failed to resolve import "./Input"`, `"./Skeleton"`, `"./Separator"` y `"./field-state"`; `TypeCheckError: Cannot find module` en los cuatro.
+
+**Demostraciones** (revertidas, `cmp` sin diferencias contra copias en `confia-scratch/13a-4b`): (1) `disabled={rest.readOnly || rest.disabled}` en `Input`: rojo `expect(element).toHaveFocus()` y `expected undefined to be '1500'` (copiar) [DS18]; (2) quitar `aria-hidden` de `Skeleton`: rojo en «is hidden from assistive technology» y en la historia `Loading` (`expected 0 to be greater than 1`).
+
+**Desviaciones.** (a) `docs/ui-ux/02` §6 nombra `--color-text-muted` para solo lectura, token que no existe: se usa `text-text-secondary` sobre `bg-bg-canvas` (contraste AA). (b) El placeholder usa `--color-text-tertiary`. (c) El error de campo usa `--color-status-overdue-border`. (d) `Separator` y `Skeleton` sin Radix.
+
+**Verificación:** `pnpm install --frozen-lockfile` sin cambios; `pnpm turbo run lint typecheck test build --filter=!@confia/api`: 14 de 14; ui: 35 archivos y 278 pruebas, 0 errores de tipos; `test:a11y`: 3 archivos y 46 pruebas, 70 entradas (35 historias x 2 temas), cero bloqueantes; `pnpm audit --audit-level high`: código 0. **Tamaño de 4b completa:** 676 inserciones y 4 eliminaciones (680 efectivas) sobre 4a, sin `openspec` ni lockfile.
+
+**Correcciones de la revisión de 4b** (commit `fix(ui): dim the label of a disabled field in label-first order and keep read-only styles off disabled inputs`). R3-label-peer-order: `peer-disabled` solo alcanza a un hermano anterior, así que en el orden etiqueta-control la `Label` no se atenuaba; `Label` recibe `disabled` (`data-disabled`, lo pasará `FormField` en 5.2) y conserva el `peer` para el orden control-etiqueta. R3-readonly-matches-disabled: `:read-only` también casa con un `input` deshabilitado; las utilidades de solo lectura pasan a `read-only:not-disabled:`. Ambas se prueban con la hoja de estilos real en `atoms/field-states.a11y.test.tsx` (estilo calculado). **Rojo:** `expected '1' to be '0.7'` y `expected 'rgb(248, 250, 252)' to be 'rgb(255, 255, 255)'`, más las pruebas de jsdom de `Label`, `Input` y `field-state`. R3-skeleton-reduced-motion-unproved: la prueba se renombró a lo que prueba (lee color y animación de tokens); la emulación de movimiento reducido en el navegador queda pendiente.
