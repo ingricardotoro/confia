@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit --coverage",
-    "build": "storybook build --output-dir dist/storybook"
+    "build": "storybook build --output-dir dist/storybook",
+    "test:a11y": "vitest run --project a11y"
   },
   "dependencies": {
     "@fontsource-variable/inter": "catalog:",
@@ -41,10 +42,12 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "axe-core": "catalog:",
     "eslint": "catalog:",
     "jsdom": "catalog:",
+    "playwright": "catalog:",
     "storybook": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

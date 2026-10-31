@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { withProbeTree } from "./cruise-probe.js";
 
 // Specs/build-integrity, requirement "Reglas de dependencia del frontend"
 // (frontend-monorepo-and-contracts-pipeline, design.md decision 8; task 3.1). The same
@@ -30,11 +30,13 @@ interface CruiseResult {
   };
 }
 
-function cruise(...paths: string[]): CruiseResult {
+// `cwd` defaults to the repository; the generated-output probe cruises a temporary tree with the same
+// configuration instead of writing into packages/.
+function cruise(paths: string[], cwd: string = repositoryRoot): CruiseResult {
   const run = spawnSync(
     process.execPath,
-    [cruiser, "--config", ".dependency-cruiser.cjs", "--output-type", "json", ...paths],
-    { cwd: repositoryRoot, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+    [cruiser, "--config", join(repositoryRoot, ".dependency-cruiser.cjs"), "--output-type", "json", ...paths],
+    { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
   );
   if (run.stdout.trim() === "") {
     throw new Error(`dependency-cruiser produced no output: ${run.stderr}`);
@@ -43,7 +45,7 @@ function cruise(...paths: string[]): CruiseResult {
 }
 
 describe("the frontend dependency rules", () => {
-  const fixtures = cruise("tooling/dependency-fixtures");
+  const fixtures = cruise(["tooling/dependency-fixtures"]);
   const violatedRules = fixtures.summary.violations.map((violation) => violation.rule.name);
 
   it.each(RULES)("%s rejects its deliberate violation", (rule) => {
@@ -51,24 +53,24 @@ describe("the frontend dependency rules", () => {
   });
 
   it("finds no violation in the real tree, over a set that is not empty", () => {
-    const real = cruise("apps", "packages");
+    const real = cruise(["apps", "packages"]);
     expect(real.summary.totalCruised).toBeGreaterThan(0);
     expect(real.summary.violations).toEqual([]);
   });
 
   // Build and report output is generated, not authored: Storybook's bundles under dist/ made this
-  // run slower than the 5 s limit (task 3.1). Each directory below must stay out of the cruise.
+  // run slower than the 5 s limit (task 3.1). Each directory below must stay out of the cruise. The
+  // probe lives in a temporary tree, never under packages/, so it cannot delete output that the ui
+  // build and test tasks write at the same time.
   it.each(["dist", "coverage", "reports"])("does not cruise generated output under %s/", (directory) => {
-    const folder = join(repositoryRoot, "packages", "ui", directory);
-    const created = !existsSync(folder);
-    mkdirSync(folder, { recursive: true });
-    const probe = join(folder, "cruise-probe.js");
-    writeFileSync(probe, "export const probe = 1;");
-    try {
-      expect(cruise(`packages/ui/${directory}`).summary.totalCruised).toBe(0);
-    } finally {
-      rmSync(probe, { force: true });
-      if (created) rmSync(folder, { recursive: true, force: true });
-    }
+    withProbeTree(directory, (root) => {
+      expect(cruise([`packages/ui/${directory}`], root).summary.totalCruised).toBe(0);
+    });
+  });
+
+  it("does cruise authored code in the same temporary tree, so the probe can fail", () => {
+    withProbeTree("src", (root) => {
+      expect(cruise(["packages/ui/src"], root).summary.totalCruised).toBeGreaterThan(0);
+    });
   });
 });

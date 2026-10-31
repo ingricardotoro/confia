@@ -25,7 +25,7 @@
 | Estimated changed lines (additions + deletions, sin `openspec/`, sin `pnpm-lock.yaml` y sin código generado) | **nominal unas 3 950 (diseño §8); realista entre 4 300 y 4 600** (cada componente con historia y prueba mide de 60 a 260; el código adaptado de shadcn/ui cuenta como línea de autor) |
 | 400-line budget risk | **High** frente a las 400 líneas de la preflight; **medio a alto por PR** frente al presupuesto del proyecto de 800 y la banda del propietario de 450 a 750 |
 | Chained PRs recommended | Yes |
-| Suggested split | **9 PR apilados a `main`** (13a-1, 13a-1b, 13a-2a, 13a-2b, 13a-3a, 13a-3b y 13a-4 a 13a-6), 15 tareas en 6 fases; el séptimo PR (13a-1b) lo autorizó el propietario el 2026-10-29 al partir 1.3 (ver nota de la tarea 1.3), el octavo (13a-2b) el 2026-10-30, porque 2.1 sola midió 761 líneas efectivas frente a las 300 a 370 previstas, y el noveno (13a-3b, con 3.2 y 3.3) el 2026-10-30, porque 3.1 sola midió 538 líneas efectivas |
+| Suggested split | **10 PR apilados a `main`** (13a-1, 13a-1b, 13a-2a, 13a-2b, 13a-3a, 13a-3b, 13a-3c y 13a-4 a 13a-6), 15 tareas en 6 fases. Particiones autorizadas por el propietario: el séptimo PR (13a-1b) el 2026-10-29 al partir 1.3; el octavo (13a-2b) el 2026-10-30, porque 2.1 sola midió 761 líneas; el noveno (13a-3b) el 2026-10-30, porque 3.1 sola midió 538; y el décimo (13a-3c, tarea 3.3) el 2026-10-30, aceptando 13a-3b en 811 líneas efectivas como excepción de tamaño, porque las 132 líneas sobre 3.2 son correcciones de la revisión de 13a-3a |
 | Delivery strategy | `auto-chain` con la estrategia fijada por el propietario el 2026-10-28 |
 | Chain strategy | `stacked-to-main`: cada PR se fusiona a `main` en orden y el siguiente parte de `main` actualizado |
 | Presupuesto por PR | Banda del propietario 450 a 750; límite duro del proyecto 800 de cambio efectivo (`docs/15-flujo-de-trabajo-git.md` §3). Las pruebas y la documentación nunca se separan de su código |
@@ -395,7 +395,7 @@ contra `main` antes del PR 3.
     abierta 2 si el `build` de Storybook se acerca al límite). Commit: `feat(ui): add Storybook, the accessibility policy and the Spinner atom`.
     Tamaño: nominal 250, realista 310. — Escenarios DS69 (nivel de política), DS70 (parcial), DS62 (parcial) y la amenaza de MDX.
 
-- [ ] 3.2 **PR 3 / 3b `03-storybook-and-axe-gate`: puerta de axe en Chromium con historias portables, fixtures inaccesibles y comprobación de historias (decisiones 8 y 9; sonda S5).**
+- [x] 3.2 **PR 3 / 3b `03-storybook-and-axe-gate`: puerta de axe en Chromium con historias portables, fixtures inaccesibles y comprobación de historias (decisiones 8 y 9; sonda S5).**
   - **ROJO, la puerta primero en rojo** (propuesta, Enfoque 4). Antes de que exista la puerta, crear `src/a11y/__fixtures__/Inaccessible.stories.tsx`
     (fuera del patrón de descubrimiento): una imagen sin texto alternativo, un botón sin nombre accesible y un texto con contraste insuficiente;
     `DarkOnlyLowContrast.stories.tsx` (contraste suficiente en claro, insuficiente en oscuro, usando tokens semánticos redefinidos solo para el

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { globSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -36,6 +36,15 @@ describe("the Storybook configuration", () => {
     expect(Array.isArray(config.stories)).toBe(true);
     expect(config.stories).not.toHaveLength(0);
     expect(admitsMdx(config.stories as unknown[])).toBe(false);
+  });
+
+  it("publishes the design system stories and never a deliberately inaccessible fixture", () => {
+    const published = (config.stories as string[]).flatMap((pattern) =>
+      globSync(pattern.replace("../", ""), { cwd: packageRoot }).map((path) => path.replaceAll("\\", "/")),
+    );
+
+    expect(published).toContain("src/atoms/spinner/Spinner.stories.tsx");
+    expect(published.filter((path) => path.includes("__fixtures__"))).toEqual([]);
   });
 
   it("would notice a pattern that admits MDX (deliberate violation)", () => {

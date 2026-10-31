@@ -1,6 +1,6 @@
 import type { Result } from "axe-core";
 import { describe, expect, it } from "vitest";
-import { A11Y_TAGS, BLOCKING_IMPACTS, axeRunOptions, partitionViolations } from "./policy";
+import { A11Y_TAGS, BLOCKING_IMPACTS, REPORTED_IMPACTS, axeRunOptions, partitionViolations } from "./policy";
 
 // design.md decision 8: critical and serious fail the gate, moderate and minor are reported (03
 // section 11). The tags and the impacts live in policy.ts and nowhere else.
@@ -16,6 +16,10 @@ describe("the accessibility policy", () => {
 
   it("blocks critical and serious impacts only", () => {
     expect([...BLOCKING_IMPACTS]).toEqual(["critical", "serious"]);
+  });
+
+  it("reports moderate and minor impacts only, as an explicit allow-list", () => {
+    expect([...REPORTED_IMPACTS]).toEqual(["moderate", "minor"]);
   });
 
   it("hands the same tags to axe as run options", () => {
@@ -54,6 +58,13 @@ describe("the accessibility policy", () => {
       const missing = result("absent", undefined);
 
       expect(partitionViolations([unknown, missing])).toEqual({ blocking: [unknown, missing], reported: [] });
+    });
+
+    it("blocks an impact string the policy does not recognize (R3-unknown-impact-string)", () => {
+      const unrecognized = result("mystery", "catastrophic" as unknown as Result["impact"]);
+      const empty = result("blank", "" as unknown as Result["impact"]);
+
+      expect(partitionViolations([unrecognized, empty])).toEqual({ blocking: [unrecognized, empty], reported: [] });
     });
 
     it("finds nothing to block in an empty list", () => {

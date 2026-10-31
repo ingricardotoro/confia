@@ -253,3 +253,44 @@ Vitest, Storybook y Tailwind en `8.3.3` exacto (`pnpm peers check` fallaba). El 
 (h) Pendiente para 3.2: el patrón `../src/**/*.stories.tsx` mostrará en Storybook los fixtures de `__fixtures__`.
 
 Cierre: `pnpm install --frozen-lockfile` y `pnpm turbo run lint typecheck test build --filter=!@confia/api --force` 14 de 14, tres veces seguidas.
+
+## Tarea 3.2, puerta de axe en Chromium, fixtures inaccesibles y comprobación de historias (13a-3, parte 3b), 2026-10-30
+
+Rama `change/design-system-foundations-and-a11y-13a-3b-a11y-gate-and-ci`, desde 13a-3a (`e53657f`). Commits: `fix(ui): fail closed on unknown axe impacts and stop the cruise probe writing into packages`
+(correcciones de la revisión de 13a-3a, ver abajo) y `test(ui): gate every story with axe in Chromium in both themes`.
+
+**Implementado.** Proyecto `a11y` de Vitest (modo navegador, `@vitest/browser-playwright` 5.0.5 y `playwright` 1.64.1 en el catálogo, Chromium sin cabeza, `@tailwindcss/vite`),
+`test:a11y` = `vitest run --project a11y`; `src/a11y/run-gate.ts` (`checkStoryAccessibility`, `checkStoryInAllThemes`, `describeBlocking`, `summarize`),
+`discovery.ts` (`assertStoriesDiscovered`), `story-coverage.ts`, comandos personalizados `writeA11yReport` y `emulateColorScheme` (`browser-commands.d.ts`), fixtures
+`Inaccessible`, `DarkOnlyLowContrast` y `ModerateOnly`, y el árbol `__fixtures__/tree` con un infractor de cada tipo. Pruebas: `gate.a11y.test.tsx`, `stories.a11y.test.tsx` (historias,
+DS13 y DS08), `story-coverage.test.ts`, `discovery.test.ts`, `run-gate.test.ts` (jsdom).
+
+**Rojo observado** (antes de crear el código): `story-coverage.test.ts` y `discovery.test.ts`: `Failed to resolve import "./story-coverage"` y `"./discovery"`;
+`vitest run --project a11y`: `No projects were found ... The filter matched no projects: a11y`.
+**Verde:** `test:a11y` 12 pruebas en Chromium; el informe `reports/a11y/report.json` lista 4 resultados (`Spinner` `Default` y `Sizes`, cada una en `light` y `dark`), sin bloqueantes
+ni informados. `ui` unit: 22 archivos y 177 pruebas, cobertura sobre el umbral.
+
+**Hallazgo útil.** En jsdom, texto sin estilo da `color-contrast` incompleto y la política lo bloquea (`run-gate.test.ts`): confirma por qué la puerta corre en Chromium y que lo
+incompleto nunca pasa.
+
+**Demostraciones deliberadas**, revertidas y verificadas con `cmp` (sin salida):
+1. `color-contrast` desactivada en la ejecución de axe: rojo en «rejects insufficient contrast» y en «rejects a story that fails only in the dark theme» (`expected [] to include 'color-contrast'`) [DS67].
+2. `THEMES = ["light"]`: rojo en «evaluates the light and the dark theme» (`expected [ 'light' ] to deeply equal [ 'light', 'dark' ]`) y en el fixture solo-oscuro [DS68].
+3. Patrón de descubrimiento que no coincide con nada: `Found zero stories under atoms/, molecules/ and domain/ ... (ADR-0018)`, 1 archivo fallido [DS71].
+4. `Inaccessible.stories.tsx` copiado a `src/atoms/`: `test:a11y` sale con código 1 y nombra `fixtures-inaccessible--missing-image-alt [light]: image-alt (critical)`, `...--low-contrast-text [light]: color-contrast (serious)` y `button-name` [BX12]; el archivo se borró.
+5. `Spinner.stories.tsx` borrado: `story-coverage.test.ts` falla con `expected [ 'atoms/spinner/Spinner' ] to deeply equal []` [BX13].
+
+**Decisiones.** (a) Los fixtures nunca llegan a Storybook: el patrón de `.storybook/main.ts` pasa a `../src/{atoms,molecules,domain}/**/*.stories.tsx` (el mismo que la puerta), con prueba en
+`storybook-config.test.ts` que falló antes del cambio; el `storybook build` no contiene los fixtures. (b) El puerto de la API de Vitest, 63315, da `EACCES` en esta máquina: `api.port` = 51730,
+con `CONFIA_VITEST_API_PORT` para cambiarlo (`port: 0` se ignora y vuelve al predeterminado). (c) El proyecto `unit` excluye `*.a11y.test.tsx` y `__fixtures__`;
+`test-collection.test.ts` ahora exige que cada archivo de prueba lo recoja exactamente un proyecto. (d) `playwright install chromium` tarda más de 3 minutos en una descarga en frío (Chromium 1248).
+
+**Correcciones de la revisión de 13a-3a** (commit aparte). R3-probe-dir-race: la sonda de salida generada ahora cruza un árbol temporal del sistema (`tooling/src/cruise-probe.ts`) y ya no crea ni borra
+`packages/ui/dist|coverage|reports`; rojo: `Failed to resolve import "./cruise-probe"`; demostración: quitar `dist` de la exclusión de `.dependency-cruiser.cjs` pone en rojo
+«does not cruise generated output under dist/». R3-unknown-impact-string: `REPORTED_IMPACTS = ["moderate","minor"]` como lista permitida; rojo: `REPORTED_IMPACTS is not iterable` y
+`expected { blocking: [], reported: [ …(2) ] } to deeply equal { …(2) }`. R3-spinner-img-assertion: la prueba afirma `aria-hidden="true"` en el svg; no es protectora por sí sola, porque
+lucide-react añade `aria-hidden` por defecto (quitarlo del componente no la pone en rojo).
+
+**Medidas.** `storybook build` 4,8 s; `pnpm turbo run lint typecheck test build --filter=!@confia/api --force` 14 de 14 en 42 s; `test:a11y` 6 s con Chromium instalado;
+`pnpm test` verde con `PLAYWRIGHT_BROWSERS_PATH` apuntando a una carpeta vacía (sin navegador). `pnpm audit --audit-level high`: sin altas (2 bajas, 2 moderadas).
+**Tamaño:** supera el tope de 800 líneas efectivas desde 13a-3a (ver el informe); 3.3 no se inició.
