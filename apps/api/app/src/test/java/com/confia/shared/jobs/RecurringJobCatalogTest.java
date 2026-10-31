@@ -9,40 +9,54 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
  * Scenarios I262 and BJ62 of background-jobs-with-db-scheduler (design.md decisions 7 and 17), for the
- * recurring jobs the worker registers so far: the two identity purges, with the names and the daily
- * times written in the change, and the exact next execution of each from the fixed reference instant
- * (Sunday 2026-10-25 at 00:00 in Tegucigalpa, 06:00 UTC), none of them a year away or more, so none
- * reaches the parking instant. That they run for the configured institution is proved against a real
- * database by {@code IdentityPurgeJobsOnWorkerIT}.
+ * recurring jobs the worker registers so far: the five purges, with the names and the daily times written
+ * in the change, and the exact next execution of each from the fixed reference instant (Sunday
+ * 2026-10-25 at 00:00 in Tegucigalpa, 06:00 UTC), none of them a year away or more, so none reaches the
+ * parking instant. That they run for the configured institution is proved against a real database by
+ * {@code IdentityPurgeJobsOnWorkerIT} and {@code RecurringJobPerInstitutionIT}.
  */
 class RecurringJobCatalogTest {
 
     private static final Instant SUNDAY_MIDNIGHT = Instant.parse("2026-10-25T06:00:00Z");
 
-    private static List<RecurringJob> identityJobs() {
+    /** The five purges: the name and the daily time written in the change, and the instant of the first run (UTC). */
+    private static final Map<String, LocalTime> PURGE_TIMES = Map.of(
+            "identity.purge-password-reset-tokens", LocalTime.of(4, 30),
+            "identity.purge-refresh-tokens", LocalTime.of(4, 35),
+            "shared.purge-idempotency-keys", LocalTime.of(4, 40),
+            "identity.purge-login-backoff", LocalTime.of(4, 45),
+            "identity.purge-mfa-totp-backoff", LocalTime.of(4, 50));
+
+    private static List<RecurringJob> purgeJobs() {
         return RegisteredJobs.ofTheWorker().stream().filter(RecurringJob.class::isInstance)
-                .map(RecurringJob.class::cast).filter(job -> job.name().startsWith("identity.")).toList();
+                .map(RecurringJob.class::cast).filter(job -> job.name().contains(".purge-")).toList();
     }
 
     @Test
-    void theWorkerRegistersExactlyTheTwoIdentityPurgesAtTheirDailyTimes() {
-        assertThat(identityJobs()).extracting(RecurringJob::name, RecurringJob::calendar)
+    void theWorkerRegistersExactlyTheFivePurgesAtTheirDailyTimes() {
+        assertThat(purgeJobs()).extracting(RecurringJob::name, RecurringJob::calendar)
                 .containsExactlyInAnyOrder(
                         tuple("identity.purge-password-reset-tokens", new JobCalendar.DailyAt(LocalTime.of(4, 30))),
-                        tuple("identity.purge-refresh-tokens", new JobCalendar.DailyAt(LocalTime.of(4, 35))));
+                        tuple("identity.purge-refresh-tokens", new JobCalendar.DailyAt(LocalTime.of(4, 35))),
+                        tuple("shared.purge-idempotency-keys", new JobCalendar.DailyAt(LocalTime.of(4, 40))),
+                        tuple("identity.purge-login-backoff", new JobCalendar.DailyAt(LocalTime.of(4, 45))),
+                        tuple("identity.purge-mfa-totp-backoff", new JobCalendar.DailyAt(LocalTime.of(4, 50))));
     }
 
     @Test
     void eachPurgeRunsAtItsExactNextInstantInTegucigalpaAndWithinTheYear() {
-        assertThat(identityJobs()).as("non-vacuous").hasSize(2).allSatisfy(job -> {
+        assertThat(purgeJobs()).as("non-vacuous").hasSize(5).allSatisfy(job -> {
             Instant next = JobCalendars.scheduleOf(job.calendar())
                     .getNextExecutionTime(ExecutionComplete.simulatedSuccess(SUNDAY_MIDNIGHT));
-            assertThat(next).isEqualTo(job.name().equals("identity.purge-password-reset-tokens")
-                    ? Instant.parse("2026-10-25T10:30:00Z") : Instant.parse("2026-10-25T10:35:00Z"));
+            LocalTime time = PURGE_TIMES.get(job.name());
+            assertThat(next).as(job.name()).isEqualTo(Instant.parse("2026-10-25T00:00:00Z")
+                    .plus(Duration.ofHours(6)).plus(Duration.ofHours(time.getHour()))
+                    .plus(Duration.ofMinutes(time.getMinute())));
             assertThat(Duration.between(SUNDAY_MIDNIGHT, next)).isLessThan(Duration.ofDays(365));
         });
     }

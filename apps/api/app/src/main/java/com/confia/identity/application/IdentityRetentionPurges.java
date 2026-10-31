@@ -28,6 +28,16 @@ public interface IdentityRetentionPurges {
     RefreshTokenPurgeCount purgeRefreshTokenFamilies(InstitutionId institution, Instant cutoff, int limit);
 
     /**
+     * Deletes at most {@code limit} login backoff rows last attempted before {@code cutoff}, and returns how
+     * many it deleted. The institution is the one of the transaction's context and is not an argument: the
+     * function reads it from there and cannot be pointed at another.
+     */
+    long purgeLoginBackoff(Instant cutoff, int limit);
+
+    /** As {@link #purgeLoginBackoff}, for the TOTP backoff rows of the accounts of the institution. */
+    long purgeMfaTotpBackoff(Instant cutoff, int limit);
+
+    /**
      * Empties the encrypted successor of every token of {@code institution} consumed strictly before
      * {@code cutoff}, and returns how many it emptied. It deletes nothing.
      */
