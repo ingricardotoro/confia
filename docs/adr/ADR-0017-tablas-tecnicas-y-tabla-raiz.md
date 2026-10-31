@@ -136,6 +136,15 @@ F0. El nombre de la tabla raíz sigue la regla de prefijo de ADR-0015 como cualq
 Estos son los únicos `UPDATE` y `DELETE` de `confia_admin_app` fuera de las tablas no financieras que
 ya permitía `docs/03` sección 6.1. La tabla raíz sigue los permisos de cualquier tabla de negocio.
 
+> **Nota fechada, 2026-10-29 (`background-jobs-with-db-scheduler`, decisión D-N3 del propietario).**
+> La frase anterior se complementa, sin reescribirse, con
+> [ADR-0025](ADR-0025-purga-por-funciones-security-definer.md), en estado «Propuesto»: además de estos
+> permisos, `confia_admin_app` borra filas vencidas de tablas de retención (tokens de recuperación y de
+> refresco desde `V11`; claves de idempotencia y filas de retroceso desde `V12`) **solo** mediante
+> funciones `SECURITY DEFINER` propiedad de `confia_owner`, con `EXECUTE` exclusivo para ese rol, piso
+> de antigüedad codificado, contexto de institución y actor `system` obligatorios. Ningún rol recibe
+> `DELETE` sobre esas tablas. El catálogo de tablas exceptuadas de este ADR no cambia.
+
 ## Consecuencias
 
 **Positivas:**
