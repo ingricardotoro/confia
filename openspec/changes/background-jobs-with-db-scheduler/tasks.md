@@ -582,7 +582,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
   - **Cierre.** `./mvnw verify -Pmutation-gate`. Commit: `docs(adr): propose ADR-0025 for purging technical tables through security definer functions`.
     Tamaño: nominal 100, realista 250. — Escenarios BJ41 (parte), BJ72.
 
-- [ ] 3.6 **PR 5b / 5b-1 `05b-v12-purge-functions`: `V12` con las funciones de idempotencia y retroceso, y sus índices (decisión 16, P2, P3).**
+- [x] 3.6 **PR 5b / 5b-1 `05b-v12-purge-functions`: `V12` con las funciones de idempotencia y retroceso, y sus índices (decisión 16, P2, P3).**
   - **Precondición dura.** 3.3 (`V11` y la plantilla) fusionada en `main`.
   - **ROJO.** Ampliar `RetentionPurgeFunctionsIT.java` con `shared_purge_idempotency_keys`, `identity_purge_login_backoff` e
     `identity_purge_mfa_totp_backoff`, **con las reglas de reloj de la base de datos** y los mismos casos de la tarea 3.3 (borde exacto, un segundo
