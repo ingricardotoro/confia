@@ -621,7 +621,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     institution`. Tamaño: nominal 250, realista 550. — Escenarios I262, I263, AT18 a AT21, AT27, BJ30, BJ62 y BJ65.
   - **Resultado (2026-10-30): hecha, en dos PR.** Ramas `05b2` (641 líneas: traslado de `RetentionPurgeBatches` a `shared.security`, purga de idempotencia, `SharedWorkerJobsConfiguration`) y `05b2b` (515: `PurgeStaleBackoff`, los dos métodos del puerto de identidad, los `RecurringJob` de retroceso, `RecurringJobPerInstitutionIT` y la nota de `docs/07`); la medición conjunta fue de 1 156 líneas, sin costura nombrada para 3.7, y se siguió el precedente de 3.4: la purga compartida primero, la de identidad después. `PurgeProbeRows` se queda con 05b2 por archivo completo. Ver `odd/tasks/background-jobs-remaining-tasks.md`.
 
-- [ ] 3.8 **PR 6 `06-audit-chain-verification-cadences`: cadencias diaria y semanal del verificador (decisión 19, P1, D-N2).**
+- [x] 3.8 **PR 6 `06-audit-chain-verification-cadences`: cadencias diaria y semanal del verificador (decisión 19, P1, D-N2).**
   - **ROJO.** Ampliar `DefaultAuditChainVerifierTest.java` con `verifySince`: empieza en la primera fila con `occurred_at >= since` y toma su `prev_hash`
     **almacenado** como `running` [AT25]; cadena íntegra en la ventana reporta integridad y filas verificadas [AT07]; una fila alterada dentro de la
     ventana se identifica con exactitud [AT08]; una alteración anterior a la ventana no se ve [AT09]; ventana sin filas devuelve `Empty` [AT26]. Crear
@@ -645,6 +645,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
   - **Cierre.** `./mvnw verify -Pmutation-gate`; PIT en 80 sobre `shared.audit`. Commit: `feat(audit): verify the audit chain daily over the last calendar month
     and weekly from genesis`. Tamaño: nominal 250, realista 600 a 750. — Escenarios AT07 a AT17, AT23 a AT26, AT30, AT31, BJ62 y el escenario del
     verificador sin infraestructura de programación.
+  - **Resultado (2026-10-31): hecha, en tres PR.** Ramas `06-audit-chain-verification-cadences` (385 líneas: `verifySince`, `firstAtOrAfter`, el lector y las pruebas del recorrido de ventana), `06b-audit-chain-jobs` (788: `AuditChainVerificationJobs`, la ventana diaria, `OperationalEventLog.info/error`, el cableado y las pruebas unitarias) y `06c-audit-chain-job-integration` (366: `AuditChainVerificationJobsIT` y `AuditChainVerificationOnWorkerIT`); la medición conjunta fue de 1 539 líneas y se siguió la costura nombrada: `verifySince` con su lector primero, las tareas recurrentes y los asientos después, con las pruebas de integración en la última. El resultado de un asiento de verificación fallida es `error`, no `failure`: la restricción `shared_audit_log_outcome_chk` (V2) solo admite `success`, `denied` y `error`. Ver `odd/tasks/background-jobs-remaining-tasks.md`.
 
 ---
 
