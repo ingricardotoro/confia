@@ -129,11 +129,25 @@ public final class AuditChainVerificationJobs {
                             .text("divergence", diverged.divergence().name()).toJson());
                 } catch (RuntimeException entryFailure) {
                     eventLog.error(ENTRY_UNWRITTEN_EVENT, run.runId(), run.taskName(), institution.value(),
-                            details("scope", scope, "errorType", entryFailure.getClass().getSimpleName()));
+                            details("scope", scope, "errorType", closedTypeName(entryFailure)));
                 }
                 throw new AuditChainBrokenException(institution, diverged.firstDivergentId());
             }
         }
+    }
+
+    /**
+     * The simple name of {@code failure} as a closed detail word: letters, digits and underscores only, starting with a
+     * letter, at most 40 characters. An anonymous class has an empty simple name and some framework exceptions have
+     * longer ones; a detail that is not closed would make the event log throw inside the catch and mask the broken
+     * chain (R3, review of branch 06c), so the name is reduced instead of passed through.
+     */
+    static String closedTypeName(Throwable failure) {
+        String word = failure.getClass().getSimpleName().replaceAll("[^A-Za-z0-9_]", "");
+        if (word.isEmpty() || !Character.isLetter(word.charAt(0))) {
+            return "UnnamedException";
+        }
+        return word.length() > 40 ? word.substring(0, 40) : word;
     }
 
     /**

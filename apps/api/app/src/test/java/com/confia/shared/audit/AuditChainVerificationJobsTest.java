@@ -23,9 +23,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -240,6 +244,37 @@ class AuditChainVerificationJobsTest {
                 "scope=weekly", "errorType=IllegalStateException");
         assertThat(logs.list.get(1).getFormattedMessage() + fields(logs.list.get(1)))
                 .doesNotContain("the entry is refused");
+    }
+
+    /** An exception type that is not a closed word must not mask the broken chain (R3, review of branch 06c). */
+    @ParameterizedTest
+    @MethodSource("unclosedErrorTypes")
+    void aBrokenChainStaysBrokenWhenTheEntryFailureHasAnUnclosedTypeName(RuntimeException failure, String errorType) {
+        AuditLogWriter failing = entry -> {
+            throw failure;
+        };
+        AuditChainVerificationJobs jobs = new AuditChainVerificationJobs(runner, verifier(
+                AuditChainVerificationJobsTest::diverged), failing, new OperationalEventLog(),
+                Clock.fixed(NOW, ZoneOffset.UTC));
+        RecurringRun run = run(AuditChainVerificationJobs.WEEKLY_TASK);
+
+        assertThatThrownBy(() -> jobs.weekly().handler().runFor(INSTITUTION, run))
+                .isInstanceOf(AuditChainBrokenException.class);
+
+        assertThat(logs.list).hasSize(2);
+        assertThat(logs.list.get(1).getFormattedMessage()).isEqualTo("audit_chain_broken_entry_unwritten");
+        assertThat(fields(logs.list.get(1))).contains("errorType=" + errorType);
+    }
+
+    static Stream<Arguments> unclosedErrorTypes() {
+        return Stream.of(
+                Arguments.of(new RuntimeException("anonymous") {
+                }, "UnnamedException"),
+                Arguments.of(new ExceptionWhoseSimpleNameIsLongerThanFortyCharacters(),
+                        "ExceptionWhoseSimpleNameIsLongerThanFort"));
+    }
+
+    private static final class ExceptionWhoseSimpleNameIsLongerThanFortyCharacters extends RuntimeException {
     }
 
     /** Scenario AT31: the walk commits first, and the entry is written afterwards in a transaction of its own. */
