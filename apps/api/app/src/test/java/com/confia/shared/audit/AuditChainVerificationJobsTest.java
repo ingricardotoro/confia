@@ -215,6 +215,33 @@ class AuditChainVerificationJobsTest {
         });
     }
 
+    /** R3: the tamper alert does not depend on the audit write; a failed write is reported apart. */
+    @Test
+    void aBrokenChainRaisesTheAlertAndTheBrokenChainErrorEvenWhenItsEntryCannotBeWritten() {
+        AuditLogWriter failing = entry -> {
+            throw new IllegalStateException("the entry is refused");
+        };
+        AuditChainVerificationJobs jobs = new AuditChainVerificationJobs(runner, verifier(
+                AuditChainVerificationJobsTest::diverged), failing, new OperationalEventLog(),
+                Clock.fixed(NOW, ZoneOffset.UTC));
+        RecurringRun run = run(AuditChainVerificationJobs.WEEKLY_TASK);
+
+        assertThatThrownBy(() -> jobs.weekly().handler().runFor(INSTITUTION, run))
+                .isInstanceOfSatisfying(AuditChainBrokenException.class,
+                        thrown -> assertThat(thrown.firstDivergentId()).isEqualTo(42L));
+
+        assertThat(logs.list).hasSize(2);
+        assertThat(logs.list.get(0).getLevel()).isEqualTo(Level.ERROR);
+        assertThat(logs.list.get(0).getFormattedMessage()).isEqualTo("audit_chain_broken");
+        assertThat(logs.list.get(1).getLevel()).isEqualTo(Level.ERROR);
+        assertThat(logs.list.get(1).getFormattedMessage()).isEqualTo("audit_chain_broken_entry_unwritten");
+        assertThat(fields(logs.list.get(1))).containsExactly("runId=" + run.runId(),
+                "task=shared.audit-chain-verification-weekly", "institution=" + INSTITUTION.value(),
+                "scope=weekly", "errorType=IllegalStateException");
+        assertThat(logs.list.get(1).getFormattedMessage() + fields(logs.list.get(1)))
+                .doesNotContain("the entry is refused");
+    }
+
     /** Scenario AT31: the walk commits first, and the entry is written afterwards in a transaction of its own. */
     @Test
     void theEntryIsWrittenAfterTheWalkInATransactionOfItsOwn() {
