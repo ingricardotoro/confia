@@ -6,6 +6,16 @@
   --button-primary-bg-hover: var(--color-primary-hover);
   --button-primary-bg-active: var(--color-primary-active);
   --button-primary-fg: var(--color-primary-fg);
+  --button-secondary-bg: var(--color-bg-surface);
+  --button-secondary-bg-hover: var(--color-bg-canvas);
+  --button-secondary-bg-active: var(--color-border-subtle);
+  --button-secondary-fg: var(--color-text-primary);
+  --button-secondary-border: var(--color-border-interactive);
+  --button-subtle-fg: var(--color-text-primary);
+  --button-subtle-bg-hover: var(--color-primary-soft-bg);
+  --button-subtle-bg-active: var(--color-border-subtle);
+  --button-destructive-bg: var(--color-status-overdue-solid-bg);
+  --button-destructive-fg: var(--color-primary-fg);
   --status-badge-paid-bg: var(--color-status-paid-bg);
   --status-badge-paid-fg: var(--color-status-paid-fg);
   --status-badge-paid-border: var(--color-status-paid-border);
