@@ -149,8 +149,8 @@ T3.1 evidence:
 
 ## Next step
 
-T3.8, slice 6 `06-audit-chain-verification-cadences` (3.7 is done on `05b2` and `05b2b`, stacked on `main` 53fec6f). ADR-0026 is reserved by
-frontend change 13a (Storybook).
+T3.8, slice 6 `06-audit-chain-verification-cadences`, from `main` 49ddc62 (3.7 is merged: #228 `f4bf89f`, #229 `49ddc62`). ADR-0026 is reserved
+by frontend change 13a (Storybook).
 
 T3.7 evidence:
 - Owner decision 2026-10-31: PIT widened to `com.confia.shared.security.*` (targetClasses and targetTests in `apps/api/app/pom.xml`),
@@ -193,10 +193,10 @@ T3.7 evidence:
   (created and dropped by the test), so the real purge fails there and the other institution is purged; `consecutive_failures` is 1.
 - `RecurringJobCalendarTest` was not edited: the five purge calendars (BJ62) are asserted in `RecurringJobCatalogTest`, which already
   held the identity ones against the real worker registry.
-- Open points: PIT does not cover `shared.security` (the `app/pom.xml` targets are `*.domain.*`, `shared.security.token`, `csrf` and
-  `shared.jobs`), so "PIT en 80 sobre `shared.security`" would need a pom change outside this task's surface; the Javadoc of
-  `shared/observability/events/package-info.java` still names `identity.application.RetentionPurgeBatches` as consumer (file outside
-  the surface); docs/07 note covers the five purges, not four, because the 3.4 purges had no row yet.
+- Open points, closed: PIT now covers `shared.security` (owner decision 2026-10-31, above) and the Javadoc of
+  `shared/observability/events/package-info.java` names `com.confia.shared.security.RetentionPurgeBatches` (both in #229). The docs/07
+  note covers the five purges, not four, because the 3.4 purges had no row yet.
+- Merged: `05b2` as PR #228 (`f4bf89f`) and `05b2b` as PR #229 (`49ddc62`) into `main`.
 
 T3.6 evidence:
 
