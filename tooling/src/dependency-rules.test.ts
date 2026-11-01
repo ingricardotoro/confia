@@ -15,7 +15,23 @@ const RULES = [
   "apps-never-import-other-apps",
   "contracts-only-through-public-entry",
   "portal-never-imports-admin-contracts",
+  "ui-atoms-know-only-tokens",
+  "ui-molecules-never-import-domain",
+  "ui-never-fetches-data",
+  "ui-contracts-type-only",
 ] as const;
+
+// design-system-foundations-and-a11y, design.md decision 10 (task 6.3): each layer rule of packages/ui
+// and the deliberate violation under tooling/dependency-fixtures/packages/ui/src that it must reject.
+const LAYER_VIOLATIONS = [
+  ["ui-atoms-know-only-tokens", "atoms/imports-a-molecule.ts"],
+  ["ui-atoms-know-only-tokens", "atoms/imports-domain.ts"],
+  ["ui-molecules-never-import-domain", "molecules/imports-domain.ts"],
+  ["ui-never-fetches-data", "domain/imports-react-query.ts"],
+  ["ui-contracts-type-only", "domain/imports-contract-value.ts"],
+  ["contracts-only-through-public-entry", "domain/imports-contract-internal.ts"],
+] as const;
+const LAYERS = ["atoms", "molecules", "domain"] as const;
 
 const toolingRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = join(toolingRoot, "..");
@@ -24,8 +40,9 @@ const repositoryRoot = join(toolingRoot, "..");
 const cruiser = join(toolingRoot, "node_modules", "dependency-cruiser", "bin", "dependency-cruiser.mjs");
 
 interface CruiseResult {
+  modules: { source: string; dependents: string[] }[];
   summary: {
-    violations: { rule: { name: string } }[];
+    violations: { rule: { name: string }; from: string; to: string }[];
     totalCruised: number;
   };
 }
@@ -52,10 +69,35 @@ describe("the frontend dependency rules", () => {
     expect(violatedRules).toContain(rule);
   });
 
+  it.each(LAYER_VIOLATIONS)("%s rejects %s", (rule, file) => {
+    const flagged = fixtures.summary.violations.filter((violation) => violation.from.endsWith(`packages/ui/src/${file}`));
+
+    expect(flagged.map((violation) => violation.rule.name)).toContain(rule);
+  });
+
+  it("BX31, BX36: accepts a domain module that imports atoms, molecules and a contract type", () => {
+    const accepted = "packages/ui/src/domain/accepted-imports.ts";
+
+    expect(fixtures.modules.some((module) => module.source.endsWith(accepted))).toBe(true);
+    expect(fixtures.summary.violations.filter((violation) => violation.from.endsWith(accepted))).toEqual([]);
+  });
+
   it("finds no violation in the real tree, over a set that is not empty", () => {
     const real = cruise(["apps", "packages"]);
     expect(real.summary.totalCruised).toBeGreaterThan(0);
     expect(real.summary.violations).toEqual([]);
+  });
+
+  // ADR-0018: a layer rule that matches no real file proves nothing. The components are .tsx files; if the
+  // configuration stopped resolving that extension, the directory would still be scanned but nothing
+  // would resolve into it, and every import of a component would be an unresolved name no rule matches.
+  it.each(LAYERS)("BX37: the real tree resolves imports into a component module of packages/ui/src/%s", (layer) => {
+    const reached = cruise(["packages/ui/src"]).modules.filter(
+      (module) =>
+        module.source.startsWith(`packages/ui/src/${layer}/`) && module.source.endsWith(".tsx") && module.dependents.length > 0,
+    );
+
+    expect(reached).not.toEqual([]);
   });
 
   // Build and report output is generated, not authored: Storybook's bundles under dist/ made this
