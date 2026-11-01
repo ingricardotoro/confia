@@ -538,7 +538,7 @@ contra `main` antes del PR 3.
 
 ## Fase 6: dominio, capas e inventario (PR 6, corte 13a-6)
 
-- [ ] 6.1 **PR 6 / 6a `06-money-status-and-layers`: `MoneyAmount` (decisión 12; ADR-0011 «Presentación»; reglas 1 y 3 de `CLAUDE.md`).**
+- [x] 6.1 **PR 6 / 6a `06-money-status-and-layers`: `MoneyAmount` (decisión 12; ADR-0011 «Presentación»; reglas 1 y 3 de `CLAUDE.md`).**
   - **Precondición.** PR 5 fusionado; rama nueva desde `main`.
   - **ROJO.** `MoneyAmount.test.tsx` reutiliza la tabla de casos de `money.test.ts` (REFACTOR de 2.1) y la verifica **a través del componente**: una
     prueba por cada caso límite [DS72] — HNL [DS29], USD distinto de HNL [DS30], cero [DS31], cero negativo `-0.00` y `-0.0000` [DS32], negativo

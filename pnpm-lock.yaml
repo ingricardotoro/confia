@@ -397,6 +397,9 @@ importers:
       '@confia/config':
         specifier: workspace:*
         version: link:../config
+      '@confia/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@storybook/addon-a11y':
         specifier: 'catalog:'
         version: 10.6.2(storybook@10.6.2(@types/react@19.3.0)(react@19.3.0))
