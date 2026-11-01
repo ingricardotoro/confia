@@ -10,15 +10,25 @@ import type { MoneyAmountProps } from "./MoneyAmount";
 // formatMoney, so the utility and the component cannot drift apart (design.md decision 12).
 const UNAVAILABLE = "Importe no disponible";
 
-function element(container: HTMLElement, selector: string): HTMLElement {
-  const found = container.querySelector<HTMLElement>(selector);
-  if (found === null) throw new Error(`no element matches ${selector}`);
-  return found;
+// The component is one root with two children: the visual form (hidden) and the spoken form. They
+// have no role to be found by, so they are reached from the root, which is the only thing rendered.
+function rootOf(container: HTMLElement): HTMLElement {
+  const root = container.firstElementChild;
+  if (!(root instanceof HTMLElement)) throw new Error("nothing was rendered");
+  return root;
 }
 
-const visualOf = (container: HTMLElement) => element(container, "[aria-hidden='true']").textContent;
-const spokenOf = (container: HTMLElement) => element(container, ".sr-only").textContent;
-const rootOf = (container: HTMLElement) => element(container, ".money-amount");
+function visualOf(container: HTMLElement): string {
+  const visual = rootOf(container).firstElementChild;
+  expect(visual).toHaveAttribute("aria-hidden", "true");
+  return visual?.textContent ?? "";
+}
+
+function spokenOf(container: HTMLElement): string {
+  const spoken = rootOf(container).lastElementChild;
+  expect(spoken).not.toHaveAttribute("aria-hidden");
+  return spoken?.textContent ?? "";
+}
 
 function renderMoney(amount: string, currency: string, props: Partial<MoneyAmountProps> = {}) {
   return renderWithI18n(<MoneyAmount value={{ amount, currency }} {...props} />).container;
@@ -120,7 +130,6 @@ describe("MoneyAmount for assistive technology", () => {
     const container = renderMoney("3200.00", "HNL");
 
     expect(visualOf(container)).toBe("L\u00A03,200.00");
-    expect(element(container, "[aria-hidden='true']")).toBeInTheDocument();
     expect(spokenOf(container)).toMatch(/3,200\.00.*lempiras/);
   });
 

@@ -16,8 +16,9 @@ const LABELS: Record<FinancialStatus, string> = {
   refunded: "Reembolsado",
 };
 
-// The icon is decorative, so it has no role to be found by: it is reached by its tag, from the badge.
-const iconsOf = (badge: HTMLElement) => [...badge.getElementsByTagName("svg")];
+// The icon is decorative, so it has no role to be found by: it is reached from the badge that holds
+// it. The badge puts the drawing inside a wrapper that is its first child.
+const iconsOf = (badge: HTMLElement) => [...(badge.firstElementChild?.children ?? [])];
 
 describe("StatusBadge", () => {
   it("DS52: the table lists exactly the seven financial states", () => {
@@ -47,8 +48,8 @@ describe("StatusBadge", () => {
 
   it("DS52: no two states share an icon", () => {
     const shapes = FINANCIAL_STATUSES.map((status) => {
-      const { container, unmount } = renderWithI18n(<StatusBadge status={status} />);
-      const shape = iconsOf(container)[0]?.getAttribute("class");
+      const { unmount } = renderWithI18n(<StatusBadge status={status} />);
+      const shape = iconsOf(screen.getByText(LABELS[status]))[0]?.getAttribute("class");
       unmount();
       return shape;
     });

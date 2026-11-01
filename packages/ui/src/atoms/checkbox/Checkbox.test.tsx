@@ -124,9 +124,11 @@ describe("Checkbox", () => {
   });
 
   it("keeps its drawing hidden from assistive technology, so only the state is announced", () => {
-    const { container } = renderWithI18n(<Checkbox aria-label="Recordar" defaultChecked />);
+    renderWithI18n(<Checkbox aria-label="Recordar" defaultChecked />);
 
-    expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    // The drawing has no role, so it is reached from the checkbox: indicator, then drawing.
+    const drawing = screen.getByRole("checkbox", { name: "Recordar" }).firstElementChild?.firstElementChild;
+    expect(drawing).toHaveAttribute("aria-hidden", "true");
   });
 
   it("merges the class of the caller over its own", () => {

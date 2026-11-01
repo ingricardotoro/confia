@@ -116,10 +116,31 @@ const VISUAL_LITERAL = {
     "Visual literal. A colour is never typed by hand; use a semantic token or a utility that reads one (design.md decision 6).",
 };
 
+// design.md decision 7 (DS74): a component test describes behavior, so it finds elements the way a
+// user does (role, label, text) and not by structure, class or test id. The names are the DOM
+// traversal methods that take a selector or a tag and the Testing Library test-id queries, in
+// every variant (get, query, find; one or all), whether called on `screen`, on `within(...)` or
+// destructured from `render()`. A drawing with no role has no query: it is reached from the
+// element a role query found, through its children.
+const STRUCTURE_QUERY_METHODS =
+  "querySelector|querySelectorAll|getElementsByClassName|getElementsByTagName|getElementsByName";
+const TEST_ID_QUERIES = String.raw`/^(?:get|query|find)(?:All)?ByTestId$/`;
+const TEST_QUERY = {
+  selector: [
+    `CallExpression[callee.property.name=/^(?:${STRUCTURE_QUERY_METHODS})$/]`,
+    `CallExpression[callee.property.name=${TEST_ID_QUERIES}]`,
+    `CallExpression[callee.name=${TEST_ID_QUERIES}]`,
+  ].join(", "),
+  message:
+    "Query by structure or test id. Find the element by role, label or text, the way a user does (design.md decision 7). Only *.a11y.test.tsx may reach elements directly.",
+};
+
 const FORMAT_SCOPE = "src/format/**";
 const TESTS = ["**/*.test.{ts,tsx}", "**/*.test-d.ts"];
 const STORIES = ["**/*.stories.tsx"];
 const FIXTURES = ["**/__fixtures__/**"];
+// Chromium tests of computed style read elements the user cannot name, so they are exempt.
+const A11Y_TESTS = ["**/*.a11y.test.tsx"];
 
 /**
  * One entry per file group, each carrying the COMPLETE selector list for that group: a later
@@ -158,6 +179,19 @@ const SYNTAX_SCOPES = [
     files: ["src/domain/money-amount/**/*.tsx"],
     ignores: [...TESTS, ...STORIES, ...FIXTURES],
     controls: [JSX_TEXT, JSX_ACCESSIBLE_TEXT, MONEY_ARITHMETIC, PRIMITIVE_TOKEN, VISUAL_LITERAL],
+  },
+  // Component tests: the controls of their group plus the query rule. This entry replaces the
+  // earlier ones, so it repeats what each group keeps: the general one for everything in src, and
+  // src/format, whose tests may format (as the entry above allows).
+  {
+    files: ["src/**/*.test.tsx"],
+    ignores: [...A11Y_TESTS, ...FIXTURES],
+    controls: [MANUAL_FORMAT, PRIMITIVE_TOKEN, VISUAL_LITERAL, TEST_QUERY],
+  },
+  {
+    files: [`${FORMAT_SCOPE}/*.test.tsx`],
+    ignores: [...A11Y_TESTS, ...FIXTURES],
+    controls: [PRIMITIVE_TOKEN, VISUAL_LITERAL, TEST_QUERY],
   },
   // Fixtures are data for the guards: deliberate violations live there.
   { files: FIXTURES, controls: [] },
