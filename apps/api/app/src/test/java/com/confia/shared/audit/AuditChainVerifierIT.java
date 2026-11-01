@@ -6,8 +6,10 @@ import static org.assertj.core.api.InstanceOfAssertFactories.type;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.infrastructure.JooqAuditLogReader;
 import com.confia.shared.security.SecurityContext;
+import com.confia.support.AuditChainRows;
 import com.confia.support.CommittingPostgresIntegrationTest;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -108,6 +110,52 @@ class AuditChainVerifierIT extends CommittingPostgresIntegrationTest {
                         .as("%s enters the hash preimage (design.md §6.2): changing it alone, with "
                                 + "no recalculation, must break the chain", column)
                         .isEqualTo(targetId));
+    }
+
+    /**
+     * Scenarios AT07, AT08, AT09, AT25 and AT26 against the real reader and the real engine (the unit test
+     * covers the branches): the window starts at the first row at or after the instant, to the microsecond, keeps
+     * the stored previous hash of that row, and does not see an alteration older than the window.
+     */
+    @Test
+    void theWindowOfTheRealChainStartsAtTheInstantAndDoesNotSeeWhatIsOlder() {
+        Instant since = Instant.parse("2026-09-01T06:00:00Z");
+        InstitutionId institutionId = randomInstitutionId();
+        long old = AuditChainRows.insert(institutionId.value(), Instant.parse("2026-07-01T15:00:00Z"));
+        AuditChainRows.insert(institutionId.value(), since.minusNanos(1_000));
+        AuditChainRows.insert(institutionId.value(), since);
+        long tampered = AuditChainRows.insert(institutionId.value(), Instant.parse("2026-09-10T15:00:00Z"));
+
+        assertThat(verifier().verifySince(institutionId, since))
+                .asInstanceOf(type(AuditChainVerification.Intact.class))
+                .satisfies(intact -> assertThat(intact.verifiedRows()).isEqualTo(2L));
+
+        AuditChainRows.alter(institutionId.value(), old);
+        assertThat(verifier().verifySince(institutionId, since)).as("an older alteration is not seen")
+                .isInstanceOf(AuditChainVerification.Intact.class);
+        assertThat(verifier().verifyChainOf(institutionId))
+                .asInstanceOf(type(AuditChainVerification.Diverged.class))
+                .satisfies(diverged -> assertThat(diverged.firstDivergentId()).isEqualTo(old));
+
+        AuditChainRows.alter(institutionId.value(), tampered);
+        assertThat(verifier().verifySince(institutionId, since))
+                .asInstanceOf(type(AuditChainVerification.Diverged.class))
+                .satisfies(diverged -> {
+                    assertThat(diverged.firstDivergentId()).isEqualTo(tampered);
+                    assertThat(diverged.institutionId()).isEqualTo(institutionId);
+                });
+    }
+
+    @Test
+    void aWindowAfterTheLastRowIsEmptyAndAnotherInstitutionsRowsAreNeverInIt() {
+        Instant since = Instant.parse("2026-09-01T06:00:00Z");
+        InstitutionId institutionId = randomInstitutionId();
+        AuditChainRows.insert(institutionId.value(), since.minusSeconds(1));
+        AuditChainRows.insert(randomInstitutionId().value(), since.plusSeconds(1));
+
+        assertThat(verifier().verifySince(institutionId, since)).asInstanceOf(type(AuditChainVerification.Empty.class))
+                .satisfies(empty -> assertThat(empty.institutionId()).isEqualTo(institutionId));
+        assertThat(verifier().verifyChainOf(institutionId)).isInstanceOf(AuditChainVerification.Intact.class);
     }
 
     private long insertRow(UUID institutionId, String actorLabel, String userAgent, String traceId) {

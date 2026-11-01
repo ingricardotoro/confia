@@ -6,7 +6,10 @@ import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditLogReader;
 import com.confia.shared.audit.AuditRowSnapshot;
 import confia.generated.jooq.tables.records.SharedAuditLogRecord;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
 
@@ -39,6 +42,16 @@ public final class JooqAuditLogReader implements AuditLogReader {
                 .orderBy(SHARED_AUDIT_LOG.ID.asc())
                 .limit(pageSize)
                 .fetch(JooqAuditLogReader::toSnapshot);
+    }
+
+    @Override
+    public Optional<AuditRowSnapshot> firstAtOrAfter(InstitutionId institutionId, Instant occurredAt) {
+        return dsl.selectFrom(SHARED_AUDIT_LOG)
+                .where(SHARED_AUDIT_LOG.INSTITUTION_ID.eq(institutionId.value()))
+                .and(SHARED_AUDIT_LOG.OCCURRED_AT.ge(occurredAt.atOffset(ZoneOffset.UTC)))
+                .orderBy(SHARED_AUDIT_LOG.ID.asc())
+                .limit(1)
+                .fetchOptional(JooqAuditLogReader::toSnapshot);
     }
 
     private static AuditRowSnapshot toSnapshot(SharedAuditLogRecord row) {
