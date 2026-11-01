@@ -4,8 +4,8 @@ import type { MoneyAmount } from "./domain/money-amount";
 
 // ADR-0018 static check (DS01, DS03): the design system of this delivery has seventeen components; the
 // rest of the P0 inventory of docs/ui-ux/02 arrives in 13b. Importing one of them must not compile.
-// Each `@ts-expect-error` marks a permanent, deliberate violation; if the line stops failing, tsc reports
-// an unused directive and this file turns red.
+// Each expect-error directive below marks a permanent, deliberate violation (ADR-0018); if the line stops
+// failing, tsc reports an unused directive and this file turns red.
 describe("the public entry point, as the package name resolves it", () => {
   it("DS01: gives MoneyAmount through the package name", () => {
     expectTypeOf<typeof MoneyAmountByName>().toEqualTypeOf<typeof MoneyAmount>();
