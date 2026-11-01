@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.identity.application.DescribeCurrentSession;
-import com.confia.identity.application.JdbcStubTransactions;
 import com.confia.identity.application.RefreshTokenFamilyRepository;
 import com.confia.identity.application.SessionRevocationReason;
 import com.confia.identity.domain.RefreshTokenFamily;
@@ -14,6 +13,7 @@ import com.confia.kernel.InstitutionId;
 import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.AuthenticationMethod;
 import com.confia.shared.web.authentication.AccessTokenRejectedException;
+import com.confia.support.JdbcStubTransactions;
 import java.lang.reflect.RecordComponent;
 import java.time.Clock;
 import java.time.Instant;

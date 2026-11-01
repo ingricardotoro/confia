@@ -34,7 +34,7 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 - [x] T3.4 Slice 5a-2 `05a-identity-purge-jobs` (split: 5a-2a, 5a-2 and 5a-2b).
 - [x] T3.5 Slice 5a-3 `05a-adr-0025-and-retention-notes`.
 - [x] T3.6 Slice 5b-1 `05b-v12-purge-functions` (split: 5b-1 and 5b-1b).
-- [ ] T3.7 Slice 5b-2 `05b-idempotency-and-backoff-jobs`.
+- [x] T3.7 Slice 5b-2 `05b-idempotency-and-backoff-jobs` (split: 5b-2 and 5b-2b).
 - [ ] T3.8 Slice 6 `06-audit-chain-verification-cadences`.
 - [ ] T4.1 Slice 7a `07a-queue-observability`.
 - [ ] T4.2 Slice 7b `07b-closing-notes` (notes).
@@ -59,6 +59,8 @@ Hard order: 3.3 (V11) before 3.6 (V12).
 | T3.4 (5a-2b) | delegated writer | `05a2b-refresh-successor-clearing` | `7b38d07` plus the evidence commit `226350a`; merged by `2936620` | 539 | BUILD SUCCESS 9 min 8 s; Surefire 186 + 2 619, Failsafe 726 | BUILD SUCCESS 28 min 51 s; PIT kernel 192/194, app 872/919; JaCoCo met | PR #214 |
 | T3.6 (5b-1) | delegated writer | `05b1-v12-purge-functions` | `ae233f0` | 634 | BUILD SUCCESS 13 min 7 s; Surefire 186 + 2 623, Failsafe 760 | not run (last branch of the task is 5b-1b) | pending |
 | T3.6 (5b-1b) | delegated writer | `05b1b-backoff-purge-versus-login` | `5f5108e` | 191 | BUILD SUCCESS 10 min 40 s; Surefire 186 + 2 623, Failsafe 762 | BUILD SUCCESS 31 min 49 s; PIT kernel 192/194, app 872/919; JaCoCo met | pending |
+| T3.7 (5b-2) | delegated writer | `05b2-idempotency-and-backoff-jobs` | `f172d58` | 641 | BUILD SUCCESS 19 min 2 s; Surefire 186 + 2 631, Failsafe 766 | not run (last branch of the task is 5b-2b) | pending |
+| T3.7 (5b-2b) | delegated writer | `05b2b-backoff-purge-jobs` | `8a19935` plus the evidence commit | 515 | BUILD SUCCESS 24 min 20 s; Surefire 186 + 2 631, Failsafe 776 | BUILD SUCCESS 48 min 27 s; PIT kernel 192/194, app 872/919; JaCoCo met | pending |
 
 Main CI: PR #211 (merge `972beae`) fixed the failing CI on `main` before PRs #212 to #214 were merged.
 
@@ -147,8 +149,54 @@ T3.1 evidence:
 
 ## Next step
 
-T3.7, slice 5b-2 `05b-idempotency-and-backoff-jobs`, stacked on `05b1b-backoff-purge-versus-login`. ADR-0026 is reserved by
+T3.8, slice 6 `06-audit-chain-verification-cadences` (3.7 is done on `05b2` and `05b2b`, stacked on `main` 53fec6f). ADR-0026 is reserved by
 frontend change 13a (Storybook).
+
+T3.7 evidence:
+- Owner decision 2026-10-31: PIT widened to `com.confia.shared.security.*` (targetClasses and targetTests in `apps/api/app/pom.xml`),
+  as task 3.7 asks, because `RetentionPurgeBatches` moved there and was not mutation-tested. The mutation gate was run by the owner
+  in a PowerShell terminal outside Claude Code (two earlier runs inside it were reaped for low memory). Figures read from
+  `mutations.xml`: kernel 192/194 (99 %); app 1 163/1 259 (92 %, 18 without coverage, test strength 94 %), up from 919 mutants;
+  `shared.security` without `token` and `csrf` 291/340 (85.6 %, killed plus timed out). All above the 80 threshold.
+- Follow-ups on 05b2b: `package-info.java` of `shared/observability/events` now names `com.confia.shared.security.RetentionPurgeBatches`
+  (`57853cc`); `JdbcStubTransactions` moved to `com.confia.support` so shared tests no longer import a module helper (`0f6c82d`).
+
+
+- Split: the whole task measured 1 156 effective lines (additions plus deletions, without `openspec/` and `odd/`; docs/07 included), over
+  the 800 limit. `tasks.md` names no seam for 3.7 (only the one between 3.6 and 3.7), so the V11 and 3.4 precedent was followed, whole files
+  only: `05b2-idempotency-and-backoff-jobs` (`f172d58`, 641 lines: `RetentionPurgeBatches` moved to `shared.security`,
+  `PurgeExpiredIdempotencyKeys`, `IdempotencyRecordStore.purgeExpired`, its adapter, `SharedWorkerJobsConfiguration` with its
+  `package-info`, the `WorkerApplication` import, `ProcessBeanPolicy`, the shared-beans test, `PurgeExpiredIdempotencyKeysTest`,
+  `IdempotencyPurgeJobsIT`, `PurgeProbeRows`, the two fakes of the store) and `05b2b-backoff-purge-jobs` (`8a19935`, 515 lines:
+  `PurgeStaleBackoff`, the two port methods and adapter methods, the two recurring jobs, `IdentityBackoffPurgeJobsIT`, the four-purge
+  `IdentityPurgeJobsOnWorkerIT`, the five-purge `RecurringJobCatalogTest`, `RecurringJobPerInstitutionIT`, the identity beans in
+  `WorkerProductionWiringTest`, the docs/07 note). No comment, Javadoc or assertion was cut. Each branch passes on its own.
+- RED: the first `test-compile` failed on `PurgeStaleBackoff`, `PurgeExpiredIdempotencyKeys`, `SharedWorkerJobsConfiguration`,
+  `IdempotencyRecordStore.purgeExpired` and the two new port methods (cannot find symbol / does not override). The `ProcessBeanPolicy`
+  entry for `shared.infrastructure.wiring` was written before the configuration, but its red (non-vacuity) was not observed on its own:
+  the first run was already after the configuration existed. The first GREEN run failed `SpringModulithVerificationTest` (bootstrap
+  depends on a non-exposed type of `shared`), fixed with `@NamedInterface` on `shared.infrastructure.wiring`.
+- Decisions applied: the worker gets `SharedWorkerJobsConfiguration` only through the `@Import` of `WorkerApplication` (ADR-0024); the
+  batch loop moved to `shared.security` (public, behaviour and Javadoc kept) because `shared` cannot import `identity`; the new adapter
+  methods (`purgeExpired`, `purgeLoginBackoff`, `purgeMfaTotpBackoff`) take no `InstitutionId`: the functions read it from the
+  transaction context, and a test proves a purge in one context leaves another institution's expired rows. The older
+  `purgePasswordResetTokens` and `purgeRefreshTokenFamilies` still take and ignore it (follow-up: drop it there too).
+- Deliberate demonstrations, each reverted and confirmed with `cmp` against copies in the scratchpad (`confia-scratch/t37`):
+  - Batch repetition removed from `RetentionPurgeBatches.repeat` (returns after the first batch): `PurgeExpiredIdempotencyKeysTest`
+    fails 4 of 7 (the three-batch case, the 5 000 border, the 200 batches and the 200th short batch) [I274]. The integration test was
+    not reached, because Surefire failed first.
+  - Entry omitted when the count is zero in `PurgeExpiredIdempotencyKeys`: `aBatchThatFoundNothingStillLeavesItsEntryWithCountZero...`
+    fails 1 of 7 [AT19].
+- Focused: 37 unit (Modulith, process isolation, wiring) and 61 integration tests (the new ITs, the 3.4 ITs, the store ITs): 0 failures
+  (JaCoCo failure of the focused run expected).
+- `RecurringJobPerInstitutionIT` uses a real fault for BJ65: a `BEFORE DELETE` trigger refuses the deletion for one institution only
+  (created and dropped by the test), so the real purge fails there and the other institution is purged; `consecutive_failures` is 1.
+- `RecurringJobCalendarTest` was not edited: the five purge calendars (BJ62) are asserted in `RecurringJobCatalogTest`, which already
+  held the identity ones against the real worker registry.
+- Open points: PIT does not cover `shared.security` (the `app/pom.xml` targets are `*.domain.*`, `shared.security.token`, `csrf` and
+  `shared.jobs`), so "PIT en 80 sobre `shared.security`" would need a pom change outside this task's surface; the Javadoc of
+  `shared/observability/events/package-info.java` still names `identity.application.RetentionPurgeBatches` as consumer (file outside
+  the surface); docs/07 note covers the five purges, not four, because the 3.4 purges had no row yet.
 
 T3.6 evidence:
 

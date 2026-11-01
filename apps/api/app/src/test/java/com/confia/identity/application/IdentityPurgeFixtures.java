@@ -218,6 +218,18 @@ abstract class IdentityPurgeFixtures extends RotationIntegrationTest {
         }
 
         @Override
+        public long purgeLoginBackoff(Instant cutoff, int limit) {
+            calls.add(new Call("loginBackoff", cutoff, limit));
+            return real != null ? real.purgeLoginBackoff(cutoff, limit) : script.applyAsLong(calls.size());
+        }
+
+        @Override
+        public long purgeMfaTotpBackoff(Instant cutoff, int limit) {
+            calls.add(new Call("mfaTotpBackoff", cutoff, limit));
+            return real != null ? real.purgeMfaTotpBackoff(cutoff, limit) : script.applyAsLong(calls.size());
+        }
+
+        @Override
         public long clearResidualSuccessors(InstitutionId institution, Instant cutoff) {
             calls.add(new Call("residualSuccessors", cutoff, 0));
             return real != null ? real.clearResidualSuccessors(institution, cutoff) : 0;

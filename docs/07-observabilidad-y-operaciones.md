@@ -949,6 +949,28 @@ programar (ADR-0014).
 | **Escaneo de vulnerabilidades de la imagen en ejecución** | Semanal, lunes 06:00 | Trivy contra el digest desplegado, no contra la etiqueta | Publica conteo por severidad | Alerta S3, o S2 si hay vulnerabilidad crítica con explotación conocida |
 | **Reporte de segregación de funciones** | Trimestral | Genera el reporte "quién puede hacer qué" y lo deja para revisión con el propietario | - | Alerta S3 si no se generó |
 
+> **Nota fechada 2026-10-30 (cambio `background-jobs-with-db-scheduler`, tarea 3.7): las cinco purgas de
+> retención en el catálogo.** La fila «Purga de tokens de refresco vencidos» de la tabla de arriba queda como
+> historia; las purgas que `confia-worker` ejecuta hoy son estas cinco tareas recurrentes, todas diarias, en
+> `America/Tegucigalpa` y una vez por cada institución configurada (`CONFIA_JOBS_INSTITUTIONS`). La tabla
+> completa de las ocho tareas se cierra en la tarea 4.2.
+>
+> | Tarea | Calendario | Qué elimina | Asiento de auditoría por lote |
+> |---|---|---|---|
+> | `identity.purge-password-reset-tokens` | Diaria, 04:30 | Tokens de recuperación vencidos hace más de 24 horas | `identity.password_reset_token.purged` |
+> | `identity.purge-refresh-tokens` | Diaria, 04:35 | Vacía el sucesor residual de los tokens consumidos hace más de la ventana de gracia y elimina las familias terminadas hace más de 30 días | `identity.refresh_token.successors_cleared`, `identity.refresh_token.purged` |
+> | `shared.purge-idempotency-keys` | Diaria, 04:40 | Claves de idempotencia vencidas hace más de 24 horas | `shared.idempotency_key.purged` |
+> | `identity.purge-login-backoff` | Diaria, 04:45 | Filas de retroceso de inicio de sesión sin intento hace más de 24 horas | `identity.login_backoff.purged` |
+> | `identity.purge-mfa-totp-backoff` | Diaria, 04:50 | Filas de retroceso de TOTP sin intento hace más de 24 horas | `identity.mfa_totp_backoff.purged` |
+>
+> Cada purga repite lotes de 5 000 filas hasta que uno viene incompleto, con un máximo de 200 lotes por
+> ocurrencia; cada lote es su propia transacción y escribe en ella un asiento con el conteo (también cuando es
+> cero) y nunca datos de las filas. Si agota los 200 lotes, escribe la advertencia `retention_purge_backlog` con la
+> ocurrencia, la tarea y la institución, y el resto sigue en la ocurrencia del día siguiente. La eliminación solo
+> ocurre mediante funciones `SECURITY DEFINER` (`V11` y `V12`): ningún rol de aplicación tiene `DELETE` sobre estas
+> tablas. Una purga que falla en una institución no impide la siguiente y deja la ocurrencia registrada como
+> fallida.
+
 ### 11.1 Comandos de operación manual
 
 ```bash

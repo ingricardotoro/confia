@@ -5,6 +5,8 @@ import static confia.generated.jooq.tables.IdentityRefreshToken.IDENTITY_REFRESH
 import com.confia.identity.application.IdentityRetentionPurges;
 import com.confia.identity.application.RefreshTokenPurgeCount;
 import com.confia.kernel.InstitutionId;
+import confia.generated.jooq.routines.IdentityPurgeLoginBackoff;
+import confia.generated.jooq.routines.IdentityPurgeMfaTotpBackoff;
 import confia.generated.jooq.routines.IdentityPurgePasswordResetTokens;
 import confia.generated.jooq.routines.IdentityPurgeRefreshTokenFamilies;
 import java.time.Instant;
@@ -48,6 +50,24 @@ public final class JooqIdentityRetentionPurges implements IdentityRetentionPurge
         routine.setPLimit(limit);
         routine.execute(dsl.configuration());
         return new RefreshTokenPurgeCount(routine.getPurgedFamilies(), routine.getPurgedTokens());
+    }
+
+    @Override
+    public long purgeLoginBackoff(Instant cutoff, int limit) {
+        IdentityPurgeLoginBackoff routine = new IdentityPurgeLoginBackoff();
+        routine.setPCutoff(cutoff.atOffset(ZoneOffset.UTC));
+        routine.setPLimit(limit);
+        routine.execute(dsl.configuration());
+        return routine.getReturnValue();
+    }
+
+    @Override
+    public long purgeMfaTotpBackoff(Instant cutoff, int limit) {
+        IdentityPurgeMfaTotpBackoff routine = new IdentityPurgeMfaTotpBackoff();
+        routine.setPCutoff(cutoff.atOffset(ZoneOffset.UTC));
+        routine.setPLimit(limit);
+        routine.execute(dsl.configuration());
+        return routine.getReturnValue();
     }
 
     @Override

@@ -29,6 +29,7 @@ import com.confia.shared.security.token.AccessTokenIssuer;
 import com.confia.shared.security.token.CompactJws;
 import com.confia.shared.security.token.SigningKey;
 import com.confia.shared.security.token.SigningKeyRing;
+import com.confia.support.JdbcStubTransactions;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
