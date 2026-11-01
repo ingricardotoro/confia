@@ -591,6 +591,18 @@ GRANT EXECUTE ON FUNCTION identity_purge_password_reset_tokens(timestamptz, inte
   error falla. Es una defensa barata, en el motor, de que solo el trabajador purga.
 - **Lote acotado:** cada llamada borra como máximo `p_limit` (tope duro de 10 000). El llamador repite
   mientras el lote venga lleno (decisión 17).
+- **Argumentos nulos (decisión del propietario del 2026-11-01).** `V11` y `V12` aceptan nulos en silencio: un
+  `p_cutoff` nulo se convierte en el piso (`LEAST` ignora `NULL`) y un `p_limit` nulo en 1 (`GREATEST`). Es seguro,
+  porque nunca borra más, pero oculta un defecto: ningún llamador pasa nulos. Las cinco funciones DEBEN fallar con
+  `RAISE EXCEPTION 'confia_purge_argument_missing' USING ERRCODE = 'P0001'` antes de borrar nada. Orden de las
+  comprobaciones: `p_cutoff IS NULL`, `p_limit IS NULL`, contexto de institución y actor `system`; los argumentos
+  van primero porque su defecto no depende de la sesión y así el error señala la causa aunque la sesión también
+  esté mal. Como `V11` y `V12` están fusionadas y no se editan, una migración nueva `V13` redefine las cinco
+  funciones con `CREATE OR REPLACE FUNCTION`, la misma firma, el mismo cuerpo y las mismas cláusulas `SET`
+  (`search_path` y `TimeZone`), y solo agrega la comprobación; propietario, `REVOKE` y `GRANT` no cambian. El
+  límite no nulo se sigue acotando a 1..10 000 y el corte no nulo se sigue recortando con `LEAST`. Se entrega en
+  la tarea 3.9, antes de 4.1, y en la misma tarea ADR-0025 recibe una nota fechada que agrega la regla 10 a su
+  plantilla y cierra la advertencia de revisión de la tarea 3.3 sobre `p_cutoff` y `p_limit` nulos.
 
 | Función | Migración | Piso | Fila purgable | Particularidades |
 |---|---|---|---|---|
@@ -1095,6 +1107,13 @@ mismo día del mes anterior» (la redacción previa de la decisión 19).
 **D-N3. ADR-0025.** *Decidido por el propietario el 2026-10-24: se crea el ADR.* ADR-0025, estado «Propuesto»,
 registra las funciones `SECURITY DEFINER` de purga de P2 como regla verificable (decisión 22); ADR-0017 recibe
 una nota fechada que apunta a ADR-0025, sin reescribir su cuerpo.
+
+*Nota del 2026-11-01, decisión posterior del propietario sobre la plantilla de ADR-0025.* Las cinco funciones de
+purga deben fallar con `confia_purge_argument_missing` (`P0001`) ante un `p_cutoff` o un `p_limit` nulos, en vez
+de convertirlos en silencio en el piso y en 1. Se implementa con la migración `V13` de la tarea 3.9 (decisión 16,
+«Argumentos nulos»), con la comprobación de argumentos antes de la de contexto y la de actor. ADR-0025 sigue
+«Propuesto» y recibe, en la misma tarea, una nota fechada que agrega la regla 10 a la plantilla obligatoria, sin
+reescribir las reglas 1 a 9.
 
 ## 14. Preguntas abiertas
 

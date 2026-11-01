@@ -54,6 +54,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
 | **PR 5a** `05a-identity-token-purges` (5a) | 3.3, 3.4, 3.5 | 550 a 800 | 1 300 a 1 700 | **5a-1** `v11-purge-functions` (3.3) / **5a-2** `identity-purge-jobs` (3.4) / **5a-3** `adr-0025-and-retention-notes` (3.5, se une a 5a-2 si caben) |
 | **PR 5b** `05b-idempotency-and-backoff-purges` (5b) | 3.6, 3.7 | 400 a 650 | 900 a 1 200 | **5b-1** `v12-purge-functions` (3.6) / **5b-2** `idempotency-and-backoff-jobs` (3.7) |
 | **PR 6** `06-audit-chain-verification-cadences` (6) | 3.8 | 250 a 400 | 550 a 750 | Ninguna; si pasa de 800, `verifySince` con su lector (unidad) / tareas recurrentes y asientos |
+| **PR 6d** `06d-purge-null-arguments` (6d) | 3.9 | 250 | 400 a 550 | Ninguna (agregada por decisión del propietario del 2026-11-01) |
 | **PR 7** `07-queue-observability-and-closing` (7) | 4.1, 4.2, 4.3 | 300 a 500 | 650 a 900 | **7a** `queue-observability` (4.1) / **7b** `closing-notes-and-criterion-5` (4.2 y 4.3, solo documentación y pruebas de inventario) |
 | **Total** | 23 tareas | unas 4 200 | 9 500 a 11 500 | |
 
@@ -132,6 +133,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
 | 3.3 a 3.5 | `V11`, purgas de recuperación y refresco, ADR-0025 | PR 5a | IT: `-Dit.test='RetentionPurgeFunctionsIT,RefreshTokenPurgeIT,IdentityTokenPurgeJobsIT'` | PostgreSQL real, dos instituciones, rol `confia_admin_app` | Las tareas recurrentes se retiran de forma independiente; `V11` se elimina antes de producción |
 | 3.6 y 3.7 | `V12`, purgas de idempotencia y retroceso, corredor por institución | PR 5b | IT: `-Dit.test='RetentionPurgeFunctionsIT,IdempotencyKeyPrivilegeIT,RecurringJobPerInstitutionIT'` | Dos instituciones configuradas | Igual que 5a; `V12` posterior a `V11` |
 | 3.8 | Cadencias diaria y semanal del verificador | PR 6 | `-Dtest='DefaultAuditChainVerifierTest'`; IT: `-Dit.test='AuditChainVerificationJobsIT'` | Fila alterada con el superusuario del contenedor | Se revierte el commit; `verifyChainOf` no cambia |
+| 3.9 | `V13`, argumentos nulos de las cinco funciones de purga | PR 6d | IT: `-Dit.test='RetentionPurgeFunctionsIT,RefreshTokenFamilyPurgeFunctionIT,V13SchemaDiffIT'` | PostgreSQL real, rol `confia_admin_app` | `V13` se elimina antes de producción; `V11` y `V12` no cambian |
 | 4.1 a 4.3 | Observabilidad de la cola, notas documentales, criterio 5 y cierre | PR 7 | `-Dtest='QueueHealthTest,LogQueueMetricsTest,QueueSqlNeverReadsTaskDataTest'`; IT: `-Dit.test='QueueStateReaderIT'` | Cola sembrada en cada estado | Se revierte el commit; solo lectura y documentación |
 
 ### Dependencias y paralelismo
@@ -148,7 +150,8 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
 | 3.3 a 3.5 | 2.6 | 3.3 puede redactarse en paralelo con 3.1 y 3.2 (archivos disjuntos), pero se fusiona después de 3.2 por el orden de la cadena |
 | 3.6, 3.7 | 3.3 | Secuenciales después de 3.5 |
 | 3.8 | 2.6 | Puede redactarse en paralelo con 3.3 a 3.7; se fusiona después de 3.7 |
-| 4.1 | 2.6 | Secuencial después de 3.8 |
+| 3.9 | 3.3, 3.6 | Secuencial después de 3.8 |
+| 4.1 | 2.6 | Secuencial después de 3.9 (antes, después de 3.8) |
 | 4.2, 4.3 | 4.1 y todas las anteriores | Cierran el cambio |
 
 ---
@@ -646,6 +649,41 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     and weekly from genesis`. Tamaño: nominal 250, realista 600 a 750. — Escenarios AT07 a AT17, AT23 a AT26, AT30, AT31, BJ62 y el escenario del
     verificador sin infraestructura de programación.
   - **Resultado (2026-10-31): hecha, en tres PR.** Ramas `06-audit-chain-verification-cadences` (385 líneas: `verifySince`, `firstAtOrAfter`, el lector y las pruebas del recorrido de ventana), `06b-audit-chain-jobs` (788: `AuditChainVerificationJobs`, la ventana diaria, `OperationalEventLog.info/error`, el cableado y las pruebas unitarias) y `06c-audit-chain-job-integration` (366: `AuditChainVerificationJobsIT` y `AuditChainVerificationOnWorkerIT`); la medición conjunta fue de 1 539 líneas y se siguió la costura nombrada: `verifySince` con su lector primero, las tareas recurrentes y los asientos después, con las pruebas de integración en la última. El resultado de un asiento de verificación fallida es `error`, no `failure`: la restricción `shared_audit_log_outcome_chk` (V2) solo admite `success`, `denied` y `error`. Ver `odd/tasks/background-jobs-remaining-tasks.md`.
+
+- [ ] 3.9 **PR 6d / 6d `06d-purge-null-arguments`: `V13` con la validación de argumentos nulos de las cinco funciones de purga (decisión del propietario del 2026-11-01).**
+  - **Precondición dura.** 3.3 y 3.6 (`V11` y `V12`) fusionadas en `main`, y 3.8 cerrada. Se hace antes de 4.1. `V1` a `V12` no se editan.
+  - **ROJO.** Ampliar `RetentionPurgeFunctionsIT.java` con dos casos parametrizados sobre las cinco funciones (`Subject`), con las **reglas de reloj de
+    la base de datos** de este documento y un acceso a la función que admita nulos (hoy `purge` recibe `int`): con `p_cutoff` nulo y `p_limit` 100,
+    cada función falla con `confia_purge_argument_missing` y `SQLSTATE` `P0001`, y el conteo de filas de la tabla es el mismo antes y después [BI117];
+    con un `p_cutoff` igual o anterior al piso y `p_limit` nulo, el mismo error y ninguna fila menos, ni siquiera la única que borraría un límite
+    convertido en 1; con los dos nulos, el mismo error [BI118]; en una sesión sin `app.institution_id` y con actor `staff`, un `p_cutoff` nulo da
+    también `confia_purge_argument_missing` (la comprobación de argumentos va primero) [BI117]. `theBatchRespectsTheLimitAndAlwaysTakesAtLeastOne`
+    no cambia: cero y negativo siguen subiendo a 1 [BI71]. Ampliar `RefreshTokenFamilyPurgeFunctionIT.java`: con `p_cutoff` nulo y con `p_limit`
+    nulo, `identity_purge_refresh_token_families` falla sin devolver sus dos salidas y el número de familias y el de tokens no cambian [BI117,
+    BI118]. Crear `test/java/com/confia/schema/V13SchemaDiffIT.java` con el patrón de `V11SchemaDiffIT` y `V12SchemaDiffIT`: de `V12` a `V13` no se
+    agrega ni se quita ninguna definición y cambian exactamente las cinco funciones (`md5(prosrc)` de la instantánea de `V9SchemaDiffIT`), sin
+    `table-grant` nuevo; las sumas de verificación de `V1` a `V12` son las registradas y el historial valida. `V11SchemaDiffIT` y `V12SchemaDiffIT`
+    migran por pasos hasta su versión y no cambian. Ampliar `RolePrivilegeMatrixIT.java` solo si hace falta para afirmar que tras `V13` las cinco
+    funciones siguen con propietario `confia_owner`, `prosecdef`, `proconfig` con `search_path` y `TimeZone`, y `EXECUTE` solo para
+    `confia_admin_app` [BI68, BI83]. **Rojos esperados:** los casos nulos terminan con éxito (un corte nulo se convierte en el piso y borra las filas
+    más antiguas que él; un límite nulo se convierte en 1 y borra una fila) en vez de lanzar el error; `V13SchemaDiffIT` falla porque `V13` no existe.
+  - **VERDE.** Crear `main/resources/db/migration/V13__reject_null_purge_arguments.sql` (el nombre exacto se fija en la tarea) con
+    `CREATE OR REPLACE FUNCTION` para `identity_purge_password_reset_tokens`, `identity_purge_refresh_token_families` (con sus dos salidas `OUT`),
+    `shared_purge_idempotency_keys`, `identity_purge_login_backoff` e `identity_purge_mfa_totp_backoff`: misma firma, mismo cuerpo y mismas cláusulas
+    `SET search_path = pg_catalog, public` y `SET TimeZone = 'UTC'`, y al inicio del cuerpo, en este orden, `IF p_cutoff IS NULL` e `IF p_limit IS NULL`
+    con `RAISE EXCEPTION 'confia_purge_argument_missing' USING ERRCODE = 'P0001'`, antes de las comprobaciones de contexto y actor. Se actualizan los
+    `COMMENT ON FUNCTION`. `CREATE OR REPLACE` conserva propietario y privilegios; se repiten igualmente `REVOKE ALL ... FROM PUBLIC` y
+    `GRANT EXECUTE ... TO confia_admin_app`. **No se concede `DELETE` a ningún rol.** Regenerar jOOQ: las rutinas generadas no deben cambiar.
+  - **Nota fechada en ADR-0025.** En `docs/adr/ADR-0025-purga-por-funciones-security-definer.md`, una nota del 2026-11-01 que agrega la regla 10 a
+    la plantilla obligatoria («Argumentos obligatorios: un `p_cutoff` o un `p_limit` nulos lanzan `confia_purge_argument_missing`, `P0001`, antes
+    de la comprobación de contexto y de actor»), apunta a `V13` y a `V13SchemaDiffIT` en «Cumplimiento y verificación» y da por cerrada la
+    advertencia de revisión de la tarea 3.3 sobre `p_cutoff` y `p_limit` nulos; las reglas 1 a 9 no se reescriben y el ADR sigue «Propuesto».
+  - **Demostración deliberada.** Quitar de `V13` la comprobación de `p_cutoff` de una sola función (por ejemplo, `identity_purge_login_backoff`) pone
+    en rojo `RetentionPurgeFunctionsIT` en el caso del corte nulo solo para esa función: termina con éxito y borra filas [BI117]. Quitar la de
+    `p_limit` de otra pone en rojo el caso del límite nulo: borra una fila [BI118]. Se revierten y se confirman con `cmp`.
+  - **Cierre.** `./mvnw verify` en la rama; `./mvnw verify -Pmutation-gate` una vez, en la última rama de la tarea, según la regla de ODD (PIT no muta
+    SQL: el umbral se mide sobre el código Java vigente y no debe bajar). Commit: `feat(db): reject null cutoff and limit arguments in the purge
+    functions`. Tamaño: nominal 250, realista 400 a 550; sin costura prevista. — Escenarios BI117 y BI118 (y BI68, BI71 y BI83 como regresión).
 
 ---
 

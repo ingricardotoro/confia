@@ -143,7 +143,11 @@ y aplicar el corte efectivo `LEAST(p_cutoff, ahora de la base de datos - piso)`:
 corte hacia atrás, nunca hacia adelante**, de modo que ninguna fila más reciente que el piso se borra aunque el
 llamador pase un corte en el futuro o un reloj adelantado. NO se rechaza un corte posterior al piso (una diferencia
 de milisegundos entre el reloj de la aplicación y el de la base de datos no debe fallar la tarea): se recorta. El
-límite `p_limit` se acota entre 1 y 10 000. Cada función DEBE exigir contexto de institución y actor `system`: sin
+límite `p_limit` se acota entre 1 y 10 000. Cada función DEBE rechazar un `p_cutoff` nulo y un `p_limit` nulo con el
+error `confia_purge_argument_missing` (`SQLSTATE` `P0001`), antes de borrar ninguna fila: un corte nulo NO DEBE
+convertirse en el piso ni un límite nulo en 1, porque ningún llamador pasa nulos y un nulo es un defecto de
+programación que debe verse (decisión del propietario del 2026-11-01). La comprobación de argumentos DEBE ir antes
+que la de contexto y la de actor, en este orden: `p_cutoff`, `p_limit`, contexto de institución, actor. Cada función DEBE exigir contexto de institución y actor `system`: sin
 `app.institution_id` lanza el error `confia_purge_context_missing`, y con un actor que no es `system` lanza
 `confia_purge_actor_not_system`; **nunca** termina con un éxito de cero filas por falta de contexto. Solo purga filas
 de la institución del contexto. Ningún rol de aplicación DEBE recibir `DELETE` sobre estas tablas. Cada función DEBE
@@ -201,6 +205,35 @@ desde `infrastructure`.
   `confia_purge_actor_not_system`
 - **Y** no se elimina ninguna fila
 
+#### Escenario: [BI117] Un `p_cutoff` nulo hace fallar cada una de las cinco funciones sin borrar nada
+
+- **DADO** para cada una de las cinco funciones, en la institución del contexto, filas purgables (más antiguas que
+  el piso) y filas vigentes, y en la de familias de refresco familias purgables con sus tokens, en una sesión de
+  `confia_admin_app` con `app.institution_id` y actor `system`
+- **CUANDO** se invoca cada función con `p_cutoff` nulo y un `p_limit` válido (por ejemplo, 100)
+- **ENTONCES** cada una de las cinco invocaciones recibe el error `confia_purge_argument_missing` con `SQLSTATE`
+  `P0001`, y ninguna termina con éxito ni devuelve un conteo
+- **Y** el número de filas de cada tabla purgada es exactamente el mismo antes y después de la invocación (en la de
+  familias de refresco, el de familias y el de tokens), de modo que no se elimina ninguna fila
+- **Y** en una sesión sin `app.institution_id` y con el actor `staff`, la invocación con `p_cutoff` nulo recibe
+  también `confia_purge_argument_missing`, porque la comprobación de argumentos precede a la de contexto y actor
+- **Y** una variante de prueba de la función sin la comprobación, que convierte el corte nulo en el piso, termina
+  con éxito y hace fallar esta prueba
+
+#### Escenario: [BI118] Un `p_limit` nulo hace fallar cada una de las cinco funciones sin borrar nada
+
+- **DADO** las mismas filas del escenario BI117 en las cinco tablas, en una sesión de `confia_admin_app` con
+  `app.institution_id` y actor `system`
+- **CUANDO** se invoca cada función con un `p_cutoff` válido igual o anterior al piso y `p_limit` nulo
+- **ENTONCES** cada una de las cinco invocaciones recibe el error `confia_purge_argument_missing` con `SQLSTATE`
+  `P0001`, y ninguna termina con éxito ni devuelve un conteo
+- **Y** el número de filas de cada tabla purgada es exactamente el mismo antes y después de la invocación (en la de
+  familias de refresco, el de familias y el de tokens), de modo que no se elimina ninguna fila, ni siquiera la
+  única que borraría un límite nulo convertido en 1
+- **Y** con `p_cutoff` y `p_limit` nulos a la vez el error es el mismo
+- **Y** los límites no nulos fuera de rango (cero, negativo y mayor que 10 000) siguen acotándose entre 1 y 10 000,
+  como exige BI71
+
 #### Escenario: [BI72] Ningún rol de aplicación tiene `DELETE` sobre las tablas purgadas
 
 - **DADO** los cinco roles y las seis tablas con purga (tokens de recuperación, familias y tokens de refresco,
@@ -215,6 +248,8 @@ fuera de su ventana y ninguna dentro de ella, con casos límite un segundo antes
 un segundo después; que no toca filas de otra institución; que respeta el piso con un corte en el futuro; que
 respeta el límite de lote (`p_limit`, con tope de 10 000); y que, invocada sin contexto de institución, lanza el
 error `confia_purge_context_missing` sin borrar nada, y con un actor que no es `system`, `confia_purge_actor_not_system`.
+La prueba DEBE además demostrar que, invocada con un `p_cutoff` nulo o con un `p_limit` nulo, cada función lanza
+`confia_purge_argument_missing` sin borrar nada (escenarios BI117 y BI118).
 La prueba DEBE afirmar el error y conteos exactos, de modo que una purga sin contexto no pase por una purga
 exitosa. En el borde exacto la fila se conserva. La rutina generada por jOOQ para cada función DEBE ser la que la
 prueba invoque; si una función no se pudiera generar como rutina, se admite una llamada de SQL plano de la lista
