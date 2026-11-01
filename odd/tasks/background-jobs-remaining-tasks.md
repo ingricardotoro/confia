@@ -36,8 +36,8 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 - [x] T3.6 Slice 5b-1 `05b-v12-purge-functions` (split: 5b-1 and 5b-1b).
 - [x] T3.7 Slice 5b-2 `05b-idempotency-and-backoff-jobs` (split: 5b-2 and 5b-2b).
 - [x] T3.8 Slice 6 `06-audit-chain-verification-cadences` (split: 6, 6b and 6c).
-- [x] T3.9 Slice 6d `06d-purge-null-arguments`: `V13` rejects a NULL `p_cutoff` or `p_limit` in the five purge functions (owner decision 2026-11-01). Before T4.1.
-- [ ] T4.1 Slice 7a `07a-queue-observability`.
+- [x] T3.9 Slice 6d `06d-purge-null-arguments`: `V13` rejects a NULL `p_cutoff` or `p_limit` in the five purge functions (owner decision 2026-11-01). Before T4.1. Done: PR #240 merged into `main` `cf46452`.
+- [ ] T4.1 Slice 7a `07a-queue-observability` (in progress, started 2026-11-01 from `main` `cf46452`).
 - [ ] T4.2 Slice 7b `07b-closing-notes` (notes).
 - [ ] T4.3 Slice 7b `07b-closing-notes` (closing).
 - [ ] Archive the SDD change.
@@ -65,7 +65,8 @@ Hard order: 3.3 (V11) before 3.6 (V12); 3.9 (V13) after 3.8 and before 4.1.
 | T3.8 (6) | delegated writer | `06-audit-chain-verification-cadences` | `3996209` | 385 | BUILD SUCCESS 17 min 53 s; Surefire 186 + 2 640, Failsafe 778 | not run (last branch of the task is 6c) | approved earlier; PR #236, merged to `main` `2f44bbb` |
 | T3.8 (6b) | delegated writer | `06b-audit-chain-jobs` | `66eb21e` | 788 | BUILD SUCCESS 20 min 7 s; Surefire 186 + 2 668, Failsafe 778 | not run (last branch of the task is 6c) | approved earlier; PR #237, merged to `main` `2f44bbb` |
 | T3.8 (6c) | delegated writer | `06c-audit-chain-job-integration` | `84b01a0` plus the evidence commit | 366 | BUILD SUCCESS 21 min 17 s; Surefire 186 + 2 668, Failsafe 785 | done: first pending because the owner runs it in a terminal (it was reaped twice inside Claude Code); PIT targets now include `shared.audit` (`da7bca1`); 06c final tip `4487f61`, 498 lines vs 06b; verify BUILD SUCCESS 29 min 52 s, Surefire 186 + 2 671, Failsafe 785; mutation gate run by the owner on `94b3b9a` plus the worker IT fix (see the T3.8 evidence); 06c final tip `d82ffb7`: verify BUILD SUCCESS 18 min 33 s, Surefire 186 + 2 673, Failsafe 785; mutation gate not rerun on `d82ffb7` by owner decision (option B); the PR CI mutation job passed | approved (lineage `review-1ba1ea3e148b3fb6`, acknowledged); PR #238, merged to `main` `2f44bbb` |
-| T3.9 (6d) | delegated writer | `06d-purge-null-arguments` | the commit `feat(db): reject null cutoff and limit arguments in the purge functions` (on `f71e50e`) | 598 | BUILD SUCCESS 20 min 55 s; Surefire 186 + 2 673, Failsafe 805 | pending owner (terminal) | pending |
+| T3.9 (6d) | delegated writer | `06d-purge-null-arguments` | `03b7e2f` `feat(db): reject null cutoff and limit arguments in the purge functions`; PR #240 merged into `main` `cf46452` | 594 | BUILD SUCCESS 20 min 55 s; Surefire 186 + 2 673, Failsafe 805 | the PR CI mutation job passed | approved again after the rebase (reliability lens, lineage `review-630f816fc5369ab3`); PR #240, merged to `main` `cf46452` |
+| T4.1 (7a) | delegated writer | `07a-queue-observability` | in progress | in progress | in progress | pending CI | pending |
 
 Main CI: PR #211 (merge `972beae`) fixed the failing CI on `main` before PRs #212 to #214 were merged.
 
@@ -154,8 +155,7 @@ T3.1 evidence:
 
 ## Next step
 
-Owner on T3.9: the mutation gate in a terminal, review, push and PR of `06d-purge-null-arguments`. Then T4.1, slice 7a
-`07a-queue-observability`. (Superseded 2026-11-01: "T3.9, slice 6d `06d-purge-null-arguments` (`tasks.md` 3.9; spec BI117 and BI118;
+T4.1, slice 7a `07a-queue-observability` (in progress). T3.9 is done: PR #240 merged into `main` `cf46452`. (Superseded 2026-11-01: "T3.9, slice 6d `06d-purge-null-arguments` (`tasks.md` 3.9; spec BI117 and BI118;
 design decision 16, "Argumentos nulos"), then T4.1, slice 7a `07a-queue-observability`. T3.9 comes before T4.1. T3.8 is done: PRs #236,
 #237 and #238 are merged to `main` `2f44bbb`; 06c tip `d82ffb7`.")
 (Superseded 2026-11-01: "T4.1, slice 7a `07a-queue-observability`. T3.8 is done on `06`, `06b` and `06c` (stacked on `main` 49ddc62); the
@@ -163,8 +163,10 @@ mutation gate of 3.8 is pending (owner, terminal) and needs the PIT targets to i
 
 T3.9 evidence:
 
-- Route: delegated writer, one work unit, no split: 598 effective lines (additions plus deletions, without `openspec/` and `odd/`): V13 284,
-  `V13SchemaDiffIT` 141, `RetentionPurgeFunctionsIT` 92, `RefreshTokenFamilyPurgeFunctionIT` 68, ADR-0025 13. Over the 400 to 550 estimate
+- Route: delegated writer, one work unit, no split: 594 effective lines (additions plus deletions, without `openspec/` and `odd/`, as `git show --numstat
+  03b7e2f` reports them): V13 284, `V13SchemaDiffIT` 141, `RetentionPurgeFunctionsIT` 92 (88 added, 4 deleted),
+  `RefreshTokenFamilyPurgeFunctionIT` 68 (67 added, 1 deleted), ADR-0025 9. An earlier version of this line said 598 with 13 lines of ADR-0025; the
+  ADR note is 9 lines, so the total is 594. Over the 400 to 550 estimate
   because V13 restates the five bodies in full; under the 800 PR limit.
 - RED, observed with V13 absent (focused run of the three ITs: 78 tests, 17 failures, 3 errors). `aNullCutoffFailsAndDeletesNothing` and
   `aNullLimitFailsAndDeletesNothingNotEvenTheOneRowABatchOfOneWouldTake`, all five subjects, and the two new refresh cases failed with
