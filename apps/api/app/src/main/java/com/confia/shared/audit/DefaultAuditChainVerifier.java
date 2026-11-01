@@ -3,8 +3,10 @@ package com.confia.shared.audit;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.security.SecurityContext;
 import com.confia.shared.security.TransactionRunner;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Objects;
 import java.util.UUID;
 import tools.jackson.databind.DeserializationFeature;
@@ -14,8 +16,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * The walk of design.md decision 11: {@code running} starts at 32 zero bytes and advances with each
  * row's <em>stored</em> {@code row_hash}, never the recalculated one — irrelevant once the walk
- * stops at the first divergence, but exactly what lets a future incremental verifier (cambio 9)
- * resume from any row using its stored hash. Stops immediately at the first divergence
+ * stops at the first divergence, but exactly what lets {@link #verifySince} resume from the first row
+ * of a window using its stored hash. Stops immediately at the first divergence
  * (specs/audit-trail/spec.md: "sin continuar reportando una segunda divergencia derivada de la
  * primera").
  *
@@ -54,6 +56,28 @@ public final class DefaultAuditChainVerifier implements AuditChainVerifier {
         return transactionRunner.execute(context, () -> walk(institutionId));
     }
 
+    @Override
+    public AuditChainVerification verifySince(InstitutionId institutionId, Instant since) {
+        Objects.requireNonNull(institutionId, "institutionId");
+        Objects.requireNonNull(since, "since");
+        SecurityContext context = new SecurityContext("", "system",
+                institutionId.value().toString(), UUID.randomUUID().toString());
+        return transactionRunner.execute(context, () -> walkSince(institutionId, since));
+    }
+
+    /**
+     * Package-private for the same reason as {@link #walk}. The walk of the window: it starts at the first row
+     * whose {@code occurred_at} is at or after {@code since} and takes that row's <em>stored</em> {@code
+     * prev_hash} as the running hash (decision 19), so the link to the row before it is not part of the check.
+     */
+    AuditChainVerification walkSince(InstitutionId institutionId, Instant since) {
+        Optional<AuditRowSnapshot> first = reader.firstAtOrAfter(institutionId, since);
+        if (first.isEmpty()) {
+            return new AuditChainVerification.Empty(institutionId);
+        }
+        return walkFrom(institutionId, first.get().prevHash(), first.get().id() - 1, false);
+    }
+
     /**
      * Package-private, not {@code private}: {@link DefaultAuditChainVerifierTest} calls this
      * directly, against a fake {@link AuditLogReader}, to exercise the walk's branch logic
@@ -64,9 +88,15 @@ public final class DefaultAuditChainVerifier implements AuditChainVerifier {
      * package-visible test access to a real implementation instead of a duplicated one.
      */
     AuditChainVerification walk(InstitutionId institutionId) {
-        byte[] running = GENESIS_PREV_HASH;
+        return walkFrom(institutionId, GENESIS_PREV_HASH, 0, true);
+    }
+
+    /** The walk from {@code afterId} (exclusive) with {@code startHash} as the running hash. */
+    private AuditChainVerification walkFrom(InstitutionId institutionId, byte[] startHash, long afterRowId,
+            boolean fromGenesis) {
+        byte[] running = startHash;
         long verifiedRows = 0;
-        long afterId = 0;
+        long afterId = afterRowId;
         while (true) {
             List<AuditRowSnapshot> page = reader.pageOf(institutionId, afterId, PAGE_SIZE);
             if (page.isEmpty()) {
@@ -74,7 +104,7 @@ public final class DefaultAuditChainVerifier implements AuditChainVerifier {
             }
             for (AuditRowSnapshot row : page) {
                 AuditChainVerification.Diverged divergence =
-                        checkPrevHash(institutionId, row, running, verifiedRows);
+                        checkPrevHash(institutionId, row, running, verifiedRows, fromGenesis);
                 if (divergence != null) {
                     return divergence;
                 }
@@ -97,8 +127,8 @@ public final class DefaultAuditChainVerifier implements AuditChainVerifier {
 
     /** {@code null} when {@code row.prevHash()} is consistent with the chain so far. */
     private static AuditChainVerification.Diverged checkPrevHash(InstitutionId institutionId,
-            AuditRowSnapshot row, byte[] running, long verifiedRows) {
-        if (verifiedRows == 0) {
+            AuditRowSnapshot row, byte[] running, long verifiedRows, boolean fromGenesis) {
+        if (fromGenesis && verifiedRows == 0) {
             if (row.id() != 1) {
                 return new AuditChainVerification.Diverged(institutionId, verifiedRows, row.id(),
                         AuditChainVerification.Divergence.MISSING_GENESIS, GENESIS_PREV_HASH,

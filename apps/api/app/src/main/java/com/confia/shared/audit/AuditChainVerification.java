@@ -4,8 +4,8 @@ import com.confia.kernel.InstitutionId;
 
 /**
  * The result of {@link AuditChainVerifier#verifyChainOf(InstitutionId)} (design.md decision 11).
- * {@code sealed} with three cases so a caller — the future cambio 9, which owns scheduling this
- * against {@code confia_audit_chain_verified_rows} and the S1 alert — must handle "no activity",
+ * {@code sealed} with three cases so a caller — {@code AuditChainVerificationJobs}, which runs this
+ * on the daily and weekly cadences and raises the S1 alert — must handle "no activity",
  * "integral" and "divergent" as three genuinely different outcomes, never collapse "integral" and
  * "empty" into one misleading {@code true}/{@code false}.
  */
@@ -18,8 +18,7 @@ public sealed interface AuditChainVerification {
     /**
      * Every row recalculated exactly as stored. {@code verifiedRows} feeds
      * {@code confia_audit_chain_verified_rows} (docs/03-seguridad.md §12.4); {@code lastRowHash} is
-     * the running hash after the last row, which a future incremental verifier (cambio 9) could
-     * resume from.
+     * the running hash after the last row.
      */
     record Intact(InstitutionId institutionId, long verifiedRows, byte[] lastRowHash)
             implements AuditChainVerification {

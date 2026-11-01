@@ -1,6 +1,7 @@
 package com.confia.shared.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.InstanceOfAssertFactories.type;
 
 import com.confia.kernel.InstitutionId;
@@ -8,7 +9,9 @@ import com.confia.shared.security.TransactionRunner;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
@@ -117,6 +120,147 @@ class DefaultAuditChainVerifierTest {
         });
     }
 
+    // ---- verifySince (design.md decision 19; scenarios AT07 to AT09, AT25 and AT26) ----
+
+    private static final Instant SINCE = Instant.parse("2026-09-01T06:00:00Z");
+    private static final Instant BEFORE = Instant.parse("2026-08-31T23:00:00Z");
+    private static final Instant INSIDE = Instant.parse("2026-09-10T15:00:00Z");
+
+    /** A chain of rows 1, 2, ... linked by their stored hashes, one at each of {@code occurredAt}. */
+    private static List<AuditRowSnapshot> chainAt(InstitutionId institutionId, Instant... occurredAt) {
+        List<AuditRowSnapshot> rows = new ArrayList<>();
+        byte[] prev = GENESIS_PREV_HASH;
+        for (int i = 0; i < occurredAt.length; i++) {
+            AuditRowSnapshot row = validRow(i + 1, institutionId.value(), prev, occurredAt[i]);
+            rows.add(row);
+            prev = row.rowHash();
+        }
+        return rows;
+    }
+
+    /** Scenario AT07: only the rows of the window are verified, and they are reported intact. */
+    @Test
+    void anIntactWindowReportsIntegrityAndHowManyRowsItVerified() {
+        InstitutionId institutionId = randomInstitutionId();
+        List<AuditRowSnapshot> rows = chainAt(institutionId, BEFORE, BEFORE, INSIDE, INSIDE, INSIDE);
+
+        AuditChainVerification result = verifierOver(rows).walkSince(institutionId, SINCE);
+
+        assertThat(result).asInstanceOf(type(AuditChainVerification.Intact.class)).satisfies(intact -> {
+            assertThat(intact.institutionId()).isEqualTo(institutionId);
+            assertThat(intact.verifiedRows()).isEqualTo(3L);
+            assertThat(intact.lastRowHash()).isEqualTo(rows.get(4).rowHash());
+        });
+    }
+
+    /** The window includes the row at exactly {@code since} and leaves out the one a microsecond before. */
+    @Test
+    void theRowAtExactlyTheStartIsInsideAndOneMicrosecondBeforeItIsOutside() {
+        InstitutionId institutionId = randomInstitutionId();
+        List<AuditRowSnapshot> rows = chainAt(institutionId, SINCE.minusNanos(1_000), SINCE, INSIDE);
+
+        AuditChainVerification result = verifierOver(rows).walkSince(institutionId, SINCE);
+
+        assertThat(result).asInstanceOf(type(AuditChainVerification.Intact.class))
+                .satisfies(intact -> assertThat(intact.verifiedRows()).isEqualTo(2L));
+    }
+
+    /** Scenario AT08: the first divergent row of the window is named by its institution and id. */
+    @Test
+    void aRowAlteredInsideTheWindowIsIdentifiedExactly() {
+        InstitutionId institutionId = randomInstitutionId();
+        List<AuditRowSnapshot> rows = new ArrayList<>(
+                chainAt(institutionId, BEFORE, INSIDE, INSIDE, INSIDE, INSIDE));
+        rows.set(3, withRowHash(rows.get(3), randomBytes(32)));
+
+        AuditChainVerification result = verifierOver(rows).walkSince(institutionId, SINCE);
+
+        assertThat(result).asInstanceOf(type(AuditChainVerification.Diverged.class)).satisfies(diverged -> {
+            assertThat(diverged.institutionId()).isEqualTo(institutionId);
+            assertThat(diverged.firstDivergentId()).isEqualTo(4L);
+            assertThat(diverged.verifiedRows()).as("rows 2 and 3 were verified before it").isEqualTo(2L);
+            assertThat(diverged.divergence()).isEqualTo(AuditChainVerification.Divergence.ROW_HASH_MISMATCH);
+        });
+    }
+
+    /** Scenario AT09: an alteration before the window is invisible to the window and seen by the full walk. */
+    @Test
+    void anAlterationBeforeTheWindowIsNotSeenByTheWindowButIsByTheWholeChain() {
+        InstitutionId institutionId = randomInstitutionId();
+        List<AuditRowSnapshot> rows = new ArrayList<>(chainAt(institutionId, BEFORE, BEFORE, INSIDE));
+        rows.set(0, withRowHash(rows.get(0), randomBytes(32)));
+        DefaultAuditChainVerifier verifier = verifierOver(rows);
+
+        assertThat(verifier.walkSince(institutionId, SINCE)).isInstanceOf(AuditChainVerification.Intact.class);
+        assertThat(verifier.walk(institutionId)).asInstanceOf(type(AuditChainVerification.Diverged.class))
+                .satisfies(diverged -> assertThat(diverged.firstDivergentId()).isEqualTo(1L));
+    }
+
+    /** Scenario AT25: the link at the border is not checked; the walk starts from the stored previous hash. */
+    @Test
+    void theLinkAtTheBorderIsNotVerifiedAndTheWalkStartsFromTheStoredPreviousHash() {
+        InstitutionId institutionId = randomInstitutionId();
+        AuditRowSnapshot before = validRow(1, institutionId.value(), GENESIS_PREV_HASH, BEFORE);
+        AuditRowSnapshot first = validRow(2, institutionId.value(), randomBytes(32), INSIDE);
+        AuditRowSnapshot second = validRow(3, institutionId.value(), first.rowHash(), INSIDE);
+        DefaultAuditChainVerifier verifier = verifierOver(List.of(before, first, second));
+
+        assertThat(verifier.walkSince(institutionId, SINCE)).asInstanceOf(type(AuditChainVerification.Intact.class))
+                .satisfies(intact -> assertThat(intact.verifiedRows()).isEqualTo(2L));
+        assertThat(verifier.walk(institutionId)).asInstanceOf(type(AuditChainVerification.Diverged.class))
+                .satisfies(diverged -> {
+                    assertThat(diverged.firstDivergentId()).isEqualTo(2L);
+                    assertThat(diverged.divergence())
+                            .isEqualTo(AuditChainVerification.Divergence.PREV_HASH_MISMATCH);
+                });
+    }
+
+    /** A window that starts after the genesis row never reports a missing genesis. */
+    @Test
+    void aWindowThatStartsAfterTheGenesisRowIsNotAMissingGenesis() {
+        InstitutionId institutionId = randomInstitutionId();
+        List<AuditRowSnapshot> rows = chainAt(institutionId, BEFORE, INSIDE);
+
+        assertThat(verifierOver(rows).walkSince(institutionId, SINCE))
+                .asInstanceOf(type(AuditChainVerification.Intact.class))
+                .satisfies(intact -> assertThat(intact.verifiedRows()).isEqualTo(1L));
+    }
+
+    /** Scenario AT26: a window without rows is empty, while the whole chain is intact. */
+    @Test
+    void aWindowWithoutRowsIsEmptyAndTheWholeChainIsIntact() {
+        InstitutionId institutionId = randomInstitutionId();
+        List<AuditRowSnapshot> rows = chainAt(institutionId, BEFORE, BEFORE);
+        DefaultAuditChainVerifier verifier = verifierOver(rows);
+
+        assertThat(verifier.walkSince(institutionId, SINCE)).asInstanceOf(type(AuditChainVerification.Empty.class))
+                .satisfies(empty -> assertThat(empty.institutionId()).isEqualTo(institutionId));
+        assertThat(verifier.walk(institutionId)).isInstanceOf(AuditChainVerification.Intact.class);
+    }
+
+    /** Another institution's rows are never part of the window. */
+    @Test
+    void theWindowOfOneInstitutionNeverIncludesTheRowsOfAnother() {
+        InstitutionId institutionId = randomInstitutionId();
+        InstitutionId other = randomInstitutionId();
+        List<AuditRowSnapshot> rows = new ArrayList<>(chainAt(institutionId, BEFORE, INSIDE));
+        rows.addAll(chainAt(other, INSIDE, INSIDE, INSIDE));
+
+        assertThat(verifierOver(rows).walkSince(institutionId, SINCE))
+                .asInstanceOf(type(AuditChainVerification.Intact.class))
+                .satisfies(intact -> assertThat(intact.verifiedRows()).isEqualTo(1L));
+    }
+
+    @Test
+    void verifySinceRequiresItsArguments() {
+        DefaultAuditChainVerifier verifier = verifierOver(List.of());
+
+        assertThatThrownBy(() -> verifier.verifySince(null, SINCE)).isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("institutionId");
+        assertThatThrownBy(() -> verifier.verifySince(randomInstitutionId(), null))
+                .isInstanceOf(NullPointerException.class).hasMessageContaining("since");
+    }
+
     /**
      * The {@link TransactionRunner} and {@link DataSource} here are never invoked: {@code walk}
      * only ever touches {@code reader} and {@code serializer}. They exist only because {@link
@@ -150,14 +294,23 @@ class DefaultAuditChainVerifierTest {
 
     private static final DataSource UNUSED_DATA_SOURCE = new DriverManagerDataSource();
 
+    private static AuditRowSnapshot validRow(long id, UUID institutionId, byte[] prevHash, Instant occurredAt) {
+        return validRow(id, institutionId, prevHash, occurredAt, null, null);
+    }
+
     private static AuditRowSnapshot validRow(long id, UUID institutionId, byte[] prevHash,
             String beforeValueJson, String afterValueJson) {
-        CanonicalAuditRow canonicalRow = new CanonicalAuditRow(prevHash, id, institutionId, OCCURRED_AT,
+        return validRow(id, institutionId, prevHash, OCCURRED_AT, beforeValueJson, afterValueJson);
+    }
+
+    private static AuditRowSnapshot validRow(long id, UUID institutionId, byte[] prevHash, Instant occurredAt,
+            String beforeValueJson, String afterValueJson) {
+        CanonicalAuditRow canonicalRow = new CanonicalAuditRow(prevHash, id, institutionId, occurredAt,
                 ACTOR_ID, "system", "unit-test-actor", null, null, REQUEST_ID, null, "test.action",
                 "test_entity", "entity-1", "success", jsonNodeOf(beforeValueJson),
                 jsonNodeOf(afterValueJson), null, null);
         byte[] rowHash = SERIALIZER.rowHash(canonicalRow);
-        return new AuditRowSnapshot(id, institutionId, OCCURRED_AT, ACTOR_ID, "system",
+        return new AuditRowSnapshot(id, institutionId, occurredAt, ACTOR_ID, "system",
                 "unit-test-actor", null, null, REQUEST_ID, null, "test.action", "test_entity",
                 "entity-1", "success", beforeValueJson, afterValueJson, null, null, prevHash, rowHash);
     }
@@ -193,6 +346,14 @@ class DefaultAuditChainVerifierTest {
                     .sorted(Comparator.comparingLong(AuditRowSnapshot::id))
                     .limit(pageSize)
                     .toList();
+        }
+
+        @Override
+        public Optional<AuditRowSnapshot> firstAtOrAfter(InstitutionId institutionId, Instant occurredAt) {
+            return rows.stream()
+                    .filter(row -> row.institutionId().equals(institutionId.value())
+                            && !row.occurredAt().isBefore(occurredAt))
+                    .min(Comparator.comparingLong(AuditRowSnapshot::id));
         }
     }
 }
