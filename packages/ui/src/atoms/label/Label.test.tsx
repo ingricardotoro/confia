@@ -32,9 +32,11 @@ describe("Label", () => {
   });
 
   it("renders a label element and not a generic one", () => {
-    const { container } = renderWithI18n(<Label htmlFor="amount">Monto a cobrar</Label>);
+    renderWithI18n(<Label htmlFor="amount">Monto a cobrar</Label>);
 
-    expect(container.querySelector("label")).toHaveAttribute("for", "amount");
+    const label = screen.getByText("Monto a cobrar");
+    expect(label.tagName).toBe("LABEL");
+    expect(label).toHaveAttribute("for", "amount");
   });
 
   it("reads its colors from semantic tokens", () => {

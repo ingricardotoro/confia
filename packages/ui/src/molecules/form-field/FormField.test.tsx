@@ -97,20 +97,21 @@ describe("FormField", () => {
     });
 
     it.each(["", "   "])("DS24: a description of %j is absent: no paragraph and no reference to it", (blank) => {
-      const { container } = renderWithI18n(field({ description: blank }));
+      renderWithI18n(field({ description: blank }));
       const control = screen.getByRole(role, { name: "Monto a cobrar" });
 
       expect(control).not.toHaveAttribute("aria-describedby");
-      expect(container.querySelectorAll("p")).toHaveLength(0);
+      // No paragraph anywhere in the render, at any depth.
+      expect(screen.queryAllByRole("paragraph")).toHaveLength(0);
     });
 
     it.each(["", "   "])("DS24: an error of %j is absent: not invalid, no paragraph and no reference", (blank) => {
-      const { container } = renderWithI18n(field({ error: blank }));
+      renderWithI18n(field({ error: blank }));
       const control = screen.getByRole(role, { name: "Monto a cobrar" });
 
       expect(control).not.toHaveAttribute("aria-invalid");
       expect(control).not.toHaveAttribute("aria-describedby");
-      expect(container.querySelectorAll("p")).toHaveLength(0);
+      expect(screen.queryAllByRole("paragraph")).toHaveLength(0);
     });
 
     it("DS24: with a blank description and a real error, it references only the error", () => {

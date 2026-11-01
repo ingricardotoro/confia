@@ -54,16 +54,21 @@ describe("Badge", () => {
   });
 
   it("hides the icon that accompanies the text from assistive technology", () => {
-    const { container } = renderWithI18n(<Badge icon={<Info />}>Etiqueta</Badge>);
+    // An icon with a role and a name can be found by a query; the component must take it out of the tree.
+    renderWithI18n(
+      <Badge icon={<Info role="img" aria-label="Información" />}>Etiqueta</Badge>,
+    );
 
-    expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("img", { name: "Información", hidden: true })).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Información" })).not.toBeInTheDocument();
     expect(screen.getByText("Etiqueta")).toBeInTheDocument();
   });
 
   it("renders no icon when none is given", () => {
-    const { container } = renderWithI18n(<Badge>Etiqueta</Badge>);
+    renderWithI18n(<Badge>Etiqueta</Badge>);
 
-    expect(container.querySelector("svg")).not.toBeInTheDocument();
+    // The badge holds only its text: no wrapper for an icon.
+    expect(screen.getByText("Etiqueta").children).toHaveLength(0);
   });
 
   it.each([

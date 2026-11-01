@@ -34,10 +34,11 @@ describe("Spinner", () => {
   });
 
   it("exposes only the status to assistive technology, not the drawing inside it", () => {
-    const { container } = renderWithI18n(<Spinner />);
+    renderWithI18n(<Spinner />);
 
-    // queryByRole("img") alone passes even without aria-hidden, so the attribute is asserted directly.
-    expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    // queryByRole("img") alone passes even without aria-hidden, so the attribute is asserted directly,
+    // on the drawing inside the status.
+    expect(screen.getByRole("status", { name: "Cargando" }).firstElementChild).toHaveAttribute("aria-hidden", "true");
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 });

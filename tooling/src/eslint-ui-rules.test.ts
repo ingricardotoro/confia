@@ -197,6 +197,91 @@ describe("primitive tokens and visual literals (design.md decisions 6 and 7)", (
   );
 });
 
+describe("queries in component tests (DS74)", () => {
+  const TEST = "src/atoms/button/Button.test.tsx";
+  const queries = [
+    ["querySelector", 'const found = container.querySelector("svg");'],
+    ["querySelectorAll", 'const found = container.querySelectorAll("p");'],
+    ["a querySelector by CSS class", 'const found = container.querySelector(".money-amount");'],
+    ["a querySelectorAll by CSS class", 'const found = container.querySelectorAll(".sr-only");'],
+    ["getElementsByClassName", 'const found = container.getElementsByClassName("sr-only");'],
+    ["getElementsByTagName", 'const found = badge.getElementsByTagName("svg");'],
+    ["getByTestId", 'const found = screen.getByTestId("total");'],
+    ["queryByTestId", 'const found = screen.queryByTestId("total");'],
+    ["findByTestId", 'const found = await screen.findByTestId("total");'],
+    ["getAllByTestId", 'const found = screen.getAllByTestId("total");'],
+    ["queryAllByTestId", 'const found = screen.queryAllByTestId("total");'],
+    ["findAllByTestId", 'const found = await screen.findAllByTestId("total");'],
+    ["a query taken from render()", 'const { getByTestId } = render(ui); getByTestId("total");'],
+    ["a query on an optional chain", 'const found = container?.querySelector("svg");'],
+  ] as const;
+
+  it.each(queries)("DS74: rejects %s in a *.test.tsx file", async (_name, code) => {
+    const found = await syntax(code, TEST);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatch(/^Query by structure or test id/);
+  });
+
+  it("DS74: reports the finding on the line of the query", async () => {
+    const [hit] = (await lint('const ok = 1;\nconst found = container.querySelector("svg");', TEST)).filter(
+      (m) => m.ruleId === "no-restricted-syntax",
+    );
+    expect(hit?.line).toBe(2);
+  });
+
+  it.each(["src/atoms/button/Button.test.tsx", "src/molecules/row/Row.test.tsx", "src/domain/money-amount/MoneyAmount.test.tsx"])(
+    "DS74: rejects it in %s, whichever scope the file belongs to",
+    async (filePath) => {
+      expect(await syntax('container.querySelector("svg");', filePath)).toHaveLength(1);
+    },
+  );
+
+  it("DS74: keeps the other controls of a test file next to the query rule", async () => {
+    // A later no-restricted-syntax entry replaces the earlier one, so the test scope repeats them.
+    const code = 'container.querySelector("svg"); export const css = "bg-blue-600"; (1).toFixed(2);';
+    const found = (await syntax(code, "src/atoms/button/Button.test.tsx")).map((m) => m.split(".")[0]);
+    expect(found.sort()).toEqual(["Manual number formatting", "Query by structure or test id", "Visual literal"]);
+  });
+
+  it("DS74: applies in src/format test files, where manual formatting is intentionally allowed", async () => {
+    const code = 'container.querySelector("svg"); (1).toFixed(2);';
+    const found = (await syntax(code, "src/format/money.test.tsx")).map((m) => m.split(".")[0]);
+    // The query is rejected; the manual-format control is not part of this scope.
+    expect(found).toEqual(["Query by structure or test id"]);
+  });
+
+  it("DS74: keeps the token and literal controls in src/format test files", async () => {
+    const code = 'export const css = "bg-blue-600";';
+    const found = (await syntax(code, "src/format/money.test.tsx")).map((m) => m.split(".")[0]);
+    expect(found).toEqual(["Visual literal"]);
+  });
+
+  it("DS74: *.a11y.test.tsx is outside the scope: computed-style tests reach elements directly", async () => {
+    const code = 'container.querySelector(".sr-only"); screen.getByTestId("total");';
+    for (const filePath of ["src/atoms/controls.a11y.test.tsx", "src/domain/money-amount/MoneyAmount.a11y.test.tsx"]) {
+      expect(await syntax(code, filePath), filePath).toEqual([]);
+    }
+  });
+
+  it.each(["src/atoms/button/Button.tsx", "src/atoms/button/Button.stories.tsx", "src/test/render.tsx"])(
+    "DS74: does not apply to %s, which is not a test file",
+    async (filePath) => {
+      expect(await syntax('container.querySelector("svg");', filePath)).toEqual([]);
+    },
+  );
+
+  it("DS74: accepts the Testing Library queries by role, label and text", async () => {
+    const code = [
+      'screen.getByRole("button", { name: "Guardar" });',
+      'screen.getByLabelText("Monto");',
+      'screen.getByText("Guardar");',
+      'screen.getByTitle("Pagado");',
+      'within(screen.getByRole("status")).queryByText("Cargando");',
+    ].join("\n");
+    expect(await syntax(code, TEST)).toEqual([]);
+  });
+});
+
 describe("requests (BX33)", () => {
   it.each([
     ['fetch("/api/v1/payments")', "fetch"],

@@ -1,4 +1,5 @@
 import { composeStories } from "@storybook/react-vite";
+import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { renderWithI18n } from "../../test/render";
 import { Skeleton } from "./Skeleton";
@@ -27,7 +28,11 @@ describe("Skeleton", () => {
     const { Loading } = composeStories(stories);
     const { container } = renderWithI18n(<Loading />);
 
-    expect(container.querySelectorAll('[aria-hidden="true"]').length).toBeGreaterThan(1);
-    expect(container.querySelector('[role="status"]')).toBeNull();
+    // The blocks have no role, so they are reached from the story: the avatar and the two lines.
+    const [avatar, lines] = container.firstElementChild?.children ?? [];
+    const blocks = [avatar, ...(lines?.children ?? [])];
+    expect(blocks.length).toBeGreaterThan(1);
+    for (const block of blocks) expect(block).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

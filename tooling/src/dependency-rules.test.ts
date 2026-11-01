@@ -91,8 +91,13 @@ describe("the frontend dependency rules", () => {
   // ADR-0018: a layer rule that matches no real file proves nothing. The components are .tsx files; if the
   // configuration stopped resolving that extension, the directory would still be scanned but nothing
   // would resolve into it, and every import of a component would be an unresolved name no rule matches.
+  // One cruise of packages/ui/src serves the three layers: it is the slowest step of this file, and the
+  // result is the same for each of them.
+  let uiTree: CruiseResult | undefined;
+  const uiTreeOnce = () => (uiTree ??= cruise(["packages/ui/src"]));
+
   it.each(LAYERS)("BX37: the real tree resolves imports into a component module of packages/ui/src/%s", (layer) => {
-    const reached = cruise(["packages/ui/src"]).modules.filter(
+    const reached = uiTreeOnce().modules.filter(
       (module) =>
         module.source.startsWith(`packages/ui/src/${layer}/`) && module.source.endsWith(".tsx") && module.dependents.length > 0,
     );

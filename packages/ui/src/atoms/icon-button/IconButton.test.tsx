@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Plus } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
@@ -7,14 +7,16 @@ import { IconButton } from "./IconButton";
 
 describe("IconButton", () => {
   it("DS15: is named by its mandatory label and the drawing is hidden from assistive technology", () => {
-    const { container } = renderWithI18n(
+    renderWithI18n(
       <IconButton label="Agregar cargo">
         <Plus />
       </IconButton>,
     );
 
-    expect(screen.getByRole("button", { name: "Agregar cargo" })).toHaveAttribute("type", "button");
-    expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    const button = screen.getByRole("button", { name: "Agregar cargo" });
+    expect(button).toHaveAttribute("type", "button");
+    // The drawing has no role, so it is reached from the button that holds it.
+    expect(button.firstElementChild).toHaveAttribute("aria-hidden", "true");
   });
 
   it.each([
@@ -62,9 +64,9 @@ describe("IconButton", () => {
   it("DS17: while loading it keeps its name, stays focusable, replaces the icon with a Spinner and ignores activation", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
-    const { container } = renderWithI18n(
+    renderWithI18n(
       <IconButton label="Agregar cargo" loading onClick={onClick}>
-        <Plus />
+        <Plus role="img" aria-label="Icono del llamador" />
       </IconButton>,
     );
 
@@ -77,7 +79,9 @@ describe("IconButton", () => {
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(button).toBeEnabled();
     expect(screen.getByRole("status", { name: "Cargando" })).toBeInTheDocument();
-    expect(container.querySelectorAll("svg")).toHaveLength(1);
+    // The icon of the caller was replaced, not kept next to the Spinner, at any depth of the render.
+    expect(screen.queryAllByRole("img", { hidden: true })).toHaveLength(0);
+    expect(within(button).getAllByRole("status")).toHaveLength(1);
     expect(onClick).not.toHaveBeenCalled();
   });
 

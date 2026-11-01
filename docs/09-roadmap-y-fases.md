@@ -221,6 +221,21 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    `openspec/changes/archive/2026-09-21-jooq-flyway-testcontainers-wiring/verify-report.md`.
 9. Respaldo en dos niveles según ADR-0014: respaldo automático de RDS con restauración a un punto en el tiempo dentro de AWS, más respaldo lógico nocturno cifrado y copia fuera de sitio en un proveedor distinto de AWS (brecha B10).
 10. Sistema de diseño base en `packages/ui` con tokens, átomos y verificación de accesibilidad automatizada.
+
+   > **Nota fechada 2026-11-01 (cambio `design-system-foundations-and-a11y`, 13a, PR 6
+   > `06-money-status-and-layers`): el entregable 10 queda cerrado; el criterio de salida 8 sigue
+   > abierto.** El cambio 13a entrega los tokens semánticos y de componente en modo claro y oscuro,
+   > los diecisiete componentes de `packages/ui` (átomos, moléculas y los dos de dominio,
+   > `MoneyAmount` y `StatusBadge`), el catálogo en Storybook y la puerta de accesibilidad con
+   > axe-core sobre cada historia en ambos temas (ADR-0026, en estado Propuesto), además de las
+   > reglas de capas en `dependency-cruiser` y su espejo en ESLint. Eso es el entregable 10 y se
+   > da por cerrado. **No cierra el criterio de salida 8**, «la verificación de accesibilidad no
+   > reporta violaciones críticas en las pantallas existentes»: hoy no existe ninguna pantalla, y
+   > un criterio que no evaluó nada no se declara cumplido (ADR-0018). Se asigna al cambio 13b,
+   > `admin-web-shell-and-staff-login`, que construye la primera pantalla real y debe ejecutar
+   > sobre ella la misma puerta de axe-core; el criterio se marca solo cuando esa verificación
+   > pase sobre esa pantalla.
+
 11. Semilla de datos ficticios para desarrollo y capacitación.
 12. Mecanismo de trabajos en segundo plano con db-scheduler sobre PostgreSQL (ADR-0016): tabla de tareas creada por migración de Flyway, programación dentro de la transacción del negocio a través del componente transaccional único (mecanismo validado con prueba), ejecutor solo en `confia-worker`, reintentos acotados con espera exponencial, métricas de tareas y alerta de cola atascada, y prohibiciones verificadas por ArchUnit y `maven-enforcer-plugin`.
 
