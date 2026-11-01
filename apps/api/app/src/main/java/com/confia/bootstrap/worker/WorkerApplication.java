@@ -1,6 +1,7 @@
 package com.confia.bootstrap.worker;
 
 import com.confia.identity.infrastructure.wiring.IdentityWorkerConfiguration;
+import com.confia.shared.infrastructure.wiring.SharedWorkerJobsConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.WorkerJobsConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.WorkerPlatformConfiguration;
 import org.springframework.boot.SpringBootConfiguration;
@@ -49,6 +50,6 @@ import org.springframework.context.annotation.Import;
 @EnableAutoConfiguration(exclude = {SecurityAutoConfiguration.class,
         UserDetailsServiceAutoConfiguration.class})
 @Import({WorkerPlatformConfiguration.class, WorkerJobsConfiguration.class,
-        IdentityWorkerConfiguration.class})
+        IdentityWorkerConfiguration.class, SharedWorkerJobsConfiguration.class})
 public class WorkerApplication {
 }

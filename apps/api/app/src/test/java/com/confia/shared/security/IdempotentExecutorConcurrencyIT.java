@@ -335,6 +335,11 @@ class IdempotentExecutorConcurrencyIT extends CommittingPostgresIntegrationTest 
                     IdempotentResponse response, Instant completedAt) {
                 delegate.complete(institutionId, key, response, completedAt);
             }
+
+            @Override
+            public long purgeExpired(Instant cutoff, int limit) {
+                return delegate.purgeExpired(cutoff, limit);
+            }
         };
     }
 }

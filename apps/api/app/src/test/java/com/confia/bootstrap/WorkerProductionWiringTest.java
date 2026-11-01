@@ -12,6 +12,7 @@ import com.confia.identity.application.PasswordResetLinkSender;
 import com.confia.identity.infrastructure.Argon2Pepper;
 import com.confia.identity.infrastructure.UnavailablePasswordResetLinkSender;
 import com.confia.identity.infrastructure.wiring.IdentityWorkerConfiguration;
+import com.confia.shared.infrastructure.wiring.SharedWorkerJobsConfiguration;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.crypto.ColumnEncryptionMasterKey;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
@@ -109,6 +110,22 @@ class WorkerProductionWiringTest {
             assertThat(context.getBeansOfType(PasswordResetLinkSender.class).values())
                     .as("the only sender of the worker fails explicitly")
                     .singleElement().isExactlyInstanceOf(UnavailablePasswordResetLinkSender.class);
+        } finally {
+            context.close();
+        }
+    }
+
+    /** Decision 12: the shared jobs of the worker are these beans, and no other of {@code shared.infrastructure.wiring}. */
+    @Test
+    void theWorkerHoldsTheExactBeansOfTheSharedJobsConfiguration() {
+        ConfigurableApplicationContext context = start("worker");
+        try {
+            assertThat(ProcessBeanInspector.confiaBeans(context))
+                    .filteredOn(bean -> bean.originPackages().stream().anyMatch(
+                            pkg -> ProcessBeanPolicy.matches(pkg, "com.confia.shared.infrastructure.wiring")))
+                    .extracting(InspectedBean::name)
+                    .containsExactlyInAnyOrder(SharedWorkerJobsConfiguration.class.getName(),
+                            "idempotencyRecordStore", "purgeExpiredIdempotencyKeys", "idempotencyKeyPurgeJob");
         } finally {
             context.close();
         }
