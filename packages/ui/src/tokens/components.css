@@ -16,6 +16,14 @@
   --button-subtle-bg-active: var(--color-border-subtle);
   --button-destructive-bg: var(--color-status-overdue-solid-bg);
   --button-destructive-fg: var(--color-primary-fg);
+  --badge-neutral-bg: var(--color-bg-canvas);
+  --badge-neutral-fg: var(--color-text-secondary);
+  --badge-neutral-border: var(--color-border-subtle);
+  --badge-primary-bg: var(--color-primary-soft-bg);
+  --badge-primary-fg: var(--color-primary-soft-fg);
+  --badge-primary-border: var(--color-primary-soft-bg);
+  --badge-outline-fg: var(--color-text-primary);
+  --badge-outline-border: var(--color-border-interactive);
   --status-badge-paid-bg: var(--color-status-paid-bg);
   --status-badge-paid-fg: var(--color-status-paid-fg);
   --status-badge-paid-border: var(--color-status-paid-border);
@@ -38,6 +46,13 @@
   --status-badge-refunded-fg: var(--color-status-refunded-fg);
   --status-badge-refunded-border: var(--color-status-refunded-border);
   --spinner-animation: confia-spin 1s linear infinite;
+  --input-bg: var(--color-bg-surface);
+  --input-fg: var(--color-text-primary);
+  --input-border: var(--color-border-interactive);
+  --input-placeholder: var(--color-text-tertiary);
+  --input-invalid-border: var(--color-status-overdue-border);
+  --skeleton-bg: var(--color-border-subtle);
+  --skeleton-animation: confia-pulse 2s ease-in-out infinite;
 }
 
 /* The one keyframe set in the package. It is global on purpose: the Tailwind theme is reset, so the
@@ -46,5 +61,13 @@
 @keyframes confia-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* The pulse of a Skeleton. Global for the same reason as confia-spin; the reduced-motion block of
+   base.css shortens it. */
+@keyframes confia-pulse {
+  50% {
+    opacity: 0.5;
   }
 }
