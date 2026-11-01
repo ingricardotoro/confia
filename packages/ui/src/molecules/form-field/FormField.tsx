@@ -28,9 +28,9 @@ export interface FormFieldControl {
 export interface FormFieldProps extends Omit<ComponentProps<"div">, "children"> {
   /** The visible label. A field without one has no name, which docs/ui-ux/03 section 5 forbids. */
   label: string;
-  /** Help shown under the control and read after the label. */
+  /** Help shown under the control and read after the label. Empty or blank text is no description. */
   description?: string;
-  /** The message of the current error. An empty string is no error. */
+  /** The message of the current error. Empty or blank text is no error. */
   error?: string;
   /** Marks the field as required, in text and for assistive technology. */
   required?: boolean;
@@ -59,8 +59,9 @@ export function FormField({
   const labelId = `${base}-label`;
   const descriptionId = `${base}-description`;
   const errorId = `${base}-error`;
-  const hasError = error !== undefined && error !== "";
-  const describedBy = [description === undefined ? null : descriptionId, hasError ? errorId : null]
+  const hasDescription = description !== undefined && description.trim() !== "";
+  const hasError = error !== undefined && error.trim() !== "";
+  const describedBy = [hasDescription ? descriptionId : null, hasError ? errorId : null]
     .filter((id) => id !== null)
     .join(" ");
 
@@ -83,11 +84,11 @@ export function FormField({
         ...(required ? { "aria-required": true as const } : {}),
         ...(disabled ? { disabled: true as const } : {}),
       })}
-      {description === undefined ? null : (
+      {hasDescription ? (
         <p id={descriptionId} className="text-sm text-text-secondary">
           {description}
         </p>
-      )}
+      ) : null}
       {hasError ? <FormError id={errorId}>{error}</FormError> : null}
     </div>
   );

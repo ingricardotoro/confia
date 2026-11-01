@@ -96,6 +96,33 @@ describe("FormField", () => {
       expect(control).toHaveAccessibleDescription(HINT);
     });
 
+    it.each(["", "   "])("DS24: a description of %j is absent: no paragraph and no reference to it", (blank) => {
+      const { container } = renderWithI18n(field({ description: blank }));
+      const control = screen.getByRole(role, { name: "Monto a cobrar" });
+
+      expect(control).not.toHaveAttribute("aria-describedby");
+      expect(container.querySelectorAll("p")).toHaveLength(0);
+    });
+
+    it.each(["", "   "])("DS24: an error of %j is absent: not invalid, no paragraph and no reference", (blank) => {
+      const { container } = renderWithI18n(field({ error: blank }));
+      const control = screen.getByRole(role, { name: "Monto a cobrar" });
+
+      expect(control).not.toHaveAttribute("aria-invalid");
+      expect(control).not.toHaveAttribute("aria-describedby");
+      expect(container.querySelectorAll("p")).toHaveLength(0);
+    });
+
+    it("DS24: with a blank description and a real error, it references only the error", () => {
+      renderWithI18n(field({ description: " ", error: MESSAGE }));
+      const control = screen.getByRole(role, { name: "Monto a cobrar" });
+
+      const ids = control.getAttribute("aria-describedby")?.split(" ") ?? [];
+      expect(ids).toEqual([screen.getByText(MESSAGE).id]);
+      for (const id of ids) expect(document.getElementById(id)?.textContent).not.toBe("");
+      expect(control).toHaveAccessibleDescription(MESSAGE);
+    });
+
     it("DS23: a required field says so in text and tells assistive technology", () => {
       renderWithI18n(field({ required: true }));
       const control = screen.getByRole(role, { name: /Monto a cobrar/ });
