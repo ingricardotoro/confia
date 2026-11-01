@@ -63,7 +63,7 @@ Hard order: 3.3 (V11) before 3.6 (V12).
 | T3.7 (5b-2b) | delegated writer | `05b2b-backoff-purge-jobs` | `8a19935` plus the evidence commit | 515 | BUILD SUCCESS 24 min 20 s; Surefire 186 + 2 631, Failsafe 776 | BUILD SUCCESS 48 min 27 s; PIT kernel 192/194, app 872/919; JaCoCo met | pending |
 | T3.8 (6) | delegated writer | `06-audit-chain-verification-cadences` | `3996209` | 385 | BUILD SUCCESS 17 min 53 s; Surefire 186 + 2 640, Failsafe 778 | not run (last branch of the task is 6c) | pending |
 | T3.8 (6b) | delegated writer | `06b-audit-chain-jobs` | `66eb21e` | 788 | BUILD SUCCESS 20 min 7 s; Surefire 186 + 2 668, Failsafe 778 | not run (last branch of the task is 6c) | pending |
-| T3.8 (6c) | delegated writer | `06c-audit-chain-job-integration` | `84b01a0` plus the evidence commit | 366 | BUILD SUCCESS 21 min 17 s; Surefire 186 + 2 668, Failsafe 785 | pending: the owner runs it in a terminal (it was reaped twice inside Claude Code); `app/pom.xml` PIT targets still lack `shared.audit` | pending |
+| T3.8 (6c) | delegated writer | `06c-audit-chain-job-integration` | `84b01a0` plus the evidence commit | 366 | BUILD SUCCESS 21 min 17 s; Surefire 186 + 2 668, Failsafe 785 | pending: the owner runs it in a terminal (it was reaped twice inside Claude Code); PIT targets now include `shared.audit` (`da7bca1`); 06c final tip `4487f61`, 498 lines vs 06b; verify BUILD SUCCESS 29 min 52 s, Surefire 186 + 2 671, Failsafe 785 | pending |
 
 Main CI: PR #211 (merge `972beae`) fixed the failing CI on `main` before PRs #212 to #214 were merged.
 
@@ -331,3 +331,14 @@ T3.4 evidence:
   `LoginTimingGateIT` measured 49 ms once, a timing flake unrelated to this change); 05a2 green (186, 2 619, 715; 9 min 36 s);
   05a2b green (186, 2 619, 726; 9 min 8 s). `-Pmutation-gate` on 05a2b green in 28 min 51 s.
 - Mutation gate (re-run after the decision): PIT kernel 192/194, app 872/919; JaCoCo met.
+
+T3.8 follow-up (2026-11-01), on 06c:
+
+- PIT widened to `com.confia.shared.audit.*` (owner decision, `da7bca1`); the mutation gate is pending for the owner in a terminal.
+- R3-001 decided as the id walk: `verifySince` verifies from the first row at or after `since` and every later row by id, because a hash chain must
+  not skip a link; Javadoc of the verifier, `AuditChainVerification.Intact` and the daily report now say so (`e832df5`). design.md/spec do not
+  require an `occurred_at` filter after the first row. Tests added: first-row content tamper (regression guard, passed immediately) and a
+  non-monotonic `occurred_at` case.
+- R3 alert: the `audit_chain_broken` ERROR is emitted before the entry write; a failed write emits `audit_chain_broken_entry_unwritten` and the
+  occurrence still fails with `AuditChainBrokenException` (`4487f61`). RED observed: the new unit test failed 1 of 10 against the old code.
+- `./mvnw -B verify`: BUILD SUCCESS, 29:52 min, Surefire 186 + 2 671, Failsafe 785, 0 failures. 06c vs 06b: 498 effective lines.
