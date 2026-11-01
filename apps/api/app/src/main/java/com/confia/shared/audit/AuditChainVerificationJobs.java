@@ -126,6 +126,12 @@ public final class AuditChainVerificationJobs {
         }
     }
 
+    /**
+     * {@code verifiedRows} is what the verifier walked: the whole chain for {@code weekly}, and for {@code daily} the
+     * id walk from the first row at or after the start of the window to the end (see {@link
+     * AuditChainVerifier#verifySince}), which can include rows older than the window when {@code occurred_at} is
+     * not monotonic in {@code id}.
+     */
     private static String verified(String scope, long verifiedRows) {
         return AuditJson.object().text("scope", scope).number("verifiedRows", verifiedRows).toJson();
     }

@@ -68,7 +68,9 @@ public final class DefaultAuditChainVerifier implements AuditChainVerifier {
     /**
      * Package-private for the same reason as {@link #walk}. The walk of the window: it starts at the first row
      * whose {@code occurred_at} is at or after {@code since} and takes that row's <em>stored</em> {@code
-     * prev_hash} as the running hash (decision 19), so the link to the row before it is not part of the check.
+     * prev_hash} as the running hash (decision 19), so the link to the row before it is not part of the check,
+     * and then it pages every later row by {@code id} with no further {@code occurred_at} filter, so no link is
+     * skipped and {@code verifiedRows} counts that whole id walk.
      */
     AuditChainVerification walkSince(InstitutionId institutionId, Instant since) {
         Optional<AuditRowSnapshot> first = reader.firstAtOrAfter(institutionId, since);

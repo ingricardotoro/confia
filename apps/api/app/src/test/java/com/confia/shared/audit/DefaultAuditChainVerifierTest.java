@@ -215,6 +215,50 @@ class DefaultAuditChainVerifierTest {
                 });
     }
 
+    /**
+     * Review R3-002: the link of the first row is skipped, its content is not. Altering the content of the first row
+     * of the window (its stored hashes untouched) is a row hash mismatch at that very row, with nothing verified yet.
+     */
+    @Test
+    void theContentOfTheFirstRowOfTheWindowIsStillRecalculatedAndATamperIsDetected() {
+        InstitutionId institutionId = randomInstitutionId();
+        List<AuditRowSnapshot> rows = new ArrayList<>(chainAt(institutionId, BEFORE, INSIDE, INSIDE));
+        rows.set(1, withReason(rows.get(1), "tampered"));
+
+        AuditChainVerification result = verifierOver(rows).walkSince(institutionId, SINCE);
+
+        assertThat(result).asInstanceOf(type(AuditChainVerification.Diverged.class)).satisfies(diverged -> {
+            assertThat(diverged.firstDivergentId()).isEqualTo(2L);
+            assertThat(diverged.verifiedRows()).isZero();
+            assertThat(diverged.divergence()).isEqualTo(AuditChainVerification.Divergence.ROW_HASH_MISMATCH);
+            assertThat(diverged.storedHash()).isEqualTo(rows.get(1).rowHash());
+        });
+    }
+
+    /**
+     * Review R3-001, the documented behaviour: after the first row at or after {@code since}, the walk is by id with
+     * no further filter on {@code occurred_at}, so a later row older than {@code since} is recalculated and counted.
+     */
+    @Test
+    void whenOccurredAtIsNotMonotonicTheWindowIsTheIdWalkFromItsFirstRow() {
+        InstitutionId institutionId = randomInstitutionId();
+        List<AuditRowSnapshot> rows = new ArrayList<>(chainAt(institutionId, BEFORE, INSIDE, BEFORE, INSIDE));
+
+        assertThat(verifierOver(rows).walkSince(institutionId, SINCE))
+                .asInstanceOf(type(AuditChainVerification.Intact.class))
+                .satisfies(intact -> {
+                    assertThat(intact.verifiedRows()).as("ids 2, 3 and 4, although id 3 is older than since")
+                            .isEqualTo(3L);
+                    assertThat(intact.lastRowHash()).isEqualTo(rows.get(3).rowHash());
+                });
+
+        rows.set(2, withRowHash(rows.get(2), randomBytes(32)));
+        assertThat(verifierOver(rows).walkSince(institutionId, SINCE))
+                .asInstanceOf(type(AuditChainVerification.Diverged.class))
+                .satisfies(diverged -> assertThat(diverged.firstDivergentId())
+                        .as("the older row in the middle of the id walk is not skipped").isEqualTo(3L));
+    }
+
     /** A window that starts after the genesis row never reports a missing genesis. */
     @Test
     void aWindowThatStartsAfterTheGenesisRowIsNotAMissingGenesis() {
@@ -325,6 +369,14 @@ class DefaultAuditChainVerifierTest {
                 row.traceId(), row.action(), row.entityType(), row.entityId(), row.outcome(),
                 row.beforeValue(), row.afterValue(), row.reason(), row.approverId(), row.prevHash(),
                 rowHash);
+    }
+
+    private static AuditRowSnapshot withReason(AuditRowSnapshot row, String reason) {
+        return new AuditRowSnapshot(row.id(), row.institutionId(), row.occurredAt(), row.actorId(),
+                row.actorKind(), row.actorLabel(), row.sourceIp(), row.userAgent(), row.requestId(),
+                row.traceId(), row.action(), row.entityType(), row.entityId(), row.outcome(),
+                row.beforeValue(), row.afterValue(), reason, row.approverId(), row.prevHash(),
+                row.rowHash());
     }
 
     private static byte[] randomBytes(int length) {
