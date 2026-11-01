@@ -42,3 +42,10 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Tabular numerals for every amount (docs/ui-ux/01 section 7.5). Unlayered and !important on purpose:
+   a utility class or an inline style from the caller must not be able to turn it off, because amounts
+   in a column only line up if every one of them is tabular. */
+.money-amount {
+  font-variant-numeric: tabular-nums !important;
+}

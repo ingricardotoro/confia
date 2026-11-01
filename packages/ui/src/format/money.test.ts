@@ -10,7 +10,7 @@ function asMoney(amount: unknown, currency: unknown): MoneyValue {
   return { amount, currency } as unknown as MoneyValue;
 }
 
-function formatted(result: FormattedMoney): { visual: string; spoken: string } {
+function formatted(result: FormattedMoney): Extract<FormattedMoney, { kind: "formatted" }> {
   if (result.kind !== "formatted") throw new Error("expected a formatted amount, got invalid");
   return result;
 }
@@ -116,5 +116,22 @@ describe("formatMoney never converts the amount to a number", () => {
     }
 
     expect(spies.map((spy) => spy.mock.calls.length)).toEqual([0, 0, 0, 0]);
+  });
+});
+
+describe("formatMoney reports the sign of the amount without computing", () => {
+  it.each([
+    ["3200.00", "positive"],
+    ["0.01", "positive"],
+    ["-0.01", "negative"],
+    ["-1500.00", "negative"],
+    ["0.00", "zero"],
+    ["-0.00", "zero"],
+    ["-0.0000", "zero"],
+    ["0", "zero"],
+  ] as const)("tags %s as %s", (amount, sign) => {
+    const result = formatted(formatMoney({ amount, currency: "HNL" }, LOCALE, PLAIN));
+
+    expect(result.sign).toBe(sign);
   });
 });

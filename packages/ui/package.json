@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "@confia/config": "workspace:*",
+    "@confia/contracts": "workspace:*",
     "@storybook/addon-a11y": "catalog:",
     "@storybook/react-vite": "catalog:",
     "@tailwindcss/vite": "catalog:",

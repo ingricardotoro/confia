@@ -12,6 +12,8 @@ export interface MoneyValue {
 
 export type MoneySign = "auto" | "always" | "accounting";
 
+export type MoneySignOfAmount = "negative" | "zero" | "positive";
+
 export interface MoneyFormatOptions {
   /**
    * `auto` shows a minus for negatives; `always` also shows a plus for positives (never for zero);
@@ -23,7 +25,13 @@ export interface MoneyFormatOptions {
 }
 
 export type FormattedMoney =
-  | { readonly kind: "formatted"; readonly visual: string; readonly spoken: string }
+  | {
+      readonly kind: "formatted";
+      readonly visual: string;
+      readonly spoken: string;
+      /** Sign read from the text of the amount, so a caller can tint by sign without parsing it. */
+      readonly sign: MoneySignOfAmount;
+    }
   | { readonly kind: "invalid" };
 
 const INVALID: FormattedMoney = { kind: "invalid" };
@@ -84,7 +92,8 @@ export function formatMoney(value: MoneyValue, locale: string, options: MoneyFor
   if (!isDecimalLiteral(amount) || !isKnownCurrency(currency)) return INVALID;
 
   // Zero is never shown negative or in parentheses: "-0.00" reads as 0.00.
-  const parenthesise = options.sign === "accounting" && amount.startsWith("-") && !ZERO_PATTERN.test(amount);
+  const isZero = ZERO_PATTERN.test(amount);
+  const parenthesise = options.sign === "accounting" && amount.startsWith("-") && !isZero;
   const signDisplay = options.sign === "always" ? "exceptZero" : "negative";
   const visualMode = options.hideCurrency ? "plain" : "currency";
 
@@ -95,7 +104,8 @@ export function formatMoney(value: MoneyValue, locale: string, options: MoneyFor
       ? `(${formatterFor(locale, currency, visualMode, "never").format(amount)})`
       : formatterFor(locale, currency, visualMode, signDisplay).format(amount);
     const spoken = formatterFor(locale, currency, "name", signDisplay).format(amount);
-    return { kind: "formatted", visual, spoken };
+    const sign = isZero ? "zero" : amount.startsWith("-") ? "negative" : "positive";
+    return { kind: "formatted", visual, spoken, sign };
   } catch {
     return INVALID;
   }
