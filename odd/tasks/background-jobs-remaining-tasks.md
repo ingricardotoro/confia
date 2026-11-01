@@ -36,12 +36,13 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 - [x] T3.6 Slice 5b-1 `05b-v12-purge-functions` (split: 5b-1 and 5b-1b).
 - [x] T3.7 Slice 5b-2 `05b-idempotency-and-backoff-jobs` (split: 5b-2 and 5b-2b).
 - [x] T3.8 Slice 6 `06-audit-chain-verification-cadences` (split: 6, 6b and 6c).
+- [x] T3.9 Slice 6d `06d-purge-null-arguments`: `V13` rejects a NULL `p_cutoff` or `p_limit` in the five purge functions (owner decision 2026-11-01). Before T4.1.
 - [ ] T4.1 Slice 7a `07a-queue-observability`.
 - [ ] T4.2 Slice 7b `07b-closing-notes` (notes).
 - [ ] T4.3 Slice 7b `07b-closing-notes` (closing).
 - [ ] Archive the SDD change.
 
-Hard order: 3.3 (V11) before 3.6 (V12).
+Hard order: 3.3 (V11) before 3.6 (V12); 3.9 (V13) after 3.8 and before 4.1.
 
 ## Progress
 
@@ -61,9 +62,10 @@ Hard order: 3.3 (V11) before 3.6 (V12).
 | T3.6 (5b-1b) | delegated writer | `05b1b-backoff-purge-versus-login` | `5f5108e` | 191 | BUILD SUCCESS 10 min 40 s; Surefire 186 + 2 623, Failsafe 762 | BUILD SUCCESS 31 min 49 s; PIT kernel 192/194, app 872/919; JaCoCo met | pending |
 | T3.7 (5b-2) | delegated writer | `05b2-idempotency-and-backoff-jobs` | `f172d58` | 641 | BUILD SUCCESS 19 min 2 s; Surefire 186 + 2 631, Failsafe 766 | not run (last branch of the task is 5b-2b) | pending |
 | T3.7 (5b-2b) | delegated writer | `05b2b-backoff-purge-jobs` | `8a19935` plus the evidence commit | 515 | BUILD SUCCESS 24 min 20 s; Surefire 186 + 2 631, Failsafe 776 | BUILD SUCCESS 48 min 27 s; PIT kernel 192/194, app 872/919; JaCoCo met | pending |
-| T3.8 (6) | delegated writer | `06-audit-chain-verification-cadences` | `3996209` | 385 | BUILD SUCCESS 17 min 53 s; Surefire 186 + 2 640, Failsafe 778 | not run (last branch of the task is 6c) | pending |
-| T3.8 (6b) | delegated writer | `06b-audit-chain-jobs` | `66eb21e` | 788 | BUILD SUCCESS 20 min 7 s; Surefire 186 + 2 668, Failsafe 778 | not run (last branch of the task is 6c) | pending |
-| T3.8 (6c) | delegated writer | `06c-audit-chain-job-integration` | `84b01a0` plus the evidence commit | 366 | BUILD SUCCESS 21 min 17 s; Surefire 186 + 2 668, Failsafe 785 | pending: the owner runs it in a terminal (it was reaped twice inside Claude Code); PIT targets now include `shared.audit` (`da7bca1`); 06c final tip `4487f61`, 498 lines vs 06b; verify BUILD SUCCESS 29 min 52 s, Surefire 186 + 2 671, Failsafe 785 | pending |
+| T3.8 (6) | delegated writer | `06-audit-chain-verification-cadences` | `3996209` | 385 | BUILD SUCCESS 17 min 53 s; Surefire 186 + 2 640, Failsafe 778 | not run (last branch of the task is 6c) | approved earlier; PR #236, merged to `main` `2f44bbb` |
+| T3.8 (6b) | delegated writer | `06b-audit-chain-jobs` | `66eb21e` | 788 | BUILD SUCCESS 20 min 7 s; Surefire 186 + 2 668, Failsafe 778 | not run (last branch of the task is 6c) | approved earlier; PR #237, merged to `main` `2f44bbb` |
+| T3.8 (6c) | delegated writer | `06c-audit-chain-job-integration` | `84b01a0` plus the evidence commit | 366 | BUILD SUCCESS 21 min 17 s; Surefire 186 + 2 668, Failsafe 785 | done: first pending because the owner runs it in a terminal (it was reaped twice inside Claude Code); PIT targets now include `shared.audit` (`da7bca1`); 06c final tip `4487f61`, 498 lines vs 06b; verify BUILD SUCCESS 29 min 52 s, Surefire 186 + 2 671, Failsafe 785; mutation gate run by the owner on `94b3b9a` plus the worker IT fix (see the T3.8 evidence); 06c final tip `d82ffb7`: verify BUILD SUCCESS 18 min 33 s, Surefire 186 + 2 673, Failsafe 785; mutation gate not rerun on `d82ffb7` by owner decision (option B); the PR CI mutation job passed | approved (lineage `review-1ba1ea3e148b3fb6`, acknowledged); PR #238, merged to `main` `2f44bbb` |
+| T3.9 (6d) | delegated writer | `06d-purge-null-arguments` | the commit `feat(db): reject null cutoff and limit arguments in the purge functions` (on `f71e50e`) | 598 | BUILD SUCCESS 20 min 55 s; Surefire 186 + 2 673, Failsafe 805 | pending owner (terminal) | pending |
 
 Main CI: PR #211 (merge `972beae`) fixed the failing CI on `main` before PRs #212 to #214 were merged.
 
@@ -152,8 +154,41 @@ T3.1 evidence:
 
 ## Next step
 
-T4.1, slice 7a `07a-queue-observability`. T3.8 is done on `06`, `06b` and `06c` (stacked on `main` 49ddc62); the mutation gate of 3.8 is pending
-(owner, terminal) and needs the PIT targets to include `shared.audit` first. ADR-0026 is reserved by frontend change 13a (Storybook).
+Owner on T3.9: the mutation gate in a terminal, review, push and PR of `06d-purge-null-arguments`. Then T4.1, slice 7a
+`07a-queue-observability`. (Superseded 2026-11-01: "T3.9, slice 6d `06d-purge-null-arguments` (`tasks.md` 3.9; spec BI117 and BI118;
+design decision 16, "Argumentos nulos"), then T4.1, slice 7a `07a-queue-observability`. T3.9 comes before T4.1. T3.8 is done: PRs #236,
+#237 and #238 are merged to `main` `2f44bbb`; 06c tip `d82ffb7`.")
+(Superseded 2026-11-01: "T4.1, slice 7a `07a-queue-observability`. T3.8 is done on `06`, `06b` and `06c` (stacked on `main` 49ddc62); the
+mutation gate of 3.8 is pending (owner, terminal) and needs the PIT targets to include `shared.audit` first.") ADR-0026 is reserved by frontend change 13a (Storybook).
+
+T3.9 evidence:
+
+- Route: delegated writer, one work unit, no split: 598 effective lines (additions plus deletions, without `openspec/` and `odd/`): V13 284,
+  `V13SchemaDiffIT` 141, `RetentionPurgeFunctionsIT` 92, `RefreshTokenFamilyPurgeFunctionIT` 68, ADR-0025 13. Over the 400 to 550 estimate
+  because V13 restates the five bodies in full; under the 800 PR limit.
+- RED, observed with V13 absent (focused run of the three ITs: 78 tests, 17 failures, 3 errors). `aNullCutoffFailsAndDeletesNothing` and
+  `aNullLimitFailsAndDeletesNothingNotEvenTheOneRowABatchOfOneWouldTake`, all five subjects, and the two new refresh cases failed with
+  `[a null cut-off must not become the floor and purge: the call must fail, not succeed] Expecting actual not to be null` (the call
+  succeeded and deleted). `theArgumentCheckComesBeforeTheContextAndTheActorChecks`, all five, failed with `Expecting actual: "ERROR:
+  confia_purge_context_missing ..." to contain: "confia_purge_argument_missing"`. `V13SchemaDiffIT`, three errors: `FlywayException: No
+  migration with a target version 13 could be found`.
+- GREEN: `V13__reject_null_purge_arguments.sql` built from the V11 and V12 function texts with only the two checks inserted after `BEGIN`
+  and `CREATE` turned into `CREATE OR REPLACE`; V12's repeated condition on the deleted row is kept. Focused run with `V11SchemaDiffIT`,
+  `V12SchemaDiffIT`, `RolePrivilegeMatrixIT` and `IdempotencyKeyPrivilegeIT`: 133 tests, 0 failures (the BUILD FAILURE of a focused run is
+  the JaCoCo check with no unit tests, as before).
+- Deliberate break, one run: `p_cutoff` check removed from `identity_purge_login_backoff`, `p_limit` check removed from
+  `shared_purge_idempotency_keys`, and every `REVOKE`/`GRANT` removed from V13. `RetentionPurgeFunctionsIT` failed 4 of 66, exactly
+  `aNullCutoffFailsAndDeletesNothing[4]` and `theArgumentCheckComesBefore...[4]` (login backoff) and `aNullLimitFails...[3]` and
+  `theArgumentCheckComesBefore...[3]` (idempotency keys), each `Expecting actual not to be null` or the context-missing message.
+  `V13SchemaDiffIT` (owner, definer, config and ACL equal before and after V13) and `RolePrivilegeMatrixIT` stayed green without any
+  `REVOKE`/`GRANT`: `CREATE OR REPLACE` keeps owner and privileges, as the PostgreSQL documentation states. Reverted and confirmed with `cmp`.
+- Decisions: the nullable call types its parameters (`?::timestamptz, ?::integer`) and uses `select *` so the scalar and the two `OUT`
+  columns share one helper; `RolePrivilegeMatrixIT` was not changed, it already asserts owner, `prosecdef`, `proconfig` and `EXECUTE` of
+  the five on the current schema. The generated jOOQ routines keep their signatures and types; only the comment text, which comes from
+  `COMMENT ON FUNCTION`, changed (diffed against a copy of `target/generated-sources/jooq` taken before the build). ADR-0025 had no
+  "Notas fechadas" section: it was created at the end, as in ADR-0005. `R3-null-cutoff-silently-uses-floor` (T3.3 evidence) and the
+  "kept from V11" note of T3.6 are closed by V13.
+- `./mvnw -B verify`: BUILD SUCCESS, 20:55 min; Surefire 186 + 2 673, Failsafe 805 (785 plus the 20 new cases), 0 failures; JaCoCo met.
 
 T3.8 evidence:
 - Mutation gate on 06c (`94b3b9a` plus the worker IT fix), run by the owner in PowerShell outside Claude Code on 2026-10-31:

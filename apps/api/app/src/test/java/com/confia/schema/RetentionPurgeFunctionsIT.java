@@ -29,10 +29,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
- * The {@code SECURITY DEFINER} purge functions of {@code V11} and {@code V12}
- * (background-jobs-with-db-scheduler design.md decision 16; specs/build-integrity/spec.md,
- * scenarios BI70 to BI82, BI104 to BI108 and identity scenarios I238 to I251, I257 to I261 and
- * I270 to I273), exercised as the real {@code confia_admin_app} role. The behaviour every function
+ * The {@code SECURITY DEFINER} purge functions of {@code V11} and {@code V12}, redefined by {@code
+ * V13} to reject null arguments (background-jobs-with-db-scheduler design.md decision 16;
+ * specs/build-integrity/spec.md, scenarios BI70 to BI82, BI104 to BI108, BI117 and BI118 and
+ * identity scenarios I238 to I251, I257 to I261 and I270 to I273), exercised as the real {@code confia_admin_app} role. The behaviour every function
  * shares is written once and run for each of them through {@link Subject}; the rules that belong to
  * refresh-token families alone are in {@link RefreshTokenFamilyPurgeFunctionIT}, and the race of the
  * login backoff purge with a login is in {@code BackoffPurgeVersusLoginIT}.
@@ -312,6 +312,18 @@ class RetentionPurgeFunctionsIT extends PostgresIntegrationTest {
             return purgeUsing(function, session, cutoff, limit);
         }
 
+        /**
+         * Calls the function with arguments that may be null, typed in the statement so a null is
+         * a null {@code timestamptz} or {@code integer} and never an unresolved literal, and returns
+         * what it raised, or null when it succeeded. {@code select *} reads the scalar result and
+         * the two {@code OUT} columns alike.
+         */
+        PurgeSession.Failure failureOfPurge(PurgeSession session, OffsetDateTime cutoff,
+                Integer limit) throws SQLException {
+            return session.failureOf("select * from " + checked(function)
+                    + "(?::timestamptz, ?::integer)", cutoff, limit);
+        }
+
         String call() {
             return function;
         }
@@ -462,6 +474,78 @@ class RetentionPurgeFunctionsIT extends PostgresIntegrationTest {
                     .as("a negative limit is raised to one").isEqualTo(1);
             assertThat(subject.remaining(session, institution)).isEqualTo(1);
         }
+    }
+
+    /**
+     * Scenario BI117: a null cut-off is a defect of the caller, never the floor. Before {@code V13}
+     * {@code LEAST} ignored the null and the function purged every row older than the floor.
+     */
+    @ParameterizedTest
+    @EnumSource(Subject.class)
+    void aNullCutoffFailsAndDeletesNothing(Subject subject) throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (PurgeSession session = PurgeSession.open(ADMIN).asSystemOf(institution)) {
+            subject.seedPurgeableAt(session, institution,
+                    subject.floorAt(session).minus(FAR_BEFORE_THE_FLOOR));
+            subject.seedPurgeableAt(session, institution, session.now());
+            long before = subject.remaining(session, institution);
+
+            PurgeSession.Failure failure = subject.failureOfPurge(session, null, 100);
+
+            assertArgumentMissing(failure, "a null cut-off must not become the floor and purge");
+            assertThat(subject.remaining(session, institution)).as("nothing was deleted")
+                    .isEqualTo(before).isEqualTo(2);
+        }
+    }
+
+    /**
+     * Scenario BI118: a null limit is a defect of the caller, never a batch of one. Before {@code
+     * V13} {@code GREATEST} raised it to 1 and the function deleted the one purgeable row; with both
+     * arguments null the error is the same.
+     */
+    @ParameterizedTest
+    @EnumSource(Subject.class)
+    void aNullLimitFailsAndDeletesNothingNotEvenTheOneRowABatchOfOneWouldTake(Subject subject)
+            throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (PurgeSession session = PurgeSession.open(ADMIN).asSystemOf(institution)) {
+            OffsetDateTime floor = subject.floorAt(session);
+            subject.seedPurgeableAt(session, institution, floor.minus(FAR_BEFORE_THE_FLOOR));
+
+            assertArgumentMissing(subject.failureOfPurge(session, floor, null),
+                    "a null limit must not become a batch of one");
+            assertThat(subject.remaining(session, institution))
+                    .as("the one row a batch of one would take is still there").isEqualTo(1);
+
+            assertArgumentMissing(subject.failureOfPurge(session, null, null),
+                    "both arguments null");
+            assertThat(subject.remaining(session, institution)).as("nothing was deleted")
+                    .isEqualTo(1);
+        }
+    }
+
+    /**
+     * Scenario BI117: the arguments are checked before the institution context and the actor, so a
+     * session that is also wrong still reports the null argument as the cause.
+     */
+    @ParameterizedTest
+    @EnumSource(Subject.class)
+    void theArgumentCheckComesBeforeTheContextAndTheActorChecks(Subject subject)
+            throws SQLException {
+        try (PurgeSession session = PurgeSession.open(ADMIN)) {
+            session.context(null).actor("staff");
+
+            assertArgumentMissing(subject.failureOfPurge(session, null, 100),
+                    "a null cut-off without context and with the staff actor");
+            assertArgumentMissing(subject.failureOfPurge(session, session.now(), null),
+                    "a null limit without context and with the staff actor");
+        }
+    }
+
+    private static void assertArgumentMissing(PurgeSession.Failure failure, String description) {
+        assertThat(failure).as("%s: the call must fail, not succeed", description).isNotNull();
+        assertThat(failure.sqlState()).as(description).isEqualTo("P0001");
+        assertThat(failure.message()).as(description).contains("confia_purge_argument_missing");
     }
 
     @ParameterizedTest
