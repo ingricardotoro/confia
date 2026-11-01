@@ -153,6 +153,14 @@ T3.8, slice 6 `06-audit-chain-verification-cadences` (3.7 is done on `05b2` and 
 frontend change 13a (Storybook).
 
 T3.7 evidence:
+- Owner decision 2026-10-31: PIT widened to `com.confia.shared.security.*` (targetClasses and targetTests in `apps/api/app/pom.xml`),
+  as task 3.7 asks, because `RetentionPurgeBatches` moved there and was not mutation-tested. The mutation gate was run by the owner
+  in a PowerShell terminal outside Claude Code (two earlier runs inside it were reaped for low memory). Figures read from
+  `mutations.xml`: kernel 192/194 (99 %); app 1 163/1 259 (92 %, 18 without coverage, test strength 94 %), up from 919 mutants;
+  `shared.security` without `token` and `csrf` 291/340 (85.6 %, killed plus timed out). All above the 80 threshold.
+- Follow-ups on 05b2b: `package-info.java` of `shared/observability/events` now names `com.confia.shared.security.RetentionPurgeBatches`
+  (`57853cc`); `JdbcStubTransactions` moved to `com.confia.support` so shared tests no longer import a module helper (`0f6c82d`).
+
 
 - Split: the whole task measured 1 156 effective lines (additions plus deletions, without `openspec/` and `odd/`; docs/07 included), over
   the 800 limit. `tasks.md` names no seam for 3.7 (only the one between 3.6 and 3.7), so the V11 and 3.4 precedent was followed, whole files
