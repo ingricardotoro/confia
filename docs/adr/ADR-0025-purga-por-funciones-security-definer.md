@@ -223,3 +223,16 @@ Todo lo siguiente se ejecuta en integración continua y una falla rompe la const
 - `openspec/changes/background-jobs-with-db-scheduler/design.md`, decisiones 16, 17 y 22, y sección 13 (D-N3)
 - `openspec/changes/background-jobs-with-db-scheduler/proposal.md`, decisiones P2 y P3
 - [PostgreSQL: escribir funciones `SECURITY DEFINER` de forma segura](https://www.postgresql.org/docs/current/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY)
+
+## Notas fechadas
+
+Estas notas se añaden sin modificar el texto original de este ADR.
+
+### Nota fechada 2026-11-01: la condición de purga se repite sobre la fila borrada
+
+Registra una precisión de la tarea 3.6 del cambio `background-jobs-with-db-scheduler` (migración `V12`).
+
+1. **Comportamiento de PostgreSQL.** Un `DELETE ... WHERE clave IN (SELECT ... LIMIT n)` que espera por una actualización concurrente de la fila que va a borrar solo vuelve a evaluar, al terminar la espera, las condiciones escritas sobre esa fila. La subconsulta no se reevalúa: se reutiliza su resultado anterior. Si la condición de purga solo está en la subconsulta, una fila que la transacción concurrente acaba de renovar se borra igual.
+2. **Regla.** Toda función de purga cuyas filas puedan renovarse repite su condición (el filtro de institución y el corte) en el `WHERE` de la fila borrada, además de la subconsulta que acota el lote. Las tres funciones de `V12` lo hacen. El caso que lo motivó: un inicio de sesión que renueva su registro de retroceso mientras la purga espera, y que sin la condición repetida perdería el registro recién renovado.
+3. **Alcance.** Las funciones de `V11` no lo necesitan para ser correctas, porque un token de restablecimiento vencido o una familia de sesión revocada nunca vuelven a ser válidos. Aun así, una función nueva sigue la regla del punto 2 salvo que demuestre, con la misma clase de argumento, que sus filas no pueden renovarse.
+4. **Verificación.** `BackoffPurgeVersusLoginIT` reproduce la carrera sobre PostgreSQL real. Sin la condición repetida, el registro renovado desaparece (se esperaba 0 filas borradas y se obtuvo 1).
