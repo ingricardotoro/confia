@@ -15,6 +15,8 @@ const UNAVAILABLE = "Importe no disponible";
 function rootOf(container: HTMLElement): HTMLElement {
   const root = container.firstElementChild;
   if (!(root instanceof HTMLElement)) throw new Error("nothing was rendered");
+  // The class carries the tabular numerals, so every lookup through the root also proves it.
+  expect(root).toHaveClass("money-amount");
   return root;
 }
 
@@ -27,6 +29,8 @@ function visualOf(container: HTMLElement): string {
 function spokenOf(container: HTMLElement): string {
   const spoken = rootOf(container).lastElementChild;
   expect(spoken).not.toHaveAttribute("aria-hidden");
+  // Visually hidden, or the amount would show twice.
+  expect(spoken).toHaveClass("sr-only");
   return spoken?.textContent ?? "";
 }
 
