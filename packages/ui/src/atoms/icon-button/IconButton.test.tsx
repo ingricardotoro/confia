@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Plus } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
@@ -66,7 +66,7 @@ describe("IconButton", () => {
     const onClick = vi.fn();
     renderWithI18n(
       <IconButton label="Agregar cargo" loading onClick={onClick}>
-        <Plus />
+        <Plus role="img" aria-label="Icono del llamador" />
       </IconButton>,
     );
 
@@ -79,8 +79,9 @@ describe("IconButton", () => {
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(button).toBeEnabled();
     expect(screen.getByRole("status", { name: "Cargando" })).toBeInTheDocument();
-    // Only the Spinner is inside: the icon of the caller was replaced, not kept next to it.
-    expect(button.children).toHaveLength(1);
+    // The icon of the caller was replaced, not kept next to the Spinner, at any depth of the render.
+    expect(screen.queryAllByRole("img", { hidden: true })).toHaveLength(0);
+    expect(within(button).getAllByRole("status")).toHaveLength(1);
     expect(onClick).not.toHaveBeenCalled();
   });
 

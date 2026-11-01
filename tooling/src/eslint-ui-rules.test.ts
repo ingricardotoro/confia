@@ -243,6 +243,19 @@ describe("queries in component tests (DS74)", () => {
     expect(found.sort()).toEqual(["Manual number formatting", "Query by structure or test id", "Visual literal"]);
   });
 
+  it("DS74: applies in src/format test files, where manual formatting is intentionally allowed", async () => {
+    const code = 'container.querySelector("svg"); (1).toFixed(2);';
+    const found = (await syntax(code, "src/format/money.test.tsx")).map((m) => m.split(".")[0]);
+    // The query is rejected; the manual-format control is not part of this scope.
+    expect(found).toEqual(["Query by structure or test id"]);
+  });
+
+  it("DS74: keeps the token and literal controls in src/format test files", async () => {
+    const code = 'export const css = "bg-blue-600";';
+    const found = (await syntax(code, "src/format/money.test.tsx")).map((m) => m.split(".")[0]);
+    expect(found).toEqual(["Visual literal"]);
+  });
+
   it("DS74: *.a11y.test.tsx is outside the scope: computed-style tests reach elements directly", async () => {
     const code = 'container.querySelector(".sr-only"); screen.getByTestId("total");';
     for (const filePath of ["src/atoms/controls.a11y.test.tsx", "src/domain/money-amount/MoneyAmount.a11y.test.tsx"]) {

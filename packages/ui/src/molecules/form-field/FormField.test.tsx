@@ -101,8 +101,8 @@ describe("FormField", () => {
       const control = screen.getByRole(role, { name: "Monto a cobrar" });
 
       expect(control).not.toHaveAttribute("aria-describedby");
-      // The field holds its label and its control and nothing else: no paragraph.
-      expect(control.parentElement?.children).toHaveLength(2);
+      // No paragraph anywhere in the render, at any depth.
+      expect(screen.queryAllByRole("paragraph")).toHaveLength(0);
     });
 
     it.each(["", "   "])("DS24: an error of %j is absent: not invalid, no paragraph and no reference", (blank) => {
@@ -111,7 +111,7 @@ describe("FormField", () => {
 
       expect(control).not.toHaveAttribute("aria-invalid");
       expect(control).not.toHaveAttribute("aria-describedby");
-      expect(control.parentElement?.children).toHaveLength(2);
+      expect(screen.queryAllByRole("paragraph")).toHaveLength(0);
     });
 
     it("DS24: with a blank description and a real error, it references only the error", () => {

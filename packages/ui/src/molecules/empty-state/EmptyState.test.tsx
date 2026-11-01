@@ -21,9 +21,9 @@ describe("EmptyState", () => {
   it("renders without a description", () => {
     renderWithI18n(<EmptyState title="Sin cargos" action={{ label: "Agregar cargo", onAction: vi.fn() }} />);
 
-    // The title is alone in its block: no second, empty paragraph where the description would go.
+    // The title is the only paragraph of the whole render: no empty one where the description would go.
     expect(screen.getByText("Sin cargos")).toBeVisible();
-    expect(screen.getByText("Sin cargos").parentElement?.children).toHaveLength(1);
+    expect(screen.getAllByRole("paragraph")).toEqual([screen.getByText("Sin cargos")]);
   });
 
   it("DS26: offers the action as a control named by its label, called once per activation", async () => {
