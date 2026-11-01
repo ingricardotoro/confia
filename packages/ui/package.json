@@ -23,6 +23,7 @@
     "i18next-icu": "catalog:",
     "intl-messageformat": "catalog:",
     "lucide-react": "catalog:",
+    "radix-ui": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-i18next": "catalog:",

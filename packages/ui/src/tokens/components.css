@@ -51,6 +51,10 @@
   --input-border: var(--color-border-interactive);
   --input-placeholder: var(--color-text-tertiary);
   --input-invalid-border: var(--color-status-overdue-border);
+  --choice-bg: var(--color-bg-surface);
+  --choice-border: var(--color-border-interactive);
+  --choice-checked-bg: var(--color-primary);
+  --choice-checked-fg: var(--color-primary-fg);
   --skeleton-bg: var(--color-border-subtle);
   --skeleton-animation: confia-pulse 2s ease-in-out infinite;
 }

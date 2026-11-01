@@ -10,11 +10,11 @@ const UI_ROOT = join(import.meta.dirname, "..", "..");
 describe("the atoms of 4.1, 4.2 and 5.1 under the UI lint rules", () => {
   it("DS06: lint without errors, over a non-empty set that includes each component", async () => {
     const eslint = new ESLint({ cwd: UI_ROOT });
-    const results = await eslint.lintFiles(["src/atoms/button", "src/atoms/icon-button", "src/atoms/label", "src/atoms/badge", "src/atoms/separator", "src/atoms/skeleton", "src/atoms/input", "src/atoms/textarea"]);
+    const results = await eslint.lintFiles(["src/atoms/button", "src/atoms/icon-button", "src/atoms/label", "src/atoms/badge", "src/atoms/separator", "src/atoms/skeleton", "src/atoms/input", "src/atoms/textarea", "src/atoms/checkbox", "src/atoms/radio-group"]);
     const evaluated = results.map((r) => r.filePath.replaceAll("\\", "/"));
 
     expect(evaluated.length).toBeGreaterThan(0);
-    for (const component of ["button/Button.tsx", "icon-button/IconButton.tsx", "label/Label.tsx", "badge/Badge.tsx", "separator/Separator.tsx", "skeleton/Skeleton.tsx", "input/Input.tsx", "textarea/Textarea.tsx"]) {
+    for (const component of ["button/Button.tsx", "icon-button/IconButton.tsx", "label/Label.tsx", "badge/Badge.tsx", "separator/Separator.tsx", "skeleton/Skeleton.tsx", "input/Input.tsx", "textarea/Textarea.tsx", "checkbox/Checkbox.tsx", "radio-group/RadioGroup.tsx"]) {
       expect(evaluated.some((p) => p.endsWith(`/src/atoms/${component}`))).toBe(true);
     }
 
