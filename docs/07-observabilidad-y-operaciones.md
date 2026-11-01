@@ -971,6 +971,27 @@ programar (ADR-0014).
 > tablas. Una purga que falla en una institución no impide la siguiente y deja la ocurrencia registrada como
 > fallida.
 
+> **Nota fechada 2026-10-31 (cambio `background-jobs-with-db-scheduler`, tarea 3.8): las cadencias diaria y
+> semanal del verificador de la cadena de auditoría.** `confia-worker` ejecuta dos tareas recurrentes más, una vez
+> por cada institución configurada y en `America/Tegucigalpa`. La cadencia horaria contra el ancla externa no
+> existe: pertenece al cambio `audit-chain-hourly-anchor-verification`.
+>
+> | Tarea | Calendario | Qué verifica |
+> |---|---|---|
+> | `shared.audit-chain-verification-daily` | Diaria, 03:00 | Desde las 00:00 del primer día del mes anterior hasta el momento de la ejecución. Es el mes de calendario, no una ventana móvil de 30 días (decisión del propietario D-N2) |
+> | `shared.audit-chain-verification-weekly` | Domingo, 03:30 | La cadena completa desde su registro génesis |
+>
+> El resultado de cada institución se escribe después del recorrido, en una transacción aparte: íntegra, el asiento
+> `shared.audit.chain_verified` (alcance `daily` o `weekly` y filas verificadas) y el evento `INFO`
+> `audit_chain_verified`; sin filas en el alcance, el mismo asiento con cero filas y la advertencia
+> `audit_chain_empty_for_configured_institution`, que suele indicar un identificador de institución mal
+> configurado; divergente, el asiento `shared.audit.chain_verification_failed` con la primera fila divergente y el
+> tipo de divergencia, y el evento `ERROR` `audit_chain_broken`, que es la alerta S1 `AuditChainBroken`. Después de
+> una divergencia la ocurrencia termina como fallida y visible. Ninguna ocurrencia se reintenta: un fallo técnico
+> reprograma la tarea a su próxima ocurrencia y no deja asiento. La cadena nunca se repara ni se toca una fila.
+> El resultado del asiento de una verificación fallida es `error`, porque la restricción de la tabla admite
+> `success`, `denied` y `error`. La tabla completa de tareas se cierra en la tarea 4.2.
+
 ### 11.1 Comandos de operación manual
 
 ```bash

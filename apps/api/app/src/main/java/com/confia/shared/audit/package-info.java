@@ -14,6 +14,11 @@
  * {@code infrastructure} (ADR-0015 rule 4, R1; design.md decision 11, "Dónde vive, contra las
  * reglas de dependencia").
  *
+ * <p>{@link com.confia.shared.audit.AuditChainVerificationJobs} is the first class here that consumes {@code
+ * com.confia.shared.jobs}: it builds the two recurring jobs of the chain verifier (daily from the start of the
+ * previous month, weekly from the genesis row) as the port describes them, never with a type of the scheduling
+ * library (background-jobs-with-db-scheduler design.md, decision 19).
+ *
  * <p><b>{@code @NamedInterface} (ADR-0022).</b> Like {@link com.confia.shared.security},
  * {@code identity-module-and-password-authentication} (PR C3) needs {@code identity.application}
  * to consume {@link com.confia.shared.audit.AuditLogWriter} across the module boundary Spring

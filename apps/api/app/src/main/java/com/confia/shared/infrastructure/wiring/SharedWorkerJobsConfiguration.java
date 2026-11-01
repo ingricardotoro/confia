@@ -1,6 +1,12 @@
 package com.confia.shared.infrastructure.wiring;
 
+import com.confia.shared.audit.AuditChainVerificationJobs;
+import com.confia.shared.audit.AuditChainVerifier;
+import com.confia.shared.audit.AuditLogReader;
 import com.confia.shared.audit.AuditLogWriter;
+import com.confia.shared.audit.CanonicalAuditRowSerializer;
+import com.confia.shared.audit.DefaultAuditChainVerifier;
+import com.confia.shared.infrastructure.JooqAuditLogReader;
 import com.confia.shared.infrastructure.JooqIdempotencyRecordStore;
 import com.confia.shared.jobs.JobCalendar;
 import com.confia.shared.jobs.JobDefinition;
@@ -17,9 +23,10 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * The jobs of the {@code shared} module for the worker process (background-jobs-with-db-scheduler
- * design.md decisions 12 and 17). The first version holds the purge of idempotency keys: the store over
- * the {@code SECURITY DEFINER} function, the use case and its recurring job. The chain verifier and the
- * observation of the queue arrive with the tasks that own them. It takes the {@code DSLContext}, the
+ * design.md decisions 12, 17 and 19). It holds the purge of idempotency keys (the store over the {@code
+ * SECURITY DEFINER} function, the use case and its recurring job) and the audit-chain verification (the
+ * reader, the serializer, the verifier and the daily and weekly jobs). The observation of the queue arrives
+ * with the task that owns it. It takes the {@code DSLContext}, the
  * transactional component, the audit writer and the clock from {@code WorkerPlatformConfiguration}, and
  * declares no key, no pepper and no request origin.
  *
@@ -47,5 +54,39 @@ public class SharedWorkerJobsConfiguration {
     JobDefinition idempotencyKeyPurgeJob(PurgeExpiredIdempotencyKeys purge) {
         return new RecurringJob(PurgeExpiredIdempotencyKeys.TASK_NAME,
                 new JobCalendar.DailyAt(LocalTime.of(4, 40)), purge);
+    }
+
+    @Bean
+    AuditLogReader auditLogReader(DSLContext dsl) {
+        return new JooqAuditLogReader(dsl);
+    }
+
+    @Bean
+    CanonicalAuditRowSerializer canonicalAuditRowSerializer() {
+        return new CanonicalAuditRowSerializer();
+    }
+
+    @Bean
+    AuditChainVerifier auditChainVerifier(TransactionRunner runner, AuditLogReader reader,
+            CanonicalAuditRowSerializer serializer) {
+        return new DefaultAuditChainVerifier(runner, reader, serializer);
+    }
+
+    @Bean
+    AuditChainVerificationJobs auditChainVerificationJobs(TransactionRunner runner, AuditChainVerifier verifier,
+            AuditLogWriter auditLogWriter, Clock clock) {
+        return new AuditChainVerificationJobs(runner, verifier, auditLogWriter, new OperationalEventLog(), clock);
+    }
+
+    /** Every day at 03:00 in Tegucigalpa, from the start of the previous month, for each configured institution. */
+    @Bean
+    JobDefinition auditChainDailyVerificationJob(AuditChainVerificationJobs jobs) {
+        return jobs.daily();
+    }
+
+    /** Every Sunday at 03:30 in Tegucigalpa, over the whole chain, for each configured institution. */
+    @Bean
+    JobDefinition auditChainWeeklyVerificationJob(AuditChainVerificationJobs jobs) {
+        return jobs.weekly();
     }
 }

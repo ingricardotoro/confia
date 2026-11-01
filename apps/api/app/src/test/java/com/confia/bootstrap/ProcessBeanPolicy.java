@@ -161,6 +161,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // The shared jobs of the worker (decision 12): the configuration that declares
                     // the idempotency store, its purge and the recurring job (exact, like every entry).
                     "com.confia.shared.infrastructure.wiring",
+                    // The audit-chain verifier and its two cadences (decision 19): the serializer, the
+                    // verifier and the jobs are beans of this package (exact, like every entry).
+                    "com.confia.shared.audit",
                     // The worker's executor and the institutions it acts on (decision 12).
                     "com.confia.shared.jobs.infrastructure",
                     // The job definition a module registers is a bean of the port package itself:
