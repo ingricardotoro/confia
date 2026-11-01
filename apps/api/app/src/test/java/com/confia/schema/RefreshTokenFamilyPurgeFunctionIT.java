@@ -12,7 +12,8 @@ import org.junit.jupiter.api.Test;
 /**
  * The rules of {@code identity_purge_refresh_token_families} that belong to refresh-token families
  * and their tokens (background-jobs-with-db-scheduler design.md decision 16; identity scenarios
- * I244 to I249, I272 and I273 and build-integrity scenarios BI106 and BI107), as the real {@code
+ * I244 to I249, I272 and I273 and build-integrity scenarios BI106, BI107, BI117 and BI118), as the
+ * real {@code
  * confia_admin_app} role. What every purge function shares is in {@link RetentionPurgeFunctionsIT}.
  * The database clock rules of that class apply here: every instant is anchored on the {@code now()}
  * of the transaction that seeds and calls.
@@ -22,6 +23,9 @@ class RefreshTokenFamilyPurgeFunctionIT extends PostgresIntegrationTest {
     private static final String ADMIN = "confia_admin_app";
     private static final String PURGE =
             "select purged_families, purged_tokens from identity_purge_refresh_token_families(?, ?)";
+    /** The same call with typed parameters, so either argument can be bound as a typed null. */
+    private static final String PURGE_NULLABLE = "select purged_families, purged_tokens "
+            + "from identity_purge_refresh_token_families(?::timestamptz, ?::integer)";
 
     @Test
     void aFamilyRevokedTwentyNineDaysAgoIsKeptAndOneRevokedThirtyOneDaysAgoIsPurged()
@@ -180,6 +184,68 @@ class RefreshTokenFamilyPurgeFunctionIT extends PostgresIntegrationTest {
                 assertThat(familyExists(session, family)).isTrue();
             }
         }
+    }
+
+    /**
+     * Scenario BI117: with a null cut-off the function fails without returning its two outputs, and
+     * no family and no token is deleted. Before {@code V13} the cut-off became the 30-day floor.
+     */
+    @Test
+    void aNullCutoffFailsAndNoFamilyAndNoTokenIsDeleted() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (PurgeSession session = PurgeSession.open(ADMIN).asSystemOf(institution)) {
+            seedOldFamilyWithAChain(session, institution);
+
+            PurgeSession.Failure failure = session.failureOf(PURGE_NULLABLE, null, 100);
+
+            assertArgumentMissing(failure, "a null cut-off");
+            assertThat(familiesAndTokens(session, institution)).as("families and tokens")
+                    .containsExactly(1, 2);
+        }
+    }
+
+    /**
+     * Scenario BI118: with a null limit and a cut-off at the floor the function fails without
+     * returning its two outputs, and the one family a batch of one would take keeps every token.
+     */
+    @Test
+    void aNullLimitFailsAndNoFamilyAndNoTokenIsDeleted() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (PurgeSession session = PurgeSession.open(ADMIN).asSystemOf(institution)) {
+            seedOldFamilyWithAChain(session, institution);
+
+            PurgeSession.Failure failure = session.failureOf(PURGE_NULLABLE,
+                    session.now().minusDays(30), null);
+
+            assertArgumentMissing(failure, "a null limit");
+            assertThat(familiesAndTokens(session, institution)).as("families and tokens")
+                    .containsExactly(1, 2);
+        }
+    }
+
+    /** A family revoked 40 days ago, older than the floor, with a chain of two tokens. */
+    private static void seedOldFamilyWithAChain(PurgeSession session, UUID institution)
+            throws SQLException {
+        OffsetDateTime old = session.now().minusDays(40);
+        UUID family = session.seedFamily(institution, session.seedAccount(institution), old,
+                old.plusDays(365), old);
+        seedChain(session, institution, family, 2);
+    }
+
+    private static long[] familiesAndTokens(PurgeSession session, UUID institution)
+            throws SQLException {
+        return new long[] {
+            session.count("select count(*) from identity_refresh_token_family "
+                    + "where institution_id = ?", institution),
+            session.count("select count(*) from identity_refresh_token where institution_id = ?",
+                    institution)};
+    }
+
+    private static void assertArgumentMissing(PurgeSession.Failure failure, String description) {
+        assertThat(failure).as("%s: the call must fail, not return its outputs", description)
+                .isNotNull();
+        assertThat(failure.sqlState()).as(description).isEqualTo("P0001");
+        assertThat(failure.message()).as(description).contains("confia_purge_argument_missing");
     }
 
     /** A chain of {@code length} tokens: each consumed one names the next, the last is open. */
