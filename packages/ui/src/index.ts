@@ -7,3 +7,4 @@ export { Badge, type BadgeProps } from "./atoms/badge";
 export { Separator, type SeparatorProps } from "./atoms/separator";
 export { Skeleton, type SkeletonProps } from "./atoms/skeleton";
 export { Input, type InputProps } from "./atoms/input";
+export { Textarea, type TextareaProps } from "./atoms/textarea";
