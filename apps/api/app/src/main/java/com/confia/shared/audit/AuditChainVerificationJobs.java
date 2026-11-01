@@ -33,7 +33,9 @@ import java.util.Objects;
  *       institution always has entries, so the result usually means a mistyped identifier;
  *   <li>diverged: the entry {@value #FAILED_ACTION} with the outcome {@code error}, the first divergent id
  *       and the kind of divergence, and an {@code ERROR} {@value #BROKEN_EVENT}, the S1 alert of
- *       docs/03-seguridad.md section 12.4.
+ *       docs/03-seguridad.md section 12.4. The alert is emitted before the entry and does not depend on it: when the
+ *       entry cannot be written the occurrence still fails as a broken chain, and a second {@code ERROR}
+ *       {@value #ENTRY_UNWRITTEN_EVENT} reports the failed write.
  * </ul>
  *
  * <p>The chain is never repaired, and no row is touched. The cadence of an hour against an external anchor is
@@ -50,6 +52,7 @@ public final class AuditChainVerificationJobs {
     public static final String VERIFIED_EVENT = "audit_chain_verified";
     public static final String EMPTY_EVENT = "audit_chain_empty_for_configured_institution";
     public static final String BROKEN_EVENT = "audit_chain_broken";
+    public static final String ENTRY_UNWRITTEN_EVENT = "audit_chain_broken_entry_unwritten";
 
     /** The zone of the institution; Tegucigalpa is the only one in F0. Honduras has no daylight saving time. */
     private static final ZoneId ZONE = ZoneId.of("America/Tegucigalpa");
@@ -114,18 +117,45 @@ public final class AuditChainVerificationJobs {
                         details("scope", scope));
             }
             case AuditChainVerification.Diverged diverged -> {
-                write(institution, run, FAILED_ACTION, FAILED_OUTCOME, AuditJson.object().text("scope", scope)
-                        .number("verifiedRows", diverged.verifiedRows())
-                        .number("firstDivergentId", diverged.firstDivergentId())
-                        .text("divergence", diverged.divergence().name()).toJson());
+                // The alert does not depend on the entry: it goes out first, and a failed write is reported
+                // apart (ENTRY_UNWRITTEN_EVENT) without masking the broken chain (R3, review of branch 06b).
                 eventLog.error(BROKEN_EVENT, run.runId(), run.taskName(), institution.value(),
                         details("scope", scope, "firstDivergentId", diverged.firstDivergentId(),
                                 "divergence", diverged.divergence().name()));
+                try {
+                    write(institution, run, FAILED_ACTION, FAILED_OUTCOME, AuditJson.object().text("scope", scope)
+                            .number("verifiedRows", diverged.verifiedRows())
+                            .number("firstDivergentId", diverged.firstDivergentId())
+                            .text("divergence", diverged.divergence().name()).toJson());
+                } catch (RuntimeException entryFailure) {
+                    eventLog.error(ENTRY_UNWRITTEN_EVENT, run.runId(), run.taskName(), institution.value(),
+                            details("scope", scope, "errorType", closedTypeName(entryFailure)));
+                }
                 throw new AuditChainBrokenException(institution, diverged.firstDivergentId());
             }
         }
     }
 
+    /**
+     * The simple name of {@code failure} as a closed detail word: letters, digits and underscores only, starting with a
+     * letter, at most 40 characters. An anonymous class has an empty simple name and some framework exceptions have
+     * longer ones; a detail that is not closed would make the event log throw inside the catch and mask the broken
+     * chain (R3, review of branch 06c), so the name is reduced instead of passed through.
+     */
+    static String closedTypeName(Throwable failure) {
+        String word = failure.getClass().getSimpleName().replaceAll("[^A-Za-z0-9_]", "");
+        if (word.isEmpty() || !Character.isLetter(word.charAt(0))) {
+            return "UnnamedException";
+        }
+        return word.length() > 40 ? word.substring(0, 40) : word;
+    }
+
+    /**
+     * {@code verifiedRows} is what the verifier walked: the whole chain for {@code weekly}, and for {@code daily} the
+     * id walk from the first row at or after the start of the window to the end (see {@link
+     * AuditChainVerifier#verifySince}), which can include rows older than the window when {@code occurred_at} is
+     * not monotonic in {@code id}.
+     */
     private static String verified(String scope, long verifiedRows) {
         return AuditJson.object().text("scope", scope).number("verifiedRows", verifiedRows).toJson();
     }

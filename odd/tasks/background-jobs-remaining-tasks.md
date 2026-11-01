@@ -35,7 +35,7 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 - [x] T3.5 Slice 5a-3 `05a-adr-0025-and-retention-notes`.
 - [x] T3.6 Slice 5b-1 `05b-v12-purge-functions` (split: 5b-1 and 5b-1b).
 - [x] T3.7 Slice 5b-2 `05b-idempotency-and-backoff-jobs` (split: 5b-2 and 5b-2b).
-- [ ] T3.8 Slice 6 `06-audit-chain-verification-cadences`.
+- [x] T3.8 Slice 6 `06-audit-chain-verification-cadences` (split: 6, 6b and 6c).
 - [ ] T4.1 Slice 7a `07a-queue-observability`.
 - [ ] T4.2 Slice 7b `07b-closing-notes` (notes).
 - [ ] T4.3 Slice 7b `07b-closing-notes` (closing).
@@ -61,6 +61,9 @@ Hard order: 3.3 (V11) before 3.6 (V12).
 | T3.6 (5b-1b) | delegated writer | `05b1b-backoff-purge-versus-login` | `5f5108e` | 191 | BUILD SUCCESS 10 min 40 s; Surefire 186 + 2 623, Failsafe 762 | BUILD SUCCESS 31 min 49 s; PIT kernel 192/194, app 872/919; JaCoCo met | pending |
 | T3.7 (5b-2) | delegated writer | `05b2-idempotency-and-backoff-jobs` | `f172d58` | 641 | BUILD SUCCESS 19 min 2 s; Surefire 186 + 2 631, Failsafe 766 | not run (last branch of the task is 5b-2b) | pending |
 | T3.7 (5b-2b) | delegated writer | `05b2b-backoff-purge-jobs` | `8a19935` plus the evidence commit | 515 | BUILD SUCCESS 24 min 20 s; Surefire 186 + 2 631, Failsafe 776 | BUILD SUCCESS 48 min 27 s; PIT kernel 192/194, app 872/919; JaCoCo met | pending |
+| T3.8 (6) | delegated writer | `06-audit-chain-verification-cadences` | `3996209` | 385 | BUILD SUCCESS 17 min 53 s; Surefire 186 + 2 640, Failsafe 778 | not run (last branch of the task is 6c) | pending |
+| T3.8 (6b) | delegated writer | `06b-audit-chain-jobs` | `66eb21e` | 788 | BUILD SUCCESS 20 min 7 s; Surefire 186 + 2 668, Failsafe 778 | not run (last branch of the task is 6c) | pending |
+| T3.8 (6c) | delegated writer | `06c-audit-chain-job-integration` | `84b01a0` plus the evidence commit | 366 | BUILD SUCCESS 21 min 17 s; Surefire 186 + 2 668, Failsafe 785 | pending: the owner runs it in a terminal (it was reaped twice inside Claude Code); PIT targets now include `shared.audit` (`da7bca1`); 06c final tip `4487f61`, 498 lines vs 06b; verify BUILD SUCCESS 29 min 52 s, Surefire 186 + 2 671, Failsafe 785 | pending |
 
 Main CI: PR #211 (merge `972beae`) fixed the failing CI on `main` before PRs #212 to #214 were merged.
 
@@ -149,8 +152,61 @@ T3.1 evidence:
 
 ## Next step
 
-T3.8, slice 6 `06-audit-chain-verification-cadences`, from `main` 49ddc62 (3.7 is merged: #228 `f4bf89f`, #229 `49ddc62`). ADR-0026 is reserved
-by frontend change 13a (Storybook).
+T4.1, slice 7a `07a-queue-observability`. T3.8 is done on `06`, `06b` and `06c` (stacked on `main` 49ddc62); the mutation gate of 3.8 is pending
+(owner, terminal) and needs the PIT targets to include `shared.audit` first. ADR-0026 is reserved by frontend change 13a (Storybook).
+
+T3.8 evidence:
+- Mutation gate on 06c (`94b3b9a` plus the worker IT fix), run by the owner in PowerShell outside Claude Code on 2026-10-31:
+  BUILD SUCCESS in 57 min 4 s. From `mutations.xml`: kernel 192/194 (99 %); app 1 348/1 445 (93 %, 16 without coverage, test
+  strength 94 %); `shared.audit` 184/186 (98.9 %, killed plus timed out); `shared.security` without `token` and `csrf` 293/340
+  (86.2 %). All above the 80 threshold.
+- Review of 06c (approved) flagged `AuditChainVerificationOnWorkerIT` as order-dependent: each cadence appends its result entry to
+  CLEAN's chain, so the second walk may count the first one's entry. The assertion now requires exactly the two scopes, counts of
+  3 or 4, and at least one count of 3 (the first walk sees exactly the seeded rows). Focused run: 1 test, 0 failures.
+
+
+- Split: the whole task measured 1 539 effective lines (additions plus deletions, without `openspec/` and `odd/`; docs/07 included), over the 800
+  limit. Seam named in `tasks.md` ("`verifySince` con su lector (unidad) / tareas recurrentes y asientos"), then the integration tests last, as
+  in 3.2: `06-audit-chain-verification-cadences` (`3996209`, 385 lines: `verifySince`, `firstAtOrAfter`, `JooqAuditLogReader`, the window cases of
+  `DefaultAuditChainVerifierTest`, two real-database cases in `AuditChainVerifierIT`, `AuditChainRows`), `06b-audit-chain-jobs` (`66eb21e`, 788
+  lines: `AuditChainVerificationJobs`, `AuditChainBrokenException`, `OperationalEventLog.info/error/warn(details)`, the wiring, the unit tests, the
+  `RecurringJobCalendarTest` case, the docs/07 note) and `06c-audit-chain-job-integration` (`84b01a0`, 366 lines: `AuditChainVerificationJobsIT`,
+  `AuditChainVerificationOnWorkerIT`). Each passes on its own; no comment, Javadoc or assertion was cut. Increments are measured against the
+  previous branch of the stack; 06b is 13 lines from the limit.
+- RED: the first `test-compile` failed with `cannot find symbol` on `AuditChainVerificationJobs`, `AuditChainBrokenException`,
+  `walkSince`, `AuditChainVerificationJobs.dailyWindowStart`, and `method does not override or implement a method from a supertype` on
+  `firstAtOrAfter` and `verifySince`. The `ProcessBeanPolicy` entry for `com.confia.shared.audit` and the exact bean list of
+  `WorkerProductionWiringTest` were written before the beans, but their own red was not observed (the compile failed first).
+- Decisions applied: D-N2 (calendar-month window, from 00:00 on the first day of the previous month in Tegucigalpa; the month is the one of
+  Tegucigalpa, not of UTC, tested at 03:00 UTC on 1 November). A recurring job is never retried, also the weekly one: the divergence is raised
+  after its entry and its `ERROR` are written, so the occurrence stays failed and the job is rescheduled to its next occurrence (proved on the
+  real worker: `consecutive_failures` 1 and the next execution at the calendar instant, not seconds later).
+  `OperationalEventLog` gained `info`, `error` and `warn` with closed details (`Long`, `Integer` or a word of at most 40 letters, digits and
+  underscores, under a closed name that is not `runId`, `task` or `institution`), so the events carry the scope, the rows and the first divergent
+  id and still no free text. `ProcessBeanPolicy.WORKER` admits `com.confia.shared.audit`.
+- Deviation, `outcome`: the spec says the failed verification entry has result `failure`, but `shared_audit_log_outcome_chk` (V2) admits only
+  `success`, `denied` and `error` (first run: `violates check constraint "shared_audit_log_outcome_chk"`). The entry uses `error`
+  (`AuditChainVerificationJobs.FAILED_OUTCOME`); no migration was written. The spec text should say `error` at archive.
+- Deviation, mutation gate: `app/pom.xml` PIT `targetClasses` and `targetTests` do not include `com.confia.shared.audit.*`, and the file is outside
+  the surface of this task. Without that change the gate does not measure the closing criterion "PIT en 80 sobre `shared.audit`". The owner decides
+  and runs `-Pmutation-gate` in a terminal.
+- Deliberate demonstrations, each reverted and confirmed with `cmp` against copies in the scratchpad (`confia-scratch/t38`):
+  - Window start as "now minus 30 days": `AuditChainDailyWindowTest` fails 12 of 13 [AT23].
+  - `verifySince` starting from the hash of the previous row instead of the stored `prev_hash`:
+    `theLinkAtTheBorderIsNotVerifiedAndTheWalkStartsFromTheStoredPreviousHash` fails, the only failure of 15 [AT25].
+  - Entry written inside the transaction of the walk (the cadence wrapped in one `runner.execute`, which joins the nested ones):
+    `theEntryIsWrittenAfterTheWalkInATransactionOfItsOwn` fails, the only failure of 9 [AT31]. The real-database `AuditChainVerificationJobsIT`
+    version of the same test (it compares `txid_current()` of the walk and of the entry) was not run against the break.
+  - A first `cmp` of the 6b copy failed on line endings (the copy was taken before the checkout converted them); the break was not applied that
+    time, and was applied only after taking a new copy of the committed file.
+- Real-database seeding: `AuditChainRows` inserts rows as the superuser with an explicit `occurred_at` (the chaining trigger still chains them;
+  it needs `app.institution_id` set in the session because it writes `shared_audit_chain_head` under row-level security) and alters one with
+  `session_replication_role = replica`, like `AuditLogSuperuserTamper`.
+- Not proved by a real fault: AT16's technical failure of the verifier (unit test: no entry, no event, rollback, exception propagates); the
+  not-retried behaviour itself is the generic one of `RecurringFailureStateIT`, and `AuditChainVerificationOnWorkerIT` shows it for the divergence.
+- Operational note: `git stash push -u` failed halfway on this machine (`failed to remove apps/admin-web/: Permission denied`) after saving the
+  stash; the tracked changes were restored from the stash with `git checkout -- .` and `git stash pop`, with no loss.
+- `./mvnw -B verify` on each branch: see the progress table. The mutation gate is pending (see above).
 
 T3.7 evidence:
 - Owner decision 2026-10-31: PIT widened to `com.confia.shared.security.*` (targetClasses and targetTests in `apps/api/app/pom.xml`),
@@ -283,3 +339,14 @@ T3.4 evidence:
   `LoginTimingGateIT` measured 49 ms once, a timing flake unrelated to this change); 05a2 green (186, 2 619, 715; 9 min 36 s);
   05a2b green (186, 2 619, 726; 9 min 8 s). `-Pmutation-gate` on 05a2b green in 28 min 51 s.
 - Mutation gate (re-run after the decision): PIT kernel 192/194, app 872/919; JaCoCo met.
+
+T3.8 follow-up (2026-11-01), on 06c:
+
+- PIT widened to `com.confia.shared.audit.*` (owner decision, `da7bca1`); the mutation gate is pending for the owner in a terminal.
+- R3-001 decided as the id walk: `verifySince` verifies from the first row at or after `since` and every later row by id, because a hash chain must
+  not skip a link; Javadoc of the verifier, `AuditChainVerification.Intact` and the daily report now say so (`e832df5`). design.md/spec do not
+  require an `occurred_at` filter after the first row. Tests added: first-row content tamper (regression guard, passed immediately) and a
+  non-monotonic `occurred_at` case.
+- R3 alert: the `audit_chain_broken` ERROR is emitted before the entry write; a failed write emits `audit_chain_broken_entry_unwritten` and the
+  occurrence still fails with `AuditChainBrokenException` (`4487f61`). RED observed: the new unit test failed 1 of 10 against the old code.
+- `./mvnw -B verify`: BUILD SUCCESS, 29:52 min, Surefire 186 + 2 671, Failsafe 785, 0 failures. 06c vs 06b: 498 effective lines.

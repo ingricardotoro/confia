@@ -16,11 +16,14 @@ public interface AuditChainVerifier {
     AuditChainVerification verifyChainOf(InstitutionId institutionId);
 
     /**
-     * Recalculates the rows of {@code institutionId} whose {@code occurred_at} is at or after {@code since}.
-     * It starts at the first of them and takes the <em>stored</em> {@code prev_hash} of that row as the running
-     * hash, so the link between that row and the one before it is not checked here: the weekly cadence, which
-     * walks the whole chain, covers it. Without a row in the window the result is {@link
-     * AuditChainVerification.Empty}.
+     * Recalculates the chain of {@code institutionId} from the first row whose {@code occurred_at} is at or after
+     * {@code since}, and then every later row by {@code id}. The walk is by {@code id} and not filtered by {@code
+     * occurred_at} again: a hash chain must not skip a link, so when {@code occurred_at} is not monotonic in {@code
+     * id} a later row older than {@code since} is still recalculated and counted in {@code verifiedRows}. It takes
+     * the <em>stored</em> {@code prev_hash} of the first row as the running hash, so the link between that row and
+     * the one before it is not checked here (the weekly cadence, which walks the whole chain, covers it), but the
+     * {@code row_hash} of that first row is recalculated like any other. Without a row in the window the result is
+     * {@link AuditChainVerification.Empty}.
      */
     AuditChainVerification verifySince(InstitutionId institutionId, Instant since);
 }

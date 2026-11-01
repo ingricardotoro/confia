@@ -17,7 +17,9 @@ public sealed interface AuditChainVerification {
 
     /**
      * Every row recalculated exactly as stored. {@code verifiedRows} feeds
-     * {@code confia_audit_chain_verified_rows} (docs/03-seguridad.md §12.4); {@code lastRowHash} is
+     * {@code confia_audit_chain_verified_rows} (docs/03-seguridad.md §12.4); for a window it counts the id walk
+     * from the first row at or after {@code since} to the end, see {@link AuditChainVerifier#verifySince}; {@code
+     * lastRowHash} is
      * the running hash after the last row.
      */
     record Intact(InstitutionId institutionId, long verifiedRows, byte[] lastRowHash)

@@ -435,7 +435,9 @@
            them per task 3.7 of background-jobs-with-db-scheduler. com.confia.shared.jobs is another:
            the retry policy, the instance identifier, the payload type rule and the strict task data
            serializer are rules a mutant must not pass through (background-jobs-with-db-scheduler
-           design.md decision 2). -->
+           design.md decision 2). com.confia.shared.audit is the last: the chain verifier and its
+           cadences decide whether a tampered audit row is reported, so a mutant that survives there is
+           a break nobody sees (task 3.8; owner decision of 2026-11-01). -->
 
       <plugin>
         <groupId>org.pitest</groupId>
@@ -447,6 +449,7 @@
             <param>com.confia.shared.security.token.*</param>
             <param>com.confia.shared.security.csrf.*</param>
             <param>com.confia.shared.jobs.*</param>
+            <param>com.confia.shared.audit.*</param>
           </targetClasses>
           <targetTests>
             <param>com.confia.*.domain.*</param>
@@ -454,6 +457,7 @@
             <param>com.confia.shared.security.token.*</param>
             <param>com.confia.shared.security.csrf.*</param>
             <param>com.confia.shared.jobs.*</param>
+            <param>com.confia.shared.audit.*</param>
           </targetTests>
         </configuration>
       </plugin>
