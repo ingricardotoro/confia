@@ -93,8 +93,17 @@ class AuditChainVerificationOnWorkerIT extends WorkerJobIT {
             });
         }
 
-        assertThat(entries(CLEAN, "shared.audit.chain_verified")).containsExactlyInAnyOrder(
-                "{\"scope\": \"daily\", \"verifiedRows\": 3}", "{\"scope\": \"weekly\", \"verifiedRows\": 3}");
+        // Each cadence appends its own result entry to CLEAN's chain, so the cadence that walks second
+        // may count the first one's entry: {3, 3} when they overlap, {3, 4} when they do not. Whatever
+        // the order, the first walk sees exactly the three seeded rows.
+        List<String> verified = entries(CLEAN, "shared.audit.chain_verified");
+        assertThat(verified).hasSize(2)
+                .anySatisfy(entry -> assertThat(entry).startsWith("{\"scope\": \"daily\", \"verifiedRows\": "))
+                .anySatisfy(entry -> assertThat(entry).startsWith("{\"scope\": \"weekly\", \"verifiedRows\": "));
+        List<Integer> counts = verified.stream()
+                .map(entry -> Integer.valueOf(entry.replaceAll(".*\"verifiedRows\": (\\d+)}$", "$1")))
+                .toList();
+        assertThat(counts).allSatisfy(count -> assertThat(count).isBetween(3, 4)).contains(3);
         assertThat(entries(CLEAN, "shared.audit.chain_verification_failed")).isEmpty();
         assertThat(entries(BROKEN, "shared.audit.chain_verification_failed")).hasSize(2)
                 .anySatisfy(entry -> assertThat(entry).contains("\"scope\": \"daily\""))
