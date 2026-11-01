@@ -7,6 +7,8 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,6 +98,82 @@ class OperationalEventLogTest {
         log.warn(EVENT, UUID.randomUUID(), "identity.purge-refresh-tokens", INSTITUTION);
 
         assertThat(logged.list).hasSize(2);
+    }
+
+    /** The INFO and the ERROR of the chain verification: the three common fields, then the closed ones in order. */
+    @Test
+    void writesAnInfoAndAnErrorWithTheirClosedFieldsAfterTheCommonOnes() {
+        UUID runId = UUID.randomUUID();
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("scope", "daily");
+        details.put("verifiedRows", 15L);
+        details.put("count", 3);
+
+        new OperationalEventLog().info("audit_chain_verified", runId, TASK, INSTITUTION, details);
+        new OperationalEventLog().error("audit_chain_broken", runId, TASK, INSTITUTION, details);
+
+        assertThat(logged.list).extracting(ILoggingEvent::getLevel, ILoggingEvent::getFormattedMessage)
+                .containsExactly(org.assertj.core.api.Assertions.tuple(Level.INFO, "audit_chain_verified"),
+                        org.assertj.core.api.Assertions.tuple(Level.ERROR, "audit_chain_broken"));
+        assertThat(logged.list).allSatisfy(event -> {
+            assertThat(event.getArgumentArray()).isNull();
+            assertThat(event.getThrowableProxy()).isNull();
+            assertThat(event.getKeyValuePairs()).extracting(pair -> pair.key + "=" + pair.value)
+                    .containsExactly("runId=" + runId, "task=" + TASK, "institution=" + INSTITUTION,
+                            "scope=daily", "verifiedRows=15", "count=3");
+        });
+    }
+
+    @Test
+    void anInfoWithoutDetailsCarriesOnlyTheThreeCommonFields() {
+        new OperationalEventLog().info("audit_chain_verified", UUID.randomUUID(), TASK, INSTITUTION, Map.of());
+
+        assertThat(logged.list).singleElement()
+                .satisfies(event -> assertThat(event.getKeyValuePairs()).hasSize(3));
+    }
+
+    /** A detail can only be a number or a closed word, so it can never carry free text, a break or a forged field. */
+    @Test
+    void rejectsADetailThatCouldCarryFreeTextOrForgeAField() {
+        OperationalEventLog log = new OperationalEventLog();
+        UUID runId = UUID.randomUUID();
+
+        for (Object bad : new Object[] {"two words", "line\nbreak", "a=b", "", "1abc", "x".repeat(41),
+                "añejo", UUID.randomUUID(), 1.5d, true, new StringBuilder("scope")}) {
+            assertThatThrownBy(() -> log.error("audit_chain_broken", runId, TASK, INSTITUTION,
+                    Map.of("divergence", bad)))
+                    .as("value %s", bad)
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        for (String badKey : new String[] {"", "Scope", "1scope", "sc ope", "sc=ope", "s".repeat(41),
+                "runId", "task", "institution"}) {
+            assertThatThrownBy(() -> log.error("audit_chain_broken", runId, TASK, INSTITUTION,
+                    Map.of(badKey, 1L)))
+                    .as("key %s", badKey)
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(logged.list).as("a rejected detail writes nothing").isEmpty();
+    }
+
+    @Test
+    void acceptsADetailWordAndKeyOfTheirLongestLength() {
+        new OperationalEventLog().info("audit_chain_verified", UUID.randomUUID(), TASK, INSTITUTION,
+                Map.of("k" + "e".repeat(39), "ROW_HASH_MISMATCH", "scope", "w".repeat(40)));
+
+        assertThat(logged.list).hasSize(1);
+    }
+
+    @Test
+    void anInfoAndAnErrorRejectAnEventOrTaskThatIsNotAClosedIdentifier() {
+        OperationalEventLog log = new OperationalEventLog();
+
+        assertThatThrownBy(() -> log.info("Bad Event", UUID.randomUUID(), TASK, INSTITUTION, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> log.error("audit_chain_broken", UUID.randomUUID(), "Bad Task", INSTITUTION,
+                Map.of())).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> log.info("audit_chain_verified", UUID.randomUUID(), TASK, INSTITUTION, null))
+                .isInstanceOf(NullPointerException.class).hasMessageContaining("details");
+        assertThat(logged.list).isEmpty();
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.confia.shared.jobs;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.confia.shared.jobs.infrastructure.JobCalendars;
 import com.confia.shared.jobs.infrastructure.ParkedExecutions;
@@ -11,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.TimeZone;
 import org.junit.jupiter.api.Test;
 
@@ -88,5 +90,29 @@ class RecurringJobCalendarTest {
             assertThat(next).isBefore(SUNDAY_MIDNIGHT.plus(Duration.ofDays(366)));
             assertThat(ParkedExecutions.isParked(next)).isFalse();
         }
+    }
+
+    /**
+     * Scenarios BJ62 and AT17: the worker registers the two cadences of the chain verifier at 03:00 every day and at
+     * 03:30 every Sunday, in Tegucigalpa, and no cadence of an hour or a task that compares the last hash with an
+     * external anchor (that cadence belongs to {@code audit-chain-hourly-anchor-verification}).
+     */
+    @Test
+    void theWorkerRegistersTheDailyAndWeeklyChainVerificationAndNoHourlyOne() {
+        List<JobDefinition> all = RegisteredJobs.ofTheWorker();
+        List<RecurringJob> verification = all.stream()
+                .filter(RecurringJob.class::isInstance).map(RecurringJob.class::cast)
+                .filter(job -> job.name().startsWith("shared.audit-chain")).toList();
+
+        assertThat(verification).extracting(RecurringJob::name, RecurringJob::calendar).containsExactlyInAnyOrder(
+                tuple("shared.audit-chain-verification-daily", new JobCalendar.DailyAt(LocalTime.of(3, 0))),
+                tuple("shared.audit-chain-verification-weekly",
+                        new JobCalendar.WeeklyAt(DayOfWeek.SUNDAY, LocalTime.of(3, 30))));
+        assertThat(next(verification.stream().filter(job -> job.name().endsWith("daily")).findFirst().orElseThrow()
+                .calendar(), SUNDAY_MIDNIGHT)).isEqualTo(Instant.parse("2026-10-25T09:00:00Z"));
+        assertThat(next(verification.stream().filter(job -> job.name().endsWith("weekly")).findFirst().orElseThrow()
+                .calendar(), SUNDAY_MIDNIGHT)).isEqualTo(Instant.parse("2026-10-25T09:30:00Z"));
+        assertThat(all).extracting(JobDefinition::name)
+                .noneMatch(name -> name.contains("hourly") || name.contains("anchor"));
     }
 }

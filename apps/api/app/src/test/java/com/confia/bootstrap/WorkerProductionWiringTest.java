@@ -127,7 +127,10 @@ class WorkerProductionWiringTest {
                             pkg -> ProcessBeanPolicy.matches(pkg, "com.confia.shared.infrastructure.wiring")))
                     .extracting(InspectedBean::name)
                     .containsExactlyInAnyOrder(SharedWorkerJobsConfiguration.class.getName(),
-                            "idempotencyRecordStore", "purgeExpiredIdempotencyKeys", "idempotencyKeyPurgeJob");
+                            "idempotencyRecordStore", "purgeExpiredIdempotencyKeys", "idempotencyKeyPurgeJob",
+                            "auditLogReader", "canonicalAuditRowSerializer", "auditChainVerifier",
+                            "auditChainVerificationJobs", "auditChainDailyVerificationJob",
+                            "auditChainWeeklyVerificationJob");
         } finally {
             context.close();
         }
