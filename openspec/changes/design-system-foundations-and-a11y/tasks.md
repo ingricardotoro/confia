@@ -513,7 +513,7 @@ contra `main` antes del PR 3.
     `pnpm audit --audit-level high` en verde. Commit: `feat(ui): add Textarea, Checkbox and RadioGroup`. Tamaño: nominal 300, realista 350. —
     Escenarios DS16, DS18, DS19, DS62, DS63, DS65, DS70, DS73, DS74.
 
-- [ ] 5.2 **PR 5 / 5b `05-controls-form-and-states`: `FormField` con `FormError`, `EmptyState` y `ErrorState` (decisión 11; `docs/ui-ux/03` §5).**
+- [x] 5.2 **PR 5 / 5b `05-controls-form-and-states`: `FormField` con `FormError`, `EmptyState` y `ErrorState` (decisión 11; `docs/ui-ux/03` §5).**
   - **ROJO.** `FormField.test.tsx`: el control se consulta por su nombre accesible y es el texto de la etiqueta [DS20]; con error, el control tiene
     `aria-invalid="true"`, su `aria-describedby` referencia el elemento del mensaje y el mensaje es texto presente (no solo color) [DS21]; con
     descripción y error, `aria-describedby` referencia ambos [DS22]; obligatorio marcado con texto disponible para lectores de pantalla desde
