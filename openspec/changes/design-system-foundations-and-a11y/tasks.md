@@ -566,7 +566,7 @@ contra `main` antes del PR 3.
     `Intl` en Chromium coincide con la de Node 24 en los casos registrados en S3. Commit: `feat(ui): add MoneyAmount`. Tamaño: nominal 300, realista
     260. — Escenarios DS29 a DS39, DS40 a DS42, DS43 a DS47, DS48 a DS51, DS64, DS65, DS70, DS72, DS73, BX09 a BX11.
 
-- [ ] 6.2 **PR 6 / 6b `06-money-status-and-layers`: `StatusBadge` con color, icono y texto a la vez (design §3; `docs/ui-ux/01` §4 y `02` §5.2).**
+- [x] 6.2 **PR 6 / 6b `06-money-status-and-layers`: `StatusBadge` con color, icono y texto a la vez (design §3; `docs/ui-ux/01` §4 y `02` §5.2).**
   - **ROJO.** `StatusBadge.test.tsx`: por cada uno de los siete estados, icono propio, texto de la etiqueta `es-HN` (por ejemplo «Vencido» para
     `overdue`) y el token de color de ese estado (`--color-status-{estado}` por clase semántica) [DS52]; `iconOnly`: nombre accesible y título «Vencido»,
     texto no visible a la vista, icono decorativo [DS53]; en modo normal el estado se anuncia una sola vez y el icono está oculto a las tecnologías de

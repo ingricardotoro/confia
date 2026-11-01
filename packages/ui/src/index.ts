@@ -14,3 +14,4 @@ export { FormError, FormField, type FormErrorProps, type FormFieldControl, type 
 export { EmptyState, type EmptyStateProps } from "./molecules/empty-state";
 export { ErrorState, type ErrorStateProps } from "./molecules/error-state";
 export { MoneyAmount, type MoneyAmountProps } from "./domain/money-amount";
+export { StatusBadge, type FinancialStatus, type StatusBadgeProps } from "./domain/status-badge";
