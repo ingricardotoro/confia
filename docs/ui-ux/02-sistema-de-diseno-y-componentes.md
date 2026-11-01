@@ -181,8 +181,11 @@ financiero no es un problema estético.
 
 ```typescript
 interface MoneyAmountProps {
-  /** Importe con moneda. Nunca un number suelto. */
-  value: { amountMinor: string; currency: string };
+  /**
+   * Importe con moneda, tal como lo entrega la API: { amount: string, currency: string }, ya redondeado
+   * por el servidor a la escala menor de la moneda. Nunca un number suelto; el navegador solo lo formatea.
+   */
+  value: { amount: string; currency: string };
   /** Peso visual. 'strong' para saldos y totales. */
   emphasis?: 'normal' | 'strong' | 'muted';
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -190,6 +193,8 @@ interface MoneyAmountProps {
   colorBySign?: boolean;
   /** Muestra el signo mas en positivos. Para variaciones. */
   showPositiveSign?: boolean;
+  /** Envuelve los negativos en paréntesis. Gana sobre showPositiveSign. */
+  accounting?: boolean;
   /** Oculta el codigo o simbolo de moneda. Solo dentro de una tabla que ya lo declara. */
   hideCurrency?: boolean;
 }
@@ -208,7 +213,7 @@ Reglas obligatorias:
 | `colorBySign` solo en variaciones | Un saldo en rojo por ser negativo confunde: un saldo a favor es bueno |
 
 ```tsx
-<MoneyAmount value={{ amountMinor: '320000', currency: 'HNL' }} emphasis="strong" size="lg" />
+<MoneyAmount value={{ amount: '3200.00', currency: 'HNL' }} emphasis="strong" size="lg" />
 // L 3,200.00
 ```
 
