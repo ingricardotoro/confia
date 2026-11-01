@@ -156,6 +156,14 @@ T4.1, slice 7a `07a-queue-observability`. T3.8 is done on `06`, `06b` and `06c` 
 (owner, terminal) and needs the PIT targets to include `shared.audit` first. ADR-0026 is reserved by frontend change 13a (Storybook).
 
 T3.8 evidence:
+- Mutation gate on 06c (`94b3b9a` plus the worker IT fix), run by the owner in PowerShell outside Claude Code on 2026-10-31:
+  BUILD SUCCESS in 57 min 4 s. From `mutations.xml`: kernel 192/194 (99 %); app 1 348/1 445 (93 %, 16 without coverage, test
+  strength 94 %); `shared.audit` 184/186 (98.9 %, killed plus timed out); `shared.security` without `token` and `csrf` 293/340
+  (86.2 %). All above the 80 threshold.
+- Review of 06c (approved) flagged `AuditChainVerificationOnWorkerIT` as order-dependent: each cadence appends its result entry to
+  CLEAN's chain, so the second walk may count the first one's entry. The assertion now requires exactly the two scopes, counts of
+  3 or 4, and at least one count of 3 (the first walk sees exactly the seeded rows). Focused run: 1 test, 0 failures.
+
 
 - Split: the whole task measured 1 539 effective lines (additions plus deletions, without `openspec/` and `odd/`; docs/07 included), over the 800
   limit. Seam named in `tasks.md` ("`verifySince` con su lector (unidad) / tareas recurrentes y asientos"), then the integration tests last, as
