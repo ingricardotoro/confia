@@ -895,6 +895,28 @@ nunca en el repositorio, conforme a `CLAUDE.md`, regla 13.
 > tareas, pero no puede cambiarlas ni borrarlas, y no recibe la llave maestra de columnas, la pimienta de
 > Argon2id ni ninguna llave de firma.
 
+> **Nota fechada 2026-11-01 (cambio `background-jobs-with-db-scheduler`, tarea 4.2): resumen de los usuarios de base de
+> datos del trabajador y del portal.** Esta nota reúne en un solo lugar lo que las notas del 2026-10-25 (tareas 1.5 y 1.6)
+> y del 2026-10-27 (tarea 2.6) dicen por partes, y nombra de forma expresa lo que revierten: la frase de la nota del
+> 2026-10-04 «`portal` y `worker` no los leen ni abren conexión a la base de datos» y la decisión D5 de
+> `web-edge-foundations` («`DataSource` de producción solo en el proceso administrativo»). El texto original de la nota
+> del 2026-10-04 no se modifica y sigue valiendo para los tres secretos del proceso `admin`. La reversión responde a las
+> decisiones del propietario D-N1 (portal) y P7 (trabajador), ambas del 2026-10-24.
+>
+> | Proceso | Usuario de base de datos | Acceso a `scheduled_tasks` | Variables propias |
+> |---|---|---|---|
+> | `admin` | `confia_admin_app` | `SELECT`, `INSERT`, `UPDATE` y `DELETE` (`V10`) | Los tres secretos de la nota del 2026-10-04 |
+> | `worker` | `confia_admin_app` | `SELECT`, `INSERT`, `UPDATE` y `DELETE` (`V10`) | `CONFIA_JOBS_INSTITUTIONS` |
+> | `portal` | `confia_portal_app` | Solo `SELECT` e `INSERT` (`V10`) | Ninguna |
+>
+> Los tres reciben `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` y `SPRING_DATASOURCE_PASSWORD`; la contraseña de
+> cada rol sale del almacén de secretos. `CONFIA_JOBS_INSTITUTIONS` (`confia.jobs.institutions`) es la lista de UUID,
+> separados por comas, de las instituciones sobre las que corren las tareas recurrentes del trabajador. Es obligatoria,
+> no puede estar vacía ni repetir entradas, no es un secreto, y si es inválida el proceso se detiene antes de arrancar con
+> un mensaje que nombra la propiedad y la posición de la entrada sin repetir la lista. Que el trabajador obtenga las
+> instituciones por configuración, y no por consulta, es una deuda registrada para la fase 2 en
+> `openspec/changes/foundations-plan/exploration.md`.
+
 > **Nota fechada 2026-10-05 (cambio `web-edge-foundations`, PR 7 `request-origin`): proxies de
 > confianza.** Los procesos `admin` y `portal` deciden la IP del cliente así: es la dirección de la
 > conexión, salvo que esa dirección pertenezca a la lista de proxies de confianza; solo entonces se

@@ -992,6 +992,34 @@ programar (ADR-0014).
 > El resultado del asiento de una verificación fallida es `error`, porque la restricción de la tabla admite
 > `success`, `denied` y `error`. La tabla completa de tareas se cierra en la tarea 4.2.
 
+> **Nota fechada 2026-11-01 (cambio `background-jobs-with-db-scheduler`, tarea 4.2): las ocho tareas recurrentes de
+> `confia-worker` y el estado fallido.** Esta nota cierra la tabla que las notas del 2026-10-30 y del 2026-10-31 dejaban
+> para esta tarea. Las filas de la tabla de arriba quedan como historia; estas ocho son lo que el trabajador ejecuta
+> hoy. Todas se declaran en código y corren en `America/Tegucigalpa` (Honduras no tiene horario de verano, de modo que
+> el desfase es constante). Las siete primeras se ejecutan una vez por cada institución configurada en
+> `CONFIA_JOBS_INSTITUTIONS`; la última lee la cola, que es una para todo el sistema, y publica una sola vez por
+> ocurrencia.
+>
+> | Tarea | Calendario | Qué hace |
+> |---|---|---|
+> | `identity.purge-password-reset-tokens` | Diaria, 04:30 | Purga de tokens de recuperación vencidos |
+> | `identity.purge-refresh-tokens` | Diaria, 04:35 | Purga de tokens de refresco: sucesores residuales y familias terminadas |
+> | `shared.purge-idempotency-keys` | Diaria, 04:40 | Purga de claves de idempotencia vencidas |
+> | `identity.purge-login-backoff` | Diaria, 04:45 | Purga de filas de retroceso de inicio de sesión |
+> | `identity.purge-mfa-totp-backoff` | Diaria, 04:50 | Purga de filas de retroceso de TOTP |
+> | `shared.audit-chain-verification-daily` | Diaria, 03:00 | Verifica la cadena de auditoría desde el inicio del mes anterior |
+> | `shared.audit-chain-verification-weekly` | Domingo, 03:30 | Verifica la cadena de auditoría completa desde su registro génesis |
+> | `shared.queue-observation` | Cada 60 s | Lee el estado de la cola y publica `queue_state`, `queue_task_failed` y `queue_stalled`; el intervalo corre desde que termina la ocurrencia anterior, no desde una hora del reloj |
+>
+> **Estado fallido.** Una tarea de una sola ejecución (hoy `identity.password-reset-issuance`) se reintenta con espera
+> exponencial y un máximo de intentos; cada fallo escribe un `WARN` `job_failed` con la tarea, el intento y el resultado
+> (`retry` o `parked`), sin datos de la tarea. Al agotar los intentos la ejecución queda **estacionada**: se reprograma al
+> instante `9999-01-01T00:00:00Z`, de modo que ningún sondeo la vuelve a tomar, y nunca se borra. Conserva
+> `consecutive_failures` y `last_failure`, y la cola la cuenta como fallida. Una tarea recurrente no se reintenta: al
+> fallar se reprograma a su próxima ocurrencia y cuenta como fallida mientras `consecutive_failures` sea mayor que cero,
+> hasta su próximo éxito. En ambos casos, una institución que falla no impide que se ejecute la siguiente de la misma
+> ocurrencia, y la ocurrencia queda registrada como fallida.
+
 ### 11.1 Comandos de operación manual
 
 ```bash
@@ -1029,6 +1057,38 @@ docker compose exec postgres psql -U confia_owner -d confia -c "
   WHERE status = 'active'
   ORDER BY consumed_percent DESC;"
 ```
+
+> **Nota fechada 2026-11-01 (cambio `background-jobs-with-db-scheduler`, tarea 4.2): reprogramación manual de una tarea
+> estacionada y alerta por ausencia de `queue_state`.**
+>
+> *Reprogramar una tarea estacionada.* No se entrega ninguna herramienta: es una operación manual de un solo `UPDATE`
+> sobre `execution_time` y `consecutive_failures`, que ejecuta quien opera con el propietario del esquema
+> (`confia_owner`) o con `confia_admin_app`, los únicos roles con `UPDATE` sobre `scheduled_tasks` (`V10`). Primero se
+> localiza la fila sin leer `task_data` (las ejecuciones estacionadas son las que tienen `execution_time` en
+> `9999-01-01T00:00:00Z`), después se reprograma al instante actual y se reinicia el contador, para que la tarea
+> recupere todos sus intentos. `last_failure` se conserva como evidencia. El resultado se registra en el acta del
+> incidente.
+>
+> ```sql
+> SELECT task_name, task_instance, consecutive_failures, last_failure
+> FROM scheduled_tasks
+> WHERE execution_time >= TIMESTAMPTZ '9999-01-01 00:00:00+00';
+>
+> UPDATE scheduled_tasks
+>    SET execution_time = now(), consecutive_failures = 0
+>  WHERE task_name = '<task_name>'
+>    AND task_instance = '<task_instance>'
+>    AND NOT picked
+>    AND execution_time >= TIMESTAMPTZ '9999-01-01 00:00:00+00';
+> ```
+>
+> Una tarea recurrente fallida no necesita esta operación: corre en su próxima ocurrencia y su contador vuelve a cero
+> con el primer éxito.
+>
+> *Límite declarado de la observación.* `shared.queue-observation` corre en la misma cola que observa. Si el ejecutor
+> entero se detiene, el evento `queue_state` deja de aparecer y nada dentro del sistema puede decirlo. Los cambios 10 y 11
+> deben por eso montar una alerta por **ausencia** de `queue_state` durante más de 5 minutos, además de las alertas por
+> los valores de `queue_stalled` y `queue_task_failed`.
 
 ---
 

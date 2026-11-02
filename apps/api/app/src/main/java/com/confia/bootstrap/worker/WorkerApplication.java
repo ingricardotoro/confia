@@ -43,6 +43,24 @@ import org.springframework.context.annotation.Import;
  * surface someone wires up tomorrow, and a context with no security bean is the plainest proof
  * that the worker has no security chain.
  *
+ * <p>Two guards act before the context exists, both attached by {@code ConfiaApplication} to the
+ * builder of this process: the {@code SensitiveLogGuardInitializer} described above, and a {@code
+ * SigningKeyPlacementGuard} listener that refuses to start the worker with the administrative
+ * signing private key in its environment (ADR-0005, check 14). A third check runs at startup: the
+ * property {@code confia.jobs.institutions} ({@code CONFIA_JOBS_INSTITUTIONS}) is mandatory, so a
+ * missing, empty, repeated or malformed list of institutions stops the process before it starts any
+ * job, with a message that names the property and the position of the entry, never the list. The
+ * recurring jobs run once for each institution on that list; discovering the institutions from the
+ * database is the debt of phase 2.
+ *
+ * <p>The wiring is narrow on purpose. Besides {@link WorkerPlatformConfiguration} and {@link
+ * WorkerJobsConfiguration}, the context holds only {@link IdentityWorkerConfiguration} and {@link
+ * SharedWorkerJobsConfiguration}, which declare the jobs of the catalog (the five retention purges,
+ * the two cadences of the audit chain verification and the observation of the queue). Which packages
+ * and beans the worker may hold is a closed allow-list, the {@code WORKER} entry of {@code
+ * ProcessBeanPolicy}, which {@code ProcessBeanIsolationTest} checks against the real context: a new
+ * bean in this process is a decision that changes that list, never an accident.
+ *
  * <p>The class is public only so the launcher in the parent package can start it; nothing else
  * may reference it (enforced by ArchUnit).
  */

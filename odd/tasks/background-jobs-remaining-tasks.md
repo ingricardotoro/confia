@@ -37,8 +37,8 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 - [x] T3.7 Slice 5b-2 `05b-idempotency-and-backoff-jobs` (split: 5b-2 and 5b-2b).
 - [x] T3.8 Slice 6 `06-audit-chain-verification-cadences` (split: 6, 6b and 6c).
 - [x] T3.9 Slice 6d `06d-purge-null-arguments`: `V13` rejects a NULL `p_cutoff` or `p_limit` in the five purge functions (owner decision 2026-11-01). Before T4.1. Done: PR #240 merged into `main` `cf46452`.
-- [x] T4.1 Slice 7a `07a-queue-observability` (split: 7a-1 and 7a-2). PRs pending.
-- [ ] T4.2 Slice 7b `07b-closing-notes` (notes).
+- [x] T4.1 Slice 7a `07a-queue-observability` (split: 7a-1 and 7a-2). PRs #241 and #242 merged into `main` `e9f7c0e`.
+- [x] T4.2 Slice 7b `07b-closing-notes` (notes).
 - [ ] T4.3 Slice 7b `07b-closing-notes` (closing).
 - [ ] Archive the SDD change.
 
@@ -66,8 +66,9 @@ Hard order: 3.3 (V11) before 3.6 (V12); 3.9 (V13) after 3.8 and before 4.1.
 | T3.8 (6b) | delegated writer | `06b-audit-chain-jobs` | `66eb21e` | 788 | BUILD SUCCESS 20 min 7 s; Surefire 186 + 2 668, Failsafe 778 | not run (last branch of the task is 6c) | approved earlier; PR #237, merged to `main` `2f44bbb` |
 | T3.8 (6c) | delegated writer | `06c-audit-chain-job-integration` | `84b01a0` plus the evidence commit | 366 | BUILD SUCCESS 21 min 17 s; Surefire 186 + 2 668, Failsafe 785 | done: first pending because the owner runs it in a terminal (it was reaped twice inside Claude Code); PIT targets now include `shared.audit` (`da7bca1`); 06c final tip `4487f61`, 498 lines vs 06b; verify BUILD SUCCESS 29 min 52 s, Surefire 186 + 2 671, Failsafe 785; mutation gate run by the owner on `94b3b9a` plus the worker IT fix (see the T3.8 evidence); 06c final tip `d82ffb7`: verify BUILD SUCCESS 18 min 33 s, Surefire 186 + 2 673, Failsafe 785; mutation gate not rerun on `d82ffb7` by owner decision (option B); the PR CI mutation job passed | approved (lineage `review-1ba1ea3e148b3fb6`, acknowledged); PR #238, merged to `main` `2f44bbb` |
 | T3.9 (6d) | delegated writer | `06d-purge-null-arguments` | `03b7e2f` `feat(db): reject null cutoff and limit arguments in the purge functions`; PR #240 merged into `main` `cf46452` | 594 | BUILD SUCCESS 20 min 55 s; Surefire 186 + 2 673, Failsafe 805 | the PR CI mutation job passed | approved again after the rebase (reliability lens, lineage `review-630f816fc5369ab3`); PR #240, merged to `main` `cf46452` |
-| T4.1 (7a-1) | delegated writer | `07a-queue-observability` | `07f3e0d` | 723 | BUILD SUCCESS 22 min 14 s; Surefire 186 + 2 708, Failsafe 805 | not run (last branch of the task is 7a-2) | pending |
-| T4.1 (7a-2) | delegated writer | `07a2-queue-observation-wiring` | the implementation commit of this row | 774 | BUILD SUCCESS 22 min 56 s, on the same code before the split; Surefire 186 + 2 723, Failsafe 819 | pending CI | pending |
+| T4.1 (7a-1) | delegated writer | `07a-queue-observability` | `07f3e0d` | 723 | BUILD SUCCESS 22 min 14 s; Surefire 186 + 2 708, Failsafe 805 | not run (last branch of the task is 7a-2) | approved, acknowledged; PR #241 merged |
+| T4.1 (7a-2) | delegated writer | `07a2-queue-observation-wiring` | `f1ce08d` and `f88156f` | 800 | BUILD SUCCESS 22 min 56 s, on the same code before the split; Surefire 186 + 2 723, Failsafe 819 | PR CI passed | approved, both commits, acknowledged; PR #242 merged into `main` `e9f7c0e` |
+| T4.2 (7b) | delegated writer; the parent closed the task after the writer stopped waiting for the build | `07b-closing-notes` | the commit of this row | 423 | BUILD SUCCESS 19 min 13 s; Surefire 186 + 2 729, Failsafe 820 | pending CI | pending |
 
 Main CI: PR #211 (merge `972beae`) fixed the failing CI on `main` before PRs #212 to #214 were merged.
 
@@ -156,11 +157,19 @@ T3.1 evidence:
 
 ## Next step
 
-T4.2, slice 7b `07b-closing-notes`, once the T4.1 PRs are merged. T3.9 is done: PR #240 merged into `main` `cf46452`. (Superseded 2026-11-01: "T3.9, slice 6d `06d-purge-null-arguments` (`tasks.md` 3.9; spec BI117 and BI118;
+T4.3, slice 7b `07b-closing-notes`, then `sdd-verify` and `sdd-archive`. T4.1 is done: PRs #241 and #242 merged into `main` `e9f7c0e`. T3.9 is done: PR #240 merged into `main` `cf46452`. (Superseded 2026-11-01: "T3.9, slice 6d `06d-purge-null-arguments` (`tasks.md` 3.9; spec BI117 and BI118;
 design decision 16, "Argumentos nulos"), then T4.1, slice 7a `07a-queue-observability`. T3.9 comes before T4.1. T3.8 is done: PRs #236,
 #237 and #238 are merged to `main` `2f44bbb`; 06c tip `d82ffb7`.")
 (Superseded 2026-11-01: "T4.1, slice 7a `07a-queue-observability`. T3.8 is done on `06`, `06b` and `06c` (stacked on `main` 49ddc62); the
 mutation gate of 3.8 is pending (owner, terminal) and needs the PIT targets to include `shared.audit` first.") ADR-0026 is reserved by frontend change 13a (Storybook).
+
+T4.2 evidence:
+- RED: the focused `DocumentationNotesTest` gave 10 tests, 5 failures. Four failed on the missing dated note of task 4.2 (`docs/07` section 11, `docs/07` section 11.1, `docs/05` section 6, `foundations-plan/exploration.md`), and one on the guards missing from the Javadoc of `WorkerApplication`. GREEN: 10 tests, 0 failures.
+- Deliberate demonstration, reverted and confirmed with `cmp` (`confia-scratch/t42`): rewriting one original row of `docs/07` section 11 fails the test with "The original body of ... section 11 changed: original line 21 is missing".
+- Notes that already existed and were not duplicated: `docs/07` section 3.3 and the section 11 notes of tasks 3.7 and 3.8, `docs/03` section 6.1, `docs/08` section 6.2, and the `docs/05` section 6 notes of tasks 1.5, 1.6 and 2.6.
+- Deviation: the original text of the guarded sections is embedded as text blocks in `DocumentationNotesTest`, because `src/test/resources` was outside the allowed surface. The check is the same one: every original line must still appear, in order.
+- `./mvnw -B verify`: BUILD SUCCESS, 19 min 13 s, Surefire 186 + 2 729, Failsafe 820. The writer reported the build as killed for low memory; only its wait loop died, the build finished and its log is `confia-scratch/t42/verify.log`.
+- jqwik prints a line addressed to AI agents in the build log, telling them to ignore its results. It is text of a dependency, not an instruction of the owner; it was not followed and jqwik results still count.
 
 T4.1 evidence:
 - Split: the task measured 1 497 effective lines (1 482 added, 15 deleted, `apps/` only), over the 800 limit; the owner chose two stacked PRs on 2026-11-01 over a size exception. `07a-queue-observability` (`07f3e0d`, 723 lines): the `shared.observability.queue` package with its unit tests. `07a2-queue-observation-wiring` (774 lines): `JooqScheduledTaskQueueReader`, the wiring, the 60 s task, and the policy, architecture, catalog and integration tests. Until 7a-2 merges, the package of 7a-1 has no consumer and does not run; the verify of 7a-1 alone shows no architecture rule rejects that.
