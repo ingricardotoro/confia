@@ -169,6 +169,7 @@ T4.1 evidence:
 - Decisions applied: `SharedWorkerJobsConfiguration` reads the heartbeat interval and the missed-heartbeats limit from `Environment`, with the library defaults when a key is absent, because only `shared.jobs.infrastructure` may depend on the scheduling library. `QueueObservation` publishes once per occurrence, not per institution (BJ68).
 - Beyond the work order: `QueueSnapshotTest`, `QueueObservationTest`, `QueueObservationOnWorkerIT` and two cases in `NoUnapprovedPlainSqlTest`.
 - The declared limit (alert on the absence of `queue_state` for more than 5 minutes) is in the Javadoc of `QueueObservation`, for the note of T4.2.
+- Review of 7a-2 (approved) warned that no test proved the production supplier of recurring names. `QueueObservationOnWorkerIT.theProductionReaderCountsEveryFailingRecurringJobOfTheCatalogAsFailed` now does (owner decision, 2026-11-01). It passed at once on the correct code, so it is a regression guard. Demonstration: `.limit(0)` in the supplier fails it with "Expected size: 7 but was: 0"; reverted and confirmed with `cmp`. Focused run: 2 tests, 0 failures. 7a-2 is 800 effective lines with it, at the limit and not over it. The full verify of this commit is the PR CI.
 - Mutation gate: not run locally; the mutation run of the PR CI measures it, as in T3.8 and T3.9.
 
 T3.9 evidence:

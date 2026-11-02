@@ -7,7 +7,10 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.confia.shared.observability.queue.LogQueueMetrics;
+import com.confia.shared.observability.queue.QueueSnapshot;
+import com.confia.shared.observability.queue.QueueStateReader;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -91,5 +94,28 @@ class QueueObservationOnWorkerIT extends WorkerJobIT {
         assertThat((long) fields.get("failed")).isZero();
         assertThat(logged.list).as("a healthy queue leaves no warning")
                 .noneMatch(event -> event.getLevel() == Level.WARN);
+    }
+
+    /**
+     * The names of the recurring jobs come from the production wiring. Without them a recurring job that is failing
+     * would be reported as scheduled, so every job of the catalog but the observation itself is marked as failing and
+     * moved a day ahead, where it cannot run and clear the mark, and the reader of the real worker must see them all.
+     */
+    @Test
+    void theProductionReaderCountsEveryFailingRecurringJobOfTheCatalogAsFailed() {
+        try (ConfigurableApplicationContext worker = WorkerHarness.startWith(NoFixtures.class, List.of(FIRST))) {
+            Eventually.within(Duration.ofSeconds(60), () -> assertThat(PurgeProbeRows.scalar(
+                    "select count(*) from scheduled_tasks")).isEqualTo(8));
+            PurgeProbeRows.run("update scheduled_tasks set consecutive_failures = 1, "
+                    + "execution_time = now() + interval '1 day' where task_name <> ?", "shared.queue-observation");
+
+            QueueSnapshot snapshot = worker.getBean(QueueStateReader.class).read(Instant.now());
+
+            assertThat(snapshot.failedByTask()).as("the seven failing recurring jobs, each counted once").hasSize(7)
+                    .containsEntry("shared.audit-chain-verification-daily", 1L)
+                    .containsEntry("shared.audit-chain-verification-weekly", 1L)
+                    .doesNotContainKey("shared.queue-observation");
+            assertThat(snapshot.failed()).isEqualTo(7);
+        }
     }
 }
