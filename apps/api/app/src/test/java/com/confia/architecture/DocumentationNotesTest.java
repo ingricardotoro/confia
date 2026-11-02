@@ -37,6 +37,7 @@ class DocumentationNotesTest {
     private static final String ADR_NOTE_MARKER = "**Nota fechada, 2026-10-29";
     private static final String DOCS_05 = "docs/05-infraestructura-y-despliegue.md";
     private static final String DOCS_07 = "docs/07-observabilidad-y-operaciones.md";
+    private static final String DOCS_09 = "docs/09-roadmap-y-fases.md";
     private static final String EXPLORATION = "openspec/changes/foundations-plan/exploration.md";
     private static final String WORKER_APPLICATION =
             "apps/api/app/src/main/java/com/confia/bootstrap/worker/WorkerApplication.java";
@@ -156,6 +157,32 @@ class DocumentationNotesTest {
                 .contains("fase 2")
                 .contains("CONFIA_JOBS_INSTITUTIONS");
         assertOriginalLinesIntact(EXPLORATION + " condition 4", linesOf(ORIGINAL_EXPLORATION_CONDITION_4), all);
+    }
+
+    /**
+     * Scenarios BJ37 and BJ41 (task 4.3): exit criterion 5 of phase 0 is checked with a dated note that names the
+     * tests that prove it, and the criteria around it are left as they were.
+     */
+    @Test
+    void docs09MarksExitCriterion5OfPhase0WithADatedNoteThatNamesItsTests() {
+        List<String> all = lines(repoRoot().resolve(DOCS_09));
+        String criterion = "Una tarea programada dentro de una transacción revertida no existe, y solo el proceso "
+                + "`confia-worker` ejecuta tareas.";
+        int at = all.indexOf("- [x] " + criterion);
+        assertThat(at).as("criterion 5 is checked and its text is unchanged").isNotNegative();
+        List<String> note = new ArrayList<>();
+        for (int i = at + 1; i < all.size() && all.get(i).startsWith("  "); i++) {
+            note.add(all.get(i));
+        }
+        assertThat(String.join("\n", note))
+                .contains("2026-11-01")
+                .contains("background-jobs-with-db-scheduler")
+                .contains("JobSchedulingAtomicityIT")
+                .contains("OnlyWorkerExecutesIT")
+                .contains("ExitCriterion5EndToEndIT");
+        assertThat(all).as("the backup and accessibility criteria stay open")
+                .contains("- [ ] **Un respaldo se restaura en un entorno limpio y el acta de simulacro está firmada.**",
+                        "- [ ] La verificación de accesibilidad no reporta violaciones críticas en las pantallas existentes.");
     }
 
     @Test

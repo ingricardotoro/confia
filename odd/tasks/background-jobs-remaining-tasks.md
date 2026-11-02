@@ -39,7 +39,7 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 - [x] T3.9 Slice 6d `06d-purge-null-arguments`: `V13` rejects a NULL `p_cutoff` or `p_limit` in the five purge functions (owner decision 2026-11-01). Before T4.1. Done: PR #240 merged into `main` `cf46452`.
 - [x] T4.1 Slice 7a `07a-queue-observability` (split: 7a-1 and 7a-2). PRs #241 and #242 merged into `main` `e9f7c0e`.
 - [x] T4.2 Slice 7b `07b-closing-notes` (notes).
-- [ ] T4.3 Slice 7b `07b-closing-notes` (closing).
+- [ ] T4.3 Slice 7c (proposed split of `07b-closing-notes`, closing): the work is done and verified in the working tree of `07b-closing-notes`; the commit is held for the owner's decision on the split (the branch measures 1 089 effective lines).
 - [ ] Archive the SDD change.
 
 Hard order: 3.3 (V11) before 3.6 (V12); 3.9 (V13) after 3.8 and before 4.1.
@@ -68,7 +68,8 @@ Hard order: 3.3 (V11) before 3.6 (V12); 3.9 (V13) after 3.8 and before 4.1.
 | T3.9 (6d) | delegated writer | `06d-purge-null-arguments` | `03b7e2f` `feat(db): reject null cutoff and limit arguments in the purge functions`; PR #240 merged into `main` `cf46452` | 594 | BUILD SUCCESS 20 min 55 s; Surefire 186 + 2 673, Failsafe 805 | the PR CI mutation job passed | approved again after the rebase (reliability lens, lineage `review-630f816fc5369ab3`); PR #240, merged to `main` `cf46452` |
 | T4.1 (7a-1) | delegated writer | `07a-queue-observability` | `07f3e0d` | 723 | BUILD SUCCESS 22 min 14 s; Surefire 186 + 2 708, Failsafe 805 | not run (last branch of the task is 7a-2) | approved, acknowledged; PR #241 merged |
 | T4.1 (7a-2) | delegated writer | `07a2-queue-observation-wiring` | `f1ce08d` and `f88156f` | 800 | BUILD SUCCESS 22 min 56 s, on the same code before the split; Surefire 186 + 2 723, Failsafe 819 | PR CI passed | approved, both commits, acknowledged; PR #242 merged into `main` `e9f7c0e` |
-| T4.2 (7b) | delegated writer; the parent closed the task after the writer stopped waiting for the build | `07b-closing-notes` | the commit of this row | 423 | BUILD SUCCESS 19 min 13 s; Surefire 186 + 2 729, Failsafe 820 | pending CI | pending |
+| T4.2 (7b) | delegated writer; the parent closed the task after the writer stopped waiting for the build | `07b-closing-notes` | `ee0d0a4`; review corrections `a9e5876` (16 lines) | 423 | BUILD SUCCESS 19 min 13 s; Surefire 186 + 2 729, Failsafe 820 | pending CI | approved; three non-blocking findings corrected in `a9e5876` |
+| T4.3 (7b/7c) | delegated writer; no commit (size gate) | `07b-closing-notes` | not committed: the tree holds the work, held for the split | 650 (branch total vs `e9f7c0e`: 1 089) | BUILD SUCCESS 17 min 21 s; Surefire 186 + 2 747, Failsafe 821 | pending CI | pending |
 
 Main CI: PR #211 (merge `972beae`) fixed the failing CI on `main` before PRs #212 to #214 were merged.
 
@@ -157,11 +158,21 @@ T3.1 evidence:
 
 ## Next step
 
-T4.3, slice 7b `07b-closing-notes`, then `sdd-verify` and `sdd-archive`. T4.1 is done: PRs #241 and #242 merged into `main` `e9f7c0e`. T3.9 is done: PR #240 merged into `main` `cf46452`. (Superseded 2026-11-01: "T3.9, slice 6d `06d-purge-null-arguments` (`tasks.md` 3.9; spec BI117 and BI118;
-design decision 16, "Argumentos nulos"), then T4.1, slice 7a `07a-queue-observability`. T3.9 comes before T4.1. T3.8 is done: PRs #236,
-#237 and #238 are merged to `main` `2f44bbb`; 06c tip `d82ffb7`.")
-(Superseded 2026-11-01: "T4.1, slice 7a `07a-queue-observability`. T3.8 is done on `06`, `06b` and `06c` (stacked on `main` 49ddc62); the
-mutation gate of 3.8 is pending (owner, terminal) and needs the PIT targets to include `shared.audit` first.") ADR-0026 is reserved by frontend change 13a (Storybook).
+Decide the split of `07b-closing-notes` (1 089 effective lines against `e9f7c0e`, over the 800 limit): PR 7b with T4.2 and its correction (`ee0d0a4`, `a9e5876`, 433 lines) and a stacked PR 7c with T4.3 (656 lines), whose commit is `docs(roadmap): mark exit criterion 5 of phase 0 and close the background jobs change`. Then the PRs; then, after the last merge, the owner's `./mvnw verify -Pmutation-gate` on `main`, `sdd-verify` and `sdd-archive`. The archive must also correct the delta spec of `audit-trail`: the failed verification entry has outcome `error`, not `failure` (found in T3.8), and the approved list of plain SQL holds three classes, not only the queue reader. ADR-0026 is reserved by frontend change 13a (Storybook).
+
+(Superseded 2026-11-01: "T4.3, slice 7b `07b-closing-notes`, then `sdd-verify` and `sdd-archive`. T4.1 is done: PRs #241 and #242 merged into `main` `e9f7c0e`. T3.9 is done: PR #240 merged into `main` `cf46452`.")
+
+T4.3 evidence:
+- Route: delegated writer, one work unit. First a separate commit `a9e5876` `docs(sdd): correct the job notes after their review` for the three non-blocking findings of the 4.2 review, each checked against the code: (1) the `WorkerApplication` source was resolved against the working directory in `DocumentationNotesTest`; true, it now starts from `repoRoot()` (`fixture()` still reads `src/test/resources` from the working directory, left as it was); (2) the manual `UPDATE` of `docs/07` contradicts the original comment "Nobody writes to the task table by hand"; true, one sentence in the new note names it as the only exception, the original text is untouched; (3) "in both cases" a failing institution does not stop the next one; true that it was wrong, per-institution occurrences belong to the seven recurring jobs, the one-time task is one execution that retries and parks, and the note says so. Two assertions in `DocumentationNotesTest` pin (2) and (3).
+- Traceability: `JobsChangeTraceabilityTest` rather than a checklist, because a checklist cannot fail. The mapping is in `apply-progress.md` (241 scenarios: 231 covered, 8 partial, 2 without a test). Uncovered: "Se agrega Hibernate" and "Sin dependencias prohibidas" (a maven-enforcer rule, no test). Partial: I240 (used tokens are not seeded), I241 ("still accepted"), I264 (privilege catalogue, no attempted DELETE), BJ08, BI103, BI60, the Docker scenario and BJ37 (the scheduling side is the real client over the test pool, not the booted administrative context).
+- RED, observed with the two new test classes set aside (the state before 4.3): 16 tests, 2 failures. `docs09MarksExitCriterion5OfPhase0WithADatedNoteThatNamesItsTests:172 [criterion 5 is checked and its text is unchanged] Expecting actual: -1 to be greater than or equal to: 0`, and `everyScenarioWithAnIdentifierIsNamedByATestOrListedWithTheTestThatCoversIt:122 Expecting empty but was: ["BJ38", "BJ39", "BJ40"]`. BJ37 was not listed because a Javadoc of the docs/09 test already named it (a loose mention); AT17 was already named by `RecurringJobCalendarTest`. The absence and end-to-end tests passed the first time they ran: they are guards, each with a fixture that fails.
+- GREEN: `docs/09` criterion 5 checked with a dated note. Focused run: `DocumentationNotesTest` 11, `JobsChangeTraceabilityTest` 5, `CurrentAbsencesTest` 12 and `ExitCriterion5EndToEndIT` 1, 0 failures.
+- Deliberate demonstration, reverted and confirmed with `cmp` (`confia-scratch/t43/orig`): a business job added to the registry read by `CurrentAbsencesTest` fails exactly `theWorkerRegistersExactlyTheOneTimeTaskAndTheEightRecurringOnesOfThisChange` with `[BJ40 stops being true when each module that owns a business job delivers it] Expecting empty but was: ["unexpected invoicing.generate-monthly-charges"]`.
+- `./mvnw -B verify`: BUILD SUCCESS 17 min 21 s; Surefire 186 + 2 747, Failsafe 821. Over the 15 minute budget (R-9), as every run since 3.7 (18 to 24 min). The mutation gate is not run: it is the owner's, on `main`, after the last merge.
+- Size: the branch measures 1 089 effective lines against `e9f7c0e` (1 087 added, 2 deleted, without `openspec/` and `odd/`); T4.3 alone is 656. Over 800, so the commit of T4.3 was not made.
+- Final verification of the change (mutation gate on `main`, `sdd-verify`, `sdd-archive`): pending, not checked.
+- Deviation: the end-to-end test schedules with the real client over the test pool, as `OnlyWorkerExecutesIT` does, and not from a booted administrative context; `ProcessBeanIsolationTest` asserts that the administrative context holds no executor.
+- jqwik prints a line addressed to AI agents in the build log; it is dependency output, not an instruction, it was not followed and jqwik results still count.
 
 T4.2 evidence:
 - RED: the focused `DocumentationNotesTest` gave 10 tests, 5 failures. Four failed on the missing dated note of task 4.2 (`docs/07` section 11, `docs/07` section 11.1, `docs/05` section 6, `foundations-plan/exploration.md`), and one on the guards missing from the Javadoc of `WorkerApplication`. GREEN: 10 tests, 0 failures.

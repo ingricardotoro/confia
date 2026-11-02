@@ -264,7 +264,17 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
       `IdempotentExecutorConcurrencyIT`). La mitad de cabecera HTTP obligatoria del entregable 6
       (brecha B7) sigue diferida al cambio 7, que trae el primer endpoint; no se declara cerrada
       aquí.
-- [ ] Una tarea programada dentro de una transacción revertida no existe, y solo el proceso `confia-worker` ejecuta tareas.
+- [x] Una tarea programada dentro de una transacción revertida no existe, y solo el proceso `confia-worker` ejecuta tareas.
+      **Cerrado por el cambio 9 (`background-jobs-with-db-scheduler`); nota fechada 2026-11-01**, con tres pruebas
+      contra PostgreSQL real. `JobSchedulingAtomicityIT`: una tarea programada dentro de una transacción revertida
+      no existe y dentro de una confirmada sí, con el control negativo de un cliente construido sin el componente
+      transaccional, que deja la tarea tras la reversión. `OnlyWorkerExecutesIT`: sin el trabajador la tarea vencida
+      nunca se toma, y con él se ejecuta una sola vez. `ExitCriterion5EndToEndIT`: las dos mitades en una misma
+      ejecución, con una tarea revertida que nunca existe ni corre y una confirmada que solo ejecuta el trabajador.
+      El lado que programa es el cliente real sobre el pool de la prueba; que el proceso administrativo no tiene
+      ningún ejecutor lo demuestra `ProcessBeanIsolationTest` sobre su contexto real. La verificación final del
+      cambio (compuerta de mutación en `main`, `sdd-verify` y `sdd-archive`) sigue pendiente y no forma parte de
+      este criterio.
 - [ ] **Un respaldo se restaura en un entorno limpio y el acta de simulacro está firmada.**
 - [x] OpenAPI 3.1 se genera y publica como artefacto versionado.
       **Cerrado por el cambio 3 (`frontend-monorepo-and-contracts-pipeline`), corte 3a**, con
