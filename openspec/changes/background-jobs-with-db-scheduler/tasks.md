@@ -690,7 +690,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
 
 ## Fase 4: observabilidad de la cola y cierre
 
-- [ ] 4.1 **PR 7 / 7a `07a-queue-observability`: lector de la cola, estado degradado y adaptador por registro estructurado (decisión 20, P8).**
+- [x] 4.1 **PR 7 / 7a `07a-queue-observability`: lector de la cola, estado degradado y adaptador por registro estructurado (decisión 20, P8).**
   - **ROJO.** Crear `shared/observability/queue/QueueHealthTest.java` (900 s exactos sanos y 901 degradados con reloj fijo; el estado vuelve a normal al
     vaciarse la cola) [BJ34, BJ35], `QueueStateReaderIT.java` (filas sembradas en cada estado: `scheduled`, `due`, `running`, `failed` —estacionada o
     recurrente con `consecutive_failures > 0`—; antigüedad desde `now - min(execution_time)`; una tarea tomada con latido vencido cuenta como atascada)
@@ -709,6 +709,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     `task_data` a la lista de columnas de la consulta pone en rojo `QueueSqlNeverReadsTaskDataTest` [BJ33]. Se revierten y se confirman con `cmp`.
   - **Cierre.** `./mvnw verify -Pmutation-gate`. Commit: `feat(observability): report the job queue state through structured logs and a degraded health
     status`. Tamaño: nominal 250, realista 450 a 600. — Escenarios BJ32 a BJ36, BJ62, BJ67 a BJ69, BI101 y BI113.
+  - **Hecho (2026-11-01).** Se dividió en dos PR apilados por decisión del propietario, porque midió 1 497 líneas efectivas: `07a-queue-observability` (723) y `07a2-queue-observation-wiring` (774). `./mvnw -B verify` en verde en ambos. La evidencia está en `odd/tasks/background-jobs-remaining-tasks.md`.
 
 - [ ] 4.2 **PR 7 / 7b `07b-closing-notes`: notas documentales, Javadoc de `WorkerApplication` y seguimientos (decisión 22, P1, P5).**
   - **ROJO.** Crear o ampliar `DocumentationNotesTest.java` con las notas fechadas que faltan, comprobando que el texto original no cambió: `docs/07`

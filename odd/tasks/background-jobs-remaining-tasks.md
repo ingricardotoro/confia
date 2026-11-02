@@ -37,7 +37,7 @@ Slices 1 to 3a are merged (main `db73f83`). The owner chose ODD on 2026-10-27 to
 - [x] T3.7 Slice 5b-2 `05b-idempotency-and-backoff-jobs` (split: 5b-2 and 5b-2b).
 - [x] T3.8 Slice 6 `06-audit-chain-verification-cadences` (split: 6, 6b and 6c).
 - [x] T3.9 Slice 6d `06d-purge-null-arguments`: `V13` rejects a NULL `p_cutoff` or `p_limit` in the five purge functions (owner decision 2026-11-01). Before T4.1. Done: PR #240 merged into `main` `cf46452`.
-- [ ] T4.1 Slice 7a `07a-queue-observability` (in progress, started 2026-11-01 from `main` `cf46452`).
+- [x] T4.1 Slice 7a `07a-queue-observability` (split: 7a-1 and 7a-2). PRs pending.
 - [ ] T4.2 Slice 7b `07b-closing-notes` (notes).
 - [ ] T4.3 Slice 7b `07b-closing-notes` (closing).
 - [ ] Archive the SDD change.
@@ -66,7 +66,8 @@ Hard order: 3.3 (V11) before 3.6 (V12); 3.9 (V13) after 3.8 and before 4.1.
 | T3.8 (6b) | delegated writer | `06b-audit-chain-jobs` | `66eb21e` | 788 | BUILD SUCCESS 20 min 7 s; Surefire 186 + 2 668, Failsafe 778 | not run (last branch of the task is 6c) | approved earlier; PR #237, merged to `main` `2f44bbb` |
 | T3.8 (6c) | delegated writer | `06c-audit-chain-job-integration` | `84b01a0` plus the evidence commit | 366 | BUILD SUCCESS 21 min 17 s; Surefire 186 + 2 668, Failsafe 785 | done: first pending because the owner runs it in a terminal (it was reaped twice inside Claude Code); PIT targets now include `shared.audit` (`da7bca1`); 06c final tip `4487f61`, 498 lines vs 06b; verify BUILD SUCCESS 29 min 52 s, Surefire 186 + 2 671, Failsafe 785; mutation gate run by the owner on `94b3b9a` plus the worker IT fix (see the T3.8 evidence); 06c final tip `d82ffb7`: verify BUILD SUCCESS 18 min 33 s, Surefire 186 + 2 673, Failsafe 785; mutation gate not rerun on `d82ffb7` by owner decision (option B); the PR CI mutation job passed | approved (lineage `review-1ba1ea3e148b3fb6`, acknowledged); PR #238, merged to `main` `2f44bbb` |
 | T3.9 (6d) | delegated writer | `06d-purge-null-arguments` | `03b7e2f` `feat(db): reject null cutoff and limit arguments in the purge functions`; PR #240 merged into `main` `cf46452` | 594 | BUILD SUCCESS 20 min 55 s; Surefire 186 + 2 673, Failsafe 805 | the PR CI mutation job passed | approved again after the rebase (reliability lens, lineage `review-630f816fc5369ab3`); PR #240, merged to `main` `cf46452` |
-| T4.1 (7a) | delegated writer | `07a-queue-observability` | in progress | in progress | in progress | pending CI | pending |
+| T4.1 (7a-1) | delegated writer | `07a-queue-observability` | `07f3e0d` | 723 | BUILD SUCCESS 22 min 14 s; Surefire 186 + 2 708, Failsafe 805 | not run (last branch of the task is 7a-2) | pending |
+| T4.1 (7a-2) | delegated writer | `07a2-queue-observation-wiring` | the implementation commit of this row | 774 | BUILD SUCCESS 22 min 56 s, on the same code before the split; Surefire 186 + 2 723, Failsafe 819 | pending CI | pending |
 
 Main CI: PR #211 (merge `972beae`) fixed the failing CI on `main` before PRs #212 to #214 were merged.
 
@@ -155,11 +156,21 @@ T3.1 evidence:
 
 ## Next step
 
-T4.1, slice 7a `07a-queue-observability` (in progress). T3.9 is done: PR #240 merged into `main` `cf46452`. (Superseded 2026-11-01: "T3.9, slice 6d `06d-purge-null-arguments` (`tasks.md` 3.9; spec BI117 and BI118;
+T4.2, slice 7b `07b-closing-notes`, once the T4.1 PRs are merged. T3.9 is done: PR #240 merged into `main` `cf46452`. (Superseded 2026-11-01: "T3.9, slice 6d `06d-purge-null-arguments` (`tasks.md` 3.9; spec BI117 and BI118;
 design decision 16, "Argumentos nulos"), then T4.1, slice 7a `07a-queue-observability`. T3.9 comes before T4.1. T3.8 is done: PRs #236,
 #237 and #238 are merged to `main` `2f44bbb`; 06c tip `d82ffb7`.")
 (Superseded 2026-11-01: "T4.1, slice 7a `07a-queue-observability`. T3.8 is done on `06`, `06b` and `06c` (stacked on `main` 49ddc62); the
 mutation gate of 3.8 is pending (owner, terminal) and needs the PIT targets to include `shared.audit` first.") ADR-0026 is reserved by frontend change 13a (Storybook).
+
+T4.1 evidence:
+- Split: the task measured 1 497 effective lines (1 482 added, 15 deleted, `apps/` only), over the 800 limit; the owner chose two stacked PRs on 2026-11-01 over a size exception. `07a-queue-observability` (`07f3e0d`, 723 lines): the `shared.observability.queue` package with its unit tests. `07a2-queue-observation-wiring` (774 lines): `JooqScheduledTaskQueueReader`, the wiring, the 60 s task, and the policy, architecture, catalog and integration tests. Until 7a-2 merges, the package of 7a-1 has no consumer and does not run; the verify of 7a-1 alone shows no architecture rule rejects that.
+- RED: the first `test-compile` failed with 88 errors, all `cannot find symbol` or `package JooqScheduledTaskQueueReader does not exist`. With the classes present but not wired, 5 tests failed: `ProcessBeanIsolationTest.onlyTheWorkerHoldsTheObservationOfTheQueue[3]`, `ProcessBeanIsolationTest.registersOnlyItsAllowedBeans[3]`, `WorkerProductionWiringTest.theWorkerHoldsTheExactBeansOfTheSharedJobsConfiguration`, the eight-jobs case of `RecurringJobCatalogTest` ("Expected size: 8 but was: 7"), and `QueueSqlNeverReadsTaskDataTest.aStatementThatSelectsTaskDataFailsTheInspection`, the last one a defect of the test fixture, fixed. The red of the `ProcessBeanPolicy` entry was not observed separately: it was written together with the tests.
+- Deliberate demonstrations, each reverted and confirmed with `cmp` against copies in the scratchpad (`confia-scratch/t41`): `>` to `>=` in `QueueHealth.evaluate` fails 4 tests, among them `QueueHealthTest.anAgeOfNineHundredSecondsOrLessIsHealthy` [BJ34]; `task_data` in the select list fails `QueueSqlNeverReadsTaskDataTest.theRealStatementNeverNamesTaskDataAndUsesOnlyTheFiveColumns` [BJ33].
+- Decisions applied: `SharedWorkerJobsConfiguration` reads the heartbeat interval and the missed-heartbeats limit from `Environment`, with the library defaults when a key is absent, because only `shared.jobs.infrastructure` may depend on the scheduling library. `QueueObservation` publishes once per occurrence, not per institution (BJ68).
+- Beyond the work order: `QueueSnapshotTest`, `QueueObservationTest`, `QueueObservationOnWorkerIT` and two cases in `NoUnapprovedPlainSqlTest`.
+- The declared limit (alert on the absence of `queue_state` for more than 5 minutes) is in the Javadoc of `QueueObservation`, for the note of T4.2.
+- Review of 7a-2 (approved) warned that no test proved the production supplier of recurring names. `QueueObservationOnWorkerIT.theProductionReaderCountsEveryFailingRecurringJobOfTheCatalogAsFailed` now does (owner decision, 2026-11-01). It passed at once on the correct code, so it is a regression guard. Demonstration: `.limit(0)` in the supplier fails it with "Expected size: 7 but was: 0"; reverted and confirmed with `cmp`. Focused run: 2 tests, 0 failures. 7a-2 is 800 effective lines with it, at the limit and not over it. The full verify of this commit is the PR CI.
+- Mutation gate: not run locally; the mutation run of the PR CI measures it, as in T3.8 and T3.9.
 
 T3.9 evidence:
 

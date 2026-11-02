@@ -164,6 +164,10 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // The audit-chain verifier and its two cadences (decision 19): the serializer, the
                     // verifier and the jobs are beans of this package (exact, like every entry).
                     "com.confia.shared.audit",
+                    // The observation of the queue (decision 20, scenario BI113): the reader's port, the log
+                    // adapter and the recurring job that publishes the state (exact, like every entry). The
+                    // metrics of the administrative edge, shared.observability.metrics, stay out of the worker.
+                    "com.confia.shared.observability.queue",
                     // The worker's executor and the institutions it acts on (decision 12).
                     "com.confia.shared.jobs.infrastructure",
                     // The job definition a module registers is a bean of the port package itself:

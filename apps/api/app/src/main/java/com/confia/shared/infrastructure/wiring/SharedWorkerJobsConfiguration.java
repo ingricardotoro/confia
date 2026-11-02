@@ -8,27 +8,36 @@ import com.confia.shared.audit.CanonicalAuditRowSerializer;
 import com.confia.shared.audit.DefaultAuditChainVerifier;
 import com.confia.shared.infrastructure.JooqAuditLogReader;
 import com.confia.shared.infrastructure.JooqIdempotencyRecordStore;
+import com.confia.shared.infrastructure.JooqScheduledTaskQueueReader;
 import com.confia.shared.jobs.JobCalendar;
 import com.confia.shared.jobs.JobDefinition;
 import com.confia.shared.jobs.RecurringJob;
 import com.confia.shared.observability.events.OperationalEventLog;
+import com.confia.shared.observability.queue.LogQueueMetrics;
+import com.confia.shared.observability.queue.QueueMetrics;
+import com.confia.shared.observability.queue.QueueObservation;
+import com.confia.shared.observability.queue.QueueStateReader;
 import com.confia.shared.security.IdempotencyRecordStore;
 import com.confia.shared.security.PurgeExpiredIdempotencyKeys;
 import com.confia.shared.security.TransactionRunner;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalTime;
 import org.jooq.DSLContext;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 /**
  * The jobs of the {@code shared} module for the worker process (background-jobs-with-db-scheduler
  * design.md decisions 12, 17 and 19). It holds the purge of idempotency keys (the store over the {@code
  * SECURITY DEFINER} function, the use case and its recurring job) and the audit-chain verification (the
- * reader, the serializer, the verifier and the daily and weekly jobs). The observation of the queue arrives
- * with the task that owns it. It takes the {@code DSLContext}, the
- * transactional component, the audit writer and the clock from {@code WorkerPlatformConfiguration}, and
- * declares no key, no pepper and no request origin.
+ * reader, the serializer, the verifier and the daily and weekly jobs) and the observation of the queue (decision
+ * 20: the reader of {@code scheduled_tasks}, the log adapter and the job that publishes the state every 60
+ * seconds). It takes the {@code DSLContext}, the transactional component, the audit writer, the clock and the
+ * heartbeat settings of the executor from the environment (it never depends on the scheduling library, which
+ * only {@code shared.jobs.infrastructure} may touch), and declares no key, no pepper and no request origin.
  *
  * <p>Like {@code IdentityWorkerConfiguration}, it lives in an {@code infrastructure.wiring} package
  * because its factory method takes a {@code DSLContext} (ADR-0015 rule 4), and it is imported
@@ -54,6 +63,41 @@ public class SharedWorkerJobsConfiguration {
     JobDefinition idempotencyKeyPurgeJob(PurgeExpiredIdempotencyKeys purge) {
         return new RecurringJob(PurgeExpiredIdempotencyKeys.TASK_NAME,
                 new JobCalendar.DailyAt(LocalTime.of(4, 40)), purge);
+    }
+
+    /**
+     * The reader of the queue. A taken task counts as stalled when its last heartbeat is older than the interval of
+     * the executor times its limit of missed heartbeats, the same moment at which the library presumes its worker
+     * dead. Both come from the {@code db-scheduler.*} keys of the environment, with the defaults of the library when
+     * a key is absent; the file sets one minute and six. The recurring names come from the registered definitions
+     * at each reading, so no job is missed.
+     */
+    @Bean
+    QueueStateReader scheduledTaskQueueReader(DSLContext dsl, Environment environment,
+            ObjectProvider<JobDefinition> definitions) {
+        Duration heartbeatLimit = environment
+                .getProperty("db-scheduler.heartbeat-interval", Duration.class, Duration.ofMinutes(5))
+                .multipliedBy(environment.getProperty("db-scheduler.missed-heartbeats-limit", Integer.class, 6));
+        return new JooqScheduledTaskQueueReader(dsl, heartbeatLimit, () -> definitions.orderedStream()
+                .filter(RecurringJob.class::isInstance).map(JobDefinition::name).toList());
+    }
+
+    /** Until a metrics registry exists (P8), the queue is reported as structured log events. */
+    @Bean
+    QueueMetrics queueMetrics() {
+        return new LogQueueMetrics();
+    }
+
+    @Bean
+    QueueObservation queueObservation(TransactionRunner runner, QueueStateReader scheduledTaskQueueReader,
+            QueueMetrics queueMetrics, Clock clock) {
+        return new QueueObservation(runner, scheduledTaskQueueReader, queueMetrics, clock);
+    }
+
+    /** Every 60 seconds, once for each occurrence, whatever the number of institutions. */
+    @Bean
+    JobDefinition queueObservationJob(QueueObservation observation) {
+        return observation.job();
     }
 
     @Bean

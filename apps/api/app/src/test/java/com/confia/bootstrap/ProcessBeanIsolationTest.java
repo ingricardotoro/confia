@@ -7,6 +7,9 @@ import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
 import com.confia.shared.jobs.infrastructure.DbSchedulerJobScheduler;
 import com.confia.shared.jobs.infrastructure.TracedJobSerializer;
 import com.confia.shared.observability.metrics.LogRateLimitMetrics;
+import com.confia.shared.observability.queue.LogQueueMetrics;
+import com.confia.shared.observability.queue.QueueMetrics;
+import com.confia.shared.observability.queue.QueueObservation;
 import com.github.kagkarlsson.scheduler.Scheduler;
 import com.confia.shared.security.RateLimiter;
 import com.confia.shared.security.TransactionRunner;
@@ -133,6 +136,64 @@ class ProcessBeanIsolationTest {
         } finally {
             if (context != null) {
                 context.close();
+            }
+        }
+    }
+
+    /**
+     * The observation of the queue belongs to the worker alone (background-jobs-with-db-scheduler design.md
+     * decision 20; scenario BI113): it runs as a recurring job and only the worker executes jobs. The
+     * administrative and portal processes start without a bean of its package, and the worker holds the log
+     * adapter and the job that publishes the state, and still nothing of the metrics of the administrative edge.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("com.confia.bootstrap.ProcessBeanPolicy#all")
+    void onlyTheWorkerHoldsTheObservationOfTheQueue(ProcessBeanPolicy policy) {
+        LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.forProcess(policy.process()), policy.process());
+        ConfigurableApplicationContext context = outcome.context();
+        try {
+            assertThat(context).as("the %s process must start", policy.process()).isNotNull();
+            List<String> held = beanNamesOfTypesIn(context, "com.confia.shared.observability.queue");
+            if ("worker".equals(policy.process())) {
+                assertThat(held).anyMatch(bean -> bean.startsWith("queueMetrics : "))
+                        .anyMatch(bean -> bean.startsWith("queueObservation : "));
+                assertThat(context.getBeansOfType(QueueMetrics.class).values()).singleElement()
+                        .isExactlyInstanceOf(LogQueueMetrics.class);
+                assertThat(context.getBeansOfType(QueueObservation.class)).hasSize(1);
+                assertThat(beanNamesOfTypesIn(context, "com.confia.shared.observability.metrics"))
+                        .as("no metrics of the administrative edge in the worker").isEmpty();
+            } else {
+                assertThat(held).as("no observation of the queue in the %s process", policy.process())
+                        .isEmpty();
+                assertThat(context.getBeansOfType(QueueMetrics.class)).isEmpty();
+            }
+        } finally {
+            if (context != null) {
+                context.close();
+            }
+        }
+    }
+
+    /**
+     * The negative control of the narrowing (scenario BI113): a bean of {@code shared.observability.metrics}
+     * is refused in the worker and in the portal, naming the process, the bean and the package, and the same
+     * bean is accepted in the administrative process, which owns it.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("com.confia.bootstrap.ProcessBeanPolicy#all")
+    void aMetricsBeanOfTheAdministrativeEdgeIsRefusedInTheWorkerAndThePortalOnly(ProcessBeanPolicy policy) {
+        try (AnnotationConfigApplicationContext fixture = new AnnotationConfigApplicationContext()) {
+            fixture.registerBean("logRateLimitMetrics", LogRateLimitMetrics.class);
+            fixture.refresh();
+
+            List<String> violations = ProcessBeanInspector.violations(fixture, policy);
+            if ("admin".equals(policy.process())) {
+                assertThat(violations).isEmpty();
+            } else {
+                assertThat(violations).anyMatch(line -> line.contains("process '" + policy.process() + "'")
+                        && line.contains("logRateLimitMetrics")
+                        && line.contains("com.confia.shared.observability.metrics"));
             }
         }
     }
