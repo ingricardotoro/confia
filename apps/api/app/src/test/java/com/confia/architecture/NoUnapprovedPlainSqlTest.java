@@ -4,6 +4,7 @@ import static com.confia.architecture.ArchitectureTestSupport.assertRuleRejects;
 import static com.confia.architecture.ArchitectureTestSupport.fixtureClasses;
 import static com.confia.architecture.ArchitectureTestSupport.productionClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.AccessTarget.MethodCallTarget;
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -49,11 +50,17 @@ class NoUnapprovedPlainSqlTest {
      * JooqRefreshTokenFamilyRepository} (session-tokens-and-web-layer task 3.3): {@code
      * identity_refresh_token_family.ip_first_seen} is {@code INET} too, the open-source {@code
      * PostgresDataType} has no {@code INET} to cast to, and the address is one bind value through
-     * jOOQ's own substitution, never concatenated.
+     * jOOQ's own substitution, never concatenated. The third is {@code JooqScheduledTaskQueueReader}
+     * (background-jobs-with-db-scheduler design.md decision 20, task 4.1; scenario BI101): {@code
+     * scheduled_tasks} belongs to the library and jOOQ generates no code for it (ADR-0017 rule 6), so the one
+     * read-only statement of the queue metrics is plain SQL with bound values. {@code
+     * QueueSqlNeverReadsTaskDataTest} inspects its text and shows that it never names {@code task_data}.
      */
+    private static final String QUEUE_READER = "com.confia.shared.infrastructure.JooqScheduledTaskQueueReader";
+
     private static final Set<String> APPROVED_PLAIN_SQL_CALLERS =
             Set.of("com.confia.shared.infrastructure.JooqAuditLogWriter",
-                    "com.confia.identity.infrastructure.JooqRefreshTokenFamilyRepository");
+                    "com.confia.identity.infrastructure.JooqRefreshTokenFamilyRepository", QUEUE_READER);
 
     private static final String DSL_TYPE = "org.jooq.impl.DSL";
     private static final Set<String> FORBIDDEN_DSL_STATIC_METHODS =
@@ -63,9 +70,13 @@ class NoUnapprovedPlainSqlTest {
     private static final Set<String> FORBIDDEN_DSL_CONTEXT_METHODS =
             Set.of("fetch", "execute", "resultQuery");
 
-    private static final ArchRule RULE = classes()
-            .should(notCallUnapprovedPlainSql())
-            .because("jOOQ plain SQL is forbidden outside the approved list (ADR-0015, regla 9)");
+    private static final ArchRule RULE = ruleApproving(APPROVED_PLAIN_SQL_CALLERS);
+
+    private static ArchRule ruleApproving(Set<String> approved) {
+        return classes()
+                .should(notCallUnapprovedPlainSql(approved))
+                .because("jOOQ plain SQL is forbidden outside the approved list (ADR-0015, regla 9)");
+    }
 
     @Test
     void productionCodeCallsNoUnapprovedPlainSql() {
@@ -77,12 +88,29 @@ class NoUnapprovedPlainSqlTest {
         assertRuleRejects(RULE, fixtureClasses(), "BadPlainSqlRepository");
     }
 
-    private static ArchCondition<JavaClass> notCallUnapprovedPlainSql() {
+    @Test
+    void theApprovedListHoldsExactlyTheThreeCallers() {
+        assertThat(APPROVED_PLAIN_SQL_CALLERS).containsExactlyInAnyOrder(
+                "com.confia.shared.infrastructure.JooqAuditLogWriter",
+                "com.confia.identity.infrastructure.JooqRefreshTokenFamilyRepository", QUEUE_READER);
+    }
+
+    /** The approval is needed and the real class is the one evaluated (BI101): without it the reader is rejected. */
+    @Test
+    void theRealQueueReaderIsRejectedWithoutItsApproval() {
+        Set<String> withoutTheReader = new java.util.HashSet<>(APPROVED_PLAIN_SQL_CALLERS);
+        withoutTheReader.remove(QUEUE_READER);
+
+        assertRuleRejects(ruleApproving(withoutTheReader), productionClasses(), "JooqScheduledTaskQueueReader",
+                "resultQuery");
+    }
+
+    private static ArchCondition<JavaClass> notCallUnapprovedPlainSql(Set<String> approved) {
         return new ArchCondition<>("not call jOOQ plain-SQL entry points outside the approved "
                 + "list") {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
-                if (APPROVED_PLAIN_SQL_CALLERS.contains(javaClass.getFullName())) {
+                if (approved.contains(javaClass.getFullName())) {
                     return;
                 }
                 for (JavaMethodCall call : javaClass.getMethodCallsFromSelf()) {

@@ -130,7 +130,8 @@ class WorkerProductionWiringTest {
                             "idempotencyRecordStore", "purgeExpiredIdempotencyKeys", "idempotencyKeyPurgeJob",
                             "auditLogReader", "canonicalAuditRowSerializer", "auditChainVerifier",
                             "auditChainVerificationJobs", "auditChainDailyVerificationJob",
-                            "auditChainWeeklyVerificationJob");
+                            "auditChainWeeklyVerificationJob", "scheduledTaskQueueReader", "queueMetrics",
+                            "queueObservation", "queueObservationJob");
         } finally {
             context.close();
         }

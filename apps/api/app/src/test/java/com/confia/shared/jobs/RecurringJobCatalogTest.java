@@ -48,6 +48,22 @@ class RecurringJobCatalogTest {
                         tuple("identity.purge-mfa-totp-backoff", new JobCalendar.DailyAt(LocalTime.of(4, 50))));
     }
 
+    /** BJ62: the observation of the queue is the eighth recurring job, 60 seconds after the reference instant. */
+    @Test
+    void theQueueObservationRunsSixtySecondsAfterTheReferenceInstantAndTheWorkerHasEightRecurringJobs() {
+        List<RecurringJob> recurring = RegisteredJobs.ofTheWorker().stream()
+                .filter(RecurringJob.class::isInstance).map(RecurringJob.class::cast).toList();
+
+        assertThat(recurring).as("the catalog of eight").hasSize(8);
+        RecurringJob observation = recurring.stream().filter(job -> job.name().equals("shared.queue-observation"))
+                .findFirst().orElseThrow();
+        assertThat(observation.calendar()).isEqualTo(new JobCalendar.Every(Duration.ofSeconds(60)));
+        Instant next = JobCalendars.scheduleOf(observation.calendar())
+                .getNextExecutionTime(ExecutionComplete.simulatedSuccess(SUNDAY_MIDNIGHT));
+        assertThat(next).isEqualTo(Instant.parse("2026-10-25T06:01:00Z"));
+        assertThat(Duration.between(SUNDAY_MIDNIGHT, next)).isLessThan(Duration.ofDays(365));
+    }
+
     @Test
     void eachPurgeRunsAtItsExactNextInstantInTegucigalpaAndWithinTheYear() {
         assertThat(purgeJobs()).as("non-vacuous").hasSize(5).allSatisfy(job -> {
