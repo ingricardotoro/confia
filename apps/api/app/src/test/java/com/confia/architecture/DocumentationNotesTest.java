@@ -39,7 +39,7 @@ class DocumentationNotesTest {
     private static final String DOCS_07 = "docs/07-observabilidad-y-operaciones.md";
     private static final String EXPLORATION = "openspec/changes/foundations-plan/exploration.md";
     private static final String WORKER_APPLICATION =
-            "src/main/java/com/confia/bootstrap/worker/WorkerApplication.java";
+            "apps/api/app/src/main/java/com/confia/bootstrap/worker/WorkerApplication.java";
     private static final String CLOSING_NOTE =
             "**Nota fechada 2026-11-01 (cambio `background-jobs-with-db-scheduler`, tarea 4.2)";
     private static final String TRACED_JOB_NOTE =
@@ -106,6 +106,11 @@ class DocumentationNotesTest {
                 .contains("9999-01-01T00:00:00Z")
                 .contains("consecutive_failures")
                 .contains("last_failure");
+        assertThat(text)
+                .as("per-institution occurrences belong to the recurring jobs, not to the one-time task")
+                .contains("Las siete tareas recurrentes por institución")
+                .contains("no tiene ocurrencias por institución")
+                .doesNotContain("En ambos casos, una institución");
         assertOriginalLinesIntact(DOCS_07 + " section 11", linesOf(ORIGINAL_DOCS_07_SECTION_11), section);
     }
 
@@ -118,7 +123,9 @@ class DocumentationNotesTest {
                 .contains("consecutive_failures = 0")
                 .contains("queue_state")
                 .contains("5 minutos")
-                .contains("misma cola");
+                .contains("misma cola")
+                .as("the manual UPDATE names itself as the only exception to the 'nobody writes by hand' comment")
+                .contains("única excepción");
         assertOriginalLinesIntact(DOCS_07 + " section 11.1", linesOf(ORIGINAL_DOCS_07_SECTION_11_1), section);
     }
 
@@ -153,7 +160,7 @@ class DocumentationNotesTest {
 
     @Test
     void workerApplicationJavadocDescribesTheDataSourceTheEarlyGuardsTheSingleExecutorAndTheNarrowWiring() {
-        String javadoc = classJavadoc(Paths.get(WORKER_APPLICATION).toAbsolutePath());
+        String javadoc = classJavadoc(repoRoot().resolve(WORKER_APPLICATION));
         assertThat(javadoc)
                 .as("the DataSource of the worker")
                 .contains("DataSource")

@@ -1017,8 +1017,10 @@ programar (ADR-0014).
 > instante `9999-01-01T00:00:00Z`, de modo que ningún sondeo la vuelve a tomar, y nunca se borra. Conserva
 > `consecutive_failures` y `last_failure`, y la cola la cuenta como fallida. Una tarea recurrente no se reintenta: al
 > fallar se reprograma a su próxima ocurrencia y cuenta como fallida mientras `consecutive_failures` sea mayor que cero,
-> hasta su próximo éxito. En ambos casos, una institución que falla no impide que se ejecute la siguiente de la misma
-> ocurrencia, y la ocurrencia queda registrada como fallida.
+> hasta su próximo éxito. Las siete tareas recurrentes por institución se ejecutan una vez por cada institución configurada en cada ocurrencia:
+> la institución que falla no impide que se ejecute la siguiente de la misma ocurrencia, y la ocurrencia queda
+> registrada como fallida. La tarea de una sola ejecución no tiene ocurrencias por institución: es una única ejecución
+> para una institución, que se reintenta y, al agotar los intentos, queda estacionada.
 
 ### 11.1 Comandos de operación manual
 
@@ -1067,7 +1069,8 @@ docker compose exec postgres psql -U confia_owner -d confia -c "
 > localiza la fila sin leer `task_data` (las ejecuciones estacionadas son las que tienen `execution_time` en
 > `9999-01-01T00:00:00Z`), después se reprograma al instante actual y se reinicia el contador, para que la tarea
 > recupere todos sus intentos. `last_failure` se conserva como evidencia. El resultado se registra en el acta del
-> incidente.
+> incidente. Esta reprogramación es la única excepción a la regla del comentario de esta sección, según la cual nadie
+> escribe a mano en la tabla de tareas; ninguna otra operación manual la modifica.
 >
 > ```sql
 > SELECT task_name, task_instance, consecutive_failures, last_failure
