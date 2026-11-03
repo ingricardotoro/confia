@@ -1,7 +1,7 @@
 # Capacidad: Trabajos en segundo plano
 
 - **Identificador:** background-jobs
-- **Estado:** pendiente de aprobación del propietario del producto
+- **Estado:** Borrador
 - **Fase:** F0
 - **Cambio:** `background-jobs-with-db-scheduler` (F0, cambio 9)
 - **Propuesta:** `proposal.md`, aprobada por el propietario el 2026-10-24, con P1 a P9 vinculantes
