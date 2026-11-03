@@ -18,6 +18,14 @@ import org.junit.jupiter.api.Test;
  * dated note, and none of their original lines was rewritten. The originals are embedded as
  * fixtures under {@code src/test/resources/documentation-notes}, copies of the files as they were
  * before the notes; every fixture line must still appear, in order, in the live document.
+ *
+ * <p>It also proves the closing notes of task 4.2 of background-jobs-with-db-scheduler (scenarios BJ41,
+ * BJ42, BJ70 and BJ71): the table of the eight recurring jobs, the parked failed state, the manual
+ * reprogramming and the alert on the absence of {@code queue_state} in {@code docs/07}; the note of
+ * {@code docs/05} section 6 that reverses the one of 2026-10-04; the dated note of the foundations plan;
+ * and the Javadoc of {@code WorkerApplication}. The originals of those documents are embedded in this
+ * class as text blocks, because their sections are long and later changes legitimately add notes to them:
+ * the check is that every original line still appears, in order, never that the section is unchanged.
  */
 class DocumentationNotesTest {
 
@@ -27,6 +35,15 @@ class DocumentationNotesTest {
     private static final String DOCS_08 = "docs/08-datos-privacidad-y-retencion.md";
     private static final String NOTE_MARKER = "**Nota editorial, 2026-10-29";
     private static final String ADR_NOTE_MARKER = "**Nota fechada, 2026-10-29";
+    private static final String DOCS_05 = "docs/05-infraestructura-y-despliegue.md";
+    private static final String DOCS_07 = "docs/07-observabilidad-y-operaciones.md";
+    private static final String EXPLORATION = "openspec/changes/foundations-plan/exploration.md";
+    private static final String WORKER_APPLICATION =
+            "apps/api/app/src/main/java/com/confia/bootstrap/worker/WorkerApplication.java";
+    private static final String CLOSING_NOTE =
+            "**Nota fechada 2026-11-01 (cambio `background-jobs-with-db-scheduler`, tarea 4.2)";
+    private static final String TRACED_JOB_NOTE =
+            "**Nota fechada 2026-10-26 (cambio `background-jobs-with-db-scheduler`, tarea 2.1)";
 
     @Test
     void adr0025ExistsAsProposedAndIsIndexed() {
@@ -61,8 +78,115 @@ class DocumentationNotesTest {
         assertOriginalLinesIntact(DOCS_08 + " section 6.2", "docs-08-section-6.2.original.md", section);
     }
 
+    @Test
+    void docs07Section33HasTheTracedJobNoteAndUnchangedOriginalBody() {
+        List<String> section = section(lines(repoRoot().resolve(DOCS_07)), "### 3.3 ");
+        assertThat(String.join("\n", noteBlock(section, TRACED_JOB_NOTE)))
+                .contains("TracedJob")
+                .contains("com.confia.shared.jobs");
+        assertOriginalLinesIntact(DOCS_07 + " section 3.3", linesOf(ORIGINAL_DOCS_07_SECTION_3_3), section);
+    }
+
+    @Test
+    void docs07Section11HasTheTableOfTheEightRecurringJobsAndTheParkedFailedState() {
+        List<String> section = section(lines(repoRoot().resolve(DOCS_07)), "## 11. ");
+        List<String> note = noteBlock(section, CLOSING_NOTE);
+        String text = String.join("\n", note);
+        assertThat(text).contains("America/Tegucigalpa");
+        assertJobRow(note, "identity.purge-password-reset-tokens", "Diaria, 04:30");
+        assertJobRow(note, "identity.purge-refresh-tokens", "Diaria, 04:35");
+        assertJobRow(note, "shared.purge-idempotency-keys", "Diaria, 04:40");
+        assertJobRow(note, "identity.purge-login-backoff", "Diaria, 04:45");
+        assertJobRow(note, "identity.purge-mfa-totp-backoff", "Diaria, 04:50");
+        assertJobRow(note, "shared.audit-chain-verification-daily", "Diaria, 03:00");
+        assertJobRow(note, "shared.audit-chain-verification-weekly", "Domingo, 03:30");
+        assertJobRow(note, "shared.queue-observation", "Cada 60 s");
+        assertThat(text)
+                .as("the parked failed state")
+                .contains("9999-01-01T00:00:00Z")
+                .contains("consecutive_failures")
+                .contains("last_failure");
+        assertThat(text)
+                .as("per-institution occurrences belong to the recurring jobs, not to the one-time task")
+                .contains("Las siete tareas recurrentes por institución")
+                .contains("no tiene ocurrencias por institución")
+                .doesNotContain("En ambos casos, una institución");
+        assertOriginalLinesIntact(DOCS_07 + " section 11", linesOf(ORIGINAL_DOCS_07_SECTION_11), section);
+    }
+
+    @Test
+    void docs07Section111HasTheManualReprogrammingAndTheAbsenceAlertAndUnchangedOriginalBody() {
+        List<String> section = section(lines(repoRoot().resolve(DOCS_07)), "### 11.1 ");
+        assertThat(String.join("\n", noteBlock(section, CLOSING_NOTE)))
+                .contains("UPDATE scheduled_tasks")
+                .contains("SET execution_time")
+                .contains("consecutive_failures = 0")
+                .contains("queue_state")
+                .contains("5 minutos")
+                .contains("misma cola")
+                .as("the manual UPDATE names itself as the only exception to the 'nobody writes by hand' comment")
+                .contains("única excepción");
+        assertOriginalLinesIntact(DOCS_07 + " section 11.1", linesOf(ORIGINAL_DOCS_07_SECTION_11_1), section);
+    }
+
+    @Test
+    void docs05Section6NamesTheWorkerAndPortalUsersAndReversesTheNoteOf20261004() {
+        List<String> section = section(lines(repoRoot().resolve(DOCS_05)), "## 6. ");
+        assertThat(String.join("\n", noteBlock(section, CLOSING_NOTE)))
+                .contains("confia_admin_app")
+                .contains("confia_portal_app")
+                .contains("CONFIA_JOBS_INSTITUTIONS")
+                .contains("2026-10-04")
+                .contains("web-edge-foundations")
+                .contains("D5");
+        assertOriginalLinesIntact(DOCS_05 + " section 6 note of 2026-10-04",
+                linesOf(ORIGINAL_DOCS_05_NOTE_2026_10_04), section);
+    }
+
+    @Test
+    void foundationsPlanClosesCondition4AndRecordsTheFollowUpsAndTheDebtOfPhase2() {
+        List<String> all = lines(repoRoot().resolve(EXPLORATION));
+        assertThat(String.join("\n", noteBlock(all, CLOSING_NOTE)))
+                .contains("condición 4")
+                .contains("cerrada")
+                .contains("audit-chain-hourly-anchor-verification")
+                .contains("cambios 9 y 11")
+                .contains("data-encryption-key-batch-rotation")
+                .contains("cambio 9")
+                .contains("fase 2")
+                .contains("CONFIA_JOBS_INSTITUTIONS");
+        assertOriginalLinesIntact(EXPLORATION + " condition 4", linesOf(ORIGINAL_EXPLORATION_CONDITION_4), all);
+    }
+
+    @Test
+    void workerApplicationJavadocDescribesTheDataSourceTheEarlyGuardsTheSingleExecutorAndTheNarrowWiring() {
+        String javadoc = classJavadoc(repoRoot().resolve(WORKER_APPLICATION));
+        assertThat(javadoc)
+                .as("the DataSource of the worker")
+                .contains("DataSource")
+                .contains("confia_admin_app")
+                .contains("SPRING_DATASOURCE_URL");
+        assertThat(javadoc)
+                .as("the guards that act before the context exists")
+                .contains("SensitiveLogGuardInitializer")
+                .contains("SigningKeyPlacementGuard");
+        assertThat(javadoc)
+                .as("the single executor")
+                .contains("exactly one executor")
+                .contains("WorkerJobsConfiguration");
+        assertThat(javadoc)
+                .as("the narrow wiring")
+                .contains("SharedWorkerJobsConfiguration")
+                .contains("IdentityWorkerConfiguration")
+                .contains("CONFIA_JOBS_INSTITUTIONS")
+                .contains("ProcessBeanPolicy");
+    }
+
     private static void assertOriginalLinesIntact(String label, String fixtureName, List<String> live) {
-        List<String> original = fixture(fixtureName);
+        assertOriginalLinesIntact(label, fixture(fixtureName), live);
+    }
+
+    private static void assertOriginalLinesIntact(String label, List<String> original, List<String> live) {
         int cursor = 0;
         for (int i = 0; i < original.size(); i++) {
             String expected = original.get(i);
@@ -72,6 +196,52 @@ class DocumentationNotesTest {
                             label, i + 1, expected)
                     .isGreaterThanOrEqualTo(0);
             cursor += found + 1;
+        }
+    }
+
+    private static List<String> linesOf(String textBlock) {
+        return textBlock.lines().toList();
+    }
+
+    /** The contiguous block quote (lines starting with {@code >}) that holds the line with {@code marker}. */
+    private static List<String> noteBlock(List<String> all, String marker) {
+        int at = -1;
+        for (int i = 0; i < all.size(); i++) {
+            if (all.get(i).startsWith(">") && all.get(i).contains(marker)) {
+                at = i;
+                break;
+            }
+        }
+        assertThat(at).as("a block quote that carries \"%s\"", marker).isGreaterThanOrEqualTo(0);
+        int from = at;
+        while (from > 0 && all.get(from - 1).startsWith(">")) {
+            from--;
+        }
+        int to = at;
+        while (to + 1 < all.size() && all.get(to + 1).startsWith(">")) {
+            to++;
+        }
+        return all.subList(from, to + 1);
+    }
+
+    private static void assertJobRow(List<String> note, String task, String calendar) {
+        assertThat(note)
+                .as("the row of %s with the calendar \"%s\"", task, calendar)
+                .anySatisfy(row -> assertThat(row).startsWith("> | `" + task + "` |").contains(calendar));
+    }
+
+    /** The text of the Javadoc that precedes the class, without the comment markers. */
+    private static String classJavadoc(Path file) {
+        assertThat(file).as("file %s", file).exists();
+        try {
+            String source = Files.readString(file, StandardCharsets.UTF_8).replace("\r\n", "\n");
+            int begin = source.indexOf("/**");
+            String comment = source.substring(begin, source.indexOf("*/", begin));
+            StringBuilder text = new StringBuilder();
+            comment.lines().forEach(line -> text.append(line.strip().replaceFirst("^(/\\*\\*|\\*)\\s?", "")).append('\n'));
+            return text.toString().replaceAll("\\s+", " ").strip();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -116,4 +286,162 @@ class DocumentationNotesTest {
         }
         throw new IllegalStateException("Could not find the repository root from " + Paths.get("").toAbsolutePath());
     }
+
+    private static final String ORIGINAL_DOCS_07_SECTION_3_3 = """
+        Los trabajos en segundo plano usan db-scheduler sobre PostgreSQL (ADR-0016). Lo que sigue es el
+        contrato de correlación de sus tareas.
+
+        Los datos de una tarea **solo llevan identificadores** (institución, entidad, clave de
+        idempotencia), nunca importes ni datos personales (`docs/03-seguridad.md` sección 2.4). El
+        contexto de correlación viaja como metadatos declarados dentro de esos datos.
+
+        ```java
+        // apps/api/app/src/main/java/<paquete-base>/shared/observability/context/TracedJob.java
+        // Envelope of the db-scheduler task data (ADR-0016). Final shape and serialization fixed in F0.
+
+        public record TracedJob<T>(T payload, JobMeta meta) {
+
+            /** Every field except actorId and traceparent is mandatory. */
+            public record JobMeta(
+                    String correlationId,
+                    String requestId,
+                    String actorId,        // originating actor; null for system actors
+                    ActorKind actorKind,   // originating actor kind: STAFF, GUARDIAN or SYSTEM
+                    UUID institutionId,
+                    String traceparent) {} // W3C Trace Context carrier
+        }
+        ```
+
+        Reglas del contrato:
+
+        - **Quien programa.** Nunca programa una tarea sin `meta`, y solo lo hace desde un caso de uso,
+          dentro de la transacción del negocio. Toma `correlationId`, `requestId`, actor e institución del
+          contexto de la solicitud en curso, y el `traceparent` del contexto de trazas activo. Una tarea
+          programada sin solicitud de origen usa actor de sistema explícito.
+        - **Manejador en `confia-worker`.** Antes de ejecutar, restaura el contexto de trazas desde
+          `traceparent` y coloca en el MDC los campos de `meta` más `jobId`. El actor de `meta` se registra
+          para correlación y auditoría, pero el manejador siempre ejecuta con actor `system` y el contexto
+          de la institución de la tarea (ADR-0016, regla 4). Al terminar, limpia el MDC.
+
+        **Cómo se comprueba.** Prueba de lista aprobada de campos por tipo de tarea: una tarea sin `meta` o
+        con un `payload` que contenga campos no permitidos falla la validación de quien programa. Prueba de
+        integración que programa una tarea desde una petición HTTP y verifica que el log del trabajador
+        contiene el mismo `correlationId` que el log de la petición.
+        """;
+
+    private static final String ORIGINAL_DOCS_07_SECTION_11 = """
+        Las tareas de aplicación de esta tabla son tareas recurrentes de db-scheduler (ADR-0016): se
+        declaran en código con expresión de calendario y zona horaria `America/Tegucigalpa`, se ejecutan
+        solo en `confia-worker` a través del componente transaccional con actor `system` y el contexto de
+        cada institución, llevan `correlationId` propio y registran su resultado en la bitácora de
+        auditoría cuando tocan datos. La tabla de tareas coordina la ejecución, de modo que una tarea
+        recurrente corre una sola vez aunque haya varias réplicas del trabajador. Ninguna corre como `cron`
+        del sistema operativo dentro del contenedor de la API ni con `@Scheduled` de Spring: eso duplicaría
+        la ejecución en cada proceso. Las horas de la tabla son de `America/Tegucigalpa`.
+
+        Las tareas de infraestructura de la tabla (respaldo lógico fuera de sitio, prueba de restauración,
+        verificación de certificados y escaneo de la imagen) no son código de la aplicación y quedan fuera
+        de ADR-0016: no corren en `confia-worker`, cuya imagen solo contiene el JRE y el artefacto. Se
+        ejecutan mediante un temporizador de `systemd` en la instancia EC2 (`infra/scripts/backup.sh`,
+        `docs/05-infraestructura-y-despliegue.md`, sección 11), validado en F0. Los respaldos automáticos
+        de RDS con restauración a un punto en el tiempo los gestiona AWS directamente, sin una tarea que
+        programar (ADR-0014).
+
+        | Tarea | Frecuencia | Qué hace | Métrica que publica | Qué pasa si falla |
+        |---|---|---|---|---|
+        | **Verificación de integridad del libro mayor** | Diaria, 02:00 | Ejecuta las seis verificaciones de `.claude/skills/confia-ledger-invariants/SKILL.md` sección 7: cuadre por transacción, cuadre por cuenta contra la caché, imputación no excedida, unicidad de reverso, continuidad de auditoría y correlativo fiscal | `confia_ledger_unbalanced_transactions`, `confia_ledger_cached_balance_drift_accounts`, `confia_ledger_over_allocated_charges`, `confia_ledger_double_reversal_transactions`, `confia_fiscal_sequence_gaps` | Alerta S1 y runbook de descuadre. La cuenta afectada se marca `UNDER_REVIEW` y se bloquean sus escrituras |
+        | **Generación de cargos** | Diaria; genera los cargos de cada plan de cobro en su día de devengo | Genera los cargos del período, con un cargo por estudiante, concepto y período garantizado por restricción única | `confia_charges_generated_total`, `confia_charge_generation_last_success_timestamp_seconds` | Alerta S2 `ChargeGenerationMissed`. Reejecutar es seguro: la tarea es idempotente |
+        | **Purga de tokens de refresco vencidos** | Diaria | Elimina los tokens de refresco vencidos o revocados (ADR-0005) | Publica el conteo purgado como métrica | Alerta S3 `TaskFailed`. Un token vencido se rechaza igual al validarse; la purga reduce volumen y superficie |
+        | **Verificación de la cadena de auditoría, horaria** | Cada hora | Compara el último `record_hash` contra el ancla publicada en almacenamiento de objetos y publica el ancla nueva | `confia_audit_chain_broken` | Alerta S1 y runbook de incidente de seguridad. No se repara la cadena: se preserva la evidencia |
+        | **Verificación de la cadena de auditoría, diaria** | Diaria, 03:00 | Recalcula la cadena completa del último mes | `confia_audit_chain_verified_rows` | Igual |
+        | **Verificación de la cadena de auditoría, semanal** | Domingo, 03:30 | Recalcula desde el registro génesis | `confia_audit_chain_verified_rows{scope="weekly"}` | Igual |
+        | **Respaldo lógico fuera de sitio** | Diaria, 01:00 | `infra/scripts/backup.sh nightly`: `pg_dump` contra RDS, cifrado con age, subido a un proveedor de almacenamiento distinto al de cómputo, sin retención local (ADR-0014) | `confia_backup_last_success_timestamp_seconds`, `confia_backup_duration_seconds` | Alerta S1 `BackupMissing`. Es el único punto de recuperación ante la pérdida total de la cuenta de AWS |
+        | **Respaldo automático de RDS** | Continuo, gestionado por AWS | Respaldo automático con restauración a un punto en el tiempo, sin script propio (ADR-0014) | `confia_rds_backup_enabled`, `confia_rds_restorable_time_lag_seconds` | Alertas S1 `RdsBackupDisabled` y `RdsRestorableTimeLagHigh`. El objetivo de punto de recuperación de 15 minutos dentro de AWS depende de esto |
+        | **Prueba de restauración de respaldo** | Mensual, primer sábado | Restaura el respaldo más reciente en un entorno aislado, cuenta registros, verifica el cuadre del libro mayor y verifica la cadena de auditoría. Deja acta con fecha, duración y resultado | `confia_restore_drill_last_success_timestamp_seconds`, `confia_restore_drill_duration_seconds` | Alerta S3 `RestoreDrillOverdue`. Un respaldo no restaurado no cuenta como respaldo. Ver `docs/runbooks/restauracion-de-respaldo.md` |
+        | **Revisión de rangos CAI** | Diaria, 07:00, y tras cada emisión | Recalcula porcentaje consumido, correlativos restantes y días hasta la fecha límite por punto de emisión | `confia_cai_range_consumed_percent`, `confia_cai_range_remaining_numbers`, `confia_cai_range_days_to_expiry` | Alertas escalonadas en 85, 95 y 100 por ciento. Ver `docs/runbooks/rango-cai-agotado.md` |
+        | **Limpieza por retención de datos** | Semanal, domingo 04:00 | Aplica la política de `docs/08-datos-privacidad-y-retencion.md`: elimina o anonimiza lo vencido, respetando siempre las obligaciones de conservación fiscal | `confia_data_retention_pending_records` | Alerta S3 `RetentionBacklog`. Cada eliminación o anonimización se audita |
+        | **Reconstrucción de la caché de saldos** | Diaria, 02:30, después de la verificación de integridad | Reconstruye desde cero el saldo materializado y lo compara contra el existente antes de sustituirlo | `confia_ledger_cached_balance_drift_accounts` | Alerta S2. **Nunca se sobrescribe la caché sin registrar primero la divergencia detectada** |
+        | **Verificación de MFA en roles financieros** | Diaria, 06:00 | Comprueba que ningún usuario con permiso de escritura financiera tiene MFA inactiva | Publica el conteo como métrica | Alerta S2 `MfaMissingOnFinancialRole` y suspensión de sesión |
+        | **Recálculo de cartera por antigüedad** | Diaria, 05:00 | Recalcula la cartera vencida por tramo desde el libro mayor | `confia_outstanding_balance_minor_units` | Alerta S3. Es informativo, no bloqueante |
+        | **Verificación de certificados y secretos** | Diaria, 08:00 | Días restantes de certificados TLS y de secretos con rotación programada | `confia_tls_certificate_expiry_timestamp_seconds` | Alerta S3 `CertificateExpiringSoon` |
+        | **Escaneo de vulnerabilidades de la imagen en ejecución** | Semanal, lunes 06:00 | Trivy contra el digest desplegado, no contra la etiqueta | Publica conteo por severidad | Alerta S3, o S2 si hay vulnerabilidad crítica con explotación conocida |
+        | **Reporte de segregación de funciones** | Trimestral | Genera el reporte "quién puede hacer qué" y lo deja para revisión con el propietario | - | Alerta S3 si no se generó |
+        """;
+
+    private static final String ORIGINAL_DOCS_07_SECTION_11_1 = """
+        ```bash
+        # Estado general del despliegue
+        docker compose -f infra/docker/compose.prod.yml ps
+
+        # Logs correlacionados de una solicitud concreta, en los tres servicios
+        docker compose logs --since 24h --no-log-prefix api-admin api-portal worker \\
+          | grep '"requestId":"018f3a2b-9c4d-7e10-8f21-9a7b3c5d1e00"'
+
+        # Manual ledger integrity check: triggered from the admin API through a use case guarded by a
+        # permission and audited, which schedules the same one-time task used by the nightly run
+        # (ADR-0016). Nobody writes to the task table by hand. Endpoint and permission are defined in the
+        # ledger module specification.
+
+        # Background task status, read only. Default db-scheduler columns, validated in F0 (ADR-0016).
+        # The task data column is never selected.
+        docker compose exec postgres psql -U confia_owner -d confia -c "
+          SELECT task_name,
+                 count(*) FILTER (WHERE NOT picked AND execution_time <= now())             AS due,
+                 count(*) FILTER (WHERE picked)                                             AS running,
+                 count(*) FILTER (WHERE consecutive_failures > 0)                           AS failing,
+                 min(execution_time) FILTER (WHERE NOT picked AND execution_time <= now())  AS oldest_due
+          FROM scheduled_tasks
+          GROUP BY task_name
+          ORDER BY task_name;"
+
+        # Estado actual de los rangos CAI
+        docker compose exec postgres psql -U confia_owner -d confia -c "
+          SELECT issuance_point_id, document_type, cai, range_from, range_to, current_number,
+                 ROUND(100.0 * (current_number - range_from) / NULLIF(range_to - range_from, 0), 2)
+                   AS consumed_percent,
+                 valid_until, status
+          FROM cai_range
+          WHERE status = 'active'
+          ORDER BY consumed_percent DESC;"
+        ```
+        """;
+
+    private static final String ORIGINAL_DOCS_05_NOTE_2026_10_04 = """
+        > **Nota fechada 2026-10-04 (cambio `web-edge-foundations`, PR 2 `identity-beans`): variables del
+        > proceso administrativo.** Desde este cambio, solo el proceso `admin` abre una conexión a la base de
+        > datos y registra los casos de uso de identidad. Necesita, además de `SPRING_DATASOURCE_URL`,
+        > `SPRING_DATASOURCE_USERNAME` y `SPRING_DATASOURCE_PASSWORD` (el rol `confia_admin_app`), tres
+        > secretos. Se leen al arrancar y, si falta alguno o es inválido, el proceso se detiene antes de
+        > aceptar una sola petición, con un mensaje que nombra la propiedad y nunca repite ninguna parte
+        > del valor:
+        >
+        > | Variable de entorno | Propiedad | Formato |
+        > |---|---|---|
+        > | `CONFIA_CRYPTO_COLUMNMASTERKEY` | `confia.crypto.column-master-key` | Base64 de 32 bytes: llave maestra del cifrado de columnas |
+        > | `CONFIA_IDENTITY_ARGON2PEPPER` | `confia.identity.argon2-pepper` | Base64 de 32 bytes: pimienta de Argon2id y del identificador de inicio de sesión |
+        > | `CONFIA_IDENTITY_LOGININSTITUTIONID` | `confia.identity.login-institution-id` | UUID de la institución de inicio de sesión del proceso |
+        >
+        > Los tres valores viven en el almacén de secretos y nunca en el repositorio, ni siquiera como
+        > ejemplo. `portal` y `worker` no los leen ni abren conexión a la base de datos. El grupo de
+        > conexiones es perezoso: un proceso `admin` con la base de datos caída arranca y reporta el fallo
+        > en el primer uso. Los casos de uso `RequestPasswordReset` e `IssuePasswordResetToken` no se
+        > registran hasta que existan sus adaptadores (cambios 9 y 14).
+        """;
+
+    private static final String ORIGINAL_EXPLORATION_CONDITION_4 = """
+
+        **Condición dura de aceptación de `background-jobs-with-db-scheduler` (cambio 9) (2026-10-04, de
+        `web-edge-foundations`, revisión de seguridad del PR 6b).** La protección de registros de la regla 11
+        (`SensitiveLogGuard` y `Settings.withExecuteLogging(false)` de jOOQ) existe hoy solo donde hay `DataSource`
+        y borde web: el proceso administrativo. El trabajador no tiene `DataSource` y su política de procesos
+        prohíbe `com.confia.shared.web`, de modo que no recibe la guardia. Se escribe aquí y no como pregunta abierta,
+        porque una pregunta abierta no bloquea nada:
+
+        > **4. `background-jobs-with-db-scheduler` NO DEBE dar un `DataSource` al trabajador ni ejecutar SQL en él sin que
+        > la protección de registros sensibles esté activa en ese proceso, y NO DEBE fusionarse sin una prueba que lo
+        > demuestre** (con `org.jooq` y la raíz en `DEBUG`, un valor enlazado distintivo no aparece en ningún evento del
+        > proceso trabajador real).
+
+        Como el trabajador prohíbe `com.confia.shared.web`, la protección debe llegar por una configuración que el
+        """;
 }

@@ -711,7 +711,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     status`. Tamaño: nominal 250, realista 450 a 600. — Escenarios BJ32 a BJ36, BJ62, BJ67 a BJ69, BI101 y BI113.
   - **Hecho (2026-11-01).** Se dividió en dos PR apilados por decisión del propietario, porque midió 1 497 líneas efectivas: `07a-queue-observability` (723) y `07a2-queue-observation-wiring` (774). `./mvnw -B verify` en verde en ambos. La evidencia está en `odd/tasks/background-jobs-remaining-tasks.md`.
 
-- [ ] 4.2 **PR 7 / 7b `07b-closing-notes`: notas documentales, Javadoc de `WorkerApplication` y seguimientos (decisión 22, P1, P5).**
+- [x] 4.2 **PR 7 / 7b `07b-closing-notes`: notas documentales, Javadoc de `WorkerApplication` y seguimientos (decisión 22, P1, P5).**
   - **ROJO.** Crear o ampliar `DocumentationNotesTest.java` con las notas fechadas que faltan, comprobando que el texto original no cambió: `docs/07`
     §3.3 (ubicación de `TracedJob`) [BJ41], `docs/07` §11 y §11.1 (tabla completa de las ocho tareas recurrentes con calendario `America/Tegucigalpa`,
     estado fallido estacionado, **reprogramación manual** por un `UPDATE` de `execution_time` y `consecutive_failures`, y la alerta por ausencia de
@@ -726,6 +726,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     `cmp`.
   - **Cierre.** `./mvnw verify -Pmutation-gate`. Commit: `docs(sdd): record the job table, the parked failure state and the follow-up changes`. Tamaño:
     nominal 100, realista 250. — Escenarios BJ41, BJ42, BJ70 y BJ71.
+  - **Hecho (2026-11-01).** `./mvnw -B verify` en verde (19 min 13 s). El gate de mutación lo mide el CI del PR. La evidencia está en `odd/tasks/background-jobs-remaining-tasks.md`.
 
 - [ ] 4.3 **PR 7 / 7b `07b-closing-notes`: cierre del cambio, ausencias vigentes, trazabilidad y criterio 5 (criterio de salida 5 de F0).**
   - **ROJO.** Crear las pruebas de ausencia vigente con su motivo de caducidad: «No hay exportadores en el árbol» (falsa al cerrar los cambios 10 y 11)

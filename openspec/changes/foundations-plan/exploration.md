@@ -314,6 +314,28 @@ registra la partición y el reparto.
 > abiertas**, con dueño `password-recovery-endpoints`; este cambio no entrega ninguna ruta de
 > recuperación y lo comprueba con una prueba de ausencia vigente [BI52].
 
+> **Nota fechada 2026-11-01 (cambio `background-jobs-with-db-scheduler`, tarea 4.2).** Esta nota no modifica el texto
+> original de ninguna condición ni de ninguna fila de las tablas. Estado al cierre de ese cambio:
+>
+> - **La condición 4 queda cerrada.** El trabajador tiene `DataSource` y ejecuta SQL con la protección de registros
+>   sensibles instalada antes de que el contexto cree su primer bean, y lo demuestra `WorkerSensitiveLoggingIT` sobre el
+>   proceso trabajador real, con su control negativo (sin la guardia, un valor enlazado distintivo sí aparece en un
+>   evento).
+> - **Dos cambios nuevos con nombre**, que salen del cambio 9 por decisión del propietario P1 del 2026-10-24 y se
+>   crean cuando llegue su turno:
+>   - `audit-chain-hourly-anchor-verification`: la cadencia horaria del verificador de la cadena de auditoría contra el
+>     ancla externa. **Depende de los cambios 9 y 11**: del 9, por el ejecutor y el catálogo de tareas recurrentes, y
+>     del 11, porque compara contra el ancla externa que entrega ese cambio. Las cadencias
+>     diaria y semanal sí entraron en el cambio 9.
+>   - `data-encryption-key-batch-rotation`: la rotación por lotes y el recifrado de las llaves de cifrado de datos en
+>     estado `retired`. **Depende del cambio 9** (el ejecutor) **y de una superficie de rotación que hoy no existe**; la
+>     prueba de ausencia que hoy lo protege (`noScheduledJobReencryptsARetiredDataEncryptionKeyYet`) conserva su
+>     lugar y caduca cuando este cambio exista.
+> - **Deuda de la fase 2 (decisión P5).** El trabajador obtiene las instituciones sobre las que corren las tareas
+>   recurrentes de la configuración (`CONFIA_JOBS_INSTITUTIONS`), porque F0 tiene una sola institución. Descubrirlas
+>   desde la base de datos queda para la fase 2; hasta entonces, una institución mal configurada se purga en vacío y
+>   lo señala la advertencia `audit_chain_empty_for_configured_institution`.
+
 **Hallazgo.** `docs/09-roadmap-y-fases.md` §3 no incluye el módulo `organization` en F0, pero
 ADR-0009 exige `institution_id NOT NULL` desde la primera migración y ADR-0017 asigna la tabla raíz
 de institución a ese módulo. Se recomienda incorporar el cambio 4, con la entidad raíz mínima, al
