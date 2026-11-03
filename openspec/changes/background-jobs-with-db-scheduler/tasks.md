@@ -727,6 +727,7 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
   - **Cierre.** `./mvnw verify -Pmutation-gate`. Commit: `docs(sdd): record the job table, the parked failure state and the follow-up changes`. Tamaño:
     nominal 100, realista 250. — Escenarios BJ41, BJ42, BJ70 y BJ71.
   - **Hecho (2026-11-01).** `./mvnw -B verify` en verde (19 min 13 s). El gate de mutación lo mide el CI del PR. La evidencia está en `odd/tasks/background-jobs-remaining-tasks.md`.
+  - **Revisión (2026-11-01).** Aprobada. Tres observaciones no bloqueantes se corrigieron en `a9e5876` (`docs(sdd): correct the job notes after their review`): la ruta de `WorkerApplication` en `DocumentationNotesTest` parte ahora de la raíz del repositorio, la nota de reprogramación manual de `docs/07` nombra la única excepción a la regla de no escribir a mano en la tabla de tareas, y la nota del estado fallido limita las ocurrencias por institución a las tareas recurrentes.
 
 - [ ] 4.3 **PR 7 / 7b `07b-closing-notes`: cierre del cambio, ausencias vigentes, trazabilidad y criterio 5 (criterio de salida 5 de F0).**
   - **ROJO.** Crear las pruebas de ausencia vigente con su motivo de caducidad: «No hay exportadores en el árbol» (falsa al cerrar los cambios 10 y 11)
@@ -747,3 +748,5 @@ si necesita una costura que no está nombrada. Dos tareas contiguas comparten PR
     Después, `sdd-verify` y `sdd-archive`.
   - **Cierre.** Commit: `docs(roadmap): mark exit criterion 5 of phase 0 and close the background jobs change`. Tamaño: nominal 100, realista 200. —
     Escenarios BJ37 a BJ42, AT17, BI100 y la trazabilidad de todos los escenarios.
+  - **Estado (2026-11-01).** ROJO, VERDE y demostración hechos en el árbol de trabajo de `07b-closing-notes` (`./mvnw -B verify`: BUILD SUCCESS en 17 min 21 s, Surefire 186 + 2 747, Failsafe 821); el detalle y la trazabilidad de los 241 escenarios (231 cubiertos, 8 parciales, 2 sin prueba) están en `apply-progress.md`. El commit de cierre no se hizo: la rama completa mide 1 089 líneas efectivas contra `e9f7c0e`, sobre el límite de 800, y se propone partirla (4.2 y su corrección; 4.3 aparte, 656 líneas). Esta tarea queda sin marcar hasta que se confirme.
+  - **Verificación final del cambio: pendiente, no marcada.** La compuerta de mutación completa en `main` después de la última fusión, `sdd-verify` y `sdd-archive` se hacen después de fusionar este PR y no son parte de este trabajo. El archivo corrige además en el delta de `audit-trail` el resultado de la entrada de verificación fallida, de `failure` a `error` (hallazgo de 3.8).
