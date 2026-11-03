@@ -195,7 +195,7 @@ verificadas, y un evento `INFO` `audit_chain_verified`; **vacía** (ninguna fila
 cero filas y una advertencia `audit_chain_empty_for_configured_institution`, porque una institución real siempre
 tiene asientos y el resultado suele indicar un UUID mal configurado; **divergente**, un asiento
 `shared.audit.chain_verification_failed` con el alcance, las filas verificadas, el identificador de la primera fila
-divergente y la descripción de la divergencia, resultado `failure`, y un evento `ERROR` `audit_chain_broken` (alerta
+divergente y la descripción de la divergencia, resultado `error`, y un evento `ERROR` `audit_chain_broken` (alerta
 S1). Una verificación fallida es un resultado de negocio: tras registrarlo la ocurrencia termina como fallida y
 visible, pero NO se reintenta. Un fallo técnico de la tarea (base de datos inaccesible) tampoco se reintenta: como
 toda tarea recurrente, se reprograma a su próxima ocurrencia y queda visible como fallida hasta su próximo éxito.
@@ -236,7 +236,7 @@ solo una rutina invocable y el cambio 9 era dueño de programar sus tres cadenci
   recalcular ningún hash
 - **CUANDO** corre la cadencia diaria
 - **ENTONCES** se registra una verificación fallida (asiento `shared.audit.chain_verification_failed`, resultado
-  `failure`) con la institución, el alcance, las filas verificadas y el `id` de esa fila, y una alerta de severidad
+  `error`) con la institución, el alcance, las filas verificadas y el `id` de esa fila, y una alerta de severidad
   S1 (evento `ERROR` `audit_chain_broken`)
 - **Y** ninguna fila de `shared_audit_log` cambió como consecuencia de la verificación (salvo el asiento del propio
   resultado), y la fila alterada se conserva como evidencia

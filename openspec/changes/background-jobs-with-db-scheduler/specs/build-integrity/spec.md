@@ -628,9 +628,10 @@ incorporaba.)
 
 El sistema DEBE romper la construcción si una clase invoca un método de jOOQ que reciba una
 cadena de SQL plano (por ejemplo `DSLContext.fetch(String)` o `resultQuery(String)`), salvo que la
-clase figure en una lista explícita y cerrada de reportes aprobados (ADR-0015, regla 9 y
-cumplimiento 5). La lista contiene exactamente el lector de las métricas de cola, cuyas consultas son de solo
-lectura sobre `scheduled_tasks` y nunca seleccionan la columna `task_data`.
+clase figure en una lista explícita y cerrada de clases aprobadas (ADR-0015, regla 9 y
+cumplimiento 5). La lista contiene exactamente tres clases: `JooqAuditLogWriter`, `JooqRefreshTokenFamilyRepository`
+y `JooqScheduledTaskQueueReader`. Solo el lector de métricas de cola consulta `scheduled_tasks`, con consultas de
+solo lectura, y nunca selecciona la columna `task_data`.
 (Previously: la lista estaba vacía porque ningún reporte existía todavía.)
 
 #### Escenario: SQL plano fuera de la lista aprobada
@@ -640,9 +641,9 @@ lectura sobre `scheduled_tasks` y nunca seleccionan la columna `task_data`.
 - **CUANDO** se ejecuta `./mvnw verify`
 - **ENTONCES** la construcción falla señalando la clase infractora
 
-#### Escenario: [BI101] El lector de métricas de cola es el único con SQL plano y no lee `task_data`
+#### Escenario: [BI101] El lector de métricas de cola es el único sobre `scheduled_tasks` y no lee `task_data`
 
-- **DADO** la lista aprobada con el lector de métricas de cola
+- **DADO** la lista aprobada de tres clases, que incluye el lector de métricas de cola
 - **CUANDO** se ejecuta `./mvnw verify` con el código real, con un fixture del lector que selecciona
   `task_data` y con un fixture de otra clase con SQL plano
 - **ENTONCES** pasa con el código real, evaluando la clase real del lector, y falla en los dos fixtures
