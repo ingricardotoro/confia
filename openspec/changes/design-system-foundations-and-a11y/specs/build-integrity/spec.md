@@ -52,14 +52,16 @@ aprobarse sobre un conjunto vacío (ADR-0018).
 - **DADO** la violación deliberada de un componente que usa la clave `common.status.inexistente`,
   ausente del catálogo `es-HN`
 - **CUANDO** se ejecuta la verificación de claves
-- **ENTONCES** falla nombrando la clave, el archivo y el catálogo en el que debía existir
+- **ENTONCES** falla nombrando la clave y el archivo; el catálogo es el tipo `UiKey`, derivado de
+  `packages/ui/src/i18n/locales/es-HN/ui.json`
 
 #### Escenario: Clave no resoluble estáticamente
 
 - **DADO** la violación deliberada de un componente que construye una clave por concatenación de
   cadenas
 - **CUANDO** se ejecuta la verificación de claves
-- **ENTONCES** falla indicando que la clave no puede verificarse
+- **ENTONCES** falla nombrando el archivo e indicando que la clave no puede verificarse; cuando
+  TypeScript puede conocer la clave, la nombra también
 
 #### Escenario: Código real sin infracciones de internacionalización
 
@@ -214,9 +216,6 @@ red (la presentación no obtiene datos, `docs/ui-ux/02` §2); o `packages/ui` im
 `packages/contracts` algo distinto de tipos a través de su punto de entrada público. Cada regla DEBE
 estar acompañada de una violación deliberada que demuestre que la rechaza (ADR-0018). Ninguna regla
 puede pasar sobre un conjunto vacío: una regla que no encuentra nada que evaluar no protege nada.
-(Previously: solo cubría las cuatro reglas entre paquetes, aplicaciones y `packages/contracts`; no
-había reglas internas de capas de `packages/ui` ni restricción de uso de `packages/contracts` a
-tipos.)
 
 #### Escenario: Un paquete importa de una aplicación
 
@@ -289,8 +288,8 @@ tipos.)
 
 - **DADO** la violación deliberada en la que un archivo de `packages/ui` importa por el punto de
   entrada público un valor de ejecución (por ejemplo un esquema Zod) y no solo un tipo
-- **CUANDO** se ejecuta el análisis estático del monorepo
-- **ENTONCES** falla y nombra la regla violada
+- **CUANDO** se ejecuta la verificación de dependencias del monorepo
+- **ENTONCES** falla nombrando la regla `ui-contracts-type-only`
 
 #### Escenario: `packages/ui` importa solo tipos del punto de entrada público
 

@@ -23,10 +23,12 @@ mecanismo listo para que la primera pantalla real lo cierre.
 
 El sistema DEBE ofrecer `packages/ui` como paquete del espacio de trabajo con un único punto de
 entrada público, organizado en `tokens/`, `atoms/`, `molecules/`, `domain/` y `hooks/`
-(`docs/ui-ux/02` §3). El punto de entrada DEBE exportar exactamente los componentes P0 de esta
-entrega: `Button`, `IconButton`, `Input`, `Textarea`, `Label`, `Checkbox`, `RadioGroup`, `Badge`,
+(`docs/ui-ux/02` §3). El punto de entrada DEBE exportar exactamente los diecisiete componentes P0 de
+esta entrega: `Button`, `IconButton`, `Input`, `Textarea`, `Label`, `Checkbox`, `RadioGroup`, `Badge`,
 `Spinner`, `Separator`, `Skeleton`, `FormField`, `FormError`, `EmptyState`, `ErrorState`,
-`MoneyAmount` y `StatusBadge`. NO DEBE exportar componentes del resto del inventario P0 (por
+`MoneyAmount` y `StatusBadge`, más dos compañeros de composición: `RadioGroupItem`, sin el cual
+`RadioGroup` no es utilizable, y `buttonVariants`, la receta de clases de `Button` para enlaces con
+apariencia de botón. En total son diecinueve nombres exportados. NO DEBE exportar componentes del resto del inventario P0 (por
 ejemplo `Select`, `Toast` o `DataTable`) ni ningún token primitivo.
 
 #### Escenario: Importación desde el punto de entrada público
@@ -39,8 +41,8 @@ ejemplo `Select`, `Toast` o `DataTable`) ni ningún token primitivo.
 
 - **DADO** el punto de entrada público de `packages/ui`
 - **CUANDO** una prueba enumera sus exportaciones de componentes
-- **ENTONCES** el conjunto es exactamente el de los diecisiete componentes listados, sin uno más ni
-  uno menos
+- **ENTONCES** el conjunto es exactamente el de los diecisiete componentes listados más
+  `RadioGroupItem` y `buttonVariants`, diecinueve nombres, sin uno más ni uno menos
 - **Y** ninguna exportación es un token primitivo
 
 #### Escenario: Componente fuera del alcance de esta entrega
@@ -140,7 +142,7 @@ fuentes de respaldo de `docs/ui-ux/01` §7.1 para el caso en que Inter no cargue
 
 #### Escenario: Respaldo tipográfico
 
-- **DADO** la declaración de `--font-family-sans`
+- **DADO** la declaración de `--font-sans`
 - **CUANDO** se inspecciona su valor
 - **ENTONCES** lista `Inter` seguida de `ui-sans-serif`, `system-ui` y las fuentes genéricas de
   respaldo
@@ -490,7 +492,9 @@ inventado.
 
 El sistema DEBE servir todo texto de interfaz de `packages/ui` desde catálogos de i18next:
 `es-HN` como idioma predeterminado completo, y la infraestructura de inglés preparada sin
-traducciones reales (ADR-0011). Ningún componente DEBE contener cadenas visibles o de nombre
+traducciones reales (ADR-0011). «Inglés preparado» significa que basta con añadir el catálogo
+`packages/ui/src/i18n/locales/en/ui.json` y registrar `en` en `supportedLngs`; hoy ese catálogo no
+existe y `supportedLngs` solo contiene `es-HN`. Ningún componente DEBE contener cadenas visibles o de nombre
 accesible embebidas. Si el idioma activo carece de una clave, el sistema DEBE usar el texto de
 `es-HN` y NO DEBE mostrar la clave cruda a la persona usuaria.
 
@@ -550,6 +554,8 @@ importe grande. Cada historia DEBE poder verse en modo claro y oscuro.
   `Input`, `Skeleton`, `EmptyState`, `ErrorState`, `FormField`)
 - **CUANDO** se listan sus historias
 - **ENTONCES** cada estado aplicable tiene su historia
+- **Y** la historia de error de `Input` se llama `Invalid`; `EmptyState` cuenta su historia `Default`
+  como su estado de vacío, y `ErrorState` cuenta su historia `Default` como su estado de error
 
 #### Escenario: Casos límite de `MoneyAmount`
 
