@@ -160,8 +160,9 @@ class DocumentationNotesTest {
     }
 
     /**
-     * Scenarios BJ37 and BJ41 (task 4.3): exit criterion 5 of phase 0 is checked with a dated note that names the
-     * tests that prove it, and the criteria around it are left as they were.
+     * Scenario BJ41 (task 4.3): exit criterion 5 of phase 0 is checked with a dated note that names the
+     * tests that prove it, and the criteria around it are left as they were. The exit criterion itself (BJ37) is
+     * proved by {@code ExitCriterion5EndToEndIT}; this test only checks that the note names it.
      */
     @Test
     void docs09MarksExitCriterion5OfPhase0WithADatedNoteThatNamesItsTests() {

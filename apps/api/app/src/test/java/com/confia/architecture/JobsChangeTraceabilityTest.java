@@ -10,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,8 +26,14 @@ import org.junit.jupiter.api.Test;
  * checklist cannot fail). The deltas are read from {@code openspec/changes/}; the day the change is archived
  * they are no longer there, and the checks that need them are skipped with that reason.
  *
- * <p>A scenario with an identifier is traced when some test names it: its identifier, alone or inside a
- * range such as {@code BI70 to BI82}, appears in the source of a test class. One whose test does not name it
+ * <p>A scenario with an identifier is traced when a real test names it: its identifier, alone or inside a
+ * range such as {@code BI70 to BI82}, appears in a class that declares {@code @Test}, {@code @ParameterizedTest}
+ * or {@code @Property} methods, and only in one of two places: a {@code @DisplayName}, or the Javadoc of that
+ * class or of one of those methods, after the word "scenario" or "spec" in the same sentence ("Scenarios BI65
+ * and BI67", "Specs BJ51 and BI112"). The cue is how a test says it proves a scenario; a bare mention ("see
+ * BJ37", "after BJ12") is an aside, so a class about something else that names a scenario in passing does not
+ * trace it. A mention in a comment, in a helper method, in a harness, a policy or any class without test
+ * methods does not count on its own. One whose test does not name it
  * is listed in {@link #UNTAGGED} with the test that covers it. One without an identifier is listed in
  * {@link #BY_TITLE} the same way, or in {@link #WITHOUT_A_TEST} with the reason no test covers it. Every
  * entry must point at a class and a method that exist, and an entry that stopped being needed fails.
@@ -41,20 +46,35 @@ class JobsChangeTraceabilityTest {
             Pattern.compile("\\b(BJ|AT|BI|I)(\\d{2,3})\\s*(?:to|a|through|-)\\s*(?:BJ|AT|BI|I)?(\\d{2,3})\\b");
     private static final Pattern SCENARIO = Pattern.compile("^#### Escenario: (?:\\[([A-Z]+\\d+)\\] )?(.+)$");
 
+    private static final Pattern TEST_METHOD = Pattern.compile("(?m)^\\s*@(?:Test|ParameterizedTest|Property)\\b");
+    private static final Pattern DISPLAY_NAME = Pattern.compile("@DisplayName\\(\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+    private static final Pattern JAVADOC = Pattern.compile("/\\*\\*(.*?)\\*/", Pattern.DOTALL);
+    /** The words with which a Javadoc says what it proves: scenario(s), escenario(s), spec(s). */
+    private static final Pattern CUE = Pattern.compile("(?i)\\b(?:scenarios?|escenarios?|specs?)\\b");
+    private static final Pattern TYPE_DECLARATION = Pattern.compile(
+            "\\A\\s*(?:@\\w+(?:\\([^)]*\\))?\\s*)*(?:(?:public|protected|private|static|final|abstract|sealed)\\s+)*(?:class|interface|record|enum)\\s");
+    private static final Pattern TEST_ANNOTATION_FIRST = Pattern.compile(
+            "\\A(?:\\s*@(?!Test\\b|ParameterizedTest\\b|Property\\b)\\w+(?:\\([^)]*\\))?)*\\s*@(?:Test|ParameterizedTest|Property)\\b");
+
     record Scenario(String id, String title) {
     }
 
     /** Scenarios whose test does not carry their identifier: identifier to {@code Class#method} references. */
-    private static final Map<String, List<String>> UNTAGGED = Map.of(
-            "BI60", List.of("SchedulerStarterCompatibilityTest#theWorkerHoldsExactlyOneSchedulerAndItIsTheOneItDeclares",
-                    "WorkerHasNoMeterRegistryTest#noProcessHoldsAMeterRegistry"),
-            "BI94", List.of("ProcessBeanInspectorTest#reportsABeanOutsideTheAllowListNamingTheBeanAndItsPackage",
-                    "ProcessBeanIsolationTest#registersOnlyItsAllowedBeans"),
-            "BI102", List.of("StarterAutoConfigurationExcludedTest#anAutoConfigurationNobodyExcludedIsReportedByName"),
-            "BI103", List.of("WorkerProductionWiringTest#theRealWorkerHasADataSourceAndTheGuardIsActiveInItsContext"),
-            "BJ08", List.of("ProcessBeanIsolationTest#aSchedulerInTheAdministrativeProcessIsReportedNamingProcessAndBean",
-                    "StarterAutoConfigurationExcludedTest#anAutoConfigurationNobodyExcludedIsReportedByName"),
-            "I264", List.of("RolePrivilegeMatrixIT#noRoleOtherThanTheOwnerCanDeleteFromTheTablesThePurgeFunctionsServe"));
+    private static final Map<String, List<String>> UNTAGGED = Map.ofEntries(
+            Map.entry("BI60", List.of("SchedulerStarterCompatibilityTest#theWorkerHoldsExactlyOneSchedulerAndItIsTheOneItDeclares",
+                    "WorkerHasNoMeterRegistryTest#noProcessHoldsAMeterRegistry")),
+            Map.entry("BI65", List.of("RolePrivilegeMatrixIT#scheduledTasksPrivilegesAreExactlyTheMatrixForTheFiveRoles")),
+            Map.entry("BI67", List.of("RolePrivilegeMatrixIT#scheduledTasksPrivilegesAreExactlyTheMatrixForTheFiveRoles")),
+            Map.entry("BI68", List.of("RolePrivilegeMatrixIT#thePurgeFunctionsAreOwnedByTheOwnerRunWithItsRightsAndPinTheirSearchPathAndTimeZone",
+                    "RolePrivilegeMatrixIT#executeOnThePurgeFunctionsIsHeldByTheAdministrativeRoleAndTheOwnerOnly")),
+            Map.entry("BI69", List.of("RolePrivilegeMatrixIT#publicAndAnyRoleOutsideTheFiveCannotExecuteThePurgeFunctions")),
+            Map.entry("BI94", List.of("ProcessBeanInspectorTest#reportsABeanOutsideTheAllowListNamingTheBeanAndItsPackage",
+                    "ProcessBeanIsolationTest#registersOnlyItsAllowedBeans")),
+            Map.entry("BI102", List.of("StarterAutoConfigurationExcludedTest#anAutoConfigurationNobodyExcludedIsReportedByName")),
+            Map.entry("BI103", List.of("WorkerProductionWiringTest#theRealWorkerHasADataSourceAndTheGuardIsActiveInItsContext")),
+            Map.entry("BJ08", List.of("ProcessBeanIsolationTest#aSchedulerInTheAdministrativeProcessIsReportedNamingProcessAndBean",
+                    "StarterAutoConfigurationExcludedTest#anAutoConfigurationNobodyExcludedIsReportedByName")),
+            Map.entry("I264", List.of("RolePrivilegeMatrixIT#noRoleOtherThanTheOwnerCanDeleteFromTheTablesThePurgeFunctionsServe")));
 
     private static final Map<String, List<String>> BY_TITLE = Map.ofEntries(
             Map.entry("El verificador se invoca directamente, sin infraestructura de programación",
@@ -144,10 +164,11 @@ class JobsChangeTraceabilityTest {
     @Test
     void everyReferenceNamesAClassAndAMethodThatExist() {
         Map<String, String> sources = testSources();
+        assertThat(sourceOf(Map.of("a/Dup", "x", "b/Dup", "y"), "Dup")).as("a name shared by two files is ambiguous").isNull();
         List<String> broken = new ArrayList<>();
         Stream.concat(UNTAGGED.values().stream(), BY_TITLE.values().stream()).flatMap(List::stream).forEach(reference -> {
             String[] parts = reference.split("#");
-            String source = sources.get(parts[0]);
+            String source = sourceOf(sources, parts[0]);
             if (source == null || !source.contains("void " + parts[1] + "(")) {
                 broken.add(reference);
             }
@@ -160,6 +181,43 @@ class JobsChangeTraceabilityTest {
         List<Scenario> scenarios = List.of(new Scenario("BJ01", "named"), new Scenario("ZZ99", "invented"),
                 new Scenario("ZZ98", "covered by an entry"));
         assertThat(untraced(scenarios, Set.of("BJ01"), Set.of("ZZ98"))).containsExactly("ZZ99");
+    }
+
+    @Test
+    void aMentionOnlyInACommentAHelperAHarnessOrWithoutTheCueDoesNotCount() {
+        Map<String, String> sources = Map.of(
+                "com/confia/x/SomeHarness", """
+                        /** Harness of BJ37. */
+                        class SomeHarness { }
+                        """,
+                "com/confia/x/OtherTest", """
+                        /**
+                         * Proves something else; see BJ38 for the neighbour.
+                         */
+                        class OtherTest {
+                            /** Helper for BJ39. */
+                            void helper() { }
+
+                            @Test
+                            void aTest() {
+                                // BJ40 is mentioned here
+                            }
+                        }
+                        """,
+                "com/confia/x/RealTest", """
+                        /** Proves scenarios BJ50 and BI70 to BI72. */
+                        class RealTest {
+                            /** Scenario BJ51. */
+                            @Test
+                            void one() { }
+
+                            @Test
+                            @DisplayName("BJ52 holds")
+                            void two() { }
+                        }
+                        """);
+        assertThat(testsNaming(sources).keySet()).containsExactlyInAnyOrder("BJ50", "BJ51", "BJ52", "BI70", "BI71",
+                "BI72");
     }
 
     // --- reading ------------------------------------------------------------------------------
@@ -188,40 +246,77 @@ class JobsChangeTraceabilityTest {
         return scenarios;
     }
 
-    /** Identifier to the test classes that name it, alone or inside a range; this class is left out. */
+    /** Identifier to the test classes that name it; see the rule in the Javadoc of this class. This class is left out. */
     private static Map<String, Set<String>> testsNaming() {
+        return testsNaming(testSources());
+    }
+
+    static Map<String, Set<String>> testsNaming(Map<String, String> sources) {
         Map<String, Set<String>> naming = new TreeMap<>();
-        testSources().forEach((className, source) -> {
-            if (className.equals(JobsChangeTraceabilityTest.class.getSimpleName())) {
+        sources.forEach((path, source) -> {
+            if (path.endsWith("/" + JobsChangeTraceabilityTest.class.getSimpleName()) || !TEST_METHOD.matcher(source).find()) {
                 return;
             }
-            Matcher range = RANGE.matcher(source);
-            while (range.find()) {
-                for (int n = Integer.parseInt(range.group(2)); n <= Integer.parseInt(range.group(3)); n++) {
-                    naming.computeIfAbsent("%s%02d".formatted(range.group(1), n), k -> new HashSet<>()).add(className);
+            for (String text : taggingTexts(source)) {
+                Matcher range = RANGE.matcher(text);
+                while (range.find()) {
+                    for (int n = Integer.parseInt(range.group(2)); n <= Integer.parseInt(range.group(3)); n++) {
+                        naming.computeIfAbsent("%s%02d".formatted(range.group(1), n), k -> new HashSet<>()).add(path);
+                    }
                 }
-            }
-            Matcher tag = TAG.matcher(source);
-            while (tag.find()) {
-                naming.computeIfAbsent(tag.group(1) + tag.group(2), k -> new HashSet<>()).add(className);
+                Matcher tag = TAG.matcher(text);
+                while (tag.find()) {
+                    naming.computeIfAbsent(tag.group(1) + tag.group(2), k -> new HashSet<>()).add(path);
+                }
             }
         });
         return naming;
     }
 
-    /** Simple class name to source text, for every Java file under the test tree of {@code app}. */
+    /**
+     * The texts of a test class where a mention is a tag: every {@code @DisplayName}, and, in the Javadoc of a type or of
+     * a method annotated as a test, each sentence from its cue word ("scenario(s)", "spec(s)") to its end.
+     */
+    private static List<String> taggingTexts(String source) {
+        List<String> texts = new ArrayList<>();
+        Matcher displayName = DISPLAY_NAME.matcher(source);
+        while (displayName.find()) {
+            texts.add(displayName.group(1));
+        }
+        Matcher javadoc = JAVADOC.matcher(source);
+        while (javadoc.find()) {
+            String declaration = source.substring(javadoc.end());
+            if (TYPE_DECLARATION.matcher(declaration).find() || TEST_ANNOTATION_FIRST.matcher(declaration).find()) {
+                for (String sentence : javadoc.group(1).replaceAll("(?m)^\\s*\\*", " ").replaceAll("\\s+", " ").split("(?<=\\.)\\s")) {
+                    Matcher cue = CUE.matcher(sentence);
+                    if (cue.find()) {
+                        texts.add(sentence.substring(cue.start()));
+                    }
+                }
+            }
+        }
+        return texts;
+    }
+
+    /** Path under the test tree of {@code app}, without {@code .java}, to the source text; no two files share a key. */
     private static Map<String, String> testSources() {
-        Map<String, String> sources = new HashMap<>();
-        try (Stream<Path> files = Files.walk(repoRoot().resolve("apps/api/app/src/test/java"))) {
-            for (Path file : files.filter(f -> f.toString().endsWith(".java")).toList()) {
-                String name = file.getFileName().toString();
-                sources.put(name.substring(0, name.length() - ".java".length()),
-                        Files.readString(file, StandardCharsets.UTF_8));
+        Path tree = repoRoot().resolve("apps/api/app/src/test/java");
+        Map<String, String> sources = new TreeMap<>();
+        try (Stream<Path> files = Files.walk(tree)) {
+            for (Path file : files.filter(f -> f.toString().endsWith(".java")).sorted().toList()) {
+                String path = tree.relativize(file).toString().replace('\\', '/');
+                sources.put(path.substring(0, path.length() - ".java".length()), Files.readString(file, StandardCharsets.UTF_8));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         return sources;
+    }
+
+    /** The source of the class a reference names, by simple name; an ambiguous or missing name is {@code null}. */
+    static String sourceOf(Map<String, String> sources, String simpleName) {
+        List<String> found = sources.keySet().stream().filter(path -> path.equals(simpleName) || path.endsWith("/" + simpleName)).toList();
+        return found.size() == 1 ? sources.get(found.get(0)) : null;
     }
 
     private static Path repoRoot() {

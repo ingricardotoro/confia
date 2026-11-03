@@ -43,6 +43,9 @@ class ExitCriterion5EndToEndIT extends CommittingPostgresIntegrationTest {
     static final Map<String, String> EXECUTED_ON = new ConcurrentHashMap<>();
     static final Map<String, AtomicInteger> EXECUTIONS = new ConcurrentHashMap<>();
 
+    /** The message of the failure thrown after scheduling: the rollback must come from there and from nowhere else. */
+    private static final String AFTER_SCHEDULING = "the business operation failed after scheduling";
+
     @Configuration(proxyBeanMethods = false)
     static class Fixtures {
 
@@ -81,8 +84,8 @@ class ExitCriterion5EndToEndIT extends CommittingPostgresIntegrationTest {
                 SchedulingFixtures.contextOf(INSTITUTION, rolledBackRequest), () -> {
                     scheduler.schedule(TYPE, rolledBack, new Probe(account),
                             SchedulingFixtures.metaOf(INSTITUTION, rolledBackRequest), due);
-                    throw new IllegalStateException("the business operation failed after scheduling");
-                })).isInstanceOf(IllegalStateException.class);
+                    throw new IllegalStateException(AFTER_SCHEDULING);
+                })).isInstanceOf(IllegalStateException.class).hasMessage(AFTER_SCHEDULING);
         transactionRunner().execute(SchedulingFixtures.contextOf(INSTITUTION, committedRequest), () ->
                 scheduler.schedule(TYPE, committed, new Probe(account),
                         SchedulingFixtures.metaOf(INSTITUTION, committedRequest), due));

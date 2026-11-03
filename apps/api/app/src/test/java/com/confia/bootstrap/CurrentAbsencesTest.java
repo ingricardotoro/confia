@@ -1,6 +1,7 @@
 package com.confia.bootstrap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.bootstrap.ConfiaApplication.LaunchOutcome;
 import com.confia.bootstrap.worker.WorkerApplication;
@@ -13,6 +14,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import confia.generated.jooq.Public;
 import confia.generated.jooq.tables.OrganizationInstitution;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -153,9 +155,27 @@ class CurrentAbsencesTest {
         }
     }
 
+    /**
+     * Fixture: a class of the worker's reach that reaches the institutions table through the jOOQ schema
+     * object, which lists every table, without naming {@code OrganizationInstitution}.
+     */
+    static final class ReadsThroughTheSchema {
+        Object tables() {
+            return Public.PUBLIC.getTables();
+        }
+    }
+
+    /**
+     * The organization module, the generated institutions table, and the generated objects that list every
+     * table. The build generates no {@code Tables} umbrella class (see {@code globalObjectReferences} in
+     * {@code apps/api/app/pom.xml}); the schema {@code Public} and the {@code DefaultCatalog} are the global
+     * references that exist, and {@code Tables} stays in the list so that turning the option on does not open a gap.
+     */
     private static boolean institutionSide(String className) {
         return className.startsWith("com.confia.organization.")
-                || className.startsWith("confia.generated.jooq.tables.OrganizationInstitution");
+                || className.startsWith("confia.generated.jooq.tables.OrganizationInstitution")
+                || Set.of("confia.generated.jooq.Public", "confia.generated.jooq.DefaultCatalog",
+                        "confia.generated.jooq.Tables").contains(className);
     }
 
     /** The classes of {@code com.confia} that {@code root} reaches through its dependencies, itself included. */
@@ -203,6 +223,20 @@ class CurrentAbsencesTest {
                 .contains("com.confia.organization.application.InstitutionRepository");
         assertThat(institutionAccess(fixtures.get(ReadsTheInstitutionsTable.class))).singleElement().asString()
                 .contains("confia.generated.jooq.tables.OrganizationInstitution");
+    }
+
+    @Test
+    void aReadThroughTheSchemaObjectThatListsEveryTableIsReported() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(ReadsThroughTheSchema.class);
+        assertThat(institutionAccess(fixtures.get(ReadsThroughTheSchema.class))).isNotEmpty()
+                .allSatisfy(access -> assertThat(access).contains("confia.generated.jooq.Public"));
+    }
+
+    @Test
+    void theBuildGeneratesNoTablesUmbrellaClassSoNoFixtureReadsThroughIt() {
+        assertThatThrownBy(() -> Class.forName("confia.generated.jooq.Tables"))
+                .as("if this class exists, add a fixture that reads the institutions table through it")
+                .isInstanceOf(ClassNotFoundException.class);
     }
 
     // --- BJ40: the registry holds only the types of this change ---------------------------------

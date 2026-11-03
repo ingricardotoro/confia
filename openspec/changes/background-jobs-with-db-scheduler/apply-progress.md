@@ -497,16 +497,16 @@ Rama `change/background-jobs-with-db-scheduler-03a5-scheduling-architecture-rule
 ## Tarea 4.3 y cierre del cambio (rebanada 07b `07b-closing-notes`, 2026-11-01)
 
 Rama `change/background-jobs-with-db-scheduler-07b-closing-notes`, sobre `e9f7c0e`. Contiene 4.2 (`ee0d0a4`), la corrección de sus tres observaciones de
-revisión (`a9e5876`) y 4.3. **Medición de la rama completa contra `e9f7c0e`, sin `openspec/` ni `odd/`: 1 089 líneas efectivas** (1 087 añadidas y 2 borradas),
+revisión (`a9e5876`) y 4.3. **Medición de la rama completa contra `e9f7c0e`, sin `openspec/` ni `odd/`: 1 222 líneas efectivas** (1 220 añadidas y 2 borradas; 1 089 antes de la corrección tras la revisión de `bffac4f`),
 sobre el límite de 800; se propone partir en dos PR apilados (ver «Partición propuesta»), de modo que el commit de 4.3 no se hizo.
 
 ### Pruebas y documentos de 4.3
 
 | Pieza | Escenarios | Qué comprueba |
 |---|---|---|
-| `bootstrap/CurrentAbsencesTest` (12 pruebas) | BJ38, BJ39, BJ40, AT17 | Cada ausencia vigente con su motivo de caducidad en una constante (`BJ38_EXPIRES` y las otras tres) que sale en el mensaje de fallo, y un fixture que la misma comprobación debe reportar: un POM con Actuator y un registro de Prometheus, un contexto con un `MeterRegistry`, una clase que importa `organization` y otra que nombra la tabla de instituciones, un registro con un tipo de negocio no declarado, y una cadencia horaria o una comparación con ancla. BJ39 recorre, desde `WorkerApplication`, las clases de `com.confia` que el trabajador alcanza (ArchUnit) y exige que alcance el cableado y los trabajos reales, para no pasar sobre un conjunto vacío |
-| `shared/jobs/ExitCriterion5EndToEndIT` (1 prueba, PostgreSQL real) | BJ37 | Una tarea programada en una transacción revertida no existe ni se ejecuta; la confirmada existe, no la toma nadie sin el trabajador, y la ejecuta una sola vez el trabajador, en un hilo `db-scheduler` |
-| `architecture/JobsChangeTraceabilityTest` (5 pruebas) | los 241 escenarios | Lee los cuatro deltas y comprueba que cada escenario con identificador está nombrado por el código de alguna prueba (identificador suelto o dentro de un rango como «BI70 to BI82») o figura en una lista con la prueba que lo cubre; que los 22 sin identificador están asignados por título a `Clase#método` o declarados sin prueba; que cada referencia nombra una clase y un método que existen; que una entrada ya innecesaria falla; y que un escenario sin prueba se reporta (fixture). Se eligió sobre la lista de verificación porque una lista no puede fallar. Cuando el cambio se archive, los deltas dejan de estar en `openspec/changes/` y esas pruebas se saltan con ese motivo (`Assumptions`) |
+| `bootstrap/CurrentAbsencesTest` (14 pruebas) | BJ38, BJ39, BJ40, AT17 | Cada ausencia vigente con su motivo de caducidad en una constante (`BJ38_EXPIRES` y las otras tres) que sale en el mensaje de fallo, y un fixture que la misma comprobación debe reportar: un POM con Actuator y un registro de Prometheus, un contexto con un `MeterRegistry`, una clase que importa `organization`, otra que nombra la tabla de instituciones y otra que la lee por el objeto de esquema `Public` (el build no genera la clase `Tables`: `globalObjectReferences` es `false`; una prueba falla si esa clase aparece), un registro con un tipo de negocio no declarado, y una cadencia horaria o una comparación con ancla. BJ39 recorre, desde `WorkerApplication`, las clases de `com.confia` que el trabajador alcanza (ArchUnit) y exige que alcance el cableado y los trabajos reales, para no pasar sobre un conjunto vacío |
+| `shared/jobs/ExitCriterion5EndToEndIT` (1 prueba, PostgreSQL real) | BJ37 | Una tarea programada en una transacción revertida no existe ni se ejecuta; la confirmada existe, no la toma nadie sin el trabajador, y la ejecuta una sola vez el trabajador, en un hilo `db-scheduler`; la reversión se identifica por el mensaje de la excepción lanzada después de programar |
+| `architecture/JobsChangeTraceabilityTest` (6 pruebas) | los 241 escenarios | Lee los cuatro deltas y comprueba que cada escenario con identificador está nombrado por una prueba real (identificador suelto o dentro de un rango como «BI70 to BI82») en un `@DisplayName` o en el Javadoc de una clase con métodos de prueba o de uno de esos métodos, tras la palabra «scenario» o «spec» en la misma frase (no cuenta un comentario, un auxiliar, un arnés, una política ni una mención sin esa palabra), o figura en una lista con la prueba que lo cubre; que los 22 sin identificador están asignados por título a `Clase#método` o declarados sin prueba; que cada referencia nombra una clase y un método que existen; que una entrada ya innecesaria falla; y que un escenario sin prueba se reporta y que una mención solo en un comentario, un auxiliar, un arnés o sin la palabra no cuenta (fixtures). Las fuentes se indexan por ruta, de modo que dos clases homónimas no se pisan, y una referencia a un nombre ambiguo se rechaza. Se eligió sobre la lista de verificación porque una lista no puede fallar. Cuando el cambio se archive, los deltas dejan de estar en `openspec/changes/` y esas pruebas se saltan con ese motivo (`Assumptions`) |
 | `architecture/DocumentationNotesTest.docs09MarksExitCriterion5OfPhase0WithADatedNoteThatNamesItsTests` | BJ37, BJ41 | El criterio 5 de `docs/09` está marcado, su texto no cambió, la nota fechada nombra las tres pruebas y los criterios de respaldo y de accesibilidad siguen abiertos |
 
 **ROJO observado** (`confia-scratch/t43/red1.log`, con `CurrentAbsencesTest` y `ExitCriterion5EndToEndIT` apartados, que es el estado previo a 4.3): 16 pruebas, 2 fallos.
@@ -517,9 +517,27 @@ BJ37 no apareció en la lista porque el Javadoc de la prueba de `docs/09`, escri
 
 **Demostración deliberada**, copias en `confia-scratch/t43/orig`: en `CurrentAbsencesTest`, `@BeforeAll` agrega al registro del trabajador una tarea `invoicing.generate-monthly-charges`. Falla exactamente una de las 12 pruebas, `theWorkerRegistersExactlyTheOneTimeTaskAndTheEightRecurringOnesOfThisChange:225`, con `[BJ40 stops being true when each module that owns a business job delivers it] Expecting empty but was: ["unexpected invoicing.generate-monthly-charges"]`. Se revirtió y `cmp` no imprimió diferencias. La primera ejecución de la demostración falló antes, en la comprobación de «no vacuo» (`Expected size: 9 but was: 10`), que ocultaba el motivo; se invirtió el orden de las dos aserciones y se repitió.
 
+### Corrección tras la revisión de `bffac4f` (cinco observaciones, 2026-11-02)
+
+Cada observación se verificó contra el código antes de corregirla. Solo cambia código de prueba (`JobsChangeTraceabilityTest`, `CurrentAbsencesTest`, `ExitCriterion5EndToEndIT`, un Javadoc de `DocumentationNotesTest`); no se tocó código de producción.
+
+1. **La trazabilidad aceptaba menciones sueltas: cierto.** Contaba cualquier identificador en cualquier archivo Java del árbol de pruebas, incluidos comentarios, rangos y clases de apoyo (`WorkerHarness`, `ProcessBeanPolicy`, `RegisteredJobs`). Regla nueva, escrita en el Javadoc de la prueba: una mención cuenta solo si está en una clase que declara métodos `@Test`, `@ParameterizedTest` o `@Property`, y solo en un `@DisplayName` o en el Javadoc de esa clase o de uno de esos métodos, **tras la palabra «scenario» o «spec» en la misma frase** («Scenarios BI65 and BI67», «Specs BJ51 and BI112»); los rangos se siguen expandiendo. Así se distingue una clase de otra tema: una mención de pasada («see BJ37») no tiene la palabra y no cuenta, y un comentario, un auxiliar o un arnés tampoco. Se descartó contar solo el primer párrafo del Javadoc de la clase porque dejaba fuera pruebas que sí prueban lo que dicen (`DocumentationNotesTest` nombra BJ42, BJ70 y BJ71 en su segundo párrafo). Consecuencia en `DocumentationNotesTest`: su Javadoc decía «Scenarios BJ37 and BJ41» sobre la prueba de `docs/09`, que solo comprueba que la nota nombre las pruebas del criterio 5; se reformuló (sin quitar contenido) a «Scenario BJ41 ... The exit criterion itself (BJ37) is proved by `ExitCriterion5EndToEndIT`».
+   - ROJO observado (`confia-scratch/t43b/red1.log`; se escribió primero el fixture contra la lógica anterior, extraída sin cambios a `testsNaming(Map)`): `Tests run: 6, Failures: 1`, `JobsChangeTraceabilityTest.aMentionOnlyInACommentOrASupportClassOrALaterParagraphDoesNotCount:200` con `Expecting actual: ["BI70", "BI71", "BI72", "BJ37", "BJ38", "BJ39", "BJ40", "BJ50", "BJ51", "BJ52"] to contain exactly in any order: ["BJ50", "BJ51", "BJ52", "BI70", "BI71", "BI72"] but the following elements were unexpected: ["BJ37", "BJ38", "BJ39", "BJ40"]` (BJ37 en un arnés, BJ38 en un párrafo posterior, BJ39 en un auxiliar, BJ40 en un comentario). Al cambiar la regla, el fixture pasó a usar una mención de pasada en lugar del párrafo posterior, y la prueba se renombró a `aMentionOnlyInACommentAHelperAHarnessOrWithoutTheCueDoesNotCount`.
+   - Consecuencia honesta, sin aflojar nada: con la regla nueva (primera versión, con solo la palabra «scenario») fallaron 23 escenarios, de los que 19 tenían la mención en una clase real con otra redacción (se ensanchó la señal de «scenario» a «spec», que es como las pruebas lo escriben) y 4 solo en un auxiliar y una constante de `RolePrivilegeMatrixIT` (BI65, BI67, BI68, BI69). Esos cuatro pasaron a la lista manual `UNTAGGED` con las pruebas que los cubren; tres son parciales (tabla de parciales). Cuántos cambian: de 231 cubiertos, 8 parciales y 2 sin prueba a **228, 11 y 2**; por evidencia, de 189/24/26/2 a 184/25/30/2. Además se actualizaron 22 filas de la tabla completa (listas de pruebas sin las clases de apoyo y con las clases reales que el chequeo ya cuenta).
+   - Demostración deliberada (`confia-scratch/t43b/demo-bj37.log`, copia en `orig/`, restaurado y confirmado con `cmp`): sin `ExitCriterion5EndToEndIT`, `JobsChangeTraceabilityTest` falla con `Expecting empty but was: ["BJ37"]` (Tests run: 6, Failures: 1). En el estado anterior BJ37 seguía «cubierto» por el Javadoc de `DocumentationNotesTest`.
+2. **Punto ciego de BJ39: la clase `Tables` no existe; el punto ciego es real con otro nombre.** `apps/api/app/pom.xml` genera con `globalObjectReferences=false` (ADR-0021, decisión 2): no hay `confia.generated.jooq.Tables`. Pero sí se generan `confia.generated.jooq.Public` (el esquema, cuyo `getTables()` y `getTable(...)` alcanzan toda tabla, la de instituciones incluida) y `DefaultCatalog`; ninguno estaba en `institutionSide`, así que una lectura por ellos pasaba. `institutionSide` incluye ahora `Public`, `DefaultCatalog` y, por si se activa la opción, `Tables`; una prueba falla si la clase `Tables` aparece (hay que escribir entonces su fixture). Se comprobó que ningún código de producción usa `Public` ni `DefaultCatalog` y que la guardia sigue en verde sobre el trabajador real.
+   - ROJO observado (`confia-scratch/t43b/red2.log`): fixture `ReadsThroughTheSchema` (`Public.PUBLIC.getTables()`) sin cambiar la guardia: `Tests run: 13, Failures: 1`, `CurrentAbsencesTest.aReadThroughTheSchemaObjectThatListsEveryTableIsReported:222 Expecting actual not to be empty`. VERDE tras el cambio: 14 pruebas, 0 fallos.
+3. **La excepción de la reversión no se identificaba: cierto.** Aceptaba cualquier `IllegalStateException`. Ahora el mensaje es la constante `AFTER_SCHEDULING` y la aserción es `hasMessage(AFTER_SCHEDULING)`. Demostración deliberada (`demo-msg.log`, restaurado y confirmado con `cmp`): lanzar `new IllegalStateException("a different failure")` en lugar de la constante hace fallar la prueba con `Expecting message to be: "the business operation failed after scheduling" but was: "a different failure"` (Failsafe: Tests run: 1, Failures: 1).
+4. **Colisión de nombres: cierto como riesgo, no ocurre hoy.** `testSources` indexaba por nombre simple en un `HashMap`; dos archivos homónimos en paquetes distintos se pisaban según el orden del recorrido. Hoy no hay ninguno (`find ... -printf '%f' | sort | uniq -d` sobre el árbol de pruebas no imprime nada). Ahora se indexa por ruta relativa en un `TreeMap` con recorrido ordenado (determinista y sin pérdida), y una referencia `Clase#método` cuyo nombre coincide con más de un archivo se rechaza como ambigua (`sourceOf`, con su fixture dentro de `everyReferenceNamesAClassAndAMethodThatExist`).
+5. **Fila de ODD: cierto.** Decía 650; 433 + 656 = 1 089, así que era 656. Tras esta corrección T4.3 mide **789** líneas efectivas contra `a9e5876` (788 añadidas, 1 borrada; sin `openspec/` ni `odd/`), dentro de las 800 de 7c.
+
+- `./mvnw -B verify` completo (`confia-scratch/t43b/verify.log`): `BUILD SUCCESS` en **25:20 min**, Surefire 186 + 2 750, Failsafe 821, 0 fallos. Supera los 15 minutos de BI57, como toda corrida desde 3.7. No se ejecutó la compuerta de mutación (es del propietario, en `main`).
+- **Orden de las comprobaciones:** el renombrado de la prueba `aMentionOnlyInACommentAHelperAHarnessOrWithoutTheCueDoesNotCount` se hizo **después** del `verify` completo y se confirmó solo con una corrida focalizada de `JobsChangeTraceabilityTest` (`Tests run: 6, Failures: 0, Errors: 0`); no hay un `verify` completo posterior al renombrado.
+- Tamaño: 7c mide 789 líneas efectivas contra `a9e5876`, dentro de las 800.
+
 ### Trazabilidad de los 241 escenarios
 
-Resumen: **231 cubiertos, 8 parciales y 2 sin prueba**. Por evidencia: 189 por etiqueta del escenario en el código de una prueba, 24 solo por un rango de identificadores en el Javadoc de la clase (se revisaron contra los métodos de las clases que cubren su tema), 26 por asignación manual y 2 sin prueba.
+Resumen: **228 cubiertos, 11 parciales y 2 sin prueba**. Por evidencia: 184 por etiqueta del escenario en una prueba real, 25 solo por un rango de identificadores en el Javadoc de la clase (se revisaron contra los métodos de las clases que cubren su tema), 30 por asignación manual y 2 sin prueba. Antes de endurecer la regla de trazabilidad (corrección tras la revisión de `bffac4f`) eran 231, 8, 2 y 189, 24, 26, 2: BI65, BI67, BI68 y BI69 solo estaban nombrados en el Javadoc de un auxiliar y de una constante de `RolePrivilegeMatrixIT`, ya no cuentan por etiqueta y pasaron a la lista manual; de ellos BI67, BI68 y BI69 son parciales (ver abajo).
 
 **Sin prueba (hallazgos, no mapeados):** «Se agrega Hibernate» y «Sin dependencias prohibidas» (`build-integrity`). Los cumple la regla `bannedDependencies` de `maven-enforcer` de `apps/api/pom.xml` en cada `./mvnw verify`; ninguna prueba agrega Hibernate a un POM ni lo hace fallar. Como regla de construcción son verificables, pero no hay un fixture que lo demuestre.
 
@@ -534,6 +552,9 @@ Resumen: **231 cubiertos, 8 parciales y 2 sin prueba**. Por evidencia: 189 por e
 | BI103 | Lo ejerce el arranque del trabajador contra una URL sin servidor de las pruebas de cableado; no hay una prueba propia de «sin migración ni validación inicial» |
 | BI60 | Cubre un solo ejecutor y ningún `MeterRegistry`; la mitad de `./mvnw validate` la ejecuta la construcción, no una prueba |
 | «Las pruebas de arranque no necesitan Docker» | Indirecta: son pruebas de Surefire que arrancan los procesos contra una URL sin servidor; ninguna afirma la ausencia de Docker |
+| BI67 | El catálogo (`has_table_privilege`) prueba los privilegios; no se intenta un `SELECT` con `confia_readonly` ni las cuatro operaciones con `confia_admin_app` |
+| BI68 | La prueba de catálogo cubre propietario, `SECURITY DEFINER`, `search_path` y `EXECUTE`; solo existe el fixture de un `GRANT EXECUTE` de más, no los de una función sin `search_path` fijo ni de otra con propietario distinto |
+| BI69 | Lo prueba el catálogo de privilegios (`has_function_privilege`), no una invocación intentada por cada rol |
 | BJ37 | El lado que programa es el cliente real sobre el pool de la prueba, como en `OnlyWorkerExecutesIT`; que el proceso administrativo no tiene ejecutor lo afirma `ProcessBeanIsolationTest`. No se arranca el contexto administrativo real contra la base |
 
 **Desajuste entre la especificación y el código (para el archivo):** el delta de `build-integrity` dice que la lista aprobada de SQL plano contiene exactamente el lector de la cola; `NoUnapprovedPlainSqlTest.theApprovedListHoldsExactlyTheThreeCallers` afirma tres (`JooqAuditLogWriter`, `JooqRefreshTokenFamilyRepository` y el lector). Los otros dos llegaron con cambios anteriores. Además, el resultado de la entrada de verificación fallida es `error` y no `failure` (hallazgo de 3.8).
@@ -551,10 +572,10 @@ Lista completa (capacidad, escenario, título, prueba, tipo de evidencia, nota).
 | audit-trail | AT26 | Una ventana sin filas devuelve «vacío» | AuditChainVerificationJobsIT, AuditChainVerifierIT, DefaultAuditChainVerifierTest | etiqueta |  |
 | audit-trail | AT18 | Un asiento por categoría con el conteo | IdempotencyPurgeJobsIT, IdentityBackoffPurgeJobsIT, IdentityTokenPurgeJobsIT (+1) | etiqueta |  |
 | audit-trail | AT19 | Una purga que no encontró filas también deja su asiento | IdempotencyPurgeJobsIT, IdentityBackoffPurgeJobsIT, IdentityTokenPurgeJobsIT (+1) | etiqueta |  |
-| audit-trail | AT20 | El asiento no contiene datos de las filas purgadas | IdentityBackoffPurgeJobsIT, IdentityTokenPurgeJobsIT, PurgeExpiredIdempotencyKeysTest (+1) | etiqueta |  |
+| audit-trail | AT20 | El asiento no contiene datos de las filas purgadas | IdempotencyPurgeJobsIT, IdentityBackoffPurgeJobsIT, IdentityTokenPurgeJobsIT (+2) | etiqueta |  |
 | audit-trail | AT21 | El asiento y la purga son atómicos | IdempotencyPurgeJobsIT, IdentityBackoffPurgeJobsIT, IdentityTokenPurgeJobsIT (+1) | etiqueta |  |
 | audit-trail | AT27 | Un asiento por lote, con su número de lote | IdempotencyPurgeJobsIT, IdentityBackoffPurgeJobsIT, IdentityTokenPurgeJobsIT (+1) | etiqueta |  |
-| audit-trail | AT28 | El vaciado del sucesor deja su propio asiento | RefreshTokenPurgeIT | etiqueta |  |
+| audit-trail | AT28 | El vaciado del sucesor deja su propio asiento | IdentityTokenPurgeJobsIT, RefreshTokenPurgeIT | etiqueta |  |
 | audit-trail | AT29 | Agotar los 200 lotes deja 200 asientos y una advertencia | IdentityTokenPurgeJobsIT | etiqueta |  |
 | audit-trail | AT22 | La cadena sigue verificando tras los asientos de purga | AuditChainAfterPurgeIT | etiqueta |  |
 | audit-trail | — | El verificador se invoca directamente, sin infraestructura de programación | AuditChainVerifierIT | manual |  |
@@ -577,8 +598,8 @@ Lista completa (capacidad, escenario, título, prueba, tipo de evidencia, nota).
 | background-jobs | BJ44 | Programar una instancia ya programada no aborta la transacción del negocio | JobSchedulingGuardsIT | etiqueta |  |
 | background-jobs | BJ45 | La institución de la envoltura debe ser la de la transacción | JobSchedulingGuardsIT | etiqueta |  |
 | background-jobs | BJ46 | Hay un solo proxy transaccional por proceso | TransactionalDataSourceTest, WorkerProductionWiringTest | etiqueta |  |
-| background-jobs | BJ06 | Cero ejecutores en administración y portal, uno en el trabajador | OnlyWorkerExecutesIT, ProcessBeanIsolationTest, WorkerHarness | etiqueta |  |
-| background-jobs | BJ07 | Una tarea confirmada solo la ejecuta el trabajador | OnlyWorkerExecutesIT, WorkerHarness | etiqueta |  |
+| background-jobs | BJ06 | Cero ejecutores en administración y portal, uno en el trabajador | OnlyWorkerExecutesIT, ProcessBeanIsolationTest | etiqueta |  |
+| background-jobs | BJ07 | Una tarea confirmada solo la ejecuta el trabajador | OnlyWorkerExecutesIT | etiqueta |  |
 | background-jobs | BJ08 | Un contexto administrativo con la autoconfiguración de db-scheduler hace fallar  | ProcessBeanIsolationTest, StarterAutoConfigurationExcludedTest | manual | Scheduler simulado en un contexto vacío, no el arranque real sin la exclusión |
 | background-jobs | BJ47 | El ejecutor del iniciador se retira y queda uno solo | SchedulerStarterCompatibilityTest | etiqueta |  |
 | background-jobs | BJ48 | Toda autoconfiguración del iniciador está excluida en administración y portal | StarterAutoConfigurationExcludedTest | etiqueta |  |
@@ -589,7 +610,7 @@ Lista completa (capacidad, escenario, título, prueba, tipo de evidencia, nota).
 | background-jobs | BJ10 | La envoltura lleva el contexto y no datos personales | JobMetaTest, TracedJobSerializationTest | etiqueta |  |
 | background-jobs | BJ11 | Los datos de tarea nunca son un objeto de Java serializado | TracedJobSerializationTest | etiqueta |  |
 | background-jobs | BJ12 | La lista aprobada de campos rechaza un campo nuevo (control negativo) | JobPayloadAllowListTest, JobPayloadTypesRuleTest | etiqueta |  |
-| background-jobs | BJ13 | Todo tipo de tarea registrado tiene su entrada en la lista aprobada | JobPayloadAllowListTest, RegisteredJobs | etiqueta |  |
+| background-jobs | BJ13 | Todo tipo de tarea registrado tiene su entrada en la lista aprobada | JobPayloadAllowListTest | etiqueta |  |
 | background-jobs | BJ52 | La carga solo admite tipos que no pueden llevar texto libre | JobPayloadRulesTest, JobPayloadTypesRuleTest, JobSchedulingGuardsTest | etiqueta |  |
 | background-jobs | BJ53 | Un documento de más de 4 KiB se rechaza al programar | JobSchedulingGuardsIT, JobSchedulingGuardsTest, TracedJobSerializationTest | etiqueta |  |
 | background-jobs | BJ54 | Un campo desconocido en una fila se rechaza al leerla | JobRunnerTest, TracedJobSerializationTest | etiqueta |  |
@@ -599,7 +620,7 @@ Lista completa (capacidad, escenario, título, prueba, tipo de evidencia, nota).
 | background-jobs | BJ56 | El identificador de instancia es determinista, opaco y sensible a cada dato | JobInstanceIdProperties | etiqueta |  |
 | background-jobs | BJ16 | El manejador corre como `system` en la institución de la tarea | JobContextIT, JobRunnerTest | etiqueta |  |
 | background-jobs | BJ17 | Un manejador no ve los datos de otra institución | JobContextIT | etiqueta |  |
-| background-jobs | BJ18 | Una tarea sin institución no produce ningún efecto | JobContextIT, TracedJobSerializationTest | etiqueta |  |
+| background-jobs | BJ18 | Una tarea sin institución no produce ningún efecto | JobContextIT | etiqueta |  |
 | background-jobs | BJ57 | Una tarea de una institución inexistente no produce efecto | JobContextIT | etiqueta |  |
 | background-jobs | BJ19 | La doble ejecución de cada tipo registrado deja un solo efecto | HandlerIdempotenceIT, PasswordResetIssuanceDoubleExecutionIT | etiqueta |  |
 | background-jobs | BJ20 | Un manejador no idempotente hace fallar la prueba (control negativo) | HandlerIdempotenceIT | etiqueta |  |
@@ -632,7 +653,7 @@ Lista completa (capacidad, escenario, título, prueba, tipo de evidencia, nota).
 | background-jobs | BJ68 | La observación escribe un evento de estado por ocurrencia | LogQueueMetricsTest, QueueObservationOnWorkerIT, QueueObservationTest | etiqueta |  |
 | background-jobs | BJ69 | Las tareas fallidas y la cola atascada dejan advertencias | LogQueueMetricsTest | etiqueta |  |
 | background-jobs | BJ70 | La observación y su límite quedan documentados (solo documental) | DocumentationNotesTest | etiqueta |  |
-| background-jobs | BJ37 | Criterio 5 de extremo a extremo | DocumentationNotesTest, ExitCriterion5EndToEndIT | etiqueta | el lado que programa es el cliente real sobre el pool, no el contexto administrativo arrancado |
+| background-jobs | BJ37 | Criterio 5 de extremo a extremo | ExitCriterion5EndToEndIT | etiqueta | el lado que programa es el cliente real sobre el pool, no el contexto administrativo arrancado |
 | background-jobs | BJ38 | No hay exportadores en el árbol — cierto hoy, falso al cerrar los cambios 10 y 1 | CurrentAbsencesTest | etiqueta |  |
 | background-jobs | BJ39 | El trabajador no consulta la tabla de instituciones — cierto hoy, falso al cerra | CurrentAbsencesTest | etiqueta |  |
 | background-jobs | BJ40 | El registro de tipos contiene solo los tipos de este cambio — cierto hoy, falso  | CurrentAbsencesTest | etiqueta |  |
@@ -646,33 +667,33 @@ Lista completa (capacidad, escenario, título, prueba, tipo de evidencia, nota).
 | build-integrity | BI62 | La tabla existe con las columnas de la versión fijada | ScheduledTasksSchemaIT | etiqueta |  |
 | build-integrity | BI63 | La biblioteca no crea ni altera tablas | ScheduledTasksNotCreatedAtRuntimeIT | etiqueta |  |
 | build-integrity | BI64 | `V10` no cambia nada más y no edita migraciones anteriores | ScheduledTasksSchemaIT, V10SchemaDiffIT | etiqueta |  |
-| build-integrity | BI65 | La matriz cubre `scheduled_tasks` para los cinco roles | RolePrivilegeMatrixIT | etiqueta |  |
+| build-integrity | BI65 | La matriz cubre `scheduled_tasks` para los cinco roles | RolePrivilegeMatrixIT | manual |  |
 | build-integrity | BI66 | El portal programa con su rol real y no puede actualizar ni borrar | PortalSchedulingIT, PortalSchedulingPrivilegeIT | etiqueta |  |
-| build-integrity | BI67 | `confia_readonly` no tiene ningún privilegio y `confia_admin_app` puede operar | RolePrivilegeMatrixIT | etiqueta |  |
-| build-integrity | BI68 | El catálogo describe cada función como se exige | RolePrivilegeMatrixIT | etiqueta |  |
-| build-integrity | BI69 | Los demás roles no pueden ejecutar las funciones | RolePrivilegeMatrixIT | etiqueta |  |
+| build-integrity | BI67 | `confia_readonly` no tiene ningún privilegio y `confia_admin_app` puede operar | RolePrivilegeMatrixIT | manual | El catálogo (`has_table_privilege`) prueba los privilegios; no se intenta un `SELECT` con `confia_readonly` ni las cuatro operaciones con `confia_admin_app` |
+| build-integrity | BI68 | El catálogo describe cada función como se exige | RolePrivilegeMatrixIT | manual | La prueba de catálogo cubre propietario, `SECURITY DEFINER`, `search_path` y `EXECUTE`; solo existe el fixture de un `GRANT EXECUTE` de más, no los de una función sin `search_path` fijo ni de otra con propietario distinto |
+| build-integrity | BI69 | Los demás roles no pueden ejecutar las funciones | RolePrivilegeMatrixIT | manual | Lo prueba el catálogo de privilegios (`has_function_privilege`), no una invocación intentada por cada rol |
 | build-integrity | BI70 | Un `search_path` hostil del llamador no desvía la función | RetentionPurgeFunctionsIT | etiqueta |  |
 | build-integrity | BI71 | El llamador solo puede mover el corte hacia atrás, nunca hacia adelante | RetentionPurgeFunctionsIT | rango |  |
 | build-integrity | BI104 | Control negativo: un corte en el futuro no borra nada más reciente que el piso | RetentionPurgeFunctionsIT | etiqueta |  |
 | build-integrity | BI105 | Sin contexto o con un actor que no es `system` la función falla | RetentionPurgeFunctionsIT | rango |  |
 | build-integrity | BI117 | Un `p_cutoff` nulo hace fallar cada una de las cinco funciones sin borrar nada | RefreshTokenFamilyPurgeFunctionIT, RetentionPurgeFunctionsIT, V13SchemaDiffIT | etiqueta |  |
 | build-integrity | BI118 | Un `p_limit` nulo hace fallar cada una de las cinco funciones sin borrar nada | RefreshTokenFamilyPurgeFunctionIT, RetentionPurgeFunctionsIT, V13SchemaDiffIT | etiqueta |  |
-| build-integrity | BI72 | Ningún rol de aplicación tiene `DELETE` sobre las tablas purgadas | RolePrivilegeMatrixIT | etiqueta |  |
+| build-integrity | BI72 | Ningún rol de aplicación tiene `DELETE` sobre las tablas purgadas | RetentionPurgeFunctionsIT | rango |  |
 | build-integrity | BI73 | Un segundo antes, en el borde y un segundo después | RetentionPurgeFunctionsIT | rango |  |
 | build-integrity | BI74 | Nunca se borra una fila vigente | RetentionPurgeFunctionsIT | rango |  |
 | build-integrity | BI75 | Otra institución queda intacta | RetentionPurgeFunctionsIT | rango |  |
 | build-integrity | BI76 | Sin contexto de institución la función falla y la prueba lo detecta | RetentionPurgeFunctionsIT | rango |  |
 | build-integrity | BI77 | Una variante sin corte hace fallar la prueba (control negativo) | RetentionPurgeFunctionsIT | etiqueta |  |
-| build-integrity | BI106 | El límite de lote se respeta y se acota a 10 000 | RefreshTokenFamilyPurgeFunctionIT | etiqueta |  |
-| build-integrity | BI107 | La función de familias de refresco elimina familias completas hasta el límite y  | RefreshTokenFamilyPurgeFunctionIT | etiqueta |  |
+| build-integrity | BI106 | El límite de lote se respeta y se acota a 10 000 | RefreshTokenFamilyPurgeFunctionIT, RetentionPurgeFunctionsIT | etiqueta |  |
+| build-integrity | BI107 | La función de familias de refresco elimina familias completas hasta el límite y | RefreshTokenFamilyPurgeFunctionIT, RetentionPurgeFunctionsIT | etiqueta |  |
 | build-integrity | BI78 | Una clave caducada hace más de 24 horas se elimina | RetentionPurgeFunctionsIT | rango |  |
 | build-integrity | BI79 | El borde de 24 horas conserva la clave | RetentionPurgeFunctionsIT | rango |  |
 | build-integrity | BI80 | Una clave vigente o recién caducada se conserva y sigue siendo reutilizable | RetentionPurgeFunctionsIT | etiqueta |  |
 | build-integrity | BI81 | El índice por institución y `expires_at` existe | RetentionPurgeFunctionsIT | etiqueta |  |
 | build-integrity | BI108 | El índice de la tabla de retroceso de inicio de sesión existe | RetentionPurgeFunctionsIT | etiqueta |  |
 | build-integrity | BI82 | Una clave purgada se comporta como nueva | RetentionPurgeFunctionsIT | etiqueta |  |
-| build-integrity | BI83 | La matriz afirma `DELETE` ausente y `EXECUTE` exacto | IdempotencyKeyPrivilegeIT, RolePrivilegeMatrixIT | etiqueta |  |
-| build-integrity | BI84 | Un `DELETE` o un `EXECUTE` de más hace fallar la matriz (control negativo) | IdempotencyKeyPrivilegeIT, RolePrivilegeMatrixIT | etiqueta |  |
+| build-integrity | BI83 | La matriz afirma `DELETE` ausente y `EXECUTE` exacto | IdempotencyKeyPrivilegeIT | etiqueta |  |
+| build-integrity | BI84 | Un `DELETE` o un `EXECUTE` de más hace fallar la matriz (control negativo) | IdempotencyKeyPrivilegeIT | etiqueta |  |
 | build-integrity | BI85 | Fixtures con cada anotación prohibida | NoInMemorySchedulingTest | etiqueta |  |
 | build-integrity | BI86 | El código real no usa ninguna y la regla evalúa clases reales | NoInMemorySchedulingTest | etiqueta |  |
 | build-integrity | BI87 | Una sola lista de prefijos para los tres procesos | SensitiveLogGuardInstallationTest | etiqueta |  |
@@ -689,16 +710,16 @@ Lista completa (capacidad, escenario, título, prueba, tipo de evidencia, nota).
 | build-integrity | BI112 | El portal solo admite el cableado de programación | PortalContextStartupTest, ProcessBeanIsolationTest | etiqueta |  |
 | build-integrity | BI95 | El trabajador tiene su ejecutor y los otros dos procesos no | ProcessBeanIsolationTest, SchedulerStarterCompatibilityTest | etiqueta |  |
 | build-integrity | BI96 | El control negativo detecta un ejecutor donde no corresponde y un trabajador sin | ProcessBeanIsolationTest | etiqueta |  |
-| build-integrity | BI113 | La ausencia de observabilidad se estrecha a las métricas y admite las de cola en | ProcessBeanIsolationTest, ProcessBeanPolicy | etiqueta |  |
+| build-integrity | BI113 | La ausencia de observabilidad se estrecha a las métricas y admite las de cola en | ProcessBeanIsolationTest | etiqueta |  |
 | build-integrity | BI114 | Una autoconfiguración nueva del iniciador sin excluir rompe la construcción | StarterAutoConfigurationExcludedTest | etiqueta |  |
 | build-integrity | BI97 | `AuditScopeExclusionInventoryTest` admite solo db-scheduler y `V10` | AuditScopeExclusionInventoryTest | etiqueta |  |
-| build-integrity | BI98 | `IdentityScopeExclusionInventoryTest` invierte el adaptador y conserva la rotaci | IdentityScopeExclusionInventoryTest, RegisteredJobs | etiqueta |  |
+| build-integrity | BI98 | `IdentityScopeExclusionInventoryTest` invierte el adaptador y conserva la rotaci | IdentityScopeExclusionInventoryTest | etiqueta |  |
 | build-integrity | BI99 | `MultiTenantSchemaIT` evalúa la tabla real y no exime nada más | MultiTenantSchemaIT | etiqueta |  |
 | build-integrity | — | Se agrega Hibernate | SIN PRUEBA (regla del enforcer) | sin prueba |  |
 | build-integrity | — | Sin dependencias prohibidas | SIN PRUEBA (regla del enforcer) | sin prueba |  |
 | build-integrity | BI100 | db-scheduler está admitido y otra biblioteca de programación no | DbSchedulerConfinementTest, SchedulerDependencySingleSourceTest | etiqueta |  |
 | build-integrity | — | SQL plano fuera de la lista aprobada | NoUnapprovedPlainSqlTest | manual |  |
-| build-integrity | BI101 | El lector de métricas de cola es el único con SQL plano y no lee `task_data` | NoUnapprovedPlainSqlTest, QueueSqlNeverReadsTaskDataTest | etiqueta |  |
+| build-integrity | BI101 | El lector de métricas de cola es el único con SQL plano y no lee `task_data` | QueueSqlNeverReadsTaskDataTest | etiqueta |  |
 | build-integrity | — | La matriz de privilegios cubre la tabla nueva para los cinco roles | RolePrivilegeMatrixIT | manual |  |
 | build-integrity | — | `confia_admin_app` puede leer, insertar y actualizar, pero no borrar | RolePrivilegeMatrixIT | manual |  |
 | build-integrity | — | `confia_portal_app` no tiene ningún privilegio sobre la tabla nueva | RolePrivilegeMatrixIT | manual |  |
@@ -741,15 +762,15 @@ Lista completa (capacidad, escenario, título, prueba, tipo de evidencia, nota).
 | identity | I243 | Sin contexto de institución la purga falla y no elimina ninguna fila | RetentionPurgeFunctionsIT | rango |  |
 | identity | I270 | Un actor que no es `system` no puede purgar tokens de recuperación | RetentionPurgeFunctionsIT | etiqueta |  |
 | identity | I271 | Un corte en el futuro no elimina un token más reciente que el piso | RetentionPurgeFunctionsIT | rango |  |
-| identity | I244 | Una familia revocada hace más de 30 días se elimina con sus tokens | RefreshTokenFamilyPurgeFunctionIT | etiqueta |  |
+| identity | I244 | Una familia revocada hace más de 30 días se elimina con sus tokens | RefreshTokenFamilyPurgeFunctionIT, RetentionPurgeFunctionsIT | etiqueta |  |
 | identity | I245 | El borde de 30 días conserva la familia y un segundo después la elimina | RefreshTokenFamilyPurgeFunctionIT, RetentionPurgeFunctionsIT | rango |  |
 | identity | I246 | Una familia vencida sin revocar se purga desde su vencimiento absoluto | RefreshTokenFamilyPurgeFunctionIT, RetentionPurgeFunctionsIT | rango |  |
 | identity | I247 | Una familia viva o dentro de la ventana no pierde ningún token | RefreshTokenFamilyPurgeFunctionIT, RetentionPurgeFunctionsIT | rango |  |
 | identity | I248 | Los tokens se eliminan antes que su familia sin violar claves foráneas | RefreshTokenFamilyPurgeFunctionIT, RetentionPurgeFunctionsIT | rango |  |
-| identity | I249 | Un fallo a mitad de la purga no deja una familia a medias | RefreshTokenFamilyPurgeFunctionIT | etiqueta |  |
+| identity | I249 | Un fallo a mitad de la purga no deja una familia a medias | RefreshTokenFamilyPurgeFunctionIT, RetentionPurgeFunctionsIT | etiqueta |  |
 | identity | I250 | La purga de refresco no cruza instituciones | RetentionPurgeFunctionsIT | rango |  |
 | identity | I251 | Sin contexto de institución la purga de refresco falla y no elimina nada | RetentionPurgeFunctionsIT | etiqueta |  |
-| identity | I272 | La inactividad de una familia no la hace purgable | RefreshTokenFamilyPurgeFunctionIT | etiqueta |  |
+| identity | I272 | La inactividad de una familia no la hace purgable | RefreshTokenFamilyPurgeFunctionIT, RetentionPurgeFunctionsIT | etiqueta |  |
 | identity | I273 | Una familia purgable se elimina completa aunque supere el tamaño del lote en tok | RefreshTokenFamilyPurgeFunctionIT, RetentionPurgeFunctionsIT | etiqueta |  |
 | identity | I252 | El sucesor residual se vacía una vez vencida la gracia | RefreshTokenPurgeIT | etiqueta |  |
 | identity | I253 | Dentro de la gracia y en el borde exacto el sucesor se conserva | RefreshTokenPurgeIT | etiqueta |  |
@@ -858,7 +879,7 @@ Resultado de las doce, con la prueba que la resuelve (todas existen y las que co
 
 ### Partición propuesta
 
-La rama completa mide 1 089 líneas. Costura natural: **PR 7b** = 4.2 y su corrección (`ee0d0a4`, `a9e5876`, 433 líneas) tal como está, y un **PR 7c** apilado sobre él con 4.3 (656 líneas: `CurrentAbsencesTest` 271, `JobsChangeTraceabilityTest` 237, `ExitCriterion5EndToEndIT` 109, el caso nuevo de `DocumentationNotesTest` 27 y la nota de `docs/09` 12). Crear la rama de 7c y confirmar 4.3 ahí lo hace el orquestador: este trabajo no cambia de rama.
+La rama completa mide 1 222 líneas (1 089 antes de la corrección tras la revisión de `bffac4f`). Costura natural: **PR 7b** = 4.2 y su corrección (`ee0d0a4`, `a9e5876`, 433 líneas) tal como está, y un **PR 7c** apilado sobre él con 4.3 (789 líneas contra `a9e5876`, 656 en `bffac4f` y 133 de la corrección: `CurrentAbsencesTest` 305, `JobsChangeTraceabilityTest` 332, `ExitCriterion5EndToEndIT` 112, el caso nuevo de `DocumentationNotesTest` 28 y la nota de `docs/09` 12). Crear la rama de 7c y confirmar 4.3 ahí lo hace el orquestador: este trabajo no cambia de rama.
 
 ### Verificación final del cambio: pendiente
 
