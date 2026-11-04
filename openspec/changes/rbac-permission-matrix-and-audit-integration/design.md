@@ -510,7 +510,7 @@ prohibidos. La emisión ocurre por eso en el hilo de la petición, con un costo 
    asiento y un resumen ajeno: dos transacciones cortas de una inserción cada una, acotadas por el tiempo de espera del
    grupo de conexiones. La cola se vacía más rápido de lo que se llena: un resumen de omisiones exige al menos `T + 1`
    denegaciones de su clave, un resumen de conteo 1 nace de un asiento fallido, y cada denegación escribe hasta uno.
-2. **`flushClosedWindows(now)`**, de uso solo en pruebas unitarias y de integración sin HTTP: barre sin compuerta y escribe
+2. **`flushClosedWindows(now)`**, de uso solo en pruebas (en las de borde con HTTP, solo para el vaciado previo descrito abajo): barre sin compuerta y escribe
    la cola hasta el primer fallo. Las pruebas de borde disparan la emisión con una denegación, como dicen AZ53 y AT35.
    **Independencia del orden de las pruebas.** En `AuthorizationEdgeIT`, un solo contexto comparte el bean `DenialWindows`,
    su cola, su compuerta y el `MutableClock`, así que la cola puede tener resúmenes de otras pruebas delante del propio.
