@@ -8,8 +8,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -45,6 +49,14 @@ class DocumentationNotesTest {
             "**Nota fechada 2026-11-01 (cambio `background-jobs-with-db-scheduler`, tarea 4.2)";
     private static final String TRACED_JOB_NOTE =
             "**Nota fechada 2026-10-26 (cambio `background-jobs-with-db-scheduler`, tarea 2.1)";
+    private static final String ADR_0027 = "docs/adr/ADR-0027-autorizacion-por-permisos-resueltos-por-peticion.md";
+    private static final String ADR_0005 = "docs/adr/ADR-0005-autenticacion-y-gestion-de-sesiones.md";
+    private static final String ADR_0005_NOTE_HEADING = "### Nota fechada 2026-11-04";
+    /** SHA-256 of ADR-0005 as it was before this note: every line up to the new heading, each ended by a line feed. */
+    private static final String ADR_0005_ORIGINAL_SHA256 =
+            "d120e72d8f00a2650eea565352b5f292cbf4451250ca9d17f0ec304d03448162";
+    private static final String RBAC_NOTE = "**Nota fechada 2026-11-04 (cambio "
+            + "`rbac-permission-matrix-and-audit-integration`, PR 1 `permission-catalog-and-adr`)";
 
     @Test
     void adr0025ExistsAsProposedAndIsIndexed() {
@@ -208,6 +220,92 @@ class DocumentationNotesTest {
                 .contains("IdentityWorkerConfiguration")
                 .contains("CONFIA_JOBS_INSTITUTIONS")
                 .contains("ProcessBeanPolicy");
+    }
+
+    /**
+     * Scenarios AZ16 and AZ72 (rbac-permission-matrix-and-audit-integration, task 1): ADR-0027 exists as
+     * proposed with the sections of its design, and the index lists it.
+     */
+    @Test
+    void adr0027ExistsAsProposedWithItsSectionsAndIsIndexed() {
+        List<String> adr = lines(repoRoot().resolve(ADR_0027));
+        assertThat(adr).contains("- **Estado:** Propuesto");
+        assertThat(adr).anySatisfy(line -> assertThat(line).startsWith("- **Fecha:** 2026-11-04"));
+        assertThat(adr).contains("## Contexto y problema", "## Decisión", "## Partes de ADR-0005 que reemplaza",
+                "## Alternativas descartadas", "## Consecuencias", "## Cómo se verifica");
+        assertThat(String.join("\n", adr)).contains("`docs/03`").doesNotContain("<Título>");
+
+        List<String> readme = lines(repoRoot().resolve("docs/adr/README.md"));
+        assertThat(readme)
+                .anySatisfy(row -> assertThat(row)
+                        .startsWith("| [0027](ADR-0027-autorizacion-por-permisos-resueltos-por-peticion.md) |")
+                        .contains("| Propuesto | 2026-11-04 |"));
+    }
+
+    @Test
+    void adr0005HasTheDatedNoteThatPointsToAdr0027AndItsOriginalBodyIsIntact() {
+        List<String> live = lines(repoRoot().resolve(ADR_0005));
+        int note = indexOfLineStartingWith(live, ADR_0005_NOTE_HEADING);
+        assertThat(note).as("the dated note of ADR-0005").isNotNegative();
+        assertThat(String.join("\n", live.subList(note, live.size())))
+                .contains("(ADR-0027-autorizacion-por-permisos-resueltos-por-peticion.md)")
+                .contains("diez minutos")
+                .contains("Auditor")
+                .contains("Coordinador Académico")
+                .contains("verificación 9");
+
+        List<String> original = new ArrayList<>(live.subList(0, note));
+        while (original.getLast().isBlank()) {
+            original.removeLast();
+        }
+        assertThat(sha256(original.stream().map(line -> line + "\n").collect(Collectors.joining())))
+                .as("the original body of ADR-0005, up to its dated notes, is not rewritten")
+                .isEqualTo(ADR_0005_ORIGINAL_SHA256);
+    }
+
+    @Test
+    void docs03Section51HasTheDatedNoteAndUnchangedOriginalBody() {
+        List<String> section = section(lines(repoRoot().resolve(DOCS_03)), "### 5.1 ");
+        assertThat(prose(noteBlock(section, RBAC_NOTE)))
+                .contains("un rol por cuenta e institución")
+                .contains("lista cerrada")
+                .contains("por petición")
+                .contains("ADR-0027");
+        assertOriginalLinesIntact(DOCS_03 + " section 5.1", linesOf(ORIGINAL_DOCS_03_SECTION_5_1), section);
+    }
+
+    @Test
+    void docs03Section53HasTheDatedNoteOnTheQuarterlyReportAndUnchangedOriginalBody() {
+        List<String> section = section(lines(repoRoot().resolve(DOCS_03)), "### 5.3 ");
+        assertThat(prose(noteBlock(section, RBAC_NOTE)))
+                .contains("revisa operaciones")
+                .contains("pares de permisos")
+                .contains("primera operación con aprobación");
+        assertOriginalLinesIntact(DOCS_03 + " section 5.3", linesOf(ORIGINAL_DOCS_03_SECTION_5_3), section);
+    }
+
+    /** The text of a block quote as running prose: no quote marks and no line breaks, so a wrap never splits a phrase. */
+    private static String prose(List<String> quote) {
+        return quote.stream().map(line -> line.replaceFirst("^>\\s?", "")).collect(Collectors.joining(" "))
+                .replaceAll("\\s+", " ");
+    }
+
+    private static int indexOfLineStartingWith(List<String> all, String prefix) {
+        for (int i = 0; i < all.size(); i++) {
+            if (all.get(i).startsWith(prefix)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static String sha256(String text) {
+        try {
+            return HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static void assertOriginalLinesIntact(String label, String fixtureName, List<String> live) {
@@ -471,5 +569,65 @@ class DocumentationNotesTest {
         > proceso trabajador real).
 
         Como el trabajador prohíbe `com.confia.shared.web`, la protección debe llegar por una configuración que el
+        """;
+
+    private static final String ORIGINAL_DOCS_03_SECTION_5_1 = """
+        ### 5.1 Modelo RBAC con permisos granulares
+
+        La autorización se decide **siempre en el servidor**. El frontend oculta lo que el usuario no
+        puede hacer solo por experiencia de uso, nunca como control.
+
+        Estructura:
+
+        ```
+        Usuario  ->  Rol (uno o varios)  ->  Permiso (módulo + verbo)
+        ```
+
+        Un permiso se nombra `modulo:verbo`, por ejemplo `payments:create` o `invoicing:void`. Los verbos
+        son los seis siguientes y ninguno más:
+
+        | Verbo | Significado | Nota |
+        |---|---|---|
+        | `create` | Crear un registro nuevo | |
+        | `read` | Consultar | |
+        | `update` | Modificar datos no financieros | Nunca aplica a asientos del libro mayor |
+        | `void` (anular) | Anular o reversar una operación | Siempre genera asiento de reverso, nunca borra |
+        | `approve` (aprobar) | Autorizar una operación que otro actor inició | Base de la segregación de funciones |
+        | `export` (exportar) | Extraer datos a CSV, Excel o PDF en volumen | Separado de `read` a propósito, por riesgo de fuga masiva |
+
+        Los permisos se declaran en el controlador con una anotación y Spring Security los verifica en
+        el servidor. **Un controlador sin permiso declarado no arranca la aplicación**: el arranque
+        recorre el mapa de rutas y falla si encuentra una ruta sin metadato de permiso o sin marca
+        explícita de pública.
+
+        **Cómo se comprueba.** Prueba de arranque que enumera todas las rutas de OpenAPI y verifica que
+        cada una declara permiso o es explícitamente pública. La lista de rutas públicas es una lista
+        blanca corta y revisada.
+        """;
+
+    private static final String ORIGINAL_DOCS_03_SECTION_5_3 = """
+        ### 5.3 Segregación de funciones
+
+        Ninguna persona debe poder completar sola un ciclo que mueva dinero fuera del control interno.
+
+        | Operación sensible | Quien inicia | Quien aprueba | Regla |
+        |---|---|---|---|
+        | Anulación de factura | Cajero o Contabilidad | Contabilidad o Super Administrador, **actor distinto del que emitió** | El sistema rechaza la aprobación si el aprobador es el emisor |
+        | Nota de crédito sobre monto mayor al umbral | Contabilidad | Super Administrador | Umbral configurable, con vigencia |
+        | Ajuste manual en el libro mayor | Administrador | Super Administrador | Motivo obligatorio de al menos 20 caracteres, adjunto opcional |
+        | Baja por incobrable | Contabilidad | Super Administrador | Siempre requiere aprobación, sin umbral |
+        | Cierre de caja con diferencia superior al umbral | Cajero | Administrador o Super Administrador | Ver `docs/runbooks/cierre-de-caja-con-diferencia.md` |
+        | Alta o cambio de rol de usuario | Super Administrador | No autoaplicable | Un usuario nunca puede modificar sus propios roles |
+        | Cambio de configuración fiscal (CAI, tasas) | Contabilidad | Super Administrador | Toda la configuración fiscal tiene vigencia y auditoría |
+        | Reembolso a un tercero | Contabilidad | Super Administrador | Con documento fiscal correspondiente |
+
+        Implementación: las operaciones marcadas crean un registro en estado `pendiente de aprobación` con
+        su actor iniciador. La aprobación es un caso de uso separado que valida que el aprobador tiene el
+        permiso `approve` del módulo y que **su identificador difiere del iniciador**. Ambos eventos se
+        auditan. Una aprobación caduca a las 72 horas sin resolución y notifica.
+
+        **Cómo se comprueba.** Prueba de integración por cada fila: el mismo actor intenta iniciar y
+        aprobar, y el sistema rechaza con 403 y un tipo de error específico. El reporte trimestral de
+        segregación de funciones no debe listar ningún usuario con ambos permisos del mismo par.
         """;
 }
