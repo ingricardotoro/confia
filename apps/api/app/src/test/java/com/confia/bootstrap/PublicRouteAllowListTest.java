@@ -9,6 +9,9 @@ import com.confia.shared.web.authentication.AuthenticatedEndpoints;
 import com.confia.shared.security.SecondFactorPurpose;
 import com.confia.shared.web.authentication.SecondFactorEndpoint;
 import com.confia.shared.web.authentication.SessionCheck;
+import com.confia.kernel.Permission;
+import com.confia.shared.web.authorization.PermissionedEndpoint;
+import com.confia.shared.web.authorization.PermissionedEndpoints;
 import com.confia.shared.web.edge.PublicEndpoint;
 import com.confia.shared.web.edge.PublicEndpoints;
 import com.confia.shared.web.harness.HarnessProcess;
@@ -126,6 +129,40 @@ class PublicRouteAllowListTest {
     }
 
 
+    /**
+     * The permission entries that answer an anonymous request with anything but {@code 401} (WE105): a
+     * route of the permission list that runs without a credential is a hole, whatever its controller does.
+     */
+    static List<String> permissionedRoutesThatAnswerWithoutACredential(int port,
+            PermissionedEndpoints permissioned) {
+        List<String> holes = new ArrayList<>();
+        for (PermissionedEndpoint entry : permissioned.endpoints()) {
+            int status = anonymous(entry.method().name(), sample(entry.pattern()), port);
+            if (status != 401) {
+                holes.add(entry.method() + " " + entry.pattern() + " is on the permission list "
+                        + "and answered " + status + " to an anonymous request");
+            }
+        }
+        return holes;
+    }
+
+    /** The permission entries with no registered route that serves them (BI135). */
+    static List<String> permissionedEntriesWithoutARoute(ApplicationContext context,
+            PermissionedEndpoints permissioned) {
+        List<Route> routes = RegisteredRoutes.of(context);
+        List<String> orphans = new ArrayList<>();
+        for (PermissionedEndpoint entry : permissioned.endpoints()) {
+            boolean served = routes.stream().anyMatch(route -> route.pattern()
+                    .equals(entry.pattern()) && (RegisteredRoutes.ANY_METHOD.equals(route.method())
+                    || route.method().equals(entry.method().name())));
+            if (!served) {
+                orphans.add(entry.method() + " " + entry.pattern()
+                        + " is on the permission list and no route serves it");
+            }
+        }
+        return orphans;
+    }
+
     /** The restricted entries with no registered route that serves them (decision 6, BI20). */
     static List<String> secondFactorEntriesWithoutARoute(ApplicationContext context,
             AuthenticatedEndpoints endpoints) {
@@ -193,7 +230,21 @@ class PublicRouteAllowListTest {
      */
     static List<Route> routesOnNeitherList(ApplicationContext context, PublicEndpoints allowed,
             AuthenticatedEndpoints authenticated) {
+        return routesOnNeitherList(context, allowed, authenticated,
+                new PermissionedEndpoints(List.of()));
+    }
+
+    /**
+     * The same with the fourth class (BI135): a route is classified when it is public, authenticated,
+     * restricted or on the permission list, for its own method.
+     */
+    static List<Route> routesOnNeitherList(ApplicationContext context, PublicEndpoints allowed,
+            AuthenticatedEndpoints authenticated, PermissionedEndpoints permissioned) {
         return RegisteredRoutes.of(context).stream()
+                .filter(route -> permissioned.endpoints().stream().noneMatch(entry ->
+                        entry.pattern().equals(route.pattern()) && (RegisteredRoutes.ANY_METHOD
+                                .equals(route.method()) || route.method().equals(
+                                        entry.method().name()))))
                 .filter(route -> allowed.endpoints().stream().noneMatch(entry ->
                         entry.pattern().equals(route.pattern()) && (RegisteredRoutes.ANY_METHOD
                                 .equals(route.method()) || route.method().equals(
@@ -315,6 +366,13 @@ class PublicRouteAllowListTest {
                 assertThat(allowed.endpoints()).as("non-vacuous: and lists them").isNotEmpty();
             }
             AuthenticatedEndpoints authenticated = authenticatedListOf(process);
+            PermissionedEndpoints permissioned = "admin".equals(process)
+                    ? PermissionedEndpoints.forAdmin() : new PermissionedEndpoints(List.of());
+            assertThat(permissioned.endpoints()).as("no route needs a permission until task 7")
+                    .isEmpty();
+            assertThat(permissionedEntriesWithoutARoute(context, permissioned)).isEmpty();
+            assertThat(permissionedRoutesThatAnswerWithoutACredential(running.port(), permissioned))
+                    .isEmpty();
             assertThat(unenumerableRoutes(context)).isEmpty();
             assertThat(leaks(context, running.port(), allowed)).isEmpty();
             assertThat(entriesWithoutARoute(context, allowed)).isEmpty();
@@ -325,9 +383,9 @@ class PublicRouteAllowListTest {
             assertThat(authenticatedRoutesThatAnswerWithoutACredential(running.port(),
                     authenticated)).isEmpty();
             if ("default".equals(profile)) {
-                assertThat(routesOnNeitherList(context, allowed, authenticated))
-                        .as("in production the routes of a process are exactly its public ones, "
-                                + "its authenticated ones and its restricted ones").isEmpty();
+                assertThat(routesOnNeitherList(context, allowed, authenticated, permissioned))
+                        .as("in production the routes of a process are exactly the ones of its "
+                                + "four classes").isEmpty();
             }
             // The local profile also registers routes of springdoc that no list admits (the YAML
             // document, the per-group documents). The chain denies them, which the anonymous check
@@ -466,6 +524,49 @@ class PublicRouteAllowListTest {
                     PublicEndpoints.forAdmin(harness.context().getEnvironment()),
                     harnessRestricted())).extracting(Route::pattern)
                     .doesNotContain("/test/second-factor/verify", "/test/second-factor/enroll");
+        }
+    }
+
+    /**
+     * WE105 and BI135: a permission entry whose route answers {@code 200} to anyone fails the enumeration
+     * naming the route, and one that answers {@code 401} does not.
+     */
+    @Test
+    void aPermissionEntryThatAnswersWithoutACredentialFailsNamingTheRoute() {
+        try (HarnessProcess harness = HarnessProcess.start()) {
+            PermissionedEndpoints configuredOpen = new PermissionedEndpoints(List.of(
+                    new PermissionedEndpoint(HttpMethod.GET, "/test/open", Permission.IDENTITY_READ),
+                    new PermissionedEndpoint(HttpMethod.GET, "/test/permissioned",
+                            Permission.IDENTITY_READ)));
+
+            assertThat(permissionedRoutesThatAnswerWithoutACredential(harness.port(), configuredOpen))
+                    .containsExactly("GET /test/open is on the permission list and answered 200 to "
+                            + "an anonymous request");
+            assertThat(permissionedRoutesThatAnswerWithoutACredential(harness.port(),
+                    harness.bean(PermissionedEndpoints.class)))
+                    .as("the real harness list answers 401 to anyone").isEmpty();
+        }
+    }
+
+    /** BI135: the permission routes of the harness are on none of the other lists, so only the fourth class classifies them. */
+    @Test
+    void aRouteOfThePermissionListIsClassifiedOnlyByTheFourthClass() {
+        try (HarnessProcess harness = HarnessProcess.start()) {
+            PublicEndpoints allowed = PublicEndpoints.forAdmin(harness.context().getEnvironment());
+            AuthenticatedEndpoints authenticated = AuthenticatedEndpoints.forAdmin();
+            PermissionedEndpoints permissioned = harness.bean(PermissionedEndpoints.class);
+
+            assertThat(routesOnNeitherList(harness.context(), allowed, authenticated))
+                    .extracting(Route::toString).contains("ANY /test/permissioned",
+                            "ANY /test/accounts/{id}");
+            assertThat(routesOnNeitherList(harness.context(), allowed, authenticated, permissioned))
+                    .extracting(Route::toString).doesNotContain("ANY /test/permissioned",
+                            "ANY /test/accounts/{id}");
+            assertThat(permissionedEntriesWithoutARoute(harness.context(), permissioned)).isEmpty();
+            assertThat(permissionedEntriesWithoutARoute(harness.context(), new PermissionedEndpoints(
+                    List.of(new PermissionedEndpoint(HttpMethod.GET, "/ghost",
+                            Permission.IDENTITY_READ)))))
+                    .containsExactly("GET /ghost is on the permission list and no route serves it");
         }
     }
 
