@@ -138,13 +138,13 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
 
 ## Fase 1: catálogo y resolución por petición
 
-- [ ] 1 **PR 1 `permission-catalog-and-adr`: catálogo de 89 permisos, matriz de seis roles, paridad con `docs/03` §5.2 y ADR-0027 (D2, D3, D17; O1, O2, O3, O10).**
+- [x] 1 **PR 1 `permission-catalog-and-adr`: catálogo de 89 permisos, matriz de seis roles, paridad con `docs/03` §5.2 y ADR-0027 (D2, D3, D17; O1, O2, O3, O10).**
   - **Archivos.** Crea `apps/api/kernel/src/main/java/com/confia/kernel/Permission.java`, `identity/domain/StaffRole.java`,
     `docs/adr/ADR-0027-autorizacion-por-permisos-resueltos-por-peticion.md`; modifica `docs/03-seguridad.md` (§5.1, §5.2, §5.3),
     `docs/adr/README.md`, `docs/adr/ADR-0005-autenticacion-y-gestion-de-sesiones.md` (solo nota fechada). Pruebas:
     `kernel/src/test/.../PermissionTest.java`, `identity/domain/StaffRoleTest.java`, `architecture/PermissionMatrixParityTest.java`,
     `architecture/DomainPurityRulesTest.java`, `architecture/DocumentationNotesTest.java` (ampliada).
-  - [ ] 1.1 **ROJO.** `PermissionTest`: 89 constantes sin repetir, forma `^[a-z]+:[a-z]+(-[a-z]+)*$`, 88 de módulo y verbo (18 módulos, 6 verbos) más
+  - [x] 1.1 **ROJO.** `PermissionTest`: 89 constantes sin repetir, forma `^[a-z]+:[a-z]+(-[a-z]+)*$`, 88 de módulo y verbo (18 módulos, 6 verbos) más
     `invoicing:request-void`, distinto de `invoicing:void`; `ledger:update`, `payments:update` e `invoicing:update` no existen; `ofCode` desconocido
     devuelve vacío [AZ04, AZ05, AZ06]. `StaffRoleTest`: seis roles en orden de catálogo con sus códigos, sin rol del Encargado ni tabla global en
     `db/migration` [AZ01, AZ02]; `ofCode` desconocido da `Optional.empty()` [AZ03]; una aserción por columna de la matriz: Super Admin 88 sin solicitud [AZ07],
@@ -157,15 +157,22 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     [AZ72]. `DomainPurityRulesTest`: `..domain..` solo depende de `kernel` y de su módulo, ni Spring ni jOOQ; `kernel.Permission` sin dependencias; fixtures que
     importan Spring o jOOQ fallan [BI132]. **Rojos esperados:** error de compilación `cannot find symbol class Permission` y `StaffRole`; paridad con
     `marker not found` en `docs/03`; ADR-0027 inexistente.
-  - [ ] 1.2 **VERDE y REFACTOR.** Crear los dos enums (`Permission` con código y `ofCode`; `StaffRole` con `code()`, `permissions()` inmutable y `ofCode`), la
+  - [x] 1.2 **VERDE y REFACTOR.** Crear los dos enums (`Permission` con código y `ofCode`; `StaffRole` con `code()`, `permissions()` inmutable y `ofCode`), la
     nota fechada de §5.2 con la matriz efectiva y su marcador, las demás notas, ADR-0027 en estado **Propuesto** con el esquema de D17, la fila del índice y la
     nota de ADR-0005. Sin cambios de `ProcessBeanPolicy` (no hay beans).
-  - [ ] 1.3 **Demostraciones deliberadas.** (1) Agregar `PAYMENTS_CREATE` a `administrator` en `StaffRole.java` pone en rojo `PermissionMatrixParityTest` y
+  - [x] 1.3 **Demostraciones deliberadas.** (1) Agregar `PAYMENTS_CREATE` a `administrator` en `StaffRole.java` pone en rojo `PermissionMatrixParityTest` y
     `StaffRoleTest` [AZ09, AZ15]. (2) Quitar `audit:export` del Auditor en la nota de `docs/03-seguridad.md` pone en rojo la paridad [AZ15]. (3) Vaciar la tabla
     de la nota pone en rojo la aserción de 6 por 18 celdas [AZ14]. Se revierten y se confirman con `cmp`.
-  - [ ] 1.4 **Cierre.** `./mvnw -B verify`. Commits: `feat(kernel): add the closed permission catalog`, `feat(identity): add the staff role matrix and its parity check
+  - [x] 1.4 **Cierre.** `./mvnw -B verify`. Commits: `feat(kernel): add the closed permission catalog`, `feat(identity): add the staff role matrix and its parity check
     with the security document`, `docs(adr): propose ADR-0027 on permissions resolved per request`. Tamaño: diseño 740 (230 prod., 270 pruebas, 240 doc.); costura 1a/1b si
     supera 800. — Escenarios AZ01 a AZ16, AZ72 y BI132.
+  - **Cierre 2026-11-04 (evidencia en `apply-progress.md`).** El propietario eligió el corte en dos PR porque el árbol completo midió 1 492 líneas efectivas (la costura
+    1a/1b del desglose daba ≈ 1 170). **PR 1a** (rama `change/rbac-permission-matrix-and-audit-integration-1-permission-catalog-and-adr`, 761 líneas efectivas contra
+    `e946a31`): `a6e2554` catálogo, `bd1a5df` reglas de pureza del dominio, `227610e` ADR-0027, índice, nota de ADR-0005 y notas de §5.1 y §5.3. **PR 1b** (rama
+    `change/rbac-permission-matrix-and-audit-integration-1b-staff-role-matrix`, 735 líneas efectivas contra la punta de 1a): `65affc2` matriz de roles, paridad y nota de
+    §5.2. Rojos observados, tres demostraciones revertidas con `cmp`. Pruebas focalizadas en verde en cada rama (1a: 30; 1b: 58). `./mvnw -B verify` sobre el árbol
+    combinado: `BUILD SUCCESS` en 20:36 min (kernel 196, unitarias 2 787, integración 821). **Lección de estimación:** el diseño subestimó las pruebas unas cuatro veces
+    (1 051 líneas reales frente a 270).
 
 - [ ] 2 **PR 2 `role-assignment-and-resolver`: `V14`, puerto `PermissionResolver`, adaptador de solo lectura bajo RLS (D4, D5; O1, O3, O9).**
   - **Archivos.** Crea `app/src/main/resources/db/migration/V14__create_identity_staff_account_role.sql`, `shared/security/PermissionResolver.java`,

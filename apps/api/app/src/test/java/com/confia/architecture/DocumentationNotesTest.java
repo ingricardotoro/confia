@@ -275,6 +275,29 @@ class DocumentationNotesTest {
     }
 
     @Test
+    void docs03Section52HasTheMatrixNoteWithTheFourDifferencesRule3TheClosingParagraphAndThePendingInitiators() {
+        List<String> section = section(lines(repoRoot().resolve(DOCS_03)), "### 5.2 ");
+        String note = prose(noteBlock(section, RBAC_NOTE));
+        assertThat(note).as("the four differences")
+                .contains("`invoicing:request-void`")
+                .contains("`audit:read`")
+                .contains("`payments:create`")
+                .contains("MFA propia");
+        assertThat(note).as("rule 3 rewritten")
+                .contains("el Auditor es el único rol de solo lectura absoluta");
+        assertThat(note).as("the closing paragraph")
+                .contains("`StaffRole`")
+                .contains("PermissionMatrixParityTest")
+                .contains("migración semilla");
+        assertThat(note).as("the initiators of section 5.3 without a permission, pending")
+                .contains("ajuste manual del libro mayor")
+                .contains("baja por incobrable")
+                .contains("reembolso a un tercero")
+                .contains("pendientes");
+        assertOriginalLinesIntact(DOCS_03 + " section 5.2", linesOf(ORIGINAL_DOCS_03_SECTION_5_2), section);
+    }
+
+    @Test
     void docs03Section53HasTheDatedNoteOnTheQuarterlyReportAndUnchangedOriginalBody() {
         List<String> section = section(lines(repoRoot().resolve(DOCS_03)), "### 5.3 ");
         assertThat(prose(noteBlock(section, RBAC_NOTE)))
@@ -603,6 +626,62 @@ class DocumentationNotesTest {
         **Cómo se comprueba.** Prueba de arranque que enumera todas las rutas de OpenAPI y verifica que
         cada una declara permiso o es explícitamente pública. La lista de rutas públicas es una lista
         blanca corta y revisada.
+        """;
+
+    private static final String ORIGINAL_DOCS_03_SECTION_5_2 = """
+        ### 5.2 Matriz de permisos por rol
+
+        Leyenda: **C** crear, **L** leer, **A** actualizar, **N** anular, **P** aprobar, **X** exportar.
+        Una celda vacía significa sin acceso. `L*` significa lectura restringida por seguridad a nivel de
+        fila a los propios estudiantes vinculados.
+
+        | Módulo | Super Admin | Administrador | Cajero | Contabilidad | Auditor | Coord. Académico | Encargado |
+        |---|---|---|---|---|---|---|---|
+        | `identity` (usuarios, roles) | C L A N P X | L | | | L | | |
+        | `identity` (MFA propia) | C L A | C L A | C L A | C L A | C L A | C L A | C L A |
+        | `organization` (institución, año, grado) | C L A N X | C L A X | L | L | L X | C L A X | |
+        | `students` | C L A N X | C L A X | L | L | L X | C L A X | L* |
+        | `guardians` | C L A N X | C L A X | L | L | L X | L | L* A* |
+        | `catalog` (conceptos y tarifas) | C L A N X | C L A X | L | L X | L X | L | |
+        | `scholarships` (becas) | C L A N P X | C L A P X | L | L X | L X | C L | L* |
+        | `charges` (devengo y cargos) | C L A N P X | C L N P X | L | L X | L X | L | L* |
+        | `ledger` (libro mayor) | L N P X | L N X | L | L X | L X | | L* |
+        | `payments` | C L N P X | C L N P X | **C L** | L N X | L X | | L* |
+        | `cashbox` (sesiones de caja) | C L N P X | L P X | **C L** | L X | L X | | |
+        | `invoicing` (factura, CAI, NC) | C L N P X | L P X | **C L** | **C L N P X** | L X | | L* |
+        | `collections` (mora y cobranza) | C L A N P X | C L A P X | L | L X | L X | L | L* |
+        | `reconciliation` (bancaria) | C L A P X | L P X | | **C L A P X** | L X | | |
+        | `documents` (constancias) | C L A N P X | C L A P X | L | | L X | C L A P X | **C** L* |
+        | `reporting` | L X | L X | L (solo su caja) | L X | **L X** | L X (académico) | |
+        | `notifications` | C L A N X | C L A X | L | | L X | C L | L* A* (preferencias) |
+        | `audit` (bitácora) | **L X** | L | | | **L X** | | |
+        | `settings` (configuración) | C L A N X | L A | | L | L X | | |
+
+        Reglas de la matriz que no se ven en la tabla:
+
+        1. **Nadie tiene `update` sobre `ledger`.** Ni el Super Administrador. La tabla de asientos no
+           acepta `UPDATE` a nivel de motor de base de datos.
+        2. **Nadie tiene `delete`.** El verbo no existe en el sistema. La anulación es siempre `void`.
+        3. **El Auditor es de solo lectura absoluta.** Es el único rol con lectura completa de la bitácora
+           y sin ninguna capacidad de escritura en todo el sistema. Su cuenta existe para responder a un
+           auditor externo sin concederle privilegio operativo.
+        4. **El Cajero no puede anular.** Puede crear pagos y facturas dentro de su sesión de caja, pero
+           la anulación requiere `invoicing:void`, que reside en Contabilidad y Super Administrador. Este
+           es el control central contra el actor 2.
+        5. **El Administrador no puede cobrar.** No tiene `payments:create` ni `cashbox:create`. Quien
+           configura el sistema no maneja el efectivo.
+        6. **`export` sobre `students` y `guardians`** se audita siempre con el filtro y el conteo de
+           filas, y dispara alerta sobre un umbral configurable.
+        7. **El Encargado nunca tiene permisos administrativos.** Su privilegio se define además por el
+           proceso: el binario del portal no contiene los módulos administrativos.
+
+        La matriz vive también como dato en la migración semilla, de modo que el documento y el sistema no
+        puedan divergir en silencio.
+
+        **Cómo se comprueba.** Una prueba de integración lee esta matriz desde un archivo de definición
+        compartido y verifica, rol por rol y endpoint por endpoint, que el acceso concedido y el denegado
+        coinciden con la tabla. Un cambio de permiso que no actualice la definición rompe la construcción.
+        Trimestralmente se genera el reporte "quién puede hacer qué" y se revisa con el propietario.
         """;
 
     private static final String ORIGINAL_DOCS_03_SECTION_5_3 = """

@@ -759,6 +759,58 @@ compartido y verifica, rol por rol y endpoint por endpoint, que el acceso conced
 coinciden con la tabla. Un cambio de permiso que no actualice la definición rompe la construcción.
 Trimestralmente se genera el reporte "quién puede hacer qué" y se revisa con el propietario.
 
+> **Nota fechada 2026-11-04 (cambio `rbac-permission-matrix-and-audit-integration`, PR 1 `permission-catalog-and-adr`): matriz
+> efectiva de los seis roles.** La tabla y las reglas anteriores no se reescriben. La matriz que el sistema aplica, aprobada por el
+> propietario el 2026-11-03, difiere de ellas en cuatro puntos:
+>
+> 1. **El Cajero gana el permiso `invoicing:request-void`** (letra **S**, solicitar la anulación de una factura). Es distinto de
+>    `invoicing:void`, que sigue siendo solo de Contabilidad y del Super Administrador. El flujo de la solicitud pendiente y de su
+>    aprobación no pertenece a este cambio.
+> 2. **El Administrador pierde `audit:read`.** La bitácora la leen y exportan solo el Super Administrador y el Auditor.
+> 3. **El Administrador pierde `payments:create`**, de acuerdo con la regla 5 («el Administrador no puede cobrar»), que la tabla anterior
+>    contradecía.
+> 4. **La MFA propia deja de ser una fila de permisos.** Es autoservicio de los seis roles y no figura en el catálogo.
+>
+> La columna del Encargado queda solo documentada para F8 y no entra en la matriz. Las restricciones de alcance dentro de un permiso
+> («solo su caja», «académico», `L*`, `A*`) tampoco son parte de la matriz: las aplica cada caso de uso (§5.4).
+>
+> **Matriz efectiva de permisos de los seis roles** (la que lee `PermissionMatrixParityTest`). Letras como en la leyenda, más **S**
+> para `invoicing:request-void`; «—» es sin acceso:
+>
+> | Módulo | Super Admin | Administrador | Cajero | Contabilidad | Auditor | Coord. Académico |
+> |---|---|---|---|---|---|---|
+> | `identity` (usuarios, roles) | C L A N P X | L | — | — | L | — |
+> | `organization` | C L A N X | C L A X | L | L | L X | C L A X |
+> | `students` | C L A N X | C L A X | L | L | L X | C L A X |
+> | `guardians` | C L A N X | C L A X | L | L | L X | L |
+> | `catalog` | C L A N X | C L A X | L | L X | L X | L |
+> | `scholarships` | C L A N P X | C L A P X | L | L X | L X | C L |
+> | `charges` | C L A N P X | C L N P X | L | L X | L X | L |
+> | `ledger` | L N P X | L N X | L | L X | L X | — |
+> | `payments` | C L N P X | L N P X | C L | L N X | L X | — |
+> | `cashbox` | C L N P X | L P X | C L | L X | L X | — |
+> | `invoicing` | C L N P X | L P X | C L S | C L N P X | L X | — |
+> | `collections` | C L A N P X | C L A P X | L | L X | L X | L |
+> | `reconciliation` | C L A P X | L P X | — | C L A P X | L X | — |
+> | `documents` | C L A N P X | C L A P X | L | — | L X | C L A P X |
+> | `reporting` | L X | L X | L | L X | L X | L X |
+> | `notifications` | C L A N X | C L A X | L | — | L X | C L |
+> | `audit` (bitácora) | L X | — | — | — | L X | — |
+> | `settings` | C L A N X | L A | — | L | L X | — |
+>
+> Dos reglas de la lista anterior cambian de redacción; las demás siguen como estaban:
+>
+> - **Regla 3, reescrita.** Dice ahora «el Auditor es el único rol de solo lectura absoluta»: sus permisos son únicamente `read` y `export`, en los
+>   18 módulos. La lectura completa de la bitácora ya no es exclusiva del Auditor, porque la comparte con el Super Administrador.
+> - **Párrafo final, reemplazado.** La matriz vive en código (`StaffRole`), no en una migración semilla. `PermissionMatrixParityTest`
+>   la compara celda por celda con la tabla de esta nota, para seis roles y 18 módulos, y un permiso cambiado en un solo lado rompe la
+>   construcción. La prueba de integración rol por rol y endpoint por endpoint de «Cómo se comprueba» se construye con las rutas con
+>   permiso del mismo cambio.
+>
+> Tres iniciadores de §5.3 no tienen hoy un permiso en la matriz que los identifique: el ajuste manual del libro mayor (Administrador),
+> la baja por incobrable (Contabilidad) y el reembolso a un tercero (Contabilidad). Quedan anotados como pendientes de los cambios que
+> construyan cada operación, que declararán el permiso que les corresponda.
+
 ### 5.3 Segregación de funciones
 
 Ninguna persona debe poder completar sola un ciclo que mueva dinero fuera del control interno.
