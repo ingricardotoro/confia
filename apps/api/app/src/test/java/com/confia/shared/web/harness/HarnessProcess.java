@@ -133,6 +133,16 @@ public final class HarnessProcess implements AutoCloseable {
         return context.getBean(RecordingSessionValidity.class);
     }
 
+    /** The double of the permission resolver port, which the permission decider asks. */
+    public RecordingPermissionResolver permissionResolver() {
+        return context.getBean(RecordingPermissionResolver.class);
+    }
+
+    /** The double of the authorization metrics port. */
+    public RecordingAuthorizationMetrics authorizationMetrics() {
+        return context.getBean(RecordingAuthorizationMetrics.class);
+    }
+
     /** What the harness controllers observed. */
     public Calls calls() {
         return context.getBean(Calls.class);

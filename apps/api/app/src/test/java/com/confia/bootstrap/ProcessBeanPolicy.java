@@ -26,6 +26,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
     private static final String SCHEDULER_REASON = "only the worker runs db-scheduler (ADR-0016)";
     private static final String OTHER_ENTRY_POINT = "another process entry point (ADR-0003)";
     private static final String ADMIN_MODULE = "administrative module (ADR-0003)";
+    private static final String ADMIN_AUTHORIZATION =
+            "the permission list and the decider are administrative only: the portal decides "
+                    + "nothing by staff permission (ADR-0027)";
     private static final String WEB_EDGE =
             "the worker never serves the OpenAPI surface or any other part of the web edge: "
                     + "no filters, no security chain (ADR-0003; web-edge-foundations decision 4)";
@@ -99,6 +102,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // Idempotency-Key header and the handler that runs a use case under it.
                     // Administrative only, and exact like every entry.
                     "com.confia.shared.web.idempotency",
+                    // The permission list and the decider of the administrative chain
+                    // (rbac-permission-matrix-and-audit-integration D18). Exact like every entry.
+                    "com.confia.shared.web.authorization",
                     // The identity module as the three packages its beans come from: the use
                     // cases, the adapters, and the named-interface package of its configuration.
                     // Each entry is exact because the non-vacuity check compares by equality.
@@ -148,7 +154,10 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     SESSION_PACKAGE, SESSION_COOKIE_REASON,
                     // The adapter reads the institution of a staff token, which the portal never
                     // verifies (decision 6 of session-tokens-and-web-layer).
-                    "com.confia.organization", STAFF_INSTITUTION));
+                    "com.confia.organization", STAFF_INSTITUTION,
+                    // The permission decision belongs to the administrative chain alone
+                    // (rbac-permission-matrix-and-audit-integration D18, scenarios AZ39, BI129).
+                    "com.confia.shared.web.authorization", ADMIN_AUTHORIZATION));
 
     static final ProcessBeanPolicy WORKER = new ProcessBeanPolicy("worker",
             "com.confia.bootstrap.worker",

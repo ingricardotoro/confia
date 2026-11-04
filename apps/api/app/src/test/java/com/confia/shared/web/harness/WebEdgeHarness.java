@@ -17,6 +17,10 @@ import com.confia.shared.web.edge.PublicEndpoint;
 import com.confia.shared.web.edge.PublicEndpoints;
 import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
 import com.confia.shared.security.RateLimiterConfiguration;
+import com.confia.kernel.Permission;
+import com.confia.shared.web.authorization.PermissionDecider;
+import com.confia.shared.web.authorization.PermissionedEndpoint;
+import com.confia.shared.web.authorization.PermissionedEndpoints;
 import com.confia.shared.web.edge.AdminSecurityConfiguration;
 import com.confia.shared.web.edge.SecurityChains;
 import com.confia.shared.web.edge.ThrottlingConfiguration;
@@ -56,7 +60,7 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
         OrganizationConfiguration.class, CsrfConfiguration.class, HarnessController.class,
         CookieHarnessController.class, LimitedController.class,
         UnknownPolicyController.class, SingleFieldController.class, DocumentedProbeController.class,
-        SecondFactorHarnessController.class,
+        SecondFactorHarnessController.class, PermissionedHarnessController.class,
         DocumentedProbeController.ProbeAdvice.class})
 class WebEdgeHarness {
 
@@ -87,10 +91,38 @@ class WebEdgeHarness {
     }
 
     @Bean
+    RecordingPermissionResolver permissionResolver() {
+        return new RecordingPermissionResolver();
+    }
+
+    @Bean
+    @org.springframework.context.annotation.Primary
+    RecordingAuthorizationMetrics recordingAuthorizationMetrics() {
+        return new RecordingAuthorizationMetrics();
+    }
+
+    /** The routes with a permission that only this harness adds; one has a path variable. */
+    @Bean
+    PermissionedEndpoints permissionedEndpoints() {
+        return new PermissionedEndpoints(List.of(
+                new PermissionedEndpoint(HttpMethod.GET, "/test/permissioned",
+                        Permission.IDENTITY_READ),
+                new PermissionedEndpoint(HttpMethod.GET, "/test/accounts/{id}",
+                        Permission.IDENTITY_READ)));
+    }
+
+    @Bean
+    PermissionDecider permissionDecider(RecordingPermissionResolver resolver,
+            RecordingAuthorizationMetrics metrics) {
+        return new PermissionDecider(resolver, metrics);
+    }
+
+    @Bean
     SecurityFilterChain harnessChain(HttpSecurity http, Environment environment,
             ProblemResponses problems, HarnessTokens tokens,
             RecordingSessionValidity sessionValidity, CsrfTokens csrfTokens,
-            WebEdgeProperties webEdge) throws Exception {
+            WebEdgeProperties webEdge, PermissionedEndpoints permissioned,
+            PermissionDecider decider) throws Exception {
         boolean portal = "portal".equals(environment.getProperty(PROCESS_PROPERTY));
         PublicEndpoints real = portal
                 ? PublicEndpoints.forPortal(environment)
@@ -143,10 +175,10 @@ class WebEdgeHarness {
                         new SecondFactorEndpoint(HttpMethod.POST, "/test/second-factor/enroll",
                                 Set.of(SecondFactorPurpose.ENROLL))));
         AccessTokenAuthenticationFilter tokenFilter = new AccessTokenAuthenticationFilter(
-                tokens.verifier(), authenticated, sessionValidity,
+                tokens.verifier(), authenticated, permissioned, sessionValidity,
                 new ProblemAuthenticationEntryPoint(problems));
         HttpSecurity chain = SecurityChains.denyByDefault(http, new PublicEndpoints(endpoints),
-                authenticated, problems);
+                authenticated, permissioned, decider, problems);
         if ("off".equals(environment.getProperty(CSRF_FILTER_PROPERTY))) {
             // The control variant of WE55: the same chain with the CSRF filter left out.
             chain.addFilterBefore(tokenFilter, AnonymousAuthenticationFilter.class);

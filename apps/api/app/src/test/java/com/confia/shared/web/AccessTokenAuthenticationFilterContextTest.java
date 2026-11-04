@@ -13,6 +13,7 @@ import com.confia.shared.web.authentication.AccessTokenAuthenticationFilter;
 import com.confia.shared.web.authentication.ActorAuthentication;
 import com.confia.shared.web.authentication.AuthenticatedEndpoints;
 import com.confia.shared.web.authentication.AccessTokenRejectedException;
+import com.confia.shared.web.authorization.PermissionedEndpoints;
 import com.confia.shared.web.harness.HarnessTokens;
 import com.confia.shared.web.harness.RecordingSessionValidity;
 import java.util.ArrayList;
@@ -47,6 +48,7 @@ class AccessTokenAuthenticationFilterContextTest {
     private final List<String> entryPointCalls = new ArrayList<>();
     private final AccessTokenAuthenticationFilter filter = new AccessTokenAuthenticationFilter(
             tokens.verifier(), new AuthenticatedEndpoints(List.of()),
+            new PermissionedEndpoints(List.of()),
             sessionValidity,
             (request, response, exception) -> entryPointCalls
                     .add(exception.getClass().getSimpleName()));
@@ -186,7 +188,7 @@ class AccessTokenAuthenticationFilterContextTest {
                             Set.of(SecondFactorPurpose.VERIFY, SecondFactorPurpose.ENROLL)),
                     new SecondFactorEndpoint(HttpMethod.POST, "/test/second-factor/enroll",
                             Set.of(SecondFactorPurpose.ENROLL)))),
-            sessionValidity,
+            new PermissionedEndpoints(List.of()), sessionValidity,
             (request, response, exception) -> entryPointCalls
                     .add(exception.getClass().getSimpleName()));
 

@@ -67,6 +67,23 @@ public final class HarnessTokens {
         return accessAt(Instant.now());
     }
 
+    /** A valid access token for {@code account} in {@link #INSTITUTION}, with {@code methods} in {@code amr}. */
+    public String accessFor(UUID account, Set<AuthenticationMethod> methods) {
+        return new AccessTokenIssuer(jws, Clock.systemUTC())
+                .issueAccess(account, INSTITUTION, SESSION, methods).compact();
+    }
+
+    /** A full session token ({@code pwd} and {@code otp}) for {@code account}. */
+    public String fullSession(UUID account) {
+        return accessFor(account,
+                Set.of(AuthenticationMethod.PASSWORD, AuthenticationMethod.ONE_TIME_PASSWORD));
+    }
+
+    /** A token that proves the password only, for {@code account}. */
+    public String passwordOnly(UUID account) {
+        return accessFor(account, Set.of(AuthenticationMethod.PASSWORD));
+    }
+
     /** A valid access token for {@link #ACCOUNT} in {@code institution}, issued now. */
     public String accessForInstitution(UUID institution) {
         return new AccessTokenIssuer(jws, Clock.systemUTC())
