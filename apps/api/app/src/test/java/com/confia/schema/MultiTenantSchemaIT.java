@@ -326,6 +326,29 @@ class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
         }
     }
 
+    /**
+     * Scenario BI119 (rbac-permission-matrix-and-audit-integration specs/build-integrity/spec.md): the
+     * role-assignment table of {@code V14} passes the same generic gates as the refresh-token tables,
+     * with no entry in any exclusion set: the discriminator, row security enabled and forced, one
+     * policy, and every unique index led by the institution.
+     */
+    @Test
+    void theStaffAccountRoleTablePassesTheGenericGatesWithoutAnyExclusion() {
+        String name = "identity_staff_account_role";
+        assertThat(TECHNICAL_TABLES).doesNotContain(name);
+        assertThat(CLOSED_CATALOGUE_TABLES).doesNotContain(name);
+        assertThat(baseTablesInPublicSchema()).filteredOn(table -> table.name().equals(name))
+                .singleElement()
+                .satisfies(table -> assertThat(table.hasNotNullInstitutionId()).isTrue());
+        RowSecurityFlags flags = rowSecurityFlagsOf(name);
+        assertThat(flags.rowSecurity()).as("ENABLE ROW LEVEL SECURITY").isTrue();
+        assertThat(flags.forceRowSecurity()).as("FORCE ROW LEVEL SECURITY").isTrue();
+        assertThat(policyCountOn(name)).as("one policy").isEqualTo(1L);
+        assertThat(uniqueIndexesInPublicSchema()).filteredOn(index -> index.tableName().equals(name))
+                .as("unique indexes of %s", name).isNotEmpty()
+                .allSatisfy(index -> assertThat(index.columns()).contains("institution_id"));
+    }
+
     private static final String PASSWORD_RESET_TOKEN_INSERT = """
             insert into identity_password_reset_token
                 (institution_id, id, account_id, token_hash, issued_at, expires_at)

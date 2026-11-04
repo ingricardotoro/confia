@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -989,6 +990,153 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
                         }
                     }
                 }
+            }
+        }
+        return violations;
+    }
+
+    /**
+     * The role-assignment table of {@code V14} (rbac-permission-matrix-and-audit-integration design.md
+     * D4; specs/build-integrity/spec.md, scenarios BI122 to BI124), exact, with no privilege more and
+     * none less: {@code confia_admin_app} reads and nothing else, because nothing writes the table in
+     * production until change 8b grants what its own migration needs; {@code confia_portal_app} holds
+     * nothing; {@code confia_readonly} reads, subject to the row policy; {@code confia_backup} reads
+     * through {@code pg_read_all_data}; {@code confia_owner} retains all four by definition.
+     */
+    private static final String STAFF_ROLE_TABLE = "identity_staff_account_role";
+
+    private static final Map<String, Set<String>> STAFF_ROLE_MATRIX = Map.of(
+            "confia_owner", Set.of("SELECT", "INSERT", "UPDATE", "DELETE"),
+            "confia_admin_app", Set.of("SELECT"),
+            "confia_portal_app", Set.of(),
+            "confia_readonly", Set.of("SELECT"),
+            "confia_backup", Set.of("SELECT"));
+
+    @Test
+    void privilegesOnTheStaffRoleTableAreExactlyTheMatrixForTheFiveRoles() throws SQLException {
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres")) {
+            assertThat(matrixViolations(superuser, STAFF_ROLE_TABLE, STAFF_ROLE_MATRIX))
+                    .as("privileges on %s that differ from the matrix", STAFF_ROLE_TABLE).isEmpty();
+        }
+        assertThat(STAFF_ROLE_MATRIX.keySet()).as("non-vacuous: all five roles are covered")
+                .containsExactlyInAnyOrderElementsOf(FIVE_ROLES);
+        for (String column : columnsOf(STAFF_ROLE_TABLE)) {
+            for (String privilege : List.of("INSERT", "UPDATE")) {
+                assertThat(hasColumnPrivilege("confia_admin_app", STAFF_ROLE_TABLE, column, privilege))
+                        .as("no column grant of %s on %s either", privilege, column).isFalse();
+            }
+        }
+    }
+
+    @Test
+    void aPrivilegeOfMoreOnTheStaffRoleTableBreaksTheMatrix() throws SQLException {
+        try (StepwiseDatabase database = StepwiseDatabase.migratedTo("14")) {
+            try (Connection superuser = database.connectionAs("postgres")) {
+                assertThat(matrixViolations(superuser, STAFF_ROLE_TABLE, STAFF_ROLE_MATRIX))
+                        .as("the fixture starts from the exact matrix").isEmpty();
+            }
+            try (Connection owner = database.connectionAs("confia_owner");
+                    Statement statement = owner.createStatement()) {
+                statement.execute("GRANT DELETE ON " + STAFF_ROLE_TABLE + " TO confia_admin_app");
+            }
+            try (Connection superuser = database.connectionAs("postgres")) {
+                assertThat(matrixViolations(superuser, STAFF_ROLE_TABLE, STAFF_ROLE_MATRIX))
+                        .singleElement().asString().contains("confia_admin_app", "DELETE");
+            }
+        }
+    }
+
+    @Test
+    void publicAndAnyRoleOutsideTheFiveInheritNoPrivilegeOnTheStaffRoleTable() throws SQLException {
+        for (String privilege : ALL_PRIVILEGES) {
+            assertThat(hasTablePrivilege("public", STAFF_ROLE_TABLE, privilege))
+                    .as("PUBLIC must hold no %s on %s", privilege, STAFF_ROLE_TABLE).isFalse();
+        }
+        String scratchRole = "probe_role_outside_the_five_staff_role";
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres");
+                Statement statement = superuser.createStatement()) {
+            statement.execute("drop role if exists " + scratchRole);
+            statement.execute("create role " + scratchRole + " nosuperuser nobypassrls");
+            try {
+                for (String privilege : ALL_PRIVILEGES) {
+                    assertThat(hasTablePrivilege(scratchRole, STAFF_ROLE_TABLE, privilege))
+                            .as("a role that is none of the five must inherit no %s", privilege)
+                            .isFalse();
+                }
+            } finally {
+                statement.execute("drop role if exists " + scratchRole);
+            }
+        }
+    }
+
+    private static final Map<String, String> STAFF_ROLE_STATEMENTS = Map.of(
+            "SELECT", "select count(*) from " + STAFF_ROLE_TABLE,
+            "INSERT", "insert into " + STAFF_ROLE_TABLE
+                    + " (institution_id, account_id, role_code)"
+                    + " values (gen_random_uuid(), gen_random_uuid(), 'cashier')",
+            "UPDATE", "update " + STAFF_ROLE_TABLE + " set role_code = 'cashier'",
+            "DELETE", "delete from " + STAFF_ROLE_TABLE);
+
+    /** BI123 and BI124: what the engine does with the four statements, not only what the catalog says. */
+    @Test
+    void theAdministrativeRoleCanOnlyReadAndThePortalCanDoNothingWithTheStaffRoleTable()
+            throws SQLException {
+        UUID institution = UUID.randomUUID();
+        for (String statement : STAFF_ROLE_STATEMENTS.values()) {
+            assertThat(refusedAs("confia_portal_app", institution, statement))
+                    .as("portal: %s", statement).isEqualTo("42501");
+        }
+        assertThat(refusedAs("confia_admin_app", institution, STAFF_ROLE_STATEMENTS.get("SELECT")))
+                .as("the administrative role reads").isNull();
+        for (String privilege : List.of("INSERT", "UPDATE", "DELETE")) {
+            assertThat(refusedAs("confia_admin_app", institution, STAFF_ROLE_STATEMENTS.get(privilege)))
+                    .as("administrative role: %s", privilege).isEqualTo("42501");
+        }
+    }
+
+    /** The SQLState with which {@code role} is refused {@code sql}, or null when it ran. Never committed. */
+    private static String refusedAs(String role, UUID institution, String sql) throws SQLException {
+        try (Connection connection = SharedPostgresContainer.connectionAs(role)) {
+            connection.setAutoCommit(false);
+            try (var statement = connection.prepareStatement(
+                    "select set_config('app.institution_id', ?, true)")) {
+                statement.setString(1, institution.toString());
+                statement.execute();
+            }
+            try (Statement statement = connection.createStatement()) {
+                statement.execute(sql);
+                return null;
+            } catch (SQLException e) {
+                return e.getSQLState();
+            } finally {
+                connection.rollback();
+            }
+        }
+    }
+
+    /** One line per role whose held privileges on {@code table} differ from {@code matrix}. */
+    private static List<String> matrixViolations(Connection connection, String table,
+            Map<String, Set<String>> matrix) throws SQLException {
+        List<String> violations = new ArrayList<>();
+        for (var expected : matrix.entrySet()) {
+            Set<String> held = new TreeSet<>();
+            for (String privilege : ALL_PRIVILEGES) {
+                try (var statement = connection.prepareStatement(
+                        "select has_table_privilege(?, ?, ?)")) {
+                    statement.setString(1, expected.getKey());
+                    statement.setString(2, table);
+                    statement.setString(3, privilege);
+                    try (var result = statement.executeQuery()) {
+                        result.next();
+                        if (result.getBoolean(1)) {
+                            held.add(privilege);
+                        }
+                    }
+                }
+            }
+            if (!held.equals(new TreeSet<>(expected.getValue()))) {
+                violations.add("%s holds %s on %s but the matrix says %s".formatted(expected.getKey(),
+                        held, table, new TreeSet<>(expected.getValue())));
             }
         }
         return violations;
