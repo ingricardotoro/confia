@@ -689,6 +689,22 @@ explícita de pública.
 cada una declara permiso o es explícitamente pública. La lista de rutas públicas es una lista
 blanca corta y revisada.
 
+> **Nota fechada 2026-11-04 (cambio `rbac-permission-matrix-and-audit-integration`, PR 1 `permission-catalog-and-adr`): modelo de
+> autorización que adopta el cambio.** El texto anterior no se reescribe; tres puntos cambian y los registra ADR-0027, en estado
+> «Propuesto» hasta la aprobación del propietario:
+>
+> 1. **Un rol por cuenta e institución.** «Uno o varios» pasa a un rol por cuenta e institución, exactamente uno (decisión O3).
+>    Los seis roles y el catálogo cerrado de 89 permisos viven en código (`StaffRole` y `Permission`), sin tablas globales; la base de
+>    datos guarda solo qué rol tiene cada cuenta.
+> 2. **Lista cerrada en el filtro, no anotación.** Los permisos no se declaran en el controlador con una anotación. La decisión se
+>    toma en la cadena de filtros sobre una lista cerrada de rutas con permiso, y el arranque falla ante una ruta que no está
+>    clasificada. No existe `@PreAuthorize` ni seguridad de métodos.
+> 3. **Permisos resueltos por petición.** Los permisos se leen de la base de datos en cada petición a una ruta con permiso, en solo
+>    lectura y sin caché; el token de acceso no lleva permisos ni roles.
+>
+> Además de los seis verbos, el catálogo tiene un código compuesto, `invoicing:request-void`, que expresa la solicitud de anulación de
+> una factura y no se confunde con `invoicing:void`. Este PR entrega el catálogo y la matriz; la resolución por petición y la lista cerrada en el filtro llegan en los PR siguientes del mismo cambio.
+
 ### 5.2 Matriz de permisos por rol
 
 Leyenda: **C** crear, **L** leer, **A** actualizar, **N** anular, **P** aprobar, **X** exportar.
@@ -766,6 +782,14 @@ auditan. Una aprobación caduca a las 72 horas sin resolución y notifica.
 **Cómo se comprueba.** Prueba de integración por cada fila: el mismo actor intenta iniciar y
 aprobar, y el sistema rechaza con 403 y un tipo de error específico. El reporte trimestral de
 segregación de funciones no debe listar ningún usuario con ambos permisos del mismo par.
+
+> **Nota fechada 2026-11-04 (cambio `rbac-permission-matrix-and-audit-integration`, PR 1 `permission-catalog-and-adr`): el informe
+> trimestral revisa operaciones.** El texto anterior no se reescribe. Con un rol por cuenta, un rol como Contabilidad tiene a la vez
+> `invoicing:create` e `invoicing:approve`, de modo que la verificación «ningún usuario con ambos permisos del mismo par» listaría a todo
+> usuario de ese rol aunque ninguno apruebe lo que inició. El control de esta sección es sobre la operación y no sobre pares de
+> permisos: el caso de uso de aprobación rechaza al aprobador que es el iniciador, y el informe trimestral revisa operaciones. Lista
+> cada operación sensible resuelta en el trimestre con su iniciador y su aprobador, y señala toda en la que coinciden. El informe llega
+> con el cambio que entregue la primera operación con aprobación.
 
 ### 5.4 Autorización a nivel de objeto
 
