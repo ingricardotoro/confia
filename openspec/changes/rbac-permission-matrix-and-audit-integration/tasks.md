@@ -174,14 +174,14 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     combinado: `BUILD SUCCESS` en 20:36 min (kernel 196, unitarias 2 787, integración 821). **Lección de estimación:** el diseño subestimó las pruebas unas cuatro veces
     (1 051 líneas reales frente a 270).
 
-- [ ] 2 **PR 2 `role-assignment-and-resolver`: `V14`, puerto `PermissionResolver`, adaptador de solo lectura bajo RLS (D4, D5; O1, O3, O9).**
+- [x] 2 **PR 2 `role-assignment-and-resolver`: `V14`, puerto `PermissionResolver`, adaptador de solo lectura bajo RLS (D4, D5; O1, O3, O9).**
   - **Archivos.** Crea `app/src/main/resources/db/migration/V14__create_identity_staff_account_role.sql`, `shared/security/PermissionResolver.java`,
     `identity/application/{StaffRoleAssignmentRepository,AccountPermissions}.java`, `identity/infrastructure/JooqStaffRoleAssignmentRepository.java`; modifica
     `identity/infrastructure/wiring/IdentityConfiguration.java` (la factoría devuelve `AccountPermissions`, no el puerto). Pruebas: `schema/V14SchemaDiffIT`,
     `schema/IdentityStaffAccountRoleSchemaIT`, `identity/AccountPermissionsTest`, `identity/AccountPermissionsIT`, `schema/RolePrivilegeMatrixIT` y
     `schema/MultiTenantSchemaIT` (ampliadas), `support/StaffRoleFixtures` (nuevo, con `confia_owner` y `app.institution_id`),
     `support/CommittingPostgresIntegrationTest` (limpieza de la tabla), `architecture/PermissionResolverInventoryTest`.
-  - [ ] 2.1 **ROJO, ataques primero.** `AccountPermissionsTest` (repositorio doble): cuenta con rol Contabilidad devuelve exactamente su conjunto [AZ17]; sin fila,
+  - [x] 2.1 **ROJO, ataques primero.** `AccountPermissionsTest` (repositorio doble): cuenta con rol Contabilidad devuelve exactamente su conjunto [AZ17]; sin fila,
     conjunto vacío y sin excepción [AZ18]; código desconocido, vacío [AZ19]; el repositorio lanza y `resolve` lanza, nunca devuelve vacío [AZ21].
     `AccountPermissionsIT` (dos instituciones): `ACC-4` de `INS-1` sin rol y `ACC-4` de `INS-2` Super Admin con token de `INS-1`, vacío [AZ20]; la institución sale
     del actor y una cabecera `X-Institution-Id` ajena no entra al puerto [I285]; la transacción es de solo lectura (`25006` ante un `INSERT`) y está cerrada al
@@ -195,15 +195,23 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     `PermissionResolverInventoryTest`: exactamente un adaptador, en `identity`; ninguna factoría devuelve el puerto; el puerto no depende de `identity`
     [I284, completada con el único consumidor en la tarea 3]. **Rojos esperados:** `relation "identity_staff_account_role" does not exist`; `No migration
     with a target version 14 could be found`; `cannot find symbol` del puerto.
-  - [ ] 2.2 **VERDE y REFACTOR.** `V14` con el DDL exacto de D4 (`_pk`, `_account_fk`, `_code_chk`, `ENABLE` y `FORCE ROW LEVEL SECURITY`, política,
+  - [x] 2.2 **VERDE y REFACTOR.** `V14` con el DDL exacto de D4 (`_pk`, `_account_fk`, `_code_chk`, `ENABLE` y `FORCE ROW LEVEL SECURITY`, política,
     `REVOKE ALL ... FROM PUBLIC`, `SELECT` a `confia_admin_app` y `confia_readonly`); puerto, repositorio, `AccountPermissions` con
     `runner.executeReadOnly(actor.securityContext(requestId), ...)`, `StaffRole.ofCode` y `Set.of()` ante fila ausente o código desconocido; sin caché. jOOQ se
     regenera en la construcción. Sin cambios de `ProcessBeanPolicy` (D18).
-  - [ ] 2.3 **Demostraciones deliberadas.** (1) Quitar `FORCE ROW LEVEL SECURITY` de `V14` pone en rojo `IdentityStaffAccountRoleSchemaIT` y `MultiTenantSchemaIT`
+  - [x] 2.3 **Demostraciones deliberadas.** (1) Quitar `FORCE ROW LEVEL SECURITY` de `V14` pone en rojo `IdentityStaffAccountRoleSchemaIT` y `MultiTenantSchemaIT`
     [BI119, BI121]. (2) Conceder `DELETE` a `confia_admin_app` pone en rojo `RolePrivilegeMatrixIT` por privilegio de más [BI122, BI124]. (3) Hacer que
     `AccountPermissions` devuelva `Set.of(Permission.values())` ante un error pone en rojo `AccountPermissionsTest` [AZ21]. Se revierten y se confirman con `cmp`.
-  - [ ] 2.4 **Cierre.** `./mvnw -B verify`. Commits: `feat(db): create the staff account role assignment table with exact grants`, `feat(identity): resolve effective
+  - [x] 2.4 **Cierre.** `./mvnw -B verify`. Commits: `feat(db): create the staff account role assignment table with exact grants`, `feat(identity): resolve effective
     permissions per request from the role assignment`. Tamaño: diseño 640 (150 prod., 480 pruebas, 10 doc.). — Escenarios AZ17 a AZ21, AZ23, I278 a I286 y BI119 a BI124.
+  - **Cierre 2026-11-04 (evidencia en `apply-progress.md`).** El árbol midió 1 247 líneas efectivas (185 de producción, 1 062 de pruebas; las pruebas fueron unas 2,2 veces
+    las 480 del pronóstico), por lo que el propietario aprobó el corte en dos PR. **PR 2a** (rama `change/rbac-permission-matrix-and-audit-integration-2-role-assignment-and-resolver`,
+    `969c27f`, 627 líneas efectivas contra `20701ec`): `V14`, `V14SchemaDiffIT`, `IdentityStaffAccountRoleSchemaIT`, ampliaciones de `MultiTenantSchemaIT` y `RolePrivilegeMatrixIT`,
+    `StaffRoleFixtures`; solo pruebas focalizadas (74, en verde). **PR 2b** (rama `change/rbac-permission-matrix-and-audit-integration-2b-permission-resolver`, `73ca53b`, 640 líneas
+    contra `969c27f`): puerto, repositorio, `AccountPermissions`, adaptador jOOQ, fábrica, `AccountPermissionsTest`, `AccountPermissionsIT`, `PermissionResolverInventoryTest` y
+    `UnknownRoleCodeResolutionIT` (AZ19, en `schema` porque `StepwiseDatabase` es de paquete); 11 + 6 pruebas focalizadas en verde. `./mvnw -B verify` sobre la punta de 2b (árbol combinado):
+    `BUILD SUCCESS` en 33:33 min (kernel 196, unitarias 2 798 con 3 omitidas preexistentes, integración 842). Rojos observados y tres demostraciones revertidas con `cmp`.
+    2b debe fusionarse a continuación de 2a.
 
 ## Fase 2: decisión en el filtro y auditoría de denegaciones
 
