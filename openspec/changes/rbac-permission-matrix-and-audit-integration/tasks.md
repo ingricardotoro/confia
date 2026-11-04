@@ -291,7 +291,10 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     quedan 4 pendientes (diseño D10, latencia acotada); `failedSummaryReturnsToTheHeadAndStopsThePass`: el resumen fallido vuelve primero a la cola, no se intenta otro y la métrica sube una vez;
     `requeueIntoAFullQueueDiscardsAndCounts` (cota de prueba pequeña); **DC-2** `shutdownWritesPendingSummaries`: `destroy()` escribe los resúmenes pendientes antes de cerrar el `DataSource`, y no
     escribe nada si no hay omisiones; `shutdownStopsAtTheFirstFailure`: un solo intento y la métrica por cada resumen no escrito; `shutdownStopsWhenItsBudgetIsSpent`: un escritor envuelto avanza
-    el `MutableClock` 4 s por inserción, se escriben 3 y el resto cuenta como no escrito. `AuthorizationEdgeIT` (segunda parte, con `T=3` por propiedad): `/test/accounts/{id}` con `123` y
+    el `MutableClock` 4 s por inserción, se escriben 3 y el resto cuenta como no escrito. `AuthorizationEdgeIT` (segunda parte, con `T=3` por propiedad; cada prueba que espera un resumen
+    vacía antes la cola compartida con `flushClosedWindows` y comprueba `pendingSummaryCount()` en 0, y después dispara la emisión con a lo sumo tantas denegaciones de otra clave como resúmenes
+    pendientes, afirmando solo sobre su propia institución, según el diseño, «Independencia del orden de las pruebas»; `edgeSummaryTestsPassInAnyOrder` corre la clase en tres órdenes aleatorios
+    y la demostración deliberada quita el vaciado previo y fija el orden con `@Order` para que AZ53 corra después de AZ52, que deja un resumen pendiente: AZ53 falla, se revierte y se confirma con `cmp`): `/test/accounts/{id}` con `123` y
     `abc`: dos `403`, exactamente dos asientos, uno por petición, con `entity_id` del permiso de la entrada y plantilla `/test/accounts/{id}`, sin `123` ni `abc` [AZ37];
     `concurrentDenialsOfOneKeyWriteExactlyTFullRows`: 8 peticiones liberadas por un cerrojo, 3 completos, resumen de conteo 5 tras cerrar la ventana y la siguiente denegación de otra clave, ocho
     `403` y cadena íntegra [AZ79]; tres completos y sin resumen [AZ52]; 5 denegaciones, reloj manual hasta cerrar la ventana y

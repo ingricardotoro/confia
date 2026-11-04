@@ -512,6 +512,14 @@ prohibidos. La emisión ocurre por eso en el hilo de la petición, con un costo 
    denegaciones de su clave, un resumen de conteo 1 nace de un asiento fallido, y cada denegación escribe hasta uno.
 2. **`flushClosedWindows(now)`**, de uso solo en pruebas unitarias y de integración sin HTTP: barre sin compuerta y escribe
    la cola hasta el primer fallo. Las pruebas de borde disparan la emisión con una denegación, como dicen AZ53 y AT35.
+   **Independencia del orden de las pruebas.** En `AuthorizationEdgeIT`, un solo contexto comparte el bean `DenialWindows`,
+   su cola, su compuerta y el `MutableClock`, así que la cola puede tener resúmenes de otras pruebas delante del propio.
+   Por eso cada prueba de borde que espera un resumen: (a) antes de empezar vacía la cola de las pruebas anteriores con
+   `flushClosedWindows(now)` sobre el bean del contexto, que es la única llamada directa permitida en una prueba con HTTP,
+   y comprueba que `pendingSummaryCount()` es 0; (b) después dispara la emisión con denegaciones de otra clave, como mucho
+   tantas como resúmenes pendientes haya, y afirma sobre las filas de su propia institución. El resultado ya no depende
+   del orden (AZ57, AZ70 y las tres corridas en orden aleatorio de BI138). `pendingSummaryCount()` es de solo lectura y
+   se expone solo para las pruebas; el límite de un resumen por denegación de producción no cambia.
 3. **Al apagar**, `DisposableBean.destroy` invoca `closeAllForShutdown(now)`, que cierra toda ventana con omisiones,
    vencida o no, y escribe la cola con dos cotas: corta en el primer fallo de escritura, de modo que una base de datos
    caída cuesta un solo intento, y se detiene cuando el `Clock` inyectado marca 10 segundos desde el inicio del apagado,
