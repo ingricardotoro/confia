@@ -241,7 +241,14 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
 
 **Criterios de salida:**
 
-- [ ] Un intento de importar el `domain` de otro módulo rompe la construcción en integración continua.
+- [x] Un intento de importar el `domain` de otro módulo rompe la construcción en integración continua.
+      **Cerrado; nota fechada 2026-11-03.** La regla la aplica `NoCrossModuleDomainImportsTest` (ArchUnit) sobre el código
+      de producción. No pasa en vacío: `atLeastTwoDistinctModuleDomainsExistInProductionCode` exige al menos dos módulos con
+      `domain`, y hoy son `identity` y `organization`. `rejectsTheFixtureCrossModuleDomainImport` demuestra que la regla
+      rechaza el fixture `fixture/moduleone/domain/ModuleOneEntity`, que importa el `domain` de otro módulo, y
+      `SpringModulithVerificationTest` lo confirma por separado. Las dos pruebas corren en `./mvnw verify`, que el CI
+      ejecuta en cada PR. No hay una corrida del CI en rojo registrada: la prueba de la ruptura es el fixture. Esto cierra
+      también el hallazgo W2 del cambio 1, que el entregable 1 registra como pendiente heredado.
 - [ ] Un usuario sin permiso recibe 403 y el intento queda en `AuditLog`.
 - [x] El verificador de cadena de auditoría detecta una manipulación inyectada en una prueba.
       **Cerrado por la parte B del cambio 5, corte B3b-i**, con
