@@ -9,8 +9,11 @@
 - Los escenarios nuevos se numeran `AT32` en adelante, a continuación del máximo de la especificación vigente (`AT31`).
 - La política de qué denegaciones se auditan, el tope y el fallo de la escritura están en la capacidad `authorization`;
   este delta describe la forma del asiento en la bitácora.
-- Valores que fija el diseño: el `entity_type` del asiento de denegación, la acción y el detalle exactos del asiento de
-  resumen, y el momento de su emisión.
+- Valores fijados por el diseño (`design.md` §3, D9 y D10): `entity_type` `authorization.permission`; detalle del asiento
+  completo `{"routeTemplate":"..."}`; acción del resumen `authorization.access.denied_summary` con `outcome` `denied` y
+  detalle `{"omittedCount":n,"windowStart":"...","windowSeconds":300}` (cuenta en `actor_id` y permiso en `entity_id`);
+  el agente de usuario acotado permanece en el asiento completo y está ausente en el resumen; el resumen se emite de
+  forma perezosa (al cerrar la ventana, en la siguiente denegación de cualquier clave, y al apagar).
 
 ## ADDED Requirements
 
@@ -29,9 +32,9 @@ asiento DEBE escribirse en su propia transacción y encadenarse con el mismo mec
 - **DADO** la cuenta `ACC-6` de `INS-1` sin el permiso `identity:read`
 - **CUANDO** solicita `GET /api/v1/identity/roles` y es denegada
 - **ENTONCES** existe un asiento de `INS-1` con `action` `authorization.access.denied`, `outcome` `denied`,
-  `actor_kind` `staff`, `actor_id` y `actor_label` iguales al identificador de `ACC-6`, `entity_id` `identity:read` y
-  `request_id` igual al `traceId`
-- **Y** su detalle contiene la plantilla de ruta y nada más que miembros declarados por el constructor tipado
+  `actor_kind` `staff`, `actor_id` y `actor_label` iguales al identificador de `ACC-6`, `entity_type`
+  `authorization.permission`, `entity_id` `identity:read` y `request_id` igual al `traceId`
+- **Y** su detalle es exactamente `{"routeTemplate":"/api/v1/identity/roles"}`, construido con el constructor tipado
 
 #### Escenario: [AT33] El asiento no contiene la petición
 
@@ -47,19 +50,21 @@ asiento DEBE escribirse en su propia transacción y encadenarse con el mismo mec
 
 ### Requisito: El asiento de resumen de denegaciones tiene una forma fija y no contiene la petición
 
-El sistema DEBE escribir el asiento de resumen de denegaciones, cuando se supera el tope, como un asiento de la
-institución del token con `outcome` igual a `denied`, el identificador de la cuenta, el código del permiso, el conteo
-de denegaciones omitidas y la ventana a la que corresponde, construido con el constructor tipado. El asiento de resumen
-NO DEBE contener la ruta, la consulta, el cuerpo, las cabeceras ni el correo, y DEBE ser distinguible de un asiento
-completo por su acción (que fija el diseño). La suma de los asientos completos y de los conteos de los resúmenes de una
+El sistema DEBE escribir el asiento de resumen de denegaciones, cuando se supera el tope y se cierra la ventana, como un
+asiento de la institución del token con `action` igual a `authorization.access.denied_summary`, `outcome` igual a
+`denied`, la cuenta en `actor_id`, el código del permiso en `entity_id` y el detalle
+`{"omittedCount":n,"windowStart":"...","windowSeconds":300}`, construido con el constructor tipado. El asiento de resumen
+NO DEBE contener la ruta, la consulta, el cuerpo, las cabeceras, el agente de usuario ni el correo, y se distingue de un
+asiento completo por su acción. La suma de los asientos completos y de los conteos de los resúmenes de una
 ventana DEBE ser igual al número de denegaciones por permiso de esa cuenta y permiso en esa ventana.
 
 #### Escenario: [AT35] El resumen lleva el conteo y no la petición
 
 - **DADO** un tope de prueba `T` igual a 3, un reloj inyectado y 5 denegaciones de `ACC-6` por `identity:read`
-- **CUANDO** se emite el resumen de la ventana
-- **ENTONCES** existe un asiento de resumen con el conteo 2, el identificador de `ACC-6` y `identity:read`, sin ruta,
-  consulta, cuerpo ni cabeceras
+- **CUANDO** el reloj inyectado supera la ventana y se produce la siguiente denegación de cualquier clave
+- **ENTONCES** existe un asiento `authorization.access.denied_summary` con `omittedCount` igual a 2, `windowSeconds`
+  igual a 300 (la ventana de producción), `actor_id` igual a `ACC-6` y `entity_id` `identity:read`, sin ruta, consulta,
+  cuerpo, cabeceras ni agente de usuario
 
 #### Escenario: [AT36] La suma de filas y conteos iguala las denegaciones
 

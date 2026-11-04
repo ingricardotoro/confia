@@ -11,16 +11,18 @@
 - Los escenarios nuevos se numeran `I278` en adelante, a continuación del máximo de la especificación vigente
   (`I277`). Los escenarios que se conservan de la especificación vigente conservan su identificador; los que no
   llevaban número no lo llevan.
-- Este delta describe comportamiento observable; los nombres de clases, de tablas, de columnas y de la forma exacta del
-  informe los fija el diseño. El catálogo de roles, la matriz y la decisión de permiso están en la capacidad
+- Este delta describe comportamiento observable. El catálogo de roles, la matriz y la decisión de permiso están en la capacidad
   `authorization`; los privilegios y la seguridad de fila de la tabla nueva, en `build-integrity`.
 - **Con la MFA obligatoria para todo el personal (Q1), el desenlace `Authenticated` ya no se produce en producción para
   una cuenta del personal.** El tipo cerrado conserva sus cuatro desenlaces; los escenarios que ejercitan
-  `Authenticated` y su traducción a sesión usan una política de MFA de prueba que no exige el segundo factor. El diseño
-  confirma si ese camino se mantiene como código alcanzable solo por esa política.
-- **Valores que fija el diseño:** los códigos de rol almacenados, el nombre de la tabla de asignación y de su
-  restricción, la forma del resultado del resolutor ante un fallo de lectura, la forma del informe de roles y el
-  conjunto exacto de privilegios de la tabla.
+  `Authenticated` y su traducción a sesión usan una política de MFA de prueba que no exige el segundo factor. El
+  diseño (D14) mantiene `Authenticated` en el tipo cerrado, alcanzable solo con esa política, y conserva `MfaPolicy` como
+  costura, constante verdadera en producción.
+- **Valores fijados por el diseño** (`design.md` §3): códigos de rol `super_admin`, `administrator`, `cashier`,
+  `accounting`, `auditor` y `academic_coordinator`; tabla `identity_staff_account_role(institution_id, account_id,
+  role_code, created_at)` con clave primaria `(institution_id, account_id)`, `_account_fk` y `_code_chk`; el resultado del
+  resolutor es un conjunto de permisos y un fallo de lectura se lanza como excepción; el informe de roles es
+  `{"roles":[{"code":"...","permissions":["..."]}]}`; `confia_admin_app` recibe solo `SELECT` sobre la tabla.
 - La regla «MFA activa» sigue significando una credencial TOTP verificada; ya no depende de ninguna columna.
 
 ## ADDED Requirements
@@ -71,8 +73,8 @@ ruta para asignar roles; los roles se asignan en pruebas.
 
 - **DADO** el esquema migrado
 - **CUANDO** se inspeccionan las columnas de la tabla de asignación
-- **ENTONCES** contiene solo la institución, la cuenta, el código de rol y las columnas técnicas que fija el diseño,
-  y ninguna columna de permisos
+- **ENTONCES** contiene exactamente `institution_id`, `account_id`, `role_code` y `created_at`, con clave primaria
+  `(institution_id, account_id)`, y ninguna columna de permisos
 
 ### Requisito: El resolutor de permisos tiene un único adaptador, en `identity`, de solo lectura dentro de `TransactionRunner.executeReadOnly`
 
@@ -168,7 +170,9 @@ Super Admin, Administrador y Auditor; los demás reciben `403 forbidden` y un as
 
 - **DADO** la respuesta del escenario anterior
 - **CUANDO** se compara con el catálogo
-- **ENTONCES** contiene exactamente los seis roles y, para cada uno, exactamente los permisos de la matriz efectiva
+- **ENTONCES** tiene la forma `{"roles":[{"code":"...","permissions":["..."]}]}`, con exactamente los seis roles
+  (códigos `super_admin`, `administrator`, `cashier`, `accounting`, `auditor` y `academic_coordinator`) y, para cada uno,
+  exactamente los permisos de la matriz efectiva
   (por ejemplo, el Cajero con el permiso de solicitud de anulación y sin `invoicing:void`)
 
 #### Escenario: [I295] El informe no contiene datos personales

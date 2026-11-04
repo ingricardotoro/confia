@@ -32,16 +32,21 @@ Fuentes de verdad: `docs/03-seguridad.md` §4.3, §5.1 a §5.4; ADR-0005, ADR-00
   `approve` y `export`, y al permiso de solicitud de anulación.
 - Esta especificación describe comportamiento observable. Los nombres de clase, de paquete y de tabla los fija el
   diseño.
-- **Valores que fija el diseño y que esta especificación no codifica:** el código exacto del permiso de solicitud de
-  anulación (provisional `invoicing:request-void`); la ortografía exacta de los verbos `create`, `update`, `approve` y
-  `export` (la propuesta cita literalmente `identity:read`, `audit:read`, `invoicing:void` y `ledger:update`); los
-  códigos de rol almacenados; el tope y la ventana de las denegaciones; el momento de emisión del asiento de resumen;
-  los nombres de las acciones del asiento de resumen y de las métricas; el `entity_type` del asiento; la forma del
-  resultado del resolutor ante un fallo de lectura; el estado HTTP del fallo de infraestructura de la resolución; si el
-  rechazo por falta de `otp` deja un asiento propio; el número de la migración, del ADR y de las pruebas.
+- **Valores fijados por el diseño** (`design.md` §3, aprobado el 2026-11-03): permiso de solicitud
+  `invoicing:request-void`; verbos `create`, `read`, `update`, `void`, `approve`, `export`; forma del código
+  `^[a-z]+:[a-z]+(-[a-z]+)*$`; catálogo como enum `com.confia.kernel.Permission` con 89 constantes; códigos de rol
+  `super_admin`, `administrator`, `cashier`, `accounting`, `auditor`, `academic_coordinator`; tope `T` de producción de
+  10 asientos completos; ventana `V` de 5 minutos, fija y abierta por la primera denegación de la clave; cota del estado de
+  10 000 claves `(institución, cuenta, permiso)`; `entity_type` `authorization.permission`; acción del resumen
+  `authorization.access.denied_summary`; métricas `authorization_denial_omitted`, `authorization_denial_audit_failed`,
+  `authorization_resolution_failed` y `authorization_denial_tracker_full`; un fallo de lectura del resolutor se lanza
+  como excepción (el resultado exitoso es un conjunto de permisos); el fallo de resolución responde `500` con
+  `internal-error`; el rechazo por falta de `otp` es `403 forbidden` sin asiento y sin métrica; ADR-0027. Los escenarios del
+  tope usan valores de prueba (`T` igual a 3, por ejemplo) sobre un reloj inyectado; los de producción son los anteriores.
 - **Determinismo.** Toda prueba del tope, de la ventana y del criterio 2 DEBE ser determinista: no depende del reloj
-  real, del orden de ejecución de otras pruebas ni de estado que otra prueba haya dejado. El diseño DEBE proveer un
-  reloj inyectable para la ventana y un estado aislado por prueba para el contador de denegaciones.
+  real, del orden de ejecución de otras pruebas ni de estado que otra prueba haya dejado. El reloj de la ventana es un
+  `java.time.Clock` inyectado (un retroceso del reloj cuenta como ventana vencida) y el contador de denegaciones tiene
+  estado aislado por prueba.
 
 ## Requisitos
 
@@ -259,8 +264,8 @@ DEBEN llevar permisos (ADR nuevo, que reemplaza la parte de ADR-0005 sobre permi
 
 - **DADO** una lectura de la base de datos que lanza un error de infraestructura
 - **CUANDO** se resuelven los permisos
-- **ENTONCES** no se devuelve ningún permiso
-- **Y** el resultado es distinguible de la resolución exitosa con conjunto vacío del escenario AZ18
+- **ENTONCES** no se devuelve ningún permiso: la resolución lanza una excepción en lugar de devolver un conjunto
+- **Y** el resultado es distinguible de la resolución exitosa con conjunto vacío del escenario AZ18, que no lanza
 
 #### Escenario: [AZ22] Un cambio de rol surte efecto en la petición siguiente
 
@@ -289,7 +294,10 @@ El sistema DEBE exigir, en toda ruta de la lista cerrada de rutas con permiso, q
 controlador ni a la consulta del resolutor, y DEBE responder `403` con el código `forbidden`. Este rechazo NO es una
 denegación por permiso, de modo que no cuenta para el tope ni escribe el asiento `authorization.access.denied`. Una
 petición sin credencial DEBE responder `401 authentication-required`. Un token restringido NO DEBE abrir una ruta con
-permiso. Es un valor que fija el diseño si el rechazo por falta de `otp` deja un asiento propio con otra acción.
+permiso. El rechazo por falta de `otp` NO deja asiento propio ni emite métrica (decisión del diseño D12: con la política
+real no existe un token `[pwd]` del personal, de modo que es una anomalía que no debe abrir otra vía de inundación). Un
+token `[pwd, otp]` vigente cuya sesión fue revocada DEBE rechazarse con `401 token-invalid` antes de la consulta del
+resolutor (decisión del diseño D6).
 
 #### Escenario: [AZ25] Un token `[pwd]` no abre una ruta con permiso
 
@@ -297,7 +305,7 @@ permiso. Es un valor que fija el diseño si el rechazo por falta de `otp` deja u
 - **CUANDO** se envía la petición
 - **ENTONCES** la respuesta es `403` con `forbidden`, el controlador registra cero invocaciones y el resolutor
   registra cero invocaciones
-- **Y** no existe ningún asiento `authorization.access.denied`
+- **Y** no existe ningún asiento `authorization.access.denied` ni se emite ninguna métrica de denegación
 
 #### Escenario: [AZ26] Un token `[pwd, otp]` con el permiso llega al controlador
 
@@ -319,6 +327,13 @@ permiso. Es un valor que fija el diseño si el rechazo por falta de `otp` deja u
 - **ENTONCES** ambos se rechazan sin llegar al controlador ni al resolutor, y no se escribe ningún asiento de
   denegación
 
+#### Escenario: [AZ78] Un token vigente de una sesión revocada se rechaza antes del resolutor
+
+- **DADO** un token `[pwd, otp]` vigente cuya sesión fue revocada
+- **CUANDO** se presenta a una ruta con permiso
+- **ENTONCES** la respuesta es `401` con el código `token-invalid`
+- **Y** el resolutor registra cero invocaciones y no existe ningún asiento de denegación
+
 ### Requisito: La lista de rutas con permiso es cerrada y cada entrada nombra un permiso del catálogo
 
 El sistema DEBE declarar las rutas con permiso como una lista cerrada, definida en un único lugar, con método,
@@ -335,11 +350,13 @@ hacerse en el servidor con los datos resueltos por el servidor: una afirmación 
 - **CUANDO** se enumeran sus entradas
 - **ENTONCES** contiene exactamente `GET /api/v1/identity/roles` con `identity:read`
 
-#### Escenario: [AZ30] Una entrada con un permiso fuera del catálogo impide arrancar
+#### Escenario: [AZ30] Una entrada con un permiso fuera del catálogo no compila
 
-- **DADO** una lista de prueba con una entrada cuyo permiso no figura en el catálogo
-- **CUANDO** arranca el proceso administrativo con esa lista
-- **ENTONCES** el arranque falla señalando la entrada
+- **DADO** que el permiso de cada entrada de la lista es un valor tipado del catálogo (`Permission`), no un texto
+- **CUANDO** se compila un fixture permanente con una entrada que usa un texto en lugar de un valor de `Permission`
+- **ENTONCES** la compilación del fixture falla, de modo que no existe en ejecución una lista con un permiso fuera del
+  catálogo
+- **Y** la guarda de arranque sigue fallando ante una entrada sin ruta registrada (escenario AZ35)
 
 #### Escenario: [AZ31] El cliente no puede afirmar un permiso
 
@@ -499,8 +516,9 @@ falta de `otp`; ni el fallo de infraestructura de la resolución. Estos casos co
 
 El sistema NO DEBE incluir en el asiento de denegación, en el asiento de resumen, en las métricas ni en los registros
 de la aplicación la ruta cruda, la cadena de consulta, el cuerpo de la petición ni las cabeceras (salvo la IP y el
-agente de usuario acotado que ya captura el origen de la petición), ni ningún valor de variable de ruta. Es un valor que
-fija el diseño si el agente de usuario acotado permanece en el asiento de denegación.
+agente de usuario acotado que ya captura el origen de la petición), ni ningún valor de variable de ruta. El agente de
+usuario acotado permanece en el asiento completo (lo completa el mecanismo existente) y está ausente en el asiento de
+resumen, que no pertenece a una petición (decisión del diseño D9 y D10).
 
 #### Escenario: [AZ51] Una búsqueda de centinelas no encuentra fugas
 
@@ -511,15 +529,20 @@ fija el diseño si el agente de usuario acotado permanece en el asiento de deneg
 
 ### Requisito: El tope por usuario y permiso en una ventana limita las filas completas y produce una fila de resumen y una métrica
 
-El sistema DEBE contar las denegaciones por permiso por cuenta y permiso en una ventana acotada en memoria. Hasta el
-tope configurado, cada denegación DEBE escribir su asiento completo. Pasado el tope dentro de la ventana, las
-denegaciones adicionales NO DEBEN escribir una fila completa; el sistema DEBE escribir una fila de resumen con el
-conteo de denegaciones omitidas, la cuenta, el código del permiso y la ventana, y DEBE emitir una métrica. Todas las
-denegaciones DEBEN responder `403 forbidden` con independencia del tope. El contador DEBE ser por cuenta y permiso: dos
-cuentas, o dos permisos de la misma cuenta, llevan contadores independientes. Al vencer la ventana el contador DEBE
-reiniciarse. El estado en memoria DEBE tener una cota de tamaño. El tope en memoria es por proceso (declarado en el
-diseño). Los valores del tope, de la ventana, de la cota y del momento de emisión del resumen los fija el diseño; los
-escenarios usan valores de prueba. La ventana DEBE usar un reloj inyectable y las pruebas un estado aislado.
+El sistema DEBE contar las denegaciones por permiso por institución, cuenta y permiso en una ventana acotada en memoria.
+Los valores de producción son: tope `T` de 10 asientos completos; ventana `V` de 5 minutos, fija y abierta por la primera
+denegación de la clave; cota del estado de 10 000 claves. Hasta el tope, cada denegación DEBE escribir su asiento
+completo. Pasado el tope dentro de la ventana, las denegaciones adicionales NO DEBEN escribir una fila completa; el
+sistema DEBE emitir la métrica `authorization_denial_omitted` y, al cerrar la ventana, escribir una única fila de resumen
+(acción `authorization.access.denied_summary`, `outcome` `denied`, cuenta en `actor_id`, permiso en `entity_id`) con el
+conteo de denegaciones omitidas y la ventana. La emisión del resumen es perezosa: ocurre al cerrar la ventana, en la
+siguiente denegación de cualquier clave, y al apagar el proceso. Todas las denegaciones DEBEN responder `403 forbidden`
+con independencia del tope. El contador DEBE ser por cuenta y permiso: dos cuentas, o dos permisos de la misma cuenta,
+llevan contadores independientes. Al vencer la ventana el contador DEBE reiniciarse. El estado en memoria DEBE tener la
+cota de tamaño; con el estado lleno, una clave nueva escribe el asiento completo sin contar y emite la métrica
+`authorization_denial_tracker_full`, y ninguna clave viva se expulsa. El tope en memoria es por proceso. La ventana usa un
+`java.time.Clock` inyectable (un retroceso del reloj cuenta como ventana vencida) y las pruebas un estado aislado; los
+escenarios usan valores de prueba.
 
 #### Escenario: [AZ52] Hasta el tope, filas completas
 
@@ -530,11 +553,12 @@ escenarios usan valores de prueba. La ventana DEBE usar un reloj inyectable y la
 #### Escenario: [AZ53] Pasado el tope, resumen y métrica, y siempre 403
 
 - **DADO** el tope de prueba `T` igual a 3 y 5 denegaciones de la misma cuenta y permiso dentro de la ventana
-- **CUANDO** se hace avanzar el reloj manual hasta el cierre de la ventana y se dispara la emisión de resúmenes
-  pendientes (el mecanismo lo fija el diseño)
-- **ENTONCES** existen exactamente 3 asientos completos y exactamente una fila de resumen con el conteo omitido 2, la
-  cuenta y el código del permiso
-- **Y** la métrica de omisión se incrementó en 2 y las 5 respuestas fueron `403 forbidden`
+- **CUANDO** se hace avanzar el reloj manual hasta el cierre de la ventana y se produce la siguiente denegación de
+  cualquier clave (la emisión del resumen es perezosa)
+- **ENTONCES** existen exactamente 3 asientos completos y exactamente una fila de resumen
+  (`authorization.access.denied_summary`) con el conteo omitido 2, la cuenta en `actor_id` y el código del permiso en
+  `entity_id`
+- **Y** la métrica `authorization_denial_omitted` se incrementó en 2 y las 5 respuestas fueron `403 forbidden`
 
 #### Escenario: [AZ54] Los contadores son independientes por cuenta y por permiso
 
@@ -553,7 +577,8 @@ escenarios usan valores de prueba. La ventana DEBE usar un reloj inyectable y la
 - **DADO** una cota de prueba de 10 claves y denegaciones de 25 cuentas distintas
 - **CUANDO** se inspecciona el tamaño del estado
 - **ENTONCES** nunca supera la cota y todas las respuestas son `403 forbidden`
-- **Y** el comportamiento de una clave nueva con el estado lleno lo fija el diseño
+- **Y** la denegación de una clave nueva con el estado lleno escribe su asiento completo sin contar, emite la métrica
+  `authorization_denial_tracker_full` y no expulsa ninguna clave viva
 
 #### Escenario: [AZ57] El tope y la ventana se prueban sin reloj real ni estado compartido
 
@@ -564,8 +589,8 @@ escenarios usan valores de prueba. La ventana DEBE usar un reloj inyectable y la
 
 ### Requisito: La métrica de denegaciones y de errores se publica por un puerto
 
-El sistema DEBE publicar la métrica de denegaciones omitidas y la métrica de error de la escritura del asiento por un
-puerto, con un adaptador de producción por registro estructurado (precedente de las métricas de cola), y la prueba DEBE
+El sistema DEBE publicar las métricas `authorization_denial_omitted`, `authorization_denial_audit_failed`,
+`authorization_resolution_failed` y `authorization_denial_tracker_full` por un puerto, con un adaptador de producción por registro estructurado (precedente de las métricas de cola), y la prueba DEBE
 poder sustituir el puerto por un doble. Las etiquetas de la métrica NO DEBEN contener datos personales ni la ruta cruda.
 
 #### Escenario: [AZ58] La métrica llega al puerto sin datos personales
@@ -577,7 +602,7 @@ poder sustituir el puerto por un doble. Las etiquetas de la métrica NO DEBEN co
 ### Requisito: Si falla la escritura del asiento de denegación, la respuesta sigue siendo `403 forbidden`
 
 Si la escritura del asiento de denegación falla, el sistema DEBE responder igualmente `403` con `forbidden`, NO DEBE
-invocar el controlador, NO DEBE responder `500`, y DEBE emitir una métrica de error.
+invocar el controlador, NO DEBE responder `500`, y DEBE emitir la métrica `authorization_denial_audit_failed`.
 
 #### Escenario: [AZ59] Una auditoría que falla no cambia la respuesta
 
@@ -593,11 +618,12 @@ Si la consulta del resolutor falla por una causa de infraestructura, el sistema 
 el controlador NO DEBE invocarse. El fallo NO es una denegación por permiso: NO DEBE escribir el asiento
 `authorization.access.denied`, NO DEBE contar para el tope de ninguna cuenta y NO DEBE responder `403 forbidden`, para
 no aparentar que el usuario carece del permiso. La respuesta DEBE ser un Problem Details construido con el
-tratamiento existente de un fallo de dependencia, sin detalles internos (hoy `500` con `internal-error`; el estado
-exacto, y si hace falta un código nuevo con `503`, lo fija el diseño, que además DEBE resolver cómo el filtro produce
-esa respuesta, porque una excepción del filtro no llega al manejador de excepciones de los controladores). El fallo DEBE
-quedar observable para operación sin datos personales. El primer acceso tras recuperarse la base de datos DEBE
-resolverse con normalidad.
+tratamiento existente de un fallo interno, sin detalles internos: `500` con `internal-error`, sin código público nuevo
+(decisión del diseño D7: un `503` prometería una condición transitoria que aquí no se sabe; el último recurso del filtro
+de contexto de la petición produce la respuesta, porque una excepción del filtro no llega al manejador de excepciones de
+los controladores). Un fallo de lectura del resolutor se lanza como excepción y nunca se lee como un conjunto vacío. El
+fallo DEBE quedar observable para operación, sin datos personales, con la métrica `authorization_resolution_failed`. El
+primer acceso tras recuperarse la base de datos DEBE resolverse con normalidad.
 
 #### Escenario: [AZ60] El fallo de lectura no es una denegación por permiso
 
@@ -623,7 +649,8 @@ resolverse con normalidad.
 
 - **DADO** el catálogo de códigos de error de `web-edge`
 - **CUANDO** se produce el fallo de resolución
-- **ENTONCES** el estado y el código son los que fija el diseño (hoy `500` con `internal-error`) y ninguno es `403`
+- **ENTONCES** el estado es `500` y el código `internal-error`, ninguno es `403` ni `forbidden`, y se emitió la métrica
+  `authorization_resolution_failed`
 
 #### Escenario: [AZ64] Tras recuperarse la base de datos, el acceso se resuelve con normalidad
 
@@ -633,8 +660,8 @@ resolverse con normalidad.
 
 ### Requisito: Criterio de salida 2 de F0, demostrado de extremo a extremo con sus controles
 
-El sistema DEBE tener una prueba de integración con el proceso administrativo real (`HarnessProcess`), PostgreSQL real
-y un token real de inicio de sesión con MFA, sobre un controlador del árbol de pruebas y sobre la ruta real
+El sistema DEBE tener una prueba de integración con el proceso administrativo real y un arnés con PostgreSQL real
+(`HarnessProcess` no tiene `DataSource`; decisión del diseño D19) y un token real de inicio de sesión con MFA, sobre un controlador del árbol de pruebas y sobre la ruta real
 `GET /api/v1/identity/roles`: un usuario sin el permiso recibe `403 forbidden`, el controlador se invoca cero veces y
 existe exactamente un asiento `denied` cuyo `request_id` coincide con el `traceId`. La prueba DEBE incluir los
 controles positivos y negativos de los escenarios siguientes y DEBE ser determinista (reloj inyectado, estado aislado,
@@ -671,8 +698,10 @@ datos propios).
 - **DADO** el flujo real con un escritor de bitácora que falla en una prueba, y con un tope de prueba `T` igual a 2
   en otra
 - **CUANDO** el rol Cajero solicita la ruta
-- **ENTONCES** en la primera la respuesta sigue siendo `403 forbidden`, y en la segunda la tercera denegación produce
-  la fila de resumen y la métrica
+- **ENTONCES** en la primera la respuesta sigue siendo `403 forbidden`
+- **Y** en la segunda la tercera denegación no escribe fila completa, responde `403` e incrementa la métrica
+  `authorization_denial_omitted`; al cerrar la ventana (reloj inyectado) y producirse la siguiente denegación, existe la
+  fila de resumen con conteo 1
 
 #### Escenario: [AZ70] Control determinista
 
@@ -686,7 +715,7 @@ El cambio DEBE registrar, con notas fechadas y sin reescribir cuerpos originales
 los seis roles, derivada de los roles), §5.1 (un rol por institución, lista cerrada en el filtro en lugar de
 anotación, permisos resueltos por petición), §5.2 (matriz efectiva, regla 3, permiso de solicitud, matriz en código) y
 §5.3 (el informe trimestral revisa operaciones, no pares de permisos). DEBE existir un ADR nuevo, «Autorización por
-permisos resueltos por petición», con el siguiente número libre, listado en `docs/adr/README.md`, que reemplaza la parte
+permisos resueltos por petición», numerado ADR-0027, listado en `docs/adr/README.md`, que reemplaza la parte
 de ADR-0005 sobre permisos en el token, el retraso de propagación y la regla de MFA por rol. ADR-0005 DEBE conservar su
 texto original con una nota fechada de remisión. `docs/09-roadmap-y-fases.md` DEBE marcar el criterio de salida 2 con
 su prueba de cierre.

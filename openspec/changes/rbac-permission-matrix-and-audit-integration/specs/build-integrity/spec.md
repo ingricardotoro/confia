@@ -8,12 +8,13 @@
 
 - Los escenarios nuevos se numeran `BI119` en adelante, a continuación del máximo de la especificación vigente
   (`BI118`). Los escenarios que se conservan conservan su identificador.
-- El número de las migraciones nuevas (la de la tabla de asignación de rol, «V14 o la siguiente libre», y la del retiro
-  de `mfa_required`) lo fija el diseño; este delta las nombra por su función.
-- Valores que fija el diseño: el nombre de la tabla de asignación y de su restricción, el conjunto exacto de privilegios
-  de `confia_admin_app` sobre ella (este delta sigue el patrón de las tablas de identidad: `SELECT`, `INSERT` y
-  `UPDATE`, sin `DELETE`; el diseño puede estrechar a `SELECT` si no hay escritura de producción), las respuestas
-  exactas de la operación nueva de OpenAPI y la lista de beans de `ProcessBeanPolicy`.
+- Valores fijados por el diseño (`design.md` §3, aprobado el 2026-11-03): las migraciones son
+  `V14__create_identity_staff_account_role.sql` y `V15__drop_identity_staff_account_mfa_required.sql`; la tabla es
+  `identity_staff_account_role(institution_id, account_id, role_code, created_at)` con las restricciones `_pk
+  (institution_id, account_id)`, `_account_fk` y `_code_chk`; `confia_admin_app` recibe solo `SELECT` (nada escribe en
+  producción en este cambio; 8b concede lo que necesite en su migración); el OpenAPI del informe declara `bearerAuth`,
+  `x-required-permission: identity:read` y las respuestas `200`, `401`, `403` y `500`; los códigos de permiso viven en
+  `com.confia.kernel.Permission` y el puerto del resolutor en `shared.security`.
 - Cada línea nueva de `ProcessBeanPolicy` y cada regla de ArchUnit llega en el mismo pull request que el paquete o el
   bean que la requiere (ADR-0024). La cadena de siete pull requests apilados de la propuesta (Q5) no cambia ese
   principio: la tabla y el resolutor llegan en la rebanada 2; el decisor y la guarda, en la 3; el retiro de la columna,
@@ -54,8 +55,8 @@ de permisos (ADR-0017). La tabla DEBE pasar las puertas genéricas de `MultiTena
 ### Requisito: Permisos de acceso a la tabla de asignación de rol por rol de base de datos
 
 El sistema DEBE conceder sobre la tabla de asignación de rol, exactamente y sin uno más ni uno menos
-(`docs/03-seguridad.md` §6.1): a `confia_admin_app`, `SELECT`, `INSERT` y `UPDATE`, sin `DELETE` (valor que confirma
-el diseño); a `confia_portal_app`, **ningún privilegio**; a `confia_readonly`, solo `SELECT`, sujeto a la política de
+(`docs/03-seguridad.md` §6.1): a `confia_admin_app`, solo `SELECT` (decisión del diseño D4: nada escribe en producción en
+este cambio; el cambio 8b concede lo que necesite en su migración); a `confia_portal_app`, **ningún privilegio**; a `confia_readonly`, solo `SELECT`, sujeto a la política de
 fila; a `confia_backup`, el alcance de `pg_read_all_data`; a `confia_owner`, ningún privilegio adicional a los de
 propietario del esquema, sin `BYPASSRLS`. El sistema DEBE extender `RolePrivilegeMatrixIT` con las filas de la tabla
 para los cinco roles.
@@ -73,11 +74,11 @@ para los cinco roles.
 - **CUANDO** intenta `SELECT`, `INSERT`, `UPDATE` o `DELETE` sobre la tabla
 - **ENTONCES** las cuatro operaciones se rechazan por falta de privilegio
 
-#### Escenario: [BI124] Ningún rol de aplicación puede borrar asignaciones
+#### Escenario: [BI124] `confia_admin_app` solo puede leer la tabla
 
 - **DADO** `confia_admin_app` con el contexto de una institución
-- **CUANDO** intenta `DELETE` sobre la tabla
-- **ENTONCES** se rechaza por falta de privilegio
+- **CUANDO** intenta `SELECT`, y después `INSERT`, `UPDATE` y `DELETE`, sobre la tabla
+- **ENTONCES** el `SELECT` se permite y las otras tres operaciones se rechazan por falta de privilegio
 
 ### Requisito: Una migración propia retira la columna `mfa_required` después de que la política de MFA esté en `main`
 
@@ -95,8 +96,11 @@ pruebas que antes la fijaban DEBEN asignar un rol mediante un ayudante común o 
 #### Escenario: [BI126] Nada refiere la columna
 
 - **DADO** el código de producción, el código de prueba y el código generado
-- **CUANDO** se busca `mfa_required`, `MFA_REQUIRED` y `mfaRequired`
-- **ENTONCES** no hay ninguna aparición, salvo en `V6` (que no se edita) y en la migración de retiro
+- **CUANDO** se busca `mfa_required` sin distinguir mayúsculas ni formas derivadas (`MFA_REQUIRED`, `mfaRequired`,
+  `getMfaRequired`)
+- **ENTONCES** no hay ninguna aparición, salvo en `V6` (que no se edita), en la migración de retiro `V15` y en las
+  pruebas fijadas a una versión anterior a `V15` con `StepwiseDatabase.migratedTo`, como `V9ExistingRowsIT`, que inserta
+  en una versión donde la columna es obligatoria
 
 #### Escenario: [BI127] El retiro no precede a la política
 
@@ -135,19 +139,21 @@ la requiere.
 
 ### Requisito: Las reglas de dependencia protegen las fronteras de la autorización
 
-El sistema DEBE hacer cumplir con ArchUnit: que los puertos y códigos de permiso de `shared.security` no dependen de
-ningún módulo (`SharedBoundaryRulesTest`); que el catálogo de roles y la asignación de roles a permisos, y la política de
+El sistema DEBE hacer cumplir con ArchUnit: que el puerto de resolución de permisos en `shared.security` y los códigos de
+permiso en `com.confia.kernel` (`Permission`) no dependen de ningún módulo (`SharedBoundaryRulesTest`; el dominio no
+puede importar `shared.security`, `docs/01`); que el catálogo de roles y la asignación de roles a permisos, y la política de
 MFA, viven en `identity.domain` sin framework ni entrada/salida; que la tabla de asignación y su adaptador jOOQ viven
 en `identity.infrastructure` y ninguna clase `web` toca jOOQ; que el puerto de resolución de permisos tiene exactamente
 una implementación de producción, en `identity`; que ninguna clase de producción usa anotaciones de permiso ni
 seguridad de métodos para decidir permisos; y que la decisión de permiso no se toma en `application`.
 
-#### Escenario: [BI131] `shared.security` no importa módulos
+#### Escenario: [BI131] El puerto en `shared.security` y los códigos de permiso en `kernel` no importan módulos
 
-- **DADO** el puerto y los códigos de permiso en `shared.security`
+- **DADO** el puerto de resolución en `shared.security` y los códigos de permiso en `com.confia.kernel`
 - **CUANDO** se ejecutan las reglas de dependencia
-- **ENTONCES** ninguna clase de `shared` importa un módulo, y con un fixture que importa una clase de `identity` la
-  regla falla
+- **ENTONCES** ninguna clase de `shared` ni de `kernel` importa un módulo, el dominio de `identity` importa los
+  códigos desde `kernel` y no desde `shared.security`, y con un fixture que importa una clase de `identity` la regla
+  falla
 
 #### Escenario: [BI132] El dominio del catálogo no depende de frameworks
 
@@ -234,8 +240,8 @@ esquema de seguridad (`bearerAuth` para el token de acceso, un esquema propio pa
 cookie de sesión con la cabecera `X-CSRF-Token` para el refresco y el cierre actual; el inicio de sesión no
 declara ninguno) y exactamente las respuestas de su contrato, incluidas `429` y `503` donde actúa el limitador,
 las de error con `application/problem+json` y el esquema de Problem Details. La operación del informe de roles DEBE
-declarar `bearerAuth`, el permiso que exige, y las respuestas `200`, `401`, `403` y `500` (el conjunto exacto lo fija
-el diseño). El esquema `ProblemDetail` DEBE
+declarar `bearerAuth`, `x-required-permission: identity:read` y exactamente las respuestas `200`, `401`, `403` y `500`.
+El esquema `ProblemDetail` DEBE
 declarar el miembro `errors`. El documento NO DEBE contener respuestas genéricas que el traductor
 global añadiría y que no estén aprobadas en la instantánea (la generación automática de respuestas
 genéricas queda desactivada y cada respuesta se declara de forma explícita en la operación). `packages/contracts`
@@ -284,7 +290,7 @@ DEBE regenerarse desde la instantánea, incluidos los esquemas Zod, y las aplica
 
 - **DADO** la instantánea aprobada
 - **CUANDO** se lee `GET /api/v1/identity/roles`
-- **ENTONCES** declara `bearerAuth`, el permiso `identity:read`, y respuestas `200`, `401`, `403` y `500`, y ninguna
+- **ENTONCES** declara `bearerAuth`, `x-required-permission: identity:read`, y exactamente las respuestas `200`, `401`, `403` y `500`, y ninguna
   otra operación del documento declara un permiso de rol
 
 ### Requisito: Tablas nuevas de cifrado de columna y MFA, con `institution_id` y seguridad de fila forzada

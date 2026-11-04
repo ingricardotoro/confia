@@ -12,8 +12,8 @@
 - El comportamiento de la decisión de permiso (catálogo, resolución, `otp`, guarda, auditoría de denegaciones) está en
   la capacidad `authorization`; este delta describe la posición de la decisión en la cadena y el tratamiento de las
   respuestas `403` y de los fallos.
-- Valores que fija el diseño y que este delta no codifica: el estado HTTP exacto del fallo de infraestructura de la
-  resolución (hoy `500` con `internal-error`) y la forma en que el filtro produce esa respuesta.
+- Valor fijado por el diseño (`design.md` §3, D7): el fallo de infraestructura de la resolución responde `500` con
+  `internal-error`, sin código público nuevo, por el último recurso del filtro de contexto de la petición.
 
 ## ADDED Requirements
 
@@ -90,18 +90,17 @@ diferir `instance` y `traceId`. Esa igualdad no revela qué rutas existen ni qu�
 
 Cuando la resolución de permisos falla por infraestructura, la cadena administrativa DEBE denegar el acceso sin
 invocar el controlador y DEBE responder con un Problem Details del catálogo existente para un fallo interno o de
-dependencia (hoy `internal-error` con `500`), sin detalles internos, sin repetir mensajes de excepción y con
-`traceId`. La respuesta NO DEBE tener el código `forbidden` ni el estado `403`. El fallo NO DEBE invocar el
-manejador de acceso denegado que audita denegaciones. El estado exacto, y si hace falta un código nuevo con `503`,
-lo fija el diseño; el diseño DEBE además resolver cómo el filtro, que se ejecuta antes del manejador de excepciones de
-los controladores, construye esa respuesta.
+dependencia: `internal-error` con `500`, sin código público nuevo (decisión del diseño D7), sin detalles internos, sin
+repetir mensajes de excepción y con `traceId`. La respuesta NO DEBE tener el código `forbidden` ni el estado `403`. El
+fallo NO DEBE invocar el manejador de acceso denegado que audita denegaciones. Como el filtro se ejecuta antes del
+manejador de excepciones de los controladores, la respuesta la construye el último recurso del filtro de contexto de la
+petición.
 
 #### Escenario: [WE101] El fallo de resolución no responde `403 forbidden`
 
 - **DADO** una ruta con permiso y un resolutor de prueba que lanza un error de infraestructura
 - **CUANDO** un actor con sesión completa envía la petición
-- **ENTONCES** la respuesta es un Problem Details con `traceId`, cuyo estado y código son los del tratamiento existente
-  de fallos internos (hoy `500` con `internal-error`), y ninguno es `403` ni `forbidden`
+- **ENTONCES** la respuesta es un Problem Details con `traceId`, cuyo estado es `500` y cuyo código es `internal-error`, y ninguno es `403` ni `forbidden`
 - **Y** el controlador registra cero invocaciones y el manejador de acceso denegado registra cero invocaciones
 
 #### Escenario: [WE102] El fallo no expone detalles internos
