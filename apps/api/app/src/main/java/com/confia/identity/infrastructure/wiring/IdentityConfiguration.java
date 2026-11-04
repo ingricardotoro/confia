@@ -1,5 +1,6 @@
 package com.confia.identity.infrastructure.wiring;
 
+import com.confia.identity.application.AccountPermissions;
 import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.AuthenticateWithPassword;
 import com.confia.identity.application.CompleteSecondFactor;
@@ -24,6 +25,7 @@ import com.confia.identity.application.ResetPasswordWithToken;
 import com.confia.identity.application.RotateRefreshToken;
 import com.confia.identity.application.SessionLiveness;
 import com.confia.identity.application.StaffAccountRepository;
+import com.confia.identity.application.StaffRoleAssignmentRepository;
 import com.confia.identity.application.TotpCredentialRepository;
 import com.confia.identity.application.TotpVerificationBackoffStore;
 import com.confia.identity.application.VerifyTotpCode;
@@ -42,6 +44,7 @@ import com.confia.identity.infrastructure.JooqRecoveryCodeRepository;
 import com.confia.identity.infrastructure.JooqRefreshTokenFamilyRepository;
 import com.confia.identity.infrastructure.JooqRefreshTokenRepository;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
+import com.confia.identity.infrastructure.JooqStaffRoleAssignmentRepository;
 import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.identity.infrastructure.JooqTotpVerificationBackoffStore;
 import com.confia.shared.audit.AuditLogWriter;
@@ -226,6 +229,23 @@ public class IdentityConfiguration {
     SessionLiveness sessionLiveness(TransactionRunner runner,
             RefreshTokenFamilyRepository families, Clock clock) {
         return new SessionLiveness(runner, families, clock);
+    }
+
+    @Bean
+    StaffRoleAssignmentRepository staffRoleAssignmentRepository(DSLContext dsl) {
+        return new JooqStaffRoleAssignmentRepository(dsl);
+    }
+
+    /**
+     * The adapter of the permission resolver port, which the permission decider of the administrative
+     * chain asks (change 8, task 3). As with {@link SessionLiveness}, the factory returns the adapter's
+     * own type and not the port, so no method of production returns the port and no adapter can hide
+     * in a lambda.
+     */
+    @Bean
+    AccountPermissions accountPermissions(TransactionRunner runner,
+            StaffRoleAssignmentRepository assignments) {
+        return new AccountPermissions(runner, assignments);
     }
 
     /**
