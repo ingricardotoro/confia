@@ -118,8 +118,8 @@ deriva de los roles, sin columna independiente.
 **MFA derivada (O4)**
 
 13. `MfaPolicy` en `identity` sustituye toda lectura de `mfa_required` en el inicio de sesión, el segundo
-    factor y el restablecimiento de contraseña. La regla exacta para una cuenta sin rol depende de la
-    pregunta abierta Q1.
+    factor y el restablecimiento de contraseña. Toda cuenta del personal lleva MFA obligatoria, tenga o no
+    rol (Q1).
 14. Migración propia, posterior a la derivación, que retira la columna `mfa_required`; los fixtures de
     prueba (unas 96 apariciones en 45 archivos) pasan a asignar roles.
 
@@ -169,7 +169,7 @@ deriva de los roles, sin columna independiente.
 
 ## Matriz final de los seis roles del personal
 
-Para aprobación del propietario. Leyenda de `docs/03` §5.2: **C** crear, **L** leer, **A** actualizar,
+Aprobada por el propietario el 2026-11-03. Leyenda de `docs/03` §5.2: **C** crear, **L** leer, **A** actualizar,
 **N** anular, **P** aprobar, **X** exportar; nueva: **S** solicitar anulación. «—» significa sin acceso.
 **Δ** marca toda diferencia con `docs/03` §5.2.
 
@@ -289,10 +289,10 @@ Reglas reescritas (por nota fechada):
 | El resolutor falla abierto por un error de programación | Baja | Pruebas en rojo de fallo cerrado: sin rol, rol desconocido, error de lectura, otra institución |
 | Mucho cambio en las pruebas al retirar `mfa_required` (unas 96 apariciones en 45 archivos) | Alta | Derivación y retiro en rebanadas separadas; fixtures con rol por un ayudante común |
 | Un rol asignado a una sesión sin MFA concede permisos al instante, porque se resuelven por petición | Media | Toda ruta con permiso exige `otp` en `amr`; la revocación de sesiones al cambiar el rol es de 8b |
-| La matriz se aprueba con contradicciones de `docs/03` aún abiertas (Q3, Q4) | Media | La prueba de paridad hace explícito cualquier cambio posterior; las celdas afectadas se marcan |
+| Tres iniciadores de §5.3 siguen sin permiso en la matriz (Q4) | Media | Se resuelven en el cambio que construya cada operación y quedan anotados en `docs/03`; la prueba de paridad hace explícito cualquier cambio posterior |
 | Desviación de la normalización de rutas entre la lista cerrada y MVC | Media | La guarda compara contra el mapa real de rutas y la prueba usa el proceso real |
 | Subestimación de tamaño (factor histórico de 2,2 a 7,97) y más de 15 tareas | Alta | Cadena de rebanadas de abajo; si `tasks.md` supera 15 tareas, la fase de tareas propone partir el cambio |
-| La estrategia de entrega de la sesión es `single-pr`, incompatible con el tope de 800 líneas de `docs/15` §3 | Cierta | El propietario debe aprobar la división o una excepción de tamaño antes de aplicar (Q5) |
+| El cambio supera con claridad el tope de 800 líneas por PR de `docs/15` §3 | Cierta | Cadena de siete PR apilados, aprobada por el propietario (Q5) |
 
 ## Plan de reversión
 
@@ -343,8 +343,9 @@ No existe ningún entorno desplegado ni dato real.
 **Pronóstico: unas 3 400 a 4 200 líneas efectivas** (producción de 1 100 a 1 400, pruebas de 1 800 a
 2 300, documentación y spec unas 500), con el rango de la exploración y el pequeño agregado del permiso
 de solicitud y de la matriz efectiva en `docs/03`. **Supera con claridad el tope de 800 líneas por PR**
-de `docs/15` §3, así que la estrategia `single-pr` de la sesión no es viable sin una excepción de
-tamaño. Se propone esta cadena de PR sobre `main`; las pruebas nunca se separan del código que prueban.
+de `docs/15` §3. El propietario aprobó esta cadena de PR sobre `main` (Q5); las pruebas nunca se separan
+del código que prueban. La suma de los rangos por rebanada, de 3 550 a 5 250 líneas, es mayor que el
+pronóstico global; ninguna de las dos cifras es una medición, y lo que obliga es el tope de cada PR.
 
 | Orden | Rebanada | Contenido | Líneas aprox. |
 |---|---|---|---|
@@ -359,11 +360,6 @@ tamaño. Se propone esta cadena de PR sobre `main`; las pruebas nunca se separan
 **Órdenes duros:** 1 antes que todo; 2 antes de 3 y de 5a; 3 antes de 4; 4 y 3 antes de 6; 5a antes de
 5b. Se estiman de 14 a 16 tareas frente al tope de 15 de `openspec/config.yaml`.
 
-```
-Decision needed before apply: Yes
-Chained PRs recommended: Yes
-400-line budget risk: High
-```
 
 ## Preguntas resueltas por el propietario (2026-11-03)
 
