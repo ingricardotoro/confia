@@ -6,6 +6,10 @@
 - **Fecha:** 2026-11-03
 - **Estado:** pendiente de aprobación del propietario. O1 a O10 y Q1 a Q5 están decididas y no se reabren. Lo que este
   documento pide al propietario está en la sección 14.
+- **Corrección de planificación del 2026-11-04** (a pedido del propietario, antes de aplicar): D6 (sesión viva derivada de
+  la misma lista), D10 (concurrencia del barrido, invariante de la suma, latencia por petición, compuerta ante un
+  retroceso del reloj, apagado acotado), D14 (cómo llega la exención al proceso de inicio de sesión), §2, §3, §5, §6, §9 y
+  §12. Ningún valor aprobado cambia.
 - **Entradas:** `proposal.md` (aprobada el 2026-11-03), `exploration.md`, deltas de `specs/` (AZ01-AZ77, WE94-WE105,
   I278-I303, AT32-AT38, BI119-BI139), `docs/01-arquitectura.md`, `docs/03-seguridad.md` §4.3 y §5, ADR-0005, ADR-0009,
   ADR-0015, ADR-0017, ADR-0022, ADR-0024, y el código de la rama en `dc2c194`.
@@ -67,7 +71,7 @@ invariantes guían el diseño, y cada rebanada las prueba en rojo antes de escri
 | El portal admite beans de `shared.security`; el trabajador también | `ProcessBeanPolicy.java:132`, `:159` | D1: los beans de autorización no viven en `shared.security` |
 | `NoInMemorySchedulingTest` prohíbe `ScheduledExecutorService`, `Timer` y `org.springframework.scheduling` | `NoInMemorySchedulingTest.java:25-32` | D10: el resumen se emite de forma perezosa, sin temporizador |
 | `identity_staff_account.mfa_required` es `NOT NULL` sin `DEFAULT`, y producción nunca inserta cuentas | `V6:7-10`; `JooqStaffAccountRepository` | D15: los fixtures siguen insertando la columna hasta la rebanada 5b |
-| 97 apariciones de `mfa_required`, `MFA_REQUIRED` o `mfaRequired` en 48 archivos: 13 en 5 archivos de producción y 84 en 43 de prueba. Además `getMfaRequired()` en `JooqStaffAccountRepository.java:49,66`, que esa búsqueda no encuentra | Búsqueda del 2026-11-03 | D15 y sección 11 (BI126) |
+| Medido el 2026-11-04 en `6b48d1b`, árbol limpio, sin distinguir mayúsculas, solo archivos versionados bajo `apps/`: el patrón `mfa_?required` aparece 102 veces en 49 archivos (`V6`, 5 archivos Java de producción, entre ellos `getMfaRequired()` de `JooqStaffAccountRepository`, y 43 de prueba); el literal `mfa_required` aparece en 44 (`V6`, 3 de producción y 40 de prueba). El código de jOOQ generado no está versionado y ninguna de las dos búsquedas lo ve | Búsqueda del 2026-11-04 | D15 y sección 11 (BI126) |
 | 31 semillas de prueba con `mfaRequired=false` en 10 archivos de `identity/web` esperan una sesión sin segundo factor, mezcladas con cuentas con MFA en el mismo proceso | Búsqueda del 2026-11-03; `LoginEndpointSupport.java:53-77` | D14: la política de prueba decide por cuenta |
 | `V9ExistingRowsIT` y otras pruebas migran a una versión histórica con `StepwiseDatabase.migratedTo(...)`, donde la columna existe y es obligatoria | `V9ExistingRowsIT.java:39-47` | Sección 11: BI126 necesita una excepción |
 | `SecurityHeadersFilter` ya fija `Cache-Control: no-store` en toda respuesta | `SecurityHeadersFilter.java:48` | D16: el informe no lo repite |
@@ -101,10 +105,14 @@ Cada valor que la especificación dejó al diseño, con su razón en una línea.
 | Cota del estado | 10 000 claves `(institución, cuenta, permiso)` | Unos 2 MB; solo un actor con sesión completa crea una clave | D10 |
 | Clave nueva con el estado lleno | Asiento completo sin contar, más métrica; ninguna clave viva se expulsa | Nunca se pierde una denegación (regla 14) y una expulsión borraría el contador de quien se está limitando | D10 |
 | Emisión del resumen | Perezosa: al cerrar la ventana, en la siguiente denegación de cualquier clave, y al apagar | No hay programador en memoria permitido y el estado no puede ir al trabajador | D10 |
+| Resúmenes por petición | Como mucho 1 en el hilo de una denegación | Una respuesta `403` paga a lo sumo su asiento y un resumen ajeno | D10 |
+| Barrido | Solo memoria, fuera de toda función de asignación, como mucho una vez por segundo y hasta 500 ventanas movidas | Cumple el contrato de `ConcurrentHashMap.compute` y acota el trabajo por petición | D10 |
+| Cola de resúmenes pendientes | `LinkedBlockingDeque` con capacidad 10 000 | Misma cota que el estado; un descarte se cuenta en métrica | D10 |
+| Apagado | Corta en el primer fallo y se detiene a los 10 segundos medidos con el `Clock` inyectado | Una base de datos caída no retiene el cierre del proceso | D10 |
 | Acción del resumen | `authorization.access.denied_summary` | Se distingue por acción, con `outcome=denied` | D10 |
 | Detalle del resumen | `{"omittedCount":n,"windowStart":"...","windowSeconds":300}` | Conteo y ventana; cuenta y permiso están en `actor_id` y `entity_id` | D10 |
 | Métricas | `authorization_denial_omitted`, `authorization_denial_audit_failed`, `authorization_resolution_failed`, `authorization_denial_tracker_full` | Mismo estilo que `rate_limit_capacity_exhausted`; hacia Prometheus llevarán prefijo `confia_` y sufijo `_total` | D11 |
-| Reloj de la ventana | `java.time.Clock` inyectado; un retroceso cuenta como ventana vencida | Hay que registrar el instante de inicio; un paso del reloj solo puede escribir más filas, nunca menos | D10 |
+| Reloj de la ventana | `java.time.Clock` inyectado; un retroceso cuenta como ventana vencida, y un instante de barrido siguiente más de un segundo en el futuro cuenta como vencido | Hay que registrar el instante de inicio; un paso del reloj solo puede escribir más filas, nunca menos, ni detener el barrido | D10 |
 | `Authenticated` | Permanece en el tipo cerrado, alcanzable solo con una política de prueba | La especificación conserva cuatro desenlaces e I149 e I228 lo ejercitan | D14 |
 | `MfaPolicy` | Se conserva como costura, constante verdadera en producción | Quitarla obligaría a cambiar escenarios y dejaría sin prueba la rama de sesión | D14 |
 | OpenAPI del informe | `bearerAuth`, `x-required-permission: identity:read`, respuestas `200`, `401`, `403` y `500` | Exactamente las que la ruta puede producir | D16 |
@@ -309,6 +317,18 @@ que acepte una sesión cerrada, y ADR-0005 ya exigía validar `sid` para las esc
 lectura por petición. Los escenarios vigentes no lo contradicen, pero tampoco lo piden: la sección 11 recomienda agregar
 uno.
 
+**Una sola lista, sin segundo comparador que pueda divergir.** `AuthorizationConfiguration` declara un único bean
+`PermissionedEndpoints`, y `AdminSecurityConfiguration` pasa esa misma instancia a `SecurityChains` y al constructor de
+`AccessTokenAuthenticationFilter`, que gana un parámetro `PermissionedEndpoints` y deriva de `endpoints()`, en su
+constructor, los comparadores de sesión viva de las rutas con permiso. No existe un valor `SessionCheck` por entrada ni otra
+lista que editar. Los arneses hacen lo mismo con su lista de prueba. Una prueba de deriva lo hace cumplir sobre **cada**
+entrada, no sobre una ruta de ejemplo: `PermissionEdgeTest.everyPermissionedEntryRejectsARevokedSession` y
+`AuthorizationEdgeIT.everyPermissionedEntryRejectsARevokedSession` recorren la lista del arnés (al menos dos entradas, una
+con variable de ruta) con un token `[pwd, otp]` de sesión revocada y exigen, por entrada, `401 token-invalid`, cero
+invocaciones del resolutor y ningún asiento; la segunda corre con la lista de `@Import` del proceso administrativo, de modo
+que cubre el cableado de `AdminSecurityConfiguration`. **Demostración deliberada:** derivar los comparadores con
+`endpoints().stream().skip(1)` pone en rojo las dos pruebas, nombrando la entrada omitida.
+
 **Alternativas descartadas.** `@RequirePermission` con seguridad de métodos, descartada por la propuesta y por WE94,
 porque corre después de los interceptores y dentro de la transacción. Un `AuthorizationManager` único que busque la
 entrada dentro de la petición: reintroduce una segunda coincidencia de rutas que puede discrepar de la de la cadena.
@@ -402,8 +422,8 @@ resolutor ya se cerró. La decisión del tope se toma **fuera** de la transacci�
 `TransactionRunner` no cuenta dos veces.
 
 **Fallo.** `PermissionDenialAudit.record` captura `RuntimeException`, incrementa `authorization_denial_audit_failed` una
-vez, no registra la excepción (su mensaje podría repetir valores) y vuelve. La respuesta sigue siendo `403 forbidden`
-(AZ59). La excepción lleva el actor en un campo `transient`, igual que `ActorAuthentication`, y un mensaje fijo, porque
+vez, no registra la excepción (su mensaje podría repetir valores), devuelve la denegación a la suma del tope con
+`fullRowFailed` o `untrackedRowFailed` (D10) y vuelve. La respuesta sigue siendo `403 forbidden` (AZ59). La excepción lleva el actor en un campo `transient`, igual que `ActorAuthentication`, y un mensaje fijo, porque
 `AccessDeniedException` es `Serializable`.
 
 **Agente de usuario.** Permanece, sin código nuevo: lo pone el mecanismo común, está acotado y saneado por
@@ -411,26 +431,52 @@ vez, no registra la excepción (su mensaje podría repetir valores) y vuelve. La
 
 ### D10. Tope, ventana y resumen
 
-**Estado.** `DenialWindows`, un bean en memoria sobre `ConcurrentHashMap<DenialKey, Window>`, con la clave
-`(institutionId, accountId, permission)`. Incluye la institución porque la clave primaria de la cuenta es compuesta y AZ20
-usa el mismo identificador en dos instituciones. La reserva de lugar sigue a `InMemoryRateLimiter`: un contador con
-compare-and-set que nunca deja pasar la cota.
+**Estado.** `DenialWindows`, un bean en memoria con tres piezas:
+
+- `ConcurrentHashMap<DenialKey, Window>`, con la clave `(institutionId, accountId, permission)`. Incluye la institución
+  porque la clave primaria de la cuenta es compuesta y AZ20 usa el mismo identificador en dos instituciones. `Window` es
+  un registro inmutable (`windowStart`, `full`, `omitted`): cada cambio reemplaza el valor.
+- Un contador de lugares `AtomicInteger`, con reserva por compare-and-set como en `InMemoryRateLimiter`, que nunca deja
+  pasar la cota de 10 000 claves.
+- Una cola de resúmenes pendientes `LinkedBlockingDeque<PendingSummary>` con capacidad 10 000. `PendingSummary` lleva la
+  clave, `windowStart` y `omittedCount`.
 
 ```java
-Decision record(DenialKey key, Instant now);          // FULL_ROW | OMITTED | UNTRACKED
-List<ClosedWindow> closedWindows(Instant now, int max);
-List<ClosedWindow> allWindows(Instant now);           // only at shutdown
+Decision record(DenialKey key, Instant now);              // FULL_ROW(windowStart) | OMITTED | UNTRACKED
+void fullRowFailed(DenialKey key, Instant windowStart);   // the write of a FULL_ROW failed
+void untrackedRowFailed(DenialKey key, Instant now);      // the write of an UNTRACKED row failed
+void sweepIfDue(Instant now);                             // gated, in memory only, outside any mapping function
+Optional<PendingSummary> pollPending();
+boolean requeue(PendingSummary summary);                  // offerFirst; false when the queue is full
+List<PendingSummary> closeAllForShutdown(Instant now);    // every window with omissions, closed or not
 int size();
+int pendingSize();
 ```
 
-Una llamada a `record`, dentro de `compute` y por tanto atómica por clave, sigue una de estas filas:
+**Mecanismo de concurrencia.** El contrato de `ConcurrentHashMap.compute` prohíbe que la función de asignación modifique
+otras asignaciones del mismo mapa. Tres reglas lo respetan:
 
-| Situación | Efecto | Decisión |
+1. `record`, `fullRowFailed` y `untrackedRowFailed` usan `compute(key, ...)` solo sobre su propia clave. La función decide
+   sobre la `Window` de esa clave, reserva un lugar con compare-and-set si la clave es nueva y puede encolar en la cola de
+   pendientes, que es otra estructura. Nunca barre, nunca escribe en la base de datos y nunca invoca otro método del mapa.
+2. El barrido corre **fuera** de toda función de asignación. Recorre `entrySet()`, cuya iteración es débilmente
+   consistente y no bloquea el mapa, y por cada ventana candidata a vencida invoca `computeIfPresent` **sobre esa misma
+   clave**. Esa función vuelve a comprobar el vencimiento dentro de la operación atómica de la clave, encola el resumen si
+   hubo omisiones y devuelve `null` para quitar la entrada; el lugar se libera después de quitarla. Una denegación
+   concurrente de la misma clave queda serializada con esa operación: o cae en la ventana vieja antes de que se quite, o
+   abre una nueva después, y en ningún caso se pierde ni se cuenta dos veces.
+3. La compuerta del barrido es un `AtomicLong` con el instante del siguiente barrido permitido. Solo barre el hilo que gana
+   el compare-and-set; los demás siguen sin esperar.
+
+Una llamada a `record` sigue una de estas filas:
+
+| Situación (dentro de `compute` de la clave) | Efecto | Decisión |
 |---|---|---|
-| Clave nueva con lugar, o ventana vencida o reloj retrocedido | Si la ventana anterior omitió algo, pasa a la cola de pendientes. Abre una ventana con `full=1` | `FULL_ROW` |
+| Clave nueva y la reserva de lugar tiene éxito | Abre una ventana con `full=1` | `FULL_ROW` |
+| Ventana vencida (`now >= windowStart + V`) o reloj retrocedido (`now < windowStart`) | Si la ventana anterior omitió algo, su resumen pasa a la cola. Abre una ventana con `full=1` en el mismo lugar | `FULL_ROW` |
 | Ventana abierta y `full < T` | `full++` | `FULL_ROW` |
 | Ventana abierta y `full == T` | `omitted++` | `OMITTED` |
-| Clave nueva sin lugar, aun después de barrer | Nada | `UNTRACKED` |
+| Clave nueva y la reserva falla | Nada. Fuera de `compute`: `sweepIfDue(now)` y un único reintento | `UNTRACKED` si el reintento también falla |
 
 | Decisión | Asiento | Métrica |
 |---|---|---|
@@ -438,26 +484,61 @@ Una llamada a `record`, dentro de `compute` y por tanto atómica por clave, sigu
 | `OMITTED` | Ninguno | `authorization_denial_omitted(permission)` |
 | `UNTRACKED` | Completo | `authorization_denial_tracker_full` |
 
-**Emisión del resumen.** No hay programador posible: `NoInMemorySchedulingTest` prohíbe los temporizadores y db-scheduler
-corre en otro proceso, sin acceso a esta memoria. Hay tres disparadores:
+**La suma se conserva ante un fallo de escritura.** La invariante es: por clave, los asientos completos escritos más el
+conteo de los resúmenes escritos, pendientes o en ventanas vivas igualan las denegaciones registradas; una vez vaciada la
+cola, filas completas más resúmenes igualan las denegaciones. Ninguna denegación sale de esa suma salvo por los límites
+declarados abajo. Por eso un asiento que falla no se pierde:
 
-1. **Cada denegación** llama a `flushIfDue(now)`, como mucho una vez por segundo en todo el proceso. Mueve las ventanas
-   vencidas a la cola, libera sus lugares y escribe hasta 50 resúmenes. Las ventanas vencidas sin omisiones solo se
-   eliminan.
-2. **`flushClosedWindows(now)`** hace lo mismo sin el límite de frecuencia, y es el «disparo» que usan AZ53 y AT35 después
-   de mover el reloj.
-3. **Al apagar**, `DisposableBean.destroy` emite todas las ventanas con omisiones, vencidas o no. Cada resumen se escribe
-   antes de que se cierre el `DataSource`, porque el bean depende de `TransactionRunner`.
+- **`FULL_ROW` que falla.** `PermissionDenialAudit` invoca `fullRowFailed(key, windowStart)`. Dentro de `compute` de la
+  misma clave, si la ventana viva tiene ese `windowStart`, devuelve el lugar del tope (`full--`) y suma la denegación a las
+  omisiones (`omitted++`), de modo que el resumen de la ventana la incluye. Si la ventana ya se cerró o se reemplazó,
+  encola un resumen propio de conteo 1 con ese `windowStart`.
+- **`UNTRACKED` que falla.** `untrackedRowFailed` encola un resumen de conteo 1 con el instante de la denegación como
+  `windowStart`.
+- En ambos casos `authorization_denial_audit_failed` se incrementa una vez y la respuesta sigue siendo `403 forbidden`
+  (AZ59). La decisión del tope y su corrección ocurren fuera de la transacción, de modo que un reintento interno de
+  `TransactionRunner` no cuenta dos veces.
 
-Un fallo al escribir un resumen lo devuelve a la cola, corta ese barrido e incrementa
-`authorization_denial_audit_failed`. La cola tiene la misma cota de 10 000. Si está llena, el resumen se descarta, con la
-misma métrica. Las métricas de omisión ya se publicaron al omitir, de modo que operación ve la inundación aunque el
-resumen tarde.
+**Emisión del resumen.** No hay programador posible: `NoInMemorySchedulingTest` prohíbe los temporizadores, db-scheduler
+corre en otro proceso sin acceso a esta memoria, y `@Async`, `@Scheduled` y cualquier otra biblioteca de programación están
+prohibidos. La emisión ocurre por eso en el hilo de la petición, con un costo acotado. Hay tres disparadores:
 
-**Límite declarado.** Una caída no ordenada pierde los conteos pendientes en memoria, y un resumen puede emitirse mucho
-después de su ventana si no hay más denegaciones en el proceso. Su detalle lleva `windowStart`, de modo que el asiento
-sigue siendo exacto. Es propio de la decisión O8, «ventana acotada en memoria». El tope es por proceso: con `n` réplicas el
-tope efectivo se multiplica por `n`. Un tope compartido, si hace falta, llega con Redis en el cambio 11.
+1. **Cada denegación**, después de su propio asiento (o de su omisión), invoca `afterDenial(now)`: primero
+   `sweepIfDue(now)`, que solo trabaja en memoria, barre como mucho una vez por segundo en todo el proceso y mueve como
+   mucho 500 ventanas vencidas por barrido (las vencidas sin omisiones solo se quitan; las demás quedan para el barrido
+   siguiente); después escribe **como mucho un** resumen de la cola. Una respuesta `403` paga así, a lo sumo, su propio
+   asiento y un resumen ajeno: dos transacciones cortas de una inserción cada una, acotadas por el tiempo de espera del
+   grupo de conexiones. La cola se vacía más rápido de lo que se llena: un resumen de omisiones exige al menos `T + 1`
+   denegaciones de su clave, un resumen de conteo 1 nace de un asiento fallido, y cada denegación escribe hasta uno.
+2. **`flushClosedWindows(now)`**, de uso solo en pruebas unitarias y de integración sin HTTP: barre sin compuerta y escribe
+   la cola hasta el primer fallo. Las pruebas de borde disparan la emisión con una denegación, como dicen AZ53 y AT35.
+3. **Al apagar**, `DisposableBean.destroy` invoca `closeAllForShutdown(now)`, que cierra toda ventana con omisiones,
+   vencida o no, y escribe la cola con dos cotas: corta en el primer fallo de escritura, de modo que una base de datos
+   caída cuesta un solo intento, y se detiene cuando el `Clock` inyectado marca 10 segundos desde el inicio del apagado,
+   comprobado entre escritura y escritura. Cada resumen se escribe antes de que se cierre el `DataSource`, porque el bean
+   depende de `TransactionRunner`. Lo que no llega a escribirse incrementa `authorization_denial_audit_failed` una vez por
+   resumen.
+
+**Fallo de un resumen y cola llena.** Si la escritura de un resumen falla, vuelve a la cabeza de la cola con `offerFirst`,
+se incrementa `authorization_denial_audit_failed` y la pasada se corta: la denegación en curso no intenta otro. Si la cola
+está llena al encolar o al devolver, el resumen se descarta con la misma métrica. Las métricas de omisión ya se
+publicaron al omitir, de modo que operación ve la inundación aunque el resumen tarde o se pierda.
+
+**Compuerta del barrido y reloj.** `sweepIfDue` barre si `now >= nextSweepAt` **o** si `nextSweepAt - now > 1 s`. Con un
+reloj que avanza, el instante siguiente nunca está más lejos que el propio intervalo, de modo que esa distancia solo puede
+venir de un retroceso, y se trata como reinicio: el barrido corre y fija `nextSweepAt = now + 1 s`. Sin esa regla, un paso
+atrás de una hora dejaría el barrido detenido una hora.
+
+**Límites declarados**, todos propios de la decisión O8, «ventana acotada en memoria», y registrados en ADR-0027:
+
+1. Una caída no ordenada pierde las ventanas y la cola en memoria.
+2. Un resumen descartado por cola llena, o no escrito al apagar por fallo o por agotar los 10 segundos, pierde su conteo de
+   la bitácora; quedan la métrica `authorization_denial_audit_failed` y las `authorization_denial_omitted` ya publicadas.
+3. Un asiento fallido cuyo resumen de conteo 1 no cabe en la cola se pierde con la misma métrica.
+4. Un resumen puede emitirse mucho después de su ventana si no hay más denegaciones en el proceso. Su detalle lleva
+   `windowStart`, de modo que el asiento sigue siendo exacto.
+5. El tope es por proceso: con `n` réplicas el tope efectivo se multiplica por `n`. Un tope compartido, si hace falta,
+   llega con Redis en el cambio 11.
 
 **Forma del resumen.** Se escribe con el contexto de seguridad de la **institución de la ventana** y un `requestId` nuevo,
 porque el `WITH CHECK` de la política exige esa institución y la petición que dispara el barrido pertenece a otra
@@ -558,10 +639,30 @@ proceso cuentas que esperan una sesión directa (I149, I228) y cuentas con MFA (
 conservan así su significado. La política de prueba, `SecondFactorExemptions` en `src/test`, exime a las cuentas que la
 prueba le indique.
 
-**Cómo llega al proceso real.** `LoginProcess` agrega la propiedad `spring.main.sources` con una configuración de prueba que
-declara un `@Primary MfaPolicy`, sin cambiar la producción: esa clase no existe en el artefacto. La sonda S1 lo confirma en
-la primera tarea de la rebanada 5a. Si `ConfiaApplication.launch` no respeta la propiedad, la alternativa es un
-`BeanPostProcessor` agregado por un `ApplicationContextInitializer` de prueba, nunca un parámetro nuevo en producción.
+**Cómo llega al proceso real.** El proceso de inicio de sesión corre **en la misma JVM** que la prueba:
+`LoginProcess.start` invoca `AdminProcessLauncher.launch`, que llama a `ConfiaApplication.launch` y devuelve el
+`ConfigurableApplicationContext` en proceso. Sobre eso:
+
+- **Registro.** `LoginProcess` agrega la propiedad `spring.main.sources` con `SecondFactorExemptionsConfiguration`, de
+  `src/test`, que declara un `@Bean @Primary SecondFactorExemptions` (implementa `MfaPolicy`). La producción no cambia:
+  esa clase no existe en el artefacto, y sin ella el único bean es `MfaPolicy.STAFF`.
+- **Sin estado estático.** `SecondFactorExemptions` guarda las cuentas eximidas en un conjunto de instancia
+  (`ConcurrentHashMap.newKeySet()`), uno por contexto, que se descarta al cerrar el proceso. Ningún campo `static` lo
+  sostiene, de modo que dos procesos de la misma JVM, o dos clases de prueba sucesivas, no comparten exenciones.
+- **Acceso desde la prueba.** `LoginProcess.exemptions()` devuelve `context.getBean(SecondFactorExemptions.class)`, y
+  `LoginEndpointSupport` gana el método abstracto `exemptions()`, que cada subclase resuelve con su proceso.
+- **Orden de siembra.** El proceso arranca primero (uno por clase). Cada prueba siembra la fila de la cuenta, la registra
+  como eximida si su parámetro lo pide y solo después inicia sesión. La política se consulta en cada inicio de sesión, de
+  modo que basta con que el registro preceda al inicio de sesión; los identificadores de cuenta son aleatorios y una
+  exención no alcanza a otra prueba.
+
+**Sonda S1**, primera prueba de la rebanada 5a, `SecondFactorExemptionsProbeIT`: en un mismo proceso con la configuración
+de prueba, una cuenta eximida con contraseña correcta obtiene la sesión y sus cookies, como en I149 (desenlace `Authenticated`), y una cuenta no
+eximida con credencial verificada obtiene el token restringido (`SecondFactorRequired`); y en un proceso sin la
+configuración, el contexto no contiene `SecondFactorExemptions` y su único `MfaPolicy` es `STAFF`. Si
+`ConfiaApplication.launch` no respeta `spring.main.sources`, la alternativa es un `BeanPostProcessor` agregado por un
+`ApplicationContextInitializer` de prueba, con el mismo conjunto de instancia y la misma sonda, nunca un parámetro nuevo en
+producción.
 
 **`Authenticated` sigue alcanzable solo con esa política.** El tipo cerrado, sus `switch` exhaustivos, la rama de `LogIn`
 que emite la sesión y la traducción a `200` siguen probados. I302 y `MfaPolicyProductionWiringTest` afirman, sobre el
@@ -676,6 +777,7 @@ que el contenedor no los registre dos veces.
 | `ALLOWED_ROUTE_RULES` admite `access`, solo desde `SecurityChains` | 3 | BI17, BI134 |
 | Sin `@PreAuthorize`, `@RequirePermission` ni `@EnableMethodSecurity` | 3 | BI133, WE94 |
 | Sin `Thread.sleep`, `Instant.now()` ni `Clock.systemUTC()` en las pruebas nombradas | 4 | BI137 |
+| Ninguna función de asignación de `DenialWindows` toca otra asignación del mapa ni barre | 4 | D10 (AZ79) |
 | `..application..` no depende de `PermissionDecider` ni de `PermissionDeniedException` | 3 | Requisito de BI131-BI133 |
 
 **Inversiones.** `WebEdgeScopeExclusionInventoryTest` (rebanada 3), `PublicRouteAllowListTest` y `RegisteredRoutes` con cuatro
@@ -690,7 +792,14 @@ clases (3 y 6), `IdentityScopeExclusionInventoryTest` y `AuditScopeExclusionInve
 | Con base de datos, sin HTTP: `PermissionDenialAuditIT` | `TransactionRunner` real (es `final` y no se dobla), `MutableClock`, escritor real o envuelto para fallar | Instancia propia por prueba e institución propia |
 | Borde sin base de datos: `PermissionEdgeTest` sobre `HarnessProcess` | Lista con rutas de prueba, resolutor y grabador dobles | Proceso propio por clase; dobles que se limpian entre pruebas |
 | Borde con base de datos: `AuthorizationEdgeIT` | `@SpringBootTest` sobre un arnés con la misma lista de `@Import` del proceso administrativo, más el controlador de prueba, como `IdempotencyEdgeIT`. Un `BeanPostProcessor` sustituye `Clock` por `MutableClock` y puede envolver `AuditLogWriter` | Institución y cuentas propias por prueba, que aíslan contadores por clave; `T` por propiedad |
-| Proceso real: `ExitCriterion2EndToEndIT` | `AdminProcessLauncher`, sin dobles | Institución propia; TOTP calculado por un ayudante de prueba |
+| Proceso real: `ExitCriterion2EndToEndIT` | `AdminProcessLauncher`, sin dobles y sin reloj manual: no se inyecta ningún `Clock` en el proceso real | Institución propia; TOTP calculado por un ayudante de prueba |
+
+**AZ69 se prueba solo en el arnés.** El proceso real no admite un reloj manual sin un bean de prueba, y agregarlo lo
+convertiría en un proceso con dobles. AZ69 (escritor roto y tope `T=2` con cierre de ventana) corre por eso solo en
+`AuthorizationEdgeIT`, que el requisito del criterio 2 admite («un arnés con PostgreSQL real»). Para que el arnés no se
+aparte del proceso real, `AuthorizationEdgeIT.harnessImportsTheAdministrativeConfiguration` compara por reflexión su lista
+de `@Import` con la de `AdminApplication`, salvo el controlador de prueba, y falla ante cualquier diferencia. AZ65 a AZ68 y
+AZ70 corren en los dos niveles.
 
 El contador se aísla porque cada prueba usa su propia institución y `DenialWindows` incluye la institución en la clave. No
 hace falta un método de reinicio solo para pruebas. Las invocaciones de controlador en procesos con dobles las cuenta un
@@ -700,9 +809,12 @@ hace falta un método de reinicio solo para pruebas. Las invocaciones de control
 
 | Punto | Comportamiento |
 |---|---|
-| Dos denegaciones de la misma clave | `compute` es atómico por clave; nunca se pasan de `T` ni se pierde una omisión |
+| Dos denegaciones de la misma clave | `compute` es atómico por clave; nunca se pasan de `T` ni se pierde una omisión (AZ79) |
 | Inserción de la clave 10 001 | La reserva por compare-and-set nunca supera la cota, aun bajo contención |
 | Dos hilos con el barrido vencido | `compareAndSet` sobre el instante siguiente: barre uno solo |
+| Barrido frente a una denegación de la misma clave | El barrido corre fuera de toda función de asignación y quita cada entrada con `computeIfPresent` sobre su propia clave; la denegación cae antes en la ventana vieja o después en una nueva, sin pérdida ni doble conteo |
+| Asiento completo que falla | `fullRowFailed` devuelve el lugar y suma la denegación a las omisiones dentro de `compute` de la clave; la suma se conserva (AZ80) |
+| Cola de pendientes | `LinkedBlockingDeque` acotada; `offerFirst` y `offer` devuelven falso si está llena, y el descarte se cuenta |
 | Reintento de `TransactionRunner` | Revierte la inserción y repite; el contador ya decidió fuera de la transacción |
 | Denegaciones que disputan `shared_audit_chain_head` | Se serializan por institución. El bloqueo dura una inserción y el tope limita cuántas ocurren |
 | Pedido en espera de conexión | La espera del grupo se acota por su tiempo de espera. Si vence, cuenta como fallo: `403` y métrica |
@@ -725,7 +837,7 @@ Cliente       Filtros            PermissionDecider    AccountPermissions   Audit
   │              │ ExceptionTranslation │                    │                  │                 │
   │              │ AuditingAccessDenied ┼────────────────────┼─► record() ──────┤                 │
   │              │                      │                    │   FULL_ROW       ├─ BEGIN, INSERT ►│
-  │              │                      │                    │   flushIfDue     │  COMMIT         │
+  │              │                      │                    │   afterDenial    │  COMMIT         │
   │◄─ 403 ───────┤ problems.write(FORBIDDEN)                 │                  │                 │
 ```
 
@@ -743,13 +855,16 @@ RequestContextFilter: response.resetBuffer(); problems.write(INTERNAL_ERROR) ─
 **Cierre de ventana:**
 
 ```
-denegación N de la cuenta B ─► flushIfDue(now), como mucho una vez por segundo
-   ├─ ventanas vencidas con omitted > 0 ─► cola
-   ├─ ventanas vencidas con omitted = 0 ─► se eliminan
-   └─ hasta 50 de la cola:
+denegación N de la cuenta B, después de su propio asiento ─► afterDenial(now)
+   ├─ sweepIfDue(now): solo memoria, fuera de compute; como mucho una vez por segundo
+   │  (o de inmediato si nextSweepAt está más de 1 s en el futuro), hasta 500 ventanas movidas
+   │    ├─ vencida con omitted > 0 ─► computeIfPresent(su clave): cola, entrada quitada, lugar libre
+   │    └─ vencida con omitted = 0 ─► computeIfPresent(su clave): entrada quitada, lugar libre
+   └─ como mucho 1 de la cola:
         ScopedValue RequestOrigin vacío
         TransactionRunner.execute(contexto de la institución de la ventana)
         INSERT authorization.access.denied_summary
+        si falla: offerFirst a la cola (o descarte si está llena) + authorization_denial_audit_failed
 ```
 
 ## 7. Cambios de archivos, por rebanada
@@ -848,9 +963,9 @@ la prueba, una vez, y dejar constancia en el progreso.
 |---|---|---|---|---|
 | 1 | `PermissionTest`, `StaffRoleTest` (cada columna, conteos 89 y 88, ausentes), `PermissionMatrixParityTest` | | AZ01-AZ16, BI132 | Agregar `PAYMENTS_CREATE` a `administrator`; quitar `audit:export` del Auditor en la copia del documento; vaciar la tabla |
 | 2 | `AccountPermissionsTest` (sin rol, código desconocido, error) | `AccountPermissionsIT` (dos instituciones, solo lectura), `V14SchemaDiffIT`, RLS, privilegios | AZ17-AZ21, AZ23, I278-I286, BI119-BI124 | Quitar `FORCE` de la tabla; conceder `DELETE`; devolver todos los permisos ante un error |
-| 3 | `RouteCoverageGuardTest`, `PermissionDeciderTest` | `PermissionEdgeTest`, `AuthorizationEdgeIT` (orden frente a los interceptores), `OpenApiRouteClassificationTest`, enumerador con cuatro clases | AZ24-AZ39 (la respuesta de AZ30 según la sección 11), AZ60, AZ61, AZ63, AZ64, WE94-WE97, WE101, WE102, WE105, BI128-BI133, BI135 | Quitar la comprobación de `otp`; mover la decisión a un interceptor (WE95 debe fallar); controlador sin clasificar; resolutor que lanza con `SENTINEL-RESOLVER-6`; bean en el portal |
-| 4 | `DenialWindowsTest` (`T`, ventana, cota, reloj atrás, contención con 16 hilos), `LogAuthorizationMetricsTest` | `PermissionDenialAuditIT`, `AuthorizationEdgeIT`: asiento, `request_id`, cadena, transacción propia, centinelas, resumen, escritor roto, casos no auditados | AZ40-AZ59, AZ62, WE98-WE100, AT32-AT38, BI137, BI138 | Dejar el origen en el resumen y ver la IP ajena; contar dentro de la transacción y reintentar; responder `500` ante escritor roto; agregar `Thread.sleep` al fixture |
-| 5a | `MfaPolicyTest` | `MfaPolicyProductionWiringTest`, login y restablecimiento con cuentas con y sin rol | I287-I291, I301, I302, escenarios modificados de identidad | Hacer `STAFF` falsa; leer un rol en la política; devolver `Authenticated` para una cuenta sin rol |
+| 3 | `RouteCoverageGuardTest`, `PermissionDeciderTest` | `PermissionEdgeTest`, `AuthorizationEdgeIT` (orden frente a los interceptores), `OpenApiRouteClassificationTest`, enumerador con cuatro clases | AZ24-AZ36, AZ38, AZ39, AZ78 (la respuesta de AZ30 según la sección 11), AZ60, AZ61, AZ63, AZ64, WE94-WE97, WE101, WE102, WE105, BI128-BI133, BI135 | Quitar la comprobación de `otp`; mover la decisión a un interceptor (WE95 debe fallar); controlador sin clasificar; resolutor que lanza con `SENTINEL-RESOLVER-6`; bean en el portal; derivar la sesión viva con `skip(1)` (prueba de deriva de D6) |
+| 4 | `DenialWindowsTest` (`T`, ventana, cota, reloj atrás, contención con cerrojo, barrido fuera de `compute`, compuerta, límite por barrido, cola acotada, fallo de asiento completo), `LogAuthorizationMetricsTest` | `PermissionDenialAuditIT`, `AuthorizationEdgeIT`: asiento, `request_id`, cadena, transacción propia, centinelas, resumen, un resumen por petición, fallo y devolución del resumen, apagado acotado, escritor roto, casos no auditados | AZ37, AZ40-AZ59, AZ62, AZ79, AZ80, WE98-WE100, AT32-AT38, BI137, BI138 | Dejar el origen en el resumen y ver la IP ajena; contar dentro de la transacción y reintentar; responder `500` ante escritor roto; agregar `Thread.sleep` al fixture; barrer dentro de `compute`; escribir toda la cola en una petición; quitar la regla del instante futuro; no devolver el asiento fallido a la suma |
+| 5a | `MfaPolicyTest`, `MfaPolicyProductionWiringTest` | `SecondFactorExemptionsProbeIT` (sonda S1), login y restablecimiento con cuentas con y sin rol | I287-I291, I301, I302, escenarios modificados de identidad | Hacer `STAFF` falsa; leer un rol en la política; devolver `Authenticated` para una cuenta sin rol; guardar las exenciones en un campo `static` |
 | 5b | | `V15SchemaDiffIT`, ausencia en esquema, jOOQ y árbol de fuentes | I292, BI125-BI127 | Reinsertar una referencia en un fixture actual |
 | 6 | `ListRolePermissionsTest` | `RolesReportEndpointIT`, `AuthorizationEdgeIT` (criterio 2 sobre ruta de prueba y real), `ExitCriterion2EndToEndIT`, instantánea | AZ22, AZ29, AZ65-AZ76, AZ77, I293-I300, I303, WE79, WE103, WE104, BI24-BI27, BI134, BI136, BI139 | Quitar la entrada de la lista (debe ser `403` sin asiento); agregar un correo al DTO; agregar un endpoint de bitácora al fixture |
 
@@ -863,8 +978,25 @@ la prueba, una vez, y dejar constancia en el progreso.
 - **AZ51 y AZ68.** La búsqueda de centinelas recorre `shared_audit_log`, los registros capturados con la raíz en `DEBUG` y el
   doble de métricas. `instance` del Problem repite la ruta al propio cliente, como en toda respuesta, y no forma parte de la
   búsqueda.
-- **AZ65 a AZ68.** Se ejecutan dos veces: sobre `AuthorizationEdgeIT`, con contador de invocaciones y reloj inyectado, y sobre
-  el proceso real, que demuestra que el cableado de producción es el mismo.
+- **AZ65 a AZ68 y AZ70.** Se ejecutan dos veces: sobre `AuthorizationEdgeIT`, con contador de invocaciones y reloj
+  inyectado, y sobre el proceso real, que demuestra que el cableado de producción es el mismo. **AZ69 solo en el arnés**
+  (D19), con `harnessImportsTheAdministrativeConfiguration` como guarda de deriva.
+- **Pruebas nombradas de D10.** Todas con `MutableClock`, instancia e institución propias y concurrencia por
+  `CountDownLatch` o `CyclicBarrier`, sin tiempo real:
+
+  | Comportamiento | Prueba | Demostración deliberada |
+  |---|---|---|
+  | Tope exacto con denegaciones concurrentes de una clave (AZ79) | `DenialWindowsTest.concurrentDenialsOfOneKeyNeverExceedTheCap`; `AuthorizationEdgeIT.concurrentDenialsOfOneKeyWriteExactlyTFullRows` | Comparar `full <= T`: `T + 1` filas completas. Una pérdida de actualización por `get` y `put` no se usa como demostración, porque su intercalado no es determinista |
+  | Barrido fuera de toda función de asignación | `AuthorizationBoundaryRulesTest.denialWindowsMappingFunctionsTouchNoOtherMapping`: ningún método sintético `lambda$*` de `DenialWindows` invoca un método de `ConcurrentHashMap` ni `sweepIfDue` (por eso el barrido recorre con un bucle `for`, no con una lambda). Además, `DenialWindowsTest.sweepRacingARecordOfTheSameKeyLosesNoDenial` libera con un cerrojo, a la vez, el barrido y una denegación de una clave vencida, y afirma la suma | Invocar `sweepIfDue` desde la función de `record`: la regla falla nombrando el método sintético |
+  | Asiento completo que falla (AZ80) | `DenialWindowsTest.failedFullRowReturnsTheSlotAndCountsAsOmitted`; `DenialWindowsTest.failedFullRowOfAClosedWindowQueuesASummaryOfOne`; `PermissionDenialAuditIT.failedFullRowIsCountedInTheSummary` | No invocar `fullRowFailed`: el resumen cuenta uno menos |
+  | Un resumen por petición | `PermissionDenialAuditIT.oneDenialWritesAtMostOneSummary`: con 5 resúmenes pendientes, un escritor envuelto que cuenta registra como mucho 2 inserciones (el asiento propio y un resumen) y quedan 4 pendientes | Escribir toda la cola en `afterDenial`: 6 inserciones |
+  | Fallo, devolución y corte | `PermissionDenialAuditIT.failedSummaryReturnsToTheHeadAndStopsThePass` (el resumen vuelve primero a la cola, no se intenta otro, métrica una vez) | Devolverlo con `offerLast`: el orden cambia |
+  | Cota de la cola | `DenialWindowsTest.pendingQueueDiscardsBeyondItsBound`; `PermissionDenialAuditIT.requeueIntoAFullQueueDiscardsAndCounts` (cota de prueba pequeña) | Cola sin capacidad: el tamaño supera la cota |
+  | Límite por barrido | `DenialWindowsTest.sweepMovesAtMostItsLimitAndLeavesTheRest` (límite de prueba 2, cinco ventanas vencidas: dos barridos mueven 2 y 2, el tercero 1) | Quitar el límite: el primer barrido mueve 5 |
+  | Compuerta de un segundo | `DenialWindowsTest.sweepRunsAtMostOncePerSecond` (dos barridos en el mismo instante: uno solo trabaja; a 1 s, el segundo) | Quitar el compare-and-set: barren los dos |
+  | Instante futuro tras un retroceso | `DenialWindowsTest.farFutureNextSweepInstantIsTreatedAsDue` (barrido a `t`, reloj a `t - 1 h`: barre de inmediato) | Quitar la regla de distancia: no barre |
+  | Retroceso en una ventana (DC-1) | `DenialWindowsTest.backwardClockClosesTheWindowAndKeepsTheSum` | Quitar la rama `now < windowStart` |
+  | Apagado (DC-2) | `PermissionDenialAuditIT.shutdownWritesPendingSummaries`; `PermissionDenialAuditIT.shutdownStopsAtTheFirstFailure` (un intento y métrica por cada resumen no escrito); `PermissionDenialAuditIT.shutdownStopsWhenItsBudgetIsSpent` (un escritor envuelto avanza el `MutableClock` 4 s por inserción: se escriben 3 y el resto cuenta como no escrito) | Dejar `destroy()` vacío; quitar el corte; quitar el presupuesto |
 - **Cobertura y mutación.** `kernel` e `identity.domain` a 95 por ciento y PIT a 80, con `Permission`, `StaffRole` y `MfaPolicy`
   dentro. `MfaPolicy.STAFF` mutado a falso debe morir.
 
@@ -938,7 +1070,10 @@ ausencia de asiento por falta de `otp` en AZ25 (D12).
 | El PR 3 o el PR 4 supera 800 líneas | Alta | Punto de corte definido en 10.1 y revisión de la cuenta antes de abrir el PR |
 | Más de 15 tareas en `tasks.md` | Media | Una tarea por rebanada con subtareas. La fase de tareas lo verifica |
 | Un resumen se atribuye a la IP de otra persona | Media | Origen enlazado de nuevo a uno vacío, con prueba negativa (D10) |
-| Se pierden conteos pendientes en una caída no ordenada | Baja | Métrica ya publicada al omitir; límite declarado en ADR-0027 |
+| Se pierden conteos pendientes en una caída no ordenada, por cola llena o por agotar el presupuesto de apagado | Baja | Métricas ya publicadas al omitir y al descartar; límites declarados en D10 y ADR-0027 |
+| Una respuesta `403` tarda por los resúmenes de otras cuentas | Baja | Como mucho un resumen por petición (D10), con `PermissionDenialAuditIT.oneDenialWritesAtMostOneSummary` |
+| La lista de sesión viva se aparta de la lista de rutas con permiso | Baja | Una sola instancia de `PermissionedEndpoints` y prueba de deriva por entrada (D6) |
+| El arnés de `AuthorizationEdgeIT` se aparta del proceso real, y AZ69 deja de probar el cableado | Baja | `harnessImportsTheAdministrativeConfiguration` (D19) |
 | El resumen tarda mucho si cesan las denegaciones | Media | `windowStart` en el detalle; emisión al apagar; límite declarado |
 | Tiempo observable distinto entre una ruta con permiso y una sin mapear, por el asiento | Baja | Requiere una cuenta con sesión completa y MFA, y WE99 cubre solo el contenido. Se acepta para F0 |
 | Dos lecturas por petición con permiso | Baja | Ambas por clave primaria; se medirá con k6 cuando exista la primera ruta de volumen |

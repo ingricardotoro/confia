@@ -324,8 +324,8 @@ resolutor (decisión del diseño D6).
 
 - **DADO** un token restringido `mfa-verify` y otro `mfa-enroll`
 - **CUANDO** cada uno se presenta a una ruta con permiso
-- **ENTONCES** ambos se rechazan sin llegar al controlador ni al resolutor, y no se escribe ningún asiento de
-  denegación
+- **ENTONCES** ambos reciben `401` con el código `token-invalid`, porque su audiencia no es la del token de acceso
+- **Y** ninguno llega al controlador ni al resolutor, y no se escribe ningún asiento de denegación
 
 #### Escenario: [AZ78] Un token vigente de una sesión revocada se rechaza antes del resolutor
 
@@ -411,6 +411,8 @@ pública DEBE seguir siendo corta y revisada. La guarda DEBE existir solo en el 
 - **DADO** una ruta con permiso de prueba `GET /test/accounts/{id}`
 - **CUANDO** se piden `/test/accounts/123` y `/test/accounts/abc` con un usuario sin el permiso
 - **ENTONCES** ambas reciben `403 forbidden` por la entrada de la lista, no por la denegación final
+- **Y** existen exactamente dos asientos `authorization.access.denied`, uno por petición, cada uno con `entity_id` igual
+  al código del permiso de la entrada y con la plantilla `/test/accounts/{id}` en su detalle, sin `123` ni `abc`
 
 #### Escenario: [AZ38] La prueba sobre OpenAPI falla ante una operación sin clasificar
 
@@ -542,7 +544,11 @@ llevan contadores independientes. Al vencer la ventana el contador DEBE reinicia
 cota de tamaño; con el estado lleno, una clave nueva escribe el asiento completo sin contar y emite la métrica
 `authorization_denial_tracker_full`, y ninguna clave viva se expulsa. El tope en memoria es por proceso. La ventana usa un
 `java.time.Clock` inyectable (un retroceso del reloj cuenta como ventana vencida) y las pruebas un estado aislado; los
-escenarios usan valores de prueba.
+escenarios usan valores de prueba. Por cuenta y permiso, los asientos completos más los conteos de los resúmenes DEBEN
+igualar las denegaciones, también bajo concurrencia y también cuando la escritura de un asiento completo falla: esa
+denegación DEBE sumarse al conteo del resumen. Solo quedan fuera de la suma los límites declarados por el diseño (D10):
+una caída no ordenada del proceso, un resumen descartado por la cota de la cola de pendientes y un resumen no escrito al
+apagar.
 
 #### Escenario: [AZ52] Hasta el tope, filas completas
 
@@ -586,6 +592,27 @@ escenarios usan valores de prueba.
 - **CUANDO** se ejecutan en cualquier orden y repetidas
 - **ENTONCES** dan el mismo resultado, porque usan un reloj inyectado, no esperan tiempo real y no heredan el contador
   de otra prueba
+
+#### Escenario: [AZ79] Denegaciones concurrentes de una misma clave respetan el tope exacto
+
+- **DADO** un tope de prueba `T` igual a 3, un reloj manual detenido dentro de la ventana, y 8 peticiones de la misma
+  cuenta sin el permiso, por el mismo permiso, retenidas por un cerrojo de cuenta regresiva que las libera a la vez (sin
+  esperas de tiempo real)
+- **CUANDO** terminan las 8, se hace avanzar el reloj manual hasta el cierre de la ventana y se produce la siguiente
+  denegación de otra clave
+- **ENTONCES** existen exactamente 3 asientos completos de esa cuenta y ese permiso y exactamente una fila de resumen con
+  el conteo omitido 5, de modo que filas completas más conteo igualan 8
+- **Y** las 8 respuestas son `403 forbidden` y el verificador de cadena de la institución reporta la cadena íntegra
+
+#### Escenario: [AZ80] Un asiento completo que no se pudo escribir se suma al resumen
+
+- **DADO** un tope de prueba `T` igual a 3, un reloj manual y un escritor de bitácora que falla solo en la primera
+  inserción
+- **CUANDO** la misma cuenta es denegada 5 veces por el mismo permiso dentro de la ventana, y después el reloj manual
+  alcanza el cierre de la ventana y se produce la siguiente denegación de otra clave
+- **ENTONCES** existen exactamente 3 asientos completos y una fila de resumen con el conteo omitido 2, de modo que filas
+  completas más conteo igualan 5
+- **Y** las 5 respuestas son `403 forbidden` y la métrica `authorization_denial_audit_failed` se emitió una vez
 
 ### Requisito: La métrica de denegaciones y de errores se publica por un puerto
 

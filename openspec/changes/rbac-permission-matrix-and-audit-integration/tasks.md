@@ -3,7 +3,7 @@
 - **Cambio:** `rbac-permission-matrix-and-audit-integration` (F0, cambio 8; entregable 4, brecha A7, criterio de salida 2)
 - **Fase:** tareas
 - **Fecha:** 2026-11-03
-- **Estado:** pendiente de aprobación del propietario
+- **Estado:** pendiente de aprobación del propietario; corregido el 2026-11-04 a su pedido (observación 11)
 - **Entradas aprobadas:** `proposal.md` (O1 a O10 y Q1 a Q5 vinculantes), `design.md` (D1 a D19, secciones 9, 10 y 11) y los deltas
   `specs/authorization`, `specs/web-edge`, `specs/identity`, `specs/audit-trail` y `specs/build-integrity` (identificadores `AZ`, `WE`, `I`, `AT` y `BI`,
   más los escenarios modificados sin identificador, que cada fila de la trazabilidad nombra por su título)
@@ -105,9 +105,9 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
 | 1 | Catálogo `Permission`, matriz `StaffRole`, paridad con `docs/03`, ADR-0027 | PR 1 | `-Dtest='PermissionTest,StaffRoleTest,PermissionMatrixParityTest,DomainPurityRulesTest,DocumentationNotesTest'` | N/A: sin comportamiento en ejecución (solo tipos y documentos) | Se revierte el commit; nada depende aún del catálogo |
 | 2 | `V14`, puerto `PermissionResolver`, adaptador de solo lectura | PR 2 | `-Dtest='AccountPermissionsTest,PermissionResolverInventoryTest'`; IT: `-Dit.test='V14SchemaDiffIT,IdentityStaffAccountRoleSchemaIT,AccountPermissionsIT,RolePrivilegeMatrixIT'` | PostgreSQL real con los cinco roles y dos instituciones | Se elimina `V14` (antes de producción) y se regenera jOOQ; el resolutor no tiene consumidor |
 | 3 | Decisor en la cadena, lista cerrada, `otp`, sesión viva, guarda de arranque | PR 3 (3a, 3b) | `-Dtest='PermissionDeciderTest,PermissionEdgeTest,RouteCoverageGuardTest,PublicRouteAllowListTest,AuthorizationBoundaryRulesTest,ProcessBeanIsolationTest'`; IT: `-Dit.test='AuthorizationEdgeIT,ProductionRoutesClassifiedIT'` | Cadena administrativa real con rutas de prueba y PostgreSQL | Con la lista de producción vacía no cambia ninguna ruta; revertir deja `denyAll` |
-| 4 | Auditoría de denegaciones con tope, ventana y resumen | PR 4 (4a, 4b) | `-Dtest='DenialWindowsTest,LogAuthorizationMetricsTest,NoRealTimeInDenialTestsTest'`; IT: `-Dit.test='PermissionDenialAuditIT,AuthorizationEdgeIT'` | Escritor real y roto, reloj manual, institución propia | Se revierte el decorador; los asientos escritos no se borran |
-| 5 | `MfaPolicy` sin leer la columna | PR 5a | `-Dtest='MfaPolicy*Test,AuthenticateWithPassword*,ResetPasswordWithToken*,StaffAccountTest'`; IT: `-Dit.test='LoginEndpointIT,MfaPolicyProductionWiringTest'` | Proceso de inicio de sesión real con política de prueba y política real | Se revierte el commit; la columna sigue existiendo |
-| 6 | `V15` y retiro de la columna de los fixtures | PR 5b | `-Dtest='MfaRequiredAbsenceTest'`; IT: `-Dit.test='V15SchemaDiffIT,V9ExistingRowsIT,MultiTenantSchemaIT'` | PostgreSQL real migrado por pasos | Antes de producción se elimina `V15`; después, migración nueva |
+| 4 | Auditoría de denegaciones con tope, ventana y resumen | PR 4 (4a, 4b) | `-Dtest='DenialWindowsTest,LogAuthorizationMetricsTest,NoRealTimeInDenialTestsTest,AuthorizationBoundaryRulesTest'`; IT: `-Dit.test='PermissionDenialAuditIT,AuthorizationEdgeIT'` | Escritor real y roto, reloj manual, institución propia | Se revierte el decorador; los asientos escritos no se borran |
+| 5 | `MfaPolicy` sin leer la columna | PR 5a | `-Dtest='MfaPolicy*Test,AuthenticateWithPassword*,ResetPasswordWithToken*,StaffAccountTest'` (incluye `MfaPolicyProductionWiringTest`, que por su sufijo `Test` corre en Surefire); IT: `-Dit.test='SecondFactorExemptionsProbeIT,LoginEndpointIT'` | Proceso de inicio de sesión real en la misma JVM, con política de prueba y política real | Se revierte el commit; la columna sigue existiendo |
+| 6 | `V15` y retiro de la columna de los fixtures | PR 5b | `-Dtest='MfaRequiredAbsenceTest'`; IT: `-Dit.test='V15SchemaDiffIT,V9ExistingRowsIT,RetentionPurgeFunctionsIT,RefreshTokenFamilyPurgeFunctionIT,MultiTenantSchemaIT'` | PostgreSQL real migrado por pasos | Antes de producción se elimina `V15`; después, migración nueva |
 | 7 | `GET /api/v1/identity/roles`, criterio 2, `docs/09` | PR 6 (7a, 7b) | `-Dtest='ListRolePermissionsTest,PermissionedEndpointsTest,OpenApiContractSnapshotTest,DocumentationNotesTest'`; IT: `-Dit.test='RolesReportEndpointIT,AuthorizationEdgeIT,ExitCriterion2EndToEndIT'` | Proceso administrativo real (`AdminProcessLauncher`) con inicio de sesión TOTP | Se quita la entrada de la lista: la ruta vuelve a `denyAll` |
 
 ### Dependencias y paralelismo
@@ -128,9 +128,9 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
 |---|---|---|---|
 | 1 | Paridad 6 por 18 celdas, 89 permisos, ADR indexado | Administrador con `payments:create`; matriz vaciada | `./mvnw -B verify` |
 | 2 | Resolutor falla cerrado en cuatro casos; privilegios exactos | Sin `FORCE`; `DELETE` concedido; todos los permisos ante un error | `./mvnw -B verify` |
-| 3 | `403` sin asiento previo a idempotencia y limitador; arranque falla ante ruta sin clasificar | Sin `otp`; decisión en interceptor; guarda desactivada; portal con beans | `./mvnw -B verify` |
-| 4 | Un asiento por denegación, tope, resumen, `403` con escritor roto | Origen ajeno en el resumen; contar dentro de la transacción; `500` ante escritor roto; reloj atrás; apagado sin emisión | `./mvnw -B verify` |
-| 5 | Seis roles y cuenta sin rol exigen segundo factor; `STAFF` en el proceso real | `STAFF` falsa; exigencia condicionada al rol; `Authenticated` sin rol | `./mvnw -B verify` |
+| 3 | `403` sin asiento previo a idempotencia y limitador; arranque falla ante ruta sin clasificar; sesión viva en cada entrada | Sin `otp`; decisión en interceptor; guarda desactivada; portal con beans; sesión viva derivada con `skip(1)` | `./mvnw -B verify` |
+| 4 | Un asiento por denegación, tope exacto bajo concurrencia, suma conservada ante un fallo, resumen, un resumen por petición, `403` con escritor roto | Origen ajeno en el resumen; contar dentro de la transacción; `500` ante escritor roto; reloj atrás; apagado sin emisión; barrido dentro de `compute`; toda la cola en una petición; sin regla del instante futuro; asiento fallido fuera de la suma | `./mvnw -B verify` |
+| 5 | Seis roles y cuenta sin rol exigen segundo factor; `STAFF` en el proceso real; exención por instancia en la misma JVM | `STAFF` falsa; exigencia condicionada al rol; `Authenticated` sin rol; exenciones en un campo `static` | `./mvnw -B verify` |
 | 6 | Columna ausente en esquema, jOOQ y fuentes | Referencia reinsertada en un fixture; segunda sentencia en `V15` | `./mvnw -B verify` |
 | 7 | Criterio 2 de extremo a extremo; informe sin datos personales; instantánea de ocho operaciones | Entrada quitada de la lista (`403` sin asiento); correo en el DTO; endpoint de bitácora en un fixture | `./mvnw -B verify`; **propietario: `./mvnw verify -Pmutation-gate` en `main`** |
 
@@ -205,7 +205,7 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     `PermissionDecider`, `PermissionDeniedException`, `PermissionResolutionFailedException`, `RouteCoverageGuard`, `AuthorizationMetrics` (solo
     `resolutionFailed`); `shared/web/edge/AuthorizationConfiguration`; `shared/observability/metrics/LogAuthorizationMetrics`; `shared/web/problem/DataAccessFailure`
     (extraída de `ProblemExceptionHandler`, mecánica). Modifica `shared/web/edge/SecurityChains` y `AdminSecurityConfiguration`,
-    `shared/web/authentication/AccessTokenAuthenticationFilter` (rutas con permiso a `LIVE_SESSION`), `AuthenticatedEndpoints` y `ActorAuthentication` (Javadoc),
+    `shared/web/authentication/AccessTokenAuthenticationFilter` (sesión viva derivada de la misma instancia de `PermissionedEndpoints`, diseño D6), `AuthenticatedEndpoints` y `ActorAuthentication` (Javadoc),
     `bootstrap/admin/AdminApplication`, `ObservabilityMetricsConfiguration`, `ProblemExceptionHandler`, y de prueba `bootstrap/ProcessBeanPolicy`.
     Pruebas: `PermissionDeciderTest`, `PermissionEdgeTest`, `RouteCoverageGuardTest`, `OpenApiRouteClassificationTest`, `ProductionRoutesClassifiedIT`,
     `AuthorizationEdgeIT` (primera parte), `PermissionedEndpointTextPermissionCompilationTest`, `architecture/AuthorizationBoundaryRulesTest`,
@@ -215,17 +215,21 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     `AuthorizationManager#authorize(Supplier, RequestAuthorizationContext)` de Spring Security 7.1.1; si difiere, se anota y se adapta sin consultar.
   - [ ] 3.2 **ROJO, ataques primero.** `PermissionEdgeTest` (`HarnessProcess`, lista de rutas de prueba, resolutor y grabador dobles, contador de invocaciones por
     `HandlerInterceptor` de prueba): token `[pwd]` da `403 forbidden` con cero invocaciones del controlador y del resolutor [AZ25]; `[pwd, otp]` con el permiso llega al
-    controlador [AZ26]; sin credencial `401 authentication-required` [AZ27]; tokens `mfa-verify` y `mfa-enroll` rechazados antes del resolutor [AZ28]; token vigente de
-    sesión revocada `401 token-invalid` con cero invocaciones del resolutor [AZ78]; cabecera, parámetro y cuerpo con `identity:read` de un Cajero dan `403` [AZ31]; las cinco
-    variantes de ruta no dan `2xx` [AZ32]; `POST`, `PUT`, `PATCH` y `DELETE` no dan `2xx` ni asiento [AZ33]; `/test/accounts/{id}` con `123` y `abc` da `403` por la entrada
-    [AZ37]; claim `permissions` da `401 token-invalid` sin permisos ni roles en el principal [AZ24]; resolutor que lanza con `SENTINEL-RESOLVER-6`: respuesta `500
+    controlador [AZ26]; sin credencial `401 authentication-required` [AZ27]; tokens `mfa-verify` y `mfa-enroll` reciben cada uno `401 token-invalid`, con cero invocaciones del
+    controlador y del resolutor [AZ28]; token vigente de sesión revocada `401 token-invalid` con cero invocaciones del resolutor [AZ78]; **prueba de deriva (diseño D6)**
+    `PermissionEdgeTest.everyPermissionedEntryRejectsARevokedSession`: recorre **cada** entrada de la lista del arnés (al menos dos, una con variable de ruta) con un token de sesión
+    revocada y exige por entrada `401 token-invalid` y cero invocaciones del resolutor [AZ78]; cabecera, parámetro y cuerpo con `identity:read` de un Cajero dan `403` [AZ31]; las cinco
+    variantes de ruta no dan `2xx` [AZ32]; `POST`, `PUT`, `PATCH` y `DELETE` no dan `2xx` ni asiento [AZ33]; `/test/accounts/{id}` con `123` y `abc` consulta el resolutor una vez por
+    petición (precondición de AZ37, cuyo asiento por petición se prueba en la tarea 4); claim `permissions` da `401 token-invalid` sin permisos ni roles en el principal [AZ24]; resolutor que lanza con `SENTINEL-RESOLVER-6`: respuesta `500
     internal-error` con `traceId`, ni `403` ni `forbidden`, grabador y controlador en cero [WE101, AZ60, AZ63]; el cuerpo, las cabeceras y el registro capturado no contienen el
     mensaje ni la clase [WE102, AZ61]; la métrica `authorization_resolution_failed` se incrementa una vez [AZ63]; tras recuperarse el resolutor, el mismo actor recibe la
     respuesta del controlador [AZ64]; ruta con permiso configurada para responder `200` sin credencial hace fallar la enumeración [WE105]. `PermissionDeciderTest`:
     anónimo, `[pwd]`, concedido, denegado con `PermissionDeniedException` (permiso, plantilla, actor) y fallo envuelto sin causa. `AuthorizationEdgeIT` (primera parte, con
     PostgreSQL): una ruta con permiso de prueba que exige `Idempotency-Key` y un limitador que cuenta: la denegación no toca el interceptor, el limitador, el controlador
     ni `shared_idempotency_key` [WE95]; la respuesta es idéntica con y sin clave [WE96]; con el permiso y sin clave responde `400 idempotency-key-missing` después de la
-    decisión [WE97]; el orden de filtros e interceptores [WE94]. `RouteCoverageGuardTest`: ruta sin clasificar, mensaje con método y plantilla [AZ34]; entrada sin
+    decisión [WE97]; el orden de filtros e interceptores [WE94]; `AuthorizationEdgeIT.everyPermissionedEntryRejectsARevokedSession`, la misma prueba de deriva sobre el cableado
+    de `AdminSecurityConfiguration` [AZ78]; `AuthorizationEdgeIT.harnessImportsTheAdministrativeConfiguration`: la lista de `@Import` del arnés es la de `AdminApplication` más el
+    controlador de prueba (diseño D19). `RouteCoverageGuardTest`: ruta sin clasificar, mensaje con método y plantilla [AZ34]; entrada sin
     ruta registrada [AZ35]; ruta en dos clases, `RouterFunction`, cero rutas evaluadas. `ProductionRoutesClassifiedIT` (`AdminProcessLauncher`): pasa con conjunto no
     vacío [AZ36]. `OpenApiRouteClassificationTest`: falla ante una operación sin clasificar y pasa con el documento real [AZ38].
     `PermissionedEndpointTextPermissionCompilationTest`: el fixture permanente con un texto en lugar de `Permission` no compila (el error esperado es el de tipos
@@ -237,20 +241,24 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     puerto y códigos sin importar módulos, dominio de `identity` importa desde `kernel` [BI131]; `PermissionDecider` único consumidor del puerto [I284]. `ProcessBeanIsolationTest`:
     cada bean nuevo y cada línea de `ProcessBeanPolicy` (`ADMIN` permite `com.confia.shared.web.authorization`; `PORTAL` lo prohíbe con motivo; `WORKER` ya lo cubre) primero en rojo
     con `not in the allow-list` [AZ39, BI128, BI129, BI130]. **Rojos esperados:** el principal con permiso recibe `403` por `denyAll` (no hay entrada); la guarda no existe y el
-    arranque no falla; el resolutor que lanza llega a `403`; clases inexistentes.
+    arranque no falla; el resolutor que lanza llega a `403`; la sesión revocada llega a `403` en lugar de `401` en cada entrada (el filtro no conoce la lista); clases inexistentes.
   - [ ] 3.3 **VERDE y REFACTOR.** `SecurityChains` gana la sobrecarga que agrega, después de las rutas restringidas y antes de `anyRequest().denyAll()`,
     `requestMatchers(method, pattern).access(decider.forEndpoint(endpoint))`; las otras dos sobrecargas no cambian. `PermissionDecider` (anónimo `DENIED`, sin `otp` `DENIED`
     sin consultar al resolutor, concedido, o `PermissionDeniedException`; la plantilla viene de la entrada coincidente, nunca de la petición); `resolve` registra solo clases y
-    `SQLState`, emite la métrica y lanza `PermissionResolutionFailedException` sin causa. `AccessTokenAuthenticationFilter` añade las rutas con permiso a las de sesión viva.
+    `SQLState`, emite la métrica y lanza `PermissionResolutionFailedException` sin causa. `AccessTokenAuthenticationFilter` recibe por constructor la **misma instancia** de
+    `PermissionedEndpoints` que `SecurityChains` (un único bean de `AuthorizationConfiguration`, pasado a ambos por `AdminSecurityConfiguration`) y deriva de `endpoints()` sus
+    comparadores de sesión viva; no hay segunda lista ni valor `SessionCheck` por entrada.
     `RouteCoverageGuard` como `SmartInitializingSingleton` con el mensaje de método y ruta. Sin `AuditingAccessDeniedHandler` todavía (tarea 4): el manejador de `403` no cambia.
   - [ ] 3.4 **Demostraciones deliberadas.** (1) Quitar la comprobación de `otp` en `PermissionDecider` pone en rojo `PermissionEdgeTest` [AZ25]. (2) Mover la decisión a un
     `HandlerInterceptor` registrado después del de idempotencia pone en rojo `AuthorizationEdgeIT` [WE95]. (3) Dejar `RouteCoverageGuard` sin efecto pone en rojo `RouteCoverageGuardTest`
     [AZ34]. (4) Relanzar la excepción original en lugar de la envoltura sin causa pone en rojo `PermissionEdgeTest` por el centinela en el registro [WE102]. (5) Importar
-    `AuthorizationConfiguration` desde `PortalApplication` pone en rojo `ProcessBeanIsolationTest` nombrando bean y paquete [AZ39, BI129]. Se revierten y se confirman con `cmp`.
+    `AuthorizationConfiguration` desde `PortalApplication` pone en rojo `ProcessBeanIsolationTest` nombrando bean y paquete [AZ39, BI129]. (6) Derivar los comparadores de sesión viva
+    con `endpoints().stream().skip(1)` en `AccessTokenAuthenticationFilter` pone en rojo `everyPermissionedEntryRejectsARevokedSession` en `PermissionEdgeTest` y en `AuthorizationEdgeIT`,
+    nombrando la entrada omitida [AZ78]. Se revierten y se confirman con `cmp`.
   - [ ] 3.5 **Cierre.** `./mvnw -B verify`. Commits: `feat(web): decide permissions in the admin filter chain over a closed endpoint list`, `feat(web): fail startup on routes without a
     classification`, `refactor(web): extract the data access failure description for reuse`. Tamaño: diseño 790 (340 prod., 440 pruebas, 10 doc.). **Corte (diseño §10.1):** si supera
     800, la rama `...-route-coverage-guard` (3b) recibe `RouteCoverageGuard`, `RouteCoverageGuardTest`, `OpenApiRouteClassificationTest`, `ProductionRoutesClassifiedIT` y el
-    enumerador de cuatro clases [AZ34, AZ35, AZ36, AZ38, BI135]; 3b se fusiona antes de la tarea 4. — Escenarios AZ24 a AZ28, AZ30 a AZ39, AZ60, AZ61, AZ63, AZ64, AZ78, WE94 a WE97,
+    enumerador de cuatro clases [AZ34, AZ35, AZ36, AZ38, BI135]; 3b se fusiona antes de la tarea 4. — Escenarios AZ24 a AZ28, AZ30 a AZ36, AZ38, AZ39, AZ60, AZ61, AZ63, AZ64, AZ78, WE94 a WE97,
     WE101, WE102, WE105, BI128 a BI131, BI133, BI135, BI17, BI20 y los WE conservados (WE18 a WE23, WE33, WE80, WE81 y los seis sin identificador).
 
 - [ ] 4 **PR 4 `permission-denial-audit`: asiento de denegación en transacción propia, tope, ventana, resumen perezoso y métricas (D8 a D11, D19).**
@@ -258,13 +266,19 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     `AuthorizationProperties`; modifica `AuthorizationMetrics` (cuatro métodos), `LogAuthorizationMetrics`, `SecurityChains` (el manejador por parámetro),
     `AdminSecurityConfiguration`, `AuthorizationConfiguration`, `app/src/main/resources/application.yml` (`confia.authorization.denials`: `max-full-rows: 10`,
     `window: 5m`, `max-tracked-keys: 10000`), `docs/07-observabilidad-y-operaciones.md` (nota fechada de los cuatro eventos). Pruebas: `DenialWindowsTest`,
-    `LogAuthorizationMetricsTest`, `PermissionDenialAuditIT`, `AuthorizationEdgeIT` (segunda parte), `architecture/NoRealTimeInDenialTestsTest`, `DocumentationNotesTest`.
-  - [ ] 4.1 **ROJO, ataques primero.** `DenialWindowsTest` (instancia propia, `MutableClock`): hasta `T` filas completas y después `OMITTED` [AZ52 en unidad]; contadores
-    independientes por cuenta, por permiso y por institución [AZ54]; vencida la ventana, se reinicia [AZ55]; la cota de 10 claves nunca se supera con 25 cuentas, la clave nueva con
-    el estado lleno da `UNTRACKED` sin expulsar ninguna [AZ56]; 16 hilos con `CyclicBarrier` nunca pasan de `T` ni pierden una omisión; `flushIfDue` barre una sola vez por
-    segundo; un resumen cuya escritura falla vuelve a la cola, corta el barrido y la cola respeta su cota. **Comprobaciones de diseño sin escenario:** **DC-1** un reloj que
-    retrocede cuenta como ventana vencida: la ventana anterior con omisiones pasa a la cola, se abre una nueva con `full=1` y la suma de filas y conteos se conserva (nunca
-    menos filas); **DC-2** el apagado emite los resúmenes pendientes: `allWindows(now)` devuelve también las ventanas abiertas con omisiones, y sin omisiones no devuelve nada.
+    `LogAuthorizationMetricsTest`, `PermissionDenialAuditIT`, `AuthorizationEdgeIT` (segunda parte), `architecture/NoRealTimeInDenialTestsTest`, `architecture/AuthorizationBoundaryRulesTest`
+    (ampliada), `DocumentationNotesTest`.
+  - [ ] 4.1 **ROJO, ataques primero.** `DenialWindowsTest` (instancia propia, `MutableClock`, concurrencia con `CountDownLatch` o `CyclicBarrier`, límites de prueba por constructor): hasta
+    `T` filas completas y después `OMITTED` [AZ52 en unidad]; contadores independientes por cuenta, por permiso y por institución [AZ54]; vencida la ventana, se reinicia [AZ55]; la cota de
+    10 claves nunca se supera con 25 cuentas, la clave nueva con el estado lleno da `UNTRACKED` sin expulsar ninguna [AZ56]; `concurrentDenialsOfOneKeyNeverExceedTheCap`: 8 hilos liberados
+    por un cerrojo sobre una clave dan exactamente `T` `FULL_ROW` y 5 `OMITTED` [AZ79 en unidad]; `sweepRacingARecordOfTheSameKeyLosesNoDenial`: el barrido y una denegación de una clave vencida
+    liberados a la vez conservan la suma; `failedFullRowReturnsTheSlotAndCountsAsOmitted` y `failedFullRowOfAClosedWindowQueuesASummaryOfOne` [AZ80 en unidad];
+    `pendingQueueDiscardsBeyondItsBound`; `sweepMovesAtMostItsLimitAndLeavesTheRest` (límite 2, cinco vencidas: 2, 2 y 1); `sweepRunsAtMostOncePerSecond` (la compuerta);
+    `farFutureNextSweepInstantIsTreatedAsDue` (barrido a `t`, reloj a `t - 1 h`: barre de inmediato). **Comprobaciones de diseño sin escenario:** **DC-1**
+    `backwardClockClosesTheWindowAndKeepsTheSum`: un reloj que retrocede cuenta como ventana vencida, la ventana anterior con omisiones pasa a la cola, se abre una nueva con `full=1` y la suma
+    de filas y conteos se conserva (nunca menos filas); **DC-2** el apagado emite los resúmenes pendientes: `closeAllForShutdown(now)` devuelve también las ventanas abiertas con omisiones, y sin
+    omisiones no devuelve nada. `AuthorizationBoundaryRulesTest.denialWindowsMappingFunctionsTouchNoOtherMapping`: ningún método sintético `lambda$*` de `DenialWindows` invoca un método de
+    `ConcurrentHashMap` ni `sweepIfDue`, con fixture que lo hace y falla (diseño D10).
     `LogAuthorizationMetricsTest`: eventos `WARN` con `event`, `permission` y `suppressed`, uno por segundo y por clave, sin correo, IP ni ruta [AZ58]; cota por construcción.
     `PermissionDenialAuditIT` (`TransactionRunner` real, `MutableClock`, escritor real o envuelto para fallar, institución propia): un solo asiento con `action`, `outcome`,
     `actor_kind`, `actor_id`, `entity_id`, `entity_type` `authorization.permission` y detalle exacto `{"routeTemplate":"/api/v1/identity/roles"}` con el constructor tipado
@@ -272,8 +286,15 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     el grabador y el asiento existe tras la respuesta [AZ43]; plantilla `/test/accounts/{id}` sin `SENTINEL-ID-9` [AZ44]; el contador decide fuera de la transacción: un
     reintento por `40001` no cuenta dos veces; cadena verificada tras los asientos [AZ45, AT37]; dos instituciones, dos cadenas íntegras [AT34]; resumen: `omittedCount` 2,
     `windowSeconds` 300, cuenta y permiso, sin ruta, consulta, cuerpo, cabeceras, agente de usuario ni IP, **con prueba negativa de origen** (barrido disparado por una petición con IP y agente
-    ajenos) [AT35]; 3 completos más conteo 2 igualan 5 [AT36]; **DC-2** `destroy()` del bean escribe los resúmenes pendientes antes de cerrar el `DataSource`, y no escribe nada si no hay
-    omisiones. `AuthorizationEdgeIT` (segunda parte, con `T=3` por propiedad): tres completos y sin resumen [AZ52]; 5 denegaciones, reloj manual hasta cerrar la ventana y
+    ajenos) [AT35]; 3 completos más conteo 2 igualan 5 [AT36]; `failedFullRowIsCountedInTheSummary`: escritor que falla solo en la primera inserción, 5 denegaciones, 3 completos y resumen de
+    conteo 2 [AZ80]; `oneDenialWritesAtMostOneSummary`: con 5 resúmenes pendientes, un escritor envuelto que cuenta registra como mucho 2 inserciones por denegación (su asiento y un resumen) y
+    quedan 4 pendientes (diseño D10, latencia acotada); `failedSummaryReturnsToTheHeadAndStopsThePass`: el resumen fallido vuelve primero a la cola, no se intenta otro y la métrica sube una vez;
+    `requeueIntoAFullQueueDiscardsAndCounts` (cota de prueba pequeña); **DC-2** `shutdownWritesPendingSummaries`: `destroy()` escribe los resúmenes pendientes antes de cerrar el `DataSource`, y no
+    escribe nada si no hay omisiones; `shutdownStopsAtTheFirstFailure`: un solo intento y la métrica por cada resumen no escrito; `shutdownStopsWhenItsBudgetIsSpent`: un escritor envuelto avanza
+    el `MutableClock` 4 s por inserción, se escriben 3 y el resto cuenta como no escrito. `AuthorizationEdgeIT` (segunda parte, con `T=3` por propiedad): `/test/accounts/{id}` con `123` y
+    `abc`: dos `403`, exactamente dos asientos, uno por petición, con `entity_id` del permiso de la entrada y plantilla `/test/accounts/{id}`, sin `123` ni `abc` [AZ37];
+    `concurrentDenialsOfOneKeyWriteExactlyTFullRows`: 8 peticiones liberadas por un cerrojo, 3 completos, resumen de conteo 5 tras cerrar la ventana y la siguiente denegación de otra clave, ocho
+    `403` y cadena íntegra [AZ79]; tres completos y sin resumen [AZ52]; 5 denegaciones, reloj manual hasta cerrar la ventana y
     la siguiente denegación de otra clave: 3 completos, un resumen con conteo 2, métrica `authorization_denial_omitted` incrementada 2 y cinco `403` [AZ53]; acceso concedido sin asiento
     [AZ46]; ruta sin mapear sin asiento [AZ47]; CSRF `csrf-invalid` sin asiento [AZ48]; `404` de objeto sin asiento [AZ49]; `401` sin credencial, vencido y alterado sin asiento [AZ50]; falla
     de resolución sin asiento ni consumo del tope: 10 fallos y luego 3 denegaciones escriben 3 completas [AZ62]; (AZ60 se completa aquí: sin asiento y contador sin variar); ruta
@@ -282,22 +303,31 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     centinelas `SENTINEL-PATH-1`, `SENTINEL-QUERY-2`, `SENTINEL-BODY-3`, `SENTINEL-HEADER-4` y el token en `shared_audit_log`, registros con la raíz en `DEBUG` y doble de métricas
     [AZ51, AT33]; las pruebas del tope corren en cualquier orden y repetidas [AZ57]. `NoRealTimeInDenialTestsTest`: ninguna clase nombrada refiere `Thread.sleep`, `Instant.now()` ni
     `Clock.systemUTC()`, con fixture [BI137]; tres ejecuciones en orden aleatorio (`-Dsurefire.runOrder=random`) con resultado idéntico, registradas [BI138]. **Rojos esperados:**
-    `cannot find symbol` de `DenialWindows`; `expected 1 audit entry but found 0` (el manejador actual no escribe).
+    `cannot find symbol` de `DenialWindows`; `expected 1 audit entry but found 0` (el manejador actual no escribe); AZ37 con `expected 2 audit entries but found 0`.
   - [ ] 4.2 **VERDE y REFACTOR.** `AuditingAccessDeniedHandler` decora a `ProblemAccessDeniedHandler` solo en la cadena administrativa y registra únicamente
     `PermissionDeniedException` antes de responder; `PermissionDenialAudit` implementa el grabador (`record` nunca lanza; captura `RuntimeException`, incrementa la métrica una vez y no
     registra la excepción); `runner.execute(actor.securityContext(requestId), ...)` con `AuditLogWriter` y `AuditJson`; resumen con el contexto de la institución de la ventana, un
-    `requestId` nuevo y `ScopedValue.where(RequestOrigin.CURRENT, new RequestOrigin(summaryRequestId, null, null))`; `DisposableBean.destroy`; `DenialWindows` con `compute` por
-    clave, reserva con compare-and-set y `Clock` inyectado; `AuthorizationProperties` validada en el constructor. Sin líneas nuevas de `ProcessBeanPolicy` (el paquete ya está permitido;
+    `requestId` nuevo y `ScopedValue.where(RequestOrigin.CURRENT, new RequestOrigin(summaryRequestId, null, null))`; `DisposableBean.destroy` con corte en el primer fallo y presupuesto de
+    10 s por el `Clock` inyectado; `DenialWindows` según diseño D10: `compute` solo sobre la propia clave, barrido fuera de toda función de asignación con un bucle `for` y `computeIfPresent`
+    por clave, compuerta `AtomicLong` con la regla del instante futuro, como mucho 500 ventanas por barrido, cola `LinkedBlockingDeque` de 10 000, reserva con compare-and-set, `fullRowFailed`
+    y `untrackedRowFailed` invocados por `PermissionDenialAudit` al fallar un asiento, y `afterDenial` que escribe como mucho un resumen; `AuthorizationProperties` validada en el constructor. Sin líneas nuevas de `ProcessBeanPolicy` (el paquete ya está permitido;
     `ProcessBeanIsolationTest` lo confirma). Nota fechada de `docs/07` con los cuatro eventos.
   - [ ] 4.3 **Demostraciones deliberadas.** (1) No volver a enlazar `RequestOrigin.CURRENT` al escribir el resumen pone en rojo `PermissionDenialAuditIT`: el resumen lleva la IP ajena
     [AT35]. (2) Mover `windows.record` dentro de la lambda del `TransactionRunner` pone en rojo la prueba del reintento: el conteo se duplica [AZ52, AZ53]. (3) Quitar el `catch` de
     `PermissionDenialAudit.record` pone en rojo `AuthorizationEdgeIT`: llega un `500` [AZ59, WE100]. (4) Comparar `full <= T` en lugar de `full < T` pone en rojo `DenialWindowsTest`
     [AZ52]. (5) Quitar la rama de reloj retrocedido pone en rojo la comprobación **DC-1**. (6) Dejar `destroy()` vacío pone en rojo la comprobación **DC-2**. (7) Agregar `Thread.sleep` a
-    un fixture del tope pone en rojo `NoRealTimeInDenialTestsTest` [BI137]. Se revierten y se confirman con `cmp`.
+    un fixture del tope pone en rojo `NoRealTimeInDenialTestsTest` [BI137]. (8) Invocar `sweepIfDue` desde la función de `record` pone en rojo
+    `denialWindowsMappingFunctionsTouchNoOtherMapping`, nombrando el método sintético [D10]. (9) Escribir toda la cola en `afterDenial` pone en rojo `oneDenialWritesAtMostOneSummary`: seis
+    inserciones. (10) Quitar la regla de distancia de la compuerta pone en rojo `farFutureNextSweepInstantIsTreatedAsDue`. (11) No invocar `fullRowFailed` pone en rojo
+    `failedFullRowIsCountedInTheSummary`: el resumen cuenta 1 [AZ80]. (12) Quitar el límite por barrido pone en rojo `sweepMovesAtMostItsLimitAndLeavesTheRest`. (13) Devolver el resumen fallido
+    con `offerLast` pone en rojo `failedSummaryReturnsToTheHeadAndStopsThePass`. (14) Quitar el presupuesto del apagado pone en rojo `shutdownStopsWhenItsBudgetIsSpent`. La demostración (4)
+    también pone en rojo `concurrentDenialsOfOneKeyNeverExceedTheCap` [AZ79]; una pérdida de actualización por `get` y `put` no se usa, porque su intercalado no es determinista. Se revierten y se
+    confirman con `cmp`.
   - [ ] 4.4 **Cierre.** `./mvnw -B verify`. Commits: `feat(web): audit permission denials with a bounded in-memory cap and a window summary`, `feat(observability): publish the
     authorization events through a port`, `docs(ops): note the four authorization events`. Tamaño: diseño 780 (340 prod., 420 pruebas, 20 doc.). **Corte (diseño §10.1):** si supera 800, la
     rama `...-authorization-metrics` (4a) recibe `AuthorizationMetrics` completo, `LogAuthorizationMetrics`, `LogAuthorizationMetricsTest` y la nota de `docs/07` con su prueba [AZ58 en
-    unidad]; 4b conserva el resto. — Escenarios AZ40 a AZ59, AZ62, WE98 a WE100, AT32 a AT38, BI137, BI138, **DC-1** y **DC-2**.
+    unidad]; 4b conserva el resto. La corrección del 2026-11-04 agrega pruebas a esta rebanada, de modo que el corte 4a/4b es probable; se mide antes de abrir el PR. — Escenarios AZ37, AZ40 a
+    AZ59, AZ62, AZ79, AZ80, WE98 a WE100, AT32 a AT38, BI137, BI138, **DC-1** y **DC-2**.
 
 ## Fase 3: MFA derivada de una política
 
@@ -305,15 +335,23 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
   - **Archivos.** Crea `identity/domain/MfaPolicy.java`; modifica `identity/domain/StaffAccount.java` (sin el campo), `AuthenticationResult` (Javadoc),
     `identity/application/{AuthenticateWithPassword,ResetPasswordWithToken}.java`, `identity/infrastructure/JooqStaffAccountRepository.java` (deja de leer `getMfaRequired()`),
     `identity/infrastructure/wiring/IdentityConfiguration.java` (registra `MfaPolicy.STAFF`), `bootstrap/ProcessBeanPolicy.java` (`ADMIN` permite `com.confia.identity.domain`),
-    `docs/03-seguridad.md` §4.3 (nota fechada). Pruebas: `MfaPolicyTest`, `MfaPolicyProductionWiringTest`, `SecondFactorExemptions` (en `src/test`), `identity/web/LoginEndpointSupport`,
+    `docs/03-seguridad.md` §4.3 (nota fechada). Pruebas: `MfaPolicyTest`, `MfaPolicyProductionWiringTest`, `SecondFactorExemptions` y `SecondFactorExemptionsConfiguration` (en `src/test`), `identity/web/SecondFactorExemptionsProbeIT`, `identity/web/LoginEndpointSupport`,
     `identity/web/LoginProcess`, `StaffAccountTest`, `AuthenticateWithPassword*`, `ResetPasswordWithToken*`, `DocumentationNotesTest`. **Los fixtures siguen insertando la columna**
     (`NOT NULL` sin `DEFAULT`, `V6` no se edita); el parámetro `mfaRequired` de los ayudantes pasa a alimentar `SecondFactorExemptions`.
-  - [ ] 5.1 **Sonda S1.** Primera prueba de la tarea: `LoginProcess` agrega `spring.main.sources` con una configuración de prueba que declara un `@Primary MfaPolicy`, y `ConfiaApplication.launch`
-    la respeta. Si no, la alternativa es un `BeanPostProcessor` agregado por un `ApplicationContextInitializer` de prueba, **nunca un parámetro nuevo en producción**; se anota el resultado.
+  - [ ] 5.1 **Sonda S1 (diseño D14).** Primera prueba de la tarea, `identity/web/SecondFactorExemptionsProbeIT`. El proceso corre en la misma JVM (`LoginProcess.start` →
+    `AdminProcessLauncher.launch` → `ConfiaApplication.launch`). `LoginProcess` agrega `spring.main.sources` con `SecondFactorExemptionsConfiguration` (de `src/test`), que declara un
+    `@Bean @Primary SecondFactorExemptions` con un conjunto de instancia (`ConcurrentHashMap.newKeySet()`), sin ningún campo `static`; `LoginProcess.exemptions()` lo obtiene con
+    `context.getBean(...)` y `LoginEndpointSupport` gana `abstract SecondFactorExemptions exemptions()`. Orden: el proceso arranca por clase, cada prueba siembra la fila, registra la exención y
+    solo después inicia sesión. La sonda afirma, en un mismo proceso con la configuración, que una cuenta **eximida** con contraseña correcta obtiene la sesión y sus cookies (`Authenticated`,
+    como I149) y que una cuenta **no eximida** con credencial verificada obtiene el token restringido (`SecondFactorRequired`); que, en un segundo proceso con la configuración, la cuenta eximida en
+    el primero y no registrada en el segundo obtiene `SecondFactorRequired` (sin estado compartido entre contextos); y, en un proceso sin la configuración, que el contexto no contiene
+    `SecondFactorExemptions` y que su único `MfaPolicy` es `STAFF`. **Rojo esperado:** `NoSuchBeanDefinitionException` de `SecondFactorExemptions` (la configuración no existe). Si
+    `ConfiaApplication.launch` no respeta `spring.main.sources`, la alternativa es un `BeanPostProcessor` agregado por un `ApplicationContextInitializer` de prueba, con el mismo conjunto de
+    instancia y la misma sonda, **nunca un parámetro nuevo en producción**; se anota el resultado.
   - [ ] 5.2 **ROJO, ataques primero.** Con la política real y filas con `mfa_required=false` en el fixture: cuenta con rol Contabilidad y credencial verificada da `SecondFactorRequired`
     [I287]; cuenta sin rol y sin credencial da `SecondFactorEnrollmentRequired`, nunca `Authenticated` [I288]; quitar la asignación no desactiva la exigencia [I289]; los seis roles dan
     `SecondFactorRequired` [I290]; el restablecimiento sin segundo factor se rechaza para una cuenta sin rol con credencial verificada [I291]; cuenta sin rol y con credencial verificada
-    exige el código [I301]; con la política real ni la cuenta con rol ni la cuenta sin rol obtienen `Authenticated` [I302]. `MfaPolicyProductionWiringTest` (proceso real): el bean es `STAFF`,
+    exige el código [I301]; con la política real ni la cuenta con rol ni la cuenta sin rol obtienen `Authenticated` [I302]. `MfaPolicyProductionWiringTest` (proceso real, en Surefire por su sufijo `Test`): el bean es `STAFF`,
     `ArchUnit` afirma que `STAFF` es la única definición de producción y que el trabajador y el portal no registran el bean [I302, BI129 parte de la política]. Las pruebas migradas que
     esperan `Authenticated` pasan a declarar su exención con `SecondFactorExemptions` con la columna insertada en `true`: **rojo** `expected Authenticated but was SecondFactorRequired`
     (I149, I156, I228 y la traducción a `200`). Resto de escenarios modificados: desenlaces de cuenta con credencial verificada y sin credencial, `I217`, `Authenticated` sin campo de alcance con
@@ -325,10 +363,13 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     lee ningún rol ni propiedad. Nota fechada de `docs/03` §4.3 (MFA obligatoria y derivada). La construcción pasa **sin** `V15` [BI127].
   - [ ] 5.4 **Demostraciones deliberadas.** (1) Hacer `STAFF = account -> false` pone en rojo `MfaPolicyTest`, `MfaPolicyProductionWiringTest` e I288 (y debe morir bajo PIT). (2) Condicionar la
     exigencia a la existencia de una asignación de rol en `AuthenticateWithPassword` pone en rojo I288 e I301. (3) Devolver `Authenticated` para una cuenta sin rol pone en rojo I302. Se
-    revierten y se confirman con `cmp`.
+    revierten y se confirman con `cmp`. (4) Guardar las exenciones en un campo `static` de `SecondFactorExemptions` (código de prueba) pone en rojo la sonda S1: en el segundo proceso la cuenta
+    no registrada hereda la exención del primero y recibe `Authenticated`. Se restaura desde la copia y se confirma con `cmp`.
   - [ ] 5.5 **Cierre.** `./mvnw -B verify` y registro en `apply-progress.md` de que esta construcción pasa sin `V15` (insumo de [BI127]). Commits: `refactor(identity): derive the second factor
     requirement from MfaPolicy instead of a column`, `docs(security): note the mandatory derived MFA in section 4.3`. Tamaño: diseño 570 (70 prod., 480 pruebas, 20 doc.). — Escenarios I287 a I291, I301,
-    I302 y los modificados de MFA, inicio de sesión y restablecimiento (I149 a I156, I217, I218, I228, I167 a I169 y los 14 sin identificador de esos requisitos) listados en la trazabilidad.
+    I302 y los modificados de MFA, inicio de sesión y restablecimiento (I149 a I156, I217, I218, I228, I167 a I169 y los 10 sin identificador de esos requisitos) listados en la trazabilidad.
+    Los otros 4 modificados sin identificador del delta de `identity` («Permiso presente por el rol asignado», «Cliente afirma un permiso que la cuenta no tiene», «El único camino para cambiar
+    una contraseña es el token» y «Un restablecimiento sin token válido nunca cambia la contraseña») son de la tarea 7.
 
 - [ ] 6 **PR 5b `drop-mfa-required-column`: `V15` y retiro de la columna de 43 archivos de prueba (D15 pasos 2 y 3).**
   - **Archivos.** Crea `app/src/main/resources/db/migration/V15__drop_identity_staff_account_mfa_required.sql` (solo `ALTER TABLE identity_staff_account DROP COLUMN mfa_required`).
@@ -341,7 +382,14 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     no la contiene y no hay aparición de `mfa_required`, `MFA_REQUIRED`, `mfaRequired` ni `getMfaRequired` sin distinguir mayúsculas, salvo `V6`, `V15` y las pruebas fijadas con `migratedTo`
     a una versión anterior a 15; con un fixture que reinserta una referencia falla señalando el archivo [I292, BI126]. Verificación documental del orden: `V15` es posterior a la tarea 5
     fusionada [BI127]. Regresión: las puertas genéricas, la lectura aislada y el contexto vacío de las cuatro tablas de `V6` sobre el esquema migrado (tres escenarios sin identificador).
-    **Rojos esperados:** `No migration with a target version 15 could be found`; la búsqueda encuentra la columna en 13 archivos de producción y de prueba actuales.
+    **Rojos esperados:** `No migration with a target version 15 could be found`; la búsqueda de `MfaRequiredAbsenceTest` falla y enumera los archivos. **Línea base medida** el 2026-11-04 en
+    `6b48d1b`, con el árbol limpio, sin distinguir mayúsculas y solo sobre archivos versionados de `apps/` (búsqueda con ripgrep, que respeta `.gitignore`, equivalente a `git grep -il` porque
+    no había archivos sin seguimiento): `mfa_?required` aparece en **49 archivos**, que son `V6`, 5 archivos Java de producción (`StaffAccount`, `AuthenticationResult`,
+    `AuthenticateWithPassword`, `ResetPasswordWithToken` y `JooqStaffAccountRepository`) y **43 de prueba**; el literal de `git grep -il mfa_required` da **44** (`V6`, 3 de producción y 40 de
+    prueba), porque no ve `mfaRequired` ni `getMfaRequired`. Después de la tarea 5 no debe quedar ningún archivo Java de producción, de modo que el rojo esperado son los archivos de prueba de
+    esa línea base que la tarea 5 no tocó, salvo los fijados con `migratedTo` (exceptuados), más el código de jOOQ generado, que no está versionado y solo ve la prueba. El ejecutor vuelve a
+    medir con `git grep -il -E "mfa_?required" -- apps` antes del rojo y registra en `apply-progress.md` la orden, el recuento y la lista; una aparición en producción Java es otra causa y
+    detiene la tarea.
   - [ ] 6.3 **VERDE y REFACTOR.** Crear `V15`; regenerar jOOQ en la construcción; quitar la columna de los 43 archivos (cambio mecánico); renombrar el parámetro de los ayudantes; eliminar la
     prueba de creación de la cuenta con la columna. Las pruebas fijadas a una versión histórica conservan la columna.
   - [ ] 6.4 **Demostraciones deliberadas.** (1) Reinsertar `mfa_required` en un ayudante de fixture actual pone en rojo `MfaRequiredAbsenceTest` [BI126]. (2) Agregar a `V15` una segunda sentencia
@@ -376,8 +424,10 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     `identity:read` y `request_id` igual al `traceId` [AZ65]; Auditor recibe `200` y ningún asiento de denegación [AZ66]; el verificador de cadena sigue íntegro [AZ67]; centinelas en consulta y
     cabeceras ajenas no aparecen en `shared_audit_log` ni en los registros [AZ68]; escritor roto: sigue el `403`; con `T=2`, la tercera denegación no escribe fila completa, incrementa
     `authorization_denial_omitted` y, al cerrar la ventana con el reloj inyectado y producirse otra denegación, existe el resumen con conteo 1 [AZ69]; aislada, repetida y tras otra prueba que denegó a la
-    misma cuenta da el mismo resultado [AZ70]; cambio de rol de Auditor a Cajero y repetición con el mismo token: `403` sin esperar a que venza [AZ22]. Se ejecutan en dos niveles: arnés con contador y proceso
-    real (mismo cableado de producción). Orden aleatorio, tres veces [BI138 se extiende].
+    misma cuenta da el mismo resultado [AZ70]; cambio de rol de Auditor a Cajero y repetición con el mismo token: `403` sin esperar a que venza [AZ22]. AZ65 a AZ68, AZ70 y AZ22 se ejecutan en dos niveles:
+    arnés con contador y proceso real (mismo cableado de producción). **AZ69 se prueba solo en el arnés** (`AuthorizationEdgeIT`, con el `MutableClock` que inyecta su `BeanPostProcessor` y el escritor
+    envuelto): el proceso real no admite reloj manual ni escritor roto sin un bean de prueba (diseño D19), y `harnessImportsTheAdministrativeConfiguration` (tarea 3) impide que el arnés se aparte del
+    proceso real. Orden aleatorio, tres veces [BI138 se extiende].
   - [ ] 7.4 **ROJO, inversiones y ausencias.** `AuthorizationScopeExclusionInventoryTest` con control negativo: ninguna ruta de gestión de roles, cuentas ni bitácora, ni inscripción de MFA con sesión completa [AZ74];
     ningún caso de uso, migración ni tarea inserta asignaciones y ninguna migración inserta cuentas [AZ75]; la cadena del portal sin roles, permisos ni lista [AZ76]; sin flujo de solicitud o aprobación de
     anulación, alcance dentro de un permiso, tarea de integridad de MFA, informe de segregación ni cliente de Redis para el tope [AZ77]. `IdentityScopeExclusionInventoryTest`: ningún caso de uso asigna o cambia
@@ -416,18 +466,19 @@ Los escenarios modificados sin identificador se nombran por su título abreviado
 |---|---|---|---|
 | 1 (PR 1) | AZ01 a AZ16, AZ72, BI132 | `PermissionTest`, `StaffRoleTest`, `PermissionMatrixParityTest`, `DocumentationNotesTest`, `DomainPurityRulesTest` | 18 |
 | 2 (PR 2) | AZ17 a AZ21, AZ23, I278 a I286, BI119 a BI124 | `AccountPermissionsTest/IT`, `IdentityStaffAccountRoleSchemaIT`, `V14SchemaDiffIT`, `RolePrivilegeMatrixIT`, `PermissionResolverInventoryTest` | 21 |
-| 3 (PR 3) | AZ24 a AZ28, AZ30 a AZ39, AZ60, AZ61, AZ63, AZ64, AZ78; WE94 a WE97, WE101, WE102, WE105; BI17, BI20, BI128 a BI131, BI133, BI135; conservados: WE18 a WE23, WE33, WE80, WE81 y seis sin identificador («Ruta no registrada sin credencial», «Ruta registrada fuera de la lista blanca», «La respuesta no distingue rutas existentes de inexistentes», «Principal autenticado sin permiso», «Método distinto al permitido en una ruta pública», «Variantes de la ruta no eluden la denegación») | `PermissionEdgeTest`, `AuthorizationEdgeIT`, `RouteCoverageGuardTest`, `PublicRouteAllowListTest`, `AuthorizationBoundaryRulesTest`, `ProcessBeanIsolationTest` | 50 |
-| 4 (PR 4) | AZ40 a AZ59, AZ62; WE98 a WE100; AT32 a AT38; BI137, BI138; DC-1, DC-2 | `DenialWindowsTest`, `PermissionDenialAuditIT`, `AuthorizationEdgeIT`, `LogAuthorizationMetricsTest`, `NoRealTimeInDenialTestsTest` | 35 |
+| 3 (PR 3) | AZ24 a AZ28, AZ30 a AZ36, AZ38, AZ39, AZ60, AZ61, AZ63, AZ64, AZ78; WE94 a WE97, WE101, WE102, WE105; BI17, BI20, BI128 a BI131, BI133, BI135; conservados: WE18 a WE23, WE33, WE80, WE81 y seis sin identificador («Ruta no registrada sin credencial», «Ruta registrada fuera de la lista blanca», «La respuesta no distingue rutas existentes de inexistentes», «Principal autenticado sin permiso», «Método distinto al permitido en una ruta pública», «Variantes de la ruta no eluden la denegación») | `PermissionEdgeTest`, `AuthorizationEdgeIT`, `RouteCoverageGuardTest`, `PublicRouteAllowListTest`, `AuthorizationBoundaryRulesTest`, `ProcessBeanIsolationTest` | 49 |
+| 4 (PR 4) | AZ37, AZ40 a AZ59, AZ62, AZ79, AZ80; WE98 a WE100; AT32 a AT38; BI137, BI138; DC-1, DC-2 | `DenialWindowsTest`, `PermissionDenialAuditIT`, `AuthorizationEdgeIT`, `LogAuthorizationMetricsTest`, `NoRealTimeInDenialTestsTest`, `AuthorizationBoundaryRulesTest` | 38 |
 | 5 (PR 5a) | I287 a I291, I301, I302; I149 a I156, I228, I167 a I169, I217, I218; sin identificador: «Cuenta del personal con secreto TOTP ya inscrito y verificado», «Cuenta del personal sin ningún secreto TOTP inscrito», «Contraseña correcta produce el desenlace `Authenticated` sin campo de alcance», «Toda causa de rechazo produce el desenlace `Rejected`», «Los cuatro desenlaces son exactamente los que el tipo cerrado permite», «Un desenlace no manejado rompe la compilación», «`SecondFactorRequired` no avanza el contador de retroceso», «Sin segundo factor no hay restablecimiento…», «Un código de recuperación de MFA sustituye al código TOTP», «Una cuenta sin secreto restablece solo con el enlace» | `MfaPolicyTest`, `MfaPolicyProductionWiringTest`, `LoginEndpointIT`, `AuthenticateWithPassword*`, `ResetPasswordWithToken*` | 31 |
 | 6 (PR 5b) | I292, BI125 a BI127; V6 sin identificador: «Las puertas genéricas de esquema pasan sobre cada tabla nueva…», «Una institución no lee la llave de datos de otra», «Sin contexto de institución, la consulta devuelve cero filas…» | `V15SchemaDiffIT`, `MfaRequiredAbsenceTest`, `MultiTenantSchemaIT` | 7 |
 | 7 (PR 6) | AZ22, AZ29, AZ65 a AZ71, AZ73 a AZ77; I293 a I300, I303, I58 a I62, I215, I216; sin identificador: «Permiso presente por el rol asignado», «Cliente afirma un permiso que la cuenta no tiene», «El único camino para cambiar una contraseña es el token», «Un restablecimiento sin token válido nunca cambia la contraseña»; WE79, WE103, WE104; BI16, BI18, BI19, BI24 a BI27, BI59, BI134, BI136, BI139; audit-trail sin identificador: «La política de fila filtra solo por institución…», «Ningún endpoint expone la bitácora con el permiso `audit:read`» | `RolesReportEndpointIT`, `ExitCriterion2EndToEndIT`, `AuthorizationEdgeIT`, `OpenApiContractSnapshotTest`, inventarios de ausencia, `DocumentationNotesTest` | 50 |
-| | **Total** (144 escenarios nuevos, 66 modificados o conservados y 2 comprobaciones de diseño) | | **212** |
+| | **Total** (146 escenarios nuevos, 66 modificados o conservados y 2 comprobaciones de diseño) | | **214** |
 
 **Escenarios sin tarea:** ninguno. **Comprobaciones de diseño sin escenario (unitarias, tarea 4):** **DC-1** un retroceso del reloj cuenta como ventana vencida (`DenialWindowsTest`); **DC-2** el apagado emite los
-resúmenes pendientes (`DenialWindowsTest.allWindows` y `PermissionDenialAuditIT`). Escenarios documentales sin aserción automática: AZ16 (nota fechada, cubierto por `DocumentationNotesTest`), AZ73, BI127 (orden de
+resúmenes pendientes (`DenialWindowsTest` sobre `closeAllForShutdown` y `PermissionDenialAuditIT.shutdown*`). Las pruebas de D10 sin escenario propio (barrido fuera de `compute`, compuerta,
+límite por barrido, cola acotada, un resumen por petición, apagado acotado) están nombradas en la tarea 4 y en el diseño §9. Escenarios documentales sin aserción automática: AZ16 (nota fechada, cubierto por `DocumentationNotesTest`), AZ73, BI127 (orden de
 PR, evidencia en `apply-progress.md`).
 
-## Contradicciones y observaciones (no se editó ni la especificación ni el diseño)
+## Contradicciones y observaciones (las 1 a 10 son del desglose original; la 11 registra la corrección del 2026-11-04, que sí editó el diseño y los deltas)
 
 1. **Estado de la sección 11 del diseño.** Dice «No se editó ninguno» y su encabezado cita AZ01-AZ77, pero los deltas ya aplican los siete cambios (AZ78 existe, AZ69, BI122, BI126 y BI131 con la redacción
    recomendada). El texto del diseño quedó desactualizado; no afecta a las tareas.
@@ -445,3 +496,7 @@ PR, evidencia en `apply-progress.md`).
 9. **`docs/15` §3** dice que cada PR «apunta al anterior, no a `main`»; el propietario aprobó `stacked-to-main` (cada rama parte de la anterior y se fusiona en orden a `main`). Es la misma práctica de los
    cambios 5 a 9; se mantiene.
 10. **Base del PR 1.** La rama del cambio lleva cinco commits de documentos SDD. La tarea 1 confirma con `git log` si ya están en `main`; si no, el PR 1 los hereda y se excluyen de la medición por estar bajo `openspec/`.
+11. **Corrección de planificación del 2026-11-04** (pedida por el propietario). Se reflejan los cambios del diseño en D6, D10, D14 y D19: prueba de deriva de la sesión viva (tarea 3), concurrencia del
+    barrido, suma conservada ante un fallo, un resumen por petición, compuerta ante un retroceso y apagado acotado (tarea 4), exención por instancia en la misma JVM (tarea 5), AZ69 solo en el arnés
+    (tarea 7). AZ37 pasa de la tarea 3 a la 4, porque su asiento por petición exige el manejador que audita. Escenarios nuevos AZ79 y AZ80 (tarea 4). La tarea 5 tiene 10 escenarios modificados sin
+    identificador, no 14: los otros 4 del delta de `identity` ya eran de la tarea 7. El rojo esperado de la tarea 6 se rehízo sobre una medición. Ningún valor aprobado cambia.

@@ -58,10 +58,12 @@ NO DEBE aprender nada de la idempotencia ni del limitador: la respuesta a una pe
 
 ### Requisito: El manejador de `403` distingue la denegación por permiso de las demás respuestas `403`
 
-El manejador de acceso denegado DEBE responder siempre con el Problem Details `403` con el código `forbidden`, y DEBE
-auditar únicamente la denegación por permiso, que identifica porque la excepción lleva el código del permiso. Las demás
-respuestas `403` (ruta sin mapear por la denegación final, rechazo de CSRF o de `Origin`, rechazo por falta de `otp`)
-NO DEBEN producir el asiento de denegación. El cuerpo de la respuesta de una denegación por permiso, tanto si el asiento
+El manejador de acceso denegado DEBE responder con el Problem Details `403` con el código `forbidden` a toda denegación
+que le llega, que son la denegación por permiso, la ruta sin mapear rechazada por la denegación final y el rechazo por
+falta de `otp`, y DEBE auditar únicamente la denegación por permiso, que identifica porque la excepción lleva el código
+del permiso. El rechazo de CSRF o de `Origin` no pasa por ese manejador: lo responde el filtro de CSRF y conserva su
+`403` con el código `csrf-invalid`. Ninguna respuesta `403` distinta de la denegación por permiso (ruta sin mapear,
+rechazo de CSRF o de `Origin`, rechazo por falta de `otp`) DEBE producir el asiento de denegación. El cuerpo de la respuesta de una denegación por permiso, tanto si el asiento
 se escribió como si no, DEBE ser idéntico en estado, `type`, `title` y `detail` al de una ruta sin mapear; solo pueden
 diferir `instance` y `traceId`. Esa igualdad no revela qué rutas existen ni qué permisos exige cada una.
 
