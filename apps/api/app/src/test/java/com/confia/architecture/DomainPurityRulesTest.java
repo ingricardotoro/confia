@@ -65,11 +65,11 @@ class DomainPurityRulesTest {
     }
 
     @Test
-    void theRealDomainSetIsNotEmptyAndHoldsStaffAccount() {
+    void theRealDomainSetIsNotEmptyAndHoldsTheRoleMatrix() {
         assertThat(productionClasses().stream()
                 .filter(javaClass -> javaClass.getPackageName().equals("com.confia.identity.domain"))
                 .map(JavaClass::getSimpleName))
-                .contains("StaffAccount");
+                .contains("StaffRole", "StaffAccount");
     }
 
     @Test
