@@ -1,11 +1,20 @@
 package com.confia.shared.web.edge;
 
 import com.confia.shared.security.PermissionResolver;
+import com.confia.shared.web.authentication.AuthenticatedEndpoint;
+import com.confia.shared.web.authentication.AuthenticatedEndpoints;
+import com.confia.shared.web.authentication.SecondFactorEndpoint;
 import com.confia.shared.web.authorization.AuthorizationMetrics;
 import com.confia.shared.web.authorization.PermissionDecider;
 import com.confia.shared.web.authorization.PermissionedEndpoints;
+import com.confia.shared.web.authorization.RouteCoverageGuard;
+import com.confia.shared.web.authorization.RouteCoverageGuard.Classified;
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 /**
  * The beans of the authorization by permission of the administrative process
@@ -27,5 +36,29 @@ public class AuthorizationConfiguration {
     @Bean
     PermissionDecider permissionDecider(PermissionResolver resolver, AuthorizationMetrics metrics) {
         return new PermissionDecider(resolver, metrics);
+    }
+
+    /**
+     * The guard of the start (design.md D13): every route of the application is on one of the four lists
+     * of this process, built from the same sources the security chain is built from.
+     */
+    @Bean
+    RouteCoverageGuard routeCoverageGuard(Environment environment, PermissionedEndpoints permissioned,
+            ListableBeanFactory beans) {
+        List<Classified> classified = new ArrayList<>();
+        PublicEndpoints.forAdmin(environment).endpoints().forEach(entry -> classified.add(
+                new Classified(RouteCoverageGuard.PUBLIC, entry.method(), entry.pattern())));
+        AuthenticatedEndpoints authenticated = AuthenticatedEndpoints.forAdmin();
+        for (AuthenticatedEndpoint entry : authenticated.endpoints()) {
+            classified.add(new Classified(RouteCoverageGuard.AUTHENTICATED, entry.method(),
+                    entry.pattern()));
+        }
+        for (SecondFactorEndpoint entry : authenticated.secondFactorEndpoints()) {
+            classified.add(new Classified(RouteCoverageGuard.RESTRICTED, entry.method(),
+                    entry.pattern()));
+        }
+        permissioned.endpoints().forEach(entry -> classified.add(new Classified(
+                RouteCoverageGuard.PERMISSIONED, entry.method(), entry.pattern())));
+        return new RouteCoverageGuard(classified, beans);
     }
 }
