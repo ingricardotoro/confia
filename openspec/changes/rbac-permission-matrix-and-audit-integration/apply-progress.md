@@ -16,6 +16,7 @@
 | 1.3 Demostraciones deliberadas | hecho | Tres rupturas revertidas y confirmadas con `cmp` |
 | 1.4 Cierre | hecho | `./mvnw -B verify` en verde sobre el árbol combinado; commits repartidos en 1a y 1b |
 | 1 | hecho | Dos PR: 1a (761 líneas) y 1b (735 líneas) |
+| 2 | hecho | Dos PR: 2a (627 líneas) y 2b (640 líneas); `verify` en verde sobre 2b |
 
 ## Evidencia de ciclo TDD
 
@@ -154,6 +155,64 @@ ADR en 1a; se añadió el commit `test(architecture)` de las reglas de pureza.
 
 **Lección de estimación:** el diseño subestimó las pruebas unas cuatro veces (1 051 líneas reales frente a 270); conviene revisar los pronósticos de pruebas de las tareas 2 a 7.
 
+## Tarea 2 (2026-11-04): completa, en dos PR (el propietario aprobó el corte)
+
+Rama `change/rbac-permission-matrix-and-audit-integration-2-role-assignment-and-resolver` (sobre 1b, `20701ec`). El árbol completo midió
+**1 247 líneas efectivas** (185 de producción, 1 062 de pruebas) contra el límite de 800 y el pronóstico de 640. Por la regla del lote no se comprometió nada hasta que el propietario aprobó el corte. Los archivos
+Ahora está repartido en dos ramas (ver el cierre abajo); los registros están en `C:\Users\MARVIN\AppData\Local\Temp\confia-scratch\t82`.
+
+### Evidencia de ciclo TDD (tarea 2)
+
+| Unidad | Archivo de prueba | Capa | ROJO | VERDE | TRIANGULACIÓN | REFACTOR |
+|---|---|---|---|---|---|---|
+| Resolutor | `identity/AccountPermissionsTest` | Unitaria | No compilaba (`cannot find symbol`) y luego `UnsupportedOperation skeleton` (4 errores, 2 fallos) | 6/6 | Contabilidad y Cajero, cinco códigos inválidos más el válido, sin fila, error, institución y cuenta del actor | Sin cambios |
+| Resolutor | `identity/AccountPermissionsIT` | Integración | `relation "identity_staff_account_role" does not exist` | 5/5 | Dos instituciones con la misma cuenta, cabecera ajena, solo lectura, `25006` | Sin cambios |
+| Tabla | `schema/IdentityStaffAccountRoleSchemaIT` | Integración | `relation ... does not exist`; `No migration with a target version 14` | 9/9 | Dos asignaciones, cinco códigos inválidos y seis válidos, FK, RLS (admin y propietario), columnas, AZ19 | Se añadió `rowSecurityIsForcedOnTheOwnerToo` al ver en la demostración 1 que ninguna prueba del propietario cubría `FORCE` |
+| Tabla | `schema/V14SchemaDiffIT` | Integración | `No migration with a target version 14` | 2/2 | Diferencia de catálogo y sumas de `V1` a `V13` | La suma de `V13` (`-1568951550`) se registró de la primera ejecución en verde; `V13` no se editó desde `03b7e2f` |
+| Tabla | `schema/MultiTenantSchemaIT` (BI119) | Integración | `Expected size: 1 but was: 0 in: []` | 12/12 | | |
+| Privilegios | `schema/RolePrivilegeMatrixIT` (BI122 a BI124) | Integración | `relation ... does not exist` | 52/52 | Matriz de cinco roles, variante con `DELETE` de más, PUBLIC y rol ajeno, cuatro sentencias con `confia_admin_app` y `confia_portal_app` | |
+| Inventario | `architecture/PermissionResolverInventoryTest` | Arquitectura | No compilaba | 5/5 | Cada ausencia con su clase infractora | |
+
+Rojo 1 (compilación, sin producción): `BUILD FAILURE`, 68 errores `cannot find symbol` sobre `AccountPermissions` (14), `PermissionResolver` (10), `JooqStaffRoleAssignmentRepository`
+(5) y `StaffRoleAssignmentRepository` (5). Rojo 2 (con un esqueleto que lanza `UnsupportedOperationException` y sin `V14`): `Tests run: 79, Failures: 4, Errors: 16`; extracto verbatim en
+`red2-excerpt.txt`: `PSQL ERROR: relation "identity_staff_account_role" does not exist`, `Flyway No migration with a target version 14 could be found`, `UnsupportedOperation skeleton`.
+
+### Demostraciones (cada una revertida y confirmada con `cmp` contra copias en `t82`)
+
+1. **Quitar `FORCE ROW LEVEL SECURITY` de `V14`.** Rojo: `rowSecurityIsForcedOnTheOwnerToo` (`expected: "42501" but was: "23503"`),
+   `MultiTenantSchemaIT.everyTableWith...Forced` y `theStaffAccountRoleTable...` (`identity_staff_account_role must have FORCE ROW LEVEL SECURITY`), `V14SchemaDiffIT`
+   (`expected: "r|rls=true|force=true" but was: "r|rls=true|force=false"`). `CMP_OK_1`.
+2. **`GRANT DELETE ... TO confia_admin_app`.** Rojo: `confia_admin_app holds [DELETE, SELECT] on identity_staff_account_role but the matrix says [SELECT]` (dos pruebas),
+   `administrative role: DELETE expected: "42501" but was: null` y la diferencia de `V14SchemaDiffIT`. `CMP_OK_2`.
+3. **`AccountPermissions` devuelve `Set.of(Permission.values())` ante un error.** Rojo: `AccountPermissionsTest.aFailureOfTheReadIsThrownNever...:87 Expecting code to raise a throwable.` `CMP_OK_3`.
+
+Confirmación posterior a las tres reversiones (80 pruebas focalizadas, `-Djacoco.skip=true`): `AccountPermissionsTest` 6, `PermissionResolverInventoryTest` 5, `AccountPermissionsIT` 5,
+`IdentityStaffAccountRoleSchemaIT` 9, `MultiTenantSchemaIT` 12, `RolePrivilegeMatrixIT` 52, `V14SchemaDiffIT` 2: 0 fallos, `BUILD SUCCESS`. `./mvnw -B verify` completo **no se ejecutó**:
+Esas 80 pruebas corrieron sobre el árbol completo antes del corte.
+
+### Medición y corte (aprobado por el propietario)
+
+| Archivo | Líneas |
+|---|---|
+| `V14__create_identity_staff_account_role.sql` | 35 |
+| `PermissionResolver`, `StaffRoleAssignmentRepository`, `AccountPermissions`, `JooqStaffRoleAssignmentRepository`, `IdentityConfiguration` (+) | 23, 21, 52, 34, 20 |
+| `V14SchemaDiffIT`, `IdentityStaffAccountRoleSchemaIT`, `MultiTenantSchemaIT` (+), `RolePrivilegeMatrixIT` (+), `StaffRoleFixtures` | 104, 288, 23, 148, 86 |
+| `AccountPermissionsTest`, `AccountPermissionsIT`, `PermissionResolverInventoryTest` | 125, 139, 149 |
+
+- **PR 2a `staff-account-role-table` ≈ 627:** `V14`, `V14SchemaDiffIT`, `MultiTenantSchemaIT`, `RolePrivilegeMatrixIT`, `StaffRoleFixtures` e `IdentityStaffAccountRoleSchemaIT` sin la prueba de AZ19 (≈ 231).
+- **PR 2b `permission-resolver` ≈ 640:** puerto, repositorio, adaptador, fábrica, `AccountPermissionsTest`, `AccountPermissionsIT`, `PermissionResolverInventoryTest` y la prueba de AZ19 movida a un archivo propio de
+  `schema` (≈ 77, porque `StepwiseDatabase` es de paquete). 2b depende de 2a por la tabla.
+
+### Cierre de la tarea 2 con el corte aprobado
+
+| Rama | Punta | Commits | Líneas efectivas | Verificación |
+|---|---|---|---|---|
+| 2a `change/rbac-permission-matrix-and-audit-integration-2-role-assignment-and-resolver` | `969c27f` | `feat(db): create the staff account role assignment table with exact grants` | **627** contra `20701ec` | Solo pruebas focalizadas (`-Djacoco.skip=true`): `IdentityStaffAccountRoleSchemaIT` 8, `MultiTenantSchemaIT` 12, `RolePrivilegeMatrixIT` 52, `V14SchemaDiffIT` 2: 74, 0 fallos, `BUILD SUCCESS` (01:47). No se corrió `verify` completo sobre 2a sola. |
+| 2b `change/rbac-permission-matrix-and-audit-integration-2b-permission-resolver` | `73ca53b` (más el commit `docs(sdd)` de estos archivos) | `feat(identity): resolve effective permissions per request from the role assignment` | **640** contra `969c27f` | Focalizadas: `AccountPermissionsTest` 6, `PermissionResolverInventoryTest` 5, `AccountPermissionsIT` 5, `UnknownRoleCodeResolutionIT` 1: 17, 0 fallos. **`./mvnw -B verify` sobre esta punta (árbol combinado, una sola ejecución): kernel 196, unitarias 2 798 (3 omitidas, `JobsChangeTraceabilityTest`, preexistentes), integración 842, ambas con «All coverage checks have been met», `BUILD SUCCESS`, Total time 33:33 min.** No se ejecutó `-Pmutation-gate`. |
+
+Notas: la prueba de AZ19 pasó a `schema/UnknownRoleCodeResolutionIT` (2b) porque `StepwiseDatabase` es de paquete; 2a conserva 8 de las 9 pruebas de `IdentityStaffAccountRoleSchemaIT`.
+Las pruebas midieron unas 2,2 veces su pronóstico (1 062 líneas reales frente a 480). 2b debe fusionarse a continuación de 2a. Sin cambios en `ProcessBeanPolicy`, poms ni recursos distintos de `V14`.
+
 ## Pendiente
 
-- Tareas 2 a 7 sin empezar. La tarea 2 parte de la punta de 1b (o de `main` si ya se fusionaron).
+- Tareas 3 a 7 sin empezar. La tarea 3 parte de la punta de 2b (o de `main` si ya se fusionaron 2a y 2b).
