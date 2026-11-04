@@ -10,8 +10,9 @@ import org.springframework.security.core.GrantedAuthority;
 /**
  * Spring Security's view of an authenticated actor, so the chain's authorization rule {@code
  * authenticated()} can see one (session-tokens-and-web-layer design.md, decision 5). It carries the
- * actor and nothing else: no authority, because no route grants a permission yet, and no credential,
- * because the token is not kept past the filter. {@code toString} is the actor's, which leaves out
+ * actor and nothing else: no authority, because the permissions of an actor are resolved by the
+ * permission decider for each request and never travel with the principal (rbac-permission-matrix-and-
+ * audit-integration design.md D6), and no credential, because the token is not kept past the filter. {@code toString} is the actor's, which leaves out
  * the token identifier.
  */
 public final class ActorAuthentication implements Authentication {

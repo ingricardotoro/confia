@@ -9,8 +9,9 @@ import org.springframework.http.HttpMethod;
  * The closed, immutable list of routes of the administrative chain that need an authenticated actor
  * and no permission of any role, parallel to {@code PublicEndpoints} and defined in this one place
  * (session-tokens-and-web-layer design.md, decision 5). A route on neither list is denied, so adding
- * a controller never opens a route by itself. The matrix of roles and permissions replaces this list
- * in change 8.
+ * a controller never opens a route by itself. The routes that need a permission are a third
+ * list, {@code PermissionedEndpoints}, which does not replace this one: the self-service routes stay
+ * here (rbac-permission-matrix-and-audit-integration design.md D6).
  *
  * <p>In production the list holds the two routes of the session read and of the end of every
  * session (tasks 5.2 and 7b); the public

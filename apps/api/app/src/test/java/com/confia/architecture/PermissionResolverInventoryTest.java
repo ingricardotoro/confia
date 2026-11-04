@@ -21,8 +21,7 @@ import org.junit.jupiter.api.Test;
  * the inventory of the session validity port: a static scan of the compiled production tree over a set
  * proven non-empty first, and a deliberately violating class for each absence, so the detector is shown
  * to find what it looks for. The only production consumer of the port is the permission decider of the
- * administrative chain, which arrives in task 3 of the change; until then nobody calls it, and that
- * task turns the empty expectation below into exactly that one class.
+ * administrative chain; the inventory allows exactly that one class (task 3 of the change).
  */
 class PermissionResolverInventoryTest {
 
@@ -76,9 +75,10 @@ class PermissionResolverInventoryTest {
     }
 
     @Test
-    void noProductionClassCallsThePortYetAndTheDetectorFindsOneThatDoes() {
+    void thePermissionDeciderIsTheOnlyProductionClassThatCallsThePortAndTheDetectorFindsAnother() {
         assertThat(classesCallingThePort(production()))
-                .as("the decider of task 3 will be the only entry").isEmpty();
+                .as("the decider of the administrative chain is the only entry (I284)")
+                .containsExactly("com.confia.shared.web.authorization.PermissionDecider");
         assertThat(classesCallingThePort(new ClassFileImporter().importClasses(Consumer.class)))
                 .containsExactly(Consumer.class.getName());
     }
