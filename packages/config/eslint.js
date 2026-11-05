@@ -49,18 +49,32 @@ export function contractImportRestrictions({ portal = false } = {}) {
 // ADR-0011: no interface text outside the i18next catalog. The two messages differ so a failing
 // test can tell visible text from accessible text.
 const ACCESSIBLE_ATTRIBUTES = String.raw`/^(?:aria-label|aria-description|title|alt|placeholder|label)$/`;
-const JSX_TEXT = {
-  selector: String.raw`JSXText[value=/\S/], :matches(JSXElement, JSXFragment) > JSXExpressionContainer > Literal[value=/\S/]`,
-  message: "Hard-coded interface text. Resolve it from the es-HN catalog with useUiText().t (ADR-0011).",
-};
-const JSX_ACCESSIBLE_TEXT = {
-  selector: [
-    `JSXAttribute[name.name=${ACCESSIBLE_ATTRIBUTES}] > Literal`,
-    `JSXAttribute[name.name=${ACCESSIBLE_ATTRIBUTES}] > JSXExpressionContainer > Literal`,
-    `JSXAttribute[name.name=${ACCESSIBLE_ATTRIBUTES}] > JSXExpressionContainer > TemplateLiteral[expressions.length=0]`,
-  ].join(", "),
-  message: "Hard-coded accessible text. Resolve it from the es-HN catalog with useUiText().t (ADR-0011).",
-};
+const JSX_TEXT_SELECTOR = String.raw`JSXText[value=/\S/], :matches(JSXElement, JSXFragment) > JSXExpressionContainer > Literal[value=/\S/]`;
+const JSX_ACCESSIBLE_TEXT_SELECTOR = [
+  `JSXAttribute[name.name=${ACCESSIBLE_ATTRIBUTES}] > Literal`,
+  `JSXAttribute[name.name=${ACCESSIBLE_ATTRIBUTES}] > JSXExpressionContainer > Literal`,
+  `JSXAttribute[name.name=${ACCESSIBLE_ATTRIBUTES}] > JSXExpressionContainer > TemplateLiteral[expressions.length=0]`,
+].join(", ");
+
+/**
+ * The two text controls of ADR-0011, shared by packages/ui and the apps. Only the hook the message
+ * points to differs: each package names the catalog hook it owns.
+ *
+ * @param {string} hook
+ */
+function jsxTextControls(hook) {
+  return [
+    {
+      selector: JSX_TEXT_SELECTOR,
+      message: `Hard-coded interface text. Resolve it from the es-HN catalog with ${hook} (ADR-0011).`,
+    },
+    {
+      selector: JSX_ACCESSIBLE_TEXT_SELECTOR,
+      message: `Hard-coded accessible text. Resolve it from the es-HN catalog with ${hook} (ADR-0011).`,
+    },
+  ];
+}
+const [JSX_TEXT, JSX_ACCESSIBLE_TEXT] = jsxTextControls("useUiText().t");
 
 // ADR-0011: numbers are formatted only by src/format, through Intl.
 const MANUAL_FORMAT = {
@@ -228,6 +242,16 @@ const NO_REQUESTS = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource"].map(
   message: "packages/ui never makes requests; the container that owns the data does (CLAUDE.md, frontend).",
 }));
 
+/** One `no-restricted-syntax` entry of a file group, shared by the ui and the app rule sets. */
+function syntaxEntry({ files, ignores, controls }) {
+  return {
+    files,
+    ...(ignores === undefined ? {} : { ignores }),
+    // A bare ["error"] would inherit the options of the previous entry, so "no controls" is "off".
+    rules: { "no-restricted-syntax": controls.length === 0 ? "off" : ["error", ...controls] },
+  };
+}
+
 /**
  * The static rules of packages/ui. Core ESLint rules only (`no-restricted-syntax`,
  * `no-restricted-globals`, `no-restricted-imports`).
@@ -240,23 +264,120 @@ export function uiSourceRules({ portal = false } = {}) {
   return [
     { files: ["**/*.ts", "**/*.tsx"], languageOptions: { parser: tseslint.parser } },
     { files: ["**/*.{ts,tsx,js,mjs}"], rules: { "no-restricted-globals": ["error", ...NO_REQUESTS] } },
-    ...SYNTAX_SCOPES.map(({ files, ignores, controls }) => ({
-      files,
-      ...(ignores === undefined ? {} : { ignores }),
-      // A bare ["error"] would inherit the options of the previous entry, so "no controls" is "off".
-      rules: { "no-restricted-syntax": controls.length === 0 ? "off" : ["error", ...controls] },
-    })),
+    ...SYNTAX_SCOPES.map(syntaxEntry),
     { files: ["src/**/*.{ts,tsx}"], rules: importRules(portal, []) },
     { files: ["src/atoms/**"], rules: importRules(portal, [NO_MOLECULES, NO_DOMAIN]) },
     { files: ["src/molecules/**"], rules: importRules(portal, [NO_DOMAIN]) },
   ];
 }
 
+// ---------------------------------------------------------------------------------------------
+// Application rules (admin-web-foundations-and-session, design.md D2). An application shares with
+// packages/ui the controls about text, formatting, primitive tokens and hand-typed colours. It does
+// not take the ui-only ones: its own client opens the network, and it has no atoms or molecules.
+// ---------------------------------------------------------------------------------------------
+
+const [APP_JSX_TEXT, APP_JSX_ACCESSIBLE_TEXT] = jsxTextControls("useAdminText().t");
+
+const APP_MANUAL_FORMAT = {
+  selector: MANUAL_FORMAT.selector,
+  message: "Manual number formatting. Format through Intl, never toFixed or toLocaleString (ADR-0011).",
+};
+
+// In packages/ui the money scopes are folders, so every arithmetic operator is money arithmetic. In
+// an application a countdown subtracts, so only an operand that is an amount is selected: an
+// identifier `amount` or `*Amount`, or a member of that name (`money.amount`). A child selector
+// reports the operand itself. The formatting methods are not listed: APP_MANUAL_FORMAT reports them.
+// Known limit: an alias (`const a = money.amount; Number(a)`) is not detected.
+const AMOUNT_NAME = String.raw`/^(?:amount|\w*Amount)$/`;
+const AMOUNT = `:matches(Identifier[name=${AMOUNT_NAME}], MemberExpression[property.name=${AMOUNT_NAME}])`;
+const APP_MONEY = {
+  selector: [
+    `CallExpression[callee.name=/^(?:Number|parseFloat|parseInt)$/] > ${AMOUNT}`,
+    `NewExpression[callee.name='Number'] > ${AMOUNT}`,
+    `CallExpression[callee.object.name='Math'] > ${AMOUNT}`,
+    `:matches(UnaryExpression[operator='+'], UnaryExpression[operator='-']) > ${AMOUNT}`,
+    `UpdateExpression > ${AMOUNT}`,
+    `:matches(BinaryExpression, AssignmentExpression)[operator=${MONEY_OPERATOR}] > ${AMOUNT}`,
+    // A slash cannot sit inside an esquery regular expression, so division is matched by value.
+    `:matches(BinaryExpression, AssignmentExpression)[operator='/'] > ${AMOUNT}`,
+    `:matches(BinaryExpression, AssignmentExpression)[operator='/='] > ${AMOUNT}`,
+  ].join(", "),
+  message: MONEY_ARITHMETIC.message,
+};
+
+// The server sets every cookie; the app reads the CSRF cookie and never writes one.
+const NO_COOKIE_WRITE = {
+  selector:
+    "AssignmentExpression:matches([left.object.name='document'], [left.object.property.name='document'])[left.property.name='cookie']",
+  message: "Cookie write. The server owns every cookie; the app only reads the CSRF cookie (design.md D6).",
+};
+
+const APP_TEST_QUERY = {
+  selector: TEST_QUERY.selector,
+  message: "Query by structure or test id. Find the element by role, label or text, the way a user does.",
+};
+
+// Network: only src/shared/api (and e2e, which is outside src) opens it. Every interface that does,
+// directly or through window, globalThis or self, plus navigator.sendBeacon.
+const NETWORK_INTERFACES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "Worker", "SharedWorker"];
+const NETWORK_MESSAGE = "Network access outside src/shared/api. Only the API client opens the network (design.md D2).";
+const APP_NO_NETWORK = NETWORK_INTERFACES.map((name) => ({ name, message: NETWORK_MESSAGE }));
+const APP_NO_NETWORK_PROPS = [
+  ...["window", "globalThis", "self"].flatMap((object) =>
+    NETWORK_INTERFACES.map((property) => ({ object, property, message: NETWORK_MESSAGE })),
+  ),
+  // No `object`: it also catches window.navigator.sendBeacon.
+  { property: "sendBeacon", message: NETWORK_MESSAGE },
+];
+
+const APP_CONTROLS = [APP_MANUAL_FORMAT, PRIMITIVE_TOKEN, VISUAL_LITERAL, APP_MONEY, NO_COOKIE_WRITE];
+
+// Same layering as SYNTAX_SCOPES: each entry carries its complete list because a later entry replaces
+// the earlier one.
+const APP_SYNTAX_SCOPES = [
+  { files: ["src/**/*.{ts,tsx}"], controls: APP_CONTROLS },
+  {
+    files: ["src/**/*.tsx"],
+    ignores: [...TESTS, ...STORIES, ...FIXTURES],
+    controls: [APP_JSX_TEXT, APP_JSX_ACCESSIBLE_TEXT, ...APP_CONTROLS],
+  },
+  { files: ["src/**/*.test.tsx"], ignores: FIXTURES, controls: [...APP_CONTROLS, APP_TEST_QUERY] },
+  { files: FIXTURES, controls: [] },
+];
+
 /**
- * @param {{ tsconfigRootDir: string, ignores?: string[], portal?: boolean, ui?: boolean, react?: boolean }} options
- * `react` turns on the rules of hooks and the React Compiler rules of eslint-plugin-react-hooks.
+ * The static rules of an application: text, formatting, tokens, amounts, cookies and the network.
+ * The exception for the network is the exact folder `src/shared/api`, so a similarly named folder
+ * does not inherit it, and `e2e` is outside `src`.
+ *
+ * @param {{ portal?: boolean }} [options] `portal` keeps the ban on the administrative contract
+ * (ADR-0003); the rules are composed here so a caller that takes only these keeps the mirror.
+ * @returns {import("eslint").Linter.Config[]}
  */
-export function confiaEslint({ tsconfigRootDir, ignores = [], portal = false, ui = false, react = false }) {
+export function appSourceRules({ portal = false } = {}) {
+  return [
+    contractImportRestrictions({ portal }),
+    { files: ["**/*.ts", "**/*.tsx"], languageOptions: { parser: tseslint.parser } },
+    {
+      files: ["src/**/*.{ts,tsx,js,mjs}"],
+      ignores: ["src/shared/api/**"],
+      rules: {
+        "no-restricted-globals": ["error", ...APP_NO_NETWORK],
+        "no-restricted-properties": ["error", ...APP_NO_NETWORK_PROPS],
+      },
+    },
+    ...APP_SYNTAX_SCOPES.map(syntaxEntry),
+  ];
+}
+
+/**
+ * @param {{ tsconfigRootDir: string, ignores?: string[], portal?: boolean, ui?: boolean, app?: boolean, react?: boolean }} options
+ * `ui` is for packages/ui and `app` for an application: they are different rule sets, and where both
+ * apply (they should not) the ui entries come last and win. `react` turns on the rules of hooks and
+ * the React Compiler rules of eslint-plugin-react-hooks.
+ */
+export function confiaEslint({ tsconfigRootDir, ignores = [], portal = false, ui = false, app = false, react = false }) {
   return tseslint.config(
     { ignores: ["node_modules/**", "dist/**", "coverage/**", "reports/**", ...ignores] },
     js.configs.recommended,
@@ -268,6 +389,7 @@ export function confiaEslint({ tsconfigRootDir, ignores = [], portal = false, ui
     },
     contractImportRestrictions({ portal }),
     ...(react ? [reactHooks.configs.flat.recommended] : []),
+    ...(app ? appSourceRules({ portal }) : []),
     ...(ui ? uiSourceRules({ portal }) : []),
     {
       files: ["**/*.js"],
