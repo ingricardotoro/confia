@@ -1,9 +1,9 @@
 # Delta para Integridad de la construcción
 
-- **Estado:** pendiente de aprobación del propietario del producto
-- **Cambio:** `admin-web-scaffold-and-staff-login` (F0, cambio 13b-1)
+- **Estado:** actualizado el 2026-11-05 con los cambios de especificación que el propietario aprobó junto con el diseño
+- **Cambio:** `admin-web-foundations-and-session` (F0, cambio 13b-1, parte 1 de 2). Los escenarios del criterio de salida 8 y de la matriz completa viven en `admin-web-staff-sign-in`.
 - **Propuesta:** `proposal.md`, aprobada por el propietario el 2026-11-04 (P6: sin semilla ni CORS en `apps/api`; P8: Playwright
-  con axe sobre rutas renderizadas bajo un ADR nuevo, con la política de bloqueo en `@confia/config`)
+  con axe sobre rutas renderizadas bajo un ADR nuevo, con la política de bloqueo en `@confia/config`), con Q1 resuelta el 2026-11-05
 
 **Convenciones de este delta.**
 
@@ -16,12 +16,17 @@
   de importes prohibidas en `packages/ui`», «Reglas de dependencia del frontend» y «La verificación de historias entra a la
   integración continua solo de forma aditiva» siguen diciendo la verdad sobre `packages/ui` y sobre el comando fijado del
   trabajo `frontend`.
-- **Valores que fija el diseño y que esta especificación no fija:** la configuración de ESLint que separa las reglas comunes de
-  las exclusivas de `ui`; las carpetas que cuentan como presentación y como `shared/api`; si se agregan `navigator.sendBeacon` y
-  `Worker` a las interfaces de red prohibidas; el lugar de los *fixtures* de violación deliberada; la matriz exacta de rutas y
-  estados de la puerta (esta especificación fija un mínimo); el nombre y la ruta del informe; el límite de tiempo del trabajo
-  nuevo de integración continua; las versiones de las dependencias nuevas, que se verifican contra la regla de dos semanas; el
-  número del ADR nuevo (el siguiente libre; hoy 0028).
+- **Valores fijados por el diseño** (`design.md`, sección 4 y D2, D3, D14 a D16 y D19):
+  - **ESLint:** `appSourceRules()` y `confiaEslint({ app: true })`; `uiSourceRules` conserva firma y mensajes.
+  - **Carpetas:** presentación, `src/**/components/`; red, `src/shared/api/**` con `ignores` exacto.
+  - **Interfaces de red prohibidas, además de las cuatro:** `Worker`, `SharedWorker` y `navigator.sendBeacon`.
+  - **Fixtures:** ESLint, en línea en `tooling/src/eslint-app-rules.test.ts`; dependencias, `tooling/dependency-fixtures/apps/admin-web/src/`;
+    claves, `apps/admin-web/src/i18n/__fixtures__/*.fixture`; supresiones, `tooling/src/__fixtures__/suppressions/`; puerta,
+    `apps/admin-web/e2e/fixtures/a11y/*.html`.
+  - **Informes:** `apps/admin-web/reports/a11y/report.json` y `reports/e2e/`; artefacto `admin-web-e2e-report`.
+  - **Límite del trabajo nuevo:** 20 minutos. **ADR nuevo:** ADR-0028, en estado Propuesto.
+  - **Versiones:** se fijan en el PR 2 (las de QR, en el PR 14), publicadas hace más de 14 días, con `pnpm audit --audit-level high`
+    limpio y `pnpm why` sin duplicar `react` ni `axe-core`; `@playwright/test` exactamente 1.64.1.
 - Toda regla de este delta lleva su violación deliberada y no aprueba sobre un conjunto vacío (ADR-0018).
 
 ## ADDED Requirements
@@ -109,8 +114,8 @@ conjunto vacío.
 
 ### Requisito: La red solo se abre desde `src/shared/api` y `e2e` en `apps/admin-web`
 
-El sistema DEBE romper el análisis estático cuando el código de `apps/admin-web` usa `fetch`, `XMLHttpRequest`, `WebSocket` o
-`EventSource`, directamente o mediante `window` o `globalThis`, fuera de `src/shared/api/**` y de `e2e/**` (los recorridos de
+El sistema DEBE romper el análisis estático cuando el código de `apps/admin-web` usa `fetch`, `XMLHttpRequest`, `WebSocket`,
+`EventSource`, `Worker`, `SharedWorker` o `navigator.sendBeacon`, directamente o mediante `window`, `globalThis` o `self`, fuera de `src/shared/api/**` y de `e2e/**` (los recorridos de
 navegador usan la red por diseño). La excepción DEBE limitarse a esas dos rutas exactas: una carpeta de nombre parecido NO
 DEBE heredarla. Cada interfaz DEBE tener su violación deliberada, y la regla NO DEBE aprobar sobre un conjunto vacío.
 
@@ -143,6 +148,12 @@ DEBE heredarla. Cada interfaz DEBE tener su violación deliberada, y la regla NO
 - **DADO** las violaciones deliberadas de archivos de la aplicación que invocan `window.fetch` y `globalThis.fetch`
 - **CUANDO** se ejecuta el análisis estático del monorepo
 - **ENTONCES** las dos fallan nombrando la regla de red de la aplicación
+
+#### Escenario: [BX110] `Worker`, `SharedWorker` y `navigator.sendBeacon` fuera de `shared/api`
+
+- **DADO** las violaciones deliberadas de archivos de la aplicación que crean un `Worker` y un `SharedWorker` e invocan `navigator.sendBeacon`
+- **CUANDO** se ejecuta el análisis estático del monorepo
+- **ENTONCES** las tres fallan nombrando la regla de red de la aplicación
 
 #### Escenario: [BX54] `fetch` dentro de `src/shared/api`
 
@@ -292,17 +303,14 @@ cambiar el punto de entrada único de `@confia/ui` (exportarla desde `ui` lo rom
 ### Requisito: La puerta de accesibilidad se ejecuta sobre rutas renderizadas de `apps/admin-web`, en los dos temas, y falla con cero rutas
 
 El sistema DEBE ejecutar axe con Playwright y `@axe-core/playwright` sobre una matriz de ruta, estado y tema de
-`apps/admin-web` renderizada con `vite preview` (`docs/ui-ux/03` §9; ADR nuevo «axe sobre rutas renderizadas»; ADR-0018). Cada
+`apps/admin-web` renderizada con `vite preview` (`docs/ui-ux/03` §9; ADR-0028, «axe sobre rutas renderizadas»; ADR-0018). Cada
 combinación DEBE evaluarse en tema claro y en tema oscuro, emulando la preferencia del sistema, y DEBE analizarse solo después
-de que el contenido esperado de su estado sea visible; analizar durante un esqueleto de carga produce un falso verde. La
-matriz mínima cubre cada pantalla en estos estados:
+de que el contenido esperado de su estado sea visible; analizar durante un esqueleto de carga produce un falso verde. La matriz mínima de esta parte cubre cada pantalla que existe al terminarla, en estos estados, 6 estados por 2 temas
+(las pantallas de acceso entran con `admin-web-staff-sign-in`):
 
 | Pantalla | Estados mínimos |
 |---|---|
 | Arranque | restaurando; error de red con reintento |
-| Inicio de sesión | inicial; con resumen de errores de campo; credenciales no aceptadas; límite con cuenta regresiva; servicio ocupado; enviando; contraseña visible; con aviso de llegada |
-| Verificación | código TOTP; código de recuperación; código no aceptado |
-| Inscripción | cargando; QR y clave; códigos de recuperación; primer código; error de red |
 | Página autenticada | cargando; confirmación; error de lectura |
 | Ruta no encontrada | única |
 
@@ -375,7 +383,7 @@ test build --filter=!@confia/api`, DEBE seguir idéntico, y `admin-web` DEBE ent
 `lint`, `typecheck` y `test`. El trabajo nuevo NO DEBE requerir Docker, JDK ni API real. `turbo.json` DEBE declarar la tarea
 `test:e2e` sin caché y la tarea `dev`. La prueba `ci-workflow.test.ts` DEBE afirmar la existencia y las propiedades del trabajo
 nuevo. El trabajo `frontend verify` NO DEBE superar su límite de 10 minutos con `admin-web` incluido, y el tiempo medido se
-registra en el diseño.
+registra en `design.md`, D16, al ejecutar el PR 2.
 
 #### Escenario: [BX83] El diff de `ci.yml` solo agrega
 
@@ -394,14 +402,14 @@ registra en el diseño.
 
 - **DADO** `ci.yml` y la prueba `ci-workflow.test.ts`
 - **CUANDO** se leen
-- **ENTONCES** existe el trabajo `admin-web e2e and accessibility`, con Chromium, `vite preview`, un límite de tiempo declarado y
+- **ENTONCES** existe el trabajo `admin-web e2e and accessibility`, con Chromium, `vite preview`, un límite de tiempo de 20 minutos y
   acciones fijadas por SHA, y la prueba falla si el trabajo desaparece o pierde una de esas propiedades
 
 #### Escenario: [BX86] El informe se conserva aunque el trabajo falle
 
 - **DADO** una ejecución del trabajo nuevo con una violación de accesibilidad
 - **CUANDO** termina en rojo
-- **ENTONCES** el informe de violaciones quedó subido como artefacto de la ejecución y el resultado es visible en el remoto
+- **ENTONCES** el informe de violaciones quedó subido como artefacto `admin-web-e2e-report` de la ejecución y el resultado es visible en el remoto
 
 #### Escenario: [BX87] El trabajo nuevo no necesita Docker, JDK ni API real
 
@@ -419,7 +427,8 @@ registra en el diseño.
 
 - **DADO** una ejecución del trabajo `frontend` con `admin-web` y `packages/ui` incluidos
 - **CUANDO** termina
-- **ENTONCES** su duración es menor que el límite de 10 minutos y el diseño registra la medida
+- **ENTONCES** su duración es menor que el límite de 10 minutos
+- **Y** el tiempo se registra en `design.md`, D16, con nota fechada, al ejecutar el PR 2
 
 #### Escenario: [BX90] El trabajo de historias de `packages/ui` sigue intacto
 
@@ -435,10 +444,10 @@ registra en el diseño.
 
 ### Requisito: Las dependencias nuevas del frontend pasan por el catálogo, la regla de dos semanas, la auditoría y el resultado de compilación
 
-El sistema DEBE declarar las dependencias nuevas (`@tanstack/*`, `msw`, `@playwright/test`, `@axe-core/playwright` y una
-biblioteca de QR que funcione sin red) en el catálogo de `pnpm-workspace.yaml`, sujetas a la regla de antigüedad de dos
-semanas vigente, sin debilitarla. Las bibliotecas de prueba (`msw`, `@playwright/test`, `@axe-core/playwright` y la de
-decodificación de QR de la prueba) DEBEN ser dependencias de desarrollo y NO DEBEN llegar al resultado de compilación de
+El sistema DEBE declarar las dependencias nuevas (`@tanstack/*`, `msw`, `@playwright/test`, `@axe-core/playwright` y, cuando lleguen
+en el PR 14 de la parte 2, `qrcode.react` y `jsqr`) en el catálogo de `pnpm-workspace.yaml`, sujetas a la regla de antigüedad de dos
+semanas, que este cambio hace cumplir agregando `minimumReleaseAge: 20160`. Las bibliotecas de prueba (`msw`, `@playwright/test`,
+`@axe-core/playwright` y `jsqr`) DEBEN ser dependencias de desarrollo y NO DEBEN llegar al resultado de compilación de
 producción. El escaneo de dependencias de pnpm y Trivy DEBEN seguir rompiendo la construcción ante severidad alta o crítica.
 Una dependencia bloqueada DEBE reemplazarse en el diseño, no excepcionarse.
 
@@ -450,15 +459,16 @@ Una dependencia bloqueada DEBE reemplazarse en el diseño, no excepcionarse.
 
 #### Escenario: [BX93] La regla de antigüedad no se debilita
 
-- **DADO** la configuración de antigüedad mínima de `pnpm-workspace.yaml`
-- **CUANDO** se compara con `main`
-- **ENTONCES** su valor no es menor y no hay excepciones nuevas para las dependencias de este cambio
+- **DADO** la configuración `minimumReleaseAge` de `pnpm-workspace.yaml`
+- **CUANDO** se lee
+- **ENTONCES** el valor existe y no es menor de 20 160 minutos
+- **Y** no hay excepciones nuevas para las dependencias de este cambio
 
 #### Escenario: [BX94] Las bibliotecas de prueba son de desarrollo
 
 - **DADO** `apps/admin-web/package.json`
 - **CUANDO** se leen sus secciones de dependencias
-- **ENTONCES** `msw`, `@playwright/test`, `@axe-core/playwright` y la biblioteca de decodificación de QR están solo en
+- **ENTONCES** `msw`, `@playwright/test`, `@axe-core/playwright` y, cuando llegue en el PR 14, `jsqr` están solo en
   `devDependencies`
 
 #### Escenario: [BX95] Ninguna biblioteca de prueba llega a producción
@@ -499,55 +509,24 @@ con o sin pruebas.
 
 ### Requisito: Un ADR nuevo y notas fechadas dejan escrita la puerta sobre rutas, y el criterio de salida 8 se marca solo cuando la puerta pasa
 
-El sistema DEBE registrar la decisión de «axe sobre rutas renderizadas» en un ADR nuevo, con el siguiente número libre en
+El sistema DEBE registrar la decisión de «axe sobre rutas renderizadas» en ADR-0028, en
 `docs/adr/`, indexado en `docs/adr/README.md` y en estado Propuesto. ADR-0026 NO DEBE reescribirse: DEBE recibir solo una nota
-fechada sobre el traslado de la política. `docs/09-roadmap-y-fases.md` DEBE recibir una nota fechada con el nombre del cambio
-y la división 13b-1 y 13b-2, y con la salida de la semilla y de CORS de 13b (que la propuesta de 13a asignaba a él); el
-criterio de salida 8 DEBE marcarse solo cuando la puerta pase sobre el inicio de sesión, la verificación y la inscripción, y
-DEBE desmarcarse con nota fechada si la puerta o una pantalla evaluada se revierte. `docs/ui-ux/04` y `docs/ui-ux/06` DEBEN
-recibir notas fechadas donde el comportamiento se concreta. `CLAUDE.md` y `docs/01-arquitectura.md` §3 DEBEN sumar la puerta
+fechada sobre el traslado de la política. `CLAUDE.md` y `docs/01-arquitectura.md` §3 DEBEN sumar la puerta
 sobre rutas a la fila de pruebas del frontend, y `packages/config/package.json` DEBE actualizar su descripción y declarar la
 exportación `./a11y`.
+El criterio de salida 8 NO DEBE marcarse en este cambio: se marca en `admin-web-staff-sign-in`, con su nota de `docs/09-roadmap-y-fases.md`.
 
 #### Escenario: [BX100] El ADR nuevo existe, está indexado y es Propuesto
 
 - **DADO** `docs/adr/`
 - **CUANDO** se busca el ADR de «axe sobre rutas renderizadas»
-- **ENTONCES** existe con el siguiente número libre al crearlo, aparece en `docs/adr/README.md` y su estado es Propuesto
+- **ENTONCES** existe con el número 0028, aparece en `docs/adr/README.md` y su estado es Propuesto
 
 #### Escenario: [BX101] ADR-0026 conserva su texto
 
 - **DADO** el diff de ADR-0026 frente a `main`
 - **CUANDO** se inspecciona
 - **ENTONCES** no contiene líneas eliminadas ni modificadas, solo una nota fechada agregada sobre el traslado de la política
-
-#### Escenario: [BX102] El criterio 8 no se marca antes de tiempo
-
-- **DADO** `docs/09-roadmap-y-fases.md` en cualquier momento previo a que la puerta pase sobre el inicio de sesión, la
-  verificación y la inscripción
-- **CUANDO** se lee el criterio de salida 8
-- **ENTONCES** no está marcado como cumplido
-
-#### Escenario: [BX103] El criterio 8 se marca con su prueba
-
-- **DADO** la puerta en verde sobre el inicio de sesión, la verificación, la inscripción, el arranque y la página autenticada, en
-  los dos temas
-- **CUANDO** se lee el criterio de salida 8 en `docs/09-roadmap-y-fases.md`
-- **ENTONCES** está marcado y cita la puerta y el cambio
-
-#### Escenario: [BX104] La nota de `docs/09` es fechada y registra la división
-
-- **DADO** el diff de `docs/09-roadmap-y-fases.md` frente a `main`
-- **CUANDO** se inspecciona
-- **ENTONCES** la nota agregada está fechada, nombra el cambio `admin-web-scaffold-and-staff-login`, describe la división 13b-1 y
-  13b-2 y declara que la semilla y CORS salen de 13b
-- **Y** las notas anteriores del documento no se reescriben
-
-#### Escenario: [BX105] Las notas de `docs/ui-ux/04` y `docs/ui-ux/06` son fechadas
-
-- **DADO** el diff de los dos documentos frente a `main`
-- **CUANDO** se inspecciona
-- **ENTONCES** solo contiene notas fechadas agregadas
 
 #### Escenario: [BX106] `CLAUDE.md` y `docs/01` mencionan la puerta sobre rutas
 
@@ -560,9 +539,3 @@ exportación `./a11y`.
 - **DADO** `packages/config/package.json`
 - **CUANDO** se lee
 - **ENTONCES** su descripción menciona la política de accesibilidad y su mapa de exportaciones incluye `./a11y`
-
-#### Escenario: [BX108] Revertir la puerta o una pantalla desmarca el criterio
-
-- **DADO** la reversión de la puerta o de una pantalla evaluada
-- **CUANDO** se lee `docs/09-roadmap-y-fases.md` tras la reversión
-- **ENTONCES** el criterio de salida 8 está desmarcado y una nota fechada explica por qué

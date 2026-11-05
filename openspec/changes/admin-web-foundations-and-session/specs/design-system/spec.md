@@ -1,7 +1,7 @@
 # Delta para Sistema de diseño
 
-- **Estado:** pendiente de aprobación del propietario del producto
-- **Cambio:** `admin-web-scaffold-and-staff-login` (F0, cambio 13b-1)
+- **Estado:** actualizado el 2026-11-05 con los cambios de especificación que el propietario aprobó junto con el diseño
+- **Cambio:** `admin-web-foundations-and-session` (F0, cambio 13b-1, parte 1 de 2)
 - **Propuesta:** `proposal.md`, aprobada por el propietario el 2026-11-04 (P1: el catálogo `ui`, compartido por el panel y
   el portal, no se dirige a la persona; P8: la política de accesibilidad pasa a `@confia/config`)
 
@@ -13,13 +13,19 @@
 - Este delta agrega `FormErrorSummary` y `Alert`, corrige los pendientes W2 y W3 de 13a, y hace que la política de
   accesibilidad se consuma desde `@confia/config`. `Dialog`, `Toast`, `Banner` y el resto del inventario P0 siguen fuera
   (`Dialog` es del cambio 13b-2).
-- **Valores que fija el diseño y que esta especificación no fija:** la capa de cada componente nuevo (átomo o molécula) y sus
-  carpetas; la lista exacta de variantes de `Alert` por encima del mínimo exigido; el mecanismo con el que `FormErrorSummary`
-  recibe el foco (referencia o propiedad); la lista de formas de segunda persona que la prueba de voz rechaza; el texto de
-  la etiqueta de reintento por defecto de `ErrorState`.
+- **Valores fijados por el diseño** (`design.md`, sección 4 y D13 y D17):
+  - **Capa y carpetas:** los dos son moléculas, `molecules/alert/` y `molecules/form-error-summary/`.
+  - **Variantes de `Alert`:** `info`, `warning` y `destructive`; ninguna pantalla pide `success`.
+  - **Foco de ambos:** `tabIndex={-1}` fijo y `ref` por propiedad (React 19).
+  - **Etiqueta de reintento por defecto de `ErrorState`:** `common.retry`, «Reintentar», ya en el catálogo.
+  - **Formas de segunda persona rechazadas en el catálogo `ui`.** En cualquier lugar: `tu tus ti te contigo tuyo tuya tuyos tuyas vos tienes puedes quieres debes sabes estás eres has haz tenés podés querés sabés iniciá
+  ingresá escribí revisá intentá usá guardá copiá volvé esperá verificá confirmá abrí cerrá inténtalo comunícate`,
+    más `usted su sus suyo suya suyos suyas`. Solo al inicio de frase: `inicia ingresa escribe revisa intenta genera usa guarda copia vuelve espera verifica confirma continúa abre cierra avisa solicita
+  recarga registra asigna`, más `inicie ingrese escriba revise intente genere use
+    guarde copie vuelva espere verifique confirme continúe abra cierre avise solicite recargue registre asigne`.
 - El texto del encabezado de `FormErrorSummary` de este delta difiere de «No se pudo guardar. Revise 2 campos.»
-  (`docs/ui-ux/04` §7) porque «Revise» es un imperativo de segunda persona y el catálogo `ui` es compartido; la propuesta
-  y el propietario deciden si prevalece el texto de la guía.
+  (`docs/ui-ux/04` §7) porque «Revise» es un imperativo de segunda persona y el catálogo `ui` es compartido. Prevalece el texto
+  de este delta, aprobado por el propietario con el diseño (`design.md`, sección 16, punto 5); la nota en `docs/ui-ux/04` llega con `admin-web-staff-sign-in`.
 
 ## ADDED Requirements
 
@@ -81,8 +87,8 @@ orden de la lista DEBE ser el de la entrada.
 
 ### Requisito: `Alert` comunica severidad con color, icono y texto a la vez y se anuncia según su gravedad
 
-El sistema DEBE ofrecer `Alert` como componente en línea y contextual (`docs/ui-ux/02` §4, `docs/ui-ux/01` §6), con al menos
-las variantes informativa, de advertencia y destructiva. Cada variante DEBE comunicar su severidad con color, icono y texto
+El sistema DEBE ofrecer `Alert` como molécula en línea y contextual (`docs/ui-ux/02` §4, `docs/ui-ux/01` §6), con las
+variantes `info` (informativa), `warning` (de advertencia) y `destructive` (destructiva). Cada variante DEBE comunicar su severidad con color, icono y texto
 a la vez: el icono es decorativo (`aria-hidden`) y un texto visualmente oculto del catálogo `ui` nombra la severidad antes
 del contenido. La variante destructiva DEBE anunciarse con `role="alert"` (cortesía asertiva) y las demás con
 `role="status"` (cortesía `polite`): `assertive` solo para lo que impide continuar (`docs/ui-ux/03` §4). El contenido y el
@@ -127,6 +133,19 @@ contenedor DEBE poder recibir el foco de forma programática sin entrar en el or
 - **DADO** las historias de las tres variantes en modo claro y oscuro
 - **CUANDO** corre la puerta de accesibilidad de historias
 - **ENTONCES** ninguna historia de `Alert` registra violaciones críticas ni serias, incluido el contraste
+
+### Requisito: `FormField` acepta el identificador de su control
+
+El sistema DEBE permitir que `FormField` reciba una propiedad opcional `controlId` y la use como identificador del control y como
+destino de su etiqueta. Sin esa propiedad DEBE seguir generando el identificador como hasta ahora. La propiedad no cambia ninguna
+exportación. Sin ella, `FormErrorSummary` no podría enlazar un error con un control compuesto con `FormField`.
+
+#### Escenario: [DS98] `controlId` llega al control y a la etiqueta
+
+- **DADO** un `FormField` con `controlId="identifier"`, y otro sin esa propiedad
+- **CUANDO** se renderizan y un `FormErrorSummary` enlaza un error con `identifier`
+- **ENTONCES** el control del primero tiene ese `id`, su etiqueta apunta a él, y activar el enlace le da el foco
+- **Y** el segundo conserva un identificador generado, asociado a su etiqueta
 
 ## MODIFIED Requirements
 
@@ -240,7 +259,7 @@ función de reintento: omitirlas DEBE ser un error de tipos. `ErrorState` DEBE a
 las tecnologías de asistencia mediante una región activa y ofrecer el reintento como control
 operable por teclado. El control de reintento de `ErrorState` DEBE tener siempre un nombre
 accesible no vacío: ante una etiqueta vacía o formada solo por espacios DEBE usar la etiqueta por
-defecto del catálogo `ui`. `EmptyState` y `ErrorState` NO DEBEN renderizar un párrafo vacío cuando
+defecto del catálogo `ui`, `common.retry` («Reintentar»). `EmptyState` y `ErrorState` NO DEBEN renderizar un párrafo vacío cuando
 no reciben descripción.
 (Previously: sin la exigencia de nombre accesible no vacío del reintento ni de ausencia de párrafos vacíos, pendiente W3 de 13a.)
 
@@ -274,7 +293,7 @@ no reciben descripción.
 
 - **DADO** un `ErrorState` con la etiqueta de reintento vacía, y otro con la etiqueta formada solo por espacios
 - **CUANDO** se consulta el control de reintento por rol
-- **ENTONCES** su nombre accesible es el texto por defecto del catálogo `ui` y no es vacío
+- **ENTONCES** su nombre accesible es «Reintentar», de la clave `common.retry` del catálogo `ui`, y no es vacío
 
 #### Escenario: [DS92] Sin descripción no hay párrafo vacío
 
@@ -324,8 +343,8 @@ persona. Los textos que se dirigen a la persona viven en el catálogo de cada ap
 
 - **DADO** todos los valores de `packages/ui/src/i18n/locales/es-HN/ui.json`, incluidas las claves de `FormErrorSummary` y de
   `Alert`
-- **CUANDO** una prueba los compara con la lista de formas de segunda persona que fija el diseño (tuteo, «usted», pronombres
-  y posesivos)
+- **CUANDO** una prueba los compara con las dos listas de formas de segunda persona de las convenciones de este delta (tuteo,
+  «usted», pronombres y posesivos)
 - **ENTONCES** ninguno coincide
 
 #### Escenario: [DS94] La prueba de voz rechaza una segunda persona

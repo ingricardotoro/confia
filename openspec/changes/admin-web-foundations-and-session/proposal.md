@@ -1,20 +1,47 @@
-# Propuesta: andamiaje de `apps/admin-web` e inicio de sesión del personal (cambio 13b-1 de F0)
+# Propuesta: fundaciones de `apps/admin-web` y sesión (cambio 13b-1 de F0, parte 1 de 2)
 
-- **Cambio:** `admin-web-scaffold-and-staff-login`
-- **Rama:** `change/admin-web-scaffold-and-staff-login`
-- **Fase del roadmap:** F0, cambio 13b-1. Cierra el criterio de salida 8 de la fase 0
+- **Cambio:** `admin-web-foundations-and-session` (antes `admin-web-scaffold-and-staff-login`)
+- **Rama:** `change/admin-web-foundations-and-session`
+- **Fase del roadmap:** F0, cambio 13b-1, parte 1 de 2. **No cierra** el criterio de salida 8 de la fase 0; lo cierra la parte 2
   (`docs/09-roadmap-y-fases.md`:294, «La verificación de accesibilidad no reporta violaciones críticas
   en las pantallas existentes»), que la nota fechada de `docs/09`:225-237 asignó al antiguo 13b.
-- **Sucesor:** 13b-2, con el shell, la vida completa de la sesión y el aviso de inactividad.
+- **Sucesor:** `admin-web-staff-sign-in` (parte 2). **13b-2**, con el shell, la vida completa de la sesión y el aviso de inactividad,
+  sigue a la parte 2.
 - **Depende de:** `design-system-foundations-and-a11y` (13a), `session-endpoints-cookie-and-csrf`,
   `column-encryption-and-mfa-totp` y los esquemas de `@confia/contracts/admin`.
-- **Exploración:** `openspec/changes/admin-web-scaffold-and-staff-login/exploration.md` (Engram
+- **Exploración:** `openspec/changes/admin-web-foundations-and-session/exploration.md` (Engram
   `sdd/admin-web-shell-and-staff-login/explore`, observación 781). Se escribió con el nombre antiguo,
   `admin-web-shell-and-staff-login`; sus decisiones T1 a T11 valen salvo donde el propietario decidió
   otra cosa.
 - **Decisiones del propietario:** Engram `sdd/admin-web-shell-and-staff-login/owner-decisions`
   (observación 784), tomadas el 2026-11-04. Son vinculantes y esta propuesta no las reabre.
-- **Estado:** aprobada por el propietario el 2026-11-04 (`openspec/config.yaml`, `rules.proposal`).
+- **Estado:** aprobada por el propietario el 2026-11-04 (`openspec/config.yaml`, `rules.proposal`); diseño aprobado el 2026-11-05, con
+  los siete cambios de especificación de `design.md` §13, y Q1 resuelta ese día.
+
+## Actualización del 2026-11-05: Q1 resuelta y cambio dividido
+
+El propietario decidió **cortar la cadena después del PR 11b** (Q1). El cambio se vuelve dos:
+
+| Parte | Cambio | Contenido | PR |
+|---|---|---|---|
+| 1 | `admin-web-foundations-and-session`, esta carpeta | PR 1 a 11b: reglas, aplicación, cliente, sesión, `ui`, arranque, página mínima, puerta y CI | De 12 a 17 |
+| 2 | `admin-web-staff-sign-in` | PR 12a a 15: las tres pantallas. Empieza cuando la parte 1 esté fusionada | De 7 a 9 |
+
+**Efecto sobre el criterio de salida 8.** La parte 1 **no lo cierra**: su puerta corre en verde sobre las pantallas de ese momento, pero
+BX102 prohíbe marcarlo antes de que exista la verificación sobre inicio de sesión, verificación e inscripción. Lo cierra la parte 2, contra lo que
+prometía P7. Al terminar la parte 1, una persona todavía no puede iniciar sesión.
+
+**Lectura del resto de esta propuesta.** Se conserva como se aprobó. Lo que dice de las pantallas de inicio de sesión, verificación e
+inscripción (alcance 17 a 20), de los PR 12 a 15, del criterio 8 y de los recorridos con inicio de sesión en «Criterios de éxito» pasa a la parte 2. El
+reparto por escenario está en `specs/` de cada cambio, y `tasks.md` lista el de esta parte.
+
+**Dueños de los defectos ajenos que encontró el diseño:**
+
+| Defecto | Dueño | Mientras tanto |
+|---|---|---|
+| El esquema `ProblemDetail.instance` exige `zod.url()` y el backend lo emite relativo | **Cambio 8b** | El cliente no usa `ProblemDetail.safeParse`, y el simulador valida sin `instance` (D7) |
+| `proxy_read_timeout 30s` iguala el retardo tope (`docs/05`:1477) | **Cambio 11** | Riesgo R3: sin reintento, de modo que no se agrava |
+| La guarda de Java `noPlaywrightTestExercisesTheAuthenticationFlowYet` busca `*.spec.ts` y queda en verde y falsa | **Cambio 11** | Se queda así hasta entonces; `apps/api` no se toca (D18) |
 
 ## Intención
 
@@ -378,7 +405,7 @@ límite, lo que según esa regla obliga a dividir el cambio. El punto de corte n
 
 ## Preguntas abiertas para el propietario
 
-- **Q1. Aprobar la cadena y qué hacer si excede 15 tareas.** La división de P7 prometió que 13b-1 cierra el criterio 8,
+- **Q1, resuelta por el propietario el 2026-11-05: cortar después del PR 11b.** La sección «Actualización del 2026-11-05» dice su efecto. Texto original de la pregunta: la división de P7 prometió que 13b-1 cierra el criterio 8,
   pero un corte tras el PR 11 lo llevaría a una segunda parte, porque la puerta ya correría sin las tres pantallas. Es
   una decisión sobre entrega y sobre cuándo se cierra el criterio, y no se toma aquí. Este cambio puede arrancar sin ella;
   se vuelve bloqueante en la fase de tareas, si el conteo pasa de 15.

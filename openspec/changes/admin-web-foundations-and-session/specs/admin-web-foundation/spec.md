@@ -1,11 +1,11 @@
 # Capacidad: Fundación de `apps/admin-web`
 
 - **Identificador:** admin-web-foundation
-- **Estado:** pendiente de aprobación del propietario del producto
-- **Fase:** F0 (cambio 13b-1)
-- **Cambio:** `admin-web-scaffold-and-staff-login`
+- **Estado:** actualizada el 2026-11-05 con los cambios de especificación que el propietario aprobó junto con el diseño
+- **Fase:** F0 (cambio 13b-1, parte 1 de 2)
+- **Cambio:** `admin-web-foundations-and-session`. Los escenarios de esta capacidad que dependen de las pantallas viven en `admin-web-staff-sign-in`.
 - **Propuesta:** `proposal.md`, aprobada por el propietario el 2026-11-04, con las decisiones P1, P2, P3 y P6 a P10 y la
-  resolución de Q2 vinculantes
+  resolución de Q2 vinculantes, y con Q1 resuelta el 2026-11-05
 
 ## Propósito
 
@@ -28,13 +28,24 @@ Fuentes de verdad: `docs/01-arquitectura.md`, `docs/03-seguridad.md` (CSP y cook
 - Los escenarios se numeran `AW01` en adelante. El prefijo `AW` no existe en ninguna otra especificación ni delta.
 - Esta especificación describe comportamiento observable. Los nombres de carpeta, de módulo y de variable los fija el
   diseño.
-- **Valores que fija el diseño y que esta especificación no fija:** la dirección y el nombre de la variable del backend
-  local al que apunta el proxy; los nombres de las rutas; el nombre y la forma de los módulos de `shared/api`; el tiempo
-  límite del cliente, que DEBE ser estrictamente mayor que el retardo máximo de 30 s que documenta `docs/ui-ux/06`; el
-  valor por defecto cuando falta un `Retry-After` utilizable y su tope de presentación; la lista de formas verbales de
-  tuteo que la prueba de voz rechaza; el destino del registro de un código Problem desconocido; la cabecera de CSP exacta
-  con la que corren los recorridos; el mecanismo que simula el `Set-Cookie`, que decide la sonda del paso 0; los retardos
-  de reintento de las consultas de lectura.
+- **Valores fijados por el diseño** (`design.md`, sección 4 y D4 a D7, D9 y D17):
+  - **Proxy:** variable `CONFIA_API_PROXY_TARGET`, por defecto `http://localhost:8080`; solo admite `localhost` o `127.0.0.1` y otro
+    valor aborta. `changeOrigin: false`. `dev` y `preview` en el puerto `5173`, con `strictPort`, anfitrión `localhost`.
+  - **Rutas:** `/iniciar-sesion`, `/iniciar-sesion/verificacion`, `/iniciar-sesion/inscripcion`, `/` y `notFoundComponent`.
+  - **Módulos de `shared/api`:** `http.ts`, `csrf-cookie.ts`, `problem.ts`, `problem-keys.ts`, `report-unknown-problem.ts` y
+    `auth-operations.ts`; solo `http.ts` tiene `fetch`.
+  - **Tiempo límite del cliente:** 60 s. **`Retry-After`:** 60 s por defecto y 3 600 s de tope de presentación.
+  - **Destino de un Problem desconocido:** `console.warn` por una función inyectable, con estado y `type` sin consulta ni fragmento, a lo
+    sumo 200 caracteres.
+  - **Reintentos de lectura:** 1 000 ms y 2 000 ms, `networkMode: "always"`.
+  - **Simulación de `Set-Cookie`:** servidor Node detrás del proxy de Vite (sonda del paso 0).
+  - **CSP de los recorridos:** `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self';
+    connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; worker-src 'self' blob:;
+    manifest-src 'self'`.
+  - **Formas de tuteo y de voseo rechazadas en el catálogo `admin`.** En cualquier lugar: `tu tus ti te contigo tuyo tuya tuyos tuyas vos tienes puedes quieres debes sabes estás eres has haz tenés podés querés sabés iniciá
+  ingresá escribí revisá intentá usá guardá copiá volvé esperá verificá confirmá abrí cerrá inténtalo comunícate`. Solo al inicio de frase:
+    `inicia ingresa escribe revisa intenta genera usa guarda copia vuelve espera verifica confirma continúa abre cierra avisa solicita
+  recarga registra asigna`.
 - Los textos de interfaz de esta capacidad se leen del catálogo `admin`; esta especificación fija el texto solo cuando un
   documento de `docs/ui-ux` ya lo fija.
 
@@ -120,12 +131,6 @@ indicador que desactive el atributo `Secure` de las cookies, ni modificar ningú
 - **CUANDO** el navegador pide `/api/v1/auth/sessions/refresh`
 - **ENTONCES** el servidor de pruebas recibe la misma ruta y método, con el `Origin` de la página
 
-#### Escenario: [AW09] Ninguna petición sale del origen de la página
-
-- **DADO** un recorrido completo de inicio de sesión en Chromium con registro de todas las peticiones
-- **CUANDO** termina
-- **ENTONCES** el origen de cada petición es el de la página y no se emitió ninguna petición `OPTIONS`
-
 #### Escenario: [AW10] El cambio no toca `apps/api`
 
 - **DADO** el diff de la rama del cambio frente a `main`
@@ -137,8 +142,7 @@ indicador que desactive el atributo `Secure` de las cookies, ni modificar ningú
 - **DADO** la configuración de Vite, los scripts del paquete y el código de la aplicación
 - **CUANDO** se busca una cabecera `Access-Control-Allow-*` o un indicador, variable o rama que quite `Secure` a una cookie
 - **ENTONCES** no existe ninguno
-- **Y** el desarrollo local sobre HTTPS local queda como la salida admitida si la sonda del paso 0 demuestra que las cookies
-  `Secure` y con prefijo fallan sobre `http://localhost`
+- **Y** no hace falta HTTPS local: la sonda del paso 0 midió que las cookies `Secure` y con prefijo funcionan sobre `http://localhost`
 
 ### Requisito: El resultado de compilación es compatible con la CSP estricta de `docs/03`
 
@@ -224,7 +228,7 @@ las consultas de lectura reintenten como máximo dos veces con retroceso exponen
 
 - **DADO** una consulta de lectura cuya respuesta es siempre `503`
 - **CUANDO** se ejecuta hasta agotar sus reintentos
-- **ENTONCES** el servidor registra como máximo tres peticiones en total, separadas por un retroceso creciente
+- **ENTONCES** el servidor registra como máximo tres peticiones en total, separadas por retardos de 1 000 ms y 2 000 ms
 
 #### Escenario: [AW22] Una lectura no reintenta ante un `4xx`
 
@@ -283,13 +287,13 @@ resolverse estáticamente.
 El sistema DEBE redactar los textos del catálogo `admin` dirigidos a la persona en «usted» (decisión P1): formas de
 imperativo y de indicativo de tercera persona («Inicie sesión», «Su sesión»), sin tuteo ni voseo. La guía de contenido
 `docs/ui-ux/05` DEBE recibir una nota fechada que fije ese trato para el personal y mantenga el tono del portal; el texto
-original de la guía NO DEBE reescribirse. Una prueba DEBE rechazar las formas de tuteo y de voseo que fija el diseño.
+original de la guía NO DEBE reescribirse. Una prueba DEBE rechazar las formas de tuteo y de voseo de las convenciones de esta especificación.
 
 #### Escenario: [AW29] Ningún texto del catálogo `admin` usa tuteo
 
 - **DADO** todos los valores del catálogo `es-HN` `admin`
-- **CUANDO** una prueba los compara con la lista de formas de tuteo y de voseo que fija el diseño (por ejemplo `tu`, `tus`,
-  `tienes`, `puedes`, `inicia` como imperativo de tú, `vos`)
+- **CUANDO** una prueba los compara con las dos listas de formas de tuteo y de voseo de las convenciones de esta especificación
+  (en cualquier lugar, y solo al inicio de frase)
 - **ENTONCES** ninguno coincide
 
 #### Escenario: [AW30] La prueba de voz rechaza el tuteo
@@ -316,7 +320,9 @@ original de la guía NO DEBE reescribirse. Una prueba DEBE rechazar las formas d
 
 El sistema DEBE concentrar toda comunicación con la API en un cliente en `src/shared/api`, el único lugar de la aplicación
 con `fetch`. El cliente DEBE usar rutas relativas, `credentials: "same-origin"` y los esquemas Zod de
-`@confia/contracts/admin` para validar cada respuesta con cuerpo. Para las seis operaciones de este cambio DEBE enviar
+`@confia/contracts/admin` para validar cada respuesta con cuerpo, con una excepción: el campo `instance` de una respuesta de error
+no se valida, porque el backend lo emite como ruta relativa y el esquema generado exige `zod.url()`. El cliente lee `type`, `traceId` y
+`errors` con un esquema angosto y no usa `ProblemDetail.safeParse`; el cambio 8b es el dueño de corregir el esquema. Para las seis operaciones de este cambio DEBE enviar
 exactamente estas cabeceras y cuerpos, y NINGUNA lleva `Idempotency-Key`, que no aplica a la autenticación:
 
 | Operación | Método y ruta | `Authorization` | `X-CSRF-Token` | Cuerpo |
@@ -331,7 +337,8 @@ exactamente estas cabeceras y cuerpos, y NINGUNA lleva `Idempotency-Key`, que no
 El cliente DEBE leer la cookie CSRF `__Host-confia_csrf` por su nombre exacto. Una respuesta que no cumpla el esquema
 esperado DEBE tratarse como un resultado distinguible de «respuesta inesperada», no como un éxito ni como un fallo de
 red, y NO DEBE usarse parcialmente. El cliente NO DEBE cancelar una petición por un tiempo límite propio menor que el
-retardo máximo documentado de 30 s.
+retardo máximo documentado de 30 s. Su tiempo límite propio es de 60 s, con `setTimeout` y `AbortController`; al vencer, el resultado
+es «error de red» y no se reintenta.
 
 #### Escenario: [AW33] Inicio de sesión
 
@@ -391,8 +398,7 @@ retardo máximo documentado de 30 s.
 
 - **DADO** un `200` de inicio de sesión cuyo cuerpo no cumple `LoginResponse`
 - **CUANDO** el cliente lo procesa
-- **ENTONCES** devuelve el resultado «respuesta inesperada» sin ningún token y la pantalla muestra el mensaje genérico de
-  error inesperado
+- **ENTONCES** devuelve el resultado «respuesta inesperada» sin ningún token
 
 #### Escenario: [AW42] La respuesta de inicio de sesión se distingue por `status`
 
@@ -453,26 +459,12 @@ traiga `traceId`, mostrarlo visible y copiable (`docs/ui-ux/04` §9, regla de pr
 - **CUANDO** se ejecuta la verificación de tipos
 - **ENTONCES** falla señalando el código sin clave
 
-#### Escenario: [AW49] `title` y `detail` no se muestran
-
-- **DADO** una respuesta `401 authentication-failed` con `title` «CENTINELA-TITULO» y `detail` «CENTINELA-DETALLE»
-- **CUANDO** la pantalla de inicio de sesión la procesa
-- **ENTONCES** ninguno de los dos textos aparece en el documento, en ningún atributo accesible ni en la consola
-
 #### Escenario: [AW50] `validation-failed` expone los errores por campo
 
 - **DADO** una respuesta `400 validation-failed` con `errors` `[{"field":"identifier","reason":"not-blank"}]`
 - **CUANDO** el analizador la procesa
 - **ENTONCES** expone la lista con `field` y `reason`
 - **Y** una respuesta `validation-failed` sin `errors` produce una lista vacía
-
-#### Escenario: [AW51] Una razón o un campo desconocidos usan el texto genérico
-
-- **DADO** un `validation-failed` con una razón fuera de las conocidas (`not-blank`, `size`, `max`) y otro con un campo que
-  el formulario no tiene
-- **CUANDO** la pantalla los procesa
-- **ENTONCES** la razón desconocida se muestra con el texto genérico del campo y el campo ajeno se muestra en el resumen,
-  sin descartar ningún error
 
 #### Escenario: [AW52] `Retry-After` en segundos enteros
 
@@ -484,19 +476,14 @@ traiga `traceId`, mostrarlo visible y copiable (`docs/ui-ux/04` §9, regla de pr
 
 - **DADO** una respuesta `429` sin `Retry-After`, con `Retry-After: 0`, con `Retry-After: abc` y con una fecha HTTP
 - **CUANDO** el analizador las procesa
-- **ENTONCES** las cuatro usan el valor por defecto que fija el diseño y ninguna produce un número negativo, cero ni `NaN`
-
-#### Escenario: [AW54] El mensaje genérico muestra el identificador de traza
-
-- **DADO** un `500 internal-error` con `traceId` «01J8Z4K2QF9P0X»
-- **CUANDO** la pantalla lo procesa
-- **ENTONCES** muestra el mensaje genérico, el identificador visible y un control con nombre accesible que lo copia
+- **ENTONCES** las cuatro usan el valor por defecto de 60 segundos y ninguna produce un número negativo, cero ni `NaN`
+- **Y** un `Retry-After: 99999` se recorta al tope de presentación de 3 600 segundos
 
 #### Escenario: [AW55] El caso desconocido se registra sin el cuerpo
 
 - **DADO** una respuesta de código desconocido con `title`, `detail` y `instance`
-- **CUANDO** el analizador registra el hallazgo en el destino que fija el diseño
-- **ENTONCES** el registro contiene como máximo el `type` y el estado, y ni el `title`, ni el `detail`, ni el `instance`, ni
+- **CUANDO** el analizador registra el hallazgo con `console.warn`, por una función inyectable
+- **ENTONCES** el registro contiene como máximo el estado y el `type`, sin consulta ni fragmento y de a lo sumo 200 caracteres, y ni el `title`, ni el `detail`, ni el `instance`, ni
   ningún token o dato de la persona (`CLAUDE.md`, regla 11)
 
 #### Escenario: [AW56] Un cuerpo de error no JSON se trata como desconocido
@@ -539,8 +526,8 @@ del portal. NO DEBE contener un generador de operaciones de orval, que se reeval
 
 - **DADO** el árbol de rutas de `apps/admin-web`
 - **CUANDO** se enumeran sus rutas
-- **ENTONCES** son únicamente las de arranque, inicio de sesión, verificación, inscripción, página autenticada y ruta no
-  encontrada
+- **ENTONCES** son únicamente las de inicio de sesión, verificación, inscripción, página autenticada y ruta no encontrada, más la
+  pantalla de arranque, que no es una ruta
 - **Y** este escenario deja de ser cierto el día que el cambio 13b-2 entregue el shell
 
 #### Escenario: [AW60] No existen componentes del shell en la aplicación
