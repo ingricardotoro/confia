@@ -1,0 +1,3 @@
+// ADR-0018: the decision record that allows the directive below.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const allowed = (value: any) => value;

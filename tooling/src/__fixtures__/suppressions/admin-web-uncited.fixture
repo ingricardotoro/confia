@@ -1,0 +1,3 @@
+// A component of apps/admin-web that turns a rule off without citing the ADR that allows it.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const unsafe = (value: any) => value;
