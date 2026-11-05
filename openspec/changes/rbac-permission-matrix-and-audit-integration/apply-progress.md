@@ -219,7 +219,7 @@ Las pruebas midieron unas 2,2 veces su pronóstico (1 062 líneas reales frente 
 
 ## Tarea 3 (2026-11-04): confirmada en cuatro ramas; `verify` completo en verde en el CI
 
-El propietario aprobó el corte en cuatro partes. Cada rama sale de la anterior; la base de cada medición es la punta anterior (`ca3f283` para 3a-1; ya está en `main`). Sin push.
+El propietario aprobó el corte en cuatro partes. Cada rama sale de la anterior; la base de cada medición es la punta anterior (`ca3f283` para 3a-1; ya está en `main`). Las cuatro ramas se subieron el 2026-11-04 y abrieron #253 a #256.
 
 | Rama | Punta | Commits | Líneas efectivas | Pruebas focalizadas (`-Djacoco.skip=true`) |
 |---|---|---|---|---|
@@ -230,7 +230,7 @@ El propietario aprobó el corte en cuatro partes. Cada rama sale de la anterior;
 
 Las ramas inferiores solo tuvieron ejecuciones focalizadas. Las pruebas de la tarea midieron unas 3,7 veces su pronóstico (el diseño daba 440 de pruebas; el total de la tarea fue 2 730 líneas, de ellas unas 2 000 de pruebas).
 
-**`verify` completo: no hay resultado.** La ejecución sobre la punta de 3b (`3341cd0`) fue terminada por el entorno por memoria crítica (2,7 GB libres de 32 GB, 12 contenedores Docker activos); su registro `confia-scratch/t83/verify.log` está incompleto y no es un resultado. No se reintentó mientras persista la presión de memoria. Por decisión del propietario, el `verify` de cada rama es el del CI de su PR.
+**`verify` completo local (intento del 2026-11-04, sin resultado):** la ejecución sobre la punta de 3b (`3341cd0`) fue terminada por el entorno por memoria crítica (2,7 GB libres de 32 GB, 12 contenedores Docker activos); su registro `confia-scratch/t83/verify.log` está incompleto y no es un resultado. No se reintentó mientras persista la presión de memoria. Por decisión del propietario, el `verify` de cada rama es el del CI de su PR.
 
 **ROJOS no observados antes del VERDE:** `RouteCoverageGuardTest` y `RouteCoverageGuard` (se escribió la guarda antes de su prueba), `AuthorizationEdgeIT`, `OpenApiRouteClassificationTest`, `ProductionRoutesClassifiedIT`, los casos nuevos de `PublicRouteAllowListTest`, `AuthorizationBoundaryRulesTest`, `PermissionedEndpointTextPermissionCompilationTest`, `LogAuthorizationMetricsTest` y la línea `not in the allow-list` de `ProcessBeanIsolationTest`. Observados: compilación (116 `cannot find symbol`) y `PermissionEdgeTest` 13 fallos de 25 con el esqueleto.
 **Demostraciones** (no son ROJO previo; cada una revertida y confirmada con `cmp`): 1, 2, 4, 5 y 6 como se registró; 3 (guarda sin efecto): `RouteCoverageGuardTest` 11 de 13 fallan. La 4 solo falló tras corregir una aserción débil de la prueba; la 5 falla por `UnsatisfiedDependency` del resolutor, no por el mensaje `not in the allow-list`.
