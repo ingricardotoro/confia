@@ -215,4 +215,33 @@ Las pruebas midieron unas 2,2 veces su pronóstico (1 062 líneas reales frente 
 
 ## Pendiente
 
-- Tareas 3 a 7 sin empezar. La tarea 3 parte de la punta de 2b (o de `main` si ya se fusionaron 2a y 2b).
+- Tareas 4 a 7 sin empezar. La tarea 3 está terminada: el `verify` completo lo midió el CI de cada PR (ver abajo).
+
+## Tarea 3 (2026-11-04): confirmada en cuatro ramas; `verify` completo en verde en el CI
+
+El propietario aprobó el corte en cuatro partes. Cada rama sale de la anterior; la base de cada medición es la punta anterior (`ca3f283` para 3a-1; ya está en `main`). Las cuatro ramas se subieron el 2026-11-04 y abrieron #253 a #256.
+
+| Rama | Punta | Commits | Líneas efectivas | Pruebas focalizadas (`-Djacoco.skip=true`) |
+|---|---|---|---|---|
+| 3a-1 `...-3-filter-authorization` | `24c9c5e` | `ad9bc75` refactor DataAccessFailure; `24c9c5e` decisor y lista | **713** | 92 unitarias, 0 fallos (`BUILD SUCCESS`) |
+| 3a-2 `...-3a2-chain-wiring` | `761636c` | `761636c` decisión en la cadena | **633** | 216 unitarias + `SessionLivenessIT` 12, 0 fallos |
+| 3a-3 `...-3a3-authorization-edge-and-rules` | `8df15eb` | `02d0d20` reglas de arquitectura; `8df15eb` `AuthorizationEdgeIT` | **727** | 27 unitarias + `AuthorizationEdgeIT` 6, 0 fallos |
+| 3b `...-3b-route-coverage-guard` | `3341cd0` | `f1a4eca` guarda; `3341cd0` pruebas de clasificación | **657** | 131 unitarias + `ProductionRoutesClassifiedIT` 2 + `AuthorizationEdgeIT` 6, 0 fallos |
+
+Las ramas inferiores solo tuvieron ejecuciones focalizadas. Las pruebas de la tarea midieron unas 3,7 veces su pronóstico (el diseño daba 440 de pruebas; el total de la tarea fue 2 730 líneas, de ellas unas 2 000 de pruebas).
+
+**`verify` completo local (intento del 2026-11-04, sin resultado):** la ejecución sobre la punta de 3b (`3341cd0`) fue terminada por el entorno por memoria crítica (2,7 GB libres de 32 GB, 12 contenedores Docker activos); su registro `confia-scratch/t83/verify.log` está incompleto y no es un resultado. No se reintentó mientras persista la presión de memoria. Por decisión del propietario, el `verify` de cada rama es el del CI de su PR.
+
+**ROJOS no observados antes del VERDE:** `RouteCoverageGuardTest` y `RouteCoverageGuard` (se escribió la guarda antes de su prueba), `AuthorizationEdgeIT`, `OpenApiRouteClassificationTest`, `ProductionRoutesClassifiedIT`, los casos nuevos de `PublicRouteAllowListTest`, `AuthorizationBoundaryRulesTest`, `PermissionedEndpointTextPermissionCompilationTest`, `LogAuthorizationMetricsTest` y la línea `not in the allow-list` de `ProcessBeanIsolationTest`. Observados: compilación (116 `cannot find symbol`) y `PermissionEdgeTest` 13 fallos de 25 con el esqueleto.
+**Demostraciones** (no son ROJO previo; cada una revertida y confirmada con `cmp`): 1, 2, 4, 5 y 6 como se registró; 3 (guarda sin efecto): `RouteCoverageGuardTest` 11 de 13 fallan. La 4 solo falló tras corregir una aserción débil de la prueba; la 5 falla por `UnsatisfiedDependency` del resolutor, no por el mensaje `not in the allow-list`.
+
+**Arreglo tras el primer CI (2026-11-05):** `IdempotencyScopeExclusionInventoryTest` fallaba porque `AuthenticationMethod` y `PermissionResolver` no estaban en la lista permitida del paquete web de `shared.security`. `1cdc6fe` limita `AuthenticationMethod` a `shared.web.authorization` y `PermissionResolver` a ese paquete y a `shared.web.edge.AuthorizationConfiguration`, con una prueba nueva; se propagó con merge hacia adelante (`9456f55`, `d5643f3`, `3c68e92`) tras pasar la suite unitaria completa en cada punta.
+
+**CI en verde (2026-11-05)**, con backend verify, backend mutation, frontend verify, accesibilidad y escaneo de seguridad:
+
+| PR | Punta | backend verify | backend mutation |
+|---|---|---|---|
+| #253 (3a-1) | `1cdc6fe` | pass, 14 min 33 s | pass, 43 min 24 s |
+| #254 (3a-2) | `9456f55` | pass, 13 min 51 s | pass, 47 min 39 s |
+| #255 (3a-3) | `d5643f3` | pass, 14 min 27 s (tras relanzar el job por la inestabilidad de `CsrfKeyStartupTest`) | pass, 44 min 55 s |
+| #256 (3b) | `3c68e92` | pass, 14 min 44 s | pass, 44 min 8 s |
