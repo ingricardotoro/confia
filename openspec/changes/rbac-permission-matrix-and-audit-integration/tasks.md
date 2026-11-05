@@ -215,7 +215,7 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
 
 ## Fase 2: decisión en el filtro y auditoría de denegaciones
 
-- [ ] 3 **PR 3 `filter-authorization-and-route-guard`: decisor sobre lista cerrada, `otp`, sesión viva, fallo de resolución, guarda de arranque e inversiones (D1, D6, D7, D13, D18).**
+- [x] 3 **PR 3 `filter-authorization-and-route-guard`: decisor sobre lista cerrada, `otp`, sesión viva, fallo de resolución, guarda de arranque e inversiones (D1, D6, D7, D13, D18).**
   - **Archivos.** Crea en `shared/web/authorization/`: `PermissionedEndpoint`, `PermissionedEndpoints` (lista de producción **vacía** hasta la tarea 7),
     `PermissionDecider`, `PermissionDeniedException`, `PermissionResolutionFailedException`, `RouteCoverageGuard`, `AuthorizationMetrics` (solo
     `resolutionFailed`); `shared/web/edge/AuthorizationConfiguration`; `shared/observability/metrics/LogAuthorizationMetrics`; `shared/web/problem/DataAccessFailure`
