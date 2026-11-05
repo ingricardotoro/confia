@@ -1,5 +1,6 @@
 package com.confia.shared.observability.metrics;
 
+import com.confia.shared.web.authorization.AuthorizationMetrics;
 import com.confia.shared.web.ratelimit.RateLimitMetrics;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +14,11 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration(proxyBeanMethods = false)
 public class ObservabilityMetricsConfiguration {
+
+    @Bean
+    AuthorizationMetrics authorizationMetrics() {
+        return new LogAuthorizationMetrics();
+    }
 
     @Bean
     RateLimitMetrics rateLimitMetrics() {
