@@ -36,8 +36,9 @@ import org.springframework.security.authentication.AuthenticationProvider;
  *       and exactly one, the cookie helper {@code SessionCookies}, uses {@code
  *       jakarta.servlet.http.Cookie} (session-endpoints-cookie-and-csrf, BI47);
  *   <li>no authorization rule on a route beyond the public allow-list, the authenticated list (any
- *       authenticated actor, no role) and the final denial, and no
- *       method-level permission annotation (owner: change 8, RBAC);
+ *       authenticated actor, no role), the permission list ({@code access}, applied by {@code
+ *       SecurityChains} alone, rbac-permission-matrix-and-audit-integration BI17) and the final
+ *       denial, and no method-level permission annotation;
  *   <li>no class of a {@code ..web..} package has {@code Institution} in its name (owner: the first
  *       endpoint of institution administration);
  *   <li>the limiter and the delay materializer are used by no production class outside their own
@@ -66,6 +67,9 @@ class WebEdgeScopeExclusionInventoryTest {
                     + ".AuthorizeHttpRequestsConfigurer$AuthorizedUrl";
     private static final Set<String> ALLOWED_ROUTE_RULES =
             Set.of("permitAll", "authenticated", "denyAll");
+    /** The rule that takes a manager of its own, applied by the one class that builds the chain. */
+    private static final String ACCESS_RULE = "access";
+    private static final String CHAIN_BUILDER = "com.confia.shared.web.edge.SecurityChains";
     private static final Set<String> PERMISSION_ANNOTATIONS = Set.of(
             "org.springframework.security.access.prepost.PreAuthorize",
             "org.springframework.security.access.prepost.PostAuthorize",
@@ -260,7 +264,7 @@ class WebEdgeScopeExclusionInventoryTest {
                         .getName());
     }
 
-    // --- No permission rule on a route (owner: change 8, RBAC) ---
+    // --- No role rule on a route, and the permission rule only from the chain builder (BI17) ---
 
     @Test
     void theChainHoldsOnlyPublicRoutesAuthenticatedRoutesAndTheFinalDenial() {
@@ -269,11 +273,22 @@ class WebEdgeScopeExclusionInventoryTest {
         assertThat(routeRulesApplied(production))
                 .as("the scan sees the real chain: its lists permit and authenticate routes and its last "
                         + "rule denies every other one")
-                .containsAll(ALLOWED_ROUTE_RULES);
+                .containsAll(ALLOWED_ROUTE_RULES).contains(ACCESS_RULE);
         assertThat(routeRulesBeyondTheAllowListAndTheFinalDenial(production))
-                .as("no route carries a role, permission or MFA rule: the matrix "
-                        + "is change 8's")
+                .as("no route carries a role or MFA rule, and the one rule with a manager of its own "
+                        + "(access) is applied only by the class that builds the chain (BI17)")
                 .isEmpty();
+        assertThat(classesApplying(production, ACCESS_RULE)).containsExactly(CHAIN_BUILDER);
+    }
+
+    @Test
+    void theRouteRuleDetectorFindsAnAccessRuleAppliedOutsideTheChainBuilder() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(
+                WebEdgeScopeViolationFixtures.AccessRuleChain.class);
+
+        assertThat(routeRulesBeyondTheAllowListAndTheFinalDenial(fixtures))
+                .containsExactly(WebEdgeScopeViolationFixtures.AccessRuleChain.class.getName()
+                        + " applies access(...) to a route");
     }
 
     @Test
@@ -562,14 +577,25 @@ class WebEdgeScopeExclusionInventoryTest {
         return applied;
     }
 
+    /** The names of the classes that call {@code rule} on an {@code AuthorizedUrl}. */
+    private static List<String> classesApplying(JavaClasses classes, String rule) {
+        return classes.stream().filter(javaClass -> javaClass.getMethodCallsFromSelf().stream()
+                        .anyMatch(call -> call.getTargetOwner().getName().equals(AUTHORIZED_URL)
+                                && call.getTarget().getName().equals(rule)))
+                .map(JavaClass::getName).sorted().toList();
+    }
+
     private static List<String> routeRulesBeyondTheAllowListAndTheFinalDenial(
             JavaClasses classes) {
         List<String> found = new java.util.ArrayList<>();
         for (JavaClass javaClass : classes) {
             for (JavaMethodCall call : javaClass.getMethodCallsFromSelf()) {
                 String rule = call.getTarget().getName();
+                boolean theChainBuilderDecidesByManager = ACCESS_RULE.equals(rule)
+                        && javaClass.getName().equals(CHAIN_BUILDER);
                 if (call.getTargetOwner().getName().equals(AUTHORIZED_URL)
-                        && !ALLOWED_ROUTE_RULES.contains(rule)) {
+                        && !ALLOWED_ROUTE_RULES.contains(rule)
+                        && !theChainBuilderDecidesByManager) {
                     found.add(javaClass.getName() + " applies " + rule + "(...) to a route");
                 }
             }

@@ -5,6 +5,7 @@ import com.confia.shared.security.RateLimitDecision;
 import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.RateLimiter;
 import com.confia.shared.security.SessionValidity;
+import org.springframework.security.authorization.AuthorizationDecision;
 import com.confia.shared.web.delay.Delayed;
 import com.confia.shared.web.delay.RequiredDelayMaterializer;
 import com.confia.shared.web.ratelimit.RateLimited;
@@ -86,6 +87,15 @@ public final class WebEdgeScopeViolationFixtures {
 
         public void protect(HttpSecurity http) throws Exception {
             http.authorizeHttpRequests(requests -> requests.anyRequest().hasRole("ADMIN"));
+        }
+    }
+
+    /** A chain that decides a route with a manager of its own, outside the class that builds the chain. */
+    public static final class AccessRuleChain {
+
+        public void protect(HttpSecurity http) throws Exception {
+            http.authorizeHttpRequests(requests -> requests.anyRequest()
+                    .access((authentication, context) -> new AuthorizationDecision(true)));
         }
     }
 

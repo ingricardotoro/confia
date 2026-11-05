@@ -11,11 +11,14 @@ import com.confia.shared.observability.queue.LogQueueMetrics;
 import com.confia.shared.observability.queue.QueueMetrics;
 import com.confia.shared.observability.queue.QueueObservation;
 import com.github.kagkarlsson.scheduler.Scheduler;
+import com.confia.shared.security.PermissionResolver;
 import com.confia.shared.security.RateLimiter;
 import com.confia.shared.security.TransactionRunner;
 import com.confia.shared.security.TransactionalDataSource;
 import com.confia.shared.security.token.SessionTokenConfiguration;
 import com.confia.shared.security.token.SigningKeyRing;
+import com.confia.shared.web.authorization.PermissionDecider;
+import com.confia.shared.web.authorization.PermissionedEndpoints;
 import com.confia.shared.web.delay.DelayProperties;
 import com.confia.shared.web.delay.RequiredDelayMaterializer;
 import com.confia.shared.web.ratelimit.RateLimitInterceptor;
@@ -261,6 +264,49 @@ class ProcessBeanIsolationTest {
                 context.close();
             }
         }
+    }
+
+    /**
+     * Scenarios AZ39 and BI128 to BI130 (rbac-permission-matrix-and-audit-integration design.md D18):
+     * the permission list, the decider and the permission resolver belong to the administrative
+     * process alone. The portal and the worker start without a bean of the authorization package or of
+     * the resolver port, and the policy of the portal names the package as forbidden, with its reason.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("com.confia.bootstrap.ProcessBeanPolicy#all")
+    void onlyTheAdministrativeProcessHoldsTheAuthorizationBeans(ProcessBeanPolicy policy) {
+        LaunchOutcome outcome = ConfiaApplication.launch(
+                TestProcessArguments.forProcess(policy.process()), policy.process());
+        ConfigurableApplicationContext context = outcome.context();
+        try {
+            assertThat(context).as("the %s process must start", policy.process()).isNotNull();
+            List<String> held = beanNamesOfTypesIn(context, "com.confia.shared.web.authorization");
+            if ("admin".equals(policy.process())) {
+                assertThat(held).anyMatch(bean -> bean.endsWith(PermissionedEndpoints.class.getName()))
+                        .anyMatch(bean -> bean.endsWith(PermissionDecider.class.getName()));
+                assertThat(context.getBeansOfType(PermissionedEndpoints.class)).hasSize(1);
+                assertThat(context.getBeansOfType(PermissionResolver.class)).hasSize(1);
+            } else {
+                assertThat(held).as("no authorization bean in the %s process", policy.process())
+                        .isEmpty();
+                assertThat(context.getBeansOfType(PermissionResolver.class))
+                        .as("no permission resolver in the %s process", policy.process()).isEmpty();
+            }
+        } finally {
+            if (context != null) {
+                context.close();
+            }
+        }
+    }
+
+    @Test
+    void thePortalPolicyForbidsTheAuthorizationPackageWithItsReason() {
+        assertThat(ProcessBeanPolicy.PORTAL.forbiddenPackages())
+                .containsKey("com.confia.shared.web.authorization");
+        assertThat(ProcessBeanPolicy.PORTAL.forbiddenPackages()
+                .get("com.confia.shared.web.authorization")).contains("administrative");
+        assertThat(ProcessBeanPolicy.ADMIN.allowedPackages())
+                .contains("com.confia.shared.web.authorization");
     }
 
     /**

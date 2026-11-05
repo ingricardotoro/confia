@@ -16,6 +16,7 @@ import com.confia.shared.web.authentication.AccessTokenRejectedException;
 import com.confia.shared.web.authentication.AuthenticatedEndpoint;
 import com.confia.shared.web.authentication.AuthenticatedEndpoints;
 import com.confia.shared.web.authentication.SessionCheck;
+import com.confia.shared.web.authorization.PermissionedEndpoints;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -177,7 +178,8 @@ class SessionLivenessIT extends RotationIntegrationTest {
                 new AuthenticatedEndpoint(HttpMethod.GET, TOKEN_ONLY, SessionCheck.TOKEN_ONLY)));
         Outcome outcome = new Outcome();
         AccessTokenAuthenticationFilter filter = new AccessTokenAuthenticationFilter(
-                verifierAt(instant), endpoints, liveness(instant),
+                verifierAt(instant), endpoints, new PermissionedEndpoints(List.of()),
+                liveness(instant),
                 (request, response, exception) -> outcome.rejection.set(exception));
         MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
         request.addHeader("Authorization", "Bearer " + token);

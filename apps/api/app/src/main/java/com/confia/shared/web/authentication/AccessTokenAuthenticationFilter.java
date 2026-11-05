@@ -9,6 +9,7 @@ import com.confia.shared.security.token.MfaPurpose;
 import com.confia.shared.security.token.MfaTokenClaims;
 import com.confia.shared.security.token.TokenRejectedException;
 import com.confia.shared.security.token.TokenRejection;
+import com.confia.shared.web.authorization.PermissionedEndpoints;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,6 +21,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -75,16 +77,23 @@ public final class AccessTokenAuthenticationFilter extends OncePerRequestFilter 
     private final AuthenticationEntryPoint entryPoint;
 
     public AccessTokenAuthenticationFilter(AccessTokenVerifier verifier,
-            AuthenticatedEndpoints endpoints, SessionValidity sessionValidity,
+            AuthenticatedEndpoints endpoints, PermissionedEndpoints permissioned,
+            SessionValidity sessionValidity,
             AuthenticationEntryPoint entryPoint) {
         this.verifier = Objects.requireNonNull(verifier, "verifier");
         this.sessionValidity = Objects.requireNonNull(sessionValidity, "sessionValidity");
         this.entryPoint = Objects.requireNonNull(entryPoint, "entryPoint");
         PathPatternRequestMatcher.Builder matchers = PathPatternRequestMatcher.withDefaults();
-        this.liveSessionRoutes = endpoints.endpoints().stream()
-                .filter(endpoint -> endpoint.check() == SessionCheck.LIVE_SESSION)
-                .<RequestMatcher>map(endpoint -> matchers.matcher(endpoint.method(),
-                        endpoint.pattern()))
+        this.liveSessionRoutes = Stream.concat(
+                endpoints.endpoints().stream()
+                        .filter(endpoint -> endpoint.check() == SessionCheck.LIVE_SESSION)
+                        .<RequestMatcher>map(endpoint -> matchers.matcher(endpoint.method(),
+                                endpoint.pattern())),
+                // Every route with a permission asks for a live session, derived from the one list
+                // the chain decides over, so no second list can drift (design.md D6).
+                permissioned.endpoints().stream()
+                        .<RequestMatcher>map(endpoint -> matchers.matcher(endpoint.method(),
+                                endpoint.pattern())))
                 .toList();
         this.restrictedRoutes = endpoints.secondFactorEndpoints().stream()
                 .map(endpoint -> new RestrictedRoute(

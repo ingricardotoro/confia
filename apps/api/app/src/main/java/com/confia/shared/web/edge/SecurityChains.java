@@ -1,6 +1,8 @@
 package com.confia.shared.web.edge;
 
 import com.confia.shared.web.authentication.AuthenticatedEndpoints;
+import com.confia.shared.web.authorization.PermissionDecider;
+import com.confia.shared.web.authorization.PermissionedEndpoints;
 import com.confia.shared.web.problem.ProblemAccessDeniedHandler;
 import com.confia.shared.web.problem.ProblemAuthenticationEntryPoint;
 import com.confia.shared.web.problem.ProblemResponses;
@@ -30,6 +32,11 @@ import org.springframework.security.config.http.SessionCreationPolicy;
  * which any authenticated actor may use, with no role, permission or second factor involved. The
  * order is public routes, authenticated routes, then the final denial, so an authenticated actor on a
  * route that is on neither list gets {@code 403}.
+ *
+ * <p>The administrative chain adds a third list (rbac-permission-matrix-and-audit-integration design.md
+ * D6): the routes of {@code PermissionedEndpoints}, after the restricted ones and before the final
+ * denial, each decided by the manager the permission decider builds for its entry. It is the only place
+ * that applies the {@code access} rule.
  */
 public final class SecurityChains {
 
@@ -46,11 +53,23 @@ public final class SecurityChains {
     }
 
     /**
-     * Like the chain without authenticated routes, with the routes of {@code authenticated}
-     * between the public ones and the final denial.
+     * Like the chain without permission routes: the portal and the harnesses that have none.
      */
     public static HttpSecurity denyByDefault(HttpSecurity http, PublicEndpoints endpoints,
             AuthenticatedEndpoints authenticated, ProblemResponses problems) throws Exception {
+        return denyByDefault(http, endpoints, authenticated, new PermissionedEndpoints(List.of()),
+                null, problems);
+    }
+
+    /**
+     * The administrative chain: like the one with authenticated routes, with the routes of {@code
+     * permissioned} after the restricted ones and before the final denial, each decided by the
+     * manager that {@code decider} builds for its entry (rbac-permission-matrix-and-audit-integration
+     * design.md D6). {@code decider} may be {@code null} only when the list is empty.
+     */
+    public static HttpSecurity denyByDefault(HttpSecurity http, PublicEndpoints endpoints,
+            AuthenticatedEndpoints authenticated, PermissionedEndpoints permissioned,
+            PermissionDecider decider, ProblemResponses problems) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
@@ -72,6 +91,9 @@ public final class SecurityChains {
                     authenticated.secondFactorEndpoints().forEach(endpoint -> requests
                             .requestMatchers(endpoint.method(), endpoint.pattern())
                             .authenticated());
+                    permissioned.endpoints().forEach(endpoint -> requests
+                            .requestMatchers(endpoint.method(), endpoint.pattern())
+                            .access(decider.forEndpoint(endpoint)));
                     requests.anyRequest().denyAll();
                 });
     }

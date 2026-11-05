@@ -5,6 +5,8 @@ import com.confia.shared.security.csrf.CsrfTokens;
 import com.confia.shared.security.token.AccessTokenVerifier;
 import com.confia.shared.web.authentication.AccessTokenAuthenticationFilter;
 import com.confia.shared.web.authentication.AuthenticatedEndpoints;
+import com.confia.shared.web.authorization.PermissionDecider;
+import com.confia.shared.web.authorization.PermissionedEndpoints;
 import com.confia.shared.web.csrf.AllowedOrigins;
 import com.confia.shared.web.csrf.CookieCredentialRoute;
 import com.confia.shared.web.csrf.CsrfOriginFilter;
@@ -39,13 +41,15 @@ public class AdminSecurityConfiguration {
     @Bean
     SecurityFilterChain adminSecurityFilterChain(HttpSecurity http, Environment environment,
             ProblemResponses problems, AccessTokenVerifier verifier,
-            SessionValidity sessionValidity, CsrfTokens csrfTokens, WebEdgeProperties webEdge)
+            SessionValidity sessionValidity, CsrfTokens csrfTokens, WebEdgeProperties webEdge,
+            PermissionedEndpoints permissioned, PermissionDecider decider)
             throws Exception {
         AuthenticatedEndpoints authenticated = AuthenticatedEndpoints.forAdmin();
         HttpSecurity chain = SecurityChains.denyByDefault(http, PublicEndpoints.forAdmin(environment),
-                authenticated, problems);
+                authenticated, permissioned, decider, problems);
         addAuthenticationFilters(chain,
-                new AccessTokenAuthenticationFilter(verifier, authenticated, sessionValidity,
+                new AccessTokenAuthenticationFilter(verifier, authenticated, permissioned,
+                        sessionValidity,
                         new ProblemAuthenticationEntryPoint(problems)),
                 new CsrfOriginFilter(AllowedOrigins.parse(webEdge.allowedOrigins()),
                         CookieCredentialRoute.forAdmin(), csrfTokens, problems));
