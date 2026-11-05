@@ -78,6 +78,28 @@ class IdempotencyScopeExclusionInventoryTest {
     private static final String EDGE_CONFIGURATION =
             "com.confia.shared.web.edge.IdempotencyEdgeConfiguration";
 
+    /** The package of the permission decision of the administrative chain (ADR-0027). */
+    private static final String AUTHORIZATION_PACKAGE = "com.confia.shared.web.authorization";
+
+    /**
+     * What only the authorization package may add to the list above (rbac-permission-matrix-and-audit-
+     * integration, task 3): {@code AuthenticationMethod}, which the decider reads to refuse a session
+     * that did not prove the one-time password, and {@code PermissionResolver}, the port it asks once
+     * per request. No other web class may name either: the permission of an actor is decided in the
+     * filter chain and nowhere else, and a controller never reads how a session authenticated.
+     */
+    private static final Set<String> AUTHORIZATION_MAY_ALSO_DEPEND_ON = Set.of(
+            "com.confia.shared.security.AuthenticationMethod",
+            "com.confia.shared.security.PermissionResolver");
+
+    /**
+     * The one class outside the authorization package that wires it, and so names the resolver port it
+     * hands to the decider (the same shape as {@link #EDGE_CONFIGURATION} for the executor).
+     */
+    private static final String AUTHORIZATION_CONFIGURATION =
+            "com.confia.shared.web.edge.AuthorizationConfiguration";
+    private static final String RESOLVER = "com.confia.shared.security.PermissionResolver";
+
     /**
      * What only the HTTP idempotency mechanism ({@value #EDGE_PACKAGE}) may add to the list above
      * (5.1): the executor it calls, what it returns, the key it builds and the context it carries.
@@ -120,13 +142,7 @@ class IdempotencyScopeExclusionInventoryTest {
             if (!("." + javaClass.getPackageName() + ".").contains(".web.")) {
                 continue;
             }
-            Set<String> allowed = new HashSet<>(WEB_MAY_DEPEND_ON_SHARED_SECURITY);
-            if (isInEdgePackage(javaClass)) {
-                allowed.addAll(IDEMPOTENCY_EDGE_MAY_ALSO_DEPEND_ON);
-            }
-            if (javaClass.getName().equals(EDGE_CONFIGURATION)) {
-                allowed.add(EXECUTOR);
-            }
+            Set<String> allowed = allowedFor(javaClass.getName(), javaClass.getPackageName());
             for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
                 JavaClass target = dependency.getTargetClass();
                 boolean outsideTheAllowlist = target.getPackageName().equals("com.confia.shared.security")
@@ -151,6 +167,47 @@ class IdempotencyScopeExclusionInventoryTest {
                 .as("no production class outside %s may carry the Idempotency-Key header literal",
                         EDGE_PACKAGE)
                 .doesNotContain("Idempotency-Key");
+    }
+
+    /** The {@code shared.security} types the web class named {@code className} may depend on. */
+    static Set<String> allowedFor(String className, String packageName) {
+        Set<String> allowed = new HashSet<>(WEB_MAY_DEPEND_ON_SHARED_SECURITY);
+        if (packageName.equals(EDGE_PACKAGE)) {
+            allowed.addAll(IDEMPOTENCY_EDGE_MAY_ALSO_DEPEND_ON);
+        }
+        if (className.equals(EDGE_CONFIGURATION)) {
+            allowed.add(EXECUTOR);
+        }
+        if (packageName.equals(AUTHORIZATION_PACKAGE)) {
+            allowed.addAll(AUTHORIZATION_MAY_ALSO_DEPEND_ON);
+        }
+        if (className.equals(AUTHORIZATION_CONFIGURATION)) {
+            allowed.add(RESOLVER);
+        }
+        return allowed;
+    }
+
+    /**
+     * The scoping of the allowlist above is itself checked: the authorization names reach only the
+     * authorization package and its configuration, and every other web class, the edge of idempotency
+     * included, is still refused them. Without this, widening the base set would pass unnoticed.
+     */
+    @Test
+    void theAuthorizationTypesAreAllowedOnlyToTheAuthorizationPackageAndItsConfiguration() {
+        String method = "com.confia.shared.security.AuthenticationMethod";
+        assertThat(allowedFor("com.confia.shared.web.authorization.PermissionDecider",
+                AUTHORIZATION_PACKAGE)).contains(method, RESOLVER);
+        assertThat(allowedFor(AUTHORIZATION_CONFIGURATION, "com.confia.shared.web.edge"))
+                .contains(RESOLVER).doesNotContain(method);
+        for (String[] unrelated : new String[][] {
+                {"com.confia.identity.web.LoginController", "com.confia.identity.web"},
+                {"com.confia.shared.web.edge.SecurityChains", "com.confia.shared.web.edge"},
+                {"com.confia.shared.web.authentication.AccessTokenAuthenticationFilter",
+                        "com.confia.shared.web.authentication"},
+                {"com.confia.shared.web.idempotency.IdempotentRequestHandler", EDGE_PACKAGE}}) {
+            assertThat(allowedFor(unrelated[0], unrelated[1])).as(unrelated[0])
+                    .doesNotContain(method, RESOLVER);
+        }
     }
 
     private static boolean isInEdgePackage(JavaClass javaClass) {
