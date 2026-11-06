@@ -299,3 +299,54 @@ Procedimiento: copia fuera del repositorio (`/tmp/demo`), ruptura, rojo por aser
 ### Elementos abiertos
 
 - Ninguno de esta tarea. Las ramas 4a y 4b no se empujaron.
+
+
+## Tarea 5: `auth-operations-and-contract-mocks` (2026-11-06, detenida antes del commit por la regla de las 800 líneas)
+
+- **Ruta:** escritor delegado (un solo escritor, un solo árbol de trabajo). Rama `change/admin-web-foundations-and-session-5-auth-operations-and-contract-mocks`, base `335457b`.
+- **Estado:** código, pruebas y demostraciones hechos; **sin commit** a la espera de un PR completo en verde. **Excepción del propietario (2026-11-06):** un único PR de **833 líneas efectivas (833 adiciones y 0 eliminaciones frente a `335457b`)**, excepción explícita al límite de 800 de `docs/15` §3; sin corte. La propuesta 5a/5b de «Medida» queda descartada.
+
+### Dependencias
+
+- `msw` **3.0.3** al catálogo de `pnpm-workspace.yaml` y como `devDependency` de `@confia/admin-web` (publicada el 2026-10-10, 27 días antes de hoy; la 3.0.4 es del 2026-11-06 y no cumple los 14 días). `minimumReleaseAge: 20160` y el `override` de `browserslist` quedan intactos.
+- `@confia/contracts` (`workspace:*`) como `devDependency` de la app: la tarea importa `@confia/contracts/admin` y el paquete no estaba declarado. Solo agrega el enlace.
+- Archivo de bloqueo: `pnpm install` informó «+50 -6». Las 50 altas son el árbol de `msw` (`yargs`, `@inquirer/*`, `@mswjs/interceptors`, `cookie` 2.0.1, etc.); las 6 bajas son entradas de resolución de `vitest`, `@vitest/*` y `orval` que cambian de clave. Como `msw` es un par opcional de `vitest` y de `@orval/mock`, pnpm **reescribió el sufijo de pares** de esas entradas; ninguna versión existente se movió. Las políticas de la cadena de suministro (`minimumReleaseAge`) validaron el bloqueo.
+- `pnpm audit --audit-level high`: sin altas ni críticas (2 moderadas, las de antes).
+
+### Evidencia del ciclo TDD (5.1, 5.2)
+
+| Superficie | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| `src/test/contract-responses.test.ts` | Sí, no carga | `Failed to resolve import "./contract-responses.ts"` | 12 pasan |
+| `src/shared/api/auth-operations.test.ts` (AW33 a AW39, AW41, AW42, I310) | Sí, no carga | `Failed to resolve import "./auth-operations.ts"` (la causa esperada, con `msw-server` y `contract-responses` ya presentes) | 23 pasan |
+| `src/test/auth-operations-query.test.ts` (AW20 a AW22) | Mismo rojo que el anterior mientras estuvo en ese archivo (ver desviación 2) | `Failed to resolve import "./auth-operations.ts"` | 4 pasan |
+
+Pasos sin rojo (sin adornos): el rojo de `auth-operations` se observó con el archivo único; AW20 a AW22 se movieron de archivo después del verde, sin cambiar aserciones. La opción `onUnhandledRequest` de MSW 2 no existe en MSW 3 (`onUnhandledFrame`): `tsc` lo detectó tras el verde y se corrigió en `msw-server.ts`.
+
+### Demostraciones deliberadas (5.3)
+
+Procedimiento: copia fuera del repositorio (directorio temporal de la sesión), ruptura, rojo por aserción, restauración desde la copia y `cmp` sin salida. El archivo es nuevo (sin seguimiento de Git), por lo que `git diff` no aplica y el `cmp` es la comprobación.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 1 | `Authorization` en `endCurrentSession` | AW35: `expected true to be false` (la cabecera estaba presente); 1 fallo de 27 | idéntico |
+| 2 | `Idempotency-Key` en `refreshSession` | AW39 de `refreshSession`: `expected true to be false`; 1 fallo de 27 | idéntico |
+| 3 | `logIn` devuelve el cuerpo sin validar como `ok` | AW41: `expected { kind: 'ok', status: 200, … } to deeply equal { kind: 'unexpected-response', … }`; 1 fallo de 27 | idéntico |
+
+### Desviaciones del diseño y de la lista de tareas
+
+1. **Nombres de las operaciones**, por `operationId` del OpenAPI: `logIn`, `refreshSession`, `endCurrentSession`, `getCurrentSession`, `enrollSecondFactor`, `completeSecondFactor`. `refreshSession` exige el valor CSRF (`string`): sin cookie la sesión no hace petición (invariante 3); `endCurrentSession` lo acepta ausente (AW36). `completeSecondFactor` toma `{ kind: "code" | "recovery-code", value }` para que sea exactamente uno.
+2. **AW20 a AW22 en `src/test/auth-operations-query.test.ts`**, no en `auth-operations.test.ts`. La regla `admin-shared-never-imports-features` impide que `shared/` importe `app/query-client.ts`; la prueba de PR (`tooling/src/dependency-rules.test.ts`) la detectó en la primera corrida. Las aserciones son las mismas.
+3. **`contract-responses.ts`** devuelve `{ status, body, contentType }` (sin depender de MSW, para que el simulador de 11a lo use), valida cada cuerpo con el esquema generado y lanza `ContractViolation` (nombra la respuesta y el campo, nunca el valor). `problem()` valida con `ProblemDetail.omit({ instance: true })` y emite `instance` relativo, como el backend (D7). Los centinelas, el secreto base32 y los códigos de recuperación se generan en ejecución con `node:crypto`.
+4. **`msw-server.ts`** es de uso opt-in por archivo (`installMswServer()`), no entra en `setup.ts`: las pruebas que reemplazan `fetch` con `vi.stubGlobal` no cambian.
+5. **Conteo de pruebas de la base.** `U` en `335457b` mide hoy 198 pasan y 1 `todo` (la nota de la tarea 4 decía 192); con la tarea 5 son 237 pasan y 1 `todo` (+39), 21 archivos.
+
+### Medida (regla de las 800 líneas)
+
+`git diff --cached --numstat -M 335457b -- . ':(exclude)openspec' ':(exclude)pnpm-lock.yaml' ':(exclude)packages/contracts/src/generated'` con todo lo previsto en el índice: **833 líneas efectivas (833 adiciones, 0 eliminaciones)**. **Supera 800: no se compromete.** Desglose: `auth-operations.ts` 117, `auth-operations.test.ts` 274, `auth-operations-query.test.ts` 78, `contract-responses.ts` 157, `contract-responses.test.ts` 124, `msw-server.ts` 80, `package.json` 2, `pnpm-workspace.yaml` 1. La tarea no tiene corte predefinido (la estimación a 4x era 670). Propuesta de corte por archivos completos, con sus pruebas, para decisión del propietario: **5a** `contract-responses.ts` y su prueba, más el enlace de `@confia/contracts` (≈ 282); **5b** `msw-server.ts`, `auth-operations.ts` y sus dos pruebas, más `msw` en el catálogo y el archivo de bloqueo (≈ 551).
+
+### Suites
+
+- **U** (`pnpm --filter @confia/admin-web test`): una corrida en verde antes de mover AW20 a AW22 (21 archivos, 237 pasan y 1 `todo`, cobertura 100/97,82/100/100). Después, con la máquina sin memoria (1 a 2 GB libres), las corridas completas fallan por **tiempos de espera de 5 000 ms o por no poder arrancar procesos** (`main.test.tsx`, `vite.config.test.ts`, `App.test.tsx`, `i18n.test.tsx`, a veces `keys.check.test.ts`); los mismos archivos pasan solos (8 archivos, 41 pruebas), y con `--maxWorkers=2` pasaron 236 de 237 (un tiempo de espera en `vite.config.test.ts`). Los 39 casos de la tarea 5 pasan siempre. **El cierre con U y PR completos queda pendiente de una máquina descargada.**
+- **PR:** la primera corrida detectó la violación de `admin-shared-never-imports-features` (desviación 2). Corregida, `tooling/src/dependency-rules.test.ts` y `eslint-app-rules.test.ts` pasan (112 y 3 `todo`); `lint` y `typecheck` de `admin-web` pasan. No se repitió el PR completo por la falta de memoria.
+- Guarda de `*.spec.*` sobre `apps/` y AW10: ver el informe de cierre.
