@@ -304,7 +304,7 @@ Procedimiento: copia fuera del repositorio (`/tmp/demo`), ruptura, rojo por aser
 ## Tarea 5: `auth-operations-and-contract-mocks` (2026-11-06, detenida antes del commit por la regla de las 800 líneas)
 
 - **Ruta:** escritor delegado (un solo escritor, un solo árbol de trabajo). Rama `change/admin-web-foundations-and-session-5-auth-operations-and-contract-mocks`, base `335457b`.
-- **Estado:** código, pruebas y demostraciones hechos; **sin commit** a la espera de un PR completo en verde. **Excepción del propietario (2026-11-06):** un único PR de **833 líneas efectivas (833 adiciones y 0 eliminaciones frente a `335457b`)**, excepción explícita al límite de 800 de `docs/15` §3; sin corte. La propuesta 5a/5b de «Medida» queda descartada.
+- **Estado:** hecho y comprometido (`2ef41f5`, `fe64bed`, `cb6c00b`; ver «Tarea 5: cierre»). Al detenerse, el trabajo estaba sin commit a la espera de un PR completo en verde. **Excepción del propietario (2026-11-06):** un único PR de **833 líneas efectivas (833 adiciones y 0 eliminaciones frente a `335457b`)**, excepción explícita al límite de 800 de `docs/15` §3; sin corte. La propuesta 5a/5b de «Medida» queda descartada.
 
 ### Dependencias
 
@@ -341,11 +341,11 @@ Procedimiento: copia fuera del repositorio (directorio temporal de la sesión), 
 4. **`msw-server.ts`** es de uso opt-in por archivo (`installMswServer()`), no entra en `setup.ts`: las pruebas que reemplazan `fetch` con `vi.stubGlobal` no cambian.
 5. **Conteo de pruebas de la base.** `U` en `335457b` mide hoy 198 pasan y 1 `todo` (la nota de la tarea 4 decía 192); con la tarea 5 son 237 pasan y 1 `todo` (+39), 21 archivos.
 
-### Medida (regla de las 800 líneas)
+### Medida (regla de las 800 líneas), al detenerse; el estado vigente está en «Tarea 5: cierre»
 
 `git diff --cached --numstat -M 335457b -- . ':(exclude)openspec' ':(exclude)pnpm-lock.yaml' ':(exclude)packages/contracts/src/generated'` con todo lo previsto en el índice: **833 líneas efectivas (833 adiciones, 0 eliminaciones)**. **Supera 800: no se compromete.** Desglose: `auth-operations.ts` 117, `auth-operations.test.ts` 274, `auth-operations-query.test.ts` 78, `contract-responses.ts` 157, `contract-responses.test.ts` 124, `msw-server.ts` 80, `package.json` 2, `pnpm-workspace.yaml` 1. La tarea no tiene corte predefinido (la estimación a 4x era 670). Propuesta de corte por archivos completos, con sus pruebas, para decisión del propietario: **5a** `contract-responses.ts` y su prueba, más el enlace de `@confia/contracts` (≈ 282); **5b** `msw-server.ts`, `auth-operations.ts` y sus dos pruebas, más `msw` en el catálogo y el archivo de bloqueo (≈ 551).
 
-### Suites
+### Suites, antes del ajuste del tiempo límite; las vigentes están en «Tarea 5: cierre»
 
 - **U** (`pnpm --filter @confia/admin-web test`): una corrida en verde antes de mover AW20 a AW22 (21 archivos, 237 pasan y 1 `todo`, cobertura 100/97,82/100/100). Después, con la máquina sin memoria (1 a 2 GB libres), las corridas completas fallan por **tiempos de espera de 5 000 ms o por no poder arrancar procesos** (`main.test.tsx`, `vite.config.test.ts`, `App.test.tsx`, `i18n.test.tsx`, a veces `keys.check.test.ts`); los mismos archivos pasan solos (8 archivos, 41 pruebas), y con `--maxWorkers=2` pasaron 236 de 237 (un tiempo de espera en `vite.config.test.ts`). Los 39 casos de la tarea 5 pasan siempre. **El cierre con U y PR completos queda pendiente de una máquina descargada.**
 - **PR:** la primera corrida detectó la violación de `admin-shared-never-imports-features` (desviación 2). Corregida, `tooling/src/dependency-rules.test.ts` y `eslint-app-rules.test.ts` pasan (112 y 3 `todo`); `lint` y `typecheck` de `admin-web` pasan. No se repitió el PR completo por la falta de memoria.
