@@ -572,6 +572,8 @@ sigue diciendo que el e2e llega con el cambio 11: BX83 prohíbe modificar línea
 es simulada.
 
 **BX89: el tiempo no se pudo medir en esta fase.** El PR 2 lo mide en la primera ejecución remota y lo agrega a esta sección con nota fechada.
+
+**Nota del 2026-11-05 (BX89, medida del PR 2, #259):** el trabajo `frontend verify` tardó **1 min 51 s** y **2 min 11 s** en las dos primeras ejecuciones remotas del PR 2. Cabe con holgura en el límite de 10 minutos, así que BX19 no cambia.
 Si `frontend verify` no cabe en 10 minutos, se detiene el PR 2: subir el límite cambia BX19.
 
 ### D17. Voz

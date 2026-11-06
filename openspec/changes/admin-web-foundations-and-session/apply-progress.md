@@ -10,7 +10,7 @@
 | Tarea | Estado | Rama | Líneas efectivas |
 |---|---|---|---|
 | 1 `app-static-rules` | **Hecha** (sin corte) | `change/admin-web-foundations-and-session-1-app-static-rules` | 702 de 800 |
-| 2 `admin-web-package-and-router` | **Hecha salvo 2.4** (medida de CI pendiente del empuje) | `change/admin-web-foundations-and-session-2-admin-web-package-and-router` | 673 de 800 |
+| 2 `admin-web-package-and-router` | **Hecha** (2.4 medida en #259 el 2026-11-05) | `change/admin-web-foundations-and-session-2-admin-web-package-and-router` | 673 de 800 |
 | 3 a 12 | Pendientes | | |
 
 ## Tarea 1: `app-static-rules`
@@ -181,3 +181,8 @@ Medida con `git add -N .` y `git diff --numstat -M 1be0378` (sin `openspec/`, el
 - Guarda de `*.spec.*` sobre `apps/`: sin coincidencias. AW10: `git diff --name-only 1be0378 -- apps/api` vacío.
 - `pnpm audit --audit-level high`: sin altas ni críticas (2 moderadas).
 - Una primera corrida de PR falló en `@confia/ui` (`run-gate.test.ts`) por el archivo de bloqueo regenerado una sola vez (ver «Hallazgo»); con el bloqueo corregido, pasa.
+
+
+## Tarea 2: subtarea 2.4 cerrada (2026-11-05)
+
+En el PR #259, `frontend verify` tardó 1 min 51 s y 2 min 11 s en las dos primeras ejecuciones remotas, dentro del límite de 10 minutos (BX19 sin cambios). La cifra quedó en `design.md` D16 con nota fechada, y la tarea 2 se marca terminada.
