@@ -46,7 +46,9 @@ function send(port: number, method: string, path: string): Promise<{ status: num
   });
 }
 
-describe("the same-origin proxy", () => {
+// The time limit is explicit because this suite builds the whole app graph cold (or starts a real
+// server), which can outlast Vitest's 5 s default on a loaded machine; no assertion waits on it.
+describe("the same-origin proxy", { timeout: 20_000 }, () => {
   let backend: Server;
   let received: Received[];
   let backendPort: number;
