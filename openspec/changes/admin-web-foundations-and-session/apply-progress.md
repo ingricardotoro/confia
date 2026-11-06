@@ -356,3 +356,28 @@ Procedimiento: copia fuera del repositorio (directorio temporal de la sesión), 
 - **Tiempo límite de las pruebas de arranque.** La suite de PR falló dos veces por `Test timed out in 5000ms` en `main.test.tsx` («mounts the app into #root»), también con 4,7 GB libres. Causa observada: la prueba usa `vi.resetModules()` e importa `main.tsx` en frío, de modo que recompila todo el grafo de la app; sola, esa importación ya ocupa casi 1,7 s. Por decisión del propietario, `2ef41f5` da a ese `describe` y al del proxy de `vite.config.test.ts` un tiempo límite propio de 20 s, sin cambiar ninguna aserción.
 - **Suites después del ajuste:** `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1 --force`: 18 de 18 tareas; app 237 pruebas y 1 pendiente.
 - **Commits:** `2ef41f5` (tiempo límite) y `fe64bed` (operaciones de acceso y respuestas de contrato). Medida del PR contra `335457b`: 841 líneas efectivas, 833 de la tarea más 8 del ajuste, dentro de la excepción aprobada.
+
+
+## Tarea 6: `session-basics` (2026-11-06, partida en 6a y 6b)
+
+- **Ruta:** escritor delegado (un solo escritor, un solo árbol de trabajo). Corte predefinido de la tarea, aprobado por el propietario el 2026-11-06: **6a** `session-store-and-refresh` (almacén, coordinador, Web Locks; SS14 a SS16, SS18, invariante 3, prueba de almacén de SS59) sobre `87df591`; **6b** `access-session` (`AccessSession`, consulta de la sesión actual; SS21 a SS26) sobre el commit de 6a.
+
+### Parte 6a: almacén y coordinador de refresco
+
+- **Archivos.** `src/features/identity/session/{token-store,refresh-coordinator}.ts` y sus pruebas, más `src/test/fake-locks.ts` (cola exclusiva con el orden del navegador; registra nombre y modo). `index.ts` no entra en 6a: la instancia única se crea en 6b, donde existe `AccessSession`.
+- **ROJO (6.1).** `token-store.test.ts` y `refresh-coordinator.test.ts` no cargan: `Failed to resolve import "./token-store.ts"` y `Failed to resolve import "./refresh-coordinator.ts"` (la causa esperada: el módulo no existe). 2 suites fallidas, 0 pruebas ejecutadas.
+- **VERDE (6.2).** 17 pruebas (6 de almacén, 11 del coordinador). Primera corrida: 15 pasan y 2 por tiempo de espera de 5 000 ms, en las dos pruebas del invariante 3. Causa observada: **defecto de la prueba, no de producción**. El ayudante que retiene el bloqueo como «otra pestaña» capturaba `release` dentro de un callback que el bloqueo falso invoca de forma asíncrona, y la prueba lo llamaba antes (aún era una función vacía). Se corrigió el ayudante para esperar a tener el bloqueo; las aserciones no cambiaron.
+- **Decisiones de diseño.**
+  - `createRefreshCoordinator({ refresh, readCsrf, locks })` devuelve el desenlace como valor (`refreshed`, `no-session`, `network`, `rejected`); no lanza por lo que dijo el servidor, por lo que SS16 reparte el mismo valor a todos. Lo que hace con el desenlace (guardar el token, terminar la sesión local) es de `AccessSession` (6b). `readCsrf` se inyecta; en 6b recibe `readCsrfToken`.
+  - `createTokenStore()` expone `accept(outcome)`, `accessToken()`, `secondFactorToken()` y `clear()`. `accept` recibe un `LoginOutcome` tal como llegó y guarda un solo tipo de token a la vez; no tiene entrada para el identificador (SS59). La prueba de SS59 de esta parte comprueba que ninguna lectura del almacén contiene el identificador y que su superficie son solo las cuatro operaciones; el requisito completo de pantalla sigue en la parte 2.
+  - Sin temporizadores en producción. SS18 afirma que no se llama a `setInterval`; el temporizador de 60 s del transporte (`http.ts`) no es un sondeo y no se afirma ausente.
+- **Demostraciones deliberadas (6.3), ambas del coordinador, que vive en 6a.** Procedimiento: copia fuera del repositorio, ruptura, rojo por aserción, restauración y `cmp` sin salida.
+
+  | # | Ruptura | Rojo observado | `cmp` |
+  |---|---|---|---|
+  | 2 | `inFlight ??=` por `inFlight =` (sin compartir la promesa) | SS14: `expected [ … ] to have a length of 1 but got 3`; también SS16 y SS18 (`toBe` entre desenlaces); 3 fallos de 11 | idéntico |
+  | 1 | Leer el valor CSRF antes de pedir el bloqueo | Invariante 3: `expected [ 'csrf-before' ] to deeply equal [ 'csrf-rotated-by-the-other-tab' ]` y `expected { kind: 'refreshed', … } to deeply equal { kind: 'no-session' }`; 2 fallos de 11 | idéntico |
+
+  Las demostraciones (3) a (5) son de 6b, donde vive el código que rompen.
+- **Suites (6a).** **U** 24 archivos, 254 pasan y 1 `todo`, cobertura 100/98,07/100/100; **T** 9 archivos, 270 pasan y 3 `todo`; **PR** 18 de 18 tareas. Guarda de `*.spec.*` sobre `apps/` y AW10 (`git diff --name-only 87df591 -- apps/api`): vacíos.
+- **Medida (800 líneas).** 409 líneas efectivas (409 adiciones, 0 eliminaciones) frente a `87df591`: `refresh-coordinator.test.ts` 176, `refresh-coordinator.ts` 65, `token-store.test.ts` 89, `token-store.ts` 56, `fake-locks.ts` 23.
