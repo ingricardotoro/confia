@@ -1,0 +1,45 @@
+{
+  "signIn": {
+    "contact": "Si no recuerda su contraseña, comuníquese con la administración de su institución.",
+    "waiting": "Verificando sus datos. Esto puede tardar hasta 30 segundos."
+  },
+  "secondFactor": {
+    "waiting": "Verificando el código. Esto puede tardar hasta 30 segundos."
+  },
+  "notice": {
+    "sessionExpired": "Su sesión se cerró por seguridad. Vuelva a iniciar sesión.",
+    "verificationInterrupted": "La verificación se interrumpió. Inicie sesión de nuevo para continuar.",
+    "enrollmentInterrupted": "La inscripción se interrumpió. El código QR y los códigos de recuperación anteriores ya no sirven; al iniciar sesión se generarán nuevos.",
+    "alreadyEnrolled": "Su cuenta ya tiene un segundo factor inscrito. Inicie sesión y use su código de verificación."
+  },
+  "signedIn": {
+    "title": "Sesión iniciada.",
+    "message": "Su sesión está activa."
+  },
+  "problem": {
+    "authenticationFailed": "El correo o la contraseña no son correctos.",
+    "capacityExceeded": "El servicio está ocupado en este momento. Espere un momento e intente de nuevo.",
+    "network": "No se pudo conectar con el servidor. Revise su conexión e intente de nuevo.",
+    "recoveryInvalid": "El código de recuperación no es correcto o ya se usó. Revíselo e intente de nuevo.",
+    "notProcessed": "No se pudieron procesar los datos enviados. Revíselos e intente de nuevo."
+  },
+  "countdown": {
+    "remaining": "Puede intentar de nuevo en {seconds} s.",
+    "done": "Ya puede intentar de nuevo."
+  },
+  "copy": {
+    "key": "Copiar clave",
+    "keyDone": "Clave copiada.",
+    "trace": "Copiar identificador",
+    "traceDone": "Identificador copiado.",
+    "failed": "No se pudo copiar. Seleccione el texto y cópielo manualmente."
+  },
+  "boot": {
+    "restoring": "Restaurando su sesión.",
+    "failed": "No se pudo restaurar la sesión. Revise su conexión e intente de nuevo."
+  },
+  "notFound": {
+    "title": "Esta página no existe.",
+    "link": "Ir a inicio de sesión"
+  }
+}
