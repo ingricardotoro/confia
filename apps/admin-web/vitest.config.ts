@@ -1,0 +1,21 @@
+import { configDefaults, defineConfig } from "vitest/config";
+import { confiaVitest } from "@confia/config/vitest";
+
+// The same bar as packages/ui (build-integrity, BX97 to BX99): 80 percent, with every production
+// file in the denominator, tested or not. Playwright journeys are *.e2e.ts and never match here.
+export default defineConfig({
+  test: {
+    ...confiaVitest.test,
+    include: ["src/**/*.test.{ts,tsx}", "*.test.ts"],
+    exclude: [...configDefaults.exclude, "src/**/__fixtures__/**"],
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+    passWithNoTests: false,
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.test.{ts,tsx}", "src/**/*.test-d.ts", "src/**/__fixtures__/**", "src/test/**", "**/*.d.ts"],
+      thresholds: { lines: 80, branches: 80, functions: 80, statements: 80 },
+    },
+  },
+});
