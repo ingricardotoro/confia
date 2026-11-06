@@ -10,7 +10,8 @@
 | Tarea | Estado | Rama | Líneas efectivas |
 |---|---|---|---|
 | 1 `app-static-rules` | **Hecha** (sin corte) | `change/admin-web-foundations-and-session-1-app-static-rules` | 702 de 800 |
-| 2 a 12 | Pendientes | | |
+| 2 `admin-web-package-and-router` | **Hecha** (2.4 medida en #259 el 2026-11-05) | `change/admin-web-foundations-and-session-2-admin-web-package-and-router` | 673 de 800 |
+| 3 a 12 | Pendientes | | |
 
 ## Tarea 1: `app-static-rules`
 
@@ -111,3 +112,77 @@ Resultados de la última ejecución sobre el árbol final:
 - Los `it.todo` esperan: BX54 y BX57 (tarea 4), BX65 (tarea 2), BX46, BX61 y BX62 (tarea 9).
 - El selector de importes (`APP_MONEY`) no detecta alias (`const a = money.amount; Number(a)`), límite ya registrado en D2.
 - El recorrido de `apps/` por el escáner es real solo cuando exista código en `apps/admin-web` (tarea 2).
+
+## Tarea 2: `admin-web-package-and-router`
+
+- **Ruta:** escritor delegado (un solo escritor, un solo árbol de trabajo). Rama `change/admin-web-foundations-and-session-2-admin-web-package-and-router`, base `1be0378`.
+- **Subtarea 2.4 (medida de CI, BX89): pendiente.** Requiere la primera ejecución remota del PR, es decir, que el propietario empuje. No se marca y la nota de D16 no se escribió.
+
+### Dependencias (2.1)
+
+Versiones fijadas en el catálogo, todas publicadas hace más de 14 días y legibles por pnpm 12.8.1: `@tanstack/react-router` 1.170.45, `@tanstack/react-query` 5.104.5 (la última, 5.106.1, es de hoy), `@tanstack/react-form` 1.33.5, `@playwright/test` 1.64.1 (igual que `playwright`) y `@axe-core/playwright` 4.14.0 (depende de `axe-core ~4.14.0`). `msw`, `qrcode.react` y `jsqr` no entran aquí. `pnpm audit --audit-level high`: limpio (2 moderadas). `pnpm why`: una sola versión de `react` (19.3.0), `react-dom` y `axe-core` (4.14.0).
+
+**Rojo verificado de 2.1:** en un proyecto de prueba fuera del repositorio, pnpm 12.8.1 con `minimumReleaseAge: 20160` rechazó `@playwright/test@1.65.0` (y `playwright` y `playwright-core` 1.65.0) y aceptó 1.64.1.
+
+**Hallazgo (bloqueo y decisión del propietario, 2026-11-05).** Al activar `minimumReleaseAge`, el archivo de bloqueo heredado de `main` dejó de pasar la política: `browserslist@4.29.5` (2026-10-26) y otras nueve versiones transitivas tenían menos de 14 días. El propietario eligió la opción 1: un `overrides` fechado que fija `browserslist` en 4.29.4, con la nota correspondiente en D19. Como la política verifica también las demás, se regeneró el archivo de bloqueo para que pnpm eligiera versiones maduras. **Advertencia para el propietario:** la primera regeneración dejó `vite` sin sus pares opcionales (`esbuild`, `jiti`, `yaml`) y una prueba de `@confia/ui` (`run-gate.test.ts`, «restores the page… when the story throws») falló de forma determinista. Una segunda resolución (`pnpm install --no-prefer-frozen-lockfile`) restauró los pares y la prueba pasó. El archivo de bloqueo resultante cambia unas 600 líneas (excluidas de la medida) y mueve versiones transitivas maduras (por ejemplo `fast-uri`, `ignore`, `resolve`, `acorn`); las del catálogo no cambian. Conviene revisar el diff del bloqueo.
+
+### Medida y corte (regla de las 800 líneas)
+
+Ver «Medida final» al final de esta sección.
+
+### Evidencia del ciclo TDD (2.2, 2.3)
+
+| Superficie | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| `workspace-guards.test.ts` (BX92, BX93, BX94, BX91, D19, AW01, BX88) | Sí, 8 de 14 fallos | BX93: `actual value must be number or bigint, received "undefined"`; BX92, BX94, BX91 y AW01: `ENOENT apps/admin-web/package.json`; D19 Playwright: `expected undefined to be '1.64.1'`; D19 versión única: `expected [] to have a length of 1 but got +0`; BX88: `expected undefined to deeply equal { cache, persistent, dependsOn }` | 14 pasan |
+| `suppression-citations.test.ts` (AW17, BX65) | Sí, 1 fallo (el `it.todo` pasó a prueba) | `expected 0 to be greater than 0` (ningún archivo real de `admin-web`) | pasa |
+| `vite.config.test.ts` (AW07, AW08, AW11, `resolveApiTarget`) | Sí, el archivo no carga | `Cannot find module './vite.config.ts'` | 16 pasan |
+| `App.test.tsx`, `vitest.config.test.ts` (AW01, BX97 a BX99) | Sí, no cargan | `Cannot find module './App.tsx'` y `'./vitest.config.ts'` | pasan |
+
+**Rojos sorprendentes durante el verde, registrados sin adornos:**
+
+- **AW11 (CORS).** Con la configuración de D4 tal cual, Vite respondió a la ruta proxificada con `access-control-allow-origin` (su `server.cors` por defecto acepta orígenes `localhost`): `expected [ 'access-control-allow-origin' ] to deeply equal []`. Se corrigió con `cors: false` en `server` y `preview`. **Desviación del diseño**, ver abajo.
+- **BX97 con `main.tsx` sin prueba:** la cobertura bajó a 70 % de líneas, 63,63 % de sentencias y 25 % de ramas, y falló el umbral; es la demostración natural de BX99 (el archivo sin prueba cuenta en el denominador). Se agregó `main.test.tsx` y la cobertura quedó en 100 %.
+- Primera ejecución de las pruebas del proxy: `ECONNREFUSED` porque el cliente forzaba IPv4 y `host: "localhost"` enlaza `::1`; se quitó `family: 4` de la prueba.
+
+**Pasos sin rojo (sin adornos):** BX96 y AW62 (en `workspace-guards.test.ts`) y AW16 y AW62 (en `structure.test.ts`) pasaron en la primera ejecución: caracterizan un estado que ya era cierto (el paso de auditoría de `ci.yml`, `orval` solo con cliente `zod`, ausencia de árbol de rutas). Las demostraciones deliberadas de abajo no los cubren; protegen contra una regresión futura, no contra un defecto actual. El `AW01` de turbo se apoya en `turbo run --dry=json`.
+
+### Demostraciones deliberadas (2.5)
+
+Procedimiento: copia a un directorio temporal de la sesión, ruptura, rojo por aserción, restauración desde la copia y `cmp` sin salida.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 1 | `resolveApiTarget` devuelve el valor sin validar | 6 fallos, uno por destino no local (`expected [Function] to throw an error`) | idéntico |
+| 2 | `changeOrigin: true` | 3 fallos: AW07 (`expected '127.0.0.1:62471' to be 'localhost:62472'`), AW08 con el mismo `Host`, y la guarda de fuente de D4 | idéntico |
+| 3 | `minimumReleaseAge: 10080` | 1 fallo: BX93 `expected 10080 to be greater than or equal to 20160` | idéntico |
+
+### Desviaciones del diseño
+
+1. **`cors: false` en `server` y `preview`** (D4 no lo decía). Sin él, Vite agrega `Access-Control-Allow-Origin` a una petición con `Origin` local, lo que contradice AW11. La página es del mismo origen, así que no cambia el comportamiento del navegador. Conviene una nota fechada en D4 en un PR que toque el diseño.
+2. **`vite.config.ts` exporta una función** (`defineConfig(() => …)`) y no un objeto, para leer `CONFIA_API_PROXY_TARGET` cuando Vite crea el servidor y poder probarlo con `createServer`.
+3. **La app no importa aún `@confia/ui/styles.css` ni depende de `@confia/ui`.** Hacerlo ejecutaría `^build` de `@confia/ui` (Storybook) en cada `build` de la app y la tarea 2 no lo pide. AW03 pertenece a la tarea 12. `@tanstack/react-query` y `@tanstack/react-form` están declaradas pero sin uso hasta las tareas 3 y siguientes.
+4. **`apps/admin-web/package.json`** fija `test` como `vitest run --coverage`, con los umbrales de `packages/ui` (80 %). `vitest.config.ts` incluye `src/**/*.test.{ts,tsx}` y `*.test.ts` de la raíz del paquete (`vite.config.test.ts` y `vitest.config.test.ts`).
+5. **Archivo de bloqueo regenerado**, ver «Hallazgo» arriba.
+
+### Elementos abiertos
+
+- 2.4: medir `frontend verify` en la primera ejecución remota y anotarlo en D16. Si no cabe en 10 minutos, se detiene el PR (BX19, decisión del propietario). El trabajo de CI ahora ejecuta además `build` de `@confia/admin-web` y la verificación de la antigüedad al instalar.
+- Retirar el `overrides` de `browserslist` hacia el 2026-11-09.
+- Los `it.todo` restantes: BX54 y BX57 (tarea 4), BX46, BX61 y BX62 (tarea 9). BX57 estaba asignado a esta tarea en el diseño §10 (la fila «PR 2») pero `tasks.md` lo asigna a la tarea 4; se siguió `tasks.md`.
+
+### Medida final y suites de cierre (2.6)
+
+Medida con `git add -N .` y `git diff --numstat -M 1be0378` (sin `openspec/`, el archivo de bloqueo ni código generado): **673 líneas efectivas** (671 adiciones y 2 eliminaciones), por debajo de 800; no se aplicó corte. El diseño estimaba 650 a 4x. Dos commits: el paquete y su configuración, y la regla de antigüedad con su guarda y la nota de D19.
+
+- **U** `pnpm --filter @confia/admin-web test`: 5 archivos, 25 pasan; cobertura 100 % (umbral 80 %).
+- **T** `pnpm --filter ./tooling test`: 9 archivos, 268 pasan, 5 `todo` (BX54, BX57, BX46, BX61 y BX62; BX65 dejó de ser `todo`).
+- **PR** `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1`: 18 de 18 tareas, sin caché (`@confia/ui` 524, `@confia/tooling` 268, `@confia/admin-web` 25, `@confia/config` 4, `@confia/contracts` 8).
+- Guarda de `*.spec.*` sobre `apps/`: sin coincidencias. AW10: `git diff --name-only 1be0378 -- apps/api` vacío.
+- `pnpm audit --audit-level high`: sin altas ni críticas (2 moderadas).
+- Una primera corrida de PR falló en `@confia/ui` (`run-gate.test.ts`) por el archivo de bloqueo regenerado una sola vez (ver «Hallazgo»); con el bloqueo corregido, pasa.
+
+
+## Tarea 2: subtarea 2.4 cerrada (2026-11-05)
+
+En el PR #259, `frontend verify` tardó 1 min 51 s y 2 min 11 s en las dos primeras ejecuciones remotas, dentro del límite de 10 minutos (BX19 sin cambios). La cifra quedó en `design.md` D16 con nota fechada, y la tarea 2 se marca terminada.
