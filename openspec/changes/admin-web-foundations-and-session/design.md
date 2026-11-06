@@ -615,6 +615,8 @@ con estas condiciones: publicada hace más de 14 días, `pnpm audit --audit-leve
 **`minimumReleaseAge: 20160` se agrega en el PR 2**, con su fijación en `workspace-guards.test.ts`. Hoy nada hace cumplir la regla y BX93 no tendría
 qué comparar. Por verificar en rojo: que pnpm 12.8.1 lea esa clave.
 
+> **Nota del 2026-11-05 (tarea 2).** pnpm 12.8.1 sí lee `minimumReleaseAge`. Al activarla, el archivo de bloqueo heredado de `main` dejó de pasar la política: `browserslist@4.29.5` (publicada el 2026-10-26, la trae `@babel/core`) y otras diez versiones transitivas tenían menos de 14 días. Decisión del propietario: sin `minimumReleaseAgeExclude`; se fija `browserslist` a 4.29.4 con un `overrides` fechado en `pnpm-workspace.yaml` (mismo mecanismo que `undici`) y el archivo de bloqueo se regeneró para que pnpm elija versiones maduras. El `overrides` se retira cuando 4.29.5 cumpla 14 días, hacia el 2026-11-09. Las versiones del catálogo no cambian.
+
 ## 6. Flujos
 
 **Arranque, con y sin cookie**

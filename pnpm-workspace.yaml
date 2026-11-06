@@ -21,6 +21,12 @@ allowBuilds:
   # from failing the install while still running nothing.
   esbuild: false
 
+# No version is installed until it has been published for two weeks (20 160 minutes). A fresh release
+# is the cheapest way for a compromised package to reach the lockfile; waiting lets the registry and
+# the advisories catch it first. A blocked version is replaced in the design, never excepted: there is
+# deliberately no minimumReleaseAgeExclude (build-integrity BX93; pnpm 12.8.1 reads this key, task 2.1).
+minimumReleaseAge: 20160
+
 # The one place each tool's version is written (task 2.1). Packages depend on "catalog:", never on
 # a version of their own. TypeScript stays on 6.0.x, not 7: typescript-eslint 8.71 declares
 # typescript >=4.8.4 <6.1.0.

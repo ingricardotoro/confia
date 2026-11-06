@@ -63,8 +63,15 @@ const sections = (manifest: Manifest) =>
 describe("the admin web package under the monorepo rules", () => {
   const workspace = parse(read("pnpm-workspace.yaml")) as {
     catalog: Record<string, string>;
+    minimumReleaseAge?: number;
+    minimumReleaseAgeExclude?: unknown;
   };
   const adminManifest = () => manifestOf("apps/admin-web/package.json");
+
+  it("BX93: keeps a release age of at least two weeks, with no exception for this change", () => {
+    expect(workspace.minimumReleaseAge).toBeGreaterThanOrEqual(20_160);
+    expect(workspace.minimumReleaseAgeExclude ?? []).toEqual([]);
+  });
 
   it("BX92: takes every version from the catalog or from the workspace", () => {
     const versions = sections(adminManifest()).flatMap((section) => Object.entries(section));
