@@ -18,6 +18,9 @@
   },
   "problem": {
     "authenticationFailed": "El correo o la contraseña no son correctos.",
+    "secondFactorInvalid": "El código de verificación no es correcto o ya expiró. Genere uno nuevo en su aplicación.",
+    "rateLimited": "Hizo demasiadas solicitudes seguidas. Espere unos segundos e intente de nuevo.",
+    "unexpected": "Ocurrió un error inesperado y la operación no se completó. Intente de nuevo; si el problema continúa, comparta el identificador con soporte.",
     "capacityExceeded": "El servicio está ocupado en este momento. Espere un momento e intente de nuevo.",
     "network": "No se pudo conectar con el servidor. Revise su conexión e intente de nuevo.",
     "recoveryInvalid": "El código de recuperación no es correcto o ya se usó. Revíselo e intente de nuevo.",

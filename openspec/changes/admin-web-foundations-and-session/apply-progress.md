@@ -246,3 +246,56 @@ Suites (todas con el árbol sin commit): **U** 12 archivos, 66 pasan y 1 `todo`,
 ### Excepción a la regla de las 800 líneas
 
 Medido: **1 214 líneas efectivas** (1 099 adiciones y 115 eliminaciones) frente a `a6a9736`; la estimación del diseño era 740 a 4x. La tarea no tiene corte predefinido, así que se consultó al propietario, que el 2026-11-05 **aprobó un único PR** como excepción al límite de 800 líneas de `docs/15` §3. No se partió ni se quitó ninguna prueba, comentario o aserción. La propuesta de corte 3a/3b (≈ 547 y ≈ 667 líneas) queda descartada.
+
+
+## Tarea 4: `api-transport-and-problem-map` (2026-11-06, partida en 4a y 4b)
+
+- **Ruta:** escritor delegado (un solo escritor, un solo árbol de trabajo). Base común `496573c`.
+- **Ramas:** 4a `change/admin-web-foundations-and-session-4a-api-transport` (commit `12e45c4`, `feat(admin-web): add the api transport and the problem reader`) y 4b `change/admin-web-foundations-and-session-4b-problem-key-map` (parte de 4a).
+
+### El corte y por qué se movió `problem.ts` a 4a
+
+La tarea medía **1 091 líneas efectivas** (1 064 adiciones y 27 eliminaciones) frente a `496573c`, sobre las 800. El corte predefinido decía 4a (transporte y CSRF) / 4b (Problem y mapa). El propietario aprobó el 2026-11-06 un corte ajustado: `http.ts` llama a `readProblem` para toda respuesta de error, de modo que `problem.ts` y `report-unknown-problem.ts` no pueden ir después del transporte sin que 4a deje de compilar. Por eso **4a** lleva `http`, `csrf-cookie`, `api-failure`, `problem`, `report-unknown-problem`, `query-client` y sus pruebas, y **4b** lleva `problem-keys` (con `problem-keys.test-d.ts`), `admin.json` y BX54/BX57 en `tooling/src/eslint-app-rules.test.ts`.
+
+### Medidas (regla de las 800 líneas)
+
+- **4a: 948 líneas efectivas** (924 adiciones y 24 eliminaciones) frente a `496573c`. **Supera 800: excepción explícita del propietario a `docs/15` §3, aprobada el 2026-11-06** (opción A, un solo PR; la alternativa de un segundo corte 4a-1/4a-2 exigía mover `ApiResult` a un archivo nuevo y sumaba un PR). No se quitó ninguna prueba, comentario ni aserción.
+- **4b: 143 líneas efectivas** (140 adiciones y 3 eliminaciones) frente a `12e45c4`.
+
+### Evidencia del ciclo TDD (4.1, 4.2)
+
+| Superficie | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| `csrf-cookie`, `problem`, `report-unknown-problem`, `http`, `problem-keys`, `api-failure` y `query-client.test.ts` | Sí, 7 archivos no cargan | `Failed to resolve import "./csrf-cookie.ts"` (y los demás módulos de `shared/api`; `../shared/api/api-failure.ts` desde `query-client.test.ts`) | pasan |
+| `problem-keys.test-d.ts` (AW48) | Sí, `tsc` | `Cannot find module './problem.ts'` y `'./problem-keys.ts'`; `Unused '@ts-expect-error' directive` | sin errores de tipos |
+| `tooling/src/eslint-app-rules.test.ts` (BX54, BX57) | Sí, 2 fallos | BX54: `src/shared/api/http.ts was linted: expected undefined to be defined`; BX57: `expected 0 to be greater than 0` | 72 pasan, 1 `todo` (BX46) |
+
+Rojos del verde, sin adornos: `eslint` rechazó plantillas con `number` (`restrict-template-expressions`), flechas que devuelven `void` y un `void` sin efecto; se corrigieron en el código y las pruebas, no en las aserciones.
+
+### Demostraciones deliberadas (4.3, todas de 4a)
+
+Procedimiento: copia fuera del repositorio (`/tmp/demo`), ruptura, rojo por aserción, restauración desde la copia, `cmp` sin salida y `git diff` del archivo vacío.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 1 | `ProblemDetail.safeParse(body).success` completo antes de leer el código | 28 fallos de `problem.test.ts`: `expected 'unknown' to be 'authentication-failed'` y los otros catorce códigos de AW46 (por `instance` relativo), más errores y `Retry-After` | idéntico |
+| 2 | Tiempo límite de 20 s | 2 fallos: AW44 `expected true to be false` (la señal se canceló a los 31 s) y el de 60 s | idéntico |
+| 3 | `includes(CSRF_COOKIE_NAME)` en vez de nombre exacto | AW40: `expected 'falso' to be undefined` | idéntico |
+| 4 | Pasar `detail` al reporte | AW55: `expected "vi.fn()" to be called once with arguments: [ { status: 500, … } ]` | idéntico |
+
+### Desviaciones del diseño
+
+1. **Tres claves nuevas en `admin.json`** (aprobadas por el propietario el 2026-11-06, textos tal cual): `problem.secondFactorInvalid`, `problem.rateLimited` y `problem.unexpected`. D7 exige un mapa exhaustivo de los quince códigos a `AdminKey` y §8 solo lista cinco claves `problem.*`. Los dos primeros son los textos fijados por `docs/ui-ux/05` y `docs/ui-ux/04`:729; `problem.unexpected` se deriva de `docs/ui-ux/04`:739 sin «Nada quedó registrado a medias» (falso ante un fallo de red) y sin `{{traceId}}` (el identificador va aparte).
+2. **`isRetryable` afinado (D9).** `ApiFailure` e `isRetryableFailure` (`shared/api/api-failure.ts`): `retryRead` reintenta solo red y 5xx. Un error que no es `ApiFailure` ya **no** se reintenta (antes, sin `status`, sí). Las pruebas de `query-client.test.ts` usan `ApiFailure`.
+3. **`http.ts`** exporta `request(options + schema)` y `requestEmpty(options)`; `schema` es la forma estructural de `safeParse`, sin depender de Zod. Una ruta que no empieza con `/api/` lanza `TypeError` (error del programador): es el único caso en que lanza.
+4. **Mapa de claves:** los códigos sin texto propio (`csrf-invalid`, `unsupported-media-type`, `authentication-required`, `forbidden`, `resource-not-found`, `internal-error`, desconocido) apuntan a `problem.unexpected`; `token-*` a `notice.verificationInterrupted`; `session-expired` a `notice.sessionExpired`. Las pantallas de la parte 2 podrán elegir una clave más específica.
+
+### Suites
+
+- **4a (árbol solo con 4a):** **U** 17 archivos, 175 pasan y 1 `todo`, cobertura 100/97,56/100/100; **T** 9 archivos, 268 pasan y 5 `todo`; **PR** 18 de 18 tareas.
+- **4b (árbol completo):** **U** 19 archivos, 192 pasan y 1 `todo`, cobertura 100/97,56/100/100; **T** 9 archivos, 270 pasan y 3 `todo` (BX54 y BX57 dejaron de ser `todo`; quedan BX46, BX61 y BX62); **PR** 18 de 18 tareas (`@confia/ui` 524, `@confia/tooling` 270, `@confia/admin-web` 192, `@confia/config` 24, `@confia/contracts` 8). Guarda de `*.spec.*` sobre `apps/`: sin coincidencias. AW10: `git diff --name-only 496573c -- apps/api` vacío.
+- Hallazgo de 4b: la prueba de supresiones (AW17) exigió citar un ADR en el `@ts-expect-error` de `problem-keys.test-d.ts`; se citó ADR-0011, como en `keys.test-d.ts`.
+
+### Elementos abiertos
+
+- Ninguno de esta tarea. Las ramas 4a y 4b no se empujaron.
