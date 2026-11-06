@@ -240,7 +240,7 @@ describe("the time limit", () => {
 });
 
 describe("the paths", () => {
-  it.each(["https://evil.example/api/v1/x", "//evil.example/api/v1/x", "/other/v1/x", "api/v1/x", "/api", "/api/v1/x\\y", "/apix/v1"])(
+  it.each(["https://evil.example/api/v1/x", "//evil.example/api/v1/x", "/other/v1/x", "api/v1/x", "/api", "/api/v1/x\\y", "/apix/v1", "/api/../admin", "/api/v1/../../x", "/api/./v1/x", "/api/%2e%2e/admin", "/api/v1/%2E./x", "/api/v1/.."])(
     "AW45: refuses %s before any request leaves",
     async (path) => {
       await expect(request({ method: "GET", path, schema: greetingSchema })).rejects.toThrow(TypeError);

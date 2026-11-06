@@ -30,9 +30,13 @@ export interface RequestOptions {
 /** The limit is ours, not the server's: a slow answer is awaited, and a lost one is given up on. */
 const REQUEST_TIMEOUT_MS = 60_000;
 const RELATIVE_API_PATH = /^\/api\/[^\s\\]*$/;
+/** A `.` or `..` segment, also percent-encoded: the URL parser resolves both, and `..` would climb out of /api/. */
+const DOT_SEGMENT = /(^|\/)(\.|%2e){1,2}(\/|$)/i;
 
 function assertRelativeApiPath(path: string): void {
-  if (!RELATIVE_API_PATH.test(path)) throw new TypeError("An API path must be relative and start with /api/.");
+  if (!RELATIVE_API_PATH.test(path) || DOT_SEGMENT.test(path)) {
+    throw new TypeError("An API path must be relative, start with /api/ and hold no dot segments.");
+  }
 }
 
 function initOf(options: RequestOptions, signal: AbortSignal): RequestInit {
