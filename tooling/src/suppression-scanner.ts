@@ -9,7 +9,18 @@ const SUPPRESSION_MARKER =
   /eslint-disable|@ts-expect-error|@ts-ignore|@ts-nocheck|a11y:\s*\{\s*disable|\btest:\s*["']off["']/;
 const ADR_CITATION = /ADR-(\d{4})/g;
 const DEFAULT_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs"];
-const SKIPPED_DIRECTORIES = new Set(["node_modules", "coverage", "dist", ".turbo", "reports", "storybook-static"]);
+const SKIPPED_DIRECTORIES = new Set([
+  "node_modules",
+  "coverage",
+  "dist",
+  ".turbo",
+  "reports",
+  "storybook-static",
+  // Output of the tools that run under apps/: Maven (apps/api) and Playwright (apps/admin-web).
+  "target",
+  "playwright-report",
+  "test-results",
+]);
 
 export interface Suppression {
   readonly file: string;

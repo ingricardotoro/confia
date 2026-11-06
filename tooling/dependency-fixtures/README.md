@@ -11,3 +11,9 @@ Nunca se importan desde código real, y la verificación de tipos y el análisis
 Las reglas de capas de `packages/ui` (`ui-*`, decisión 10 del cambio `design-system-foundations-and-a11y`) tienen sus
 violaciones bajo `packages/ui/src/`, con los módulos mínimos que importan. `domain/accepted-imports.ts` es el caso
 aceptado: un módulo de dominio que importa átomos, moléculas y un tipo del contrato no viola ninguna regla.
+
+Las reglas de `apps/admin-web` (`apps-use-ui-public-entry`, `admin-presentation-is-pure`,
+`admin-shared-never-imports-features` y `admin-token-store-is-private`, decisión D3 del cambio
+`admin-web-foundations-and-session`) tienen sus violaciones bajo `apps/admin-web/src/`. Los módulos aceptados
+(`uses-ui-public-entry.ts`, `features/identity/container.ts` y `features/identity/session/access-session.ts`) no violan
+ninguna regla. Esa carpeta no es la aplicación real: solo tiene las rutas que las reglas reconocen.

@@ -5,6 +5,8 @@
 // real tree and that fixture tree, which mirrors apps/ and packages/. The ui-* rules are the layer rules
 // of packages/ui (ADR-0018, docs/ui-ux/02 section 2; design decision 10 of design-system-foundations-
 // and-a11y); the ESLint configuration of packages/config mirrors them for the editor.
+// The apps-* and admin-* rules are those of apps/admin-web (admin-web-foundations-and-session, design.md D3).
+// Their violations live under tooling/dependency-fixtures/apps/admin-web/src.
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
@@ -73,6 +75,49 @@ module.exports = {
       severity: "error",
       from: { path: "(^|/)packages/ui/" },
       to: { path: "(^|/)packages/contracts/", dependencyTypesNot: ["type-only"] },
+    },
+    {
+      name: "apps-use-ui-public-entry",
+      comment:
+        "An application takes from packages/ui only its public entry: the package index, the catalog " +
+        "(@confia/ui/i18n) and the style sheet (@confia/ui/styles.css). Anything else is internal. A " +
+        "package name that does not resolve is matched as written.",
+      severity: "error",
+      from: { path: "(^|/)apps/" },
+      to: {
+        path: "(^|/)packages/ui/src/|(^|/)@confia/ui/",
+        pathNot:
+          "(^|/)packages/ui/src/(index\\.ts|i18n/resources\\.ts|tokens/index\\.css)$|^@confia/ui(/i18n|/styles\\.css)?$",
+      },
+    },
+    {
+      name: "admin-presentation-is-pure",
+      comment:
+        "A presentation component of apps/admin-web (the components/ folders) never imports server data, " +
+        "the router, the form library or the API client, not even as a type, by a relative path or by an " +
+        "alias (CLAUDE.md, frontend: the container owns the data).",
+      severity: "error",
+      // Two alternatives, not an optional group: the cruiser refuses a nested repetition as unsafe.
+      from: { path: "(^|/)apps/admin-web/src/components/|(^|/)apps/admin-web/src/.+/components/" },
+      to: {
+        path:
+          "(^|/node_modules/)@tanstack/(react-query|query-core|react-router|react-form)(/|$)" +
+          "|(^|/)apps/admin-web/src/shared/api/|^[@~#]/?shared/api(/|$)",
+      },
+    },
+    {
+      name: "admin-shared-never-imports-features",
+      comment: "shared/ is below the features and the app shell: shared/api does not know the session.",
+      severity: "error",
+      from: { path: "(^|/)apps/admin-web/src/shared/" },
+      to: { path: "(^|/)apps/admin-web/src/(features|app)/" },
+    },
+    {
+      name: "admin-token-store-is-private",
+      comment: "Only the session module reads the in-memory token store; every other module asks the session.",
+      severity: "error",
+      from: { path: "(^|/)apps/admin-web/src/", pathNot: "(^|/)apps/admin-web/src/features/identity/session/" },
+      to: { path: "(^|/)apps/admin-web/src/features/identity/session/token-store" },
     },
   ],
   options: {

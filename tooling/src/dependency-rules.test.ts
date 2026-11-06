@@ -19,6 +19,10 @@ const RULES = [
   "ui-molecules-never-import-domain",
   "ui-never-fetches-data",
   "ui-contracts-type-only",
+  "apps-use-ui-public-entry",
+  "admin-presentation-is-pure",
+  "admin-shared-never-imports-features",
+  "admin-token-store-is-private",
 ] as const;
 
 // design-system-foundations-and-a11y, design.md decision 10 (task 6.3): each layer rule of packages/ui
@@ -32,6 +36,26 @@ const LAYER_VIOLATIONS = [
   ["contracts-only-through-public-entry", "domain/imports-contract-internal.ts"],
 ] as const;
 const LAYERS = ["atoms", "molecules", "domain"] as const;
+
+// admin-web-foundations-and-session, design.md D3 (task 1.1): each rule of apps/admin-web and the
+// deliberate violation under tooling/dependency-fixtures/apps/admin-web/src that it must reject.
+const APP_VIOLATIONS = [
+  ["AW04", "apps-use-ui-public-entry", "imports-ui-internal.ts"],
+  ["AW04", "apps-use-ui-public-entry", "imports-ui-subpath.ts"],
+  ["BX58", "admin-presentation-is-pure", "features/identity/components/imports-query.ts"],
+  ["BX59", "admin-presentation-is-pure", "features/identity/components/imports-api-relative.ts"],
+  ["BX59", "admin-presentation-is-pure", "features/identity/components/imports-api-alias.ts"],
+  ["BX60", "admin-presentation-is-pure", "features/identity/components/imports-api-type.ts"],
+  ["D3", "admin-presentation-is-pure", "features/identity/components/imports-router.ts"],
+  ["D3", "admin-presentation-is-pure", "features/identity/components/imports-form.ts"],
+  ["D3", "admin-shared-never-imports-features", "shared/imports-a-feature.ts"],
+  ["D3", "admin-token-store-is-private", "features/billing/reads-token-store.ts"],
+] as const;
+const APP_ACCEPTED = [
+  "uses-ui-public-entry.ts",
+  "features/identity/container.ts",
+  "features/identity/session/access-session.ts",
+] as const;
 
 const toolingRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = join(toolingRoot, "..");
@@ -75,6 +99,19 @@ describe("the frontend dependency rules", () => {
     expect(flagged.map((violation) => violation.rule.name)).toContain(rule);
   });
 
+  it.each(APP_VIOLATIONS)("%s: %s rejects %s", (_id, rule, file) => {
+    const flagged = fixtures.summary.violations.filter((violation) => violation.from.endsWith(`apps/admin-web/src/${file}`));
+
+    expect(flagged.map((violation) => violation.rule.name)).toContain(rule);
+  });
+
+  it.each(APP_ACCEPTED)("BX61: accepts %s", (file) => {
+    const accepted = `apps/admin-web/src/${file}`;
+
+    expect(fixtures.modules.some((module) => module.source.endsWith(accepted))).toBe(true);
+    expect(fixtures.summary.violations.filter((violation) => violation.from.endsWith(accepted))).toEqual([]);
+  });
+
   it("BX31, BX36: accepts a domain module that imports atoms, molecules and a contract type", () => {
     const accepted = "packages/ui/src/domain/accepted-imports.ts";
 
@@ -87,6 +124,11 @@ describe("the frontend dependency rules", () => {
     expect(real.summary.totalCruised).toBeGreaterThan(0);
     expect(real.summary.violations).toEqual([]);
   });
+
+  // ADR-0018: apps/admin-web does not exist yet, so these two cannot evaluate real files. The task
+  // that creates the files turns each entry into a test; a green run over an empty set is refused.
+  it.todo("BX61: a real container of apps/admin-web imports TanStack Query and shared/api without a violation (task 9)");
+  it.todo("BX62: the presentation selector matches real component files, and fails on an empty set (task 9)");
 
   // ADR-0018: a layer rule that matches no real file proves nothing. The components are .tsx files; if the
   // configuration stopped resolving that extension, the directory would still be scanned but nothing
