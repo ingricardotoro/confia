@@ -305,3 +305,13 @@ relación continua con esa familia, no una gestión de cobranza de una sola vez.
 - [04-patrones-de-interaccion.md](04-patrones-de-interaccion.md)
 - `docs/14-glosario.md`
 - `docs/adr/ADR-0011-internacionalizacion-y-multimoneda.md`
+
+---
+
+> **Nota fechada 2026-11-05 (cambio `admin-web-foundations-and-session`, decisión P1).** Las secciones
+> anteriores no se reescriben. Esta nota fija el trato en la aplicación del personal (`apps/admin-web`):
+> los textos dirigidos a la persona se redactan en «usted», con imperativo y tercera persona de cortesía
+> («Inicie sesión», «Su sesión»), sin tuteo ni voseo. Los ejemplos de esta guía escritos en «tú» no se
+> trasladan al catálogo `admin`; la prueba de voz de `@confia/config/voice` rechaza esas formas. El
+> tono del portal no cambia: el portal de encargados y estudiantes conserva el trato y el tono que esta
+> guía describe.
