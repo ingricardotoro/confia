@@ -78,6 +78,17 @@ P es producción, configuración y documentos; T, pruebas e infraestructura de p
 - **Revisión.** Lista aplicable de `docs/03` marcada en la descripción de cada PR; empujar, abrir PR y fusionar son decisiones del propietario.
 - **Idioma.** Código, identificadores y commits en inglés; documentación y notas fechadas en español neutro profesional, sin reescribir cuerpos existentes.
 
+### Orden de ejecución (revisado el 2026-11-05)
+
+El propietario pidió ver una pantalla funcional con valores de prueba lo antes posible y aprobó este orden para las tareas que quedan. Los números de tarea y de PR no cambian; solo cambia el orden en que se aplican y se apilan:
+
+**2 → 3 → 4 → 5 → 6 → 11 (11a) → 7 → 9 → 8 → 10 → 12 (11b)**
+
+- La tarea 11 depende solo de la 5, así que se adelanta sin romper dependencias.
+- La tarea 9 sigue dependiendo de la 3, la 6 y la 7, y es la primera pantalla funcional: arranque, página mínima y cierre de sesión contra la API simulada.
+- La tarea 8 no es dependencia de la 9 y pasa después de ella. La 12 sigue dependiendo de la 9, la 10 y la 11, y cierra la parte 1.
+- Cada rama parte de la anterior **en este orden**. La tabla de tamaños conserva los sufijos de rama.
+
 ### Dependencias y paralelismo
 
 | Tarea | Depende de | Paralelismo |
@@ -200,6 +211,7 @@ P es producción, configuración y documentos; T, pruebas e infraestructura de p
 - [ ] 11 **PR 11a `simulated-api`: simulador Node, modelo de sesión y TOTP de prueba (D15).**
   - **Archivos.** Crea `apps/admin-web/e2e/mock-api/{start.mjs,server.ts,scenarios.ts,session-model.ts}`, `e2e/support/{totp,sentinels}.ts` y sus pruebas. Modifica `apps/admin-web/package.json` (`mock:api`), `packages/config/vitest.js` (solo el comentario sobre `*.spec.ts`), `contract-responses.ts` si hace falta `omit({ instance: true })`.
   - [ ] 11.1 **ROJO.** Secreto fuera del patrón lanza en prueba unitaria [SS118]; error validado sin `instance`, emitido relativo [SS118, I306]; violación en ejecución queda en `/__control/violations` [I306]. RFC 6238 con «12345678901234567890» a los 59 s da «287082», solo con `node:crypto` [SS119]. Rotado hace 5 s se acepta y hace 30 s recibe `401` [SS120]. `mfa-enroll` con `recoveryCode`, `401 second-factor-invalid` [SS121]. **Primera prueba:** que `runnerImport` no externalice un paquete enlazado; la salida escrita es arrancar en `globalSetup` de Playwright. **Rojo esperado:** `Cannot find module './session-model'` y `./totp`.
+  - **Adición aprobada el 2026-11-05: sesión de prueba sembrada.** Para ver la página mínima de la tarea 9 sin formulario de inicio de sesión, el simulador expone un control solo local en `/__control/*` que siembra una sesión de prueba: deja la cookie de refresco con los mismos atributos que el resto del simulador y una cuenta ficticia. No existe fuera del simulador, no se sirve desde el build de producción, no usa datos reales y nada lo presenta como prueba de la pila real. Lleva su prueba en rojo antes del código, y una demostración deliberada en la que el control responde fuera de `localhost` y pone esa prueba en rojo.
   - [ ] 11.2 **VERDE y REFACTOR.** Puerto 8099, solo `localhost`; escenario por `x-confia-mock-scenario`; control en `/__control/*`; familia, rotación, gracia de 10 s, `Origin` permitido, doble envío CSRF y cookies con los atributos de WE62 y WE63. Los recorridos que usa son simulados y nada los presenta como prueba de la pila real.
   - [ ] 11.3 **Demostraciones deliberadas.** (1) Gracia de 30 s pone en rojo SS120. (2) Enviar sin validar pone en rojo SS118. (3) Aceptar recuperación con `mfa-enroll` pone en rojo SS121. (4) SHA-256 pone en rojo SS119. Se revierten y se confirman con `cmp`.
   - [ ] 11.4 **Cierre.** Suites **U, C, T, UI, PR** (la C, T y UI porque se toca `packages/config`), guarda y AW10. Commit: `test(admin-web): add the simulated api with its session model`. Tamaño: 1 420 a 4x. **Corte predefinido:** 11a-1 (modelo, TOTP, validación; SS119 a SS121) / 11a-2 (servidor, escenarios, control, centinelas; SS118, I306). Con 1 420, si una parte sigue sobre 800 aplica la regla de detención. — Fila 11.
