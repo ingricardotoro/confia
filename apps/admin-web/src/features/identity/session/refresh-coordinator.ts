@@ -32,6 +32,14 @@ export interface RefreshCoordinator {
   refreshOnce(): Promise<RefreshOutcome>;
 }
 
+/**
+ * Runs `run` holding the exclusive lock, or just runs it where the browser has no Web Locks. Sign out
+ * takes the same lock, so it never sends a cookie that a refresh in another tab is about to replace.
+ */
+export function withCrossTabLock<T>(locks: CrossTabLocks | undefined, run: () => Promise<T>): Promise<T> {
+  return locks === undefined ? run() : locks.request(REFRESH_LOCK_NAME, { mode: "exclusive" }, run);
+}
+
 function classify(result: ApiResult<AuthenticatedSessionResponseOutput>): RefreshOutcome {
   if (result.kind === "ok") return { kind: "refreshed", session: result.data };
   return result.kind === "network" ? { kind: "network" } : { kind: "rejected" };
@@ -54,11 +62,9 @@ export function createRefreshCoordinator({ refresh, readCsrf, locks }: RefreshDe
 
   return {
     refreshOnce() {
-      inFlight ??= (locks === undefined ? attempt() : locks.request(REFRESH_LOCK_NAME, { mode: "exclusive" }, attempt)).finally(
-        () => {
-          inFlight = undefined;
-        },
-      );
+      inFlight ??= withCrossTabLock(locks, attempt).finally(() => {
+        inFlight = undefined;
+      });
       return inFlight;
     },
   };
