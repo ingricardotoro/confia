@@ -55,6 +55,26 @@ describe("ErrorState", () => {
     expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
   });
 
+  it.each([["empty", ""], ["only spaces", "   "]])(
+    "DS91: names the retry with the catalog label when the label is %s",
+    (_case, retryLabel) => {
+      renderWithI18n(<ErrorState title="No pudimos cargar los cargos" retryLabel={retryLabel} onRetry={vi.fn()} />);
+
+      expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+    },
+  );
+
+  it.each([["missing", undefined], ["an empty string", ""], ["only spaces", "   "]])(
+    "DS92: renders no empty paragraph when the description is %s",
+    (_case, description) => {
+      renderWithI18n(
+        <ErrorState title="No pudimos cargar los cargos" {...(description === undefined ? {} : { description })} onRetry={vi.fn()} />,
+      );
+
+      expect(screen.getAllByRole("paragraph")).toEqual([screen.getByText("No pudimos cargar los cargos")]);
+    },
+  );
+
   it("merges the class of the caller over its own", () => {
     const { container } = renderWithI18n(
       <ErrorState title="No pudimos cargar los cargos" className="mt-4" onRetry={vi.fn()} />,

@@ -18,6 +18,8 @@ const APPLICABLE: [string, string, string[][]][] = [
   ["Skeleton", "atoms/skeleton/Skeleton.stories.tsx", [["Loading"]]],
   ["EmptyState", "molecules/empty-state/EmptyState.stories.tsx", [["Empty", "Default"]]],
   ["ErrorState", "molecules/error-state/ErrorState.stories.tsx", [["Error", "Default"]]],
+  // Alert has no loading or empty state: the one that applies is its error, the Destructive variant.
+  ["Alert", "molecules/alert/Alert.stories.tsx", [["Destructive"]]],
   ["FormField", "molecules/form-field/FormField.stories.tsx", [["Disabled"], ERROR]],
 ];
 

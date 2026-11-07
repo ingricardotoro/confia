@@ -26,6 +26,17 @@ describe("EmptyState", () => {
     expect(screen.getAllByRole("paragraph")).toEqual([screen.getByText("Sin cargos")]);
   });
 
+  it.each([["an empty string", ""], ["only spaces", "   "]])(
+    "DS92: renders no empty paragraph when the description is %s",
+    (_case, description) => {
+      renderWithI18n(
+        <EmptyState title="Sin cargos" description={description} action={{ label: "Agregar cargo", onAction: vi.fn() }} />,
+      );
+
+      expect(screen.getAllByRole("paragraph")).toEqual([screen.getByText("Sin cargos")]);
+    },
+  );
+
   it("DS26: offers the action as a control named by its label, called once per activation", async () => {
     const user = userEvent.setup();
     const onAction = vi.fn();

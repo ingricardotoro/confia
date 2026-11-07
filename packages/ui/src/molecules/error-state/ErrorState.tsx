@@ -26,11 +26,11 @@ export function ErrorState({ title, description, onRetry, retryLabel, className,
         <TriangleAlert className="size-8 text-status-overdue-fg" />
         <div className="flex flex-col gap-1">
           <p className="text-base font-semibold text-text-primary">{title}</p>
-          {description === undefined ? null : <p className="text-sm text-text-secondary">{description}</p>}
+          {description?.trim() ? <p className="text-sm text-text-secondary">{description}</p> : null}
         </div>
       </div>
       <Button variant="secondary" onClick={onRetry}>
-        {retryLabel ?? t("common.retry")}
+        {retryLabel?.trim() ? retryLabel : t("common.retry")}
       </Button>
     </div>
   );

@@ -6,8 +6,9 @@ import * as api from "./index";
 import { findComponentsWithoutStory, findComponentsWithoutTest, listComponents } from "./a11y/story-coverage";
 
 // design-system, requirement "El punto de entrada público": the components exported are exactly the
-// seventeen of this delivery, and nothing else leaks (ADR-0018).
+// eighteen of this delivery, and nothing else leaks (ADR-0018).
 const COMPONENTS = [
+  "Alert",
   "Badge",
   "Button",
   "Checkbox",
@@ -26,7 +27,7 @@ const COMPONENTS = [
   "StatusBadge",
   "Textarea",
 ];
-// Not on the list of seventeen, and exported on purpose: the item that RadioGroup cannot be used
+// Not on the list of eighteen, and exported on purpose: the item that RadioGroup cannot be used
 // without, and the class recipe of Button for links that look like buttons.
 const COMPANIONS = ["RadioGroupItem", "buttonVariants"];
 // Exported components that live in the file of another one, so they have no directory of their own.
@@ -35,7 +36,7 @@ const SHARES_A_FILE = { FormError: "FormField" };
 const srcRoot = import.meta.dirname;
 
 describe("the public entry point of @confia/ui", () => {
-  it("DS02: exports exactly the seventeen components and their two companions", () => {
+  it("DS02: exports exactly the eighteen components and their two companions", () => {
     expect(Object.keys(api).sort()).toEqual([...COMPONENTS, ...COMPANIONS].sort());
   });
 
