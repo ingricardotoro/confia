@@ -11,6 +11,7 @@ import {
   EmptyState,
   ErrorState,
   FormError,
+  FormErrorSummary,
   FormField,
   IconButton,
   Input,
@@ -42,6 +43,7 @@ const FIXTURES: Record<string, ReactElement> = {
   EmptyState: <EmptyState title="Sin cargos" action={{ label: "Agregar", onAction: () => undefined }} />,
   ErrorState: <ErrorState title="No pudimos cargar" onRetry={() => undefined} />,
   FormError: <FormError>Ingrese un monto</FormError>,
+  FormErrorSummary: <FormErrorSummary errors={[{ controlId: "amount", message: "Ingrese un monto" }]} />,
   FormField: <FormField label="Monto">{(control) => <Input {...control} />}</FormField>,
   IconButton: (
     <IconButton label="Agregar">

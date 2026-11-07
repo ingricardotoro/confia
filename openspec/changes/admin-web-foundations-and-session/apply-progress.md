@@ -511,3 +511,23 @@ Procedimiento: copia fuera del repositorio (directorio temporal de la sesión), 
 
 Sin navegador: no se afirma ningún resultado visual. `pnpm --filter @confia/admin-web mock:api` escuchó en `http://localhost:8099` (`/__control/health` 200). `CONFIA_API_PROXY_TARGET=http://localhost:8099 pnpm --filter @confia/admin-web dev` sirvió `http://localhost:5173/` (200, `text/html`, `lang="es-HN"`) y `/src/main.tsx` (200). `GET http://localhost:8099/__control/seed-session` respondió 303 a `http://localhost:5173/` con las dos cookies (`__Secure-confia_admin_sid` con `HttpOnly` y `Path=/api/v1/auth/sessions`; `__Host-confia_csrf` con `Path=/`). Con ese frasco de cookies, a través del proxy del servidor de desarrollo: `POST /api/v1/auth/sessions/refresh` con `Origin` y `X-CSRF-Token` respondió 200 (`status: authenticated`), y `GET /api/v1/auth/sessions/current` con `Bearer` respondió 200 con los siete campos del contrato. Es lo que hace la aplicación al recargar con la sesión sembrada. Ambos procesos se detuvieron (ningún puerto 5173 ni 8099 escuchando).
 - **Cierre de la tarea 9:** 9.1 a 9.4 marcadas. Pendiente para el propietario: ver la pantalla en un navegador (abrir primero `/__control/seed-session`).
+
+## Tarea 8: `ui-form-error-summary` (2026-11-07)
+
+- **Ruta.** Escritor delegado único, rama `change/admin-web-foundations-and-session-8-ui-form-error-summary` desde `43c07d0`. Commit `3a25633` `feat(ui): add the form error summary and let form field take its control id`.
+- **Superficies.** La prueba de voz de `ui` no existía: se creó `packages/ui/src/i18n/voice.test.ts` (DS93, DS94), con las reglas de `ui` de D17 construidas sobre `ADMIN_VOICE_RULES`. También se tocaron `public-api.test.ts`, `no-network.test.tsx` y `story-states.test.ts`.
+- **ROJO (8.1), causa observada.** `FormErrorSummary.test.tsx` y `FormField.test.tsx`: `Failed to resolve import "./FormErrorSummary"` y `"../form-error-summary"`; `tsc`: `controlId` no existe en el tipo de `FormField`. DS02, DS62/DS73, DS61 (fixture), DS63, DS95 y DS88 fallan por la lista de 18 y por la historia ausente; DS93 por `formErrorSummary` ausente del catálogo. 8 pruebas en rojo más 2 archivos que no cargan. Las pruebas se escribieron antes que el código de producción.
+- **VERDE y REFACTOR (8.2).** `useSyncExternalStore` para los controles presentes, sin efecto; `<a href="#id">` con `preventDefault` y `focus()`; plural ICU. Ajustes: DS77 (el foco inicial de la prueba), la regla `no-confusing-void-expression` y `target-size` (serio) en la historia `Several`, resuelto con `min-h-6` en el enlace.
+- **Demostraciones deliberadas (8.3), con copia fuera del repositorio y `cmp` sin salida.**
+
+  | # | Ruptura | Rojo observado | `cmp` |
+  |---|---|---|---|
+  | 1 | Sin `preventDefault` | DS78: `expected 'http://localhost:3000/#b' to be 'http://localhost:3000/'`; 1 fallo de 10 | idéntico |
+  | 2 | Una exportación más en `index.ts` | DS02: `expected [ 'Alert', 'Badge', 'Button', …(19) ] to deeply equal […(18) ]`; 1 fallo de 5 | idéntico |
+  | 3 | `htmlFor` ignora `controlId` | DS98: `for="_r_1v_-control"` frente a `identifier`; 1 fallo de 53 | idéntico |
+  | 4 | «Revise» en `ui.json` (`common.required`) | DS93: `common.required: revise (sentence-start)`; 1 fallo de 5 | idéntico |
+
+- **Suites.** UI unit: 56 archivos, 566 pasan. UI `test:a11y`: 10 archivos, 178 pasan. PR: 18 de 18 tareas. Guarda de `*.spec.*` y AW10 vacíos.
+- **Medida (800 líneas).** 434 líneas efectivas frente a `43c07d0` (430 adiciones, 4 eliminaciones). Sin corte.
+- **Texto nuevo, pendiente de aprobación del propietario.** `formErrorSummary.heading`: `{count, plural, one {Hay # campo con error.} other {Hay # campos con errores.}}`. El texto de las historias va embebido en español de ejemplo, como en las demás historias.
+- **Cierre de la tarea 8:** 8.1 a 8.4 marcadas.

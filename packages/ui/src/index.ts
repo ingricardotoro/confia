@@ -11,6 +11,7 @@ export { Textarea, type TextareaProps } from "./atoms/textarea";
 export { Checkbox, type CheckboxProps, type CheckedState } from "./atoms/checkbox";
 export { RadioGroup, RadioGroupItem, type RadioGroupItemProps, type RadioGroupProps } from "./atoms/radio-group";
 export { FormError, FormField, type FormErrorProps, type FormFieldControl, type FormFieldProps } from "./molecules/form-field";
+export { FormErrorSummary, type FormErrorSummaryProps } from "./molecules/form-error-summary";
 export { Alert, type AlertProps } from "./molecules/alert";
 export { EmptyState, type EmptyStateProps } from "./molecules/empty-state";
 export { ErrorState, type ErrorStateProps } from "./molecules/error-state";

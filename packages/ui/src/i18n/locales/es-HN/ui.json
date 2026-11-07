@@ -21,6 +21,9 @@
       "destructive": "Error"
     }
   },
+  "formErrorSummary": {
+    "heading": "{count, plural, one {Hay # campo con error.} other {Hay # campos con errores.}}"
+  },
   "money": {
     "unavailable": "Importe no disponible"
   }

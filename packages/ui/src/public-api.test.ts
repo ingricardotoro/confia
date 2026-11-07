@@ -6,7 +6,7 @@ import * as api from "./index";
 import { findComponentsWithoutStory, findComponentsWithoutTest, listComponents } from "./a11y/story-coverage";
 
 // design-system, requirement "El punto de entrada público": the components exported are exactly the
-// eighteen of this delivery, and nothing else leaks (ADR-0018).
+// nineteen of this delivery, and nothing else leaks (ADR-0018).
 const COMPONENTS = [
   "Alert",
   "Badge",
@@ -15,6 +15,7 @@ const COMPONENTS = [
   "EmptyState",
   "ErrorState",
   "FormError",
+  "FormErrorSummary",
   "FormField",
   "IconButton",
   "Input",
@@ -27,7 +28,7 @@ const COMPONENTS = [
   "StatusBadge",
   "Textarea",
 ];
-// Not on the list of eighteen, and exported on purpose: the item that RadioGroup cannot be used
+// Not on the list of nineteen, and exported on purpose: the item that RadioGroup cannot be used
 // without, and the class recipe of Button for links that look like buttons.
 const COMPANIONS = ["RadioGroupItem", "buttonVariants"];
 // Exported components that live in the file of another one, so they have no directory of their own.
@@ -36,13 +37,20 @@ const SHARES_A_FILE = { FormError: "FormField" };
 const srcRoot = import.meta.dirname;
 
 describe("the public entry point of @confia/ui", () => {
-  it("DS02: exports exactly the eighteen components and their two companions", () => {
+  it("DS02: exports exactly the nineteen components and their two companions, twenty-one names", () => {
     expect(Object.keys(api).sort()).toEqual([...COMPONENTS, ...COMPANIONS].sort());
+    expect(Object.keys(api)).toHaveLength(21);
   });
 
   it("DS02: no export is a token and the entry point reads no token file", () => {
     expect(Object.keys(api).filter((name) => /token|palette/i.test(name))).toEqual([]);
     expect(readFileSync(join(srcRoot, "index.ts"), "utf8")).not.toMatch(/tokens|primitives/);
+  });
+
+  it("DS88, DS89: FormErrorSummary and Alert are imported from the entry point, and Dialog is not there", () => {
+    expect(api.FormErrorSummary).toBeTypeOf("function");
+    expect(api.Alert).toBeTypeOf("function");
+    expect(Object.keys(api)).not.toContain("Dialog");
   });
 
   it("DS01: MoneyAmount imported by the package name is the one of the entry point", () => {

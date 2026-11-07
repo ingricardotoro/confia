@@ -21,6 +21,8 @@ const APPLICABLE: [string, string, string[][]][] = [
   // Alert has no loading or empty state: the one that applies is its error, the Destructive variant.
   ["Alert", "molecules/alert/Alert.stories.tsx", [["Destructive"]]],
   ["FormField", "molecules/form-field/FormField.stories.tsx", [["Disabled"], ERROR]],
+  // The summary is itself the error state of a form; with no errors it renders nothing, which is DS79.
+  ["FormErrorSummary", "molecules/form-error-summary/FormErrorSummary.stories.tsx", [["Default"]]],
 ];
 
 describe("the stories of the states", () => {
@@ -30,6 +32,14 @@ describe("the stories of the states", () => {
     for (const accepted of states) {
       expect(names.some((name) => name !== undefined && accepted.includes(name)), accepted.join(" or ")).toBe(true);
     }
+  });
+
+  it("DS95: Alert has a story per variant, with and without a title, and the summary has one, several and no-control", () => {
+    const alert = storyNames("molecules/alert/Alert.stories.tsx");
+    const summary = storyNames("molecules/form-error-summary/FormErrorSummary.stories.tsx");
+
+    expect(alert).toEqual(expect.arrayContaining(["Info", "Warning", "Destructive", "Default", "WithoutTitle"]));
+    expect(summary).toEqual(expect.arrayContaining(["Default", "Several", "WithoutControl"]));
   });
 
   it("DS64: MoneyAmount has stories for zero, a negative, a large amount, HNL and USD", () => {
