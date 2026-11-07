@@ -1,0 +1,133 @@
+import { problem } from "../../src/test/contract-responses.ts";
+import { createSessionModel, type ModelResponse, type SessionModel } from "./session-model.ts";
+
+/**
+ * The scenarios of the simulated API (design.md D15). A scenario is a name the test sends in the
+ * `x-confia-mock-scenario` header; each one has its own session model, so journeys that run in parallel
+ * never see each other. A preset says how the sign in answers and, for one case, how a response is
+ * damaged on purpose. They simulate the shapes the backend publishes and prove nothing about the real stack.
+ */
+export const DEFAULT_SCENARIO = "default";
+export const SLOW_RESPONSE_MS = 31_000;
+const RETRY_AFTER_SECONDS = "30";
+const EXPIRY_PUSH_MS = 301_000;
+
+export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify";
+
+type LoginBehavior =
+  | "authenticated"
+  | "second-factor-required"
+  | "second-factor-enrollment-required"
+  | "authentication-failed"
+  | "too-many-requests"
+  | "capacity-exceeded"
+  | "slow"
+  | "restricted-expired";
+
+interface PresetDefinition {
+  readonly login: LoginBehavior;
+  readonly enrolled: boolean;
+  /** A fault injected after the model answered, to prove the server refuses to send it. */
+  readonly tamper?: (operation: Operation, response: ModelResponse) => ModelResponse;
+}
+
+const PRESETS: Readonly<Record<string, PresetDefinition>> = {
+  default: { login: "authenticated", enrolled: false },
+  "second-factor-required": { login: "second-factor-required", enrolled: true },
+  "enrollment-required": { login: "second-factor-enrollment-required", enrolled: false },
+  "authentication-failed": { login: "authentication-failed", enrolled: false },
+  "too-many-requests": { login: "too-many-requests", enrolled: false },
+  "capacity-exceeded": { login: "capacity-exceeded", enrolled: false },
+  slow: { login: "slow", enrolled: false },
+  "restricted-expired": { login: "restricted-expired", enrolled: true },
+  "already-enrolled": { login: "second-factor-enrollment-required", enrolled: true },
+  "contract-violation": {
+    login: "second-factor-enrollment-required",
+    enrolled: false,
+    tamper: (operation, response) =>
+      operation === "enroll" ? { ...response, body: { ...(response.body as object), secret: "too-short" } } : response,
+  },
+};
+
+export interface RecordedCall {
+  readonly method: string;
+  readonly path: string;
+}
+
+export interface Scenario {
+  readonly preset: string;
+  readonly model: SessionModel;
+  readonly calls: RecordedCall[];
+  readonly tamper: PresetDefinition["tamper"];
+  signIn(sleep: (ms: number) => Promise<void>): Promise<ModelResponse>;
+}
+
+const failure = (code: Parameters<typeof problem>[0], status: number, headers: Record<string, string> = {}): ModelResponse => ({
+  ...problem(code, status),
+  headers,
+  setCookies: [],
+});
+
+function build(preset: string, definition: PresetDefinition): Scenario {
+  let offsetMs = 0;
+  const model = createSessionModel({ now: () => Date.now() + offsetMs, enrolled: definition.enrolled });
+  return {
+    preset,
+    model,
+    calls: [],
+    tamper: definition.tamper,
+    async signIn(sleep) {
+      switch (definition.login) {
+        case "authenticated":
+          return model.openSession();
+        case "second-factor-required":
+          return model.startSecondFactor("mfa-verify");
+        case "second-factor-enrollment-required":
+          return model.startSecondFactor("mfa-enroll");
+        case "authentication-failed":
+          return failure("authentication-failed", 401);
+        case "too-many-requests":
+          return failure("too-many-requests", 429, { "Retry-After": RETRY_AFTER_SECONDS });
+        case "capacity-exceeded":
+          return failure("capacity-exceeded", 503);
+        case "slow":
+          await sleep(SLOW_RESPONSE_MS);
+          return model.openSession();
+        case "restricted-expired": {
+          const issued = model.startSecondFactor("mfa-verify");
+          offsetMs += EXPIRY_PUSH_MS;
+          return issued;
+        }
+      }
+    },
+  };
+}
+
+const ID_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
+
+export function isScenarioId(value: string): boolean {
+  return ID_PATTERN.test(value);
+}
+
+export function createScenarioStore() {
+  const scenarios = new Map<string, Scenario>();
+  const fallback = PRESETS["default"];
+  if (fallback === undefined) throw new Error("the default preset is missing");
+  return {
+    scenario(id: string): Scenario {
+      let found = scenarios.get(id);
+      if (found === undefined) {
+        found = build("default", fallback);
+        scenarios.set(id, found);
+      }
+      return found;
+    },
+    /** Starts the scenario over with a preset; `false` when the preset does not exist. */
+    apply(id: string, preset: string): boolean {
+      const definition = Object.hasOwn(PRESETS, preset) ? PRESETS[preset] : undefined;
+      if (definition === undefined) return false;
+      scenarios.set(id, build(preset, definition));
+      return true;
+    },
+  };
+}
