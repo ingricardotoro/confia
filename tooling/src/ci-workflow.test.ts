@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -67,7 +68,7 @@ describe("the design system accessibility job [BX14, BX17]", () => {
   const frontendSteps = jobs["frontend"]?.steps ?? [];
 
   it("comes after the four existing jobs, with its own name and a 15 minute limit", () => {
-    expect(Object.keys(jobs)).toEqual(["backend", "backend-mutation", "frontend", "security", "design-system-accessibility"]);
+    expect(Object.keys(jobs).slice(0, 5)).toEqual(["backend", "backend-mutation", "frontend", "security", "design-system-accessibility"]);
     expect(job?.name).toBe("design system accessibility");
     expect(job?.["runs-on"]).toBe("ubuntu-latest");
     expect(job?.["timeout-minutes"]).toBe(15);
@@ -133,5 +134,110 @@ describe("the Turborepo task test:a11y [BX17]", () => {
     expect(turbo.tasks["test:a11y"]).not.toBe(turbo.tasks["test"]);
     expect(turbo.tasks["test"]?.outputs).toBeUndefined();
     expect(JSON.stringify(turbo.tasks["test"])).not.toContain("a11y");
+  });
+});
+
+// admin-web-foundations-and-session, build-integrity BX83 to BX88 and BX90 (design.md D16). The job runs the
+// journeys and the accessibility gate over rendered routes against the simulated API. It is added to the
+// workflow and nothing that was there changes.
+describe("the admin web e2e and accessibility job [BX83 to BX88, BX90]", () => {
+  const job = jobs["admin-web-e2e"];
+  const frontendSteps = jobs["frontend"]?.steps ?? [];
+
+  it("comes after the five existing jobs, with its name, runner and a 20 minute limit [BX85]", () => {
+    expect(Object.keys(jobs)).toEqual([
+      "backend", "backend-mutation", "frontend", "security", "design-system-accessibility", "admin-web-e2e",
+    ]);
+    expect(job?.name).toBe("admin-web e2e and accessibility");
+    expect(job?.["runs-on"]).toBe("ubuntu-latest");
+    expect(job?.["timeout-minutes"]).toBe(20);
+  });
+
+  it("pins checkout, pnpm and Node to the SHAs of the frontend job [BX85]", () => {
+    expect((job?.steps ?? []).slice(0, 3)).toEqual(frontendSteps.slice(0, 3));
+  });
+
+  it("installs Chromium and runs the e2e task through Turborepo, with vite preview behind Playwright [BX85]", () => {
+    const commands = (job?.steps ?? []).flatMap((step) => (step.run === undefined ? [] : [step.run]));
+
+    expect(commands).toEqual([
+      "pnpm install --frozen-lockfile",
+      "pnpm --filter @confia/admin-web exec playwright install --with-deps chromium",
+      "pnpm turbo run test:e2e --filter=@confia/admin-web",
+    ]);
+    expect(readText("apps/admin-web/playwright.config.ts")).toContain('command: "vite build && vite preview"');
+  });
+
+  it("uploads the report folder as admin-web-e2e-report even when the job fails [BX85, BX86]", () => {
+    const upload = job?.steps.at(-1);
+
+    expect(upload?.uses).toBe(UPLOAD);
+    expect(upload?.if).toBe("always()");
+    expect(upload?.with).toMatchObject({ name: "admin-web-e2e-report", path: "apps/admin-web/reports/", "retention-days": 14 });
+  });
+
+  it("needs no Docker, no JDK and no real API [BX87]", () => {
+    const text = JSON.stringify(job);
+
+    expect(text).not.toMatch(/docker|java|jdk|maven|mvnw|testcontainers/i);
+    expect(job?.steps.filter((step) => step.uses?.startsWith("actions/setup-java"))).toEqual([]);
+  });
+
+  it("leaves the frontend command exactly as it was [BX84]", () => {
+    expect(frontendSteps.at(-1)?.run).toBe("pnpm turbo run lint typecheck test build --filter=!@confia/api");
+  });
+
+  it("keeps the design system job as it was [BX90]", () => {
+    const steps = jobs["design-system-accessibility"]?.steps ?? [];
+
+    expect(jobs["design-system-accessibility"]?.["timeout-minutes"]).toBe(15);
+    expect(steps.map((step) => step.run ?? step.uses)).toEqual([
+      CHECKOUT, PNPM_SETUP, SETUP_NODE, "pnpm install --frozen-lockfile",
+      "pnpm --filter @confia/ui exec playwright install --with-deps chromium",
+      "pnpm turbo run test:a11y --filter=@confia/ui", UPLOAD,
+    ]);
+  });
+});
+
+describe("the diff of ci.yml against main only adds [BX83]", () => {
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: repositoryRoot, encoding: "utf8" }).trim();
+  const base = (() => {
+    for (const ref of ["origin/main", "main"]) {
+      try {
+        return git("merge-base", "HEAD", ref);
+      } catch {
+        // The ref does not exist here (a shallow clone has no main): try the next one.
+      }
+    }
+    return undefined;
+  })();
+
+  // Needs the history of main, which a shallow checkout of the CI job does not have; locally it always runs.
+  it.skipIf(base === undefined)("has no deleted or modified line", () => {
+    const [added, deleted] = git("diff", "--numstat", base ?? "", "--", ".github/workflows/ci.yml").split(/\s+/);
+
+    expect(Number(added)).toBeGreaterThan(0);
+    expect(deleted).toBe("0");
+  });
+});
+
+describe("the Turborepo tasks test:e2e, dev and test:a11y [BX88]", () => {
+  const turbo = JSON.parse(readText("turbo.json")) as { tasks: Record<string, Record<string, unknown>> };
+
+  it("declares test:e2e uncached, generated first, with the report as its output and CI passed through", () => {
+    expect(turbo.tasks["test:e2e"]).toEqual({
+      cache: false,
+      dependsOn: ["^generate", "generate"],
+      outputs: ["reports/**"],
+      passThroughEnv: ["CI"],
+    });
+  });
+
+  it("declares dev, and leaves test:a11y as the design system change set it", () => {
+    expect(turbo.tasks["dev"]).toEqual({ cache: false, persistent: true, dependsOn: ["^generate"] });
+    expect(turbo.tasks["test:a11y"]).toEqual({
+      dependsOn: ["^generate", "generate"],
+      outputs: ["reports/a11y/**"],
+    });
   });
 });
