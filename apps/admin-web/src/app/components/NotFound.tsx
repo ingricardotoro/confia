@@ -22,7 +22,7 @@ export function NotFound({ href, onNavigate }: NotFoundProps) {
           event.preventDefault();
           onNavigate();
         }}
-        className="text-primary underline"
+        className="text-text-link underline"
       >
         {t("notFound.link")}
       </a>

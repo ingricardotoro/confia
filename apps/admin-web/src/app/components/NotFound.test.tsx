@@ -18,4 +18,12 @@ describe("NotFound", () => {
 
     expect(onNavigate).toHaveBeenCalledTimes(1);
   });
+
+  it("paints the link with the link color token, which keeps its contrast in the dark theme", () => {
+    renderWithAdminI18n(<NotFound href="/iniciar-sesion" onNavigate={vi.fn()} />);
+
+    const link = screen.getByRole("link", { name: "Ir a inicio de sesión" });
+    expect(link).toHaveClass("text-text-link");
+    expect(link).not.toHaveClass("text-primary");
+  });
 });
