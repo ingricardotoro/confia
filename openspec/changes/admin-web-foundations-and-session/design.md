@@ -572,6 +572,8 @@ sigue diciendo que el e2e llega con el cambio 11: BX83 prohíbe modificar línea
 es simulada.
 
 **BX89: el tiempo no se pudo medir en esta fase.** El PR 2 lo mide en la primera ejecución remota y lo agrega a esta sección con nota fechada.
+
+**Nota del 2026-11-05 (BX89, medida del PR 2, #259):** el trabajo `frontend verify` tardó **1 min 51 s** y **2 min 11 s** en las dos primeras ejecuciones remotas del PR 2. Cabe con holgura en el límite de 10 minutos, así que BX19 no cambia.
 Si `frontend verify` no cabe en 10 minutos, se detiene el PR 2: subir el límite cambia BX19.
 
 ### D17. Voz
@@ -614,6 +616,8 @@ con estas condiciones: publicada hace más de 14 días, `pnpm audit --audit-leve
 
 **`minimumReleaseAge: 20160` se agrega en el PR 2**, con su fijación en `workspace-guards.test.ts`. Hoy nada hace cumplir la regla y BX93 no tendría
 qué comparar. Por verificar en rojo: que pnpm 12.8.1 lea esa clave.
+
+> **Nota del 2026-11-05 (tarea 2).** pnpm 12.8.1 sí lee `minimumReleaseAge`. Al activarla, el archivo de bloqueo heredado de `main` dejó de pasar la política: `browserslist@4.29.5` (publicada el 2026-10-26, la trae `@babel/core`) y otras diez versiones transitivas tenían menos de 14 días. Decisión del propietario: sin `minimumReleaseAgeExclude`; se fija `browserslist` a 4.29.4 con un `overrides` fechado en `pnpm-workspace.yaml` (mismo mecanismo que `undici`) y el archivo de bloqueo se regeneró para que pnpm elija versiones maduras. El `overrides` se retira cuando 4.29.5 cumpla 14 días, hacia el 2026-11-09. Las versiones del catálogo no cambian.
 
 ## 6. Flujos
 

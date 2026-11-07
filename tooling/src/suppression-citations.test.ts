@@ -67,8 +67,19 @@ describe("the suppression scanner over an application", () => {
     }
   });
 
-  // ADR-0018: apps/ has no TypeScript yet, so this cannot evaluate real files. Task 2 creates them.
-  it.todo("BX65: the scan of apps/ ends green having evaluated real files of apps/admin-web (task 2)");
+  // ADR-0018: a green scan over an empty tree proves nothing, so the set of real files is asserted too.
+  it("AW17, BX65: the scan of apps/ ends green having evaluated real files of apps/admin-web", () => {
+    const { scannedFiles, violations } = scanSuppressions({
+      root: join(REPOSITORY, "apps"),
+      adrDirectory: ADR_DIRECTORY,
+    });
+    const ofTheApp = scannedFiles.filter((file) => file.startsWith("admin-web/"));
+
+    expect(ofTheApp.length).toBeGreaterThan(0);
+    expect(ofTheApp).toContain("admin-web/src/main.tsx");
+    expect(ofTheApp).toContain("admin-web/vite.config.ts");
+    expect(violations).toEqual([]);
+  });
 });
 
 describe("packages/ui", () => {

@@ -21,15 +21,26 @@ allowBuilds:
   # from failing the install while still running nothing.
   esbuild: false
 
+# No version is installed until it has been published for two weeks (20 160 minutes). A fresh release
+# is the cheapest way for a compromised package to reach the lockfile; waiting lets the registry and
+# the advisories catch it first. A blocked version is replaced in the design, never excepted: there is
+# deliberately no minimumReleaseAgeExclude (build-integrity BX93; pnpm 12.8.1 reads this key, task 2.1).
+minimumReleaseAge: 20160
+
 # The one place each tool's version is written (task 2.1). Packages depend on "catalog:", never on
 # a version of their own. TypeScript stays on 6.0.x, not 7: typescript-eslint 8.71 declares
 # typescript >=4.8.4 <6.1.0.
 catalog:
+  "@axe-core/playwright": 4.14.0
   "@eslint/js": 10.0.1
   "@fontsource-variable/inter": 5.3.0
+  "@playwright/test": 1.64.1
   "@storybook/addon-a11y": 10.6.2
   "@storybook/react-vite": 10.6.2
   "@tailwindcss/vite": 4.3.3
+  "@tanstack/react-form": 1.33.5
+  "@tanstack/react-query": 5.104.5
+  "@tanstack/react-router": 1.170.45
   "@testing-library/dom": 10.4.2
   "@testing-library/jest-dom": 7.0.1
   "@testing-library/react": 16.3.3
@@ -76,3 +87,7 @@ overrides:
   # undici 7.30.0: GHSA-xjj6-f33q-929c, GHSA-4w7w-5xrc-9h26, GHSA-2m5v-pch6-74hx and GHSA-qrxm-fqhp-jwvm,
   # all high, fixed in 7.30.1 (published 2026-10-15, past the two-week age rule on 2026-10-29).
   "undici@>=7.29.1 <7.30.1": 7.30.1
+  # browserslist 4.29.5 (via @babel/core) was published 2026-10-26, inside the two-week release age
+  # that minimumReleaseAge enforces from 2026-11-05. 4.29.4 (2026-10-19) is the newest mature release.
+  # Remove this entry once 4.29.5 is older than 14 days, around 2026-11-09.
+  "browserslist@4.29.5": 4.29.4
