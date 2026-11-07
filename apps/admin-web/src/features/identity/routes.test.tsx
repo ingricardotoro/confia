@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { authenticatedSession, secondFactorEnrollmentRequired, secondFactorRequired } from "../../test/contract-responses.ts";
+import { authenticatedSession, currentSession, secondFactorEnrollmentRequired, secondFactorRequired } from "../../test/contract-responses.ts";
 import { installMswServer, route } from "../../test/msw-server.ts";
 import { createTestSession, renderApp } from "../../test/render-app.tsx";
 
@@ -11,6 +11,7 @@ installMswServer();
 
 const SESSIONS = "/api/v1/auth/sessions";
 const REFRESH = `${SESSIONS}/refresh`;
+const CURRENT = `${SESSIONS}/current`;
 const CREDENTIALS = { identifier: "ana@colegio.edu.hn", password: "not-a-real-password" };
 
 const SIGN_IN = "Iniciar sesión";
@@ -40,6 +41,7 @@ describe("the guards", () => {
     "SS30: with a session, %s leads to the signed in page",
     async (path) => {
       route("post", REFRESH, authenticatedSession());
+      route("get", CURRENT, currentSession());
 
       const { router } = renderApp({ path, readCsrf: () => "csrf-value-A" });
 
@@ -102,6 +104,7 @@ describe("the routes and the screens", () => {
         name: SIGNED_IN,
         open: () => {
           route("post", REFRESH, authenticatedSession());
+          route("get", CURRENT, currentSession());
           return Promise.resolve(renderApp({ path: "/", readCsrf: () => "csrf-value-A" }));
         },
       },
