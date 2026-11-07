@@ -347,5 +347,17 @@ describe("the real apps/admin-web tree", () => {
     expect(networkFindings(tree)).toEqual([]);
   });
 
-  it.todo("BX46: the four rules pass over real component files and at least one real admin catalog key (task 9)");
+  it("BX46: the app rules pass over real component files, and over at least one real key of the admin catalog", async () => {
+    const tree = await lintRealTree();
+    const components = tree.filter(({ file }) => /\/components\/[^/]+\.tsx$/.test(file));
+    const catalog = JSON.parse(readFileSync(join(REAL_ROOT, "src/i18n/locales/es-HN/admin.json"), "utf8")) as {
+      signedIn: { title: string };
+    };
+
+    expect(components.length).toBeGreaterThan(0);
+    expect(components.flatMap(({ file, messages }) => messages.map((m) => `${file}: ${m.ruleId ?? ""}: ${m.message}`))).toEqual([]);
+    expect(catalog.signedIn.title).not.toBe("");
+    expect(readFileSync(join(REAL_ROOT, "src/features/identity/signed-in/components/SignedInPage.tsx"), "utf8")).toContain("signedIn.title");
+    expect(tree.flatMap(({ messages }) => messages)).toEqual([]);
+  });
 });

@@ -1,7 +1,9 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { createRequire } from "node:module";
 import { withProbeTree } from "./cruise-probe.js";
 
 // Specs/build-integrity, requirement "Reglas de dependencia del frontend"
@@ -57,6 +59,7 @@ const APP_ACCEPTED = [
   "features/identity/session/access-session.ts",
 ] as const;
 
+const config = createRequire(import.meta.url)("../../.dependency-cruiser.cjs") as { forbidden: unknown[] };
 const toolingRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = join(toolingRoot, "..");
 // dependency-cruiser exports neither its package.json nor its bin, so the path pnpm links into this
@@ -64,7 +67,7 @@ const repositoryRoot = join(toolingRoot, "..");
 const cruiser = join(toolingRoot, "node_modules", "dependency-cruiser", "bin", "dependency-cruiser.mjs");
 
 interface CruiseResult {
-  modules: { source: string; dependents: string[] }[];
+  modules: { source: string; dependents: string[]; dependencies?: { resolved: string }[] }[];
   summary: {
     violations: { rule: { name: string }; from: string; to: string }[];
     totalCruised: number;
@@ -125,10 +128,42 @@ describe("the frontend dependency rules", () => {
     expect(real.summary.violations).toEqual([]);
   });
 
-  // ADR-0018: apps/admin-web does not exist yet, so these two cannot evaluate real files. The task
-  // that creates the files turns each entry into a test; a green run over an empty set is refused.
-  it.todo("BX61: a real container of apps/admin-web imports TanStack Query and shared/api without a violation (task 9)");
-  it.todo("BX62: the presentation selector matches real component files, and fails on an empty set (task 9)");
+  // ADR-0018: a rule that evaluated nothing proves nothing. These two evaluate the real files of the app.
+  describe("over the real apps/admin-web", () => {
+    const real = cruise(["apps/admin-web/src"]);
+    const container = "apps/admin-web/src/features/identity/signed-in/SignedInContainer.tsx";
+
+    it("BX61: a real container imports TanStack Query and shared/api without a violation", () => {
+      const module = real.modules.find((candidate) => candidate.source === container);
+      const imported = (module?.dependencies ?? []).map((dependency) => dependency.resolved);
+
+      expect(module, `${container} was cruised`).toBeDefined();
+      // The cruise keeps files of the repository only, so the library import is read from the source.
+      expect(readFileSync(join(repositoryRoot, container), "utf8")).toMatch(/from "@tanstack\/react-query"/);
+      expect(imported.some((path) => path.startsWith("apps/admin-web/src/shared/api/"))).toBe(true);
+      expect(real.summary.violations.filter((violation) => violation.from === container)).toEqual([]);
+    });
+
+    it("BX62: the presentation selector matches real component files, and an empty set fails", () => {
+      const rule = (config.forbidden as { name: string; from: { path: string } }[]).find(
+        ({ name }) => name === "admin-presentation-is-pure",
+      );
+      const matching = (selector: string) =>
+        real.modules.filter((module) => new RegExp(selector).test(module.source) && !/\.test\.tsx?$/.test(module.source));
+      const assertNotEmpty = (selector: string) => {
+        if (matching(selector).length === 0) throw new Error(`the selector ${selector} matches no real file`);
+      };
+
+      expect(rule, "the rule exists").toBeDefined();
+      assertNotEmpty(rule?.from.path ?? "");
+      expect(matching(rule?.from.path ?? "").map((module) => module.source)).toContain(
+        "apps/admin-web/src/features/identity/signed-in/components/SignedInPage.tsx",
+      );
+      expect(() => {
+        assertNotEmpty("(^|/)apps/admin-web/src/presentation/");
+      }).toThrow("matches no real file");
+    });
+  });
 
   // ADR-0018: a layer rule that matches no real file proves nothing. The components are .tsx files; if the
   // configuration stopped resolving that extension, the directory would still be scanned but nothing

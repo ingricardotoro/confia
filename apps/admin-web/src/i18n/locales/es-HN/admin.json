@@ -19,7 +19,11 @@
   },
   "signedIn": {
     "title": "Sesión iniciada.",
-    "message": "Su sesión está activa."
+    "message": "Su sesión está activa.",
+    "loading": "Cargando su sesión.",
+    "signOut": "Cerrar sesión",
+    "signOutFailed": "No se pudo cerrar la sesión. Su sesión sigue activa. Intente de nuevo.",
+    "retrySignOut": "Reintentar cierre de sesión"
   },
   "problem": {
     "authenticationFailed": "El correo o la contraseña no son correctos.",
