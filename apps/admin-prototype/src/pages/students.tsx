@@ -2,13 +2,17 @@ import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { Alert, Badge, Button, EmptyState, FormField, Input } from "@confia/ui";
 import { HandCoins, Pencil, Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { StudentScholarships } from "./student-scholarships";
 import { Amount, Card, DataTable, DetailList, LoadGate, PageHeader, Select, StatusFor, Tabs } from "../lib/ui";
-import { GRADES, SECTIONS, type Student } from "../mock/data";
+import type { Student } from "../mock/data";
 import { actions, nextId, notify, useFakeLoad, useStore } from "../mock/store";
 
 export function StudentList() {
   const { status, retry } = useFakeLoad("students");
   const students = useStore((s) => s.students);
+  const gradeCfg = useStore((s) => s.grades);
+  const GRADES = gradeCfg.map((g) => g.name);
+  const SECTIONS = [...new Set(gradeCfg.flatMap((g) => g.sections.map((x) => x.name)))];
   const navigate = useNavigate();
   const [grade, setGrade] = useState("");
   const [section, setSection] = useState("");
@@ -70,7 +74,7 @@ export function StudentDetail() {
             <StatusFor status={student.balanceStatus} />
             {student.balanceStale ? <Badge size="sm" variant="outline">Saldo en recálculo en el servidor</Badge> : null}
           </div>
-          <Tabs value={tab} onChange={setTab} tabs={[{ id: "datos", label: "Datos" }, { id: "encargados", label: "Encargados" }, { id: "cuenta", label: "Estado de cuenta" }, { id: "pagos", label: "Pagos" }]} />
+          <Tabs value={tab} onChange={setTab} tabs={[{ id: "datos", label: "Datos" }, { id: "encargados", label: "Encargados" }, { id: "cuenta", label: "Estado de cuenta" }, { id: "pagos", label: "Pagos" }, { id: "becas", label: "Becas" }]} />
           {tab === "datos" ? (
             <Card><DetailList items={[["Nombre", student.name], ["Código", <span className="tabular-nums">{student.code}</span>], ["Grado y sección", `${student.grade} ${student.section}`], ["Jornada", student.shift], ["Fecha de matrícula", <span className="tabular-nums">{student.enrolledOn}</span>], ["Estado", student.active ? "Activo" : "Inactivo"]]} /></Card>
           ) : null}
@@ -93,6 +97,7 @@ export function StudentDetail() {
             </Card>
           ) : null}
           {tab === "cuenta" ? <AccountStatement studentId={id} /> : null}
+          {tab === "becas" ? <StudentScholarships studentId={id} /> : null}
           {tab === "pagos" ? (
             <Card className="p-0">
               {payments.filter((p) => p.studentId === id).length === 0 ? (
@@ -142,7 +147,8 @@ export function StudentForm({ mode }: { mode: "new" | "edit" }) {
   const existing = useStore((s) => s.students.find((x) => x.id === id));
   const guardians = useStore((s) => s.guardians);
   const navigate = useNavigate();
-  const [f, setF] = useState<Student>(existing ?? { id: "", code: "", name: "", grade: GRADES[0]!, section: "A", active: true, balance: "L 0.00", balanceStatus: "paid", guardianIds: [], charges: [], enrolledOn: "07/11/2026", shift: "Matutina" });
+  const gradeCfg = useStore((s) => s.grades);
+  const [f, setF] = useState<Student>(existing ?? { id: "", code: "", name: "", grade: gradeCfg[0]?.name ?? "", section: gradeCfg[0]?.sections[0]?.name ?? "A", active: true, balance: "L 0.00", balanceStatus: "paid", guardianIds: [], charges: [], enrolledOn: "07/11/2026", shift: "Matutina" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const toggle = (gid: string) => setF({ ...f, guardianIds: f.guardianIds.includes(gid) ? f.guardianIds.filter((x) => x !== gid) : [...f.guardianIds, gid] });
   const submit = (e: FormEvent) => {
@@ -166,8 +172,8 @@ export function StudentForm({ mode }: { mode: "new" | "edit" }) {
         <Card>
           <div className="grid gap-5 sm:grid-cols-2">
             <FormField label="Nombre completo" required error={errors["name"]} className="sm:col-span-2">{(c) => <Input {...c} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />}</FormField>
-            <FormField label="Grado">{(c) => <Select {...c} value={f.grade} onChange={(e) => setF({ ...f, grade: e.target.value })}>{GRADES.map((g) => <option key={g}>{g}</option>)}</Select>}</FormField>
-            <FormField label="Sección">{(c) => <Select {...c} value={f.section} onChange={(e) => setF({ ...f, section: e.target.value })}>{SECTIONS.map((g) => <option key={g}>{g}</option>)}</Select>}</FormField>
+            <FormField label="Grado">{(c) => <Select {...c} value={f.grade} onChange={(e) => setF({ ...f, grade: e.target.value, section: gradeCfg.find((g) => g.name === e.target.value)?.sections[0]?.name ?? f.section })}>{gradeCfg.map((g) => <option key={g.id}>{g.name}</option>)}</Select>}</FormField>
+            <FormField label="Sección">{(c) => <Select {...c} value={f.section} onChange={(e) => setF({ ...f, section: e.target.value })}>{(gradeCfg.find((g) => g.name === f.grade)?.sections ?? []).map((x) => <option key={x.id}>{x.name}</option>)}</Select>}</FormField>
             <FormField label="Jornada">{(c) => <Select {...c} value={f.shift} onChange={(e) => setF({ ...f, shift: e.target.value })}><option>Matutina</option><option>Vespertina</option></Select>}</FormField>
             <FormField label="Estado">{(c) => <Select {...c} value={f.active ? "on" : "off"} onChange={(e) => setF({ ...f, active: e.target.value === "on" })}><option value="on">Activo</option><option value="off">Inactivo</option></Select>}</FormField>
             <fieldset className="flex flex-col gap-2 sm:col-span-2">

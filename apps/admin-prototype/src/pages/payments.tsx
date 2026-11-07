@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { Alert, Button, EmptyState, FormField, Input } from "@confia/ui";
+import { Alert, Badge, Button, EmptyState, FormField, Input } from "@confia/ui";
 import { CheckCircle2, Plus, Printer } from "lucide-react";
 import { useState } from "react";
 import { Amount, Card, DataTable, DetailList, LoadGate, Modal, PageHeader, Select, StatusFor, displayTyped, isTypedAmount } from "../lib/ui";
@@ -50,6 +50,8 @@ export function PaymentWizard() {
   const search = useSearch({ strict: false }) as { student?: string };
   const { status, retry } = useFakeLoad("payment-new", 300);
   const students = useStore((s) => s.students);
+  const fees = useStore((s) => s.fees);
+  const feeOf = (concept: string) => fees.find((f) => concept.startsWith(f.name))?.name;
   const payments = useStore((s) => s.payments);
   const navigate = useNavigate();
   const [step, setStep] = useState(search.student ? 1 : 0);
@@ -135,7 +137,7 @@ export function PaymentWizard() {
                       <li key={c.id}>
                         <label className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm">
                           <input type="checkbox" checked={picked.includes(c.id)} onChange={() => setPicked(picked.includes(c.id) ? picked.filter((x) => x !== c.id) : [...picked, c.id])} />
-                          <span className="flex-1">{c.concept} <span className="text-text-secondary">· vence {c.due}</span></span>
+                          <span className="flex-1">{c.concept} <span className="text-text-secondary">· vence {c.due}</span>{feeOf(c.concept) ? <Badge size="sm" variant="outline" className="ml-2">Concepto: {feeOf(c.concept)}</Badge> : null}</span>
                           <StatusFor status={c.status} />
                           <Amount value={c.amount} />
                         </label>
