@@ -433,3 +433,28 @@ Procedimiento: copia fuera del repositorio (directorio temporal de la sesión), 
 
 - **Cortes.** 11a-1 `53ca356`: **809 líneas** frente a `453b4b6`, una sola PR por **excepción explícita del propietario (aprobada el 2026-11-07)**. 11a-2 partida en 11a-2a `552945c` (755) y 11a-2b `3b535a0` (99).
 - **Sesión de prueba sembrada (adición aprobada el 2026-11-05).** Ruta `GET|POST /__control/seed-session` del simulador, **solo local**: responde únicamente a un `Host` local (`localhost`, `127.0.0.1`, `[::1]`) desde un par de loopback, y escucha solo en `localhost`. Deja las dos cookies de WE62 y WE63 de una cuenta ficticia y redirige (303) a `http://localhost:5173/`. `?scenario=<id>` siembra otro escenario. Pasos: (1) `pnpm --filter @confia/admin-web mock:api`; (2) `CONFIA_API_PROXY_TARGET=http://localhost:8099 pnpm --filter @confia/admin-web dev`; (3) abrir `http://localhost:8099/__control/seed-session` en el navegador. No existe fuera del simulador, no se sirve desde el build y no es prueba de la pila real. Demostración: que el control responda fuera de `localhost` pone en rojo la prueba de `Host` ajeno.
+
+## Tarea 7: `ui-alert-and-fixes` (2026-11-07)
+
+- **Ruta.** Escritor delegado único, rama `change/admin-web-foundations-and-session-7-ui-alert-and-fixes` desde `d4297cc`. Commits: `1b1c299` `feat(ui): add the alert molecule` y `5968e3f` `fix(ui): keep the focus ring out of the button transition and never render empty labels`.
+- **Superficies que faltaban en el plan (decisión del propietario, 2026-11-07).** La prueba de exportaciones del plan se llama `packages/ui/src/public-api.test.ts` (no existen `index.test.ts` ni `exports.test.ts`). Además hicieron falta `packages/ui/src/story-states.test.ts` (fila de `Alert` en DS63, con el estado `Destructive`, el único que le aplica: no tiene carga ni vacío) y `packages/ui/src/no-network.test.tsx` (DS61 exige un *fixture* por cada componente exportado; solo se importó `Alert` y se añadió su *fixture*).
+- **Orden TDD.** Las pruebas se escribieron antes que el código de producción; no hay desviación.
+- **ROJO (7.1), causa observada.**
+  - `Alert.test.tsx` no carga: `Failed to resolve import "./Alert"`; `Alert.test-d.ts`: `Unused '@ts-expect-error'`; `Alert.a11y.test.tsx`: el mismo `Failed to resolve import "./Alert"`.
+  - DS91: con la etiqueta vacía y con solo espacios, no existe el botón «Reintentar». DS92: `expected [ 'No pudimos cargar los cargos', '' ] to deeply equal [ 'No pudimos cargar los cargos' ]` (en `EmptyState`, `[ 'Sin cargos', '   ' ]`).
+  - `public-api.test.ts`: DS02 y DS62/DS73 fallan por la lista de 18 componentes.
+  - DS90 en Chromium (corrido solo con `atoms/button`): `expected [ 'color', 'background-color', …(8) ] to not include 'outline-color'` y `expected 'rgb(255, 255, 255)' to be 'rgb(59, 130, 246)'` (el anillo seguía a mitad de transición en el primer fotograma). Corrido junto con el directorio de `Alert`, la segunda aserción falló además por el *overlay* de error de Vite, no por la causa esperada.
+- **VERDE y REFACTOR (7.2).** `Alert` con `cva`, iconos `Info`, `TriangleAlert` y `CircleAlert`, texto `alert.severity.*`, `tabIndex={-1}` y `ref` por propiedad; nueve *tokens* `--alert-*` hacia `--color-status-{pending,partial,overdue}-*`. Primera corrida unit: fallos de lint (la regla prohíbe `querySelector` fuera de `*.a11y.test.tsx`): las aserciones del icono pasaron a `Alert.a11y.test.tsx` y las de párrafo vacío usan `getAllByRole("paragraph")`. `tsc` y ESLint limpios.
+- **Demostraciones deliberadas (7.3).** Copia fuera del repositorio, ruptura, rojo, restauración y `cmp` sin salida:
+
+  | # | Ruptura | Rojo observado | `cmp` |
+  |---|---|---|---|
+  | 1 | `transition-colors` en `Button.tsx` | DS90: `expected [ 'color', 'background-color', …(8) ] to not include 'outline-color'` y el color del anillo `rgb(255, 255, 255)` frente a `rgb(59, 130, 246)`; 2 fallos de 2 | idéntico |
+  | 2 | Sin `trim` en la etiqueta de `ErrorState` | DS91 (solo espacios): falla por el nombre accesible; 1 fallo de 13 | idéntico |
+  | 3 | `p` siempre renderizado en `ErrorState` y `EmptyState` | DS92: `expected [ <p …(1)></p>, <p …(1)></p> ] to deeply equal [ <p …(1)></p> ]`; 6 fallos de 22 | idéntico |
+  | 4 | `role="status"` en `destructive` (roles invertidos) | DS83 y otras 3: `Unable to find an accessible element with the role "status"`/`"alert"`; 4 fallos de 11 | idéntico |
+
+- **Suites.** UI unit: 54 archivos, 544 pasan. UI `test:a11y`: 10 archivos, 175 pasan; las cinco historias de `Alert` pasan en ambos temas. Guarda de `*.spec.*` sobre `apps/` y AW10 (`git diff --name-only d4297cc -- apps/api`): vacíos.
+- **Medida (800 líneas).** 421 líneas efectivas frente a `d4297cc` (414 adiciones, 7 eliminaciones): 327 en el commit de `Alert` y 94 en el de las correcciones. Sin corte.
+- **Saltos de línea.** El repositorio fuerza LF (`eol=lf`); el aviso de CRLF de Git era solo informativo y `git diff --stat` coincide con `--ignore-cr-at-eol`: ningún archivo se reescribió entero.
+- **Suite PR.** La primera corrida (`pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1`) terminó con dos fallos en `admin-web`: `src/main.test.tsx` («mounts the app into #root») y `e2e/mock-api/start.test.ts` («loads the TypeScript simulator…»). **El texto del error no se capturó** (la salida estaba filtrada); ambas pruebas pasan solas (3 de 3) y comparten el patrón de tiempo de espera bajo carga que ya se vio en las tareas 5 y 6. Una única repetición completa, con la salida a un archivo, dio **18 de 18 tareas** sin fallos; no se relanzó más.
