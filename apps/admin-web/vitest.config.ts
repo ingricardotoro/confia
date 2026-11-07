@@ -2,11 +2,12 @@ import { configDefaults, defineConfig } from "vitest/config";
 import { confiaVitest } from "@confia/config/vitest";
 
 // The same bar as packages/ui (build-integrity, BX97 to BX99): 80 percent, with every production
-// file in the denominator, tested or not. Playwright journeys are *.e2e.ts and never match here.
+// file in the denominator, tested or not. Playwright journeys are *.e2e.ts and never match here. The unit
+// tests of the simulated API and its test helpers live in e2e/ and are collected as *.test.ts (task 11).
 export default defineConfig({
   test: {
     ...confiaVitest.test,
-    include: ["src/**/*.test.{ts,tsx}", "*.test.ts"],
+    include: ["src/**/*.test.{ts,tsx}", "*.test.ts", "e2e/**/*.test.ts"],
     exclude: [...configDefaults.exclude, "src/**/__fixtures__/**"],
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
