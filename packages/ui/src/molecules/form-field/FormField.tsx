@@ -32,6 +32,11 @@ export interface FormFieldProps extends Omit<ComponentProps<"div">, "children"> 
   description?: string;
   /** The message of the current error. Empty or blank text is no error. */
   error?: string;
+  /**
+   * The `id` of the control, when something outside the field must name it, as a FormErrorSummary link
+   * does. Without it the field generates one.
+   */
+  controlId?: string;
   /** Marks the field as required, in text and for assistive technology. */
   required?: boolean;
   disabled?: boolean;
@@ -47,6 +52,7 @@ export function FormField({
   label,
   description,
   error,
+  controlId: givenControlId,
   required = false,
   disabled = false,
   className,
@@ -55,7 +61,7 @@ export function FormField({
 }: FormFieldProps) {
   const { t } = useUiText();
   const base = useId();
-  const controlId = `${base}-control`;
+  const controlId = givenControlId ?? `${base}-control`;
   const labelId = `${base}-label`;
   const descriptionId = `${base}-description`;
   const errorId = `${base}-error`;

@@ -7,6 +7,7 @@ import { Input } from "../../atoms/input";
 import { RadioGroup, RadioGroupItem } from "../../atoms/radio-group";
 import { Textarea } from "../../atoms/textarea";
 import { renderWithI18n } from "../../test/render";
+import { FormErrorSummary } from "../form-error-summary";
 import { FormError as FormErrorFromIndex, FormField, type FormFieldProps } from "./index";
 
 const MESSAGE = "Ingrese un monto mayor que cero";
@@ -207,5 +208,37 @@ describe("FormField", () => {
     renderWithI18n(<FormErrorFromIndex id="problem">{MESSAGE}</FormErrorFromIndex>);
 
     expect(screen.getByText(MESSAGE)).toHaveAttribute("id", "problem");
+  });
+
+  it("DS98: controlId reaches the control and its label, and the summary link focuses it", async () => {
+    const user = userEvent.setup();
+    renderWithI18n(
+      <>
+        <FormErrorSummary errors={[{ controlId: "identifier", message: "Ingrese el identificador." }]} />
+        <FormField label="Identificador" controlId="identifier">
+          {(control) => <Input {...control} />}
+        </FormField>
+        <FormField label="Otro campo">{(control) => <Input {...control} />}</FormField>
+      </>,
+    );
+    const control = screen.getByRole("textbox", { name: "Identificador" });
+    const label = screen.getByText("Identificador", { selector: "label" });
+
+    expect(control).toHaveAttribute("id", "identifier");
+    expect(label).toHaveAttribute("for", "identifier");
+
+    await user.click(screen.getByRole("link", { name: "Ingrese el identificador." }));
+    expect(control).toHaveFocus();
+
+    const other = screen.getByRole("textbox", { name: "Otro campo" });
+    expect(other.id).not.toBe("");
+    expect(other.id).not.toBe("identifier");
+    expect(screen.getByText("Otro campo", { selector: "label" })).toHaveAttribute("for", other.id);
+  });
+
+  it("DS98: controlId does not leak onto the wrapper", () => {
+    const { container } = renderWithI18n(inputField({ controlId: "identifier" }));
+
+    expect(container.firstElementChild).not.toHaveAttribute("controlid");
   });
 });
