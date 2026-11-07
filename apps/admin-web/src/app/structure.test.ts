@@ -34,3 +34,30 @@ describe("the shape of the package", () => {
     expect(Object.keys(manifest.devDependencies)).not.toContain("orval");
   });
 });
+
+// admin-web-foundations-and-session, task 9.1 (part 9a; AW60, AW61, AW63). What this change must not
+// deliver. Each of these stops being true on the day the change named in the scenario ships it.
+describe("what this change leaves out", () => {
+  const sources = filesUnder(join(PACKAGE_ROOT, "src")).filter((file) => /\.tsx?$/.test(file) && !/\.test(-d)?\.tsx?$/.test(file));
+
+  it("AW60: no shell component exists in the app or in the entry point of the design system", () => {
+    const shell = /\b(?:function|const|class|interface|type)\s+(?:Topbar|Sidebar|PageHeader|Breadcrumb|Dialog)\b/;
+    const entry = readFileSync(join(PACKAGE_ROOT, "..", "..", "packages", "ui", "src", "index.ts"), "utf8");
+
+    expect(sources.length).toBeGreaterThan(0);
+    expect(sources.filter((file) => shell.test(readFileSync(file, "utf8")))).toEqual([]);
+    expect(entry).not.toMatch(/\b(?:Topbar|Sidebar|PageHeader|Breadcrumb|Dialog)\b/);
+  });
+
+  it("AW61: the portal app does not exist", () => {
+    expect(readdirSync(join(PACKAGE_ROOT, "..")).sort()).not.toContain("portal-web");
+  });
+
+  it("AW63: the production CSP is not delivered: no nginx configuration and no nonce in the app", () => {
+    const index = readFileSync(join(PACKAGE_ROOT, "index.html"), "utf8");
+
+    expect(filesUnder(PACKAGE_ROOT).filter((file) => /nginx/i.test(file))).toEqual([]);
+    expect(index).not.toMatch(/nonce/i);
+    expect(sources.filter((file) => /nonce/i.test(readFileSync(file, "utf8")))).toEqual([]);
+  });
+});
