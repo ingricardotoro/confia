@@ -132,3 +132,16 @@ Si se revierte tras fusionar, este ADR pasa a **Rechazado**; no se borra, y su n
 reversión retira el trabajo de CI, la tarea `test:a11y` y las dependencias de Storybook; el sistema de
 diseño queda sin catálogo ni puerta de accesibilidad, lo que `docs/ui-ux/03` §11 no permite, así que la
 reversión exige un ADR sucesor.
+
+## Notas fechadas
+
+Estas notas se añaden sin modificar el texto original de este ADR.
+
+### Nota fechada 2026-11-07: la política de accesibilidad pasa a `@confia/config/a11y` (ADR-0028)
+
+La política de bloqueo descrita arriba (etiquetas de WCAG, impactos que fallan y resultados incompletos de
+contraste) dejó de vivir en `packages/ui/src/a11y/policy.ts`. Está en `packages/config/src/a11y.ts` y se
+importa como `@confia/config/a11y`, para que la puerta de historias, el panel de Storybook y la puerta
+sobre rutas renderizadas de ADR-0028 usen un único criterio. El comportamiento no cambió, y la prueba de la
+política se movió con ella a `packages/config/src/a11y.test.ts`. Donde este ADR nombra `policy.test.ts`,
+léase `a11y.test.ts` en `packages/config`.

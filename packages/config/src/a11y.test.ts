@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Result } from "axe-core";
@@ -190,5 +191,55 @@ describe("the policy module", () => {
     expect(manifest.exports["./a11y"]).toEqual({ types: "./src/a11y.ts", default: "./src/a11y.ts" });
     expect(manifest.description).toMatch(/accessibility/i);
     expect(manifest.devDependencies["axe-core"]).toBe("catalog:");
+  });
+});
+
+describe("the documents that record the move", () => {
+  const adr0026 = "ADR-0026-storybook-y-verificacion-de-accesibilidad.md";
+  const adr0028 = "ADR-0028-axe-sobre-rutas-renderizadas.md";
+  // The original ADR-0026 as merged before this change (7bf5212): 8398 bytes. A dated note may only be
+  // appended after them, so the digest of that prefix proves no line was removed or edited [BX101].
+  const ORIGINAL_BYTES = 8398;
+  const ORIGINAL_SHA256 = "cc343e3b66b93641771080bb11d36bb0006b2898273f05d5b03ee0b6906f7155";
+
+  it("proposes ADR-0028, indexes it and keeps its status at Proposed [BX100]", () => {
+    const adr = read("docs", "adr", adr0028);
+    const index = read("docs", "adr", "README.md");
+
+    expect(adr).toMatch(/^# ADR-0028: /);
+    expect(adr).toMatch(/^- \*\*Estado:\*\* Propuesto$/m);
+    expect(index).toContain(`| [0028](${adr0028}) |`);
+    expect(index.split("\n").find((line) => line.includes(`(${adr0028})`))).toMatch(/\| Propuesto \|/);
+  });
+
+  it("states the fixed matrix, the failure with zero routes and the limit of the simulator in ADR-0028", () => {
+    const adr = read("docs", "adr", adr0028);
+
+    expect(adr).toMatch(/@axe-core\/playwright/);
+    expect(adr).toMatch(/6 estados por 2 temas/);
+    expect(adr).toMatch(/cero rutas/i);
+    expect(adr).toMatch(/simulador no es una prueba de la pila real/i);
+  });
+
+  it("only appends a dated note to ADR-0026 [BX101]", () => {
+    const bytes = Buffer.from(read("docs", "adr", adr0026).replaceAll("\r\n", "\n"), "utf8");
+    const original = bytes.subarray(0, ORIGINAL_BYTES);
+
+    expect(createHash("sha256").update(original).digest("hex")).toBe(ORIGINAL_SHA256);
+    const note = bytes.subarray(ORIGINAL_BYTES).toString("utf8");
+    expect(note).toMatch(/Nota fechada 2026-11-07/);
+    expect(note).toContain("@confia/config/a11y");
+  });
+
+  it("mentions the axe gate over rendered routes in CLAUDE.md and docs/01 [BX106]", () => {
+    const claude = read("CLAUDE.md")
+      .split("\n")
+      .filter((line) => line.startsWith("| Pruebas del frontend"));
+    const architecture = read("docs", "01-arquitectura.md");
+
+    expect(claude).toHaveLength(1);
+    expect(claude[0]).toMatch(/rutas renderizadas/);
+    expect(claude[0]).toMatch(/Playwright/);
+    expect(architecture).toMatch(/rutas renderizadas[^]{0,300}Playwright|Playwright[^]{0,300}rutas renderizadas/);
   });
 });

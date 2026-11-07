@@ -130,6 +130,9 @@ Resumen del instrumental:
 - **Accesibilidad de los componentes:** cada historia de Storybook pasa por axe-core en Chromium, en los
   temas claro y oscuro, con un proyecto de Vitest en modo navegador (`pnpm --filter @confia/ui
   test:a11y`); crítica y seria bloquean, moderada y menor se registran. ADR-0026.
+- **Accesibilidad de las pantallas:** una puerta de axe sobre rutas renderizadas de `apps/admin-web`, con
+  Playwright y `@axe-core/playwright`, en los dos temas y con la misma política de `@confia/config/a11y`;
+  falla con cero rutas evaluadas. ADR-0028, en estado Propuesto.
 - **Rendimiento:** k6.
 
 ---
