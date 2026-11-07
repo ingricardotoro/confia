@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiFailure } from "../shared/api/api-failure.ts";
 import * as api from "../shared/api/auth-operations.ts";
 import { readCsrfToken } from "../shared/api/csrf-cookie.ts";
-import { authenticatedSession, problem } from "../test/contract-responses.ts";
+import { authenticatedSession, currentSession, problem } from "../test/contract-responses.ts";
 import { installMswServer, requests, route } from "../test/msw-server.ts";
 import { createTestSession, renderApp } from "../test/render-app.tsx";
 
@@ -13,6 +13,7 @@ import { createTestSession, renderApp } from "../test/render-app.tsx";
 installMswServer();
 
 const REFRESH = "/api/v1/auth/sessions/refresh";
+const CURRENT = "/api/v1/auth/sessions/current";
 const SIGNED_IN = "Sesión iniciada.";
 const refreshes = () => requests().filter((sent) => sent.path === REFRESH);
 
@@ -60,6 +61,7 @@ describe("restoring the session on boot", () => {
 
   it("SS09: a cookie restores the session with one refresh, carrying the cookie value and nothing else", async () => {
     route("post", REFRESH, authenticatedSession());
+    route("get", CURRENT, currentSession());
 
     renderApp({ path: "/", readCsrf: () => "csrf-value-A" });
 
@@ -72,6 +74,7 @@ describe("restoring the session on boot", () => {
 
   it("SS10: the sign in route restores too, and lands on the signed in page and not on the form", async () => {
     route("post", REFRESH, authenticatedSession());
+    route("get", CURRENT, currentSession());
 
     const { router } = renderApp({ path: "/iniciar-sesion", readCsrf: () => "csrf-value-A" });
 
@@ -94,6 +97,7 @@ describe("restoring the session on boot", () => {
 
   it("SS36: the restoring screen goes away when the refresh answers 200", async () => {
     route("post", REFRESH, authenticatedSession());
+    route("get", CURRENT, currentSession());
 
     renderApp({ path: "/", readCsrf: () => "csrf-value-A" });
 
@@ -109,6 +113,7 @@ describe("the boot screen", () => {
       release = resolve;
     });
     route("post", REFRESH, authenticatedSession());
+    route("get", CURRENT, currentSession());
     const session = createTestSession({
       readCsrf: () => "csrf-value-A",
       api: {
@@ -148,6 +153,7 @@ describe("the boot screen", () => {
   it("SS12, SS13: a network failure is not retried alone in 60 seconds, and one activation makes one more request", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     route("post", REFRESH, "network-error", authenticatedSession());
+    route("get", CURRENT, currentSession());
 
     renderApp({ path: "/", readCsrf: () => "csrf-value-A" });
     await screen.findByRole("alert");

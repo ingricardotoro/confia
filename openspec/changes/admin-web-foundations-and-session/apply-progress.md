@@ -482,3 +482,32 @@ Procedimiento: copia fuera del repositorio (directorio temporal de la sesión), 
   |---|---|---|---|
   | 1 | `BootGate` muestra la restauración aunque no haya cookie (se quita `&& hasCookie`) | SS07 en las 5 rutas y la prueba nueva: `expected document not to contain element, found <p ...>` (el mensaje de restauración); 8 fallos de 15. El rojo es por la pantalla de restauración: los cero refrescos los garantiza el coordinador (tarea 6), no la puerta | idéntico |
   | 4 | Se quita `heading.current?.focus()` de `ScreenLayout` | SS32 (`ScreenLayout.test` y `routes.test`): `expect(element).toHaveFocus()`; 2 fallos | idéntico |
+
+### Cierre de 9a (2026-11-07)
+
+- **Commit** `e29f779` `feat(identity): restore the session on boot and guard the access routes`, rama `change/admin-web-foundations-and-session-9a-boot-and-guards`. Medida final: **892 líneas efectivas (867 adiciones y 25 eliminaciones) frente a `f950a8a`**; la diferencia con las 875 aprobadas son las 17 líneas de la prueba explícita de la desviación 1 que pidió el coordinador. El propietario aprobó el PR único (excepción a las 800); la cifra final queda registrada aquí para que la confirme.
+- **Suites sobre el árbol de 9a solo.** **U** 38 archivos, 391 pasan y 1 `todo`. **T** 9 archivos, 270 pasan y 3 `todo`. **PR** 18 de 18 tareas. Guarda de `*.spec.*` y AW10 (`git diff --name-only f950a8a -- apps/api`): vacíos. Registros completos en el directorio temporal del trabajo.
+
+## Tarea 9, parte 9b: página mínima, cierre de sesión y flujo (2026-11-07)
+
+- **Rama** `change/admin-web-foundations-and-session-9b-signed-in-page` desde `e29f779`.
+- **Medida 9b (800 líneas).** 584 líneas efectivas (564 adiciones y 20 eliminaciones) frente a `e29f779`. Suites: **U** 42 archivos, 417 pasan y 1 `todo`, cobertura 98,06/95,25/98,26/99,01; **T** 9 archivos, 273 pasan, 0 `todo`; **PR** 18 de 18 (la primera corrida falló en `keys.check.test.ts` por tiempo de espera de 60 s del programa de TypeScript, con la máquina muy cargada: la suite duró 206 s; y mostró avisos de MSW por lecturas de `/sessions/current` sin ruta en pruebas de 9a, que ahora declaran la ruta; la repetición dio 18 de 18). Guarda de `*.spec.*` y AW10 vacíos.
+- **ROJO (9.1), causa observada.** `SignedInPage.test.tsx` no carga: `Failed to resolve import "./SignedInPage.tsx"`. Con el `/` provisional de 9a, 13 de las 14 pruebas nuevas de `SignedInContainer`, `session-secrets.flow` y página fallan por la causa esperada (la página no lee la sesión ni ofrece «Cerrar sesión»: `Unable to find an accessible element with the role "button" and name "Cerrar sesión"`, `Unable to find role="alert"`, SS06 `expected '{"queries":…' to contain` el identificador). SS112 pasa antes del código, porque es comportamiento de 9a. SS18 falló por un defecto de la prueba (Testing Library sondea con su propio `setInterval` de 50 ms); la aserción pasó a «ningún intervalo de un segundo o más».
+- **VERDE (9.2).** `SignedInContainer` (consulta de la sesión actual con `currentSessionQueryOptions`, `useMutation` solo para `signOut`, redirección por la vista), `SignedInPage` (carga, error, listo y cierre fallido) y la traducción del fallo con `PROBLEM_KEYS`. Cuatro claves nuevas: `signedIn.loading`, `signedIn.signOut`, `signedIn.signOutFailed`, `signedIn.retrySignOut`. Dos fallos de pruebas en la primera corrida: el botón ocupado se expresa con `loading` de `Button` (pone `aria-busy` y conserva el foco), y su nombre accesible incluye el indicador.
+- **Pruebas de herramientas.** BX46, BX61 y BX62 dejan de ser `todo` (`T`: 273 pasan, 0 `todo`). BX61 lee la importación de la biblioteca del fuente porque la corrida de `dependency-cruiser` solo conserva archivos del repositorio. AW57 y AW58 se afirman por enumeración en `presentation-states.test.ts`.
+- **Desviaciones.**
+  1. **Centinelas de SS103 y SS06.** El escenario nombra «CENT-CUENTA», «CENT-INSTITUCION» y «CENT-SESION», pero el contrato exige UUID en `accountId`, `institutionId` y `sessionId`, así que los centinelas son UUID generados en ejecución.
+  2. **Reintento del cierre.** El botón cambia su etiqueta a «Reintentar cierre de sesión» junto al `Alert`; no hay un segundo botón.
+  3. **Tiempos explícitos** en SS103 y SS06 (primeras pruebas de su archivo): la primera corrida de la aplicación completa construye el grafo en frío y superó 1 s de `findBy` bajo la cobertura completa; falló dos veces seguidas en la suite completa, y se fijó el plazo de espera y de la prueba como en `main.test.tsx`. Ninguna aserción depende del tiempo.
+- **Demostraciones deliberadas (9.3) de 9b, con copia fuera del repositorio y `cmp` sin salida.**
+
+  | # | Ruptura | Rojo observado | `cmp` |
+  |---|---|---|---|
+  | 2 | `signOut` declara la sesión cerrada sin exigir `204` (`access-session.ts`) | SS109 (red y `403 csrf-invalid`): `Unable to find role="alert"`; 2 fallos de 11 | idéntico |
+  | 3 | `readCurrentSession` agrega el token a los datos de la consulta (`access-session.ts`) | SS06: `expected '{"queries":{"mutations":[],"queries":…' not to contain 'access-…'`; 1 fallo de 4 | idéntico |
+  | 5 | Selector de presentación sin archivos reales (`.dependency-cruiser.cjs`: `components/` por `presentation/`) | BX62: `the selector (^|/)apps/admin-web/src/presentation/|… matches no real file`, y 7 fallos más de las reglas de presentación; 8 de 115 | idéntico |
+
+### Comprobación manual contra el simulador (9b, 2026-11-07)
+
+Sin navegador: no se afirma ningún resultado visual. `pnpm --filter @confia/admin-web mock:api` escuchó en `http://localhost:8099` (`/__control/health` 200). `CONFIA_API_PROXY_TARGET=http://localhost:8099 pnpm --filter @confia/admin-web dev` sirvió `http://localhost:5173/` (200, `text/html`, `lang="es-HN"`) y `/src/main.tsx` (200). `GET http://localhost:8099/__control/seed-session` respondió 303 a `http://localhost:5173/` con las dos cookies (`__Secure-confia_admin_sid` con `HttpOnly` y `Path=/api/v1/auth/sessions`; `__Host-confia_csrf` con `Path=/`). Con ese frasco de cookies, a través del proxy del servidor de desarrollo: `POST /api/v1/auth/sessions/refresh` con `Origin` y `X-CSRF-Token` respondió 200 (`status: authenticated`), y `GET /api/v1/auth/sessions/current` con `Bearer` respondió 200 con los siete campos del contrato. Es lo que hace la aplicación al recargar con la sesión sembrada. Ambos procesos se detuvieron (ningún puerto 5173 ni 8099 escuchando).
+- **Cierre de la tarea 9:** 9.1 a 9.4 marcadas. Pendiente para el propietario: ver la pantalla en un navegador (abrir primero `/__control/seed-session`).
