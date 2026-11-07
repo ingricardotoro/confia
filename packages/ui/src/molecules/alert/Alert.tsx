@@ -49,7 +49,7 @@ export function Alert({ variant, title, children, className, ...rest }: AlertPro
       tabIndex={-1}
       {...rest}
       role={severity === "destructive" ? "alert" : "status"}
-      className={cn(alertVariants({ variant }), focusRing, className)}
+      className={cn(alertVariants({ variant: severity }), focusRing, className)}
     >
       <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
       <div className="flex min-w-0 flex-col gap-1">

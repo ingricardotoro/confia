@@ -43,6 +43,16 @@ describe("Alert", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Información");
   });
 
+  it("styles an explicit null variant as the informational one it announces", () => {
+    const { container } = renderWithI18n(<Alert variant={null}>Contenido</Alert>);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Información");
+    const classes = (container.firstElementChild as HTMLElement).className;
+    expect(classes).toContain("bg-(--alert-info-bg)");
+    expect(classes).toContain("text-(--alert-info-fg)");
+    expect(classes).toContain("border-(--alert-info-border)");
+  });
+
   it("DS84: shows the title and the content it receives, and only adds the severity", () => {
     renderWithI18n(
       <Alert variant="warning" title="La sesión vence pronto">
