@@ -20,7 +20,9 @@ describe("the entry point", { timeout: 20_000 }, () => {
 
     await import("./main.tsx");
 
-    expect(await screen.findByRole("main")).toBeInTheDocument();
+    // findByRole waits only 1 s by default, whatever the test limit; the cold boot can take longer on a
+    // loaded machine, so the wait for the first render is explicit.
+    expect(await screen.findByRole("main", {}, { timeout: 10_000 })).toBeInTheDocument();
   });
 
   it("fails loudly when index.html has no #root, instead of rendering nothing", async () => {
