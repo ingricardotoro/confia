@@ -134,7 +134,10 @@ export function createAccessSession({
   async function accessTokenForRequest(): Promise<string> {
     const held = store.accessToken();
     if (held === undefined) {
-      endLocally("session-expired");
+      // Only an open session can expire. With none open (signed out, never signed in, or still
+      // restoring) the read fails and the view is left as it is: arriving without a session is not
+      // an expired session.
+      if (view.status === "authenticated") endLocally("session-expired");
       throw new ApiFailure(SESSION_ENDED);
     }
     if (held.expiresAt - now() < REFRESH_MARGIN_MS) {

@@ -347,6 +347,17 @@ describe("signing out", () => {
     expect(session.getView()).toEqual({ status: "anonymous" });
     await expect(session.readCurrentSession()).rejects.toBeInstanceOf(ApiFailure);
     expect(requests()).toHaveLength(2);
+    // Signing out on purpose is not an expired session: a later read must not raise the expired notice.
+    expect(session.getView()).toEqual({ status: "anonymous" });
+  });
+
+  it("leaves the restoring view alone when a read comes before the session is restored", async () => {
+    const session = build();
+
+    await expect(session.readCurrentSession()).rejects.toBeInstanceOf(ApiFailure);
+
+    expect(session.getView()).toEqual({ status: "restoring" });
+    expect(requests()).toHaveLength(0);
   });
 
   it("keeps the session when the server did not answer 204", async () => {
