@@ -1,5 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import * as seed from "./data";
+import * as cfg from "./config-data";
+import type { Fee, Grade, Period, Scholarship, StudentScholarship } from "./config-data";
 import type { CashSession, Guardian, Invoice, Org, Payment, StaffUser, Student } from "./data";
 
 // In-memory store: a new state object is created on every write, so selectors that return an
@@ -7,12 +9,14 @@ import type { CashSession, Guardian, Invoice, Org, Payment, StaffUser, Student }
 interface State {
   orgs: Org[]; staff: StaffUser[]; students: Student[]; guardians: Guardian[];
   payments: Payment[]; invoices: Invoice[]; cashSessions: CashSession[];
+  periods: Period[]; grades: Grade[]; fees: Fee[]; scholarships: Scholarship[]; studentScholarships: StudentScholarship[];
   signedIn: boolean; simulateError: boolean; toast: string | null;
 }
 
 let state: State = {
   orgs: seed.orgs, staff: seed.staff, students: seed.students, guardians: seed.guardians,
   payments: seed.payments, invoices: seed.invoices, cashSessions: seed.cashSessions,
+  periods: cfg.periods, grades: cfg.grades, fees: cfg.fees, scholarships: cfg.scholarships, studentScholarships: cfg.studentScholarships,
   signedIn: false, simulateError: false, toast: null,
 };
 const listeners = new Set<() => void>();
@@ -42,6 +46,17 @@ export function notify(message: string) {
 }
 
 export const actions = {
+  savePeriod: (p: Period) => set({ periods: upsert(state.periods, p) }),
+  // Activating a period closes the one that was active, so there is only ever one.
+  setActivePeriod: (id: string) =>
+    set({ periods: state.periods.map((p) => (p.id === id ? { ...p, status: "Activo" as const } : p.status === "Activo" ? { ...p, status: "Cerrado" as const } : p)) }),
+  closePeriod: (id: string) => set({ periods: state.periods.map((p) => (p.id === id ? { ...p, status: "Cerrado" as const } : p)) }),
+  saveGrade: (g: Grade) => set({ grades: upsert(state.grades, g) }),
+  saveFee: (f: Fee) => set({ fees: upsert(state.fees, f) }),
+  saveScholarship: (b: Scholarship) => set({ scholarships: upsert(state.scholarships, b) }),
+  assignScholarship: (a: StudentScholarship) => set({ studentScholarships: [...state.studentScholarships, a] }),
+  removeScholarship: (studentId: string, scholarshipId: string) =>
+    set({ studentScholarships: state.studentScholarships.filter((x) => !(x.studentId === studentId && x.scholarshipId === scholarshipId)) }),
   signIn: () => set({ signedIn: true }),
   signOut: () => set({ signedIn: false }),
   setSimulateError: (v: boolean) => set({ simulateError: v }),

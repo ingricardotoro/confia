@@ -1,6 +1,6 @@
 import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { Button, FormField, Input, Alert } from "@confia/ui";
-import { Banknote, Building2, ClipboardList, FileText, GraduationCap, HandCoins, LayoutDashboard, LogOut, ReceiptText, UserCog, Users, Wallet } from "lucide-react";
+import { Banknote, BadgePercent, Building2, CalendarRange, ClipboardList, School, Tags, FileText, GraduationCap, HandCoins, LayoutDashboard, LogOut, ReceiptText, UserCog, Users, Wallet } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { actions, useStore } from "../mock/store";
 import { CURRENT_USER, INSTITUTION } from "../mock/data";
@@ -23,6 +23,15 @@ const NAV = [
       { to: "/cargos", label: "Cargos y estado de cuenta", icon: ClipboardList },
       { to: "/caja", label: "Caja", icon: Wallet },
       { to: "/facturacion", label: "Facturación", icon: ReceiptText },
+    ],
+  },
+  {
+    group: "Configuración",
+    items: [
+      { to: "/configuracion/periodos", label: "Años lectivos", icon: CalendarRange },
+      { to: "/configuracion/grados", label: "Grados y secciones", icon: School },
+      { to: "/configuracion/tarifas", label: "Tarifas y conceptos", icon: Tags },
+      { to: "/configuracion/becas", label: "Becas y descuentos", icon: BadgePercent },
     ],
   },
   {

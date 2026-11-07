@@ -1,4 +1,6 @@
 import { createHashHistory, createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
+import { GradeForm, GradeList, PeriodForm, PeriodList } from "./pages/config-academic";
+import { FeeForm, FeeList, ScholarshipForm, ScholarshipList } from "./pages/config-fees";
 import { Dashboard } from "./pages/dashboard";
 import { CashPage, ChargeList, InvoiceList } from "./pages/extras";
 import { GuardianDetail, GuardianForm, GuardianList } from "./pages/guardians";
@@ -39,6 +41,18 @@ const routeTree = root.addChildren([
   r("/cargos", ChargeList),
   r("/caja", CashPage),
   r("/facturacion", InvoiceList),
+  r("/configuracion/periodos", PeriodList),
+  r("/configuracion/periodos/nuevo", () => <PeriodForm mode="new" />),
+  r("/configuracion/periodos/$id/editar", () => <PeriodForm mode="edit" />),
+  r("/configuracion/grados", GradeList),
+  r("/configuracion/grados/nuevo", () => <GradeForm mode="new" />),
+  r("/configuracion/grados/$id/editar", () => <GradeForm mode="edit" />),
+  r("/configuracion/tarifas", FeeList),
+  r("/configuracion/tarifas/nueva", () => <FeeForm mode="new" />),
+  r("/configuracion/tarifas/$id/editar", () => <FeeForm mode="edit" />),
+  r("/configuracion/becas", ScholarshipList),
+  r("/configuracion/becas/nueva", () => <ScholarshipForm mode="new" />),
+  r("/configuracion/becas/$id/editar", () => <ScholarshipForm mode="edit" />),
 ]);
 
 export const router = createRouter({ routeTree, history: createHashHistory(), defaultPreload: false });
