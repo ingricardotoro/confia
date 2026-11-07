@@ -1,10 +1,15 @@
 {
   "signIn": {
+    "title": "Iniciar sesión",
     "contact": "Si no recuerda su contraseña, comuníquese con la administración de su institución.",
     "waiting": "Verificando sus datos. Esto puede tardar hasta 30 segundos."
   },
   "secondFactor": {
+    "title": "Verificación en dos pasos",
     "waiting": "Verificando el código. Esto puede tardar hasta 30 segundos."
+  },
+  "enrollment": {
+    "title": "Configure su verificación en dos pasos"
   },
   "notice": {
     "sessionExpired": "Su sesión se cerró por seguridad. Vuelva a iniciar sesión.",
@@ -38,6 +43,7 @@
     "failed": "No se pudo copiar. Seleccione el texto y cópielo manualmente."
   },
   "boot": {
+    "title": "Restauración de la sesión",
     "restoring": "Restaurando su sesión.",
     "failed": "No se pudo restaurar la sesión. Revise su conexión e intente de nuevo."
   },
