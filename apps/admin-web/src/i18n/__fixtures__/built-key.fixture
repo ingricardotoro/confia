@@ -1,0 +1,13 @@
+import { useAdminText } from "./use-admin-text";
+
+// ADR-0011 violation: a key built at run time, by template literal or by concatenation.
+export function BuiltKey({ suffix }: { suffix: string }) {
+  const { t } = useAdminText();
+  const part = "inexistente";
+  return (
+    <span>
+      {t(`signIn.${part}`)}
+      {t("signIn." + suffix)}
+    </span>
+  );
+}

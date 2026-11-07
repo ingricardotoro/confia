@@ -186,3 +186,63 @@ Medida con `git add -N .` y `git diff --numstat -M 1be0378` (sin `openspec/`, el
 ## Tarea 2: subtarea 2.4 cerrada (2026-11-05)
 
 En el PR #259, `frontend verify` tardó 1 min 51 s y 2 min 11 s en las dos primeras ejecuciones remotas, dentro del límite de 10 minutos (BX19 sin cambios). La cifra quedó en `design.md` D16 con nota fechada, y la tarea 2 se marca terminada.
+
+
+## Tarea 3: `providers-i18n-and-voice` (2026-11-05, excepción del propietario a las 800 líneas)
+
+- **Ruta:** escritor delegado (un solo escritor, un solo árbol de trabajo). Rama `change/admin-web-foundations-and-session-3-providers-i18n-and-voice`, base `a6a9736`.
+- **Estado:** hecho y verificado. Excede las 800 líneas por **excepción explícita del propietario** (ver «Excepción a la regla de las 800 líneas»).
+- **Ubicación (decisión del propietario, 2026-11-05).** El plan decía `packages/config/{voice,text-keys}.ts` en la raíz del paquete; se implementó bajo `packages/config/src/`, porque `vitest.js` solo incluye `src/**/*.test.ts` y `tsconfig.json` solo incluye `src`, de modo que un archivo en la raíz no se probaría, no se tiparía y fallaría `eslint .`. Exportaciones `./voice` y `./text-keys` en `packages/config/package.json`.
+
+### Dependencias
+
+`apps/admin-web` declara ahora `@confia/ui` (`workspace:*`), `i18next`, `i18next-icu` y `react-i18next` (todas `catalog:`, versiones ya presentes en el archivo de bloqueo; `pnpm install --offline` solo agregó los enlaces, ninguna versión nueva). Consecuencia de turbo: `build` de la app ahora espera el `build` de `@confia/ui` (Storybook), que la tarea 2 había evitado a propósito (desviación 3 de esa sección). En la corrida de PR ese `build` ya se ejecuta una vez y turbo lo reutiliza; el costo medido está en «Suites».
+
+### Evidencia del ciclo TDD (3.1, 3.2)
+
+| Superficie | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| `packages/config/src/voice.test.ts` (AW29, AW30) | Sí, el archivo no carga | `Cannot find module './voice' imported from .../voice.test.ts` | 13 pasan |
+| `packages/config/src/text-keys.test.ts` (BX42, BX43, AW26, AW27) | Sí, el archivo no carga | `Cannot find module './text-keys' imported from .../text-keys.test.ts` | 7 pasan |
+| `src/app/query-client.test.ts`, `AppProviders.test.tsx` (AW23) | Sí, no cargan | `Failed to resolve import "./query-client.ts"` | pasan |
+| `src/i18n/i18n.test.tsx`, `catalog.test.ts` (AW24, AW25, AW28, AW29, AW30, AW32) | Sí, no cargan | `Failed to resolve import "./use-admin-text.ts"` y `"./locales/es-HN/admin.json"` | pasan |
+| `src/i18n/keys.check.test.ts` (BX42, BX43, AW27) | Sí, no carga | `Failed to resolve import "@confia/config/text-keys"` (el esperado `@confia/config/voice` aparece en `catalog.test.ts` como error de tipos) | pasa |
+| `src/i18n/keys.test-d.ts` (AW26) | Sí, 2 fallos | `Unused '@ts-expect-error' directive` (sin módulo, la clave inexistente no falla) | pasa |
+| `src/i18n/voice-note.test.ts` (AW31) | Sí, 2 de 3 fallos | `expected '' to match /Nota fechada 2026-11-05 .../` y `expected '' to match /«usted»/` | 3 pasan |
+
+**Pasos sin rojo (sin adornos):** la primera aserción de AW31 (el texto original sigue siendo el inicio del archivo) pasó antes de escribir la nota: caracteriza el estado de partida y protege el futuro, no un defecto actual. El `it.todo` de AW28 («toda clave usada por un componente de `src/` existe») queda como `todo`: hoy ningún `.tsx` de `src/` llama a `t()`, y un verde sobre un conjunto vacío no se acepta (ADR-0018); lo activa la tarea 9.
+
+**Rojos del verde, sin adornos:** (1) el hash de AW31 falló al principio porque la longitud pinneada era en bytes (15 533) y `String.slice` cuenta caracteres (15 297); se corrigió la constante, no la aserción. (2) `eslint` rechazó `fetchQuery` (obsoleto: se usa `queryClient.query`) y `unbound-method` sobre los métodos de `TextKeyChecker` (se declararon como propiedades de función). (3) Las importaciones relativas de las pruebas de `config` exigen `.js` por `module: NodeNext`.
+
+### Demostraciones deliberadas (3.3)
+
+Procedimiento: copia fuera del repositorio, ruptura, rojo por aserción, restauración y `cmp` sin salida.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 1 | `mutations: { retry: 1 }` | 2 fallos de AW23: `expected 1 to be +0` y `expected "vi.fn()" to be called 1 times, but got 2 times` | idéntico |
+| 2 | `verificationInterrupted` empieza con «Inicia sesión de nuevo» | AW29: `["notice.verificationInterrupted: inicia (sentence-start)"]` (nombra la clave); además cae la prueba de textos exactos | idéntico |
+| 3 | Borrar `signIn.contact` de `admin.json` | `tsc`: `Argument of type '"signIn.contact"' is not assignable to parameter of type 'AdminKey'` en `keys.test-d.ts(14,7)` y otros cuatro usos [AW26] | idéntico |
+
+### Desviaciones del diseño
+
+1. **Claves `notice.sessionExpired` y `problem.authenticationFailed`.** El diseño §8 no lista las claves de AW32; se eligieron esos nombres para los dos textos fijados por la documentación. Las demás claves y valores son los de §8, verbatim.
+2. **`isRetryable` por forma del error.** D9 usa `isRetryable(error)` sin definirlo; el `ApiResult` llega en la tarea 4. Aquí se reconoce por la propiedad numérica `status`: sin ella (fallo de red) se reintenta, con `status` solo desde 500. La tarea 4 puede afinarlo.
+3. **`appResources` y `createAdminI18n`** mezclan `uiResources["es-HN"]` con `admin` en una sola instancia, con `defaultNS: "admin"`.
+4. **Prueba de AW31 por huella.** `voice-note.test.ts` fija la longitud y el SHA-256 del archivo base; la nota debe ir al final. Detecta cualquier línea cambiada sin depender de `git` ni de una rama `main` en CI, pero obliga a retirar la huella si otra tarea edita legítimamente el cuerpo de `docs/ui-ux/05`.
+5. **`AppProviders`, `src/test/render.tsx` y el cableado de `main.tsx`** son los «proveedores» del título; `main.test.tsx` sigue pasando sin cambios.
+6. **Dependencia de la app en `@confia/ui`** (ver «Dependencias»).
+
+### Medida (regla de las 800 líneas) y suites
+
+`git add -N . && git diff --numstat -M a6a9736` (sin `openspec/`, archivo de bloqueo ni código generado): **1 214 líneas efectivas** (1 099 adiciones y 115 eliminaciones). **Supera 800; el propietario aprobó un único PR (ver abajo).** El diseño estimaba 740 a 4x; las pruebas del paquete `config` (215), el verificador movido (125 más 112 eliminadas en `ui`) y el catálogo con sus pruebas pesaron más. Desglose: `packages/config` + wrapper de `ui` + nota de `docs/ui-ux/05` ≈ 547; `apps/admin-web` ≈ 667.
+
+Suites (todas con el árbol sin commit): **U** 12 archivos, 66 pasan y 1 `todo`, cobertura 100/94,73/100/100; **C** 3 archivos, 24 pasan; **T** 9 archivos, 268 pasan y 5 `todo`; **UI** 52 archivos, 524 pasan, y `test:a11y` 8 archivos, 159 pasan; **PR** `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1`: 18 de 18 tareas, 5 min 42 s (con el `build` de Storybook ahora delante del de la app). Guarda de `*.spec.*` sobre `apps/`: sin coincidencias. AW10: `git diff --name-only a6a9736 -- apps/api` vacío.
+
+### Elementos abiertos
+
+- Ninguno de esta tarea.
+
+### Excepción a la regla de las 800 líneas
+
+Medido: **1 214 líneas efectivas** (1 099 adiciones y 115 eliminaciones) frente a `a6a9736`; la estimación del diseño era 740 a 4x. La tarea no tiene corte predefinido, así que se consultó al propietario, que el 2026-11-05 **aprobó un único PR** como excepción al límite de 800 líneas de `docs/15` §3. No se partió ni se quitó ninguna prueba, comentario o aserción. La propuesta de corte 3a/3b (≈ 547 y ≈ 667 líneas) queda descartada.

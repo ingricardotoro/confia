@@ -12,7 +12,9 @@
     "./vitest": {
       "types": "./vitest.d.ts",
       "default": "./vitest.js"
-    }
+    },
+    "./voice": "./src/voice.ts",
+    "./text-keys": "./src/text-keys.ts"
   },
   "scripts": {
     "lint": "eslint .",
