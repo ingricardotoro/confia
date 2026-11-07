@@ -22,7 +22,7 @@ export function EmptyState({ title, description, action, className, ...rest }: E
       <Inbox className="size-8 text-text-tertiary" />
       <div className="flex max-w-prose flex-col gap-1">
         <p className="text-base font-semibold text-text-primary">{title}</p>
-        {description === undefined ? null : <p className="text-sm text-text-secondary">{description}</p>}
+        {description?.trim() ? <p className="text-sm text-text-secondary">{description}</p> : null}
       </div>
       <Button variant="secondary" onClick={action.onAction}>
         {action.label}
