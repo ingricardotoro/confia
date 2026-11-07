@@ -24,6 +24,7 @@
   "devDependencies": {
     "@axe-core/playwright": "catalog:",
     "@confia/config": "workspace:*",
+    "@confia/contracts": "workspace:*",
     "@playwright/test": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@testing-library/dom": "catalog:",
@@ -36,6 +37,7 @@
     "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
     "jsdom": "catalog:",
+    "msw": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
