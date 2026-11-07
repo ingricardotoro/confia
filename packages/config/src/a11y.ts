@@ -1,6 +1,6 @@
 import type { Result, RunOptions } from "axe-core";
 
-// The accessibility policy of @confia/ui (design.md decision 8, docs/ui-ux/03 section 11). The axe
+// The accessibility policy of CONFIA (design.md decisions 8 and 14, docs/ui-ux/03 section 11). The axe
 // tags and the impacts that fail the build live here and nowhere else: the browser gate (task 3.2)
 // and .storybook/preview.tsx both import them.
 

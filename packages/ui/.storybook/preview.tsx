@@ -1,6 +1,6 @@
 import type { Decorator, Preview } from "@storybook/react-vite";
 import { I18nextProvider } from "react-i18next";
-import { axeRunOptions } from "../src/a11y/policy";
+import { axeRunOptions } from "@confia/config/a11y";
 import { createUiI18n } from "../src/i18n/create-ui-i18n";
 import "../src/tokens/index.css";
 
