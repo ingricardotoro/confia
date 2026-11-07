@@ -63,6 +63,15 @@
   --choice-border: var(--color-border-interactive);
   --choice-checked-bg: var(--color-primary);
   --choice-checked-fg: var(--color-primary-fg);
+  --alert-info-bg: var(--color-status-pending-bg);
+  --alert-info-fg: var(--color-status-pending-fg);
+  --alert-info-border: var(--color-status-pending-border);
+  --alert-warning-bg: var(--color-status-partial-bg);
+  --alert-warning-fg: var(--color-status-partial-fg);
+  --alert-warning-border: var(--color-status-partial-border);
+  --alert-destructive-bg: var(--color-status-overdue-bg);
+  --alert-destructive-fg: var(--color-status-overdue-fg);
+  --alert-destructive-border: var(--color-status-overdue-border);
   --skeleton-bg: var(--color-border-subtle);
   --skeleton-animation: confia-pulse 2s ease-in-out infinite;
 }

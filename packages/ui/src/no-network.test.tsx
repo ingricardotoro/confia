@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  Alert,
   Badge,
   Button,
   Checkbox,
@@ -34,6 +35,7 @@ import { renderWithI18n } from "./test/render";
 const REQUESTS = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource"] as const;
 
 const FIXTURES: Record<string, ReactElement> = {
+  Alert: <Alert>Aviso</Alert>,
   Badge: <Badge>Etiqueta</Badge>,
   Button: <Button>Guardar</Button>,
   Checkbox: <Checkbox aria-label="Aceptar" />,
