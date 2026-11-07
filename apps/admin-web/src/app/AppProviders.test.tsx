@@ -30,3 +30,17 @@ describe("the app providers", () => {
     expect(seen.every((client) => client === queryClient)).toBe(true);
   });
 });
+
+describe("the document language", () => {
+  it("SS33: the root element takes the active language", () => {
+    document.documentElement.lang = "";
+
+    render(
+      <AppProviders queryClient={createQueryClient()} i18n={createAdminI18n()}>
+        <p />
+      </AppProviders>,
+    );
+
+    expect(document.documentElement.lang).toBe("es-HN");
+  });
+});
