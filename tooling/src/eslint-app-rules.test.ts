@@ -1,4 +1,5 @@
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import { ESLint } from "eslint";
 import { describe, expect, it } from "vitest";
 import { appSourceRules, confiaEslint, uiSourceRules } from "@confia/config/eslint";
@@ -309,7 +310,42 @@ describe("packages/ui keeps the rule and the message of every 13a violation (BX4
 // ADR-0018: a rule that evaluated nothing proves nothing. The app has no source yet; the task that
 // creates each kind of real file turns its entry into a test.
 describe("the real apps/admin-web tree", () => {
+  const REAL_ROOT = join(import.meta.dirname, "..", "..", "apps", "admin-web");
+  const NETWORK_RULES = ["no-restricted-globals", "no-restricted-properties"];
+
+  // Lints the production files of the real app with the app rules. Tests, stories and fixtures are the
+  // rules' own exceptions, so they are left out the same way the app's eslint.config.js leaves them.
+  async function lintRealTree() {
+    const eslint = new ESLint({ cwd: REAL_ROOT, overrideConfigFile: true, overrideConfig: appSourceRules() });
+    const results = await eslint.lintFiles(["src/**/*.{ts,tsx}"]);
+    return results
+      .map((result) => ({ file: relative(REAL_ROOT, result.filePath).replaceAll("\\", "/"), messages: result.messages }))
+      .filter(({ file }) => !/\.(test|test-d)\.tsx?$|__fixtures__/.test(file));
+  }
+
+  const networkFindings = (tree: Awaited<ReturnType<typeof lintRealTree>>) =>
+    tree.flatMap(({ file, messages }) =>
+      messages.filter((m) => NETWORK_RULES.includes(m.ruleId ?? "")).map((m) => `${file}: ${m.message}`),
+    );
+
+  it("BX54: the network rule passes over the real client, which does call fetch", async () => {
+    const tree = await lintRealTree();
+    const client = tree.find(({ file }) => file === "src/shared/api/http.ts");
+
+    expect(client, "src/shared/api/http.ts was linted").toBeDefined();
+    expect(readFileSync(join(REAL_ROOT, "src/shared/api/http.ts"), "utf8")).toMatch(/\bfetch\s*\(/);
+    expect(networkFindings(tree.filter(({ file }) => file.startsWith("src/shared/api/")))).toEqual([]);
+  });
+
+  it("BX57: the network rule evaluated real files inside and outside src/shared/api, and none broke it", async () => {
+    const tree = await lintRealTree();
+    const inside = tree.filter(({ file }) => file.startsWith("src/shared/api/"));
+    const outside = tree.filter(({ file }) => !file.startsWith("src/shared/api/"));
+
+    expect(inside.length).toBeGreaterThan(0);
+    expect(outside.length).toBeGreaterThan(0);
+    expect(networkFindings(tree)).toEqual([]);
+  });
+
   it.todo("BX46: the four rules pass over real component files and at least one real admin catalog key (task 9)");
-  it.todo("BX54: the network rule passes over the real client in src/shared/api (task 4)");
-  it.todo("BX57: the network rule evaluated real files inside and outside src/shared/api (task 4)");
 });
