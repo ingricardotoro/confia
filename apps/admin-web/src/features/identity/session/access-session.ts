@@ -212,14 +212,17 @@ export function createAccessSession({
       if (result.kind !== "ok") return { kind: "failed", result };
       store.accept(result.data);
       // Only an enrollment keeps the identifier (SS58, SS59); whatever an earlier sign in left is gone.
-      forgetEnrollment();
-      if (result.data.status === "authenticated") {
+      // Through changeDraft, so a listener hears the change even on the answers that show no new view.
+      const { status } = result.data;
+      changeDraft(() => {
+        forgetEnrollment();
+        if (status === "second-factor-enrollment-required") enrollmentDraft.begin(credentials.identifier);
+      });
+      if (status === "authenticated") {
         show({ status: "authenticated" });
         return { kind: "authenticated" };
       }
-      if (result.data.status === "second-factor-required") return { kind: "second-factor-required" };
-      enrollmentDraft.begin(credentials.identifier);
-      return { kind: "enrollment-required" };
+      return { kind: status === "second-factor-required" ? "second-factor-required" : "enrollment-required" };
     },
     hasSecondFactorToken: (use) => secondFactorTokenFor(use) !== undefined,
     async verify(proof) {

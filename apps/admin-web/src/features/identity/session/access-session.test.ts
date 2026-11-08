@@ -443,6 +443,18 @@ describe("the identifier kept for the enrollment", () => {
     expect(session.getEnrollment()).toBeUndefined();
   });
 
+  it("tells its listeners when a later sign in replaces the enrollment of an earlier one", async () => {
+    const { session } = await enrolling();
+    const listener = vi.fn();
+    session.subscribe(listener);
+    route("post", SESSIONS, secondFactorRequired());
+
+    await session.signIn(CREDENTIALS);
+
+    expect(session.getEnrollment()).toBeUndefined();
+    expect(listener).toHaveBeenCalled();
+  });
+
   it("keeps nothing when the credentials are refused", async () => {
     const { session, draft } = buildWithDraft();
     route("post", SESSIONS, problem("authentication-failed", 401));
