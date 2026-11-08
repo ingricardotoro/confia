@@ -23,6 +23,11 @@ Los PR 12a a 15 de `admin-web-foundations-and-session/design.md`, sección 12:
 Son de 7 a 9 PR: 5 si cada rebanada cabe, y de 7 a 9 con las pruebas al sobrecosto de cuatro veces del cambio 8. Reemplaza la pantalla provisional de inicio
 de sesión y los componentes provisionales de verificación e inscripción que deja la parte 1.
 
+> **Nota fechada 2026-11-07 (decisión del propietario, fase de diseño).** La tabla y la cifra de arriba no se reescriben y quedan superadas. La
+> entrega es una cadena de **9 PR** encadenados (`design.md`, sección 12), con cortes predefinidos que pueden llevarla hasta **15**. Cuando un PR
+> supera las 800 líneas efectivas solo por poco, se pide al propietario una excepción en lugar de cortar; cuando las supera claramente, se aplica su
+> corte predefinido. La previsión de «7 a 9 PR» se reemplaza porque el diseño dimensionó cada rebanada con las medidas reales de la parte 1.
+
 **Cierre del criterio de salida 8.** Este cambio lleva la matriz de la puerta de 6 a 22 estados, por los dos temas. El criterio se marca en `docs/09` solo cuando
 la puerta pase sobre inicio de sesión, verificación, inscripción, arranque y página autenticada (BX102, BX103, BX109). Si la puerta o una pantalla evaluada se
 revierte, se desmarca con nota fechada (BX108).
@@ -36,6 +41,9 @@ revierte, se desmarca con nota fechada (BX108).
 ## Diseño y tareas
 
 - **Diseño:** no tiene uno propio. Reutiliza `openspec/changes/admin-web-foundations-and-session/design.md`, aprobado el 2026-11-05 (D8, D10 a D12, D15, secciones 6 a 8, 10 y 11).
+  > **Nota fechada 2026-11-07 (fase de diseño).** La frase anterior queda superada: el cambio tiene su propio `design.md`, pedido en la fase de
+  > diseño. Conserva D8, D10 a D12 y D15 de la parte 1 y solo las concreta o las corrige donde el código real lo exige (E1, E2, E6 y E9 de ese
+  > documento).
 - **Tareas:** tendrá su propio `tasks.md` cuando empiece, con las mismas reglas de la parte 1 y las mediciones reales de esa cadena.
 
 ## Fuera de alcance
