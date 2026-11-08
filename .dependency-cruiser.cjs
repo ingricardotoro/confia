@@ -114,10 +114,11 @@ module.exports = {
     },
     {
       name: "admin-token-store-is-private",
-      comment: "Only the session module reads the in-memory token store; every other module asks the session.",
+      comment:
+        "Only the session module reads the in-memory token store and the enrollment draft; every other module asks the session.",
       severity: "error",
       from: { path: "(^|/)apps/admin-web/src/", pathNot: "(^|/)apps/admin-web/src/features/identity/session/" },
-      to: { path: "(^|/)apps/admin-web/src/features/identity/session/token-store" },
+      to: { path: "(^|/)apps/admin-web/src/features/identity/session/(token-store|enrollment-draft)" },
     },
   ],
   options: {

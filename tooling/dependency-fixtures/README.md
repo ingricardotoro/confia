@@ -17,3 +17,9 @@ Las reglas de `apps/admin-web` (`apps-use-ui-public-entry`, `admin-presentation-
 `admin-web-foundations-and-session`) tienen sus violaciones bajo `apps/admin-web/src/`. Los módulos aceptados
 (`uses-ui-public-entry.ts`, `features/identity/container.ts` y `features/identity/session/access-session.ts`) no violan
 ninguna regla. Esa carpeta no es la aplicación real: solo tiene las rutas que las reglas reconocen.
+
+El borrador de la inscripción (`session/enrollment-draft`, decisión E2 del cambio `admin-web-staff-sign-in`) es tan privado como el
+almacén de tokens. `features/identity/enrollment/imports-enrollment-draft.ts` lo importa directamente y viola
+`admin-token-store-is-private`. Los casos aceptados son `features/identity/enrollment/uses-session-index.ts`, que pasa por la entrada
+pública `session/index.ts`, y esa misma entrada, que importa su propio borrador. `session/enrollment-draft.ts` y `session/index.ts` son
+módulos mínimos para que esos imports resuelvan.
