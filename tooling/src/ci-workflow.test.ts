@@ -214,9 +214,11 @@ describe("the diff of ci.yml against main only adds [BX83]", () => {
 
   // Needs the history of main, which a shallow checkout of the CI job does not have; locally it always runs.
   it.skipIf(base === undefined)("has no deleted or modified line", () => {
-    const [added, deleted] = git("diff", "--numstat", base ?? "", "--", ".github/workflows/ci.yml").split(/\s+/);
+    // An empty diff (on main after the merge, or on a branch that leaves ci.yml alone) also only adds. A
+    // later change that legitimately rewrites existing lines retires this check along with BX83.
+    const numstat = git("diff", "--numstat", base ?? "", "--", ".github/workflows/ci.yml");
+    const deleted = numstat === "" ? "0" : numstat.split(/\s+/)[1];
 
-    expect(Number(added)).toBeGreaterThan(0);
     expect(deleted).toBe("0");
   });
 });
