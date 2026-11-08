@@ -19,6 +19,7 @@
     "@tanstack/react-router": "catalog:",
     "i18next": "catalog:",
     "i18next-icu": "catalog:",
+    "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-i18next": "catalog:",
