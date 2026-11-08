@@ -21,7 +21,19 @@ export function CopyButton({ text, kind }: CopyButtonProps) {
   const [outcome, setOutcome] = useState<Outcome>("idle");
 
   function copy() {
-    navigator.clipboard.writeText(text.replace(/\s/g, "")).then(
+    // Outside a secure context there is no clipboard, and some browsers throw at once instead of rejecting: every
+    // way of failing ends in the same "copy by hand" message.
+    // The DOM type says the clipboard is always there; outside a secure context it is not, so it is read as optional.
+    const clipboard = (navigator as Partial<Navigator>).clipboard;
+    let writing: Promise<void>;
+    try {
+      if (clipboard === undefined) throw new TypeError("no clipboard");
+      writing = clipboard.writeText(text.replace(/\s/g, ""));
+    } catch {
+      setOutcome("failed");
+      return;
+    }
+    writing.then(
       () => {
         setOutcome("done");
       },

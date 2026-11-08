@@ -53,6 +53,32 @@ describe("CopyButton", () => {
     expect(screen.queryByText("Identificador copiado.")).not.toBeInTheDocument();
   });
 
+  it("says so, and does not throw, when writing to the clipboard throws at once", async () => {
+    const { user, write } = setup({ text: "ABC", kind: "trace" });
+    write.mockImplementationOnce(() => {
+      throw new TypeError("not allowed");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Copiar identificador" }));
+
+    expect(await screen.findByText("No se pudo copiar. Seleccione el texto y cópielo manualmente.")).toBeInTheDocument();
+  });
+
+  it("says so when there is no clipboard, as outside a secure context", async () => {
+    const user = userEvent.setup();
+    const original = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    try {
+      renderWithAdminI18n(<CopyButton text="ABC" kind="trace" />);
+
+      await user.click(screen.getByRole("button", { name: "Copiar identificador" }));
+
+      expect(await screen.findByText("No se pudo copiar. Seleccione el texto y cópielo manualmente.")).toBeInTheDocument();
+    } finally {
+      if (original) Object.defineProperty(navigator, "clipboard", original);
+    }
+  });
+
   it("has an empty polite region before anything is copied", () => {
     setup({ text: "ABC", kind: "trace" });
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
