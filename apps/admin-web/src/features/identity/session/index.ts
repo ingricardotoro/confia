@@ -18,9 +18,11 @@ export { sessionKeys } from "./current-session-query.ts";
 export type {
   AccessSession,
   ArrivalNotice,
-  EnrollOutcome,
+  EnrollmentSnapshot,
+  EnrollmentStep,
   SessionView,
   SignInOutcome,
   SignOutOutcome,
+  StartEnrollmentOutcome,
   VerifyOutcome,
 } from "./access-session.ts";

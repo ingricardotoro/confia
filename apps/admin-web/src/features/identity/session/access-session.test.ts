@@ -13,6 +13,7 @@ import {
 import { createFakeLocks } from "../../../test/fake-locks.ts";
 import { installMswServer, requests, route } from "../../../test/msw-server.ts";
 import { createAccessSession, type AccessSession } from "./access-session.ts";
+import { createEnrollmentDraft, type EnrollmentDraft } from "./enrollment-draft.ts";
 
 // admin-web-foundations-and-session, task 6.1 (part 6b; SS22 to SS26, and design.md D8). The real
 // operations and the real transport run over the test server; the clock and the lock are injected, so a
@@ -282,22 +283,24 @@ describe("signing in and the second factor", () => {
 
     await expect(session.verify({ kind: "code", value: "123456" })).resolves.toEqual({ kind: "no-token" });
     const other = build();
-    await expect(other.enroll()).resolves.toEqual({ kind: "no-token" });
+    await expect(other.startEnrollment()).resolves.toEqual({ kind: "no-token" });
 
     expect(requests()).toHaveLength(1);
   });
 
-  it("enrolls with the restricted token and hands back the secret and the codes without keeping them", async () => {
+  it("starts the enrollment with the restricted token, keeps the secret in the draft and hands back nothing of it", async () => {
     route("post", SESSIONS, secondFactorEnrollmentRequired({ override: { secondFactorToken: "restricted-token" } }));
     const issued = enrollment();
     route("post", "/api/v1/auth/mfa/enrollments", issued);
     const session = build();
     await session.signIn(CREDENTIALS);
 
-    const outcome = await session.enroll();
+    const outcome = await session.startEnrollment();
 
-    expect(outcome).toEqual({ kind: "enrolled", ...(issued.body as object) });
+    expect(outcome).toEqual({ kind: "ready" });
     expect(requests()[1]?.headers.get("Authorization")).toBe("Bearer restricted-token");
+    expect(requests()[1]?.body).toBe("");
+    expect(session.getEnrollment()).toEqual({ identifier: CREDENTIALS.identifier, step: "secret", ...(issued.body as object) });
     expect(JSON.stringify(session.getView())).not.toContain("secret");
   });
 
@@ -307,7 +310,8 @@ describe("signing in and the second factor", () => {
     const session = build();
     await session.signIn(CREDENTIALS);
 
-    await expect(session.enroll()).resolves.toMatchObject({ kind: "failed" });
+    await expect(session.startEnrollment()).resolves.toMatchObject({ kind: "failed" });
+    expect(session.getEnrollment()).toBeUndefined();
   });
 
   it("discards the restricted token and arrives at the sign in page with the notice", async () => {
@@ -367,5 +371,325 @@ describe("signing out", () => {
     await expect(session.signOut()).resolves.toEqual({ kind: "failed" });
 
     expect(session.getView()).toEqual({ status: "authenticated" });
+  });
+});
+
+// admin-web-staff-sign-in, task 1.1 (E2, R7; SS58, SS59, SS72, SS74, SS87, SS93, SS96, SS98): the enrollment
+// draft lives in the session module, so one `endLocally` forgets it on every path. Secrets are made at run time.
+const ENROLLMENTS = "/api/v1/auth/mfa/enrollments";
+const VERIFICATIONS = "/api/v1/auth/mfa/verifications";
+const SENT_IDENTIFIER = "ana.pérez+admin@colegio.edu.hn";
+
+function buildWithDraft(): { session: AccessSession; draft: EnrollmentDraft } {
+  const draft = createEnrollmentDraft();
+  const session = createAccessSession({
+    api,
+    locks: createFakeLocks(),
+    now: () => NOW,
+    readCsrf: () => "csrf-A",
+    enrollmentDraft: draft,
+  });
+  return { session, draft };
+}
+
+/** A session that signed in and has to enroll, with the enrollment already issued. */
+async function enrolling(token = "restricted-token") {
+  const built = buildWithDraft();
+  route("post", SESSIONS, secondFactorEnrollmentRequired({ override: { secondFactorToken: token } }));
+  route("post", ENROLLMENTS, enrollment());
+  await built.session.signIn({ identifier: SENT_IDENTIFIER, password: CREDENTIALS.password });
+  await built.session.startEnrollment();
+  return built;
+}
+
+describe("the identifier kept for the enrollment", () => {
+  it("SS58: keeps the identifier that was sent when an enrollment is required", async () => {
+    const { session } = await enrolling();
+
+    const sent = JSON.parse(requests()[0]?.body ?? "{}") as { identifier: string };
+    expect(sent.identifier).toBe(SENT_IDENTIFIER);
+    expect(session.getEnrollment()?.identifier).toBe(sent.identifier);
+  });
+
+  it("SS58: keeps it trimmed", async () => {
+    const { session, draft } = buildWithDraft();
+    route("post", SESSIONS, secondFactorEnrollmentRequired());
+
+    await session.signIn({ identifier: `  ${SENT_IDENTIFIER} `, password: CREDENTIALS.password });
+
+    expect(draft.identifier()).toBe(SENT_IDENTIFIER);
+  });
+
+  it.each([
+    ["authenticated", () => accessGrant("token-new", 15 * 60_000)],
+    ["second-factor-required", () => secondFactorRequired()],
+  ])("SS59: keeps no identifier for a %s answer", async (_status, answer) => {
+    const { session, draft } = buildWithDraft();
+    route("post", SESSIONS, answer());
+
+    await session.signIn({ identifier: SENT_IDENTIFIER, password: CREDENTIALS.password });
+
+    expect(draft.identifier()).toBeUndefined();
+    expect(session.getEnrollment()).toBeUndefined();
+  });
+
+  it("SS59: a later answer that needs no enrollment forgets the identifier and the secret of the earlier one", async () => {
+    const { session, draft } = await enrolling();
+    route("post", SESSIONS, secondFactorRequired());
+
+    await session.signIn(CREDENTIALS);
+
+    expect(draft.identifier()).toBeUndefined();
+    expect(session.getEnrollment()).toBeUndefined();
+  });
+
+  it("keeps nothing when the credentials are refused", async () => {
+    const { session, draft } = buildWithDraft();
+    route("post", SESSIONS, problem("authentication-failed", 401));
+
+    await session.signIn({ identifier: SENT_IDENTIFIER, password: CREDENTIALS.password });
+
+    expect(draft.identifier()).toBeUndefined();
+  });
+});
+
+describe("starting the enrollment", () => {
+  it("SS74: two calls in a row send one request, with the restricted token, and share the promise", async () => {
+    const { session } = buildWithDraft();
+    route("post", SESSIONS, secondFactorEnrollmentRequired({ override: { secondFactorToken: "mfa-enroll-token" } }));
+    route("post", ENROLLMENTS, enrollment());
+    await session.signIn(CREDENTIALS);
+
+    const first = session.startEnrollment();
+    const second = session.startEnrollment();
+    expect(second).toBe(first);
+    await first;
+    await session.startEnrollment();
+
+    const sent = requests().filter((request) => request.path === ENROLLMENTS);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.headers.get("Authorization")).toBe("Bearer mfa-enroll-token");
+  });
+
+  it("SS74: a new restricted token asks again and replaces the secret", async () => {
+    const { session } = await enrolling("first-token");
+    const before = session.getEnrollment()?.secret;
+    route("post", SESSIONS, secondFactorEnrollmentRequired({ override: { secondFactorToken: "second-token" } }));
+    route("post", ENROLLMENTS, enrollment());
+    await session.signIn(CREDENTIALS);
+
+    await session.startEnrollment();
+
+    expect(requests().filter((request) => request.path === ENROLLMENTS)).toHaveLength(2);
+    expect(session.getEnrollment()?.secret).not.toBe(before);
+    expect(session.getEnrollment()?.step).toBe("secret");
+  });
+
+  it("makes no request without a restricted token for the enrollment", async () => {
+    const { session } = buildWithDraft();
+    route("post", SESSIONS, secondFactorRequired());
+    await session.signIn(CREDENTIALS);
+
+    await expect(session.startEnrollment()).resolves.toEqual({ kind: "no-token" });
+
+    expect(requests()).toHaveLength(1);
+  });
+
+  it("makes no request with a restricted token that has ended", async () => {
+    const { session } = buildWithDraft();
+    route(
+      "post",
+      SESSIONS,
+      secondFactorEnrollmentRequired({ override: { secondFactorTokenExpiresAt: new Date(NOW - 1_000).toISOString() } }),
+    );
+    await session.signIn(CREDENTIALS);
+
+    await expect(session.startEnrollment()).resolves.toEqual({ kind: "no-token" });
+
+    expect(requests()).toHaveLength(1);
+  });
+
+  it.each([
+    ["a network error", () => "network-error" as const],
+    ["a 429", () => problem("too-many-requests", 429)],
+    ["a 503", () => problem("capacity-exceeded", 503)],
+    ["an unexpected answer", () => ({ status: 200, body: { unexpected: true }, contentType: "application/json" })],
+  ])("SS87: %s forgets the promise, keeps the token and sends the next request only when asked again", async (_name, failure) => {
+    const { session } = buildWithDraft();
+    route("post", SESSIONS, secondFactorEnrollmentRequired());
+    route("post", ENROLLMENTS, failure(), enrollment());
+    await session.signIn(CREDENTIALS);
+
+    await expect(session.startEnrollment()).resolves.toMatchObject({ kind: "failed" });
+    expect(session.hasSecondFactorToken("mfa-enroll")).toBe(true);
+    expect(session.getEnrollment()).toBeUndefined();
+    expect(requests().filter((request) => request.path === ENROLLMENTS)).toHaveLength(1);
+
+    await expect(session.startEnrollment()).resolves.toEqual({ kind: "ready" });
+    expect(requests().filter((request) => request.path === ENROLLMENTS)).toHaveLength(2);
+    expect(session.getEnrollment()?.step).toBe("secret");
+  });
+
+  it("does not keep the answer of an enrollment that was abandoned while it was in flight", async () => {
+    const { session, draft } = buildWithDraft();
+    route("post", SESSIONS, secondFactorEnrollmentRequired());
+    route("post", ENROLLMENTS, enrollment());
+    await session.signIn(CREDENTIALS);
+
+    const started = session.startEnrollment();
+    session.discardSecondFactor("enrollment-interrupted");
+
+    await expect(started).resolves.toEqual({ kind: "no-token" });
+    expect(draft.snapshot()).toBeUndefined();
+  });
+});
+
+describe("the steps of the enrollment", () => {
+  it("SS93: moves secret, recovery-codes, first-code and no operation returns the codes afterwards", async () => {
+    const { session } = await enrolling();
+    const codes = session.getEnrollment()?.recoveryCodes ?? [];
+    expect(codes).toHaveLength(10);
+
+    session.advanceEnrollment();
+    expect(session.getEnrollment()).toMatchObject({ step: "recovery-codes", recoveryCodes: codes });
+    session.advanceEnrollment();
+
+    expect(session.getEnrollment()).toMatchObject({ step: "first-code", recoveryCodes: undefined });
+    await expect(session.startEnrollment()).resolves.toEqual({ kind: "ready" });
+    expect(JSON.stringify(session.getEnrollment())).not.toContain(codes[0] ?? "no-code");
+  });
+
+  it("goes back to the secret and, with no codes left, straight on to the first code", async () => {
+    const { session } = await enrolling();
+    session.advanceEnrollment();
+    session.advanceEnrollment();
+
+    session.reviewEnrollmentSecret();
+    expect(session.getEnrollment()?.step).toBe("secret");
+    session.advanceEnrollment();
+
+    expect(session.getEnrollment()).toMatchObject({ step: "first-code", recoveryCodes: undefined });
+  });
+
+  it("returns the same object until the enrollment changes and tells its listeners when it does", async () => {
+    const { session } = await enrolling();
+    const listener = vi.fn();
+    session.subscribe(listener);
+    const before = session.getEnrollment();
+    expect(session.getEnrollment()).toBe(before);
+
+    session.advanceEnrollment();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(session.getEnrollment()).not.toBe(before);
+    session.reviewEnrollmentSecret();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("activating with the first code", () => {
+  it("SS96: sends only the code with the enrollment token, accepts the session and clears the draft", async () => {
+    const { session, draft } = await enrolling("enroll-token");
+    route("post", VERIFICATIONS, accessGrant("token-new", 15 * 60_000));
+
+    await expect(session.activate("123456")).resolves.toEqual({ kind: "authenticated" });
+
+    const sent = requests().at(-1);
+    expect(sent?.path).toBe(VERIFICATIONS);
+    expect(sent?.headers.get("Authorization")).toBe("Bearer enroll-token");
+    expect(JSON.parse(sent?.body ?? "{}")).toEqual({ code: "123456" });
+    expect(session.getView()).toEqual({ status: "authenticated" });
+    expect(session.hasSecondFactorToken("mfa-enroll")).toBe(false);
+    expect(draft.identifier()).toBeUndefined();
+    expect(session.getEnrollment()).toBeUndefined();
+  });
+
+  it("keeps the draft and the token after a 401 second-factor-invalid", async () => {
+    const { session } = await enrolling();
+    const before = session.getEnrollment();
+    route("post", VERIFICATIONS, problem("second-factor-invalid", 401));
+
+    await expect(session.activate("123456")).resolves.toMatchObject({ kind: "failed" });
+
+    expect(session.getEnrollment()).toBe(before);
+    expect(session.hasSecondFactorToken("mfa-enroll")).toBe(true);
+    expect(session.getView()).toEqual({ status: "restoring" });
+  });
+
+  it.each(["token-expired", "token-invalid"] as const)(
+    "ends the enrollment with the interrupted notice on a 401 %s",
+    async (code) => {
+      const { session, draft } = await enrolling();
+      route("post", VERIFICATIONS, problem(code, 401));
+
+      await expect(session.activate("123456")).resolves.toMatchObject({ kind: "failed" });
+
+      expect(session.getView()).toEqual({ status: "anonymous", notice: "enrollment-interrupted" });
+      expect(session.hasSecondFactorToken("mfa-enroll")).toBe(false);
+      expect(draft.identifier()).toBeUndefined();
+      expect(session.getEnrollment()).toBeUndefined();
+    },
+  );
+
+  it("ends the enrollment with the interrupted notice, and no request, without an enrollment token", async () => {
+    const { session, draft } = await enrolling();
+    session.discardSecondFactor();
+    const sent = requests().length;
+
+    await expect(session.activate("123456")).resolves.toEqual({ kind: "no-token" });
+
+    expect(requests()).toHaveLength(sent);
+    expect(session.getView()).toEqual({ status: "anonymous", notice: "enrollment-interrupted" });
+    expect(draft.snapshot()).toBeUndefined();
+  });
+
+  it("does not end an open session when asked to activate without an enrollment token", async () => {
+    const session = await signedIn("token-old", 15 * 60_000);
+
+    await expect(session.activate("123456")).resolves.toEqual({ kind: "no-token" });
+
+    expect(session.getView()).toEqual({ status: "authenticated" });
+  });
+
+  it("clears the draft on a correct verification as well", async () => {
+    const { session, draft } = await enrolling();
+    route("post", SESSIONS, secondFactorRequired({ override: { secondFactorToken: "verify-token" } }));
+    await session.signIn(CREDENTIALS);
+    route("post", VERIFICATIONS, accessGrant("token-new", 15 * 60_000));
+
+    await session.verify({ kind: "code", value: "123456" });
+
+    expect(draft.snapshot()).toBeUndefined();
+  });
+});
+
+describe("leaving the enrollment", () => {
+  it("SS98: discarding the second factor clears the draft", async () => {
+    const { session, draft } = await enrolling();
+
+    session.discardSecondFactor("enrollment-interrupted");
+
+    expect(draft.identifier()).toBeUndefined();
+    expect(session.getEnrollment()).toBeUndefined();
+  });
+
+  it("SS98: signing out clears the draft", async () => {
+    const { session, draft } = await enrolling();
+    route("delete", CURRENT, noContent());
+
+    await session.signOut();
+
+    expect(draft.identifier()).toBeUndefined();
+    expect(session.getEnrollment()).toBeUndefined();
+  });
+
+  it("SS98: a session that ends by itself clears the draft", async () => {
+    const { session, draft } = await enrolling();
+    route("post", REFRESH, problem("session-expired", 401));
+
+    await session.boot();
+
+    expect(session.getView()).toEqual({ status: "anonymous", notice: "session-expired" });
+    expect(draft.identifier()).toBeUndefined();
   });
 });
