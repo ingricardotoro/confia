@@ -29,11 +29,11 @@ la puerta de accesibilidad sobre rutas (capacidad `build-integrity`) cierra el c
   - **Código de recuperación:** sin espacios, en mayúsculas, de 1 a 64 caracteres; sin comprobar el alfabeto.
   - **QR:** `qrcode.react`, `QRCodeSVG`, como única vía. Si SS83 falla en rojo, el PR se detiene y decide el propietario.
     **Decodificador de prueba:** `jsqr`.
+  - **Matriz de la puerta:** la de `build-integrity`, 22 estados por 2 temas.
 
 > **Nota fechada 2026-11-07 (decisión del propietario, fase de diseño).** Se retira la salida alternativa que este bloque daba por decidida.
 > Texto anterior: «si SS83 falla en rojo, la salida ya decidida es `qrcode` con `QRCode.create()` y un `<path>` propio». Contradecía el
 > requisito de la inscripción, que exige `QRCodeSVG` de `qrcode.react` con DEBE (`design.md`, E11).
-  - **Matriz de la puerta:** la de `build-integrity`, 22 estados por 2 temas.
 
 ## ADDED Requirements
 
