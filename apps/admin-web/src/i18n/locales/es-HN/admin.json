@@ -35,6 +35,12 @@
     "recoveryInvalid": "El código de recuperación no es correcto o ya se usó. Revíselo e intente de nuevo.",
     "notProcessed": "No se pudieron procesar los datos enviados. Revíselos e intente de nuevo."
   },
+  "field": {
+    "required": "Este dato es obligatorio.",
+    "tooLong": "Este dato es demasiado largo.",
+    "invalid": "Este dato no es válido.",
+    "unknown": "Uno de los datos enviados no es válido."
+  },
   "countdown": {
     "remaining": "Puede intentar de nuevo en {seconds} s.",
     "done": "Ya puede intentar de nuevo."
