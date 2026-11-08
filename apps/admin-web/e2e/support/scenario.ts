@@ -11,13 +11,33 @@ export const newScenarioId = (prefix = "e2e"): string => `${prefix}-${randomUUID
  * The `test` of the journeys. Each test gets its own scenario id and its context sends it on every request
  * (the page, its fetches and the navigations), so the simulator keeps one session model per test.
  */
-export const test = base.extend<{ scenarioId: string }>({
+export const test = base.extend<{ scenarioId: string; cspViolations: string[] }>({
+  // Filled by the page below; a test that provokes a violation on purpose empties it again.
+  cspViolations: async ({ browserName }, use, testInfo) => {
+    testInfo.annotations.push({ type: "browser", description: browserName });
+    await use([]);
+  },
   scenarioId: async ({ browserName }, use, testInfo) => {
     await use(newScenarioId(`${browserName}-${String(testInfo.workerIndex)}`));
   },
   context: async ({ context, scenarioId }, use) => {
     await context.setExtraHTTPHeaders({ [SCENARIO_HEADER]: scenarioId });
     await use(context);
+  },
+  // AW12: every journey runs with the CSP of vite preview, and a securitypolicyviolation event in any of
+  // its documents fails it. The binding survives navigations, which a window variable would not.
+  page: async ({ page, cspViolations }, use) => {
+    await page.exposeFunction("confiaReportCsp", (text: string) => {
+      cspViolations.push(text);
+    });
+    await page.addInitScript(() => {
+      document.addEventListener("securitypolicyviolation", (event) => {
+        const report = (window as unknown as { confiaReportCsp: (text: string) => Promise<void> }).confiaReportCsp;
+        void report(`${event.violatedDirective} ${event.blockedURI}`);
+      });
+    });
+    await use(page);
+    expect(cspViolations, "CSP violations during the journey").toEqual([]);
   },
 });
 
