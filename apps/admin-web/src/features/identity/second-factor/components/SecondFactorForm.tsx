@@ -100,10 +100,10 @@ export function SecondFactorForm({
         </p>
       </form>
       <div className="flex flex-col items-start gap-2">
-        <Button type="button" variant="link" onClick={onToggleMode}>
+        <Button type="button" variant="link" aria-disabled={submitting || undefined} onClick={onToggleMode}>
           {t(mode === "code" ? "secondFactor.useRecovery" : "secondFactor.useCode")}
         </Button>
-        <Button type="button" variant="link" onClick={onBack}>
+        <Button type="button" variant="link" aria-disabled={submitting || undefined} onClick={onBack}>
           {t("secondFactor.back")}
         </Button>
       </div>
