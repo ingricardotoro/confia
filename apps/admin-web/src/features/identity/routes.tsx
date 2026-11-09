@@ -89,7 +89,7 @@ export function createIdentityRoutes(root: AnyRoute, session: AccessSession): An
           toSignIn();
         }
       },
-      component: () => <EnrollmentContainer session={session} signInPath={ACCESS_PATHS.signIn} />,
+      component: () => <EnrollmentContainer session={session} signInPath={ACCESS_PATHS.signIn} homePath={ACCESS_PATHS.home} />,
     }),
   ];
 }

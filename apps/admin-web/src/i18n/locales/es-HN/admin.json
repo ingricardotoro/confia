@@ -27,6 +27,17 @@
       "title": "Escanee el código QR",
       "intro": "Escanee el código con su aplicación de autenticación o escriba la clave manualmente."
     },
+    "codes": {
+      "title": "Guarde sus códigos de recuperación",
+      "intro": "Cada código sirve una sola vez si pierde acceso a su aplicación. No se volverán a mostrar.",
+      "confirm": "He guardado mis códigos de recuperación",
+      "confirmRequired": "Confirme que guardó sus códigos de recuperación para continuar."
+    },
+    "firstCode": {
+      "title": "Escriba el primer código",
+      "submit": "Activar",
+      "reviewSecret": "Ver de nuevo el código QR"
+    },
     "qrLabel": "Código QR para su aplicación de autenticación",
     "manualKey": "Clave para escribir manualmente",
     "continue": "Continuar"
