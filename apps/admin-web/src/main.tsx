@@ -1,3 +1,4 @@
+import "./app/zod-config.ts";
 import "@confia/ui/styles.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
