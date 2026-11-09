@@ -532,6 +532,21 @@ regla de dependencia del resto del sistema y no se relaja para observabilidad.
 > tiempo de espera asíncrono, una `ResponseStatusException(503)`), así que ya no implica por sí solo al
 > limitador: el operador debe leer el `reason` del evento y el registro de errores del servidor.
 
+> **Nota fechada 2026-11-09 (cambio `rbac-permission-matrix-and-audit-integration`, tarea 4a): los cuatro
+> eventos de la autorización.** El puerto `AuthorizationMetrics` (`shared/web/authorization`) declara cuatro
+> señales y su adaptador interino `LogAuthorizationMetrics` vive en `shared/observability/metrics`, con la
+> misma forma que `LogRateLimitMetrics`: un evento `WARN` fijo y estructurado con los campos `event`,
+> `permission` cuando aplica y `suppressed`. Los eventos son `authorization_denial_omitted` (una denegación
+> sin fila completa porque se agotó el tope de su ventana; lleva `permission`),
+> `authorization_denial_audit_failed` (no se pudo escribir el asiento de una denegación; la respuesta sigue
+> siendo `403`), `authorization_resolution_failed` (no se pudieron leer los permisos del actor) y
+> `authorization_denial_tracker_full` (el rastreador de denegaciones llegó a su cota). Está acotado a un
+> evento por segundo y por clave, donde la clave es el evento y, en el primero, su permiso; el estado es
+> cerrado porque `Permission` es un catálogo cerrado. Ningún método recibe un correo, una IP ni una ruta, y
+> el evento no los escribe. Esta nota no define ninguna alerta nueva: el adaptador hacia Prometheus llega con
+> el cambio de observabilidad, con prefijo `confia_` y sufijo `_total`, y sustituye a este sin tocar la
+> autorización.
+
 ---
 
 ## 6. Tableros de Grafana

@@ -58,6 +58,9 @@ class DocumentationNotesTest {
     private static final String RBAC_NOTE = "**Nota fechada 2026-11-04 (cambio "
             + "`rbac-permission-matrix-and-audit-integration`, PR 1 `permission-catalog-and-adr`)";
 
+    private static final String AUTHORIZATION_EVENTS_NOTE = "**Nota fechada 2026-11-09 (cambio "
+            + "`rbac-permission-matrix-and-audit-integration`, tarea 4a";
+
     @Test
     void adr0025ExistsAsProposedAndIsIndexed() {
         List<String> adr = lines(repoRoot().resolve(ADR_0025));
@@ -98,6 +101,22 @@ class DocumentationNotesTest {
                 .contains("TracedJob")
                 .contains("com.confia.shared.jobs");
         assertOriginalLinesIntact(DOCS_07 + " section 3.3", linesOf(ORIGINAL_DOCS_07_SECTION_3_3), section);
+    }
+
+    @Test
+    void docs07Section54HasTheDatedNoteWithTheFourAuthorizationEvents() {
+        List<String> section = section(lines(repoRoot().resolve(DOCS_07)), "### 5.4 ");
+        String note = prose(noteBlock(section, AUTHORIZATION_EVENTS_NOTE));
+        assertThat(note)
+                .contains("`AuthorizationMetrics`")
+                .contains("`LogAuthorizationMetrics`")
+                .contains("`authorization_denial_omitted`")
+                .contains("`authorization_denial_audit_failed`")
+                .contains("`authorization_resolution_failed`")
+                .contains("`authorization_denial_tracker_full`")
+                .contains("`suppressed`")
+                .contains("un evento por segundo")
+                .contains("ninguna alerta nueva");
     }
 
     @Test
