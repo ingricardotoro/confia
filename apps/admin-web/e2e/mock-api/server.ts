@@ -16,6 +16,7 @@ import {
   type Operation,
   type Scenario,
 } from "./scenarios.ts";
+import { base32Encode } from "../support/totp.ts";
 import { parseCookieHeader, type ModelResponse } from "./session-model.ts";
 
 /**
@@ -196,6 +197,14 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
       const seeded = store.scenario(target).model.openSession();
       res.writeHead(303, { Location: `${PAGE_ORIGIN}/`, "Set-Cookie": [...seeded.setCookies], "Cache-Control": "no-store" });
       return void res.end();
+    }
+    // The key and the recovery codes of the fictitious account of a scenario, for a journey to compute a code. Only
+    // the data of that account leaves here; the Host and peer check above is the one every control answer passes.
+    const accountMatch = /^\/__control\/account\/([^/]+)$/.exec(path);
+    if (method === "GET" && accountMatch?.[1] !== undefined && isScenarioId(accountMatch[1])) {
+      const { model } = store.scenario(accountMatch[1]);
+      writeJson(res, 200, { secret: base32Encode(model.testSecret()), recoveryCodes: model.recoveryCodes() });
+      return;
     }
     const scenarioMatch = /^\/__control\/(scenarios|requests)\/([^/]+)$/.exec(path);
     if (scenarioMatch !== null && scenarioMatch[2] !== undefined && isScenarioId(scenarioMatch[2])) {

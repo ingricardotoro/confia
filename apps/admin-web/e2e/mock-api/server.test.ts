@@ -2,6 +2,7 @@
 import { request, type IncomingHttpHeaders } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { EnrollmentResponse } from "@confia/contracts/admin";
 import { findLeaks, makeSentinel } from "../support/sentinels.ts";
 import { base32Decode, totpCode } from "../support/totp.ts";
 import { CSRF_COOKIE, SESSION_COOKIE } from "./session-model.ts";
@@ -353,5 +354,63 @@ describe("the seeded test session", { timeout: LIMIT }, () => {
 
     expect((await call("POST", "/api/v1/auth/sessions/refresh", { headers: cookieRoute(seeded), scenario: "mine" })).status).toBe(200);
     expect((await call("POST", "/api/v1/auth/sessions/refresh", { headers: cookieRoute(seeded) })).status).toBe(401);
+  });
+});
+
+describe("the account control of the fictitious test account [I304]", { timeout: LIMIT }, () => {
+  const keyOf = (reply: Reply) => base32Decode((reply.json as { secret: string }).secret);
+
+  it("answers the key and the recovery codes of the model, in the shape of the enrollment, and nothing else", async () => {
+    const reply = await call("GET", "/__control/account/mine");
+
+    expect(reply.status).toBe(200);
+    expect(reply.headers["cache-control"]).toBe("no-store");
+    expect(Object.keys(reply.json as object).sort()).toEqual(["recoveryCodes", "secret"]);
+    expect(EnrollmentResponse.safeParse(reply.json).success).toBe(true);
+    expect((reply.json as { recoveryCodes: string[] }).recoveryCodes).toHaveLength(10);
+  });
+
+  it("gives the key the model accepts: a code computed from it completes the second factor", async () => {
+    await preset("acct", "second-factor-required");
+    const account = await call("GET", "/__control/account/acct");
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: "acct" });
+    const bearer = { Authorization: `Bearer ${(login.json as { secondFactorToken: string }).secondFactorToken}` };
+
+    const done = await call("POST", "/api/v1/auth/mfa/verifications", {
+      headers: bearer,
+      body: { code: totpCode(keyOf(account), Date.now() / 1000) },
+      scenario: "acct",
+    });
+
+    expect(done.status).toBe(200);
+  });
+
+  it("lists only the recovery codes still valid, and keeps one account for each scenario", async () => {
+    await preset("used", "second-factor-required");
+    const before = (await call("GET", "/__control/account/used")).json as { recoveryCodes: string[] };
+    const [spent] = before.recoveryCodes;
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: "used" });
+    const bearer = { Authorization: `Bearer ${(login.json as { secondFactorToken: string }).secondFactorToken}` };
+    await call("POST", "/api/v1/auth/mfa/verifications", { headers: bearer, body: { recoveryCode: spent }, scenario: "used" });
+
+    const after = (await call("GET", "/__control/account/used")).json as { recoveryCodes: string[] };
+    const other = (await call("GET", "/__control/account/other")).json as { secret: string; recoveryCodes: string[] };
+
+    expect(after.recoveryCodes).toHaveLength(9);
+    expect(after.recoveryCodes).not.toContain(spent);
+    expect(other.recoveryCodes).not.toContain(spent);
+  });
+
+  it("answers only on a local host name: another Host header gets 403 and no key or code", async () => {
+    for (const host of ["evil.example", "localhost.evil.example", "192.0.2.10"]) {
+      const reply = await call("GET", "/__control/account/mine", { headers: { Host: host } });
+
+      expect([host, reply.status, "secret" in (reply.json as object)]).toEqual([host, 403, false]);
+    }
+  });
+
+  it("refuses an id that is not a scenario id and a method other than GET", async () => {
+    expect((await call("GET", "/__control/account/not%20valid")).status).toBe(404);
+    expect((await call("POST", "/__control/account/mine")).status).toBe(404);
   });
 });
