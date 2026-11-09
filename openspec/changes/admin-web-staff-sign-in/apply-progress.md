@@ -209,3 +209,56 @@ ocupada por procesos ajenos. Con 4 trabajadores todo pasó a la primera.
 
 `pnpm install --frozen-lockfile --prefer-offline` pasa con el importador editado y `pnpm why react` muestra una sola versión. Guarda de `*.spec.*` vacía y
 `git diff --name-only cb3ded9 -- apps/api packages/ui packages/contracts` vacío en ambas partes.
+
+
+## Tarea 4: `sign-in-states-and-journey`
+
+### Medida (regla de las 800 líneas), 2026-11-08
+
+Medida con `git add -N .`, `git reset`, `git add -A` y `git diff --cached --numstat -M 2ceaa46` (sin `openspec/`, archivo de bloqueo ni código generado) antes de comprometer:
+636 adiciones y 20 eliminaciones, **656 líneas**. Bajo 800: sin excepción y sin corte (4a / 4b no se aplican). Medida final sobre los dos commits: 639 adiciones y 19 eliminaciones, **658**.
+
+### Evidencia del ciclo TDD
+
+| Paso | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| Contenedor y presentación (jsdom) | Sí, antes del código de producción | 5 de 15 pruebas fallan: SS43 `Unable to find an element with the text: Puede intentar de nuevo en 15 s.`; SS44 `expected [ Array(1) ] to have a length of 2 but got 1`; SS48 `Unable to find an element with the text: Verificando sus datos…`; SS60 (tono de advertencia) y E7 (el aviso sigue tras el primer envío). En `SignInForm.test.tsx`, 6 fallos (`Objects are not valid as a React child (found: object with keys {message, tone})` y la región ausente) | 60 pruebas de `sign-in` |
+| Simulador | Sí | `expected 400 to be 200` al aplicar `validation-failed` e `internal-error`: el preset no existía | 55 pruebas de `e2e/mock-api` |
+| Matriz de la puerta | Sí | `expected [] to deeply equal [ 'initial', 'error-summary', … ]` | 32 pruebas de `e2e/support` |
+| Recorrido | Sí | `Error: No tests found.` para `sign-in.e2e.ts` | 3 recorridos y 16 evaluaciones de la puerta |
+
+**Ya en verde sin código nuevo (fijan comportamiento de las tareas 2 y 3, no hubo rojo posible):** SS41 (`400` por campo), SS47 (`503`), SS49 (red), SS50 y AW54 (`500` con traza), AW49, AW64 y el aviso de cada uno de los cuatro motivos de SS60. Se dejan escritas porque el requisito de la tarea las nombra.
+**Código de apoyo escrito antes de su prueba:** `headers` opcional en `Reply` de `src/test/msw-server.ts` (para dar `Retry-After` al `429` de SS43); es solo de prueba.
+
+### Demostraciones deliberadas (tarea 4.3)
+
+Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, restauración desde la copia y `cmp` sin salida.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 1 | El número de la cuenta regresiva dentro del texto del `Alert` (`ProblemAlert message={…+countdown.remaining}`) | SS44: `expected [ …(16) ] to have a length of 2 but got 16`; además SS43 | idéntico |
+| 2 | Un aviso que mueve el foco (`useEffect` que enfoca el `Alert` del aviso) | 6 fallos de SS60: `expect(element).not.toHaveFocus()` en los cuatro motivos y en `SignInForm`, y `expect(element).toHaveFocus()` (el `h1`) | idéntico |
+
+**Una demostración encontró una prueba débil.** La primera vez, la demostración 1 **no** puso en rojo SS44: el bucle de los 15 segundos era síncrono y `MutationObserver` entrega en microtareas, así que los 15 cambios llegaban en un solo lote. Se corrigió la prueba (`await act(async …)` por segundo) y la ruptura dio el rojo de arriba. Se repitió tras cambiar la lectura de las regiones, con el mismo resultado.
+
+### Desviaciones y decisiones
+
+1. **Región `polite` sin `role="status"`.** Es un `<p aria-live="polite" aria-atomic="true">` siempre presente. Con `role="status"`, `src/app/BootGate.test.tsx:47` (fuera de la superficie de la tarea) falla porque exige que la pantalla de inicio de sesión no tenga ningún `status`. Se evitó tocar ese archivo.
+2. **Aviso por `restricted-expired` en la puerta: no es posible aún.** Con ese preset el inicio de sesión lleva a la verificación, que sigue siendo provisional hasta la tarea 5, y el aviso solo aparece al enviar el código. La fila «con aviso» usa un `refresh` rechazado con `401 session-expired` (`page.route`), que lleva al inicio de sesión con el aviso de sesión vencida. El preset `restricted-expired` queda para los recorridos de la tarea 6.
+3. **Presets de la puerta.** `GateCombination` gana `preset?` y `checkCombination` recibe `scenarioId` para aplicarlo antes de `arrange` (`a11y-report.ts`, `a11y-gate.ts`, `gate.e2e.ts`; todos bajo `e2e/`). Las aserciones de total pasaron de `MINIMUM.length * 2` a `MATRIX.length * 2` en `a11y-report.test.ts` y `gate.e2e.ts`, porque la matriz tiene ahora 14 combinaciones y 28 evaluaciones; el mínimo sigue en 6.
+4. **Aviso del `already-enrolled` en jsdom.** `startEnrollment` no termina la sesión ante `409`; lo hace el contenedor de inscripción de la tarea 7. La prueba llama a `discardSecondFactor("second-factor-already-enrolled")` como lo hará ese contenedor.
+5. **`notice` pasa a `{ message, tone }`.** El tono `warning` es solo para `second-factor-already-enrolled` (E7). La cuenta regresiva se dibuja en un `<p>` fuera de toda región y de `Alert`.
+6. **Lectura de las regiones activas en SS44.** `queryAllByText` con una función de coincidencia que ve cada elemento, porque la regla del repositorio prohíbe `querySelector*` y `getElementsByTagName`, y ninguna consulta por rol lista los `aria-live`.
+7. **R4 decidido.** La región de espera se vacía en el mismo commit en que aparece el aviso; el observador ve exactamente dos cambios desde la aparición del aviso hasta el fin de la espera (`snapshots.slice(first)` de longitud 2).
+8. **4.4 (medida de CI, R6) queda pendiente** hasta que el propietario empuje. El recorrido de 31 s (SS48) tarda unos 33 s; la suite E completa midió 1,1 min en esta máquina con 2 trabajadores.
+
+### Verificación de cierre
+
+| Suite | Resultado |
+|---|---|
+| U `pnpm --filter @confia/admin-web test` | 59 archivos, 615 pruebas y 1 `todo`, cobertura sobre el umbral |
+| T `pnpm --filter ./tooling test` | 9 archivos, 286 pruebas |
+| E `pnpm --filter @confia/admin-web test:e2e` | 56 de 56 (37 previas, 3 recorridos de inicio de sesión, 16 evaluaciones de la puerta) |
+| PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 |
+
+Guarda de `*.spec.*` vacía y `git diff --name-only 2ceaa46 -- apps/api packages/ui packages/contracts` vacío. Sin dependencias nuevas.

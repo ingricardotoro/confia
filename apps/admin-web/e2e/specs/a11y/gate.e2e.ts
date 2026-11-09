@@ -9,13 +9,13 @@ import { expect, test } from "../../support/scenario.ts";
 test.describe("the accessibility gate over the real routes", () => {
   test("[BX77] refuses to pass on zero combinations, and the real matrix is not empty", () => {
     expect(() => assertCoversMinimum([], MINIMUM)).toThrow(/zero combinations/);
-    expect(assertCoversMinimum(MATRIX, MINIMUM)).toHaveLength(MINIMUM.length * THEMES.length);
+    expect(assertCoversMinimum(MATRIX, MINIMUM)).toHaveLength(MATRIX.length * THEMES.length);
   });
 
   for (const combination of MATRIX) {
     for (const theme of THEMES) {
-      test(`[BX81] ${combination.route} [${combination.state}] in the ${theme} theme has no blocking violation`, async ({ page }) => {
-        const result = await checkCombination(page, combination, theme);
+      test(`[BX81] ${combination.route} [${combination.state}] in the ${theme} theme has no blocking violation`, async ({ page, scenarioId }) => {
+        const result = await checkCombination(page, combination, theme, { scenarioId });
         recordResult(result);
 
         assertNoBlocking([result]);

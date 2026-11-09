@@ -7,13 +7,14 @@ import { SignInForm, type SignInFormProps } from "./SignInForm.tsx";
 
 // admin-web-staff-sign-in, task 3.1 (E8; SS37, SS39, SS42, SS51, SS52, SS55). The sign in screen as a presentation.
 // States. Success: the empty form, one with a general error, one with a trace id, one with field errors and its summary,
-// one with an arrival notice, and one sending. Loading and empty: not applicable, it reads nothing; the request of the
+// one with an arrival notice of each tone, one waiting (a count after a 429) and one sending. Loading and empty: not applicable, it reads nothing; the request of the
 // form is the "sending" state. The error of a request is the alert and the field errors, shown here from props.
 const noop = () => undefined;
 const base: SignInFormProps = {
   values: { identifier: "", password: "" },
   fieldErrors: {},
   summary: [],
+  liveMessage: "",
   submitting: false,
   summaryRef: noop,
   alertRef: noop,
@@ -173,18 +174,51 @@ describe("SignInForm: its states", () => {
   });
 
   it("an arrival notice is shown as information after the heading, and the heading keeps the focus", () => {
-    show({ notice: "Su sesión se cerró por seguridad. Vuelva a iniciar sesión." });
+    show({ notice: { message: "Su sesión se cerró por seguridad. Vuelva a iniciar sesión.", tone: "info" } });
 
-    const notice = screen.getByRole("status");
+    const notice = screen.getByText("Su sesión se cerró por seguridad. Vuelva a iniciar sesión.").closest('[role="status"]');
     expect(notice).toHaveTextContent("Su sesión se cerró por seguridad. Vuelva a iniciar sesión.");
     expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();
     expect(notice).not.toHaveFocus();
   });
 
-  it("shows no notice and no alert when it is given none", () => {
+  it("SS60: a notice of the warning tone is a warning, still a polite status that does not take the focus", () => {
+    show({ notice: { message: "Su cuenta ya tiene un segundo factor inscrito.", tone: "warning" } });
+
+    const notice = screen.getByText("Su cuenta ya tiene un segundo factor inscrito.").closest('[role="status"]');
+    expect(notice).toHaveTextContent("Advertencia");
+    expect(notice).not.toHaveFocus();
+  });
+
+  it("shows no notice and no alert when it is given none, and no status role of its own: the polite region of the form is an empty `aria-live` element", () => {
     show();
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("SS48: the text of the wait is in the polite region of the form", () => {
+    show({ submitting: true, liveMessage: "Verificando sus datos. Esto puede tardar hasta 30 segundos." });
+
+    const region = screen.getByText("Verificando sus datos. Esto puede tardar hasta 30 segundos.").closest("[aria-live]");
+    expect(region).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("SS43: the count is shown outside every active region, after the alert, and the alert keeps its fixed text", () => {
+    show({
+      alert: { message: "Hizo demasiadas solicitudes seguidas. Espere unos segundos e intente de nuevo." },
+      countdown: { remaining: "Puede intentar de nuevo en 15 s." },
+    });
+
+    const count = screen.getByText("Puede intentar de nuevo en 15 s.");
+    expect(count.closest('[role="alert"], [role="status"], [aria-live]')).toBeNull();
+    expect(screen.getByRole("alert")).not.toHaveTextContent("15");
+    expect(screen.getByRole("alert").compareDocumentPosition(count) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("SS44: at the end of the wait the polite region says that the person can try again", () => {
+    show({ liveMessage: "Ya puede intentar de nuevo." });
+
+    expect(screen.getByText("Ya puede intentar de nuevo.")).toHaveAttribute("aria-live", "polite");
   });
 });
