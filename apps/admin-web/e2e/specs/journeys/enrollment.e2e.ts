@@ -72,6 +72,32 @@ test.describe("the enrollment screen, against the simulated API", { annotation: 
     expect(urls.filter((url) => url.pathname === ENROLL_PATH)).toHaveLength(1);
   });
 
+  test("[SS114, I305] the complete mandatory enrollment, with the mouse, ends on the signed in page and sends only the first code to activate", async ({
+    page,
+    request,
+    scenarioId,
+  }) => {
+    await preset(page, scenarioId, "enrollment-required");
+    const activations: string[] = [];
+    page.on("request", (made: Request) => {
+      if (made.method() === "POST" && new URL(made.url()).pathname === "/api/v1/auth/mfa/verifications") activations.push(made.postData() ?? "");
+    });
+
+    await signIn(page);
+    await expect(page.getByRole("img", { name: QR_NAME })).toBeVisible();
+    const account = await accountOf(request, scenarioId);
+    await page.getByRole("button", { name: "Continuar" }).click();
+    await page.getByRole("checkbox", { name: /He guardado mis códigos de recuperación/ }).click();
+    await page.getByRole("button", { name: "Continuar" }).click();
+    const code = currentCode(account);
+    await page.getByRole("textbox", { name: /Código de verificación/ }).fill(code);
+    await page.getByRole("button", { name: "Activar" }).click();
+
+    await expect(page.getByRole("heading", { level: 1, name: "Sesión iniciada." })).toBeVisible();
+    // Exactly one activation, with the code and nothing else: no key, no recovery code, no identifier.
+    expect(activations.map((body) => JSON.parse(body) as unknown)).toEqual([{ code }]);
+  });
+
   test("[SS88] an enrollment token that expired before the request ends at the sign in screen with its notice", async ({ page, request, scenarioId }) => {
     await preset(page, scenarioId, "enrollment-expired");
 
