@@ -245,3 +245,17 @@ Las ramas inferiores solo tuvieron ejecuciones focalizadas. Las pruebas de la ta
 | #254 (3a-2) | `9456f55` | pass, 13 min 51 s | pass, 47 min 39 s |
 | #255 (3a-3) | `d5643f3` | pass, 14 min 27 s (tras relanzar el job por la inestabilidad de `CsrfKeyStartupTest`) | pass, 44 min 55 s |
 | #256 (3b) | `3c68e92` | pass, 14 min 44 s | pass, 44 min 8 s |
+
+## Tarea 4a (2026-11-09): puerto de métricas completo, adaptador y nota de `docs/07`
+
+Rama `change/rbac-permission-matrix-and-audit-integration-4a-authorization-metrics`, creada desde `origin/main` (tareas 1 a 3 fusionadas). Corte 4a/4b del diseño §10.1; 4b (manejador, grabador, `DenialWindows`, propiedades, ITs, cableado de la cadena) no se empezó y la tarea 4 sigue sin marcarse.
+
+| Commits | Líneas efectivas | Verificación focalizada (`-Djacoco.skip=true`, JDK 25) |
+|---|---|---|
+| `9a44aaa` `feat(observability): publish the authorization events through a port`; `2080360` `docs(ops): note the four authorization events` | **254** contra `origin/main` (235 añadidas, 19 borradas; sin `openspec/`) | `LogAuthorizationMetricsTest` 6, `DocumentationNotesTest` 17, `AuthorizationBoundaryRulesTest` 5, `ProcessBeanIsolationTest` 33, `PermissionDeciderTest` 8: 69, 0 fallos |
+
+- **ROJO observado:** con las pruebas nuevas y sin producción, la compilación de pruebas falló con 14 errores `cannot find symbol` en `LogAuthorizationMetricsTest` (`denialOmitted`, `denialAuditFailed`, `denialTrackerFull`, `trackedKeys`). **No observado por separado:** la prueba nueva de `DocumentationNotesTest` (nota de `docs/07`), porque el fallo de compilación la tapó; se escribió la nota después sin correr esa prueba contra el árbol sin nota.
+- **Demostración deliberada:** no hecha en 4a (la tarea 4 la fija sobre código de 4b).
+- **Ajustes fuera de los archivos centrales:** `RecordingAuthorizationMetrics` (doble de pruebas en `shared/web/harness`) implementa los tres métodos nuevos y expone contadores; `LogAuthorizationMetrics` pasó de `synchronized` con un solo contador a un mapa por clave (evento y permiso), como `LogRateLimitMetrics`; sus pruebas viven en `shared/observability/metrics`, no en `shared/web/authorization`.
+- La nota de `docs/07` está en la sección 5.4 y la comprueba `docs07Section54HasTheDatedNoteWithTheFourAuthorizationEvents`.
+- No se corrió `./mvnw verify` completo (memoria limitada); queda al CI del PR.
