@@ -1,10 +1,9 @@
 import { createRoute, redirect, type AnyRoute } from "@tanstack/react-router";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
-import type { AdminKey } from "../../i18n/resources.ts";
-import { useSessionView } from "./boot/use-session-view.ts";
 import { AccessPlaceholder } from "./components/AccessPlaceholder.tsx";
 import { SignedInContainer } from "./signed-in/SignedInContainer.tsx";
-import type { AccessSession, ArrivalNotice } from "./session/index.ts";
+import { SignInContainer } from "./sign-in/SignInContainer.tsx";
+import type { AccessSession } from "./session/index.ts";
 
 /** The only routes of this change (AW59). The URL never carries a destination (AW19). */
 export const ACCESS_PATHS = {
@@ -13,13 +12,6 @@ export const ACCESS_PATHS = {
   verification: "/iniciar-sesion/verificacion",
   enrollment: "/iniciar-sesion/inscripcion",
 } as const;
-
-const NOTICE_TEXT: Record<ArrivalNotice, AdminKey> = {
-  "session-expired": "notice.sessionExpired",
-  "second-factor-interrupted": "notice.verificationInterrupted",
-  "enrollment-interrupted": "notice.enrollmentInterrupted",
-  "second-factor-already-enrolled": "notice.alreadyEnrolled",
-};
 
 const trimSlash = (pathname: string) => pathname.replace(/\/+$/, "");
 
@@ -47,14 +39,6 @@ function toHome(): void {
 }
 
 const isAuthenticated = (session: AccessSession) => session.getView().status === "authenticated";
-
-function SignInContainer({ session }: { readonly session: AccessSession }) {
-  const { t } = useAdminText();
-  const view = useSessionView(session);
-  const notice = view.status === "anonymous" && view.notice !== undefined ? t(NOTICE_TEXT[view.notice]) : undefined;
-
-  return <AccessPlaceholder title={t("signIn.title")} notice={notice} />;
-}
 
 function SecondFactorContainer() {
   const { t } = useAdminText();
@@ -84,7 +68,14 @@ export function createIdentityRoutes(root: AnyRoute, session: AccessSession): An
       beforeLoad: () => {
         if (isAuthenticated(session)) toHome();
       },
-      component: () => <SignInContainer session={session} />,
+      component: () => (
+        <SignInContainer
+          session={session}
+          homePath={ACCESS_PATHS.home}
+          verificationPath={ACCESS_PATHS.verification}
+          enrollmentPath={ACCESS_PATHS.enrollment}
+        />
+      ),
     }),
     createRoute({
       getParentRoute,

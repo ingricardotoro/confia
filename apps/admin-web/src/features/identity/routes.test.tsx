@@ -127,14 +127,25 @@ describe("the routes and the screens", () => {
     expect(titles).toEqual([SIGN_IN, SECOND_FACTOR, ENROLLMENT, SIGNED_IN, NOT_FOUND]);
   });
 
-  it("the placeholders offer no field: the credentials come with the next change", async () => {
-    renderApp({ path: "/iniciar-sesion" });
-    await screen.findByRole("heading", { level: 1, name: SIGN_IN });
+  it.each([
+    ["/iniciar-sesion/verificacion", "verify", SECOND_FACTOR],
+    ["/iniciar-sesion/inscripcion", "enroll", ENROLLMENT],
+  ] as const)("the placeholder at %s offers no field: its form comes with a later task", async (path, grant, heading) => {
+    renderApp({ path, session: await withToken(grant) });
+    await screen.findByRole("heading", { level: 1, name: heading });
 
     expect(document.forms).toHaveLength(0);
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/.+/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("admin-web-staff-sign-in task 3: the sign in route renders its form with both fields and the sign in button", async () => {
+    renderApp({ path: "/iniciar-sesion" });
+    await screen.findByRole("heading", { level: 1, name: SIGN_IN });
+
+    expect(document.forms).toHaveLength(1);
+    expect(screen.getByRole("textbox", { name: /Correo electrónico/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Iniciar sesión" })).toBeInTheDocument();
   });
 
   it("AW18: an unknown route shows the not found screen with a link to sign in, in the text of the catalog", async () => {

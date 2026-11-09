@@ -2,7 +2,7 @@
 
 - **Cambio:** `admin-web-staff-sign-in` (13b-1 de F0, parte 2 de 2)
 - **Modo:** TDD estricto. Comandos por superficie según `tasks.md` (pnpm y Vitest); el `test_command` de Maven no se usa.
-- **Última actualización:** 2026-11-07
+- **Última actualización:** 2026-11-08
 - **Entrega:** PR apilados (`stacked-to-main`), 800 líneas efectivas por PR (`docs/15` §3), umbral de excepción 880
 
 ## Estado acumulado
@@ -11,7 +11,8 @@
 |---|---|---|---|
 | 1 `enrollment-draft-in-session` | **Hecha** (sin corte) | `change/admin-web-staff-sign-in-1-enrollment-draft-in-session` | 698 de 800 (base `ca98c03`) |
 | 2 `access-form-foundation` | **Hecha**, con corte 2a / 2b y excepción del propietario para 2a | 2a `change/admin-web-staff-sign-in-2-access-form-foundation`; 2b `change/admin-web-staff-sign-in-2b-access-form-feedback` | 2a 848 (base `152172b`, excepción aprobada 2026-11-07); 2b 443 (base `e226ce3`) |
-| 3 a 9 | Pendientes | | |
+| 3 `sign-in-form` | **Hecha**, con corte 3a / 3b (el total superó 880) | 3a `change/admin-web-staff-sign-in-3-sign-in-form`; 3b `change/admin-web-staff-sign-in-3b-sign-in-container` | Total 912 (base `cb3ded9`); 3a 569 (base `cb3ded9`); 3b 343 (base `2598e28`) |
+| 4 a 9 | Pendientes | | |
 
 ## Tarea 1: `enrollment-draft-in-session`
 
@@ -139,3 +140,72 @@ catálogo y el archivo de bloqueo pueden alcanzar sus reglas; el importador edit
 (2) `CopyButton` usa `Button` con texto y no `IconButton`, porque `lucide-react` entra a la app en la tarea 3. (3) `CopyButton` lleva su propia región `status`
 siempre presente (vacía hasta copiar). (4) `ProblemAlert` recibe `ref` como propiedad. Sin textos fuera de la sección 8.
 
+
+## Tarea 3: `sign-in-form`
+
+### Medida (regla de las 800 líneas), 2026-11-08
+
+Medida con `git add -N .`, `git reset`, `git add -A` y `git diff --cached --numstat -M cb3ded9` (sin `openspec/`, archivo de bloqueo ni código generado) sobre
+la tarea completa antes de comprometer: 887 adiciones y 23 eliminaciones, **910 líneas** (912 con la aserción de `type="text"` que se agregó en la
+demostración 2). Está sobre 880, así que no se pidió excepción y se aplicó el corte predefinido por archivos completos:
+**3a** (esquema, `PasswordField`, `SignInForm`, sus pruebas, las cuatro claves de `signIn.*`, `lucide-react`) **569** contra `cb3ded9`;
+**3b** (`SignInContainer`, su prueba, `routes.tsx` y `routes.test.tsx`) **343** contra el commit de 3a (`2598e28`).
+
+### Evidencia del ciclo TDD
+
+| Paso | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| 3a: esquema, `PasswordField`, `SignInForm` | Sí, antes del código de producción | `Failed to resolve import "./sign-in-schema.ts"`, `"./PasswordField.tsx"` y `"./SignInForm.tsx"` (3 archivos fallidos, ninguna prueba ejecutada) | 31 pruebas. Un error de mi prueba: el nombre del botón enviando incluye el `Spinner`; la consulta pasó a `/Iniciar sesión/` |
+| 3b: contenedor y rutas | Sí | Las 10 pruebas de `SignInContainer.test.tsx` fallan con `Unable to find an accessible element with the role "textbox"` (y `"button"` en la primera): la ruta aún mostraba el provisional sin campos. La prueba no importa el contenedor (se prueba por la app completa), así que el rojo es de comportamiento y no `Failed to resolve import` | 246 pruebas de `features/identity` y `app` |
+
+El supuesto de 3.1 se cumplió: `LoginRequest.extend({ ... .min(1) })` sobre los esquemas generados de Zod 4.6.6 funciona sin importar `zod` en la app.
+No hubo código de producción antes de su prueba.
+
+### Demostraciones deliberadas (tarea 3.3)
+
+Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, restauración desde la copia y `cmp` sin salida.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 1 | `maxLength={320}` en el identificador | 2 fallos de SS51: `no field has a maxlength or a pattern` y el pegado de 400 caracteres (`expected last "vi.fn()" call to have been called with [ 'identifier', …(1) ]`) | idéntico |
+| 2 | `type="email"` en el identificador | SS52 (`the identifier is plain text…`) y, tras agregar la aserción `type="text"` a la prueba del contenedor, SS58. Con la prueba de SS58 sin esa aserción **no** se ponía en rojo: jsdom recorta igual que `normalizeIdentifier`, así que el valor enviado era idéntico; se reforzó la prueba en lugar de dar por cumplida la demostración | idéntico |
+| 3 | `normalizeIdentifier` con `.toLowerCase()` | 2 fallos de SS58: `expected 'ana.pérez+admin@colegio.edu.hn' to be 'Ana.Pérez+Admin@Colegio.edu.hn'` (esquema y contenedor) | idéntico |
+| 4 | Nombre del control `Ocultar contraseña` cuando está visible | 2 fallos de SS53: `Unable to find an accessible element with the role "button" and name "Mostrar contraseña"` | idéntico |
+
+### Desviaciones y decisiones
+
+1. **Catálogo en 3a.** `tasks.md` asigna el catálogo a 3b; las presentaciones de 3a leen `signIn.identifier`, `password`, `submit` y `showPassword` con `useAdminText`,
+   así que las cuatro claves van en 3a. Los textos son los de la sección 8, sin ninguno fuera de ella.
+2. **Textos aprobados en pruebas de componente.** La aserción literal de los textos de §8 vive en `SignInForm.test.tsx` y `PasswordField.test.tsx`, no en
+   `src/i18n/catalog.test.ts`, que queda fuera de la superficie de la tarea (igual que la desviación 5 de la tarea 2).
+3. **Espera, cuenta regresiva y región `polite` sin renderizar.** El contenedor pasa a la presentación todo lo que expone el gancho, pero `SignInForm` solo dibuja
+   resumen, `Alert`, avisos y botón; `liveMessage` y `countdown` son de la tarea 4 (SS43 a SS48), como fija su lista de archivos. Mientras tanto un `429` muestra el texto fijo
+   del `Alert` sin número.
+4. **Aviso de llegada.** Pasa tal cual del provisional: `Alert` `info` después del `h1`. `NOTICE_TEXT` se mudó de `routes.tsx` al contenedor. La variante `warning` y el ocultarse
+   al primer envío son de la tarea 4 (E7).
+5. **`routes.test.tsx`.** La prueba «the placeholders offer no field» ya no vale para el inicio de sesión; pasó a verificación e inscripción (siguen provisionales) y se agregó una
+   que comprueba que la ruta de inicio de sesión dibuja el formulario.
+6. **SS59 en pantalla es débil.** Antes de que llegue el secreto, `getEnrollment()` es `undefined` tanto con borrador como sin él; la prueba de pantalla comprueba que con
+   `second-factor-required` no hay inscripción posible. La que distingue el borrador está en `access-session.test.ts` (tarea 1).
+7. **Sin fila de la puerta de accesibilidad todavía.** La matriz no tiene filas del inicio de sesión hasta la tarea 4. Para no dejar la pantalla sin revisión de axe, se corrió una vez
+   `@axe-core/playwright` desde un guion fuera del repositorio contra el simulador y la compilación (`vite preview`): 4 estados (inicial, resumen, contraseña visible,
+   credenciales no aceptadas) por 2 temas sin violaciones; el primer `Tab` cae en el identificador; el foco va al resumen y al `Alert`. No es evidencia de la puerta.
+
+### Verificación de cierre
+
+Cada parte sobre su propio árbol (3a con los archivos de 3b apartados, sin `git stash`). U de 3a y 3b con `--maxWorkers=4` y PR con
+`VITEST_MAX_WORKERS=4 pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1 --env-mode=loose`.
+**Por qué se limitaron los trabajadores.** Con el número por defecto, U falló dos veces en 3a con tiempos agotados de 5 s en pruebas ajenas a la tarea y distintas cada vez
+(la primera: `use-access-form.test.tsx > focuses the alert when the failure has no field…`; la segunda: 7 pruebas de `use-access-form`, `routes`, `CopyButton`,
+`SignedInContainer`, `BootScreen` y `SignedInPage`), y PR falló dos veces por lo mismo (11 y 4 fallos). Ninguno se repitió en la misma prueba; el equipo tenía 40 % de CPU
+ocupada por procesos ajenos. Con 4 trabajadores todo pasó a la primera.
+
+| Suite | 3a | 3b |
+|---|---|---|
+| U | 57 archivos, 579 pruebas y 1 `todo`, cobertura sobre el umbral | 58 archivos, 591 pruebas y 1 `todo` |
+| T | 9 archivos, 286 pruebas | 9 archivos, 286 pruebas |
+| E (`--workers=2`) | 37 de 37 | 37 de 37 |
+| PR | 18 de 18 | 18 de 18 |
+
+`pnpm install --frozen-lockfile --prefer-offline` pasa con el importador editado y `pnpm why react` muestra una sola versión. Guarda de `*.spec.*` vacía y
+`git diff --name-only cb3ded9 -- apps/api packages/ui packages/contracts` vacío en ambas partes.
