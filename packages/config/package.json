@@ -1,7 +1,7 @@
 {
   "name": "@confia/config",
   "private": true,
-  "description": "Shared TypeScript, ESLint and Vitest configuration for every CONFIA frontend package.",
+  "description": "Shared TypeScript, ESLint and Vitest configuration, and the accessibility policy, for every CONFIA frontend package.",
   "type": "module",
   "exports": {
     "./tsconfig.base.json": "./tsconfig.base.json",
@@ -12,6 +12,10 @@
     "./vitest": {
       "types": "./vitest.d.ts",
       "default": "./vitest.js"
+    },
+    "./a11y": {
+      "types": "./src/a11y.ts",
+      "default": "./src/a11y.ts"
     },
     "./voice": "./src/voice.ts",
     "./text-keys": "./src/text-keys.ts"
@@ -28,6 +32,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "axe-core": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

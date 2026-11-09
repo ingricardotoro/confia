@@ -1,6 +1,6 @@
 import axe from "axe-core";
 import type { Result } from "axe-core";
-import { axeRunOptions, partitionViolations } from "./policy";
+import { axeRunOptions, partitionViolations } from "@confia/config/a11y";
 
 // The one function every story goes through, real or deliberately inaccessible (design.md decision
 // 8): gate.a11y.test.tsx proves it rejects, stories.a11y.test.tsx applies it to the catalog.
