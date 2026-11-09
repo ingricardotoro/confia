@@ -75,7 +75,9 @@ describe("CopyButton", () => {
 
       expect(await screen.findByText("No se pudo copiar. Seleccione el texto y cópielo manualmente.")).toBeInTheDocument();
     } finally {
+      // Put back what was there, or remove the own property this test added, so later tests see the clipboard again.
       if (original) Object.defineProperty(navigator, "clipboard", original);
+      else Reflect.deleteProperty(navigator, "clipboard");
     }
   });
 
