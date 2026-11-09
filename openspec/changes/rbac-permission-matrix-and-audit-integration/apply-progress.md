@@ -259,3 +259,63 @@ Rama `change/rbac-permission-matrix-and-audit-integration-4a-authorization-metri
 - **Ajustes fuera de los archivos centrales:** `RecordingAuthorizationMetrics` (doble de pruebas en `shared/web/harness`) implementa los tres métodos nuevos y expone contadores; `LogAuthorizationMetrics` pasó de `synchronized` con un solo contador a un mapa por clave (evento y permiso), como `LogRateLimitMetrics`; sus pruebas viven en `shared/observability/metrics`, no en `shared/web/authorization`.
 - La nota de `docs/07` está en la sección 5.4 y la comprueba `docs07Section54HasTheDatedNoteWithTheFourAuthorizationEvents`.
 - No se corrió `./mvnw verify` completo (memoria limitada); queda al CI del PR.
+
+## Tarea 4b (2026-11-09): parcial, bloqueada por dos pruebas de inventario fuera de las superficies permitidas
+
+Rama `change/rbac-permission-matrix-and-audit-integration-4b-permission-denial-audit`, sobre la punta de 4a (`284d881`). **La tarea 4 sigue sin marcarse.**
+
+### Estado de los commits
+
+| Commit | Contenido | Líneas efectivas |
+|---|---|---|
+| `37995de` `test(observability): cover concurrent signals and null permission in authorization metrics` | Cierra las sugerencias **R3-001** y **R3-002** de la revisión de 4a: ocho hilos sobre una sola clave producen un solo evento `WARN` y el siguiente evento lleva `suppressed=7`; `denialOmitted(null)` lanza `NullPointerException` sin evento ni clave. `LogAuthorizationMetricsTest` pasó de 6 a 8 pruebas. Las dos pasaron a la primera contra el código existente (no hubo rojo: cubren comportamiento ya correcto, sin defecto en `LogAuthorizationMetrics`). | 57 |
+| `4d2fd11` `feat(web): count permission denials in bounded in-memory windows` | Unidad A: `DenialWindows`, `AuthorizationProperties`, `application.yml`, `MutableClock` (de prueba), `DenialWindowsTest` (22) y la regla `denialWindowsMappingFunctionsTouchNoOtherMapping` con su fixture. | 956 |
+| Sin comprometer (árbol de trabajo) | Unidad B: `AuditingAccessDeniedHandler`, `PermissionDenialRecorder`, `PermissionDenialAudit`, cableado en `SecurityChains`, `AdminSecurityConfiguration` y `AuthorizationConfiguration`, doble de prueba del grabador, `PermissionEdgeTest` (+3), `PermissionDenialAuditIT` (14), `AuthorizationEdgeIT` segunda parte (+11), `NoRealTimeInDenialTestsTest` (2). | ≈ 1 400 |
+
+La unidad B no se compromete porque dos pruebas de inventario existentes fallan con ella y están fuera de las superficies permitidas de este lote (un commit en rojo no entra al historial):
+
+1. `apps/api/app/src/test/java/com/confia/shared/security/IdempotencyScopeExclusionInventoryTest.java`: `PermissionDenialAudit` (paquete web) depende de `shared.security.TransactionRunner` y de `SecurityContext`, y `AuthorizationConfiguration` de `TransactionRunner`; ninguno está en la lista permitida de la capa web. Hace falta ampliar `AUTHORIZATION_MAY_ALSO_DEPEND_ON` con esos dos tipos y `AuthorizationConfiguration` con `TransactionRunner`, y la prueba de alcance de la lista.
+2. `apps/api/app/src/test/java/com/confia/shared/audit/AuditScopeExclusionInventoryTest.java` (`noWebPackageClassDependsOnTheAuditModule`): ningún paquete web puede depender de `shared.audit`; `PermissionDenialAudit` usa `AuditEntry`, `AuditJson` y `AuditLogWriter`, y `AuthorizationConfiguration` el puerto del escritor. Hace falta una excepción nombrada para esas dos clases, con su justificación (el diseño D9 manda auditar desde el manejador del `403`).
+
+### Evidencia de ciclo TDD (tarea 4b)
+
+| Unidad | Prueba | ROJO observado | VERDE |
+|---|---|---|---|
+| `DenialWindows` | `DenialWindowsTest` | Compilación de pruebas: `cannot find symbol class DenialWindows` (con `DenialWindowsTest` ya escrita y sin producción). Con producción, 2 de 22 fallaron por un defecto real (se encolaba un resumen de cero omisiones al cerrar una ventana) y se corrigió | 22/22; tres ejecuciones con `-Dsurefire.runOrder=random`: 22/22, 22/22, 22/22 [BI138] |
+| Borde con base de datos | `AuthorizationEdgeIT` (segunda parte) | Con las clases creadas y **sin enlazar** el manejador: 7 de 17 fallaron con `Expected size: 2 but was: 0 in: []` (AZ37), `Expected size: 3 but was: 0` (tope) y `Expected size: 1 but was: 0` (WE98) | 17/17; tres órdenes aleatorios (semillas 11, 22 y 33 de `junit.jupiter.execution.order.random.seed`, con `@TestMethodOrder(MethodOrderer.Random.class)`): 17/17 cada una |
+| Grabador | `PermissionDenialAuditIT` | Con las clases creadas y sin enlazar: 2 fallos de la prueba (expectativas mal escritas: `jsonb` reordena los miembros del detalle y el reintento da 4 intentos, no 5); se corrigieron las pruebas, no la producción | 14/14 |
+| Reglas | `NoRealTimeInDenialTestsTest`, `AuthorizationBoundaryRulesTest` | **No observado el rojo previo** de ambas (se escribieron junto con su producción); sí se observaron al aplicar las demostraciones 7 y 8 | 2/2 y 7/7 |
+| Manejador del arnés | `PermissionEdgeTest` (+3) | **No observado el rojo previo** por separado | 28/28 |
+
+**Hallazgo de herramienta:** ArchUnit no importa los métodos sintéticos, por lo que la primera versión de la regla de D10 falló de forma vacía («failed to check any classes»); se reemplazó por una lectura directa del bytecode con el ASM que Spring reempaqueta (`org.springframework.asm`), que sí ve `lambda$attempt$0` y los demás.
+
+### Demostraciones deliberadas (cada una revertida y confirmada con `cmp` contra una copia en el directorio temporal de la sesión)
+
+| # | Ruptura | Rojo por la aserción de resultado | `cmp` |
+|---|---|---|---|
+| 1 | No volver a enlazar `RequestOrigin.CURRENT` al escribir el resumen | `PermissionDenialAuditIT...NoOrigin`: «not the address of the request that fired it» | OK |
+| 2 | Contar dentro de la lambda del `TransactionRunner` (una llamada más a `windows.record` allí) | `aRetryOfTheRunnerDoesNotCountTheDenialTwice` y otras 3 | OK |
+| 3 | Quitar el `catch` de `PermissionDenialAudit.record` | `AuthorizationEdgeIT.theAnswerIsTheSame...` (llega `500`) y 2 de `PermissionDenialAuditIT` (la excepción sale) | OK |
+| 4 | `full <= T` | `DenialWindowsTest`: 9 fallos, entre ellos `concurrentDenialsOfOneKeyNeverExceedTheCap` [AZ79] | OK |
+| 5 | Quitar la rama del reloj retrocedido | `backwardClockClosesTheWindowAndKeepsTheSum` (DC-1) | OK |
+| 6 | `destroy()` vacío | `shutdownWritesPendingSummaries...` y otras 2 (DC-2) | OK |
+| 7 | `Thread.sleep` en `DenialWindowsTest` | `NoRealTimeInDenialTestsTest`: `calls method <java.lang.Thread.sleep(long)>` | OK |
+| 8 | `sweepIfDue` dentro de la función de `record` | `denialWindowsMappingFunctionsTouchNoOtherMapping`: `lambda$attempt$0 calls ...DenialWindows.sweepIfDue` | OK |
+| 9 | Escribir la cola (hasta 10) en `afterDenial` | `oneDenialWritesAtMostOneSummary` y 2 más | OK |
+| 10 | Quitar la regla de distancia de la compuerta | `farFutureNextSweepInstantIsTreatedAsDue` | OK |
+| 11 | No invocar `fullRowFailed` | `failedFullRowIsCountedInTheSummary` | OK |
+| 12 | Quitar el límite por barrido | `sweepMovesAtMostItsLimitAndLeavesTheRest` y `sweepRunsAtMostOncePerSecond` | OK |
+| 13 | `offerLast` al devolver un resumen fallido | `failedSummaryReturnsToTheHeadAndStopsThePass` («back at the head») | OK |
+| 14 | Quitar el presupuesto del apagado | `shutdownStopsWhenItsBudgetIsSpent` (se escriben 5, no 3) | OK |
+| 15 | Sin vaciado previo, con un resumen ajeno en la cola y un solo disparo | `fiveDenialsWriteThreeRowsAndAfterTheWindowOneSummaryOfTwo`: «the summary of the window was written» | OK |
+
+Notas: en la 2 la ruptura es una aproximación (una llamada extra a `windows.record` dentro de la lambda), no el movimiento literal de la línea. En la 15 el ayudante de la prueba (`closeTheWindowAndFireTheEmissionOf`) dispara tantas denegaciones de otra clave como resúmenes pendientes haya tras el primer barrido; la ruptura lo reduce a un disparo, que es lo que el diseño describe.
+
+### Desviaciones y pendientes
+
+- El `MutableClock` del diseño D19 no es reutilizable (el existente es una fuente de nanosegundos, de paquete, que nunca retrocede); se creó `shared/web/harness/MutableClock` como `java.time.Clock` mutable.
+- En lugar de `edgeSummaryTestsPassInAnyOrder` (una prueba que se lanza a sí misma), `AuthorizationEdgeIT` usa `@TestMethodOrder(MethodOrderer.Random.class)` y se ejecutó con tres semillas. Cada prueba de resumen avanza el reloj, vacía la cola con `flushClosedWindows` y solo afirma sobre su institución.
+- `AuthorizationEdgeIT` reemplaza en el contexto el `Clock`, `AuthorizationMetrics`, `AuditLogWriter` y el decisor (con un resolutor que puede fallar); la primera parte ahora usa ese reloj para las sesiones.
+- No cubierto: AZ49 (`404` de objeto sin asiento), porque el arnés no tiene una ruta con permiso que responda `404`; la búsqueda de centinelas de los registros se limita a los registradores de `com.confia` (la raíz en `DEBUG` incluye los de Spring, que repiten la ruta por su cuenta); el cuerpo del `403` repite la ruta en `instance` por diseño (WE99).
+- Un resumen que no cabe al devolverse a una cola llena cuenta dos veces `authorization_denial_audit_failed` (el fallo de escritura y el descarte).
+- Sin líneas nuevas en `ProcessBeanPolicy` (`ProcessBeanIsolationTest` 33/33). No se corrió `./mvnw verify` completo (memoria limitada).
