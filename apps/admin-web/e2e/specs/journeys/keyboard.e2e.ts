@@ -64,7 +64,6 @@ test.describe("the sign in with a code, with the keyboard only, against the simu
     await expect(page.getByRole("heading", { level: 1, name: "Verificación en dos pasos" })).toBeFocused();
     await press(page, "Tab");
     await expect(page.getByRole("textbox", { name: /Código de verificación/ })).toBeFocused();
-    await page.keyboard.type(currentCode(account));
     await press(page, "Tab");
     await expect(page.getByRole("button", { name: "Verificar" })).toBeFocused();
     await press(page, "Tab");
@@ -72,6 +71,8 @@ test.describe("the sign in with a code, with the keyboard only, against the simu
     await press(page, "Shift+Tab");
     await press(page, "Shift+Tab");
     await expect(page.getByRole("textbox", { name: /Código de verificación/ })).toBeFocused();
+    // The code is computed right before it is sent, so a 30 s step boundary cannot fall between the two.
+    await page.keyboard.type(currentCode(account));
     await page.keyboard.press("Enter");
 
     await expect(page.getByRole("heading", { level: 1, name: "Sesión iniciada." })).toBeVisible();
