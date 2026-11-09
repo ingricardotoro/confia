@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es-HN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="confia-a11y-fixture" content="dark-only-contrast" />
+    <title>Contraste solo en el tema oscuro</title>
+    <style>
+      body { background: #ffffff; color: #111111; }
+      /* Readable in the light theme; about 1.2 to 1 in the dark one. */
+      @media (prefers-color-scheme: dark) {
+        body { background: #222222; color: #333333; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Contraste solo en el tema oscuro</h1>
+      <p>Este texto se lee en el tema claro y no en el oscuro.</p>
+    </main>
+  </body>
+</html>

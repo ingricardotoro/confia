@@ -1,0 +1,81 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { MATRIX, MINIMUM } from "./a11y-matrix.ts";
+import { THEMES, assertCoversMinimum, assertNoBlocking, summarizeReport, type GateResult, type Result } from "./a11y-report.ts";
+import { SCENARIO_HEADER } from "./scenario-header.ts";
+import { SCENARIO_HEADER as SERVER_HEADER } from "../mock-api/server.ts";
+
+const violation = (id: string, impact: Result["impact"]): Result =>
+  ({ id, impact, help: `${id} help`, nodes: [{ target: ["#x"] }] }) as unknown as Result;
+const result = (blocking: Result[], theme: GateResult["theme"] = "light"): GateResult => ({
+  route: "/inaccessible",
+  state: "ready",
+  theme,
+  blocking,
+  reported: [],
+});
+
+describe("the evaluations of the matrix [BX74, BX77]", () => {
+  it("covers every minimum combination in both themes, with the minimum written apart from the matrix", () => {
+    const evaluations = assertCoversMinimum(MATRIX, MINIMUM);
+
+    expect(MINIMUM).toHaveLength(6);
+    for (const wanted of MINIMUM) {
+      const themes = evaluations.filter((e) => e.route === wanted.route && e.state === wanted.state).map((e) => e.theme);
+      expect(themes).toEqual([...THEMES]);
+    }
+    expect(evaluations).toHaveLength(12);
+  });
+
+  it("fails on zero combinations instead of passing", () => {
+    expect(() => {
+      assertCoversMinimum([], MINIMUM);
+    }).toThrow(/zero combinations/);
+  });
+
+  it("fails and names the minimum combination the matrix lacks", () => {
+    expect(() => {
+      assertCoversMinimum(MATRIX.slice(1), MINIMUM);
+    }).toThrow(new RegExp(MATRIX[0]?.state ?? "unreachable"));
+  });
+});
+
+describe("the verdict [BX75]", () => {
+  it("names route, state, theme, rule and impact of every blocking violation", () => {
+    expect(() => {
+      assertNoBlocking([result([violation("button-name", "critical")], "dark")]);
+    }).toThrow(
+      "/inaccessible [ready] dark: button-name (critical)",
+    );
+  });
+
+  it("passes when nothing blocks", () => {
+    expect(() => {
+      assertNoBlocking([result([])]);
+    }).not.toThrow();
+  });
+
+  it("summarizes the evaluations without the page markup", () => {
+    const report = summarizeReport([
+      { ...result([violation("button-name", "critical")]), blocking: [{ rule: "button-name", impact: "critical", help: "h", targets: ["#x"] }], reported: [] },
+    ]);
+
+    expect(report).toMatchObject({ evaluated: 1, blocking: 1, reported: 0 });
+  });
+});
+
+describe("the policy and the header", () => {
+  const read = (path: string) => readFileSync(join(import.meta.dirname, path), "utf8");
+
+  it("shares the module of the accessibility policy with the story gate [BX73]", () => {
+    const stories = read("../../../../packages/ui/src/a11y/run-gate.ts");
+
+    expect(read("./a11y-gate.ts")).toContain('from "@confia/config/a11y"');
+    expect(stories).toContain('from "@confia/config/a11y"');
+  });
+
+  it("sends the header the simulator reads", () => {
+    expect(SCENARIO_HEADER).toBe(SERVER_HEADER);
+  });
+});

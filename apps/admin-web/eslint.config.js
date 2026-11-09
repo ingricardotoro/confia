@@ -5,4 +5,9 @@ import { confiaEslint } from "@confia/config/eslint";
 export default [
   ...confiaEslint({ tsconfigRootDir: import.meta.dirname, app: true, react: true }),
   { ignores: ["e2e/mock-api/start.mjs"] },
+  {
+    // Playwright fixtures receive a function named `use`, which the React hooks rule takes for a hook.
+    files: ["e2e/support/scenario.ts"],
+    rules: { "react-hooks/rules-of-hooks": "off" },
+  },
 ];

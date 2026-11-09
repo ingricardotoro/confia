@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "build": "vite build",
+    "test:e2e": "playwright test",
     "mock:api": "node e2e/mock-api/start.mjs"
   },
   "dependencies": {
