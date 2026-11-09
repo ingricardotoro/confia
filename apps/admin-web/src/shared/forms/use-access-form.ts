@@ -4,6 +4,7 @@ import { useAdminText } from "../../i18n/use-admin-text.ts";
 import type { AdminKey } from "../../i18n/resources.ts";
 import type { AccessFailure } from "./access-failure.ts";
 import { resolveFieldErrors, type FieldIssue } from "./field-errors.ts";
+import { useRetryCountdown } from "./use-retry-countdown.ts";
 
 /** What a form's own validation says about a field. Reasons, not texts: the hook turns them into catalog keys. */
 export type FieldReason = "required" | "too-long" | "format";
@@ -34,7 +35,9 @@ export interface AccessFormView<F extends string> {
   /** For `FormErrorSummary`; empty until a submit fails. */
   readonly summary: readonly { readonly controlId: string; readonly message: string }[];
   readonly alert?: { readonly message: string; readonly traceId?: string };
-  /** The text of the form's one polite region: the wait while a request is in flight, and nothing otherwise. */
+  /** The wait after a 429, translated. It goes outside every active region: a number that changes each second must not be announced. */
+  readonly countdown?: { readonly remaining: string };
+  /** The text of the form's one polite region: the wait while a request is in flight, the end of a 429 wait, or nothing. */
   readonly liveMessage: string;
   readonly submitting: boolean;
   readonly summaryRef: Ref<HTMLDivElement>;
@@ -65,6 +68,7 @@ export function useAccessForm<F extends string>({ fields, validate, submit, wait
   const [submitting, setSubmitting] = useState(false);
   const [focusRequest, setFocusRequest] = useState<FocusRequest>({ count: 0, target: "alert" });
   const inFlight = useRef(false);
+  const countdown = useRetryCountdown();
   // Callback refs kept in state, so the effect below sees an element that mounts in the same commit as the request.
   const [summaryElement, setSummaryElement] = useState<HTMLDivElement | null>(null);
   const [alertElement, setAlertElement] = useState<HTMLDivElement | null>(null);
@@ -114,6 +118,7 @@ export function useAccessForm<F extends string>({ fields, validate, submit, wait
     setAlert(undefined);
     setIssues([]);
     setSummaryShown(false);
+    countdown.clear();
     let failure: AccessFailure | undefined;
     try {
       failure = await submit(sent);
@@ -126,6 +131,7 @@ export function useAccessForm<F extends string>({ fields, validate, submit, wait
       fail(failure.errors, "summary");
       return;
     }
+    if (failure.kind === "rate-limited") countdown.start(failure.retryAfterSeconds);
     const traceId = "traceId" in failure ? failure.traceId : undefined;
     const key = failure.kind === "message" ? failure.key : failure.kind === "rate-limited" ? "problem.rateLimited" : "problem.unexpected";
     setAlert({ message: t(key), ...(traceId === undefined ? {} : { traceId }) });
@@ -137,6 +143,11 @@ export function useAccessForm<F extends string>({ fields, validate, submit, wait
     // The button already refuses a second activation while it is busy; this guard covers the submit that does not
     // go through it, such as Enter in a field, and the one that arrives before the render that marks it busy.
     if (inFlight.current) return;
+    // During a 429 wait nothing is sent and the count goes on; the person is taken back to the reason.
+    if (countdown.isActive()) {
+      alertElement?.focus();
+      return;
+    }
     const sent = normalized(form.state.values);
     const found = issuesOf(validate(sent));
     if (found.length > 0) {
@@ -154,7 +165,8 @@ export function useAccessForm<F extends string>({ fields, validate, submit, wait
     fieldErrors,
     summary: summaryShown ? summary.map(({ controlId, key }) => ({ controlId, message: t(key) })) : [],
     ...(alert === undefined ? {} : { alert }),
-    liveMessage: submitting ? t(waitingKey) : "",
+    ...(countdown.remainingSeconds === undefined ? {} : { countdown: { remaining: t("countdown.remaining", { seconds: countdown.remainingSeconds }) } }),
+    liveMessage: submitting ? t(waitingKey) : countdown.finished ? t("countdown.done") : "",
     submitting,
     summaryRef: setSummaryElement,
     alertRef: setAlertElement,

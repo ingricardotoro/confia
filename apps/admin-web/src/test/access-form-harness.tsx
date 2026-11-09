@@ -38,6 +38,7 @@ export function AccessFormHarness({ submit, validate = requireBoth, labels }: Ac
           {form.alert.traceId === undefined ? null : <span>{form.alert.traceId}</span>}
         </Alert>
       )}
+      {form.countdown === undefined ? null : <p>{form.countdown.remaining}</p>}
       <FormField label={labels.identifier} controlId="harness-identifier" required {...errorOf(form.fieldErrors.identifier)}>
         {(control) => (
           <Input

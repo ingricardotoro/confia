@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AccessFormHarness, type AccessFormHarnessProps } from "../../test/access-form-harness.tsx";
 import { renderWithAdminI18n } from "../../test/render.tsx";
 import type { AccessFailure } from "./access-failure.ts";
@@ -232,5 +232,76 @@ describe("useAccessForm: a submit in flight", () => {
     await user.click(button());
 
     expect(submit).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("useAccessForm: a 429", () => {
+  const limited: AccessFailure = { kind: "rate-limited", retryAfterSeconds: 15 };
+
+  async function typeAndLimit(submit: Submit) {
+    const form = renderForm(submit);
+    await form.user.type(form.identifier(), "ana");
+    await form.user.type(form.password(), "x");
+    // Timers are simulated only from here, so typing keeps its real timing.
+    vi.useFakeTimers();
+    fireEvent.submit(form.form());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    return form;
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("SS43: shows the fixed text in the alert and the seconds apart from it, counting down", async () => {
+    await typeAndLimit(vi.fn<Submit>(() => Promise.resolve(limited)));
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Hizo demasiadas solicitudes seguidas. Espere unos segundos e intente de nuevo.");
+    expect(alert).not.toHaveTextContent(/\d+ s/);
+    expect(screen.getByText("Puede intentar de nuevo en 15 s.")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.getByText("Puede intentar de nuevo en 13 s.")).toBeInTheDocument();
+    expect(alert).toHaveTextContent("Hizo demasiadas solicitudes seguidas. Espere unos segundos e intente de nuevo.");
+  });
+
+  it("SS45: a submit during the wait does not call submit, does not restart the count, and returns the focus to the alert", async () => {
+    const submit = vi.fn<Submit>(() => Promise.resolve(limited));
+    const { identifier, form, button } = await typeAndLimit(submit);
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+    identifier().focus();
+
+    fireEvent.submit(form());
+
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Puede intentar de nuevo en 11 s.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveFocus();
+    expect(button()).not.toBeDisabled();
+  });
+
+  it("SS46: when the wait ends, the polite region says so and a new submit goes through", async () => {
+    const submit = vi.fn<Submit>(() => Promise.resolve(limited));
+    const { form } = await typeAndLimit(submit);
+
+    act(() => {
+      vi.advanceTimersByTime(15_000);
+    });
+
+    expect(screen.getByRole("status", { name: LABELS.live })).toHaveTextContent("Ya puede intentar de nuevo.");
+    expect(screen.queryByText(/Puede intentar de nuevo en/)).not.toBeInTheDocument();
+
+    fireEvent.submit(form());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(submit).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("status", { name: LABELS.live })).toBeEmptyDOMElement();
   });
 });
