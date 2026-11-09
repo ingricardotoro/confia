@@ -171,6 +171,27 @@ describe("the scenarios", { timeout: LIMIT }, () => {
     expect([reply.status, typeOf(reply)]).toEqual([status, code]);
   });
 
+  it("SS41: the preset validation-failed answers 400 with the password refused for its length, and the answer meets the contract", async () => {
+    await preset("refused", "validation-failed");
+
+    const reply = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: "refused" });
+
+    expect([reply.status, typeOf(reply)]).toEqual([400, "validation-failed"]);
+    expect((reply.json as { errors: unknown }).errors).toEqual([{ field: "password", reason: "max" }]);
+    expect(reply.text).not.toContain(credentials.password);
+    expect((await call("GET", "/__control/violations")).json).toEqual([]);
+  });
+
+  it("SS50: the preset internal-error answers 500 with a trace id, and the answer meets the contract", async () => {
+    await preset("broken-down", "internal-error");
+
+    const reply = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: "broken-down" });
+
+    expect([reply.status, typeOf(reply)]).toEqual([500, "internal-error"]);
+    expect((reply.json as { traceId?: string }).traceId).toMatch(/^[A-Z0-9]{8,32}$/);
+    expect((await call("GET", "/__control/violations")).json).toEqual([]);
+  });
+
   it("gives Retry-After with the 429", async () => {
     await preset("busy", "too-many-requests");
 

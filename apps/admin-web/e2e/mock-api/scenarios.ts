@@ -1,4 +1,4 @@
-import { problem } from "../../src/test/contract-responses.ts";
+import { problem, type ProblemOptions } from "../../src/test/contract-responses.ts";
 import { createSessionModel, type ModelResponse, type SessionModel } from "./session-model.ts";
 
 /**
@@ -10,6 +10,8 @@ import { createSessionModel, type ModelResponse, type SessionModel } from "./ses
 export const DEFAULT_SCENARIO = "default";
 export const SLOW_RESPONSE_MS = 31_000;
 const RETRY_AFTER_SECONDS = "30";
+/** A fictitious trace id, the shape the backend gives: the screen shows it and the person copies it (SS50, AW54). */
+const TRACE_ID = "01J8Z4K2QF9P0X";
 const EXPIRY_PUSH_MS = 301_000;
 
 export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify";
@@ -21,6 +23,8 @@ type LoginBehavior =
   | "authentication-failed"
   | "too-many-requests"
   | "capacity-exceeded"
+  | "validation-failed"
+  | "internal-error"
   | "slow"
   | "restricted-expired";
 
@@ -38,6 +42,8 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   "authentication-failed": { login: "authentication-failed", enrolled: false },
   "too-many-requests": { login: "too-many-requests", enrolled: false },
   "capacity-exceeded": { login: "capacity-exceeded", enrolled: false },
+  "validation-failed": { login: "validation-failed", enrolled: false },
+  "internal-error": { login: "internal-error", enrolled: false },
   slow: { login: "slow", enrolled: false },
   "restricted-expired": { login: "restricted-expired", enrolled: true },
   "already-enrolled": { login: "second-factor-enrollment-required", enrolled: true },
@@ -62,8 +68,13 @@ export interface Scenario {
   signIn(sleep: (ms: number) => Promise<void>): Promise<ModelResponse>;
 }
 
-const failure = (code: Parameters<typeof problem>[0], status: number, headers: Record<string, string> = {}): ModelResponse => ({
-  ...problem(code, status),
+const failure = (
+  code: Parameters<typeof problem>[0],
+  status: number,
+  headers: Record<string, string> = {},
+  options: ProblemOptions = {},
+): ModelResponse => ({
+  ...problem(code, status, options),
   headers,
   setCookies: [],
 });
@@ -90,6 +101,10 @@ function build(preset: string, definition: PresetDefinition): Scenario {
           return failure("too-many-requests", 429, { "Retry-After": RETRY_AFTER_SECONDS });
         case "capacity-exceeded":
           return failure("capacity-exceeded", 503);
+        case "validation-failed":
+          return failure("validation-failed", 400, {}, { errors: [{ field: "password", reason: "max" }] });
+        case "internal-error":
+          return failure("internal-error", 500, {}, { traceId: TRACE_ID });
         case "slow":
           await sleep(SLOW_RESPONSE_MS);
           return model.openSession();

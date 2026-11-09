@@ -25,7 +25,8 @@ describe("the evaluations of the matrix [BX74, BX77]", () => {
       const themes = evaluations.filter((e) => e.route === wanted.route && e.state === wanted.state).map((e) => e.theme);
       expect(themes).toEqual([...THEMES]);
     }
-    expect(evaluations).toHaveLength(12);
+    // Every combination of the matrix is evaluated, the minimum and the screens added since.
+    expect(evaluations).toHaveLength(MATRIX.length * THEMES.length);
   });
 
   it("fails on zero combinations instead of passing", () => {
@@ -38,6 +39,46 @@ describe("the evaluations of the matrix [BX74, BX77]", () => {
     expect(() => {
       assertCoversMinimum(MATRIX.slice(1), MINIMUM);
     }).toThrow(new RegExp(MATRIX[0]?.state ?? "unreachable"));
+  });
+});
+
+describe("the states of the sign in screen [BX109]", () => {
+  const SIGN_IN = "/iniciar-sesion";
+  const signIn = MATRIX.filter((combination) => combination.route === SIGN_IN);
+
+  it("holds the eight states, each once, so the gate evaluates 16 combinations of the screen in both themes", () => {
+    expect(signIn.map((combination) => combination.state)).toEqual([
+      "initial",
+      "error-summary",
+      "credentials-rejected",
+      "rate-limited-countdown",
+      "service-busy",
+      "sending",
+      "password-visible",
+      "with-notice",
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...signIn])).toHaveLength((MINIMUM.length + signIn.length) * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+
+  it("reaches the states of a failure through the presets of the simulator, and the rest without one", () => {
+    const presets = Object.fromEntries(signIn.map((combination) => [combination.state, combination.preset]));
+
+    expect(presets).toEqual({
+      initial: undefined,
+      "error-summary": undefined,
+      "credentials-rejected": "authentication-failed",
+      "rate-limited-countdown": "too-many-requests",
+      "service-busy": "capacity-exceeded",
+      sending: "slow",
+      "password-visible": undefined,
+      "with-notice": undefined,
+    });
+  });
+
+  it("keeps the minimum of the part 1 at six combinations until the last screen", () => {
+    expect(MINIMUM).toHaveLength(6);
+    expect(MINIMUM.some((wanted) => wanted.route === SIGN_IN)).toBe(false);
   });
 });
 

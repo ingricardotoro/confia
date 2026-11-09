@@ -16,6 +16,8 @@ export interface CombinationId {
 
 /** A route and state the gate can reach: how to get there, and the content that proves it was reached. */
 export interface GateCombination extends CombinationId {
+  /** A preset of the simulated API, applied to the scenario of the test before `arrange` runs. */
+  readonly preset?: string;
   arrange(page: Page): Promise<void>;
   expected(page: Page): Locator;
 }

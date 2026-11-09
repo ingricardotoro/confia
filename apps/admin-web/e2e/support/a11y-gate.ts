@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { A11Y_TAGS, partitionViolations } from "@confia/config/a11y";
 import type { GateCombination, GateResult, Theme } from "./a11y-report.ts";
+import { MOCK_API_URL } from "./scenario-header.ts";
 
 // One function for the real routes and for the deliberate ones (design.md D15). The policy is the one
 // of @confia/config/a11y that the story gate of packages/ui imports too (BX73).
@@ -9,6 +10,8 @@ import type { GateCombination, GateResult, Theme } from "./a11y-report.ts";
 export interface CheckOptions {
   /** How long the expected content may take to show; a state that never shows it fails (BX78). */
   readonly expectedTimeoutMs?: number;
+  /** The scenario of the test; required by a combination that names a preset of the simulated API. */
+  readonly scenarioId?: string;
 }
 
 /**
@@ -24,6 +27,11 @@ export async function checkCombination(
 ): Promise<GateResult> {
   const timeout = options.expectedTimeoutMs ?? 10_000;
   await page.emulateMedia({ colorScheme: theme });
+  if (combination.preset !== undefined) {
+    if (options.scenarioId === undefined) throw new Error(`${combination.route} [${combination.state}] names a preset and needs the scenario of the test.`);
+    const applied = await page.request.post(`${MOCK_API_URL}/__control/scenarios/${options.scenarioId}`, { data: { preset: combination.preset } });
+    if (!applied.ok()) throw new Error(`The simulator refused the preset of ${combination.route} [${combination.state}].`);
+  }
   await combination.arrange(page);
   try {
     await combination.expected(page).waitFor({ state: "visible", timeout });
