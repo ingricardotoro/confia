@@ -27,9 +27,13 @@ la puerta de accesibilidad sobre rutas (capacidad `build-integrity`) cierra el c
   - **URI:** `otpauth://totp/CONFIA:<encodeURIComponent(identificador)>?secret=<secreto>&issuer=CONFIA`, sin `algorithm`, `digits` ni `period`.
   - **Inscripción:** secciones de una sola ruta, solo hacia adelante, sin entradas de historial.
   - **Código de recuperación:** sin espacios, en mayúsculas, de 1 a 64 caracteres; sin comprobar el alfabeto.
-  - **QR:** `qrcode.react`, `QRCodeSVG`; si SS83 falla en rojo, la salida ya decidida es `qrcode` con `QRCode.create()` y un `<path>` propio.
+  - **QR:** `qrcode.react`, `QRCodeSVG`, como única vía. Si SS83 falla en rojo, el PR se detiene y decide el propietario.
     **Decodificador de prueba:** `jsqr`.
   - **Matriz de la puerta:** la de `build-integrity`, 22 estados por 2 temas.
+
+> **Nota fechada 2026-11-07 (decisión del propietario, fase de diseño).** Se retira la salida alternativa que este bloque daba por decidida.
+> Texto anterior: «si SS83 falla en rojo, la salida ya decidida es `qrcode` con `QRCode.create()` y un `<path>` propio». Contradecía el
+> requisito de la inscripción, que exige `QRCodeSVG` de `qrcode.react` con DEBE (`design.md`, E11).
 
 ## ADDED Requirements
 
@@ -152,12 +156,17 @@ campos DEBEN permitir pegar y NO DEBEN tener `maxLength` menor que el del contra
 - **ENTONCES** el pegado se acepta
 - **Y** ningún `maxLength` es menor que el máximo del contrato del campo
 
+> **Nota fechada 2026-11-07 (decisión del propietario, fase de diseño).** `docs/ui-ux/04-patrones-de-interaccion.md:393-394` dice que, tras un
+> envío fallido, el foco salta al primer campo con error y que el resumen es `role="alert"`. Este requisito (SS37), `docs/ui-ux/03-accesibilidad.md:141`
+> y `FormErrorSummary` (`role="group"`) enfocan el resumen. Ganan esta especificación y `docs/ui-ux/03`. El texto de este requisito no cambia; la
+> nota fechada en `docs/ui-ux/04` se agrega en el PR que implementa el formulario, no en esta fase (`design.md`, E3 y sección 14).
+
 ### Requisito: El inicio de sesión pide identificador y contraseña, no ofrece recuperación de contraseña y permite mostrar la contraseña
 
 El sistema DEBE mostrar un formulario con el campo del identificador (`autocomplete="username"`) y el de la contraseña
 (`autocomplete="current-password"`, oculta por defecto), cada uno con etiqueta visible asociada y marcado en texto como
 obligatorio. DEBE ofrecer un control «mostrar contraseña» compuesto con `Input` e `IconButton` en la funcionalidad de
-identidad (decisión P10): con nombre accesible que cambia entre mostrar y ocultar, `aria-pressed`, que conserva el valor
+identidad (decisión P10): con el nombre accesible fijo «Mostrar contraseña» y el estado en `aria-pressed`, que conserva el valor
 y el foco y que vuelve a ocultar la contraseña cada vez que se entra a la pantalla. DEBE mostrar un texto que remite a la
 administración para recuperar la contraseña y NO DEBE ofrecer enlace, ruta ni operación de contraseña olvidada (decisión
 P3; el autoservicio por HTTP no existe). Una respuesta `401 authentication-failed` DEBE mostrar siempre el mismo texto
@@ -177,8 +186,14 @@ fijado, sin distinguir cuál de los dos datos falló. La respuesta `200` DEBE ll
 - **DADO** la contraseña escrita «CENTINELA-CLAVE»
 - **CUANDO** la persona activa el control de mostrar contraseña
 - **ENTONCES** el campo pasa a `type="text"` con el mismo valor, el control tiene `aria-pressed="true"` y su nombre accesible
-  pasó de «mostrar» a «ocultar», y el foco sigue en el control
-- **Y** al activarlo de nuevo vuelve a `type="password"`
+  sigue siendo «Mostrar contraseña», y el foco sigue en el control
+- **Y** al activarlo de nuevo vuelve a `type="password"` y el control tiene `aria-pressed="false"`
+
+> **Nota fechada 2026-11-07 (decisión del propietario, fase de diseño).** Se enmiendan este escenario y el cuerpo de su requisito: el
+> nombre accesible del control es fijo y el estado lo lleva solo `aria-pressed`, porque combinar un nombre que cambia con `aria-pressed`
+> da dos señales del mismo estado. Texto anterior del requisito: «con nombre accesible que cambia entre mostrar y ocultar, `aria-pressed`».
+> Texto anterior de la primera cláusula ENTONCES: «el control tiene `aria-pressed="true"` y su nombre accesible pasó de «mostrar» a
+> «ocultar»». La segunda cláusula agrega `aria-pressed="false"` (`design.md`, E8).
 
 #### Escenario: [SS54] La contraseña vuelve a estar oculta al entrar de nuevo
 
@@ -685,6 +700,12 @@ ejercitan de verdad y cuáles no; los recorridos simulados NO DEBEN presentarse 
 - **DADO** el informe del cambio y `docs/09-roadmap-y-fases.md`
 - **CUANDO** se leen las menciones a los recorridos
 - **ENTONCES** declaran que corren contra una API simulada y que la prueba contra la pila real es del cambio 11
+
+> **Nota fechada 2026-11-07 (decisión del propietario, fase de diseño).** El simulador que entrega la parte 1 no cumple todavía todo lo que este
+> requisito le pide: no tiene escenario de `400 validation-failed` con `errors` por configuración de la prueba (solo lo responde ante un cuerpo
+> que el contrato rechaza), ni de `500 internal-error` con `traceId`, ni de token restringido vencido en la inscripción; devuelve el mismo secreto
+> en cada inscripción de un escenario, lo que impide SS100, y no expone la clave ni los códigos de la cuenta ya inscrita que necesitan los recorridos
+> con TOTP y con código de recuperación. El texto del requisito no cambia: esta parte cierra esas brechas (`design.md`, E13).
 
 ### Requisito: Ausencia de lo que pertenece a los cambios 13b-2 y 8b (brechas con destino)
 
