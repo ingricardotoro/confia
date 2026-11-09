@@ -37,8 +37,9 @@ export function RecoveryCodesStep({ codes, confirmed, summary, error, summaryRef
       </h2>
       <p className="text-text-secondary">{t("enrollment.codes.intro")}</p>
       <ul className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-border-subtle p-4 font-mono text-base tracking-wide text-text-primary">
-        {codes.map((code) => (
-          <li key={code}>{code}</li>
+        {codes.map((code, index) => (
+          // Positions, not codes: the list is shown once and never reordered.
+          <li key={index}>{code}</li>
         ))}
       </ul>
       <form

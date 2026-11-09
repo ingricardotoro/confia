@@ -179,10 +179,10 @@ const codeField = () => screen.getByRole("textbox", { name: /Código de verifica
 const shownText = () => document.body.textContent;
 
 /** Opens the enrollment and presses Continue on the secret step. */
-async function toCodes() {
+async function toCodes(options: RenderAppOptions = {}) {
   const reply = enrollment();
   route("post", ENROLLMENTS, reply);
-  const app = await open();
+  const app = await open(options);
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "Continuar" }, TIMEOUT));
   await screen.findByRole("heading", { level: 2, name: CODES_HEADING }, TIMEOUT);
@@ -190,8 +190,8 @@ async function toCodes() {
 }
 
 /** Confirms the codes and presses Continue. */
-async function toFirstCode() {
-  const reached = await toCodes();
+async function toFirstCode(options: RenderAppOptions = {}) {
+  const reached = await toCodes(options);
   await reached.user.click(screen.getByRole("checkbox", { name: CONFIRM }));
   await reached.user.click(screen.getByRole("button", { name: "Continuar" }));
   await screen.findByRole("heading", { level: 2, name: FIRST_CODE_HEADING }, TIMEOUT);
@@ -381,5 +381,99 @@ describe("EnrollmentContainer: leaving", () => {
     expect(router.state.location.pathname).toBe("/");
     expect(screen.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
     expect(enrollments()).toHaveLength(1);
+  });
+});
+
+/** An activation that waits for `release()` before it reaches the server, so a test can act while it is in flight. */
+function heldActivation() {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return {
+    release: () => {
+      release();
+    },
+    options: {
+      api: {
+        ...api,
+        completeSecondFactor: async (token: string, proof: Parameters<typeof api.completeSecondFactor>[1]) => {
+          await held;
+          return api.completeSecondFactor(token, proof);
+        },
+      },
+    } satisfies RenderAppOptions,
+  };
+}
+
+describe("EnrollmentContainer: an activation that is in flight", () => {
+  it("an answer that arrives after the person left for sign in navigates nobody", LIMIT, async () => {
+    route("post", VERIFICATIONS, authenticatedSession());
+    route("get", CURRENT, currentSession());
+    const held = heldActivation();
+    const { user, router } = await toFirstCode(held.options);
+    await user.type(codeField(), sixDigits());
+    await user.click(screen.getByRole("button", { name: "Activar" }));
+    await router.navigate({ to: "/iniciar-sesion" });
+    await screen.findByRole("heading", { level: 1, name: "Iniciar sesión" }, TIMEOUT);
+
+    held.release();
+    await waitFor(() => {
+      expect(verifications()).toHaveLength(1);
+    }, TIMEOUT);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(router.state.location.pathname).toBe("/iniciar-sesion");
+    expect(screen.queryByRole("heading", { level: 1, name: "Sesión iniciada." })).not.toBeInTheDocument();
+  });
+
+  it("while it is in flight, See the QR code again does nothing: the draft stays at the first code", LIMIT, async () => {
+    route("post", VERIFICATIONS, problem("second-factor-invalid", 401));
+    const held = heldActivation();
+    const { user, session } = await toFirstCode(held.options);
+    await user.type(codeField(), sixDigits());
+    await user.click(screen.getByRole("button", { name: "Activar" }));
+
+    await user.click(screen.getByRole("button", { name: "Ver de nuevo el código QR" }));
+
+    expect(session.getEnrollment()?.step).toBe("first-code");
+    held.release();
+    expect(await screen.findByRole("alert", {}, TIMEOUT)).toHaveTextContent(INVALID_CODE);
+  });
+});
+
+describe("EnrollmentContainer: a recovery codes step without codes", () => {
+  it("is a failure with a way out, not an empty list the person could confirm", LIMIT, async () => {
+    route("post", ENROLLMENTS, enrollment());
+    route("post", SESSIONS, secondFactorEnrollmentRequired());
+    const real = createTestSession();
+    await real.signIn({ identifier: IDENTIFIER, password: crypto.randomUUID() });
+    // A draft that reached the codes step with none: the session cannot do it, so the container is shown one by hand.
+    // The same object until the draft changes, as the store requires.
+    let seen: ReturnType<typeof real.getEnrollment>;
+    let shown: ReturnType<typeof real.getEnrollment>;
+    const session = {
+      ...real,
+      getEnrollment: () => {
+        const held = real.getEnrollment();
+        if (held !== seen) {
+          seen = held;
+          shown = held === undefined ? undefined : { ...held, step: "recovery-codes" as const, recoveryCodes: undefined };
+        }
+        return shown;
+      },
+    };
+    const { router } = renderApp({ path: "/iniciar-sesion/inscripcion", session });
+    const user = userEvent.setup();
+
+    const alert = await screen.findByRole("alert", {}, TIMEOUT);
+
+    expect(alert).toHaveTextContent(FAILED);
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continuar" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Reintentar" }));
+    expect(await screen.findByText(/La inscripción se interrumpió./, {}, TIMEOUT)).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/iniciar-sesion");
   });
 });
