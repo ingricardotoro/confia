@@ -184,7 +184,7 @@ export function EnrollmentContainer({ session, signInPath, homePath }: Enrollmen
             }}
           />
         ) : snapshot.step === "recovery-codes" ? (
-          snapshot.recoveryCodes === undefined ? (
+          snapshot.recoveryCodes === undefined || snapshot.recoveryCodes.length === 0 ? (
             // The draft only gets here with codes; without them there is nothing to confirm, and a list the person never
             // saw must not be confirmable. It is a failure whose way out starts over (the secret in view no longer counts).
             <ErrorState

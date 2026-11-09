@@ -443,7 +443,10 @@ describe("EnrollmentContainer: an activation that is in flight", () => {
 });
 
 describe("EnrollmentContainer: a recovery codes step without codes", () => {
-  it("is a failure with a way out, not an empty list the person could confirm", LIMIT, async () => {
+  it.each([
+    ["missing", undefined],
+    ["empty", [] as string[]],
+  ])("with the codes %s, is a failure with a way out, not an empty list the person could confirm", LIMIT, async (_case, codes) => {
     route("post", ENROLLMENTS, enrollment());
     route("post", SESSIONS, secondFactorEnrollmentRequired());
     const real = createTestSession();
@@ -458,7 +461,7 @@ describe("EnrollmentContainer: a recovery codes step without codes", () => {
         const held = real.getEnrollment();
         if (held !== seen) {
           seen = held;
-          shown = held === undefined ? undefined : { ...held, step: "recovery-codes" as const, recoveryCodes: undefined };
+          shown = held === undefined ? undefined : { ...held, step: "recovery-codes" as const, recoveryCodes: codes };
         }
         return shown;
       },

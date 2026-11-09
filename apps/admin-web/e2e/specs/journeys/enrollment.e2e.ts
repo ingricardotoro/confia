@@ -131,7 +131,9 @@ test.describe("the enrollment screen, against the simulated API", { annotation: 
     await signIn(page);
     await expect(page.getByRole("img", { name: QR_NAME })).toBeVisible();
     const seen = urls.length;
-    await page.waitForLoadState("networkidle");
+    // `networkidle` resolves at once here: the document load ended before the client-side route change. A fixed
+    // window after the QR shows is what gives a late request (a font, an asset) the chance to appear.
+    await page.waitForTimeout(2_000);
 
     expect(urls).toHaveLength(seen);
     expect(blocked).toEqual([]);
