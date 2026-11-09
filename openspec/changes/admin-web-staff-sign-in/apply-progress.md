@@ -316,3 +316,13 @@ La primera vez la ruptura 2 se escribió mal con `sed` (el escape `\s` quedó co
 | PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 (14 reutilizadas de la caché de turbo, que depende de las entradas) |
 
 Guarda de `*.spec.*` vacía y `git diff --name-only 60d4bf9 -- apps/api packages/ui packages/contracts` vacío (índice y árbol). Sin dependencias nuevas. **Excepción del propietario (2026-11-09):** la tarea 5 se entrega como un solo PR de **856 líneas efectivas** (844 adiciones y 12 eliminaciones contra `60d4bf9`), dentro del umbral de 880; sin corte 5a / 5b.
+
+### Corrección de la revisión R3-001 (2026-11-09)
+
+La revisión nativa aprobó la tarea 5 y señaló un defecto (advertencia): el cambio de modo y «Volver al inicio de sesión» seguían activos con una verificación en vuelo. Cambiar de modo
+remonta el formulario (`key={mode}`) con un gancho nuevo, así que se podía enviar una segunda prueba, y la respuesta huérfana navegaba después de que la persona se había ido.
+
+- **ROJO observado:** el cambio de modo quitaba el campo del código (`Unable to find an accessible element with the role "textbox" and name /Código de verificación/`) y una respuesta liberada tras salir de la pantalla llevaba a `/` (`expected '/' to be '/iniciar-sesion'`). Una primera versión de la segunda prueba esperaba una petición registrada por MSW con la respuesta retenida antes del transporte; falló por esa causa y se corrigió a esperar el `aria-busy`.
+- **VERDE:** mientras `form.submitting`, el cambio de modo y el regreso se ignoran (sin `disabled`: siguen enfocables y llevan `aria-disabled`, como el botón ocupado ignora una segunda activación); una respuesta que llega con el componente desmontado no navega ni descarta nada (`mounted` en un efecto, válido con `StrictMode`).
+- **Pruebas:** 2 nuevas en `SecondFactorContainer.test.tsx` (con `completeSecondFactor` retenida). U 62 archivos y 661 pruebas y 1 `todo`; E 56 de 56; PR 18 de 18.
+

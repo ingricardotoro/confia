@@ -1,6 +1,7 @@
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import * as api from "../../../shared/api/auth-operations.ts";
 import { authenticatedSession, currentSession, problem, secondFactorRequired } from "../../../test/contract-responses.ts";
 import { installMswServer, requests, route } from "../../../test/msw-server.ts";
 import { createTestSession, renderApp } from "../../../test/render-app.tsx";
@@ -287,5 +288,88 @@ describe("SecondFactorContainer: what stays out of the caches", () => {
     expect(caches).not.toContain(wrong);
     expect(caches).not.toContain(right);
     expect(sentBodies()).toEqual([{ code: wrong }, { recoveryCode: right }]);
+  });
+});
+
+/** A promise a test settles by hand, so the server can "retain" an answer. */
+function gate() {
+  let release: () => void = () => undefined;
+  const closed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { closed, release };
+}
+
+/** Opens the verification over a session whose verification request waits for the gate. */
+async function openHeld(held: ReturnType<typeof gate>) {
+  let started = 0;
+  route("post", SESSIONS, secondFactorRequired());
+  const session = createTestSession({
+    api: {
+      ...api,
+      completeSecondFactor: async (token, proof) => {
+        started += 1;
+        await held.closed;
+        return api.completeSecondFactor(token, proof);
+      },
+    },
+  });
+  await session.signIn({ identifier: "ana@colegio.edu.hn", password: crypto.randomUUID() });
+  const user = userEvent.setup();
+  const app = renderApp({ path: "/iniciar-sesion/verificacion", session });
+  await screen.findByRole("heading", { level: 1, name: HEADING }, TIMEOUT);
+  return { user, started: () => started, ...app };
+}
+
+describe("SecondFactorContainer: while a verification is pending", () => {
+  it("R3-001: the mode toggle and the way back are ignored, stay focusable and announced, and work again once it settles", LIMIT, async () => {
+    const held = gate();
+    route("post", VERIFICATIONS, problem("second-factor-invalid", 401));
+    const { user, router, started } = await openHeld(held);
+    await user.type(codeField(), "123456");
+    await user.click(submitButton());
+    await waitFor(() => {
+      expect(submitButton()).toHaveAttribute("aria-busy", "true");
+    });
+    const before = codeField();
+
+    await user.click(toRecovery());
+    await user.click(screen.getByRole("button", { name: "Volver al inicio de sesión" }));
+
+    expect(codeField()).toBe(before);
+    expect(screen.queryByRole("textbox", { name: /Código de recuperación/ })).not.toBeInTheDocument();
+    expect(toRecovery()).toHaveAttribute("aria-disabled", "true");
+    expect(toRecovery()).toBeEnabled();
+    expect(router.state.location.pathname).toBe("/iniciar-sesion/verificacion");
+    expect(started()).toBe(1);
+
+    held.release();
+    await screen.findByRole("alert", {}, TIMEOUT);
+    expect(toRecovery()).not.toHaveAttribute("aria-disabled");
+    await user.click(toRecovery());
+
+    expect(recoveryField()).toHaveFocus();
+    expect(started()).toBe(1);
+  });
+
+  it("R3-001: an answer that settles after the person left the screen does not navigate", LIMIT, async () => {
+    const held = gate();
+    route("post", VERIFICATIONS, authenticatedSession());
+    route("get", CURRENT, currentSession());
+    const { user, router } = await openHeld(held);
+    await user.type(codeField(), "123456");
+    await user.click(submitButton());
+    await waitFor(() => {
+      expect(submitButton()).toHaveAttribute("aria-busy", "true");
+    });
+
+    await act(async () => {
+      await router.navigate({ to: "/iniciar-sesion" });
+    });
+    await screen.findByRole("heading", { level: 1, name: "Iniciar sesión" }, TIMEOUT);
+    held.release();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    expect(router.state.location.pathname).toBe("/iniciar-sesion");
   });
 });

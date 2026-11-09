@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { classifyAccessFailure, type AccessFailure } from "../../../shared/forms/access-failure.ts";
 import { useAccessForm } from "../../../shared/forms/use-access-form.ts";
 import type { AccessSession } from "../session/index.ts";
@@ -33,6 +33,14 @@ interface EntryProps extends SecondFactorContainerProps {
  */
 function SecondFactorEntry({ session, homePath, signInPath, mode, focusField, onToggleMode }: EntryProps) {
   const navigate = useNavigate();
+  // An answer that arrives after the person left the screen belongs to nobody: it must not navigate or discard anything.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   async function backToSignIn(): Promise<undefined> {
     // The restricted token ended or is gone: the sign in starts over and tells the person why (SS28, SS69, SS70).
@@ -52,6 +60,7 @@ function SecondFactorEntry({ session, homePath, signInPath, mode, focusField, on
       const outcome = await session.verify(
         mode === "code" ? { kind: "code", value: values.code } : { kind: "recovery-code", value: values.recoveryCode },
       );
+      if (!mounted.current) return undefined;
       if (outcome.kind === "authenticated") {
         await navigate({ to: homePath, replace: true });
         return undefined;
@@ -73,8 +82,13 @@ function SecondFactorEntry({ session, homePath, signInPath, mode, focusField, on
       {...form}
       mode={mode}
       focusField={focusField}
-      onToggleMode={onToggleMode}
+      // While a request is pending both controls are ignored, as the busy button ignores a second activation: a change of
+      // mode would start the form over and allow a second proof, and leaving would orphan the answer (R3-001).
+      onToggleMode={() => {
+        if (!form.submitting) onToggleMode();
+      }}
       onBack={() => {
+        if (form.submitting) return;
         // The guard of the root route discards the token when the screen is left, with no notice (SS73).
         void navigate({ to: signInPath });
       }}
