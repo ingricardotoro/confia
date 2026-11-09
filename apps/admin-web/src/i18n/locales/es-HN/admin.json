@@ -1,6 +1,10 @@
 {
   "signIn": {
     "title": "Iniciar sesión",
+    "identifier": "Correo electrónico",
+    "password": "Contraseña",
+    "submit": "Iniciar sesión",
+    "showPassword": "Mostrar contraseña",
     "contact": "Si no recuerda su contraseña, comuníquese con la administración de su institución.",
     "waiting": "Verificando sus datos. Esto puede tardar hasta 30 segundos."
   },
