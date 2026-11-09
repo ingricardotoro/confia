@@ -19,7 +19,7 @@ export interface RecordedRequest {
 }
 
 /** What a route answers: a contract response, or the network failing before any response. */
-export type Reply = ContractResponse | "network-error";
+export type Reply = (ContractResponse & { readonly headers?: Readonly<Record<string, string>> }) | "network-error";
 
 type Method = "get" | "post" | "put" | "patch" | "delete";
 
@@ -30,7 +30,7 @@ function toHttpResponse(reply: Reply): Response {
   if (reply === "network-error") return HttpResponse.error();
   return new HttpResponse(reply.body === undefined ? null : JSON.stringify(reply.body), {
     status: reply.status,
-    ...(reply.contentType === undefined ? {} : { headers: { "Content-Type": reply.contentType } }),
+    headers: { ...(reply.contentType === undefined ? {} : { "Content-Type": reply.contentType }), ...reply.headers },
   });
 }
 

@@ -12,8 +12,12 @@ export interface SignInFormProps {
   readonly fieldErrors: Readonly<Partial<Record<SignInField, string>>>;
   readonly summary: readonly { readonly controlId: string; readonly message: string }[];
   readonly alert?: { readonly message: string; readonly traceId?: string };
-  /** Why the person arrived here when it was not by choice. */
-  readonly notice?: string | undefined;
+  /** Why the person arrived here when it was not by choice, and how serious it is. */
+  readonly notice?: { readonly message: string; readonly tone: "info" | "warning" } | undefined;
+  /** The wait after a 429, already translated. It is drawn outside every active region: a number that changes each second must not be announced. */
+  readonly countdown?: { readonly remaining: string } | undefined;
+  /** The one polite region of the form: the wait while a request is in flight, the end of a 429 wait, or nothing. */
+  readonly liveMessage: string;
   readonly submitting: boolean;
   readonly summaryRef: Ref<HTMLDivElement>;
   readonly alertRef: Ref<HTMLDivElement>;
@@ -26,7 +30,8 @@ export interface SignInFormProps {
  * The sign in screen (design.md E8). The identifier is plain text, not `type="email"`: the browser may change or
  * refuse a value the server accepts, and it has to arrive as typed (SS52, SS58). There is no `maxLength` and no
  * `pattern`, so a long value can be pasted and the contract is the only limit (SS51). The contact text is a plain
- * paragraph: there is no recovery to link to (SS55).
+ * paragraph: there is no recovery to link to (SS55). The form has one polite region for the wait and for its end, and
+ * the count of a 429 stays outside it (SS44, SS48).
  */
 export function SignInForm({
   values,
@@ -34,6 +39,8 @@ export function SignInForm({
   summary,
   alert,
   notice,
+  countdown,
+  liveMessage,
   submitting,
   summaryRef,
   alertRef,
@@ -45,10 +52,11 @@ export function SignInForm({
 
   return (
     <ScreenLayout title={t("signIn.title")}>
-      {notice === undefined ? null : <Alert variant="info">{notice}</Alert>}
+      {notice === undefined ? null : <Alert variant={notice.tone}>{notice.message}</Alert>}
       <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4">
         <FormErrorSummary ref={summaryRef} errors={summary} />
         {alert === undefined ? null : <ProblemAlert ref={alertRef} message={alert.message} {...(alert.traceId === undefined ? {} : { traceId: alert.traceId })} />}
+        {countdown === undefined ? null : <p className="text-sm text-text-secondary">{countdown.remaining}</p>}
         <FormField
           label={t("signIn.identifier")}
           controlId={SIGN_IN_CONTROL_IDS.identifier}
@@ -88,6 +96,9 @@ export function SignInForm({
         <Button type="submit" loading={submitting}>
           {t("signIn.submit")}
         </Button>
+        <p aria-live="polite" aria-atomic="true" className="text-sm text-text-secondary">
+          {liveMessage}
+        </p>
       </form>
       <p className="text-sm text-text-secondary">{t("signIn.contact")}</p>
     </ScreenLayout>

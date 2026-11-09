@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import type { AdminKey } from "../../../i18n/resources.ts";
 import { classifyAccessFailure } from "../../../shared/forms/access-failure.ts";
@@ -33,7 +34,12 @@ export function SignInContainer({ session, homePath, verificationPath, enrollmen
   const { t } = useAdminText();
   const navigate = useNavigate();
   const view = useSessionView(session);
-  const notice = view.status === "anonymous" && view.notice !== undefined ? t(NOTICE_TEXT[view.notice]) : undefined;
+  // The notice is for the arrival: it goes away when the first request starts, so it never sits next to the error of a new attempt (E7).
+  const [attempted, setAttempted] = useState(false);
+  const notice =
+    view.status === "anonymous" && view.notice !== undefined && !attempted
+      ? { message: t(NOTICE_TEXT[view.notice]), tone: view.notice === "second-factor-already-enrolled" ? ("warning" as const) : ("info" as const) }
+      : undefined;
 
   const form = useAccessForm<SignInField>({
     fields: {
@@ -43,6 +49,7 @@ export function SignInContainer({ session, homePath, verificationPath, enrollmen
     validate: validateSignIn,
     waitingKey: "signIn.waiting",
     async submit(credentials) {
+      setAttempted(true);
       const outcome = await session.signIn(credentials);
       switch (outcome.kind) {
         case "failed":
