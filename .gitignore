@@ -9,6 +9,9 @@ dist/
 # Vitest browser-mode screenshots and attachments (failure evidence is local, never committed)
 .vitest/
 build/
+# A test folder of the admin web named after what it checks, not build output (admin-web-foundations-and-session,
+# task 12): without this its journeys were never committed.
+!apps/admin-web/e2e/specs/build/
 out/
 .next/
 .turbo/
