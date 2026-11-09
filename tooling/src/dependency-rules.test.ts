@@ -52,11 +52,15 @@ const APP_VIOLATIONS = [
   ["D3", "admin-presentation-is-pure", "features/identity/components/imports-form.ts"],
   ["D3", "admin-shared-never-imports-features", "shared/imports-a-feature.ts"],
   ["D3", "admin-token-store-is-private", "features/billing/reads-token-store.ts"],
+  // admin-web-staff-sign-in, design.md E2 (task 1.1): the enrollment draft is as private as the token store.
+  ["E2", "admin-token-store-is-private", "features/identity/enrollment/imports-enrollment-draft.ts"],
 ] as const;
 const APP_ACCEPTED = [
   "uses-ui-public-entry.ts",
   "features/identity/container.ts",
   "features/identity/session/access-session.ts",
+  "features/identity/session/index.ts",
+  "features/identity/enrollment/uses-session-index.ts",
 ] as const;
 
 const config = createRequire(import.meta.url)("../../.dependency-cruiser.cjs") as { forbidden: unknown[] };

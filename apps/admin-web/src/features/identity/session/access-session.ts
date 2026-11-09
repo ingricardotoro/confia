@@ -3,6 +3,13 @@ import { ApiFailure, type ApiFailureResult } from "../../../shared/api/api-failu
 import type * as authOperations from "../../../shared/api/auth-operations.ts";
 import type { Credentials, SecondFactorProof } from "../../../shared/api/auth-operations.ts";
 import { readCsrfToken } from "../../../shared/api/csrf-cookie.ts";
+import {
+  createEnrollmentDraft,
+  type EnrollmentDraft,
+  type EnrollmentSnapshot,
+  type EnrollmentStep,
+  type StartEnrollmentOutcome,
+} from "./enrollment-draft.ts";
 import { createRefreshCoordinator, withCrossTabLock, type CrossTabLocks } from "./refresh-coordinator.ts";
 import { createTokenStore, type SecondFactorUse } from "./token-store.ts";
 
@@ -37,10 +44,7 @@ export type VerifyOutcome =
   | { readonly kind: "no-token" }
   | { readonly kind: "failed"; readonly result: ApiFailureResult };
 
-export type EnrollOutcome =
-  | { readonly kind: "enrolled"; readonly secret: string; readonly recoveryCodes: readonly string[] }
-  | { readonly kind: "no-token" }
-  | { readonly kind: "failed"; readonly result: ApiFailureResult };
+export type { EnrollmentSnapshot, EnrollmentStep, StartEnrollmentOutcome };
 
 export type SignOutOutcome = { readonly kind: "signed-out" } | { readonly kind: "failed" };
 
@@ -54,7 +58,14 @@ export interface AccessSession {
   signIn(credentials: Credentials): Promise<SignInOutcome>;
   hasSecondFactorToken(use: SecondFactorUse): boolean;
   verify(proof: SecondFactorProof): Promise<VerifyOutcome>;
-  enroll(): Promise<EnrollOutcome>;
+  /** One request per restricted token: a second call shares the first one's promise (SS74). */
+  startEnrollment(): Promise<StartEnrollmentOutcome>;
+  /** The same object until the enrollment changes; `undefined` before the secret arrives and after the draft is cleared. */
+  getEnrollment(): EnrollmentSnapshot | undefined;
+  advanceEnrollment(): void;
+  reviewEnrollmentSecret(): void;
+  /** The first code of an enrollment, only as a TOTP code and with the `mfa-enroll` token (SS72, SS96). */
+  activate(code: string): Promise<VerifyOutcome>;
   discardSecondFactor(notice?: ArrivalNotice): void;
   /** Throws `ApiFailure`; it is the query function of the current session. */
   readCurrentSession(): Promise<CurrentSessionResponseOutput>;
@@ -69,6 +80,8 @@ export interface AccessSessionDependencies {
   readonly now: () => number;
   /** Reads the CSRF cookie; the default is the app's one reader. */
   readonly readCsrf?: () => string | undefined;
+  /** The draft of the enrollment; the default is a new one. Tests pass theirs to look inside it. */
+  readonly enrollmentDraft?: EnrollmentDraft;
 }
 
 /** A request with a `Bearer` token refreshes first when less than this is left of it (SS22, SS23). */
@@ -92,21 +105,41 @@ export function createAccessSession({
   locks,
   now,
   readCsrf = () => readCsrfToken(),
+  enrollmentDraft = createEnrollmentDraft(),
 }: AccessSessionDependencies): AccessSession {
   const store = createTokenStore();
   const coordinator = createRefreshCoordinator({ refresh: api.refreshSession, readCsrf, locks });
   const listeners = new Set<() => void>();
   let view: SessionView = { status: "restoring" };
   let booting: Promise<void> | undefined;
+  /** The enrollment request of the restricted token held, so a second call and React's double mount share it. */
+  let starting: { readonly token: string; readonly promise: Promise<StartEnrollmentOutcome> } | undefined;
 
-  function show(next: SessionView): void {
-    view = next;
+  function notify(): void {
     for (const listener of [...listeners]) listener();
   }
 
-  /** Forgets the tokens and shows the sign in page. The query cache is cleared by `app/`, which sees the view. */
+  function show(next: SessionView): void {
+    view = next;
+    notify();
+  }
+
+  /** Runs a change of the draft and tells the listeners only if it changed something. */
+  function changeDraft(change: () => void): void {
+    const before = enrollmentDraft.snapshot();
+    change();
+    if (enrollmentDraft.snapshot() !== before) notify();
+  }
+
+  function forgetEnrollment(): void {
+    enrollmentDraft.clear();
+    starting = undefined;
+  }
+
+  /** Forgets the tokens and the enrollment and shows the sign in page. The query cache is cleared by `app/`, which sees the view. */
   function endLocally(notice?: ArrivalNotice): void {
     store.clear();
+    forgetEnrollment();
     show(notice === undefined ? { status: "anonymous" } : { status: "anonymous", notice });
   }
 
@@ -178,11 +211,18 @@ export function createAccessSession({
       const result = await api.logIn(credentials);
       if (result.kind !== "ok") return { kind: "failed", result };
       store.accept(result.data);
-      if (result.data.status === "authenticated") {
+      // Only an enrollment keeps the identifier (SS58, SS59); whatever an earlier sign in left is gone.
+      // Through changeDraft, so a listener hears the change even on the answers that show no new view.
+      const { status } = result.data;
+      changeDraft(() => {
+        forgetEnrollment();
+        if (status === "second-factor-enrollment-required") enrollmentDraft.begin(credentials.identifier);
+      });
+      if (status === "authenticated") {
         show({ status: "authenticated" });
         return { kind: "authenticated" };
       }
-      return { kind: result.data.status === "second-factor-required" ? "second-factor-required" : "enrollment-required" };
+      return { kind: status === "second-factor-required" ? "second-factor-required" : "enrollment-required" };
     },
     hasSecondFactorToken: (use) => secondFactorTokenFor(use) !== undefined,
     async verify(proof) {
@@ -191,16 +231,60 @@ export function createAccessSession({
       const result = await api.completeSecondFactor(token, proof);
       if (result.kind !== "ok") return { kind: "failed", result };
       store.accept(result.data);
+      forgetEnrollment();
       show({ status: "authenticated" });
       return { kind: "authenticated" };
     },
-    async enroll() {
+    startEnrollment() {
       const token = secondFactorTokenFor("mfa-enroll");
-      if (token === undefined) return { kind: "no-token" };
-      const result = await api.enrollSecondFactor(token);
-      if (result.kind !== "ok") return { kind: "failed", result };
-      // The secret and the codes are shown once and belong to the enrollment screen, not to the session.
-      return { kind: "enrolled", secret: result.data.secret, recoveryCodes: result.data.recoveryCodes };
+      if (token === undefined) return Promise.resolve({ kind: "no-token" });
+      if (starting?.token === token) return starting.promise;
+      const promise = (async (): Promise<StartEnrollmentOutcome> => {
+        const result = await api.enrollSecondFactor(token);
+        // Abandoned while in flight: the answer belongs to nobody.
+        if (starting?.token !== token) return { kind: "no-token" };
+        if (result.kind !== "ok") {
+          // Forgotten, so only the person's retry sends the next request; the token stays (SS87).
+          starting = undefined;
+          return { kind: "failed", result };
+        }
+        changeDraft(() => {
+          enrollmentDraft.receive(result.data.secret, result.data.recoveryCodes);
+        });
+        return { kind: "ready" };
+      })();
+      starting = { token, promise };
+      return promise;
+    },
+    getEnrollment: () => enrollmentDraft.snapshot(),
+    advanceEnrollment() {
+      changeDraft(() => {
+        enrollmentDraft.advance();
+      });
+    },
+    reviewEnrollmentSecret() {
+      changeDraft(() => {
+        enrollmentDraft.review();
+      });
+    },
+    async activate(code) {
+      const token = secondFactorTokenFor("mfa-enroll");
+      if (token === undefined) {
+        // An open session has nothing to interrupt; otherwise the enrollment is over.
+        if (store.accessToken() === undefined) endLocally("enrollment-interrupted");
+        return { kind: "no-token" };
+      }
+      const result = await api.completeSecondFactor(token, { kind: "code", value: code });
+      if (result.kind !== "ok") {
+        // The restricted token ended: the enrollment is over, and a new sign in starts a new secret (SS100).
+        const code = result.kind === "problem" ? result.problem.code : undefined;
+        if (code === "token-expired" || code === "token-invalid") endLocally("enrollment-interrupted");
+        return { kind: "failed", result };
+      }
+      store.accept(result.data);
+      forgetEnrollment();
+      show({ status: "authenticated" });
+      return { kind: "authenticated" };
     },
     discardSecondFactor(notice) {
       if (store.accessToken() === undefined) endLocally(notice);
