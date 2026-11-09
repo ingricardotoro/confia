@@ -109,7 +109,8 @@ export function createSessionModel(options: SessionModelOptions = {}): SessionMo
   const institutionId = crypto.randomUUID();
   const key = randomBytes(20);
   const held = enrollment({ override: { secret: base32Encode(key) } });
-  const recovery = new Set((held.body as { recoveryCodes: string[] }).recoveryCodes);
+  // Keyed by the capitals form: the verification screen sends a recovery code in capitals (SS65), whatever case it was handed out in.
+  const recovery = new Map((held.body as { recoveryCodes: string[] }).recoveryCodes.map((code) => [code.toUpperCase(), code]));
   let enrolled = options.enrolled ?? false;
 
   const refreshes = new Map<string, RefreshEntry>();
@@ -242,7 +243,7 @@ export function createSessionModel(options: SessionModelOptions = {}): SessionMo
     } else {
       // The first verification of a credential takes a code and nothing else, and the token is not spent.
       if (found.token.use === "mfa-enroll") return invalid();
-      if (proof.recoveryCode === undefined || !recovery.delete(proof.recoveryCode)) return invalid();
+      if (proof.recoveryCode === undefined || !recovery.delete(proof.recoveryCode.toUpperCase())) return invalid();
     }
     restricted.delete(found.value);
     if (found.token.use === "mfa-enroll") enrolled = true;
@@ -258,6 +259,6 @@ export function createSessionModel(options: SessionModelOptions = {}): SessionMo
     signOut,
     currentSession: currentSessionOf,
     testSecret: () => Uint8Array.from(key),
-    recoveryCodes: () => [...recovery],
+    recoveryCodes: () => [...recovery.values()],
   };
 }

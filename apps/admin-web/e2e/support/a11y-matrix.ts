@@ -19,6 +19,7 @@ const cut = (route: Route): Promise<void> => route.abort("failed");
 const seed = (page: Page) => page.goto(`${MOCK_API_URL}/__control/seed-session`);
 
 const SIGN_IN = "/iniciar-sesion";
+const VERIFICATION = "/iniciar-sesion/verificacion";
 const IDENTIFIER = "docente.prueba@example.test";
 
 /** Types fictitious credentials and sends the form; the password is made at run time, so none is written here. */
@@ -27,6 +28,12 @@ async function submitCredentials(page: Page): Promise<void> {
   await page.locator("#sign-in-identifier").fill(IDENTIFIER);
   await page.locator("#sign-in-password").fill(randomUUID());
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
+}
+
+/** Signs in with the preset that asks for the second factor and waits on the verification screen, on its own field. */
+async function reachVerification(page: Page): Promise<void> {
+  await submitCredentials(page);
+  await page.getByRole("textbox", { name: /Código de verificación/ }).waitFor();
 }
 
 /** The six combinations of the minimum, written apart from the matrix so a dropped one is noticed (BX74). */
@@ -152,8 +159,8 @@ export const MATRIX: readonly GateCombination[] = [
     route: SIGN_IN,
     state: "with-notice",
     arrange: async (page) => {
-      // A rejected refresh ends the session and leads here with the notice. The verification, which the
-      // simulator preset restricted-expired reaches, is not a screen yet, so this is the way to the notice.
+      // A rejected refresh ends the session and leads here with the notice. The notice of an interrupted
+      // verification (preset restricted-expired) is covered by the journeys, where a code is typed.
       const expired = problem("session-expired", 401);
       await page.route(REFRESH, (route) =>
         route.fulfill({ status: expired.status, contentType: expired.contentType ?? "application/problem+json", body: JSON.stringify(expired.body) }),
@@ -161,5 +168,35 @@ export const MATRIX: readonly GateCombination[] = [
       await seed(page);
     },
     expected: (page) => page.getByText("Su sesión se cerró por seguridad. Vuelva a iniciar sesión."),
+  },
+  {
+    route: VERIFICATION,
+    state: "totp",
+    preset: "second-factor-required",
+    arrange: submitCredentials,
+    expected: (page) => page.getByRole("textbox", { name: /Código de verificación/ }),
+  },
+  {
+    route: VERIFICATION,
+    state: "recovery",
+    preset: "second-factor-required",
+    arrange: async (page) => {
+      await reachVerification(page);
+      await page.getByRole("button", { name: "Usar un código de recuperación" }).click();
+    },
+    expected: (page) => page.getByRole("textbox", { name: /Código de recuperación/ }),
+  },
+  {
+    route: VERIFICATION,
+    state: "code-rejected",
+    preset: "second-factor-required",
+    arrange: async (page) => {
+      await reachVerification(page);
+      await page.getByRole("button", { name: "Usar un código de recuperación" }).click();
+      // Not hexadecimal, so no code the simulator hands out can be this one, whatever the run.
+      await page.getByRole("textbox", { name: /Código de recuperación/ }).fill("not-a-recovery-code");
+      await page.getByRole("button", { name: "Verificar" }).click();
+    },
+    expected: (page) => page.getByRole("alert").filter({ hasText: "El código de recuperación no es correcto o ya se usó." }),
   },
 ];

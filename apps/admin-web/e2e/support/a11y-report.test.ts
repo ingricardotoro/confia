@@ -57,7 +57,8 @@ describe("the states of the sign in screen [BX109]", () => {
       "password-visible",
       "with-notice",
     ]);
-    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...signIn])).toHaveLength((MINIMUM.length + signIn.length) * THEMES.length);
+    // The gate evaluates the whole matrix, so the count follows it as screens are added.
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...signIn])).toHaveLength(MATRIX.length * THEMES.length);
     expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
   });
 
@@ -79,6 +80,24 @@ describe("the states of the sign in screen [BX109]", () => {
   it("keeps the minimum of the part 1 at six combinations until the last screen", () => {
     expect(MINIMUM).toHaveLength(6);
     expect(MINIMUM.some((wanted) => wanted.route === SIGN_IN)).toBe(false);
+  });
+});
+
+describe("the states of the verification screen [BX109]", () => {
+  const VERIFICATION = "/iniciar-sesion/verificacion";
+  const verification = MATRIX.filter((combination) => combination.route === VERIFICATION);
+
+  it("holds the three states, each once, all reached through the preset that asks for the second factor", () => {
+    expect(verification.map((combination) => [combination.state, combination.preset])).toEqual([
+      ["totp", "second-factor-required"],
+      ["recovery", "second-factor-required"],
+      ["code-rejected", "second-factor-required"],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...verification])).toHaveLength(MATRIX.length * THEMES.length);
+  });
+
+  it("keeps the minimum of the part 1 at six combinations", () => {
+    expect(MINIMUM.some((wanted) => wanted.route === VERIFICATION)).toBe(false);
   });
 });
 

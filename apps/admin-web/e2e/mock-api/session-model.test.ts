@@ -343,6 +343,17 @@ describe("SS121: the restricted tokens", () => {
     expect(typeOf(model.verify(bearerOf(model.startSecondFactor("mfa-verify")), { recoveryCode: held }))).toBe("second-factor-invalid");
   });
 
+  it("accepts a recovery code in capitals, as the verification screen sends it, and lists the codes as they were handed out", () => {
+    const { model } = fixture({ enrolled: true });
+    const held = model.recoveryCodes()[0] ?? "";
+
+    expect(held).toBe(held.toLowerCase());
+    expect(model.verify(bearerOf(model.startSecondFactor("mfa-verify")), { recoveryCode: held.toUpperCase() }).status).toBe(200);
+    expect(model.recoveryCodes()).toHaveLength(9);
+    expect(model.recoveryCodes()).not.toContain(held);
+    expect(typeOf(model.verify(bearerOf(model.startSecondFactor("mfa-verify")), { recoveryCode: held }))).toBe("second-factor-invalid");
+  });
+
   it("answers 400 validation-failed unless the body holds exactly one proof", () => {
     const { model } = fixture({ enrolled: true });
     const token = bearerOf(model.startSecondFactor("mfa-verify"));

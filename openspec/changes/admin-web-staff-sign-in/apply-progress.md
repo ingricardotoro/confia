@@ -326,3 +326,53 @@ remonta el formulario (`key={mode}`) con un gancho nuevo, así que se podía env
 - **VERDE:** mientras `form.submitting`, el cambio de modo y el regreso se ignoran (sin `disabled`: siguen enfocables y llevan `aria-disabled`, como el botón ocupado ignora una segunda activación); una respuesta que llega con el componente desmontado no navega ni descarta nada (`mounted` en un efecto, válido con `StrictMode`).
 - **Pruebas:** 2 nuevas en `SecondFactorContainer.test.tsx` (con `completeSecondFactor` retenida). U 62 archivos y 661 pruebas y 1 `todo`; E 56 de 56; PR 18 de 18.
 
+
+
+## Tarea 6: `second-factor-journeys`
+
+### Medida (regla de las 800 líneas), 2026-11-08
+
+Medida con `git add -A` y `git diff --cached --numstat -M 5199e0c` (sin `openspec/`, archivo de bloqueo ni código generado) antes de comprometer: 403 adiciones y 6 eliminaciones, **409 líneas**.
+Bajo 800: sin excepción y sin corte. De ellas, 41 corresponden a `e2e/specs/build/dist.e2e.ts` (ver desviación 1).
+
+### Evidencia del ciclo TDD
+
+| Paso | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| Control de cuenta (`server.test.ts`) | Sí, antes del código | 3 de 5 pruebas: `expected 404 to be 200` en `GET /__control/account/<id>` (forma, clave aceptada por el modelo, códigos vigentes) | 31 pruebas del servidor |
+| Código de recuperación en mayúsculas (`session-model.test.ts`) | Sí | `expected 401 to be 200`: la pantalla envía el código en mayúsculas (SS65) y el modelo guardaba el código tal como lo repartió, en minúsculas | 1 prueba nueva |
+| Filas de la puerta (`a11y-report.test.ts`) | Sí | `expected [] to deeply equal [ [ 'totp', …(1) ], …(2) ]` | 3 filas y 6 evaluaciones en dos temas |
+| Recorridos y `dist.e2e.ts` | **No hubo rojo de navegador.** Los recorridos se escribieron después del control de cuenta, ya en verde, y no se corrió `No tests found` | 11 de 11 en verde a la primera | 68 de 68 en E |
+
+**Ya en verde sin código nuevo:** las pruebas de `Host` ajeno y de id inválido o método distinto del control de cuenta (el control entero ya pasa por `isLocal`, y la ruta ya devolvía `404`); la prueba de `dist` (el build nunca contuvo `__control`). Se dejan porque el requisito las nombra y la demostración 1 prueba que la de `Host` puede fallar.
+
+### Demostraciones deliberadas (tarea 6.3)
+
+Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, restauración desde la copia y `cmp` sin salida.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 1 | Control de cuenta sin comprobar `Host` (`isLocal` omitido para `/__control/account/`) | `AssertionError: expected [ 'evil.example', 200, true ] to deeply equal [ 'evil.example', 403, false ]`, y solo esa prueba (1 de 31) | idéntico |
+| 2 | `className="hidden"` (`display: none`) en el campo del código de `SecondFactorForm.tsx` | `expect(locator).toBeFocused() failed` sobre el campo `Código de verificación` (`element(s) not found`), en el paso que sigue a la pantalla de verificación de `keyboard.e2e.ts` | idéntico |
+
+### Desviaciones y decisiones
+
+1. **`dist.e2e.ts` no estaba versionado.** `.gitignore` ignora `build/` y `e2e/specs/build/dist.e2e.ts` nunca se comprometió (`git log --all` sin historia; el árbol principal no lo tiene). Las suites E de las partes anteriores lo ejecutaban solo en este árbol. Se agregó con `git add -f` y se le sumó la comprobación de `__control`. **Pendiente del propietario:** una excepción en `.gitignore` (`!apps/admin-web/e2e/specs/build/`), que queda fuera de la superficie permitida.
+2. **Defecto del simulador, no de `src/`.** Los códigos de recuperación del modelo salen en minúsculas hexadecimales y la pantalla los envía en mayúsculas (SS65), así que el recorrido de recuperación habría sido rechazado. El modelo compara ahora sin distinguir mayúsculas (`Map` con clave en mayúsculas) y `recoveryCodes()` devuelve los códigos como se repartieron. No se tocó `src/`.
+3. **Control de cuenta.** `GET /__control/account/:id` devuelve `{ secret, recoveryCodes }` (la forma de `EnrollmentResponse`), solo con las comprobaciones de `Host` y de par de bucle de todo `/__control/*`; `:id` es un id de escenario; nada de esto está en `dist` (comprobado por `dist.e2e.ts`).
+4. **Fila `code-rejected` por el modo de recuperación.** La puerta no conoce el id del escenario en `arrange`, así que el rechazo usa un código de recuperación que no puede ser hexadecimal. Un código TOTP fijo tendría una probabilidad pequeña de coincidir con el vigente.
+5. **El recuento de la puerta sigue la matriz.** La prueba de las 8 filas del inicio de sesión comparaba con `(6 + 8) * 2` (igual al tamaño de la matriz de entonces); ahora compara con `MATRIX.length * THEMES.length`, igual que la de la tarea 4. La matriz tiene 17 combinaciones y 34 evaluaciones.
+6. **Transitorio de la puerta.** Una vez, `code-rejected` en tema claro tardó 12,2 s en la corrida focalizada; repetida, 2,0 s por tema. No se reprodujo.
+7. **Informe.** Los recorridos de verificación llevan la anotación `api: simulated; not the real stack` en su `describe`; los títulos dicen «against the simulated API».
+8. **T no se tocó:** `tooling/` no cambió; se corrió de todos modos.
+
+### Verificación de cierre
+
+| Suite | Resultado |
+|---|---|
+| U `pnpm --filter @confia/admin-web test` | 62 archivos, 669 pruebas y 1 `todo` |
+| T `pnpm --filter ./tooling test` | 9 archivos, 286 pruebas |
+| E `pnpm --filter @confia/admin-web test:e2e` | 68 de 68 (56 previas, 4 de verificación, 1 de teclado, 1 de `dist`, 6 evaluaciones de la puerta) |
+| PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 (14 de la caché de turbo) |
+
+Guarda de `*.spec.*` vacía y `git diff --name-only 5199e0c -- apps/api packages/ui packages/contracts` vacío. Sin dependencias nuevas.
