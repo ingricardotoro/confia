@@ -1,13 +1,20 @@
 package com.confia.shared.observability.metrics;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.confia.kernel.Permission;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
@@ -135,6 +142,56 @@ class LogAuthorizationMetricsTest {
             metrics.denialOmitted(permission);
         }
         assertThat(metrics.trackedKeys()).isEqualTo(Permission.values().length + 3);
+    }
+
+    // --- Review suggestions R3-001 and R3-002 of the 4a review ---
+
+    @Test
+    void concurrentSignalsOfOneKeyWriteOneEventPerWindowAndCountTheRestInTheNext()
+            throws Exception {
+        int threads = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        try {
+            CountDownLatch ready = new CountDownLatch(threads);
+            CountDownLatch go = new CountDownLatch(1);
+            List<Future<?>> calls = new ArrayList<>();
+            for (int i = 0; i < threads; i++) {
+                calls.add(pool.submit(() -> {
+                    ready.countDown();
+                    go.await();
+                    metrics.denialOmitted(Permission.IDENTITY_READ);
+                    return null;
+                }));
+            }
+            assertThat(ready.await(30, TimeUnit.SECONDS)).isTrue();
+            go.countDown();
+            for (Future<?> call : calls) {
+                call.get(30, TimeUnit.SECONDS);
+            }
+
+            assertThat(logged.list).as("one event for the window, however many threads").hasSize(1);
+            assertThat(pairs(0)).containsExactly("event=authorization_denial_omitted",
+                    "permission=identity:read", "suppressed=0");
+
+            nanos.addAndGet(SECOND);
+            metrics.denialOmitted(Permission.IDENTITY_READ);
+
+            assertThat(logged.list).hasSize(2);
+            assertThat(pairs(1)).as("the seven held back are counted in the next event")
+                    .containsExactly("event=authorization_denial_omitted",
+                            "permission=identity:read", "suppressed=7");
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void aNullPermissionIsRefusedWithoutAnEventAndWithoutAKey() {
+        assertThatThrownBy(() -> metrics.denialOmitted(null))
+                .isInstanceOf(NullPointerException.class);
+
+        assertThat(logged.list).isEmpty();
+        assertThat(metrics.trackedKeys()).isZero();
     }
 
     private List<String> pairs(int event) {
