@@ -17,6 +17,9 @@ export default defineConfig({
   // *.spec.ts under apps/ and the backend does not change here (D18).
   testMatch: /\.e2e\.ts$/,
   fullyParallel: true,
+  // Two workers against one `vite preview` and one simulator: the default (half the cores) overloads them on a
+  // busy machine and the failures are page loads that time out, not assertions (staff sign in, task 1).
+  workers: 2,
   forbidOnly: CI,
   retries: 0,
   outputDir: "reports/e2e/results",

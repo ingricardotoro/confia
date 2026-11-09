@@ -10,6 +10,9 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}", "*.test.ts", "e2e/**/*.test.ts"],
     exclude: [...configDefaults.exclude, "src/**/__fixtures__/**"],
     environment: "jsdom",
+    // Several suites import the whole app cold or start real servers; with the default worker count a busy
+    // machine turns that into 5 s timeouts in unrelated tests (staff sign in, tasks 1 and 3). Four is enough.
+    maxWorkers: 4,
     setupFiles: ["./src/test/setup.ts"],
     passWithNoTests: false,
     coverage: {
