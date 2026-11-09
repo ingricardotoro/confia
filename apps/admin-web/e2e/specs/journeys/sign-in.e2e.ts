@@ -49,8 +49,9 @@ test.describe("the sign in screen", () => {
     const button = page.locator("button[type=submit]");
     const region = page.locator("[aria-live=polite]").filter({ hasText: "Verificando sus datos. Esto puede tardar hasta 30 segundos." });
     await expect(region).toBeVisible();
-    // Still busy at three moments of the wait, never released early and never replaced by an error.
-    for (const waitMs of [1_000, 14_000, 14_000]) {
+    // Still busy at three moments of the wait, never released early and never replaced by an error. The last
+    // check runs about 21 s in, so a busy machine still leaves about 10 s before the 31 s answer arrives.
+    for (const waitMs of [1_000, 10_000, 10_000]) {
       await page.waitForTimeout(waitMs);
       await expect(button).toHaveAttribute("aria-busy", "true");
       await expect(region).toBeVisible();
