@@ -127,16 +127,22 @@ describe("the routes and the screens", () => {
     expect(titles).toEqual([SIGN_IN, SECOND_FACTOR, ENROLLMENT, SIGNED_IN, NOT_FOUND]);
   });
 
-  it.each([
-    ["/iniciar-sesion/verificacion", "verify", SECOND_FACTOR],
-    ["/iniciar-sesion/inscripcion", "enroll", ENROLLMENT],
-  ] as const)("the placeholder at %s offers no field: its form comes with a later task", async (path, grant, heading) => {
-    renderApp({ path, session: await withToken(grant) });
-    await screen.findByRole("heading", { level: 1, name: heading });
+  it("the placeholder at the enrollment route offers no field: its form comes with a later task", async () => {
+    renderApp({ path: "/iniciar-sesion/inscripcion", session: await withToken("enroll") });
+    await screen.findByRole("heading", { level: 1, name: ENROLLMENT });
 
     expect(document.forms).toHaveLength(0);
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("admin-web-staff-sign-in task 5: the verification route renders its form with the code field and the verify button", async () => {
+    renderApp({ path: "/iniciar-sesion/verificacion", session: await withToken("verify") });
+    await screen.findByRole("heading", { level: 1, name: SECOND_FACTOR });
+
+    expect(document.forms).toHaveLength(1);
+    expect(screen.getByRole("textbox", { name: /Código de verificación/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Verificar" })).toBeInTheDocument();
   });
 
   it("admin-web-staff-sign-in task 3: the sign in route renders its form with both fields and the sign in button", async () => {

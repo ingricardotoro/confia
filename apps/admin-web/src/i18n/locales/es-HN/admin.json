@@ -10,6 +10,13 @@
   },
   "secondFactor": {
     "title": "Verificación en dos pasos",
+    "code": "Código de verificación",
+    "codeFormat": "Escriba los 6 dígitos que muestra su aplicación.",
+    "recoveryCode": "Código de recuperación",
+    "useRecovery": "Usar un código de recuperación",
+    "useCode": "Usar el código de la aplicación",
+    "submit": "Verificar",
+    "back": "Volver al inicio de sesión",
     "waiting": "Verificando el código. Esto puede tardar hasta 30 segundos."
   },
   "enrollment": {

@@ -12,7 +12,9 @@
 | 1 `enrollment-draft-in-session` | **Hecha** (sin corte) | `change/admin-web-staff-sign-in-1-enrollment-draft-in-session` | 698 de 800 (base `ca98c03`) |
 | 2 `access-form-foundation` | **Hecha**, con corte 2a / 2b y excepción del propietario para 2a | 2a `change/admin-web-staff-sign-in-2-access-form-foundation`; 2b `change/admin-web-staff-sign-in-2b-access-form-feedback` | 2a 848 (base `152172b`, excepción aprobada 2026-11-07); 2b 443 (base `e226ce3`) |
 | 3 `sign-in-form` | **Hecha**, con corte 3a / 3b (el total superó 880) | 3a `change/admin-web-staff-sign-in-3-sign-in-form`; 3b `change/admin-web-staff-sign-in-3b-sign-in-container` | Total 912 (base `cb3ded9`); 3a 569 (base `cb3ded9`); 3b 343 (base `2598e28`) |
-| 4 a 9 | Pendientes | | |
+| 4 `sign-in-states-and-journey` | **Hecha** (sin corte) | `change/admin-web-staff-sign-in-4-sign-in-states-and-journey` | 656 (base `2ceaa46`) |
+| 5 `second-factor-screen` | **Hecha** (sin corte; excepción del propietario del 2026-11-09) | `change/admin-web-staff-sign-in-5-second-factor-screen` | 856 (base `60d4bf9`) |
+| 6 a 9 | Pendientes | | |
 
 ## Tarea 1: `enrollment-draft-in-session`
 
@@ -262,3 +264,55 @@ Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, 
 | PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 |
 
 Guarda de `*.spec.*` vacía y `git diff --name-only 2ceaa46 -- apps/api packages/ui packages/contracts` vacío. Sin dependencias nuevas.
+
+
+## Tarea 5: `second-factor-screen`
+
+### Medida (regla de las 800 líneas), 2026-11-08
+
+Medida con `git add -N .`, `git reset`, `git add -A` y `git diff --cached --numstat -M 60d4bf9` (sin `openspec/`, archivo de bloqueo ni código generado), antes de comprometer:
+844 adiciones y 12 eliminaciones, **856 líneas**. Está entre 800 y 880: se pidió al propietario una excepción explícita, que concedió el 2026-11-09 (un solo PR). El corte
+predefinido, no aplicado, por archivos completos mediría: 5a (esquema, presentación, sus pruebas y las siete claves de `secondFactor.*`) **431** contra `60d4bf9`; 5b (contenedor, su prueba,
+`routes.tsx` y `routes.test.tsx`) **425** contra el commit de 5a.
+
+### Evidencia del ciclo TDD
+
+| Paso | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| Esquema y presentación | Sí, antes del código de producción | `Failed to resolve import "./second-factor-schema.ts"` y `"./SecondFactorForm.tsx"` (2 archivos fallidos, ninguna prueba ejecutada) | 56 pruebas con contenedor y rutas |
+| Contenedor y rutas | Sí | 15 pruebas fallan por comportamiento: `Unable to find an accessible element with the role "textbox" and name /Código de verificación/` (y `"button"` con «Usar un código de recuperación»), y `routes.test.tsx` `expected  to have a length of 1 but got +0` (la ruta aún dibujaba el provisional). SS28, SS31 y el resto ya pasaban con el provisional | 56 pruebas |
+
+El supuesto de 5.1 se cumplió: `unwrap()` y `.regex()` funcionan sobre los esquemas generados de Zod 4.6.6 sin importar `zod` en la app.
+No hubo código de producción antes de su prueba.
+
+### Demostraciones deliberadas (tarea 5.3)
+
+Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, restauración desde la copia y `cmp` sin salida.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 1 | Quitar `key={mode}` del contenedor | 2 fallos: SS64 (`expect(element).toHaveFocus()`) y SS65 (`expect(element).toHaveValue()`: el valor del otro modo sobrevive) | idéntico |
+| 2 | `normalizeCode` con `/\s/g` en lugar de quitar también los de ancho cero | SS62 en el esquema (`expected '1\u200b2…' to be '123456'`) y en el contenedor (`Expected: "123456"`, recibido con los caracteres de ancho cero) | idéntico |
+
+La primera vez la ruptura 2 se escribió mal con `sed` (el escape `\s` quedó como `s`) y el rojo era de otra causa; se restauró, se confirmó con `cmp` y se repitió bien.
+
+### Desviaciones y decisiones
+
+1. **Ambos campos declarados en el gancho.** `useAccessForm` recibe `code` y `recoveryCode` (cada uno con su normalización) y `validate`/`submit` miran solo el del modo; solo uno se monta. Con `key={mode}` el formulario se reinicia al cambiar de modo, así que la demostración 1 es observable.
+2. **`SecondFactorEntry` dentro de `SecondFactorContainer.tsx`.** El contenedor guarda `mode` y `changedByPerson`; el componente interior, que llama al gancho, lleva la `key`. Así no se necesita un archivo más.
+3. **Foco en el campo nuevo.** `SecondFactorForm` lo enfoca en su propio efecto, que corre después del de `ScreenLayout` (el de un hijo corre antes que el del padre); si el efecto fuera de un descendiente, el `h1` le quitaría el foco.
+4. **Región `polite`.** Mismo `<p aria-live="polite" aria-atomic="true">` sin `role="status"` que el inicio de sesión (desviación 1 de la tarea 4).
+5. **`routes.test.tsx`.** La prueba «the placeholders offer no field» queda solo para la inscripción y se agregó una que comprueba que la verificación dibuja su formulario.
+6. **Textos.** Las siete claves de `secondFactor.*` son las de la sección 8; ninguna fuera de ella. `secondFactor.waiting`, `problem.secondFactorInvalid` y `problem.recoveryInvalid` ya existían.
+7. **Sin fila de la puerta de accesibilidad todavía.** Las filas de la verificación son de la tarea 6 (`a11y-matrix.ts` no está en la lista de la tarea 5).
+
+### Verificación (árbol sin comprometer)
+
+| Suite | Resultado |
+|---|---|
+| U `pnpm --filter @confia/admin-web test` | 62 archivos, 659 pruebas y 1 `todo` |
+| T `pnpm --filter ./tooling test` | 9 archivos, 286 pruebas |
+| E `pnpm --filter @confia/admin-web test:e2e` | 56 de 56 |
+| PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 (14 reutilizadas de la caché de turbo, que depende de las entradas) |
+
+Guarda de `*.spec.*` vacía y `git diff --name-only 60d4bf9 -- apps/api packages/ui packages/contracts` vacío (índice y árbol). Sin dependencias nuevas. **Excepción del propietario (2026-11-09):** la tarea 5 se entrega como un solo PR de **856 líneas efectivas** (844 adiciones y 12 eliminaciones contra `60d4bf9`), dentro del umbral de 880; sin corte 5a / 5b.
