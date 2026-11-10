@@ -356,7 +356,7 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     `docs/03-seguridad.md` §4.3 (nota fechada). Pruebas: `MfaPolicyTest`, `MfaPolicyProductionWiringTest`, `SecondFactorExemptions` y `SecondFactorExemptionsConfiguration` (en `src/test`), `identity/web/SecondFactorExemptionsProbeIT`, `identity/web/LoginEndpointSupport`,
     `identity/web/LoginProcess`, `StaffAccountTest`, `AuthenticateWithPassword*`, `ResetPasswordWithToken*`, `DocumentationNotesTest`. **Los fixtures siguen insertando la columna**
     (`NOT NULL` sin `DEFAULT`, `V6` no se edita); el parámetro `mfaRequired` de los ayudantes pasa a alimentar `SecondFactorExemptions`.
-  - [ ] 5.1 **Sonda S1 (diseño D14).** Primera prueba de la tarea, `identity/web/SecondFactorExemptionsProbeIT`. El proceso corre en la misma JVM (`LoginProcess.start` →
+  - [x] 5.1 **Sonda S1 (diseño D14).** Primera prueba de la tarea, `identity/web/SecondFactorExemptionsProbeIT`. El proceso corre en la misma JVM (`LoginProcess.start` →
     `AdminProcessLauncher.launch` → `ConfiaApplication.launch`). `LoginProcess` agrega `spring.main.sources` con `SecondFactorExemptionsConfiguration` (de `src/test`), que declara un
     `@Bean @Primary SecondFactorExemptions` con un conjunto de instancia (`ConcurrentHashMap.newKeySet()`), sin ningún campo `static`; `LoginProcess.exemptions()` lo obtiene con
     `context.getBean(...)` y `LoginEndpointSupport` gana `abstract SecondFactorExemptions exemptions()`. Orden: el proceso arranca por clase, cada prueba siembra la fila, registra la exención y

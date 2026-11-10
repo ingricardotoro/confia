@@ -334,3 +334,72 @@ Medición total de 4b contra `284d881`, sin `openspec/`: **2 480 líneas** (2 46
 **Verificación tras el cierre (`-Djacoco.skip=true`):** `IdempotencyScopeExclusionInventoryTest` 4, `AuditScopeExclusionInventoryTest` 8, `DenialWindowsTest` 22, `LogAuthorizationMetricsTest` 8, `NoRealTimeInDenialTestsTest` 2, `AuthorizationBoundaryRulesTest` 7, `ProcessBeanIsolationTest` 33, `PermissionEdgeTest` 28, `PermissionDeciderTest` 8, `WebEdgeScopeExclusionInventoryTest` 29, `TransactionsOnlyInSharedSecurityTest` 3: 0 fallos, salida 0. ITs: `PermissionDenialAuditIT` 14 y `AuthorizationEdgeIT` 17, 0 fallos. No se corrió `./mvnw verify` completo (memoria limitada).
 
 **La tarea 4 se deja abierta en `tasks.md`** porque no todas sus comprobaciones están observadas: AZ49 (`404` de objeto sin asiento) no está cubierta; `edgeSummaryTestsPassInAnyOrder` se sustituyó por orden aleatorio con tres semillas; la demostración 2 es una aproximación; faltan rojos previos observados de varias pruebas (ver arriba) y no hay `./mvnw -B verify` completo de la tarea (queda al CI del PR).
+
+## Tarea 5 (2026-11-09): PR 5a `mfa-policy-derivation`, comprometida; queda abierta en `tasks.md`
+
+Rama `change/rbac-permission-matrix-and-audit-integration-5a-mfa-policy-derivation`, apilada sobre la punta de 4b (`031c360`). Sin push. El propietario aprobó la corrección
+de la superficie de edición: `ProcessBeanPolicy.java` vive en `src/test/java/com/confia/bootstrap/`, no en `src/main`. `ProcessBeanIsolationTest.java` no se modificó.
+
+| Commit | Contenido | Líneas efectivas |
+|---|---|---|
+| `bca0330` `refactor(identity): derive the second factor requirement from MfaPolicy instead of a column` | `MfaPolicy` (`STAFF = account -> true`), `StaffAccount` sin el campo, `AuthenticateWithPassword` y `ResetPasswordWithToken` con la política, repositorio sin `getMfaRequired()`, `IdentityConfiguration.mfaPolicy()`, línea `com.confia.identity.domain` en `ProcessBeanPolicy`, Javadoc de `AuthenticationResult`, y todas las pruebas (sonda S1, `MfaPolicyTest`, `MfaPolicyProductionWiringTest`, `AuthenticateWithPasswordStaffPolicyIT`, `LoginEndpointStaffPolicyIT`, `SecondFactorExemptions*`, migración de los ayudantes y de los casos de uso) | 1 079 (978 + 101) |
+| `aa71a63` `docs(security): note the mandatory derived MFA in section 4.3` | Nota fechada de `docs/03` §4.3 y `DocumentationNotesTest` (líneas originales de §4.3 intactas) | 66 |
+
+Medición contra `031c360`, sin `openspec/`: **1 145 líneas** (1 044 añadidas, 101 borradas; 106 de producción, 1 039 de pruebas y documentación). Supera el aviso de 800 por las
+pruebas (el diseño estimó 570). No se partió porque el cambio de firma de los dos casos de uso obliga a tocar a la vez todos los sitios de construcción.
+
+### Sonda S1 (diseño D14): D14 se confirma
+
+`ConfiaApplication.launch` respeta `spring.main.sources` (se enlaza a `SpringApplication` desde los argumentos), de modo que no hizo falta la alternativa del `BeanPostProcessor`.
+Rojo observado, con las pruebas y `SecondFactorExemptions` escritos y sin agregar la propiedad: `NoSuchBeanDefinitionException: No qualifying bean of type
+'com.confia.identity.web.SecondFactorExemptions' available` (2 de 3). Con la propiedad: el contexto del proceso real contiene el bean, dos procesos de la misma JVM no comparten
+exenciones, y un proceso sin la configuración no tiene `SecondFactorExemptions` y su único `MfaPolicy` es `STAFF`. En esa etapa `SecondFactorExemptions` aún no implementaba
+`MfaPolicy` (no existía) y la sonda de aislamiento falló con `expected: "second-factor-required" but was: "authenticated"` (la columna decidía todavía).
+
+### Evidencia de ciclo TDD (tarea 5)
+
+| Paso | Observado |
+|---|---|
+| R1, pruebas sin producción | Compilación de pruebas: `cannot find symbol class MfaPolicy` (y el constructor de `StaffAccount` de cuatro argumentos). |
+| R2, con `MfaPolicy` y los parámetros nuevos ya aceptados pero ignorados, y la columna aún leída (el `StaffAccount` de cuatro argumentos era un constructor temporal con `false`) | Unitarias: 6 fallos (`Expecting actual: Authenticated[...] to be an instance of ...SecondFactorEnrollmentRequired`, `...SecondFactorRequired`, `Completed[] to be an instance of ...SecondFactorMissing`, y `Expecting actual: [] to contain exactly [StaffAccountId...]` para «la política se consulta tras la contraseña»). `AuthenticateWithPasswordStaffPolicyIT`: 10 de 11 reciben `Authenticated` (I287, I288, I289, I290 por rol, I301); `SecondFactorExemptionsProbeIT`: 1 de 3 (`expected "second-factor-required" but was "authenticated"`); `LoginEndpointStaffPolicyIT`: 3 de 4 (I302). |
+| `ProcessBeanIsolationTest` | Rojo observado con el bean ya creado y sin la línea: `process 'admin': bean 'mfaPolicy' from package 'com.confia.identity.domain' - not in the allow-list`; verde con la línea. |
+| `DocumentationNotesTest` | Se escribió junto con la nota; el rojo se observó después, retirando la nota (ver demostración 5). |
+| VERDE | Suite unitaria completa de `app` (`./mvnw -B -q test -pl app -am -Djacoco.skip=true`): 2 870 pruebas, 0 fallos. Todas las pruebas de integración de `com/confia/identity/**` (73 clases, 488 pruebas), 0 fallos. |
+
+### Demostraciones deliberadas (revertidas y confirmadas con `cmp` contra copias en el directorio temporal de la sesión)
+
+| # | Ruptura | Rojo por la aserción de resultado | `cmp` |
+|---|---|---|---|
+| 1 | `STAFF = account -> false` | `MfaPolicyTest` 54 de 55; `MfaPolicyProductionWiringTest.theRealProcessAsksEveryAccountForASecondFactor`; `AuthenticateWithPasswordStaffPolicyIT` 11 de 11 (I288 entre ellas). **PIT no se ejecutó localmente** (corre en el CI del PR). | OK |
+| 2 | `AuthenticateWithPassword` condiciona la exigencia a la existencia de una asignación de rol | I288 (`...NoRoleAndNoCredential...:78`), I301 (`...NoRoleAndAVerifiedCredential...:90`) e I289 (`removingTheRoleAssignment...:103`): `Expecting actual: Authenticated[...] not to be an instance of ...Authenticated` | OK |
+| 3 | `Authenticated` para una cuenta sin rol | `LoginEndpointStaffPolicyIT` (I302): `expected: "second-factor-required" but was: "authenticated"` (2 de 4) | OK |
+| 4 | Conjunto de exenciones `static` en `SecondFactorExemptions` | `SecondFactorExemptionsProbeIT.anAccountExemptInOneProcessOwesTheSecondFactorInAnother:88`: `Expecting value to be true but was false` (el segundo proceso hereda la exención) | OK |
+| 5 | Retirar la nota de `docs/03` §4.3 | `DocumentationNotesTest.docs03Section43...`: `a block quote that carries "**Nota fechada 2026-11-09 ... PR 5a"` | OK (`docs/03` idéntico a la copia) |
+
+Las rupturas 2 y 3 son aproximaciones: `AuthenticateWithPassword` no conoce los roles, de modo que la ruptura agrega un método temporal `hasRoleAssignment` en `JooqStaffAccountRepository` (SQL plano) y lo consulta
+por `instanceof`; ambos archivos se restauraron y se compararon. En la 4 la aserción que falla es la de la política (`requiresSecondFactor`) y no llega a la de `authenticated`, que viene después.
+
+### 5.5 Construcción sin `V15` [BI127]
+
+Esta construcción pasa **sin** `V15`: la última migración es `V14` y no existe ninguna posterior; la suite unitaria completa y las pruebas de integración de `identity` corrieron contra el esquema con la
+columna `mfa_required` todavía `NOT NULL`, que los fixtures siguen insertando. No se ejecutó `./mvnw -B verify` completo (memoria limitada; queda al CI del PR), de modo que la comprobación de 5.5 sobre la
+construcción completa y la puerta de mutación no están observadas.
+
+### Desviaciones y pendientes
+
+- Los ayudantes de siembra conservan el parámetro `mfaRequired`: lo insertan tal cual en la columna y, cuando vale `false`, registran la exención. Por eso el rojo previsto «`expected Authenticated but was
+  SecondFactorRequired`» de las pruebas migradas con la columna en `true` no se observó con esa forma; el equivalente observado es el de R2 (cuentas con la columna en `false` que reciben `Authenticated`).
+- Se agregó `SecondFactorExemptions.nobodyOwes()` (política de prueba para los fixtures de casos de uso que siempre representaron «sin segundo factor») y `revokeExemption`, para
+  `SecondFactorEndpointsIT.openFamily`, que antes alternaba la columna.
+- `MfaPolicyProductionWiringTest` prueba el proceso administrativo real y, con ArchUnit sobre el código de producción, que `STAFF` es la única definición; que el trabajador y el portal no registran el bean lo
+  cubre `ProcessBeanIsolationTest` (sus listas no incluyen ningún paquete de `identity`). Las reglas están dentro de esa prueba y no en `architecture/` (fuera de las superficies permitidas); no llevan un fixture
+  permanente de rechazo, solo comprobaciones de que el escaneo no es vacío.
+- **La tarea 5 queda abierta en `tasks.md`** salvo 5.1: faltan `./mvnw -B verify` completo, PIT, el rojo con la forma prevista de las pruebas migradas y la ruptura 2 literal.
+
+### Pendiente de la revisión de 4b (hallazgos no bloqueantes diferidos por el propietario)
+
+- R3-002 y R4-002: la llamada al grabador no está protegida antes de delegar y puede convertir un `403` en `500`.
+- R2-001 y R3-003: `ServletException` se envuelve sin la causa.
+- R4-001: el `403` espera hasta dos transacciones de base de datos sin tiempo límite.
+- R2-002: métodos públicos solo para pruebas en `PermissionDenialAudit`.
+- R2-003: doble conteo de un resumen descartado.
