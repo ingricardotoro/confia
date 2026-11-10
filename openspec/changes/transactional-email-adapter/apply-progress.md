@@ -176,3 +176,8 @@ El propietario aprobó el camino recomendado arriba. Cambios (RED observado ante
 Medido con `git diff --numstat` de los dos commits, sin `openspec/` ni código generado: **932 líneas** (510 + 422), por encima de las 800.
 Costura de `tasks.md`: «migración y pruebas de esquema / adaptador jOOQ», que coincide con los dos commits. Recomendación: dividir en
 PR 2a (`1596a22`) y PR 2b (`9c6e53f`), o aceptar `size:exception`. No se comprimió nada para ajustarse.
+
+### Cierre del PR 2 (2026-11-10)
+
+`./mvnw -B verify -Pmutation-gate` en `apps/api`, JDK 25: **`BUILD SUCCESS`** con los commits `1596a22` y `9c6e53f` (más el registro `6807067`). Los avisos
+`Minion exited abnormally ... TIMED_OUT` de PIT son mutantes que provocan bucles y cuentan como muertos; el umbral de 80 se cumplió.
