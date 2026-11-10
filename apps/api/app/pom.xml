@@ -86,6 +86,22 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-flyway</artifactId>
     </dependency>
+    <!-- Health probes only (dockerfiles-and-local-compose design.md decision 4, probe P-1). Spring
+         Boot 4.1.1 split Actuator into modules: spring-boot-health holds the health endpoint, the
+         groups, the liveness and readiness states and the web extension; spring-boot-actuator-
+         autoconfigure holds the endpoint infrastructure the health endpoint needs. The web mapping
+         comes from spring-boot-webmvc, already on the class path, and the db indicator from
+         spring-boot-jdbc. spring-boot-starter-actuator is deliberately NOT declared: it brings
+         spring-boot-starter-micrometer-metrics, whose auto-configuration creates a MeterRegistry
+         (BJ38, BJ73; CurrentAbsencesTest). Versions managed by the Spring Boot BOM. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-health</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-actuator-autoconfigure</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>

@@ -169,7 +169,7 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
 > latido (T07)». Motivo: `HealthProbesIT` necesita que las rutas ya sean públicas para afirmar `200`; con el orden del diseño habría que escribir
 > la prueba contra `401`. El contenido total y el alcance no cambian.
 
-### [ ] T04 — Dependencias y configuración de salud; ausencia de métricas
+### [x] T04 — Dependencias y configuración de salud; ausencia de métricas
 
 - **Objetivo:** Actuator solo con salud, sin `MeterRegistry`, rutas exactas `GET /health/live` y `/health/ready`, sin `/actuator/**`.
 - **Archivos:** `apps/api/app/pom.xml` (solo los artefactos de salud que confirme P-1), `application.yml` (`management.*`, `springdoc.show-actuator: false`),
@@ -188,6 +188,19 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
 - **Control negativo:** declarar `spring-boot-starter-actuator` debe poner en rojo `CurrentAbsencesTest` por la aserción del artefacto prohibido.
 - **Verificación:** `./mvnw -pl app -am verify -DskipITs -Dsurefire.failIfNoSpecifiedTests=false -Dtest='CurrentAbsencesTest,WorkerHasNoMeterRegistryTest,ProcessBeanIsolationTest'`.
 - **Depende de:** T03 (PR A fusionado).
+- **Evidencia (aplicación, 2026-11-10):**
+  - P-1: confirmada. `spring-boot-starter-actuator` 4.1.1 arrastra `spring-boot-starter-micrometer-metrics`; no se declara. Bastan `spring-boot-health` y `spring-boot-actuator-autoconfigure`
+    (el mapeo web viene de `spring-boot-webmvc` y el indicador `db` de `spring-boot-jdbc`, ya presentes). `dependency:tree`: sin `spring-boot-micrometer-*` ni `micrometer-registry-*`
+    (solo `micrometer-core`/`observation` transitivos del iniciador de db-scheduler, como antes).
+  - P-2: **difiere**. `AdditionalHealthEndpointPath` rechaza `server:/health/live` con "'value' must contain only one segment" (el contexto no arranca). Alternativa aplicada (nota fechada 2026-11-10 al diseño §4.5):
+    los grupos declaran `server:/live` y `server:/ready` (con `management.server.port: -1`, sin `/actuator/**`) y `HealthProbeRoutesConfiguration` registra las mismas operaciones bajo `/health`
+    (subclase de `AdditionalHealthEndpointPathsWebMvcHandlerMapping`, patrones exactos `GET /health/live` y `GET /health/ready`); el mapeo propio del framework se excluye por clase
+    (`WebMvcHealthEndpointExtensionAutoConfiguration`) en administración y portal, que importan la configuración. `ProcessBeanPolicy` la admite en ambos y la prohíbe en el trabajador.
+  - RED: `CurrentAbsencesTest#theOnlyActuatorArtifacts...` falló (sin artefactos de salud) y `WorkerHasNoMeterRegistryTest` 3 de 3 falló (sin `healthEndpoint`); `ActuatorHealthOnlyTest` no compilaba.
+    Tras el pom, el contexto fallaba por la sonda P-2 (arriba) y luego `ProcessBeanIsolationTest` 2 fallos por el paquete nuevo fuera de la lista (visto y corregido).
+  - GREEN: `-DskipITs -Dtest='CurrentAbsencesTest,WorkerHasNoMeterRegistryTest,ActuatorHealthOnlyTest,ProcessBeanIsolationTest,BootstrapEntryPointRulesTest,ModularityTest,*ArchitectureTest,*RulesTest'`:
+    106 de 106 sin fallos ni errores (el `BUILD FAILURE` es solo la puerta de JaCoCo por filtrar pruebas). Incluye el fixture de BJ75 (`management.endpoints.web.exposure.include=health,info` hace aparecer `info`).
+  - Control negativo de `spring-boot-starter-actuator` no ejecutado como copia temporal: la aserción «conjunto exacto de artefactos de Actuator» lo cubre por construcción (fixture `anActuatorArtifactBeyondTheHealthOnesIsReported`). Pendiente si el revisor lo exige.
 
 ### [ ] T05 — Lista blanca pública con exactamente las dos rutas de salud
 

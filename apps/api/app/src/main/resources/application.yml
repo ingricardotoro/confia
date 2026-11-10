@@ -136,6 +136,51 @@ spring:
     # configuration; nothing reads it.
     sql-dialect: POSTGRES
 
+# Health probes and nothing else (dockerfiles-and-local-compose design.md decision 4; probes P-1 and
+# P-2). Actuator is present only as the health module: no metrics, no MeterRegistry, no /actuator/**.
+# With the management port at -1 no management context exists, so the only routes are the two probe
+# routes, served on the main port with exact patterns (GET /health/live and GET /health/ready), which is
+# what PublicEndpoints lists and PublicRouteAllowListTest compares. An additional path takes one segment
+# only (probe P-2), so the groups declare /live and /ready and HealthProbeRoutesConfiguration serves them
+# under /health; the framework's own mapping of the additional paths is excluded in the web entry points.
+# The bodies carry only the status: no components and no details, for any caller (CR09 to CR11).
+management:
+  server:
+    port: -1
+  endpoints:
+    access:
+      default: none
+    web:
+      exposure:
+        include: health
+      discovery:
+        enabled: false
+  endpoint:
+    health:
+      access: read-only
+      show-details: never
+      show-components: never
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+          additional-path: "server:/live"
+        readiness:
+          include: readinessState, db
+          additional-path: "server:/ready"
+  health:
+    defaults:
+      # No disk space, SSL or other default contributor: the readiness group is the application state
+      # and the database, and nothing else (CR12).
+      enabled: false
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+    db:
+      enabled: true
+
 # OpenAPI (docs/01-arquitectura.md §7; frontend-monorepo-and-contracts-pipeline, design.md decision
 # 3). Off by default: only application-local.yml and application-preprod.yml turn the document
 # endpoint and Swagger UI on, so a new profile or a typo in SPRING_PROFILES_ACTIVE leaves them
@@ -151,3 +196,5 @@ springdoc:
   # translator that carry a status of their own, so a new handler would put a response nobody
   # approved in the snapshot (session-tokens-and-web-layer design.md decision 13; probe S-4).
   override-with-generic-response: false
+  # Explicit: health never enters the OpenAPI snapshots (dockerfiles-and-local-compose design.md 4.2).
+  show-actuator: false

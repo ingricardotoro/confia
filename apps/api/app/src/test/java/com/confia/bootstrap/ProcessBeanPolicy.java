@@ -94,6 +94,8 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // of the second. Administrative only, and each exact for the same reason.
                     "com.confia.shared.web.ratelimit",
                     "com.confia.shared.observability.metrics",
+                    // The health probe routes (dockerfiles-and-local-compose decision 4): exact.
+                    "com.confia.shared.observability.health",
                     // The delay materializer and its properties: the bounded semaphore a
                     // login-like endpoint takes a permit from before its use case runs.
                     // Administrative only, and exact like every entry.
@@ -136,7 +138,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // wiring comes with them: no jOOQ context, no repository, no business module.
                     // Each is exact and contributes a bean.
                     "com.confia.shared.security", "com.confia.shared.jobs.infrastructure",
-                    "com.confia.shared.jobs.infrastructure.wiring"),
+                    "com.confia.shared.jobs.infrastructure.wiring",
+                    // The health probe routes (dockerfiles-and-local-compose decision 4): exact.
+                    "com.confia.shared.observability.health"),
             forbidden("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     "com.confia.invoicing", ADMIN_MODULE,
@@ -199,7 +203,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
                     CSRF_PACKAGE, CSRF_REASON,
                     SESSION_PACKAGE, SESSION_COOKIE_REASON,
-                    "com.confia.organization", STAFF_INSTITUTION));
+                    "com.confia.organization", STAFF_INSTITUTION,
+                    "com.confia.shared.observability.health",
+                    "the worker serves no route; its health is a heartbeat file (WE100)"));
 
     /**
      * The migrate process (dockerfiles-and-local-compose design.md decision 2): a closed context of
