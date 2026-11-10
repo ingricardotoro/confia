@@ -141,7 +141,7 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
     `ProcessBeanPolicy.MIGRATE` no entra en `all()` (no hay contexto vivo); la prueba de `BootstrapEntryPointRulesTest` fija los subpaquetes admin, migrate, portal y worker.
     El caso CR05 se prueba con `connection-timeout=1000` para acotar el tiempo.
 
-### [ ] T03 — Ningún otro perfil migra (CR07, CR08)
+### [x] T03 — Ningún otro perfil migra (CR07, CR08)
 
 - **Objetivo:** `admin`, `portal` y `worker` contra una base vacía o a falta de una migración no crean esquema ni tocan `flyway_schema_history`.
 - **Archivos:** `apps/api/app/src/test/java/com/confia/bootstrap/MigrateProfileIT.java` (extensión) o `OtherProfilesDoNotMigrateIT.java` (nuevo).
@@ -153,6 +153,13 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
 - **Verificación:** `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test='MigrateProfileIT' -Dfailsafe.failIfNoSpecifiedTests=false`;
   cierre del PR A: `./mvnw verify -Pmutation-gate` en verde (cobertura y mutación en umbrales).
 - **Depende de:** T02.
+- **Evidencia (aplicación, 2026-11-10):**
+  - Excepción de RED declarada (caracterización): `OtherProfilesDoNotMigrateIT` pasó a la primera, 6 de 6 (`-Dit.test=OtherProfilesDoNotMigrateIT`). Cada perfil se conecta como `confia_owner`,
+    de modo que un resultado limpio no se explica por falta de privilegios. Se separó en un archivo propio en lugar de extender `MigrateProfileIT`.
+  - Control negativo observado: `spring.flyway.enabled: true` en `application.yml` → 6 de 6 en rojo (tablas creadas en `public` y historial modificado); revertido.
+  - La parte «no indica preparado» de CR07 sigue para T06.
+  - Cierre del PR A: `./mvnw verify -Pmutation-gate` → BUILD SUCCESS (exit 0): 865 `*IT` sin fallos, 2867 pruebas unitarias sin fallos (3 omitidas previas), cobertura y mutación en umbral
+    (`app`: 1467 mutaciones, 93 % eliminadas; `kernel`: 201, 99 %).
 
 ---
 
