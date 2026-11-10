@@ -7,6 +7,7 @@ import { CashPage, ChargeList, InvoiceList } from "./pages/extras";
 import { GuardianDetail, GuardianForm, GuardianList } from "./pages/guardians";
 import { OrgDetail, OrgForm, OrgList } from "./pages/orgs";
 import { PaymentDetail, PaymentList, PaymentWizard } from "./pages/payments";
+import { ClosingReport, IncomeReport, PortfolioReport } from "./pages/reports";
 import { Shell } from "./pages/shell";
 import { StudentDetail, StudentForm, StudentList } from "./pages/students";
 import { UserDetail, UserForm, UserList } from "./pages/users";
@@ -48,6 +49,9 @@ const routeTree = root.addChildren([
   r("/cobranza/promesas/$id/editar", () => <PromiseForm mode="edit" />),
   r("/cobranza/recordatorios", ReminderList),
   r("/cobranza/recordatorios/nuevo", ReminderForm),
+  r("/reportes/ingresos", IncomeReport),
+  r("/reportes/cartera", PortfolioReport),
+  r("/reportes/cierres", ClosingReport),
   r("/configuracion/periodos", PeriodList),
   r("/configuracion/periodos/nuevo", () => <PeriodForm mode="new" />),
   r("/configuracion/periodos/$id/editar", () => <PeriodForm mode="edit" />),
