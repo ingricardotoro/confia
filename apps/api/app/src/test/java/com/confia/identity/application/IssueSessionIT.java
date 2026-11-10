@@ -35,7 +35,7 @@ class IssueSessionIT extends SessionIssuanceIntegrationTest {
     /** Scenarios I87 and I90, and the access token the session hands out after the commit. */
     @Test
     void aSessionIsIssuedWithItsFamilyItsTokenAndItsEntryInOneTransaction() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
 
         IssuedSession session = issue(EIGHT, ana);
 
@@ -76,7 +76,7 @@ class IssueSessionIT extends SessionIssuanceIntegrationTest {
     /** Scenario I88 (ADR-0005, test 5): the stored value is the SHA-256, never the delivered text. */
     @Test
     void theStoredValueIsTheSha256OfTheDeliveredTokenAndNoColumnHoldsTheToken() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
 
         IssuedSession first = issue(EIGHT, ana);
         IssuedSession second = issue("2026-10-12T08:01:00Z", ana);
@@ -103,7 +103,7 @@ class IssueSessionIT extends SessionIssuanceIntegrationTest {
     /** Scenario I90: the entry carries no secret, not even the hash. */
     @Test
     void theEntryContainsNeitherTheTokenNorItsHash() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
 
         IssuedSession session = issueSession(EIGHT).execute(context(),
                 commandFrom(ana, true, "agente", "203.0.113.9"));
@@ -120,7 +120,7 @@ class IssueSessionIT extends SessionIssuanceIntegrationTest {
     /** Scenario I89: if the unit does not commit, nothing of it exists. */
     @Test
     void aFailureAfterTheFamilyAndTheTokenAreWrittenLeavesNothingBehind() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         JooqAuditLogWriter real = new JooqAuditLogWriter(dsl);
         AuditLogWriter failing = entry -> {
             real.append(entry);
@@ -139,7 +139,7 @@ class IssueSessionIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void aFailureWhileWritingTheTokenTakesTheFamilyWithIt() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         RefreshTokenRepository failing = withInsert(new JooqRefreshTokenRepository(dsl),
                 (institution, row) -> {
                     throw new IllegalStateException("the token could not be written");
@@ -166,7 +166,7 @@ class IssueSessionIT extends SessionIssuanceIntegrationTest {
     /** Scenario I119: a digest of the agent and the first address, never the agent's text. */
     @Test
     void onlyTheFingerprintAndTheFirstAddressAreStored() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         String agent = "Mozilla/5.0 (agente-prueba)";
 
         IssuedSession session = issueSession(EIGHT).execute(context(),
@@ -183,7 +183,7 @@ class IssueSessionIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void anIpv6AddressIsStoredAsAnAddress() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
 
         IssuedSession session = issueSession(EIGHT).execute(context(),
                 commandFrom(ana, false, "agente", "2001:db8::1"));
@@ -198,7 +198,7 @@ class IssueSessionIT extends SessionIssuanceIntegrationTest {
     /** Scenario I120: no request, no agent, no address. */
     @Test
     void anIssuanceWithoutOriginIsAcceptedWithANullAddressAndTheFingerprintOfNoAgent() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
 
         IssuedSession session = issue(EIGHT, ana);
 
@@ -214,7 +214,7 @@ class IssueSessionIT extends SessionIssuanceIntegrationTest {
     /** Scenario I126: a session opened after a reset is not the reset's to revoke. */
     @Test
     void aSessionStartedAfterAResetIsNotAffectedByIt() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         String token = issueTokenAt(ana, "2026-10-12T09:50:00Z").value();
         resetAt(token, "Lempira y maíz 2026", new SecondFactorProof.None(), "2026-10-12T10:00:00Z");
 

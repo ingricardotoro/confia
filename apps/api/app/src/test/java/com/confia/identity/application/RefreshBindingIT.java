@@ -36,7 +36,7 @@ class RefreshBindingIT extends RotationIntegrationTest {
     /** Scenario I190: the agent and the address both changed. */
     @Test
     void anAgentAndAnAddressThatBothChangedRefuseTheRefreshAndRevokeTheFamily() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issueSession(NINE).execute(context(),
                 commandFrom(ana, false, AGENT_ONE, FIRST_ADDRESS));
         Rotated rotated = (Rotated) rotateFrom("2026-10-12T09:15:00Z",
@@ -72,7 +72,7 @@ class RefreshBindingIT extends RotationIntegrationTest {
     /** Scenarios I191 and I121: only the agent, or only the address, changed. */
     @Test
     void ifOnlyTheAgentOrOnlyTheAddressChangedTheTokenStillRotates() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession agentOnly = issueSession(NINE).execute(context(),
                 commandFrom(ana, false, AGENT_ONE, FIRST_ADDRESS));
         IssuedSession addressOnly = issueSession(NINE).execute(context(),
@@ -93,7 +93,7 @@ class RefreshBindingIT extends RotationIntegrationTest {
     /** A request that carries no address cannot show that the address changed. */
     @Test
     void aRequestWithoutAnAddressDoesNotCountAsAChangedAddress() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issueSession(NINE).execute(context(),
                 commandFrom(ana, false, AGENT_ONE, FIRST_ADDRESS));
 
@@ -106,7 +106,7 @@ class RefreshBindingIT extends RotationIntegrationTest {
     /** Scenario I192: a family opened without an origin has nothing to compare against. */
     @Test
     void aFamilyOpenedWithoutAnAgentOrAnAddressRotatesFromAnywhere() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession noOrigin = issue(NINE, ana);
 
         RefreshOutcome outcome = rotateFrom("2026-10-12T09:15:00Z", noOrigin.refreshToken().value(),
@@ -119,7 +119,7 @@ class RefreshBindingIT extends RotationIntegrationTest {
     /** Scenario I192, the other half: an agent was recorded but no address. */
     @Test
     void aFamilyThatRecordedNoAddressIsNotRefusedForAChangedAddress() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession noAddress = issueSession(NINE).execute(context(),
                 commandFrom(ana, false, AGENT_ONE, null));
 
@@ -132,7 +132,7 @@ class RefreshBindingIT extends RotationIntegrationTest {
     /** Scenario I193: the revocation is of the family that changed, and of no other. */
     @Test
     void onlyTheFamilyWhoseBindingChangedIsRevoked() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession affected = issueSession(NINE).execute(context(),
                 commandFrom(ana, false, AGENT_ONE, FIRST_ADDRESS));
         IssuedSession other = issueSession(NINE).execute(context(),
@@ -152,7 +152,7 @@ class RefreshBindingIT extends RotationIntegrationTest {
     /** Scenario I225, the first half: a consumed token outside the grace is a reuse, not a binding. */
     @Test
     void aConsumedTokenOutsideTheGraceIsAReuseEvenIfTheBindingChanged() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamilyFrom(ana, false, "2026-10-12T08:00:00Z", "2026-10-12T08:20:00Z",
                 "2026-10-12T20:00:00Z", null, null, FIRST_ADDRESS);
         ConsumedSeed seed = seedConsumedToken(family, "2026-10-12T08:00:00Z",
@@ -171,7 +171,7 @@ class RefreshBindingIT extends RotationIntegrationTest {
     /** Scenario I225, the second half: the binding is evaluated before the expiry of the token. */
     @Test
     void anExpiredOwnTokenIsABindingChangeWhenTheBindingChanged() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamilyFrom(ana, false, "2026-10-12T08:00:00Z", "2026-10-12T08:20:00Z",
                 "2026-10-12T20:00:00Z", null, null, FIRST_ADDRESS);
         PlainRefreshToken expired = seedOpenToken(family, "2026-10-12T08:00:00Z",
@@ -188,7 +188,7 @@ class RefreshBindingIT extends RotationIntegrationTest {
     /** Scenario I226: a compressed IPv6 address and the same one expanded are the same address. */
     @Test
     void anIpv6AddressWrittenExpandedIsTheSameAddressAsTheCompressedOneStored() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamilyFrom(ana, false, "2026-10-12T08:00:00Z", "2026-10-12T08:20:00Z",
                 "2026-10-12T20:00:00Z", null, null, "2001:db8::1");
         PlainRefreshToken token = seedOpenToken(family, "2026-10-12T08:20:00Z",
@@ -204,7 +204,7 @@ class RefreshBindingIT extends RotationIntegrationTest {
     /** Scenario I226, from the other side: the family was opened from an expanded address. */
     @Test
     void aCompressedIpv6AddressIsTheSameAddressAsTheOneAFamilyWasOpenedFrom() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issueSession(NINE).execute(context(),
                 commandFrom(ana, false, AGENT_ONE, "2001:0db8:0000:0000:0000:0000:0000:0001"));
 

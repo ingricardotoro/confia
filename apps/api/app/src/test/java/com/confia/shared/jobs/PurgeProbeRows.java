@@ -55,8 +55,8 @@ public final class PurgeProbeRows {
         for (int i = 0; i < count; i++) {
             UUID account = UUID.randomUUID();
             run("""
-                    insert into identity_staff_account (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, '$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aGFzaA', false)
+                    insert into identity_staff_account (institution_id, id, email, password_hash)
+                    values (?, ?, ?, '$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aGFzaA')
                     """, institution, account, "purga." + account + "@colegio.edu.hn");
             run("""
                     insert into identity_mfa_totp_backoff

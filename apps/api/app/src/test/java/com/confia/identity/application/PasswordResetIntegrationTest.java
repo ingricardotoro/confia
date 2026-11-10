@@ -80,19 +80,19 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
                 UUID.randomUUID().toString());
     }
 
-    StaffAccountId seedStaffAccount(String email, String password, boolean mfaRequired) {
+    StaffAccountId seedStaffAccount(String email, String password, boolean exemptFromSecondFactor) {
         StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
         String hash = HASHER.hash(PlainPassword.of(password)).value();
         transactionRunner().execute(context(), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, ?)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId.value(), accountId.value(),
-                    LoginIdentifier.of(email).value(), hash, mfaRequired);
+                    LoginIdentifier.of(email).value(), hash);
             return null;
         });
-        if (!mfaRequired) {
+        if (exemptFromSecondFactor) {
             exemptions.exempt(accountId);
         }
         return accountId;

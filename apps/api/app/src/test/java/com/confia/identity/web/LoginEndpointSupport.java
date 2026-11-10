@@ -53,24 +53,23 @@ abstract class LoginEndpointSupport extends CommittingPostgresIntegrationTest {
         return new SecurityContext("", "system", of.value().toString(), UUID.randomUUID().toString());
     }
 
-    StaffAccountId seedAccount(String email, boolean mfaRequired, boolean secretEnrolled) {
-        return seedAccountIn(institution(), email, PASSWORD, mfaRequired, secretEnrolled);
+    StaffAccountId seedAccount(String email, boolean exemptFromSecondFactor, boolean secretEnrolled) {
+        return seedAccountIn(institution(), email, PASSWORD, exemptFromSecondFactor, secretEnrolled);
     }
 
     StaffAccountId seedAccountIn(InstitutionId of, String email, String password,
-            boolean mfaRequired, boolean secretEnrolled) {
+            boolean exemptFromSecondFactor, boolean secretEnrolled) {
         StaffAccountId account = new StaffAccountId(UUID.randomUUID());
-        if (!mfaRequired) {
+        if (exemptFromSecondFactor) {
             exemptions().exempt(account);
         }
         String hash = HASHER.hash(PlainPassword.of(password)).value();
         transactionRunner().execute(contextOf(of), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, ?)
-                    """, of.value(), account.value(), LoginIdentifier.of(email).value(), hash,
-                    mfaRequired);
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
+                    """, of.value(), account.value(), LoginIdentifier.of(email).value(), hash);
             if (secretEnrolled) {
                 // A verified secret: "MFA active" is a credential that accepted a code (design.md, decision 13).
                 JooqTotpCredentialRepository credentials = new JooqTotpCredentialRepository(dsl);

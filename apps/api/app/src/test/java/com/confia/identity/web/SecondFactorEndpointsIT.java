@@ -439,12 +439,12 @@ class SecondFactorEndpointsIT extends LoginEndpointSupport {
 
     private Account newAccount() {
         String email = freshEmail();
-        return new Account(email, seedAccount(email, true, false));
+        return new Account(email, seedAccount(email, false, false));
     }
 
     private Account newAccountWithoutMfa() {
         String email = freshEmail();
-        return new Account(email, seedAccount(email, false, false));
+        return new Account(email, seedAccount(email, true, false));
     }
 
     /** A family opened by a real login, the session a first verification must end. */

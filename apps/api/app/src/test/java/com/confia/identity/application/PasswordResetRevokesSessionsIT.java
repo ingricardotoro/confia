@@ -54,8 +54,8 @@ class PasswordResetRevokesSessionsIT extends PasswordResetIntegrationTest {
     /** Scenario I24: three families revoked, two of another account untouched, the count audited. */
     @Test
     void aCompletedResetRevokesEveryLiveFamilyOfTheAccountAndNoneOfAnother() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
-        StaffAccountId carlos = seedStaffAccount(CARLOS, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
+        StaffAccountId carlos = seedStaffAccount(CARLOS, CURRENT, true);
         for (int i = 0; i < 3; i++) {
             seedFamily(ana, "2026-10-15T09:00:00Z", null, null, true);
         }
@@ -101,7 +101,7 @@ class PasswordResetRevokesSessionsIT extends PasswordResetIntegrationTest {
     /** Scenario I122: a failure after consuming, rehashing and revoking leaves nothing behind. */
     @Test
     void aTransactionThatRollsBackAfterRevokingLeavesEveryFamilyLive() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
         for (int i = 0; i < 3; i++) {
             seedFamily(ana, "2026-10-15T09:00:00Z", null, null, true);
         }
@@ -135,7 +135,7 @@ class PasswordResetRevokesSessionsIT extends PasswordResetIntegrationTest {
     /** The revocation entry is part of the unit too: if it cannot be written, nothing happens. */
     @Test
     void aFailingRevocationEntryRollsBackTheWholeReset() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
         seedFamily(ana, "2026-10-15T09:00:00Z", null, null, true);
         PlainPasswordResetToken token = issueTokenAt(ana, ISSUED_AT);
         JooqAuditLogWriter realAudit = new JooqAuditLogWriter(dsl);
@@ -160,7 +160,7 @@ class PasswordResetRevokesSessionsIT extends PasswordResetIntegrationTest {
     /** Scenario I123: a revoker that throws means no reset: same password, token still alive. */
     @Test
     void aRevokerThatFailsLeavesThePasswordAndTheTokenUntouched() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
         seedFamily(ana, "2026-10-15T09:00:00Z", null, null, true);
         PlainPasswordResetToken token = issueTokenAt(ana, ISSUED_AT);
         AccountSessionRevoker failing = (institution, account, reason, now) -> {
@@ -182,7 +182,7 @@ class PasswordResetRevokesSessionsIT extends PasswordResetIntegrationTest {
     /** Scenario I124: the four rejections leave three live families exactly as they were. */
     @Test
     void noRejectionRevokesAnyFamily() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, false);
         PlainTotpSecret secret = enrollTotp(sofia);
         for (int i = 0; i < 3; i++) {
             seedFamily(sofia, "2026-10-15T09:00:00Z", null, null, true);
@@ -210,7 +210,7 @@ class PasswordResetRevokesSessionsIT extends PasswordResetIntegrationTest {
     /** Scenario I125, first half: no families at all, and the entry still says zero. */
     @Test
     void anAccountWithoutFamiliesCompletesAndAuditsZeroRevocations() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
         PlainPasswordResetToken token = issueTokenAt(ana, ISSUED_AT);
 
         ResetPasswordDecision decision = resetAt(token.value(), NEW, NONE, RESET_AT);
@@ -227,7 +227,7 @@ class PasswordResetRevokesSessionsIT extends PasswordResetIntegrationTest {
     /** Scenario I125, second half: an already revoked family keeps its instant and its reason. */
     @Test
     void anAlreadyRevokedFamilyKeepsItsReasonAndOnlyTheLiveOneIsRevoked() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
         UUID reused = seedFamily(ana, "2026-10-15T07:00:00Z", "2026-10-15T08:00:00Z",
                 "reuse_detected", false);
         UUID live = seedFamily(ana, "2026-10-15T09:00:00Z", null, null, true);
@@ -252,7 +252,7 @@ class PasswordResetRevokesSessionsIT extends PasswordResetIntegrationTest {
     /** Enrolling a second factor is not a password change: it revokes nothing. */
     @Test
     void enrollingASecondFactorRevokesNothing() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, false);
         for (int i = 0; i < 2; i++) {
             seedFamily(sofia, "2026-10-15T09:00:00Z", null, null, true);
         }

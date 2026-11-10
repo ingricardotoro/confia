@@ -219,7 +219,7 @@ class RefreshGraceWindowIT extends RotationIntegrationTest {
      */
     @Test
     void rotatingTheFamilyEmptiesTheSuccessorsConsumedTenSecondsAgoOrMore() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID kept = seedFamily(ana, false, EIGHT, "2026-10-12T10:00:00Z", TWENTY, null, null);
         ConsumedSeed keptSeed = seedConsumedToken(kept, EIGHT, SIXTEEN, "2026-10-12T10:00:00Z",
                 AGENT_ONE, true);
@@ -239,7 +239,7 @@ class RefreshGraceWindowIT extends RotationIntegrationTest {
     /** Scenario I101, second execution: a revocation of the family empties the value too. */
     @Test
     void revokingTheFamilyEmptiesTheSuccessor() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, "2026-10-12T10:00:00Z", TWENTY, null, null);
         seedConsumedToken(family, EIGHT, SIXTEEN, "2026-10-12T10:00:00Z", AGENT_ONE, true);
         JooqAccountSessionRevoker revoker = new JooqAccountSessionRevoker(dsl);
@@ -271,7 +271,7 @@ class RefreshGraceWindowIT extends RotationIntegrationTest {
     /** Scenario I103: no user agent on either presentation is the same device. */
     @Test
     void noUserAgentOnEitherPresentationIsTheSameDevice() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issueSession(START).execute(context(),
                 commandFrom(ana, false, null, null));
         Rotated fresh = (Rotated) rotate(ROTATED_AT, first.refreshToken().value(), null);
@@ -286,7 +286,7 @@ class RefreshGraceWindowIT extends RotationIntegrationTest {
 
     @Test
     void anAbsentUserAgentAndAPresentOneAreNotTheSameDevice() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issueSession(START).execute(context(),
                 commandFrom(ana, false, null, null));
         rotate(ROTATED_AT, first.refreshToken().value(), null);
@@ -365,7 +365,7 @@ class RefreshGraceWindowIT extends RotationIntegrationTest {
     }
 
     private Rotation rotatedOnce(String email, boolean secondFactor, String agent) {
-        StaffAccountId account = seedStaffAccount(email, CURRENT_PASSWORD, secondFactor);
+        StaffAccountId account = seedStaffAccount(email, CURRENT_PASSWORD, !secondFactor);
         IssuedSession first = issueSession(START).execute(context(),
                 commandFrom(account, secondFactor, agent, null));
         Rotated fresh = (Rotated) rotate(ROTATED_AT, first.refreshToken().value(), agent);

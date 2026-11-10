@@ -158,8 +158,8 @@ class RequestPasswordResetIT extends CommittingPostgresIntegrationTest {
         transactionRunner().execute(context(), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, false)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId.value(), accountId.value(),
                     LoginIdentifier.of(email).value(), hash);
             return null;

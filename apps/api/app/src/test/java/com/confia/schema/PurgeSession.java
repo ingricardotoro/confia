@@ -29,11 +29,20 @@ final class PurgeSession implements AutoCloseable {
     private static final String PASSWORD_HASH =
             "$argon2id$v=19$m=19456,t=3,p=1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNoaGFzaGhhc2g";
 
+    /** The insert of a staff account in the current schema: the second factor is not stored. */
+    static final String CURRENT_ACCOUNT_INSERT = """
+            insert into identity_staff_account
+                (institution_id, id, email, password_hash)
+            values (?, ?, ?, ?)
+            """;
+
     private final Connection connection;
     private final OffsetDateTime now;
+    private final String accountInsert;
 
-    private PurgeSession(Connection connection) throws SQLException {
+    private PurgeSession(Connection connection, String accountInsert) throws SQLException {
         this.connection = connection;
+        this.accountInsert = accountInsert;
         this.connection.setAutoCommit(false);
         // "30 days" is a calendar interval in the session zone: pin the zone so a daylight-saving
         // zone of the JVM cannot move the floor by an hour.
@@ -45,12 +54,22 @@ final class PurgeSession implements AutoCloseable {
 
     /** A session of {@code role} on the shared container's database. */
     static PurgeSession open(String role) throws SQLException {
-        return new PurgeSession(SharedPostgresContainer.connectionAs(role));
+        return new PurgeSession(SharedPostgresContainer.connectionAs(role), CURRENT_ACCOUNT_INSERT);
     }
 
-    /** A session of {@code role} on a throw-away database. */
+    /** A session of {@code role} on a throw-away database that never seeds accounts. */
     static PurgeSession open(StepwiseDatabase database, String role) throws SQLException {
-        return new PurgeSession(database.connectionAs(role));
+        return new PurgeSession(database.connectionAs(role), CURRENT_ACCOUNT_INSERT);
+    }
+
+    /**
+     * A session on a throw-away database pinned to a version before the staff account lost its
+     * second factor column. That version still requires the column, so the test that pins the
+     * version brings the insert that satisfies it.
+     */
+    static PurgeSession open(StepwiseDatabase database, String role, String accountInsert)
+            throws SQLException {
+        return new PurgeSession(database.connectionAs(role), accountInsert);
     }
 
     Connection connection() {
@@ -88,11 +107,7 @@ final class PurgeSession implements AutoCloseable {
 
     UUID seedAccount(UUID institutionId) throws SQLException {
         UUID accountId = UUID.randomUUID();
-        execute("""
-                insert into identity_staff_account
-                    (institution_id, id, email, password_hash, mfa_required)
-                values (?, ?, ?, ?, false)
-                """, institutionId, accountId, "purge." + accountId + "@colegio.edu.hn",
+        execute(accountInsert, institutionId, accountId, "purge." + accountId + "@colegio.edu.hn",
                 PASSWORD_HASH);
         return accountId;
     }

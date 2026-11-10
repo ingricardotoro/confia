@@ -32,7 +32,7 @@ class PasswordResetTotpBackoffSharingIT extends PasswordResetIntegrationTest {
     /** Scenario I13: login and reset failures add up in one counter. */
     @Test
     void loginAndResetFailuresAddUpInTheSameCounter() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, false);
         PlainTotpSecret secret = enrollTotp(sofia);
         PlainPasswordResetToken token = issueTokenAt(sofia, "2026-10-14T09:00:00Z");
 
@@ -66,7 +66,7 @@ class PasswordResetTotpBackoffSharingIT extends PasswordResetIntegrationTest {
     /** Scenario I14: the failure is committed and the token still serves. */
     @Test
     void theFailureIsCommittedAndTheTokenStillServes() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, false);
         PlainTotpSecret secret = enrollTotp(sofia);
         PlainPasswordResetToken token = issueTokenAt(sofia, "2026-10-14T14:00:00Z");
 

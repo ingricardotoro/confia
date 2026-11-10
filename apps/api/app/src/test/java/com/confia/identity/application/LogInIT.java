@@ -75,7 +75,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void aCorrectPasswordWithoutSecondFactorStartsASessionWithItsFamilyAndBothEntries() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
 
         LoginDecision decision = logIn(EIGHT).execute(command(ANA, CURRENT_PASSWORD));
 
@@ -102,7 +102,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void aCorrectPasswordOfAnAccountWithAnEnrolledSecondFactorGetsTheVerificationTokenAndNoSession() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
         enroll(ana);
 
         LoginDecision decision = logIn(EIGHT).execute(command(ANA, CURRENT_PASSWORD));
@@ -125,7 +125,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void aCorrectPasswordOfAnAccountThatMustEnrollGetsTheEnrollmentTokenAndNoSession() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
 
         LoginDecision decision = logIn(EIGHT).execute(command(ANA, CURRENT_PASSWORD));
 
@@ -141,7 +141,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void emittingTenRestrictedTokensCreatesNoFamilyAndNoRefreshToken() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
         long familiesBefore = count("identity_refresh_token_family");
         long tokensBefore = count("identity_refresh_token");
 
@@ -156,7 +156,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void aWrongPasswordAndAnUnknownIdentifierBothFailWithoutASession() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
 
         LoginDecision wrong = logIn(EIGHT).execute(command(ANA, WRONG));
         LoginDecision unknown = logIn(EIGHT).execute(command("nadie@colegio.edu.hn", WRONG));
@@ -170,7 +170,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void aCorrectPasswordDuringTheBackoffStartsASessionAndCarriesTheDelay() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         logIn("2026-10-12T08:00:00Z").execute(command(ANA, WRONG));
         logIn("2026-10-12T08:00:20Z").execute(command(ANA, WRONG));
         logIn("2026-10-12T08:00:40Z").execute(command(ANA, WRONG));
@@ -183,7 +183,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void anIdentifierOrAPasswordThatCannotBeNormalizedFailsAtOnceAndTouchesNoTable() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         List<LoginCommand> unusable = List.of(
                 new LoginCommand("ab", CURRENT_PASSWORD, ClientAddress.parseLiteral(CLIENT_IP), AGENT, ""),
                 new LoginCommand("   ab   ", CURRENT_PASSWORD, null, null, ""),
@@ -206,7 +206,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void anEntryThatFailsAfterTheFamilyIsWrittenRollsBackTheFamilyTheEntriesAndTheBackoff() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
 
         assertThatThrownBy(() -> logIn(EIGHT, failingOn("identity.session.started"), spread,
                 () -> institutionId).execute(command(ANA, CURRENT_PASSWORD)))
@@ -222,7 +222,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void aTokenThatCannotBeWrittenRollsBackTheAuthenticationEntryToo() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         RefreshTokenRepository failing = withInsert(new JooqRefreshTokenRepository(dsl),
                 (institution, row) -> {
                     throw new IllegalStateException("the token could not be written");
@@ -238,7 +238,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void anInstitutionThatChangesBetweenTheReadAndTheGuardIsAWiringDefectAndWritesNothing() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         AtomicInteger reads = new AtomicInteger();
         InstitutionId other = new InstitutionId(UUID.randomUUID());
         LoginInstitutionProvider unstable = () -> reads.getAndIncrement() == 0 ? institutionId : other;
@@ -255,7 +255,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void theFifthDistinctIdentifierWritesTheSignalInTheSameTransactionAndWarnsAfterCommit() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         String requestId = UUID.randomUUID().toString();
         logIn("2026-10-12T10:00:00Z").execute(command(ANA, WRONG));
         for (int unknown = 1; unknown <= 3; unknown++) {
@@ -308,7 +308,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void theEdgeOfTenMinutesIsStrictAndASignalledAddressStillAuthenticates() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         for (int unknown = 1; unknown <= 4; unknown++) {
             logIn("2026-10-12T10:00:00Z").execute(command("intruso" + unknown + "@colegio.edu.hn", WRONG));
         }
@@ -357,10 +357,10 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void onlyARejectedAttemptWithAnAddressIsRecordedAsAFailure() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
-        StaffAccountId pending = seedStaffAccount("pendiente@colegio.edu.hn", CURRENT_PASSWORD, true);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
+        StaffAccountId pending = seedStaffAccount("pendiente@colegio.edu.hn", CURRENT_PASSWORD, false);
         enroll(pending);
-        seedStaffAccount("nuevo@colegio.edu.hn", CURRENT_PASSWORD, true);
+        seedStaffAccount("nuevo@colegio.edu.hn", CURRENT_PASSWORD, false);
         RecordingSpread recording = new RecordingSpread();
 
         logIn(EIGHT, new JooqAuditLogWriter(dsl), recording, () -> institutionId)
@@ -389,7 +389,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void theFamilyKeepsTheAddressAndTheFingerprintOfTheAgentOfTheRequest() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
 
         LoginDecision decision = logIn(EIGHT).execute(command(ANA, CURRENT_PASSWORD));
 
@@ -407,7 +407,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void aLoginWithoutOriginIsAcceptedWithANullAddress() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
 
         LoginDecision decision = logIn(EIGHT).execute(new LoginCommand(ANA, CURRENT_PASSWORD, null,
                 null, ""));
@@ -425,7 +425,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
 
     @Test
     void theAuthenticationEntryCarriesTheAddressAndTheAgentOfTheCommand() {
-        seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        seedStaffAccount(ANA, CURRENT_PASSWORD, true);
 
         logIn(EIGHT).execute(command(ANA, WRONG));
 

@@ -42,7 +42,7 @@ class EndSessionIT extends RevocationIntegrationTest {
 
     @Test
     void aLiveSessionIsRevokedWithLogoutItsSuccessorsAreEmptiedAndTheClosingIsAudited() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issue("2026-10-15T15:00:00Z", ana);
         Rotated rotated = (Rotated) rotate("2026-10-15T15:05:00Z",
                 first.refreshToken().value(), AGENT_ONE);
@@ -72,7 +72,7 @@ class EndSessionIT extends RevocationIntegrationTest {
     /** Scenario I195: the token of a rotation that already happened still locates the family. */
     @Test
     void aConsumedRefreshTokenAlsoClosesTheFamily() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issue("2026-10-15T15:00:00Z", ana);
         Rotated second = (Rotated) rotate("2026-10-15T15:05:00Z", first.refreshToken().value(),
                 AGENT_ONE);
@@ -92,7 +92,7 @@ class EndSessionIT extends RevocationIntegrationTest {
     /** Scenario I197: only the family of the presented token. */
     @Test
     void onlyTheFamilyOfThePresentedTokenIsRevoked() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession closed = issue("2026-10-15T15:00:00Z", ana);
         IssuedSession kept = issue("2026-10-15T15:01:00Z", ana);
 
@@ -112,7 +112,7 @@ class EndSessionIT extends RevocationIntegrationTest {
     @ValueSource(strings = {" ", "not-a-token", "q9Zb2X-kP3r_Tm7Wv1cH8eN4sLd0fGyJ5uAiO6pRtQ",
             "q9Zb2X-kP3r_Tm7Wv1cH8eN4sLd0fGyJ5uAiO6pRtQEx", "q9Zb2X+kP3r/Tm7Wv1cH8eN4sLd0fGyJ5uAiO6pRtQE"})
     void aMissingOrMalformedTextDoesNothingAndWritesNothing(String presented) {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         issue("2026-10-15T15:00:00Z", ana);
         String before = storedSessions();
         int auditBefore = auditRows().size();
@@ -126,7 +126,7 @@ class EndSessionIT extends RevocationIntegrationTest {
     /** Scenario I196, first half: a well-formed token that no family owns. */
     @Test
     void anUnknownTokenDoesNothingAndWritesNothing() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         issue("2026-10-15T15:00:00Z", ana);
         String before = storedSessions();
         int auditBefore = auditRows().size();
@@ -140,7 +140,7 @@ class EndSessionIT extends RevocationIntegrationTest {
     /** Scenario I196, second half: a revoked family keeps its reason and its instant. */
     @Test
     void anAlreadyRevokedFamilyKeepsItsReasonAndItsInstantAndWritesNoEntry() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID reused = seedFamily(ana, false, "2026-10-15T13:00:00Z", "2026-10-15T13:30:00Z",
                 "2026-10-16T01:00:00Z", "2026-10-15T13:30:00Z", "reuse_detected");
         PlainRefreshToken token = seedOpenToken(reused, "2026-10-15T13:00:00Z",
@@ -159,7 +159,7 @@ class EndSessionIT extends RevocationIntegrationTest {
 
     @Test
     void aFamilyThatHasEndedByTimeIsNotRevokedAndWritesNoEntry() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID expired = seedFamily(ana, false, "2026-10-15T01:00:00Z", "2026-10-15T14:50:00Z",
                 "2026-10-15T13:00:00Z", null, null);
         PlainRefreshToken afterEnd = seedOpenToken(expired, "2026-10-15T01:00:00Z",
@@ -179,7 +179,7 @@ class EndSessionIT extends RevocationIntegrationTest {
 
     @Test
     void aFamilyAtTheExactEndOfItsLifeAndOneAtTheExactIdleBorderAreNotRevoked() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID atEnd = seedFamily(ana, false, "2026-10-15T03:20:00Z", "2026-10-15T15:10:00Z",
                 LOGOUT_AT, null, null);
         PlainRefreshToken endToken = seedOpenToken(atEnd, "2026-10-15T03:20:00Z",
@@ -216,7 +216,7 @@ class EndSessionIT extends RevocationIntegrationTest {
 
     @Test
     void aClosingThatCannotBeAuditedLeavesTheFamilyLive() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issue("2026-10-15T15:00:00Z", ana);
         JooqAuditLogWriter real = new JooqAuditLogWriter(dsl);
         AuditLogWriter failing = entry -> {
@@ -236,7 +236,7 @@ class EndSessionIT extends RevocationIntegrationTest {
 
     @Test
     void theRequestIdentifierGoesToTheEntryAndABlankOneGetsAFreshIdentifier() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession withId = issue("2026-10-15T15:00:00Z", ana);
         IssuedSession blank = issue("2026-10-15T15:01:00Z", ana);
         UUID requestId = UUID.randomUUID();
@@ -256,8 +256,8 @@ class EndSessionIT extends RevocationIntegrationTest {
     /** Scenario I200: every live family of the account, none of another account. */
     @Test
     void everyLiveFamilyOfTheAccountIsRevokedAndNoneOfAnotherOrAlreadyRevoked() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
-        StaffAccountId carlos = seedStaffAccount(CARLOS, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
+        StaffAccountId carlos = seedStaffAccount(CARLOS, CURRENT_PASSWORD, true);
         IssuedSession current = issue("2026-10-15T15:00:00Z", ana);
         issue("2026-10-15T15:01:00Z", ana);
         rotate("2026-10-15T15:05:00Z", issue("2026-10-15T15:02:00Z", ana).refreshToken().value(),
@@ -297,7 +297,7 @@ class EndSessionIT extends RevocationIntegrationTest {
 
     @Test
     void anAccountWithNoLiveFamilyStillWritesTheEntryWithZero() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
 
         endAllSessions(LOGOUT_AT).execute(actorOf(institutionId, ana, UUID.randomUUID()),
                 UUID.randomUUID().toString());
@@ -308,7 +308,7 @@ class EndSessionIT extends RevocationIntegrationTest {
 
     @Test
     void theAccountIsLockedBeforeTheFamiliesAndTheRevocationCarriesTheLogoutReason() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         issue("2026-10-15T15:00:00Z", ana);
         List<String> calls = new ArrayList<>();
         JooqStaffAccountRepository realAccounts = new JooqStaffAccountRepository(dsl);
@@ -347,7 +347,7 @@ class EndSessionIT extends RevocationIntegrationTest {
 
     @Test
     void aClosingThatCannotBeAuditedLeavesEveryFamilyLive() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issue("2026-10-15T15:00:00Z", ana);
         issue("2026-10-15T15:01:00Z", ana);
         JooqAuditLogWriter real = new JooqAuditLogWriter(dsl);

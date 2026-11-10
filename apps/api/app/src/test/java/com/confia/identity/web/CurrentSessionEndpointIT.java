@@ -106,9 +106,9 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
         String hash = HASHER.hash(PlainPassword.of("Cafetal de Copán 2026")).value();
         transactionRunner().execute(contextOf(of), () -> dsl.execute("""
                 insert into identity_staff_account
-                    (institution_id, id, email, password_hash, mfa_required)
-                values (?, ?, ?, ?, ?)
-                """, of.value(), account.value(), LoginIdentifier.of(email).value(), hash, false));
+                    (institution_id, id, email, password_hash)
+                values (?, ?, ?, ?)
+                """, of.value(), account.value(), LoginIdentifier.of(email).value(), hash));
         return account;
     }
 

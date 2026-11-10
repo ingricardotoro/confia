@@ -41,7 +41,7 @@ class LoginCookieProfilesIT extends LoginEndpointSupport {
         try (LoginProcess process = LoginProcess.start(PEPPER_BYTES, INSTITUTION, TEST_PASSWORD,
                 Map.of("spring.profiles.active", profile))) {
             current = process;
-            seedAccount(ANA, false, false);
+            seedAccount(ANA, true, false);
             HttpResponse<String> response = process.login(LoginProcess.freshAddress(), ANA, PASSWORD);
 
             assertThat(response.statusCode()).as("the login under the %s profile", profile)

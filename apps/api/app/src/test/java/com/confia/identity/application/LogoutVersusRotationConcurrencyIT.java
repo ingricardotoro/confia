@@ -43,7 +43,7 @@ class LogoutVersusRotationConcurrencyIT extends RevocationIntegrationTest {
     @Test
     void aClosingThatWaitsForTheRotationOfTheSameTokenRevokesTheFamilyAndLeavesNoLiveToken()
             throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issue("2026-10-15T15:00:00Z", ana);
         String token = session.refreshToken().value();
         CountDownLatch locked = new CountDownLatch(1);
@@ -86,7 +86,7 @@ class LogoutVersusRotationConcurrencyIT extends RevocationIntegrationTest {
     @Test
     void aRotationThatWaitsForTheClosingOfTheSameTokenIsRejectedAsRevokedAndConsumesNothing()
             throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issue("2026-10-15T15:00:00Z", ana);
         String token = session.refreshToken().value();
         CountDownLatch locked = new CountDownLatch(1);

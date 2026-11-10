@@ -54,7 +54,7 @@ class ConcurrentEnrollmentIT extends PasswordResetIntegrationTest {
     @Test
     void anEnrollmentThatWaitsForTheLockOfTheAccountIsAReenrollmentAndItsSecretStands()
             throws Exception {
-        StaffAccountId jorge = seedStaffAccount(JORGE, "Cafetal de Copán 2026", true);
+        StaffAccountId jorge = seedStaffAccount(JORGE, "Cafetal de Copán 2026", false);
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         EnrollTotpSecondFactor holding = enrollment(
@@ -93,7 +93,7 @@ class ConcurrentEnrollmentIT extends PasswordResetIntegrationTest {
     @Test
     void twoEnrollmentsReleasedTogetherAreAnEnrollmentAndAReenrollmentNeverAUniquenessViolation()
             throws Exception {
-        StaffAccountId jorge = seedStaffAccount(JORGE, "Cafetal de Copán 2026", true);
+        StaffAccountId jorge = seedStaffAccount(JORGE, "Cafetal de Copán 2026", false);
         EnrollTotpSecondFactor useCase = enrollment(new JooqStaffAccountRepository(dsl));
         CyclicBarrier start = new CyclicBarrier(2);
         List<Throwable> failures = Collections.synchronizedList(new ArrayList<>());

@@ -29,7 +29,7 @@ class RefreshSessionIT extends RotationIntegrationTest {
 
     @Test
     void aFreshRotationIsAGrantWithTheEndsOfTheSessionAndTheNewRefreshToken() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
         IssuedSession first = issueSession(NINE).execute(context(),
                 commandFrom(ana, true, AGENT_ONE, "203.0.113.9"));
 
@@ -52,7 +52,7 @@ class RefreshSessionIT extends RotationIntegrationTest {
 
     @Test
     void aRetryInsideTheGraceWindowIsAGrantWithTheSameRefreshToken() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issueSession(NINE).execute(context(),
                 commandFrom(ana, false, AGENT_ONE, null));
         Refreshed fresh = (Refreshed) refresh("2026-10-12T09:15:00Z", first.refreshToken().value());
@@ -69,7 +69,7 @@ class RefreshSessionIT extends RotationIntegrationTest {
 
     @Test
     void everyRejectionIsTheSameValueWhateverTheReason() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession live = issueSession(NINE).execute(context(),
                 commandFrom(ana, false, AGENT_ONE, "203.0.113.9"));
         IssuedSession reused = issueSession(NINE).execute(context(),

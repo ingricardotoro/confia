@@ -25,7 +25,7 @@ class RefreshTokenFamilyRevokeIT extends RevocationIntegrationTest {
     @ParameterizedTest
     @EnumSource(SessionRevocationReason.class)
     void everyReasonOfTheCatalogueIsWrittenExactlyAsItsCode(SessionRevocationReason reason) {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, "2026-10-15T15:00:00Z", "2026-10-15T15:10:00Z",
                 "2026-10-16T03:00:00Z", null, null);
 
@@ -39,7 +39,7 @@ class RefreshTokenFamilyRevokeIT extends RevocationIntegrationTest {
 
     @Test
     void aFamilyAlreadyRevokedForTheSameReasonAtTheSameInstantIsNotRevokedAgain() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, "2026-10-15T15:00:00Z", "2026-10-15T15:10:00Z",
                 "2026-10-16T03:00:00Z", NOW, "logout");
 
@@ -54,7 +54,7 @@ class RefreshTokenFamilyRevokeIT extends RevocationIntegrationTest {
 
     @Test
     void aFamilyAlreadyRevokedForAnotherReasonKeepsItsReasonAndItsInstant() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, "2026-10-15T13:00:00Z", "2026-10-15T13:30:00Z",
                 "2026-10-16T01:00:00Z", "2026-10-15T13:30:00Z", "reuse_detected");
 
@@ -69,7 +69,7 @@ class RefreshTokenFamilyRevokeIT extends RevocationIntegrationTest {
 
     @Test
     void onlyTheNamedFamilyIsRevokedAndATokenIsNotTouched() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID named = seedFamily(ana, false, "2026-10-15T15:00:00Z", "2026-10-15T15:10:00Z",
                 "2026-10-16T03:00:00Z", null, null);
         seedOpenToken(named, "2026-10-15T15:00:00Z", "2026-10-15T23:00:00Z");
@@ -89,7 +89,7 @@ class RefreshTokenFamilyRevokeIT extends RevocationIntegrationTest {
 
     @Test
     void aFamilyOfAnotherInstitutionIsNotRevoked() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, "2026-10-15T15:00:00Z", "2026-10-15T15:10:00Z",
                 "2026-10-16T03:00:00Z", null, null);
         InstitutionId other = new InstitutionId(UUID.randomUUID());
@@ -102,7 +102,7 @@ class RefreshTokenFamilyRevokeIT extends RevocationIntegrationTest {
 
     @Test
     void revokingForReuseKeepsWritingTheReuseReasonAndIsConditionalToo() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, "2026-10-15T15:00:00Z", "2026-10-15T15:10:00Z",
                 "2026-10-16T03:00:00Z", null, null);
 

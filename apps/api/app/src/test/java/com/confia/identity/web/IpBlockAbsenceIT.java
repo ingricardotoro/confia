@@ -50,7 +50,7 @@ class IpBlockAbsenceIT extends LoginEndpointSupport {
 
     @Test
     void sixDifferentIdentifiersFromOneAddressDoNotBlockTheAddress() {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
         String address = LoginProcess.freshAddress();
 
         for (int attempt = 1; attempt <= 6; attempt++) {

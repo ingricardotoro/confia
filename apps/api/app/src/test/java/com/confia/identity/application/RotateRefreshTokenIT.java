@@ -53,7 +53,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I91, with the stored result: one consumed token, one open successor, one entry. */
     @Test
     void aFreshRotationConsumesTheTokenAndLeavesExactlyOneSuccessor() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issueSession(NINE).execute(context(),
                 commandFrom(ana, false, AGENT_ONE, "203.0.113.9"));
 
@@ -107,7 +107,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
 
     @Test
     void aRotationCanFollowARotationAndTheNewTokenCarriesTheSecondFactorOfTheFamily() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
         IssuedSession first = issueSession(NINE).execute(context(),
                 commandFrom(ana, true, AGENT_ONE, null));
         Rotated second = (Rotated) rotate("2026-10-12T09:10:00Z", first.refreshToken().value(),
@@ -133,7 +133,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I92: not a token this system could have issued, and one it never did. */
     @Test
     void aTokenThatWasNeverIssuedOrCannotBeOneIsUnknownAndChangesNothing() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         issue(NINE, ana);
         String before = storedSessions();
         List<String> presented = List.of(MADE_UP, "", MADE_UP.substring(1), MADE_UP + "a",
@@ -159,7 +159,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I93. */
     @Test
     void aLiveTokenOfARevokedFamilyIsRejectedAndTheFamilyIsLeftAsItWas() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, "2026-10-12T08:30:00Z",
                 "password_change");
         PlainRefreshToken token = seedOpenToken(family, EIGHT, "2026-10-12T16:00:00Z");
@@ -176,7 +176,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I94: the row-level policy hides the token, so it is a token nobody issued. */
     @Test
     void aTokenOfAnotherInstitutionIsNotVisibleToTheSessionOfThisOne() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issue(NINE, ana);
         InstitutionId other = new InstitutionId(UUID.randomUUID());
         String before = storedSessions();
@@ -192,7 +192,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I109, both executions, and I113: the expiry is not a reuse and touches no other family. */
     @Test
     void aFamilyIdleForThirtyMinutesIsRejectedAtTheBorderAndNotOneSecondBefore() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID early = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         PlainRefreshToken earlyToken = seedOpenToken(early, EIGHT, "2026-10-12T16:00:00Z");
         UUID idle = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
@@ -217,7 +217,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenarios I110 and I111. */
     @Test
     void theAbsoluteEndClipsTheNewTokenAndRejectsAtTheEndItself() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID clipped = seedFamily(ana, false, EIGHT, "2026-10-12T19:50:00Z", TWENTY, null, null);
         PlainRefreshToken clippedToken = seedOpenToken(clipped, "2026-10-12T19:45:00Z", TWENTY);
         UUID ended = seedFamily(ana, false, EIGHT, "2026-10-12T19:59:00Z", TWENTY, null, null);
@@ -236,7 +236,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I112. */
     @Test
     void aTokenIsRejectedAtItsOwnExpiryWhileItsFamilyIsAlive() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, "2026-10-12T15:59:50Z", TWENTY, null, null);
         PlainRefreshToken token = seedOpenToken(family, EIGHT, "2026-10-12T16:00:00Z");
         String before = storedSessions();
@@ -251,7 +251,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I142, both cases: the expiry wins over the reuse, and it empties the successor. */
     @Test
     void aConsumedTokenPresentedToAnExpiredFamilyIsAnExpiryAndEmptiesTheEncryptedSuccessor() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID idle = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         ConsumedSeed idleSeed = seedConsumedToken(idle, "2026-10-12T07:00:00Z",
                 "2026-10-12T15:00:00Z", EIGHT, AGENT_ONE, true);
@@ -279,7 +279,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I145: consumption is evaluated before the token's own expiry. */
     @Test
     void aConsumedTokenThatAlsoExpiredByItselfInALiveFamilyIsAReuse() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, "2026-10-12T16:30:00Z", TWENTY, null, null);
         ConsumedSeed seed = seedConsumedToken(family, EIGHT, "2026-10-12T16:00:00Z",
                 "2026-10-12T08:01:00Z", AGENT_ONE, false);
@@ -292,7 +292,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I114: the authenticated request has no way to write in this change. */
     @Test
     void authenticatedRequestsDoNotWriteLastUsedAtOrAnyRow() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issue(NINE, ana);
         String before = storedSessions();
         int entries = auditRows().size();
@@ -312,7 +312,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I121 and the absence of binding: another agent rotates a live token in a live family. */
     @Test
     void anotherAgentRotatesALiveTokenAndTheFamilyIsNotRevoked() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issueSession(NINE).execute(context(),
                 commandFrom(ana, false, AGENT_ONE, "203.0.113.9"));
 
@@ -330,7 +330,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** The absence of any purge: a revoked family and an expired token are still there after a rejection. */
     @Test
     void expiredAndRevokedRowsAreKept() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, "2026-10-10T08:00:00Z", "2026-10-10T08:00:00Z",
                 "2026-10-10T20:00:00Z", "2026-10-10T09:00:00Z", "password_change");
         PlainRefreshToken token = seedOpenToken(family, "2026-10-10T08:00:00Z",
@@ -346,7 +346,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** One transaction: if the entry cannot be written, nothing of the rotation exists. */
     @Test
     void aFailureAfterTheRotationIsWrittenLeavesTheTokenOpenAndNoSuccessor() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issue(NINE, ana);
         String before = storedSessions();
         JooqAuditLogWriter real = new JooqAuditLogWriter(dsl);
@@ -368,7 +368,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** No secret reaches the trail, neither on a rotation nor on a rejection. */
     @Test
     void theEntriesOfARotationAndOfARejectionCarryNoSecret() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issue(NINE, ana);
         Rotated rotated = (Rotated) rotate("2026-10-12T09:10:00Z", first.refreshToken().value(),
                 AGENT_ONE);
@@ -396,7 +396,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
      */
     @Test
     void aConsumedTokenPresentedOutsideTheGraceWindowRevokesTheFamilyAndLeavesNoLiveToken() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issue("2026-10-12T08:55:00Z", ana);
         Rotated rotated = (Rotated) rotate("2026-10-12T09:00:00Z", first.refreshToken().value(),
                 AGENT_ONE);
@@ -428,7 +428,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I105: the rejection is a returned value, so what it wrote is committed. */
     @Test
     void theRevocationAndItsEntrySurviveTheRejectionAndAreReadFromANewTransaction() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, "2026-10-12T09:15:00Z", TWENTY, null, null);
         ConsumedSeed seed = seedConsumedToken(family, EIGHT, SIXTEEN, "2026-10-12T09:00:00Z",
                 AGENT_ONE, false);
@@ -446,7 +446,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** One transaction: if the entry cannot be written, the family is not revoked either. */
     @Test
     void aFailureAfterTheRevocationLeavesTheFamilyAndItsTokensAsTheyWere() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, "2026-10-12T09:15:00Z", TWENTY, null, null);
         ConsumedSeed seed = seedConsumedToken(family, EIGHT, SIXTEEN, "2026-10-12T09:00:00Z",
                 AGENT_ONE, true);
@@ -470,7 +470,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I106: a reuse in one family touches no other family of the same account. */
     @Test
     void onlyTheFamilyWhereTheReuseHappenedIsRevoked() {
-        StaffAccountId maria = seedStaffAccount("maria.lopez@colegio.edu.hn", CURRENT_PASSWORD, false);
+        StaffAccountId maria = seedStaffAccount("maria.lopez@colegio.edu.hn", CURRENT_PASSWORD, true);
         UUID reused = seedFamily(maria, false, EIGHT, "2026-10-12T09:15:00Z", TWENTY, null, null);
         ConsumedSeed seed = seedConsumedToken(reused, EIGHT, SIXTEEN, "2026-10-12T09:00:00Z",
                 AGENT_ONE, false);
@@ -491,7 +491,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I107: a token of a family already revoked changes nothing and is not a second reuse. */
     @Test
     void presentingATokenOfAFamilyAlreadyRevokedForReuseModifiesNothing() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession first = issue("2026-10-12T08:55:00Z", ana);
         rotate("2026-10-12T09:00:00Z", first.refreshToken().value(), AGENT_ONE);
         rotate("2026-10-12T09:20:00Z", first.refreshToken().value(), AGENT_ONE);
@@ -512,7 +512,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** The note of review 3.2 (S-2): a revocation for reuse empties the encrypted successors too. */
     @Test
     void aReuseEmptiesTheEncryptedSuccessorsOfEveryTokenOfTheFamily() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, "2026-10-12T09:15:00Z", TWENTY, null, null);
         ConsumedSeed older = seedConsumedToken(family, EIGHT, SIXTEEN, "2026-10-12T08:30:00Z",
                 AGENT_ONE, true);
@@ -529,7 +529,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** Scenario I144: five rejections, five entries of denial, and not one secret in any. */
     @Test
     void everyRejectionLeavesOneDeniedEntryAndNoneCarriesASecret() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID revokedFamily = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, "2026-10-12T08:30:00Z",
                 "password_change");
         PlainRefreshToken revokedToken = seedOpenToken(revokedFamily, EIGHT, SIXTEEN);
@@ -570,7 +570,7 @@ class RotateRefreshTokenIT extends RotationIntegrationTest {
     /** The absence of any notice to the holder: this change delivers the revocation and its entry. */
     @Test
     void aReuseNotifiesNobodyAndNoEntryNamesANotification() {
-        StaffAccountId maria = seedStaffAccount("maria.lopez@colegio.edu.hn", CURRENT_PASSWORD, false);
+        StaffAccountId maria = seedStaffAccount("maria.lopez@colegio.edu.hn", CURRENT_PASSWORD, true);
         UUID family = seedFamily(maria, false, EIGHT, "2026-10-12T09:15:00Z", TWENTY, null, null);
         ConsumedSeed seed = seedConsumedToken(family, EIGHT, SIXTEEN, "2026-10-12T09:00:00Z",
                 AGENT_ONE, false);

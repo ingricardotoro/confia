@@ -18,9 +18,8 @@ import org.junit.jupiter.api.Test;
 /**
  * {@code POST /api/v1/auth/sessions} on the real administrative process exactly as production
  * assembles it, with {@link MfaPolicy#STAFF} and no test policy (rbac-permission-matrix-and-audit-
- * integration design.md D14; scenario I302, and I287 to I290 at the edge): rows whose retired
- * {@code mfa_required} column says {@code false} still never obtain a session, with or without a
- * role.
+ * integration design.md D14; scenario I302, and I287 to I290 at the edge): rows that carry
+ * no stored second factor hint still never obtain a session, with or without a role.
  */
 class LoginEndpointStaffPolicyIT extends LoginEndpointSupport {
 
@@ -61,7 +60,7 @@ class LoginEndpointStaffPolicyIT extends LoginEndpointSupport {
     void anAccountWithARoleAndAVerifiedCredentialGetsTheRestrictedTokenAndNoCookie()
             throws SQLException {
         String email = "contabilidad." + UUID.randomUUID() + "@colegio.edu.hn";
-        StaffAccountId account = seedAccount(email, false, true);
+        StaffAccountId account = seedAccount(email, true, true);
         assign(account, "accounting");
 
         HttpResponse<String> response = process.login(LoginProcess.freshAddress(), email, PASSWORD);
@@ -75,7 +74,7 @@ class LoginEndpointStaffPolicyIT extends LoginEndpointSupport {
     @Test
     void anAccountWithNoRoleAndNoCredentialGetsTheEnrollmentTokenAndNeverASession() {
         String email = "sinrol." + UUID.randomUUID() + "@colegio.edu.hn";
-        seedAccount(email, false, false);
+        seedAccount(email, true, false);
 
         HttpResponse<String> response = process.login(LoginProcess.freshAddress(), email, PASSWORD);
 
@@ -89,7 +88,7 @@ class LoginEndpointStaffPolicyIT extends LoginEndpointSupport {
     @Test
     void anAccountWithNoRoleAndAVerifiedCredentialOwesTheCode() {
         String email = "sinrolcodigo." + UUID.randomUUID() + "@colegio.edu.hn";
-        seedAccount(email, false, true);
+        seedAccount(email, true, true);
 
         HttpResponse<String> response = process.login(LoginProcess.freshAddress(), email, PASSWORD);
 

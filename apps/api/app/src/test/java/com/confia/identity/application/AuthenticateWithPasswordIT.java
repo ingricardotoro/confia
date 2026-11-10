@@ -53,9 +53,9 @@ import tools.jackson.databind.json.JsonMapper;
  * {@link Duration} the use case computes and returns — never a wait it lived through.
  *
  * <p><b>The second-factor scenarios (column-encryption-and-mfa-totp, C4, task 4.3).</b> {@link
- * #mfaRequiredAccountWithEnrolledTotpProducesSecondFactorRequiredWithoutAdvancingBackoffOrAuditingFailure}
+ * #secondFactorOwingAccountWithEnrolledTotpProducesSecondFactorRequiredWithoutAdvancingBackoffOrAuditingFailure}
  * and {@link
- * #mfaRequiredAccountWithoutAnyEnrolledSecretProducesSecondFactorEnrollmentRequired} seed the TOTP
+ * #secondFactorOwingAccountWithoutAnyEnrolledSecretProducesSecondFactorEnrollmentRequired} seed the TOTP
  * credential directly through {@link JooqTotpCredentialRepository}, exactly the way {@code
  * VerifyTotpCodeIT} already does (C2's own discrepancy resolution) — never through {@code
  * EnrollTotpSecondFactor}, whose own seam is unrelated to what these two scenarios test. The
@@ -234,16 +234,16 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
     }
 
     /**
-     * specs/identity/spec.md, "MFA obligatoria para cuentas marcadas con mfa_required", escenario
-     * "Cuenta con mfa_required en true y secreto TOTP ya inscrito"; "Exhaustividad forzada por el
+     * specs/identity/spec.md, "MFA obligatoria para cuentas marcadas con el indicador de segundo factor", escenario
+     * "Cuenta con el indicador en true y secreto TOTP ya inscrito"; "Exhaustividad forzada por el
      * compilador...", escenario "SecondFactorRequired no avanza el contador de retroceso ni se
      * audita como fallo".
      */
     @Test
-    void mfaRequiredAccountWithEnrolledTotpProducesSecondFactorRequiredWithoutAdvancingBackoffOrAuditingFailure() {
+    void secondFactorOwingAccountWithEnrolledTotpProducesSecondFactorRequiredWithoutAdvancingBackoffOrAuditingFailure() {
         InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
         LoginIdentifier identifier = LoginIdentifier.of(EXISTING_EMAIL);
-        StaffAccountId accountId = seedStaffAccount(institutionId, identifier, true);
+        StaffAccountId accountId = seedStaffAccount(institutionId, identifier, false);
         seedTotpCredential(institutionId, accountId);
 
         AuthenticationDecision decision = attempt(institutionId, identifier.value(),
@@ -283,10 +283,10 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
      * for a first code that no check could accept, and the attempt is no failure.
      */
     @Test
-    void mfaRequiredAccountWithAnEnrolledButNeverVerifiedSecretProducesSecondFactorEnrollmentRequired() {
+    void secondFactorOwingAccountWithAnEnrolledButNeverVerifiedSecretProducesSecondFactorEnrollmentRequired() {
         InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
         LoginIdentifier identifier = LoginIdentifier.of(EXISTING_EMAIL);
-        StaffAccountId accountId = seedStaffAccount(institutionId, identifier, true);
+        StaffAccountId accountId = seedStaffAccount(institutionId, identifier, false);
         seedUnverifiedTotpCredential(institutionId, accountId);
 
         AuthenticationDecision decision = attempt(institutionId, identifier.value(),
@@ -302,14 +302,14 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
     }
 
     /**
-     * specs/identity/spec.md, "MFA obligatoria para cuentas marcadas con mfa_required", escenario
-     * "Cuenta con mfa_required en true sin ningún secreto TOTP inscrito".
+     * specs/identity/spec.md, "MFA obligatoria para cuentas marcadas con el indicador de segundo factor", escenario
+     * "Cuenta con el indicador en true sin ningún secreto TOTP inscrito".
      */
     @Test
-    void mfaRequiredAccountWithoutAnyEnrolledSecretProducesSecondFactorEnrollmentRequired() {
+    void secondFactorOwingAccountWithoutAnyEnrolledSecretProducesSecondFactorEnrollmentRequired() {
         InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
         LoginIdentifier identifier = LoginIdentifier.of(EXISTING_EMAIL);
-        StaffAccountId accountId = seedStaffAccount(institutionId, identifier, true);
+        StaffAccountId accountId = seedStaffAccount(institutionId, identifier, false);
 
         AuthenticationDecision decision = attempt(institutionId, identifier.value(),
                 CORRECT_PASSWORD_RAW, "2026-03-10T13:30:00Z");
@@ -333,17 +333,17 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
     /**
      * specs/identity/spec.md, "Resultado tipado de la autenticación con cuatro desenlaces",
      * escenario "Contraseña correcta produce el desenlace Authenticated sin campo de alcance" —
-     * regression, unchanged from part 1; and "Columna mfa_required...", escenario "Este cambio no
-     * deriva mfa_required de ningún permiso todavía": a hypothetical account whose future role
+     * regression, unchanged from part 1; and "Columna del indicador de segundo factor...", escenario "Este cambio no
+     * deriva el indicador de ningún permiso todavía": a hypothetical account whose future role
      * would, once the cambio 8 derivation exists, include a financial-write permission is still
-     * persisted here with {@code mfa_required = false}, exactly as whoever created it decided, with
+     * persisted here with the flag column set to false, exactly as whoever created it decided, with
      * no correction from any permission concept — because none exists yet in this tree.
      */
     @Test
     void anAccountThePolicyExemptsStillProducesAuthenticatedWithNoDerivationFromAnyPermission() {
         InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
         LoginIdentifier identifier = LoginIdentifier.of(EXISTING_EMAIL);
-        seedStaffAccount(institutionId, identifier, false);
+        seedStaffAccount(institutionId, identifier, true);
 
         AuthenticationDecision decision = attempt(institutionId, identifier.value(),
                 CORRECT_PASSWORD_RAW, "2026-03-10T13:45:00Z");
@@ -364,28 +364,27 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
     }
 
     private StaffAccountId seedStaffAccount(InstitutionId institutionId, LoginIdentifier identifier) {
-        return seedStaffAccount(institutionId, identifier, false);
+        return seedStaffAccount(institutionId, identifier, true);
     }
 
     /**
-     * {@code mfaRequired} lets task 4.3's own scenarios seed an account with {@code mfa_required =
-     * true} — returning the generated {@link StaffAccountId} lets those same scenarios seed a
+     * {@code exemptFromSecondFactor} lets the scenarios that need an exempt account seed one;
+     * returning the generated {@link StaffAccountId} lets those same scenarios seed a
      * matching {@code identity_mfa_totp_credential} row for it through {@link #seedTotpCredential}.
      */
     private StaffAccountId seedStaffAccount(InstitutionId institutionId, LoginIdentifier identifier,
-            boolean mfaRequired) {
+            boolean exemptFromSecondFactor) {
         StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
         StoredPasswordHash hash = HASHER.hash(PlainPassword.of(CORRECT_PASSWORD_RAW));
         transactionRunner().execute(contextOf(institutionId), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, ?)
-                    """, institutionId.value(), accountId.value(), identifier.value(), hash.value(),
-                    mfaRequired);
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
+                    """, institutionId.value(), accountId.value(), identifier.value(), hash.value());
             return null;
         });
-        if (!mfaRequired) {
+        if (exemptFromSecondFactor) {
             exemptions.exempt(accountId);
         }
         return accountId;

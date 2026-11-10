@@ -59,8 +59,8 @@ class SecondFactorExemptionsProbeIT extends LoginEndpointSupport {
     void anExemptAccountGetsTheSessionAndAnAccountThatIsNotGetsTheRestrictedToken() {
         String exempt = "exenta." + UUID.randomUUID() + "@colegio.edu.hn";
         String owing = "obligada." + UUID.randomUUID() + "@colegio.edu.hn";
-        seedAccount(exempt, false, true);
-        seedAccount(owing, true, true);
+        seedAccount(exempt, true, true);
+        seedAccount(owing, false, true);
 
         HttpResponse<String> session = first.login(LoginProcess.freshAddress(), exempt, PASSWORD);
         HttpResponse<String> restricted = first.login(LoginProcess.freshAddress(), owing, PASSWORD);
@@ -79,7 +79,7 @@ class SecondFactorExemptionsProbeIT extends LoginEndpointSupport {
     @Test
     void anAccountExemptInOneProcessOwesTheSecondFactorInAnother() {
         String email = "compartida." + UUID.randomUUID() + "@colegio.edu.hn";
-        StaffAccountId account = seedAccount(email, false, true);
+        StaffAccountId account = seedAccount(email, true, true);
 
         HttpResponse<String> inTheSecond = second.login(LoginProcess.freshAddress(), email, PASSWORD);
         HttpResponse<String> inTheFirst = first.login(LoginProcess.freshAddress(), email, PASSWORD);

@@ -234,8 +234,8 @@ class JooqPasswordResetTokenRepositoryIT extends CommittingPostgresIntegrationTe
         transactionRunner().execute(contextOf(institutionId), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, false)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId.value(), account.value(),
                     "reset." + account.value() + "@colegio.edu.hn", PLACEHOLDER_PASSWORD_HASH);
             return null;

@@ -47,8 +47,8 @@ public final class StaffRoleFixtures {
             throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
                 insert into identity_staff_account
-                    (institution_id, id, email, password_hash, mfa_required)
-                values (?, ?, ?, ?, true)
+                    (institution_id, id, email, password_hash)
+                values (?, ?, ?, ?)
                 """)) {
             statement.setObject(1, institution);
             statement.setObject(2, account);

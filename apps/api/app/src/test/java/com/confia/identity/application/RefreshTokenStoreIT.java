@@ -43,7 +43,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void anOpenTokenIsReadWithItsWindowAndNothingConsumed() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         PlainRefreshToken token = seedOpenToken(family, EIGHT, SIXTEEN);
 
@@ -59,7 +59,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void aConsumedTokenSaysWhoPresentedItAndWhetherItsEncryptedSuccessorIsStillThere() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         ConsumedSeed withCiphertext = seedConsumedToken(family, EIGHT, SIXTEEN,
                 "2026-10-12T08:05:00Z", AGENT_ONE, true);
@@ -82,7 +82,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void aTokenWhoseSuccessorWasConsumedInTurnSaysSo() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, "2026-10-12T08:05:00Z", TWENTY, null, null);
         ConsumedSeed seed = seedConsumedToken(family, EIGHT, SIXTEEN, "2026-10-12T08:05:00Z",
                 AGENT_ONE, true);
@@ -98,7 +98,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void aTokenIsFoundByItsIdentifierAndAnUnknownOneIsNot() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         RefreshTokenState byHash = findByText(seedOpenToken(family, EIGHT, SIXTEEN)).orElseThrow();
 
@@ -113,7 +113,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void anotherInstitutionNeitherSeesNorConsumesNorLocksWhatIsNotItsOwn() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         PlainRefreshToken token = seedOpenToken(family, EIGHT, SIXTEEN);
         UUID tokenId = findByText(token).orElseThrow().id();
@@ -131,7 +131,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void aTokenIsConsumedOnceWithWhoPresentedItAndItsSuccessorAndNeverTwice() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         RefreshTokenState open = findByText(seedOpenToken(family, EIGHT, SIXTEEN)).orElseThrow();
         UUID successorId = UUID.randomUUID();
@@ -160,7 +160,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
     /** The encrypted successor is written by the very statement that consumes the token (V8 trigger). */
     @Test
     void consumingATokenStoresItsEncryptedSuccessorInTheSameStatement() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         RefreshTokenState open = findByText(seedOpenToken(family, EIGHT, SIXTEEN)).orElseThrow();
         UUID successorId = UUID.randomUUID();
@@ -181,7 +181,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void theEncryptedSuccessorIsReadWithTheExpiryOfTheTokenThatReplacedItWhileItIsStillThere() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         ConsumedSeed seed = seedConsumedToken(family, EIGHT, SIXTEEN, "2026-10-12T08:05:00Z",
                 AGENT_ONE, true);
@@ -213,7 +213,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
     /** The cutoff is inclusive, as the window is strict: a token consumed exactly at it is outside. */
     @Test
     void emptyingByAgeTouchesOnlyTheSuccessorsConsumedAtOrBeforeTheCutoffOfThatFamily() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         ConsumedSeed seed = seedConsumedToken(family, "2026-10-12T07:00:00Z", SIXTEEN,
                 "2026-10-12T08:00:00Z", AGENT_ONE, true);
@@ -238,7 +238,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void emptyingTheSuccessorsReachesOnlyTheTokensOfThatFamily() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID emptied = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         seedConsumedToken(emptied, EIGHT, SIXTEEN, "2026-10-12T08:05:00Z", AGENT_ONE, true);
         UUID kept = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
@@ -257,7 +257,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void aFamilyIsReadWithItsStateWhetherLiveOrRevokedAndAnUnknownOneIsNot() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID live = seedFamily(ana, true, EIGHT, "2026-10-12T09:00:00Z", TWENTY, null, null);
         UUID revoked = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, "2026-10-12T08:30:00Z",
                 "password_change");
@@ -277,7 +277,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void theUseOfAFamilyMovesForwardAndTheEngineRefusesToMoveItBack() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
 
         transactionRunner().execute(context(), () -> {
@@ -295,7 +295,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void revokingForReuseMarksOnlyThatFamilyOnceAndNeverChangesAnEarlierRevocation() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         UUID bystander = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         UUID alreadyRevoked = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, "2026-10-12T08:30:00Z",
@@ -321,7 +321,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void aFamilyOfAnotherInstitutionIsNotRevokedForReuse() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         InstitutionId other = new InstitutionId(UUID.randomUUID());
 
@@ -335,7 +335,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
     /** The lock is the point of serialization of the family: a second locker waits for the first. */
     @Test
     void lockingAFamilyMakesASecondLockerWaitUntilTheFirstTransactionEnds() throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -365,7 +365,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
 
     @Test
     void aFamilyIsReadWithoutALockWithItsRevocationAndOnlyForItsOwnInstitution() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID live = seedFamily(ana, true, EIGHT, SIXTEEN, TWENTY, null, null);
         UUID revoked = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, SIXTEEN, "password_change");
         InstitutionId other = new InstitutionId(UUID.randomUUID());
@@ -388,7 +388,7 @@ class RefreshTokenStoreIT extends RotationIntegrationTest {
     /** Asking is not locking: a reader is not kept waiting by the holder of the lock of the family. */
     @Test
     void readingAFamilyDoesNotWaitForTheTransactionThatHoldsItsLock() throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);

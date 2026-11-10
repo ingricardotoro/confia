@@ -37,7 +37,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * The attacks on the derived second factor, with the real policy {@link MfaPolicy#STAFF} and rows
- * whose retired {@code mfa_required} column says {@code false}
+ * that carry no stored second factor hint at all
  * (rbac-permission-matrix-and-audit-integration design.md D14, owner decisions O4 and Q1;
  * scenarios I287 to I290, I301 and I302): whatever the row says and whatever role the account holds
  * or lost, a correct password is never enough to start a session.
@@ -59,7 +59,7 @@ class AuthenticateWithPasswordStaffPolicyIT extends CommittingPostgresIntegratio
 
     @Test
     void anAccountWithTheAccountingRoleAndAVerifiedCredentialOwesTheCode() throws SQLException {
-        StaffAccountId account = seed(false);
+        StaffAccountId account = seed();
         assign(account, "accounting");
         verifyCredential(account);
 
@@ -71,7 +71,7 @@ class AuthenticateWithPasswordStaffPolicyIT extends CommittingPostgresIntegratio
 
     @Test
     void anAccountWithNoRoleAndNoCredentialOwesTheEnrollmentAndIsNeverAuthenticated() {
-        StaffAccountId account = seed(false);
+        StaffAccountId account = seed();
 
         AuthenticationResult result = login("2026-11-09T10:05:00Z");
 
@@ -82,7 +82,7 @@ class AuthenticateWithPasswordStaffPolicyIT extends CommittingPostgresIntegratio
 
     @Test
     void anAccountWithNoRoleAndAVerifiedCredentialOwesTheCode() {
-        StaffAccountId account = seed(false);
+        StaffAccountId account = seed();
         verifyCredential(account);
 
         AuthenticationResult result = login("2026-11-09T10:10:00Z");
@@ -93,7 +93,7 @@ class AuthenticateWithPasswordStaffPolicyIT extends CommittingPostgresIntegratio
 
     @Test
     void removingTheRoleAssignmentDoesNotLiftTheRequirement() throws SQLException {
-        StaffAccountId account = seed(false);
+        StaffAccountId account = seed();
         assign(account, "accounting");
         verifyCredential(account);
         assertThat(login("2026-11-09T10:15:00Z")).isInstanceOf(SecondFactorRequired.class);
@@ -106,7 +106,7 @@ class AuthenticateWithPasswordStaffPolicyIT extends CommittingPostgresIntegratio
     @ParameterizedTest
     @EnumSource(StaffRole.class)
     void everyRoleOwesTheCode(StaffRole role) throws SQLException {
-        StaffAccountId account = seed(false);
+        StaffAccountId account = seed();
         assign(account, role.code());
         verifyCredential(account);
 
@@ -115,7 +115,7 @@ class AuthenticateWithPasswordStaffPolicyIT extends CommittingPostgresIntegratio
 
     @Test
     void theRetiredColumnSetToTrueGivesTheSameOutcomeAsSetToFalse() {
-        seed(true);
+        seed();
 
         assertThat(login("2026-11-09T10:25:00Z")).isInstanceOf(SecondFactorEnrollmentRequired.class);
     }
@@ -129,16 +129,15 @@ class AuthenticateWithPasswordStaffPolicyIT extends CommittingPostgresIntegratio
         return useCase.execute(contextOf(), new AuthenticationCommand(EMAIL, PASSWORD)).result();
     }
 
-    /** The account row, with the retired column set as given (it is {@code NOT NULL} until task 6). */
-    private StaffAccountId seed(boolean retiredColumn) {
+    /** The account row: nothing on it says whether the account owes a second factor. */
+    private StaffAccountId seed() {
         StaffAccountId account = new StaffAccountId(UUID.randomUUID());
         String hash = HASHER.hash(PlainPassword.of(PASSWORD)).value();
         transactionRunner().execute(contextOf(), () -> dsl.execute("""
                 insert into identity_staff_account
-                    (institution_id, id, email, password_hash, mfa_required)
-                values (?, ?, ?, ?, ?)
-                """, institution.value(), account.value(), LoginIdentifier.of(EMAIL).value(), hash,
-                retiredColumn));
+                    (institution_id, id, email, password_hash)
+                values (?, ?, ?, ?)
+                """, institution.value(), account.value(), LoginIdentifier.of(EMAIL).value(), hash));
         return account;
     }
 

@@ -36,7 +36,7 @@ class PasswordResetAtomicityIT extends PasswordResetIntegrationTest {
     /** Scenario I20. */
     @Test
     void aResetThatDoesNotCommitLeavesNoConsumptionNoNewPasswordAndNoEntry() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
         PlainPasswordResetToken token = issueTokenAt(ana, "2026-10-15T15:00:00Z");
         int entriesBefore = auditRows().size();
         List<Boolean> consumptions = new ArrayList<>();

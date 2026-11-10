@@ -44,7 +44,7 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
     /** Scenario I35: accepted within the window, single use, and the passwords swap. */
     @Test
     void aTokenWorksOnceWithinItsWindowAndTheNewPasswordReplacesTheOld() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
         PlainPasswordResetToken token = issueTokenAt(ana, "2026-05-14T10:00:00Z");
 
         ResetPasswordDecision first = resetAt(token.value(), NEW, NONE, "2026-05-14T10:20:00Z");
@@ -60,7 +60,7 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
     /** Scenario I36: superseded, not expired, and the newer token completes. */
     @Test
     void aSupersededTokenIsRejectedAsSupersededAndTheNewerOneCompletes() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
         PlainPasswordResetToken older = issueTokenAt(ana, "2026-05-14T10:00:00Z");
         PlainPasswordResetToken newer = issueTokenAt(ana, "2026-05-14T10:25:00Z");
 
@@ -77,8 +77,8 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
     /** Scenario I37: 10:29:59 is inside, 10:30:00 is outside. */
     @Test
     void theThirtyMinuteBorderIsStrict() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
-        StaffAccountId luis = seedStaffAccount("luis.fernandez@colegio.edu.hn", CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
+        StaffAccountId luis = seedStaffAccount("luis.fernandez@colegio.edu.hn", CURRENT, true);
         PlainPasswordResetToken anaToken = issueTokenAt(ana, "2026-05-14T10:00:00Z");
         PlainPasswordResetToken luisToken = issueTokenAt(luis, "2026-05-14T10:00:00Z");
 
@@ -92,7 +92,7 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
     /** Scenario I38: a scheduled but not yet issued request supersedes nothing. */
     @Test
     void aRequestWhoseIssuanceHasNotRunDoesNotSupersedeTheLiveToken() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
         PlainPasswordResetToken token = issueTokenAt(ana, "2026-05-14T10:00:00Z");
         RecordingScheduler scheduler = new RecordingScheduler();
         new RequestPasswordReset(transactionRunner(), () -> institutionId,
@@ -106,11 +106,11 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
         assertThat(decision.outcome()).isInstanceOf(Completed.class);
     }
 
-    /** Scenario I11: mfa_required without a secret resets with the link; enrollment still due. */
+    /** Scenario I11: an account that owes the second factor, without a secret, resets with the link; enrollment still due. */
     @Test
-    void mfaRequiredWithoutASecretResetsWithTheLinkAndEnrollmentIsStillRequired() {
+    void secondFactorOwingWithoutASecretResetsWithTheLinkAndEnrollmentIsStillRequired() {
         String jorge = "jorge.aguilar@colegio.edu.hn";
-        StaffAccountId account = seedStaffAccount(jorge, CURRENT, true);
+        StaffAccountId account = seedStaffAccount(jorge, CURRENT, false);
         PlainPasswordResetToken token = issueTokenAt(account, "2026-10-13T08:00:00Z");
 
         ResetPasswordDecision decision = resetAt(token.value(), "Semana Morazánica 2026", NONE,
@@ -127,9 +127,9 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
      * login owes the enrollment: it is never handed a token to verify a first code.
      */
     @Test
-    void mfaRequiredWithASecretNeverVerifiedResetsWithTheLinkAloneAndEnrollmentIsStillRequired() {
+    void secondFactorOwingWithASecretNeverVerifiedResetsWithTheLinkAloneAndEnrollmentIsStillRequired() {
         String jorge = "jorge.aguilar@colegio.edu.hn";
-        StaffAccountId account = seedStaffAccount(jorge, CURRENT, true);
+        StaffAccountId account = seedStaffAccount(jorge, CURRENT, false);
         enrollWithoutVerifying(account);
         PlainPasswordResetToken token = issueTokenAt(account, "2026-10-13T08:00:00Z");
 
@@ -144,11 +144,11 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
                 .isInstanceOf(SecondFactorEnrollmentRequired.class);
     }
 
-    /** Scenario I12: mfa_required false with a secret needs no code and verifies none. */
+    /** Scenario I12: an exempt account with a secret needs no code and verifies none. */
     @Test
     void mfaNotRequiredWithAnEnrolledSecretResetsWithoutAnyTotpVerification() {
         String maria = "maria.lopez@colegio.edu.hn";
-        StaffAccountId account = seedStaffAccount(maria, CURRENT, false);
+        StaffAccountId account = seedStaffAccount(maria, CURRENT, true);
         enrollTotp(account);
         PlainPasswordResetToken token = issueTokenAt(account, "2026-10-13T08:00:00Z");
 
@@ -203,7 +203,7 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
     /** Scenarios I17 and I18: the configured institution decides, and a foreign token is unknown. */
     @Test
     void aTokenOfAnotherInstitutionIsUnknownAndStaysAliveInItsOwn() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
         PlainPasswordResetToken token = issueTokenAt(ana, "2026-10-15T15:00:00Z");
         InstitutionId otherProcess = new InstitutionId(UUID.randomUUID());
 
@@ -220,7 +220,7 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
 
     @Test
     void aContextThatDisagreesWithTheConfiguredInstitutionIsAWiringDefect() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
         PlainPasswordResetToken token = issueTokenAt(ana, "2026-10-15T15:00:00Z");
 
         assertThatThrownBy(() -> resetUseCase("2026-10-15T15:05:00Z", new JooqAuditLogWriter(dsl),
@@ -235,14 +235,14 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
     @Test
     void theFourTokenRejectionReasonsGiveOneResultAndFourAuditedReasons() {
         PlainPasswordResetToken neverIssued = PlainPasswordResetToken.generate(new SecureRandom());
-        StaffAccountId expiredAccount = seedStaffAccount("vencido@colegio.edu.hn", CURRENT, false);
+        StaffAccountId expiredAccount = seedStaffAccount("vencido@colegio.edu.hn", CURRENT, true);
         PlainPasswordResetToken expired = issueTokenAt(expiredAccount, "2026-10-15T15:00:00Z");
         StaffAccountId supersededAccount = seedStaffAccount("superado@colegio.edu.hn", CURRENT,
                 false);
         PlainPasswordResetToken superseded = issueTokenAt(supersededAccount,
                 "2026-10-15T15:40:00Z");
         issueTokenAt(supersededAccount, "2026-10-15T15:50:00Z");
-        StaffAccountId usedAccount = seedStaffAccount("usado@colegio.edu.hn", CURRENT, false);
+        StaffAccountId usedAccount = seedStaffAccount("usado@colegio.edu.hn", CURRENT, true);
         PlainPasswordResetToken used = issueTokenAt(usedAccount, "2026-10-15T15:50:00Z");
         assertThat(resetAt(used.value(), NEW, NONE, "2026-10-15T15:55:00Z").outcome())
                 .isInstanceOf(Completed.class);
@@ -263,7 +263,7 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
     /** Scenarios I23 and I28: only the consumption, the new hash and their entries; no notice. */
     @Test
     void aCompletedResetOnlyConsumesChangesTheHashAndAuditsWithoutNotifyingAnyone() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT, true);
         PlainPasswordResetToken token = issueTokenAt(ana, "2026-10-15T15:00:00Z");
         List<String> actionsBefore = auditRows().stream().map(AuditRowSnapshot::action).toList();
 
@@ -283,7 +283,7 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
     /** Scenario I34: a token that was never issued never changes the password. */
     @Test
     void aNeverIssuedTokenNeverChangesThePassword() {
-        seedStaffAccount(ANA, CURRENT, false);
+        seedStaffAccount(ANA, CURRENT, true);
 
         ResetPasswordDecision decision = resetAt(
                 PlainPasswordResetToken.generate(new SecureRandom()).value(), NEW, NONE,
@@ -294,7 +294,7 @@ class ResetPasswordWithTokenIT extends PasswordResetIntegrationTest {
     }
 
     private PlainPasswordResetToken liveTokenFor(String email) {
-        return issueTokenAt(seedStaffAccount(email, CURRENT, false), "2026-10-15T15:00:00Z");
+        return issueTokenAt(seedStaffAccount(email, CURRENT, true), "2026-10-15T15:00:00Z");
     }
 
     /** The {@code reason} of every rejected entry, oldest first (the reader orders by id). */

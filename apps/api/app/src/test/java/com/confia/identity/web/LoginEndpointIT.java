@@ -72,7 +72,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void correctCredentialsWithoutASecondFactorStartASessionWithExactlyTwoCookies() {
-        StaffAccountId ana = seedAccount(ANA, false, false);
+        StaffAccountId ana = seedAccount(ANA, true, false);
         String address = LoginProcess.freshAddress();
         long sessionsBefore = process.createdHttpSessions();
 
@@ -122,7 +122,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void anAccountWithAnEnrolledSecondFactorGetsAVerificationTokenAndNoCookie() {
-        StaffAccountId sofia = seedAccount("sofia.mejia@colegio.edu.hn", true, true);
+        StaffAccountId sofia = seedAccount("sofia.mejia@colegio.edu.hn", false, true);
         long sessionsBefore = process.createdHttpSessions();
 
         HttpResponse<String> response = process.login(LoginProcess.freshAddress(),
@@ -149,7 +149,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void anAccountThatMustEnrollGetsAnEnrollmentTokenAndNoCookie() {
-        StaffAccountId jorge = seedAccount("jorge.aguilar@colegio.edu.hn", true, false);
+        StaffAccountId jorge = seedAccount("jorge.aguilar@colegio.edu.hn", false, false);
 
         HttpResponse<String> response = process.login(LoginProcess.freshAddress(),
                 "jorge.aguilar@colegio.edu.hn", PASSWORD);
@@ -168,7 +168,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void aRejectedLoginIs401AuthenticationFailedWithTheBearerChallengeAndNothingIssued() {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
         long sessionsBefore = process.createdHttpSessions();
 
         HttpResponse<String> response = process.login(LoginProcess.freshAddress(), ANA, "otra-clave-1");
@@ -187,7 +187,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void aBodyWithoutAnIdentifierOrWithAnEmptyPasswordOrAnOverlongFieldIs400NamingTheField() {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
         String address = LoginProcess.freshAddress();
         String overlong = "x".repeat(321) + "@colegio.edu.hn";
 
@@ -216,7 +216,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void aBodyWithAnUnknownPropertyIs400AndNeverEchoesIt() {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
 
         HttpResponse<String> response = process.post("{\"identifier\":\"" + ANA
                 + "\",\"password\":\"" + PASSWORD + "\",\"role\":\"propiedad-extra-zeta\"}",
@@ -229,7 +229,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void aPasswordOfThreeCharactersReachesTheUseCaseBecauseTheMinimumIsNotImposedOnEntry() {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
 
         HttpResponse<String> response = process.login(LoginProcess.freshAddress(), ANA, "abc");
 
@@ -253,7 +253,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
     @ParameterizedTest
     @ValueSource(strings = {"text/plain", "application/x-www-form-urlencoded"})
     void aContentTypeThatIsNotJsonIs415AndTheUseCaseRunsZeroTimes(String contentType) {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
 
         HttpResponse<String> response = process.post(LoginProcess.jsonOf(ANA, PASSWORD),
                 "Content-Type", contentType, "X-Forwarded-For", LoginProcess.freshAddress());
@@ -269,9 +269,9 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void theInstitutionOfTheConfigurationIsTheOnlyOneAndAHeaderThatNamesAnotherIsIgnored() {
-        StaffAccountId mine = seedAccount(ANA, false, false);
+        StaffAccountId mine = seedAccount(ANA, true, false);
         InstitutionId other = new InstitutionId(UUID.randomUUID());
-        seedAccountIn(other, ANA, "Otra clave larga 2026", false, false);
+        seedAccountIn(other, ANA, "Otra clave larga 2026", true, false);
 
         HttpResponse<String> response = process.post(LoginProcess.jsonOf(ANA, PASSWORD),
                 "X-Forwarded-For", LoginProcess.freshAddress(),
@@ -288,7 +288,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void theLoginNeitherReadsNorRequiresTheCsrfTokenAndOverwritesAnEarlierCookieWithoutRevokingIt() {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
         String address = LoginProcess.freshAddress();
         HttpResponse<String> first = process.login(address, ANA, PASSWORD);
         String earlier = cookieNamed(first.headers().allValues("Set-Cookie"), SESSION_COOKIE);
@@ -310,7 +310,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void aRequestWithoutAnAllowedOriginIs403CsrfInvalidAndTheUseCaseRunsZeroTimes() {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
 
         HttpResponse<String> missing = process.postRaw(LoginProcess.jsonOf(ANA, PASSWORD),
                 "Content-Type", "application/json", "X-Forwarded-For", LoginProcess.freshAddress());
@@ -326,7 +326,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void theWaitOfTheBackoffHappensAfterTheCommitAndDoesNotDenyACorrectPassword() throws Exception {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
         seedBackoff(ANA, 3);
         String address = LoginProcess.freshAddress();
         long started = System.nanoTime();
@@ -350,7 +350,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void anExistingAccountAndAMissingOneAnswerTheSameWithoutPriorFailures() {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
 
         HttpResponse<String> existing = process.login(LoginProcess.freshAddress(), ANA, "incorrecta-1");
         HttpResponse<String> missing = process.login(LoginProcess.freshAddress(),
@@ -362,7 +362,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void theyAnswerTheSameAfterThreeFailuresAndWaitTheSameDelay() {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
         String missingIdentifier = "nadie.registrado@colegio.edu.hn";
         HttpResponse<String> existing = null;
         HttpResponse<String> missing = null;
@@ -388,7 +388,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void theComparisonFlagsAnyDifferenceOfStatusBodyOrHeaderExceptTraceIdAndDate() {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
         HttpResponse<String> rejected = process.login(LoginProcess.freshAddress(), ANA, "incorrecta-1");
         HttpResponse<String> invalid = process.post("{}", "X-Forwarded-For", LoginProcess.freshAddress());
 
@@ -418,7 +418,7 @@ class LoginEndpointIT extends LoginEndpointSupport {
 
     @Test
     void noAnswerOfTheRouteCreatesAnHttpSession() {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
         long sessionsBefore = process.createdHttpSessions();
         String address = LoginProcess.freshAddress();
 

@@ -88,7 +88,7 @@ class LoginTimingGateIT extends LoginEndpointSupport {
 
     @Test
     void theMediansOfAnExistingAccountAndOfAnUnknownIdentifierDifferByFiftyMillisecondsAtMost() {
-        seedAccount(EXISTING, false, false);
+        seedAccount(EXISTING, true, false);
 
         Gate gate = measure(this::existingAccount, this::unknownIdentifier);
 
@@ -101,7 +101,7 @@ class LoginTimingGateIT extends LoginEndpointSupport {
     /** BI56: an unknown identifier answered at once, which is what omitting the decoy amounts to. */
     @Test
     void theSameGateFailsWhenTheUnknownIdentifierIsAnsweredWithoutTheDecoyVerification() {
-        seedAccount(EXISTING, false, false);
+        seedAccount(EXISTING, true, false);
 
         Gate gate = measure(this::existingAccount, this::answeredAtOnce);
 
