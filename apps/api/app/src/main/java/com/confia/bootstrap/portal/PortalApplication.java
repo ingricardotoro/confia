@@ -1,6 +1,8 @@
 package com.confia.bootstrap.portal;
 
 import com.confia.shared.jobs.infrastructure.wiring.JobSchedulingConfiguration;
+import com.confia.shared.observability.health.HealthProbeRoutesConfiguration;
+import com.confia.shared.observability.health.ReadinessDatabaseHealthConfiguration;
 import com.confia.shared.security.TransactionRunnerConfiguration;
 import com.confia.shared.web.edge.PortalSecurityConfiguration;
 import com.confia.shared.web.edge.WebEdgeConfiguration;
@@ -9,6 +11,7 @@ import com.confia.shared.web.openapi.ProcessApiInfo;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
+import org.springframework.boot.webmvc.autoconfigure.actuate.endpoint.web.WebMvcHealthEndpointExtensionAutoConfiguration;
 import org.springframework.boot.webmvc.autoconfigure.error.ErrorMvcAutoConfiguration;
 import org.springframework.context.annotation.Import;
 
@@ -40,17 +43,22 @@ import org.springframework.context.annotation.Import;
  * (ADR-0016). {@code StarterAutoConfigurationExcludedTest} fails the build naming any starter entry
  * missing here.
  *
+ * <p>The health probes (dockerfiles-and-local-compose decision 4): {@link HealthProbeRoutesConfiguration} and {@link ReadinessDatabaseHealthConfiguration}
+ * serves {@code GET /health/live} and {@code GET /health/ready}, and the framework's own mapping for the
+ * additional paths of the probe groups is excluded because it takes one segment only (probe P-2).
+ *
  * <p>The class is public only so the launcher in the parent package can start it; nothing else
  * may reference it (enforced by ArchUnit).
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {UserDetailsServiceAutoConfiguration.class,
-        ErrorMvcAutoConfiguration.class}, excludeName = {
+        ErrorMvcAutoConfiguration.class, WebMvcHealthEndpointExtensionAutoConfiguration.class}, excludeName = {
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration",
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerMetricsAutoConfiguration",
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerActuatorAutoConfiguration"})
 @Import({ContractSchemas.class, ProcessApiInfo.class, WebEdgeConfiguration.class,
         PortalSecurityConfiguration.class, TransactionRunnerConfiguration.class,
-        JobSchedulingConfiguration.class})
+        JobSchedulingConfiguration.class,
+        HealthProbeRoutesConfiguration.class, ReadinessDatabaseHealthConfiguration.class})
 public class PortalApplication {
 }

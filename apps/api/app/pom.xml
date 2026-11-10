@@ -86,6 +86,22 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-flyway</artifactId>
     </dependency>
+    <!-- Health probes only (dockerfiles-and-local-compose design.md decision 4, probe P-1). Spring
+         Boot 4.1.1 split Actuator into modules: spring-boot-health holds the health endpoint, the
+         groups, the liveness and readiness states and the web extension; spring-boot-actuator-
+         autoconfigure holds the endpoint infrastructure the health endpoint needs. The web mapping
+         comes from spring-boot-webmvc, already on the class path, and the db indicator from
+         spring-boot-jdbc. spring-boot-starter-actuator is deliberately NOT declared: it brings
+         spring-boot-starter-micrometer-metrics, whose auto-configuration creates a MeterRegistry
+         (BJ38, BJ73; CurrentAbsencesTest). Versions managed by the Spring Boot BOM. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-health</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-actuator-autoconfigure</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
@@ -186,6 +202,9 @@
   </dependencies>
 
   <build>
+    <!-- The executable jar has a fixed name so its path never depends on the version
+         (docs/05; dockerfiles-and-local-compose design.md decision 1). -->
+    <finalName>confia-api</finalName>
     <!-- Single source of truth for the PostgreSQL image (ADR-0015 rule 1; design.md decision 3;
          task 1.6). Filtering is restricted to confia-build.properties alone. Declared as two
          passes over the SAME directory, in order, rather than an <excludes> on the first pass:
@@ -211,6 +230,25 @@
       </testResource>
     </testResources>
     <plugins>
+      <!-- Executable jar (BI119, CR01, CR02). The repackage execution runs in package, after the
+           plain jar, so the same verify that ran the architecture rules, the coverage gate and
+           the mutation gate leaves target/confia-api.jar; a rule that fails stops the build before
+           the jar exists (BI120). The original jar stays as confia-api.jar.original. -->
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <mainClass>com.confia.bootstrap.ConfiaApplication</mainClass>
+        </configuration>
+        <executions>
+          <execution>
+            <id>repackage</id>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
       <!-- Coverage gate for this module (design.md decision 9; task 1.1 measured 89.7% line and
            84.6% branch coverage on com.confia.bootstrap alone, both above 80%, so the BUNDLE rule
            is declared in this pull request rather than deferred to PR B1). The prepare-agent and

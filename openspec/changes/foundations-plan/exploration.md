@@ -336,6 +336,43 @@ registra la partición y el reparto.
 >   desde la base de datos queda para la fase 2; hasta entonces, una institución mal configurada se purga en vacío y
 >   lo señala la advertencia `audit_chain_empty_for_configured_institution`.
 
+**Nota (2026-11-09, división del cambio 11).** El propietario aprobó el 2026-11-09 dividir el cambio 11,
+`containerization-and-cicd-pipeline`, en **seis** cambios SDD. La exploración vive en Engram
+(`sdd/containerization-and-cicd-pipeline/explore`) y la parte que corresponde al primero, en
+`openspec/changes/dockerfiles-and-local-compose/exploration.md`. El motivo es de tamaño: el inventario
+real del cambio 11 suma de 50 a 60 tareas, contra la estimación de 12 a 14 de la tabla y contra el límite
+de quince de `openspec/changes/README.md`. La división en dos que preveía el párrafo posterior a la tabla
+(`dockerfiles-and-local-compose` más `cicd-pipeline-and-preprod-deploy`) no alcanza: la segunda mitad
+seguiría muy por encima del límite.
+
+| Orden | Id | Cambio | Entrega | Depende de |
+|---|---|---|---|---|
+| 1 | 11a | `dockerfiles-and-local-compose` | Jar ejecutable, perfil `migrate` real, imágenes de la API y de `apps/admin-web`, `docker-compose.yml` y su *overlay* de producción, `.env.example` sin secretos, y el **subconjunto mínimo de salud** (Actuator con sondas de vida y de preparación para las comprobaciones de los contenedores) | 1, 3 y el subconjunto de salud que incluye él mismo |
+| 2 | 11b | `redis-shared-rate-limiting` | Redis y su adaptador detrás del puerto del limitador por IP (cierra la aceptación provisional D2 del cuarto corte) | 11a |
+| 3 | 11c | `image-supply-chain-and-publishing` | `cd.yml`, escaneo de imágenes con Trivy, SBOM, firma con cosign y procedencia SLSA, Renovate, fijación por dígest (incluido el pendiente de `confia.postgres.image` de `docs/09`), y Hadolint si no entra en 11a | 11a |
+| 4 | 11d | `preprod-environment-and-deploy` | OpenTofu, nginx de borde con Cloudflare, SSM con OIDC, ADR del gestor de secretos y calibración de Argon2id en el servidor real | 11b y 11c |
+| 5 | 11e | `audit-chain-external-anchor` | Ancla externa de la cadena de auditoría sobre S3, con MinIO en local | 11a |
+| 6 | 11f | `real-stack-e2e-journeys` | Recorridos de extremo a extremo contra la pila real | 11a y el cambio 8b |
+
+11b, 11c y 11e pueden correr en paralelo después de 11a; 11d espera a 11b y a 11c; 11f puede empezar en
+cuanto estén 11a y el cambio 8b.
+
+Dos dependencias que la tabla no registraba:
+
+- **El cambio 10 y la salud.** Las comprobaciones de salud de los contenedores necesitan Actuator, que
+  pertenece al cambio 10 (`structured-logging-and-tracing`), aún no iniciado. Se resuelve incluyendo en
+  11a **solo** el subconjunto mínimo: Actuator con las sondas de vida y de preparación y sus efectos sobre
+  la lista blanca pública y la seguridad. El resto del cambio 10 (registro, trazas, métricas, indicadores
+  propios restantes) sigue siendo suyo.
+- **El cambio 8b** bloquea únicamente a 11f, porque crea la cuenta de personal que usan los recorridos
+  reales (decisión Q2 del propietario del 2026-11-04 en `admin-web-foundations-and-session`).
+
+El cambio 12, `backup-restore-and-drill`, se mantiene como un solo cambio y depende de **11d** (el entorno
+donde se respalda y restaura) y de las **métricas del cambio 10** (las de respaldo). Donde otras notas
+nombran «el cambio 11» como dependencia, la parte concreta es: Redis, 11b; ancla externa (incluida
+`audit-chain-hourly-anchor-verification`), 11e; despliegue y nginx de borde, 11d. Las filas 11 y 12 de la
+tabla no se reescriben: esta nota las enmienda.
+
 **Hallazgo.** `docs/09-roadmap-y-fases.md` §3 no incluye el módulo `organization` en F0, pero
 ADR-0009 exige `institution_id NOT NULL` desde la primera migración y ADR-0017 asigna la tabla raíz
 de institución a ese módulo. Se recomienda incorporar el cambio 4, con la entidad raíz mínima, al
