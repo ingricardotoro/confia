@@ -473,3 +473,7 @@ Tras restaurar `V15` no se volvió a correr `V15SchemaDiffIT`; la restauración 
 - Suite unitaria completa de `app`: 2 974 pruebas, 0 fallos, 3 omitidas.
 - Integración `com/confia/identity/**`, `schema/**`, `shared/**` y `support/**`: 114 clases, 658 pruebas, 0 fallos.
 - **No observado:** `./mvnw -B verify` completo, JaCoCo, PIT, las pruebas de integración fuera de esos paquetes y la comprobación de BI127 sobre la cadena fusionada. Quedan para el CI del PR.
+
+### Revisión nativa de la tarea 6 (2026-11-09): no se pudo ejecutar
+
+`gentle-ai review start` sobre `5b10396..a050897` (86 archivos, 1 306 líneas) rechazó el candidato con `lens_context_budget_exceeded` antes de crear autoridad alguna. No se puede partir sin dejar commits intermedios en rojo, porque `mfa_required` es `NOT NULL` sin valor por defecto y `V15` debe ir con los fixtures. Por decisión del propietario, la tarea 6 queda sin revisión nativa y se apoya en el `verify` del CI de su PR. Riesgo señalado para quien revise ese PR: el cambio de polaridad del parámetro `exemptFromSecondFactor` (unos 270 sitios de llamada invertidos por script).
