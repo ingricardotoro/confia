@@ -18,6 +18,7 @@ import com.confia.shared.web.edge.PublicEndpoints;
 import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
 import com.confia.shared.security.RateLimiterConfiguration;
 import com.confia.kernel.Permission;
+import com.confia.shared.web.authorization.AuditingAccessDeniedHandler;
 import com.confia.shared.web.authorization.PermissionDecider;
 import com.confia.shared.web.authorization.PermissionedEndpoint;
 import com.confia.shared.web.authorization.PermissionedEndpoints;
@@ -25,6 +26,7 @@ import com.confia.shared.web.edge.AdminSecurityConfiguration;
 import com.confia.shared.web.edge.SecurityChains;
 import com.confia.shared.web.edge.ThrottlingConfiguration;
 import com.confia.shared.web.edge.WebEdgeConfiguration;
+import com.confia.shared.web.problem.ProblemAccessDeniedHandler;
 import com.confia.shared.web.problem.ProblemAuthenticationEntryPoint;
 import com.confia.shared.web.problem.ProblemResponses;
 import java.util.ArrayList;
@@ -101,6 +103,11 @@ class WebEdgeHarness {
         return new RecordingAuthorizationMetrics();
     }
 
+    @Bean
+    RecordingPermissionDenialRecorder denialRecorder() {
+        return new RecordingPermissionDenialRecorder();
+    }
+
     /** The routes with a permission that only this harness adds; one has a path variable. */
     @Bean
     PermissionedEndpoints permissionedEndpoints() {
@@ -122,7 +129,8 @@ class WebEdgeHarness {
             ProblemResponses problems, HarnessTokens tokens,
             RecordingSessionValidity sessionValidity, CsrfTokens csrfTokens,
             WebEdgeProperties webEdge, PermissionedEndpoints permissioned,
-            PermissionDecider decider) throws Exception {
+            PermissionDecider decider, RecordingPermissionDenialRecorder denialRecorder)
+            throws Exception {
         boolean portal = "portal".equals(environment.getProperty(PROCESS_PROPERTY));
         PublicEndpoints real = portal
                 ? PublicEndpoints.forPortal(environment)
@@ -178,7 +186,9 @@ class WebEdgeHarness {
                 tokens.verifier(), authenticated, permissioned, sessionValidity,
                 new ProblemAuthenticationEntryPoint(problems));
         HttpSecurity chain = SecurityChains.denyByDefault(http, new PublicEndpoints(endpoints),
-                authenticated, permissioned, decider, problems);
+                authenticated, permissioned, decider,
+                new AuditingAccessDeniedHandler(new ProblemAccessDeniedHandler(problems),
+                        denialRecorder), problems);
         if ("off".equals(environment.getProperty(CSRF_FILTER_PROPERTY))) {
             // The control variant of WE55: the same chain with the CSRF filter left out.
             chain.addFilterBefore(tokenFilter, AnonymousAuthenticationFilter.class);

@@ -138,6 +138,11 @@ public final class HarnessProcess implements AutoCloseable {
         return context.getBean(RecordingPermissionResolver.class);
     }
 
+    /** The double of the denial recorder, which the auditing handler of the harness chain calls. */
+    public RecordingPermissionDenialRecorder denialRecorder() {
+        return context.getBean(RecordingPermissionDenialRecorder.class);
+    }
+
     /** The double of the authorization metrics port. */
     public RecordingAuthorizationMetrics authorizationMetrics() {
         return context.getBean(RecordingAuthorizationMetrics.class);
