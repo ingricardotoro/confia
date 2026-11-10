@@ -20,6 +20,8 @@ const seed = (page: Page) => page.goto(`${MOCK_API_URL}/__control/seed-session`)
 
 const SIGN_IN = "/iniciar-sesion";
 const VERIFICATION = "/iniciar-sesion/verificacion";
+const ENROLLMENT = "/iniciar-sesion/inscripcion";
+const ENROLLMENTS = "**/api/v1/auth/mfa/enrollments";
 const IDENTIFIER = "docente.prueba@example.test";
 
 /** Types fictitious credentials and sends the form; the password is made at run time, so none is written here. */
@@ -198,5 +200,32 @@ export const MATRIX: readonly GateCombination[] = [
       await page.getByRole("button", { name: "Verificar" }).click();
     },
     expected: (page) => page.getByRole("alert").filter({ hasText: "El código de recuperación no es correcto o ya se usó." }),
+  },
+  {
+    route: ENROLLMENT,
+    state: "loading",
+    preset: "enrollment-required",
+    arrange: async (page) => {
+      await page.route(ENROLLMENTS, hold);
+      await submitCredentials(page);
+    },
+    expected: (page) => page.getByText("Preparando su verificación en dos pasos."),
+  },
+  {
+    route: ENROLLMENT,
+    state: "secret",
+    preset: "enrollment-required",
+    arrange: submitCredentials,
+    expected: (page) => page.getByRole("img", { name: "Código QR para su aplicación de autenticación" }),
+  },
+  {
+    route: ENROLLMENT,
+    state: "network-error",
+    preset: "enrollment-required",
+    arrange: async (page) => {
+      await page.route(ENROLLMENTS, cut);
+      await submitCredentials(page);
+    },
+    expected: (page) => page.getByRole("alert").filter({ hasText: "No se pudo preparar la verificación en dos pasos." }),
   },
 ];

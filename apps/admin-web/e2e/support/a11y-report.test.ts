@@ -101,6 +101,20 @@ describe("the states of the verification screen [BX109]", () => {
   });
 });
 
+describe("the states of the enrollment screen up to its secret step [BX109]", () => {
+  const ENROLLMENT = "/iniciar-sesion/inscripcion";
+  const enrollment = MATRIX.filter((combination) => combination.route === ENROLLMENT);
+
+  it("holds the three states, each once, all reached through the preset that asks for an enrollment", () => {
+    expect(enrollment.map((combination) => [combination.state, combination.preset])).toEqual([
+      ["loading", "enrollment-required"],
+      ["secret", "enrollment-required"],
+      ["network-error", "enrollment-required"],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...enrollment])).toHaveLength(MATRIX.length * THEMES.length);
+  });
+});
+
 describe("the verdict [BX75]", () => {
   it("names route, state, theme, rule and impact of every blocking violation", () => {
     expect(() => {

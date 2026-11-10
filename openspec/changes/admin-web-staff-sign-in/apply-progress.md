@@ -376,3 +376,64 @@ Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, 
 | PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 (14 de la caché de turbo) |
 
 Guarda de `*.spec.*` vacía y `git diff --name-only 5199e0c -- apps/api packages/ui packages/contracts` vacío. Sin dependencias nuevas.
+
+
+## Tarea 7: `enrollment-secret-and-qr`
+
+### Dependencias (subtarea 7.1), 2026-11-09
+
+| Paquete | Versión | Publicada | Sección | Licencia |
+|---|---|---|---|---|
+| `qrcode.react` | 4.2.0 | 2024-12-11 | `dependencies` de la app, por catálogo | ISC; par `react ^16.8 \|\| … \|\| ^19`, sin dependencias de ejecución |
+| `jsqr` | 1.4.0 | 2021-04-24 | `devDependencies` de la app, por catálogo | Apache-2.0; sin dependencias |
+
+Ambas son las últimas de su serie y llevan más de 14 días publicadas. `pnpm audit --audit-level high` termina con código 0 (quedan 2 avisos moderados ya existentes, de `glob` y `minimatch` por `packages/ui` y `packages/config`, ajenos a estas entradas); `pnpm why react` muestra una sola `react@19.3.0`; `pnpm install --frozen-lockfile --prefer-offline` pasa. `jsqr` queda declarado sin uso hasta el PR 8 (SS81).
+
+### Medida (regla de las 800 líneas), 2026-11-09
+
+Medida con `git reset`, `git add -A` y `git diff --cached --numstat -M af20884` (sin `openspec/`, archivo de bloqueo ni código generado): 661 adiciones y 26 eliminaciones, **687 líneas**. Bajo 800: sin excepción y sin corte 7a / 7b.
+
+### Evidencia del ciclo TDD
+
+| Paso | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| SS83 (`TotpQrCode.test.tsx`), antes de escribir `TotpQrCode` | Sí | `Failed to resolve import "./TotpQrCode.tsx"` | 2 pruebas: **`QRCodeSVG` cumple SS83** con `level="M"`, `marginSize={4}`, `role="img"` y `title`: el elemento tiene el nombre del catálogo y ningún elemento del subárbol lleva `style`. No hubo punto de detención |
+| URI y clave | Sí | `Failed to resolve import "./otpauth-uri.ts"` y `"./manual-key.ts"` | 5 pruebas |
+| `SecretStep` | Sí (corrida aparte quitando el archivo) | `Failed to resolve import "./SecretStep.tsx"`. **Escribí el componente en el mismo paso que su prueba**; el rojo se registró después, moviendo el archivo fuera, y se restauró | 4 pruebas |
+| `EnrollmentContainer` y ruta | Sí | 11 de 12 fallan por comportamiento (la ruta aún dibujaba el provisional): `Unable to find role="heading" and name "Escanee el código QR"`, `Unable to find role="alert"`, `Unable to find an element with the text: Preparando su verificación…`. SS29 ya pasaba con la guarda | 12 pruebas más la de `routes.test.tsx` |
+| Preset `enrollment-expired` | Sí | `expected 400 to be 200` (preset desconocido) | 32 pruebas del simulador |
+| 3 filas de la puerta | Sí | `expected [] to deeply equal [ [ 'loading', …(1) ], …(2) ]` | 14 pruebas |
+| Recorrido `enrollment.e2e.ts` | **No hubo rojo de navegador**: se escribió con la pantalla ya en verde | 2 de 2 en verde | 76 de 76 en E |
+
+### Demostraciones deliberadas (tarea 7.6)
+
+Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, restauración desde la copia y `cmp` sin salida.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 1 | `style={{ width: 200 }}` en `QRCodeSVG` | SS83: `expected '<svg height="128" width="128" viewBox…' not to match /\sstyle=/`, y la de igualdad con la salida de la biblioteca | idéntico |
+| 2 | Promesa de inscripción sin memorizar en `access-session.ts` (se quitó el `return starting.promise`) | SS75 bajo `StrictMode`: `expected [ …(2) ] to have a length of 1 but got 2` | idéntico |
+| 3 | *Adicional:* clave sin agrupar (`join("")`) | SS77: `expected 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' to be 'JBSW Y3DP EHPK 3PXP …'` en `manual-key.test.ts` y en `SecretStep.test.tsx` | idéntico |
+
+### Desviaciones y decisiones
+
+1. **«Continuar» avanza el borrador, pero el contenedor solo dibuja `secret`.** Los pasos `recovery-codes` y `first-code` son de la tarea 8; hasta que se fusione, pulsar «Continuar» deja el contenedor sin contenido de sección. La cadena 7 a 8 se fusiona en orden.
+2. **El `h2` toma el foco y el `h1` ya no.** Al aparecer la sección, su `h2` enfoca (E10). Por eso la prueba de SS32 de `routes.test.tsx` espera el foco en el `h2` para la inscripción; el `h1` lo recibe solo al montar la pantalla, durante la carga.
+3. **`SignInContainer.states.test.tsx`** (fuera de la lista de la tarea pero dentro de `features/identity/**`): su prueba de SS60 simulaba a mano lo que ahora hace el contenedor real ante `409` (descartar con el aviso y volver); se quitó esa simulación y se espera el aviso.
+4. **`strict` en `renderApp`** (`src/test/render-app.tsx`): envuelve la aplicación en `StrictMode` para SS75.
+5. **`account.ts`** del simulador expone también `secret` en base32 (`TestAccount.secret`), para comparar con el portapapeles.
+6. **Tamaño del QR.** Se dibuja con el tamaño por defecto de la biblioteca (128 px): el diseño prohíbe `style` y `imageSettings`, y SS83 compara con la salida de la biblioteca. Si el propietario lo quiere más grande, se decide aparte.
+7. **Contenedor con carga y error en línea.** Sin archivos de presentación aparte para ellos; usan `Spinner` y `ErrorState` de `@confia/ui`. El detalle del error reutiliza `problem.*`; el identificador de traza se muestra con `CopyButton`.
+8. **Textos.** Las siete claves son las de la sección 8; ninguna fuera de ella (`enrollment.title` ya existía).
+9. **`routes.test.tsx`:** la prueba del provisional («sin campo») se reemplazó por una que comprueba la sección con su QR. `AccessPlaceholder` ya no se usa; su retiro es de la tarea 9.
+
+### Verificación de cierre
+
+| Suite | Resultado |
+|---|---|
+| U `pnpm --filter @confia/admin-web test` | 67 archivos, 696 pruebas y 1 `todo` |
+| T `pnpm --filter ./tooling test` | 9 archivos, 286 pruebas |
+| E `pnpm --filter @confia/admin-web test:e2e` | 76 de 76 (68 previas, 2 recorridos de inscripción, 6 evaluaciones de la puerta) |
+| PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 |
+
+Guarda de `*.spec.*` vacía y `git diff --name-only af20884 -- apps/api packages/ui packages/contracts` vacío (índice y árbol). Sin caracteres invisibles en los 24 archivos.

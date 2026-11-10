@@ -1,6 +1,5 @@
 import { createRoute, redirect, type AnyRoute } from "@tanstack/react-router";
-import { useAdminText } from "../../i18n/use-admin-text.ts";
-import { AccessPlaceholder } from "./components/AccessPlaceholder.tsx";
+import { EnrollmentContainer } from "./enrollment/EnrollmentContainer.tsx";
 import { SecondFactorContainer } from "./second-factor/SecondFactorContainer.tsx";
 import { SignedInContainer } from "./signed-in/SignedInContainer.tsx";
 import { SignInContainer } from "./sign-in/SignInContainer.tsx";
@@ -40,11 +39,6 @@ function toHome(): void {
 }
 
 const isAuthenticated = (session: AccessSession) => session.getView().status === "authenticated";
-
-function EnrollmentContainer() {
-  const { t } = useAdminText();
-  return <AccessPlaceholder title={t("enrollment.title")} />;
-}
 
 /** The routes of access, children of the root, each behind its guard. */
 export function createIdentityRoutes(root: AnyRoute, session: AccessSession): AnyRoute[] {
@@ -95,7 +89,7 @@ export function createIdentityRoutes(root: AnyRoute, session: AccessSession): An
           toSignIn();
         }
       },
-      component: EnrollmentContainer,
+      component: () => <EnrollmentContainer session={session} signInPath={ACCESS_PATHS.signIn} />,
     }),
   ];
 }
