@@ -532,3 +532,49 @@ T no se corrió: `tooling/` no cambió en esta tarea. Guarda de `*.spec.*` vací
 ### Correcciones de la revisión de 8a, 2026-11-09 (rama 8b)
 
 Dos advertencias de la revisión, corregidas en 8b con su prueba primero. (1) La guarda de ubicación de `FirstCodeEntry` ahora tiene la prueba de su rama falsa: una activación retenida, la persona sale al inicio de sesión, se libera la respuesta y la ubicación sigue en el inicio de sesión. Demostración: guarda reemplazada por `entered.current !== ""`; rojo `AssertionError: expected '/' to be '/iniciar-sesion'`; `cmp` idéntico. (2) Un paso `recovery-codes` sin códigos ya no dibuja una lista vacía confirmable: muestra `ErrorState` con `enrollment.failed` y `problem.unexpected` (textos ya aprobados), y «Reintentar» descarta la inscripción y lleva al inicio de sesión con el aviso de inscripción interrumpida. Rojo observado: `Unable to find role="alert"` (se dibujaba el paso con la casilla). Además, una prueba de que «Ver de nuevo el código QR» no hace nada mientras la activación está en vuelo (ya estaba en verde: sin rojo posible) y los elementos de la lista de códigos se identifican por posición. Medida de 8b acumulada contra `6ff4c32`: 409 líneas. U 730 pruebas y 1 `todo`; E 85 de 85; PR 18 de 18.
+
+## Tarea 9 `access-journeys-and-criterion-8` (rama `change/admin-web-staff-sign-in-9-access-journeys-and-criterion-8`)
+
+### Medida y detención, 2026-11-09
+
+Medida con `git reset`, `git add -A` y `git diff --cached --numstat -M 3edc501 -- . ':(exclude)openspec' ':(exclude)pnpm-lock.yaml' ':(exclude)packages/contracts/src/generated'`: 948 adiciones y 44 eliminaciones, **992 líneas**, sobre el umbral de 880. **Nada se comprometió.** El trabajo está preparado en el área de preparación (staged) y sin commits.
+
+Corte propuesto, por archivos completos con sus pruebas (sin quitar pruebas ni comentarios):
+
+| Parte | Archivos | Líneas |
+|---|---|---|
+| 9a: navegador y centinelas | `e2e/specs/journeys/secrets.e2e.ts` (374), `journeys-inventory.test.ts` (65), `keyboard.e2e.ts` (64), `enrollment.e2e.ts` (26), `e2e/support/sentinels.ts` (16) y `sentinels.test.ts` (29), `session-secrets.flow.test.tsx` (149) | 723 |
+| 9b: documentos y limpieza | `src/app/docs-notes.test.ts` (158), `src/app/structure.test.ts` (53), borrado de `AccessPlaceholder.tsx` y su prueba (38), `docs/09-roadmap-y-fases.md` (16), `docs/ui-ux/04` y `06` (4) | 269 |
+
+Verificación del conjunto completo, ya observada: U 69 archivos, 752 pruebas y 2 `todo`; E 96 de 96 (la puerta: 44 evaluaciones, 22 estados por 2 temas, en verde antes de marcar el criterio 8); `lint` y `typecheck` de `admin-web` sin salida de error; guarda de `*.spec.*` vacía; `apps/api`, `packages/ui` y `packages/contracts` sin diferencias frente a `3edc501`; sin caracteres invisibles en los 12 archivos. Faltan, tras el corte, la prueba de PR completo y T (no aplica: `tooling/` no cambió).
+
+### Decisión del propietario y cierre de la tarea 9, 2026-11-09
+
+El propietario aprobó el corte. Dos ramas encadenadas, sin empujar:
+
+| Parte | Rama | Commits | Medida (adiciones + eliminaciones) |
+|---|---|---|---|
+| 9a | `change/admin-web-staff-sign-in-9-access-journeys-and-criterion-8` | `1b6de8f test(admin-web): cover the full enrollment and every secret surface in the browser` | 719 + 4 = **723** contra `3edc501` |
+| 9b | `change/admin-web-staff-sign-in-9b-cleanup-and-criterion-8` | `432c16f refactor(identity): remove the access placeholder`, `b0460bd docs(ui-ux): record the access screens in the interaction and flow guides`, `8eb38f8 docs(roadmap): close exit criterion 8 with the simulated journeys`, y este cierre | 229 + 40 = **269** contra `1b6de8f` |
+
+Los 992 de la tarea completa quedan repartidos en 723 y 269; ninguna parte pasa de 800. El árbol de 9a se verificó solo, sin los archivos de 9b (se movieron a una carpeta temporal y se restauraron con `cmp` idéntico).
+
+**Verificación.** 9a: U 70 archivos y 741 pruebas con 2 `todo`; E 96 de 96; PR 18 de 18. 9b: U 69 archivos y 752 pruebas con 2 `todo`; E 96 de 96; PR 18 de 18. T no se corrió: `tooling/` no cambió. Guarda de `*.spec.*` vacía; `apps/api`, `packages/ui` y `packages/contracts` sin diferencias contra `3edc501`; sin caracteres invisibles.
+
+**ROJO.** `secrets.e2e.ts`: `Error: No tests found.`; `variantsOf`: `TypeError: variantsOf is not a function`; inventario: `ENOENT` de `secrets.e2e.ts`; notas de `docs-notes.test.ts`: 10 fallos con las notas vacías. Sin ROJO posible, por existir ya el comportamiento: los flujos de `session-secrets.flow.test.tsx` y las ausencias de `structure.test.ts`. Se protegen de un verde vacío con una prueba que planta un valor en cada superficie (almacenamientos, IndexedDB, URL, historial, `window`, cookies y consola) y con conjuntos positivos exactos.
+
+**Demostraciones (con `cmp` idéntico).** (1) Quitar la nota de `docs/09`: rojo en BX102 (`the criterion is marked without a dated note`), BX103 y BX104. (2) Quitar la fila `signed-in-ready` de la matriz: `Error: The matrix lacks: / [signed-in-ready].` (3) Adicional: `SignInContainer` guarda la contraseña en `sessionStorage`: el recorrido TOTP falla con `the verification: sessionStorage` y las etiquetas `password, base64` y `password, base64url`, sin imprimir el valor.
+
+**Criterio 8.** Marcado solo en 9b, con la puerta en verde observada sobre las cinco pantallas (44 evaluaciones, 22 estados por 2 temas).
+
+**Desviaciones.** El commit de `docs/ui-ux` va antes que el de `docs/09` porque `docs-notes.test.ts` prueba los tres documentos y cada commit debe quedar en verde; el commit de `docs/ui-ux` lleva una versión parcial de ese archivo y el de `docs/09` la completa. Se agregó el recorrido de inscripción solo con teclado (SS114) a `keyboard.e2e.ts`. `routes.tsx` no necesitó limpieza.
+
+**Pendiente.** 9.4 es del propietario tras fusionar la cadena. Siguen pendientes las mediciones remotas 4.4, BX86 y BX89, que dependen de empujar. Con todo lo demás cerrado, el cambio queda **listo para `sdd-verify` y `sdd-archive`**, con esas evidencias remotas como condición.
+
+### Revisión de 9a: advertencias R3-001, R3-002 y R3-003, 2026-11-09
+
+La revisión de Gentle AI aprobó 9a con tres advertencias. Las dos primeras se corrigieron en la rama 9b con su prueba:
+
+- **R3-001.** El recorrido de inscripción comprobaba al final que había diez etiquetas `recovery code`, pero la cuenta del simulador ya las agregaba con los mismos nombres, así que la aserción no podía fallar si el oyente nunca leía la respuesta. Los valores aprendidos de las respuestas de la API van ahora en un conjunto aparte (`learned`) y el recorrido exige que la clave y los diez códigos aprendidos sean exactamente los de la cuenta. Demostración: el oyente sin leer `recoveryCodes` pone en rojo `the ten codes of the enrollment answer were learned`; `cmp` idéntico.
+- **R3-002.** El código TOTP escrito se buscaba como subcadena y podía coincidir por azar dentro de un número más largo. Ahora se busca como token completo (`findTokenLeaks`, con su prueba unitaria: primero en rojo con `TypeError: findTokenLeaks is not a function`), también en sus codificaciones. Demostración: `SecondFactorContainer` guarda el código en `sessionStorage`; el recorrido TOTP falla con `the signed in page: sessionStorage, the typed code`; `cmp` idéntico.
+- **R3-003, aceptada sin cambio.** La espera fija de 2 s de `enrollment.e2e.ts` (SS82) se mantiene: una petición tardía (fuente o recurso) solo puede aparecer si se deja pasar un tiempo tras mostrarse el QR, y `networkidle` ya se resolvió. Queda registrada como decisión aceptada.

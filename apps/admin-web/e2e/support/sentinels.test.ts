@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { findLeaks, makeSentinel, variantsOf } from "./sentinels.ts";
+import { findLeaks, findTokenLeaks, makeSentinel, variantsOf } from "./sentinels.ts";
 
 // admin-web-foundations-and-session, task 11.1 (CLAUDE.md rules 11 and 13). The values a test must never
 // see in a log or a report are made at run time, so none is written in the repository.
@@ -51,5 +51,22 @@ describe("the sentinels", () => {
     expect(leaks).not.toContain("password");
     expect(leaks).not.toContain("password, hex");
     expect(JSON.stringify(leaks)).not.toContain(password);
+  });
+
+  // admin-web-staff-sign-in, task 9 (review R3-002): a short code is searched as a whole token, so a longer run of digits that
+  // happens to contain it is not a leak, and a code kept on its own (quoted, spaced, after a key) is.
+  it("finds a short code only as a whole token, not inside a longer run of letters or digits", () => {
+    const code = { "typed code": "123456" };
+
+    expect(findTokenLeaks("timestamp 1761234567890 id a123456b", code)).toEqual([]);
+    expect(findTokenLeaks("{\"kept\":\"123456\"}", code)).toEqual(["typed code"]);
+    expect(findTokenLeaks("code=123456&x=1", code)).toEqual(["typed code"]);
+    expect(findTokenLeaks("123456", code)).toEqual(["typed code"]);
+    expect(findTokenLeaks("1234567 and 123456.", code)).toEqual(["typed code"]);
+  });
+
+  it("takes a value with characters that mean something in a pattern as plain text", () => {
+    expect(findTokenLeaks("a.b+c", { value: "a.b+c" })).toEqual(["value"]);
+    expect(findTokenLeaks("axb+c", { value: "a.b+c" })).toEqual([]);
   });
 });
