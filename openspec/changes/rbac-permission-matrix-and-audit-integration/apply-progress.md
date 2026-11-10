@@ -477,3 +477,64 @@ Tras restaurar `V15` no se volvió a correr `V15SchemaDiffIT`; la restauración 
 ### Revisión nativa de la tarea 6 (2026-11-09): no se pudo ejecutar
 
 `gentle-ai review start` sobre `5b10396..a050897` (86 archivos, 1 306 líneas) rechazó el candidato con `lens_context_budget_exceeded` antes de crear autoridad alguna. No se puede partir sin dejar commits intermedios en rojo, porque `mfa_required` es `NOT NULL` sin valor por defecto y `V15` debe ir con los fixtures. Por decisión del propietario, la tarea 6 queda sin revisión nativa y se apoya en el `verify` del CI de su PR. Riesgo señalado para quien revise ese PR: el cambio de polaridad del parámetro `exemptFromSecondFactor` (unos 270 sitios de llamada invertidos por script).
+
+## Tarea 7a (PR 6 `roles-report-and-criterion-2`, primera parte) — 2026-11-09
+
+Rama `change/rbac-permission-matrix-and-audit-integration-6a-roles-report-and-criterion-2`, apilada sobre la punta de la tarea 6 (`5c25d37`). Sin push. **Alcance de esta unidad:** 7.1, 7.2 y 7.5 en
+lo que toca al informe, y las demostraciones (1) y (2) de 7.7. **Queda para 7b:** 7.3 (`ExitCriterion2EndToEndIT` y tercera parte de `AuthorizationEdgeIT`), 7.4 (inversiones), 7.6 (registro del
+cambio 8b), `docs/09`, notas de `docs/03`, `DocumentationNotesTest` y las demostraciones (3) y (4). La tarea 7 **no** se marca en `tasks.md`.
+
+### 7.1 Sonda de orval
+
+`@Operation(extensions = @Extension(properties = @ExtensionProperty(name = "x-required-permission", value = "identity:read")))` aparece en el documento como `"x-required-permission" : "identity:read"` y
+`pnpm generate` en `packages/contracts` (orval 8.38.0) terminó sin error ni advertencia: **orval tolera la extensión**; no hizo falta la alternativa de llevar el permiso en la descripción, y BI139 se
+afirma sobre la extensión. `packages/contracts/src/generated/` está ignorado por Git (`.gitignore:90`), de modo que **no hay diferencia comprometida** en `packages/contracts`: la regeneración solo añadió
+30 líneas a `src/generated/admin/` (`ListRolePermissionsResponse` y el esquema `RolePermissions`) y dejó `portal/` idéntico (comparado con una copia previa). `pnpm typecheck` y `pnpm test` del paquete
+en verde (8 pruebas). `pnpm generate` ejecutó antes una instalación implícita en `node_modules` de esta copia de trabajo (resolvió `zod` 4.6.6 y `vitest` 5.0.5); `git status` no muestra cambios fuera de `apps/api`.
+
+### Evidencia de ciclo TDD (7.2 y 7.5)
+
+| Paso | Observado |
+|---|---|
+| Rojo de `ListRolePermissionsTest` y `PermissionedEndpointsTest` | Compilación: `cannot find symbol` para `ListRolePermissions` y `RolePermissionsView` (el árbol no tenía el código de producción). Con las dos clases de aplicación y sin la entrada de la lista, `PermissionedEndpointsTest.theProductionListIsExactlyTheReportOfTheRolesAndNeedsIdentityRead:24` falla con `Expecting actual:` (lista vacía) y las 8 de `ListRolePermissionsTest` pasan. |
+| Rojo de `RolesReportEndpointIT` y `ProductionRoutesClassifiedIT` (controlador registrado, sin entrada) | **Difirió de lo previsto** (`403` por `denyAll`): el proceso **no arranca**, `IllegalStateException: route GET /api/v1/identity/roles is on no list (public, authenticated, restricted or permissioned)` en `RouteCoverageGuard.afterSingletonsInstantiated:83`, 2 errores de arranque. Es un cierre más fuerte que el previsto: una ruta sin lista ni siquiera llega a servirse. |
+| Rojo de `OpenApiContractSnapshotTest` | 4 fallos: `eachProcessPublishesExactlyItsApprovedSnapshot` (`first at $.components.schemas.RolePermissions`) y los tres del control negativo del informe (la instantánea aún no tenía la ruta). Las demás pruebas nuevas del documento pasan porque leen el documento generado. |
+| Verde | `RolesReportEndpointIT` 15 de 15; `ProductionRoutesClassifiedIT` 2 de 2; `PermissionedEndpointsTest` 4; `ListRolePermissionsTest` 8; instantánea regenerada con `-Dconfia.openapi.update=true` (la prueba falla a propósito al reescribir) y diff revisado: **+84 líneas, solo adiciones** (`RolePermissions`, `RolesReportResponse`, la operación `listRolePermissions`); `portal.openapi.json` sin cambios. |
+| Corrección de pruebas ajenas por la nueva ruta | `PublicRouteAllowListTest` (2 afirmaciones: «solo rutas públicas y autenticadas» y «ninguna ruta necesita permiso hasta la tarea 7»), `CurrentSessionEndpointIT` (WE29: ahora ocho rutas) y `AuthorizationEdgeIT` (17 errores de arranque: su arnés importa `IdentityWebConfiguration` y reemplazaba la lista por la suya; ahora es la lista de producción más la del arnés, con la aserción de WE94 ajustada). |
+
+Pruebas del informe contra el proceso real: Auditor `200` con `Cache-Control: no-store` y forma exacta; seis roles en orden de catálogo con permisos de la matriz ordenados; Cajero con `invoicing:request-void` y sin
+`invoicing:void`; Super Administrador y Administrador `200`; ningún correo, nombre ni identificador de cuenta, institución o sesión en cuerpo ni cabeceras; dos solicitudes idénticas byte a byte; Cajero,
+Contabilidad y Coordinador Académico `403 forbidden` con exactamente un asiento `authorization.access.denied` y `entity_id` `identity:read`; acceso concedido sin asiento; sin `Idempotency-Key` `200` y cero
+marcadores; cabecera, parámetro `claimedPermission` y rol afirmados por un Cajero ignorados; Auditor con rol y cabeceras ajenos sigue en `200`; token de otra institución sin asignación `403`; cuenta sin
+asignación `403`; sin credencial `401 authentication-required`; el token no lleva `role`, `roles`, `permissions` ni `scope` y dos `jti` distintos.
+
+### Demostraciones deliberadas (revertidas y confirmadas con `cmp` contra copias en el directorio temporal de la sesión)
+
+| # | Ruptura | Rojo | `cmp` |
+|---|---|---|---|
+| 1a | Quitar la entrada de `PermissionedEndpoints.forAdmin()` (`List.of()`) | `PermissionedEndpointsTest.theProductionListIsExactlyTheReportOfTheRolesAndNeedsIdentityRead:24` por aserción (1 de 4). `RolesReportEndpointIT` **no llega a aserciones**: error de arranque por `RouteCoverageGuard` (1 error), no un `403` sin asiento [AZ29] | OK |
+| 1b | Variante para obtener rojo por resultado: la entrada pide `PAYMENTS_CREATE` en lugar de `IDENTITY_READ` | `RolesReportEndpointIT`: 10 fallos y 1 error por aserción de estado (`but was: 403` donde se esperaba `200`; `Expecting actual not to be null` en la fila de denegación esperada) [AZ29] | OK |
+| 2 | Agregar el miembro `email` al DTO `RolesReportResponse.Role` con un correo literal | `RolesReportEndpointIT.noEmailNameOrIdentifierOfTheAccountOrTheInstitutionReachesTheResponse:160` (`not to contain "@"`) y `anAuditorReceivesTheReportWithNoStoreAndTheExactShape:110` (`to contain exactly "code", "permissions"`) [I295] | OK |
+
+`ExitCriterion2EndToEndIT` no existe todavía, así que la parte de la demostración 1 que lo nombra queda para 7b.
+
+### Desviaciones y pendientes para 7b
+
+- **«Cero invocaciones» en el proceso real:** el proceso administrativo real no admite un contador sobre el caso de uso sin un bean de prueba (D19), de modo que `RolesReportEndpointIT` lo demuestra por lo que
+  responde una denegación (problema sin miembro `roles`) y por el asiento; la versión con contador es la del arnés de `AuthorizationEdgeIT` (tercera parte, 7b).
+- **Método distinto de `GET` sobre la ruta:** un `POST` de un token de cabecera recibe `403 csrf-invalid` antes de llegar al decisor de permisos, por lo que no sirve para probar «solo el GET está en la lista»;
+  la prueba se retiró en vez de afirmar otra cosa.
+- Nombre del esquema anidado: `RolePermissions` (no `Role`), para que `packages/contracts` no exporte un tipo genérico `Role`.
+- **No observado en 7a:** `./mvnw -B verify` completo, JaCoCo y PIT (quedan para el CI del PR); las pruebas de integración fuera de `identity/**`, `shared/**` y `bootstrap/*IT`.
+
+### Verificación (7a)
+
+- Unitaria completa de `app` (`./mvnw -B -q test -pl app -am -Djacoco.skip=true`): 2 992 pruebas, 0 fallos, 3 omitidas (2 974 previas más 18 nuevas).
+- Integración `identity/**`, `shared/**` y `bootstrap/*IT`: 679 pruebas; fallaron `CurrentSessionEndpointIT` (WE29, 1) y `AuthorizationEdgeIT` (17 errores de arranque), corregidas como se describe arriba.
+  Segunda pasada de esas dos clases junto con `RolesReportEndpointIT` y `ProductionRoutesClassifiedIT`: 12, 17, 15 y 2 pruebas, 0 fallos. Un informe de `V15SchemaDiffIT` con un fallo sigue en `target/` pero es
+  anterior (demostración 2 de la tarea 6, no se volvió a correr en 7a).
+- Orden focalizada final (`ListRolePermissionsTest,PermissionedEndpointsTest,OpenApiContractSnapshotTest,AuthorizationBoundaryRulesTest,PublicRouteAllowListTest,WebExposedTypesRuleTest,ProcessBeanIsolationTest`
+  más `-Dit.test=RolesReportEndpointIT,AuthorizationEdgeIT,ProductionRoutesClassifiedIT,CurrentSessionEndpointIT`), tras revertir las demostraciones: sin fallos.
+- `packages/contracts`: `pnpm typecheck` y `pnpm test` en verde.
+- Líneas efectivas contra `5c25d37`, sin `openspec/` ni `packages/contracts`: 937 (918 añadidas, 19 borradas); sin la instantánea `admin.openapi.json` (+84), 853. Producción 193 (`+187 -6`). Supera el aviso de 800 del PR
+  solo por la suma de la instantánea y de `RolesReportEndpointIT` (400); 7b suma sobre ese total, por lo que el PR 6 debe partirse según la regla de partición.
