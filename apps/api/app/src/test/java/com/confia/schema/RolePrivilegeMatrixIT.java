@@ -1094,6 +1094,114 @@ class RolePrivilegeMatrixIT extends PostgresIntegrationTest {
         }
     }
 
+    /**
+     * The email delivery log of {@code V16} (transactional-email-adapter specs/build-integrity/spec.md,
+     * scenarios BI157 and BI158), exact: {@code confia_admin_app}, the role the worker connects with,
+     * inserts and reads and can neither update nor delete, because the log is insert-only;
+     * {@code confia_portal_app} holds nothing; {@code confia_readonly} reads, subject to the row
+     * policy; {@code confia_backup} reads through {@code pg_read_all_data}; {@code confia_owner}
+     * retains all four by definition.
+     */
+    private static final String EMAIL_DELIVERY_TABLE = "notifications_email_delivery";
+
+    private static final Map<String, Set<String>> EMAIL_DELIVERY_MATRIX = Map.of(
+            "confia_owner", Set.of("SELECT", "INSERT", "UPDATE", "DELETE"),
+            "confia_admin_app", Set.of("SELECT", "INSERT"),
+            "confia_portal_app", Set.of(),
+            "confia_readonly", Set.of("SELECT"),
+            "confia_backup", Set.of("SELECT"));
+
+    @Test
+    void privilegesOnTheEmailDeliveryLogAreExactlyTheMatrixForTheFiveRoles() throws SQLException {
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres")) {
+            assertThat(matrixViolations(superuser, EMAIL_DELIVERY_TABLE, EMAIL_DELIVERY_MATRIX))
+                    .as("privileges on %s that differ from the matrix", EMAIL_DELIVERY_TABLE)
+                    .isEmpty();
+        }
+        assertThat(EMAIL_DELIVERY_MATRIX.keySet()).as("non-vacuous: all five roles are covered")
+                .containsExactlyInAnyOrderElementsOf(FIVE_ROLES);
+        for (String column : columnsOf(EMAIL_DELIVERY_TABLE)) {
+            assertThat(hasColumnPrivilege("confia_admin_app", EMAIL_DELIVERY_TABLE, column, "UPDATE"))
+                    .as("no column grant of UPDATE on %s either", column).isFalse();
+        }
+    }
+
+    @Test
+    void aPrivilegeOfMoreOnTheEmailDeliveryLogBreaksTheMatrix() throws SQLException {
+        try (StepwiseDatabase database = StepwiseDatabase.migratedTo("16")) {
+            try (Connection superuser = database.connectionAs("postgres")) {
+                assertThat(matrixViolations(superuser, EMAIL_DELIVERY_TABLE, EMAIL_DELIVERY_MATRIX))
+                        .as("the fixture starts from the exact matrix").isEmpty();
+            }
+            try (Connection owner = database.connectionAs("confia_owner");
+                    Statement statement = owner.createStatement()) {
+                statement.execute(
+                        "GRANT UPDATE ON " + EMAIL_DELIVERY_TABLE + " TO confia_admin_app");
+            }
+            try (Connection superuser = database.connectionAs("postgres")) {
+                assertThat(matrixViolations(superuser, EMAIL_DELIVERY_TABLE, EMAIL_DELIVERY_MATRIX))
+                        .singleElement().asString().contains("confia_admin_app", "UPDATE");
+            }
+        }
+    }
+
+    @Test
+    void publicAndAnyRoleOutsideTheFiveInheritNoPrivilegeOnTheEmailDeliveryLog()
+            throws SQLException {
+        for (String privilege : ALL_PRIVILEGES) {
+            assertThat(hasTablePrivilege("public", EMAIL_DELIVERY_TABLE, privilege))
+                    .as("PUBLIC must hold no %s on %s", privilege, EMAIL_DELIVERY_TABLE).isFalse();
+        }
+        String scratchRole = "probe_role_outside_the_five_email_delivery";
+        try (Connection superuser = SharedPostgresContainer.connectionAs("postgres");
+                Statement statement = superuser.createStatement()) {
+            statement.execute("drop role if exists " + scratchRole);
+            statement.execute("create role " + scratchRole + " nosuperuser nobypassrls");
+            try {
+                for (String privilege : ALL_PRIVILEGES) {
+                    assertThat(hasTablePrivilege(scratchRole, EMAIL_DELIVERY_TABLE, privilege))
+                            .as("a role that is none of the five must inherit no %s", privilege)
+                            .isFalse();
+                }
+            } finally {
+                statement.execute("drop role if exists " + scratchRole);
+            }
+        }
+    }
+
+    private static final Map<String, String> EMAIL_DELIVERY_STATEMENTS = Map.of(
+            "SELECT", "select count(*) from " + EMAIL_DELIVERY_TABLE,
+            "INSERT", "insert into " + EMAIL_DELIVERY_TABLE
+                    + " (institution_id, id, request_id, attempted_at, channel, purpose,"
+                    + " template_key, template_version, recipient_hash, status, failure_class)"
+                    + " values (?, gen_random_uuid(), gen_random_uuid(), now(), 'email',"
+                    + " 'transactional', 'password-reset-link', 1, repeat('a', 64), 'failed',"
+                    + " 'unavailable')",
+            "UPDATE", "update " + EMAIL_DELIVERY_TABLE + " set status = 'sent'",
+            "DELETE", "delete from " + EMAIL_DELIVERY_TABLE);
+
+    /** BI158: what the engine does with the four statements, not only what the catalogue says. */
+    @Test
+    void theAdministrativeRoleInsertsAndReadsTheEmailDeliveryLogButNeverUpdatesOrDeletesIt()
+            throws SQLException {
+        UUID institution = UUID.randomUUID();
+        for (String statement : EMAIL_DELIVERY_STATEMENTS.values()) {
+            assertThat(refusedAs("confia_portal_app", institution,
+                    statement.replace("?", "'" + institution + "'")))
+                    .as("portal: %s", statement).isEqualTo("42501");
+        }
+        for (String allowed : List.of("SELECT", "INSERT")) {
+            assertThat(refusedAs("confia_admin_app", institution,
+                    EMAIL_DELIVERY_STATEMENTS.get(allowed).replace("?", "'" + institution + "'")))
+                    .as("administrative role: %s", allowed).isNull();
+        }
+        for (String refused : List.of("UPDATE", "DELETE")) {
+            assertThat(refusedAs("confia_admin_app", institution,
+                    EMAIL_DELIVERY_STATEMENTS.get(refused)))
+                    .as("administrative role: %s", refused).isEqualTo("42501");
+        }
+    }
+
     /** The SQLState with which {@code role} is refused {@code sql}, or null when it ran. Never committed. */
     private static String refusedAs(String role, UUID institution, String sql) throws SQLException {
         try (Connection connection = SharedPostgresContainer.connectionAs(role)) {

@@ -171,6 +171,21 @@
       <groupId>com.github.kagkarlsson</groupId>
       <artifactId>db-scheduler-spring-boot-4-starter</artifactId>
     </dependency>
+    <!-- Mail transport of the notifications module (ADR-0029; transactional-email-adapter design.md
+         decision 2). JavaMailSenderImpl lives in spring-context-support and talks to the Angus Mail
+         implementation of Jakarta Mail. There is deliberately NO spring-boot-starter-mail: the sender
+         is built by hand in notifications.infrastructure, so no process can receive one through
+         spring.mail.* auto-configuration (BI151). Versions managed by the Spring Boot 4.1.1 BOM
+         (spring-framework-bom 7.0.9 and angus-mail 2.0.5, probe S1). Only
+         com.confia.notifications.infrastructure may depend on these packages (BI150). -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context-support</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.angus</groupId>
+      <artifactId>angus-mail</artifactId>
+    </dependency>
     <!-- @NamedInterface (ADR-0022; design.md decision 12) is org.springframework.modulith.
          NamedInterface, which lives in spring-modulith-api, NOT in spring-modulith-core (S1b probe,
          apply-progress.md): a same-simple-name org.springframework.modulith.core.NamedInterface

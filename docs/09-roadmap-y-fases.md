@@ -147,6 +147,15 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    > (`CLAUDE.md`, reglas 11 y 13). Ningún endpoint de identidad usa el mecanismo, y la regla de
    > ArchUnit W5 (`IdempotencyNotInIdentityTest`) rompe la construcción si alguno lo usa. El texto
    > original se conserva como histórico.
+   >
+   > **Nota fechada 2026-11-09 (cambio `transactional-email-adapter`): división del cambio 14.** El propietario
+   > partió el cambio 14 en **14a, `transactional-email-adapter`**, que entrega el adaptador de envío del
+   > enlace (pendiente *b*, primera mitad) con el módulo `notifications` mínimo en el trabajador, y **14b,
+   > `account-security-notices`**, dueño del aviso al titular tras el restablecimiento con IP y momento
+   > (pendiente *b*, segunda mitad), del aviso de códigos de recuperación de MFA bajos y del aviso por
+   > reutilización de refresco detectada. 14b depende de 14a y, para la IP, de `password-recovery-endpoints`.
+   > Rebotes, supresión, baja, correo HTML, plantillas en base de datos y purga de la bitácora de envío siguen
+   > en F6. El texto original se conserva.
 4. **Matriz de autorización** documentada y verificada por pruebas: qué rol puede hacer qué operación (brecha A7).
 5. Bitácora de auditoría de solo inserción, encadenada por hash, sin permiso de actualización ni borrado para el rol de aplicación (brecha B6).
 6. Infraestructura de idempotencia: marcador con clave primaria natural, espera acotada
