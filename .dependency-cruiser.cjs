@@ -120,6 +120,31 @@ module.exports = {
       from: { path: "(^|/)apps/admin-web/src/", pathNot: "(^|/)apps/admin-web/src/features/identity/session/" },
       to: { path: "(^|/)apps/admin-web/src/features/identity/session/(token-store|enrollment-draft)" },
     },
+    {
+      name: "admin-session-lifecycle-planner-is-pure",
+      comment:
+        "The planner and the policy of the session lifecycle import nothing from outside their folder: no React, " +
+        "no shared/api, no DOM (admin-web-shell-and-session-lifecycle, design.md H2 and H16). A test file of the " +
+        "folder is not the planner and may import its test runner.",
+      severity: "error",
+      from: {
+        path: "(^|/)apps/admin-web/src/features/identity/session/lifecycle/(planner|policy)[^/]*\\.ts$",
+        pathNot: "\\.test\\.ts$",
+      },
+      to: { pathNot: "(^|/)apps/admin-web/src/features/identity/session/lifecycle/" },
+    },
+    {
+      name: "admin-session-lifecycle-is-private",
+      comment:
+        "Outside src/features/identity/ only session/lifecycle/index.ts is imported, never an internal file of the " +
+        "lifecycle folder (admin-web-shell-and-session-lifecycle, design.md H16).",
+      severity: "error",
+      from: { path: "(^|/)apps/admin-web/src/", pathNot: "(^|/)apps/admin-web/src/features/identity/" },
+      to: {
+        path: "(^|/)apps/admin-web/src/features/identity/session/lifecycle/",
+        pathNot: "(^|/)apps/admin-web/src/features/identity/session/lifecycle/index\\.ts$",
+      },
+    },
   ],
   options: {
     doNotFollow: { path: "node_modules" },
