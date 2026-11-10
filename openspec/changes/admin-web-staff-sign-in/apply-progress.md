@@ -570,3 +570,11 @@ Los 992 de la tarea completa quedan repartidos en 723 y 269; ninguna parte pasa 
 **Desviaciones.** El commit de `docs/ui-ux` va antes que el de `docs/09` porque `docs-notes.test.ts` prueba los tres documentos y cada commit debe quedar en verde; el commit de `docs/ui-ux` lleva una versión parcial de ese archivo y el de `docs/09` la completa. Se agregó el recorrido de inscripción solo con teclado (SS114) a `keyboard.e2e.ts`. `routes.tsx` no necesitó limpieza.
 
 **Pendiente.** 9.4 es del propietario tras fusionar la cadena. Siguen pendientes las mediciones remotas 4.4, BX86 y BX89, que dependen de empujar. Con todo lo demás cerrado, el cambio queda **listo para `sdd-verify` y `sdd-archive`**, con esas evidencias remotas como condición.
+
+### Revisión de 9a: advertencias R3-001, R3-002 y R3-003, 2026-11-09
+
+La revisión de Gentle AI aprobó 9a con tres advertencias. Las dos primeras se corrigieron en la rama 9b con su prueba:
+
+- **R3-001.** El recorrido de inscripción comprobaba al final que había diez etiquetas `recovery code`, pero la cuenta del simulador ya las agregaba con los mismos nombres, así que la aserción no podía fallar si el oyente nunca leía la respuesta. Los valores aprendidos de las respuestas de la API van ahora en un conjunto aparte (`learned`) y el recorrido exige que la clave y los diez códigos aprendidos sean exactamente los de la cuenta. Demostración: el oyente sin leer `recoveryCodes` pone en rojo `the ten codes of the enrollment answer were learned`; `cmp` idéntico.
+- **R3-002.** El código TOTP escrito se buscaba como subcadena y podía coincidir por azar dentro de un número más largo. Ahora se busca como token completo (`findTokenLeaks`, con su prueba unitaria: primero en rojo con `TypeError: findTokenLeaks is not a function`), también en sus codificaciones. Demostración: `SecondFactorContainer` guarda el código en `sessionStorage`; el recorrido TOTP falla con `the signed in page: sessionStorage, the typed code`; `cmp` idéntico.
+- **R3-003, aceptada sin cambio.** La espera fija de 2 s de `enrollment.e2e.ts` (SS82) se mantiene: una petición tardía (fuente o recurso) solo puede aparecer si se deja pasar un tiempo tras mostrarse el QR, y `networkidle` ya se resolvió. Queda registrada como decisión aceptada.

@@ -30,3 +30,15 @@ export function variantsOf(label: string, value: string): Record<string, string>
     [`${label}, JSON escaped`]: JSON.stringify(value).slice(1, -1),
   };
 }
+
+/**
+ * The labels whose value appears in `text` as a whole token: not glued to a letter or a digit on either side. For a short value, such
+ * as a six digit code, a plain substring search can match by chance inside a longer number; a value kept on its own (quoted, after
+ * a key, between spaces) is still found.
+ */
+export function findTokenLeaks(text: string, sentinels: Readonly<Record<string, string>>): string[] {
+  const plain = (value: string) => value.replace(/[.*+?^$(){}|[\]\\]/g, "\\$&");
+  return Object.entries(sentinels)
+    .filter(([, value]) => new RegExp("(?<![A-Za-z0-9])" + plain(value) + "(?![A-Za-z0-9])").test(text))
+    .map(([label]) => label);
+}

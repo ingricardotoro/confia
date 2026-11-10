@@ -3,7 +3,7 @@ import { buildOtpauthUri } from "../../../src/features/identity/enrollment/otpau
 import { problem } from "../../../src/test/contract-responses.ts";
 import { accountOf, currentCode, type TestAccount } from "../../support/account.ts";
 import { expect, MOCK_API_URL, recordedCalls, test } from "../../support/scenario.ts";
-import { findLeaks, makeSentinel, variantsOf } from "../../support/sentinels.ts";
+import { findLeaks, findTokenLeaks, makeSentinel, variantsOf } from "../../support/sentinels.ts";
 
 // The seven journeys of access, each one with sentinels of its own, in Chromium against the production build and the SIMULATED API (SS01,
 // SS02, SS04, SS05, SS116, SS117, I305). After every screen of every journey the page is searched for what must never be kept: the
@@ -27,9 +27,15 @@ interface Outgoing {
   readonly text: string;
 }
 
-/** What a journey has seen: the values to search for, the console, every request that left, and the answers still being read. */
+/**
+ * What a journey has seen: the values to search for, the console, every request that left, and the answers still being read. The
+ * values come in three sets that never share a label: `known` (typed or read from the account control), `learned` (read by the
+ * listener from the answers of the API) and `typed` (the six digit codes, which are searched as whole tokens).
+ */
 interface Watch {
   readonly known: Record<string, string>;
+  readonly learned: Record<string, string>;
+  readonly typed: Record<string, string>;
   readonly console: string[];
   readonly outgoing: Outgoing[];
   readonly reading: Promise<void>[];
@@ -41,20 +47,20 @@ function remember(known: Record<string, string>, label: string, value: string): 
 }
 
 /** Reads the answers of the API for the tokens, the key and the codes the screens receive. They are values of this run only. */
-async function learn(known: Record<string, string>, response: Response): Promise<void> {
+async function learn(learned: Record<string, string>, response: Response): Promise<void> {
   const body: unknown = await response.json().catch(() => null);
   if (typeof body !== "object" || body === null) return;
   const record = body as Record<string, unknown>;
   for (const [field, label] of [["accessToken", "access token"], ["secondFactorToken", "restricted token"], ["secret", "secret"]] as const) {
-    if (typeof record[field] === "string") remember(known, label, record[field]);
+    if (typeof record[field] === "string") remember(learned, label, record[field]);
   }
   if (Array.isArray(record["recoveryCodes"])) {
-    for (const code of record["recoveryCodes"]) if (typeof code === "string") remember(known, "recovery code", code);
+    for (const code of record["recoveryCodes"]) if (typeof code === "string") remember(learned, "recovery code", code);
   }
 }
 
 function watch(page: Page, known: Record<string, string>): Watch {
-  const seen: Watch = { known, console: [], outgoing: [], reading: [] };
+  const seen: Watch = { known, learned: {}, typed: {}, console: [], outgoing: [], reading: [] };
   page.on("console", (message) => seen.console.push(`${message.type()}: ${message.text()}`));
   page.on("pageerror", (error) => seen.console.push(`pageerror: ${error.message}`));
   page.on("request", (request) => {
@@ -64,7 +70,7 @@ function watch(page: Page, known: Record<string, string>): Watch {
     });
   });
   page.on("response", (response) => {
-    if (new URL(response.url()).pathname.startsWith("/api/")) seen.reading.push(learn(seen.known, response));
+    if (new URL(response.url()).pathname.startsWith("/api/")) seen.reading.push(learn(seen.learned, response));
   });
   return seen;
 }
@@ -144,10 +150,14 @@ const cookieNames = (surfaces: Surfaces): string[] =>
 /** After a screen: no value in any surface or in the console; no key or URI in any request; the password only in the sign in; one visible cookie at most. */
 async function expectClean(page: Page, seen: Watch, stage: string): Promise<Surfaces> {
   await Promise.all(seen.reading);
-  const values = searched(seen.known);
+  const values = searched({ ...seen.known, ...seen.learned });
+  const codes: Record<string, string> = {};
+  for (const [label, value] of Object.entries(seen.typed)) Object.assign(codes, variantsOf(label, value));
   const surfaces = await surfacesOf(page);
   for (const [surface, text] of Object.entries({ ...surfaces, console: seen.console.join("\n") })) {
     expect(findLeaks(text, values), `${stage}: ${surface}`).toEqual([]);
+    // A six digit code is searched as a whole token: inside a longer number it would match by chance (review R3-002).
+    expect(findTokenLeaks(text, codes), `${stage}: ${surface}, the typed code`).toEqual([]);
   }
   const only = (prefix: string) => Object.fromEntries(Object.entries(values).filter(([label]) => label.startsWith(prefix)));
   expect(findLeaks(seen.outgoing.map((request) => request.text).join("\n"), only("secret")), `${stage}: the key or the URI in a request`).toEqual([]);
@@ -237,7 +247,7 @@ test.describe("the journeys of access and their secrets, against the simulated A
     await expectClean(page, seen, "the verification");
     // The code is computed right before it is typed, so a 30 s step boundary cannot fall between the two.
     const code = currentCode(account);
-    seen.known["typed code"] = code;
+    seen.typed["typed code"] = code;
     await page.getByRole("textbox", { name: /Código de verificación/ }).fill(code);
     await page.getByRole("button", { name: "Verificar" }).click();
 
@@ -276,6 +286,12 @@ test.describe("the journeys of access and their secrets, against the simulated A
     // The simulator hands out a new secret at every enrollment, so the account is read once the screen has its one.
     const account = await accountOf(request, scenarioId);
     Object.assign(seen.known, accountValues(account));
+    // What the screen received, read from the answer of the API by the listener and kept apart from what the account control handed out.
+    await Promise.all(seen.reading);
+    const received = (prefix: string) => Object.entries(seen.learned).filter(([label]) => label.startsWith(prefix)).map(([, value]) => value).sort();
+    // Booleans, so a failure does not print the key or the codes.
+    expect(received("secret").join() === account.secret, "the key of the enrollment answer was learned").toBe(true);
+    expect(received("recovery code").join() === [...account.recoveryCodes].sort().join(), "the ten codes of the enrollment answer were learned").toBe(true);
     expect(account.recoveryCodes).toHaveLength(10);
     await expectClean(page, seen, "the secret");
     await page.getByRole("button", { name: "Continuar" }).click();
@@ -286,14 +302,14 @@ test.describe("the journeys of access and their secrets, against the simulated A
     await expect(page.getByRole("heading", { level: 2, name: "Escriba el primer código" })).toBeVisible();
     await expectClean(page, seen, "the first code");
     const code = currentCode(account);
-    seen.known["typed code"] = code;
+    seen.typed["typed code"] = code;
     await page.getByRole("textbox", { name: /Código de verificación/ }).fill(code);
     await page.getByRole("button", { name: "Activar" }).click();
 
     await expect(page.getByRole("heading", SIGNED_IN)).toBeVisible();
     expect(cookieNames(await expectClean(page, seen, "the signed in page"))).toEqual([CSRF_COOKIE]);
-    // The whole answer of the enrollment was read: its secret and its ten codes were among the values searched.
-    expect(Object.keys(seen.known).filter((label) => label.startsWith("recovery code")).length).toBeGreaterThanOrEqual(10);
+    // The listener also read the access token of the activation, so the tokens were among the values searched on the last screen.
+    expect(Object.keys(seen.learned).some((label) => label.startsWith("access token"))).toBe(true);
   });
 
   test("[SS116, SS117, I305] reload that keeps the session: the restored session leaves no secret either", async ({ page, request, scenarioId }) => {
@@ -346,7 +362,7 @@ test.describe("the journeys of access and their secrets, against the simulated A
     await expect(page.getByRole("heading", VERIFICATION)).toBeVisible();
     await expectClean(page, seen, "the verification");
     const code = currentCode(account);
-    seen.known["typed code"] = code;
+    seen.typed["typed code"] = code;
     await page.getByRole("textbox", { name: /Código de verificación/ }).fill(code);
     await page.getByRole("button", { name: "Verificar" }).click();
 
