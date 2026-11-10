@@ -4,7 +4,8 @@
 - **Modo:** TDD estricto. Ejecutor: `./mvnw -B` en `apps/api` (JDK 25, Docker en ejecución).
 - **Rama del PR 1:** `change/transactional-email-adapter-01-notifications-module-and-mail-rule`, apilada sobre
   `change/transactional-email-adapter` (`1bab0d6`). Sin push.
-- **Estado del PR 1 (2026-11-09):** tarea 1 hecha; la tarea 2 se registra en la sección siguiente.
+- **Estado del PR 1 (2026-11-10):** tarea 1 hecha. Tarea 2 **parcial y bloqueada** por un conflicto de diseño con
+  `SigningAndHashingConfinementTest` (ver «Tarea 2»); no se marca `[x]`.
 
 ## Entorno de ejecución (notas para quien repita los comandos)
 
@@ -21,6 +22,7 @@
 | Tarea | Estado | Evidencia |
 |---|---|---|
 | 1 | hecho | Sondas S1 a S4, rojo de compilación, verde, dos controles negativos revertidos con `cmp` |
+| 2 | parcial | Todo salvo `RecipientHash` está en verde; `RecipientHash` está retenido (conflicto de diseño, abajo) |
 
 ## Sondas de la tarea 1 (diseño §2.2)
 
@@ -69,3 +71,53 @@ exige que `InternetAddress` y `SimpleMailMessage` se carguen y que existan los d
 - **Regla sin población previa.** A diferencia de `DbSchedulerConfinementTest`, no se exige que
   `notifications.infrastructure` tenga clases: en este PR está vacío (llega con la tarea 5). La no vacuidad se prueba
   con los fixtures y la carga de las clases del cliente.
+
+## Tarea 2: dominio y API pública de `notifications` (parcial)
+
+### Qué se entrega en este commit
+
+`notifications/package-info.java`, `notifications.domain` (`FailureClass`, `RenderedEmail`) y
+`notifications.application.api` con `@NamedInterface("api")` (`SendTransactionalEmail`, `TransactionalEmail`,
+`TransactionalEmailTemplate`, `EmailRecipient`, `EmailDeliveryReceipt`, `EmailDeliveryFailedException`), con sus pruebas
+(`FailureClassTest`, `RenderedEmailTest`, `TransactionalEmailTest`, `EmailRecipientTest`, `EmailDeliveryOutcomeTypesTest`,
+`NotificationsModuleTest` para `NT02` y la forma del módulo).
+
+### Rojo 2
+
+`./mvnw -B -pl app -am verify -DskipITs -Dsurefire.failIfNoSpecifiedTests=false -Dtest='RecipientHashTest,TransactionalEmailTest'`
+sin código de producción: `COMPILATION ERROR`, `cannot find symbol` sobre `RecipientHash`, `TransactionalEmail`,
+`EmailRecipient` y el resto (200 líneas de error; causa esperada).
+
+### Verde y controles
+
+- Verde del lote (97 pruebas con `RecipientHash`): `Tests run: 97, Failures: 0`, incluidas `SpringModulithVerificationTest`,
+  `NoTechnicalLayerPackageNamesTest`, `DomainPurityRulesTest` y `LayeredArchitectureTest`.
+- Control negativo: quitar `toLowerCase(Locale.ROOT)` y la comprobación de caracteres de control de `TransactionalEmail`
+  puso en rojo 11 pruebas (`anyIsoControlCharacterInAParameterIsRejected` x8, `theHeaderInjectionOfScenarioNt05...`,
+  `lowerCasingDoesNotDependOnTheDefaultLocale` y otra de `RecipientHashTest`); revertido y confirmado con `cmp`.
+- `./mvnw -B verify -Pmutation-gate` completo, **sin** `RecipientHash`: `BUILD SUCCESS`; 2 944 pruebas unitarias
+  (3 omitidas previas) y 850 de integración sin fallos; `All coverage checks have been met`; PIT sobre `notifications.domain`:
+  `RenderedEmail` 21 de 21 mutantes muertos (`FailureClass` no genera mutantes).
+
+### Conflicto de diseño que bloquea `RecipientHash` (decisión 8)
+
+La decisión 8 sitúa el HMAC-SHA-256 en `notifications.domain` con `javax.crypto.Mac`. El primer `verify` completo con esa
+clase falló: `SigningAndHashingConfinementTest.productionCodeOutsideIdentityAndSharedSecurityNeitherSignsNorHashes` (BI11 a
+BI13 y BI38, decisión 16 de `session-tokens-and-web-layer`) prohíbe `Mac`, `MessageDigest` y `org.bouncycastle..` fuera de
+`identity` y `shared.security`, **sin lista de excepciones**, y manda usar `com.confia.shared.security.Digests`. Hoy `Digests`
+solo ofrece `sha256`, y `DomainPurityRulesTest` impide que un `domain` dependa de `shared`. Las tres violaciones son las
+llamadas a `Mac` de `RecipientHash.hmacSha256Hex`. Resolverlo exige editar `shared/security` (fuera de las superficies
+autorizadas de este lote) o una regla; no se inventó una excepción.
+
+Camino recomendado, para decisión del propietario: añadir `Digests.hmacSha256(byte[] key, byte[] data)` en `shared.security`
+(con su prueba y el vector de RFC 4231, que PIT ya cubre en `shared.security.*`), dejar en `notifications.domain` solo el
+tipo valor `RecipientHash` con la normalización (`strip` y `toLowerCase(Locale.ROOT)`) y su validación hex de 64, y calcular
+el HMAC en `notifications.application` con `Digests`. La llave menor de 32 bytes se rechaza en esa clase de aplicación.
+
+El trabajo hecho (clase, `RecipientHashTest` con el vector de RFC 4231, `RecipientHashProperties` con jqwik) está en la rama local
+`wip/transactional-email-adapter-recipient-hash`, fuera de este PR.
+
+### Presupuesto
+
+Sin `RecipientHash`, el PR 1 mide 793 líneas en `notifications` más unas 150 de la tarea 1 (aprox. 940), por encima de 800
+incluso antes de añadir `RecipientHash`; la costura de `tasks.md` es 1a (tarea 1) y 1b (tarea 2).
