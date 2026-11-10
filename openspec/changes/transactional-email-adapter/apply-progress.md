@@ -4,8 +4,7 @@
 - **Modo:** TDD estricto. Ejecutor: `./mvnw -B` en `apps/api` (JDK 25, Docker en ejecución).
 - **Rama del PR 1:** `change/transactional-email-adapter-01-notifications-module-and-mail-rule`, apilada sobre
   `change/transactional-email-adapter` (`1bab0d6`). Sin push.
-- **Estado del PR 1 (2026-11-10):** tarea 1 hecha. Tarea 2 **parcial y bloqueada** por un conflicto de diseño con
-  `SigningAndHashingConfinementTest` (ver «Tarea 2»); no se marca `[x]`.
+- **Estado del PR 1 (2026-11-10):** tarea 1 hecha. Tarea 2 **hecha** el 2026-11-10, tras corregir la decisión 8 (ver «Corrección del 2026-11-10»).
 
 ## Entorno de ejecución (notas para quien repita los comandos)
 
@@ -22,7 +21,7 @@
 | Tarea | Estado | Evidencia |
 |---|---|---|
 | 1 | hecho | Sondas S1 a S4, rojo de compilación, verde, dos controles negativos revertidos con `cmp` |
-| 2 | parcial | Todo salvo `RecipientHash` está en verde; `RecipientHash` está retenido (conflicto de diseño, abajo) |
+| 2 | hecho | `verify -Pmutation-gate` completo en verde tras la corrección de `RecipientHash` |
 
 ## Sondas de la tarea 1 (diseño §2.2)
 
@@ -121,3 +120,22 @@ El trabajo hecho (clase, `RecipientHashTest` con el vector de RFC 4231, `Recipie
 
 Sin `RecipientHash`, el PR 1 mide 793 líneas en `notifications` más unas 150 de la tarea 1 (aprox. 940), por encima de 800
 incluso antes de añadir `RecipientHash`; la costura de `tasks.md` es 1a (tarea 1) y 1b (tarea 2).
+
+## Corrección del 2026-11-10: el HMAC sale del dominio
+
+El propietario aprobó el camino recomendado arriba. Cambios (RED observado antes de GREEN: `cannot find symbol` sobre
+`RecipientHasher`, `RecipientHash.normalize` y `Digests.hmacSha256`):
+
+- `Digests.hmacSha256(key, data)` en `shared.security` (rechaza llaves de menos de 32 bytes sin revelarlas), con los
+  vectores 6 y 7 de RFC 4231 en `DigestsTest`.
+- `notifications.domain.RecipientHash`: solo tipo valor y `normalize`. `notifications.application.RecipientHasher`:
+  calcula el HMAC con `Digests`. Pruebas: `RecipientHashTest`, `RecipientHasherTest`, `RecipientHasherProperties`.
+- Control negativo: quitar `toLowerCase(Locale.ROOT)` y la comprobación de longitud de llave puso en rojo 6 pruebas
+  (`RecipientHashTest` x2, `RecipientHasherTest`, `RecipientHasherProperties`, `DigestsTest`); revertido con `cmp`.
+- Corregidos `design.md` (decisión 8, tabla de archivos y de pruebas) y `tasks.md` (tarea 2). La especificación `NT14` y
+  ADR-0029 no nombran al dominio como dueño del HMAC; no cambian.
+- Nota para la tarea 10: `EmailDeliveryFailedException.failureClass()` devuelve `FailureClass` (fuera de `api`); exponerlo
+  por `api` o devolver `String`. Registrada en `design.md` y `tasks.md`.
+- Verificación: `./mvnw -B verify -Pmutation-gate` en `apps/api`, JDK 25: `BUILD SUCCESS`; 2 962 pruebas unitarias (3
+  omitidas previas) y 850 de integración sin fallos; cobertura cumplida; PIT con el umbral de 80.
+- La rama `wip/transactional-email-adapter-recipient-hash` se eliminó al absorberse.

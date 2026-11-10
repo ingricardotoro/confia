@@ -162,10 +162,19 @@ construcción. Pruebas: `V16SchemaDiffIT`, `MultiTenantSchemaIT`, `RolePrivilege
 
 ### Decisión 8 — Hash del destinatario
 
-`RecipientHash.of(byte[] key, String address)` en `notifications.domain`: HMAC-SHA-256 de la dirección recortada y
-en minúsculas (`Locale.ROOT`), hexadecimal en minúsculas, con la llave de `NOTIFICATIONS_RECIPIENT_HASH_KEY`
-(Base64, al menos 32 bytes). Mismo patrón que `IdentifierFingerprint`, sin compartir la llave: una llave por
-propósito. Rotarla rompe la correlación histórica por hash; se acepta y se documenta en el runbook.
+> **Corrección del 2026-11-10 (aplicación de la tarea 2).** La redacción original ponía el cálculo del HMAC en
+> `notifications.domain` con `javax.crypto.Mac`. `SigningAndHashingConfinementTest` (BI11 a BI13 y BI38, decisión 16 de
+> `session-tokens-and-web-layer`) prohíbe `Mac` fuera de `identity` y `shared.security` sin lista de excepciones, y
+> `DomainPurityRulesTest` impide que un dominio dependa de `shared`. El propietario aprobó la separación siguiente.
+
+- `Digests.hmacSha256(byte[] key, byte[] data)` en `shared.security`: HMAC-SHA-256 de 32 bytes; rechaza llaves de menos de
+  32 bytes con un mensaje que no revela la llave. Pruebas con los vectores 6 y 7 de RFC 4231.
+- `RecipientHash` (`notifications.domain`): solo el tipo valor (64 hexadecimales en minúsculas, espejo del `CHECK` de
+  `V16`) y `normalize(String)`: `strip()` y minúsculas con `Locale.ROOT`. Sin criptografía.
+- `RecipientHasher` (`notifications.application`): recibe la llave (Base64 ya decodificada, al menos 32 bytes, copia propia,
+  `toString()` redactado) y calcula `RecipientHash` con `Digests.hmacSha256` sobre la dirección normalizada, en hexadecimal.
+- Mismo patrón que `IdentifierFingerprint`, sin compartir la llave: una llave por propósito. Rotarla rompe la correlación
+  histórica por hash; se acepta y se documenta en el runbook.
 
 ### Decisión 9 — Observabilidad
 
@@ -189,6 +198,11 @@ El contexto es el `system` de la tarea; la dirección es el `LoginIdentifier` de
 transacción de emisión (`Issuance` gana `tokenId` y `recipient`). `ensureAvailable()` conserva su versión por
 defecto y el adaptador nuevo no la sobrescribe. El fallo del puerto es `PasswordResetLinkDeliveryException`
 (`identity.application`), con un código cerrado; el adaptador traduce a él la excepción de `notifications`.
+
+**Nota para la tarea 10 (2026-11-10).** `EmailDeliveryFailedException.failureClass()` devuelve `FailureClass`, que vive en
+`notifications.domain` y no está en la interfaz nombrada `api`; que `identity` lo use probablemente rompa Spring Modulith y
+`NoCrossModuleDomainImportsTest`. Antes de escribir el adaptador, o bien se expone `FailureClass` por `api`, o bien la
+excepción devuelve el código como `String`.
 
 **Descartada:** releer la dirección en el adaptador con otra transacción. Añade una lectura y una ventana en la
 que la cuenta puede cambiar entre la emisión y el envío.
@@ -281,7 +295,7 @@ worker: PasswordResetIssuanceJobHandler
 | `app/src/test/java/com/confia/architecture/MailClientConfinementTest.java` y fixtures | Crear | 1 |
 | `app/src/test/java/com/confia/bootstrap/StarterAutoConfigurationExcludedTest.java` | Ampliar (`BI151`) | 1 |
 | `app/src/main/java/com/confia/notifications/package-info.java` | Crear | 2 |
-| `notifications/domain/RecipientHash.java`, `RenderedEmail.java`, `FailureClass.java` | Crear | 2 |
+| `notifications/domain/RecipientHash.java`, `RenderedEmail.java`, `FailureClass.java`; `notifications/application/RecipientHasher.java`; `shared/security/Digests.java` (`hmacSha256`) | Crear / ampliar | 2 |
 | `notifications/application/api/*` | Crear | 2 |
 | `app/src/main/resources/db/migration/V16__create_notifications_email_delivery.sql` | Crear | 3 |
 | `notifications/application/EmailDeliveryLog.java`, `infrastructure/JooqEmailDeliveryLog.java` | Crear | 3 |
@@ -305,7 +319,7 @@ worker: PasswordResetIssuanceJobHandler
 
 | Nivel | Qué | Pruebas |
 |---|---|---|
-| Unidad (95 % y PIT ≥ 80 en `notifications.domain`) | Hash, validación de parámetros, composición | `RecipientHashTest` (vector conocido de RFC 4231 para el HMAC, propiedad jqwik de normalización), `TransactionalEmailTest`, `TemplateRendererTest` |
+| Unidad (95 % y PIT ≥ 80 en `notifications.domain` y `shared.security`) | Hash, validación de parámetros, composición | `DigestsTest` (vectores de RFC 4231), `RecipientHashTest`, `RecipientHasherTest` y `RecipientHasherProperties` (normalización con jqwik), `TransactionalEmailTest`, `TemplateRendererTest` |
 | Unidad con dobles | Caso de uso y compensación | `DeliverTransactionalEmailTest` (aceptado, fallido, bitácora caída tras aceptar y tras fallar), `IssuePasswordResetTokenTest` (compensa, no compensa si ya no está abierto, relanza, T2 falla con suprimido) |
 | Arquitectura | Confinamiento, procesos, módulos | `MailClientConfinementTest`, `ProcessBeanIsolationTest`, `SpringModulithVerificationTest`, `TableOwnershipByModuleTest`, `TemplateCatalogCoverageTest` |
 | Integración con PostgreSQL | Esquema, RLS, privilegios, repositorios | `V16SchemaDiffIT`, `V17SchemaDiffIT`, `NotificationsRowSecurityIT`, `RolePrivilegeMatrixIT`, `JooqEmailDeliveryLogIT`, `JooqPasswordResetTokenRepositoryIT` |
