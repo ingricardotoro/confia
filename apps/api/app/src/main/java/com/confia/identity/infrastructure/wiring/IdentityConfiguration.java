@@ -11,6 +11,7 @@ import com.confia.identity.application.EndCurrentSession;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.IssueSession;
 import com.confia.identity.application.LogIn;
+import com.confia.identity.application.ListRolePermissions;
 import com.confia.identity.application.LoginBackoffStore;
 import com.confia.identity.application.LoginIdentifierFingerprinter;
 import com.confia.identity.application.LoginInstitutionProvider;
@@ -257,6 +258,15 @@ public class IdentityConfiguration {
     DescribeCurrentSession describeCurrentSession(TransactionRunner runner,
             RefreshTokenFamilyRepository families, Clock clock) {
         return new DescribeCurrentSession(runner, families, clock);
+    }
+
+    /**
+     * The use case behind the roles report: a constant of the catalog, so it takes nothing. The
+     * controller that calls it is registered by {@code IdentityWebConfiguration}.
+     */
+    @Bean
+    ListRolePermissions listRolePermissions() {
+        return new ListRolePermissions();
     }
 
     /**

@@ -6,9 +6,11 @@ import com.confia.identity.application.EndAllSessions;
 import com.confia.identity.application.EndCurrentSession;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.LogIn;
+import com.confia.identity.application.ListRolePermissions;
 import com.confia.identity.application.RefreshSession;
 import com.confia.identity.web.CurrentSessionController;
 import com.confia.identity.web.LoginController;
+import com.confia.identity.web.RolesReportController;
 import com.confia.identity.web.SecondFactorController;
 import com.confia.identity.web.SessionEndController;
 import com.confia.identity.web.SessionRefreshController;
@@ -22,9 +24,9 @@ import org.springframework.context.annotation.Configuration;
  * The public configuration of the web layer of {@code identity} for the administrative process
  * (session-tokens-and-web-layer design.md decision 13; session-endpoints-cookie-and-csrf design.md
  * decision 11; ADR-0024): it registers the controllers of the module and nothing else. They are the
- * one of the current session and the login. The use cases they take come from {@code
- * IdentityConfiguration}, which owns every use case of the module; the controllers are registered
- * here and not there because a controller is a class of the {@code web} layer, and an {@code
+ * ones of the current session, the roles report and the login. The use cases they take come
+ * from {@code IdentityConfiguration}, which owns every use case of the module; the controllers are
+ * registered here and not there because a controller is a class of the {@code web} layer, and an {@code
  * infrastructure} package that registered it would depend on the web layer it is meant to sit
  * behind. What the login takes from the edge (the delay materializer, the recorder of failures and
  * the cookie helper) is registered by the configurations of {@code shared.web.edge}.
@@ -38,6 +40,11 @@ public class IdentityWebConfiguration {
     @Bean
     CurrentSessionController currentSessionController(DescribeCurrentSession describe) {
         return new CurrentSessionController(describe);
+    }
+
+    @Bean
+    RolesReportController rolesReportController(ListRolePermissions list) {
+        return new RolesReportController(list);
     }
 
     @Bean

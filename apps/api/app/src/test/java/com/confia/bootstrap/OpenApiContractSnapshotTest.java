@@ -215,13 +215,15 @@ class OpenApiContractSnapshotTest {
     private static final String SESSION_PATH = "/api/v1/auth/sessions/current";
     private static final String LOGIN_PATH = "/api/v1/auth/sessions";
     private static final String REFRESH_PATH = "/api/v1/auth/sessions/refresh";
+    private static final String ROLES_PATH = "/api/v1/identity/roles";
 
     @Test
-    void theAdministrativeDocumentHoldsExactlyTheLoginTheCurrentSessionAndTheSecondFactorOperations() {
+    void theAdministrativeDocumentHoldsExactlyTheLoginTheSessionTheSecondFactorAndTheRolesReportOperations() {
         Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
 
         assertThat(pathsOf(admin)).containsExactlyInAnyOrder(LOGIN_PATH, SESSION_PATH,
-                "/api/v1/auth/mfa/verifications", "/api/v1/auth/mfa/enrollments", REFRESH_PATH);
+                "/api/v1/auth/mfa/verifications", "/api/v1/auth/mfa/enrollments", REFRESH_PATH,
+                ROLES_PATH);
         Map<String, Object> refresh = asMap(asMap(asMap(admin.get("paths")).get(REFRESH_PATH))
                 .get("post"));
         assertThat(asMap(refresh.get("responses"))).containsOnlyKeys("200", "401", "403", "429", "503");
@@ -379,6 +381,61 @@ class OpenApiContractSnapshotTest {
         assertThat(pathsOf(parse(normalizedDocumentOf("portal")))).isEmpty();
     }
 
+    /** BI139, BI24 and BI59: eight operations, and the report is the only one that declares a permission. */
+    @Test
+    void theAdministrativeDocumentHoldsEightOperationsAndOnlyTheRolesReportDeclaresAPermission() {
+        Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
+        List<String> withPermission = new ArrayList<>();
+        int operations = 0;
+        for (Map.Entry<String, Object> path : asMap(admin.get("paths")).entrySet()) {
+            for (Map.Entry<String, Object> method : asMap(path.getValue()).entrySet()) {
+                operations++;
+                if (asMap(method.getValue()).containsKey("x-required-permission")) {
+                    withPermission.add(method.getKey() + " " + path.getKey());
+                }
+            }
+        }
+
+        assertThat(operations).isEqualTo(8);
+        assertThat(withPermission).containsExactly("get " + ROLES_PATH);
+    }
+
+    @Test
+    void theRolesReportDeclaresTheBearerTheIdentityReadPermissionAndOnlyFourResponses() {
+        Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
+        Map<String, Object> path = asMap(asMap(admin.get("paths")).get(ROLES_PATH));
+        assertThat(path).as("a read, and no other method").containsOnlyKeys("get");
+        Map<String, Object> operation = asMap(path.get("get"));
+
+        assertThat(operation.get("operationId")).isEqualTo("listRolePermissions");
+        assertThat(asList(operation.get("tags"))).containsExactly("identity-roles");
+        assertThat(operation.get("x-required-permission")).isEqualTo("identity:read");
+        assertThat(asMap(operation.get("responses"))).containsOnlyKeys("200", "401", "403", "500");
+        assertThat(asList(operation.get("security"))).hasSize(1);
+        assertThat(asMap(asList(operation.get("security")).get(0))).containsOnlyKeys("bearerAuth");
+        assertThat(operation.get("parameters")).as("no parameter, no Idempotency-Key").isNull();
+        assertThat(operation.get("requestBody")).as("a read has no body").isNull();
+        for (String code : List.of("401", "403", "500")) {
+            Map<String, Object> content = asMap(asMap(asMap(operation.get("responses")).get(code))
+                    .get("content"));
+            assertThat(asMap(asMap(content.get("application/problem+json")).get("schema")))
+                    .containsEntry("$ref", "#/components/schemas/ProblemDetail");
+        }
+        assertThat(asMap(asMap(asMap(asMap(asMap(operation.get("responses")).get("200"))
+                .get("content")).get("application/json")).get("schema")))
+                .containsEntry("$ref", "#/components/schemas/RolesReportResponse");
+    }
+
+    @Test
+    void theRolesReportSchemaIsTheClosedListOfRolesWithCodeAndPermissions() {
+        Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
+
+        Map<String, Object> report = schemaOf(admin, "RolesReportResponse");
+        assertThat(asMap(report.get("properties"))).containsOnlyKeys("roles");
+        Map<String, Object> role = schemaOf(admin, "RolePermissions");
+        assertThat(asMap(role.get("properties"))).containsOnlyKeys("code", "permissions");
+    }
+
     /**
      * BI25, the negative control: the document of a route to which the translator added a response
      * nobody approved (a {@code 403} and a {@code 429} here) fails the comparison naming that
@@ -388,9 +445,22 @@ class OpenApiContractSnapshotTest {
     @ValueSource(strings = {"403", "429"})
     void anUnapprovedResponseOfTheTranslatorFailsNamingTheAddedResponse(String code,
             @TempDir Path temporary) throws IOException {
+        assertAnAddedResponseFailsTheComparison(SESSION_PATH, code, temporary);
+    }
+
+    /** BI139: the same control over the report, whose approved responses are the four of its contract. */
+    @ParameterizedTest
+    @ValueSource(strings = {"404", "429", "default"})
+    void anUnapprovedResponseOfTheRolesReportFailsNamingTheAddedResponse(String code,
+            @TempDir Path temporary) throws IOException {
+        assertAnAddedResponseFailsTheComparison(ROLES_PATH, code, temporary);
+    }
+
+    private static void assertAnAddedResponseFailsTheComparison(String route, String code,
+            Path temporary) throws IOException {
         Map<String, Object> altered = parse(Files.readString(
                 SNAPSHOT_DIRECTORY.resolve(fileNameOf("admin")), StandardCharsets.UTF_8));
-        asMap(asMap(asMap(asMap(altered.get("paths")).get(SESSION_PATH)).get("get"))
+        asMap(asMap(asMap(asMap(altered.get("paths")).get(route)).get("get"))
                 .get("responses")).put(code, new TreeMap<String, Object>(
                         Map.of("description", "added by the translator")));
         String generated = JSON.writerWithDefaultPrettyPrinter()
@@ -403,7 +473,7 @@ class OpenApiContractSnapshotTest {
         assertThatThrownBy(() -> verifyAgainstSnapshot("admin", generated, snapshotDirectory,
                 temporary.resolve("generated"), false))
                 .isInstanceOf(AssertionError.class)
-                .hasMessageContaining("first at $.paths." + SESSION_PATH + ".get.responses." + code);
+                .hasMessageContaining("first at $.paths." + route + ".get.responses." + code);
     }
 
     private static String normalizedDocumentOf(String appProfile) {

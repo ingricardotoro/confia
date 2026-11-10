@@ -1,6 +1,8 @@
 package com.confia.shared.web.authorization;
 
+import com.confia.kernel.Permission;
 import java.util.List;
+import org.springframework.http.HttpMethod;
 
 /**
  * The closed, immutable list of routes of the administrative chain that need a permission, parallel to
@@ -22,11 +24,14 @@ public final class PermissionedEndpoints {
     }
 
     /**
-     * The list of the administrative process. It is empty until the endpoint that reports the roles
-     * arrives, which is the first route that needs a permission (tasks 6 and 7 of the change).
+     * The list of the administrative process: the one route that reports which role can do what,
+     * which needs {@code identity:read} (design.md D16). A route of a later change is added here, in
+     * the same commit as its controller.
      */
     public static PermissionedEndpoints forAdmin() {
-        return new PermissionedEndpoints(List.of());
+        return new PermissionedEndpoints(List.of(
+                new PermissionedEndpoint(HttpMethod.GET, "/api/v1/identity/roles",
+                        Permission.IDENTITY_READ)));
     }
 
     /** The routes, in a list that cannot be modified. */

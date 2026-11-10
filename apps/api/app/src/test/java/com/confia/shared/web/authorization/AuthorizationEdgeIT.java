@@ -151,6 +151,10 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
             new PermissionedEndpoint(HttpMethod.GET, AuthorizationTestController.ACCOUNTS,
                     Permission.IDENTITY_READ));
 
+    /** The routes of the production list (the roles report, whose controller the harness loads) and the ones of the harness. */
+    private static final List<PermissionedEndpoint> HARNESS_ENTRIES = java.util.stream.Stream.concat(
+            PermissionedEndpoints.forAdmin().endpoints().stream(), TEST_ENTRIES.stream()).toList();
+
     /** A session: a staff account with a role and a live family, and the full-session token of both. */
     private record Session(UUID institution, UUID account, UUID family, String token) {
     }
@@ -202,13 +206,14 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     // --- WE94: where the decision stands ---
 
     @Test
-    void theDecisionStandsAfterTheBearerFilterOfTheChainAndTheListIsTheOneOfTheHarness() {
+    void theDecisionStandsAfterTheBearerFilterOfTheChainAndTheListIsTheProductionOnePlusTheOneOfTheHarness() {
         List<Class<?>> filters = chain.getFilters().stream().<Class<?>>map(Object::getClass).toList();
 
         assertThat(filters).contains(AccessTokenAuthenticationFilter.class, AuthorizationFilter.class);
         assertThat(filters.indexOf(AccessTokenAuthenticationFilter.class))
                 .isLessThan(filters.indexOf(AuthorizationFilter.class));
-        assertThat(endpoints.endpoints()).containsExactlyElementsOf(TEST_ENTRIES);
+        assertThat(endpoints.endpoints()).as("the production list and the routes of the harness")
+                .containsExactlyElementsOf(HARNESS_ENTRIES);
     }
 
     // --- WE95 to WE97: the decision comes before idempotency, the limiter and the controller ---
@@ -837,7 +842,7 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
                         }, METRICS);
                     }
                     if (bean instanceof PermissionedEndpoints) {
-                        return new PermissionedEndpoints(TEST_ENTRIES);
+                        return new PermissionedEndpoints(HARNESS_ENTRIES);
                     }
                     if (bean instanceof RateLimiterRegistry registry) {
                         Map<String, RateLimiter> counting = new ConcurrentHashMap<>();
