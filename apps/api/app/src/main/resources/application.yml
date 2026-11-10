@@ -115,6 +115,10 @@ spring:
       # use. All three processes have a DataSource (the portal since task 2.6 of
       # background-jobs-with-db-scheduler, decision 14), so none of them fails to start with the database down.
       initialization-fail-timeout: -1
+      # How long a request waits for a connection. The default (30 s) would make the readiness probe
+      # hang past its window with PostgreSQL down instead of answering 503 (dockerfiles-and-local-compose
+      # design.md decision 5; CR10). Milliseconds: the pool property is a long, not a duration.
+      connection-timeout: 5000
   web:
     resources:
       # No static resource handler: without a mapping for /** the route map of a process holds only

@@ -192,7 +192,7 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
   - P-1: confirmada. `spring-boot-starter-actuator` 4.1.1 arrastra `spring-boot-starter-micrometer-metrics`; no se declara. Bastan `spring-boot-health` y `spring-boot-actuator-autoconfigure`
     (el mapeo web viene de `spring-boot-webmvc` y el indicador `db` de `spring-boot-jdbc`, ya presentes). `dependency:tree`: sin `spring-boot-micrometer-*` ni `micrometer-registry-*`
     (solo `micrometer-core`/`observation` transitivos del iniciador de db-scheduler, como antes).
-  - P-2: **difiere**. `AdditionalHealthEndpointPath` rechaza `server:/health/live` con "'value' must contain only one segment" (el contexto no arranca). Alternativa aplicada (nota fechada 2026-11-10 al diseño §4.5):
+  - P-2: **difiere**. `AdditionalHealthEndpointPath` rechaza `server:/health/live` con "'value' must contain only one segment" (el contexto no arranca). Alternativa aplicada (la nota fechada en `design.md` §4.5 queda pendiente: ese archivo está fuera de la superficie de edición de esta aplicación):
     los grupos declaran `server:/live` y `server:/ready` (con `management.server.port: -1`, sin `/actuator/**`) y `HealthProbeRoutesConfiguration` registra las mismas operaciones bajo `/health`
     (subclase de `AdditionalHealthEndpointPathsWebMvcHandlerMapping`, patrones exactos `GET /health/live` y `GET /health/ready`); el mapeo propio del framework se excluye por clase
     (`WebMvcHealthEndpointExtensionAutoConfiguration`) en administración y portal, que importan la configuración. `ProcessBeanPolicy` la admite en ambos y la prohíbe en el trabajador.
@@ -202,7 +202,7 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
     106 de 106 sin fallos ni errores (el `BUILD FAILURE` es solo la puerta de JaCoCo por filtrar pruebas). Incluye el fixture de BJ75 (`management.endpoints.web.exposure.include=health,info` hace aparecer `info`).
   - Control negativo de `spring-boot-starter-actuator` no ejecutado como copia temporal: la aserción «conjunto exacto de artefactos de Actuator» lo cubre por construcción (fixture `anActuatorArtifactBeyondTheHealthOnesIsReported`). Pendiente si el revisor lo exige.
 
-### [ ] T05 — Lista blanca pública con exactamente las dos rutas de salud
+### [x] T05 — Lista blanca pública con exactamente las dos rutas de salud
 
 - **Objetivo:** `PublicEndpoints` incluye `GET /health/live` y `GET /health/ready` en administración y portal; el resto sigue denegado con `401`.
 - **Archivos:** `shared/web/edge/PublicEndpoints.java` (`HEALTH_LIVE`, `HEALTH_READY` en `forAdmin` y `forPortal`; Javadoc de las líneas 20-21),
@@ -216,6 +216,15 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
 - **Control negativo:** añadir una tercera entrada de salud a `PublicEndpoints` debe poner en rojo la aserción de «lista exacta».
 - **Verificación:** `./mvnw -pl app -am verify -DskipITs -Dsurefire.failIfNoSpecifiedTests=false -Dtest='PublicRouteAllowListTest,RouteCoverageGuardTest,ProcessBeanIsolationTest'`.
 - **Depende de:** T04.
+- **Evidencia (aplicación, 2026-11-10):**
+  - RED: con `PublicRouteAllowListTest` actualizada (rutas públicas de producción = previas más las dos de salud) y sin tocar `PublicEndpoints`: fallos en las ejecuciones de producción y `local` de
+    la prueba de lista cerrada, y `aHealthRouteMissingFromTheAllowListFailsNamingTheRoute` (ruta registrada sin clasificar). Antes, 8 errores de arranque del arnés (`HarnessProcess`) por el miembro
+    `db` inexistente del grupo de preparación sin `DataSource`: el arnés fija ahora `management.endpoint.health.group.readiness.include=readinessState`.
+  - GREEN: `-DskipITs -Dtest='PublicRouteAllowListTest,RouteCoverageGuardTest,ProcessBeanIsolationTest'`: 70 de 70 sin fallos (WE94 a WE99, CR13 por omisión y `local`; ocho peticiones no `GET` → 401; ocho rutas
+    `/actuator*` y `/health/other` → 401).
+  - Control negativo observado: una tercera entrada `GET /health/extra` en `PublicEndpoints` → 4 fallos de la prueba de lista cerrada nombrando `GET /health/extra`; restaurado (`diff` contra la copia sin salida).
+  - Desviación: `spring.datasource.hikari.connection-timeout` pasa de T06 a T05, porque con la base inalcanzable de las pruebas la comprobación anónima de `/health/ready` esperaba los 30 s por omisión (tiempo de espera
+    del cliente de la prueba). Valor `5000` (milisegundos): la propiedad de Hikari es un `long`, y `5s` del diseño §4.2 no enlaza (`Could not bind properties to 'HikariDataSource'`, observado).
 
 ### [ ] T06 — Indicador `db` de preparación, `connection-timeout` y `HealthProbesIT`
 
