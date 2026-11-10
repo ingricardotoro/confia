@@ -164,12 +164,41 @@ public class AuditScopeExclusionInventoryTest {
         return violations;
     }
 
+    /**
+     * The two web classes that may name the audit module, by full class name (rbac-permission-matrix-and-audit-integration design.md D8 and
+     * D9): the recorder writes the audit entry of a denial by permission from the handler of the 403,
+     * and the configuration of the edge builds it with the writer port. Every other web class stays
+     * refused.
+     */
+    private static final Set<String> WEB_MAY_USE_AUDIT = Set.of(
+            "com.confia.shared.web.authorization.PermissionDenialAudit",
+            "com.confia.shared.web.edge.AuthorizationConfiguration");
+
+    /** Whether the web class named {@code className} may depend on the audit module. */
+    static boolean webClassMayDependOnAudit(String className) {
+        return WEB_MAY_USE_AUDIT.contains(className);
+    }
+
+    @Test
+    void onlyTheNamedWebClassesMayDependOnTheAuditModule() {
+        assertThat(webClassMayDependOnAudit(
+                "com.confia.shared.web.authorization.PermissionDenialAudit")).isTrue();
+        for (String unlisted : new String[] {"com.confia.shared.web.authorization.PermissionDecider",
+                "com.confia.shared.web.authorization.AuditingAccessDeniedHandler",
+                "com.confia.shared.web.edge.SecurityChains", "com.confia.identity.web.LoginController"}) {
+            assertThat(webClassMayDependOnAudit(unlisted)).as(unlisted).isFalse();
+        }
+    }
+
     @Test
     void noWebPackageClassDependsOnTheAuditModule() {
         JavaClasses classes = assertNonEmptyProductionClasses();
 
         for (JavaClass javaClass : classes) {
             if (!("." + javaClass.getPackageName() + ".").contains(".web.")) {
+                continue;
+            }
+            if (webClassMayDependOnAudit(javaClass.getName())) {
                 continue;
             }
             for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {

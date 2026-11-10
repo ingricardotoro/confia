@@ -3,17 +3,22 @@ package com.confia.identity.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.confia.identity.domain.AuthenticationResult;
 import com.confia.identity.domain.AuthenticationResult.Authenticated;
+import com.confia.identity.domain.AuthenticationResult.SecondFactorEnrollmentRequired;
+import com.confia.identity.domain.AuthenticationResult.SecondFactorRequired;
 import com.confia.identity.domain.AuthenticationResult.Rejected;
 import com.confia.identity.domain.AuthenticationResult.RejectionReason;
 import com.confia.identity.domain.BackoffState;
 import com.confia.identity.domain.IdentifierFingerprint;
 import com.confia.identity.domain.LoginIdentifier;
+import com.confia.identity.domain.MfaPolicy;
 import com.confia.identity.domain.PlainPassword;
 import com.confia.identity.domain.StaffAccount;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.StoredPasswordHash;
 import com.confia.identity.domain.TotpCredential;
+import com.confia.identity.web.SecondFactorExemptions;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
 import com.confia.shared.audit.AuditLogWriter;
@@ -28,10 +33,12 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
@@ -173,6 +180,98 @@ class AuthenticateWithPasswordTest {
                 .isEqualTo(1);
     }
 
+    // --- the second factor is decided by the policy, never by the row (D14; I287, I288, I302) ---
+
+    @Test
+    void theStaffPolicyNeverYieldsAuthenticatedAndAskForTheEnrollmentWithoutACredential() {
+        StaffAccount account = accountOf(EXISTING_IDENTIFIER);
+
+        AuthenticationResult result = loginUnder(MfaPolicy.STAFF, account, new FakeTotpCredentialRepository());
+
+        assertThat(result).isInstanceOf(SecondFactorEnrollmentRequired.class);
+        assertThat(((SecondFactorEnrollmentRequired) result).userId()).isEqualTo(account.id());
+    }
+
+    @Test
+    void theStaffPolicyAsksForTheCodeOfAnAccountWithAVerifiedCredential() {
+        StaffAccount account = accountOf(EXISTING_IDENTIFIER);
+        FakeTotpCredentialRepository credentials = new FakeTotpCredentialRepository();
+        credentials.enrollVerified(account.id());
+
+        AuthenticationResult result = loginUnder(MfaPolicy.STAFF, account, credentials);
+
+        assertThat(result).isInstanceOf(SecondFactorRequired.class);
+        assertThat(((SecondFactorRequired) result).userId()).isEqualTo(account.id());
+        assertThat(((SecondFactorRequired) result).institutionId()).isEqualTo(INSTITUTION_ID);
+    }
+
+    @Test
+    void anAccountThePolicyExemptsAuthenticatesEvenWithAVerifiedCredential() {
+        StaffAccount account = accountOf(EXISTING_IDENTIFIER);
+        FakeTotpCredentialRepository credentials = new FakeTotpCredentialRepository();
+        credentials.enrollVerified(account.id());
+        SecondFactorExemptions exemptions = new SecondFactorExemptions();
+        exemptions.exempt(account.id());
+
+        AuthenticationResult result = loginUnder(exemptions, account, credentials);
+
+        assertThat(result).isInstanceOf(Authenticated.class);
+    }
+
+    @Test
+    void thePolicyIsAskedAboutTheAccountThatAuthenticatedAndOnlyAfterThePasswordMatched() {
+        StaffAccount account = accountOf(EXISTING_IDENTIFIER);
+        List<StaffAccountId> asked = new ArrayList<>();
+        MfaPolicy recording = candidate -> {
+            asked.add(candidate);
+            return true;
+        };
+        FakeStaffAccountRepository accounts = new FakeStaffAccountRepository();
+        accounts.add(account);
+        AuthenticateWithPassword useCase = useCase(accounts, new FakeTotpCredentialRepository(),
+                new FakeLoginBackoffStore(), new FakePasswordHasher(CORRECT_PASSWORD, STORED_HASH,
+                        DECOY_HASH), new FakeAuditLogWriter(), recording,
+                fixedClock("2026-03-10T11:00:00Z"));
+
+        useCase.runWithinTransaction(INSTITUTION_ID, "",
+                new AuthenticationCommand(EXISTING_IDENTIFIER.value(), "incorrecta"));
+        assertThat(asked).as("a wrong password never reaches the policy").isEmpty();
+
+        useCase.runWithinTransaction(INSTITUTION_ID, "",
+                new AuthenticationCommand(EXISTING_IDENTIFIER.value(), "Segura#2026"));
+        assertThat(asked).containsExactly(account.id());
+    }
+
+    @Test
+    void aSecondFactorOutcomeDoesNotAdvanceTheBackoffUnderTheStaffPolicy() {
+        StaffAccount account = accountOf(EXISTING_IDENTIFIER);
+        FakeStaffAccountRepository accounts = new FakeStaffAccountRepository();
+        accounts.add(account);
+        FakeLoginBackoffStore backoffStore = new FakeLoginBackoffStore();
+        FakeAuditLogWriter audit = new FakeAuditLogWriter();
+        AuthenticateWithPassword useCase = useCase(accounts, new FakeTotpCredentialRepository(),
+                backoffStore, new FakePasswordHasher(CORRECT_PASSWORD, STORED_HASH, DECOY_HASH),
+                audit, MfaPolicy.STAFF, fixedClock("2026-03-10T11:00:00Z"));
+
+        AuthenticationDecision decision = useCase.runWithinTransaction(INSTITUTION_ID, "",
+                new AuthenticationCommand(EXISTING_IDENTIFIER.value(), "Segura#2026"));
+
+        assertThat(decision.result()).isInstanceOf(SecondFactorEnrollmentRequired.class);
+        assertThat(backoffStore.savedStates.get(fingerprintOf(EXISTING_IDENTIFIER)).consecutiveFailures())
+                .isZero();
+    }
+
+    private AuthenticationResult loginUnder(MfaPolicy policy, StaffAccount account,
+            FakeTotpCredentialRepository credentials) {
+        FakeStaffAccountRepository accounts = new FakeStaffAccountRepository();
+        accounts.add(account);
+        AuthenticateWithPassword useCase = useCase(accounts, credentials, new FakeLoginBackoffStore(),
+                new FakePasswordHasher(CORRECT_PASSWORD, STORED_HASH, DECOY_HASH),
+                new FakeAuditLogWriter(), policy, fixedClock("2026-03-10T11:00:00Z"));
+        return useCase.runWithinTransaction(INSTITUTION_ID, "",
+                new AuthenticationCommand(EXISTING_IDENTIFIER.value(), "Segura#2026")).result();
+    }
+
     @Test
     void aMismatchedInstitutionFailsLoudlyAndNeverReturnsRejected() {
         InstitutionId configured = new InstitutionId(UUID.randomUUID());
@@ -182,7 +281,7 @@ class AuthenticateWithPasswordTest {
                 new FakeTotpCredentialRepository(), new FakeLoginBackoffStore(),
                 new FakePasswordHasher(CORRECT_PASSWORD, STORED_HASH, DECOY_HASH),
                 AuthenticateWithPasswordTest::deterministicFingerprint, new FakeAuditLogWriter(),
-                fixedClock("2026-03-10T11:00:00Z"));
+                SecondFactorExemptions.nobodyOwes(), fixedClock("2026-03-10T11:00:00Z"));
         SecurityContext context = new SecurityContext("", ACTOR_KIND_SYSTEM,
                 requested.value().toString(), UUID.randomUUID().toString());
 
@@ -211,16 +310,24 @@ class AuthenticateWithPasswordTest {
     private AuthenticateWithPassword useCase(FakeStaffAccountRepository accounts,
             FakeLoginBackoffStore backoffStore, FakePasswordHasher passwordHasher,
             FakeAuditLogWriter auditLogWriter, Clock clock) {
-        return new AuthenticateWithPassword(unusedTransactionRunner(), () -> INSTITUTION_ID, accounts,
-                new FakeTotpCredentialRepository(), backoffStore, passwordHasher,
-                AuthenticateWithPasswordTest::deterministicFingerprint, auditLogWriter, clock);
+        return useCase(accounts, new FakeTotpCredentialRepository(), backoffStore, passwordHasher,
+                auditLogWriter, SecondFactorExemptions.nobodyOwes(), clock);
     }
 
-    /** {@code mfaRequired = false}, unchanged from part 1: every existing scenario in this class
-     * authenticates without any second factor. */
+    private AuthenticateWithPassword useCase(FakeStaffAccountRepository accounts,
+            FakeTotpCredentialRepository totpCredentials, FakeLoginBackoffStore backoffStore,
+            FakePasswordHasher passwordHasher, FakeAuditLogWriter auditLogWriter,
+            MfaPolicy mfaPolicy, Clock clock) {
+        return new AuthenticateWithPassword(unusedTransactionRunner(), () -> INSTITUTION_ID, accounts,
+                totpCredentials, backoffStore, passwordHasher,
+                AuthenticateWithPasswordTest::deterministicFingerprint, auditLogWriter, mfaPolicy,
+                clock);
+    }
+
+    /** An account row; the policy of each scenario decides whether it owes a second factor. */
     private static StaffAccount accountOf(LoginIdentifier identifier) {
         return new StaffAccount(new StaffAccountId(UUID.randomUUID()), INSTITUTION_ID, identifier,
-                STORED_HASH, false);
+                STORED_HASH);
     }
 
     private static IdentifierFingerprint fingerprintOf(LoginIdentifier identifier) {
@@ -348,10 +455,14 @@ class AuthenticateWithPasswordTest {
         }
     }
 
-    /** Every existing scenario in this class seeds {@code mfaRequired = false}, so {@link
-     * AuthenticateWithPassword} never calls {@link #findByAccountId}: it always returns empty,
-     * never exercised. */
+    /** Holds the credentials the scenario enrolls; an account not in {@code verified} has none. */
     private static final class FakeTotpCredentialRepository implements TotpCredentialRepository {
+        private final Set<StaffAccountId> verified = new HashSet<>();
+
+        void enrollVerified(StaffAccountId account) {
+            verified.add(account);
+        }
+
         @Override
         public void insert(InstitutionId institutionId, StaffAccountId accountId,
                 String encryptedSecret) {
@@ -361,7 +472,9 @@ class AuthenticateWithPasswordTest {
         @Override
         public Optional<TotpCredential> findByAccountId(InstitutionId institutionId,
                 StaffAccountId accountId) {
-            return Optional.empty();
+            return verified.contains(accountId)
+                    ? Optional.of(new TotpCredential(accountId, "v1:00000000-0000-0000-0000-000000000000:aXY=:Y2lwaGVy:dGFn", 58_204L))
+                    : Optional.empty();
         }
 
         @Override

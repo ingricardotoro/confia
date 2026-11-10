@@ -46,25 +46,30 @@ abstract class LoginEndpointSupport extends CommittingPostgresIntegrationTest {
     /** The institution the process under test is configured with. */
     abstract InstitutionId institution();
 
+    /** The test policy of the process under test; an account seeded without a second factor is exempted there. */
+    abstract SecondFactorExemptions exemptions();
+
     static SecurityContext contextOf(InstitutionId of) {
         return new SecurityContext("", "system", of.value().toString(), UUID.randomUUID().toString());
     }
 
-    StaffAccountId seedAccount(String email, boolean mfaRequired, boolean secretEnrolled) {
-        return seedAccountIn(institution(), email, PASSWORD, mfaRequired, secretEnrolled);
+    StaffAccountId seedAccount(String email, boolean exemptFromSecondFactor, boolean secretEnrolled) {
+        return seedAccountIn(institution(), email, PASSWORD, exemptFromSecondFactor, secretEnrolled);
     }
 
     StaffAccountId seedAccountIn(InstitutionId of, String email, String password,
-            boolean mfaRequired, boolean secretEnrolled) {
+            boolean exemptFromSecondFactor, boolean secretEnrolled) {
         StaffAccountId account = new StaffAccountId(UUID.randomUUID());
+        if (exemptFromSecondFactor) {
+            exemptions().exempt(account);
+        }
         String hash = HASHER.hash(PlainPassword.of(password)).value();
         transactionRunner().execute(contextOf(of), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, ?)
-                    """, of.value(), account.value(), LoginIdentifier.of(email).value(), hash,
-                    mfaRequired);
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
+                    """, of.value(), account.value(), LoginIdentifier.of(email).value(), hash);
             if (secretEnrolled) {
                 // A verified secret: "MFA active" is a credential that accepted a code (design.md, decision 13).
                 JooqTotpCredentialRepository credentials = new JooqTotpCredentialRepository(dsl);

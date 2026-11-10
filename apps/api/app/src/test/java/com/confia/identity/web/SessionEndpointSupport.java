@@ -46,7 +46,7 @@ abstract class SessionEndpointSupport extends LoginEndpointSupport {
 
     Opened openSession(LoginProcess process, String address) {
         String email = "sesion." + UUID.randomUUID() + "@colegio.edu.hn";
-        seedAccount(email, false, false);
+        seedAccount(email, true, false);
         HttpResponse<String> response = process.login(address, email, PASSWORD);
         assertThat(response.statusCode()).isEqualTo(200);
         JsonNode body = json(response);
@@ -105,7 +105,7 @@ abstract class SessionEndpointSupport extends LoginEndpointSupport {
      */
     UUID seedFamily(String createdAgo, String lastUsedAgo, String endsIn, String revokedReason) {
         StaffAccountId account = seedAccount("semilla." + UUID.randomUUID() + "@colegio.edu.hn",
-                false, false);
+                true, false);
         UUID familyId = UUID.randomUUID();
         transactionRunner().execute(contextOf(institution()), () -> dsl.execute("""
                 insert into identity_refresh_token_family

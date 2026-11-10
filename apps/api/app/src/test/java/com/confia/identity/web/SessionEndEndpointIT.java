@@ -46,6 +46,11 @@ class SessionEndEndpointIT extends SessionEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     // --- I194: the current session ---
 
     @Test
@@ -110,7 +115,7 @@ class SessionEndEndpointIT extends SessionEndpointSupport {
     @Test
     void closingOneSessionByCookieLeavesTheOtherSessionOfTheAccountAlive() {
         String email = "dos." + UUID.randomUUID() + "@colegio.edu.hn";
-        seedAccount(email, false, false);
+        seedAccount(email, true, false);
         Opened first = loginAs(email);
         Opened second = loginAs(email);
 
@@ -168,7 +173,7 @@ class SessionEndEndpointIT extends SessionEndpointSupport {
     @Test
     void closingEverySessionWithTheBearerTokenNeedsNoCsrfRevokesTheWholeAccountAndDeletesTheCookies() {
         String email = "todas." + UUID.randomUUID() + "@colegio.edu.hn";
-        seedAccount(email, false, false);
+        seedAccount(email, true, false);
         Opened one = loginAs(email);
         Opened two = loginAs(email);
         Opened three = loginAs(email);

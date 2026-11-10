@@ -50,6 +50,17 @@ class RetentionPurgeFunctionsIT extends PostgresIntegrationTest {
     private static final Duration FAR_BEFORE_THE_FLOOR = Duration.ofDays(10);
     private static final Pattern FUNCTION_NAME = Pattern.compile("[a-z_]+");
 
+    /**
+     * The staff account insert of the throw-away databases pinned to version 11, where the second
+     * factor column is still {@code NOT NULL}. The tests that pin a version before 15 keep it
+     * (design.md D15 step 3).
+     */
+    static final String PRE_15_ACCOUNT_INSERT = """
+            insert into identity_staff_account
+                (institution_id, id, email, password_hash, mfa_required)
+            values (?, ?, ?, ?, false)
+            """;
+
     /** One purge function, with what a test needs to seed rows for it and to read them back. */
     enum Subject {
         PASSWORD_RESET("identity_purge_password_reset_tokens", Duration.ofHours(24)) {
@@ -248,9 +259,9 @@ class RetentionPurgeFunctionsIT extends PostgresIntegrationTest {
                 session.execute("""
                         with accounts as (
                             insert into identity_staff_account
-                                (institution_id, id, email, password_hash, mfa_required)
+                                (institution_id, id, email, password_hash)
                             select ?, gen_random_uuid(), 'many.' || g || '.' || ? || '@colegio.edu.hn',
-                                   '$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aGFzaA', true
+                                   '$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aGFzaA'
                               from generate_series(1, ?) g
                             returning institution_id, id)
                         insert into identity_mfa_totp_backoff
@@ -775,13 +786,13 @@ class RetentionPurgeFunctionsIT extends PostgresIntegrationTest {
                         + "to confia_admin_app");
                 owner.commit();
             }
-            try (PurgeSession session = PurgeSession.open(database, ADMIN)) {
+            try (PurgeSession session = PurgeSession.open(database, ADMIN, PRE_15_ACCOUNT_INSERT)) {
                 assertThatThrownBy(() -> assertCutoffBoundary(Subject.PASSWORD_RESET,
                         "identity_purge_password_reset_tokens_uncut", session))
                         .as("a function that ignores the cut-off must fail the boundary check")
                         .isInstanceOf(AssertionError.class);
             }
-            try (PurgeSession session = PurgeSession.open(database, ADMIN)) {
+            try (PurgeSession session = PurgeSession.open(database, ADMIN, PRE_15_ACCOUNT_INSERT)) {
                 assertCutoffBoundary(Subject.PASSWORD_RESET, Subject.PASSWORD_RESET.call(),
                         session);
             }

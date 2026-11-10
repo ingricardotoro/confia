@@ -47,6 +47,11 @@ class SessionRefreshEndpointIT extends SessionEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     // --- I186: the normal refresh ---
 
     @Test
@@ -217,7 +222,7 @@ class SessionRefreshEndpointIT extends SessionEndpointSupport {
     @Test
     void anAgentAndAnAddressThatBothChangedAreRefusedAsSessionExpiredAndTheFamilyIsRevoked() {
         String email = "vinculo." + UUID.randomUUID() + "@colegio.edu.hn";
-        seedAccount(email, false, false);
+        seedAccount(email, true, false);
         String home = LoginProcess.freshAddress();
         HttpResponse<String> login = process.post(LoginProcess.jsonOf(email, PASSWORD),
                 "User-Agent", "agente-uno", "X-Forwarded-For", home);

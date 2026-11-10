@@ -87,8 +87,8 @@ class PasswordResetLeavesNoValidTokenIT extends RotationIntegrationTest {
 
     @Test
     void afterTheResetNoRefreshTokenRotatesAndNoAccessTokenOfTheAccountIsAccepted() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
-        StaffAccountId carlos = seedStaffAccount(CARLOS, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
+        StaffAccountId carlos = seedStaffAccount(CARLOS, CURRENT_PASSWORD, true);
         List<IssuedSession> anas = threeSessionsOf(ana);
         IssuedSession carlosSession = issueNow(carlos);
         assertThat(anas).allSatisfy(session -> assertThat(current(session).statusCode())
@@ -111,7 +111,7 @@ class PasswordResetLeavesNoValidTokenIT extends RotationIntegrationTest {
 
     @Test
     void controlWithoutTheRevokerEveryTokenOfTheAccountIsStillAlive() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         List<IssuedSession> anas = threeSessionsOf(ana);
         PlainPasswordResetToken token = issueTokenAt(ana, Instant.now().toString());
         AccountSessionRevoker revokesNothing = (institution, account, reason, now) -> 0;

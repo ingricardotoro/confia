@@ -42,8 +42,8 @@ class RefreshTokenSchemaIT extends CommittingPostgresIntegrationTest {
 
     private static final String ACCOUNT_INSERT = """
             insert into identity_staff_account
-                (institution_id, id, email, password_hash, mfa_required)
-            values (?, ?, ?, ?, false)
+                (institution_id, id, email, password_hash)
+            values (?, ?, ?, ?)
             """;
 
     private static final String FAMILY_INSERT = """

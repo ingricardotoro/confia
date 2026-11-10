@@ -16,6 +16,7 @@ import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
 import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
+import com.confia.identity.web.SecondFactorExemptions;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditRowSnapshot;
 import com.confia.shared.infrastructure.JooqAuditLogReader;
@@ -87,7 +88,7 @@ class RequestPasswordResetIT extends CommittingPostgresIntegrationTest {
                 () -> institutionId, new JooqStaffAccountRepository(dsl),
                 new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), HASHER,
                 FINGERPRINTER, new JooqAuditLogWriter(dsl),
-                Clock.fixed(Instant.parse("2026-10-12T10:01:00Z"), ZoneOffset.UTC))
+                SecondFactorExemptions.nobodyOwes(), Clock.fixed(Instant.parse("2026-10-12T10:01:00Z"), ZoneOffset.UTC))
                 .execute(context(), new AuthenticationCommand(EXISTING_EMAIL, CURRENT_PASSWORD));
 
         assertThat(login.result()).isInstanceOf(Authenticated.class);
@@ -157,8 +158,8 @@ class RequestPasswordResetIT extends CommittingPostgresIntegrationTest {
         transactionRunner().execute(context(), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, false)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId.value(), accountId.value(),
                     LoginIdentifier.of(email).value(), hash);
             return null;

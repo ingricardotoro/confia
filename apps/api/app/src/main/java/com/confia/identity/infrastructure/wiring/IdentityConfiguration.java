@@ -11,6 +11,7 @@ import com.confia.identity.application.EndCurrentSession;
 import com.confia.identity.application.EnrollTotpSecondFactor;
 import com.confia.identity.application.IssueSession;
 import com.confia.identity.application.LogIn;
+import com.confia.identity.application.ListRolePermissions;
 import com.confia.identity.application.LoginBackoffStore;
 import com.confia.identity.application.LoginIdentifierFingerprinter;
 import com.confia.identity.application.LoginInstitutionProvider;
@@ -29,6 +30,7 @@ import com.confia.identity.application.StaffRoleAssignmentRepository;
 import com.confia.identity.application.TotpCredentialRepository;
 import com.confia.identity.application.TotpVerificationBackoffStore;
 import com.confia.identity.application.VerifyTotpCode;
+import com.confia.identity.domain.MfaPolicy;
 import com.confia.identity.infrastructure.Argon2Pepper;
 import com.confia.identity.infrastructure.Argon2Profile;
 import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
@@ -259,6 +261,15 @@ public class IdentityConfiguration {
     }
 
     /**
+     * The use case behind the roles report: a constant of the catalog, so it takes nothing. The
+     * controller that calls it is registered by {@code IdentityWebConfiguration}.
+     */
+    @Bean
+    ListRolePermissions listRolePermissions() {
+        return new ListRolePermissions();
+    }
+
+    /**
      * The two ways a session is ended on purpose (session-endpoints-cookie-and-csrf design.md
      * decision 15). Registered here with the other use cases of the module; no controller calls them
      * until the endpoints that expose them.
@@ -277,14 +288,23 @@ public class IdentityConfiguration {
         return new EndAllSessions(runner, accounts, sessionRevoker, auditLogWriter, clock);
     }
 
+    /**
+     * The second-factor policy of production: every staff account owes one (design.md, D14; owner
+     * decision Q1). Nothing configures it, so no property can switch the requirement off.
+     */
+    @Bean
+    MfaPolicy mfaPolicy() {
+        return MfaPolicy.STAFF;
+    }
+
     @Bean
     AuthenticateWithPassword authenticateWithPassword(TransactionRunner runner,
             LoginInstitutionProvider institutionProvider, StaffAccountRepository accounts,
             TotpCredentialRepository totpCredentials, LoginBackoffStore backoffStore,
             PasswordHasher passwordHasher, LoginIdentifierFingerprinter fingerprinter,
-            AuditLogWriter auditLogWriter, Clock clock) {
+            AuditLogWriter auditLogWriter, MfaPolicy mfaPolicy, Clock clock) {
         return new AuthenticateWithPassword(runner, institutionProvider, accounts, totpCredentials,
-                backoffStore, passwordHasher, fingerprinter, auditLogWriter, clock);
+                backoffStore, passwordHasher, fingerprinter, auditLogWriter, mfaPolicy, clock);
     }
 
     /**
@@ -354,9 +374,9 @@ public class IdentityConfiguration {
             StaffAccountRepository accounts, TotpCredentialRepository totpCredentials,
             VerifyTotpCode verifyTotp, ConsumeRecoveryCode consumeRecoveryCode,
             PasswordHasher passwordHasher, AccountSessionRevoker sessionRevoker,
-            AuditLogWriter auditLogWriter, Clock clock) {
+            AuditLogWriter auditLogWriter, MfaPolicy mfaPolicy, Clock clock) {
         return new ResetPasswordWithToken(runner, institutionProvider, tokens, accounts,
                 totpCredentials, verifyTotp, consumeRecoveryCode, passwordHasher, sessionRevoker,
-                auditLogWriter, clock);
+                auditLogWriter, mfaPolicy, clock);
     }
 }

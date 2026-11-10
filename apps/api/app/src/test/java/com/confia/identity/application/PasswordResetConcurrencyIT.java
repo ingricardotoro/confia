@@ -122,7 +122,7 @@ class PasswordResetConcurrencyIT extends PasswordResetIntegrationTest {
     @Test
     void twoConcurrentResetsWithTheSameTokenProduceExactlyOneChange() throws Exception {
         String ana = "ana.martinez@colegio.edu.hn";
-        StaffAccountId account = seedStaffAccount(ana, "Cafetal de Copán 2026", false);
+        StaffAccountId account = seedStaffAccount(ana, "Cafetal de Copán 2026", true);
         PlainPasswordResetToken token = issueTokenAt(account, "2026-10-15T15:00:00Z");
         String[] passwords = {"Primera contraseña 2026", "Segunda contraseña 2026"};
         CyclicBarrier start = new CyclicBarrier(2);
@@ -187,8 +187,8 @@ class PasswordResetConcurrencyIT extends PasswordResetIntegrationTest {
         transactionRunner().execute(context(), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, false)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId.value(), accountId.value(),
                     LoginIdentifier.of("carlos.ramirez@colegio.edu.hn").value(),
                     PLACEHOLDER_PASSWORD_HASH);
@@ -231,7 +231,7 @@ class PasswordResetConcurrencyIT extends PasswordResetIntegrationTest {
         public Optional<StaffAccount> lockById(InstitutionId institution, StaffAccountId account) {
             return Optional.of(new StaffAccount(account, institution,
                     LoginIdentifier.of("carlos.ramirez@colegio.edu.hn"),
-                    new StoredPasswordHash(PLACEHOLDER_PASSWORD_HASH), false));
+                    new StoredPasswordHash(PLACEHOLDER_PASSWORD_HASH)));
         }
 
         @Override

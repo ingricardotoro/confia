@@ -76,7 +76,7 @@ class RefreshTokenPurgeIT extends IdentityPurgeFixtures {
     /** Scenario I254: a token whose successor was emptied is still a reuse when it comes back after the grace. */
     @Test
     void emptyingTheSuccessorDoesNotTurnOffReuseDetection() {
-        StaffAccountId account = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId account = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(account, false, "2026-10-25T09:00:00Z", "2026-10-25T10:00:00Z",
                 "2026-10-26T09:00:00Z", null, null);
         ConsumedSeed seed = seedConsumedToken(family, "2026-10-25T09:00:00Z", "2026-10-25T17:00:00Z",
@@ -128,7 +128,7 @@ class RefreshTokenPurgeIT extends IdentityPurgeFixtures {
     void theFamiliesPastTheirCutoffAreDeletedWithTheirTokensAndTheEntryHoldsOnlyCountsAndInstants() {
         Instant now = databaseNow();
         Instant cutoff = now.minus(Duration.ofDays(30));
-        StaffAccountId account = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId account = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         String before = cutoff.minus(Duration.ofDays(2)).toString();
         String sixtyDaysAhead = now.plus(Duration.ofDays(60)).toString();
 
@@ -179,7 +179,7 @@ class RefreshTokenPurgeIT extends IdentityPurgeFixtures {
     @Test
     void aSecondRunChangesNothingAndReportsZero() {
         seedConsumedWithResidualSuccessor(institutionId, CONSUMED_AT);
-        StaffAccountId account = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId account = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         seedFamily(account, false, "2026-07-01T00:00:00Z", "2026-07-01T00:00:00Z", "2026-07-02T00:00:00Z",
                 "2026-07-01T12:00:00Z", "password_change");
         PurgeExpiredRefreshTokens purge = refreshPurge(fixedAt(Instant.parse("2026-10-25T10:00:11Z")));

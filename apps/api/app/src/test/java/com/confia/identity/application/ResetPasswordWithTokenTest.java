@@ -9,6 +9,7 @@ import com.confia.identity.application.ResetOutcome.SecondFactorMissing;
 import com.confia.identity.application.ResetOutcome.SecondFactorRejected;
 import com.confia.identity.application.ResetOutcome.TokenRejected;
 import com.confia.identity.domain.LoginIdentifier;
+import com.confia.identity.domain.MfaPolicy;
 import com.confia.identity.domain.PasswordResetRejectionReason;
 import com.confia.identity.domain.PasswordResetTokenHash;
 import com.confia.identity.domain.PasswordResetTokenPolicy;
@@ -22,6 +23,7 @@ import com.confia.identity.domain.StoredPasswordHash;
 import com.confia.identity.domain.StoredRecoveryCodeHash;
 import com.confia.identity.domain.TotpCode;
 import com.confia.identity.domain.TotpCredential;
+import com.confia.identity.web.SecondFactorExemptions;
 import com.confia.kernel.AesGcmCipher;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
@@ -58,6 +60,7 @@ class ResetPasswordWithTokenTest {
     private final CountingHasher hasher = new CountingHasher();
     private final FakeRevoker revoker = new FakeRevoker(accounts);
     private final List<AuditEntry> audit = new ArrayList<>();
+    private final SecondFactorExemptions exemptions = new SecondFactorExemptions();
 
     @Test
     void anUnknownTokenNeverLocksTheAccountNorComputesArgon2id() {
@@ -86,7 +89,7 @@ class ResetPasswordWithTokenTest {
 
     @Test
     void aPasswordOfTheWrongLengthNeitherLocksNorSpendsASecondFactorAttempt() {
-        StaffAccountId account = seedLiveTokenFor(true);
+        StaffAccountId account = seedLiveTokenFor(false);
         totpCredentials.enrolled = true;
 
         ResetPasswordDecision decision = useCase().runWithinTransaction(INSTITUTION, "",
@@ -107,7 +110,7 @@ class ResetPasswordWithTokenTest {
 
     @Test
     void aSecondFactorPresentedToAnAccountWithoutActiveMfaIsIgnored() {
-        seedLiveTokenFor(false);
+        seedLiveTokenFor(true);
         totpCredentials.enrolled = true;
 
         ResetPasswordDecision decision = useCase().runWithinTransaction(INSTITUTION, "",
@@ -122,10 +125,47 @@ class ResetPasswordWithTokenTest {
         assertThat(audit.get(1).afterValue()).isEqualTo("{\"secondFactor\":\"none\"}");
     }
 
+    /** Scenarios I291 and I301 at the unit level: the staff policy owes the code to every account. */
+    @Test
+    void underTheStaffPolicyAnAccountWithAVerifiedCredentialNeedsTheSecondFactorWhateverItsRow() {
+        seedLiveTokenFor(true);
+        totpCredentials.enrolled = true;
+
+        ResetPasswordDecision decision = useCase(MfaPolicy.STAFF).runWithinTransaction(INSTITUTION,
+                "", command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None()));
+
+        assertThat(decision.outcome()).isInstanceOf(SecondFactorMissing.class);
+        assertThat(hasher.hashes).isZero();
+        assertThat(accounts.replacedWith).isNull();
+        assertThat(revoker.calls).isZero();
+    }
+
+    @Test
+    void underTheStaffPolicyAnAccountWithoutAVerifiedCredentialResetsWithTheLinkAlone() {
+        seedLiveTokenFor(false);
+
+        ResetPasswordDecision decision = useCase(MfaPolicy.STAFF).runWithinTransaction(INSTITUTION,
+                "", command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None()));
+
+        assertThat(decision.outcome()).isInstanceOf(Completed.class);
+        assertThat(accounts.replacedWith).isNotNull();
+    }
+
+    @Test
+    void theCredentialIsNotReadForAnAccountThePolicyExempts() {
+        seedLiveTokenFor(true);
+        totpCredentials.enrolled = true;
+
+        useCase().runWithinTransaction(INSTITUTION, "",
+                command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None()));
+
+        assertThat(totpCredentials.lookups).isZero();
+    }
+
     /** Scenario I24 at the unit level: once, after the hash, with the reset's own instant. */
     @Test
     void aCompletedResetRevokesOnceAfterTheHashIsReplacedAndAuditsTheCount() {
-        StaffAccountId account = seedLiveTokenFor(false);
+        StaffAccountId account = seedLiveTokenFor(true);
         revoker.revoked = 3;
 
         ResetPasswordDecision decision = useCase().runWithinTransaction(INSTITUTION, "",
@@ -152,7 +192,7 @@ class ResetPasswordWithTokenTest {
     /** Scenario I125, first half: the entry exists even when nothing was revoked. */
     @Test
     void theRevocationEntryIsWrittenEvenWhenNoFamilyWasRevoked() {
-        seedLiveTokenFor(false);
+        seedLiveTokenFor(true);
         revoker.revoked = 0;
 
         useCase().runWithinTransaction(INSTITUTION, "",
@@ -170,7 +210,7 @@ class ResetPasswordWithTokenTest {
         useCase().runWithinTransaction(INSTITUTION, "",
                 command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None()));
         // A live token with a password of the wrong length.
-        seedLiveTokenFor(false);
+        seedLiveTokenFor(true);
         useCase().runWithinTransaction(INSTITUTION, "",
                 command(TOKEN, "a".repeat(11), new SecondFactorProof.None()));
         // A live token that loses the consumption race.
@@ -179,7 +219,7 @@ class ResetPasswordWithTokenTest {
                 command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None()));
         tokens.consumeWins = true;
         // A live token of an account with active MFA and no proof.
-        seedLiveTokenFor(true);
+        seedLiveTokenFor(false);
         totpCredentials.enrolled = true;
         ResetPasswordDecision missing = useCase().runWithinTransaction(INSTITUTION, "",
                 command(TOKEN, NEW_PASSWORD, new SecondFactorProof.None()));
@@ -193,7 +233,7 @@ class ResetPasswordWithTokenTest {
     /** Scenario I123 at the unit level: a failing revocation never reports the reset as done. */
     @Test
     void aFailingRevocationPropagatesAndWritesNoCompletionEntry() {
-        seedLiveTokenFor(false);
+        seedLiveTokenFor(true);
         revoker.failure = new IllegalStateException("revocation unavailable");
 
         assertThatThrownBy(() -> useCase().runWithinTransaction(INSTITUTION, "",
@@ -210,7 +250,7 @@ class ResetPasswordWithTokenTest {
      */
     @Test
     void aPasswordHashThatAffectedNoRowFailsTheResetBeforeRevokingOrAuditing() {
-        seedLiveTokenFor(false);
+        seedLiveTokenFor(true);
         accounts.replaceAffectsARow = false;
 
         assertThatThrownBy(() -> useCase().runWithinTransaction(INSTITUTION, "",
@@ -223,7 +263,7 @@ class ResetPasswordWithTokenTest {
 
     @Test
     void aLostConsumptionRaceIsATokenRejectionAndPaysNoArgon2id() {
-        seedLiveTokenFor(false);
+        seedLiveTokenFor(true);
         tokens.consumeWins = false;
 
         ResetPasswordDecision decision = useCase().runWithinTransaction(INSTITUTION, "",
@@ -267,7 +307,7 @@ class ResetPasswordWithTokenTest {
         };
     }
 
-    private StaffAccountId seedLiveTokenFor(boolean mfaRequired) {
+    private StaffAccountId seedLiveTokenFor(boolean exemptFromSecondFactor) {
         StaffAccountId account = new StaffAccountId(UUID.randomUUID());
         Instant issuedAt = NOW.minusSeconds(600);
         tokens.row = new PasswordResetTokenRow(UUID.randomUUID(), account, issuedAt,
@@ -275,8 +315,10 @@ class ResetPasswordWithTokenTest {
         tokens.rowHash = PasswordResetTokenHash.of(PlainPasswordResetToken.of(TOKEN));
         accounts.account = new StaffAccount(account, INSTITUTION,
                 LoginIdentifier.of("ana.martinez@colegio.edu.hn"),
-                new StoredPasswordHash("$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aW5pY2lhbA"),
-                mfaRequired);
+                new StoredPasswordHash("$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aW5pY2lhbA"));
+        if (exemptFromSecondFactor) {
+            exemptions.exempt(account);
+        }
         return account;
     }
 
@@ -286,6 +328,10 @@ class ResetPasswordWithTokenTest {
     }
 
     private ResetPasswordWithToken useCase() {
+        return useCase(exemptions);
+    }
+
+    private ResetPasswordWithToken useCase(MfaPolicy mfaPolicy) {
         TransactionRunner runner = neverConnectingRunner();
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         VerifyTotpCode verifyTotp = new VerifyTotpCode(runner, totpCredentials,
@@ -295,7 +341,7 @@ class ResetPasswordWithTokenTest {
                 new UnusedRecoveryCodes(), new UnusedRecoveryCodeHasher(), audit::add, clock);
         return new ResetPasswordWithToken(runner, () -> INSTITUTION, tokens, accounts,
                 totpCredentials, verifyTotp, consumeRecoveryCode, hasher, revoker, audit::add,
-                clock);
+                mfaPolicy, clock);
     }
 
     private static TransactionRunner neverConnectingRunner() {

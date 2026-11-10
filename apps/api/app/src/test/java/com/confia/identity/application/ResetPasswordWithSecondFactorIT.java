@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * {@link ResetPasswordWithToken} for an account with active MFA: {@code mfa_required} and an
+ * {@link ResetPasswordWithToken} for an account with active MFA: the second factor and an
  * enrolled TOTP secret (password-recovery-token design.md decision 7, step 5; tasks.md task 4.2).
  * The reset composes the part 2 verifiers through their package-private {@code
  * runWithinTransaction}, never their {@code execute}, so they share its transaction. Kept apart from
@@ -33,7 +33,7 @@ class ResetPasswordWithSecondFactorIT extends PasswordResetIntegrationTest {
     /** Scenario I9: no code, no reset and the token stays alive; a valid TOTP code resets. */
     @Test
     void withoutASecondFactorThereIsNoResetAndWithAValidTotpCodeThereIs() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, false);
         EnrollTotpSecondFactorResult.Enrolled enrollment = enroll(sofia);
         PlainPasswordResetToken token = issueTokenAt(sofia, "2026-10-12T09:00:00Z");
 
@@ -56,7 +56,7 @@ class ResetPasswordWithSecondFactorIT extends PasswordResetIntegrationTest {
     /** Scenario I10: a recovery code replaces TOTP, is used up, and nine remain. */
     @Test
     void aRecoveryCodeReplacesTheTotpCodeAndIsUsedUp() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, false);
         EnrollTotpSecondFactorResult.Enrolled enrollment = enroll(sofia);
         PlainRecoveryCode code = enrollment.recoveryCodes().get(0);
         PlainPasswordResetToken token = issueTokenAt(sofia, "2026-10-12T11:00:00Z");
@@ -81,7 +81,7 @@ class ResetPasswordWithSecondFactorIT extends PasswordResetIntegrationTest {
     /** Scenario I46: consuming one of three remaining codes audits the low-codes signal. */
     @Test
     void consumingOneOfThreeRemainingCodesInAResetAuditsTheLowCodesSignal() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT, false);
         EnrollTotpSecondFactorResult.Enrolled enrollment = enroll(sofia);
         List<PlainRecoveryCode> codes = enrollment.recoveryCodes();
         leaveOnlyTheFirstThreeUnused(sofia, codes);

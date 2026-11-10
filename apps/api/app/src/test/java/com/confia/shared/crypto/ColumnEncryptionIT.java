@@ -287,8 +287,8 @@ class ColumnEncryptionIT extends CommittingPostgresIntegrationTest {
             String encryptedSecret) {
         dsl.execute("""
                 insert into identity_staff_account
-                    (institution_id, id, email, password_hash, mfa_required)
-                values (?, ?, ?, ?, true)
+                    (institution_id, id, email, password_hash)
+                values (?, ?, ?, ?)
                 """, institutionId.value(), accountId, "mfa." + accountId + "@colegio.edu.hn",
                 PLACEHOLDER_PASSWORD_HASH);
         dsl.execute("""

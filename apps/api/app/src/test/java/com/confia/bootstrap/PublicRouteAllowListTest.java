@@ -354,8 +354,8 @@ class PublicRouteAllowListTest {
             List<Route> routes = RegisteredRoutes.of(context);
 
             if ("default".equals(profile)) {
-                assertThat(routes).as("production registers only the public and the authenticated "
-                        + "routes of %s", process).extracting(Route::toString)
+                assertThat(routes).as("production registers only the public, the authenticated "
+                        + "and the permissioned routes of %s", process).extracting(Route::toString)
                         .containsExactlyInAnyOrderElementsOf(productionRoutesOf(process));
                 assertThat(allowed.endpoints()).as("the one public route of production")
                         .extracting(entry -> entry.method() + " " + entry.pattern())
@@ -368,8 +368,11 @@ class PublicRouteAllowListTest {
             AuthenticatedEndpoints authenticated = authenticatedListOf(process);
             PermissionedEndpoints permissioned = "admin".equals(process)
                     ? PermissionedEndpoints.forAdmin() : new PermissionedEndpoints(List.of());
-            assertThat(permissioned.endpoints()).as("no route needs a permission until task 7")
-                    .isEmpty();
+            assertThat(permissioned.endpoints()).as("the one route that needs a permission is the roles "
+                    + "report; the portal has none")
+                    .extracting(entry -> entry.method() + " " + entry.pattern())
+                    .containsExactlyElementsOf("admin".equals(process)
+                            ? List.of("GET /api/v1/identity/roles") : List.of());
             assertThat(permissionedEntriesWithoutARoute(context, permissioned)).isEmpty();
             assertThat(permissionedRoutesThatAnswerWithoutACredential(running.port(), permissioned))
                     .isEmpty();
@@ -419,6 +422,7 @@ class PublicRouteAllowListTest {
         if ("admin".equals(process)) {
             all.add("POST /api/v1/auth/mfa/verifications");
             all.add("POST /api/v1/auth/mfa/enrollments");
+            all.add("GET /api/v1/identity/roles");
         }
         return all;
     }

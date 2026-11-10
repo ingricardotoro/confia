@@ -22,6 +22,7 @@ import com.confia.identity.infrastructure.JooqRecoveryCodeRepository;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
 import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.identity.infrastructure.JooqTotpVerificationBackoffStore;
+import com.confia.identity.web.SecondFactorExemptions;
 import com.confia.kernel.AesGcmCipher;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditLogWriter;
@@ -66,6 +67,8 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
     static final Duration TOTP_PERIOD = Duration.ofSeconds(30);
 
     final InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+    /** The test policy: an account seeded without a second factor is exempt, as the old column said. */
+    final SecondFactorExemptions exemptions = new SecondFactorExemptions();
     private final ColumnEncryptionMasterKey masterKey = randomMasterKey();
 
     SecurityContext context() {
@@ -77,18 +80,21 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
                 UUID.randomUUID().toString());
     }
 
-    StaffAccountId seedStaffAccount(String email, String password, boolean mfaRequired) {
+    StaffAccountId seedStaffAccount(String email, String password, boolean exemptFromSecondFactor) {
         StaffAccountId accountId = new StaffAccountId(UUID.randomUUID());
         String hash = HASHER.hash(PlainPassword.of(password)).value();
         transactionRunner().execute(context(), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, ?)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId.value(), accountId.value(),
-                    LoginIdentifier.of(email).value(), hash, mfaRequired);
+                    LoginIdentifier.of(email).value(), hash);
             return null;
         });
+        if (exemptFromSecondFactor) {
+            exemptions.exempt(accountId);
+        }
         return accountId;
     }
 
@@ -166,14 +172,14 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
                 clock);
         return new ResetPasswordWithToken(transactionRunner(), () -> configuredInstitution, tokens,
                 new JooqStaffAccountRepository(dsl), new JooqTotpCredentialRepository(dsl),
-                verifyTotp, consumeRecoveryCode, HASHER, revoker, auditLogWriter, clock);
+                verifyTotp, consumeRecoveryCode, HASHER, revoker, auditLogWriter, exemptions, clock);
     }
 
     AuthenticationResult loginAt(String email, String password, String instant) {
         return new AuthenticateWithPassword(transactionRunner(), () -> institutionId,
                 new JooqStaffAccountRepository(dsl), new JooqTotpCredentialRepository(dsl),
                 new JooqLoginBackoffStore(dsl), HASHER, FINGERPRINTER, new JooqAuditLogWriter(dsl),
-                fixedClock(instant))
+                exemptions, fixedClock(instant))
                 .execute(context(), new AuthenticationCommand(email, password))
                 .result();
     }

@@ -58,7 +58,7 @@ class SessionIssuanceResetConcurrencyIT extends SessionIssuanceIntegrationTest {
      */
     @Test
     void aFamilyBeingIssuedWhenTheResetStartsIsRevokedByTheReset() throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         PlainPasswordResetToken token = issueTokenAt(ana, "2026-10-15T15:00:00Z");
         CountDownLatch written = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -108,7 +108,7 @@ class SessionIssuanceResetConcurrencyIT extends SessionIssuanceIntegrationTest {
      */
     @Test
     void anIssuanceStartedWhileTheResetIsRunningWaitsForItAndIsNotRevoked() throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession earlier = issue("2026-10-15T14:00:00Z", ana);
         PlainPasswordResetToken token = issueTokenAt(ana, "2026-10-15T15:00:00Z");
         CountDownLatch revoked = new CountDownLatch(1);

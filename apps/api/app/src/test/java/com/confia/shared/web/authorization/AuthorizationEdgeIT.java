@@ -4,6 +4,34 @@ import static com.confia.shared.web.harness.ProblemAssertions.assertProblem;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.confia.identity.domain.StaffRole;
+import org.slf4j.LoggerFactory;
+import org.assertj.core.api.InstanceOfAssertFactories;
+import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Future;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.CountDownLatch;
+import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.time.ZoneOffset;
+import java.time.OffsetDateTime;
+import java.time.Instant;
+import java.sql.ResultSet;
+import com.confia.shared.web.harness.RecordingAuthorizationMetrics;
+import com.confia.shared.web.harness.MutableClock;
+import com.confia.shared.security.TransactionRunner;
+import com.confia.shared.security.PermissionResolver;
+import com.confia.shared.infrastructure.JooqAuditLogReader;
+import com.confia.shared.audit.DefaultAuditChainVerifier;
+import com.confia.shared.audit.CanonicalAuditRowSerializer;
+import com.confia.shared.audit.AuditLogWriter;
+import com.confia.shared.audit.AuditChainVerifier;
+import com.confia.shared.audit.AuditChainVerification;
+import com.confia.kernel.InstitutionId;
+import ch.qos.logback.core.read.ListAppender;
+import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.confia.identity.domain.UserAgentFingerprint;
 import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
 import com.confia.identity.web.wiring.IdentityWebConfiguration;
@@ -62,6 +90,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -90,13 +120,29 @@ import tools.jackson.databind.JsonNode;
  * {@code Idempotency-Key} and spends a quota of the limiter, and a denied request must reach neither.
  */
 @SpringBootTest(classes = AuthorizationEdgeIT.Harness.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "confia.authorization.denials.max-full-rows=3")
+@TestMethodOrder(MethodOrderer.Random.class)
 class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
 
     private static final String KID = "authorization-edge-key";
     private static final KeyPair KEYS = newKeyPair();
     private static final CompactJws JWS = new CompactJws(
             SigningKeyRing.of(SigningKey.signing(KID, KEYS.getPublic(), KEYS.getPrivate())));
+    private static final Duration WINDOW = Duration.ofMinutes(5);
+
+    /** The clock of the process under test: it only moves when a test moves it. */
+    static final MutableClock CLOCK = new MutableClock(Instant.parse("2026-11-09T10:00:00Z"));
+
+    /** The signals of the authorization, counted; every test reads its own difference. */
+    static final RecordingAuthorizationMetrics METRICS = new RecordingAuthorizationMetrics();
+
+    /** While set, the write of a denial fails the way a broken database would. */
+    static final AtomicBoolean FAIL_AUDIT_WRITES = new AtomicBoolean();
+
+    /** While set, the resolution of the permissions fails. */
+    static final AtomicBoolean FAIL_RESOLUTION = new AtomicBoolean();
+
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1).followRedirects(HttpClient.Redirect.NEVER).build();
     private static final List<PermissionedEndpoint> TEST_ENTRIES = List.of(
@@ -104,6 +150,10 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
                     Permission.PAYMENTS_CREATE),
             new PermissionedEndpoint(HttpMethod.GET, AuthorizationTestController.ACCOUNTS,
                     Permission.IDENTITY_READ));
+
+    /** The routes of the production list (the roles report, whose controller the harness loads) and the ones of the harness. */
+    private static final List<PermissionedEndpoint> HARNESS_ENTRIES = java.util.stream.Stream.concat(
+            PermissionedEndpoints.forAdmin().endpoints().stream(), TEST_ENTRIES.stream()).toList();
 
     /** A session: a staff account with a role and a live family, and the full-session token of both. */
     private record Session(UUID institution, UUID account, UUID family, String token) {
@@ -138,6 +188,12 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     @Autowired
     private PermissionedEndpoints endpoints;
 
+    @Autowired
+    private PermissionDenialAudit audit;
+
+    @Autowired
+    private TransactionRunner runner;
+
     private int controllerBefore;
     private int limiterBefore;
 
@@ -150,13 +206,14 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     // --- WE94: where the decision stands ---
 
     @Test
-    void theDecisionStandsAfterTheBearerFilterOfTheChainAndTheListIsTheOneOfTheHarness() {
+    void theDecisionStandsAfterTheBearerFilterOfTheChainAndTheListIsTheProductionOnePlusTheOneOfTheHarness() {
         List<Class<?>> filters = chain.getFilters().stream().<Class<?>>map(Object::getClass).toList();
 
         assertThat(filters).contains(AccessTokenAuthenticationFilter.class, AuthorizationFilter.class);
         assertThat(filters.indexOf(AccessTokenAuthenticationFilter.class))
                 .isLessThan(filters.indexOf(AuthorizationFilter.class));
-        assertThat(endpoints.endpoints()).containsExactlyElementsOf(TEST_ENTRIES);
+        assertThat(endpoints.endpoints()).as("the production list and the routes of the harness")
+                .containsExactlyElementsOf(HARNESS_ENTRIES);
     }
 
     // --- WE95 to WE97: the decision comes before idempotency, the limiter and the controller ---
@@ -245,6 +302,386 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
                 .containsExactlyInAnyOrder(processExcludes.excludeName());
     }
 
+    // =========================================================================================
+    // Second part (task 4): the audit of the denials (design.md D8 to D10 and D19). Every test has
+    // an institution of its own, so the counters of the keys are its own; the queue, the gate and
+    // the clock are shared by the context, so a test that waits for a summary first empties the
+    // queue (design.md, "Independencia del orden de las pruebas") and the class runs in random order.
+    // =========================================================================================
+
+    // --- AZ37: one row per request, with the template and no value of the request ---
+
+    @Test
+    void aPathVariableGivesOneRowPerRequestWithTheTemplateAndNeitherValue() throws SQLException {
+        Session cashier = sessionOf(StaffRole.CASHIER);
+
+        for (String id : List.of("123", "abc")) {
+            assertProblem(get(cashier, "/test/authorization/accounts/" + id), 403, "forbidden");
+        }
+
+        List<Map<String, String>> rows = rowsOf(cashier.institution());
+        assertThat(rows).hasSize(2);
+        assertThat(rows).allSatisfy(row -> {
+            assertThat(row.get("action")).isEqualTo("authorization.access.denied");
+            assertThat(row.get("entity_id")).isEqualTo("identity:read");
+            assertThat(row.get("after_value"))
+                    .isEqualTo("{\"routeTemplate\": \"/test/authorization/accounts/{id}\"}");
+        });
+        assertThat(rows.toString()).doesNotContain("123", "abc");
+    }
+
+    // --- AZ52, AZ53: the cap and the summary ---
+
+    @Test
+    void threeDenialsWriteThreeFullRowsAndNoSummary() throws SQLException {
+        Session administrator = sessionOf(StaffRole.ADMINISTRATOR);
+        int omittedBefore = METRICS.denialsOmitted().size();
+
+        for (int i = 0; i < 3; i++) {
+            assertProblem(pay(administrator, null), 403, "forbidden");
+        }
+
+        assertThat(rowsOf(administrator.institution())).hasSize(3)
+                .allSatisfy(row -> assertThat(row.get("action"))
+                        .isEqualTo("authorization.access.denied"));
+        assertThat(METRICS.denialsOmitted().size()).isEqualTo(omittedBefore);
+    }
+
+    @Test
+    void fiveDenialsWriteThreeRowsAndAfterTheWindowOneSummaryOfTwo() throws SQLException {
+        emptyTheSharedQueue();
+        Session administrator = sessionOf(StaffRole.ADMINISTRATOR);
+        int omittedBefore = METRICS.denialsOmitted().size();
+
+        for (int i = 0; i < 5; i++) {
+            assertProblem(pay(administrator, null), 403, "forbidden");
+        }
+        assertThat(rowsOf(administrator.institution())).hasSize(3);
+        closeTheWindowAndFireTheEmissionOf(administrator.institution());
+
+        List<Map<String, String>> rows = rowsOf(administrator.institution());
+        assertThat(rows).hasSize(4);
+        Map<String, String> summary = rows.get(3);
+        assertThat(summary.get("action")).isEqualTo("authorization.access.denied_summary");
+        assertThat(summary.get("after_value")).contains("\"omittedCount\": 2",
+                "\"windowSeconds\": 300");
+        assertThat(summary.get("actor_id")).isEqualTo(administrator.account().toString());
+        assertThat(summary.get("entity_id")).isEqualTo("payments:create");
+        assertThat(summary.get("source_ip")).as("no origin on a summary").isNull();
+        assertThat(summary.toString()).doesNotContain("/test/authorization");
+        assertThat(METRICS.denialsOmitted().subList(omittedBefore, METRICS.denialsOmitted().size()))
+                .containsExactly(Permission.PAYMENTS_CREATE, Permission.PAYMENTS_CREATE);
+        assertChainIntact(administrator.institution(), 4);
+    }
+
+    // --- AZ79: the cap under concurrency, over HTTP ---
+
+    @Test
+    void concurrentDenialsOfOneKeyWriteExactlyTFullRows() throws Exception {
+        emptyTheSharedQueue();
+        Session administrator = sessionOf(StaffRole.ADMINISTRATOR);
+        int threads = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        try {
+            CountDownLatch ready = new CountDownLatch(threads);
+            CountDownLatch go = new CountDownLatch(1);
+            List<Future<HttpResponse<String>>> responses = new ArrayList<>();
+            for (int i = 0; i < threads; i++) {
+                responses.add(pool.submit(() -> {
+                    ready.countDown();
+                    go.await();
+                    return pay(administrator, null);
+                }));
+            }
+            assertThat(ready.await(30, TimeUnit.SECONDS)).isTrue();
+            go.countDown();
+            for (Future<HttpResponse<String>> response : responses) {
+                assertProblem(response.get(60, TimeUnit.SECONDS), 403, "forbidden");
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(rowsOf(administrator.institution())).hasSize(3);
+
+        closeTheWindowAndFireTheEmissionOf(administrator.institution());
+
+        List<Map<String, String>> rows = rowsOf(administrator.institution());
+        assertThat(rows).hasSize(4);
+        assertThat(rows.get(3).get("after_value")).contains("\"omittedCount\": 5");
+        assertChainIntact(administrator.institution(), 4);
+    }
+
+    // --- AZ46 to AZ50, AT38: what is not a denial by permission leaves no row ---
+
+    @Test
+    void aGrantedRequestLeavesNoRow() throws SQLException {
+        Session cashier = sessionOf(StaffRole.CASHIER);
+
+        HttpResponse<String> response = pay(cashier, "a-granted-key-001");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(rowsOf(cashier.institution())).isEmpty();
+    }
+
+    @Test
+    void anUnmappedRouteGivesForbiddenAndNoRow() throws SQLException {
+        Session administrator = sessionOf(StaffRole.SUPER_ADMIN);
+        long before = deniedRowsOfAllInstitutions();
+
+        HttpResponse<String> response = get(administrator, "/test/authorization/not-mapped");
+
+        assertProblem(response, 403, "forbidden");
+        assertThat(deniedRowsOfAllInstitutions()).isEqualTo(before);
+        assertThat(rowsOf(administrator.institution())).isEmpty();
+    }
+
+    @Test
+    void aRejectedOriginOnACookieRouteIsCsrfInvalidAndLeavesNoRow() throws Exception {
+        long before = deniedRowsOfAllInstitutions();
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port
+                        + "/api/v1/auth/sessions/refresh"))
+                .header("Origin", "https://evil.example")
+                .POST(HttpRequest.BodyPublishers.noBody()).build();
+
+        HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+
+        assertProblem(response, 403, "csrf-invalid");
+        assertThat(deniedRowsOfAllInstitutions()).isEqualTo(before);
+    }
+
+    @Test
+    void noCredentialAnExpiredTokenAndATamperedOneAreUnauthorizedAndLeaveNoRow()
+            throws SQLException {
+        Session administrator = sessionOf(StaffRole.ADMINISTRATOR);
+        long before = deniedRowsOfAllInstitutions();
+        String expired = new AccessTokenIssuer(JWS,
+                Clock.fixed(CLOCK.instant().minus(Duration.ofHours(3)), ZoneOffset.UTC))
+                .issueAccess(administrator.account(), administrator.institution(),
+                        administrator.family(), Set.of(AuthenticationMethod.PASSWORD,
+                                AuthenticationMethod.ONE_TIME_PASSWORD)).compact();
+
+        HttpResponse<String> none = rawPay(null);
+        HttpResponse<String> old = rawPay(expired);
+        HttpResponse<String> tampered = rawPay(administrator.token() + "x");
+
+        assertProblem(none, 401, "authentication-required");
+        assertThat(old.statusCode()).isEqualTo(401);
+        assertThat(tampered.statusCode()).isEqualTo(401);
+        assertThat(deniedRowsOfAllInstitutions()).isEqualTo(before);
+    }
+
+    // --- AZ60, AZ62: a resolution that fails writes nothing and spends nothing of the cap ---
+
+    @Test
+    void failedResolutionsWriteNoRowAndDoNotConsumeTheCap() throws SQLException {
+        Session administrator = sessionOf(StaffRole.ADMINISTRATOR);
+        int resolutionBefore = METRICS.resolutionFailedCount();
+        FAIL_RESOLUTION.set(true);
+        try {
+            for (int i = 0; i < 10; i++) {
+                assertProblem(pay(administrator, null), 500, "internal-error");
+            }
+        } finally {
+            FAIL_RESOLUTION.set(false);
+        }
+        assertThat(rowsOf(administrator.institution())).isEmpty();
+        assertThat(METRICS.resolutionFailedCount() - resolutionBefore).isEqualTo(10);
+
+        for (int i = 0; i < 3; i++) {
+            assertProblem(pay(administrator, null), 403, "forbidden");
+        }
+
+        assertThat(rowsOf(administrator.institution())).as("the cap was not spent").hasSize(3);
+    }
+
+    // --- WE98 to WE100, AZ59: the answer is the same whether the trace is written or not ---
+
+    @Test
+    void theAnswerIsTheSameForAMappedAndAnUnmappedRouteAndWhenTheWriterIsBroken()
+            throws SQLException {
+        Session administrator = sessionOf(StaffRole.ADMINISTRATOR);
+
+        HttpResponse<String> mapped = pay(administrator, null);
+        HttpResponse<String> unmapped = get(administrator, "/test/authorization/not-mapped");
+        assertThat(rowsOf(administrator.institution())).as("one row for the mapped route, none "
+                + "for the unmapped one").hasSize(1);
+        int controllerNow = controller.invocations();
+        int failedBefore = METRICS.denialAuditFailedCount();
+        FAIL_AUDIT_WRITES.set(true);
+        HttpResponse<String> broken;
+        try {
+            broken = pay(administrator, null);
+        } finally {
+            FAIL_AUDIT_WRITES.set(false);
+        }
+
+        JsonNode mappedBody = assertProblem(mapped, 403, "forbidden");
+        JsonNode unmappedBody = assertProblem(unmapped, 403, "forbidden");
+        JsonNode brokenBody = assertProblem(broken, 403, "forbidden");
+        for (String field : List.of("type", "title", "detail", "status")) {
+            assertThat(unmappedBody.get(field)).as(field).isEqualTo(mappedBody.get(field));
+            assertThat(brokenBody.get(field)).as(field).isEqualTo(mappedBody.get(field));
+        }
+        assertThat(controller.invocations()).isEqualTo(controllerNow);
+        assertThat(METRICS.denialAuditFailedCount() - failedBefore).isEqualTo(1);
+        assertThat(broken.body()).doesNotContain("SENTINEL-WRITER", "IllegalState");
+        assertThat(rowsOf(administrator.institution())).as("the broken write left nothing")
+                .hasSize(1);
+    }
+
+    // --- AZ51, AT33: no value of the request reaches the audit, the logs or the signals ---
+
+    @Test
+    void noValueOfTheRequestReachesTheRowsTheLogsOrTheSignals() throws Exception {
+        Session cashier = sessionOf(StaffRole.CASHIER);
+        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory
+                .getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        ch.qos.logback.classic.Level level = root.getLevel();
+        ListAppender<ILoggingEvent> logged = new ListAppender<>();
+        logged.start();
+        root.addAppender(logged);
+        root.setLevel(ch.qos.logback.classic.Level.DEBUG);
+        HttpResponse<String> response;
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port
+                            + "/test/authorization/accounts/SENTINEL-PATH-1?q=SENTINEL-QUERY-2"))
+                    .header("Authorization", "Bearer " + cashier.token())
+                    .header("Origin", "https://admin.colegio.edu.hn")
+                    .header("X-Sentinel", "SENTINEL-HEADER-4")
+                    .method("GET", HttpRequest.BodyPublishers.ofString("SENTINEL-BODY-3")).build();
+            response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+        } finally {
+            root.setLevel(level);
+            root.detachAppender(logged);
+        }
+
+        assertProblem(response, 403, "forbidden");
+        String rows = rowsOf(cashier.institution()).toString();
+        assertThat(rows).contains("authorization.access.denied");
+        String[] sentinels = {"SENTINEL-PATH-1", "SENTINEL-QUERY-2", "SENTINEL-BODY-3",
+                "SENTINEL-HEADER-4", cashier.token()};
+        assertThat(rows).doesNotContain(sentinels);
+        String ours = logged.list.stream()
+                .filter(event -> event.getLoggerName().startsWith("com.confia"))
+                .map(event -> event.getFormattedMessage() + event.getKeyValuePairs()
+                        + (event.getThrowableProxy() == null ? "" : event.getThrowableProxy()
+                                .getMessage()))
+                .collect(Collectors.joining("\n"));
+        assertThat(ours).doesNotContain(sentinels);
+        // The problem repeats the path as its instance, by design (WE99); nothing else of the request.
+        assertThat(response.body()).doesNotContain("SENTINEL-QUERY-2", "SENTINEL-BODY-3",
+                "SENTINEL-HEADER-4", cashier.token());
+    }
+
+    // --- Helpers of the second part ---
+
+    private void emptyTheSharedQueue() {
+        CLOCK.advance(WINDOW.plusSeconds(1));
+        audit.flushClosedWindows(CLOCK.instant());
+        assertThat(audit.pendingSummaryCount()).as("the shared queue is empty").isZero();
+    }
+
+    /**
+     * Closes the window of {@code institution} and fires the emission with denials of another key (a
+     * cashier of another institution asking for what a cashier lacks), as many as summaries were
+     * pending, and no more: the result never depends on which test ran before.
+     */
+    private void closeTheWindowAndFireTheEmissionOf(UUID institution) throws SQLException {
+        CLOCK.advance(WINDOW.plusSeconds(1));
+        Session trigger = sessionOf(StaffRole.CASHIER);
+        assertProblem(get(trigger, "/test/authorization/accounts/1"), 403, "forbidden");
+        int budget = audit.pendingSummaryCount();
+        for (int i = 0; i < budget && !hasSummary(institution); i++) {
+            assertProblem(get(trigger, "/test/authorization/accounts/1"), 403, "forbidden");
+        }
+        assertThat(hasSummary(institution)).as("the summary of the window was written").isTrue();
+    }
+
+    private boolean hasSummary(UUID institution) throws SQLException {
+        return rowsOf(institution).stream().anyMatch(row ->
+                "authorization.access.denied_summary".equals(row.get("action")));
+    }
+
+    private HttpResponse<String> get(Session session, String path) {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                .timeout(Duration.ofSeconds(30))
+                .header("Authorization", "Bearer " + session.token())
+                .header("Origin", "https://admin.colegio.edu.hn").GET().build();
+        return call(request);
+    }
+
+    private HttpResponse<String> rawPay(String token) {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://localhost:" + port
+                        + AuthorizationTestController.PAYMENTS))
+                .timeout(Duration.ofSeconds(30))
+                .header("Origin", "https://admin.colegio.edu.hn")
+                .POST(HttpRequest.BodyPublishers.noBody());
+        if (token != null) {
+            request.header("Authorization", "Bearer " + token);
+        }
+        return call(request.build());
+    }
+
+    private static HttpResponse<String> call(HttpRequest request) {
+        try {
+            return HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted while calling the server", e);
+        }
+    }
+
+    private static OffsetDateTime at(Instant instant) {
+        return OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
+    }
+
+    /** The audit rows of {@code institution} in chain order, read as the superuser of the container. */
+    private static List<Map<String, String>> rowsOf(UUID institution) throws SQLException {
+        List<Map<String, String>> rows = new ArrayList<>();
+        try (Connection connection = SharedPostgresContainer.connectionAs("postgres");
+                PreparedStatement statement = connection.prepareStatement("""
+                        select action, entity_id, entity_type, outcome, actor_id::text as actor_id,
+                               after_value::text as after_value, host(source_ip) as source_ip,
+                               request_id::text as request_id
+                          from shared_audit_log where institution_id = ? order by id
+                        """)) {
+            statement.setObject(1, institution);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    Map<String, String> row = new LinkedHashMap<>();
+                    for (String column : List.of("action", "entity_id", "entity_type", "outcome",
+                            "actor_id", "after_value", "source_ip", "request_id")) {
+                        row.put(column, result.getString(column));
+                    }
+                    rows.add(row);
+                }
+            }
+        }
+        return rows;
+    }
+
+    private static long deniedRowsOfAllInstitutions() throws SQLException {
+        try (Connection connection = SharedPostgresContainer.connectionAs("postgres");
+                PreparedStatement statement = connection.prepareStatement("""
+                        select count(*) from shared_audit_log
+                         where action like 'authorization.access.denied%'
+                        """);
+                ResultSet result = statement.executeQuery()) {
+            result.next();
+            return result.getLong(1);
+        }
+    }
+
+    private void assertChainIntact(UUID institution, long rows) {
+        AuditChainVerifier verifier = new DefaultAuditChainVerifier(runner,
+                new JooqAuditLogReader(dsl), new CanonicalAuditRowSerializer());
+        assertThat(verifier.verifyChainOf(new InstitutionId(institution)))
+                .asInstanceOf(InstanceOfAssertFactories.type(AuditChainVerification.Intact.class))
+                .satisfies(intact -> assertThat(intact.verifiedRows()).isEqualTo(rows));
+    }
+
     // --- Helpers ---
 
     private HttpResponse<String> pay(Session session, String idempotencyKey) {
@@ -281,17 +718,20 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
                         insert into identity_refresh_token_family
                             (institution_id, id, account_id, second_factor_verified,
                              user_agent_fingerprint, created_at, last_used_at, absolute_expires_at)
-                        values (?, ?, ?, true, ?, now() - interval '5 minutes',
-                                now() - interval '1 minute', now() + interval '12 hours')
+                        values (?, ?, ?, true, ?, ?,
+                                ?, ?)
                         """)) {
             statement.setObject(1, institution);
             statement.setObject(2, family);
             statement.setObject(3, account);
             statement.setString(4, UserAgentFingerprint.of("agente-uno").value());
+            statement.setObject(5, at(CLOCK.instant().minus(Duration.ofMinutes(5))));
+            statement.setObject(6, at(CLOCK.instant().minus(Duration.ofMinutes(1))));
+            statement.setObject(7, at(CLOCK.instant().plus(Duration.ofHours(12))));
             statement.executeUpdate();
             connection.commit();
         }
-        String token = new AccessTokenIssuer(JWS, Clock.systemUTC()).issueAccess(account,
+        String token = new AccessTokenIssuer(JWS, CLOCK).issueAccess(account,
                 institution, family, Set.of(AuthenticationMethod.PASSWORD,
                         AuthenticationMethod.ONE_TIME_PASSWORD)).compact();
         return new Session(institution, account, family, token);
@@ -373,12 +813,36 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
 
         @Bean
         static BeanPostProcessor testEntriesAndCountingLimiters(
-                org.springframework.beans.factory.ObjectProvider<LimiterCalls> calls) {
+                org.springframework.beans.factory.ObjectProvider<LimiterCalls> calls,
+                org.springframework.beans.factory.ObjectProvider<PermissionResolver> resolvers) {
             return new BeanPostProcessor() {
                 @Override
                 public Object postProcessAfterInitialization(Object bean, String beanName) {
+                    if (bean instanceof Clock) {
+                        return CLOCK;
+                    }
+                    if (bean instanceof AuthorizationMetrics) {
+                        return METRICS;
+                    }
+                    if (bean instanceof AuditLogWriter writer) {
+                        return (AuditLogWriter) entry -> {
+                            if (FAIL_AUDIT_WRITES.get()
+                                    && entry.action().startsWith("authorization.access.denied")) {
+                                throw new IllegalStateException("boom SENTINEL-WRITER");
+                            }
+                            writer.append(entry);
+                        };
+                    }
+                    if (bean instanceof PermissionDecider) {
+                        return new PermissionDecider(actor -> {
+                            if (FAIL_RESOLUTION.get()) {
+                                throw new IllegalStateException("resolution failed SENTINEL-RESOLVER");
+                            }
+                            return resolvers.getObject().resolve(actor);
+                        }, METRICS);
+                    }
                     if (bean instanceof PermissionedEndpoints) {
-                        return new PermissionedEndpoints(TEST_ENTRIES);
+                        return new PermissionedEndpoints(HARNESS_ENTRIES);
                     }
                     if (bean instanceof RateLimiterRegistry registry) {
                         Map<String, RateLimiter> counting = new ConcurrentHashMap<>();

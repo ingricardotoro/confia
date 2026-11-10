@@ -45,6 +45,11 @@ class SessionCookieRoutesCsrfIT extends SessionEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     @Test
     void theControlSameRequestsDoneRightAreServed() {
         Opened forRefresh = openSession(process);

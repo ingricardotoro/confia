@@ -41,7 +41,7 @@ class IssueSessionOriginAndSecondFactorIT extends SessionIssuanceIntegrationTest
     /** The second-factor flag reaches the family, the entry and the {@code amr} of the access token. */
     @Test
     void aSessionOpenedAfterTheSecondFactorRecordsItEverywhere() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
 
         IssuedSession session = issueSession(EIGHT).execute(context(),
                 commandFrom(ana, true, null, null));
@@ -58,8 +58,8 @@ class IssueSessionOriginAndSecondFactorIT extends SessionIssuanceIntegrationTest
     /** The two outcomes of an account with MFA: neither of them opens a session. */
     @Test
     void anAccountWithMfaThatHasNotCompletedItsSecondFactorGetsNoFamily() {
-        seedStaffAccount("sofia.mejia@colegio.edu.hn", CURRENT_PASSWORD, true);
-        enrollTotp(seedStaffAccount("jorge.aguilar@colegio.edu.hn", CURRENT_PASSWORD, true));
+        seedStaffAccount("sofia.mejia@colegio.edu.hn", CURRENT_PASSWORD, false);
+        enrollTotp(seedStaffAccount("jorge.aguilar@colegio.edu.hn", CURRENT_PASSWORD, false));
 
         assertThat(loginAt("jorge.aguilar@colegio.edu.hn", CURRENT_PASSWORD, "2026-10-12T08:00:00Z"))
                 .isInstanceOf(AuthenticationResult.SecondFactorRequired.class);
@@ -74,7 +74,7 @@ class IssueSessionOriginAndSecondFactorIT extends SessionIssuanceIntegrationTest
     /** The first origin scenario of web-edge: an entry written during a request carries its origin. */
     @Test
     void theEntryOfAnIssuanceDuringARequestCarriesItsAddressAndAgent() throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssueSession useCase = issueSession(EIGHT,
                 new RequestOriginAuditLogWriter(new JooqAuditLogWriter(dsl)),
                 new JooqRefreshTokenRepository(dsl));
@@ -93,7 +93,7 @@ class IssueSessionOriginAndSecondFactorIT extends SessionIssuanceIntegrationTest
     /** The second origin scenario: outside a request, both fields stay null. */
     @Test
     void theEntryOfAnIssuanceOutsideARequestKeepsBothFieldsNull() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssueSession useCase = issueSession(EIGHT,
                 new RequestOriginAuditLogWriter(new JooqAuditLogWriter(dsl)),
                 new JooqRefreshTokenRepository(dsl));
@@ -111,7 +111,7 @@ class IssueSessionOriginAndSecondFactorIT extends SessionIssuanceIntegrationTest
     void fiftyConcurrentIssuancesEachWriteTheirOwnAddressAndAgentWithoutCrossTalk()
             throws Exception {
         int requests = 50;
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssueSession useCase = issueSession(EIGHT,
                 new RequestOriginAuditLogWriter(new JooqAuditLogWriter(dsl)),
                 new JooqRefreshTokenRepository(dsl));

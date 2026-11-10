@@ -69,6 +69,11 @@ class SessionFlowRedactionIT extends SessionEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     // --- I210: the control, first ---
 
     @Test
@@ -117,7 +122,7 @@ class SessionFlowRedactionIT extends SessionEndpointSupport {
         Map<String, String> secrets = new LinkedHashMap<>();
         secrets.put("the password", PASSWORD);
         String email = "flujo." + UUID.randomUUID() + "@colegio.edu.hn";
-        seedAccount(email, true, false);
+        seedAccount(email, false, false);
 
         List<String> captured = capturing(() -> {
             HttpResponse<String> login = process.login(LoginProcess.freshAddress(), email, PASSWORD);

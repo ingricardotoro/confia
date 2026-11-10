@@ -98,8 +98,8 @@ class IdentityRowSecurityIT extends CommittingPostgresIntegrationTest {
             setInstitutionContext(connection, institutionId);
             assertRejected(connection, "identity_staff_account", """
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, false)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId, UUID.randomUUID(), email, PLACEHOLDER_PASSWORD_HASH);
             connection.rollback();
 
@@ -251,8 +251,8 @@ class IdentityRowSecurityIT extends CommittingPostgresIntegrationTest {
             setInstitutionContext(connection, institutionId);
             execute(connection, """
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, false)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId, accountId, "admin.token@colegio.edu.hn",
                     PLACEHOLDER_PASSWORD_HASH);
 
@@ -330,8 +330,8 @@ class IdentityRowSecurityIT extends CommittingPostgresIntegrationTest {
         transactionRunner().execute(contextOf(institutionId), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, false)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId, accountId, "token." + accountId + "@colegio.edu.hn",
                     PLACEHOLDER_PASSWORD_HASH);
             dsl.execute(PASSWORD_RESET_TOKEN_INSERT, institutionId, UUID.randomUUID(), accountId,
@@ -394,8 +394,8 @@ class IdentityRowSecurityIT extends CommittingPostgresIntegrationTest {
         transactionRunner().execute(contextOf(institutionId), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, false)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId, UUID.randomUUID(), email, PLACEHOLDER_PASSWORD_HASH);
             return null;
         });

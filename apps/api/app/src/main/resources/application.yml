@@ -66,6 +66,17 @@ confia:
       # counted and audited whole, only this wait is capped. Positive and at most 60s.
       max-wait: 30s
 
+  # The audit of the denials by permission (rbac-permission-matrix-and-audit-integration design.md
+  # D10). Per account, permission and window, the first max-full-rows denials are written as full audit
+  # rows and the rest are counted into one summary when the window closes. max-tracked-keys bounds the
+  # windows held in memory; a new key beyond it is written as a full row and counted as untracked. The
+  # cap is per process. None of these values is a secret.
+  authorization:
+    denials:
+      max-full-rows: 10
+      window: 5m
+      max-tracked-keys: 10000
+
 # The executor of the worker process (background-jobs-with-db-scheduler design.md decision 1; ADR-0016).
 # These keys are read only by the worker: the administrative and portal entry points exclude the whole
 # db-scheduler auto-configuration, so here they are inert. confia.jobs.executor.autostart is never set

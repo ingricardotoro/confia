@@ -1,6 +1,11 @@
 package com.confia.shared.web.edge;
 
+import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.PermissionResolver;
+import com.confia.shared.security.TransactionRunner;
+import com.confia.shared.web.authorization.AuthorizationProperties;
+import com.confia.shared.web.authorization.DenialWindows;
+import com.confia.shared.web.authorization.PermissionDenialAudit;
 import com.confia.shared.web.authentication.AuthenticatedEndpoint;
 import com.confia.shared.web.authentication.AuthenticatedEndpoints;
 import com.confia.shared.web.authentication.SecondFactorEndpoint;
@@ -9,10 +14,12 @@ import com.confia.shared.web.authorization.PermissionDecider;
 import com.confia.shared.web.authorization.PermissionedEndpoints;
 import com.confia.shared.web.authorization.RouteCoverageGuard;
 import com.confia.shared.web.authorization.RouteCoverageGuard.Classified;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.context.annotation.Bean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
@@ -26,11 +33,32 @@ import org.springframework.core.env.Environment;
  * the worker has no web edge.
  */
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(AuthorizationProperties.class)
 public class AuthorizationConfiguration {
 
     @Bean
     PermissionedEndpoints permissionedEndpoints() {
         return PermissionedEndpoints.forAdmin();
+    }
+
+    /**
+     * The cap, the window and the queue of summaries of the denials (design.md D10): one instance per
+     * process, in memory, bounded by the properties.
+     */
+    @Bean
+    DenialWindows denialWindows(AuthorizationProperties properties, AuthorizationMetrics metrics) {
+        return DenialWindows.of(properties, metrics);
+    }
+
+    /**
+     * The audit of the denials by permission (design.md D9). It depends on the transaction runner, so at
+     * shutdown it is destroyed before the data source and can write the summaries still pending.
+     */
+    @Bean
+    PermissionDenialAudit permissionDenialAudit(TransactionRunner runner, AuditLogWriter writer,
+            DenialWindows windows, AuthorizationMetrics metrics, Clock clock,
+            AuthorizationProperties properties) {
+        return new PermissionDenialAudit(runner, writer, windows, metrics, clock, properties.window());
     }
 
     @Bean

@@ -106,9 +106,9 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
         String hash = HASHER.hash(PlainPassword.of("Cafetal de Copán 2026")).value();
         transactionRunner().execute(contextOf(of), () -> dsl.execute("""
                 insert into identity_staff_account
-                    (institution_id, id, email, password_hash, mfa_required)
-                values (?, ?, ?, ?, ?)
-                """, of.value(), account.value(), LoginIdentifier.of(email).value(), hash, false));
+                    (institution_id, id, email, password_hash)
+                values (?, ?, ?, ?)
+                """, of.value(), account.value(), LoginIdentifier.of(email).value(), hash));
         return account;
     }
 
@@ -422,12 +422,13 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
     // --- WE29 ---
 
     @Test
-    void theProductionRoutesAreExactlyTheSevenSessionRoutesAndEveryOtherAnonymousRequestIs401() {
+    void theProductionRoutesAreExactlyTheSevenSessionRoutesAndTheRolesReportAndEveryOtherAnonymousRequestIs401() {
         assertThat(AdminProcessLauncher.routesOf(process))
                 .containsExactlyInAnyOrder("POST /api/v1/auth/sessions",
                         "GET /api/v1/auth/sessions/current", "POST /api/v1/auth/mfa/enrollments",
                         "POST /api/v1/auth/mfa/verifications", "POST /api/v1/auth/sessions/refresh",
-                        "DELETE /api/v1/auth/sessions/current", "DELETE /api/v1/auth/sessions");
+                        "DELETE /api/v1/auth/sessions/current", "DELETE /api/v1/auth/sessions",
+                        "GET /api/v1/identity/roles");
 
         assertProblem(get("/api/v1/auth/sessions"), 401, "authentication-required");
         assertProblem(get("/api/v1/anything"), 401, "authentication-required");

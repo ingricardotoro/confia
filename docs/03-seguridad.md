@@ -424,6 +424,22 @@ Prueba de integración que reutiliza un código ya consumido y espera rechazo.
 > (`identity.mfa.enrolled` con `replacedUnverified`). No hay migración: la inscripción en dos momentos
 > usa el contador `-1` como marca de «sin verificar».
 
+> **Nota fechada 2026-11-09 (cambio `rbac-permission-matrix-and-audit-integration`, PR 5a
+> `mfa-policy-derivation`): MFA obligatoria y derivada.** La tabla anterior queda reemplazada por una
+> sola regla, decidida por el propietario (O4 y Q1): **toda cuenta del personal debe un segundo
+> factor**, con rol asignado o sin él. Las filas «Recomendada» y «Opcional» y la condición «obligatoria
+> si tiene permiso de exportar» ya no aplican al personal. La exigencia no se guarda en la cuenta ni se
+> calcula desde roles o permisos: la decide la política `MfaPolicy`, cuya única definición de
+> producción es `MfaPolicy.STAFF` (toda cuenta la debe), registrada solo en el proceso administrativo y
+> sin ninguna propiedad que la cambie. Por eso quitar o cambiar la asignación de rol no desactiva la
+> exigencia, y una cuenta del personal con contraseña correcta nunca obtiene una sesión completa: recibe
+> el token restringido de verificación o el de inscripción. La columna
+> `identity_staff_account.mfa_required` deja de leerse desde esta rebanada y se retira en la
+> siguiente (5b). En la nota del 2026-10-23, «MFA activa» significa desde ahora una credencial
+> **verificada** de una cuenta del personal, sin la condición `mfa_required` en `true`.
+> El desenlace `Authenticated` se conserva en el tipo cerrado, pero solo una política de prueba lo
+> alcanza.
+
 ### 4.4 Bloqueo con retroceso exponencial
 
 No se usa bloqueo permanente de cuenta: es un vector de denegación de servicio contra usuarios

@@ -14,6 +14,7 @@ import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
 import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
+import com.confia.identity.web.SecondFactorExemptions;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.shared.security.SecurityContext;
@@ -139,8 +140,8 @@ class LoginBackoffAtomicityIT extends CommittingPostgresIntegrationTest {
         transactionRunner().execute(contextOf(institutionId), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, false)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId.value(), UUID.randomUUID(), identifier.value(), hash.value());
             return null;
         });
@@ -150,7 +151,7 @@ class LoginBackoffAtomicityIT extends CommittingPostgresIntegrationTest {
         return new AuthenticateWithPassword(transactionRunner(), () -> institutionId,
                 new JooqStaffAccountRepository(dsl), new JooqTotpCredentialRepository(dsl),
                 new JooqLoginBackoffStore(dsl), HASHER, FINGERPRINTER, new JooqAuditLogWriter(dsl),
-                fixedClock(instant));
+                SecondFactorExemptions.nobodyOwes(), fixedClock(instant));
     }
 
     private long countBackoffRows(InstitutionId institutionId, IdentifierFingerprint fingerprint) {

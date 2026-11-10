@@ -53,7 +53,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
     /** [I170]: a valid TOTP code with an {@code mfa-verify} token opens the full session. */
     @Test
     void aValidTotpCodeOpensTheSessionWithPasswordAndOneTimePassword() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, false);
         Enrolled enrolled = enroll(sofia);
 
         CompleteSecondFactorDecision decision = useCase(T0).execute(totp(sofia,
@@ -78,7 +78,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
     /** [I171]: a recovery code opens the session and is used up; the second use is refused. */
     @Test
     void aRecoveryCodeOpensTheSessionIsConsumedAndCannotBeUsedTwice() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, false);
         Enrolled enrolled = enroll(sofia);
         PlainRecoveryCode code = enrolled.recoveryCodes().get(0);
 
@@ -98,7 +98,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
     /** [I172]: a wrong code advances the backoff, and from the third failure the answer owes a delay. */
     @Test
     void aWrongCodeAdvancesTheBackoffAndFromTheThirdFailureOwesTheDelay() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, false);
         Enrolled enrolled = enroll(sofia);
         String wrong = wrongCodeAt(enrolled.secret(), T0).value();
 
@@ -122,7 +122,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
     /** [I175]: the code that was accepted for a counter is refused in the same window. */
     @Test
     void aCodeReusedInTheSameWindowIsRefused() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, false);
         Enrolled enrolled = enroll(sofia);
         String code = validCodeAt(enrolled.secret(), T0).value();
 
@@ -139,7 +139,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
     /** [I223]: a wrong recovery code is a failure of the same backoff as the TOTP codes. */
     @Test
     void aWrongRecoveryCodeAddsToTheTotpBackoffAndOwesTheDelay() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, false);
         Enrolled enrolled = enroll(sofia);
         String wrongTotp = wrongCodeAt(enrolled.secret(), T0).value();
         useCase(T0).execute(totp(sofia, SecondFactorPurpose.VERIFY, wrongTotp));
@@ -159,7 +159,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
     /** A right recovery code clears the backoff, as a right TOTP code does. */
     @Test
     void aRightRecoveryCodeClearsTheBackoff() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, false);
         Enrolled enrolled = enroll(sofia);
         useCase(T0).execute(recovery(sofia, SecondFactorPurpose.VERIFY, "ZZZZZZZZZZ"));
         assertThat(consecutiveFailures(sofia, T0)).isEqualTo(1);
@@ -176,7 +176,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
     /** [I169] and [I221]: a recovery code does not verify the credential, and is not consumed. */
     @Test
     void withAnEnrollTokenAndAnUnverifiedCredentialARecoveryCodeIsRefusedUnused() {
-        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, true);
+        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, false);
         Enrolled enrolled = enrollWithoutVerifying(jorge);
 
         CompleteSecondFactorDecision decision = useCase(T0).execute(recovery(jorge,
@@ -193,7 +193,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
     /** [I222]: with the credential already verified an {@code mfa-enroll} token proves nothing. */
     @Test
     void withAnEnrollTokenAndAVerifiedCredentialEveryProofIsRefusedAndNothingChanges() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, false);
         Enrolled enrolled = enroll(sofia);
         issue("2026-10-22T09:00:00Z", sofia);
 
@@ -217,8 +217,8 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
      */
     @Test
     void theFirstVerificationActivatesTheCredentialAndRevokesTheOtherSessionsOfTheAccountOnly() {
-        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, true);
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         Enrolled enrolled = enrollWithoutVerifying(jorge);
         IssuedSession older = issue("2026-10-22T08:00:00Z", jorge);
         IssuedSession newer = issue("2026-10-22T08:30:00Z", jorge);
@@ -257,7 +257,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
     /** [I177]: a later verification of the same account revokes nothing. */
     @Test
     void aLaterVerificationRevokesNothing() {
-        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, true);
+        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, false);
         Enrolled enrolled = enrollWithoutVerifying(jorge);
         useCase(T0).execute(totp(jorge, SecondFactorPurpose.ENROLL,
                 validCodeAt(enrolled.secret(), T0).value()));
@@ -278,7 +278,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
     /** [I178]: a failure after the revocation and before the commit leaves nothing behind. */
     @Test
     void anActivationThatFailsAfterRevokingRollsEverythingBack() {
-        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, true);
+        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, false);
         Enrolled enrolled = enrollWithoutVerifying(jorge);
         IssuedSession previous = issue("2026-10-22T08:00:00Z", jorge);
         AuditLogWriter failingOnActivation = entry -> {
@@ -307,7 +307,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
     @Test
     void anActivationWithoutOtherSessionsWritesTheEntryWithZeroAndNeverCrossesInstitutions() {
         InstitutionId other = new InstitutionId(UUID.randomUUID());
-        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, true);
+        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, false);
         StaffAccountId jorgeElsewhere = seedStaffAccountIn(other, jorge, JORGE);
         IssuedSession elsewhere = issueIn(other, "2026-10-22T08:00:00Z", jorgeElsewhere);
         Enrolled enrolled = enrollWithoutVerifying(jorge);
@@ -327,7 +327,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
 
     @Test
     void anAccountWithoutACredentialIsRefusedWhateverThePurpose() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, false);
 
         for (SecondFactorPurpose purpose : SecondFactorPurpose.values()) {
             assertThat(useCase(T0).execute(totp(sofia, purpose, "123456")).outcome())
@@ -338,7 +338,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
 
     @Test
     void aVerifyTokenWithAnUnverifiedCredentialIsRefusedWithoutEvaluatingTheProof() {
-        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, true);
+        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, false);
         Enrolled enrolled = enrollWithoutVerifying(jorge);
 
         CompleteSecondFactorDecision decision = useCase(T0).execute(totp(jorge,
@@ -351,7 +351,7 @@ class CompleteSecondFactorIT extends RevocationIntegrationTest {
 
     @Test
     void aProofThatCannotBeACodeIsRefusedAsAnIncorrectOneWithoutAnError() {
-        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, true);
+        StaffAccountId sofia = seedStaffAccount(SOFIA, CURRENT_PASSWORD, false);
         enroll(sofia);
 
         assertThat(useCase(T0).execute(totp(sofia, SecondFactorPurpose.VERIFY, "12ab")).outcome())

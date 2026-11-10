@@ -5,11 +5,14 @@ import com.confia.shared.security.csrf.CsrfTokens;
 import com.confia.shared.security.token.AccessTokenVerifier;
 import com.confia.shared.web.authentication.AccessTokenAuthenticationFilter;
 import com.confia.shared.web.authentication.AuthenticatedEndpoints;
+import com.confia.shared.web.authorization.AuditingAccessDeniedHandler;
 import com.confia.shared.web.authorization.PermissionDecider;
+import com.confia.shared.web.authorization.PermissionDenialRecorder;
 import com.confia.shared.web.authorization.PermissionedEndpoints;
 import com.confia.shared.web.csrf.AllowedOrigins;
 import com.confia.shared.web.csrf.CookieCredentialRoute;
 import com.confia.shared.web.csrf.CsrfOriginFilter;
+import com.confia.shared.web.problem.ProblemAccessDeniedHandler;
 import com.confia.shared.web.problem.ProblemAuthenticationEntryPoint;
 import com.confia.shared.web.problem.ProblemResponses;
 import com.confia.shared.web.request.WebEdgeProperties;
@@ -42,11 +45,15 @@ public class AdminSecurityConfiguration {
     SecurityFilterChain adminSecurityFilterChain(HttpSecurity http, Environment environment,
             ProblemResponses problems, AccessTokenVerifier verifier,
             SessionValidity sessionValidity, CsrfTokens csrfTokens, WebEdgeProperties webEdge,
-            PermissionedEndpoints permissioned, PermissionDecider decider)
+            PermissionedEndpoints permissioned, PermissionDecider decider,
+            PermissionDenialRecorder denialRecorder)
             throws Exception {
         AuthenticatedEndpoints authenticated = AuthenticatedEndpoints.forAdmin();
         HttpSecurity chain = SecurityChains.denyByDefault(http, PublicEndpoints.forAdmin(environment),
-                authenticated, permissioned, decider, problems);
+                authenticated, permissioned, decider,
+                new AuditingAccessDeniedHandler(new ProblemAccessDeniedHandler(problems),
+                        denialRecorder),
+                problems);
         addAuthenticationFilters(chain,
                 new AccessTokenAuthenticationFilter(verifier, authenticated, permissioned,
                         sessionValidity,

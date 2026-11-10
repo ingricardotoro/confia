@@ -101,6 +101,17 @@ class IdempotencyScopeExclusionInventoryTest {
     private static final String RESOLVER = "com.confia.shared.security.PermissionResolver";
 
     /**
+     * Named exceptions for the audit of the denials by permission (rbac-permission-matrix-and-audit-
+     * integration design.md D8 and D9): the recorder opens the transaction of the audit entry through the
+     * runner with the security context of the actor, and the configuration of the edge hands it the
+     * runner. No other web class, the rest of the authorization package included, may name them.
+     */
+    private static final String DENIAL_AUDIT =
+            "com.confia.shared.web.authorization.PermissionDenialAudit";
+    private static final String RUNNER = "com.confia.shared.security.TransactionRunner";
+    private static final String SECURITY_CONTEXT = "com.confia.shared.security.SecurityContext";
+
+    /**
      * What only the HTTP idempotency mechanism ({@value #EDGE_PACKAGE}) may add to the list above
      * (5.1): the executor it calls, what it returns, the key it builds and the context it carries.
      * No other web class may name any of them, so a controller reaches idempotency only through the
@@ -184,6 +195,13 @@ class IdempotencyScopeExclusionInventoryTest {
         if (className.equals(AUTHORIZATION_CONFIGURATION)) {
             allowed.add(RESOLVER);
         }
+        if (className.equals(DENIAL_AUDIT)) {
+            allowed.add(RUNNER);
+            allowed.add(SECURITY_CONTEXT);
+        }
+        if (className.equals(AUTHORIZATION_CONFIGURATION)) {
+            allowed.add(RUNNER);
+        }
         return allowed;
     }
 
@@ -207,6 +225,18 @@ class IdempotencyScopeExclusionInventoryTest {
                 {"com.confia.shared.web.idempotency.IdempotentRequestHandler", EDGE_PACKAGE}}) {
             assertThat(allowedFor(unrelated[0], unrelated[1])).as(unrelated[0])
                     .doesNotContain(method, RESOLVER);
+        }
+        assertThat(allowedFor(DENIAL_AUDIT, AUTHORIZATION_PACKAGE)).contains(RUNNER, SECURITY_CONTEXT);
+        assertThat(allowedFor(AUTHORIZATION_CONFIGURATION, "com.confia.shared.web.edge"))
+                .contains(RUNNER).doesNotContain(SECURITY_CONTEXT);
+        for (String unlisted : new String[] {
+                "com.confia.shared.web.authorization.PermissionDecider",
+                "com.confia.shared.web.authorization.AuditingAccessDeniedHandler",
+                "com.confia.shared.web.edge.AdminSecurityConfiguration",
+                "com.confia.identity.web.LoginController"}) {
+            String unlistedPackage = unlisted.substring(0, unlisted.lastIndexOf('.'));
+            assertThat(allowedFor(unlisted, unlistedPackage)).as(unlisted)
+                    .doesNotContain(RUNNER, SECURITY_CONTEXT);
         }
     }
 

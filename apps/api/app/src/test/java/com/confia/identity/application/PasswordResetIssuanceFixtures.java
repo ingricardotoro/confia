@@ -85,8 +85,8 @@ abstract class PasswordResetIssuanceFixtures extends CommittingPostgresIntegrati
         transactionRunner().execute(contextFor(institution), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, '$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aGFzaA', false)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, '$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aGFzaA')
                     """, institution, account, LoginIdentifier.of(email).value());
             return null;
         });

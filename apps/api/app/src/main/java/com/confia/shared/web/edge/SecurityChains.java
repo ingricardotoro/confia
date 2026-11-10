@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.access.AccessDeniedHandler;
 
 /**
  * The one definition of the deny-by-default chain, applied to the administrative process, to the
@@ -58,18 +59,21 @@ public final class SecurityChains {
     public static HttpSecurity denyByDefault(HttpSecurity http, PublicEndpoints endpoints,
             AuthenticatedEndpoints authenticated, ProblemResponses problems) throws Exception {
         return denyByDefault(http, endpoints, authenticated, new PermissionedEndpoints(List.of()),
-                null, problems);
+                null, new ProblemAccessDeniedHandler(problems), problems);
     }
 
     /**
      * The administrative chain: like the one with authenticated routes, with the routes of {@code
      * permissioned} after the restricted ones and before the final denial, each decided by the
      * manager that {@code decider} builds for its entry (rbac-permission-matrix-and-audit-integration
-     * design.md D6). {@code decider} may be {@code null} only when the list is empty.
+     * design.md D6). {@code decider} may be {@code null} only when the list is empty. {@code
+     * accessDeniedHandler} answers the {@code 403}: the administrative process gives it the one that
+     * records the denials by permission (design.md D8), the portal and the other overloads the plain one.
      */
     public static HttpSecurity denyByDefault(HttpSecurity http, PublicEndpoints endpoints,
             AuthenticatedEndpoints authenticated, PermissionedEndpoints permissioned,
-            PermissionDecider decider, ProblemResponses problems) throws Exception {
+            PermissionDecider decider, AccessDeniedHandler accessDeniedHandler,
+            ProblemResponses problems) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
@@ -81,7 +85,7 @@ public final class SecurityChains {
                 .headers(AbstractHttpConfigurer::disable)
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(new ProblemAuthenticationEntryPoint(problems))
-                        .accessDeniedHandler(new ProblemAccessDeniedHandler(problems)))
+                        .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(requests -> {
                     endpoints.endpoints().forEach(endpoint -> requests
                             .requestMatchers(endpoint.method(), endpoint.pattern()).permitAll());

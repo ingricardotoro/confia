@@ -46,10 +46,15 @@ class LoginRateLimitClosesH1IT extends LoginEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     /** I160: ten requests a minute reach the use case and the eleventh is refused before it. */
     @Test
     void tenLoginsAMinuteReachTheUseCaseAndTheEleventhIs429WithoutRunningIt() {
-        seedAccount(PENDING, true, false);
+        seedAccount(PENDING, false, false);
         String address = LoginProcess.freshAddress();
 
         for (int attempt = 1; attempt <= 10; attempt++) {
@@ -80,7 +85,7 @@ class LoginRateLimitClosesH1IT extends LoginEndpointSupport {
      */
     @Test
     void afterTenFailuresOfTheClientTheBackoffRowsAndTheFailureEntriesStopGrowing() {
-        seedAccount(ANA, false, false);
+        seedAccount(ANA, true, false);
         String address = LoginProcess.freshAddress();
 
         for (int attempt = 1; attempt <= 3; attempt++) {
@@ -114,8 +119,8 @@ class LoginRateLimitClosesH1IT extends LoginEndpointSupport {
     /** I162: only a rejected attempt counts as a failure of the address. */
     @Test
     void twelveCorrectLoginsOfAccountsWithAPendingSecondFactorLeaveTheFailureCountAtZero() {
-        seedAccount(PENDING, true, false);
-        seedAccount("pendiente.verificar@colegio.edu.hn", true, true);
+        seedAccount(PENDING, false, false);
+        seedAccount("pendiente.verificar@colegio.edu.hn", false, true);
         String address = LoginProcess.freshAddress();
 
         for (int attempt = 1; attempt <= 12; attempt++) {
@@ -132,7 +137,7 @@ class LoginRateLimitClosesH1IT extends LoginEndpointSupport {
     /** I163: a request refused by the origin filter does not use up the quota of the address. */
     @Test
     void aRequestWithAForeignOriginIs403AndTheQuotaOfTheAddressStaysAtNine() {
-        seedAccount(PENDING, true, false);
+        seedAccount(PENDING, false, false);
         String address = LoginProcess.freshAddress();
         for (int attempt = 1; attempt <= 9; attempt++) {
             assertThat(process.login(address, PENDING, PASSWORD).statusCode()).isEqualTo(200);

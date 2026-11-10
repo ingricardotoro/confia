@@ -245,6 +245,40 @@ class PermissionEdgeTest {
         assertThat(controllerInvocations()).isZero();
     }
 
+    // --- Task 4: what the handler hands to the recorder ---
+
+    @ParameterizedTest
+    @ValueSource(strings = {"123", "abc"})
+    void aDenialByPermissionIsRecordedOncePerRequestWithTheTemplateAndNeverTheValue(String id) {
+        process.denialRecorder().clear();
+
+        HttpResponse<String> response = getAs("/test/accounts/" + id,
+                process.tokens().fullSession(CASHIER));
+
+        tools.jackson.databind.JsonNode body = assertProblem(response, 403, "forbidden");
+        assertThat(process.denialRecorder().calls()).hasSize(1);
+        var call = process.denialRecorder().calls().get(0);
+        assertThat(call.denied().permission()).isEqualTo(Permission.IDENTITY_READ);
+        assertThat(call.denied().routeTemplate()).isEqualTo("/test/accounts/{id}");
+        assertThat(call.denied().actor().accountId()).isEqualTo(CASHIER);
+        assertThat(call.requestId()).as("the trace id of the problem the client received")
+                .isEqualTo(body.get("traceId").asString());
+        assertThat(call.denied().routeTemplate() + call.requestId()).doesNotContain(id);
+    }
+
+    @Test
+    void theCasesThatAreNotADenialByPermissionAreNeverRecorded() {
+        process.denialRecorder().clear();
+
+        assertProblem(getAs(ROUTE, process.tokens().passwordOnly(READER)), 403, "forbidden");
+        assertProblem(getAs("/test/not-mapped-anywhere", process.tokens().fullSession(READER)), 403,
+                "forbidden");
+        assertProblem(process.get(ROUTE), 401, "authentication-required");
+        assertThat(getAs(ROUTE, process.tokens().fullSession(READER)).statusCode()).isEqualTo(200);
+
+        assertThat(process.denialRecorder().calls()).isEmpty();
+    }
+
     // --- AZ60 to AZ64, WE101, WE102: a resolution that fails ---
 
     @Test

@@ -10,6 +10,7 @@ import com.confia.shared.security.AuthenticationMethod;
 import com.confia.shared.security.TransactionRunner;
 import com.confia.support.StaffRoleFixtures;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
@@ -45,8 +46,8 @@ class UnknownRoleCodeResolutionIT {
             try (Connection owner = database.connectionAs("confia_owner")) {
                 owner.setAutoCommit(false);
                 StaffRoleFixtures.fixInstitution(owner, institution);
-                StaffRoleFixtures.insertAccount(owner, institution, ghost);
-                StaffRoleFixtures.insertAccount(owner, institution, cashier);
+                insertAccountBefore15(owner, institution, ghost);
+                insertAccountBefore15(owner, institution, cashier);
                 try (Statement statement = owner.createStatement()) {
                     statement.execute("alter table identity_staff_account_role drop constraint "
                             + "identity_staff_account_role_code_chk");
@@ -64,6 +65,25 @@ class UnknownRoleCodeResolutionIT {
             assertThat(resolver.resolve(actor(institution, ghost))).isEmpty();
             assertThat(resolver.resolve(actor(institution, cashier)))
                     .isEqualTo(StaffRole.CASHIER.permissions());
+        }
+    }
+
+    /**
+     * The database is pinned to version 14, where the staff account still requires the second
+     * factor column, so the shared fixture (written for the current schema) cannot insert it.
+     */
+    private static void insertAccountBefore15(Connection connection, UUID institution, UUID account)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                insert into identity_staff_account
+                    (institution_id, id, email, password_hash, mfa_required)
+                values (?, ?, ?, ?, true)
+                """)) {
+            statement.setObject(1, institution);
+            statement.setObject(2, account);
+            statement.setString(3, "staff-" + account + "@colegio.edu.hn");
+            statement.setString(4, "$argon2id$v=19$m=19456,t=3,p=1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNoaGFzaGhhc2g");
+            statement.executeUpdate();
         }
     }
 

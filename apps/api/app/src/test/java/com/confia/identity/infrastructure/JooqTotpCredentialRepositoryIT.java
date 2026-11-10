@@ -194,8 +194,8 @@ class JooqTotpCredentialRepositoryIT extends CommittingPostgresIntegrationTest {
     private void seedAccount(InstitutionId institutionId, StaffAccountId accountId) {
         dsl.execute("""
                 insert into identity_staff_account
-                    (institution_id, id, email, password_hash, mfa_required)
-                values (?, ?, ?, ?, true)
+                    (institution_id, id, email, password_hash)
+                values (?, ?, ?, ?)
                 """, institutionId.value(), accountId.value(),
                 "mfa." + accountId.value() + "@colegio.edu.hn", PLACEHOLDER_PASSWORD_HASH);
     }

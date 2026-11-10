@@ -52,7 +52,7 @@ class RevocationProducersIT extends RevocationIntegrationTest {
     }
 
     private String reuseDetected() {
-        StaffAccountId account = seedStaffAccount("reuso@colegio.edu.hn", CURRENT_PASSWORD, false);
+        StaffAccountId account = seedStaffAccount("reuso@colegio.edu.hn", CURRENT_PASSWORD, true);
         IssuedSession first = issue(T0, account);
         rotate("2026-10-22T10:01:00Z", first.refreshToken().value(), AGENT_ONE);
         rotate(LATER, first.refreshToken().value(), AGENT_ONE);
@@ -60,7 +60,7 @@ class RevocationProducersIT extends RevocationIntegrationTest {
     }
 
     private String passwordChange() {
-        StaffAccountId account = seedStaffAccount("clave@colegio.edu.hn", CURRENT_PASSWORD, false);
+        StaffAccountId account = seedStaffAccount("clave@colegio.edu.hn", CURRENT_PASSWORD, true);
         IssuedSession session = issue(T0, account);
         String token = issueTokenAt(account, T0).value();
         resetAt(token, "Lempira y maíz 2026", new SecondFactorProof.None(), "2026-10-22T10:05:00Z");
@@ -68,7 +68,7 @@ class RevocationProducersIT extends RevocationIntegrationTest {
     }
 
     private String logout() {
-        StaffAccountId account = seedStaffAccount("salida@colegio.edu.hn", CURRENT_PASSWORD, false);
+        StaffAccountId account = seedStaffAccount("salida@colegio.edu.hn", CURRENT_PASSWORD, true);
         IssuedSession session = issue(T0, account);
         endCurrentSession(LATER).execute(session.refreshToken().value(),
                 UUID.randomUUID().toString());
@@ -76,7 +76,7 @@ class RevocationProducersIT extends RevocationIntegrationTest {
     }
 
     private String logoutOfEverySession() {
-        StaffAccountId account = seedStaffAccount("todas@colegio.edu.hn", CURRENT_PASSWORD, false);
+        StaffAccountId account = seedStaffAccount("todas@colegio.edu.hn", CURRENT_PASSWORD, true);
         IssuedSession session = issue(T0, account);
         endAllSessions(LATER).execute(actorOf(institutionId, account, session.sessionId()),
                 UUID.randomUUID().toString());
@@ -84,7 +84,7 @@ class RevocationProducersIT extends RevocationIntegrationTest {
     }
 
     private String mfaChange() {
-        StaffAccountId account = seedStaffAccount("factor@colegio.edu.hn", CURRENT_PASSWORD, true);
+        StaffAccountId account = seedStaffAccount("factor@colegio.edu.hn", CURRENT_PASSWORD, false);
         Enrolled enrolled = enrollWithoutVerifying(account);
         IssuedSession previous = issue("2026-10-22T08:00:00Z", account);
         CompleteSecondFactorDecision decision = completeSecondFactor(LATER)
@@ -96,7 +96,7 @@ class RevocationProducersIT extends RevocationIntegrationTest {
     }
 
     private String bindingChanged() {
-        StaffAccountId account = seedStaffAccount("vinculo@colegio.edu.hn", CURRENT_PASSWORD, false);
+        StaffAccountId account = seedStaffAccount("vinculo@colegio.edu.hn", CURRENT_PASSWORD, true);
         IssuedSession session = issueSession(T0).execute(context(),
                 commandFrom(account, false, AGENT_ONE, "203.0.113.9"));
         rotation(fixedClock(LATER), new JooqAuditLogWriter(dsl), institutionId)

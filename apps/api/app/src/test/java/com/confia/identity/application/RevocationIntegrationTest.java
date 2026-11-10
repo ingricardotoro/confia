@@ -87,8 +87,8 @@ abstract class RevocationIntegrationTest extends RotationIntegrationTest {
         String hash = HASHER.hash(PlainPassword.of(CURRENT_PASSWORD)).value();
         transactionRunner().execute(contextOf(institution), () -> dsl.execute("""
                 insert into identity_staff_account
-                    (institution_id, id, email, password_hash, mfa_required)
-                values (?, ?, ?, ?, false)
+                    (institution_id, id, email, password_hash)
+                values (?, ?, ?, ?)
                 """, institution.value(), accountId.value(), LoginIdentifier.of(email).value(),
                 hash));
         return accountId;

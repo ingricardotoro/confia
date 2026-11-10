@@ -52,7 +52,7 @@ class RefreshRotationConcurrencyIT extends RotationIntegrationTest {
     @Test
     void aRotationWaitingForTheLockOfAFamilyTheResetRevokesIsRejectedAndConsumesNothing()
             throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issue("2026-10-15T15:00:00Z", ana);
         PlainPasswordResetToken resetToken = issueTokenAt(ana, "2026-10-15T15:00:00Z");
         CountDownLatch revoked = new CountDownLatch(1);
@@ -125,7 +125,7 @@ class RefreshRotationConcurrencyIT extends RotationIntegrationTest {
     @Test
     void theSameTokenFromTwoDevicesIsOneFreshRotationAndOneReuseWithExactlyOneSuccessor()
             throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issue("2026-10-15T15:00:00Z", ana);
         String token = session.refreshToken().value();
         CountDownLatch locked = new CountDownLatch(1);
@@ -168,7 +168,7 @@ class RefreshRotationConcurrencyIT extends RotationIntegrationTest {
     @Test
     void whenTheFirstTransactionHasAlreadyReadTheTokenTheSecondOneStillWaitsAndTheOutcomeIsTheSame()
             throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issue("2026-10-15T15:00:00Z", ana);
         String token = session.refreshToken().value();
         CountDownLatch reread = new CountDownLatch(1);
@@ -206,7 +206,7 @@ class RefreshRotationConcurrencyIT extends RotationIntegrationTest {
     @Test
     void theSameTokenFromTheSameDeviceIsOneFreshRotationAndOneGraceReplayWithTheSameSuccessor()
             throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issue("2026-10-15T15:00:00Z", ana);
         String token = session.refreshToken().value();
         CountDownLatch locked = new CountDownLatch(1);
@@ -235,7 +235,7 @@ class RefreshRotationConcurrencyIT extends RotationIntegrationTest {
     @Test
     void whenTheFirstTransactionHasAlreadyReadTheTokenTheSameDeviceStillGetsTheGraceReplay()
             throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issue("2026-10-15T15:00:00Z", ana);
         String token = session.refreshToken().value();
         CountDownLatch reread = new CountDownLatch(1);
@@ -292,7 +292,7 @@ class RefreshRotationConcurrencyIT extends RotationIntegrationTest {
      */
     @Test
     void aResetThatWaitsForARotationRevokesTheFamilyAndLeavesNoLiveToken() throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         IssuedSession session = issue("2026-10-15T15:00:00Z", ana);
         PlainPasswordResetToken resetToken = issueTokenAt(ana, "2026-10-15T15:00:00Z");
         CountDownLatch locked = new CountDownLatch(1);
@@ -334,7 +334,7 @@ class RefreshRotationConcurrencyIT extends RotationIntegrationTest {
     @Test
     void aReuseThatWaitsForARotationOfTheSuccessorRevokesTheFamilyAndLeavesNoLiveToken()
             throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, "2026-10-15T14:00:00Z", "2026-10-15T15:15:00Z",
                 "2026-10-16T02:00:00Z", null, null);
         ConsumedSeed seed = seedConsumedToken(family, "2026-10-15T14:00:00Z", "2026-10-15T22:00:00Z",
@@ -365,7 +365,7 @@ class RefreshRotationConcurrencyIT extends RotationIntegrationTest {
     @Test
     void aRotationThatWaitsForAReuseOfTheConsumedTokenIsRejectedAsRevokedAndConsumesNothing()
             throws Exception {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, "2026-10-15T14:00:00Z", "2026-10-15T15:15:00Z",
                 "2026-10-16T02:00:00Z", null, null);
         ConsumedSeed seed = seedConsumedToken(family, "2026-10-15T14:00:00Z", "2026-10-15T22:00:00Z",

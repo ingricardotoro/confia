@@ -245,3 +245,296 @@ Las ramas inferiores solo tuvieron ejecuciones focalizadas. Las pruebas de la ta
 | #254 (3a-2) | `9456f55` | pass, 13 min 51 s | pass, 47 min 39 s |
 | #255 (3a-3) | `d5643f3` | pass, 14 min 27 s (tras relanzar el job por la inestabilidad de `CsrfKeyStartupTest`) | pass, 44 min 55 s |
 | #256 (3b) | `3c68e92` | pass, 14 min 44 s | pass, 44 min 8 s |
+
+## Tarea 4a (2026-11-09): puerto de métricas completo, adaptador y nota de `docs/07`
+
+Rama `change/rbac-permission-matrix-and-audit-integration-4a-authorization-metrics`, creada desde `origin/main` (tareas 1 a 3 fusionadas). Corte 4a/4b del diseño §10.1; 4b (manejador, grabador, `DenialWindows`, propiedades, ITs, cableado de la cadena) no se empezó y la tarea 4 sigue sin marcarse.
+
+| Commits | Líneas efectivas | Verificación focalizada (`-Djacoco.skip=true`, JDK 25) |
+|---|---|---|
+| `9a44aaa` `feat(observability): publish the authorization events through a port`; `2080360` `docs(ops): note the four authorization events` | **254** contra `origin/main` (235 añadidas, 19 borradas; sin `openspec/`) | `LogAuthorizationMetricsTest` 6, `DocumentationNotesTest` 17, `AuthorizationBoundaryRulesTest` 5, `ProcessBeanIsolationTest` 33, `PermissionDeciderTest` 8: 69, 0 fallos |
+
+- **ROJO observado:** con las pruebas nuevas y sin producción, la compilación de pruebas falló con 14 errores `cannot find symbol` en `LogAuthorizationMetricsTest` (`denialOmitted`, `denialAuditFailed`, `denialTrackerFull`, `trackedKeys`). **No observado por separado:** la prueba nueva de `DocumentationNotesTest` (nota de `docs/07`), porque el fallo de compilación la tapó; se escribió la nota después sin correr esa prueba contra el árbol sin nota.
+- **Demostración deliberada:** no hecha en 4a (la tarea 4 la fija sobre código de 4b).
+- **Ajustes fuera de los archivos centrales:** `RecordingAuthorizationMetrics` (doble de pruebas en `shared/web/harness`) implementa los tres métodos nuevos y expone contadores; `LogAuthorizationMetrics` pasó de `synchronized` con un solo contador a un mapa por clave (evento y permiso), como `LogRateLimitMetrics`; sus pruebas viven en `shared/observability/metrics`, no en `shared/web/authorization`.
+- La nota de `docs/07` está en la sección 5.4 y la comprueba `docs07Section54HasTheDatedNoteWithTheFourAuthorizationEvents`.
+- No se corrió `./mvnw verify` completo (memoria limitada); queda al CI del PR.
+
+## Tarea 4b (2026-11-09): parcial, bloqueada por dos pruebas de inventario fuera de las superficies permitidas
+
+Rama `change/rbac-permission-matrix-and-audit-integration-4b-permission-denial-audit`, sobre la punta de 4a (`284d881`). **La tarea 4 sigue sin marcarse.**
+
+### Estado de los commits
+
+| Commit | Contenido | Líneas efectivas |
+|---|---|---|
+| `37995de` `test(observability): cover concurrent signals and null permission in authorization metrics` | Cierra las sugerencias **R3-001** y **R3-002** de la revisión de 4a: ocho hilos sobre una sola clave producen un solo evento `WARN` y el siguiente evento lleva `suppressed=7`; `denialOmitted(null)` lanza `NullPointerException` sin evento ni clave. `LogAuthorizationMetricsTest` pasó de 6 a 8 pruebas. Las dos pasaron a la primera contra el código existente (no hubo rojo: cubren comportamiento ya correcto, sin defecto en `LogAuthorizationMetrics`). | 57 |
+| `4d2fd11` `feat(web): count permission denials in bounded in-memory windows` | Unidad A: `DenialWindows`, `AuthorizationProperties`, `application.yml`, `MutableClock` (de prueba), `DenialWindowsTest` (22) y la regla `denialWindowsMappingFunctionsTouchNoOtherMapping` con su fixture. | 956 |
+| Sin comprometer (árbol de trabajo) | Unidad B: `AuditingAccessDeniedHandler`, `PermissionDenialRecorder`, `PermissionDenialAudit`, cableado en `SecurityChains`, `AdminSecurityConfiguration` y `AuthorizationConfiguration`, doble de prueba del grabador, `PermissionEdgeTest` (+3), `PermissionDenialAuditIT` (14), `AuthorizationEdgeIT` segunda parte (+11), `NoRealTimeInDenialTestsTest` (2). | ≈ 1 400 |
+
+La unidad B no se compromete porque dos pruebas de inventario existentes fallan con ella y están fuera de las superficies permitidas de este lote (un commit en rojo no entra al historial):
+
+1. `apps/api/app/src/test/java/com/confia/shared/security/IdempotencyScopeExclusionInventoryTest.java`: `PermissionDenialAudit` (paquete web) depende de `shared.security.TransactionRunner` y de `SecurityContext`, y `AuthorizationConfiguration` de `TransactionRunner`; ninguno está en la lista permitida de la capa web. Hace falta ampliar `AUTHORIZATION_MAY_ALSO_DEPEND_ON` con esos dos tipos y `AuthorizationConfiguration` con `TransactionRunner`, y la prueba de alcance de la lista.
+2. `apps/api/app/src/test/java/com/confia/shared/audit/AuditScopeExclusionInventoryTest.java` (`noWebPackageClassDependsOnTheAuditModule`): ningún paquete web puede depender de `shared.audit`; `PermissionDenialAudit` usa `AuditEntry`, `AuditJson` y `AuditLogWriter`, y `AuthorizationConfiguration` el puerto del escritor. Hace falta una excepción nombrada para esas dos clases, con su justificación (el diseño D9 manda auditar desde el manejador del `403`).
+
+### Evidencia de ciclo TDD (tarea 4b)
+
+| Unidad | Prueba | ROJO observado | VERDE |
+|---|---|---|---|
+| `DenialWindows` | `DenialWindowsTest` | Compilación de pruebas: `cannot find symbol class DenialWindows` (con `DenialWindowsTest` ya escrita y sin producción). Con producción, 2 de 22 fallaron por un defecto real (se encolaba un resumen de cero omisiones al cerrar una ventana) y se corrigió | 22/22; tres ejecuciones con `-Dsurefire.runOrder=random`: 22/22, 22/22, 22/22 [BI138] |
+| Borde con base de datos | `AuthorizationEdgeIT` (segunda parte) | Con las clases creadas y **sin enlazar** el manejador: 7 de 17 fallaron con `Expected size: 2 but was: 0 in: []` (AZ37), `Expected size: 3 but was: 0` (tope) y `Expected size: 1 but was: 0` (WE98) | 17/17; tres órdenes aleatorios (semillas 11, 22 y 33 de `junit.jupiter.execution.order.random.seed`, con `@TestMethodOrder(MethodOrderer.Random.class)`): 17/17 cada una |
+| Grabador | `PermissionDenialAuditIT` | Con las clases creadas y sin enlazar: 2 fallos de la prueba (expectativas mal escritas: `jsonb` reordena los miembros del detalle y el reintento da 4 intentos, no 5); se corrigieron las pruebas, no la producción | 14/14 |
+| Reglas | `NoRealTimeInDenialTestsTest`, `AuthorizationBoundaryRulesTest` | **No observado el rojo previo** de ambas (se escribieron junto con su producción); sí se observaron al aplicar las demostraciones 7 y 8 | 2/2 y 7/7 |
+| Manejador del arnés | `PermissionEdgeTest` (+3) | **No observado el rojo previo** por separado | 28/28 |
+
+**Hallazgo de herramienta:** ArchUnit no importa los métodos sintéticos, por lo que la primera versión de la regla de D10 falló de forma vacía («failed to check any classes»); se reemplazó por una lectura directa del bytecode con el ASM que Spring reempaqueta (`org.springframework.asm`), que sí ve `lambda$attempt$0` y los demás.
+
+### Demostraciones deliberadas (cada una revertida y confirmada con `cmp` contra una copia en el directorio temporal de la sesión)
+
+| # | Ruptura | Rojo por la aserción de resultado | `cmp` |
+|---|---|---|---|
+| 1 | No volver a enlazar `RequestOrigin.CURRENT` al escribir el resumen | `PermissionDenialAuditIT...NoOrigin`: «not the address of the request that fired it» | OK |
+| 2 | Contar dentro de la lambda del `TransactionRunner` (una llamada más a `windows.record` allí) | `aRetryOfTheRunnerDoesNotCountTheDenialTwice` y otras 3 | OK |
+| 3 | Quitar el `catch` de `PermissionDenialAudit.record` | `AuthorizationEdgeIT.theAnswerIsTheSame...` (llega `500`) y 2 de `PermissionDenialAuditIT` (la excepción sale) | OK |
+| 4 | `full <= T` | `DenialWindowsTest`: 9 fallos, entre ellos `concurrentDenialsOfOneKeyNeverExceedTheCap` [AZ79] | OK |
+| 5 | Quitar la rama del reloj retrocedido | `backwardClockClosesTheWindowAndKeepsTheSum` (DC-1) | OK |
+| 6 | `destroy()` vacío | `shutdownWritesPendingSummaries...` y otras 2 (DC-2) | OK |
+| 7 | `Thread.sleep` en `DenialWindowsTest` | `NoRealTimeInDenialTestsTest`: `calls method <java.lang.Thread.sleep(long)>` | OK |
+| 8 | `sweepIfDue` dentro de la función de `record` | `denialWindowsMappingFunctionsTouchNoOtherMapping`: `lambda$attempt$0 calls ...DenialWindows.sweepIfDue` | OK |
+| 9 | Escribir la cola (hasta 10) en `afterDenial` | `oneDenialWritesAtMostOneSummary` y 2 más | OK |
+| 10 | Quitar la regla de distancia de la compuerta | `farFutureNextSweepInstantIsTreatedAsDue` | OK |
+| 11 | No invocar `fullRowFailed` | `failedFullRowIsCountedInTheSummary` | OK |
+| 12 | Quitar el límite por barrido | `sweepMovesAtMostItsLimitAndLeavesTheRest` y `sweepRunsAtMostOncePerSecond` | OK |
+| 13 | `offerLast` al devolver un resumen fallido | `failedSummaryReturnsToTheHeadAndStopsThePass` («back at the head») | OK |
+| 14 | Quitar el presupuesto del apagado | `shutdownStopsWhenItsBudgetIsSpent` (se escriben 5, no 3) | OK |
+| 15 | Sin vaciado previo, con un resumen ajeno en la cola y un solo disparo | `fiveDenialsWriteThreeRowsAndAfterTheWindowOneSummaryOfTwo`: «the summary of the window was written» | OK |
+
+Notas: en la 2 la ruptura es una aproximación (una llamada extra a `windows.record` dentro de la lambda), no el movimiento literal de la línea. En la 15 el ayudante de la prueba (`closeTheWindowAndFireTheEmissionOf`) dispara tantas denegaciones de otra clave como resúmenes pendientes haya tras el primer barrido; la ruptura lo reduce a un disparo, que es lo que el diseño describe.
+
+### Desviaciones y pendientes
+
+- El `MutableClock` del diseño D19 no es reutilizable (el existente es una fuente de nanosegundos, de paquete, que nunca retrocede); se creó `shared/web/harness/MutableClock` como `java.time.Clock` mutable.
+- En lugar de `edgeSummaryTestsPassInAnyOrder` (una prueba que se lanza a sí misma), `AuthorizationEdgeIT` usa `@TestMethodOrder(MethodOrderer.Random.class)` y se ejecutó con tres semillas. Cada prueba de resumen avanza el reloj, vacía la cola con `flushClosedWindows` y solo afirma sobre su institución.
+- `AuthorizationEdgeIT` reemplaza en el contexto el `Clock`, `AuthorizationMetrics`, `AuditLogWriter` y el decisor (con un resolutor que puede fallar); la primera parte ahora usa ese reloj para las sesiones.
+- No cubierto: AZ49 (`404` de objeto sin asiento), porque el arnés no tiene una ruta con permiso que responda `404`; la búsqueda de centinelas de los registros se limita a los registradores de `com.confia` (la raíz en `DEBUG` incluye los de Spring, que repiten la ruta por su cuenta); el cuerpo del `403` repite la ruta en `instance` por diseño (WE99).
+- Un resumen que no cabe al devolverse a una cola llena cuenta dos veces `authorization_denial_audit_failed` (el fallo de escritura y el descarte).
+- Sin líneas nuevas en `ProcessBeanPolicy` (`ProcessBeanIsolationTest` 33/33). No se corrió `./mvnw verify` completo (memoria limitada).
+
+### Cierre de la unidad B de 4b (2026-11-09, tras la aprobación de las excepciones nombradas)
+
+El propietario aprobó las excepciones nombradas en las dos pruebas de inventario; con ellas la unidad B se comprometió en dos commits. Lo anterior de esta sección («sin comprometer», «bloqueada») queda superado por esta tabla.
+
+| Commit | Contenido | Líneas efectivas |
+|---|---|---|
+| `8abf59e` `feat(web): audit permission denials with a bounded in-memory cap and a window summary` | `AuditingAccessDeniedHandler`, `PermissionDenialRecorder`, `PermissionDenialAudit`, cableado (`SecurityChains` recibe el manejador por parámetro, `AdminSecurityConfiguration`, `AuthorizationConfiguration`), excepciones nombradas en `IdempotencyScopeExclusionInventoryTest` (`TransactionRunner` y `SecurityContext` solo para `PermissionDenialAudit`; `TransactionRunner` solo para `AuthorizationConfiguration`) y en `AuditScopeExclusionInventoryTest` (solo esas dos clases pueden nombrar `shared.audit`), cada una con su nota de D8 y D9, más el arnés (`WebEdgeHarness`, `HarnessProcess`, doble del grabador). Control negativo: `allowedFor` y `webClassMayDependOnAudit` siguen negando esos tipos a `PermissionDecider`, `AuditingAccessDeniedHandler`, `SecurityChains`, `AdminSecurityConfiguration` y a un controlador. | 427 (419 + 8) |
+| `898dd4e` `test(web): prove the audit of permission denials at the edge, with real time banned` | `PermissionDenialAuditIT` (14), `AuthorizationEdgeIT` segunda parte (+11), `PermissionEdgeTest` (+3), `NoRealTimeInDenialTestsTest` (2). | 1 040 (1 035 + 5) |
+
+Medición total de 4b contra `284d881`, sin `openspec/`: **2 480 líneas** (2 467 añadidas, 13 borradas), en cuatro commits de código (`37995de` 57, `4d2fd11` 956, `8abf59e` 427, `898dd4e` 1 040). El último supera el aviso de 800 por pruebas de integración (el diseño subestimó las pruebas, como en las tareas 1 a 3); un posible corte es `PermissionDenialAuditIT` (460) frente al resto.
+
+**Verificación tras el cierre (`-Djacoco.skip=true`):** `IdempotencyScopeExclusionInventoryTest` 4, `AuditScopeExclusionInventoryTest` 8, `DenialWindowsTest` 22, `LogAuthorizationMetricsTest` 8, `NoRealTimeInDenialTestsTest` 2, `AuthorizationBoundaryRulesTest` 7, `ProcessBeanIsolationTest` 33, `PermissionEdgeTest` 28, `PermissionDeciderTest` 8, `WebEdgeScopeExclusionInventoryTest` 29, `TransactionsOnlyInSharedSecurityTest` 3: 0 fallos, salida 0. ITs: `PermissionDenialAuditIT` 14 y `AuthorizationEdgeIT` 17, 0 fallos. No se corrió `./mvnw verify` completo (memoria limitada).
+
+**La tarea 4 se deja abierta en `tasks.md`** porque no todas sus comprobaciones están observadas: AZ49 (`404` de objeto sin asiento) no está cubierta; `edgeSummaryTestsPassInAnyOrder` se sustituyó por orden aleatorio con tres semillas; la demostración 2 es una aproximación; faltan rojos previos observados de varias pruebas (ver arriba) y no hay `./mvnw -B verify` completo de la tarea (queda al CI del PR).
+
+## Tarea 5 (2026-11-09): PR 5a `mfa-policy-derivation`, comprometida; queda abierta en `tasks.md`
+
+Rama `change/rbac-permission-matrix-and-audit-integration-5a-mfa-policy-derivation`, apilada sobre la punta de 4b (`031c360`). Sin push. El propietario aprobó la corrección
+de la superficie de edición: `ProcessBeanPolicy.java` vive en `src/test/java/com/confia/bootstrap/`, no en `src/main`. `ProcessBeanIsolationTest.java` no se modificó.
+
+| Commit | Contenido | Líneas efectivas |
+|---|---|---|
+| `bca0330` `refactor(identity): derive the second factor requirement from MfaPolicy instead of a column` | `MfaPolicy` (`STAFF = account -> true`), `StaffAccount` sin el campo, `AuthenticateWithPassword` y `ResetPasswordWithToken` con la política, repositorio sin `getMfaRequired()`, `IdentityConfiguration.mfaPolicy()`, línea `com.confia.identity.domain` en `ProcessBeanPolicy`, Javadoc de `AuthenticationResult`, y todas las pruebas (sonda S1, `MfaPolicyTest`, `MfaPolicyProductionWiringTest`, `AuthenticateWithPasswordStaffPolicyIT`, `LoginEndpointStaffPolicyIT`, `SecondFactorExemptions*`, migración de los ayudantes y de los casos de uso) | 1 079 (978 + 101) |
+| `aa71a63` `docs(security): note the mandatory derived MFA in section 4.3` | Nota fechada de `docs/03` §4.3 y `DocumentationNotesTest` (líneas originales de §4.3 intactas) | 66 |
+
+Medición contra `031c360`, sin `openspec/`: **1 145 líneas** (1 044 añadidas, 101 borradas; 106 de producción, 1 039 de pruebas y documentación). Supera el aviso de 800 por las
+pruebas (el diseño estimó 570). No se partió porque el cambio de firma de los dos casos de uso obliga a tocar a la vez todos los sitios de construcción.
+
+### Sonda S1 (diseño D14): D14 se confirma
+
+`ConfiaApplication.launch` respeta `spring.main.sources` (se enlaza a `SpringApplication` desde los argumentos), de modo que no hizo falta la alternativa del `BeanPostProcessor`.
+Rojo observado, con las pruebas y `SecondFactorExemptions` escritos y sin agregar la propiedad: `NoSuchBeanDefinitionException: No qualifying bean of type
+'com.confia.identity.web.SecondFactorExemptions' available` (2 de 3). Con la propiedad: el contexto del proceso real contiene el bean, dos procesos de la misma JVM no comparten
+exenciones, y un proceso sin la configuración no tiene `SecondFactorExemptions` y su único `MfaPolicy` es `STAFF`. En esa etapa `SecondFactorExemptions` aún no implementaba
+`MfaPolicy` (no existía) y la sonda de aislamiento falló con `expected: "second-factor-required" but was: "authenticated"` (la columna decidía todavía).
+
+### Evidencia de ciclo TDD (tarea 5)
+
+| Paso | Observado |
+|---|---|
+| R1, pruebas sin producción | Compilación de pruebas: `cannot find symbol class MfaPolicy` (y el constructor de `StaffAccount` de cuatro argumentos). |
+| R2, con `MfaPolicy` y los parámetros nuevos ya aceptados pero ignorados, y la columna aún leída (el `StaffAccount` de cuatro argumentos era un constructor temporal con `false`) | Unitarias: 6 fallos (`Expecting actual: Authenticated[...] to be an instance of ...SecondFactorEnrollmentRequired`, `...SecondFactorRequired`, `Completed[] to be an instance of ...SecondFactorMissing`, y `Expecting actual: [] to contain exactly [StaffAccountId...]` para «la política se consulta tras la contraseña»). `AuthenticateWithPasswordStaffPolicyIT`: 10 de 11 reciben `Authenticated` (I287, I288, I289, I290 por rol, I301); `SecondFactorExemptionsProbeIT`: 1 de 3 (`expected "second-factor-required" but was "authenticated"`); `LoginEndpointStaffPolicyIT`: 3 de 4 (I302). |
+| `ProcessBeanIsolationTest` | Rojo observado con el bean ya creado y sin la línea: `process 'admin': bean 'mfaPolicy' from package 'com.confia.identity.domain' - not in the allow-list`; verde con la línea. |
+| `DocumentationNotesTest` | Se escribió junto con la nota; el rojo se observó después, retirando la nota (ver demostración 5). |
+| VERDE | Suite unitaria completa de `app` (`./mvnw -B -q test -pl app -am -Djacoco.skip=true`): 2 870 pruebas, 0 fallos. Todas las pruebas de integración de `com/confia/identity/**` (73 clases, 488 pruebas), 0 fallos. |
+
+### Demostraciones deliberadas (revertidas y confirmadas con `cmp` contra copias en el directorio temporal de la sesión)
+
+| # | Ruptura | Rojo por la aserción de resultado | `cmp` |
+|---|---|---|---|
+| 1 | `STAFF = account -> false` | `MfaPolicyTest` 54 de 55; `MfaPolicyProductionWiringTest.theRealProcessAsksEveryAccountForASecondFactor`; `AuthenticateWithPasswordStaffPolicyIT` 11 de 11 (I288 entre ellas). **PIT no se ejecutó localmente** (corre en el CI del PR). | OK |
+| 2 | `AuthenticateWithPassword` condiciona la exigencia a la existencia de una asignación de rol | I288 (`...NoRoleAndNoCredential...:78`), I301 (`...NoRoleAndAVerifiedCredential...:90`) e I289 (`removingTheRoleAssignment...:103`): `Expecting actual: Authenticated[...] not to be an instance of ...Authenticated` | OK |
+| 3 | `Authenticated` para una cuenta sin rol | `LoginEndpointStaffPolicyIT` (I302): `expected: "second-factor-required" but was: "authenticated"` (2 de 4) | OK |
+| 4 | Conjunto de exenciones `static` en `SecondFactorExemptions` | `SecondFactorExemptionsProbeIT.anAccountExemptInOneProcessOwesTheSecondFactorInAnother:88`: `Expecting value to be true but was false` (el segundo proceso hereda la exención) | OK |
+| 5 | Retirar la nota de `docs/03` §4.3 | `DocumentationNotesTest.docs03Section43...`: `a block quote that carries "**Nota fechada 2026-11-09 ... PR 5a"` | OK (`docs/03` idéntico a la copia) |
+
+Las rupturas 2 y 3 son aproximaciones: `AuthenticateWithPassword` no conoce los roles, de modo que la ruptura agrega un método temporal `hasRoleAssignment` en `JooqStaffAccountRepository` (SQL plano) y lo consulta
+por `instanceof`; ambos archivos se restauraron y se compararon. En la 4 la aserción que falla es la de la política (`requiresSecondFactor`) y no llega a la de `authenticated`, que viene después.
+
+### 5.5 Construcción sin `V15` [BI127]
+
+Esta construcción pasa **sin** `V15`: la última migración es `V14` y no existe ninguna posterior; la suite unitaria completa y las pruebas de integración de `identity` corrieron contra el esquema con la
+columna `mfa_required` todavía `NOT NULL`, que los fixtures siguen insertando. No se ejecutó `./mvnw -B verify` completo (memoria limitada; queda al CI del PR), de modo que la comprobación de 5.5 sobre la
+construcción completa y la puerta de mutación no están observadas.
+
+### Desviaciones y pendientes
+
+- Los ayudantes de siembra conservan el parámetro `mfaRequired`: lo insertan tal cual en la columna y, cuando vale `false`, registran la exención. Por eso el rojo previsto «`expected Authenticated but was
+  SecondFactorRequired`» de las pruebas migradas con la columna en `true` no se observó con esa forma; el equivalente observado es el de R2 (cuentas con la columna en `false` que reciben `Authenticated`).
+- Se agregó `SecondFactorExemptions.nobodyOwes()` (política de prueba para los fixtures de casos de uso que siempre representaron «sin segundo factor») y `revokeExemption`, para
+  `SecondFactorEndpointsIT.openFamily`, que antes alternaba la columna.
+- `MfaPolicyProductionWiringTest` prueba el proceso administrativo real y, con ArchUnit sobre el código de producción, que `STAFF` es la única definición; que el trabajador y el portal no registran el bean lo
+  cubre `ProcessBeanIsolationTest` (sus listas no incluyen ningún paquete de `identity`). Las reglas están dentro de esa prueba y no en `architecture/` (fuera de las superficies permitidas); no llevan un fixture
+  permanente de rechazo, solo comprobaciones de que el escaneo no es vacío.
+- **La tarea 5 queda abierta en `tasks.md`** salvo 5.1: faltan `./mvnw -B verify` completo, PIT, el rojo con la forma prevista de las pruebas migradas y la ruptura 2 literal.
+
+### Pendiente de la revisión de 4b (hallazgos no bloqueantes diferidos por el propietario)
+
+- R3-002 y R4-002: la llamada al grabador no está protegida antes de delegar y puede convertir un `403` en `500`.
+- R2-001 y R3-003: `ServletException` se envuelve sin la causa.
+- R4-001: el `403` espera hasta dos transacciones de base de datos sin tiempo límite.
+- R2-002: métodos públicos solo para pruebas en `PermissionDenialAudit`.
+- R2-003: doble conteo de un resumen descartado.
+
+## Tarea 6 (PR 5b `drop-mfa-required-column`) — 2026-11-09
+
+Rama `change/rbac-permission-matrix-and-audit-integration-5b-drop-mfa-required-column`, apilada sobre la punta de la tarea 5 (`5b10396`). Sin push. **[BI127] pendiente:** la tarea 5 está
+comprometida bajo esta rama pero **no fusionada**; el orden «`V15` después de la tarea 5 fusionada» solo queda cumplido cuando la cadena se fusione en ese orden. No se afirma antes.
+
+| Commit | Contenido |
+|---|---|
+| `317a2e8` `docs(identity): stop naming the retired second factor column in javadoc` | Solo Javadoc de `AuthenticationResult` (2 menciones) y `StaffAccount` (1), por decisión del propietario, para que no quede ningún archivo Java de producción con el patrón |
+| `55533c2` `feat(db): drop the mfa_required column now derived by MfaPolicy` | `V15`, `V15SchemaDiffIT`, `MfaRequiredAbsenceTest` y el retiro de la columna de los fixtures |
+
+Líneas efectivas contra `5b10396`, sin `openspec/`: **1 230** en 84 archivos (781 añadidas, 449 borradas); producción 9 (`+6 -3` de Javadoc y `+3` de `V15`). Supera el aviso de 800 por el cambio
+mecánico de los fixtures, que no es partible: la columna es `NOT NULL` sin `DEFAULT`, de modo que `V15` y los fixtures tienen que entrar en el mismo commit para que la suite quede en verde.
+**Desviación:** por eso no existe el segundo commit previsto, `test(identity): remove the column from the staff account fixtures`; su contenido va en `55533c2`.
+
+### 6.1 Inventario
+
+- Pruebas con `StepwiseDatabase.migratedTo(...)` a una versión anterior a 15 que insertan cuentas: `V9ExistingRowsIT` (versión 8, inserción propia), `RetentionPurgeFunctionsIT` y
+  `RefreshTokenFamilyPurgeFunctionIT` (versión 11, vía `PurgeSession`) y, **no previsto en el diseño**, `UnknownRoleCodeResolutionIT` (versión 14, vía `StaffRoleFixtures.insertAccount`).
+  El resto de las pruebas con `migratedTo` (`V9` a `V14SchemaDiffIT`, `RolePrivilegeMatrixIT`, `PortalSchedulingPrivilegeIT`, `ScheduledTasksNotCreatedAtRuntimeIT`) no insertan cuentas.
+- `schema/PurgeSession` **atiende a ambas versiones**: la usan `BackoffPurgeVersusLoginIT` y `RefreshPurgeVersusRotationConcurrencyIT` (esquema actual) y las dos pruebas fijadas a 11. Se separó la
+  inserción: la sesión recibe el SQL de inserción de cuentas (`CURRENT_ACCOUNT_INSERT` por defecto, sin la columna) y las pruebas fijadas pasan `RetentionPurgeFunctionsIT.PRE_15_ACCOUNT_INSERT`
+  mediante una sobrecarga `open(database, role, accountInsert)`. El `seedMany` de `mfa_totp_backoff` de `RetentionPurgeFunctionsIT` inserta cuentas con SQL propio sobre la base compartida
+  (esquema actual) y perdió la columna.
+- `UnknownRoleCodeResolutionIT` (versión 14) lleva ahora su propio `insertAccountBefore15` con la columna, porque `StaffRoleFixtures.insertAccount` está escrito para el esquema actual.
+- `getMfaRequired()` de `JooqStaffAccountRepository`: **la tarea 5 lo retiró** (`git grep -i "getMfaRequired" -- apps/api/app/src/main` sin resultados).
+
+### 6.2 Medición previa al rojo
+
+Orden: `git grep -il -E "mfa_?required" -- apps` en `5b10396` (árbol limpio): **47 archivos**: `V6`, `AuthenticationResult.java` y `StaffAccount.java` (producción, solo Javadoc),
+`DocumentationNotesTest` y 43 más de prueba. Esto **difirió de lo previsto** («ningún archivo Java de producción»): eran Javadoc que cita el nombre de la columna. Se detuvo la tarea, el
+propietario autorizó reescribirlas (`317a2e8`) y agregó `DocumentationNotesTest` como exención nombrada. Tras `317a2e8`: cero archivos Java de producción con el patrón (`git grep -il -E "mfa_?required" --
+apps/api/app/src/main/java` sin salida). La lista de exenciones de `tasks.md` (`V6`, `V15`, pruebas fijadas con `migratedTo`) **creció en un archivo por decisión del propietario**:
+`DocumentationNotesTest` (afirma la nota fechada de `docs/03` §4.3, que debe seguir nombrando la columna). `MfaRequiredAbsenceTest` también se exime a sí misma por contener el patrón.
+
+### Evidencia de ciclo TDD (tarea 6)
+
+| Paso | Observado |
+|---|---|
+| Rojo de `MfaRequiredAbsenceTest` (pruebas nuevas sobre el árbol sin `V15` ni cambios de fixtures) | 2 de 5 fallan. `noFileUnderAppsNamesTheRetiredColumnExceptTheNamedExemptions`: `[files that still name the retired column] Expecting empty but was: [...]` con 41 archivos de prueba enumerados por ruta (los fijados con `migratedTo` quedan exceptuados). `theJooqCodeGeneratedFromTheMigratedSchemaDoesNotCarryTheColumn`: `Expecting empty but was: ["IdentityStaffAccount.java", "IdentityStaffAccountRecord.java"]`. Las otras tres (detector sobre fixture y patrón) pasan en rojo y en verde por diseño. |
+| Rojo de `V15SchemaDiffIT` | 2 de 2 con `FlywayException: No migration with a target version 15 could be found. Ensure target is specified correctly and the migration exists.` |
+| Primer verde de `V15SchemaDiffIT` | Falló 1 de 2 por una **suposición mía incorrecta**: `[the one definition V15 removes] ... but some elements were not expected: ["constraint:identity_staff_account.identity_staff_account_mfa_required_not_null"]`. PostgreSQL 18 cataloga el `NOT NULL` como restricción de la columna y desaparece con ella; la prueba ahora exige exactamente esas dos definiciones eliminadas y nada añadido ni cambiado (BI125). Verde después. |
+| Regresión de los tres escenarios de `V6` | `IdentityRowSecurityIT` (10) y `MfaTableRowSecurityIT` (6) en verde sobre el esquema migrado a 15. |
+| Rojos de los fixtures cambiados | No se observó un rojo por archivo antes de `V15`: con la columna `NOT NULL` y sin `V15`, quitarla de los fixtures los rompe todos a la vez. El rojo agregado es el de `MfaRequiredAbsenceTest`. |
+
+### 6.3 Verde y REFACTOR
+
+- `V15` solo con `ALTER TABLE identity_staff_account DROP COLUMN mfa_required`; jOOQ regenerada por la construcción (`IdentityStaffAccount.java` ya no contiene `MFA_REQUIRED`).
+- Columna retirada de todos los fixtures actuales. El parámetro de los ayudantes pasa a `exemptFromSecondFactor` con **polaridad invertida** (antes `mfaRequired`): las llamadas con literal booleano
+  se invirtieron con un script (207 de `seedStaffAccount` más las de `seedAccount`, `seedAccountIn` y `seedLiveTokenFor`) y las de variable a mano (`RefreshGraceWindowIT`: `!secondFactor`). Ayudantes:
+  `AuthenticateWithPasswordIT`, `PasswordResetIntegrationTest`, `ResetPasswordWithTokenTest.seedLiveTokenFor`, `LoginEndpointSupport`. `AuthenticateWithPasswordStaffPolicyIT.seed()` pierde su parámetro.
+- Pruebas `mfaRequired...` renombradas a `secondFactorOwing...` y comentarios sin el literal. Eliminada `MultiTenantSchemaIT.mfaRequiredIsFixedAtAccountCreationWithNoRoleDataBackingIt` con su ayudante.
+- `V15SchemaDiffIT` contiene el literal de la columna: migra a 14 y a 15, de modo que queda exceptuada por la regla de «fijada antes de 15» (`migratedTo("14")`), no por una exención nombrada.
+
+### Demostraciones deliberadas (revertidas y confirmadas con `cmp` contra copias en el directorio temporal de la sesión)
+
+| # | Ruptura | Rojo por la aserción de resultado | `cmp` |
+|---|---|---|---|
+| 1 | Reinsertar `mfa_required` (columna y valor) en `support/StaffRoleFixtures.insertAccount` | `MfaRequiredAbsenceTest.noFileUnderApps...`: `Expecting empty but was: ["apps/api/app/src/test/java/com/confia/support/StaffRoleFixtures.java"]` (1 de 5) [BI126] | OK |
+| 2 | `V15` con una segunda sentencia `ALTER TABLE identity_staff_account ALTER COLUMN email TYPE varchar(300)` | `V15SchemaDiffIT.v15RemovesOnly...:46`: `[V15 changes no definition] Expecting empty but was: ["column:identity_staff_account.email", "constraint:...email_len_chk", "constraint:...email_lower_chk"]` (1 de 2) [BI125] | OK |
+
+Tras restaurar `V15` no se volvió a correr `V15SchemaDiffIT`; la restauración se comprobó con `cmp`.
+
+### Verificación
+
+- Unitaria `MfaRequiredAbsenceTest`: 5 pruebas, 0 fallos.
+- Integración focalizada `V15SchemaDiffIT,V9ExistingRowsIT,RetentionPurgeFunctionsIT,RefreshTokenFamilyPurgeFunctionIT,MultiTenantSchemaIT,UnknownRoleCodeResolutionIT,MfaTableRowSecurityIT,IdentityRowSecurityIT`: 8 clases, 0 fallos.
+- Suite unitaria completa de `app`: 2 974 pruebas, 0 fallos, 3 omitidas.
+- Integración `com/confia/identity/**`, `schema/**`, `shared/**` y `support/**`: 114 clases, 658 pruebas, 0 fallos.
+- **No observado:** `./mvnw -B verify` completo, JaCoCo, PIT, las pruebas de integración fuera de esos paquetes y la comprobación de BI127 sobre la cadena fusionada. Quedan para el CI del PR.
+
+### Revisión nativa de la tarea 6 (2026-11-09): no se pudo ejecutar
+
+`gentle-ai review start` sobre `5b10396..a050897` (86 archivos, 1 306 líneas) rechazó el candidato con `lens_context_budget_exceeded` antes de crear autoridad alguna. No se puede partir sin dejar commits intermedios en rojo, porque `mfa_required` es `NOT NULL` sin valor por defecto y `V15` debe ir con los fixtures. Por decisión del propietario, la tarea 6 queda sin revisión nativa y se apoya en el `verify` del CI de su PR. Riesgo señalado para quien revise ese PR: el cambio de polaridad del parámetro `exemptFromSecondFactor` (unos 270 sitios de llamada invertidos por script).
+
+## Tarea 7a (PR 6 `roles-report-and-criterion-2`, primera parte) — 2026-11-09
+
+Rama `change/rbac-permission-matrix-and-audit-integration-6a-roles-report-and-criterion-2`, apilada sobre la punta de la tarea 6 (`5c25d37`). Sin push. **Alcance de esta unidad:** 7.1, 7.2 y 7.5 en
+lo que toca al informe, y las demostraciones (1) y (2) de 7.7. **Queda para 7b:** 7.3 (`ExitCriterion2EndToEndIT` y tercera parte de `AuthorizationEdgeIT`), 7.4 (inversiones), 7.6 (registro del
+cambio 8b), `docs/09`, notas de `docs/03`, `DocumentationNotesTest` y las demostraciones (3) y (4). La tarea 7 **no** se marca en `tasks.md`.
+
+### 7.1 Sonda de orval
+
+`@Operation(extensions = @Extension(properties = @ExtensionProperty(name = "x-required-permission", value = "identity:read")))` aparece en el documento como `"x-required-permission" : "identity:read"` y
+`pnpm generate` en `packages/contracts` (orval 8.38.0) terminó sin error ni advertencia: **orval tolera la extensión**; no hizo falta la alternativa de llevar el permiso en la descripción, y BI139 se
+afirma sobre la extensión. `packages/contracts/src/generated/` está ignorado por Git (`.gitignore:90`), de modo que **no hay diferencia comprometida** en `packages/contracts`: la regeneración solo añadió
+30 líneas a `src/generated/admin/` (`ListRolePermissionsResponse` y el esquema `RolePermissions`) y dejó `portal/` idéntico (comparado con una copia previa). `pnpm typecheck` y `pnpm test` del paquete
+en verde (8 pruebas). `pnpm generate` ejecutó antes una instalación implícita en `node_modules` de esta copia de trabajo (resolvió `zod` 4.6.6 y `vitest` 5.0.5); `git status` no muestra cambios fuera de `apps/api`.
+
+### Evidencia de ciclo TDD (7.2 y 7.5)
+
+| Paso | Observado |
+|---|---|
+| Rojo de `ListRolePermissionsTest` y `PermissionedEndpointsTest` | Compilación: `cannot find symbol` para `ListRolePermissions` y `RolePermissionsView` (el árbol no tenía el código de producción). Con las dos clases de aplicación y sin la entrada de la lista, `PermissionedEndpointsTest.theProductionListIsExactlyTheReportOfTheRolesAndNeedsIdentityRead:24` falla con `Expecting actual:` (lista vacía) y las 8 de `ListRolePermissionsTest` pasan. |
+| Rojo de `RolesReportEndpointIT` y `ProductionRoutesClassifiedIT` (controlador registrado, sin entrada) | **Difirió de lo previsto** (`403` por `denyAll`): el proceso **no arranca**, `IllegalStateException: route GET /api/v1/identity/roles is on no list (public, authenticated, restricted or permissioned)` en `RouteCoverageGuard.afterSingletonsInstantiated:83`, 2 errores de arranque. Es un cierre más fuerte que el previsto: una ruta sin lista ni siquiera llega a servirse. |
+| Rojo de `OpenApiContractSnapshotTest` | 4 fallos: `eachProcessPublishesExactlyItsApprovedSnapshot` (`first at $.components.schemas.RolePermissions`) y los tres del control negativo del informe (la instantánea aún no tenía la ruta). Las demás pruebas nuevas del documento pasan porque leen el documento generado. |
+| Verde | `RolesReportEndpointIT` 15 de 15; `ProductionRoutesClassifiedIT` 2 de 2; `PermissionedEndpointsTest` 4; `ListRolePermissionsTest` 8; instantánea regenerada con `-Dconfia.openapi.update=true` (la prueba falla a propósito al reescribir) y diff revisado: **+84 líneas, solo adiciones** (`RolePermissions`, `RolesReportResponse`, la operación `listRolePermissions`); `portal.openapi.json` sin cambios. |
+| Corrección de pruebas ajenas por la nueva ruta | `PublicRouteAllowListTest` (2 afirmaciones: «solo rutas públicas y autenticadas» y «ninguna ruta necesita permiso hasta la tarea 7»), `CurrentSessionEndpointIT` (WE29: ahora ocho rutas) y `AuthorizationEdgeIT` (17 errores de arranque: su arnés importa `IdentityWebConfiguration` y reemplazaba la lista por la suya; ahora es la lista de producción más la del arnés, con la aserción de WE94 ajustada). |
+
+Pruebas del informe contra el proceso real: Auditor `200` con `Cache-Control: no-store` y forma exacta; seis roles en orden de catálogo con permisos de la matriz ordenados; Cajero con `invoicing:request-void` y sin
+`invoicing:void`; Super Administrador y Administrador `200`; ningún correo, nombre ni identificador de cuenta, institución o sesión en cuerpo ni cabeceras; dos solicitudes idénticas byte a byte; Cajero,
+Contabilidad y Coordinador Académico `403 forbidden` con exactamente un asiento `authorization.access.denied` y `entity_id` `identity:read`; acceso concedido sin asiento; sin `Idempotency-Key` `200` y cero
+marcadores; cabecera, parámetro `claimedPermission` y rol afirmados por un Cajero ignorados; Auditor con rol y cabeceras ajenos sigue en `200`; token de otra institución sin asignación `403`; cuenta sin
+asignación `403`; sin credencial `401 authentication-required`; el token no lleva `role`, `roles`, `permissions` ni `scope` y dos `jti` distintos.
+
+### Demostraciones deliberadas (revertidas y confirmadas con `cmp` contra copias en el directorio temporal de la sesión)
+
+| # | Ruptura | Rojo | `cmp` |
+|---|---|---|---|
+| 1a | Quitar la entrada de `PermissionedEndpoints.forAdmin()` (`List.of()`) | `PermissionedEndpointsTest.theProductionListIsExactlyTheReportOfTheRolesAndNeedsIdentityRead:24` por aserción (1 de 4). `RolesReportEndpointIT` **no llega a aserciones**: error de arranque por `RouteCoverageGuard` (1 error), no un `403` sin asiento [AZ29] | OK |
+| 1b | Variante para obtener rojo por resultado: la entrada pide `PAYMENTS_CREATE` en lugar de `IDENTITY_READ` | `RolesReportEndpointIT`: 10 fallos y 1 error por aserción de estado (`but was: 403` donde se esperaba `200`; `Expecting actual not to be null` en la fila de denegación esperada) [AZ29] | OK |
+| 2 | Agregar el miembro `email` al DTO `RolesReportResponse.Role` con un correo literal | `RolesReportEndpointIT.noEmailNameOrIdentifierOfTheAccountOrTheInstitutionReachesTheResponse:160` (`not to contain "@"`) y `anAuditorReceivesTheReportWithNoStoreAndTheExactShape:110` (`to contain exactly "code", "permissions"`) [I295] | OK |
+
+`ExitCriterion2EndToEndIT` no existe todavía, así que la parte de la demostración 1 que lo nombra queda para 7b.
+
+### Desviaciones y pendientes para 7b
+
+- **«Cero invocaciones» en el proceso real:** el proceso administrativo real no admite un contador sobre el caso de uso sin un bean de prueba (D19), de modo que `RolesReportEndpointIT` lo demuestra por lo que
+  responde una denegación (problema sin miembro `roles`) y por el asiento; la versión con contador es la del arnés de `AuthorizationEdgeIT` (tercera parte, 7b).
+- **Método distinto de `GET` sobre la ruta:** un `POST` de un token de cabecera recibe `403 csrf-invalid` antes de llegar al decisor de permisos, por lo que no sirve para probar «solo el GET está en la lista»;
+  la prueba se retiró en vez de afirmar otra cosa.
+- Nombre del esquema anidado: `RolePermissions` (no `Role`), para que `packages/contracts` no exporte un tipo genérico `Role`.
+- **No observado en 7a:** `./mvnw -B verify` completo, JaCoCo y PIT (quedan para el CI del PR); las pruebas de integración fuera de `identity/**`, `shared/**` y `bootstrap/*IT`.
+
+### Verificación (7a)
+
+- Unitaria completa de `app` (`./mvnw -B -q test -pl app -am -Djacoco.skip=true`): 2 992 pruebas, 0 fallos, 3 omitidas (2 974 previas más 18 nuevas).
+- Integración `identity/**`, `shared/**` y `bootstrap/*IT`: 679 pruebas; fallaron `CurrentSessionEndpointIT` (WE29, 1) y `AuthorizationEdgeIT` (17 errores de arranque), corregidas como se describe arriba.
+  Segunda pasada de esas dos clases junto con `RolesReportEndpointIT` y `ProductionRoutesClassifiedIT`: 12, 17, 15 y 2 pruebas, 0 fallos. Un informe de `V15SchemaDiffIT` con un fallo sigue en `target/` pero es
+  anterior (demostración 2 de la tarea 6, no se volvió a correr en 7a).
+- Orden focalizada final (`ListRolePermissionsTest,PermissionedEndpointsTest,OpenApiContractSnapshotTest,AuthorizationBoundaryRulesTest,PublicRouteAllowListTest,WebExposedTypesRuleTest,ProcessBeanIsolationTest`
+  más `-Dit.test=RolesReportEndpointIT,AuthorizationEdgeIT,ProductionRoutesClassifiedIT,CurrentSessionEndpointIT`), tras revertir las demostraciones: sin fallos.
+- `packages/contracts`: `pnpm typecheck` y `pnpm test` en verde.
+- Líneas efectivas contra `5c25d37`, sin `openspec/` ni `packages/contracts`: 937 (918 añadidas, 19 borradas); sin la instantánea `admin.openapi.json` (+84), 853. Producción 193 (`+187 -6`). Supera el aviso de 800 del PR
+  solo por la suma de la instantánea y de `RolesReportEndpointIT` (400); 7b suma sobre ese total, por lo que el PR 6 debe partirse según la regla de partición.

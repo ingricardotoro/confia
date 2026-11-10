@@ -45,7 +45,7 @@ class EnrollVersusVerifyConcurrencyIT extends RevocationIntegrationTest {
     /** The verification owns the lock: the enrollment waits, finds the credential verified and is refused. */
     @Test
     void anEnrollmentThatWaitsForTheFirstVerificationIsRefusedAndTheSecretStands() throws Exception {
-        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, true);
+        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, false);
         Enrolled first = enrollWithoutVerifying(jorge);
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -74,7 +74,7 @@ class EnrollVersusVerifyConcurrencyIT extends RevocationIntegrationTest {
     @Test
     void aVerificationThatWaitsForAReenrollmentFindsTheNewSecretAndRefusesTheOldCode()
             throws Exception {
-        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, true);
+        StaffAccountId jorge = seedStaffAccount(JORGE, CURRENT_PASSWORD, false);
         Enrolled first = enrollWithoutVerifying(jorge);
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);

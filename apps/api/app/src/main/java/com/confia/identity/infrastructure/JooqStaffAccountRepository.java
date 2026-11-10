@@ -45,8 +45,7 @@ public final class JooqStaffAccountRepository implements StaffAccountRepository 
                 .and(IDENTITY_STAFF_ACCOUNT.EMAIL.eq(identifier.value()))
                 .fetchOptional(record -> new StaffAccount(new StaffAccountId(record.getId()),
                         institutionId, identifier,
-                        new StoredPasswordHash(record.getPasswordHash()),
-                        record.getMfaRequired()));
+                        new StoredPasswordHash(record.getPasswordHash())));
     }
 
     /**
@@ -62,8 +61,7 @@ public final class JooqStaffAccountRepository implements StaffAccountRepository 
                 .forUpdate()
                 .fetchOptional(record -> new StaffAccount(accountId, institutionId,
                         new LoginIdentifier(record.getEmail()),
-                        new StoredPasswordHash(record.getPasswordHash()),
-                        record.getMfaRequired()));
+                        new StoredPasswordHash(record.getPasswordHash())));
     }
 
     @Override

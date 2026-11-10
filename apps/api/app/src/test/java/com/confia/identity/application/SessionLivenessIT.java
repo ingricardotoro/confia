@@ -69,7 +69,7 @@ class SessionLivenessIT extends RotationIntegrationTest {
 
     @Test
     void aLiveFamilyIsActive() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
 
         assertThat(liveness("2026-10-12T08:29:59Z").isActive(actor(ana, family))).isTrue();
@@ -77,7 +77,7 @@ class SessionLivenessIT extends RotationIntegrationTest {
 
     @Test
     void aRevokedFamilyIsNotActiveWhateverItsWindow() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID revoked = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, "2026-10-12T08:10:00Z",
                 SessionRevocationReason.PASSWORD_CHANGE.code());
 
@@ -86,7 +86,7 @@ class SessionLivenessIT extends RotationIntegrationTest {
 
     @Test
     void aFamilyIsNotActiveAtItsAbsoluteEndAndIsOneSecondBefore() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, "2026-10-12T19:50:00Z", TWENTY, null, null);
 
         assertThat(liveness("2026-10-12T19:59:59Z").isActive(actor(ana, family)))
@@ -96,7 +96,7 @@ class SessionLivenessIT extends RotationIntegrationTest {
 
     @Test
     void aFamilyIsNotActiveAfterExactlyThirtyMinutesWithoutUse() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
 
         assertThat(liveness("2026-10-12T08:29:59Z").isActive(actor(ana, family))).isTrue();
@@ -106,7 +106,7 @@ class SessionLivenessIT extends RotationIntegrationTest {
 
     @Test
     void anUnknownFamilyIsNotActive() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
 
         assertThat(liveness("2026-10-12T08:10:00Z").isActive(actor(ana, UUID.randomUUID())))
                 .isFalse();
@@ -114,7 +114,7 @@ class SessionLivenessIT extends RotationIntegrationTest {
 
     @Test
     void aFamilyOfAnotherInstitutionIsNotActiveUnderTheContextOfTheCaller() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         InstitutionId other = new InstitutionId(UUID.randomUUID());
 
@@ -126,8 +126,8 @@ class SessionLivenessIT extends RotationIntegrationTest {
 
     @Test
     void aLiveFamilyOfAnotherAccountOfTheSameInstitutionIsNotActive() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
-        StaffAccountId luis = seedStaffAccount("luis.perez@colegio.edu.hn", CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
+        StaffAccountId luis = seedStaffAccount("luis.perez@colegio.edu.hn", CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
 
         assertThat(liveness("2026-10-12T08:10:00Z").isActive(actor(luis, family))).isFalse();
@@ -138,7 +138,7 @@ class SessionLivenessIT extends RotationIntegrationTest {
 
     @Test
     void askingNeverWritesAuditsOrMovesTheLastUse() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         Record before = familyRow(family);
         int auditBefore = auditRows().size();
@@ -155,7 +155,7 @@ class SessionLivenessIT extends RotationIntegrationTest {
 
     @Test
     void aDatabaseFailureReachesTheCallerInsteadOfAnAnswer() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         DataAccessException failure = new DataAccessException("the database is not there");
         SessionLiveness failing = new SessionLiveness(transactionRunner(),
@@ -202,7 +202,7 @@ class SessionLivenessIT extends RotationIntegrationTest {
 
     @Test
     void aLiveSessionRouteRejectsAnUnexpiredTokenOfARevokedFamilyAndALiveOneIsServed() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID revoked = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, "2026-10-12T08:08:30Z",
                 SessionRevocationReason.PASSWORD_CHANGE.code());
         UUID live = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
@@ -220,7 +220,7 @@ class SessionLivenessIT extends RotationIntegrationTest {
 
     @Test
     void aTokenOfAFamilyRevokedByAPasswordResetFailsTheCheckOfTheSession() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID family = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, null, null);
         String token = tokenIssuedAt(EIGHT, ana, family);
         assertThat(present("2026-10-12T08:05:00Z", token, LIVE).reached)
@@ -237,7 +237,7 @@ class SessionLivenessIT extends RotationIntegrationTest {
 
     @Test
     void aRouteWithoutTheCheckAcceptsTheTokenUntilItExpiresAndThenSaysSo() {
-        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, false);
+        StaffAccountId ana = seedStaffAccount(ANA, CURRENT_PASSWORD, true);
         UUID revoked = seedFamily(ana, false, EIGHT, EIGHT, TWENTY, "2026-10-12T08:08:30Z",
                 SessionRevocationReason.PASSWORD_CHANGE.code());
         String token = tokenIssuedAt(EIGHT, ana, revoked);

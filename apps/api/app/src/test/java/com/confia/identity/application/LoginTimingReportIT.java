@@ -12,6 +12,7 @@ import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
 import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
+import com.confia.identity.web.SecondFactorExemptions;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.shared.security.SecurityContext;
@@ -60,7 +61,7 @@ class LoginTimingReportIT extends CommittingPostgresIntegrationTest {
         AuthenticateWithPassword useCase = new AuthenticateWithPassword(transactionRunner(),
                 () -> institutionId, new JooqStaffAccountRepository(dsl),
                 new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), hasher,
-                fingerprinter, new JooqAuditLogWriter(dsl), Clock.systemUTC());
+                fingerprinter, new JooqAuditLogWriter(dsl), SecondFactorExemptions.nobodyOwes(), Clock.systemUTC());
         SecurityContext context = contextOf(institutionId);
 
         List<Long> existingAccountNanos = new ArrayList<>(SAMPLE_SIZE);
@@ -118,8 +119,8 @@ class LoginTimingReportIT extends CommittingPostgresIntegrationTest {
         transactionRunner().execute(contextOf(institutionId), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, false)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId.value(), UUID.randomUUID(), identifier.value(), hash.value());
             return null;
         });

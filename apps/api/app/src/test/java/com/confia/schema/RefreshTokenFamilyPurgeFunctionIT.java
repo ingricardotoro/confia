@@ -169,7 +169,8 @@ class RefreshTokenFamilyPurgeFunctionIT extends PostgresIntegrationTest {
                         + "execute function refuse_family_delete()");
                 owner.commit();
             }
-            try (PurgeSession session = PurgeSession.open(database, ADMIN).asSystemOf(institution)) {
+            try (PurgeSession session = PurgeSession.open(database, ADMIN,
+                    RetentionPurgeFunctionsIT.PRE_15_ACCOUNT_INSERT).asSystemOf(institution)) {
                 OffsetDateTime old = session.now().minusDays(40);
                 UUID family = session.seedFamily(institution, session.seedAccount(institution),
                         old, old.plusDays(365), old);

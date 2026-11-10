@@ -16,6 +16,7 @@ import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
 import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
+import com.confia.identity.web.SecondFactorExemptions;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.shared.security.SecurityContext;
@@ -105,7 +106,7 @@ class LoginInstitutionIT extends CommittingPostgresIntegrationTest {
                     new ConfiguredLoginInstitutionProvider(), new JooqStaffAccountRepository(dsl),
                     new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), HASHER,
                     FINGERPRINTER, new JooqAuditLogWriter(dsl),
-                    fixedClock("2026-03-10T15:00:00Z"));
+                    SecondFactorExemptions.nobodyOwes(), fixedClock("2026-03-10T15:00:00Z"));
             SecurityContext mismatchedContext = new SecurityContext("", "system",
                     requested.value().toString(), UUID.randomUUID().toString());
 
@@ -127,7 +128,7 @@ class LoginInstitutionIT extends CommittingPostgresIntegrationTest {
                     new ConfiguredLoginInstitutionProvider(), new JooqStaffAccountRepository(dsl),
                     new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), HASHER,
                     FINGERPRINTER, new JooqAuditLogWriter(dsl),
-                    fixedClock("2026-03-10T15:00:00Z"));
+                    SecondFactorExemptions.nobodyOwes(), fixedClock("2026-03-10T15:00:00Z"));
             SecurityContext context = new SecurityContext("", "system",
                     institutionId.value().toString(), UUID.randomUUID().toString());
             return useCase.execute(context,
@@ -143,8 +144,8 @@ class LoginInstitutionIT extends CommittingPostgresIntegrationTest {
         transactionRunner().execute(contextOf(institutionId), () -> {
             dsl.execute("""
                     insert into identity_staff_account
-                        (institution_id, id, email, password_hash, mfa_required)
-                    values (?, ?, ?, ?, false)
+                        (institution_id, id, email, password_hash)
+                    values (?, ?, ?, ?)
                     """, institutionId.value(), UUID.randomUUID(), identifier.value(), hash.value());
             return null;
         });
