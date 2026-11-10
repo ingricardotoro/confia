@@ -1,10 +1,11 @@
-import { Link, Outlet, useNavigate } from "@tanstack/react-router";
+import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Button, FormField, Input, Alert } from "@confia/ui";
 import { ScrollText, BarChart3, BellRing, Landmark, PieChart, Handshake, TriangleAlert, Banknote, BadgePercent, Building2, CalendarRange, ClipboardList, School, Tags, FileText, GraduationCap, HandCoins, LayoutDashboard, LogOut, ReceiptText, UserCog, Users, Wallet } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { actions, useStore } from "../mock/store";
 import { CURRENT_USER, INSTITUTION } from "../mock/data";
 import { Toast } from "../lib/ui";
+import { PortalShell } from "./portal";
 
 
 const NAV = [
@@ -65,6 +66,8 @@ export function Shell() {
   const toast = useStore((s) => s.toast);
   const simulateError = useStore((s) => s.simulateError);
   const navigate = useNavigate();
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  if (path.startsWith("/portal")) return <PortalShell />;
   if (!signedIn) return <SignIn />;
 
   return (
@@ -97,7 +100,10 @@ export function Shell() {
             </div>
           ))}
         </nav>
-        <div className="border-t border-border-subtle p-3 text-xs text-text-tertiary">Prototipo con datos ficticios</div>
+        <div className="flex flex-col gap-2 border-t border-border-subtle p-3 text-xs text-text-tertiary">
+          <Link to="/portal" className="font-medium text-text-link hover:underline">Ver portal de encargados</Link>
+          <span>Prototipo con datos ficticios</span>
+        </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-border-subtle bg-bg-surface px-6 py-3">
@@ -152,6 +158,7 @@ function SignIn() {
           <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /> Mostrar contraseña
         </label>
         <Button type="submit" size="lg">Ingresar</Button>
+        <Link to="/portal" className="text-center text-sm font-medium text-text-link hover:underline">Entrar como encargado</Link>
       </form>
     </div>
   );

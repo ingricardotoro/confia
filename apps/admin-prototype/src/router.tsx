@@ -9,6 +9,7 @@ import { GuardianDetail, GuardianForm, GuardianList } from "./pages/guardians";
 import { OrgDetail, OrgForm, OrgList } from "./pages/orgs";
 import { PaymentDetail, PaymentList, PaymentWizard } from "./pages/payments";
 import { ClosingReport, IncomeReport, PortfolioReport } from "./pages/reports";
+import { PortalHistory, PortalHome, PortalPrefs, PortalReport, PortalStatement } from "./pages/portal";
 import { Shell } from "./pages/shell";
 import { StudentDetail, StudentForm, StudentList } from "./pages/students";
 import { UserDetail, UserForm, UserList } from "./pages/users";
@@ -54,6 +55,11 @@ const routeTree = root.addChildren([
   r("/reportes/cartera", PortfolioReport),
   r("/reportes/cierres", ClosingReport),
   r("/auditoria", AuditLog),
+  r("/portal", PortalHome),
+  r("/portal/hijo/$id", PortalStatement),
+  r("/portal/pagos", PortalHistory),
+  r("/portal/reportar", PortalReport),
+  r("/portal/preferencias", PortalPrefs),
   r("/configuracion/periodos", PeriodList),
   r("/configuracion/periodos/nuevo", () => <PeriodForm mode="new" />),
   r("/configuracion/periodos/$id/editar", () => <PeriodForm mode="edit" />),

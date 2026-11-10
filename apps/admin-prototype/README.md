@@ -31,15 +31,22 @@ pnpm --filter @confia/admin-prototype dev
 | Pagos | Registro en tres pasos, listado, recibo y anulación |
 | Cargos, caja y facturación | Cargos pendientes, apertura y cierre de caja, facturas con CAI y correlativo de prueba |
 | Configuración académica | Períodos, grados y secciones, tarifas y becas |
+| Cobranza | Morosos (filtros por grado y tramo, detalle con cargos e historial de contacto), promesas de pago (alta, edición, marcar cumplida o incumplida) y recordatorios |
+| Reportes | Ingresos (rangos preparados y barras), cartera por tramo y por grado, cierres de caja con detalle; «Exportar» es simulado |
+| Auditoría | Bitácora de solo lectura con filtros y panel de detalle |
+| Portal de encargados | Entrada desde el inicio de sesión o el pie del menú (`#/portal`): hijos y saldos, estado de cuenta, pagos y recibos, reporte de pago, preferencias |
 
-## Módulos pendientes (anotados el 2026-11-07, para otro momento)
+## Módulos pendientes
 
-1. **Cobranza:** morosos, promesas de pago y recordatorios.
-2. **Reportes:** ingresos, cartera y cierres de caja.
-3. **Bitácora de auditoría.**
-4. **Portal de encargados:** la vista del padre o la madre, con el estado de cuenta y los pagos de sus hijos.
+Ninguno de los cuatro módulos anotados el 2026-11-07 queda pendiente. Cualquier módulo nuevo se anota aquí.
 
 ## Simplificaciones conocidas
+
+- Los morosos, los reportes y la bitácora son datos escritos a mano: no se recalculan al registrar pagos ni se alinean al céntimo con el módulo de estudiantes.
+- Los recordatorios no se envían; el número de destinatarios sale de una tabla escrita a mano.
+- Las barras de los reportes usan el porcentaje escrito como ancho CSS; los rangos de fechas solo cambian entre conjuntos preparados.
+- El portal de encargados no tiene autenticación propia: muestra siempre a la encargada ficticia Patricia Soto de Rápalo. «Cerrar sesión» vuelve al inicio de sesión del personal.
+- Los reportes de pago del portal no llegan al módulo de pagos del personal.
 
 - Los permisos por rol no se aplican: todos los usuarios ven todo.
 - No hay estado de cuenta imprimible ni detalle de factura.
