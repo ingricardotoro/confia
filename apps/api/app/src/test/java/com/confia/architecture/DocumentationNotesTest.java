@@ -58,6 +58,9 @@ class DocumentationNotesTest {
     private static final String RBAC_NOTE = "**Nota fechada 2026-11-04 (cambio "
             + "`rbac-permission-matrix-and-audit-integration`, PR 1 `permission-catalog-and-adr`)";
 
+    private static final String MFA_NOTE = "**Nota fechada 2026-11-09 (cambio "
+            + "`rbac-permission-matrix-and-audit-integration`, PR 5a";
+
     private static final String AUTHORIZATION_EVENTS_NOTE = "**Nota fechada 2026-11-09 (cambio "
             + "`rbac-permission-matrix-and-audit-integration`, tarea 4a";
 
@@ -324,6 +327,18 @@ class DocumentationNotesTest {
                 .contains("pares de permisos")
                 .contains("primera operación con aprobación");
         assertOriginalLinesIntact(DOCS_03 + " section 5.3", linesOf(ORIGINAL_DOCS_03_SECTION_5_3), section);
+    }
+
+    @Test
+    void docs03Section43HasTheDatedNoteOnTheMandatoryDerivedMfaAndUnchangedOriginalBody() {
+        List<String> section = section(lines(repoRoot().resolve(DOCS_03)), "### 4.3 ");
+        assertThat(prose(noteBlock(section, MFA_NOTE)))
+                .contains("toda cuenta del personal debe un segundo factor")
+                .contains("`MfaPolicy.STAFF`")
+                .contains("no desactiva la exigencia")
+                .contains("`identity_staff_account.mfa_required` deja de leerse")
+                .contains("solo una política de prueba lo alcanza");
+        assertOriginalLinesIntact(DOCS_03 + " section 4.3", linesOf(ORIGINAL_DOCS_03_SECTION_4_3), section);
     }
 
     /** The text of a block quote as running prose: no quote marks and no line breaks, so a wrap never splits a phrase. */
@@ -727,5 +742,40 @@ class DocumentationNotesTest {
         **Cómo se comprueba.** Prueba de integración por cada fila: el mismo actor intenta iniciar y
         aprobar, y el sistema rechaza con 403 y un tipo de error específico. El reporte trimestral de
         segregación de funciones no debe listar ningún usuario con ambos permisos del mismo par.
+        """;
+
+    private static final String ORIGINAL_DOCS_03_SECTION_4_3 = """
+        ### 4.3 MFA con TOTP
+
+        | Rol | MFA |
+        |---|---|
+        | Super Administrador | **Obligatoria.** No puede desactivarse |
+        | Administrador | **Obligatoria** |
+        | Cajero | **Obligatoria** (tiene escritura financiera) |
+        | Contabilidad | **Obligatoria** (emite y anula documentos fiscales) |
+        | Auditor | Obligatoria (accede a datos personales en volumen) |
+        | Coordinador Académico | Recomendada, obligatoria si tiene permiso de exportar |
+        | Encargado | Opcional, promovida activamente en la interfaz |
+
+        **Regla dura: todo rol con permiso de escritura financiera exige MFA.** La verificación no es
+        declarativa: un trabajo de integridad diario comprueba que ningún usuario con un permiso de
+        escritura financiera tiene MFA inactiva, y si lo encuentra, suspende la sesión y notifica.
+
+        Especificación técnica:
+
+        - Algoritmo TOTP (RFC 6238), SHA-1 para compatibilidad con autenticadores estándar, 6 dígitos,
+          periodo de 30 segundos, ventana de tolerancia de ±1 periodo.
+        - Secreto de 20 bytes aleatorios, cifrado a nivel de columna en reposo. Ver 7.3.
+        - **Prevención de reutilización de código**: se almacena el último contador aceptado por usuario y
+          se rechaza cualquier código de un contador menor o igual.
+        - Límite de tasa específico sobre la verificación de código: 5 intentos por cada 15 minutos por
+          usuario, con retroceso exponencial posterior.
+        - **Códigos de recuperación**: 10 códigos de un solo uso de 10 caracteres, mostrados una única vez
+          y almacenados con el mismo Argon2id que las contraseñas. Usar uno lo invalida y se notifica al
+          usuario. Quedar con menos de 3 códigos genera aviso.
+        - Se acepta WebAuthn como segundo factor adicional en fase posterior. TOTP es el mínimo.
+
+        **Cómo se comprueba.** Prueba de extremo a extremo del flujo completo de inicio de sesión con MFA.
+        Prueba de integración que reutiliza un código ya consumido y espera rechazo.
         """;
 }
