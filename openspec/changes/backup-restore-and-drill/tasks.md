@@ -3,7 +3,7 @@
 - **Cambio:** `backup-restore-and-drill` (F0, cambio 12; entregable 9, brecha B10; cierra el criterio de salida 6)
 - **Fase:** tareas
 - **Fecha:** 2026-11-09
-- **Estado:** pendiente de aprobación del propietario
+- **Estado:** aprobado por el propietario el 2026-11-09. Decisión del 2026-11-10: una sola carpeta de cambio con dos ramas de archivo (12a y 12b); las tareas 10 a 15 siguen bloqueadas hasta que lleguen sus dependencias.
 - **Entradas aprobadas el 2026-11-09:** `proposal.md`, `design.md` (decisiones 1 a 15, sondas P-1 a P-14, secciones 6 a 10) y los
   deltas `specs/backup-and-restore` (BR01 a BR68, sin BR63), `specs/build-integrity` (BI140 a BI150) y `specs/audit-trail` (AT39 a AT42).
 - **Modo de TDD:** estricto (`openspec/config.yaml`). Ejecutor: `./mvnw` en `apps/api` con JDK 25 y Docker en ejecución. Los scripts de
