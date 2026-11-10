@@ -1,7 +1,7 @@
 /**
  * The health probes of the two web processes (dockerfiles-and-local-compose design.md decision 4):
  * the routes {@code GET /health/live} and {@code GET /health/ready} ({@link
- * com.confia.shared.observability.health.HealthProbeRoutesConfiguration}). Actuator is present as the
+ * com.confia.shared.observability.health.HealthProbeRoutesConfiguration}, {@link com.confia.shared.observability.health.ReadinessDatabaseHealthConfiguration}). Actuator is present as the
  * health module only: no metrics, no {@code MeterRegistry} and no {@code /actuator/**} route.
  *
  * <p><b>{@code @NamedInterface}, and who consumes it</b> (ADR-0022: every new named interface of

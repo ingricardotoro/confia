@@ -226,7 +226,7 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
   - Desviación: `spring.datasource.hikari.connection-timeout` pasa de T06 a T05, porque con la base inalcanzable de las pruebas la comprobación anónima de `/health/ready` esperaba los 30 s por omisión (tiempo de espera
     del cliente de la prueba). Valor `5000` (milisegundos): la propiedad de Hikari es un `long`, y `5s` del diseño §4.2 no enlaza (`Could not bind properties to 'HikariDataSource'`, observado).
 
-### [ ] T06 — Indicador `db` de preparación, `connection-timeout` y `HealthProbesIT`
+### [x] T06 — Indicador `db` de preparación, `connection-timeout` y `HealthProbesIT`
 
 - **Objetivo:** `/health/ready` responde `200` solo con PostgreSQL migrado y `503 {"status":"DOWN"}` en menos de 8 s con la base caída; vida sigue `200`;
   cuerpos sin detalle.
@@ -244,6 +244,16 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
   caso de base sin migrar.
 - **Verificación:** `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test='HealthProbesIT' -Dfailsafe.failIfNoSpecifiedTests=false`.
 - **Depende de:** T05.
+- **Evidencia (aplicación, 2026-11-10):**
+  - Orden TDD: el indicador se escribió **antes** que `HealthProbesIT` (desviación del rojo previo); el rojo se obtuvo después con los dos controles negativos declarados, ejecutados contra la prueba ya escrita.
+  - GREEN: `-Dit.test=HealthProbesIT`: 9 de 9 (administración y portal × perfil por omisión y `local` con base migrada → ambas `200 {"status":"UP"}`; base sin migrar → vida `200`, preparación `503 {"status":"DOWN"}` (CR07);
+    base inalcanzable → vida `200`, preparación `503` en menos de 8 s sin `components`, `details`, host, puerto ni texto del controlador, `Content-Type` sin `problem+json` y `/actuator/env` sigue siendo `401 problem+json` (CR10, CR11, WE101);
+    el grupo de preparación contiene `readinessState` y `db` y ningún otro (CR12)). Pruebas unitarias y de arquitectura relacionadas: 134 de 134.
+  - Controles negativos observados: `Connection.isValid()` en lugar del SQL → falla el caso de base sin migrar (CR07); `show-details`/`show-components: always` → fallan las aserciones de cuerpo (8 de 9 en rojo en conjunto). Restaurados.
+  - Un primer verde falló en el portal por un error de la propia prueba (argumento `spring.datasource.url` duplicado, que Spring une con coma); corregido usando `portalAgainst`.
+  - Desviaciones: (1) el indicador usa JDBC plano sobre el `DataSource` (no jOOQ), así que no entra en la lista de SQL plano de `NoUnapprovedPlainSqlTest` (regla 9 de ADR-0015 es sobre jOOQ); (2) `connection-timeout: 5000` ya se aplicó en T05;
+    (3) «PostgreSQL detenido» se aproxima con un proceso cuya URL JDBC nadie atiende (el error del controlador menciona host y puerto, que es lo que CR11 no debe filtrar) en vez de detener el contenedor compartido;
+    (4) CR11 con token administrativo válido **no se probó** (no hay emisor de token de prueba a mano en esta prueba); la ruta es pública y el cuerpo no depende del llamante (`show-details: never`). Pendiente.
 
 ### [ ] T07 — Latido del trabajador refrescado por el sondeo de db-scheduler
 

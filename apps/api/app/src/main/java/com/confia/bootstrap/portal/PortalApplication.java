@@ -2,6 +2,7 @@ package com.confia.bootstrap.portal;
 
 import com.confia.shared.jobs.infrastructure.wiring.JobSchedulingConfiguration;
 import com.confia.shared.observability.health.HealthProbeRoutesConfiguration;
+import com.confia.shared.observability.health.ReadinessDatabaseHealthConfiguration;
 import com.confia.shared.security.TransactionRunnerConfiguration;
 import com.confia.shared.web.edge.PortalSecurityConfiguration;
 import com.confia.shared.web.edge.WebEdgeConfiguration;
@@ -42,7 +43,7 @@ import org.springframework.context.annotation.Import;
  * (ADR-0016). {@code StarterAutoConfigurationExcludedTest} fails the build naming any starter entry
  * missing here.
  *
- * <p>The health probes (dockerfiles-and-local-compose decision 4): {@link HealthProbeRoutesConfiguration}
+ * <p>The health probes (dockerfiles-and-local-compose decision 4): {@link HealthProbeRoutesConfiguration} and {@link ReadinessDatabaseHealthConfiguration}
  * serves {@code GET /health/live} and {@code GET /health/ready}, and the framework's own mapping for the
  * additional paths of the probe groups is excluded because it takes one segment only (probe P-2).
  *
@@ -58,6 +59,6 @@ import org.springframework.context.annotation.Import;
 @Import({ContractSchemas.class, ProcessApiInfo.class, WebEdgeConfiguration.class,
         PortalSecurityConfiguration.class, TransactionRunnerConfiguration.class,
         JobSchedulingConfiguration.class,
-        HealthProbeRoutesConfiguration.class})
+        HealthProbeRoutesConfiguration.class, ReadinessDatabaseHealthConfiguration.class})
 public class PortalApplication {
 }

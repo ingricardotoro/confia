@@ -5,6 +5,7 @@ import com.confia.identity.web.wiring.IdentityWebConfiguration;
 import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.JobSchedulingConfiguration;
 import com.confia.shared.observability.health.HealthProbeRoutesConfiguration;
+import com.confia.shared.observability.health.ReadinessDatabaseHealthConfiguration;
 import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
 import com.confia.shared.platform.infrastructure.SharedPlatformConfiguration;
 import com.confia.shared.security.RateLimiterConfiguration;
@@ -62,7 +63,7 @@ import org.springframework.context.annotation.Import;
  * naming any entry missing here. A property such as {@code db-scheduler.enabled=false} is not
  * used: an environment can flip a property, not the code of an entry point.
  *
- * <p>The health probes (dockerfiles-and-local-compose decision 4): {@link HealthProbeRoutesConfiguration}
+ * <p>The health probes (dockerfiles-and-local-compose decision 4): {@link HealthProbeRoutesConfiguration} and {@link ReadinessDatabaseHealthConfiguration}
  * serves {@code GET /health/live} and {@code GET /health/ready}, and the framework's own mapping for the
  * additional paths of the probe groups is excluded because it takes one segment only (probe P-2).
  *
@@ -83,6 +84,6 @@ import org.springframework.context.annotation.Import;
         SessionTokenConfiguration.class, CsrfConfiguration.class,
         SessionCookieConfiguration.class, JobSchedulingConfiguration.class,
         AuthorizationConfiguration.class,
-        HealthProbeRoutesConfiguration.class})
+        HealthProbeRoutesConfiguration.class, ReadinessDatabaseHealthConfiguration.class})
 public class AdminApplication {
 }
