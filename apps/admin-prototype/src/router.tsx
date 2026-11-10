@@ -1,6 +1,7 @@
 import { createHashHistory, createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { GradeForm, GradeList, PeriodForm, PeriodList } from "./pages/config-academic";
 import { FeeForm, FeeList, ScholarshipForm, ScholarshipList } from "./pages/config-fees";
+import { DebtorList, PromiseForm, PromiseList, ReminderForm, ReminderList } from "./pages/collections";
 import { Dashboard } from "./pages/dashboard";
 import { CashPage, ChargeList, InvoiceList } from "./pages/extras";
 import { GuardianDetail, GuardianForm, GuardianList } from "./pages/guardians";
@@ -41,6 +42,12 @@ const routeTree = root.addChildren([
   r("/cargos", ChargeList),
   r("/caja", CashPage),
   r("/facturacion", InvoiceList),
+  r("/cobranza/morosos", DebtorList),
+  r("/cobranza/promesas", PromiseList),
+  r("/cobranza/promesas/nueva", () => <PromiseForm mode="new" />),
+  r("/cobranza/promesas/$id/editar", () => <PromiseForm mode="edit" />),
+  r("/cobranza/recordatorios", ReminderList),
+  r("/cobranza/recordatorios/nuevo", ReminderForm),
   r("/configuracion/periodos", PeriodList),
   r("/configuracion/periodos/nuevo", () => <PeriodForm mode="new" />),
   r("/configuracion/periodos/$id/editar", () => <PeriodForm mode="edit" />),

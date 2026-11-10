@@ -2,6 +2,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import * as seed from "./data";
 import * as cfg from "./config-data";
 import type { Fee, Grade, Period, Scholarship, StudentScholarship } from "./config-data";
+import * as col from "./collections-data";
+import type { PaymentPromise, PromiseStatus, Reminder } from "./collections-data";
 import type { CashSession, Guardian, Invoice, Org, Payment, StaffUser, Student } from "./data";
 
 // In-memory store: a new state object is created on every write, so selectors that return an
@@ -10,6 +12,7 @@ interface State {
   orgs: Org[]; staff: StaffUser[]; students: Student[]; guardians: Guardian[];
   payments: Payment[]; invoices: Invoice[]; cashSessions: CashSession[];
   periods: Period[]; grades: Grade[]; fees: Fee[]; scholarships: Scholarship[]; studentScholarships: StudentScholarship[];
+  promises: PaymentPromise[]; reminders: Reminder[];
   signedIn: boolean; simulateError: boolean; toast: string | null;
 }
 
@@ -17,6 +20,7 @@ let state: State = {
   orgs: seed.orgs, staff: seed.staff, students: seed.students, guardians: seed.guardians,
   payments: seed.payments, invoices: seed.invoices, cashSessions: seed.cashSessions,
   periods: cfg.periods, grades: cfg.grades, fees: cfg.fees, scholarships: cfg.scholarships, studentScholarships: cfg.studentScholarships,
+  promises: col.promises, reminders: col.reminders,
   signedIn: false, simulateError: false, toast: null,
 };
 const listeners = new Set<() => void>();
@@ -46,6 +50,9 @@ export function notify(message: string) {
 }
 
 export const actions = {
+  savePromise: (p: PaymentPromise) => set({ promises: upsert(state.promises, p) }),
+  setPromiseStatus: (id: string, status: PromiseStatus) => set({ promises: state.promises.map((p) => (p.id === id ? { ...p, status } : p)) }),
+  addReminder: (r: Reminder) => set({ reminders: [r, ...state.reminders] }),
   savePeriod: (p: Period) => set({ periods: upsert(state.periods, p) }),
   // Activating a period closes the one that was active, so there is only ever one.
   setActivePeriod: (id: string) =>

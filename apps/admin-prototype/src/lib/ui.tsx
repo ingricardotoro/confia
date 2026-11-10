@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Alert, Button, EmptyState, ErrorState, Input, Skeleton, StatusBadge } from "@confia/ui";
+import { Alert, Badge, Button, EmptyState, ErrorState, Input, Skeleton, StatusBadge } from "@confia/ui";
 import { ChevronRight, Search, X } from "lucide-react";
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import type { Status } from "../mock/data";
@@ -233,4 +233,51 @@ export function DataTable<T>({ rows, columns, rowKey, searchText, searchPlacehol
       )}
     </Card>
   );
+}
+
+/** Side panel for record details. Closes with Escape or the close button. */
+export function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/30">
+      <div role="dialog" aria-modal="true" aria-label={title} className="flex h-full w-full max-w-xl flex-col overflow-y-auto bg-bg-surface-elevated p-6 shadow-xl">
+        <div className="mb-4 flex items-start justify-between gap-2">
+          <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
+          <Button variant="subtle" size="sm" onClick={onClose}><X /> Cerrar</Button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Simple read-only table for hand-written rows inside cards and drawers. */
+export function MiniTable({ caption, head, rows, rightFrom }: { caption: string; head: string[]; rows: ReactNode[][]; rightFrom?: number[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <caption className="sr-only">{caption}</caption>
+        <thead className="text-text-secondary">
+          <tr>{head.map((h, i) => <th key={h} scope="col" className={`px-2 py-2 font-medium ${rightFrom?.includes(i) ? "text-right" : "text-left"}`}>{h}</th>)}</tr>
+        </thead>
+        <tbody className="divide-y divide-border-subtle">
+          {rows.map((r, ri) => <tr key={ri}>{r.map((c, i) => <td key={i} className={`px-2 py-2 ${rightFrom?.includes(i) ? "text-right" : "text-left"}`}>{c}</td>)}</tr>)}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export type Tone = "neutral" | "primary" | "outline" | "danger" | "success";
+const TONE_CLASS = {
+  danger: "border-status-overdue-border bg-status-overdue-bg text-status-overdue-fg",
+  success: "border-status-paid-border bg-status-paid-bg text-status-paid-fg",
+} as const;
+export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone?: Tone }) {
+  if (tone === "danger" || tone === "success") return <span className={`inline-flex h-5 items-center rounded-full border px-2 text-xs font-medium whitespace-nowrap ${TONE_CLASS[tone]}`}>{children}</span>;
+  return <Badge size="sm" variant={tone}>{children}</Badge>;
 }
