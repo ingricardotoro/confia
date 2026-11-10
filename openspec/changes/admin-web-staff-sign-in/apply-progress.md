@@ -487,3 +487,48 @@ La demostración 2 (matriz sin las filas nuevas) es de 8b.
 | PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 (14 de la caché de turbo) |
 
 Guarda de `*.spec.*` vacía y `git diff --name-only b923a63 -- apps/api packages/ui packages/contracts` vacío. Sin caracteres invisibles en los 10 archivos. T no se tocó (`tooling/` sin cambios).
+
+### Parte 8b `simulator-and-qr-browser-tests` (rama `change/admin-web-staff-sign-in-8b-enrollment-browser-checks`)
+
+Medida con `git reset`, `git add -A` y `git diff --cached --numstat -M 6ff4c32` (sin `openspec/`): 265 adiciones y 22 eliminaciones, **287 líneas**. La tarea completa suma 792 + 287 = 1 079 contra `b923a63`, sobre las 880 del umbral del propietario: por eso se aplicó el corte.
+
+| Paso | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| Simulador (`session-model.test.ts` y `server.test.ts`) | Sí, antes del código | 2 pruebas: `expected 'VYP4P7CWNNUE62ST3WFBFBTA3YN57QOA' not to be 'VYP4P7CWNNUE62ST3WFBFBTA3YN57QOA'`: el secreto era idéntico entre inscripciones | 64 pruebas del simulador |
+| Matriz y mínimo (`a11y-report.test.ts`) | Sí, antes del código | 5 pruebas: `expected [ { route: '/', …(1) }, …(5) ] to have a length of 22 but got 6`, más las filas de inscripción (`…(2)` contra `…(4)`) | 15 pruebas; 22 estados y 44 evaluaciones |
+| Recorridos SS81, SS82, SS84, SS85, SS100 | **No hubo rojo de navegador** de entrada: la pantalla y el simulador ya estaban en verde cuando se escribieron. SS100 sí se puso en rojo con la demostración 3 | 5 de 5 en verde a la primera | 85 de 85 en E |
+
+### Demostraciones deliberadas (tarea 8.3, las de 8b)
+
+Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, restauración desde la copia y `cmp` sin salida.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 2 | Matriz sin las filas `recovery-codes` y `first-code` | `Error: The matrix lacks: /iniciar-sesion/inscripcion [recovery-codes], /iniciar-sesion/inscripcion [first-code].` en la prueba del mínimo y en las de cada pantalla, y `AssertionError: expected [ [ 'loading', …(1) ], …(2) ] to deeply equal [ [ 'loading', …(1) ], …(4) ]` en la de inscripción (4 de 15) | idéntico |
+| 4 | *Adicional:* `value={`${uri}x`}` en `TotpQrCode.tsx` | SS81: el texto decodificado difiere del URI (`Expected` y `Received` distan en la `x` final) | idéntico |
+| 5 | *Adicional:* el simulador no vuelve a generar la clave tras la primera inscripción | SS100: `Error: the second secret differs from the first` (`Expected: true`, `Received: false`) | idéntico |
+
+La demostración 1 (continuar deshabilitado) y la 3 de la tarea (códigos conservados) están en 8a.
+
+### Desviaciones y decisiones de 8b
+
+1. **El `SS78` de la tarea 7 cambió.** Leía la cuenta antes de iniciar sesión; con un secreto nuevo por inscripción, la lee cuando la pantalla ya muestra el suyo.
+2. **Sin cambio en `server.ts`.** La lista de la tarea lo nombra, pero `enroll` vive en `session-model.ts`; el control de la cuenta ya leía el modelo. Se agregó una prueba de servidor (`server.test.ts`).
+3. **Comparaciones sin imprimir secretos.** SS81 y SS100 comparan con un booleano y un mensaje, para que un fallo no escriba el secreto en el informe (regla 11). El `SS78` de la tarea 7 sigue comparando el texto del portapapeles directamente y un fallo lo imprimiría; es un secreto ficticio de la ejecución, pero queda anotado.
+4. **`MINIMUM` son los 22 estados.** Se escribe a mano, aparte de la matriz, con los ocho del inicio de sesión, los tres de la verificación y los cinco de la inscripción además de los seis de la parte 1. Las pruebas que decían «el mínimo sigue en seis» ahora dicen que contiene cada pantalla.
+5. **SS84.** Se leen los rellenos calculados de los dos `path` del SVG y se comprueba que el fondo cubre todo el dibujo y que los módulos empiezan a 4 unidades del borde; no se mide un contraste.
+6. **SS85.** Cubre URL, cabeceras y cuerpos de todas las peticiones de una inscripción completa. El identificador aparece en una sola petición (el cuerpo del inicio de sesión).
+
+### Verificación de cierre de 8b (y de la tarea 8)
+
+| Suite | Resultado |
+|---|---|
+| U `pnpm --filter @confia/admin-web test` | 69 archivos, 727 pruebas y 1 `todo` |
+| E `pnpm --filter @confia/admin-web test:e2e` | 85 de 85 (76 previas, 5 recorridos, 4 evaluaciones de la puerta de los dos estados nuevos) |
+| PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 (14 de la caché de turbo) |
+
+T no se corrió: `tooling/` no cambió en esta tarea. Guarda de `*.spec.*` vacía y `git diff --name-only b923a63 -- apps/api packages/ui packages/contracts` vacío. Sin caracteres invisibles en los archivos de 8b.
+
+### Correcciones de la revisión de 8a, 2026-11-09 (rama 8b)
+
+Dos advertencias de la revisión, corregidas en 8b con su prueba primero. (1) La guarda de ubicación de `FirstCodeEntry` ahora tiene la prueba de su rama falsa: una activación retenida, la persona sale al inicio de sesión, se libera la respuesta y la ubicación sigue en el inicio de sesión. Demostración: guarda reemplazada por `entered.current !== ""`; rojo `AssertionError: expected '/' to be '/iniciar-sesion'`; `cmp` idéntico. (2) Un paso `recovery-codes` sin códigos ya no dibuja una lista vacía confirmable: muestra `ErrorState` con `enrollment.failed` y `problem.unexpected` (textos ya aprobados), y «Reintentar» descarta la inscripción y lleva al inicio de sesión con el aviso de inscripción interrumpida. Rojo observado: `Unable to find role="alert"` (se dibujaba el paso con la casilla). Además, una prueba de que «Ver de nuevo el código QR» no hace nada mientras la activación está en vuelo (ya estaba en verde: sin rojo posible) y los elementos de la lista de códigos se identifican por posición. Medida de 8b acumulada contra `6ff4c32`: 409 líneas. U 730 pruebas y 1 `todo`; E 85 de 85; PR 18 de 18.

@@ -107,10 +107,17 @@ export function createSessionModel(options: SessionModelOptions = {}): SessionMo
   const origins = options.allowedOrigins ?? DEFAULT_ORIGINS;
   const accountId = crypto.randomUUID();
   const institutionId = crypto.randomUUID();
-  const key = randomBytes(20);
-  const held = enrollment({ override: { secret: base32Encode(key) } });
-  // Keyed by the capitals form: the verification screen sends a recovery code in capitals (SS65), whatever case it was handed out in.
-  const recovery = new Map((held.body as { recoveryCodes: string[] }).recoveryCodes.map((code) => [code.toUpperCase(), code]));
+  // The account holds the secret and the codes of its last enrollment: each call to enroll replaces them, as the backend does (SS100).
+  let key = randomBytes(20);
+  let recovery = new Map<string, string>();
+  /** A new secret and new codes. Keyed by the capitals form: the verification screen sends a recovery code in capitals (SS65), whatever case it was handed out in. */
+  function hand(): ContractResponse {
+    key = randomBytes(20);
+    const fresh = enrollment({ override: { secret: base32Encode(key) } });
+    recovery = new Map((fresh.body as { recoveryCodes: string[] }).recoveryCodes.map((code) => [code.toUpperCase(), code]));
+    return fresh;
+  }
+  hand();
   let enrolled = options.enrolled ?? false;
 
   const refreshes = new Map<string, RefreshEntry>();
@@ -225,7 +232,7 @@ export function createSessionModel(options: SessionModelOptions = {}): SessionMo
     if ("refused" in found) return found.refused;
     if (found.token.use !== "mfa-enroll") return fail("token-invalid", 401);
     if (enrolled) return fail("mfa-already-enrolled", 409);
-    return wrap(held);
+    return wrap(hand());
   }
 
   function verify(bearer: string | undefined, body: unknown): ModelResponse {

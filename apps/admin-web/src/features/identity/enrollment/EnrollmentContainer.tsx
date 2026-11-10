@@ -184,7 +184,20 @@ export function EnrollmentContainer({ session, signInPath, homePath }: Enrollmen
             }}
           />
         ) : snapshot.step === "recovery-codes" ? (
-          <RecoveryCodesEntry session={session} codes={snapshot.recoveryCodes ?? []} />
+          snapshot.recoveryCodes === undefined || snapshot.recoveryCodes.length === 0 ? (
+            // The draft only gets here with codes; without them there is nothing to confirm, and a list the person never
+            // saw must not be confirmable. It is a failure whose way out starts over (the secret in view no longer counts).
+            <ErrorState
+              title={t("enrollment.failed")}
+              description={t("problem.unexpected")}
+              onRetry={() => {
+                session.discardSecondFactor("enrollment-interrupted");
+                void navigate({ to: signInPath, replace: true });
+              }}
+            />
+          ) : (
+            <RecoveryCodesEntry session={session} codes={snapshot.recoveryCodes} />
+          )
         ) : (
           <FirstCodeEntry
             session={session}

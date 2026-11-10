@@ -395,6 +395,23 @@ describe("the account control of the fictitious test account [I304]", { timeout:
     expect(done.status).toBe(200);
   });
 
+  it("two enrollments in a row answer different secrets and codes, and the account control follows the last one [SS100]", async () => {
+    await preset("twice", "enrollment-required");
+    const enroll = async () => {
+      const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: "twice" });
+      const bearer = { Authorization: `Bearer ${(login.json as { secondFactorToken: string }).secondFactorToken}` };
+      return (await call("POST", "/api/v1/auth/mfa/enrollments", { headers: bearer, scenario: "twice" })).json as { secret: string; recoveryCodes: string[] };
+    };
+
+    const first = await enroll();
+    const second = await enroll();
+    const account = (await call("GET", "/__control/account/twice")).json as { secret: string; recoveryCodes: string[] };
+
+    expect(second.secret).not.toBe(first.secret);
+    expect(second.recoveryCodes.filter((code) => first.recoveryCodes.includes(code))).toEqual([]);
+    expect(account).toEqual(second);
+  });
+
   it("lists only the recovery codes still valid, and keeps one account for each scenario", async () => {
     await preset("used", "second-factor-required");
     const before = (await call("GET", "/__control/account/used")).json as { recoveryCodes: string[] };

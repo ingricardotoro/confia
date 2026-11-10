@@ -20,13 +20,14 @@ describe("the evaluations of the matrix [BX74, BX77]", () => {
   it("covers every minimum combination in both themes, with the minimum written apart from the matrix", () => {
     const evaluations = assertCoversMinimum(MATRIX, MINIMUM);
 
-    expect(MINIMUM).toHaveLength(6);
+    expect(MINIMUM).toHaveLength(22);
     for (const wanted of MINIMUM) {
       const themes = evaluations.filter((e) => e.route === wanted.route && e.state === wanted.state).map((e) => e.theme);
       expect(themes).toEqual([...THEMES]);
     }
-    // Every combination of the matrix is evaluated, the minimum and the screens added since.
-    expect(evaluations).toHaveLength(MATRIX.length * THEMES.length);
+    // Every combination of the matrix is evaluated, in both themes: 22 states, 44 evaluations (BX109).
+    expect(evaluations).toHaveLength(44);
+    expect(MATRIX).toHaveLength(MINIMUM.length);
   });
 
   it("fails on zero combinations instead of passing", () => {
@@ -77,9 +78,8 @@ describe("the states of the sign in screen [BX109]", () => {
     });
   });
 
-  it("keeps the minimum of the part 1 at six combinations until the last screen", () => {
-    expect(MINIMUM).toHaveLength(6);
-    expect(MINIMUM.some((wanted) => wanted.route === SIGN_IN)).toBe(false);
+  it("has the eight states in the minimum, now that the last screen is in", () => {
+    expect(MINIMUM.filter((wanted) => wanted.route === SIGN_IN)).toHaveLength(8);
   });
 });
 
@@ -96,22 +96,29 @@ describe("the states of the verification screen [BX109]", () => {
     expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...verification])).toHaveLength(MATRIX.length * THEMES.length);
   });
 
-  it("keeps the minimum of the part 1 at six combinations", () => {
-    expect(MINIMUM.some((wanted) => wanted.route === VERIFICATION)).toBe(false);
+  it("has the three states in the minimum", () => {
+    expect(MINIMUM.filter((wanted) => wanted.route === VERIFICATION)).toHaveLength(3);
   });
 });
 
-describe("the states of the enrollment screen up to its secret step [BX109]", () => {
+describe("the states of the enrollment screen [BX109]", () => {
   const ENROLLMENT = "/iniciar-sesion/inscripcion";
   const enrollment = MATRIX.filter((combination) => combination.route === ENROLLMENT);
 
-  it("holds the three states, each once, all reached through the preset that asks for an enrollment", () => {
+  it("holds the five states, each once, all reached through the preset that asks for an enrollment", () => {
     expect(enrollment.map((combination) => [combination.state, combination.preset])).toEqual([
       ["loading", "enrollment-required"],
       ["secret", "enrollment-required"],
+      ["recovery-codes", "enrollment-required"],
+      ["first-code", "enrollment-required"],
       ["network-error", "enrollment-required"],
     ]);
     expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...enrollment])).toHaveLength(MATRIX.length * THEMES.length);
+  });
+
+  it("has the five states in the minimum, and the whole matrix is the 22 states of the three screens and the part 1 [BX109]", () => {
+    expect(MINIMUM.filter((wanted) => wanted.route === ENROLLMENT)).toHaveLength(5);
+    expect(MINIMUM).toHaveLength(6 + 8 + 3 + 5);
   });
 });
 
