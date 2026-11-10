@@ -139,3 +139,45 @@ El propietario aprobó el camino recomendado arriba. Cambios (RED observado ante
 - Verificación: `./mvnw -B verify -Pmutation-gate` en `apps/api`, JDK 25: `BUILD SUCCESS`; 2 962 pruebas unitarias (3
   omitidas previas) y 850 de integración sin fallos; cobertura cumplida; PIT con el umbral de 80.
 - La rama `wip/transactional-email-adapter-recipient-hash` se eliminó al absorberse.
+
+## Tarea 3: migración `V16` y adaptador de la bitácora (PR 2)
+
+- **Rama:** `change/transactional-email-adapter-02-email-delivery-log-table`, apilada sobre la del PR 1 (`1f0ccc2`). Sin push.
+- **Estado (2026-11-10):** tarea 3 **hecha**; la verificación de la tarea pasó (abajo). El `verify -Pmutation-gate` completo
+  se registra en la sección «Cierre del PR 2».
+- **Commits:** `1596a22` (migración y pruebas de esquema, 510 líneas) y `9c6e53f` (puerto, adaptador y sus pruebas, 422 líneas).
+
+### Rojo registrado
+
+- Esquema (`V16SchemaDiffIT`, `NotificationsRowSecurityIT`, `RolePrivilegeMatrixIT`, `MultiTenantSchemaIT`), sin `V16`:
+  `-Dit.test=…` dio 76 pruebas, 4 fallos y 8 errores, todos por la causa esperada: `relation "notifications_email_delivery" does
+  not exist` o `Flyway: No migration with a target version 16 could be found`.
+- Puerto, registro y adaptador (`EmailDeliveryAttemptTest`, `JooqEmailDeliveryLogIT`) sin código de producción: `COMPILATION ERROR`,
+  54 `cannot find symbol` sobre `EmailDeliveryAttempt`, `JooqEmailDeliveryLog` y sus miembros.
+
+### Verde y observaciones
+
+- Segunda corrida de verde: `EmailDeliveryAttemptTest` falló en `everyRequiredComponentIsChecked` (`EmailDeliveryAttempt.failed` con clase nula lanzaba
+  `IllegalArgumentException` y no `NullPointerException`); se corrigió con `Objects.requireNonNull` en la fábrica. Luego todo en verde.
+- Comando de la tarea (unitarias y de integración juntas): `-Dtest='EmailDeliveryAttemptTest,TableOwnershipByModuleTest,JooqConfinedToInfrastructureTest,SpringModulithVerificationTest,NoTechnicalLayerPackageNamesTest,LayeredArchitectureTest,DomainPurityRulesTest'`
+  `-Dit.test='V16SchemaDiffIT,NotificationsRowSecurityIT,RolePrivilegeMatrixIT,MultiTenantSchemaIT,JooqEmailDeliveryLogIT'`:
+  21 pruebas unitarias y 82 de integración, 0 fallos. El `BUILD FAILURE` posterior es solo el `jacoco:check` de un `-Dtest` acotado.
+- **Control negativo.** En `V16`, conceder `UPDATE` a `confia_admin_app` y quitar `FORCE ROW LEVEL SECURITY` puso en rojo 6 pruebas
+  (`RolePrivilegeMatrixIT` x3, `MultiTenantSchemaIT` x2, `V16SchemaDiffIT` x1: la matriz, `BI158` y el catálogo); revertido y confirmado con `cmp`.
+- **Checksum de `V14`.** `V16SchemaDiffIT` registra los checksums de `V1` a `V14`. El de `V14` (`-279518595`) no estaba registrado en ninguna prueba
+  previa; se leyó de `flyway_schema_history` con el archivo sin cambios desde su único commit (`969c27f`). Los de `V1` a `V13` coinciden con `V14SchemaDiffIT`.
+- **Hueco de `V15`.** La base no tiene `V15` (la reserva rbac 5b). Flyway acepta el hueco: `migrate("16")` y `validateUpTo("16")` funcionan. Si rbac 5b fusiona
+  antes, `V16SchemaDiffIT` y `RolePrivilegeMatrixIT` pasan a partir de `V15` sin cambios de lógica, pero su `migratedTo("14")` debe revisarse al rebasar.
+- **`status_chk`.** Una fila `pending` rompe también `outcome_chk`, que PostgreSQL informa primero (orden alfabético); por eso la prueba solo exige el rechazo para ese caso.
+- **Lo que queda para las tareas 6 y 7.** El puerto `EmailDeliveryLog` y el registro `EmailDeliveryAttempt` quedan sin cablear: ningún bean los crea todavía.
+
+### Presupuesto
+
+Medido con `git diff --numstat` de los dos commits, sin `openspec/` ni código generado: **932 líneas** (510 + 422), por encima de las 800.
+Costura de `tasks.md`: «migración y pruebas de esquema / adaptador jOOQ», que coincide con los dos commits. Recomendación: dividir en
+PR 2a (`1596a22`) y PR 2b (`9c6e53f`), o aceptar `size:exception`. No se comprimió nada para ajustarse.
+
+### Cierre del PR 2 (2026-11-10)
+
+`./mvnw -B verify -Pmutation-gate` en `apps/api`, JDK 25: **`BUILD SUCCESS`** con los commits `1596a22` y `9c6e53f` (más el registro `6807067`). Los avisos
+`Minion exited abnormally ... TIMED_OUT` de PIT son mutantes que provocan bucles y cuentan como muertos; el umbral de 80 se cumplió.

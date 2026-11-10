@@ -97,7 +97,7 @@ Chain strategy: stacked-to-main
 
 ## Fase 2: bitácora de envío
 
-- [ ] **3. Migración `V16` y adaptador de la bitácora** (decisión 7; `NT11`-`NT13`, `BI154`-`BI158`)
+- [x] **3. Migración `V16` y adaptador de la bitácora** (decisión 7; `NT11`-`NT13`, `BI154`-`BI158`)
   - **RED.** `V16SchemaDiffIT`, `NotificationsRowSecurityIT` (`BI154`, `BI155`), filas nuevas de
     `RolePrivilegeMatrixIT` (`BI157`, `BI158`), `MultiTenantSchemaIT` (`BI156`), `JooqEmailDeliveryLogIT` (inserta
     `sent` y `failed`, ninguna columna con datos personales).
