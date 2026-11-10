@@ -91,7 +91,7 @@ class JooqStaffAccountRepositoryIT extends CommittingPostgresIntegrationTest {
                 () -> repository().lockById(institutionId, accountId));
 
         assertThat(locked).contains(new StaffAccount(accountId, institutionId, identifier,
-                new StoredPasswordHash(PLACEHOLDER_PASSWORD_HASH), false));
+                new StoredPasswordHash(PLACEHOLDER_PASSWORD_HASH)));
     }
 
     @Test

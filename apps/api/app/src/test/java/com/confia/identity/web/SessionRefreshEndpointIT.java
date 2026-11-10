@@ -47,6 +47,11 @@ class SessionRefreshEndpointIT extends SessionEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     // --- I186: the normal refresh ---
 
     @Test

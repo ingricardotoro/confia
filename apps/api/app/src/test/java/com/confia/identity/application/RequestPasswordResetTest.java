@@ -70,7 +70,7 @@ class RequestPasswordResetTest {
         StaffAccountId existingId = new StaffAccountId(UUID.randomUUID());
         accounts.existing = new StaffAccount(existingId, CONFIGURED,
                 LoginIdentifier.of("ana.martinez@colegio.edu.hn"), new StoredPasswordHash(
-                        "$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aGFzaA"), false);
+                        "$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aGFzaA"));
         List<AuditEntry> audit = new ArrayList<>();
         RequestPasswordReset useCase = new RequestPasswordReset(neverConnectingRunner(),
                 () -> CONFIGURED, accounts, RequestPasswordResetTest::fingerprint, scheduler,
@@ -109,7 +109,7 @@ class RequestPasswordResetTest {
         StaffAccountId existingId = new StaffAccountId(UUID.randomUUID());
         accounts.existing = new StaffAccount(existingId, CONFIGURED,
                 LoginIdentifier.of("ana.martinez@colegio.edu.hn"), new StoredPasswordHash(
-                        "$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aGFzaA"), false);
+                        "$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aGFzaA"));
         List<AuditEntry> audit = new ArrayList<>();
         RequestPasswordReset useCase = new RequestPasswordReset(neverConnectingRunner(),
                 () -> CONFIGURED, accounts, RequestPasswordResetTest::fingerprint, scheduler,

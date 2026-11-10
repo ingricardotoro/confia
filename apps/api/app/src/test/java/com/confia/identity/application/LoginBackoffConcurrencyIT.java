@@ -15,6 +15,7 @@ import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
 import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
+import com.confia.identity.web.SecondFactorExemptions;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.shared.security.SecurityContext;
@@ -104,7 +105,7 @@ class LoginBackoffConcurrencyIT extends CommittingPostgresIntegrationTest {
         AuthenticateWithPassword useCase = new AuthenticateWithPassword(independentRunner,
                 () -> institutionId, new JooqStaffAccountRepository(dsl),
                 new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), HASHER,
-                FINGERPRINTER, new JooqAuditLogWriter(dsl), fixedClock(instant));
+                FINGERPRINTER, new JooqAuditLogWriter(dsl), SecondFactorExemptions.nobodyOwes(), fixedClock(instant));
         SecurityContext context = contextOf(institutionId);
         return () -> independentRunner.execute(context, () -> {
             awaitUninterruptibly(barrier);

@@ -35,10 +35,13 @@ import java.util.Objects;
 public sealed interface AuthenticationResult {
 
     /**
-     * The credential was valid. Carries only the two identifiers the caller needs to resolve the
-     * rest of the session; {@code requiredDelay} — the anti-brute-force wait this outcome may
-     * still owe, even on success — travels in {@code AuthenticationDecision}, not here
-     * (design.md, decision 10, "El retardo viaja en un envoltorio").
+     * The credential was valid and the {@link MfaPolicy} exempts the account. With the production
+     * policy ({@link MfaPolicy#STAFF}) no account is exempt, so this outcome is reachable only with a
+     * test policy (rbac-permission-matrix-and-audit-integration design.md, D14). Carries only the
+     * two identifiers the caller needs to resolve the rest of the session; {@code requiredDelay} —
+     * the anti-brute-force wait this outcome may still owe, even on success — travels in
+     * {@code AuthenticationDecision}, not here (design.md, decision 10, "El retardo viaja en
+     * un envoltorio").
      */
     record Authenticated(StaffAccountId userId, InstitutionId institutionId)
             implements AuthenticationResult {
@@ -63,8 +66,8 @@ public sealed interface AuthenticationResult {
     }
 
     /**
-     * The credential was valid, the account has {@code mfa_required = true}, and it already has a
-     * TOTP secret enrolled: pending a valid TOTP code before this login completes
+     * The credential was valid, the account owes a second factor under the {@link MfaPolicy}, and it
+     * already has a TOTP secret enrolled: pending a valid TOTP code before this login completes
      * (column-encryption-and-mfa-totp, specs/identity/spec.md, "MFA obligatoria para cuentas
      * marcadas con {@code mfa_required}"). Carries only the two identifiers the caller needs to
      * challenge for a code; translating this outcome into a session token that can only call the
@@ -87,8 +90,8 @@ public sealed interface AuthenticationResult {
     }
 
     /**
-     * The credential was valid, the account has {@code mfa_required = true}, but it has no TOTP
-     * secret enrolled yet: pending enrollment before this login completes
+     * The credential was valid, the account owes a second factor under the {@link MfaPolicy}, but it has no
+     * TOTP secret enrolled yet: pending enrollment before this login completes
      * (column-encryption-and-mfa-totp, specs/identity/spec.md, "MFA obligatoria para cuentas
      * marcadas con {@code mfa_required}"). Carries only the two identifiers the caller needs to
      * start enrollment; translating this outcome into a session token restricted to the enrollment

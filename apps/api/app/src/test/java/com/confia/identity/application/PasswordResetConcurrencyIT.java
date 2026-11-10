@@ -231,7 +231,7 @@ class PasswordResetConcurrencyIT extends PasswordResetIntegrationTest {
         public Optional<StaffAccount> lockById(InstitutionId institution, StaffAccountId account) {
             return Optional.of(new StaffAccount(account, institution,
                     LoginIdentifier.of("carlos.ramirez@colegio.edu.hn"),
-                    new StoredPasswordHash(PLACEHOLDER_PASSWORD_HASH), false));
+                    new StoredPasswordHash(PLACEHOLDER_PASSWORD_HASH)));
         }
 
         @Override

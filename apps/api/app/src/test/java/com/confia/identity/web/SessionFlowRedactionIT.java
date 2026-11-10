@@ -69,6 +69,11 @@ class SessionFlowRedactionIT extends SessionEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     // --- I210: the control, first ---
 
     @Test

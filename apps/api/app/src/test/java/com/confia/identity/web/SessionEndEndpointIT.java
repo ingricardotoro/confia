@@ -46,6 +46,11 @@ class SessionEndEndpointIT extends SessionEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     // --- I194: the current session ---
 
     @Test

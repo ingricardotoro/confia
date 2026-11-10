@@ -23,18 +23,25 @@ class LoginCookieProfilesIT extends LoginEndpointSupport {
     private static final InstitutionId INSTITUTION = new InstitutionId(UUID.randomUUID());
     private static final String ANA = "ana.martinez@colegio.edu.hn";
 
+    private LoginProcess current;
+
     @Override
     InstitutionId institution() {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return current.exemptions();
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"local", "preprod", "prod"})
     void bothCookiesAreSecureAndPrefixedInEveryProfile(String profile) {
-        seedAccount(ANA, false, false);
-
         try (LoginProcess process = LoginProcess.start(PEPPER_BYTES, INSTITUTION, TEST_PASSWORD,
                 Map.of("spring.profiles.active", profile))) {
+            current = process;
+            seedAccount(ANA, false, false);
             HttpResponse<String> response = process.login(LoginProcess.freshAddress(), ANA, PASSWORD);
 
             assertThat(response.statusCode()).as("the login under the %s profile", profile)

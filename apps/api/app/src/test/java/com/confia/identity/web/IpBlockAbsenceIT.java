@@ -43,6 +43,11 @@ class IpBlockAbsenceIT extends LoginEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     @Test
     void sixDifferentIdentifiersFromOneAddressDoNotBlockTheAddress() {
         seedAccount(ANA, false, false);

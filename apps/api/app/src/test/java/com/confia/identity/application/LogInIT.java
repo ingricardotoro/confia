@@ -452,7 +452,7 @@ class LogInIT extends SessionIssuanceIntegrationTest {
         AuthenticateWithPassword authenticate = new AuthenticateWithPassword(transactionRunner(),
                 () -> institutionId, new JooqStaffAccountRepository(dsl),
                 new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), HASHER,
-                FINGERPRINTER, writer, clock);
+                FINGERPRINTER, writer, exemptions, clock);
         return new LogIn(transactionRunner(), provider, authenticate,
                 issueSession(clock, writer, tokens), accessTokenIssuer(clock), FINGERPRINTER,
                 failureSpread, writer, new SecurityEventLog(), clock);

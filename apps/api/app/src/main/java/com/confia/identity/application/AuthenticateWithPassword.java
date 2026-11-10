@@ -10,6 +10,7 @@ import com.confia.identity.domain.BackoffPolicy;
 import com.confia.identity.domain.BackoffState;
 import com.confia.identity.domain.IdentifierFingerprint;
 import com.confia.identity.domain.LoginIdentifier;
+import com.confia.identity.domain.MfaPolicy;
 import com.confia.identity.domain.PlainPassword;
 import com.confia.identity.domain.StaffAccount;
 import com.confia.identity.domain.TotpCredential;
@@ -60,12 +61,13 @@ import java.util.UUID;
  * construction.
  *
  * <p><b>The second-factor seam (column-encryption-and-mfa-totp, C4).</b> Once the presented
- * password matches, and only then, this class reads {@code mfa_required} off the resolved {@link
- * StaffAccount} and, when it is {@code true}, whether {@link #totpCredentials} already has a
- * secret enrolled for that account (proposal.md, "Cómo se determina qué cuenta necesita segundo
- * factor"): {@code false} still produces {@link Authenticated}, unchanged from part 1; {@code
- * true} with a secret enrolled produces {@link SecondFactorRequired}; {@code true} with none
- * produces {@link SecondFactorEnrollmentRequired}. A wrong password is decided first and never
+ * password matches, and only then, this class asks the {@link MfaPolicy} whether the resolved
+ * {@link StaffAccount} owes a second factor and, when it does, whether {@link #totpCredentials}
+ * already has a secret enrolled for that account (proposal.md, "Cómo se determina qué cuenta necesita segundo
+ * factor"): an account the policy exempts still produces {@link Authenticated} (only a test policy
+ * does, since {@code MfaPolicy.STAFF} exempts none); one that owes it with a secret enrolled
+ * produces {@link SecondFactorRequired}; one that owes it with none produces {@link
+ * SecondFactorEnrollmentRequired}. A wrong password is decided first and never
  * reaches this reading, so a wrong password never discloses whether an account requires a second
  * factor. Both {@link #decideBackoffState} and {@link #auditOutcomeOf} are exhaustive {@code
  * switch} expressions with no {@code default} over {@link AuthenticationResult}'s four outcomes
@@ -97,6 +99,7 @@ public final class AuthenticateWithPassword {
     private final PasswordHasher passwordHasher;
     private final LoginIdentifierFingerprinter fingerprinter;
     private final AuditLogWriter auditLogWriter;
+    private final MfaPolicy mfaPolicy;
     private final Clock clock;
     private final BackoffPolicy backoffPolicy;
 
@@ -104,7 +107,7 @@ public final class AuthenticateWithPassword {
             LoginInstitutionProvider institutionProvider, StaffAccountRepository accounts,
             TotpCredentialRepository totpCredentials, LoginBackoffStore backoffStore,
             PasswordHasher passwordHasher, LoginIdentifierFingerprinter fingerprinter,
-            AuditLogWriter auditLogWriter, Clock clock) {
+            AuditLogWriter auditLogWriter, MfaPolicy mfaPolicy, Clock clock) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.institutionProvider = Objects.requireNonNull(institutionProvider, "institutionProvider");
         this.accounts = Objects.requireNonNull(accounts, "accounts");
@@ -113,6 +116,7 @@ public final class AuthenticateWithPassword {
         this.passwordHasher = Objects.requireNonNull(passwordHasher, "passwordHasher");
         this.fingerprinter = Objects.requireNonNull(fingerprinter, "fingerprinter");
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
+        this.mfaPolicy = Objects.requireNonNull(mfaPolicy, "mfaPolicy");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.backoffPolicy = new BackoffPolicy();
     }
@@ -199,7 +203,7 @@ public final class AuthenticateWithPassword {
      */
     private AuthenticationResult outcomeForValidCredentials(StaffAccount staffAccount,
             InstitutionId institutionId) {
-        if (!staffAccount.mfaRequired()) {
+        if (!mfaPolicy.requiresSecondFactor(staffAccount.id())) {
             return new Authenticated(staffAccount.id(), institutionId);
         }
         // "MFA active" is a verified secret (session-endpoints-cookie-and-csrf design.md, decision

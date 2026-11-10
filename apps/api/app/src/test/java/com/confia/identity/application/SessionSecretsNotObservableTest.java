@@ -366,7 +366,7 @@ class SessionSecretsNotObservableTest {
         public Optional<StaffAccount> lockById(InstitutionId institutionId, StaffAccountId id) {
             return Optional.of(new StaffAccount(id, institutionId,
                     LoginIdentifier.of("maria.lopez@colegio.edu.hn"),
-                    new StoredPasswordHash("$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aW5pY2lhbA"), false));
+                    new StoredPasswordHash("$argon2id$v=19$m=19456,t=3,p=1$c2FsdA$aW5pY2lhbA")));
         }
 
         @Override

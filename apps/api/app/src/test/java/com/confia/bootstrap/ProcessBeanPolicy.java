@@ -110,6 +110,11 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // Each entry is exact because the non-vacuity check compares by equality.
                     "com.confia.identity.application", "com.confia.identity.infrastructure",
                     "com.confia.identity.infrastructure.wiring",
+                    // The second-factor policy of production, MfaPolicy.STAFF, is a bean of the
+                    // domain package (rbac-permission-matrix-and-audit-integration D14, D18).
+                    // Administrative only; the portal forbids com.confia.identity and the worker
+                    // registers no identity bean. Exact like every entry.
+                    "com.confia.identity.domain",
                     // The web layer of identity (session-tokens-and-web-layer, task 5.2): the
                     // controller of the current session and the named-interface package of the
                     // configuration that registers it. Administrative only, each exact.

@@ -44,6 +44,7 @@ import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.identity.infrastructure.JooqTotpVerificationBackoffStore;
 import com.confia.identity.testsupport.fixture.LeakingMfaSecretFixture;
 import com.confia.identity.testsupport.fixture.LeakingPasswordResetTokenFixture;
+import com.confia.identity.web.SecondFactorExemptions;
 import com.confia.kernel.AeadIntegrityException;
 import com.confia.kernel.AesGcmCipher;
 import com.confia.kernel.InstitutionId;
@@ -113,7 +114,7 @@ class IdentitySecretRedactionIT extends CommittingPostgresIntegrationTest {
                 () -> institutionId, new JooqStaffAccountRepository(dsl),
                 new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), hasher,
                 fingerprinter, new JooqAuditLogWriter(dsl),
-                Clock.fixed(Instant.parse("2026-03-10T16:00:00Z"), ZoneOffset.UTC));
+                SecondFactorExemptions.nobodyOwes(), Clock.fixed(Instant.parse("2026-03-10T16:00:00Z"), ZoneOffset.UTC));
 
         AuthenticationDecision decision = useCase.execute(contextOf(institutionId),
                 new AuthenticationCommand(identifier.value(), PASSWORD_LITERAL));
@@ -348,7 +349,7 @@ class IdentitySecretRedactionIT extends CommittingPostgresIntegrationTest {
                 new ConsumeRecoveryCode(transactionRunner(), new JooqRecoveryCodeRepository(dsl),
                         new BouncyCastleRecoveryCodeHasher(Argon2Profile.floor(), pepper),
                         new JooqAuditLogWriter(dsl), clock),
-                hasher, new JooqAccountSessionRevoker(dsl), new JooqAuditLogWriter(dsl), clock);
+                hasher, new JooqAccountSessionRevoker(dsl), new JooqAuditLogWriter(dsl), SecondFactorExemptions.nobodyOwes(), clock);
         ResetPasswordCommand command = new ResetPasswordCommand(token.value(), newPasswordLiteral,
                 new SecondFactorProof.None());
         ResetPasswordDecision decision = reset.execute(contextOf(institutionId), command);

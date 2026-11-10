@@ -22,6 +22,7 @@ import com.confia.identity.infrastructure.JooqRecoveryCodeRepository;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
 import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
 import com.confia.identity.infrastructure.JooqTotpVerificationBackoffStore;
+import com.confia.identity.web.SecondFactorExemptions;
 import com.confia.kernel.AesGcmCipher;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditLogWriter;
@@ -66,6 +67,8 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
     static final Duration TOTP_PERIOD = Duration.ofSeconds(30);
 
     final InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
+    /** The test policy: an account seeded without a second factor is exempt, as the old column said. */
+    final SecondFactorExemptions exemptions = new SecondFactorExemptions();
     private final ColumnEncryptionMasterKey masterKey = randomMasterKey();
 
     SecurityContext context() {
@@ -89,6 +92,9 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
                     LoginIdentifier.of(email).value(), hash, mfaRequired);
             return null;
         });
+        if (!mfaRequired) {
+            exemptions.exempt(accountId);
+        }
         return accountId;
     }
 
@@ -166,14 +172,14 @@ abstract class PasswordResetIntegrationTest extends CommittingPostgresIntegratio
                 clock);
         return new ResetPasswordWithToken(transactionRunner(), () -> configuredInstitution, tokens,
                 new JooqStaffAccountRepository(dsl), new JooqTotpCredentialRepository(dsl),
-                verifyTotp, consumeRecoveryCode, HASHER, revoker, auditLogWriter, clock);
+                verifyTotp, consumeRecoveryCode, HASHER, revoker, auditLogWriter, exemptions, clock);
     }
 
     AuthenticationResult loginAt(String email, String password, String instant) {
         return new AuthenticateWithPassword(transactionRunner(), () -> institutionId,
                 new JooqStaffAccountRepository(dsl), new JooqTotpCredentialRepository(dsl),
                 new JooqLoginBackoffStore(dsl), HASHER, FINGERPRINTER, new JooqAuditLogWriter(dsl),
-                fixedClock(instant))
+                exemptions, fixedClock(instant))
                 .execute(context(), new AuthenticationCommand(email, password))
                 .result();
     }

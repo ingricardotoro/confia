@@ -5,6 +5,7 @@ import com.confia.identity.application.ResetOutcome.PasswordRejected;
 import com.confia.identity.application.ResetOutcome.SecondFactorMissing;
 import com.confia.identity.application.ResetOutcome.SecondFactorRejected;
 import com.confia.identity.application.ResetOutcome.TokenRejected;
+import com.confia.identity.domain.MfaPolicy;
 import com.confia.identity.domain.PasswordResetRejectionReason;
 import com.confia.identity.domain.PasswordResetTokenHash;
 import com.confia.identity.domain.PasswordResetTokenPolicy;
@@ -80,6 +81,7 @@ public final class ResetPasswordWithToken {
     private final PasswordHasher passwordHasher;
     private final AccountSessionRevoker sessionRevoker;
     private final AuditLogWriter auditLogWriter;
+    private final MfaPolicy mfaPolicy;
     private final Clock clock;
     private final PasswordResetTokenPolicy tokenPolicy;
     private final StaffPasswordLengthPolicy lengthPolicy;
@@ -89,7 +91,7 @@ public final class ResetPasswordWithToken {
             StaffAccountRepository accounts, TotpCredentialRepository totpCredentials,
             VerifyTotpCode verifyTotp, ConsumeRecoveryCode consumeRecoveryCode,
             PasswordHasher passwordHasher, AccountSessionRevoker sessionRevoker,
-            AuditLogWriter auditLogWriter, Clock clock) {
+            AuditLogWriter auditLogWriter, MfaPolicy mfaPolicy, Clock clock) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.institutionProvider = Objects.requireNonNull(institutionProvider, "institutionProvider");
         this.tokens = Objects.requireNonNull(tokens, "tokens");
@@ -100,6 +102,7 @@ public final class ResetPasswordWithToken {
         this.passwordHasher = Objects.requireNonNull(passwordHasher, "passwordHasher");
         this.sessionRevoker = Objects.requireNonNull(sessionRevoker, "sessionRevoker");
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
+        this.mfaPolicy = Objects.requireNonNull(mfaPolicy, "mfaPolicy");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.tokenPolicy = new PasswordResetTokenPolicy();
         this.lengthPolicy = new StaffPasswordLengthPolicy();
@@ -234,7 +237,7 @@ public final class ResetPasswordWithToken {
     }
 
     private boolean mfaActive(InstitutionId institutionId, StaffAccount account) {
-        return account.mfaRequired()
+        return mfaPolicy.requiresSecondFactor(account.id())
                 && totpCredentials.findByAccountId(institutionId, account.id())
                         .map(TotpCredential::isVerified).orElse(false);
     }

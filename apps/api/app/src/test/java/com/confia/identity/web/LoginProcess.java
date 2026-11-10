@@ -79,6 +79,20 @@ final class LoginProcess implements AutoCloseable {
      */
     static LoginProcess start(byte[] pepperBytes, InstitutionId institution,
             String databasePassword, Map<String, String> extra) {
+        return start(pepperBytes, institution, databasePassword, extra, true);
+    }
+
+    /**
+     * The process exactly as production assembles it: no {@link SecondFactorExemptions} is
+     * registered, so the only second-factor policy is {@code MfaPolicy.STAFF}.
+     */
+    static LoginProcess startWithoutExemptions(byte[] pepperBytes, InstitutionId institution,
+            String databasePassword, Map<String, String> extra) {
+        return start(pepperBytes, institution, databasePassword, extra, false);
+    }
+
+    private static LoginProcess start(byte[] pepperBytes, InstitutionId institution,
+            String databasePassword, Map<String, String> extra, boolean withExemptions) {
         KeyPair keys = newKeys();
         CompactJws jws = new CompactJws(SigningKeyRing.of(SigningKey.signing(
                 AdminProcessLauncher.signingKid(), keys.getPublic(), keys.getPrivate())));
@@ -87,6 +101,10 @@ final class LoginProcess implements AutoCloseable {
         properties.put("confia.identity.argon2-pepper",
                 Base64.getEncoder().encodeToString(pepperBytes));
         properties.put("confia.web.trusted-proxies", TRUST_LOOPBACK);
+        if (withExemptions) {
+            // The test policy of the second factor, as an extra source of the real process (D14).
+            properties.put("spring.main.sources", SecondFactorExemptionsConfiguration.class.getName());
+        }
         properties.putAll(extra);
         ConfigurableApplicationContext context = AdminProcessLauncher.launch(
                 SharedPostgresContainer.jdbcUrl(), "confia_admin_app", databasePassword, keys,
@@ -122,6 +140,11 @@ final class LoginProcess implements AutoCloseable {
 
     ConfigurableApplicationContext context() {
         return context;
+    }
+
+    /** The test policy of this process; fails when the process was started without it. */
+    SecondFactorExemptions exemptions() {
+        return context.getBean(SecondFactorExemptions.class);
     }
 
     /** A login request with the allowed origin and a JSON body, from the given client address. */

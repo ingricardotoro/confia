@@ -20,6 +20,7 @@ import com.confia.identity.infrastructure.HmacLoginIdentifierFingerprinter;
 import com.confia.identity.infrastructure.JooqLoginBackoffStore;
 import com.confia.identity.infrastructure.JooqStaffAccountRepository;
 import com.confia.identity.infrastructure.JooqTotpCredentialRepository;
+import com.confia.identity.web.SecondFactorExemptions;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditLogReader;
 import com.confia.shared.audit.AuditRowSnapshot;
@@ -63,6 +64,9 @@ import tools.jackson.databind.json.JsonMapper;
  * ever checks whether a row exists, never decrypts it.
  */
 class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
+
+    /** The test policy: an account seeded without a second factor is exempt, as the old column said. */
+    private final SecondFactorExemptions exemptions = new SecondFactorExemptions();
 
     private static final String EXISTING_EMAIL = "carlos.ramirez@colegio.edu.hn";
     private static final String NONEXISTENT_EMAIL = "nadie.registrado@colegio.edu.hn";
@@ -336,7 +340,7 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
      * no correction from any permission concept — because none exists yet in this tree.
      */
     @Test
-    void mfaRequiredFalseStillProducesAuthenticatedWithNoDerivationFromAnyFuturePermission() {
+    void anAccountThePolicyExemptsStillProducesAuthenticatedWithNoDerivationFromAnyPermission() {
         InstitutionId institutionId = new InstitutionId(UUID.randomUUID());
         LoginIdentifier identifier = LoginIdentifier.of(EXISTING_EMAIL);
         seedStaffAccount(institutionId, identifier, false);
@@ -352,7 +356,8 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
         AuthenticateWithPassword useCase = new AuthenticateWithPassword(transactionRunner(),
                 () -> institutionId, new JooqStaffAccountRepository(dsl),
                 new JooqTotpCredentialRepository(dsl), new JooqLoginBackoffStore(dsl), HASHER,
-                FINGERPRINTER, new JooqAuditLogWriter(dsl), fixedClock(instant));
+                FINGERPRINTER, new JooqAuditLogWriter(dsl), exemptions,
+                fixedClock(instant));
         SecurityContext context = new SecurityContext("", "system", institutionId.value().toString(),
                 UUID.randomUUID().toString());
         return useCase.execute(context, new AuthenticationCommand(presentedIdentifier, presentedPassword));
@@ -380,6 +385,9 @@ class AuthenticateWithPasswordIT extends CommittingPostgresIntegrationTest {
                     mfaRequired);
             return null;
         });
+        if (!mfaRequired) {
+            exemptions.exempt(accountId);
+        }
         return accountId;
     }
 

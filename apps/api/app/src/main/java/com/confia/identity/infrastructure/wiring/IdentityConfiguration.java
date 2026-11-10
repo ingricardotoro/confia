@@ -29,6 +29,7 @@ import com.confia.identity.application.StaffRoleAssignmentRepository;
 import com.confia.identity.application.TotpCredentialRepository;
 import com.confia.identity.application.TotpVerificationBackoffStore;
 import com.confia.identity.application.VerifyTotpCode;
+import com.confia.identity.domain.MfaPolicy;
 import com.confia.identity.infrastructure.Argon2Pepper;
 import com.confia.identity.infrastructure.Argon2Profile;
 import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
@@ -277,14 +278,23 @@ public class IdentityConfiguration {
         return new EndAllSessions(runner, accounts, sessionRevoker, auditLogWriter, clock);
     }
 
+    /**
+     * The second-factor policy of production: every staff account owes one (design.md, D14; owner
+     * decision Q1). Nothing configures it, so no property can switch the requirement off.
+     */
+    @Bean
+    MfaPolicy mfaPolicy() {
+        return MfaPolicy.STAFF;
+    }
+
     @Bean
     AuthenticateWithPassword authenticateWithPassword(TransactionRunner runner,
             LoginInstitutionProvider institutionProvider, StaffAccountRepository accounts,
             TotpCredentialRepository totpCredentials, LoginBackoffStore backoffStore,
             PasswordHasher passwordHasher, LoginIdentifierFingerprinter fingerprinter,
-            AuditLogWriter auditLogWriter, Clock clock) {
+            AuditLogWriter auditLogWriter, MfaPolicy mfaPolicy, Clock clock) {
         return new AuthenticateWithPassword(runner, institutionProvider, accounts, totpCredentials,
-                backoffStore, passwordHasher, fingerprinter, auditLogWriter, clock);
+                backoffStore, passwordHasher, fingerprinter, auditLogWriter, mfaPolicy, clock);
     }
 
     /**
@@ -354,9 +364,9 @@ public class IdentityConfiguration {
             StaffAccountRepository accounts, TotpCredentialRepository totpCredentials,
             VerifyTotpCode verifyTotp, ConsumeRecoveryCode consumeRecoveryCode,
             PasswordHasher passwordHasher, AccountSessionRevoker sessionRevoker,
-            AuditLogWriter auditLogWriter, Clock clock) {
+            AuditLogWriter auditLogWriter, MfaPolicy mfaPolicy, Clock clock) {
         return new ResetPasswordWithToken(runner, institutionProvider, tokens, accounts,
                 totpCredentials, verifyTotp, consumeRecoveryCode, passwordHasher, sessionRevoker,
-                auditLogWriter, clock);
+                auditLogWriter, mfaPolicy, clock);
     }
 }

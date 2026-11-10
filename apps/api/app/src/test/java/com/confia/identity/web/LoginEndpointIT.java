@@ -63,6 +63,11 @@ class LoginEndpointIT extends LoginEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     // --- I149, WE62, WE87 ---
 
     @Test

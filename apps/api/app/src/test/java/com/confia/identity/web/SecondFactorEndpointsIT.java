@@ -9,11 +9,7 @@ import com.confia.kernel.InstitutionId;
 import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.AuthenticationMethod;
 import com.confia.shared.security.token.MfaPurpose;
-import com.confia.support.SharedPostgresContainer;
 import java.net.http.HttpResponse;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -68,6 +64,11 @@ class SecondFactorEndpointsIT extends LoginEndpointSupport {
     @Override
     InstitutionId institution() {
         return INSTITUTION;
+    }
+
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
     }
 
     // --- I180 and I181: the enrollment ---
@@ -425,23 +426,6 @@ class SecondFactorEndpointsIT extends LoginEndpointSupport {
                 """, INSTITUTION.value(), account.value()).get(0, Long.class));
     }
 
-    /**
-     * The flag is changed as the database owner: the role of the application may not change it, and
-     * no endpoint does. It stands for an administrator who required the second factor after a session began.
-     */
-    private static void setMfaRequired(StaffAccountId account, boolean required) {
-        try (Connection connection = SharedPostgresContainer.connectionAs("postgres");
-                PreparedStatement statement = connection.prepareStatement(
-                        "update identity_staff_account set mfa_required = ? where institution_id = ? and id = ?")) {
-            statement.setBoolean(1, required);
-            statement.setObject(2, INSTITUTION.value());
-            statement.setObject(3, account.value());
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
     private Record familyOf(UUID familyId) {
         return transactionRunner().execute(contextOf(INSTITUTION), () -> dsl.fetchSingle("""
                 select account_id, second_factor_verified, revoked_at, revoked_reason
@@ -508,11 +492,11 @@ class SecondFactorEndpointsIT extends LoginEndpointSupport {
         }
 
         IssuedFamily openFamily() {
-            // A session of an account that owes no second factor yet: the account is free of MFA
-            // for this one login, then marked as requiring it, as an administrator would.
-            setMfaRequired(id, false);
+            // A session of an account that owes no second factor yet: the account is exempt for this
+            // one login under the test policy, then owes it again, as if the requirement began.
+            exemptions().exempt(id);
             JsonNode body = loginBody();
-            setMfaRequired(id, true);
+            exemptions().revokeExemption(id);
             UUID sessionId = process.verifier().verifyAccess(body.get("accessToken").asString())
                     .sessionId();
             return new IssuedFamily(sessionId);

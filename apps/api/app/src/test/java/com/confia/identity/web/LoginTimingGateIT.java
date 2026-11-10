@@ -81,6 +81,11 @@ class LoginTimingGateIT extends LoginEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     @Test
     void theMediansOfAnExistingAccountAndOfAnUnknownIdentifierDifferByFiftyMillisecondsAtMost() {
         seedAccount(EXISTING, false, false);

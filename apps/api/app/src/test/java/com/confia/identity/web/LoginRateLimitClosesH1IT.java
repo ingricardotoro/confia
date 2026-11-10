@@ -46,6 +46,11 @@ class LoginRateLimitClosesH1IT extends LoginEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     /** I160: ten requests a minute reach the use case and the eleventh is refused before it. */
     @Test
     void tenLoginsAMinuteReachTheUseCaseAndTheEleventhIs429WithoutRunningIt() {

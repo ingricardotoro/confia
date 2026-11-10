@@ -49,6 +49,11 @@ class TwoTabRefreshConcurrencyIT extends SessionEndpointSupport {
         return INSTITUTION;
     }
 
+    @Override
+    SecondFactorExemptions exemptions() {
+        return process.exemptions();
+    }
+
     @Test
     void twoTabsRefreshingTheSameTokenAtOnceEndWithTheSameSuccessorAndACsrfThatValidatesAgainstIt()
             throws InterruptedException, ExecutionException, TimeoutException {
