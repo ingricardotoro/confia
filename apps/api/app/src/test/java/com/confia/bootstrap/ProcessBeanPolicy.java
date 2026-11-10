@@ -201,6 +201,20 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     SESSION_PACKAGE, SESSION_COOKIE_REASON,
                     "com.confia.organization", STAFF_INSTITUTION));
 
+    /**
+     * The migrate process (dockerfiles-and-local-compose design.md decision 2): a closed context of
+     * the DataSource and Flyway. It is not part of {@link #all()} because it never returns a live
+     * context; {@code MigrateContextIsolationTest} checks it against the context its builder makes.
+     */
+    static final ProcessBeanPolicy MIGRATE = new ProcessBeanPolicy("migrate",
+            "com.confia.bootstrap.migrate",
+            // The sensitive log guard the initializer of every entry point installs (exact, like
+            // every entry); the design listed only the entry package, but the guard is a bean.
+            Set.of("com.confia.bootstrap.migrate", "com.confia.shared.logging"),
+            Map.of(SCHEDULER_PACKAGE, SCHEDULER_REASON,
+                    "org.springframework.security", SPRING_SECURITY,
+                    "com.confia.shared.web", WEB_EDGE));
+
     /** A forbidden-package map from key, reason pairs: {@code Map.of} stops at ten entries. */
     private static Map<String, String> forbidden(String... pairs) {
         Map<String, String> map = new java.util.LinkedHashMap<>();

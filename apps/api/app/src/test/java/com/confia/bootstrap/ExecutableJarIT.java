@@ -67,6 +67,38 @@ class ExecutableJarIT {
     }
 
     @Test
+    void theJarAppliesTheMigrationsAsTheOwnerAndExitsWithZero() throws Exception {
+        try (ScratchDatabase database = ScratchDatabase.ownedByTheRealOwner()) {
+            Path output = Files.createTempFile(moduleBasedir().resolve("target"), "migrate", ".log");
+            ProcessBuilder builder = new ProcessBuilder(javaExecutable(), "-jar",
+                    jarPath().toString())
+                    .redirectErrorStream(true)
+                    .redirectOutput(output.toFile());
+            builder.environment().put(AppProfile.ENV_VARIABLE, "migrate");
+            builder.environment().put("SPRING_DATASOURCE_URL", database.jdbcUrl());
+            builder.environment().put("SPRING_DATASOURCE_USERNAME", database.ownerRole());
+            builder.environment().put("SPRING_DATASOURCE_PASSWORD", database.ownerPassword());
+            Process launched = builder.start();
+
+            boolean finished = launched.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!finished) {
+                launched.destroyForcibly();
+            }
+            String log = Files.readString(output, StandardCharsets.UTF_8);
+            assertThat(finished).as("migrate must end by itself").isTrue();
+            assertThat(launched.exitValue()).as(log).isZero();
+            assertThat(log).doesNotContain(database.ownerPassword());
+            try (java.sql.Connection connection = database.connectAsOwner();
+                    java.sql.Statement statement = connection.createStatement();
+                    java.sql.ResultSet result = statement.executeQuery(
+                            "SELECT count(*) FROM flyway_schema_history WHERE success")) {
+                result.next();
+                assertThat(result.getInt(1)).as("non-vacuous: migrations applied").isPositive();
+            }
+        }
+    }
+
+    @Test
     void theJarEntriesHoldNoTestClassesNoTestFixturesAndNoSecretValues() throws IOException {
         List<String> names = new ArrayList<>();
         List<String> secretLines = new ArrayList<>();

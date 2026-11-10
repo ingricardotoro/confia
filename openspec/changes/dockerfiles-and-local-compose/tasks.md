@@ -107,7 +107,7 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
   - Control negativo (quitar `repackage`) cubierto por el RED (el jar no existe). BI120 no se ejecutó con una copia con importación cruzada: se apoya en el orden del ciclo
     (las reglas ArchUnit corren en `test`, antes de `package`/`repackage`). Pendiente de comprobación manual si el revisor la exige.
 
-### [ ] T02 — Perfil `migrate`: contexto cerrado de Flyway que aplica y termina
+### [x] T02 — Perfil `migrate`: contexto cerrado de Flyway que aplica y termina
 
 - **Objetivo:** `APP_PROFILE=migrate` aplica Flyway como `confia_owner` y termina con 0; cualquier fallo, con 1; sin puertos, sin `Scheduler`, sin
   contraseña en la salida.
@@ -128,6 +128,18 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
 - **Verificación:** `./mvnw -pl app -am verify -DskipITs -Dsurefire.failIfNoSpecifiedTests=false -Dtest='MigrateContextIsolationTest,BootstrapEntryPointRulesTest,ProcessBeanIsolationTest'`;
   `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test='MigrateProfileIT,ExecutableJarIT' -Dfailsafe.failIfNoSpecifiedTests=false`.
 - **Depende de:** T01 (el caso por jar). Las pruebas del lanzador y del contexto no dependen de T01.
+- **Evidencia (aplicación, 2026-11-10):**
+  - P-1 parcial: confirmado con `unzip -l` sobre `~/.m2`: `org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration` (`spring-boot-jdbc-4.1.1`) y
+    `org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration` (`spring-boot-flyway-4.1.1`); `spring-boot-autoconfigure-4.1.1` no trae ya los paquetes `autoconfigure.jdbc` ni `autoconfigure.flyway`.
+  - RED: `ConfiaApplicationTest#migrateAgainstAnUnreachableDatabase...` falló (el lanzador devolvía 0, no 1) y `MigrateContextIsolationTest` falló; antes, la compilación de las pruebas
+    fallaba por la ausencia de `migrateBuilder()` (rojo de compilación). `MigrateProfileIT` se escribió antes de la implementación pero se ejecutó solo después (su rojo es el del lanzador sin rama real).
+  - GREEN: `-DskipITs -Dtest='ConfiaApplicationTest,MigrateContextIsolationTest,BootstrapEntryPointRulesTest,ProcessBeanIsolationTest'`: 53 de 53. `-Dit.test='MigrateProfileIT,ExecutableJarIT'`: 9 de 9
+    (incluye `migrate` por jar con `java -jar` → 0, y suma divergente y migración rota → distinto de 0 con el nombre de la migración y sin la contraseña).
+  - Controles negativos observados: `@EnableAutoConfiguration` en `MigrateApplication` → `MigrateContextIsolationTest` rojo por «no db-scheduler Scheduler»; registrar `args` (con la contraseña)
+    en el fallo → 2 fallos de `MigrateProfileIT` en la aserción de ausencia de contraseña. Ambos revertidos.
+  - Desviación: la política `MIGRATE` permite además `com.confia.shared.logging` (el bean `sensitiveLogGuard` que instala el inicializador); el diseño listaba solo el paquete de entrada.
+    `ProcessBeanPolicy.MIGRATE` no entra en `all()` (no hay contexto vivo); la prueba de `BootstrapEntryPointRulesTest` fija los subpaquetes admin, migrate, portal y worker.
+    El caso CR05 se prueba con `connection-timeout=1000` para acotar el tiempo.
 
 ### [ ] T03 — Ningún otro perfil migra (CR07, CR08)
 
