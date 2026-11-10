@@ -71,7 +71,7 @@ Chain strategy: stacked-to-main
 
 ## Fase 1: módulo y reglas
 
-- [ ] **1. Sondas, dependencias y regla de confinamiento del cliente de correo** (diseño, decisiones 2 y 3; `BI150`,
+- [x] **1. Sondas, dependencias y regla de confinamiento del cliente de correo** (diseño, decisiones 2 y 3; `BI150`,
   `BI151`)
   - **RED.** `MailClientConfinementTest` con sus dos fixtures (`identity.infrastructure` con `InternetAddress`,
     `notifications.application` con `SimpleMailMessage`): falla el fixture que debe fallar y la regla compila sin
