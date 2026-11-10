@@ -83,14 +83,17 @@ Chain strategy: stacked-to-main
     -Dtest='MailClientConfinementTest,StarterAutoConfigurationExcludedTest'` y `./mvnw -pl app dependency:tree`
     sin `spring-boot-mail`.
 
-- [ ] **2. Dominio y API pública de `notifications`** (decisiones 1, 4 y 8; `NT02`, `NT05`, `NT14`)
-  - **RED.** `RecipientHashTest` (vector de RFC 4231, normalización con jqwik, llave menor de 32 bytes rechazada,
-    distinto del SHA-256 sin llave), `TransactionalEmailTest` (parámetros exactos de la plantilla, caracteres de
+- [x] **2. Dominio y API pública de `notifications`** (decisiones 1, 4 y 8; `NT02`, `NT05`, `NT14`)
+  - **RED.** `DigestsTest` (vectores 6 y 7 de RFC 4231, llave menor de 32 bytes rechazada, distinto del SHA-256 sin llave),
+    `RecipientHashTest` (normalización y forma de 64 hexadecimales), `RecipientHasherTest` y `RecipientHasherProperties`
+    (HMAC de la dirección normalizada, jqwik, distinto del SHA-256 sin llave), `TransactionalEmailTest` (parámetros exactos de la plantilla, caracteres de
     control rechazados, `toString()` de `EmailRecipient` redactado).
-  - **GREEN.** `package-info.java` del módulo, `notifications.domain` (`RecipientHash`, `RenderedEmail`,
-    `FailureClass`) y `notifications.application.api` con `@NamedInterface("api")`.
-  - **Verificación.** `-Dtest='RecipientHashTest,TransactionalEmailTest,SpringModulithVerificationTest,NoTechnicalLayerPackageNamesTest'`
-    y PIT sobre `notifications.domain` (≥ 80) en el `verify -Pmutation-gate` del PR.
+  - **GREEN.** `Digests.hmacSha256` en `shared.security`; `package-info.java` del módulo, `notifications.domain`
+    (`RecipientHash` solo como tipo valor y normalización, `RenderedEmail`, `FailureClass`), `RecipientHasher` en
+    `notifications.application` y `notifications.application.api` con `@NamedInterface("api")`. Corrección del 2026-11-10:
+    el HMAC no puede vivir en el dominio (BI11 a BI13 y BI38; diseño, decisión 8).
+  - **Verificación.** `-Dtest='DigestsTest,RecipientHashTest,RecipientHasherTest,TransactionalEmailTest,SpringModulithVerificationTest,NoTechnicalLayerPackageNamesTest,SigningAndHashingConfinementTest'`
+    y PIT sobre `notifications.domain` y `shared.security` (≥ 80) en el `verify -Pmutation-gate` del PR.
 
 ## Fase 2: bitácora de envío
 
@@ -166,6 +169,8 @@ Chain strategy: stacked-to-main
 
 - [ ] **10. Adaptador `EmailPasswordResetLinkSender` y retiro del emisor que falla** (decisión 13; `I320`-`I323`;
   inversión del escenario «El puerto de envío solo tiene el emisor que falla de forma explícita»)
+  - **Nota (2026-11-10).** `EmailDeliveryFailedException.failureClass()` devuelve `FailureClass` (`notifications.domain`,
+    fuera de la interfaz `api`). Antes del adaptador: exponer `FailureClass` por `api` o devolver el código como `String`.
   - **RED.** `EmailPasswordResetLinkSenderTest` (enlace `base#token=…`, vigencia de la política, traducción del fallo),
     `PasswordResetLinkSettingsStartupTest` (cinco URL inválidas y `http` local aceptada),
     `IdentityScopeExclusionInventoryTest` exige exactamente `EmailPasswordResetLinkSender` (falla mientras exista el
