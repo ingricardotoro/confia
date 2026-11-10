@@ -437,3 +437,53 @@ Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, 
 | PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 |
 
 Guarda de `*.spec.*` vacía y `git diff --name-only af20884 -- apps/api packages/ui packages/contracts` vacío (índice y árbol). Sin caracteres invisibles en los 24 archivos.
+
+
+## Tarea 8: `enrollment-codes-and-activation`
+
+### Corte aplicado, 2026-11-09
+
+La tarea 8 se parte en **8a** `codes-first-code-and-activation` (rama `change/admin-web-staff-sign-in-8-enrollment-codes-and-activation`) y **8b** `simulator-and-qr-browser-tests` (rama `change/admin-web-staff-sign-in-8b-enrollment-browser-checks`, desde el commit de 8a). Esta sección documenta 8a; 8b agrega la suya al terminar.
+
+### Medida de 8a (regla de las 800 líneas)
+
+Medida con `git reset`, `git add -A` y `git diff --cached --numstat -M b923a63` (sin `openspec/`, archivo de bloqueo ni código generado): 781 adiciones y 11 eliminaciones, **792 líneas**. Bajo 800: sin excepción. Se midió el trabajo de 8a antes de escribir 8b porque la estimación de 8b (simulador, matriz y recorrido del QR) llevaba el total de la tarea muy por encima de 880.
+
+### Evidencia del ciclo TDD
+
+| Paso | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| `RecoveryCodesStep.test.tsx`, `FirstCodeStep.test.tsx` | Sí, antes del código | `Failed to resolve import "./RecoveryCodesStep.tsx"` y `"./FirstCodeStep.tsx"` | 7 y 7 pruebas |
+| `EnrollmentContainer.test.tsx` (nuevas SS89 a SS94, SS96 a SS99) | Sí, antes del código | 12 de 12 fallan por comportamiento: `Unable to find role="heading" and name "Guarde sus códigos de recuperación"` (tras «Continuar» solo se dibujaba el vacío) | 24 pruebas |
+
+### Demostraciones deliberadas (tarea 8.3, las de 8a)
+
+Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, restauración desde la copia y `cmp` sin salida.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 1 | *Adicional:* `disabled={!confirmed}` en «Continuar» de `RecoveryCodesStep.tsx` | SS90 en la presentación y en el contenedor: `Error: expect(element).toBeEnabled()` (2 de 2) | idéntico |
+| 3 | *Adicional:* `advance()` de `enrollment-draft.ts` conserva los códigos al pasar a `first-code` | SS93 del contenedor: `AssertionError: expected [ '8fef6ed967', '1d007b855f', …(8) ] to be undefined` | idéntico |
+
+La demostración 2 (matriz sin las filas nuevas) es de 8b.
+
+### Desviaciones y decisiones
+
+1. **`SecretStep.tsx` no cambia.** La lista de la tarea lo nombra para que «Continuar» salte a `first-code` sin códigos, pero `advance()` del borrador (tarea 1) ya lo hace: la prueba de SS94 lo demuestra con el contenedor.
+2. **Archivos fuera de la lista de la tarea, dentro de la superficie permitida.** `enrollment/enrollment-controls.ts` (los dos `controlId` fijos), `features/identity/routes.tsx` (el contenedor recibe `homePath`) y `src/test/setup.ts`: jsdom no tiene `ResizeObserver`, que el `Checkbox` de `@confia/ui` usa dentro de un `form`, así que se agregó un sustituto que no mide nada.
+3. **Navegación tras activar.** El `200` borra el borrador y desmonta la sección antes de que su propia respuesta llegue, de modo que «estar montado» no dice si la persona sigue ahí. La sección compara la ruta de entrada con la actual (`useRouter`): navega al inicio o al inicio de sesión solo si la persona sigue en ella. La primera versión usaba una guarda de montaje y la prueba de SS96 la puso en rojo (el recorrido se quedaba en la carga).
+4. **Casilla y resumen.** La confirmación y el «Continuar» sin marcar son estado local de `RecoveryCodesEntry`; no usan `useAccessForm`, cuyos valores son cadenas con normalización. Se muestran el resumen (con el foco y el enlace) y el mensaje bajo la casilla, que lleva «obligatorio» por el `FormField`.
+5. **El primer código repite el QR y la clave.** El diseño (E10) y SS97 lo piden; «Ver de nuevo el código QR» vuelve a `secret` sin petición (SS94).
+6. **Textos.** Las ocho claves nuevas son las de la sección 8 (`codes.title`, `intro`, `confirm`, `confirmRequired`, `firstCode.title`, `submit`, `reviewSecret`); ninguna fuera de ella. Se reutilizan `secondFactor.code`, `secondFactor.codeFormat`, `secondFactor.waiting` y `problem.secondFactorInvalid`.
+7. **`startEnrollment` sin `catch`.** No se corrigió: las operaciones de `shared/api` devuelven resultados en lugar de lanzar, y la prueba que lo justificaría no existe todavía.
+8. **Sin prueba de respuesta tardía.** La rama de `stillHere()` falso (la persona se fue con la petición en vuelo) no tiene prueba propia: hacerla exige simular una activación que llega después de que la guarda descartó el token, un caso del módulo de sesión que no se investigó aquí.
+
+### Verificación de cierre de 8a
+
+| Suite | Resultado |
+|---|---|
+| U `pnpm --filter @confia/admin-web test` | 69 archivos, 724 pruebas y 1 `todo` |
+| E `pnpm --filter @confia/admin-web test:e2e` | 76 de 76 |
+| PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 (14 de la caché de turbo) |
+
+Guarda de `*.spec.*` vacía y `git diff --name-only b923a63 -- apps/api packages/ui packages/contracts` vacío. Sin caracteres invisibles en los 10 archivos. T no se tocó (`tooling/` sin cambios).
