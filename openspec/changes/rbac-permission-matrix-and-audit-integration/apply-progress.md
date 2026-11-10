@@ -403,3 +403,73 @@ construcción completa y la puerta de mutación no están observadas.
 - R4-001: el `403` espera hasta dos transacciones de base de datos sin tiempo límite.
 - R2-002: métodos públicos solo para pruebas en `PermissionDenialAudit`.
 - R2-003: doble conteo de un resumen descartado.
+
+## Tarea 6 (PR 5b `drop-mfa-required-column`) — 2026-11-09
+
+Rama `change/rbac-permission-matrix-and-audit-integration-5b-drop-mfa-required-column`, apilada sobre la punta de la tarea 5 (`5b10396`). Sin push. **[BI127] pendiente:** la tarea 5 está
+comprometida bajo esta rama pero **no fusionada**; el orden «`V15` después de la tarea 5 fusionada» solo queda cumplido cuando la cadena se fusione en ese orden. No se afirma antes.
+
+| Commit | Contenido |
+|---|---|
+| `317a2e8` `docs(identity): stop naming the retired second factor column in javadoc` | Solo Javadoc de `AuthenticationResult` (2 menciones) y `StaffAccount` (1), por decisión del propietario, para que no quede ningún archivo Java de producción con el patrón |
+| `55533c2` `feat(db): drop the mfa_required column now derived by MfaPolicy` | `V15`, `V15SchemaDiffIT`, `MfaRequiredAbsenceTest` y el retiro de la columna de los fixtures |
+
+Líneas efectivas contra `5b10396`, sin `openspec/`: **1 230** en 84 archivos (781 añadidas, 449 borradas); producción 9 (`+6 -3` de Javadoc y `+3` de `V15`). Supera el aviso de 800 por el cambio
+mecánico de los fixtures, que no es partible: la columna es `NOT NULL` sin `DEFAULT`, de modo que `V15` y los fixtures tienen que entrar en el mismo commit para que la suite quede en verde.
+**Desviación:** por eso no existe el segundo commit previsto, `test(identity): remove the column from the staff account fixtures`; su contenido va en `55533c2`.
+
+### 6.1 Inventario
+
+- Pruebas con `StepwiseDatabase.migratedTo(...)` a una versión anterior a 15 que insertan cuentas: `V9ExistingRowsIT` (versión 8, inserción propia), `RetentionPurgeFunctionsIT` y
+  `RefreshTokenFamilyPurgeFunctionIT` (versión 11, vía `PurgeSession`) y, **no previsto en el diseño**, `UnknownRoleCodeResolutionIT` (versión 14, vía `StaffRoleFixtures.insertAccount`).
+  El resto de las pruebas con `migratedTo` (`V9` a `V14SchemaDiffIT`, `RolePrivilegeMatrixIT`, `PortalSchedulingPrivilegeIT`, `ScheduledTasksNotCreatedAtRuntimeIT`) no insertan cuentas.
+- `schema/PurgeSession` **atiende a ambas versiones**: la usan `BackoffPurgeVersusLoginIT` y `RefreshPurgeVersusRotationConcurrencyIT` (esquema actual) y las dos pruebas fijadas a 11. Se separó la
+  inserción: la sesión recibe el SQL de inserción de cuentas (`CURRENT_ACCOUNT_INSERT` por defecto, sin la columna) y las pruebas fijadas pasan `RetentionPurgeFunctionsIT.PRE_15_ACCOUNT_INSERT`
+  mediante una sobrecarga `open(database, role, accountInsert)`. El `seedMany` de `mfa_totp_backoff` de `RetentionPurgeFunctionsIT` inserta cuentas con SQL propio sobre la base compartida
+  (esquema actual) y perdió la columna.
+- `UnknownRoleCodeResolutionIT` (versión 14) lleva ahora su propio `insertAccountBefore15` con la columna, porque `StaffRoleFixtures.insertAccount` está escrito para el esquema actual.
+- `getMfaRequired()` de `JooqStaffAccountRepository`: **la tarea 5 lo retiró** (`git grep -i "getMfaRequired" -- apps/api/app/src/main` sin resultados).
+
+### 6.2 Medición previa al rojo
+
+Orden: `git grep -il -E "mfa_?required" -- apps` en `5b10396` (árbol limpio): **47 archivos**: `V6`, `AuthenticationResult.java` y `StaffAccount.java` (producción, solo Javadoc),
+`DocumentationNotesTest` y 43 más de prueba. Esto **difirió de lo previsto** («ningún archivo Java de producción»): eran Javadoc que cita el nombre de la columna. Se detuvo la tarea, el
+propietario autorizó reescribirlas (`317a2e8`) y agregó `DocumentationNotesTest` como exención nombrada. Tras `317a2e8`: cero archivos Java de producción con el patrón (`git grep -il -E "mfa_?required" --
+apps/api/app/src/main/java` sin salida). La lista de exenciones de `tasks.md` (`V6`, `V15`, pruebas fijadas con `migratedTo`) **creció en un archivo por decisión del propietario**:
+`DocumentationNotesTest` (afirma la nota fechada de `docs/03` §4.3, que debe seguir nombrando la columna). `MfaRequiredAbsenceTest` también se exime a sí misma por contener el patrón.
+
+### Evidencia de ciclo TDD (tarea 6)
+
+| Paso | Observado |
+|---|---|
+| Rojo de `MfaRequiredAbsenceTest` (pruebas nuevas sobre el árbol sin `V15` ni cambios de fixtures) | 2 de 5 fallan. `noFileUnderAppsNamesTheRetiredColumnExceptTheNamedExemptions`: `[files that still name the retired column] Expecting empty but was: [...]` con 41 archivos de prueba enumerados por ruta (los fijados con `migratedTo` quedan exceptuados). `theJooqCodeGeneratedFromTheMigratedSchemaDoesNotCarryTheColumn`: `Expecting empty but was: ["IdentityStaffAccount.java", "IdentityStaffAccountRecord.java"]`. Las otras tres (detector sobre fixture y patrón) pasan en rojo y en verde por diseño. |
+| Rojo de `V15SchemaDiffIT` | 2 de 2 con `FlywayException: No migration with a target version 15 could be found. Ensure target is specified correctly and the migration exists.` |
+| Primer verde de `V15SchemaDiffIT` | Falló 1 de 2 por una **suposición mía incorrecta**: `[the one definition V15 removes] ... but some elements were not expected: ["constraint:identity_staff_account.identity_staff_account_mfa_required_not_null"]`. PostgreSQL 18 cataloga el `NOT NULL` como restricción de la columna y desaparece con ella; la prueba ahora exige exactamente esas dos definiciones eliminadas y nada añadido ni cambiado (BI125). Verde después. |
+| Regresión de los tres escenarios de `V6` | `IdentityRowSecurityIT` (10) y `MfaTableRowSecurityIT` (6) en verde sobre el esquema migrado a 15. |
+| Rojos de los fixtures cambiados | No se observó un rojo por archivo antes de `V15`: con la columna `NOT NULL` y sin `V15`, quitarla de los fixtures los rompe todos a la vez. El rojo agregado es el de `MfaRequiredAbsenceTest`. |
+
+### 6.3 Verde y REFACTOR
+
+- `V15` solo con `ALTER TABLE identity_staff_account DROP COLUMN mfa_required`; jOOQ regenerada por la construcción (`IdentityStaffAccount.java` ya no contiene `MFA_REQUIRED`).
+- Columna retirada de todos los fixtures actuales. El parámetro de los ayudantes pasa a `exemptFromSecondFactor` con **polaridad invertida** (antes `mfaRequired`): las llamadas con literal booleano
+  se invirtieron con un script (207 de `seedStaffAccount` más las de `seedAccount`, `seedAccountIn` y `seedLiveTokenFor`) y las de variable a mano (`RefreshGraceWindowIT`: `!secondFactor`). Ayudantes:
+  `AuthenticateWithPasswordIT`, `PasswordResetIntegrationTest`, `ResetPasswordWithTokenTest.seedLiveTokenFor`, `LoginEndpointSupport`. `AuthenticateWithPasswordStaffPolicyIT.seed()` pierde su parámetro.
+- Pruebas `mfaRequired...` renombradas a `secondFactorOwing...` y comentarios sin el literal. Eliminada `MultiTenantSchemaIT.mfaRequiredIsFixedAtAccountCreationWithNoRoleDataBackingIt` con su ayudante.
+- `V15SchemaDiffIT` contiene el literal de la columna: migra a 14 y a 15, de modo que queda exceptuada por la regla de «fijada antes de 15» (`migratedTo("14")`), no por una exención nombrada.
+
+### Demostraciones deliberadas (revertidas y confirmadas con `cmp` contra copias en el directorio temporal de la sesión)
+
+| # | Ruptura | Rojo por la aserción de resultado | `cmp` |
+|---|---|---|---|
+| 1 | Reinsertar `mfa_required` (columna y valor) en `support/StaffRoleFixtures.insertAccount` | `MfaRequiredAbsenceTest.noFileUnderApps...`: `Expecting empty but was: ["apps/api/app/src/test/java/com/confia/support/StaffRoleFixtures.java"]` (1 de 5) [BI126] | OK |
+| 2 | `V15` con una segunda sentencia `ALTER TABLE identity_staff_account ALTER COLUMN email TYPE varchar(300)` | `V15SchemaDiffIT.v15RemovesOnly...:46`: `[V15 changes no definition] Expecting empty but was: ["column:identity_staff_account.email", "constraint:...email_len_chk", "constraint:...email_lower_chk"]` (1 de 2) [BI125] | OK |
+
+Tras restaurar `V15` no se volvió a correr `V15SchemaDiffIT`; la restauración se comprobó con `cmp`.
+
+### Verificación
+
+- Unitaria `MfaRequiredAbsenceTest`: 5 pruebas, 0 fallos.
+- Integración focalizada `V15SchemaDiffIT,V9ExistingRowsIT,RetentionPurgeFunctionsIT,RefreshTokenFamilyPurgeFunctionIT,MultiTenantSchemaIT,UnknownRoleCodeResolutionIT,MfaTableRowSecurityIT,IdentityRowSecurityIT`: 8 clases, 0 fallos.
+- Suite unitaria completa de `app`: 2 974 pruebas, 0 fallos, 3 omitidas.
+- Integración `com/confia/identity/**`, `schema/**`, `shared/**` y `support/**`: 114 clases, 658 pruebas, 0 fallos.
+- **No observado:** `./mvnw -B verify` completo, JaCoCo, PIT, las pruebas de integración fuera de esos paquetes y la comprobación de BI127 sobre la cadena fusionada. Quedan para el CI del PR.

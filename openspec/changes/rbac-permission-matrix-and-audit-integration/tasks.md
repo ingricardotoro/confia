@@ -393,7 +393,7 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
   - **Archivos.** Crea `app/src/main/resources/db/migration/V15__drop_identity_staff_account_mfa_required.sql` (solo `ALTER TABLE identity_staff_account DROP COLUMN mfa_required`).
     Modifica los 43 archivos de prueba que insertan la columna, salvo los fijados a una versión histórica, los ayudantes de prueba (el parámetro pasa a `exemptFromSecondFactor`) y elimina de
     `schema/MultiTenantSchemaIT` la prueba `mfaRequiredIsFixedAtAccountCreation...`. Pruebas nuevas: `schema/V15SchemaDiffIT`, `architecture/MfaRequiredAbsenceTest`.
-  - [ ] 6.1 **Inventario primero (D15 paso 3).** Registrar en `apply-progress.md` las pruebas que migran a una versión anterior a 15 con `StepwiseDatabase.migratedTo(...)` e insertan cuentas
+  - [x] 6.1 **Inventario primero (D15 paso 3).** Registrar en `apply-progress.md` las pruebas que migran a una versión anterior a 15 con `StepwiseDatabase.migratedTo(...)` e insertan cuentas
     (`V9ExistingRowsIT`, `RetentionPurgeFunctionsIT`, `RefreshTokenFamilyPurgeFunctionIT`) y si `schema/PurgeSession` (usada por cuatro pruebas) atiende a ambas versiones; si es así se
     separa su inserción. También `getMfaRequired()` de `JooqStaffAccountRepository`, que la búsqueda de texto no encuentra: confirmar que la tarea 5 lo retiró.
   - [ ] 6.2 **ROJO.** `V15SchemaDiffIT`: de `V14` a `V15` la única diferencia es la columna `mfa_required` [BI125]. `MfaRequiredAbsenceTest`: la columna no existe, el código de jOOQ generado
@@ -408,9 +408,9 @@ de las tareas 2, 5 y 6 no se prevén (la 6 es indivisible: la migración y los f
     esa línea base que la tarea 5 no tocó, salvo los fijados con `migratedTo` (exceptuados), más el código de jOOQ generado, que no está versionado y solo ve la prueba. El ejecutor vuelve a
     medir con `git grep -il -E "mfa_?required" -- apps` antes del rojo y registra en `apply-progress.md` la orden, el recuento y la lista; una aparición en producción Java es otra causa y
     detiene la tarea.
-  - [ ] 6.3 **VERDE y REFACTOR.** Crear `V15`; regenerar jOOQ en la construcción; quitar la columna de los 43 archivos (cambio mecánico); renombrar el parámetro de los ayudantes; eliminar la
+  - [x] 6.3 **VERDE y REFACTOR.** Crear `V15`; regenerar jOOQ en la construcción; quitar la columna de los 43 archivos (cambio mecánico); renombrar el parámetro de los ayudantes; eliminar la
     prueba de creación de la cuenta con la columna. Las pruebas fijadas a una versión histórica conservan la columna.
-  - [ ] 6.4 **Demostraciones deliberadas.** (1) Reinsertar `mfa_required` en un ayudante de fixture actual pone en rojo `MfaRequiredAbsenceTest` [BI126]. (2) Agregar a `V15` una segunda sentencia
+  - [x] 6.4 **Demostraciones deliberadas.** (1) Reinsertar `mfa_required` en un ayudante de fixture actual pone en rojo `MfaRequiredAbsenceTest` [BI126]. (2) Agregar a `V15` una segunda sentencia
     que altere otra columna de la misma tabla pone en rojo `V15SchemaDiffIT` [BI125]. Se revierten y se confirman con `cmp`.
   - [ ] 6.5 **Cierre.** `./mvnw -B verify` (PIT no muta SQL; el umbral se mide en el CI sobre el código vigente). Commits: `feat(db): drop the mfa_required column now derived by MfaPolicy`,
     `test(identity): remove the column from the staff account fixtures`. Tamaño: diseño 345 (5 prod., 340 pruebas); sin costura. — Escenarios I292, BI125 a BI127 y los tres de `V6`.
