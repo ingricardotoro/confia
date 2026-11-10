@@ -16,7 +16,7 @@ import java.util.Objects;
  *
  * <p>Whether the account owes a second factor is not a property of the row: {@link MfaPolicy}
  * decides it (rbac-permission-matrix-and-audit-integration design.md, D14; owner decisions O4 and
- * Q1). The {@code identity_staff_account.mfa_required} column that {@code
+ * Q1). The staff-account second-factor flag column that {@code
  * column-encryption-and-mfa-totp} (C4) introduced is no longer read by anything; dropping it is a
  * later slice (D15).
  */

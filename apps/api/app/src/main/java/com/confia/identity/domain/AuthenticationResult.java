@@ -69,7 +69,7 @@ public sealed interface AuthenticationResult {
      * The credential was valid, the account owes a second factor under the {@link MfaPolicy}, and it
      * already has a TOTP secret enrolled: pending a valid TOTP code before this login completes
      * (column-encryption-and-mfa-totp, specs/identity/spec.md, "MFA obligatoria para cuentas
-     * marcadas con {@code mfa_required}"). Carries only the two identifiers the caller needs to
+     * marcadas con el indicador de segundo factor"). Carries only the two identifiers the caller needs to
      * challenge for a code; translating this outcome into a session token that can only call the
      * TOTP-verification endpoint is {@code session-tokens-and-web-layer}'s job, the fourth change of
      * this sequence — this change decides and returns the typed outcome, and issues no token
@@ -93,7 +93,7 @@ public sealed interface AuthenticationResult {
      * The credential was valid, the account owes a second factor under the {@link MfaPolicy}, but it has no
      * TOTP secret enrolled yet: pending enrollment before this login completes
      * (column-encryption-and-mfa-totp, specs/identity/spec.md, "MFA obligatoria para cuentas
-     * marcadas con {@code mfa_required}"). Carries only the two identifiers the caller needs to
+     * marcadas con el indicador de segundo factor"). Carries only the two identifiers the caller needs to
      * start enrollment; translating this outcome into a session token restricted to the enrollment
      * endpoint is {@code session-tokens-and-web-layer}'s job — this change issues no token.
      *
