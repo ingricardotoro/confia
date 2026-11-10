@@ -272,6 +272,18 @@ la brecha no tenía dueño. La fila no se reescribe: esta nota amplía su alcanc
 entregue, deja de ser cierto el escenario «Una reutilización detectada no notifica a nadie» de
 `session-tokens-and-web-layer`.
 
+**Nota (2026-11-09, división del cambio 14, aprobada por el propietario).** Al aprobar la propuesta de
+`transactional-email-adapter`, el propietario partió el cambio 14 en dos cambios SDD secuenciales:
+
+| # | Identificador del cambio | Cubre | Depende de | Origen |
+|---|---|---|---|---|
+| 14a | `transactional-email-adapter` | Módulo `notifications` mínimo en el trabajador, adaptador SMTP (SES, ADR-0014), bitácora de envío, plantillas en texto plano `es-HN`, Mailpit y la entrega del enlace de recuperación con compensación ante fallo | 9 | Fila 14 de la nota del 2026-09-30 |
+| 14b | `account-security-notices` | Avisos al titular: restablecimiento completado con IP y momento, códigos de recuperación de MFA bajos y reutilización de refresco detectada (nota del 2026-10-16) | 14a y, para la IP, `password-recovery-endpoints` | Decisión P1 del propietario, 2026-11-09 |
+
+La fila 14 y la nota del 2026-10-16 no se reescriben: los avisos que nombraban pasan a 14b, que es su dueño.
+Los rebotes asíncronos de SES, la lista de supresión, la baja, el correo HTML, las plantillas versionadas en base
+de datos y la purga de la bitácora de envío quedan en F6 como brechas registradas.
+
 **Nota (2026-10-06, quinto corte: la parte 4b se parte en tres cambios y las condiciones duras se
 reparten; registrada el 2026-10-19 al cerrar la tarea 5.2 de `session-tokens-and-web-layer`, PR 15).**
 Por decisión del propietario del 2026-10-06 (DA-1 y DA-6 de la exploración de `session-tokens-and-web-layer`),
