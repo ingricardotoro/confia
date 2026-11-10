@@ -80,7 +80,7 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
 
 ## PR A — `jar-and-migrate` (T01 a T03, unas 430 a 450 líneas)
 
-### [ ] T01 — Jar ejecutable `confia-api.jar` sin debilitar la construcción
+### [x] T01 — Jar ejecutable `confia-api.jar` sin debilitar la construcción
 
 - **Objetivo:** `./mvnw verify` deja `apps/api/app/target/confia-api.jar` arrancable con `java -jar`; `kernel` sigue siendo biblioteca.
 - **Archivos:** `apps/api/pom.xml` (`spring-boot-maven-plugin` en `pluginManagement` con `${spring-boot.version}`; `classesDirectory` de Failsafe),
@@ -97,6 +97,15 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
 - **Verificación:** `./mvnw -pl app -am verify -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=ExecutableJarIT -Dfailsafe.failIfNoSpecifiedTests=false`;
   después `./mvnw verify` completo en verde y `ls app/target/confia-api.jar`.
 - **Depende de:** ninguna (raíz de la cadena).
+- **Evidencia (aplicación, 2026-11-10):**
+  - P-8: confirmada. Con `classesDirectory=${project.build.outputDirectory}` en Failsafe, `./mvnw verify` completo corrió 854 `*IT` con el jar reempaquetado
+    presente: 853 en verde y 1 error (`LoginCookieProfilesIT`, `HttpTimeoutException` tras 1433 s, ajeno al cambio). Repetida sola junto a `ExecutableJarIT`: 7 de 7 en verde
+    (flaqueza de entorno, no del jar). No hizo falta el clasificador `exec`. Nota: `JAVA_HOME` debe apuntar a JDK 25 (el enforcer rechaza el 21 del entorno).
+  - RED: `-Dit.test=ExecutableJarIT` sin el plugin: 4 pruebas, 1 fallo (`theBuildLeavesTheExecutableJarAtTheFixedPath`) y 1 error (`NoSuchFile confia-api.jar`).
+  - GREEN: mismo comando con el pom: `Tests run: 4, Failures: 0, Errors: 0`; `app/target/confia-api.jar` (50 MB) y `confia-api.jar.original` existen. La puerta de JaCoCo falla
+    en ese comando focalizado por cobertura parcial (esperado al filtrar pruebas); en el `verify` completo no se señaló.
+  - Control negativo (quitar `repackage`) cubierto por el RED (el jar no existe). BI120 no se ejecutó con una copia con importación cruzada: se apoya en el orden del ciclo
+    (las reglas ArchUnit corren en `test`, antes de `package`/`repackage`). Pendiente de comprobación manual si el revisor la exige.
 
 ### [ ] T02 — Perfil `migrate`: contexto cerrado de Flyway que aplica y termina
 
