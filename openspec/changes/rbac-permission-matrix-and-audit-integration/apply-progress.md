@@ -319,3 +319,18 @@ Notas: en la 2 la ruptura es una aproximación (una llamada extra a `windows.rec
 - No cubierto: AZ49 (`404` de objeto sin asiento), porque el arnés no tiene una ruta con permiso que responda `404`; la búsqueda de centinelas de los registros se limita a los registradores de `com.confia` (la raíz en `DEBUG` incluye los de Spring, que repiten la ruta por su cuenta); el cuerpo del `403` repite la ruta en `instance` por diseño (WE99).
 - Un resumen que no cabe al devolverse a una cola llena cuenta dos veces `authorization_denial_audit_failed` (el fallo de escritura y el descarte).
 - Sin líneas nuevas en `ProcessBeanPolicy` (`ProcessBeanIsolationTest` 33/33). No se corrió `./mvnw verify` completo (memoria limitada).
+
+### Cierre de la unidad B de 4b (2026-11-09, tras la aprobación de las excepciones nombradas)
+
+El propietario aprobó las excepciones nombradas en las dos pruebas de inventario; con ellas la unidad B se comprometió en dos commits. Lo anterior de esta sección («sin comprometer», «bloqueada») queda superado por esta tabla.
+
+| Commit | Contenido | Líneas efectivas |
+|---|---|---|
+| `8abf59e` `feat(web): audit permission denials with a bounded in-memory cap and a window summary` | `AuditingAccessDeniedHandler`, `PermissionDenialRecorder`, `PermissionDenialAudit`, cableado (`SecurityChains` recibe el manejador por parámetro, `AdminSecurityConfiguration`, `AuthorizationConfiguration`), excepciones nombradas en `IdempotencyScopeExclusionInventoryTest` (`TransactionRunner` y `SecurityContext` solo para `PermissionDenialAudit`; `TransactionRunner` solo para `AuthorizationConfiguration`) y en `AuditScopeExclusionInventoryTest` (solo esas dos clases pueden nombrar `shared.audit`), cada una con su nota de D8 y D9, más el arnés (`WebEdgeHarness`, `HarnessProcess`, doble del grabador). Control negativo: `allowedFor` y `webClassMayDependOnAudit` siguen negando esos tipos a `PermissionDecider`, `AuditingAccessDeniedHandler`, `SecurityChains`, `AdminSecurityConfiguration` y a un controlador. | 427 (419 + 8) |
+| `898dd4e` `test(web): prove the audit of permission denials at the edge, with real time banned` | `PermissionDenialAuditIT` (14), `AuthorizationEdgeIT` segunda parte (+11), `PermissionEdgeTest` (+3), `NoRealTimeInDenialTestsTest` (2). | 1 040 (1 035 + 5) |
+
+Medición total de 4b contra `284d881`, sin `openspec/`: **2 480 líneas** (2 467 añadidas, 13 borradas), en cuatro commits de código (`37995de` 57, `4d2fd11` 956, `8abf59e` 427, `898dd4e` 1 040). El último supera el aviso de 800 por pruebas de integración (el diseño subestimó las pruebas, como en las tareas 1 a 3); un posible corte es `PermissionDenialAuditIT` (460) frente al resto.
+
+**Verificación tras el cierre (`-Djacoco.skip=true`):** `IdempotencyScopeExclusionInventoryTest` 4, `AuditScopeExclusionInventoryTest` 8, `DenialWindowsTest` 22, `LogAuthorizationMetricsTest` 8, `NoRealTimeInDenialTestsTest` 2, `AuthorizationBoundaryRulesTest` 7, `ProcessBeanIsolationTest` 33, `PermissionEdgeTest` 28, `PermissionDeciderTest` 8, `WebEdgeScopeExclusionInventoryTest` 29, `TransactionsOnlyInSharedSecurityTest` 3: 0 fallos, salida 0. ITs: `PermissionDenialAuditIT` 14 y `AuthorizationEdgeIT` 17, 0 fallos. No se corrió `./mvnw verify` completo (memoria limitada).
+
+**La tarea 4 se deja abierta en `tasks.md`** porque no todas sus comprobaciones están observadas: AZ49 (`404` de objeto sin asiento) no está cubierta; `edgeSummaryTestsPassInAnyOrder` se sustituyó por orden aleatorio con tres semillas; la demostración 2 es una aproximación; faltan rojos previos observados de varias pruebas (ver arriba) y no hay `./mvnw -B verify` completo de la tarea (queda al CI del PR).
