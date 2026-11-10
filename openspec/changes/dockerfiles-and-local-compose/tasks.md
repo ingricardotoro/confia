@@ -255,7 +255,7 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
     (3) «PostgreSQL detenido» se aproxima con un proceso cuya URL JDBC nadie atiende (el error del controlador menciona host y puerto, que es lo que CR11 no debe filtrar) en vez de detener el contenedor compartido;
     (4) CR11 con token administrativo válido **no se probó** (no hay emisor de token de prueba a mano en esta prueba); la ruta es pública y el cuerpo no depende del llamante (`show-details: never`). Pendiente.
 
-### [ ] T07 — Latido del trabajador refrescado por el sondeo de db-scheduler
+### [x] T07 — Latido del trabajador refrescado por el sondeo de db-scheduler
 
 - **Objetivo:** el trabajador toca un archivo en cada ciclo de sondeo contra PostgreSQL; sin puerto, sin ruta, sin hilos propios.
 - **Archivos:** `shared/jobs/infrastructure/` (oyente de latido y su registro en `WorkerJobsConfiguration`; propiedad `confia.health.heartbeat-file`),
@@ -272,6 +272,15 @@ T08 y T09 son independientes entre sí y pueden redactarse en paralelo, pero se 
 - **Verificación:** `./mvnw -pl app -am verify -DskipITs -Dsurefire.failIfNoSpecifiedTests=false -Dtest='WorkerHeartbeatListenerTest,NoInMemorySchedulingTest,ProcessBeanIsolationTest'`;
   `-Dit.test='WorkerHeartbeatIT'`; cierre del PR B: `./mvnw verify -Pmutation-gate` en verde.
 - **Depende de:** T06 (comparte la configuración del trabajador y el cierre del PR).
+- **Evidencia (aplicación, 2026-11-10):**
+  - P-4: confirmada. `db-scheduler` 16.12.0 emite `SchedulerEventType.RAN_EXECUTE_DUE` al terminar cada ciclo de sondeo de tareas vencidas (paquete `...scheduler.event`; el constructor admite `addSchedulerListener`).
+    Con el ejecutor activo, intervalo de 1 s y ninguna tarea vencida, la fecha avanza; con la base eliminada deja de avanzar (el ciclo termina en `UNEXPECTED_ERROR`). No hizo falta la alternativa B.
+  - RED: `WorkerHeartbeatListenerTest` no compilaba (sin `WorkerHeartbeatListener`).
+  - GREEN: `-DskipITs -Dtest='WorkerHeartbeatListenerTest,NoInMemorySchedulingTest'`: 6 de 6. `-Dit.test=WorkerHeartbeatIT`: 2 de 2 (la fecha avanza por sondeo sin esperas fijas, el archivo queda vacío, el contexto no es un
+    `WebServerApplicationContext` (WE100), la fecha se congela con la base eliminada tras una ventana de observación acotada de 5 s, y sin propiedad no se escribe ningún archivo).
+  - Control negativo observado: oyente sobre un evento distinto (`FAILED_MULTIPLE_HEARTBEATS`) → `WorkerHeartbeatIT` falla con «timed out waiting for the first heartbeat»; restaurado.
+  - Notas: el oyente vive en `shared.jobs.infrastructure` (paquete ya permitido al trabajador) y se registra en `WorkerJobsConfiguration` solo con `confia.health.heartbeat-file`. «Base caída» se aproxima eliminando la base
+    de pruebas con `WITH (FORCE)`, no deteniendo el contenedor compartido. La comprobación de Compose (`find -mmin -1`) pertenece a T10.
 
 ---
 
