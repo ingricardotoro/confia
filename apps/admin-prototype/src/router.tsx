@@ -2,6 +2,7 @@ import { createHashHistory, createRootRoute, createRoute, createRouter } from "@
 import { GradeForm, GradeList, PeriodForm, PeriodList } from "./pages/config-academic";
 import { FeeForm, FeeList, ScholarshipForm, ScholarshipList } from "./pages/config-fees";
 import { DebtorList, PromiseForm, PromiseList, ReminderForm, ReminderList } from "./pages/collections";
+import { AuditLog } from "./pages/audit";
 import { Dashboard } from "./pages/dashboard";
 import { CashPage, ChargeList, InvoiceList } from "./pages/extras";
 import { GuardianDetail, GuardianForm, GuardianList } from "./pages/guardians";
@@ -52,6 +53,7 @@ const routeTree = root.addChildren([
   r("/reportes/ingresos", IncomeReport),
   r("/reportes/cartera", PortfolioReport),
   r("/reportes/cierres", ClosingReport),
+  r("/auditoria", AuditLog),
   r("/configuracion/periodos", PeriodList),
   r("/configuracion/periodos/nuevo", () => <PeriodForm mode="new" />),
   r("/configuracion/periodos/$id/editar", () => <PeriodForm mode="edit" />),

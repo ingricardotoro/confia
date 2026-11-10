@@ -1,6 +1,6 @@
 import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { Button, FormField, Input, Alert } from "@confia/ui";
-import { BarChart3, BellRing, Landmark, PieChart, Handshake, TriangleAlert, Banknote, BadgePercent, Building2, CalendarRange, ClipboardList, School, Tags, FileText, GraduationCap, HandCoins, LayoutDashboard, LogOut, ReceiptText, UserCog, Users, Wallet } from "lucide-react";
+import { ScrollText, BarChart3, BellRing, Landmark, PieChart, Handshake, TriangleAlert, Banknote, BadgePercent, Building2, CalendarRange, ClipboardList, School, Tags, FileText, GraduationCap, HandCoins, LayoutDashboard, LogOut, ReceiptText, UserCog, Users, Wallet } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { actions, useStore } from "../mock/store";
 import { CURRENT_USER, INSTITUTION } from "../mock/data";
@@ -41,6 +41,7 @@ const NAV = [
       { to: "/reportes/cierres", label: "Cierres de caja", icon: Landmark },
     ],
   },
+  { group: "Auditoría", items: [{ to: "/auditoria", label: "Bitácora de auditoría", icon: ScrollText }] },
   {
     group: "Configuración",
     items: [
