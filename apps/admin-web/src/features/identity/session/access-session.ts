@@ -240,7 +240,13 @@ export function createAccessSession({
       if (token === undefined) return Promise.resolve({ kind: "no-token" });
       if (starting?.token === token) return starting.promise;
       const promise = (async (): Promise<StartEnrollmentOutcome> => {
-        const result = await api.enrollSecondFactor(token);
+        // `shared/api` returns results and never throws; if a call still does, it ends as a failure the person can
+        // retry, and the rejected promise is not kept, or every retry would return the same rejection.
+        const result = await api.enrollSecondFactor(token).catch((): "threw" => "threw");
+        if (result === "threw") {
+          if (starting?.token === token) starting = undefined;
+          return { kind: "failed", result: { kind: "network" } };
+        }
         // Abandoned while in flight: the answer belongs to nobody.
         if (starting?.token !== token) return { kind: "no-token" };
         if (result.kind !== "ok") {
