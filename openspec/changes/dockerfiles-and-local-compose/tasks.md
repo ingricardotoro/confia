@@ -3,7 +3,7 @@
 - **Cambio:** `dockerfiles-and-local-compose` (F0, cambio 11a; entregable 8 parcial y medición de memoria del entregable 1)
 - **Fase:** tareas
 - **Fecha:** 2026-11-09
-- **Estado:** pendiente de aprobación del propietario
+- **Estado:** aprobado por el propietario el 2026-11-09.
 - **Entradas aprobadas:** `proposal.md`, `design.md` (decisiones 1 a 11, sondas P-1 a P-9, secciones 6 a 10) y los deltas
   `specs/container-runtime` (CR01 a CR54), `specs/build-integrity` (BI119 a BI127), `specs/web-edge` (WE94 a WE101 y los escenarios
   vigentes sin identificador que el delta conserva) y `specs/background-jobs` (BJ38, BJ73 a BJ75).
