@@ -101,6 +101,25 @@ describe("the states of the verification screen [BX109]", () => {
   });
 });
 
+describe("the states of the academic structure", () => {
+  const organization = MATRIX.filter((combination) => combination.route.startsWith("/organization/"));
+
+  it("holds the four views ready, the open dialog and its error summary, the empty state and the load error, each once", () => {
+    expect(organization.map((combination) => [combination.route, combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["/organization/academic-years", "ready", undefined, undefined],
+      ["/organization/modalities", "ready", undefined, undefined],
+      ["/organization/grades", "ready", undefined, undefined],
+      ["/organization/sections", "ready", undefined, undefined],
+      ["/organization/modalities", "dialog-open", undefined, true],
+      ["/organization/modalities", "dialog-error-summary", undefined, true],
+      ["/organization/academic-years", "empty", "organization-empty", undefined],
+      ["/organization/academic-years", "load-error", "organization-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...organization])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+});
+
 describe("the verdict [BX75]", () => {
   it("names route, state, theme, rule and impact of every blocking violation", () => {
     expect(() => {

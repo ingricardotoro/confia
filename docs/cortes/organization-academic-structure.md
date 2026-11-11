@@ -147,9 +147,8 @@ subnavegación de enlaces; `/organization` redirige a años lectivos. Código en
   (máximo de la API): con más de 200 años, modalidades o grados faltarían opciones y la fila mostraría
   «No disponible». Si la institución crece, hace falta un endpoint de búsqueda.
 - No hay selector de tamaño de página en pantalla (el parámetro `pageSize` de la URL sí se respeta).
-- La puerta de accesibilidad con Playwright y el simulador de API de `e2e/` no se ampliaron a `/organization`;
-  la accesibilidad se cubre con pruebas de componente (etiquetas, descripciones de error, foco del diálogo,
-  regiones `aria-live`). Falta correr axe sobre estas rutas.
+- La puerta de accesibilidad y el simulador de API de `e2e/` se ampliaron a `/organization` en un paso posterior
+  (sección «Pruebas e2e»).
 - Se tocó fuera de la superficie de pantallas: `access-session.ts` (método `authorized`), su prueba
   `access-session-authorized.test.ts` y el inventario de rutas de `features/identity/routes.test.tsx`.
 
@@ -158,3 +157,54 @@ vista con los flujos de listado, página y orden enviados al servidor, URL, alta
 de negocio, `403`, estados vacío y de error con reintento, edición y desactivación; pruebas de componente de
 cada pieza de presentación; y pruebas de operaciones, razones de esquema, formato de fecha y clasificación de
 fallos.
+
+## Pruebas e2e
+
+Playwright en Chromium contra `vite build && vite preview`, con la API simulada por `e2e/mock-api` (una
+simulación de las formas publicadas, no una prueba de la pila real ni de sus reglas; esas son del backend).
+Se siguió la mecánica existente: `*.e2e.ts` en `e2e/specs`, aislamiento por la cabecera
+`x-confia-mock-scenario`, puerta de axe de ADR-0028 con la política de `@confia/config/a11y`.
+
+**Simulador.** `mock-api/organization-model.ts` atiende las doce operaciones de `/api/v1/organization` con
+estado en memoria por escenario (filas semilla en `organization-seed.ts`, con identificadores fijos): listados
+paginados, ordenados y filtrados como lo hace el servidor (`page` desde 0, `size` 1 a 200, `sort=campo,dir`,
+campo no permitido o página inválida es `400`), `POST` con `201` y `PUT` con `200`, y cuerpos validados contra los
+esquemas de petición generados. Solo repite las reglas que un recorrido necesita: `duplicate-name`,
+`academic-year-overlap` (extremos inclusivos), `academic-year-already-active`, `academic-year-closed`,
+`inactive-reference`, `resource-not-found` y `validation-failed` con `errors[]`. Toda ruta exige el token de acceso
+de la sesión simulada (`401` sin él). Las respuestas se arman con los constructores de `src/test/contract-responses.ts`,
+que ya validan contra el contrato. Perfiles nuevos: `organization-empty`, `organization-forbidden` (lecturas
+normales y escrituras `403`) y `organization-server-error` (las tres primeras lecturas de cada recurso, es decir, el
+intento y sus dos reintentos, responden `500` con `traceId`; luego se recupera). Por omisión el escenario trae filas.
+Pruebas unitarias en `mock-api/server.test.ts`.
+
+**Recorridos** (`e2e/specs/journeys/organization-*.e2e.ts`, apoyo en `e2e/support/organization.ts`):
+
+- `organization-crud`: inicio de sesión y apertura de «Estructura académica» desde la navegación; alta de año,
+  modalidad, grado y sección desde una institución vacía, con cada una listada; errores de campo sin petición;
+  edición y desactivación o activación desde la fila; campos fijos de solo lectura; cupo vaciado.
+- `organization-lists`: paginar y ordenar con la URL, las filas y la consulta enviada; volver a la página 1 al
+  cambiar el orden; enlace compartido con parámetros inválidos descartados; filtros de grados (modalidad) y secciones
+  (año y grado), resultado vacío con «Quitar filtros» y filtro restaurado desde la URL.
+- `organization-states`: solape por un día, código y orden repetidos, segundo año en curso y año cerrado, todos
+  en español y con el diálogo abierto; `403` en un alta y en la desactivación desde la fila; estado vacío de las
+  cuatro vistas con su acción; estado de error con identificador de soporte y reintento.
+- `organization-keyboard`: abrir el diálogo con Enter o Espacio, llenarlo y enviarlo solo con teclado, foco
+  visible en cada paso, foco atrapado en el diálogo, Escape, y retorno del foco al botón que lo abrió.
+
+**Puerta de axe.** Ocho combinaciones nuevas en `e2e/support/a11y-matrix.ts`, cada una en tema claro y oscuro: las
+cuatro vistas con filas, el diálogo abierto, el diálogo con resumen de errores, el vacío de años y el error de carga
+de años. Resultado: cero violaciones bloqueantes. Axe devuelve cuatro resultados `incomplete` de `aria-hidden-focus`
+(no bloquean por la política) en los dos estados con diálogo, en ambos temas: son las guardas de foco de Radix y el
+contenido que `hideOthers` oculta detrás del modal. No se tocó ninguna pantalla ni componente por accesibilidad.
+
+**Defecto conocido, sin resolver.** El `Dialog` modal de `@confia/ui` (Radix) bloquea el desplazamiento de la página con
+`react-remove-scroll`, que agrega un elemento `<style>` en tiempo de ejecución. La política del panel es
+`style-src 'self'` (`docs/03-seguridad.md` y `vite.config.ts`), por lo que el navegador lo rechaza y reporta
+`style-src-elem inline` cada vez que se abre un diálogo. Arreglarlo exige decidir sobre la política (un nonce o un
+hash para estilos) o sobre el diálogo (un `<dialog>` nativo), y eso corresponde al propietario y a
+`confia-security-auditor`. Mientras tanto los recorridos y la puerta que abren un diálogo descartan exactamente ese
+reporte (`dropDialogScrollLockReports`) y cualquier otro reporte de CSP sigue haciéndolos fallar (AW12).
+
+**Ejecución.** `typecheck` y `lint` pasan; `test` falla solo en AW61 (la carpeta vacía `apps/portal-web`, previo a
+este paso); `test:e2e` completo: 109 pruebas, todas pasan.
