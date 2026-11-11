@@ -1278,6 +1278,15 @@ Content-Security-Policy:
 > decisión se toma con su propio cambio: la cookie de CSRF `__Host-` no admite `Domain`, y la lista de
 > orígenes permitidos (`confia.web.allowed-origins`) debe actualizarse a la vez que la política.
 
+> **Nota fechada 2026-11-11 (corte `organization-academic-structure`).** El `Dialog` modal del panel
+> (Radix) bloquea el desplazamiento de la página con `react-remove-scroll`, que agrega **un** elemento
+> `<style>` en tiempo de ejecución. La política del panel pasa a `style-src 'self' 'nonce-{NONCE}'`: el
+> **mismo tipo de nonce de 128 bits por respuesta HTML** que usarán los scripts en el cambio 11, nunca reutilizado y con `Cache-Control: no-store`, entra en la
+> cabecera y en `<meta name="csp-nonce">`, y la aplicación se lo entrega a esa biblioteca al arrancar
+> (`src/main.tsx`). Sigue sin existir `unsafe-inline`. Hoy lo emite `vite preview`; en producción lo
+> emite la aplicación, junto con el nonce de scripts, en el cambio 11, que también debe actualizar el bloque normativo de arriba. La política del portal no cambia
+> hasta que tenga un diálogo modal.
+
 Política del **portal de encargados**, que además debe permitir el marco de la pasarela cuando se
 usen campos alojados:
 

@@ -53,11 +53,16 @@ describe("what this change leaves out", () => {
     expect(readdirSync(join(PACKAGE_ROOT, "..")).sort()).not.toContain("portal-web");
   });
 
-  it("AW63: the production CSP is not delivered: no nginx configuration and no nonce in the app", () => {
+  it("AW63: the production CSP is not delivered: no nginx configuration, and the only nonce in the app is the one the page reads", () => {
     const index = readFileSync(join(PACKAGE_ROOT, "index.html"), "utf8");
 
     expect(filesUnder(PACKAGE_ROOT).filter((file) => /nginx/i.test(file))).toEqual([]);
-    expect(index).not.toMatch(/nonce/i);
-    expect(sources.filter((file) => /nonce/i.test(readFileSync(file, "utf8")))).toEqual([]);
+    // The server fills the placeholder per response (vite preview here, the application in production, change 11). The app
+    // reads it once, in main.tsx, for the style element that Radix adds at run time; nothing else knows about a nonce.
+    expect(index.match(/nonce/gi)).toEqual(["nonce", "NONCE"]);
+    expect(index).toContain('<meta name="csp-nonce" content="__CSP_NONCE__" />');
+    expect(
+      sources.filter((file) => /nonce/i.test(readFileSync(file, "utf8"))).map((file) => file.replaceAll("\\", "/").split("/").pop()),
+    ).toEqual(["main.tsx"]);
   });
 });

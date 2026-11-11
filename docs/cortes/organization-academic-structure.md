@@ -198,13 +198,12 @@ de años. Resultado: cero violaciones bloqueantes. Axe devuelve cuatro resultado
 (no bloquean por la política) en los dos estados con diálogo, en ambos temas: son las guardas de foco de Radix y el
 contenido que `hideOthers` oculta detrás del modal. No se tocó ninguna pantalla ni componente por accesibilidad.
 
-**Defecto conocido, sin resolver.** El `Dialog` modal de `@confia/ui` (Radix) bloquea el desplazamiento de la página con
-`react-remove-scroll`, que agrega un elemento `<style>` en tiempo de ejecución. La política del panel es
-`style-src 'self'` (`docs/03-seguridad.md` y `vite.config.ts`), por lo que el navegador lo rechaza y reporta
-`style-src-elem inline` cada vez que se abre un diálogo. Arreglarlo exige decidir sobre la política (un nonce o un
-hash para estilos) o sobre el diálogo (un `<dialog>` nativo), y eso corresponde al propietario y a
-`confia-security-auditor`. Mientras tanto los recorridos y la puerta que abren un diálogo descartan exactamente ese
-reporte (`dropDialogScrollLockReports`) y cualquier otro reporte de CSP sigue haciéndolos fallar (AW12).
+**Defecto de CSP, resuelto con un nonce de estilo.** El `Dialog` modal de `@confia/ui` (Radix) agrega un `<style>`
+en tiempo de ejecución (`react-remove-scroll`) y la política `style-src 'self'` lo rechazaba. Ahora la política lleva
+`style-src 'self' 'nonce-{NONCE}'` con un nonce nuevo por respuesta HTML (`vite preview` ahora hace de servidor; en
+producción lo emite la aplicación, cambio 11), la página lo publica en `<meta name="csp-nonce">` y `src/main.tsx` se lo
+entrega a la biblioteca con `get-nonce`. Se eliminó el descarte de reportes en los recorridos y en la puerta: cualquier
+reporte de CSP, también el del diálogo, los hace fallar (AW12). Nota en `docs/03-seguridad.md` §8.1.
 
 **Ejecución.** `typecheck` y `lint` pasan; `test` falla solo en AW61 (la carpeta vacía `apps/portal-web`, previo a
 este paso); `test:e2e` completo: 109 pruebas, todas pasan.

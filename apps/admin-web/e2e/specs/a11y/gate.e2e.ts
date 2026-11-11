@@ -1,7 +1,6 @@
 import { checkCombination } from "../../support/a11y-gate.ts";
 import { MATRIX, MINIMUM } from "../../support/a11y-matrix.ts";
 import { assertCoversMinimum, assertNoBlocking, THEMES } from "../../support/a11y-report.ts";
-import { dropDialogScrollLockReports } from "../../support/organization.ts";
 import { recordResult } from "../../support/record-result.ts";
 import { expect, test } from "../../support/scenario.ts";
 
@@ -15,11 +14,9 @@ test.describe("the accessibility gate over the real routes", () => {
 
   for (const combination of MATRIX) {
     for (const theme of THEMES) {
-      test(`[BX81] ${combination.route} [${combination.state}] in the ${theme} theme has no blocking violation`, async ({ page, scenarioId, cspViolations }) => {
+      test(`[BX81] ${combination.route} [${combination.state}] in the ${theme} theme has no blocking violation`, async ({ page, scenarioId }) => {
         const result = await checkCombination(page, combination, theme, { scenarioId });
         recordResult(result);
-        // The scroll lock of a modal dialog raises one known CSP report (see organization.ts); no other report is dropped.
-        if (combination.opensDialog === true) dropDialogScrollLockReports(cspViolations);
 
         assertNoBlocking([result]);
       });

@@ -1,31 +1,8 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, MOCK_API_URL, seedSession, test as scenarioTest } from "./scenario.ts";
 
-/**
- * KNOWN DEFECT, reported with this change and not fixed by it: the modal Dialog of `@confia/ui` is Radix's, and Radix
- * locks the scroll of the page with react-remove-scroll, which adds a `<style>` element at run time. The policy of the
- * panel is `style-src 'self'` (docs/03, CSP of the admin panel, and vite preview), so the browser refuses it and reports this one
- * violation every time a dialog opens. Fixing it means a decision about the policy (a nonce or a hash for styles) or about
- * the dialog (a native `<dialog>`), and neither is a choice of the tests. Until then a journey that opens a dialog drops
- * exactly this report, and any other CSP report still fails it (AW12).
- */
-export const DIALOG_SCROLL_LOCK_CSP = "style-src-elem inline";
-
-/** Empties the reports of the scroll lock from the list the journey will be judged by. */
-export function dropDialogScrollLockReports(reports: string[]): void {
-  for (let index = reports.length - 1; index >= 0; index -= 1) {
-    if (reports[index] === DIALOG_SCROLL_LOCK_CSP) reports.splice(index, 1);
-  }
-}
-
-/** The `test` of the journeys that open a dialog: the one of `scenario.ts`, minus the known report above. */
-export const test = scenarioTest.extend({
-  // `provide` and not `use`: the hooks rule takes a function named `use` for a React hook.
-  page: async ({ page, cspViolations }, provide) => {
-    await provide(page);
-    dropDialogScrollLockReports(cspViolations);
-  },
-});
+/** The `test` of the journeys that open a dialog: the one of `scenario.ts`. The scroll lock of the modal Dialog carries the nonce of the page, so it raises no CSP report (AW12 applies to it like to any other). */
+export const test = scenarioTest;
 
 /**
  * What the journeys of the academic structure share: reaching a view from the navigation of a signed in page, and
