@@ -11,13 +11,10 @@ describe("the public entry point, as the package name resolves it", () => {
     expectTypeOf<typeof MoneyAmountByName>().toEqualTypeOf<typeof MoneyAmount>();
   });
 
-  it("DS03: has neither DataTable nor Select", async () => {
+  it("DS03: has no DataTable (the Table, Pagination, Select and Dialog primitives exist)", async () => {
     // @ts-expect-error ADR-0018: DataTable is not part of this delivery
     const { DataTable } = await import("@confia/ui");
-    // @ts-expect-error ADR-0018: Select is not part of this delivery
-    const { Select } = await import("@confia/ui");
 
     expectTypeOf(DataTable).toBeAny();
-    expectTypeOf(Select).toBeAny();
   });
 });

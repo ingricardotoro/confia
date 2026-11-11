@@ -77,7 +77,7 @@ describe("the guards", () => {
 });
 
 describe("the routes and the screens", () => {
-  it("AW59: the routes are sign in, verification, enrollment and the signed in page, and nothing else", () => {
+  it("AW59: the routes are sign in, verification, enrollment, the signed in home and the registered features, and nothing else", () => {
     const { router } = renderApp({ path: "/" });
 
     expect(Object.keys(router.routesByPath).sort()).toEqual([
@@ -85,6 +85,7 @@ describe("the routes and the screens", () => {
       "/iniciar-sesion",
       "/iniciar-sesion/inscripcion",
       "/iniciar-sesion/verificacion",
+      "/organization",
     ]);
   });
 

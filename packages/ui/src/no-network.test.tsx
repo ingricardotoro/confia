@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   Checkbox,
+  Dialog,
   EmptyState,
   ErrorState,
   FormError,
@@ -17,12 +18,15 @@ import {
   Input,
   Label,
   MoneyAmount,
+  Pagination,
   RadioGroup,
   RadioGroupItem,
+  Select,
   Separator,
   Skeleton,
   Spinner,
   StatusBadge,
+  Table,
   Textarea,
 } from "./index";
 import * as api from "./index";
@@ -40,6 +44,11 @@ const FIXTURES: Record<string, ReactElement> = {
   Badge: <Badge>Etiqueta</Badge>,
   Button: <Button>Guardar</Button>,
   Checkbox: <Checkbox aria-label="Aceptar" />,
+  Dialog: (
+    <Dialog open onOpenChange={() => undefined} title="Nueva modalidad" description="Registre el nombre.">
+      <Input aria-label="Nombre" />
+    </Dialog>
+  ),
   EmptyState: <EmptyState title="Sin cargos" action={{ label: "Agregar", onAction: () => undefined }} />,
   ErrorState: <ErrorState title="No pudimos cargar" onRetry={() => undefined} />,
   FormError: <FormError>Ingrese un monto</FormError>,
@@ -53,15 +62,30 @@ const FIXTURES: Record<string, ReactElement> = {
   Input: <Input aria-label="Nombre" />,
   Label: <Label>Nombre</Label>,
   MoneyAmount: <MoneyAmount value={{ amount: "3200.00", currency: "HNL" }} />,
+  Pagination: <Pagination page={0} size={50} total={120} onPageChange={() => undefined} />,
   RadioGroup: (
     <RadioGroup aria-label="Método">
       <RadioGroupItem value="cash" aria-label="Efectivo" />
     </RadioGroup>
   ),
+  Select: (
+    <Select aria-label="Modalidad">
+      <option value="a">Regular</option>
+    </Select>
+  ),
   Separator: <Separator />,
   Skeleton: <Skeleton />,
   Spinner: <Spinner />,
   StatusBadge: <StatusBadge status="paid" />,
+  Table: (
+    <Table
+      caption="Modalidades"
+      columns={[{ id: "name", header: "Nombre", cell: (row: { name: string }) => row.name }]}
+      rows={[{ name: "Regular" }]}
+      getRowId={(row) => row.name}
+      empty={{ title: "Sin modalidades", action: { label: "Crear", onAction: () => undefined } }}
+    />
+  ),
   Textarea: <Textarea aria-label="Nota" />,
 };
 

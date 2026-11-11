@@ -40,13 +40,13 @@ describe("the shape of the package", () => {
 describe("what this change leaves out", () => {
   const sources = filesUnder(join(PACKAGE_ROOT, "src")).filter((file) => /\.tsx?$/.test(file) && !/\.test(-d)?\.tsx?$/.test(file));
 
-  it("AW60: no shell component exists in the app or in the entry point of the design system", () => {
-    const shell = /\b(?:function|const|class|interface|type)\s+(?:Topbar|Sidebar|PageHeader|Breadcrumb|Dialog)\b/;
+  it("AW60: no page header or breadcrumb exists in the app or in the entry point of the design system", () => {
+    const shell = /\b(?:function|const|class|interface|type)\s+(?:Topbar|Sidebar|PageHeader|Breadcrumb)\b/;
     const entry = readFileSync(join(PACKAGE_ROOT, "..", "..", "packages", "ui", "src", "index.ts"), "utf8");
 
     expect(sources.length).toBeGreaterThan(0);
     expect(sources.filter((file) => shell.test(readFileSync(file, "utf8")))).toEqual([]);
-    expect(entry).not.toMatch(/\b(?:Topbar|Sidebar|PageHeader|Breadcrumb|Dialog)\b/);
+    expect(entry).not.toMatch(/\b(?:Topbar|Sidebar|PageHeader|Breadcrumb)\b/);
   });
 
   it("AW61: the portal app does not exist", () => {

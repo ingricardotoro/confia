@@ -26,5 +26,15 @@
   },
   "money": {
     "unavailable": "Importe no disponible"
+  },
+  "pagination": {
+    "label": "Paginación",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "summary": "Mostrando {from, number} a {to, number} de {total, number}",
+    "page": "Página {page, number} de {pages, number}"
+  },
+  "dialog": {
+    "close": "Cerrar"
   }
 }

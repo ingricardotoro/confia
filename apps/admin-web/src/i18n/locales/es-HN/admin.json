@@ -71,5 +71,19 @@
   "notFound": {
     "title": "Esta página no existe.",
     "link": "Ir a inicio de sesión"
+  },
+  "shell": {
+    "brand": "CONFIA",
+    "skipToContent": "Saltar al contenido",
+    "navigationLabel": "Navegación principal",
+    "accountLabel": "Su cuenta"
+  },
+  "navigation": {
+    "home": "Inicio",
+    "organization": "Estructura académica"
+  },
+  "organization": {
+    "title": "Estructura académica",
+    "placeholder": "Aquí administrará los años lectivos, las modalidades, los grados y las secciones de su institución."
   }
 }
