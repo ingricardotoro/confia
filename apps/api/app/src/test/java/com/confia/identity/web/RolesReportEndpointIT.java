@@ -253,14 +253,64 @@ class RolesReportEndpointIT extends CommittingPostgresIntegrationTest {
                 .issueAccess(auditor.account(), other, family,
                         Set.of(AuthenticationMethod.PASSWORD, AuthenticationMethod.ONE_TIME_PASSWORD));
 
-        assertProblem(get(token.compact()), 403, "forbidden");
+        HttpResponse<String> response = get(token.compact());
+
+        JsonNode problem = assertProblem(response, 403, "forbidden");
+        assertThat(problem.has("roles")).as("the use case did not answer").isFalse();
+        List<String[]> rows = auditRowsOf(other);
+        assertThat(rows).as("one denial row in the institution of the token").hasSize(1);
+        assertThat(rows.get(0)[0]).isEqualTo("authorization.access.denied");
+        assertThat(rows.get(0)[1]).isEqualTo("identity:read");
     }
 
     @Test
     void anAccountWithoutAnAssignmentIsDenied() throws SQLException {
         Member nobody = member(null);
 
-        assertProblem(get(nobody.token()), 403, "forbidden");
+        HttpResponse<String> response = get(nobody.token());
+
+        JsonNode problem = assertProblem(response, 403, "forbidden");
+        assertThat(problem.has("roles")).as("the use case did not answer").isFalse();
+        List<String[]> rows = auditRowsOf(nobody.institution());
+        assertThat(rows).as("one denial row for the account without a role").hasSize(1);
+        assertThat(rows.get(0)[0]).isEqualTo("authorization.access.denied");
+        assertThat(rows.get(0)[1]).isEqualTo("identity:read");
+    }
+
+    // --- A token that cannot be accepted is answered before any permission is looked at ---
+
+    @Test
+    void anExpiredTokenAnswers401TokenExpiredAndLeavesNoDenialRow() throws SQLException {
+        Member auditor = member(StaffRole.AUDITOR.code());
+        String expired = new AccessTokenIssuer(jws, Clock.fixed(now().minus(Duration.ofHours(3)),
+                ZoneOffset.UTC)).issueAccess(auditor.account(), auditor.institution(),
+                auditor.session(), Set.of(AuthenticationMethod.PASSWORD,
+                        AuthenticationMethod.ONE_TIME_PASSWORD)).compact();
+
+        HttpResponse<String> response = get(expired);
+
+        JsonNode problem = assertProblem(response, 401, "token-expired");
+        assertThat(problem.has("roles")).isFalse();
+        assertThat(auditRowsOf(auditor.institution())).isEmpty();
+    }
+
+    @Test
+    void aTokenSignedWithAForeignKeyUnderTheKidOfTheProcessAnswers401TokenInvalid()
+            throws SQLException, NoSuchAlgorithmException {
+        Member auditor = member(StaffRole.AUDITOR.code());
+        KeyPair foreign = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        CompactJws foreignJws = new CompactJws(SigningKeyRing.of(SigningKey.signing(
+                AdminProcessLauncher.signingKid(), foreign.getPublic(), foreign.getPrivate())));
+        String forged = new AccessTokenIssuer(foreignJws, Clock.fixed(now(), ZoneOffset.UTC))
+                .issueAccess(auditor.account(), auditor.institution(), auditor.session(),
+                        Set.of(AuthenticationMethod.PASSWORD,
+                                AuthenticationMethod.ONE_TIME_PASSWORD)).compact();
+
+        HttpResponse<String> response = get(forged);
+
+        JsonNode problem = assertProblem(response, 401, "token-invalid");
+        assertThat(problem.has("roles")).isFalse();
+        assertThat(auditRowsOf(auditor.institution())).isEmpty();
     }
 
     // --- Authentication ---

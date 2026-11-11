@@ -249,7 +249,18 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
       `SpringModulithVerificationTest` lo confirma por separado. Las dos pruebas corren en `./mvnw verify`, que el CI
       ejecuta en cada PR. No hay una corrida del CI en rojo registrada: la prueba de la ruptura es el fixture. Esto cierra
       también el hallazgo W2 del cambio 1, que el entregable 1 registra como pendiente heredado.
-- [ ] Un usuario sin permiso recibe 403 y el intento queda en `AuditLog`.
+- [x] Un usuario sin permiso recibe 403 y el intento queda en `AuditLog`.
+      **Cerrado por el cambio 8; nota fechada 2026-11-10.**
+      **Nota fechada 2026-11-10 (cambio `rbac-permission-matrix-and-audit-integration`, PR 6 `roles-report-and-criterion-2`).**
+      La prueba de cierre es `ExitCriterion2EndToEndIT`, sobre el proceso administrativo real iniciado con su lanzador de producción, sin dobles y contra
+      PostgreSQL real: un Cajero que completó el inicio de sesión con contraseña y código TOTP recibe `403 forbidden` en
+      `GET /api/v1/identity/roles`, el controlador no responde y existe exactamente un asiento `authorization.access.denied` con
+      `entity_id` `identity:read` cuyo `request_id` es el `traceId` de la respuesta. El Auditor recibe `200` sin asiento de
+      denegación y el verificador de cadena sigue íntegro. Los controles de centinelas, de aislamiento entre pruebas y de cambio de
+      rol sin esperar al vencimiento del token corren también en el arnés de `AuthorizationEdgeIT` (tercera parte), que cuenta las
+      invocaciones del controlador y es el único que admite el reloj inyectado y el escritor roto del tope (el proceso real no
+      admite ninguno sin un bean de prueba). `RolesReportEndpointIT` prueba la ruta con tokens reales. La verificación final del
+      cambio (compuerta de mutación en `main`, `sdd-verify` y `sdd-archive`) sigue pendiente y no forma parte de este criterio.
 - [x] El verificador de cadena de auditoría detecta una manipulación inyectada en una prueba.
       **Cerrado por la parte B del cambio 5, corte B3b-i**, con
       `AuditChainVerifierIT.aRowAlteredDirectlyWithSuperuserWithoutRecalculatingIsIdentifiedExactly`:

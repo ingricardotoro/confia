@@ -859,6 +859,17 @@ segregación de funciones no debe listar ningún usuario con ambos permisos del 
 > cada operación sensible resuelta en el trimestre con su iniciador y su aprobador, y señala toda en la que coinciden. El informe llega
 > con el cambio que entregue la primera operación con aprobación.
 
+> **Nota fechada 2026-11-10 (cambio `rbac-permission-matrix-and-audit-integration`, PR 6 `roles-report-and-criterion-2`): registro del
+> cambio 8b.** El texto anterior no se reescribe. El alcance del cambio 8 se dividió por decisión O6 del propietario, y lo que sigue
+> queda para el cambio **8b**, que se crea cuando llegue su turno: la asignación de roles por endpoint, con la regla «un usuario nunca
+> modifica su propio rol» de la fila «Alta o cambio de rol de usuario»; la desactivación de cuentas y el motivo de revocación
+> `admin_revoke` (con la inversión de `AccountDeactivationAbsenceTest`); la inscripción y la retirada voluntarias de MFA (con la
+> inversión de `NoFullSessionMfaRoutesTest`); la reautenticación reforzada (*step-up*); el restablecimiento administrativo de
+> contraseña; el endpoint de lectura de la bitácora con `audit:read`; la creación del primer Super Admin sin secreto en migración ni en
+> el repositorio; y la revisión del riesgo aceptado DA-15 (Q2). Con ellas, el cambio 8b decide la revocación de sesiones al cambiar un
+> rol y revisa el rechazo sin `otp` (D12) si introduce rutas de elevación. Los iniciadores sin permiso de esta sección (ajuste manual
+> del libro mayor, baja por incobrable y reembolso a un tercero) quedan pendientes de los cambios que construyan cada operación (Q4).
+
 ### 5.4 Autorización a nivel de objeto
 
 El control de acceso a nivel de función (¿puede este rol llamar a este endpoint?) es necesario

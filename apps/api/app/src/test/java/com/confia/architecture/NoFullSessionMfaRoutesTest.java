@@ -17,7 +17,7 @@ import org.springframework.http.HttpMethod;
 
 /**
  * Specs/identity, scenario [I216]: no route accepts a complete access token to enroll or to remove a
- * second factor, and none lists the sessions of an account. Both are gaps with an owner (change 8 and
+ * second factor, and none lists the sessions of an account. Both are gaps with an owner (change 8b and
  * the first change of {@code apps/admin-web}) and stop being true the day that owner delivers them.
  *
  * <p>The routes are read from the handlers of the compiled production classes and from the two

@@ -12,7 +12,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
@@ -339,6 +342,111 @@ class DocumentationNotesTest {
                 .contains("`identity_staff_account.mfa_required` deja de leerse")
                 .contains("solo una política de prueba lo alcanza");
         assertOriginalLinesIntact(DOCS_03 + " section 4.3", linesOf(ORIGINAL_DOCS_03_SECTION_4_3), section);
+    }
+
+    private static final String CHANGE_8B_NOTE = "**Nota fechada 2026-11-10 (cambio "
+            + "`rbac-permission-matrix-and-audit-integration`, PR 6 `roles-report-and-criterion-2`)";
+    private static final String CRITERION_2 = "Un usuario sin permiso recibe 403 y el intento queda en `AuditLog`.";
+
+    /** What change 8b delivers, one fragment per item of the record (task 7.6), in the words of both notes. */
+    private static final List<String> CHANGE_8B_LIST = List.of(
+            "asignación de roles por endpoint",
+            "un usuario nunca modifica su propio rol",
+            "desactivación de cuentas",
+            "`admin_revoke`",
+            "`AccountDeactivationAbsenceTest`",
+            "inscripción y la retirada voluntarias de MFA",
+            "`NoFullSessionMfaRoutesTest`",
+            "reautenticación reforzada",
+            "restablecimiento administrativo de contraseña",
+            "lectura de la bitácora con `audit:read`",
+            "primer Super Admin sin secreto en migración ni en el repositorio",
+            "riesgo aceptado DA-15",
+            "revocación de sesiones al cambiar un rol",
+            "rechazo sin `otp` (D12)",
+            "ajuste manual del libro mayor",
+            "baja por incobrable",
+            "reembolso a un tercero",
+            "pendientes de los cambios que construyan cada operación");
+
+    /**
+     * Scenario AZ73 (rbac-permission-matrix-and-audit-integration, task 7.4): exit criterion 2 of phase 0
+     * is checked with a dated note that names the test that closes it, and its own text and the criteria
+     * around it are left as they were.
+     */
+    @Test
+    void docs09MarksExitCriterion2OfPhase0AndNamesTheTestThatClosesIt() {
+        List<String> all = lines(repoRoot().resolve(DOCS_09));
+        int at = all.indexOf("- [x] " + CRITERION_2);
+        assertThat(at).as("criterion 2 is checked and its text is unchanged").isNotNegative();
+        assertThat(all).as("the criterion is not left open anywhere").doesNotContain("- [ ] " + CRITERION_2);
+        List<String> note = new ArrayList<>();
+        for (int i = at + 1; i < all.size() && all.get(i).startsWith("  "); i++) {
+            note.add(all.get(i));
+        }
+        assertThat(prose(note))
+                .contains("2026-11-10")
+                .contains("rbac-permission-matrix-and-audit-integration")
+                .contains("ExitCriterion2EndToEndIT")
+                .contains("AuthorizationEdgeIT")
+                .contains("RolesReportEndpointIT")
+                .contains("`403 forbidden`")
+                .contains("`GET /api/v1/identity/roles`")
+                .contains("`authorization.access.denied`")
+                .contains("`identity:read`")
+                .contains("`traceId`");
+        assertThat(all).as("the criteria of the neighbors keep their state")
+                .contains("- [x] El verificador de cadena de auditoría detecta una manipulación inyectada en una prueba.",
+                        "- [ ] **Un respaldo se restaura en un entorno limpio y el acta de simulacro está firmada.**");
+    }
+
+    /** Scenario AZ71, the plan: the division of change 8 into 8 and 8b is recorded and row 8 of the table is intact. */
+    @Test
+    void foundationsPlanRecordsTheDivisionOfChange8And8bWithItsListAndKeepsRow8() {
+        List<String> all = lines(repoRoot().resolve(EXPLORATION));
+        String note = prose(noteBlock(all, CHANGE_8B_NOTE));
+        assertThat(note)
+                .contains("el cambio 8 se divide en 8 y 8b")
+                .contains("decisión O6")
+                .contains("criterio de salida 2")
+                .contains("`ExitCriterion2EndToEndIT`")
+                .contains("cambio **8b**");
+        assertThat(note).contains(CHANGE_8B_LIST);
+        assertThat(all).as("the row of change 8 in the table keeps its original text").contains(
+                "| 8 | `rbac-permission-matrix-and-audit-integration` | Entregable 4 (brecha A7) y semilla mínima "
+                        + "| Criterio 2 | 7 | ~10 tareas |");
+    }
+
+    /** Task 7.6 and scenario AZ71: the last note of section 5 of docs/03 records change 8b and leaves the body intact. */
+    @Test
+    void docs03Section53RecordsChange8bWithItsExactListAndKeepsTheOriginalBody() {
+        List<String> section = section(lines(repoRoot().resolve(DOCS_03)), "### 5.3 ");
+        String note = prose(noteBlock(section, CHANGE_8B_NOTE));
+        assertThat(note).contains("cambio **8b**").contains("decisión O6").contains("*step-up*");
+        assertThat(note).contains(CHANGE_8B_LIST);
+        assertOriginalLinesIntact(DOCS_03 + " section 5.3", linesOf(ORIGINAL_DOCS_03_SECTION_5_3), section);
+    }
+
+    /** Scenario AZ71: every document the change annotates carries its dated note, and ADR-0027 stays proposed. */
+    @Test
+    void everyDocumentTheChangeAnnotatesCarriesItsDatedNoteAndTheAdrStaysProposed() {
+        Pattern dated = Pattern.compile("Nota fechada 2026-11-\\d\\d \\(cambio `rbac-permission-matrix-and-audit-integration`");
+        Map<String, List<String>> annotated = new LinkedHashMap<>();
+        List<String> docs03 = lines(repoRoot().resolve(DOCS_03));
+        for (String heading : List.of("### 4.3 ", "### 5.1 ", "### 5.2 ", "### 5.3 ")) {
+            annotated.put(DOCS_03 + " " + heading.trim(), section(docs03, heading));
+        }
+        annotated.put(DOCS_07, lines(repoRoot().resolve(DOCS_07)));
+        annotated.put(DOCS_09, lines(repoRoot().resolve(DOCS_09)));
+        annotated.put(EXPLORATION, lines(repoRoot().resolve(EXPLORATION)));
+
+        annotated.forEach((label, text) -> assertThat(String.join("\n", text))
+                .as("a dated note of the change in %s", label).containsPattern(dated));
+        assertThat(String.join("\n", lines(repoRoot().resolve(ADR_0005))))
+                .as("the dated note of ADR-0005 that points to ADR-0027")
+                .containsPattern(Pattern.compile("### Nota fechada 2026-11-\\d\\d: .*\\(ADR-0027\\)"));
+        assertThat(String.join("\n", lines(repoRoot().resolve(ADR_0027))))
+                .as("ADR-0027 waits for the approval of the owner").contains("- **Estado:** Propuesto");
     }
 
     /** The text of a block quote as running prose: no quote marks and no line breaks, so a wrap never splits a phrase. */
