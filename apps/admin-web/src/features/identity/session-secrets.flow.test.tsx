@@ -44,6 +44,10 @@ describe("what the caches and the document hold", () => {
 });
 
 describe("the screen clause of the session scenarios", () => {
+  // Dated note 2026-11-10 (admin-web-shell-and-session-lifecycle, SS19 precisado, design.md section 2): the
+  // assertion below still holds. What changed is the invariant it protects: no timer or background query asks
+  // for a refresh. The lifecycle scheduler holds at most one timer and the only request that time triggers is
+  // the best effort DELETE of an expiry (session/lifecycle/session-lifecycle.flow.test.ts).
   it("SS18: without Web Locks the tab restores with one request, no error and no polling interval", async () => {
     const interval = vi.spyOn(globalThis, "setInterval");
     route("post", REFRESH, authenticatedSession());
