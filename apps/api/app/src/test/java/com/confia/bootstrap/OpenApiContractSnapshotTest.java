@@ -218,12 +218,16 @@ class OpenApiContractSnapshotTest {
     private static final String ROLES_PATH = "/api/v1/identity/roles";
 
     @Test
-    void theAdministrativeDocumentHoldsExactlyTheLoginTheSessionTheSecondFactorAndTheRolesReportOperations() {
+    void theAdministrativeDocumentHoldsExactlyTheLoginTheSessionTheSecondFactorTheRolesReportAndTheAcademicStructureOperations() {
         Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
 
         assertThat(pathsOf(admin)).containsExactlyInAnyOrder(LOGIN_PATH, SESSION_PATH,
                 "/api/v1/auth/mfa/verifications", "/api/v1/auth/mfa/enrollments", REFRESH_PATH,
-                ROLES_PATH);
+                ROLES_PATH, "/api/v1/organization/academic-years",
+                "/api/v1/organization/academic-years/{id}", "/api/v1/organization/modalities",
+                "/api/v1/organization/modalities/{id}", "/api/v1/organization/grades",
+                "/api/v1/organization/grades/{id}", "/api/v1/organization/sections",
+                "/api/v1/organization/sections/{id}");
         Map<String, Object> refresh = asMap(asMap(asMap(admin.get("paths")).get(REFRESH_PATH))
                 .get("post"));
         assertThat(asMap(refresh.get("responses"))).containsOnlyKeys("200", "401", "403", "429", "503");
@@ -381,9 +385,13 @@ class OpenApiContractSnapshotTest {
         assertThat(pathsOf(parse(normalizedDocumentOf("portal")))).isEmpty();
     }
 
-    /** BI139, BI24 and BI59: eight operations, and the report is the only one that declares a permission. */
+    /**
+     * BI139, BI24 and BI59, extended by the academic structure: twenty operations (the eight of the
+     * session and the report, plus twelve of the structure), and exactly thirteen declare a permission:
+     * the report and the twelve of the structure.
+     */
     @Test
-    void theAdministrativeDocumentHoldsEightOperationsAndOnlyTheRolesReportDeclaresAPermission() {
+    void theAdministrativeDocumentHoldsTwentyOperationsAndThirteenDeclareAPermission() {
         Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
         List<String> withPermission = new ArrayList<>();
         int operations = 0;
@@ -396,8 +404,14 @@ class OpenApiContractSnapshotTest {
             }
         }
 
-        assertThat(operations).isEqualTo(8);
-        assertThat(withPermission).containsExactly("get " + ROLES_PATH);
+        assertThat(operations).isEqualTo(20);
+        List<String> expected = new ArrayList<>(List.of("get " + ROLES_PATH));
+        for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {
+            String collection = "/api/v1/organization/" + resource;
+            expected.addAll(List.of("get " + collection, "post " + collection,
+                    "put " + collection + "/{id}"));
+        }
+        assertThat(withPermission).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     @Test

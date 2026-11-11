@@ -1,6 +1,7 @@
 package com.confia.shared.web.authorization;
 
 import com.confia.kernel.Permission;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.HttpMethod;
 
@@ -24,14 +25,26 @@ public final class PermissionedEndpoints {
     }
 
     /**
-     * The list of the administrative process: the one route that reports which role can do what,
-     * which needs {@code identity:read} (design.md D16). A route of a later change is added here, in
-     * the same commit as its controller.
+     * The list of the administrative process: the route that reports which role can do what, which
+     * needs {@code identity:read} (design.md D16), and the twelve routes of the academic structure of
+     * {@code organization}: {@code GET} needs {@code organization:read}, {@code POST} needs {@code
+     * organization:create} and {@code PUT} needs {@code organization:update}. A route of a later
+     * change is added here, in the same commit as its controller.
      */
     public static PermissionedEndpoints forAdmin() {
-        return new PermissionedEndpoints(List.of(
-                new PermissionedEndpoint(HttpMethod.GET, "/api/v1/identity/roles",
-                        Permission.IDENTITY_READ)));
+        List<PermissionedEndpoint> endpoints = new ArrayList<>();
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/identity/roles",
+                Permission.IDENTITY_READ));
+        for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {
+            String collection = "/api/v1/organization/" + resource;
+            endpoints.add(new PermissionedEndpoint(HttpMethod.GET, collection,
+                    Permission.ORGANIZATION_READ));
+            endpoints.add(new PermissionedEndpoint(HttpMethod.POST, collection,
+                    Permission.ORGANIZATION_CREATE));
+            endpoints.add(new PermissionedEndpoint(HttpMethod.PUT, collection + "/{id}",
+                    Permission.ORGANIZATION_UPDATE));
+        }
+        return new PermissionedEndpoints(endpoints);
     }
 
     /** The routes, in a list that cannot be modified. */

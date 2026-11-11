@@ -368,11 +368,11 @@ class PublicRouteAllowListTest {
             AuthenticatedEndpoints authenticated = authenticatedListOf(process);
             PermissionedEndpoints permissioned = "admin".equals(process)
                     ? PermissionedEndpoints.forAdmin() : new PermissionedEndpoints(List.of());
-            assertThat(permissioned.endpoints()).as("the one route that needs a permission is the roles "
-                    + "report; the portal has none")
+            assertThat(permissioned.endpoints()).as("the routes that need a permission are the roles "
+                    + "report and the twelve of the academic structure; the portal has none")
                     .extracting(entry -> entry.method() + " " + entry.pattern())
                     .containsExactlyElementsOf("admin".equals(process)
-                            ? List.of("GET /api/v1/identity/roles") : List.of());
+                            ? PERMISSIONED_ADMIN_ROUTES : List.of());
             assertThat(permissionedEntriesWithoutARoute(context, permissioned)).isEmpty();
             assertThat(permissionedRoutesThatAnswerWithoutACredential(running.port(), permissioned))
                     .isEmpty();
@@ -421,10 +421,19 @@ class PublicRouteAllowListTest {
         if ("admin".equals(process)) {
             all.add("POST /api/v1/auth/mfa/verifications");
             all.add("POST /api/v1/auth/mfa/enrollments");
-            all.add("GET /api/v1/identity/roles");
+            all.addAll(PERMISSIONED_ADMIN_ROUTES);
         }
         return all;
     }
+
+    /** The routes of the administrative process that need a permission, in the order of the list. */
+    private static final List<String> PERMISSIONED_ADMIN_ROUTES = List.of("GET /api/v1/identity/roles",
+            "GET /api/v1/organization/academic-years", "POST /api/v1/organization/academic-years",
+            "PUT /api/v1/organization/academic-years/{id}", "GET /api/v1/organization/modalities",
+            "POST /api/v1/organization/modalities", "PUT /api/v1/organization/modalities/{id}",
+            "GET /api/v1/organization/grades", "POST /api/v1/organization/grades",
+            "PUT /api/v1/organization/grades/{id}", "GET /api/v1/organization/sections",
+            "POST /api/v1/organization/sections", "PUT /api/v1/organization/sections/{id}");
 
     /** BI20, the first control: an authenticated entry whose route answers {@code 200} to anyone. */
     @Test

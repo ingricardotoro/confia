@@ -8,7 +8,9 @@ import org.springframework.context.annotation.Configuration;
 /**
  * The public configuration of the {@code organization} module for the administrative process
  * (session-tokens-and-web-layer design.md, decision 6; ADR-0024). It registers the adapter that
- * resolves the institution of a request from the authenticated token, and nothing else.
+ * resolves the institution of a request from the authenticated token, and nothing else. The academic
+ * structure has its own configuration, {@code AcademicStructureConfiguration}, because it needs a
+ * database and this one is also loaded by the web harness that has none.
  *
  * <p>{@code ResolveCurrentInstitution} is deliberately not registered: its error codes {@code
  * institution-not-found} and {@code institution-inactive} belong to the first route that resolves

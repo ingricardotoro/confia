@@ -39,7 +39,9 @@ import com.confia.identity.web.RolesReportResponse;
 import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
 import com.confia.identity.web.wiring.IdentityWebConfiguration;
 import com.confia.kernel.Permission;
+import com.confia.organization.infrastructure.wiring.AcademicStructureConfiguration;
 import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
+import com.confia.organization.web.wiring.OrganizationWebConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.JobSchedulingConfiguration;
 import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
 import com.confia.shared.platform.infrastructure.SharedPlatformConfiguration;
@@ -273,7 +275,10 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     void everyPermissionedEntryRejectsARevokedSession() throws SQLException {
         assertThat(endpoints.endpoints()).as("the walk is non-vacuous").hasSizeGreaterThanOrEqualTo(2)
                 .anyMatch(entry -> entry.pattern().contains("{"));
-        for (PermissionedEndpoint entry : endpoints.endpoints()) {
+        // The routes of the academic structure take a JSON body, which this walk does not send; their
+        // revoked-session case has its own test in AcademicStructureEndpointsIT.
+        for (PermissionedEndpoint entry : endpoints.endpoints().stream()
+                .filter(candidate -> !candidate.pattern().startsWith("/api/v1/organization/")).toList()) {
             Session holder = sessionOf(StaffRole.SUPER_ADMIN);
             assertThat(StaffRole.SUPER_ADMIN.permissions()).contains(entry.permission());
             HttpResponse<String> live = send(entry, holder, "a-valid-key-0002");
@@ -1041,7 +1046,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
             "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerActuatorAutoConfiguration"})
     @Import({ContractSchemas.class, ProcessApiInfo.class, SharedPlatformConfiguration.class,
             IdentityConfiguration.class, IdentityWebConfiguration.class,
-            OrganizationConfiguration.class, WebEdgeConfiguration.class,
+            OrganizationConfiguration.class, AcademicStructureConfiguration.class,
+            OrganizationWebConfiguration.class, WebEdgeConfiguration.class,
             AdminSecurityConfiguration.class, ObservabilityMetricsConfiguration.class,
             RateLimiterConfiguration.class, ThrottlingConfiguration.class,
             RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,

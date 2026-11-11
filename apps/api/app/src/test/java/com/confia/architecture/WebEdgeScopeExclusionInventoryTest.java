@@ -313,9 +313,12 @@ class WebEdgeScopeExclusionInventoryTest {
         JavaClasses production = assertNonEmptyProductionClasses();
 
         assertThat(PermissionedEndpoints.forAdmin().endpoints())
-                .as("the list is not empty: the report of the roles needs identity:read")
+                .as("the list is not empty: the report of the roles needs identity:read and the "
+                        + "academic structure needs the organization permissions")
                 .extracting(entry -> entry.method() + " " + entry.pattern())
-                .containsExactly("GET /api/v1/identity/roles");
+                .contains("GET /api/v1/identity/roles", "GET /api/v1/organization/academic-years",
+                        "POST /api/v1/organization/sections",
+                        "PUT /api/v1/organization/modalities/{id}");
         assertThat(classesApplying(production, ACCESS_RULE))
                 .as("the scan sees the chain that decides by manager").isNotEmpty();
         assertThat(managersAppliedWithoutTheList(production)).isEmpty();

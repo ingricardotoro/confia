@@ -33,6 +33,9 @@ import java.util.Optional;
  * word about why) and {@link #MFA_ALREADY_ENROLLED} (an enrollment of a credential that is already
  * verified). The refresh endpoint owns {@link #SESSION_EXPIRED} (a refresh token that was not
  * accepted, whatever the reason: unknown, revoked, expired, reused or bound elsewhere). The
+ * academic structure of {@code organization} owns {@link #ACADEMIC_YEAR_OVERLAP}, {@link
+ * #ACADEMIC_YEAR_ALREADY_ACTIVE}, {@link #ACADEMIC_YEAR_CLOSED}, {@link #DUPLICATE_NAME} and {@link
+ * #INACTIVE_REFERENCE} (all {@code 409}); its {@code 404} is {@link #RESOURCE_NOT_FOUND}. The
  * institution codes belong to a later change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
@@ -56,6 +59,11 @@ public enum ProblemCode {
     METHOD_NOT_ALLOWED("method-not-allowed", 405),
     IDEMPOTENCY_CONFLICT("idempotency-conflict", 409),
     MFA_ALREADY_ENROLLED("mfa-already-enrolled", 409),
+    ACADEMIC_YEAR_OVERLAP("academic-year-overlap", 409),
+    ACADEMIC_YEAR_ALREADY_ACTIVE("academic-year-already-active", 409),
+    ACADEMIC_YEAR_CLOSED("academic-year-closed", 409),
+    DUPLICATE_NAME("duplicate-name", 409),
+    INACTIVE_REFERENCE("inactive-reference", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
     IDEMPOTENCY_PAYLOAD_MISMATCH("idempotency-payload-mismatch", 422),
     TOO_MANY_REQUESTS("too-many-requests", 429),

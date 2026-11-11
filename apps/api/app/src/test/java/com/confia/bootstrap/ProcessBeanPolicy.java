@@ -119,12 +119,16 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // controller of the current session and the named-interface package of the
                     // configuration that registers it. Administrative only, each exact.
                     "com.confia.identity.web", "com.confia.identity.web.wiring",
-                    // The organization module as the two packages its beans come from: the
-                    // adapter that resolves the current institution from the token, and the
-                    // named-interface package of its configuration. Administrative only (a staff
-                    // token), and each entry exact like every other.
+                    // The organization module as the packages its beans come from: the adapter that
+                    // resolves the current institution from the token and the jOOQ adapters of the
+                    // academic structure, the named-interface package of its configuration, the use
+                    // cases of the structure, its controllers and the named-interface package of the
+                    // configuration that registers them (docs/cortes/organization-academic-structure.md).
+                    // Administrative only (a staff token), and each entry exact like every other.
                     "com.confia.organization.infrastructure",
-                    "com.confia.organization.infrastructure.wiring"),
+                    "com.confia.organization.infrastructure.wiring",
+                    "com.confia.organization.application", "com.confia.organization.web",
+                    "com.confia.organization.web.wiring"),
             Map.of("com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON));
