@@ -369,7 +369,7 @@ class PublicRouteAllowListTest {
             PermissionedEndpoints permissioned = "admin".equals(process)
                     ? PermissionedEndpoints.forAdmin() : new PermissionedEndpoints(List.of());
             assertThat(permissioned.endpoints()).as("the routes that need a permission are the roles "
-                    + "report and the twelve of the academic structure; the portal has none")
+                    + "report, the twelve of the academic structure and the four of the student registry; the portal has none")
                     .extracting(entry -> entry.method() + " " + entry.pattern())
                     .containsExactlyElementsOf("admin".equals(process)
                             ? PERMISSIONED_ADMIN_ROUTES : List.of());
@@ -433,7 +433,9 @@ class PublicRouteAllowListTest {
             "POST /api/v1/organization/modalities", "PUT /api/v1/organization/modalities/{id}",
             "GET /api/v1/organization/grades", "POST /api/v1/organization/grades",
             "PUT /api/v1/organization/grades/{id}", "GET /api/v1/organization/sections",
-            "POST /api/v1/organization/sections", "PUT /api/v1/organization/sections/{id}");
+            "POST /api/v1/organization/sections", "PUT /api/v1/organization/sections/{id}",
+            "GET /api/v1/students", "GET /api/v1/students/{id}", "POST /api/v1/students",
+            "PUT /api/v1/students/{id}");
 
     /** BI20, the first control: an authenticated entry whose route answers {@code 200} to anyone. */
     @Test

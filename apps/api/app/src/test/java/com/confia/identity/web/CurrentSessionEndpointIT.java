@@ -422,7 +422,7 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
     // --- WE29 ---
 
     @Test
-    void theProductionRoutesAreExactlyTheSevenSessionRoutesTheRolesReportAndTheTwelveOfTheAcademicStructureAndEveryOtherAnonymousRequestIs401() {
+    void theProductionRoutesAreExactlyTheSevenSessionRoutesTheRolesReportAndTheTwelveOfTheAcademicStructureTheFourOfTheStudentRegistryAndEveryOtherAnonymousRequestIs401() {
         List<String> expected = new java.util.ArrayList<>(List.of("POST /api/v1/auth/sessions",
                 "GET /api/v1/auth/sessions/current", "POST /api/v1/auth/mfa/enrollments",
                 "POST /api/v1/auth/mfa/verifications", "POST /api/v1/auth/sessions/refresh",
@@ -433,6 +433,8 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
                     "POST /api/v1/organization/" + resource,
                     "PUT /api/v1/organization/" + resource + "/{id}"));
         }
+        expected.addAll(List.of("GET /api/v1/students", "GET /api/v1/students/{id}", "POST /api/v1/students",
+                "PUT /api/v1/students/{id}"));
         assertThat(AdminProcessLauncher.routesOf(process)).containsExactlyInAnyOrderElementsOf(expected);
 
         assertProblem(get("/api/v1/auth/sessions"), 401, "authentication-required");
