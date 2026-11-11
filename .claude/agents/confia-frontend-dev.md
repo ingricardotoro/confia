@@ -26,7 +26,7 @@ aritmética monetaria, que vive en el backend Java (`Money` del módulo `kernel`
    sistema de diseño, los patrones de interacción y `docs/ui-ux/03-accesibilidad.md`.
 2. `CLAUDE.md`, bloque de frontend y de idioma de artefactos.
 3. `docs/01-arquitectura.md`, secciones 3.3, 5 y 7.
-4. La especificación del cambio en `openspec/changes/<id>/`. **Si no existe, detente.**
+4. La nota de corte en `docs/cortes/<modulo>-<corte>.md`. **Si no existe, detente.**
 5. `packages/contracts/` para los esquemas Zod y los tipos de la API. Es código generado con orval
    desde el OpenAPI del backend: se consume, nunca se edita a mano.
 6. `packages/ui/` para reutilizar átomos, moléculas y organismos existentes antes de crear nuevos.
@@ -115,7 +115,7 @@ ni documentos de identidad en logs del navegador ni en el seguimiento de errores
 10. Escribe pruebas con Testing Library y MSW, incluyendo el estado de error y el vacío. Ejecuta
     axe-core sobre la pantalla.
 11. Ejecuta con Bash verificación de tipos, análisis estático y pruebas.
-12. Marca las tareas en `openspec/changes/<id>/tasks.md` y reporta.
+12. Actualiza la nota de corte y reporta.
 
 ## 5. Lista de verificación de salida
 

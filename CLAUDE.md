@@ -164,43 +164,56 @@ Detalle en `docs/06-estrategia-de-testing.md`.
 
 ---
 
-## Metodología: desarrollo dirigido por especificaciones
+## Metodología: cortes verticales ágiles (ODD ligero)
 
-El proyecto sigue el ciclo SDD completo. Ninguna funcionalidad se implementa sin especificación
-aprobada.
+Se abandona el ciclo SDD completo (`docs/13-metodologia-sdd.md` queda como histórico; no se crean
+más cambios en `openspec/`). La unidad de entrega es un **corte vertical**: una capacidad de
+negocio terminada de punta a punta (migración, backend, contrato, pantalla, pruebas) que se puede
+demostrar al propietario.
 
 ```
-explorar → proponer → especificar → diseñar → tareas → aplicar → verificar → archivar
+nota de corte (≤ 1 página) → backend → contrato → frontend → verificar → PR → demo
 ```
 
-Los artefactos viven en `openspec/`. Ver `docs/13-metodologia-sdd.md` para el flujo detallado y
-los comandos disponibles.
+1. **Nota de corte.** Un archivo `docs/cortes/<modulo>-<corte>.md` de una página: objetivo,
+   reglas e invariantes que aplican, endpoints, pantallas, casos límite y criterio de aceptación.
+   Sin diseño formal ni lista de tareas aparte. Si la regla es financiera o fiscal, se cita el
+   invariante de `docs/02-modelo-de-dominio.md`.
+2. **Un corte = una rama = un PR** de hasta unos pocos días de trabajo. Un módulo se entrega en
+   dos a cuatro cortes; el primero es siempre el más delgado que ya muestre algo funcionando
+   (listar y crear), y los siguientes agregan reglas.
+3. **Pruebas dentro del corte, proporcionales al riesgo.** Reglas financieras, de seguridad y de
+   aislamiento por institución: prueba primero y casos límite (obligatorio). CRUD simple: pruebas
+   de integración del endpoint y de componente de la pantalla. No se exigen compuertas de mutación
+   ni verificaciones formales por corte; PIT y la cobertura global corren en integración continua y
+   se revisan por fase, no por PR.
+4. **Revisión ligera.** Cada PR pasa por `confia-code-reviewer`; solo los que tocan dinero,
+   autenticación, permisos o migraciones sobre datos existentes pasan además por
+   `confia-security-auditor`.
+5. **Demo al cierre de cada corte** y una línea de avance en `docs/09-roadmap-y-fases.md`
+   (casilla marcada con el PR que la cierra). Es el único registro de progreso obligatorio.
 
-**Regla dura:** si te piden implementar algo que no tiene especificación en `openspec/changes/`,
-detente y propón crear el cambio primero.
+Las reglas no negociables y la arquitectura no se relajan: lo que se simplifica es el proceso, no
+la calidad del dinero ni de la seguridad.
 
 ---
 
-## Definición de terminado
+## Definición de terminado (por corte)
 
-Una tarea no está terminada hasta que cumple todo lo siguiente:
-
-- [ ] La especificación correspondiente está actualizada
-- [ ] El código pasa verificación de tipos, análisis estático y formato
-- [ ] Las pruebas unitarias y de integración pasan y cumplen el umbral de cobertura
-- [ ] Las reglas de dependencia entre capas se respetan
-- [ ] La lista de verificación de seguridad aplicable está marcada
-- [ ] Los estados de carga, vacío y error están implementados
-- [ ] La verificación de accesibilidad no reporta violaciones críticas
-- [ ] Las acciones sensibles escriben en la bitácora de auditoría
-- [ ] La documentación de usuario u operación se actualizó si el cambio la afecta
+- [ ] Backend y frontend del corte funcionan juntos (demostrable en local)
+- [ ] El contrato OpenAPI y `packages/contracts` están regenerados
+- [ ] Pasan tipos, análisis estático, formato y las pruebas del corte
+- [ ] Reglas de dependencia entre capas respetadas (ArchUnit, dependency-cruiser)
+- [ ] Estados de carga, vacío, error y éxito implementados; sin violaciones críticas de axe
+- [ ] Acciones sensibles auditadas; permisos y aislamiento por institución probados
+- [ ] Nota de corte actualizada con lo que realmente se construyó
 
 ---
 
 ## Convenciones de Git
 
 - Commits convencionales. Sin atribución de herramientas de IA.
-- Una rama por cambio SDD, nombrada con el identificador del cambio.
+- Una rama por corte vertical, nombrada `feat/<modulo>-<corte>`.
 - Los pull requests que superen ochocientas líneas de cambio efectivo se dividen en unidades
   revisables (`docs/15-flujo-de-trabajo-git.md` §3).
 - Las migraciones de base de datos se revisan con especial cuidado y nunca se editan una vez
