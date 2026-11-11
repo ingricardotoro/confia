@@ -19,12 +19,23 @@ describe("field error keys", () => {
   });
 
   it("holds the texts of design section 8 for the four field keys, verbatim", () => {
-    expect(admin.field).toEqual({
+    expect(admin.field).toMatchObject({
       required: "Este dato es obligatorio.",
       tooLong: "Este dato es demasiado largo.",
       invalid: "Este dato no es válido.",
       unknown: "Uno de los datos enviados no es válido.",
     });
+  });
+
+  // The academic structure cut: three reasons with a text of their own, the local ones and the server's.
+  it.each([
+    ["end-after-start", "field.endAfterStart"],
+    ["positive-whole", "field.positiveWhole"],
+    ["positive", "field.positiveWhole"],
+    ["whole", "field.wholeNumber"],
+    ["min", "field.wholeNumber"],
+  ] as const)("maps the reason %j to %s", (reason, key) => {
+    expect(fieldErrorKey(reason)).toBe(key);
   });
 });
 

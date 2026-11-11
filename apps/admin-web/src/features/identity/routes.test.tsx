@@ -86,6 +86,10 @@ describe("the routes and the screens", () => {
       "/iniciar-sesion/inscripcion",
       "/iniciar-sesion/verificacion",
       "/organization",
+      "/organization/academic-years",
+      "/organization/grades",
+      "/organization/modalities",
+      "/organization/sections",
     ]);
   });
 

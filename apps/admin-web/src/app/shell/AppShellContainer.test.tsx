@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { authenticatedSession, currentSession } from "../../test/contract-responses.ts";
+import { authenticatedSession, currentSession, organizationPage } from "../../test/contract-responses.ts";
 import { installMswServer, route } from "../../test/msw-server.ts";
 import { renderApp } from "../../test/render-app.tsx";
 
@@ -15,6 +15,8 @@ const TIMEOUT = { timeout: 10_000 };
 function openAt(path: string) {
   route("post", `${SESSIONS}/refresh`, authenticatedSession());
   route("get", `${SESSIONS}/current`, currentSession());
+  // The academic structure opens on its first view, which lists the years.
+  route("get", "/api/v1/organization/academic-years", organizationPage("academic-years", []));
   return renderApp({ path, readCsrf: () => "csrf-value-A" });
 }
 
@@ -55,7 +57,10 @@ describe("the signed in shell", () => {
     await user.keyboard("{Enter}");
 
     const heading = await screen.findByRole("heading", { level: 1, name: "Estructura académica" });
-    expect(router.state.location.pathname).toBe("/organization");
+    // `/organization` alone leads to its first view.
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/organization/academic-years");
+    });
     expect(screen.getByRole("link", { name: "Estructura académica" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveAttribute("aria-current");
     await waitFor(() => {

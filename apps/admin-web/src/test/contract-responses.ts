@@ -1,14 +1,26 @@
 import { randomBytes } from "node:crypto";
 import {
+  AcademicYearPageResponse,
+  AcademicYearResponse,
   AuthenticatedSessionResponse,
   CurrentSessionResponse,
   EnrollmentResponse,
+  GradePageResponse,
+  GradeResponse,
+  ModalityPageResponse,
+  ModalityResponse,
   ProblemDetail,
   SecondFactorPendingResponse,
+  SectionPageResponse,
+  SectionResponse,
+  type AcademicYearResponseOutput,
   type AuthenticatedSessionResponseOutput,
   type CurrentSessionResponseOutput,
   type EnrollmentResponseOutput,
+  type GradeResponseOutput,
+  type ModalityResponseOutput,
   type SecondFactorPendingResponseOutput,
+  type SectionResponseOutput,
 } from "@confia/contracts/admin";
 import type { ProblemCode } from "../shared/api/problem.ts";
 
@@ -154,4 +166,85 @@ export function problem(code: ProblemCode, status: number, options: ProblemOptio
     ...(options.errors === undefined ? {} : { errors: options.errors }),
   });
   return { status, body: { ...body, instance: "/api/v1/auth/sessions" }, contentType: "application/problem+json" };
+}
+
+// The academic structure (organization-academic-structure cut). Rows and pages are checked against the
+// generated contract like every other response here.
+const STAMP = "2026-11-01T12:00:00Z";
+
+export type OrganizationResource = "academic-years" | "modalities" | "grades" | "sections";
+
+const ROW_SCHEMAS: Record<OrganizationResource, Schema<unknown>> = {
+  "academic-years": AcademicYearResponse,
+  modalities: ModalityResponse,
+  grades: GradeResponse,
+  sections: SectionResponse,
+};
+
+const PAGE_SCHEMAS: Record<OrganizationResource, Schema<unknown>> = {
+  "academic-years": AcademicYearPageResponse,
+  modalities: ModalityPageResponse,
+  grades: GradePageResponse,
+  sections: SectionPageResponse,
+};
+
+const stamped = { createdAt: STAMP, updatedAt: STAMP, isActive: true } as const;
+
+export function academicYear(override: Partial<AcademicYearResponseOutput> = {}): AcademicYearResponseOutput {
+  return checked("AcademicYearResponse", AcademicYearResponse, {
+    id: crypto.randomUUID(),
+    name: "Año lectivo 2026",
+    startDate: "2026-01-15",
+    endDate: "2026-11-30",
+    status: "PLANNED",
+    ...stamped,
+    ...override,
+  });
+}
+
+export function modality(override: Partial<ModalityResponseOutput> = {}): ModalityResponseOutput {
+  return checked("ModalityResponse", ModalityResponse, { id: crypto.randomUUID(), code: "PRI", name: "Primaria", ...stamped, ...override });
+}
+
+export function grade(override: Partial<GradeResponseOutput> = {}): GradeResponseOutput {
+  return checked("GradeResponse", GradeResponse, {
+    id: crypto.randomUUID(),
+    modalityId: crypto.randomUUID(),
+    name: "Primero",
+    ordinal: 1,
+    ...stamped,
+    ...override,
+  });
+}
+
+export function section(override: Partial<SectionResponseOutput> = {}): SectionResponseOutput {
+  return checked("SectionResponse", SectionResponse, {
+    id: crypto.randomUUID(),
+    academicYearId: crypto.randomUUID(),
+    gradeId: crypto.randomUUID(),
+    name: "A",
+    capacity: 30,
+    ...stamped,
+    ...override,
+  });
+}
+
+/** One page of a listing, as the server serves it: `total` counts every page, `items` only this one. */
+export function organizationPage(
+  resource: OrganizationResource,
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked(`${resource} page`, PAGE_SCHEMAS[resource], {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The resource a create (201) or an edit (200) answers with. */
+export function organizationRecord(resource: OrganizationResource, row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked(`${resource} record`, ROW_SCHEMAS[resource], row), contentType: JSON_TYPE };
 }

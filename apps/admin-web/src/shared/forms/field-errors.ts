@@ -19,8 +19,9 @@ export interface ResolvedFieldErrors<F extends string> {
 
 /**
  * The catalog key of a reason (design.md E5). `not-blank` and the local `required` mean the field is empty;
- * `size`, `max` and `too-long` mean it is too long; every other reason, `format` included, gets the generic
- * text of the field (AW51). A key never contains the rejected value, because none is built from it (SS41).
+ * `size`, `max` and `too-long` mean it is too long; `end-after-start`, `positive-whole` and `whole` (and the server's
+ * `positive` and `min`) have a text of their own; every other reason, `format` included, gets the generic text of
+ * the field (AW51). A key never contains the rejected value, because none is built from it (SS41).
  */
 export function fieldErrorKey(reason: string): AdminKey {
   switch (reason) {
@@ -31,6 +32,14 @@ export function fieldErrorKey(reason: string): AdminKey {
     case "max":
     case "too-long":
       return "field.tooLong";
+    case "end-after-start":
+      return "field.endAfterStart";
+    case "positive-whole":
+    case "positive":
+      return "field.positiveWhole";
+    case "whole":
+    case "min":
+      return "field.wholeNumber";
     default:
       return "field.invalid";
   }

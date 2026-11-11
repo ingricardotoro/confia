@@ -111,3 +111,50 @@ rol sin permiso recibe 403 sin efecto, cada escritura deja asiento de auditoría
 
 Un administrador crea un año, una modalidad, un grado y una sección desde la pantalla y los ve
 listados; las reglas anteriores se rechazan con mensaje claro en español.
+
+## Construido en el frontend
+
+Cuatro vistas bajo `/organization` (`/academic-years`, `/modalities`, `/grades`, `/sections`) con
+subnavegación de enlaces; `/organization` redirige a años lectivos. Código en
+`apps/admin-web/src/features/organization/`, operaciones en `shared/api/organization-operations.ts`.
+
+**Decisiones**
+
+- **Estado de la tabla en la URL**, según `docs/ui-ux/04` §3.2: `page` desde 1, `pageSize` (25, 50 o 100;
+  25 por omisión y no se escribe), `sort=campo:asc|desc` y los filtros por identificador (`modalityId`,
+  `academicYearId`, `gradeId`). Cada vista valida sus parámetros con Zod y descarta los inválidos. A la API
+  viaja como `page` desde 0, `size` y `sort=campo,dir`. Paginar y ordenar no filtran nada en el navegador.
+  Cambiar un filtro reemplaza la entrada del historial y vuelve a la página 1; cambiar de página la agrega.
+- **Permisos.** La lectura de la sesión no expone permisos, así que las acciones de escritura se ofrecen a
+  todos y la decisión sigue en el servidor: un `403` se muestra como «No tiene permiso para realizar esta
+  acción». `forbidden` y `resource-not-found` dejan de usar el mensaje genérico y tienen texto propio.
+- **Códigos nuevos** (`academic-year-overlap`, `academic-year-already-active`, `academic-year-closed`,
+  `duplicate-name`, `inactive-reference`) reflejados en `KNOWN_PROBLEM_CODES` (ahora 20), en `PROBLEM_KEYS` y
+  en el catálogo `es-HN` con mensaje propio. El `400` por `endAfterStart` se muestra en el campo de fin.
+- **Token de acceso.** Las pantallas no lo tocan: `AccessSession.authorized(operación)` entrega el token
+  (refrescado si queda menos de un minuto), devuelve los datos o lanza `ApiFailure`, y un `401` cierra la
+  sesión como la lectura de la sesión actual. La vista lo recibe por `AuthorizedSendProvider` en el shell.
+- Los `PUT` (formulario y activar o desactivar desde la fila) envían el cuerpo completo con `isActive`; los
+  campos inmutables tras crear (modalidad del grado; año y grado de la sección) se muestran de solo lectura
+  al editar. Una sección sin cupo omite `capacity`. Fechas con entrada nativa y formato `Intl.DateTimeFormat`
+  `es-HN` (en UTC, para no mover el día). Sin dinero y sin `Idempotency-Key`; sin actualización optimista.
+- Tras toda escritura se invalida `organization` completo, porque un año o una modalidad renombrados también
+  son la etiqueta de las listas de grados y secciones.
+
+**Límites conocidos**
+
+- Los selects (filtros y alta) y los nombres de las filas salen de listas de apoyo de hasta 200 filas
+  (máximo de la API): con más de 200 años, modalidades o grados faltarían opciones y la fila mostraría
+  «No disponible». Si la institución crece, hace falta un endpoint de búsqueda.
+- No hay selector de tamaño de página en pantalla (el parámetro `pageSize` de la URL sí se respeta).
+- La puerta de accesibilidad con Playwright y el simulador de API de `e2e/` no se ampliaron a `/organization`;
+  la accesibilidad se cubre con pruebas de componente (etiquetas, descripciones de error, foco del diálogo,
+  regiones `aria-live`). Falta correr axe sobre estas rutas.
+- Se tocó fuera de la superficie de pantallas: `access-session.ts` (método `authorized`), su prueba
+  `access-session-authorized.test.ts` y el inventario de rutas de `features/identity/routes.test.tsx`.
+
+**Pruebas** (Vitest, Testing Library y MSW sobre rutas, capa de consultas y transporte reales): un archivo por
+vista con los flujos de listado, página y orden enviados al servidor, URL, alta, error de campo, cada código
+de negocio, `403`, estados vacío y de error con reintento, edición y desactivación; pruebas de componente de
+cada pieza de presentación; y pruebas de operaciones, razones de esquema, formato de fecha y clasificación de
+fallos.

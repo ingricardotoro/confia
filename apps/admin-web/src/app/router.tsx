@@ -2,6 +2,7 @@ import { createRootRoute, createRoute, createRouter, Outlet, type RouterHistory 
 import { ACCESS_PATHS, createIdentityRoutes, leaveSecondFactorScreens, requireAuthentication } from "../features/identity/routes.tsx";
 import type { AccessSession } from "../features/identity/session/index.ts";
 import { useAdminText } from "../i18n/use-admin-text.ts";
+import { AuthorizedSendProvider, type AuthorizedSend } from "../shared/api/authorized-send.tsx";
 import { PageContent } from "../shared/layout/components/PageContent.tsx";
 import type { NavigationEntry } from "../shared/navigation/navigation-entry.ts";
 import { FEATURES } from "./features.ts";
@@ -36,6 +37,8 @@ export function createAppRouter({ session, history }: AppRouterOptions) {
     notFoundComponent: NotFoundContainer,
   });
 
+  // One sender for the tab: it asks the session for a token on every request, so no screen ever holds one.
+  const send: AuthorizedSend = (operation) => session.authorized(operation);
   const entries = [HOME_ENTRY, ...FEATURES.map((feature) => feature.navigation)];
   const shellRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -43,7 +46,11 @@ export function createAppRouter({ session, history }: AppRouterOptions) {
     beforeLoad: () => {
       requireAuthentication(session);
     },
-    component: () => <AppShellContainer session={session} signInPath={ACCESS_PATHS.signIn} entries={entries} />,
+    component: () => (
+      <AuthorizedSendProvider send={send}>
+        <AppShellContainer session={session} signInPath={ACCESS_PATHS.signIn} entries={entries} />
+      </AuthorizedSendProvider>
+    ),
   });
   const homeRoute = createRoute({ getParentRoute: () => shellRoute, path: ACCESS_PATHS.home, component: HomeContainer });
 
