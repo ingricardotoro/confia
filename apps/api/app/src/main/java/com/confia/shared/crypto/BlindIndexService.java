@@ -1,6 +1,7 @@
 package com.confia.shared.crypto;
 
 import com.confia.kernel.InstitutionId;
+import com.confia.shared.security.Hmacs;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HexFormat;
@@ -50,10 +51,10 @@ public final class BlindIndexService {
             throw new IllegalArgumentException("a blind index purpose is a lowercase dotted name");
         }
         byte[] master = masterKey.value();
-        byte[] key = HmacSha256.mac(master, (KEY_LABEL + purpose).getBytes(StandardCharsets.UTF_8));
+        byte[] key = Hmacs.sha256(master, (KEY_LABEL + purpose).getBytes(StandardCharsets.UTF_8));
         try {
             String message = institutionId.value() + ":" + value;
-            return HexFormat.of().formatHex(HmacSha256.mac(key, message.getBytes(StandardCharsets.UTF_8)));
+            return HexFormat.of().formatHex(Hmacs.sha256(key, message.getBytes(StandardCharsets.UTF_8)));
         } finally {
             Arrays.fill(master, (byte) 0);
             Arrays.fill(key, (byte) 0);

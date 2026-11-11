@@ -28,42 +28,6 @@ class BlindIndexServiceTest {
         return text.getBytes(StandardCharsets.US_ASCII);
     }
 
-    // --- HMAC-SHA-256 against RFC 4231 and against the JDK ---
-
-    @Test
-    void hmacMatchesTheVectorsOfRfc4231() {
-        byte[] key1 = new byte[20];
-        Arrays.fill(key1, (byte) 0x0b);
-        byte[] longKey = new byte[131];
-        Arrays.fill(longKey, (byte) 0xaa);
-
-        assertThat(HexFormat.of().formatHex(HmacSha256.mac(key1, ascii("Hi There"))))
-                .isEqualTo("b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7");
-        assertThat(HexFormat.of().formatHex(HmacSha256.mac(ascii("Jefe"), ascii("what do ya want for nothing?"))))
-                .isEqualTo("5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843");
-        assertThat(HexFormat.of().formatHex(HmacSha256.mac(longKey,
-                ascii("Test Using Larger Than Block-Size Key - Hash Key First"))))
-                .isEqualTo("60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54");
-    }
-
-    @Test
-    void hmacAgreesWithTheJdkForKeysAroundTheBlockSizeAndMessagesOfAnyLength() throws Exception {
-        SecureRandom random = new SecureRandom();
-        for (int keyLength : new int[] {1, 32, 63, 64, 65, 200}) {
-            for (int messageLength : new int[] {0, 1, 55, 56, 64, 1000}) {
-                byte[] key = new byte[keyLength];
-                byte[] message = new byte[messageLength];
-                random.nextBytes(key);
-                random.nextBytes(message);
-                Mac mac = Mac.getInstance("HmacSHA256");
-                mac.init(new SecretKeySpec(key, "HmacSHA256"));
-
-                assertThat(HmacSha256.mac(key, message)).as("key %d, message %d", keyLength, messageLength)
-                        .isEqualTo(mac.doFinal(message));
-            }
-        }
-    }
-
     // --- The blind index ---
 
     @Test
