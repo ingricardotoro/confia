@@ -20,8 +20,8 @@ export interface ResolvedFieldErrors<F extends string> {
 /**
  * The catalog key of a reason (design.md E5). `not-blank` and the local `required` mean the field is empty;
  * `size`, `max` and `too-long` mean it is too long; `end-after-start`, `positive-whole` and `whole` (and the server's
- * `positive` and `min`) have a text of their own; every other reason, `format` included, gets the generic text of
- * the field (AW51). A key never contains the rejected value, because none is built from it (SS41).
+ * `positive` and `min`), the birth date rules of a student and the format of a national id have a text of their
+ * own; every other reason, `format` included, gets the generic text of the field (AW51). A key never contains the rejected value, because none is built from it (SS41).
  */
 export function fieldErrorKey(reason: string): AdminKey {
   switch (reason) {
@@ -40,6 +40,12 @@ export function fieldErrorKey(reason: string): AdminKey {
     case "whole":
     case "min":
       return "field.wholeNumber";
+    case "past-or-present":
+      return "field.birthDateFuture";
+    case "birth-date-floor":
+      return "field.birthDateFloor";
+    case "national-id-format":
+      return "field.nationalIdFormat";
     default:
       return "field.invalid";
   }

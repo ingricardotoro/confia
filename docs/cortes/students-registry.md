@@ -123,3 +123,121 @@ bajo `/api/v1/students`; las escrituras auditan `students.student.created|update
 `BlindIndexServiceTest` (vectores RFC 4231), `StudentsStudentSchemaIT` (restricciones, RLS y privilegios) y
 `StudentEndpointsIT` (flujo de aceptación, concurrencia, aislamiento, roles, auditoría y barrido de respuestas,
 filas de auditoría y logs capturados contra el documento completo y su cifrado).
+
+
+## Construido en el frontend
+
+Ruta `/students` («Estudiantes» en la navegación). Código en `apps/admin-web/src/features/students/`, operaciones en
+`shared/api/student-operations.ts`. Reutiliza la mecánica del corte anterior: `ResourceScreen`, `ResourceFormDialog`,
+campos, `useListState`, `useResourceView` y la clasificación de fallos de `features/organization/`, y el cliente de
+recursos paginados, que se extrajo a `shared/api/resource-client.ts` (las operaciones de la estructura académica lo usan
+ahora sin cambiar su comportamiento).
+
+**Decisiones**
+
+- **Estado de la tabla en la URL**: `page`, `pageSize`, `sort=campo:asc|desc` (solo `studentCode`, `lastName`,
+  `firstName`, `birthDate`), `q` y `status` (`ACTIVE` o `INACTIVE`). Un parámetro inválido se descarta. A la API viaja como
+  `page` desde 0, `size` y `sort=campo,dir`. Orden por omisión, el del servidor: apellidos ascendente (la cabecera lo
+  marca sin escribirlo en la URL). Cambiar un filtro o el texto reemplaza la entrada del historial y vuelve a la página 1.
+- **Búsqueda con pausa.** El cuadro «Buscar» muestra lo que se escribe al instante; la URL (y el servidor) lo siguen
+  300 ms después de la última tecla, **y solo con 2 caracteres o más** (recortado). Con 1 carácter no se envía `q` y la
+  ayuda del campo pasa a «Escriba al menos 2 caracteres para buscar.». Un cambio de la URL que el cuadro no hizo (atrás,
+  un enlace, «Quitar filtros») reemplaza lo escrito; lo que el propio cuadro escribió nunca lo pisa.
+- **Documento de identidad en el formulario.** Al crear, un campo opcional (8 a 20 letras, números o guiones; el patrón
+  generado no tiene anclas y en el navegador aceptaría cualquier texto, así que el formulario lo ancla y el servidor sigue
+  siendo la autoridad). Al editar son **tres actos separados**: «Documento actual» (enmascarado, solo lectura; «Sin
+  documento» si no hay), «Reemplazar documento» (vacío conserva: el cuerpo no lleva `nationalId`) y la casilla «Quitar
+  documento» (única forma de enviar `nationalId: ""`; solo se ofrece si hay documento; al marcarla se vacía y se
+  deshabilita el campo de reemplazo). Un campo vacío nunca elimina el documento. El código es opcional al crear («si lo
+  deja vacío, el sistema genera uno») y de solo lectura al editar; nunca se envía en un `PUT`.
+- **El documento no deja rastro.** No se escribe en la URL ni en claves de consulta (ninguna consulta lo envía), no se
+  registra en consola, y el formulario se desmonta al cerrar el diálogo (tras guardar o cancelar), así que el valor
+  escrito desaparece del estado. La mutación que lo llevó tampoco se conserva: `gcTime: 0` y `reset()` al terminar, porque
+  el caché de mutaciones guarda las variables enviadas. Tras un error el formulario conserva lo escrito para corregirlo.
+- **Activar o desactivar desde la fila** envía el `PUT` con los datos actuales y el otro `status`, sin `nationalId`.
+  El formulario de edición también permite cambiar el estado.
+- **Códigos nuevos** `duplicate-student-code` y `duplicate-national-id` (`KNOWN_PROBLEM_CODES` pasa a 22,
+  `PROBLEM_KEYS`, catálogo `es-HN` y `organization-failure.ts`). Los errores de campo de un `400` tienen texto propio:
+  `birthDate` con `past-or-present` («no puede ser posterior a hoy»), `birth-date-floor` («anterior al 1 de enero de
+  1990») y `nationalId` con `pattern` (formato del documento). El `403` conserva el mensaje del corte anterior.
+- Tabla: código, apellidos, nombres, fecha de nacimiento (`Intl.DateTimeFormat` `es-HN`, en UTC), sexo, documento
+  enmascarado tal como lo envía el servidor o «—» (con «Sin documento» para lector de pantalla), estado y acciones.
+  Ordenan en el servidor las cuatro columnas que la API admite. Sin dinero, sin `Idempotency-Key` y sin actualización
+  optimista; tras toda escritura se invalida `students` completo.
+
+**Límites conocidos**
+
+- Los componentes de presentación y los hooks de lista viven en `features/organization/` y se importan desde
+  `features/students/`. Si aparece una tercera pantalla de listado conviene moverlos a `shared/`.
+- No hay selector de tamaño de página en pantalla (el parámetro `pageSize` de la URL sí se respeta).
+- El texto de `q` va a la URL: si alguien escribe ahí un número de documento, quedará en la dirección. La API no busca
+  por documento, y el campo dice que busca por nombre, apellido o código.
+- Se tocaron fuera de la superficie de la pantalla: `field-errors.ts` y `use-access-form.ts` (razones nuevas),
+  `organization-failure.ts`, `list-search.ts` (se exportan `page`, `pageSize` y `sortOf`), `fields.tsx` (`disabled` en
+  `TextField`), `use-list-search.ts` (extraído de `feature.tsx`), `test/setup.ts` (stub de `ResizeObserver`: Radix mide
+  la casilla dentro de un `<form>` y jsdom no lo trae) y las pruebas de inventario `AppShellContainer.test.tsx` y
+  `features/identity/routes.test.tsx` (una entrada y una ruta más).
+
+**Pruebas** (Vitest, Testing Library y MSW sobre rutas, capa de consultas y transporte reales):
+`StudentsContainer.test.tsx` cubre listado (columnas, fecha, documento enmascarado o guion, consulta inicial), página y
+orden enviados al servidor y a la URL, parámetros inválidos descartados, filtro de estado, búsqueda (no se envía `q` con 1
+carácter, una sola petición tras la pausa, recorte, volver a 1 carácter, «Quitar filtros» vacía el cuadro), estados vacío,
+de error con reintento, `403` y de carga, alta sin código (cuerpo exacto), con código y documento, rastro del documento
+(DOM, URL, cachés de consultas y de mutaciones, consola), formulario nuevo vacío tras guardar, errores de campo locales y
+del `400`, `duplicate-student-code`, `duplicate-national-id`, `403` y `404` en el diálogo, envío único con doble clic y
+edición conservando, reemplazando y quitando el documento con el cuerpo exacto de cada `PUT`; activar y desactivar con
+cuerpo sin documento y `403`. Más pruebas de componente (`StudentsView`, `StudentFilters`, `StudentForm`, con su
+comentario de estados) y de `student-form.ts`, `students-search.ts` y `student-operations.ts`.
+
+## Pruebas e2e
+
+Misma mecánica que el corte anterior (Playwright en Chromium contra `vite build && vite preview`, API simulada por
+`e2e/mock-api`: una simulación de las formas publicadas, no una prueba de la pila real ni de sus reglas).
+
+**Simulador.** `mock-api/students-model.ts` atiende las cuatro operaciones de `/api/v1/students` con estado en memoria
+por escenario (`students-seed.ts`: 60 estudiantes, dos por cada uno de 30 apellidos, uno de cada tres con documento y uno
+de cada diez inactivo, con identificadores fijos). Listado paginado, ordenado (`studentCode`, `lastName`, `firstName`,
+`birthDate`; por omisión apellidos), con `q` (2 a 100 caracteres, sin distinguir mayúsculas, en nombre, apellido y
+código) y `status`; todo lo demás es `400 validation-failed`. `POST` genera `E-000061`, `E-000062`... si falta el código;
+`PUT` rechaza `studentCode` y cualquier miembro desconocido; el documento omitido se conserva, vacío se elimina y otro
+valor se reemplaza; fecha futura (`past-or-present`) o anterior a 1990 (`birth-date-floor`); `duplicate-student-code`;
+`duplicate-national-id` también con otros guiones o mayúsculas. El documento completo se guarda aparte de las filas y
+ninguna respuesta lo lleva (solo `hasNationalId` y `nationalIdMasked`). Perfiles nuevos: `students-empty`,
+`students-forbidden` (lecturas normales, escrituras `403`) y `students-server-error` (las tres primeras lecturas
+responden `500` con `traceId`). Pruebas unitarias en `mock-api/server.test.ts`.
+
+**Recorridos** (`e2e/specs/journeys/students-*.e2e.ts`, apoyo en `e2e/support/students.ts`):
+
+- `students-crud`: inicio de sesión y apertura de «Estudiantes»; alta con documento, búsqueda por apellido (código
+  generado, documento enmascarado, y el documento completo ausente de la página, la URL y todas las respuestas); alta
+  con código propio y sin documento; formulario vacío sin petición; edición (código fijo, documento enmascarado,
+  conservar); reemplazar y quitar el documento con la casilla; activar y desactivar desde la fila; errores de fecha del
+  servidor bajo su campo.
+- `students-lists`: paginar con la URL, las filas y la consulta enviada; orden por omisión y por cada cabecera; volver a la
+  página 1 al cambiar el orden; enlace compartido con parámetros inválidos descartados; `q` solo desde 2 caracteres y tras la
+  pausa; búsqueda por nombre, apellido y código sin distinguir mayúsculas; filtro de estado; combinación, sin resultados y
+  «Quitar filtros»; búsqueda y estado restaurados desde la URL.
+- `students-states`: código repetido y documento repetido (con otros guiones) en español y con el diálogo abierto, y también
+  al editar; formato de documento sin petición; cancelar sin dejar el documento en la página; `403` en el alta y en la
+  desactivación; estado vacío con su acción; estado de error con identificador de soporte y reintento.
+- `students-keyboard`: abrir el diálogo con Enter, llenarlo (incluida la fecha por segmentos y el sexo con las flechas) y
+  enviarlo solo con teclado, con foco visible, foco atrapado, Escape y retorno del foco; errores del formulario vacío con
+  Espacio; la casilla «Quitar documento» con Espacio.
+
+**Puerta de axe.** Ocho combinaciones nuevas en `e2e/support/a11y-matrix.ts`, cada una en tema claro y oscuro, todas en
+`/students`: lista con filas, diálogo nuevo, diálogo de edición con documento (casilla), diálogo con resumen de errores,
+diálogo con el error de código repetido, sin coincidencias, vacío y error de carga.
+
+**Resultado de la puerta de axe y hallazgo.** Cero violaciones bloqueantes en las 16 evaluaciones nuevas. En la primera
+corrida, los dos diálogos con error (`dialog-error-summary` y `dialog-duplicate-code`, ambos temas) fallaron con
+`color-contrast` (serio, incompleto, contado como bloqueante por la política) sobre el título y la descripción del
+diálogo. Causa: el formulario del estudiante, con su resumen de errores, es más alto que el 90 vh que permite el `Dialog`
+en el viewport por omisión de 720 px; el foco que va al resumen desplaza el contenido del diálogo, el título queda fuera
+del área recortada y axe no puede calcular su fondo. No es un defecto de contraste. Esos dos estados se miden ahora en un
+viewport de 1280 x 1000 (`tallViewport` en `a11y-matrix.ts`). Queda como observación de diseño: en una pantalla baja el
+título del diálogo se pierde al saltar al resumen; conviene que `confia-uiux-designer` decida entre un formulario en dos
+columnas o un encabezado fijo del diálogo (no se tocó `packages/ui`).
+
+**Corrida completa** (`pnpm --filter @confia/admin-web test:e2e`): 157 pruebas, 157 pasaron, 0 fallos, 0 inestables.
+Una corrida previa del subconjunto de recorridos de estudiantes con dos trabajadores mostró un fallo aislado de «inicia
+sesión y abre Estudiantes» (la espera de las filas), que no se repitió solo ni en las dos corridas completas siguientes.

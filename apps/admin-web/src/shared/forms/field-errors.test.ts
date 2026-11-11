@@ -34,6 +34,10 @@ describe("field error keys", () => {
     ["positive", "field.positiveWhole"],
     ["whole", "field.wholeNumber"],
     ["min", "field.wholeNumber"],
+    // The students cut: the two birth date rules the server names, and the format of the national id.
+    ["past-or-present", "field.birthDateFuture"],
+    ["birth-date-floor", "field.birthDateFloor"],
+    ["national-id-format", "field.nationalIdFormat"],
   ] as const)("maps the reason %j to %s", (reason, key) => {
     expect(fieldErrorKey(reason)).toBe(key);
   });

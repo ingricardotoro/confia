@@ -13,6 +13,8 @@ import {
   SecondFactorPendingResponse,
   SectionPageResponse,
   SectionResponse,
+  StudentPageResponse,
+  StudentResponse,
   type AcademicYearResponseOutput,
   type AuthenticatedSessionResponseOutput,
   type CurrentSessionResponseOutput,
@@ -21,6 +23,7 @@ import {
   type ModalityResponseOutput,
   type SecondFactorPendingResponseOutput,
   type SectionResponseOutput,
+  type StudentResponseOutput,
 } from "@confia/contracts/admin";
 import type { ProblemCode } from "../shared/api/problem.ts";
 
@@ -247,4 +250,42 @@ export function organizationPage(
 /** The resource a create (201) or an edit (200) answers with. */
 export function organizationRecord(resource: OrganizationResource, row: unknown, status: 200 | 201 = 200): ContractResponse {
   return { status, body: checked(`${resource} record`, ROW_SCHEMAS[resource], row), contentType: JSON_TYPE };
+}
+
+// The students registry cut. The national id is never a field of a response: a row carries the last four
+// characters, masked, and whether there is a document at all.
+export function student(override: Partial<StudentResponseOutput> = {}): StudentResponseOutput {
+  return checked("StudentResponse", StudentResponse, {
+    id: crypto.randomUUID(),
+    studentCode: "E-000001",
+    firstName: "Ana",
+    lastName: "Pérez",
+    birthDate: "2014-03-09",
+    sex: "F",
+    status: "ACTIVE",
+    hasNationalId: false,
+    nationalIdMasked: null,
+    createdAt: STAMP,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+/** One page of students, as the server serves it. */
+export function studentPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("students page", StudentPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The student a create (201) or an edit (200) answers with. */
+export function studentRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("student record", StudentResponse, row), contentType: JSON_TYPE };
 }

@@ -14,6 +14,8 @@ describe("classifyOrganizationFailure", () => {
     ["academic-year-closed", "problem.academicYearClosed"],
     ["duplicate-name", "problem.duplicateName"],
     ["inactive-reference", "problem.inactiveReference"],
+    ["duplicate-student-code", "problem.duplicateStudentCode"],
+    ["duplicate-national-id", "problem.duplicateNationalId"],
     ["forbidden", "problem.forbidden"],
     ["resource-not-found", "problem.notFound"],
   ] as const)("gives %s its own message, with the trace id", (code, key) => {
@@ -39,6 +41,27 @@ describe("classifyOrganizationFailure", () => {
       errors: [
         { field: "name", reason: "size" },
         { field: "endDate", reason: "end-after-start" },
+      ],
+    });
+  });
+
+  it("gives the national id the pattern refused its own reason, and keeps the birth date reasons as the server names them", () => {
+    const failure = classifyOrganizationFailure(
+      problem("validation-failed", 400, {
+        errors: [
+          { field: "nationalId", reason: "pattern" },
+          { field: "birthDate", reason: "birth-date-floor" },
+          { field: "sex", reason: "pattern" },
+        ],
+      }),
+    );
+
+    expect(failure).toEqual({
+      kind: "fields",
+      errors: [
+        { field: "nationalId", reason: "national-id-format" },
+        { field: "birthDate", reason: "birth-date-floor" },
+        { field: "sex", reason: "pattern" },
       ],
     });
   });

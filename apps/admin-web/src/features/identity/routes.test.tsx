@@ -90,6 +90,7 @@ describe("the routes and the screens", () => {
       "/organization/grades",
       "/organization/modalities",
       "/organization/sections",
+      "/students",
     ]);
   });
 

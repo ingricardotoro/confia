@@ -24,7 +24,8 @@ import {
   type UpdateModalityRequest,
   type UpdateSectionRequest,
 } from "@confia/contracts/admin";
-import { request, type ApiResult, type ResponseSchema } from "./http.ts";
+import type { ApiResult } from "./http.ts";
+import { resourceClient, type PageParams } from "./resource-client.ts";
 
 /**
  * The operations of `/api/v1/organization` (the academic structure). Each takes the access token as a
@@ -32,14 +33,9 @@ import { request, type ApiResult, type ResponseSchema } from "./http.ts";
  * an `Idempotency-Key`. Paging, order and filters are the server's: they travel as query parameters and
  * nothing here, or after it, sorts or filters a page in the browser.
  */
-const BASE = "/api/v1/organization";
+const { list, create, update } = resourceClient("/api/v1/organization");
 
-/** What every listing takes: `page` counts from 0, `sort` is `field` or `field,asc|desc`. */
-export interface PageParams {
-  readonly page: number;
-  readonly size: number;
-  readonly sort?: string | undefined;
-}
+export type { PageParams };
 
 export interface GradeListParams extends PageParams {
   readonly modalityId?: string | undefined;
@@ -48,29 +44,6 @@ export interface GradeListParams extends PageParams {
 export interface SectionListParams extends PageParams {
   readonly academicYearId?: string | undefined;
   readonly gradeId?: string | undefined;
-}
-
-const bearer = (token: string): Readonly<Record<string, string>> => ({ Authorization: `Bearer ${token}` });
-
-function listPath(resource: string, params: object): string {
-  const query = new URLSearchParams();
-  for (const [name, value] of Object.entries(params) as [string, unknown][]) {
-    if (typeof value === "string" || typeof value === "number") query.set(name, String(value));
-  }
-  const text = query.toString();
-  return `${BASE}/${resource}${text === "" ? "" : `?${text}`}`;
-}
-
-function list<T>(resource: string, schema: ResponseSchema<T>, token: string, params: object): Promise<ApiResult<T>> {
-  return request({ method: "GET", path: listPath(resource, params), headers: bearer(token), schema });
-}
-
-function create<T>(resource: string, schema: ResponseSchema<T>, token: string, body: unknown): Promise<ApiResult<T>> {
-  return request({ method: "POST", path: `${BASE}/${resource}`, headers: bearer(token), body, schema });
-}
-
-function update<T>(resource: string, schema: ResponseSchema<T>, token: string, id: string, body: unknown): Promise<ApiResult<T>> {
-  return request({ method: "PUT", path: `${BASE}/${resource}/${encodeURIComponent(id)}`, headers: bearer(token), body, schema });
 }
 
 export const listAcademicYears = (token: string, params: PageParams): Promise<ApiResult<AcademicYearPageResponseOutput>> =>

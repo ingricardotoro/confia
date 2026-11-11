@@ -72,16 +72,30 @@ export interface TextFieldProps {
   readonly error?: string | undefined;
   readonly description?: string;
   readonly required?: boolean;
+  /** The field cannot be edited now (it is not sent as a change either). */
+  readonly disabled?: boolean;
   /** `date` is the native date input; `numeric` is text with the numeric keyboard, so the form words its own error. */
   readonly kind?: "text" | "date" | "numeric";
 }
 
-export function TextField({ label, controlId, value, onChange, onBlur, error, description, required = false, kind = "text" }: TextFieldProps) {
+export function TextField({
+  label,
+  controlId,
+  value,
+  onChange,
+  onBlur,
+  error,
+  description,
+  required = false,
+  disabled = false,
+  kind = "text",
+}: TextFieldProps) {
   return (
     <FormField
       label={label}
       controlId={controlId}
       required={required}
+      disabled={disabled}
       {...(error === undefined ? {} : { error })}
       {...(description === undefined ? {} : { description })}
     >
