@@ -37,7 +37,11 @@ import java.util.Optional;
  * #ACADEMIC_YEAR_ALREADY_ACTIVE}, {@link #ACADEMIC_YEAR_CLOSED}, {@link #DUPLICATE_NAME} and {@link
  * #INACTIVE_REFERENCE} (all {@code 409}); its {@code 404} is {@link #RESOURCE_NOT_FOUND}. The student
  * registry of {@code students} owns {@link #DUPLICATE_STUDENT_CODE} and {@link #DUPLICATE_NATIONAL_ID}
- * (both {@code 409}) and uses {@link #RESOURCE_NOT_FOUND} for its {@code 404}. The
+ * (both {@code 409}) and uses {@link #RESOURCE_NOT_FOUND} for its {@code 404}. The enrollments of
+ * {@code students} own {@link #STUDENT_NOT_ACTIVE}, {@link #SECTION_FULL}, {@link
+ * #DUPLICATE_ACTIVE_ENROLLMENT}, {@link #INVALID_ENROLLMENT_STATE} and {@link #TRANSFER_YEAR_MISMATCH} (all
+ * {@code 409}) and reuse {@link #INACTIVE_REFERENCE} (an inactive section), {@link #ACADEMIC_YEAR_CLOSED}
+ * and {@link #VALIDATION_FAILED} (a date out of range, with the field). The
  * institution codes belong to a later change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
@@ -68,6 +72,11 @@ public enum ProblemCode {
     INACTIVE_REFERENCE("inactive-reference", 409),
     DUPLICATE_STUDENT_CODE("duplicate-student-code", 409),
     DUPLICATE_NATIONAL_ID("duplicate-national-id", 409),
+    STUDENT_NOT_ACTIVE("student-not-active", 409),
+    SECTION_FULL("section-full", 409),
+    DUPLICATE_ACTIVE_ENROLLMENT("duplicate-active-enrollment", 409),
+    INVALID_ENROLLMENT_STATE("invalid-enrollment-state", 409),
+    TRANSFER_YEAR_MISMATCH("transfer-year-mismatch", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
     IDEMPOTENCY_PAYLOAD_MISMATCH("idempotency-payload-mismatch", 422),
     TOO_MANY_REQUESTS("too-many-requests", 429),

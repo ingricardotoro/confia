@@ -42,7 +42,9 @@ import com.confia.kernel.Permission;
 import com.confia.organization.infrastructure.wiring.AcademicStructureConfiguration;
 import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
 import com.confia.organization.web.wiring.OrganizationWebConfiguration;
+import com.confia.students.infrastructure.wiring.EnrollmentsConfiguration;
 import com.confia.students.infrastructure.wiring.StudentsConfiguration;
+import com.confia.students.web.wiring.EnrollmentsWebConfiguration;
 import com.confia.students.web.wiring.StudentsWebConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.JobSchedulingConfiguration;
 import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
@@ -279,12 +281,13 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     void everyPermissionedEntryRejectsARevokedSession() throws SQLException {
         assertThat(endpoints.endpoints()).as("the walk is non-vacuous").hasSizeGreaterThanOrEqualTo(2)
                 .anyMatch(entry -> entry.pattern().contains("{"));
-        // The routes of the academic structure and of the student registry take a JSON body or a typed
+        // The routes of the academic structure, of the student registry and of the enrollments take a JSON body or a typed
         // identifier, which this walk does not send; their revoked-session case has its own test in
         // AcademicStructureEndpointsIT and StudentEndpointsIT.
         for (PermissionedEndpoint entry : endpoints.endpoints().stream()
                 .filter(candidate -> !candidate.pattern().startsWith("/api/v1/organization/")
-                        && !candidate.pattern().startsWith("/api/v1/students"))
+                        && !candidate.pattern().startsWith("/api/v1/students")
+                        && !candidate.pattern().startsWith("/api/v1/enrollments"))
                 .toList()) {
             Session holder = sessionOf(StaffRole.SUPER_ADMIN);
             assertThat(StaffRole.SUPER_ADMIN.permissions()).contains(entry.permission());
@@ -1056,7 +1059,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
             IdentityConfiguration.class, IdentityWebConfiguration.class,
             OrganizationConfiguration.class, AcademicStructureConfiguration.class,
             OrganizationWebConfiguration.class, StudentsConfiguration.class,
-            StudentsWebConfiguration.class, WebEdgeConfiguration.class,
+            StudentsWebConfiguration.class, EnrollmentsConfiguration.class,
+            EnrollmentsWebConfiguration.class, WebEdgeConfiguration.class,
             AdminSecurityConfiguration.class, ObservabilityMetricsConfiguration.class,
             RateLimiterConfiguration.class, ThrottlingConfiguration.class,
             RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,

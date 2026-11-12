@@ -8,9 +8,11 @@ import com.confia.organization.application.ManageModalities;
 import com.confia.organization.application.ManageSections;
 import com.confia.organization.application.ModalityRepository;
 import com.confia.organization.application.SectionRepository;
+import com.confia.organization.application.directory.SectionDirectory;
 import com.confia.organization.infrastructure.JooqAcademicYearRepository;
 import com.confia.organization.infrastructure.JooqGradeRepository;
 import com.confia.organization.infrastructure.JooqModalityRepository;
+import com.confia.organization.infrastructure.JooqSectionDirectory;
 import com.confia.organization.infrastructure.JooqSectionRepository;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.TransactionRunner;
@@ -47,6 +49,12 @@ public class AcademicStructureConfiguration {
     @Bean
     SectionRepository sectionRepository(DSLContext dsl) {
         return new JooqSectionRepository(dsl);
+    }
+
+    /** The read-only view of the sections that {@code students} consumes (docs/cortes/enrollments.md). */
+    @Bean
+    SectionDirectory sectionDirectory(DSLContext dsl) {
+        return new JooqSectionDirectory(dsl);
     }
 
     @Bean

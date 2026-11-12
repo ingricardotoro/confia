@@ -20,7 +20,9 @@ import com.confia.shared.web.edge.ThrottlingConfiguration;
 import com.confia.shared.web.edge.WebEdgeConfiguration;
 import com.confia.shared.web.openapi.ContractSchemas;
 import com.confia.shared.web.openapi.ProcessApiInfo;
+import com.confia.students.infrastructure.wiring.EnrollmentsConfiguration;
 import com.confia.students.infrastructure.wiring.StudentsConfiguration;
+import com.confia.students.web.wiring.EnrollmentsWebConfiguration;
 import com.confia.students.web.wiring.StudentsWebConfiguration;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -77,7 +79,8 @@ import org.springframework.context.annotation.Import;
 @Import({ContractSchemas.class, ProcessApiInfo.class, SharedPlatformConfiguration.class,
         IdentityConfiguration.class, IdentityWebConfiguration.class, OrganizationConfiguration.class,
         AcademicStructureConfiguration.class, OrganizationWebConfiguration.class,
-        StudentsConfiguration.class, StudentsWebConfiguration.class, WebEdgeConfiguration.class, AdminSecurityConfiguration.class,
+        StudentsConfiguration.class, StudentsWebConfiguration.class, EnrollmentsConfiguration.class,
+        EnrollmentsWebConfiguration.class, WebEdgeConfiguration.class, AdminSecurityConfiguration.class,
         ObservabilityMetricsConfiguration.class, RateLimiterConfiguration.class,
         ThrottlingConfiguration.class, RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,
         SessionTokenConfiguration.class, CsrfConfiguration.class,

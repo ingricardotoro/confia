@@ -276,6 +276,66 @@
         "required" : [ "accessTokenExpiresAt", "accountId", "authenticationMethods", "idleExpiresAt", "institutionId", "sessionExpiresAt", "sessionId" ],
         "type" : "object"
       },
+      "EnrollStudentRequest" : {
+        "properties" : {
+          "enrolledOn" : {
+            "description" : "Inside the academic year of the section (both ends included) and not in the future",
+            "format" : "date",
+            "type" : "string"
+          },
+          "sectionId" : {
+            "description" : "The section; must be active, with a free seat",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "studentId" : {
+            "description" : "The student; must be ACTIVE",
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "enrolledOn", "sectionId", "studentId" ],
+        "type" : "object"
+      },
+      "EnrollmentListResponse" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StudentEnrollmentResponse"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "items" ],
+        "type" : "object"
+      },
+      "EnrollmentPageResponse" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StudentEnrollmentResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "description" : "The page served, from 0",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "description" : "The page size served",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "description" : "Rows that match, in all pages",
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "items", "page", "size", "total" ],
+        "type" : "object"
+      },
       "EnrollmentResponse" : {
         "properties" : {
           "recoveryCodes" : {
@@ -295,6 +355,68 @@
           }
         },
         "required" : [ "recoveryCodes", "secret" ],
+        "type" : "object"
+      },
+      "EnrollmentTransferResponse" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "fromSectionId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "fromSectionName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "toSectionId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "toSectionName" : {
+            "type" : "string"
+          },
+          "transferredBy" : {
+            "description" : "The staff account that moved the enrollment",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "transferredOn" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "required" : [ "createdAt", "fromSectionId", "fromSectionName", "id", "toSectionId", "toSectionName", "transferredBy", "transferredOn" ],
+        "type" : "object"
+      },
+      "ExitEnrollmentRequest" : {
+        "properties" : {
+          "status" : {
+            "enum" : [ "WITHDRAWN", "TRANSFERRED", "GRADUATED" ],
+            "pattern" : "WITHDRAWN|TRANSFERRED|GRADUATED",
+            "type" : "string"
+          },
+          "withdrawalReason" : {
+            "description" : "Required for WITHDRAWN and TRANSFERRED; optional for GRADUATED; 3 to 500 characters once stripped",
+            "maxLength" : 1000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "withdrawnOn" : {
+            "description" : "Not before the enrollment date and not in the future",
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "required" : [ "status", "withdrawnOn" ],
         "type" : "object"
       },
       "GradePageResponse" : {
@@ -638,6 +760,84 @@
         "required" : [ "academicYearId", "createdAt", "gradeId", "id", "isActive", "name", "updatedAt" ],
         "type" : "object"
       },
+      "StudentEnrollmentResponse" : {
+        "properties" : {
+          "academicYearId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "academicYearName" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "enrolledOn" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "gradeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "gradeName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "modalityName" : {
+            "type" : "string"
+          },
+          "sectionId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "sectionName" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "ACTIVE", "WITHDRAWN", "TRANSFERRED", "GRADUATED" ],
+            "type" : "string"
+          },
+          "studentCode" : {
+            "type" : "string"
+          },
+          "studentFirstName" : {
+            "type" : "string"
+          },
+          "studentId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "studentLastName" : {
+            "type" : "string"
+          },
+          "transfers" : {
+            "description" : "The sections the enrollment has been in, oldest first; absent in a list",
+            "items" : {
+              "$ref" : "#/components/schemas/EnrollmentTransferResponse"
+            },
+            "type" : "array"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "withdrawalReason" : {
+            "type" : [ "string", "null" ]
+          },
+          "withdrawnOn" : {
+            "description" : "The day it left ACTIVE; null while active",
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "academicYearId", "academicYearName", "createdAt", "enrolledOn", "gradeId", "gradeName", "id", "modalityName", "sectionId", "sectionName", "status", "studentCode", "studentFirstName", "studentId", "studentLastName", "updatedAt" ],
+        "type" : "object"
+      },
       "StudentPageResponse" : {
         "properties" : {
           "items" : {
@@ -706,6 +906,28 @@
           }
         },
         "required" : [ "birthDate", "createdAt", "firstName", "hasNationalId", "id", "lastName", "sex", "status", "studentCode", "updatedAt" ],
+        "type" : "object"
+      },
+      "TransferEnrollmentRequest" : {
+        "properties" : {
+          "reason" : {
+            "description" : "Why; optional, 3 to 500 characters once stripped",
+            "maxLength" : 1000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "toSectionId" : {
+            "description" : "A section of the same academic year, different from the current one, active and with a free seat",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "transferredOn" : {
+            "description" : "Not before the enrollment date, not in the future and not after the end of the year",
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "required" : [ "toSectionId", "transferredOn" ],
         "type" : "object"
       },
       "UpdateAcademicYearRequest" : {
@@ -1505,6 +1727,616 @@
         },
         "summary" : "Rotates the refresh token of the session cookie",
         "tags" : [ "auth-sessions" ]
+      }
+    },
+    "/api/v1/enrollments" : {
+      "get" : {
+        "description" : "One page of the enrollments of the institution of the token. Needs the permission students:read. page counts from 0, size defaults to 50 and is at most 200, sort is enrolledOn, studentLastName or status optionally followed by ,asc or ,desc (studentLastName ascending by default). academicYearId defaults to the ACTIVE academic year when there is one (every year otherwise); sectionId, gradeId and status narrow the list.",
+        "operationId" : "listEnrollments",
+        "parameters" : [ {
+          "description" : "Page, counted from 0",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Rows per page, 1 to 200; 50 when absent",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 50,
+            "format" : "int32",
+            "maximum" : 200,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Field of enrolledOn, studentLastName or status, optionally followed by ,asc or ,desc; studentLastName ascending when absent",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 40,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }, {
+          "description" : "Academic year; the ACTIVE one when absent and there is one",
+          "in" : "query",
+          "name" : "academicYearId",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "Only the enrollments in this section",
+          "in" : "query",
+          "name" : "sectionId",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "Only the enrollments in the sections of this grade",
+          "in" : "query",
+          "name" : "gradeId",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "ACTIVE, WITHDRAWN, TRANSFERRED or GRADUATED; all when absent",
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "pattern" : "ACTIVE|WITHDRAWN|TRANSFERRED|GRADUATED",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnrollmentPageResponse"
+                }
+              }
+            },
+            "description" : "One page of the enrollments"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "A parameter is out of range or the sort field is not allowed (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold students:read (forbidden)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Lists the enrollments",
+        "tags" : [ "enrollments" ],
+        "x-required-permission" : "students:read"
+      },
+      "post" : {
+        "description" : "Enrolls an ACTIVE student in an active section; the academic year is the one of the section. The date is inside the year (both ends included) and not in the future. A student has at most one ACTIVE enrollment per academic year, and a section takes no more ACTIVE enrollments than its capacity. Needs the permission students:create.",
+        "operationId" : "enrollStudent",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EnrollStudentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/StudentEnrollmentResponse"
+                }
+              }
+            },
+            "description" : "The enrollment created"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not valid, or the date is outside the year or in the future (validation-failed, with the field)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold students:create, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The student or the section does not exist in the institution of the token (resource-not-found)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The student is not active (student-not-active), the section is inactive (inactive-reference) or full (section-full), the year is closed (academic-year-closed) or the student already has an active enrollment in the year (duplicate-active-enrollment)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Enrolls a student in a section",
+        "tags" : [ "enrollments" ],
+        "x-required-permission" : "students:create"
+      }
+    },
+    "/api/v1/enrollments/{id}" : {
+      "get" : {
+        "description" : "The enrollment with this identifier in the institution of the token, with the history of its sections. Needs the permission students:read.",
+        "operationId" : "getEnrollment",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/StudentEnrollmentResponse"
+                }
+              }
+            },
+            "description" : "The enrollment"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The identifier is not valid (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold students:read (forbidden)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The enrollment does not exist in the institution of the token (resource-not-found)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Reads an enrollment",
+        "tags" : [ "enrollments" ],
+        "x-required-permission" : "students:read"
+      }
+    },
+    "/api/v1/enrollments/{id}/exit" : {
+      "post" : {
+        "description" : "Ends an ACTIVE enrollment as WITHDRAWN, TRANSFERRED (to another institution) or GRADUATED, which are final. The reason is required for the first two. Repeating an exit already done answers invalid-enrollment-state. Needs the permission students:update.",
+        "operationId" : "exitEnrollment",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExitEnrollmentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/StudentEnrollmentResponse"
+                }
+              }
+            },
+            "description" : "The enrollment after the exit, with its history"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body or the identifier is not valid, the date is out of range or the reason is missing (validation-failed, with the field)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold students:update, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The enrollment does not exist in the institution of the token (resource-not-found)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The enrollment is not active (invalid-enrollment-state) or the year is closed (academic-year-closed)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Ends an enrollment",
+        "tags" : [ "enrollments" ],
+        "x-required-permission" : "students:update"
+      }
+    },
+    "/api/v1/enrollments/{id}/transfer" : {
+      "post" : {
+        "description" : "Moves an ACTIVE enrollment to another section of the same academic year, which must be active and have a free seat, and adds an immutable entry to the history. Needs the permission students:update.",
+        "operationId" : "transferEnrollment",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TransferEnrollmentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/StudentEnrollmentResponse"
+                }
+              }
+            },
+            "description" : "The enrollment in its new section, with its history"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body or the identifier is not valid, the date is out of range or the target is the current section (validation-failed, with the field)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold students:update, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The enrollment or the target section does not exist in the institution of the token (resource-not-found)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The enrollment is not active (invalid-enrollment-state), the target is of another year (transfer-year-mismatch), inactive (inactive-reference) or full (section-full) or the year is closed (academic-year-closed)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Moves an enrollment to another section",
+        "tags" : [ "enrollments" ],
+        "x-required-permission" : "students:update"
       }
     },
     "/api/v1/identity/roles" : {
@@ -3197,6 +4029,108 @@
         "summary" : "Edits a student",
         "tags" : [ "students" ],
         "x-required-permission" : "students:update"
+      }
+    },
+    "/api/v1/students/{studentId}/enrollments" : {
+      "get" : {
+        "description" : "Every enrollment of the student, the most recent first. Needs the permission students:read.",
+        "operationId" : "listEnrollmentsOfStudent",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "studentId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnrollmentListResponse"
+                }
+              }
+            },
+            "description" : "The enrollments of the student"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The identifier is not valid (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold students:read (forbidden)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The student does not exist in the institution of the token (resource-not-found)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Lists the enrollments of a student",
+        "tags" : [ "enrollments" ],
+        "x-required-permission" : "students:read"
       }
     }
   }
