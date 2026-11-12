@@ -52,6 +52,20 @@ export function fieldErrorKey(reason: string): AdminKey {
       return "field.dateOutOfRange";
     case "same-section":
       return "field.sameSection";
+    case "rtn-format":
+      return "field.rtnFormat";
+    case "email-format":
+      return "field.emailFormat";
+    case "phone-format":
+      return "field.phoneFormat";
+    // The server reads a percentage with more than two decimals as `digits` and one out of 0.01 to 100 as `decimal-min` or `decimal-max`.
+    case "percent-format":
+    case "digits":
+      return "field.percentFormat";
+    case "percent-range":
+    case "decimal-min":
+    case "decimal-max":
+      return "field.percentRange";
     default:
       return "field.invalid";
   }

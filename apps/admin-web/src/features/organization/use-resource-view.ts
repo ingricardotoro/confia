@@ -33,18 +33,29 @@ export function useResourceView<Row>() {
       setDialog({ kind: "closed" });
     },
     /** A create or an edit was saved: the dialog closes and the region says so. */
-    saved: (kind: "created" | "updated", name: string) => {
+    saved: (kind: "created" | "updated", name: string, warning?: string) => {
       setDialog({ kind: "closed" });
-      setNotice({ tone: "success", message: t(kind === "created" ? "organization.common.created" : "organization.common.updated", { name }) });
+      const message = t(kind === "created" ? "organization.common.created" : "organization.common.updated", { name });
+      setNotice({ tone: "success", message: warning === undefined ? message : `${message} ${warning}` });
     },
-    toggle: async (id: string, name: string, nextActive: boolean, run: () => Promise<unknown>) => {
+    /** Empties the region of the screen, as opening a dialog does. */
+    clearNotice: () => {
+      setNotice(undefined);
+    },
+    /** Tells the result of an action that has its own dialog, in the region of the screen. */
+    announce: (message: string) => {
+      setNotice({ tone: "success", message });
+    },
+    toggle: async <R,>(id: string, name: string, nextActive: boolean, run: () => Promise<R>, warningOf?: (result: R) => string | undefined) => {
       if (toggling.current) return;
       toggling.current = true;
       setTogglingId(id);
       setNotice(undefined);
       try {
-        await run();
-        setNotice({ tone: "success", message: t(nextActive ? "organization.common.activated" : "organization.common.deactivated", { name }) });
+        const result = await run();
+        const message = t(nextActive ? "organization.common.activated" : "organization.common.deactivated", { name });
+        const warning = warningOf?.(result);
+        setNotice({ tone: "success", message: warning === undefined ? message : `${message} ${warning}` });
       } catch (error) {
         const { key, traceId } = failureMessageOf(failureOf(error));
         setNotice({ tone: "error", message: t(key), ...(traceId === undefined ? {} : { traceId }) });

@@ -24,7 +24,7 @@ function backendBody(code: string, extra: Record<string, unknown> = {}) {
 }
 
 describe("the known codes", () => {
-  it("AW46: lists the twenty seven codes of the specification", () => {
+  it("AW46: lists the twenty nine codes of the specification", () => {
     expect([...KNOWN_PROBLEM_CODES].sort()).toEqual(
       [
         "authentication-failed",
@@ -54,6 +54,8 @@ describe("the known codes", () => {
         "duplicate-active-enrollment",
         "invalid-enrollment-state",
         "transfer-year-mismatch",
+        "invalid-responsibility-split",
+        "guardian-not-active",
       ].sort(),
     );
   });
@@ -213,5 +215,17 @@ describe("reporting the unknown case", () => {
     await readProblem(problemResponse(backendBody("forbidden"), { status: 403 }), report);
 
     expect(report).toHaveBeenCalledExactlyOnceWith({ status: 502 });
+  });
+});
+
+describe("invalid-responsibility-split", () => {
+  it("exposes the reason of the split, and no other code carries errors", async () => {
+    const errors = [{ field: "links", reason: "sum-not-100" }];
+
+    const split = await readProblem(problemResponse(backendBody("invalid-responsibility-split", { errors })), vi.fn());
+    const other = await readProblem(problemResponse(backendBody("guardian-not-active", { errors })), vi.fn());
+
+    expect(split.errors).toEqual(errors);
+    expect(other.errors).toEqual([]);
   });
 });

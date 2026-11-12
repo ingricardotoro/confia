@@ -1,4 +1,5 @@
 import { Badge, Button, FormField, Input, Select } from "@confia/ui";
+import type { ReactNode } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 
 export interface Option {
@@ -143,10 +144,12 @@ export interface RowActionsProps {
   readonly busy: boolean;
   readonly onEdit: () => void;
   readonly onToggle: () => void;
+  /** More buttons of the row, after the two common ones. */
+  readonly extra?: ReactNode;
 }
 
 /** The actions of a row: edit, and activate or deactivate. Each button says on which record it acts. */
-export function RowActions({ name, active, busy, onEdit, onToggle }: RowActionsProps) {
+export function RowActions({ name, active, busy, onEdit, onToggle, extra }: RowActionsProps) {
   const { t } = useAdminText();
   return (
     <div className="flex flex-wrap gap-2">
@@ -162,6 +165,7 @@ export function RowActions({ name, active, busy, onEdit, onToggle }: RowActionsP
       >
         {t(active ? "organization.common.deactivate" : "organization.common.activate")}
       </Button>
+      {extra}
     </div>
   );
 }

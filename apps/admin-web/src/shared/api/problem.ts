@@ -1,6 +1,6 @@
 import { reportUnknownProblem, stripQueryAndFragment, type UnknownProblemFinding } from "./report-unknown-problem.ts";
 
-/** The twenty seven codes the backend publishes today (docs/ui-ux/04, §9, its dated note, the academic structure, the students and the enrollments cuts). */
+/** The twenty nine codes the backend publishes today (docs/ui-ux/04, §9, its dated note, the academic structure, the students, the enrollments and the guardians cuts). */
 export const KNOWN_PROBLEM_CODES = [
   "authentication-failed",
   "second-factor-invalid",
@@ -29,6 +29,8 @@ export const KNOWN_PROBLEM_CODES = [
   "duplicate-active-enrollment",
   "invalid-enrollment-state",
   "transfer-year-mismatch",
+  "invalid-responsibility-split",
+  "guardian-not-active",
 ] as const;
 
 export type ProblemCode = (typeof KNOWN_PROBLEM_CODES)[number];
@@ -110,7 +112,8 @@ export async function readProblem(
   return {
     status,
     code,
-    errors: code === "validation-failed" ? fieldErrorsOf(body.errors) : [],
+    // The split of the guardians of a student names its reason in `errors` too (`[{ field: "links", reason }]`).
+    errors: code === "validation-failed" || code === "invalid-responsibility-split" ? fieldErrorsOf(body.errors) : [],
     ...traceId,
     ...(code === "too-many-requests" ? { retryAfterSeconds: retryAfterSecondsOf(response.headers.get("Retry-After")) } : {}),
   };

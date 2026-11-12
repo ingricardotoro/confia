@@ -133,6 +133,9 @@ describe("the states of the students registry", () => {
       ["no-matches", undefined, undefined],
       ["empty", "students-empty", undefined],
       ["load-error", "students-server-error", undefined],
+      ["dialog-guardians", undefined, true],
+      ["dialog-guardians-results", undefined, true],
+      ["dialog-guardians-split-error", undefined, true],
     ]);
     expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...students])).toHaveLength(MATRIX.length * THEMES.length);
     expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
@@ -154,6 +157,25 @@ describe("the states of the enrollments", () => {
       ["load-error", "enrollments-server-error", undefined],
     ]);
     expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...enrollments])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+});
+
+describe("the states of the guardians registry", () => {
+  const guardians = MATRIX.filter((combination) => combination.route === "/guardians");
+
+  it("holds the list ready, three dialogs (new, edit with a document, errors), the detail, the no-match, empty and load-error states, each once", () => {
+    expect(guardians.map((combination) => [combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["ready", undefined, undefined],
+      ["dialog-open", undefined, true],
+      ["dialog-edit-document", undefined, true],
+      ["dialog-error-summary", undefined, true],
+      ["dialog-detail", undefined, true],
+      ["no-matches", undefined, undefined],
+      ["empty", "guardians-empty", undefined],
+      ["load-error", "guardians-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...guardians])).toHaveLength(MATRIX.length * THEMES.length);
     expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
   });
 });

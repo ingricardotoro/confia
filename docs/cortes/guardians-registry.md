@@ -233,3 +233,86 @@ el teléfono y la dirección). Además: `ProblemCodeTest`, `ProblemCodeException
 `PermissionedEndpointsTest`, `PublicRouteAllowListTest`, `CurrentSessionEndpointIT`, `AuthorizationEdgeIT`,
 `OpenApiContractSnapshotTest` (instantánea regenerada: 36 operaciones, 29 con permiso) y las pruebas de arquitectura
 (`ProcessBeanPolicy`, `WebEdgeScopeExclusionInventoryTest`).
+
+## Construido en el frontend
+
+Ruta `/guardians` («Encargados» en la navegación, registrada en `app/features.ts` después de «Matrículas») y la acción
+«Encargados» por fila en «Estudiantes». Código en `apps/admin-web/src/features/guardians/`, operaciones en
+`shared/api/guardian-operations.ts`. Reutiliza la mecánica de los cortes anteriores sin cambiar su comportamiento:
+`ResourceScreen`, `ResourceFormDialog`, campos, `useListState`, `useSearchBox`, `useAccessForm`, la clasificación de fallos de
+`features/organization/`, el cliente de recursos paginados y el buscador con pausa de las matrículas. El cliente se generó con
+`pnpm --filter @confia/contracts generate`.
+
+**Decisiones**
+
+- **Estado de la tabla en la URL**: `page`, `pageSize`, `sort=campo:asc|desc` (solo `lastName`, `code`, `status`, que son también los
+  identificadores de las columnas ordenables), `q` (2 a 100 caracteres) y `status`. Un parámetro inválido se descarta. A la API viaja
+  como `page` desde 0, `size` y `sort=campo,dir`. Orden por omisión, el del servidor: apellido ascendente.
+- **Documento y RTN son de solo escritura.** Al crear se escriben en cajas con `autocomplete="off"`, `autocorrect="off"` y
+  `spellcheck="false"`; al editar solo se muestra «Registrado» o «Sin registrar» (`hasNationalId`, `hasRtn`) y se actúa en tres
+  gestos separados: caja «Reemplazar» (vacía conserva: el miembro no se envía), casilla «Quitar» (envía texto vacío) y nada más. Los
+  valores escritos viven solo en el formulario montado: ni en la URL, ni en una clave de consulta, ni en la caché de mutaciones
+  (`gcTime: 0` y reinicio), ni en el almacenamiento, ni en la consola; una prueba lo comprueba tras guardar.
+- **Editar reemplaza el registro.** Correo, teléfono y dirección vacíos no se envían (el servidor los borra); el canal siempre se
+  envía. Activar o desactivar desde la fila reenvía el registro completo de la fila con el otro estado y sin documento ni RTN
+  (el servidor los conserva). Un encargado `INACTIVE` que sigue con estudiantes (`students` no vacío en la respuesta) produce el aviso
+  «sigue vinculado a N estudiantes» en el aviso de la pantalla; los vínculos no se tocan.
+- **Detalle.** Diálogo de solo lectura con `GET /api/v1/guardians/{id}`: datos, y tabla de estudiantes vinculados (código, nombre,
+  parentesco, porcentaje con dos decimales alineado a la derecha, pagador principal, destinatario, desde). Esqueleto al cargar y
+  reintento si falla; aviso si un encargado inactivo conserva vínculos.
+- **Diálogo «Encargados» de un estudiante** (`StudentGuardiansContainer`, abierto desde la fila de «Estudiantes»; el foco vuelve al
+  botón). Lee `GET /students/{id}/guardians` y edita el conjunto completo con `PUT`. Cada encargado es una fila (fieldset con
+  leyenda «Nombre · P-000001»): parentesco, porcentaje (texto, `inputMode="decimal"`, alineado a la derecha), casillas de pagador
+  principal y destinatario de la factura, y «Quitar a X del reparto». Agregar usa un combobox ARIA (flechas y Enter, 2 o más
+  caracteres tras 300 ms, solo `status=ACTIVE`, `size=10`) que excluye a los ya agregados; Enter nunca envía el conjunto. El foco va a
+  la fila nueva al agregar y a la caja del buscador al quitar, con un anuncio `aria-live`. Un conjunto vacío se puede guardar (quita
+  todos) y el diálogo lo advierte antes. Máximo 20 filas.
+- **Sin aritmética en el navegador.** La suma que se muestra es el `totalPercent` del servidor para lo guardado («la calcula el
+  servidor»), con `Intl.NumberFormat` a dos decimales (`shared/format/format-percent.ts`); no hay suma en vivo. El porcentaje
+  escrito se valida solo como texto (forma `\d{1,3}(\.\d{1,2})?` y rango 0.01 a 100 leído de los dígitos) y viaja como número JSON
+  con `Number(texto)`. Si suma 100.00 o no, lo dice el servidor.
+- **Errores.** Códigos nuevos con texto propio: `invalid-responsibility-split` y `guardian-not-active` (`KNOWN_PROBLEM_CODES` pasa de
+  27 a 29 y `PROBLEM_KEYS` los espeja). `readProblem` ahora lee también `errors` de `invalid-responsibility-split`, y el clasificador
+  elige el texto por motivo: `sum-not-100`, `multiple-primary-payer`, `multiple-billing-recipient`, `duplicate-guardian`. El alert
+  recibe el foco y no borra lo escrito. `duplicate-national-id` se dice «encargado» en esta pantalla y `student-not-active` «no admite
+  cambios en sus encargados» en el diálogo (los textos de estudiantes y matrículas no cambian). Errores de campo: `links[i].
+  financialResponsibilityPercent` con `digits`, `decimal-min` y `decimal-max` bajo la fila correcta y en el resumen; `pattern` de
+  `rtn`, `email` y `phone` con su mensaje. Un 403 se dice en llano dentro del diálogo y nada cambia.
+- **Sin dinero, sin `Idempotency-Key`, sin actualización optimista.** Todas las escrituras invalidan `guardianKeys.all` (listas,
+  detalles y conjuntos); mientras una escritura está en vuelo el botón se bloquea y un segundo clic no envía nada.
+- **Texto.** Todo en el catálogo `es-HN` tipado (`guardians.*`, `problem.*`, `field.*`, `navigation.guardians`,
+  `students.guardiansAction*`).
+- **Cambios compartidos mínimos y aditivos:** `RowActions` acepta `extra`, `useResourceView` gana `announce`, `clearNotice` y el aviso
+  opcional de `saved` y `toggle`, `FieldReason` gana cinco motivos, y `fieldErrorKey` los textos de formato.
+
+**Pruebas del frontend.** Vitest con Testing Library y MSW. `GuardiansContainer.test.tsx` (la petición exacta, página, orden,
+búsqueda desde dos caracteres, filtros en la URL y descarte de lo inválido, vacío, error con reintento, 403, carga, crear con los
+miembros exactos, documento y RTN sin rastro, formato, documento duplicado, un solo envío, editar conservando, reemplazando y
+quitando, activar y desactivar con aviso, detalle). `StudentGuardiansContainer.test.tsx` (conjunto actual, suma del servidor,
+búsqueda, teclado, cuerpo exacto con 33.33 + 33.33 + 33.34, quitar, conjunto vacío, validación local, cada motivo del reparto,
+`guardian-not-active`, `student-not-active`, 403, error de campo por fila, 429). Un archivo de prueba por componente de presentación,
+`guardian-form.test.ts`, `link-model.test.ts`, `shared/api/guardian-operations.test.ts` y `format-percent.test.ts`.
+
+## Pruebas e2e
+
+**Simulador.** `mock-api/guardians-model.ts` atiende las seis operaciones sobre los estudiantes del mismo escenario
+(`guardians-seed.ts`: 30 encargados, uno por apellido, cada décimo inactivo; el estudiante 1 vinculado a Rosa Aguilar 60.00 y Luis
+Alvarado 40.00). Reglas delgadas: suma exacta 100.00 (en centésimas), a lo sumo un pagador y un destinatario, encargado repetido,
+encargado y estudiante inactivos, documento repetido aun con otros guiones, historial al cerrar y abrir vínculos y reemplazo idéntico
+sin cambios. Perfiles nuevos: `guardians-empty`, `guardians-forbidden` y `guardians-server-error`. Pruebas unitarias en
+`mock-api/guardians-model.test.ts` (99.99, 100.01, 60/30, 33.33 + 33.33 + 33.34, sin vínculos, 0 y 100.01, dos pagadores, repetido,
+inactivos, historial).
+
+**Recorridos** (`e2e/specs/journeys/guardians-*.e2e.ts`, apoyo en `e2e/support/guardians.ts`): `guardians-crud`, `guardians-lists`,
+`guardians-states`, `guardians-links` (el criterio de aceptación: 60/40 a 50/50, 60/30 rechazado, el documento nunca se muestra) y
+`guardians-keyboard`. `a11y/gate` (matriz en `support/a11y-matrix.ts`): `/guardians` en listado, nuevo, editar con documento,
+resumen de errores, detalle, sin coincidencias, vacío y error de carga, y en `/students` el diálogo de encargados (conjunto,
+resultados de búsqueda y error de reparto), en tema claro y oscuro.
+
+**Resultado de la verificación (frontend).** `tsc --noEmit` y `eslint` (src y e2e) limpios. Vitest dirigido: el subconjunto de
+`shared`, `organization`, `students`, `enrollments`, `app`, `i18n`, `e2e/mock-api` y `e2e/support` pasa completo salvo AW61 (directorio
+`apps/portal-web` vacío, conocido y ajeno al corte); los contenedores de encargados y del diálogo de encargados de un estudiante
+pasan (60 pruebas), igual que el simulador, las pruebas de presentación y los tests de `app`. Playwright, solo lo del corte: los cinco
+recorridos de encargados (26 pruebas) y las 22 evaluaciones de axe (11 estados en tema claro y oscuro: 8 de `/guardians` y 3 del
+diálogo de encargados en `/students`) pasan sin violaciones bloqueantes. No se ejecutó `test:e2e` completo ni la cobertura global
+por falta de memoria del equipo.

@@ -27,6 +27,47 @@ describe("classifyOrganizationFailure", () => {
     expect(classifyOrganizationFailure(problem(code, 409, { traceId: "t-1" }))).toEqual({ kind: "message", key, traceId: "t-1" });
   });
 
+  it.each([
+    ["sum-not-100", "problem.splitSumNot100"],
+    ["multiple-primary-payer", "problem.splitMultiplePrimaryPayer"],
+    ["multiple-billing-recipient", "problem.splitMultipleBillingRecipient"],
+    ["duplicate-guardian", "problem.splitDuplicateGuardian"],
+    ["something-new", "problem.invalidResponsibilitySplit"],
+  ] as const)("gives the split reason %s its own message", (reason, key) => {
+    expect(classifyOrganizationFailure(problem("invalid-responsibility-split", 400, { errors: [{ field: "links", reason }], traceId: "t-2" }))).toEqual({
+      kind: "message",
+      key,
+      traceId: "t-2",
+    });
+  });
+
+  it("gives a split with no reason the general message of the code", () => {
+    expect(classifyOrganizationFailure(problem("invalid-responsibility-split", 400))).toEqual({ kind: "message", key: "problem.invalidResponsibilitySplit" });
+  });
+
+  it("names the contact fields a pattern refuses, so each gets its own message", () => {
+    const failure = classifyOrganizationFailure(
+      problem("validation-failed", 400, {
+        errors: [
+          { field: "rtn", reason: "pattern" },
+          { field: "email", reason: "pattern" },
+          { field: "phone", reason: "pattern" },
+          { field: "address", reason: "size" },
+        ],
+      }),
+    );
+
+    expect(failure).toEqual({
+      kind: "fields",
+      errors: [
+        { field: "rtn", reason: "rtn-format" },
+        { field: "email", reason: "email-format" },
+        { field: "phone", reason: "phone-format" },
+        { field: "address", reason: "size" },
+      ],
+    });
+  });
+
   it("omits the trace id when the server sent none", () => {
     expect(classifyOrganizationFailure(problem("forbidden", 403))).toEqual({ kind: "message", key: "problem.forbidden" });
   });

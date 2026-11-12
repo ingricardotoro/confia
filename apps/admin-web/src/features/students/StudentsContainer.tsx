@@ -1,4 +1,6 @@
 import type { TableSort } from "@confia/ui";
+import { useState } from "react";
+import { StudentGuardiansContainer } from "../guardians/StudentGuardiansContainer.tsx";
 import { toApiParams } from "../organization/list-search.ts";
 import type { SearchChange } from "../organization/search-change.ts";
 import { useListState } from "../organization/use-list-state.ts";
@@ -26,6 +28,8 @@ export function StudentsContainer({ search, onSearchChange }: StudentsContainerP
   const list = useStudentList(toApiParams(search));
   const write = useStudentWrite();
   const view = useResourceView<Student>();
+  // The student whose guardians are being managed, if any: its own dialog, apart from the form.
+  const [guardiansOf, setGuardiansOf] = useState<Student>();
   const box = useSearchBox(search.q, (q) => {
     onSearchChange({ ...search, q, page: 1 }, { replace: true });
   });
@@ -60,11 +64,29 @@ export function StudentsContainer({ search, onSearchChange }: StudentsContainerP
         }}
         onCreate={view.openCreate}
         onEdit={view.openEdit}
+        onGuardians={(row) => {
+          view.clearNotice();
+          setGuardiansOf(row);
+        }}
         onToggle={(row) => {
           const next = row.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
           void view.toggle(row.id, nameOf(row), next === "ACTIVE", () => write({ mode: "update", id: row.id, body: toggleBodyOf(row, next) }));
         }}
       />
+      {guardiansOf === undefined ? null : (
+        <StudentGuardiansContainer
+          key={guardiansOf.id}
+          studentId={guardiansOf.id}
+          studentName={nameOf(guardiansOf)}
+          onSaved={(message) => {
+            setGuardiansOf(undefined);
+            view.announce(message);
+          }}
+          onClose={() => {
+            setGuardiansOf(undefined);
+          }}
+        />
+      )}
       {view.dialog.kind === "closed" ? null : (
         <StudentFormContainer
           // A new form for each record, so nothing typed for one is shown for another.

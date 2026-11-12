@@ -41,6 +41,15 @@ describe("field error keys", () => {
     ["enrollment-date-out-of-range", "field.dateOutOfRange"],
     ["same-section", "field.sameSection"],
     ["reason-length", "field.reasonLength"],
+    // The guardians cut: the contact formats and the percentage of a link (the server names it digits, decimal-min and decimal-max).
+    ["rtn-format", "field.rtnFormat"],
+    ["email-format", "field.emailFormat"],
+    ["phone-format", "field.phoneFormat"],
+    ["percent-format", "field.percentFormat"],
+    ["digits", "field.percentFormat"],
+    ["percent-range", "field.percentRange"],
+    ["decimal-min", "field.percentRange"],
+    ["decimal-max", "field.percentRange"],
   ] as const)("maps the reason %j to %s", (reason, key) => {
     expect(fieldErrorKey(reason)).toBe(key);
   });

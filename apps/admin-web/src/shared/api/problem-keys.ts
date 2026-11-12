@@ -35,5 +35,7 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "duplicate-active-enrollment": "problem.duplicateActiveEnrollment",
   "invalid-enrollment-state": "problem.invalidEnrollmentState",
   "transfer-year-mismatch": "problem.transferYearMismatch",
+  "invalid-responsibility-split": "problem.invalidResponsibilitySplit",
+  "guardian-not-active": "problem.guardianNotActive",
   unknown: "problem.unexpected",
 };

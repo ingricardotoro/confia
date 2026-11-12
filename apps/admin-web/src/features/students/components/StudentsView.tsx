@@ -1,4 +1,4 @@
-import type { TableColumn } from "@confia/ui";
+import { Button, type TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import { formatIsoDate } from "../../../shared/format/format-date.ts";
 import { ActiveBadge, RowActions } from "../../organization/components/fields.tsx";
@@ -17,13 +17,15 @@ export interface StudentsViewProps {
   readonly onCreate: () => void;
   readonly onEdit: (row: Student) => void;
   readonly onToggle: (row: Student) => void;
+  /** Opens the dialog that manages the guardians of the student. */
+  readonly onGuardians: (row: Student) => void;
 }
 
 /**
  * The students as a table: code, last names, first names, birth date, sex, whether there is a document, state and actions,
  * with a text search and a status filter. The document column says only "registered" or a dash: the server never sends any digit.
  */
-export function StudentsView({ rows, table, pagination, notice, togglingId, filters, onCreate, onEdit, onToggle }: StudentsViewProps) {
+export function StudentsView({ rows, table, pagination, notice, togglingId, filters, onCreate, onEdit, onToggle, onGuardians }: StudentsViewProps) {
   const { t } = useAdminText();
   const columns: readonly TableColumn<Student>[] = [
     { id: "studentCode", header: t("students.columns.studentCode"), sortable: true, cell: (row) => row.studentCode },
@@ -62,6 +64,18 @@ export function StudentsView({ rows, table, pagination, notice, togglingId, filt
           onToggle={() => {
             onToggle(row);
           }}
+          extra={
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label={t("students.guardiansActionFor", { name: nameOf(row) })}
+              onClick={() => {
+                onGuardians(row);
+              }}
+            >
+              {t("students.guardiansAction")}
+            </Button>
+          }
         />
       ),
     },
