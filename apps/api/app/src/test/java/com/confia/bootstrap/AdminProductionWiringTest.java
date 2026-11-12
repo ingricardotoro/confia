@@ -248,6 +248,37 @@ class AdminProductionWiringTest {
                 });
     }
 
+    @Test
+    void aMissingBlindIndexKeyStopsTheAdminProcessAndNamesThePropertyWithoutAnyValue() {
+        assertThatThrownBy(() -> ConfiaApplication.launch(
+                TestProcessArguments.adminWithout(TestProcessArguments.BLIND_INDEX_V1_KEY_PROPERTY), "admin"))
+                .satisfies(failure -> {
+                    assertThat(stackTraceOf(failure)).contains("confia.crypto.blind-index.keys");
+                    assertThat(stackTraceOf(failure)).contains("IllegalStateException");
+                    assertNoSecretFragment(failure, "");
+                });
+    }
+
+    @Test
+    void aMissingCurrentBlindIndexVersionStopsTheAdminProcess() {
+        assertThatThrownBy(() -> ConfiaApplication.launch(TestProcessArguments.adminWithout(
+                TestProcessArguments.BLIND_INDEX_CURRENT_VERSION_PROPERTY), "admin"))
+                .satisfies(failure -> assertThat(stackTraceOf(failure))
+                        .contains(TestProcessArguments.BLIND_INDEX_CURRENT_VERSION_PROPERTY));
+    }
+
+    @Test
+    void anInvalidBlindIndexKeyStopsTheAdminProcessWithoutEchoingIt() {
+        String notBase64 = "Zq9#Xw7!Lm2@Pk4$";
+
+        assertThatThrownBy(() -> ConfiaApplication.launch(
+                TestProcessArguments.adminWith(TestProcessArguments.BLIND_INDEX_V1_KEY_PROPERTY, notBase64), "admin"))
+                .satisfies(failure -> {
+                    assertThat(stackTraceOf(failure)).contains("blind-index");
+                    assertNoSecretFragment(failure, notBase64);
+                });
+    }
+
     private static ConfigurableApplicationContext start(String process) {
         return start(process, TestProcessArguments.forProcess(process));
     }

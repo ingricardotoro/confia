@@ -27,8 +27,8 @@ import org.junit.jupiter.api.Test;
 class StudentsStudentSchemaIT extends CommittingPostgresIntegrationTest {
 
     private static final List<String> TABLES = List.of("students_student", "students_student_code_counter");
-    private static final String BLIND_A = "a".repeat(64);
-    private static final String BLIND_B = "b".repeat(64);
+    private static final String BLIND_A = "v1:" + "a".repeat(64);
+    private static final String BLIND_B = "v1:" + "b".repeat(64);
 
     private interface SqlAction {
         void run() throws SQLException;
@@ -166,6 +166,23 @@ class StudentsStudentSchemaIT extends CommittingPostgresIntegrationTest {
             student(owner, institution, UUID.randomUUID(), "E", "F", "ACTIVE", "v1:y", BLIND_B);
             StaffRoleFixtures.fixInstitution(owner, other);
             student(owner, other, UUID.randomUUID(), "A", "F", "ACTIVE", "v1:x", BLIND_A);
+            owner.rollback();
+        }
+    }
+
+    @Test
+    void theBlindIndexMustBeVersionedLowercaseHexAndAnotherVersionIsAnotherValue() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            for (String bad : List.of("a".repeat(64), "v1:" + "A".repeat(64), "v1:" + "a".repeat(63),
+                    "v0:" + "a".repeat(64), "v1:" + "a".repeat(65), "x1:" + "a".repeat(64))) {
+                SQLException refusal = rejected(owner, () -> student(owner, institution, UUID.randomUUID(), "A", "F",
+                        "ACTIVE", "v1:x", bad));
+                assertThat(refusal.getSQLState()).isEqualTo("23514");
+                assertThat(refusal.getMessage()).contains("students_student_blind_index_chk");
+            }
+            student(owner, institution, UUID.randomUUID(), "A", "F", "ACTIVE", "v1:x", "v1:" + "a".repeat(64));
+            student(owner, institution, UUID.randomUUID(), "B", "F", "ACTIVE", "v1:x", "v2:" + "a".repeat(64));
             owner.rollback();
         }
     }

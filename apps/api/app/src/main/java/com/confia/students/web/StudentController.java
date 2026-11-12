@@ -1,6 +1,7 @@
 package com.confia.students.web;
 
 import com.confia.shared.web.openapi.ContractSchemas;
+import com.confia.shared.web.ratelimit.RateLimitKey;
 import com.confia.shared.web.ratelimit.RateLimited;
 import com.confia.students.application.ManageStudents;
 import com.confia.students.application.Page;
@@ -38,8 +39,9 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code PermissionedEndpoints}: {@code students:read} for the list and the detail, {@code
  * students:create} for the creation and {@code students:update} for the edit. The institution is the one
  * of the token, never a member of the request, and nothing is deleted: a student is made inactive with
- * {@code PUT}. Every route is rate limited per client address: the reads with {@code admin-read} (300 a
- * minute) and the writes with {@code admin-write} (60 a minute). The national identity document is never part of an answer: only whether there is one. The
+ * {@code PUT}. Every route is rate limited twice: per client address (reads {@code admin-read}, 300 a
+ * minute; writes {@code admin-write}, 60 a minute) and per authenticated account (reads {@code
+ * admin-read-account}, 600 a minute; writes {@code admin-write-account}, 120 a minute). The national identity document is never part of an answer: only whether there is one. The
  * approved answers are declared one by one, so the contract snapshot holds exactly these.
  */
 @RestController
@@ -59,6 +61,7 @@ public class StudentController {
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @RateLimited(policy = "admin-read")
+    @RateLimited(policy = "admin-read-account", key = RateLimitKey.ACCOUNT)
     @Operation(operationId = "listStudents", tags = TAG, summary = "Lists the students",
             description = "One page of the students of the institution of the token, active and inactive. Needs "
                     + "the permission students:read. page counts from 0, size defaults to 50 and is at most 200, "
@@ -109,6 +112,7 @@ public class StudentController {
 
     @GetMapping(path = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     @RateLimited(policy = "admin-read")
+    @RateLimited(policy = "admin-read-account", key = RateLimitKey.ACCOUNT)
     @Operation(operationId = "getStudent", tags = TAG, summary = "Reads a student",
             description = "The student with this identifier in the institution of the token. The national "
                     + "identity document is never returned: only hasNationalId. Needs "
@@ -145,6 +149,7 @@ public class StudentController {
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @RateLimited(policy = "admin-write")
+    @RateLimited(policy = "admin-write-account", key = RateLimitKey.ACCOUNT)
     @Operation(operationId = "createStudent", tags = TAG, summary = "Registers a student",
             description = "Registers a student; its code is unique in the institution and is generated "
                     + "(E-000001, E-000002...) when missing. The national identity document, if sent, is stored "
@@ -185,6 +190,7 @@ public class StudentController {
     @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @RateLimited(policy = "admin-write")
+    @RateLimited(policy = "admin-write-account", key = RateLimitKey.ACCOUNT)
     @Operation(operationId = "updateStudent", tags = TAG, summary = "Edits a student",
             description = "Replaces the editable members of the student, status included; INACTIVE takes it "
                     + "out of use and deletes nothing. The code never changes. An omitted nationalId keeps the "

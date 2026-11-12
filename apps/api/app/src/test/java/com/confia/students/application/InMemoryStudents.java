@@ -116,10 +116,33 @@ final class InMemoryStudents {
                     throw new DuplicateStudentCodeException();
                 }
                 if (document != null && other.document() != null
-                        && other.document().blindIndex().equals(document.blindIndex())) {
+                        && document.lookupIndexes().contains(other.document().blindIndex())) {
                     throw new DuplicateNationalIdException();
                 }
             }
+        }
+
+        @Override
+        public List<IndexedNationalId> lockNationalIdsNotIndexedWith(InstitutionId institution, String version,
+                int limit) {
+            events.add("lock-not-indexed-with:" + version);
+            return rowsOf(institution).stream()
+                    .filter(s -> s.document() != null && !s.document().blindIndex().startsWith(version + ":"))
+                    .sorted(Comparator.comparing(s -> s.student().id()))
+                    .limit(limit)
+                    .map(s -> new IndexedNationalId(s.student().id(), s.document().encrypted()))
+                    .toList();
+        }
+
+        @Override
+        public void replaceBlindIndex(InstitutionId institution, UUID studentId, String blindIndex) {
+            events.add("replace-blind-index");
+            Stored current = rows.get(key(institution, studentId));
+            if (current == null || current.document() == null) {
+                throw new ResourceNotFoundException();
+            }
+            rows.put(key(institution, studentId), new Stored(current.student(),
+                    new ProtectedNationalId(current.document().encrypted(), blindIndex)));
         }
 
         @Override

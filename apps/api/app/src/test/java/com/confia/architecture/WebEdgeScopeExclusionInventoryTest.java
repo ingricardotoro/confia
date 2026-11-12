@@ -86,8 +86,9 @@ class WebEdgeScopeExclusionInventoryTest {
             "com.confia.shared.web.ratelimit.RateLimitInterceptor");
     private static final Set<String> LIMITER_PACKAGES = Set.of("com.confia.shared.web.ratelimit",
             "com.confia.shared.security", "com.confia.shared.web.edge", "com.confia.identity.web",
-            // The student registry applies admin-read and admin-write (docs/cortes/students-registry.md, M2).
-            "com.confia.students.web");
+            // The student registry and the academic structure apply admin-read and admin-write, per address and per
+            // account (docs/cortes/students-registry.md, M2 and the follow-ups).
+            "com.confia.students.web", "com.confia.organization.web");
 
     /** The types through which a class asks for a delay, and the packages that may. */
     private static final Set<String> MATERIALIZER_TYPES = Set.of(

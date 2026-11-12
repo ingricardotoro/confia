@@ -1,6 +1,8 @@
 package com.confia.shared.web.ratelimit;
 
+import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.ClientAddress;
+import com.confia.shared.security.ClientKey;
 import com.confia.shared.security.RateLimitDecision;
 import com.confia.shared.security.RateLimitDecision.Admitted;
 import com.confia.shared.security.RateLimitDecision.CapacityExhausted;
@@ -17,6 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -94,28 +97,40 @@ public final class RateLimitInterceptor implements HandlerInterceptor {
         if (!(handler instanceof HandlerMethod method)) {
             return true;
         }
-        RateLimited limited = method.getMethodAnnotation(RateLimited.class);
-        if (limited == null) {
-            return true;
-        }
-        String policy = limited.policy();
-        Verdict verdict = decide(policy);
-        return switch (verdict.decision()) {
-            case Admitted admitted -> true;
-            case Limited wait -> throw new TooManyRequestsException(wait.retryAfterSeconds());
-            case CapacityExhausted exhausted -> {
-                signal(policy, verdict.reason());
-                throw new CapacityExceededException();
+        // Address and account layers on one method are asked in declaration order; the first refusal ends it,
+        // so a request already refused by the address does not spend the quota of its account.
+        for (RateLimited limited : AnnotatedElementUtils.getMergedRepeatableAnnotations(method.getMethod(),
+                RateLimited.class, RateLimitedPolicies.class)) {
+            String policy = limited.policy();
+            Verdict verdict = decide(policy, limited.key());
+            switch (verdict.decision()) {
+                case Admitted admitted -> { }
+                case Limited wait -> throw new TooManyRequestsException(wait.retryAfterSeconds());
+                case CapacityExhausted exhausted -> {
+                    signal(policy, verdict.reason());
+                    throw new CapacityExceededException();
+                }
             }
-        };
+        }
+        return true;
     }
 
     /** The limiter's decision, or a refusal with its cause for anything that prevents one. */
-    private Verdict decide(String policy) {
+    private Verdict decide(String policy, RateLimitKey keyedBy) {
         try {
             Optional<RateLimiter> limiter = limiters.find(policy);
             if (limiter.isEmpty()) {
                 return Verdict.refusal(CapacityReason.UNKNOWN_POLICY);
+            }
+            if (keyedBy == RateLimitKey.ACCOUNT) {
+                // The account comes from the verified token bound by the authentication filter, nothing else.
+                Optional<AuthenticatedActor> actor = AuthenticatedActor.current();
+                if (actor.isEmpty()) {
+                    return Verdict.refusal(CapacityReason.NO_ACCOUNT);
+                }
+                return Verdict.of(Objects.requireNonNull(
+                        limiter.get().tryAcquire(ClientKey.ofAccount(actor.get().accountId())),
+                        "the limiter answered no decision"));
             }
             Optional<RequestOrigin> origin = RequestOrigin.current();
             if (origin.isEmpty()) {

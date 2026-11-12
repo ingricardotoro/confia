@@ -4,12 +4,14 @@ import static confia.generated.jooq.tables.StudentsStudent.STUDENTS_STUDENT;
 import static confia.generated.jooq.tables.StudentsStudentCodeCounter.STUDENTS_STUDENT_CODE_COUNTER;
 
 import com.confia.kernel.InstitutionId;
+import com.confia.students.application.IndexedNationalId;
 import com.confia.students.application.NationalIdStorage;
 import com.confia.students.application.Page;
 import com.confia.students.application.PageRequest;
 import com.confia.students.application.ProtectedNationalId;
 import com.confia.students.application.StudentFilter;
 import com.confia.students.application.StudentRepository;
+import com.confia.students.domain.DuplicateNationalIdException;
 import com.confia.students.domain.ResourceNotFoundException;
 import com.confia.students.domain.Sex;
 import com.confia.students.domain.Student;
@@ -78,6 +80,7 @@ public final class JooqStudentRepository implements StudentRepository {
 
     @Override
     public void insert(InstitutionId institutionId, Student student, ProtectedNationalId document) {
+        refuseDocumentOfAnotherStudent(institutionId, student.id(), document);
         StudentWrites.translating(() -> dsl.insertInto(STUDENTS_STUDENT)
                 .set(STUDENTS_STUDENT.INSTITUTION_ID, institutionId.value())
                 .set(STUDENTS_STUDENT.ID, student.id())
@@ -96,6 +99,9 @@ public final class JooqStudentRepository implements StudentRepository {
 
     @Override
     public void update(InstitutionId institutionId, Student student, NationalIdStorage storage) {
+        if (storage instanceof NationalIdStorage.Store store) {
+            refuseDocumentOfAnotherStudent(institutionId, student.id(), store.document());
+        }
         StudentWrites.translating(() -> {
             var update = dsl.update(STUDENTS_STUDENT)
                     .set(STUDENTS_STUDENT.FIRST_NAME, student.firstName())
@@ -116,6 +122,50 @@ public final class JooqStudentRepository implements StudentRepository {
             int rows = withDocument
                     .where(STUDENTS_STUDENT.INSTITUTION_ID.eq(institutionId.value()))
                     .and(STUDENTS_STUDENT.ID.eq(student.id()))
+                    .execute();
+            if (rows == 0) {
+                throw new ResourceNotFoundException();
+            }
+        });
+    }
+
+    /**
+     * During a key rotation a row may still carry the index of the previous version, which the unique index
+     * cannot equate with the new one, so the duplicate is searched under every configured version first. The
+     * unique index stays the last word for two concurrent writers of the same version.
+     */
+    private void refuseDocumentOfAnotherStudent(InstitutionId institutionId, UUID studentId,
+            ProtectedNationalId document) {
+        if (document != null && document.lookupIndexes().size() > 1 && dsl.fetchExists(STUDENTS_STUDENT,
+                STUDENTS_STUDENT.INSTITUTION_ID.eq(institutionId.value())
+                        .and(STUDENTS_STUDENT.ID.ne(studentId))
+                        .and(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX.in(document.lookupIndexes())))) {
+            throw new DuplicateNationalIdException();
+        }
+    }
+
+    @Override
+    public List<IndexedNationalId> lockNationalIdsNotIndexedWith(InstitutionId institutionId, String version,
+            int limit) {
+        return dsl.select(STUDENTS_STUDENT.ID, STUDENTS_STUDENT.NATIONAL_ID_ENCRYPTED)
+                .from(STUDENTS_STUDENT)
+                .where(STUDENTS_STUDENT.INSTITUTION_ID.eq(institutionId.value()))
+                .and(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX.isNotNull())
+                .and(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX.notLike(version + ":%"))
+                .orderBy(STUDENTS_STUDENT.ID.asc())
+                .limit(limit)
+                .forUpdate()
+                .fetch(row -> new IndexedNationalId(row.value1(), row.value2()));
+    }
+
+    @Override
+    public void replaceBlindIndex(InstitutionId institutionId, UUID studentId, String blindIndex) {
+        StudentWrites.translating(() -> {
+            int rows = dsl.update(STUDENTS_STUDENT)
+                    .set(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX, blindIndex)
+                    .where(STUDENTS_STUDENT.INSTITUTION_ID.eq(institutionId.value()))
+                    .and(STUDENTS_STUDENT.ID.eq(studentId))
+                    .and(STUDENTS_STUDENT.NATIONAL_ID_ENCRYPTED.isNotNull())
                     .execute();
             if (rows == 0) {
                 throw new ResourceNotFoundException();

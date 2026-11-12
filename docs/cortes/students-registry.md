@@ -22,7 +22,7 @@ Tabla `students_student` con `institution_id`, seguridad por fila forzada, sin `
 | `firstName`, `lastName` | Obligatorios, 1 a 100 caracteres, se recortan espacios |
 | `birthDate` | Obligatoria, no futura, no anterior a 1990-01-01 (mensaje claro; evita errores de captura) |
 | `sex` | `F`, `M` o `UNSPECIFIED` |
-| `nationalId` | Opcional (muchos menores no tienen). 8 a 20 caracteres alfanuméricos y guiones. Se cifra con `ColumnEncryptionService` antes de guardar. Único por institución: se detecta con un **índice ciego** (HMAC con llave propia, columna `national_id_blind_index`) para rechazar duplicados sin descifrar |
+| `nationalId` | Opcional (muchos menores no tienen). 8 a 20 caracteres alfanuméricos y guiones. Se cifra con `ColumnEncryptionService` antes de guardar. Único por institución: se detecta con un **índice ciego** (HMAC con llave propia y versionada, columna `national_id_blind_index`) para rechazar duplicados sin descifrar |
 | `status` | `ACTIVE`, `INACTIVE`. No se borra: se inactiva con `PUT` |
 
 El documento **nunca** viaja, ni completo ni en parte (ni siquiera sus últimos caracteres: con la fecha de nacimiento
@@ -115,10 +115,10 @@ nunca valores) en el estado posterior de la edición.
   documento. `changedFields` es un texto con los nombres separados por coma porque `AuditJson` no tiene arreglos.
 - **Limitación de tasa** (hallazgo M2): políticas `admin-read` (300 por minuto) y `admin-write` (60 por minuto), por IP, en
   `confia.web.rate-limit.*` de `application.yml`. El mecanismo `@RateLimited` solo cuenta por dirección; el límite por
-  cuenta de `docs/03-seguridad.md` sección 10 (600 y 120 por minuto) no es posible con él y queda en el seguimiento.
+  cuenta de `docs/03-seguridad.md` sección 10 (600 y 120 por minuto) no es posible con él y queda en el seguimiento. *(Cerrado el 2026-11-11: ver «Seguimiento».)*
 - **Índice ciego**: HMAC-SHA-256 del documento normalizado (mayúsculas, sin guiones) junto con la institución, con una
   llave derivada de la llave maestra de columnas por propósito (`students.national-id`) en el nuevo
-  `shared.crypto.BlindIndexService`. Rotar la llave maestra obliga a recalcular los índices.
+  `shared.crypto.BlindIndexService`. Rotar la llave maestra obliga a recalcular los índices. *(Reemplazado el 2026-11-11 por llaves dedicadas y versionadas: ver «Seguimiento».)*
 - **Normalizado mínimo**: tras quitar guiones el documento debe conservar al menos 5 caracteres (longitud mínima razonable del documento).
 - **Código generado**: contador por institución en `students_student_code_counter`, tomado con
   `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` (el bloqueo de fila serializa altas simultáneas y un fallo devuelve
@@ -137,19 +137,36 @@ cola de 4 caracteres) y `RateLimitPropertiesTest` (valores de las políticas).
 
 ### Seguimiento
 
-- **M1**: llave dedicada y versionada para el índice ciego, en vez de derivarla de la llave maestra de columnas, y un
-  trabajo de recálculo de índices ante rotación; antes de la primera rotación de la llave maestra.
-- **Límite por cuenta** (600 lecturas y 120 escrituras por minuto, `docs/03-seguridad.md` sección 10): el limitador solo
-  conoce la dirección; necesita una clave por cuenta.
-- **Limitación de tasa en `organization`**: los controladores de `organization` (años, grados, modalidades y secciones) no declaran `@RateLimited`;
-  hay que aplicar `admin-read` y `admin-write` como en `students`.
-- PostgreSQL con `log_error_verbosity=terse`, para que los errores de restricción no repitan en el registro del servidor
-  los valores de la fila que falló (nombres, fecha de nacimiento).
-- Los códigos de estudiante secuenciales (`E-000123`) revelan cuántos estudiantes tiene la institución.
-- El texto de la sección 10 de `docs/03-seguridad.md` aún menciona `nationalIdMasked`. (El frontend y los contratos ya no: ver
-  «Construido en el frontend».)
+Cerrado el 2026-11-11 (rama `feat/students-registry`):
 
-
+- **M1 (cerrado)**: llave dedicada y versionada para el índice ciego. `shared.crypto.BlindIndexKeys` (llaves Base64 de 32
+  bytes por versión, `confia.crypto.blind-index.current-version` y `confia.crypto.blind-index.keys.<versión>`, fallo de
+  arranque sin ellas, redactado en `toString`) y `BlindIndexService` (índice `v1:<64 hex>`; `candidates` prueba cada
+  versión configurada). V17 se editó en su sitio: `national_id_blind_index VARCHAR(80)` con restricción de formato. La
+  detección de duplicados en `JooqStudentRepository` busca bajo todas las versiones durante una rotación. El recálculo es
+  el caso de uso `ReindexNationalIds` (lotes de 200, una transacción y una entrada de auditoría por lote, idempotente) y se
+  ejecuta una vez arrancando el proceso administrativo con `confia.students.reindex.institutions`
+  (`ReindexNationalIdsRunner`). **No es un trabajo de db-scheduler**: recalcular exige descifrar y el trabajador no tiene
+  llaves de columna por diseño (ADR-0023). Nota fechada en `docs/03-seguridad.md` sección 7.3. Pruebas:
+  `BlindIndexKeysTest`, `BlindIndexServiceTest`, `BlindIndexKeysConfigurationTest`, `ReindexNationalIdsTest`,
+  `BlindIndexRotationIT`, `StudentsStudentSchemaIT`, `AdminProductionWiringTest` (fallo de arranque) y los barridos de
+  `StudentEndpointsIT` ampliados a la llave nueva.
+- **Límite por cuenta (cerrado)**: `@RateLimited` admite una segunda dimensión (`key = RateLimitKey.ACCOUNT`) y es
+  repetible; el interceptor toma la cuenta solo del `AuthenticatedActor` del token (sin cuenta: `503` por falta de
+  capacidad, motivo `NO_ACCOUNT`). Políticas `admin-read-account` (600 por minuto) y `admin-write-account` (120),
+  aplicadas junto a las de dirección en `students`. El limitador de inicio de sesión no cambió. Pruebas:
+  `RateLimitInterceptorAccountTest`, `InMemoryRateLimiterAccountKeyTest`, `RateLimitPropertiesTest` y
+  `StudentEndpointsIT`.
+- **Limitación de tasa en `organization` (cerrado)**: las 12 rutas llevan las cuatro políticas; prueba
+  `AcademicStructureEndpointsIT` (por dirección y por cuenta, 12 rutas) y lista de permitidos de
+  `WebEdgeScopeExclusionInventoryTest`.
+- **PostgreSQL con `log_error_verbosity=terse` (cerrado en lo posible)**: el contenedor de las pruebas de integración lo
+  usa (más `log_statement=none`, `log_min_error_statement=panic`; `PostgresServerLogSettingsIT`). El requisito de
+  producción, que aún no existe (F0), y el del registro de acceso del borde sin cadena de consulta quedan en
+  `docs/05-infraestructura-y-despliegue.md` y `docs/runbooks/incidente-de-seguridad.md` (notas del 2026-11-11).
+- Abierto: los códigos de estudiante secuenciales (`E-000123`) revelan cuántos estudiantes tiene la institución.
+- Abierto: el texto de la sección 10 de `docs/03-seguridad.md` aún menciona `nationalIdMasked`. (El frontend y los contratos
+  ya no: ver «Construido en el frontend».)
 
 ## Construido en el frontend
 
@@ -265,10 +282,10 @@ corrida, los dos diálogos con error (`dialog-error-summary` y `dialog-duplicate
 `color-contrast` (serio, incompleto, contado como bloqueante por la política) sobre el título y la descripción del
 diálogo. Causa: el formulario del estudiante, con su resumen de errores, es más alto que el 90 vh que permite el `Dialog`
 en el viewport por omisión de 720 px; el foco que va al resumen desplaza el contenido del diálogo, el título queda fuera
-del área recortada y axe no puede calcular su fondo. No es un defecto de contraste. Esos dos estados se miden ahora en un
-viewport de 1280 x 1000 (`tallViewport` en `a11y-matrix.ts`). Queda como observación de diseño: en una pantalla baja el
-título del diálogo se pierde al saltar al resumen; conviene que `confia-uiux-designer` decida entre un formulario en dos
-columnas o un encabezado fijo del diálogo (no se tocó `packages/ui`).
+del área recortada y axe no puede calcular su fondo. No es un defecto de contraste. Se midieron primero en un
+viewport de 1280 x 1000 (`tallViewport`). Resuelto el 2026-11-11: el `Dialog` fija encabezado y pie y el cuerpo es la única
+zona con desplazamiento (ver `docs/ui-ux/02-sistema-de-diseno-y-componentes.md`), `tallViewport` se eliminó y esos estados se
+miden en el viewport por omisión.
 
 **Corrida completa** (`pnpm --filter @confia/admin-web test:e2e`): 157 pruebas, 157 pasaron, 0 fallos, 0 inestables.
 Una corrida previa del subconjunto de recorridos de estudiantes con dos trabajadores mostró un fallo aislado de «inicia

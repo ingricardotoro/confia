@@ -176,6 +176,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     @DynamicPropertySource
     static void secretsOfTheAdministrativeProcess(DynamicPropertyRegistry registry) {
         registry.add("confia.crypto.column-master-key", () -> randomBase64());
+        registry.add("confia.crypto.blind-index.current-version", () -> "v1");
+        registry.add("confia.crypto.blind-index.keys.v1", () -> randomBase64());
         registry.add("confia.identity.argon2-pepper", () -> randomBase64());
         registry.add("confia.identity.login-institution-id", () -> UUID.randomUUID().toString());
         registry.add("confia.security.csrf.key", () -> randomBase64());

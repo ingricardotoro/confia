@@ -1,12 +1,16 @@
 package com.confia.students.infrastructure;
 
+import com.confia.kernel.AeadIntegrityException;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.crypto.BlindIndexService;
 import com.confia.shared.crypto.ColumnEncryptionService;
 import com.confia.students.application.NationalIdProtector;
+import com.confia.students.application.NationalIdReindexer;
 import com.confia.students.application.ProtectedNationalId;
 import com.confia.students.domain.NationalId;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -18,7 +22,7 @@ import java.util.UUID;
  * <p>It must run inside the transaction of the use case: the first encryption of an institution creates
  * its data-encryption key. Nothing here is ever logged.
  */
-public final class ColumnEncryptionNationalIdProtector implements NationalIdProtector {
+public final class ColumnEncryptionNationalIdProtector implements NationalIdProtector, NationalIdReindexer {
 
     static final String TABLE = "students_student";
     static final String COLUMN = "national_id_encrypted";
@@ -36,8 +40,31 @@ public final class ColumnEncryptionNationalIdProtector implements NationalIdProt
     public ProtectedNationalId protect(InstitutionId institutionId, UUID studentId, NationalId nationalId) {
         String encrypted = encryption.encryptForNewValue(TABLE, COLUMN, institutionId, rowIdOf(institutionId, studentId),
                 nationalId.normalized().getBytes(StandardCharsets.UTF_8));
-        String blindIndex = blindIndexes.compute(BLIND_INDEX_PURPOSE, institutionId, nationalId.normalized());
-        return new ProtectedNationalId(encrypted, blindIndex);
+        List<String> candidates = blindIndexes.candidates(BLIND_INDEX_PURPOSE, institutionId, nationalId.normalized());
+        return new ProtectedNationalId(encrypted, candidates.getFirst(), candidates);
+    }
+
+    @Override
+    public String currentVersion() {
+        return blindIndexes.currentVersion();
+    }
+
+    /** Decrypts the stored document of the row (bound to it) and indexes it under the current version. */
+    @Override
+    public String recompute(InstitutionId institutionId, UUID studentId, String encrypted) {
+        byte[] plain;
+        try {
+            plain = encryption.decrypt(TABLE, COLUMN, institutionId, rowIdOf(institutionId, studentId), encrypted);
+        } catch (AeadIntegrityException e) {
+            // The row is named by its identifier only; the cause carries nothing of the value and is not chained.
+            throw new IllegalStateException("the stored national id of student " + studentId
+                    + " fails its integrity check and cannot be re-indexed");
+        }
+        try {
+            return blindIndexes.compute(BLIND_INDEX_PURPOSE, institutionId, new String(plain, StandardCharsets.UTF_8));
+        } finally {
+            Arrays.fill(plain, (byte) 0);
+        }
     }
 
     /**

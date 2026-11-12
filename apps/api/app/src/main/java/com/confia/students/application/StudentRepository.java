@@ -2,6 +2,7 @@ package com.confia.students.application;
 
 import com.confia.kernel.InstitutionId;
 import com.confia.students.domain.Student;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,6 +29,15 @@ public interface StudentRepository {
     void insert(InstitutionId institutionId, Student student, ProtectedNationalId document);
 
     void update(InstitutionId institutionId, Student student, NationalIdStorage storage);
+
+    /**
+     * Locks, until the end of the transaction, and returns up to {@code limit} stored documents whose blind
+     * index does not carry {@code version}: the rows a re-index has to recompute.
+     */
+    List<IndexedNationalId> lockNationalIdsNotIndexedWith(InstitutionId institutionId, String version, int limit);
+
+    /** Replaces only the blind index of a student that has a document; the document itself is untouched. */
+    void replaceBlindIndex(InstitutionId institutionId, UUID studentId, String blindIndex);
 
     Page<Student> list(InstitutionId institutionId, PageRequest request, StudentFilter filter);
 }

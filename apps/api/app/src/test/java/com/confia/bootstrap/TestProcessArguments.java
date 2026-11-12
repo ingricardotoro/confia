@@ -31,6 +31,10 @@ final class TestProcessArguments {
     /** The property the administrative process reads its master key from. */
     static final String MASTER_KEY_PROPERTY = "confia.crypto.column-master-key";
 
+    /** The properties of the dedicated blind-index keys: the current version and the key of each version. */
+    static final String BLIND_INDEX_CURRENT_VERSION_PROPERTY = "confia.crypto.blind-index.current-version";
+    static final String BLIND_INDEX_V1_KEY_PROPERTY = "confia.crypto.blind-index.keys.v1";
+
     /** The property the administrative process reads its Argon2id pepper from. */
     static final String PEPPER_PROPERTY = "confia.identity.argon2-pepper";
 
@@ -150,6 +154,8 @@ final class TestProcessArguments {
         properties.put("server.port", "0");
         properties.put("spring.datasource.url", UNREACHABLE_JDBC_URL);
         properties.put(MASTER_KEY_PROPERTY, newMasterKey());
+        properties.put(BLIND_INDEX_CURRENT_VERSION_PROPERTY, "v1");
+        properties.put(BLIND_INDEX_V1_KEY_PROPERTY, newMasterKey());
         properties.put(PEPPER_PROPERTY, newPepper());
         properties.put(INSTITUTION_PROPERTY, UUID.randomUUID().toString());
         properties.put(CSRF_KEY_PROPERTY, newCsrfKey());

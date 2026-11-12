@@ -7,8 +7,10 @@
 -- The national identity document is personal data of a minor. It is stored only encrypted by column
 -- (national_id_encrypted, the v1:<dek>:<iv>:<ciphertext>:<tag> format of ColumnEncryptionService, whose
 -- additional authenticated data is the row itself). Duplicates are detected without decrypting through
--- national_id_blind_index, an HMAC of the normalised document under a key of its own, unique per
--- institution while present. No character of the document is kept in plain, not even its tail: with the birth date the last
+-- national_id_blind_index, an HMAC of the normalised document under a dedicated, versioned key (not derived
+-- from the master key of the column encryption; docs/03-seguridad.md section 7.3). The value is stored as
+-- <version>:<64 lowercase hex> (v1:...), so an index says which key made it and a rotation can recompute
+-- the rows of the old version in batches. It is unique per institution while present. No character of the document is kept in plain, not even its tail: with the birth date the last
 -- digits would nearly reveal the Honduran identity number. Whether a student has a document is derived
 -- from national_id_encrypted IS NOT NULL, so no read has to decrypt anything.
 --
@@ -25,7 +27,7 @@ CREATE TABLE students_student (
     birth_date              DATE         NOT NULL,
     sex                     TEXT         NOT NULL,
     national_id_encrypted   TEXT,
-    national_id_blind_index CHAR(64),
+    national_id_blind_index VARCHAR(80),
     status                  TEXT         NOT NULL DEFAULT 'ACTIVE',
     created_at              TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
     updated_at              TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
@@ -36,7 +38,10 @@ CREATE TABLE students_student (
     CONSTRAINT students_student_names_chk   CHECK (length(btrim(first_name)) > 0 AND length(btrim(last_name)) > 0),
     -- The two members of the document are present together or absent together.
     CONSTRAINT students_student_national_id_chk CHECK (
-        (national_id_encrypted IS NULL) = (national_id_blind_index IS NULL))
+        (national_id_encrypted IS NULL) = (national_id_blind_index IS NULL)),
+    -- A versioned digest: v<1-999>: and 64 lowercase hexadecimal characters (a NULL passes the check).
+    CONSTRAINT students_student_blind_index_chk CHECK (
+        national_id_blind_index ~ '^v[1-9][0-9]{0,2}:[0-9a-f]{64}$')
 );
 
 -- One document per institution while present: the duplicate is found without decrypting anything.

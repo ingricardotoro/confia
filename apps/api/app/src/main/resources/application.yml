@@ -76,6 +76,25 @@ confia:
         restricted-interval: 1m
         restriction-cap: 1h
         max-entries: 50000
+      # The same reads and writes counted per authenticated account instead of per address
+      # (docs/03-seguridad.md section 10): 600 and 120 a minute. The key is the account of the verified
+      # token; the address policies above stay as the first layer.
+      admin-read-account:
+        request-limit: 600
+        request-window: 1m
+        failure-threshold: 30
+        failure-window: 10m
+        restricted-interval: 1m
+        restriction-cap: 1h
+        max-entries: 50000
+      admin-write-account:
+        request-limit: 120
+        request-window: 1m
+        failure-threshold: 30
+        failure-window: 10m
+        restricted-interval: 1m
+        restriction-cap: 1h
+        max-entries: 50000
 
     delay:
       # The longest the answer of an authentication route is held back for its required delay

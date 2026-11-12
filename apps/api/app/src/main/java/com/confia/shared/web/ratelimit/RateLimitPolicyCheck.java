@@ -3,8 +3,9 @@ package com.confia.shared.web.ratelimit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.ListableBeanFactory;
+import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
@@ -44,11 +45,13 @@ public final class RateLimitPolicyCheck implements SmartInitializingSingleton {
             RateLimiterRegistry limiters) {
         List<String> problems = new ArrayList<>();
         for (HandlerMethod handler : handlers) {
-            RateLimited limited = handler.getMethodAnnotation(RateLimited.class);
-            if (limited != null && limiters.find(limited.policy()).isEmpty()) {
-                problems.add("@RateLimited names the unknown policy '" + limited.policy() + "' on "
-                        + handler.getBeanType().getSimpleName() + "#" + handler.getMethod().getName()
-                        + " (known: " + limiters.policies() + ")");
+            for (RateLimited limited : AnnotatedElementUtils.getMergedRepeatableAnnotations(handler.getMethod(),
+                    RateLimited.class, RateLimitedPolicies.class)) {
+                if (limiters.find(limited.policy()).isEmpty()) {
+                    problems.add("@RateLimited names the unknown policy '" + limited.policy() + "' on "
+                            + handler.getBeanType().getSimpleName() + "#" + handler.getMethod().getName()
+                            + " (known: " + limiters.policies() + ")");
+                }
             }
         }
         return problems;

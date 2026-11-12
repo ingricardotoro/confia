@@ -1,9 +1,11 @@
 package com.confia.organization.web;
 
-import com.confia.organization.application.ManageGrades;
 import com.confia.organization.application.GradeView;
+import com.confia.organization.application.ManageGrades;
 import com.confia.organization.application.Page;
 import com.confia.shared.web.openapi.ContractSchemas;
+import com.confia.shared.web.ratelimit.RateLimitKey;
+import com.confia.shared.web.ratelimit.RateLimited;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.extensions.Extension;
@@ -53,6 +55,8 @@ public class GradeController {
         this.grades = grades;
     }
 
+    @RateLimited(policy = "admin-read")
+    @RateLimited(policy = "admin-read-account", key = RateLimitKey.ACCOUNT)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "listGrades", tags = TAG, summary = "Lists the grades",
             description = "One page of the grades of the institution of the token, active and "
@@ -93,6 +97,8 @@ public class GradeController {
                 result.total(), result.page(), result.size());
     }
 
+    @RateLimited(policy = "admin-write")
+    @RateLimited(policy = "admin-write-account", key = RateLimitKey.ACCOUNT)
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(operationId = "createGrade", tags = TAG, summary = "Creates a grade",
@@ -125,6 +131,8 @@ public class GradeController {
                 request.modalityId(), request.name(), request.ordinal()));
     }
 
+    @RateLimited(policy = "admin-write")
+    @RateLimited(policy = "admin-write-account", key = RateLimitKey.ACCOUNT)
     @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "updateGrade", tags = TAG, summary = "Edits a grade",

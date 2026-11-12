@@ -95,6 +95,9 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
 
+    /** The dedicated blind-index key of the process under test; it must appear nowhere (docs/03 section 7.3). */
+    private static final String BLIND_INDEX_KEY = randomBase64Key();
+
     private static KeyPair keys;
     private static CompactJws jws;
     private static ConfigurableApplicationContext process;
@@ -123,8 +126,12 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
                 "confia_admin_app", TEST_PASSWORD, keys, Map.of(
                         // Every test shares one client address, so the production quotas would refuse them;
                         // the rate-limit test below starts a process of its own with small ones.
+                        "confia.crypto.blind-index.current-version", "v1",
+                        "confia.crypto.blind-index.keys.v1", BLIND_INDEX_KEY,
                         RATE_LIMIT + "admin-read.request-limit", "10000",
-                        RATE_LIMIT + "admin-write.request-limit", "10000"));
+                        RATE_LIMIT + "admin-write.request-limit", "10000",
+                        RATE_LIMIT + "admin-read-account.request-limit", "10000",
+                        RATE_LIMIT + "admin-write-account.request-limit", "10000"));
         port = ((WebServerApplicationContext) process).getWebServer().getPort();
     }
 
@@ -173,6 +180,7 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
         List<String> forbidden = new ArrayList<>(List.of(ID, ID_NORMALIZED, "AB-99998888", "AB99998888",
                 TAILED_ID, "080120120Q97X", TAILED_TAIL));
         forbidden.addAll(storedCiphertexts());
+        forbidden.add(BLIND_INDEX_KEY);
         List<String> audit = auditRows();
         for (String forbiddenText : forbidden) {
             assertThat(RESPONSES).as("responses must not contain %s", shorten(forbiddenText))
@@ -187,6 +195,12 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
             assertThat(logLines).as("logs must not contain %s", shorten(word))
                     .noneMatch(text -> text.contains(word));
         }
+    }
+
+    private static String randomBase64Key() {
+        byte[] key = new byte[32];
+        new java.security.SecureRandom().nextBytes(key);
+        return java.util.Base64.getEncoder().encodeToString(key);
     }
 
     private static String shorten(String text) {
@@ -235,7 +249,7 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
         // In the database the document is encrypted and indexed blind: no character of it is in plain.
         String[] row = storedDocument(UUID.fromString(id));
         assertThat(row[0]).startsWith("v1:").doesNotContain(ID).doesNotContain(ID_NORMALIZED);
-        assertThat(row[1]).matches("[0-9a-f]{64}");
+        assertThat(row[1]).matches("v1:[0-9a-f]{64}");
         assertThat(decrypt(admin.institution(), UUID.fromString(id), row[0])).isEqualTo(ID_NORMALIZED);
     }
 
@@ -451,7 +465,7 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(replaced.get("hasNationalId").asBoolean()).isTrue();
         String[] afterReplace = storedDocument(UUID.fromString(id));
         assertThat(afterReplace[0]).isNotEqualTo(original).startsWith("v1:");
-        assertThat(afterReplace[1]).isNotEqualTo(blindOriginal).matches("[0-9a-f]{64}");
+        assertThat(afterReplace[1]).isNotEqualTo(blindOriginal).matches("v1:[0-9a-f]{64}");
         assertThat(decrypt(admin.institution(), UUID.fromString(id), afterReplace[0])).isEqualTo("AB99998888");
 
         JsonNode removed = HarnessProcess.json(put(id, admin, putBody("Ana", "Perez", "2012-05-20", "F", "ACTIVE", "")));
@@ -883,6 +897,51 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
         }
     }
 
+    @Test
+    void theRoutesAreAlsoRateLimitedPerAccountSoAnotherAccountIsUnaffectedAndTwoAddressesOfOneAccountShareTheQuota()
+            throws Exception {
+        Member heavy = member(StaffRole.ADMINISTRATOR.code());
+        Member other = member(StaffRole.ADMINISTRATOR.code());
+        try (ConfigurableApplicationContext limited = AdminProcessLauncher.launch(SharedPostgresContainer.jdbcUrl(),
+                "confia_admin_app", TEST_PASSWORD, keys, Map.of("confia.web.trusted-proxies", "127.0.0.1,::1",
+                        RATE_LIMIT + "admin-read.request-limit", "10000",
+                        RATE_LIMIT + "admin-write.request-limit", "10000",
+                        RATE_LIMIT + "admin-read-account.request-limit", "2",
+                        RATE_LIMIT + "admin-write-account.request-limit", "1"))) {
+            int limitedPort = ((WebServerApplicationContext) limited).getWebServer().getPort();
+            String first = "203.0.113.20";
+            String second = "203.0.113.21";
+
+            // Writes: one per account, whichever address it comes from.
+            String id = created(sendFrom(limitedPort, first, "POST", STUDENTS, heavy.token(),
+                    body(null, "Ana", "Perez", "2012-05-20", "F", null))).get("id").asString();
+            HttpResponse<String> refusedFromAnotherAddress = sendFrom(limitedPort, second, "PUT", STUDENTS + "/" + id,
+                    heavy.token(), putBody("Cambiada", "Perez", "2012-05-20", "F", "ACTIVE", null));
+            assertProblem(refusedFromAnotherAddress, 429, "too-many-requests");
+            assertThat(refusedFromAnotherAddress.headers().firstValue("Retry-After")).hasValueSatisfying(seconds ->
+                    assertThat(Long.parseLong(seconds)).isBetween(1L, 60L));
+
+            // The same address, with another account, is not affected.
+            created(sendFrom(limitedPort, first, "POST", STUDENTS, other.token(),
+                    body(null, "Luis", "Lopez", "2012-05-20", "M", null)));
+
+            // Reads: two per account across both addresses, then 429 with Retry-After.
+            assertThat(sendFrom(limitedPort, first, "GET", STUDENTS, heavy.token(), null).statusCode()).isEqualTo(200);
+            assertThat(sendFrom(limitedPort, second, "GET", STUDENTS + "/" + id, heavy.token(), null).statusCode())
+                    .isEqualTo(200);
+            HttpResponse<String> refusedRead = sendFrom(limitedPort, first, "GET", STUDENTS, heavy.token(), null);
+            assertProblem(refusedRead, 429, "too-many-requests");
+            assertThat(refusedRead.headers().firstValue("Retry-After")).isPresent();
+            assertThat(sendFrom(limitedPort, second, "GET", STUDENTS, other.token(), null).statusCode()).isEqualTo(200);
+
+            // A request without a token never reaches the account layer: it is refused as unauthenticated.
+            assertThat(sendFrom(limitedPort, first, "GET", STUDENTS, "not-a-token", null).statusCode()).isEqualTo(401);
+            // The refused edit changed nothing.
+            assertThat(HarnessProcess.json(get(STUDENTS + "/" + id, heavy)).get("firstName").asString())
+                    .isEqualTo("Ana");
+        }
+    }
+
     // --- Logs ---
 
     @Test
@@ -1044,6 +1103,10 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
                         if (result.getString(column) != null) {
                             values.add(result.getString(column));
                         }
+                    }
+                    if (result.getString(2) != null) {
+                        // The digest alone, without its version prefix, is as secret as the whole index.
+                        values.add(result.getString(2).substring(result.getString(2).indexOf(':') + 1));
                     }
                 }
             }

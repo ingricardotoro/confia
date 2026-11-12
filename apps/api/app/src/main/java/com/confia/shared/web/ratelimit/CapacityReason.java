@@ -22,5 +22,8 @@ public enum CapacityReason {
     UNKNOWN_POLICY,
 
     /** The limiter threw something unexpected: a defect of the limiter. */
-    LIMITER_FAILURE
+    LIMITER_FAILURE,
+
+    /** The policy counts by account and the request carries no authenticated account. */
+    NO_ACCOUNT
 }

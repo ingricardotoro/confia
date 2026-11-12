@@ -254,6 +254,16 @@ Los controles preventivos están en `docs/03-seguridad.md`. Los más relevantes 
 - Prueba de penetración antes de producción y anual
 - **Simulacro de este runbook en mesa, cada seis meses**
 
+> **Nota fechada 2026-11-11 (`students-registry`, seguimiento de seguridad).** Al capturar evidencia y
+> al diagnosticar, recuerde que los registros del servidor de base de datos y los de acceso del borde deben
+> estar configurados para no repetir valores de filas ni cadenas de consulta: PostgreSQL con
+> `log_error_verbosity = terse`, `log_statement = none` y `log_min_error_statement = panic` (de lo contrario
+> una violación de unicidad imprime en el `DETAIL` los valores de la clave, como índices ciegos), y nginx sin
+> `$request` ni `$request_uri` en el formato de acceso (la búsqueda de estudiantes lleva nombres de menores
+> en `q`). Si al revisar un incidente esos registros contienen tales valores, trátelos como datos personales:
+> restrinja su acceso, inclúyalos en el inventario de datos expuestos y corrija la configuración (ver
+> `docs/05-infraestructura-y-despliegue.md`, nota del 2026-11-11, sección 10).
+
 ---
 
 ## Escalamiento

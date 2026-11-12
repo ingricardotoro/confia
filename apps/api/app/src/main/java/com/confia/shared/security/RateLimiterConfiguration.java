@@ -52,6 +52,20 @@ public class RateLimiterConfiguration {
     }
 
     /** The limiter of the writes of the administrative API, tighter than the reads. */
+    /** Reads counted per authenticated account (docs/03-seguridad.md section 10). */
+    @Bean("admin-read-account")
+    RateLimiter adminReadAccountRateLimiter(
+            @Qualifier("adminReadAccountRateLimitPolicy") RateLimitPolicy adminReadAccountRateLimitPolicy) {
+        return new InMemoryRateLimiter(adminReadAccountRateLimitPolicy);
+    }
+
+    /** Writes counted per authenticated account (docs/03-seguridad.md section 10). */
+    @Bean("admin-write-account")
+    RateLimiter adminWriteAccountRateLimiter(
+            @Qualifier("adminWriteAccountRateLimitPolicy") RateLimitPolicy adminWriteAccountRateLimitPolicy) {
+        return new InMemoryRateLimiter(adminWriteAccountRateLimitPolicy);
+    }
+
     @Bean("admin-write")
     RateLimiter adminWriteRateLimiter(
             @Qualifier("adminWriteRateLimitPolicy") RateLimitPolicy adminWriteRateLimitPolicy) {
