@@ -197,7 +197,24 @@ banderas, suma) se juzgan antes de abrir la transacción.
   índices ciegos solo para estudiantes (`CONFIA_STUDENTS_REINDEX_INSTITUTIONS`). Los índices de encargados llevan versión y la
   detección de duplicados prueba todas las versiones configuradas, pero **no existe aún un reindexado de
   `guardians_guardian.national_id_blind_index`**: debe construirse antes de la primera rotación de llave, o la llave anterior
-  no podrá retirarse sin dejar sin detección a los encargados ya registrados.
+  no podrá retirarse sin dejar sin detección a los encargados ya registrados. `docs/03-seguridad.md` §7.3 lo advierte
+  ahora de forma explícita. No se agregó una verificación al arranque: los estudiantes tampoco la tienen (solo documentan
+  la rotación) y una verificación de versiones por filas exigiría leer la tabla de cada institución al arrancar.
+
+- **Endurecimiento tras la auditoría de seguridad** (V19 editada en su lugar: no estaba aplicada en ningún entorno):
+  INV-32 ya no depende solo del caso de uso: un disparador de restricción `DEFERRABLE INITIALLY DEFERRED`
+  (`guardians_guardian_student_check_split`, `AFTER INSERT OR UPDATE`) exige, al confirmar y por estudiante afectado,
+  que los vínculos vigentes sean ninguno o sumen exactamente 100.00 (`23514`); un reemplazo cierra los vínculos y abre el
+  conjunto nuevo en una transacción, de modo que los estados intermedios se permiten. Un vínculo siempre nace abierto
+  (`BEFORE INSERT` rechaza `valid_to` no nulo) y solo se cierra en un día que no sea futuro en `America/Tegucigalpa`
+  (y, por la restricción existente, no anterior a `valid_from`). `JooqStudentDirectory` lee solo `id`, `student_code`,
+  `first_name`, `last_name` y `status` (sin documento, índice ciego ni fecha de nacimiento). El texto de
+  `duplicate-national-id` ya no promete una comprobación entre módulos («Ya existe un registro de este tipo en la
+  institución con ese documento de identidad»).
+- **Auditoría del documento duplicado**: un alta o edición rechazada por documento duplicado deja, en una transacción
+  propia (la del intento se revierte), una entrada de la acción intentada con resultado `denied`, motivo
+  `duplicate-national-id` y sin valores previos ni posteriores. Se usa `denied` y no `rejected` porque
+  `shared_audit_log_outcome_chk` (V2, ya aplicada) solo admite `success`, `denied` y `error`.
 
 ### Pruebas
 
@@ -206,7 +223,7 @@ dos pagadores, dos destinatarios, encargado repetido, encargado inactivo, y dos 
 centésimas), `LinkReplacementTest` (cerrar y abrir, igual no cambia, historial), `GuardianTest` (campos, correo, teléfono,
 canal, documento y RTN, redacción), `ManageGuardianLinksTest` y `ManageGuardiansTest` (casos de la nota a través de los casos
 de uso con puertos en memoria: orden de bloqueos, auditoría sin datos personales, aislamiento, lectura de solo lectura),
-`GuardiansGuardianSchemaIT` (restricciones, índices únicos parciales, claves compuestas, el disparador del vínculo cerrado,
+`GuardiansGuardianSchemaIT` (suma 99, 140 y 100.01 rechazadas al confirmar, reemplazo completo y cero vínculos aceptados, vínculo nacido cerrado y cierre futuro rechazados, restricciones, índices únicos parciales, claves compuestas, el disparador del vínculo cerrado,
 seguridad por fila y privilegios: sin `DELETE`, solo `UPDATE (valid_to)`, el rol de solo lectura no ve documento, RTN ni
 contacto) y `GuardianEndpointsIT` (flujo de aceptación 60/40 → 50/50 con historial y 60/30 rechazado, cada regla con su código,
 carreras contra PostgreSQL —seis reemplazos simultáneos del mismo estudiante, reemplazo contra inactivación del encargado, ocho

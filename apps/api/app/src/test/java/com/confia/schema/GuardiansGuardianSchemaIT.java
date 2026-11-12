@@ -51,6 +51,16 @@ class GuardiansGuardianSchemaIT extends CommittingPostgresIntegrationTest {
         throw new AssertionError("the database accepted a statement it had to refuse");
     }
 
+    /** A commit the deferred constraint refuses: the transaction is over, so there is no savepoint to go back to. */
+    private static SQLException failedCommit(Connection connection) {
+        try {
+            connection.commit();
+        } catch (SQLException e) {
+            return e;
+        }
+        throw new AssertionError("the database accepted a commit it had to refuse");
+    }
+
     private static void exec(Connection c, String sql, Object... parameters) throws SQLException {
         try (PreparedStatement s = c.prepareStatement(sql)) {
             for (int i = 0; i < parameters.length; i++) {
@@ -81,18 +91,22 @@ class GuardiansGuardianSchemaIT extends CommittingPostgresIntegrationTest {
                 guardian(c, institution, "P-000002"));
     }
 
+    /** Inserts the link open (a link is always born open) and, when {@code validTo} is given, closes it at once. */
     private static UUID link(Connection c, Base base, UUID guardian, String percent, boolean primary, boolean billing,
             String validTo) throws SQLException {
         UUID id = UUID.randomUUID();
         exec(c, """
                 insert into guardians_guardian_student (institution_id, id, guardian_id, student_id, relationship,
-                    financial_responsibility_percent, is_primary_payer, is_billing_recipient, valid_from, valid_to,
-                    created_by)
-                values (?, ?, ?, ?, 'MOTHER', cast(? as numeric), ?, ?, date '2026-03-01', cast(? as date), ?)
-                """, base.institution(), id, guardian, base.student(), percent, primary, billing, validTo,
-                UUID.randomUUID());
+                    financial_responsibility_percent, is_primary_payer, is_billing_recipient, valid_from, created_by)
+                values (?, ?, ?, ?, 'MOTHER', cast(? as numeric), ?, ?, date '2026-03-01', ?)
+                """, base.institution(), id, guardian, base.student(), percent, primary, billing, UUID.randomUUID());
+        if (validTo != null) {
+            exec(c, "update guardians_guardian_student set valid_to = cast(? as date) where id = ?", validTo, id);
+        }
         return id;
     }
+
+    private static final String TODAY = "(now() at time zone 'America/Tegucigalpa')::date";
 
     // --- Constraints of the guardian ---
 
@@ -307,6 +321,111 @@ class GuardiansGuardianSchemaIT extends CommittingPostgresIntegrationTest {
                     "update guardians_guardian_student set valid_to = date '2026-03-11' where id = ?", id));
             assertThat(reopen.getSQLState()).as("a closed link is never reopened").isEqualTo("23000");
             assertThat(again.getSQLState()).as("a closed link is closed once").isEqualTo("23000");
+            owner.rollback();
+        }
+    }
+
+    // --- INV-32 in the database, B1 ---
+
+    @Test
+    void theCurrentLinksOfAStudentMustAddUpToExactlyOneHundredWhenTheTransactionCommits() throws SQLException {
+        for (String[] split : new String[][] {{"60", "39"}, {"100", "40"}, {"99.99", "0.02"}}) {
+            UUID institution = UUID.randomUUID();
+            Connection owner = StaffRoleFixtures.ownerTransaction(institution);
+            try {
+                Base base = base(owner, institution);
+                link(owner, base, base.guardianA(), split[0], false, false, null);
+                // Inside the transaction the set may be anything: only the commit checks it.
+                link(owner, base, base.guardianB(), split[1], false, false, null);
+
+                SQLException commit = failedCommit(owner);
+
+                assertThat(commit.getSQLState()).as(split[0] + " + " + split[1]).isEqualTo("23514");
+                assertThat(commit.getMessage()).contains("exactly 100 percent");
+            } finally {
+                owner.close();
+            }
+        }
+    }
+
+    @Test
+    void aSetThatAddsUpToOneHundredCommitsAndReplacingItInOneTransactionIsAccepted() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        Base base;
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            base = base(owner, institution);
+            link(owner, base, base.guardianA(), "60.00", true, true, null);
+            link(owner, base, base.guardianB(), "40.00", false, false, null);
+            owner.commit();
+        }
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            // Close every link (zero current links in between) and open a complete new set, in one transaction.
+            exec(owner, "update guardians_guardian_student set valid_to = " + TODAY + " where student_id = ? "
+                    + "and valid_to is null", base.student());
+            link(owner, base, base.guardianA(), "33.33", false, false, null);
+            link(owner, base, base.guardianB(), "66.67", false, false, null);
+            owner.commit();
+        }
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            // Closing only one of the two leaves 66.67 current: refused at commit.
+            exec(owner, "update guardians_guardian_student set valid_to = " + TODAY + " where student_id = ? "
+                    + "and guardian_id = ? and valid_to is null", base.student(), base.guardianA());
+            SQLException commit = failedCommit(owner);
+            assertThat(commit.getSQLState()).isEqualTo("23514");
+        }
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution);
+                ResultSet rows = owner.createStatement().executeQuery(
+                        "select count(*) filter (where valid_to is null), count(*) from guardians_guardian_student "
+                                + "where student_id = '" + base.student() + "'")) {
+            rows.next();
+            assertThat(rows.getInt(1)).isEqualTo(2);
+            assertThat(rows.getInt(2)).isEqualTo(4);
+        }
+    }
+
+    @Test
+    void aStudentWithoutCurrentLinksCommitsAndClosingEveryLinkIsAccepted() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        Base base;
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            base = base(owner, institution);
+            owner.commit();
+        }
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            link(owner, base, base.guardianA(), "100", false, false, null);
+            owner.commit();
+        }
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            exec(owner, "update guardians_guardian_student set valid_to = " + TODAY + " where student_id = ?",
+                    base.student());
+            owner.commit();
+        }
+    }
+
+    @Test
+    void aLinkIsInsertedOpenAndIsClosedOnlyOnADayThatIsNotInTheFutureInHonduras() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            Base base = base(owner, institution);
+
+            SQLException closedAtBirth = rejected(owner, () -> exec(owner, """
+                    insert into guardians_guardian_student (institution_id, id, guardian_id, student_id, relationship,
+                        financial_responsibility_percent, valid_from, valid_to, created_by)
+                    values (?, ?, ?, ?, 'MOTHER', 100, date '2026-03-01', date '2026-03-02', ?)
+                    """, institution, UUID.randomUUID(), base.guardianA(), base.student(), UUID.randomUUID()));
+            assertThat(closedAtBirth.getSQLState()).isEqualTo("23000");
+            assertThat(closedAtBirth.getMessage()).contains("inserted open");
+
+            UUID tomorrowLink = link(owner, base, base.guardianA(), "100", false, false, null);
+            SQLException future = rejected(owner, () -> exec(owner,
+                    "update guardians_guardian_student set valid_to = " + TODAY + " + 1 where id = ?", tomorrowLink));
+            SQLException beforeStart = rejected(owner, () -> exec(owner,
+                    "update guardians_guardian_student set valid_to = date '2026-02-28' where id = ?", tomorrowLink));
+            assertThat(future.getSQLState()).isEqualTo("23000");
+            assertThat(future.getMessage()).contains("future day");
+            assertThat(beforeStart.getMessage()).contains("guardians_guardian_student_dates_chk");
+
+            exec(owner, "update guardians_guardian_student set valid_to = " + TODAY + " where id = ?", tomorrowLink);
             owner.rollback();
         }
     }

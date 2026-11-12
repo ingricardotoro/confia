@@ -1,5 +1,6 @@
 package com.confia.guardians.application;
 
+import com.confia.guardians.domain.DuplicateNationalIdException;
 import com.confia.guardians.domain.Guardian;
 import com.confia.guardians.domain.GuardianCode;
 import com.confia.guardians.domain.GuardianLink;
@@ -23,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * Registers, edits, reads and lists the guardians of the institution of the actor (docs/cortes/guardians-registry.md).
@@ -69,9 +71,10 @@ public final class ManageGuardians {
         InstitutionId institution = new InstitutionId(actor.institutionId());
         NationalId document = nationalId == null || nationalId.isBlank() ? null : NationalId.of(nationalId);
         Rtn taxNumber = rtn == null || rtn.isBlank() ? null : Rtn.of(rtn);
-        return transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
+        UUID id = UUID.randomUUID();
+        return rejectingDuplicates(actor, auditRequestId, GuardiansAudit.CREATE_ACTION, id,
+                () -> transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
             String code = generatedCode(institution);
-            UUID id = UUID.randomUUID();
             Guardian guardian = Guardian.create(id, code, firstName, lastName, document, taxNumber, email, phone,
                     address, preferredChannel, now());
             ProtectedNationalId protectedDocument =
@@ -80,7 +83,7 @@ public final class ManageGuardians {
             guardians.insert(institution, guardian, protectedDocument, protectedRtn);
             auditLogWriter.append(GuardiansAudit.created(actor, auditRequestId, guardian));
             return GuardianView.of(guardian, List.of());
-        });
+        }));
     }
 
     public GuardianView update(AuthenticatedActor actor, String requestId, UUID id, String firstName,
@@ -91,7 +94,8 @@ public final class ManageGuardians {
         InstitutionId institution = new InstitutionId(actor.institutionId());
         ProtectedValueChange<NationalId> documentChange = ProtectedValueChange.ofNationalId(nationalId);
         ProtectedValueChange<Rtn> rtnChange = ProtectedValueChange.ofRtn(rtn);
-        return transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
+        return rejectingDuplicates(actor, auditRequestId, GuardiansAudit.UPDATE_ACTION, id,
+                () -> transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
             Guardian before = guardians.lockById(institution, id).orElseThrow(ResourceNotFoundException::new);
             Guardian after = before.edit(firstName, lastName, documentChange, rtnChange, email, phone, address,
                     preferredChannel, status, now());
@@ -100,7 +104,31 @@ public final class ManageGuardians {
             auditLogWriter.append(GuardiansAudit.updated(actor, auditRequestId, before, after, documentChange,
                     rtnChange));
             return GuardianView.of(after, linkedStudents(institution, id));
-        });
+        }));
+    }
+
+    /**
+     * Runs the write and, when it is refused because the national identity document already belongs to another
+     * guardian, records the attempt: the rolled-back transaction leaves no trace, so the entry (outcome {@code
+     * rejected}, the reason code and no value, no document, no index) goes in its own transaction before the
+     * refusal is rethrown. A failure to record it never hides the refusal.
+     */
+    private GuardianView rejectingDuplicates(AuthenticatedActor actor, UUID auditRequestId, String action,
+            UUID guardianId, Supplier<GuardianView> write) {
+        try {
+            return write.get();
+        } catch (DuplicateNationalIdException duplicate) {
+            try {
+                transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
+                    auditLogWriter.append(GuardiansAudit.rejected(actor, auditRequestId, action, guardianId,
+                            GuardiansAudit.REASON_DUPLICATE_NATIONAL_ID));
+                    return null;
+                });
+            } catch (RuntimeException auditFailure) {
+                duplicate.addSuppressed(auditFailure);
+            }
+            throw duplicate;
+        }
     }
 
     public GuardianView get(AuthenticatedActor actor, String requestId, UUID id) {

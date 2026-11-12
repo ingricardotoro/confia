@@ -944,7 +944,25 @@ class GuardianEndpointsIT extends CommittingPostgresIntegrationTest {
 
         assertThat(countOf("guardians_guardian", admin.institution())).isEqualTo(2);
         assertThat(linkRows(student)).isEmpty();
-        assertThat(guardianEntries(admin.institution(), null)).hasSize(entries);
+        // Only the refused duplicate document leaves a trace: one denied entry, with a reason and no values.
+        List<String[]> after = guardianEntries(admin.institution(), null);
+        assertThat(after).hasSize(entries + 1);
+        String[] denied = after.getLast();
+        assertThat(denied[0]).isEqualTo("guardians.guardian.created");
+        assertThat(denied[3]).isNull();
+        assertThat(denied[4]).isNull();
+        try (Connection connection = SharedPostgresContainer.connectionAs("postgres");
+                PreparedStatement statement = connection.prepareStatement(
+                        "select outcome, reason from shared_audit_log where institution_id = ? and entity_id = ?")) {
+            statement.setObject(1, admin.institution());
+            statement.setString(2, denied[2]);
+            try (ResultSet result = statement.executeQuery()) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getString(1)).isEqualTo("denied");
+                assertThat(result.getString(2)).isEqualTo("duplicate-national-id");
+                assertThat(result.next()).isFalse();
+            }
+        }
         // The refused creation gave its code back: the counter is rolled back with the transaction.
         assertThat(code(admin, guardian(admin, "Nueva", "Persona", null, null))).isEqualTo("P-000003");
     }

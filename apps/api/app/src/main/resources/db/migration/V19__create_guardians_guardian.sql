@@ -27,10 +27,14 @@
 -- deleted and a closed link is never edited again: the application role may only UPDATE valid_to (column grant) and
 -- a trigger refuses to touch a link that is already closed.
 --
--- INV-32 (the current percentages of a student add up to exactly 100) is a validation of the use case, serialized
--- per student by a lock on the student row, because a rule over a set of rows cannot be a plain constraint. The
--- database does enforce what is local to the rows: one current link per guardian and student, at most one primary
--- payer and at most one billing recipient among the current links of a student, and a percentage between 0.01 and 100.
+-- INV-32 (the current percentages of a student add up to exactly 100) is validated by the use case, serialized
+-- per student by a lock on the student row, and the database is the last line of defense: a DEFERRABLE INITIALLY
+-- DEFERRED constraint trigger checks, at commit and per affected student, that the current links are none or add
+-- up to exactly 100.00 (a replacement closes the old links and opens the new ones in one transaction, so the
+-- intermediate states are allowed). The database also enforces what is local to the rows: one current link per
+-- guardian and student, at most one primary payer and at most one billing recipient among the current links of a
+-- student, and a percentage between 0.01 and 100. A link is always inserted open, and it can only be closed on a
+-- day that is not in the future in America/Tegucigalpa.
 
 CREATE TABLE guardians_guardian (
     institution_id          UUID         NOT NULL,
@@ -136,6 +140,10 @@ BEGIN
         RAISE EXCEPTION 'a guardian link can only be closed, not edited'
             USING ERRCODE = 'integrity_constraint_violation';
     END IF;
+    IF NEW.valid_to IS NOT NULL AND NEW.valid_to > (now() AT TIME ZONE 'America/Tegucigalpa')::date THEN
+        RAISE EXCEPTION 'a guardian link cannot be closed on a future day'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
     RETURN NEW;
 END;
 $$;
@@ -143,6 +151,48 @@ $$;
 CREATE TRIGGER guardians_guardian_student_keep_closed
     BEFORE UPDATE ON guardians_guardian_student
     FOR EACH ROW EXECUTE FUNCTION guardians_guardian_student_keep_closed();
+
+-- A link is born open: history is only made by closing a link, never by inserting a closed one.
+CREATE FUNCTION guardians_guardian_student_insert_open() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.valid_to IS NOT NULL THEN
+        RAISE EXCEPTION 'a guardian link must be inserted open'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER guardians_guardian_student_insert_open
+    BEFORE INSERT ON guardians_guardian_student
+    FOR EACH ROW EXECUTE FUNCTION guardians_guardian_student_insert_open();
+
+-- INV-32 in the database: at commit, the current links of every affected student are none or add up to exactly
+-- 100.00. Deferred, so a transaction may close the old links and open the new ones in any order. It runs with the
+-- privileges of the caller, so row-level security applies to the rows it adds up.
+CREATE FUNCTION guardians_guardian_student_check_split() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+DECLARE
+    link_count INTEGER;
+    total      NUMERIC;
+BEGIN
+    SELECT count(*), COALESCE(sum(financial_responsibility_percent), 0)
+        INTO link_count, total
+        FROM guardians_guardian_student
+        WHERE institution_id = NEW.institution_id AND student_id = NEW.student_id AND valid_to IS NULL;
+    IF link_count > 0 AND total <> 100.00 THEN
+        RAISE EXCEPTION 'the current guardian links of a student must add up to exactly 100 percent'
+            USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER guardians_guardian_student_check_split
+    AFTER INSERT OR UPDATE ON guardians_guardian_student
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE FUNCTION guardians_guardian_student_check_split();
 
 ALTER TABLE guardians_guardian              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE guardians_guardian              FORCE  ROW LEVEL SECURITY;

@@ -28,8 +28,14 @@ final class GuardiansAudit {
     static final String GUARDIAN = "guardians.guardian";
     static final String LINKS = "guardians.links";
 
+    static final String CREATE_ACTION = GUARDIAN + ".created";
+    static final String UPDATE_ACTION = GUARDIAN + ".updated";
+    /** The reason code of a refused attempt: a fixed word, never the document that collided. */
+    static final String REASON_DUPLICATE_NATIONAL_ID = "duplicate-national-id";
+
     private static final String ACTOR_KIND_STAFF = "staff";
     private static final String OUTCOME_SUCCESS = "success";
+    private static final String OUTCOME_DENIED = "denied";
 
     private GuardiansAudit() {
     }
@@ -39,13 +45,24 @@ final class GuardiansAudit {
         return requestId.isBlank() ? UUID.randomUUID() : UUID.fromString(requestId);
     }
 
+    /**
+     * A refused write: the outcome is {@code denied}, the one refusal value shared_audit_log accepts (V2 allows only
+     * success, denied and error). The action attempted, the guardian it aimed at and a reason code; no values at all.
+     */
+    static AuditEntry rejected(AuthenticatedActor actor, UUID requestId, String action, UUID guardianId,
+            String reason) {
+        return new AuditEntry(actor.institutionId(), actor.accountId(), ACTOR_KIND_STAFF,
+                actor.accountId().toString(), null, null, requestId, null, action, GUARDIAN, guardianId.toString(),
+                OUTCOME_DENIED, null, null, reason, null);
+    }
+
     static AuditEntry created(AuthenticatedActor actor, UUID requestId, Guardian after) {
-        return entry(actor, requestId, GUARDIAN + ".created", GUARDIAN, after.id(), null, json(after, null));
+        return entry(actor, requestId, CREATE_ACTION, GUARDIAN, after.id(), null, json(after, null));
     }
 
     static AuditEntry updated(AuthenticatedActor actor, UUID requestId, Guardian before, Guardian after,
             ProtectedValueChange<NationalId> document, ProtectedValueChange<Rtn> rtn) {
-        return entry(actor, requestId, GUARDIAN + ".updated", GUARDIAN, after.id(), json(before, null),
+        return entry(actor, requestId, UPDATE_ACTION, GUARDIAN, after.id(), json(before, null),
                 json(after, changedFields(before, after, document, rtn)));
     }
 

@@ -412,13 +412,41 @@ class ManageGuardiansTest {
     }
 
     @Test
-    void aFailedWriteIsRolledBackAndLeavesNoAuditEntry() {
+    void aWriteRefusedForADuplicateDocumentIsRolledBackAndLeavesOnlyADeniedEntryWithoutValues() {
         create("Ana", "Lopez", ID, null);
         audit.clear();
 
         assertThatThrownBy(() -> create("Eva", "Mejia", ID, null)).isInstanceOf(DuplicateNationalIdException.class);
 
         assertThat(transactionCalls).contains("rollback");
-        assertThat(audit).isEmpty();
+        assertThat(world.guardiansOf(institution)).hasSize(1);
+        assertThat(audit).hasSize(1);
+        AuditEntry entry = audit.getFirst();
+        assertThat(entry.action()).isEqualTo("guardians.guardian.created");
+        assertThat(entry.entityType()).isEqualTo("guardians.guardian");
+        assertThat(entry.outcome()).isEqualTo("denied");
+        assertThat(entry.reason()).isEqualTo("duplicate-national-id");
+        assertThat(entry.beforeValue()).isNull();
+        assertThat(entry.afterValue()).isNull();
+        assertThat(entry.actorId()).isEqualTo(actor.accountId());
+        assertThat(entry.toString()).doesNotContain("Eva", "Mejia", "0801", "12345");
+    }
+
+    @Test
+    void anEditRefusedForADuplicateDocumentIsAuditedTheSameWayAgainstTheGuardianEdited() {
+        create("Ana", "Lopez", ID, null);
+        GuardianView eva = create("Eva", "Mejia", "7777-6666-55555", null);
+        audit.clear();
+
+        assertThatThrownBy(() -> update(eva, "Eva", ID, null, "ACTIVE")).isInstanceOf(DuplicateNationalIdException.class);
+
+        assertThat(audit).hasSize(1);
+        AuditEntry entry = audit.getFirst();
+        assertThat(entry.action()).isEqualTo("guardians.guardian.updated");
+        assertThat(entry.entityId()).isEqualTo(eva.id().toString());
+        assertThat(entry.outcome()).isEqualTo("denied");
+        assertThat(entry.reason()).isEqualTo("duplicate-national-id");
+        assertThat(entry.beforeValue()).isNull();
+        assertThat(entry.afterValue()).isNull();
     }
 }
