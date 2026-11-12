@@ -44,7 +44,7 @@ class StudentImportTest {
     private final AuthenticatedActor actor = actorOf(institutionUuid);
     private final String requestId = UUID.randomUUID().toString();
     private final ManageStudents manage = new ManageStudents(runner, store.students, store.protector, auditWriter, clock);
-    private final StudentImport imports = new StudentImport(runner, store.students, store.protector, manage, clock);
+    private final StudentImport imports = new StudentImport(runner, store.students, manage, clock);
 
     private static AuthenticatedActor actorOf(UUID institutionId) {
         return new AuthenticatedActor(UUID.randomUUID(), institutionId, UUID.randomUUID(), UUID.randomUUID(),
@@ -109,7 +109,7 @@ class StudentImportTest {
     }
 
     @Test
-    void aReferenceTheInstitutionAlreadyHasIsAlreadyImportedAndItsDocumentIsNotCompared() {
+    void aReferenceTheInstitutionAlreadyHasIsAlreadyImported() {
         create(row(2, "L1", "Ana", "Perez", "2012-05-20", "F", "0801-2012-01234"));
 
         List<RowProblem> problems = evaluate(row(2, "L1", "Ana", "Perez", "2012-05-20", "F", "0801-2012-01234"),
@@ -119,13 +119,27 @@ class StudentImportTest {
     }
 
     @Test
-    void aDocumentAnotherStudentHoldsIsDuplicateNationalIdWhatEverItsSpelling() {
+    void aDocumentAnotherStudentHoldsIsNeverReportedByTheJudgmentAndTheBlindIndexIsNeverQueried() {
         manage.create(actor, requestId, null, "Eva", "Mejia", LocalDate.of(2010, 1, 1), "F", "0801-2012-01234");
+        store.events.clear();
 
         List<RowProblem> problems = evaluate(row(2, "L1", "Ana", "Perez", "2012-05-20", "F", "0801201201234"),
                 row(3, "L2", "Luis", "Lopez", "2012-05-20", "M", "0801-2012-77777"));
 
-        assertThat(problems).containsExactly(new RowProblem(2, "nationalId", "duplicate-national-id"));
+        assertThat(problems).isEmpty();
+        assertThat(store.events).doesNotContain("lookup-indexes", "existing-indexes");
+    }
+
+    @Test
+    void aStoredDocumentIsOnlyFoundWhenTheRowIsRegisteredAndThatAttemptIsAudited() {
+        manage.create(actor, requestId, null, "Eva", "Mejia", LocalDate.of(2010, 1, 1), "F", "0801-2012-01234");
+        int auditBefore = audit.size();
+
+        List<CreateOutcome> outcomes = create(row(2, "L1", "Ana", "Perez", "2012-05-20", "F", "0801201201234"),
+                row(3, "L2", "Luis", "Lopez", "2012-05-20", "M", "0801-2012-77777"));
+
+        assertThat(outcomes).containsExactly(CreateOutcome.DUPLICATE_NATIONAL_ID, CreateOutcome.CREATED);
+        assertThat(audit.size() - auditBefore).as("only the registered row writes an entry").isEqualTo(1);
     }
 
     @Test
@@ -138,12 +152,10 @@ class StudentImportTest {
     }
 
     @Test
-    void aRowWithABadReferenceStillHasItsDocumentCheckedAndAProblemInOneFieldDoesNotHideAnother() {
-        manage.create(actor, requestId, null, "Eva", "Mejia", LocalDate.of(2010, 1, 1), "F", "0801-2012-01234");
-
-        assertThat(evaluate(row(2, "", "Ana", "Perez", "2012-05-20", "F", "0801-2012-01234")))
+    void aProblemInOneFieldDoesNotHideAnother() {
+        assertThat(evaluate(row(2, "", "Ana", "Perez", "2012-05-20", "F", "12")))
                 .containsExactly(new RowProblem(2, "legacyId", "required"),
-                        new RowProblem(2, "nationalId", "duplicate-national-id"));
+                        new RowProblem(2, "nationalId", "invalid-format"));
     }
 
     @Test
@@ -195,7 +207,7 @@ class StudentImportTest {
         assertThat(audit.getFirst().afterValue()).isEqualTo(audit.get(1).afterValue()
                 .replace("E-000002", "E-000001").replace("\"hasNationalId\":false", "\"hasNationalId\":true"));
         assertThat(audit.getFirst().toString() + audit.getFirst().afterValue())
-                .doesNotContain("L1-secreto").doesNotContain("Apellido").doesNotContain("0801");
+                .doesNotContain("L1-secreto").doesNotContain("Apellido").doesNotContain("0801-2012").doesNotContain("080120");
     }
 
     @Test

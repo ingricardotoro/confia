@@ -440,19 +440,27 @@ class ImportEndpointsIT extends CommittingPostgresIntegrationTest {
     }
 
     @Test
-    void aDocumentAStudentAlreadyHoldsIsRejectedAsDuplicateNationalIdAndTheRestIsStillImported() throws SQLException {
+    void aDocumentAStudentAlreadyHoldsIsNeverReportedBySimulatingAndIsRejectedOnlyWhenApplyingWhileTheRestIsImported()
+            throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
         assertThat(unrecorded("POST", STUDENTS, admin.token(), "{\"firstName\":\"Previo\",\"lastName\":\"Existente\","
                 + "\"birthDate\":\"2010-01-01\",\"sex\":\"F\",\"nationalId\":\"0801-2012-00010\"}").statusCode())
                 .isEqualTo(201);
         String file = clean(12);
         JsonNode simulation = HarnessProcess.json(simulate(admin, file));
-        assertThat(rejectionsOf(simulation)).containsExactly(List.of(11, "nationalId", "duplicate-national-id"));
+        // The simulation is no oracle over the stored documents: it sees nothing wrong with the row.
+        assertThat(rejectionsOf(simulation)).isEmpty();
+        assertThat(simulation.get("batch").get("rejectedRows").asInt()).isZero();
+        assertThat(simulation.get("batch").get("validRows").asInt()).isEqualTo(12);
+        assertThat(countOf("students_student", admin.institution())).isEqualTo(1);
 
         JsonNode result = HarnessProcess.json(apply(admin, file));
 
+        // The application finds it, as a real registration attempt, and rejects only that row, without its value.
+        assertThat(rejectionsOf(result)).containsExactly(List.of(11, "nationalId", "duplicate-national-id"));
         assertThat(result.get("batch").get("createdRows").asInt()).isEqualTo(11);
         assertThat(result.get("batch").get("rejectedRows").asInt()).isEqualTo(1);
+        assertThat(result.get("batch").get("totalRows").asInt()).isEqualTo(12);
         assertThat(countOf("students_student", admin.institution())).isEqualTo(12);
     }
 

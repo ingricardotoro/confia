@@ -13,8 +13,9 @@ public interface StudentImportGateway {
 
     /**
      * Judges every row, writing nothing: the rules of the registry on each field, repeated references or documents
-     * within the rows, a reference that the institution already has ({@code already-imported}, and then the document
-     * of that row is not compared) and a document that another student holds. The problems come in line order.
+     * within the rows and a reference that the institution already has ({@code already-imported}). It never consults
+     * the documents already stored: whether a document is held by another student is only learned by
+     * {@link #createAll}, as {@link CreateOutcome#DUPLICATE_NATIONAL_ID}. The problems come in line order.
      */
     List<RowProblem> evaluate(AuthenticatedActor actor, String requestId, List<ImportRow> rows);
 

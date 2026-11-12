@@ -30,7 +30,9 @@ import java.util.UUID;
  * rules of the registry and registers the valid ones through {@link ManageStudents}, the same use case as the hand
  * registration, so each student gets the generated code, the encrypted document with its blind index and the audit
  * entry that a hand registration gets. It restates no rule: the field rules are {@code StudentFieldCheck}'s, the
- * document is {@code NationalId}'s and the lookups go through the registry's own repository and blind index.
+ * document is {@code NationalId}'s and the reference lookup goes through the registry's own repository. The judgment
+ * never queries the blind index of the stored documents (it would be a mass oracle over the documents of minors): a
+ * document another student holds is only found when a row is registered, like a hand registration.
  *
  * <p>Nothing here keeps, returns or logs a cell: a problem is a line, a column name and a reason.
  *
@@ -46,21 +48,19 @@ public final class StudentImport implements StudentImportGateway {
 
     private final TransactionRunner transactionRunner;
     private final StudentRepository students;
-    private final NationalIdIndexes indexes;
     private final ManageStudents manageStudents;
     private final Clock clock;
 
-    public StudentImport(TransactionRunner transactionRunner, StudentRepository students, NationalIdIndexes indexes,
+    public StudentImport(TransactionRunner transactionRunner, StudentRepository students,
             ManageStudents manageStudents, Clock clock) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.students = Objects.requireNonNull(students, "students");
-        this.indexes = Objects.requireNonNull(indexes, "indexes");
         this.manageStudents = Objects.requireNonNull(manageStudents, "manageStudents");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** What the lookups need to know about a row that passed its field rules. */
-    private record Check(int line, String reference, NationalId document) {
+    /** The line and the reference of a row that passed its field rules and is not repeated in the file. */
+    private record Check(int line, String reference) {
     }
 
     @Override
@@ -94,43 +94,33 @@ public final class StudentImport implements StudentImportGateway {
                 problems.add(new RowProblem(row.line(), "nationalId", "duplicate-in-file"));
                 document = null;
             }
-            if (reference != null || document != null) {
-                checks.add(new Check(row.line(), reference, document));
+            if (reference != null) {
+                checks.add(new Check(row.line(), reference));
             }
         }
         problems.addAll(transactionRunner.executeReadOnly(actor.securityContext(auditRequestId.toString()),
-                () -> storedConflicts(institution, checks)));
+                () -> storedReferences(institution, checks)));
         problems.sort(Comparator.comparingInt(RowProblem::line));
         return List.copyOf(problems);
     }
 
-    /** The rows whose reference or document the institution already has; two reads per thousand rows. */
-    private List<RowProblem> storedConflicts(InstitutionId institution, List<Check> checks) {
+    /**
+     * The rows whose reference the institution already has ({@code already-imported}, a low-sensitivity key of the
+     * source system); one read per thousand rows. The stored national ids are deliberately NOT consulted here: a
+     * judgment that answers "this document is already registered" for a whole file without a registration would be a
+     * mass oracle over the documents of minors. A document held by another student is found by {@link #createAll},
+     * where each attempt is a real, audited registration like a hand registration.
+     */
+    private List<RowProblem> storedReferences(InstitutionId institution, List<Check> checks) {
         Set<String> storedReferences = new HashSet<>();
-        List<String> references = checks.stream().map(Check::reference).filter(Objects::nonNull).toList();
+        List<String> references = checks.stream().map(Check::reference).toList();
         for (List<String> chunk : chunks(references)) {
             storedReferences.addAll(students.existingExternalRefs(institution, chunk));
         }
-        Map<Integer, List<String>> indexesOfLine = new HashMap<>();
-        Set<String> allIndexes = new HashSet<>();
-        for (Check check : checks) {
-            boolean alreadyImported = check.reference() != null && storedReferences.contains(check.reference());
-            if (check.document() != null && !alreadyImported) {
-                List<String> lookup = indexes.lookupIndexes(institution, check.document());
-                indexesOfLine.put(check.line(), lookup);
-                allIndexes.addAll(lookup);
-            }
-        }
-        Set<String> storedIndexes = new HashSet<>();
-        for (List<String> chunk : chunks(List.copyOf(allIndexes))) {
-            storedIndexes.addAll(students.existingBlindIndexes(institution, chunk));
-        }
         List<RowProblem> problems = new ArrayList<>();
         for (Check check : checks) {
-            if (check.reference() != null && storedReferences.contains(check.reference())) {
+            if (storedReferences.contains(check.reference())) {
                 problems.add(new RowProblem(check.line(), "legacyId", "already-imported"));
-            } else if (indexesOfLine.getOrDefault(check.line(), List.of()).stream().anyMatch(storedIndexes::contains)) {
-                problems.add(new RowProblem(check.line(), "nationalId", "duplicate-national-id"));
             }
         }
         return problems;

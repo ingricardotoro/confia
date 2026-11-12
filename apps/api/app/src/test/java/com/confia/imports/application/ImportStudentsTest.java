@@ -375,7 +375,7 @@ class ImportStudentsTest {
         byte[] file = rows(3);
         simulate(file);
         students.problems.add(new RowProblem(2, "legacyId", "already-imported"));
-        students.problems.add(new RowProblem(4, "nationalId", "duplicate-national-id"));
+        students.problems.add(new RowProblem(4, "birthDate", "invalid-date"));
 
         ImportBatchView batch = apply(file).batch();
 
@@ -383,6 +383,22 @@ class ImportStudentsTest {
         assertThat(batch.createdRows()).isEqualTo(1);
         assertThat(batch.skippedRows()).isEqualTo(1);
         assertThat(batch.rejectedRows()).isEqualTo(1);
+    }
+
+    @Test
+    void theApplicationCanRejectMoreRowsThanTheSimulationBecauseOnlyItFindsStoredDocuments() {
+        byte[] file = rows(4);
+        ImportBatchView simulated = simulate(file).batch();
+        students.outcomes = row -> row.legacyId().equals("R3") ? CreateOutcome.DUPLICATE_NATIONAL_ID
+                : CreateOutcome.CREATED;
+
+        ImportRun run = apply(file);
+
+        assertThat(simulated.rejectedRows()).isZero();
+        assertThat(run.batch().rejectedRows()).isEqualTo(1);
+        assertThat(run.batch().createdRows()).isEqualTo(3);
+        assertThat(run.batch().totalRows()).isEqualTo(4);
+        assertThat(run.rejections()).containsExactly(new RejectionView(4, "nationalId", "duplicate-national-id"));
     }
 
     @Test

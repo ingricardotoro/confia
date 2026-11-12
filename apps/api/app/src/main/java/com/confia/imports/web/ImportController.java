@@ -74,8 +74,12 @@ public class ImportController {
             description = "Reads a CSV file (UTF-8, separator , or ; detected in the header, up to 5 MB and 10000 "
                     + "rows, columns legacyId, firstName, lastName, birthDate and optionally nationalId and sex), "
                     + "judges every row with the rules of the student registry and records a VALIDATED batch. It "
-                    + "writes no student. The rejections (line, column, reason; never a value) are returned and not "
-                    + "stored; at most 200 are listed. Needs the permission students:create.",
+                    + "writes no student. It detects only the problems of the file itself (field rules, repeated "
+                    + "legacyId or national id inside the file) and rows already imported by legacyId; it never "
+                    + "checks the national ids already stored, so a national id held by another student is not "
+                    + "reported here and the rejected count of the application can be higher. The rejections (line, "
+                    + "column, reason; never a value) are returned and not stored; at most 200 are listed. Needs "
+                    + "the permission students:create.",
             security = @SecurityRequirement(name = ContractSchemas.BEARER_AUTH),
             extensions = @Extension(properties =
                     @ExtensionProperty(name = "x-required-permission", value = "students:create")))
@@ -120,7 +124,11 @@ public class ImportController {
                     + "matches a simulation by the same account in the institution. It judges the file again and "
                     + "registers the valid rows through the same use case as the hand registration (generated "
                     + "code, encrypted document, audit). A row imported before is skipped, so applying twice "
-                    + "creates nothing twice. Needs the permission students:create.",
+                    + "creates nothing twice. A national id already held by another student is found only here, "
+                    + "when the row is registered (each attempt is a real, audited write like a hand registration), "
+                    + "and the row is rejected as duplicate-national-id without its value: the rejected count of "
+                    + "the application can therefore be higher than the one the simulation reported. Needs the "
+                    + "permission students:create.",
             security = @SecurityRequirement(name = ContractSchemas.BEARER_AUTH),
             extensions = @Extension(properties =
                     @ExtensionProperty(name = "x-required-permission", value = "students:create")))

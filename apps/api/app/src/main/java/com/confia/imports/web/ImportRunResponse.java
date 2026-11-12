@@ -10,7 +10,8 @@ import java.util.List;
  */
 public record ImportRunResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED) ImportBatchResponse batch,
-        @Schema(requiredMode = RequiredMode.REQUIRED, description = "At most 200") List<RejectionResponse> rejections,
+        @Schema(requiredMode = RequiredMode.REQUIRED, description = "At most 200. Only an application lists duplicate-national-id: a simulation never "
+                + "checks the stored national ids") List<RejectionResponse> rejections,
         @Schema(requiredMode = RequiredMode.REQUIRED,
                 description = "True when there were more rejections than the 200 returned") boolean rejectionsTruncated) {
 }

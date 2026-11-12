@@ -133,7 +133,7 @@ public class StudentsConfiguration {
      */
     @Bean
     StudentImportGateway studentImportGateway(TransactionRunner transactionRunner, StudentRepository students,
-            ColumnEncryptionNationalIdProtector indexes, ManageStudents manageStudents, Clock clock) {
-        return new StudentImport(transactionRunner, students, indexes, manageStudents, clock);
+            ManageStudents manageStudents, Clock clock) {
+        return new StudentImport(transactionRunner, students, manageStudents, clock);
     }
 }
