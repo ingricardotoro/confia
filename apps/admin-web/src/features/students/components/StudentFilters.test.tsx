@@ -18,6 +18,8 @@ describe("StudentFilters", () => {
     const search = screen.getByRole("searchbox", { name: "Buscar" });
     expect(search).toHaveAccessibleDescription("Por nombre, apellido o código.");
     expect(search).toHaveAttribute("autocomplete", "off");
+    expect(search).toHaveAttribute("autocorrect", "off");
+    expect(search).toHaveAttribute("spellcheck", "false");
     const status = screen.getByLabelText("Estado");
     expect(within(status).getAllByRole("option").map((option) => option.textContent)).toEqual(["Todos", "Activo", "Inactivo"]);
     expect(status).toHaveValue("");

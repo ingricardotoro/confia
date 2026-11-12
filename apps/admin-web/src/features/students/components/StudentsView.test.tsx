@@ -7,7 +7,7 @@ import { renderWithAdminI18n } from "../../../test/render.tsx";
 import { StudentsView, type StudentsViewProps } from "./StudentsView.tsx";
 
 // States. AW57, AW58: the table of students rendered with props alone. Loading: `table.loading`. Error and empty:
-// `table.error` and `table.empty`, drawn by the table. Success: the rows, with the masked document or a dash. The
+// `table.error` and `table.empty`, drawn by the table. Success: the rows, with "registered" or a dash. The
 // filters (search and status) are a child with its own test.
 function props(override: Partial<StudentsViewProps> = {}): StudentsViewProps {
   return {
@@ -46,10 +46,12 @@ describe("StudentsView", () => {
     expect(within(row).getByText("Activo")).toBeInTheDocument();
   });
 
-  it("shows the document as the server masked it, and never anything longer", () => {
-    renderWithAdminI18n(<StudentsView {...props({ rows: [student({ hasNationalId: true, nationalIdMasked: "****2345" })] })} />);
+  it("shows only that a document is registered, with an accessible text, and no digits", () => {
+    renderWithAdminI18n(<StudentsView {...props({ rows: [student({ hasNationalId: true })] })} />);
 
-    expect(screen.getByText("****2345")).toBeInTheDocument();
+    expect(screen.getByText("Registrado")).toBeInTheDocument();
+    expect(screen.getByText("Documento registrado")).toHaveClass("sr-only");
+    expect(screen.getByText("Registrado").closest("td")).toHaveTextContent(/^RegistradoDocumento registrado$/);
     expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
 

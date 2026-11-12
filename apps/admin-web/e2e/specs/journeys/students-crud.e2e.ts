@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { maskedDocument, seededDocument, studentCodeOf } from "../../mock-api/students-seed.ts";
+import { studentCodeOf } from "../../mock-api/students-seed.ts";
 import {
   alertOf,
   bodyRows,
@@ -71,10 +71,10 @@ test.describe("the students registry, registering and editing", () => {
     await expect(page).toHaveURL(/q=Z%C3%BA%C3%B1iga/);
     await expect.poll(() => bodyRows(page)).toHaveLength(1);
     const [row] = await bodyRows(page);
-    // The system generated the code (60 students were in the seed), and the document shows masked.
+    // The system generated the code (60 students were in the seed), and the document column only says it is registered.
     expect(row?.slice(0, 3)).toEqual([studentCodeOf(61), "Zúñiga", "Marta"]);
-    expect(row?.[5]).toBe(maskedDocument(DOCUMENT));
-    expect(row?.[5]).toBe("****8765");
+    expect(row?.[5]).toContain("Registrado");
+    expect(row?.[5]).not.toMatch(/\d{4}/);
     expect(row?.[6]).toBe("Activo");
     for (const text of await Promise.all(answers)) expect(text).not.toContain(DOCUMENT_DIGITS);
     for (const text of await Promise.all(answers)) expect(text).not.toContain(DOCUMENT);
@@ -106,7 +106,7 @@ test.describe("the students registry, registering and editing", () => {
     expect(writes).toEqual([]);
   });
 
-  test("edits a student: the code is fixed, the document is shown masked, and keeping it sends no document", async ({ page, scenarioId }) => {
+  test("edits a student: the code is fixed, the document only shows as registered, and keeping it sends no document", async ({ page, scenarioId }) => {
     await openStudents(page, scenarioId);
     await searchBox(page).fill("Pérez");
     await expect.poll(() => bodyRows(page)).toHaveLength(2);
@@ -115,7 +115,7 @@ test.describe("the students registry, registering and editing", () => {
 
     await expect(field(page, "Código")).toHaveValue(studentCodeOf(42));
     await expect(field(page, "Código")).toHaveAttribute("readonly", "");
-    await expect(field(page, "Documento actual")).toHaveValue(maskedDocument(seededDocument(42)));
+    await expect(field(page, "Documento actual")).toHaveValue("Registrado");
     await expect(field(page, "Reemplazar documento")).toHaveValue("");
     await field(page, "Nombres").fill("Luis Alberto");
     await save(page).click();
@@ -123,7 +123,7 @@ test.describe("the students registry, registering and editing", () => {
     await expect(dialog(page)).toBeHidden(SAVE_TIMEOUT);
     await expect(resultNotice(page)).toContainText("Se guardaron los cambios de «Luis Alberto Pérez».");
     const row = page.getByRole("row", { name: /Luis Alberto/ });
-    await expect(row).toContainText(maskedDocument(seededDocument(42)));
+    await expect(row).toContainText("Registrado");
     await expect(row).toContainText("Activo");
   });
 
@@ -131,14 +131,14 @@ test.describe("the students registry, registering and editing", () => {
     await openStudents(page, scenarioId);
     await searchBox(page).fill("Pérez");
     const row = page.getByRole("row", { name: /Luis Pérez/ });
-    await expect(row).toContainText("****0042");
+    await expect(row).toContainText("Registrado");
 
     // Replace.
     await page.getByRole("button", { name: "Editar Luis Pérez" }).click();
     await field(page, "Reemplazar documento").fill(DOCUMENT);
     await save(page).click();
     await expect(dialog(page)).toBeHidden(SAVE_TIMEOUT);
-    await expect(row).toContainText("****8765");
+    await expect(row).toContainText("Registrado");
     expect(await page.content()).not.toContain(DOCUMENT_DIGITS);
 
     // Remove: the box is checked on purpose; an empty replacement alone would have kept it.
@@ -149,7 +149,7 @@ test.describe("the students registry, registering and editing", () => {
     await save(page).click();
     await expect(dialog(page)).toBeHidden(SAVE_TIMEOUT);
     await expect(row).toContainText("—");
-    await expect(row).not.toContainText("****");
+    await expect(row).not.toContainText(/registrado/i);
 
     // A student with no document has no box to remove it.
     await page.getByRole("button", { name: "Editar Luis Pérez" }).click();
@@ -167,7 +167,7 @@ test.describe("the students registry, registering and editing", () => {
     await expect(page.getByRole("row", { name: /Gabriela Mejía/ })).toContainText("Inactivo");
     await expect(page.getByRole("button", { name: "Activar Gabriela Mejía" })).toBeVisible();
     // Nothing is deleted: the document of the row is still there.
-    await expect(page.getByRole("row", { name: /Gabriela Mejía/ })).toContainText("****0033");
+    await expect(page.getByRole("row", { name: /Gabriela Mejía/ })).toContainText("Registrado");
 
     await page.getByRole("button", { name: "Activar Gabriela Mejía" }).click();
     await expect(resultNotice(page)).toContainText("Se activó «Gabriela Mejía».");

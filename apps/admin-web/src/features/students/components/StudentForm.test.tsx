@@ -10,7 +10,7 @@ import { StudentForm, type StudentFormProps } from "./StudentForm.tsx";
 // States. AW57, AW58: the form of a student rendered with props alone. Loading: `form.submitting`, drawn by the dialog.
 // Error: `fieldErrors` under each field. Empty: a create form with nothing typed. Success: a create form, with the code
 // optional, and an edit form, with the code fixed and the document in its three separate acts.
-const WITH_DOCUMENT = student({ hasNationalId: true, nationalIdMasked: "****2345" });
+const WITH_DOCUMENT = student({ hasNationalId: true });
 
 function props(override: Partial<StudentFormProps> = {}): StudentFormProps {
   return {
@@ -52,12 +52,12 @@ describe("StudentForm", () => {
     expect(within(dialog).queryByLabelText("Estado")).not.toBeInTheDocument();
   });
 
-  it("an existing student shows the code fixed, the document masked and apart from its replacement, and the state", () => {
+  it("an existing student shows the code fixed, the document only as registered and apart from its replacement, and the state", () => {
     renderWithAdminI18n(<StudentForm {...editProps()} />);
 
     const dialog = screen.getByRole("dialog", { name: "Editar estudiante" });
     expect(within(dialog).getByLabelText(/^Código/)).toHaveAttribute("readonly");
-    expect(within(dialog).getByLabelText("Documento actual")).toHaveValue("****2345");
+    expect(within(dialog).getByLabelText("Documento actual")).toHaveValue("Registrado");
     expect(within(dialog).getByLabelText("Documento actual")).toHaveAttribute("readonly");
     const replace = within(dialog).getByLabelText("Reemplazar documento");
     expect(replace).toHaveValue("");
@@ -66,6 +66,27 @@ describe("StudentForm", () => {
     expect(remove).not.toBeChecked();
     expect(remove).toHaveAccessibleDescription(/Si no la marca, el documento no se toca/);
     expect(within(dialog).getByLabelText("Estado")).toHaveValue("ACTIVE");
+  });
+
+  it("the id and the personal data inputs turn off autofill, autocorrect and spell checking", () => {
+    renderWithAdminI18n(<StudentForm {...props()} />);
+
+    const dialog = screen.getByRole("dialog", { name: "Nuevo estudiante" });
+    for (const label of [/Nombres/, /Apellidos/, /Fecha de nacimiento/, /Documento de identidad/]) {
+      const input = within(dialog).getByLabelText(label);
+      expect(input).toHaveAttribute("spellcheck", "false");
+      expect(input).toHaveAttribute("autocomplete", "off");
+      expect(input).toHaveAttribute("autocorrect", "off");
+    }
+  });
+
+  it("the replacement document input of an edit turns them off too", () => {
+    renderWithAdminI18n(<StudentForm {...editProps()} />);
+
+    const input = screen.getByLabelText("Reemplazar documento");
+    expect(input).toHaveAttribute("spellcheck", "false");
+    expect(input).toHaveAttribute("autocomplete", "off");
+    expect(input).toHaveAttribute("autocorrect", "off");
   });
 
   it("without a stored document it shows that there is none and offers no removal", () => {

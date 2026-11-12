@@ -252,8 +252,8 @@ export function organizationRecord(resource: OrganizationResource, row: unknown,
   return { status, body: checked(`${resource} record`, ROW_SCHEMAS[resource], row), contentType: JSON_TYPE };
 }
 
-// The students registry cut. The national id is never a field of a response: a row carries the last four
-// characters, masked, and whether there is a document at all.
+// The students registry cut. The national id is never a field of a response: a row says only whether there is
+// a document.
 export function student(override: Partial<StudentResponseOutput> = {}): StudentResponseOutput {
   return checked("StudentResponse", StudentResponse, {
     id: crypto.randomUUID(),
@@ -264,7 +264,6 @@ export function student(override: Partial<StudentResponseOutput> = {}): StudentR
     sex: "F",
     status: "ACTIVE",
     hasNationalId: false,
-    nationalIdMasked: null,
     createdAt: STAMP,
     updatedAt: STAMP,
     ...override,

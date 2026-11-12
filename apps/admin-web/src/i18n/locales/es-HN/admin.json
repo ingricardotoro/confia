@@ -283,6 +283,8 @@
     "replaceDocumentHelp": "Déjelo vacío para conservar el documento actual. Escriba el número completo para reemplazarlo.",
     "removeDocument": "Quitar documento",
     "removeDocumentHelp": "Marque esta casilla para borrar el documento guardado. Si no la marca, el documento no se toca.",
+    "documentRegistered": "Registrado",
+    "documentRegisteredText": "Documento registrado",
     "noDocumentMark": "—",
     "noDocumentText": "Sin documento",
     "sex": {

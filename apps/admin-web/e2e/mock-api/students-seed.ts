@@ -40,8 +40,6 @@ const MALE_NAMES = ["Luis", "Carlos", "José", "Mateo", "Diego", "Daniel", "Andr
 
 /** The national id of the n-th student, when it has one: eight to twenty characters, with hyphens. */
 export const seededDocument = (n: number): string => `0801-2012-${String(10000 + n)}`;
-/** What a response shows of it: four asterisks and the last four characters. */
-export const maskedDocument = (document: string): string => `****${document.replaceAll("-", "").slice(-4)}`;
 
 export const emptyStudents = (): StudentRows => ({ students: [], documents: new Map() });
 

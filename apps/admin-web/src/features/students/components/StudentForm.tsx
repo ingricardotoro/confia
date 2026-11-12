@@ -10,8 +10,8 @@ export interface StudentFormProps {
   readonly values: StudentValues;
   /** Already translated. */
   readonly fieldErrors: Readonly<Partial<Record<StudentField, string>>>;
-  /** The student being edited: what it shows of the stored document is the masked text it carries. */
-  readonly row?: Pick<Student, "nationalIdMasked" | "hasNationalId">;
+  /** The student being edited: it only knows whether a document is registered, never its digits. */
+  readonly row?: Pick<Student, "hasNationalId">;
   readonly form: ResourceFormView;
   readonly onChange: (field: StudentField, value: string) => void;
   readonly onBlur: (field: StudentField) => void;
@@ -20,8 +20,8 @@ export interface StudentFormProps {
 
 /**
  * The form of a student, in a dialog. The code is optional when new (the system generates one) and fixed afterwards.
- * The document is handled in three separate acts when editing, so none happens by accident: the current value is
- * shown masked and cannot be edited, a separate box replaces it (empty keeps it), and only an explicit checkbox
+ * The document is handled in three separate acts when editing, so none happens by accident: whether there is one is
+ * shown and cannot be edited, a separate box replaces it (empty keeps it), and only an explicit checkbox
  * removes it.
  */
 export function StudentForm({ mode, values, fieldErrors, row, form, onChange, onBlur, onClose }: StudentFormProps) {
@@ -54,9 +54,9 @@ export function StudentForm({ mode, values, fieldErrors, row, form, onChange, on
       ) : (
         <TextField label={t("students.fields.studentCode")} description={t("students.codeHelp")} {...text("studentCode")} />
       )}
-      <TextField label={t("students.fields.firstName")} required {...text("firstName")} />
-      <TextField label={t("students.fields.lastName")} required {...text("lastName")} />
-      <TextField label={t("students.fields.birthDate")} kind="date" required {...text("birthDate")} />
+      <TextField label={t("students.fields.firstName")} required sensitive {...text("firstName")} />
+      <TextField label={t("students.fields.lastName")} required sensitive {...text("lastName")} />
+      <TextField label={t("students.fields.birthDate")} kind="date" required sensitive {...text("birthDate")} />
       <OptionField
         label={t("students.fields.sex")}
         required
@@ -67,12 +67,13 @@ export function StudentForm({ mode, values, fieldErrors, row, form, onChange, on
       {editing ? (
         <>
           <FormField label={t("students.currentDocument")} controlId="student-current-document">
-            {(control) => <Input {...control} readOnly value={row?.nationalIdMasked ?? t("students.noDocumentText")} />}
+            {(control) => <Input {...control} readOnly value={t(row?.hasNationalId === true ? "students.documentRegistered" : "students.noDocumentText")} />}
           </FormField>
           <TextField
             label={t("students.replaceDocument")}
             description={t("students.replaceDocumentHelp")}
             disabled={removing}
+            sensitive
             {...text("nationalId")}
           />
           {row?.hasNationalId === true ? (
@@ -105,7 +106,7 @@ export function StudentForm({ mode, values, fieldErrors, row, form, onChange, on
           />
         </>
       ) : (
-        <TextField label={t("students.fields.nationalId")} description={t("students.nationalIdHelp")} {...text("nationalId")} />
+        <TextField label={t("students.fields.nationalId")} description={t("students.nationalIdHelp")} sensitive {...text("nationalId")} />
       )}
     </ResourceFormDialog>
   );

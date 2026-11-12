@@ -49,7 +49,7 @@ async function openList(rows: unknown[] = [student()], options: { path?: string;
 }
 
 const ANA = student({ firstName: "Ana", lastName: "Pérez", studentCode: "E-000001" });
-const WITH_DOCUMENT = student({ firstName: "Luis", lastName: "Mejía", studentCode: "E-000002", hasNationalId: true, nationalIdMasked: "****2345" });
+const WITH_DOCUMENT = student({ firstName: "Luis", lastName: "Mejía", studentCode: "E-000002", hasNationalId: true });
 
 async function fillNewStudent(user: ReturnType<typeof userEvent.setup>, extra: { code?: string; document?: string } = {}) {
   await user.click(screen.getByRole("button", { name: "Nuevo estudiante" }));
@@ -64,10 +64,10 @@ async function fillNewStudent(user: ReturnType<typeof userEvent.setup>, extra: {
 }
 
 describe("the list of students", () => {
-  it("shows each student with the date written for the person, the sex, the masked document or a dash, and the state", async () => {
+  it("shows each student with the date written for the person, the sex, whether there is a document, or a dash, and the state", async () => {
     await openList([
       student({ firstName: "Ana", lastName: "Pérez", birthDate: "2014-03-09", studentCode: "E-000001" }),
-      student({ firstName: "Luis", lastName: "Mejía", sex: "M", status: "INACTIVE", hasNationalId: true, nationalIdMasked: "****2345", studentCode: "E-000002" }),
+      student({ firstName: "Luis", lastName: "Mejía", sex: "M", status: "INACTIVE", hasNationalId: true, studentCode: "E-000002" }),
     ]);
 
     const table = screen.getByRole("table", { name: "Estudiantes de la institución" });
@@ -89,7 +89,8 @@ describe("the list of students", () => {
     expect(within(ana).getByText("Sin documento")).toBeInTheDocument();
     expect(within(ana).getByText("Activo")).toBeInTheDocument();
     const luis = within(table).getByRole("row", { name: /Mejía/ });
-    expect(within(luis).getByText("****2345")).toBeInTheDocument();
+    expect(within(luis).getByText("Registrado")).toBeInTheDocument();
+    expect(within(luis).getByText("Documento registrado")).toHaveClass("sr-only");
     expect(within(luis).getByText("Masculino")).toBeInTheDocument();
     expect(within(luis).getByText("Inactivo")).toBeInTheDocument();
   });
@@ -288,7 +289,7 @@ describe("registering a student", () => {
   it("sends the code and the document when they are typed, and the list is read again", async () => {
     const user = userEvent.setup();
     await openList([]);
-    route("post", STUDENTS, studentRecord(student({ studentCode: "E-77", hasNationalId: true, nationalIdMasked: "****2345" }), 201));
+    route("post", STUDENTS, studentRecord(student({ studentCode: "E-77", hasNationalId: true }), 201));
     const dialog = await fillNewStudent(user, { code: "E-77", document: DOCUMENT });
     const readsBefore = gets().length;
 
@@ -315,7 +316,7 @@ describe("registering a student", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { router, queryClient, container } = await openList([]);
-    route("post", STUDENTS, studentRecord(student({ hasNationalId: true, nationalIdMasked: "****2345" }), 201));
+    route("post", STUDENTS, studentRecord(student({ hasNationalId: true }), 201));
     const dialog = await fillNewStudent(user, { document: DOCUMENT });
     // While it is typed it is in the field and nowhere else.
     expect(router.state.location.searchStr).not.toContain(DOCUMENT);
@@ -334,6 +335,37 @@ describe("registering a student", () => {
       expect(queryClient.getMutationCache().getAll()).toHaveLength(0);
     });
     expect(JSON.stringify([log.mock.calls, info.mock.calls, warn.mock.calls, error.mock.calls])).not.toContain(DOCUMENT);
+  });
+
+  it("keeps the search text and the national id out of the console and out of local and session storage, after a create and an edit", async () => {
+    const user = userEvent.setup();
+    const spies = (["log", "info", "warn", "error", "debug"] as const).map((method) => vi.spyOn(console, method).mockImplementation(() => undefined));
+    const QUERY = "Quintanilla";
+    await openList([WITH_DOCUMENT]);
+    await user.type(screen.getByLabelText("Buscar"), QUERY);
+    route("post", STUDENTS, studentRecord(student({ hasNationalId: true }), 201));
+    const created = await fillNewStudent(user, { document: DOCUMENT });
+    await user.click(within(created).getByRole("button", { name: "Guardar" }));
+    await screen.findByText("Se creó el registro «Ana Pérez».");
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Editar Luis Mejía" }));
+    const edit = await screen.findByRole("dialog", { name: "Editar estudiante" });
+    route("put", `${STUDENTS}/${WITH_DOCUMENT.id}`, studentRecord({ ...WITH_DOCUMENT }));
+    await user.type(within(edit).getByLabelText("Reemplazar documento"), OTHER_DOCUMENT);
+    await user.click(within(edit).getByRole("button", { name: "Guardar" }));
+    await screen.findByText("Se guardaron los cambios de «Luis Mejía».");
+
+    const consoleOutput = JSON.stringify(spies.map((spy) => spy.mock.calls));
+    const stored = JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]);
+    for (const secret of [QUERY, DOCUMENT, OTHER_DOCUMENT, DOCUMENT.replaceAll("-", ""), OTHER_DOCUMENT.replaceAll("-", "")]) {
+      expect(consoleOutput).not.toContain(secret);
+      expect(stored).not.toContain(secret);
+    }
+    expect(localStorage).toHaveLength(0);
+    expect(sessionStorage).toHaveLength(0);
   });
 
   it("a new form after a save starts empty: the document of the last one is not there", async () => {
@@ -464,14 +496,14 @@ describe("editing a student", () => {
     return screen.findByRole("dialog", { name: "Editar estudiante" });
   }
 
-  it("shows the code as a value that cannot be changed, the document masked, and a separate box that starts empty", async () => {
+  it("shows the code as a value that cannot be changed, the document only as registered, and a separate box that starts empty", async () => {
     const user = userEvent.setup();
     const dialog = await openEdit(user);
 
     const code = within(dialog).getByLabelText(/^Código/);
     expect(code).toHaveValue("E-000002");
     expect(code).toHaveAttribute("readonly");
-    expect(within(dialog).getByLabelText("Documento actual")).toHaveValue("****2345");
+    expect(within(dialog).getByLabelText("Documento actual")).toHaveValue("Registrado");
     expect(within(dialog).getByLabelText("Documento actual")).toHaveAttribute("readonly");
     expect(within(dialog).getByLabelText("Reemplazar documento")).toHaveValue("");
     expect(within(dialog).getByRole("checkbox", { name: "Quitar documento" })).not.toBeChecked();
@@ -501,7 +533,7 @@ describe("editing a student", () => {
     const { router, queryClient } = await openList([WITH_DOCUMENT]);
     await user.click(screen.getByRole("button", { name: "Editar Luis Mejía" }));
     const dialog = await screen.findByRole("dialog", { name: "Editar estudiante" });
-    route("put", `${STUDENTS}/${WITH_DOCUMENT.id}`, studentRecord({ ...WITH_DOCUMENT, nationalIdMasked: "****8765" }));
+    route("put", `${STUDENTS}/${WITH_DOCUMENT.id}`, studentRecord({ ...WITH_DOCUMENT }));
     await user.type(within(dialog).getByLabelText("Reemplazar documento"), OTHER_DOCUMENT);
 
     await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
@@ -526,7 +558,7 @@ describe("editing a student", () => {
   it("removes the document only through the explicit checkbox, with an empty nationalId, and disables the replacement while it is checked", async () => {
     const user = userEvent.setup();
     const dialog = await openEdit(user);
-    route("put", `${STUDENTS}/${WITH_DOCUMENT.id}`, studentRecord({ ...WITH_DOCUMENT, hasNationalId: false, nationalIdMasked: null }));
+    route("put", `${STUDENTS}/${WITH_DOCUMENT.id}`, studentRecord({ ...WITH_DOCUMENT, hasNationalId: false }));
     await user.type(within(dialog).getByLabelText("Reemplazar documento"), OTHER_DOCUMENT);
 
     await user.click(within(dialog).getByRole("checkbox", { name: "Quitar documento" }));
@@ -559,7 +591,7 @@ describe("editing a student", () => {
   it("can set the document of a student that had none", async () => {
     const user = userEvent.setup();
     const dialog = await openEdit(user, ANA);
-    route("put", `${STUDENTS}/${ANA.id}`, studentRecord({ ...ANA, hasNationalId: true, nationalIdMasked: "****2345" }));
+    route("put", `${STUDENTS}/${ANA.id}`, studentRecord({ ...ANA, hasNationalId: true }));
     await user.type(within(dialog).getByLabelText("Reemplazar documento"), DOCUMENT);
 
     await user.click(within(dialog).getByRole("button", { name: "Guardar" }));

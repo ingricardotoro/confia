@@ -20,8 +20,8 @@ export interface StudentsViewProps {
 }
 
 /**
- * The students as a table: code, last names, first names, birth date, sex, the masked document, state and actions,
- * with a text search and a status filter. The document is the masked text the server sends, or a dash.
+ * The students as a table: code, last names, first names, birth date, sex, whether there is a document, state and actions,
+ * with a text search and a status filter. The document column says only "registered" or a dash: the server never sends any digit.
  */
 export function StudentsView({ rows, table, pagination, notice, togglingId, filters, onCreate, onEdit, onToggle }: StudentsViewProps) {
   const { t } = useAdminText();
@@ -35,13 +35,16 @@ export function StudentsView({ rows, table, pagination, notice, togglingId, filt
       id: "nationalId",
       header: t("students.columns.nationalId"),
       cell: (row) =>
-        row.nationalIdMasked === null ? (
+        row.hasNationalId ? (
+          <>
+            <span aria-hidden="true">{t("students.documentRegistered")}</span>
+            <span className="sr-only">{t("students.documentRegisteredText")}</span>
+          </>
+        ) : (
           <>
             <span aria-hidden="true">{t("students.noDocumentMark")}</span>
             <span className="sr-only">{t("students.noDocumentText")}</span>
           </>
-        ) : (
-          row.nationalIdMasked
         ),
     },
     { id: "status", header: t("organization.common.state"), cell: (row) => <ActiveBadge active={row.status === "ACTIVE"} /> },

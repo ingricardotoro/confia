@@ -1,7 +1,7 @@
 import { CreateStudentRequest, UpdateStudentRequest } from "@confia/contracts/admin";
 import { problem, studentPage, studentRecord, type ContractResponse } from "../../src/test/contract-responses.ts";
 import type { ModelResponse } from "./session-model.ts";
-import { emptyStudents, maskedDocument, seededStudents, type StudentRow, type StudentRows } from "./students-seed.ts";
+import { emptyStudents, seededStudents, type StudentRow, type StudentRows } from "./students-seed.ts";
 
 /**
  * The students registry of the simulated API (students-registry cut): the four operations of `/api/v1/students`, over
@@ -9,7 +9,7 @@ import { emptyStudents, maskedDocument, seededStudents, type StudentRow, type St
  * needs (a code that is generated or repeated, a national id that is repeated even with other hyphens, the birth date
  * limits, the three ways to treat the document on an edit, and a refused write). The real rules, and their limits, are
  * tested in the backend. Paging, order and search are done here as the server does them; the page never does them. The
- * national id is kept apart from the rows and no response carries it: only `hasNationalId` and the masked text.
+ * national id is kept apart from the rows and no response carries it: only `hasNationalId`.
  */
 export const STUDENTS_BASE = "/api/v1/students";
 /** How many reads fail first in the `server-error` behavior: the first try and the two retries of the page. */
@@ -74,9 +74,9 @@ const invalid = (errors: { field: string; reason: string }[]): ModelResponse => 
 /** The document as the registry compares it: no hyphens, capitals. The same document with other hyphens is the same document. */
 const normalizedId = (document: string): string => document.replaceAll("-", "").toUpperCase();
 
-/** What a response shows of a row: the stored fields, whether there is a document and its mask, never the document. */
-function present(row: StudentRow, document: string | undefined): StudentRow & { hasNationalId: boolean; nationalIdMasked: string | null } {
-  return { ...row, hasNationalId: document !== undefined, nationalIdMasked: document === undefined ? null : maskedDocument(document) };
+/** What a response shows of a row: the stored fields, and whether there is a document, never a digit of it. */
+function present(row: StudentRow, document: string | undefined): StudentRow & { hasNationalId: boolean } {
+  return { ...row, hasNationalId: document !== undefined };
 }
 
 export function createStudentsModel(options: StudentsOptions = DEFAULT_STUDENTS, now: () => Date = () => new Date()): StudentsModel {

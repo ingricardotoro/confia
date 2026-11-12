@@ -51,8 +51,8 @@ queda fuera de este corte (requeriría un permiso y una auditoría de acceso pro
 ## Pantalla (`admin-web`)
 
 Entrada «Estudiantes» en la navegación. Tabla paginada y ordenada en servidor con búsqueda `q` y filtro
-de estado; alta y edición en diálogo (código solo lectura al editar; el documento muestra el valor
-enmascarado y un campo para reemplazarlo); inactivar/activar desde la fila; estados de carga, vacío,
+de estado; alta y edición en diálogo (código solo lectura al editar; el documento muestra solo si hay uno
+(«Registrado» o «Sin documento») y un campo para reemplazarlo); inactivar/activar desde la fila; estados de carga, vacío,
 error y éxito. Escrituras visibles para todos, el servidor responde 403 (la sesión no expone permisos).
 
 ## Casos límite a probar
@@ -146,8 +146,8 @@ cola de 4 caracteres) y `RateLimitPropertiesTest` (valores de las políticas).
 - PostgreSQL con `log_error_verbosity=terse`, para que los errores de restricción no repitan en el registro del servidor
   los valores de la fila que falló (nombres, fecha de nacimiento).
 - Los códigos de estudiante secuenciales (`E-000123`) revelan cuántos estudiantes tiene la institución.
-- El texto de la sección 10 de `docs/03-seguridad.md` y el frontend (`apps/admin-web`, `packages/contracts`) aún mencionan
-  `nationalIdMasked`; hay que regenerar los contratos y quitar el campo de la pantalla.
+- El texto de la sección 10 de `docs/03-seguridad.md` aún menciona `nationalIdMasked`. (El frontend y los contratos ya no: ver
+  «Construido en el frontend».)
 
 
 
@@ -171,8 +171,8 @@ ahora sin cambiar su comportamiento).
   un enlace, «Quitar filtros») reemplaza lo escrito; lo que el propio cuadro escribió nunca lo pisa.
 - **Documento de identidad en el formulario.** Al crear, un campo opcional (8 a 20 letras, números o guiones; el patrón
   generado no tiene anclas y en el navegador aceptaría cualquier texto, así que el formulario lo ancla y el servidor sigue
-  siendo la autoridad). Al editar son **tres actos separados**: «Documento actual» (enmascarado, solo lectura; «Sin
-  documento» si no hay), «Reemplazar documento» (vacío conserva: el cuerpo no lleva `nationalId`) y la casilla «Quitar
+  siendo la autoridad). Al editar son **tres actos separados**: «Documento actual» (solo lectura: «Registrado» o «Sin
+  documento»; nunca un dígito), «Reemplazar documento» (vacío conserva: el cuerpo no lleva `nationalId`) y la casilla «Quitar
   documento» (única forma de enviar `nationalId: ""`; solo se ofrece si hay documento; al marcarla se vacía y se
   deshabilita el campo de reemplazo). Un campo vacío nunca elimina el documento. El código es opcional al crear («si lo
   deja vacío, el sistema genera uno») y de solo lectura al editar; nunca se envía en un `PUT`.
@@ -186,13 +186,19 @@ ahora sin cambiar su comportamiento).
   `PROBLEM_KEYS`, catálogo `es-HN` y `organization-failure.ts`). Los errores de campo de un `400` tienen texto propio:
   `birthDate` con `past-or-present` («no puede ser posterior a hoy»), `birth-date-floor` («anterior al 1 de enero de
   1990») y `nationalId` con `pattern` (formato del documento). El `403` conserva el mensaje del corte anterior.
-- Tabla: código, apellidos, nombres, fecha de nacimiento (`Intl.DateTimeFormat` `es-HN`, en UTC), sexo, documento
-  enmascarado tal como lo envía el servidor o «—» (con «Sin documento» para lector de pantalla), estado y acciones.
+- Tabla: código, apellidos, nombres, fecha de nacimiento (`Intl.DateTimeFormat` `es-HN`, en UTC), sexo, documento:
+  «Registrado» (con «Documento registrado» para lector de pantalla) o «—» (con «Sin documento»), estado y acciones.
   Ordenan en el servidor las cuatro columnas que la API admite. Sin dinero, sin `Idempotency-Key` y sin actualización
   optimista; tras toda escritura se invalida `students` completo.
 
 **Límites conocidos**
 
+- **Datos sensibles en los campos** (revisión de seguridad). Documento, nombres, apellidos, fecha de nacimiento y el cuadro
+  «Buscar» llevan `spellCheck={false}`, `autoComplete="off"` y `autoCorrect="off"`, para que el navegador no los envíe a
+  correctores ni los recuerde. `TextField` recibe la propiedad opcional `sensitive` (los formularios de `organization`
+  no la usan y su comportamiento no cambia). Pruebas: atributos en los campos del formulario y del filtro, y una prueba del
+  contenedor que comprueba que `q` y el documento (alta y edición) no llegan a `console` ni a `localStorage`/`sessionStorage`.
+  La búsqueda `q` sigue en la URL por diseño (historial y enlaces compartibles).
 - Los componentes de presentación y los hooks de lista viven en `features/organization/` y se importan desde
   `features/students/`. Si aparece una tercera pantalla de listado conviene moverlos a `shared/`.
 - No hay selector de tamaño de página en pantalla (el parámetro `pageSize` de la URL sí se respeta).
@@ -205,7 +211,7 @@ ahora sin cambiar su comportamiento).
   `features/identity/routes.test.tsx` (una entrada y una ruta más).
 
 **Pruebas** (Vitest, Testing Library y MSW sobre rutas, capa de consultas y transporte reales):
-`StudentsContainer.test.tsx` cubre listado (columnas, fecha, documento enmascarado o guion, consulta inicial), página y
+`StudentsContainer.test.tsx` cubre listado (columnas, fecha, «Registrado» o guion, consulta inicial), página y
 orden enviados al servidor y a la URL, parámetros inválidos descartados, filtro de estado, búsqueda (no se envía `q` con 1
 carácter, una sola petición tras la pausa, recorte, volver a 1 carácter, «Quitar filtros» vacía el cuadro), estados vacío,
 de error con reintento, `403` y de carga, alta sin código (cuerpo exacto), con código y documento, rastro del documento
@@ -228,15 +234,15 @@ código) y `status`; todo lo demás es `400 validation-failed`. `POST` genera `E
 `PUT` rechaza `studentCode` y cualquier miembro desconocido; el documento omitido se conserva, vacío se elimina y otro
 valor se reemplaza; fecha futura (`past-or-present`) o anterior a 1990 (`birth-date-floor`); `duplicate-student-code`;
 `duplicate-national-id` también con otros guiones o mayúsculas. El documento completo se guarda aparte de las filas y
-ninguna respuesta lo lleva (solo `hasNationalId` y `nationalIdMasked`). Perfiles nuevos: `students-empty`,
+ninguna respuesta lo lleva (solo `hasNationalId`). Perfiles nuevos: `students-empty`,
 `students-forbidden` (lecturas normales, escrituras `403`) y `students-server-error` (las tres primeras lecturas
 responden `500` con `traceId`). Pruebas unitarias en `mock-api/server.test.ts`.
 
 **Recorridos** (`e2e/specs/journeys/students-*.e2e.ts`, apoyo en `e2e/support/students.ts`):
 
 - `students-crud`: inicio de sesión y apertura de «Estudiantes»; alta con documento, búsqueda por apellido (código
-  generado, documento enmascarado, y el documento completo ausente de la página, la URL y todas las respuestas); alta
-  con código propio y sin documento; formulario vacío sin petición; edición (código fijo, documento enmascarado,
+  generado, documento «Registrado» sin dígitos, y el documento completo ausente de la página, la URL y todas las respuestas); alta
+  con código propio y sin documento; formulario vacío sin petición; edición (código fijo, documento «Registrado»,
   conservar); reemplazar y quitar el documento con la casilla; activar y desactivar desde la fila; errores de fecha del
   servidor bajo su campo.
 - `students-lists`: paginar con la URL, las filas y la consulta enviada; orden por omisión y por cada cabecera; volver a la

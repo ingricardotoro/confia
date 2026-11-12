@@ -76,6 +76,8 @@ export interface TextFieldProps {
   readonly disabled?: boolean;
   /** `date` is the native date input; `numeric` is text with the numeric keyboard, so the form words its own error. */
   readonly kind?: "text" | "date" | "numeric";
+  /** Personal data: the browser must not spell-check, autocorrect or autofill it (those can send it to other services). */
+  readonly sensitive?: boolean;
 }
 
 export function TextField({
@@ -89,6 +91,7 @@ export function TextField({
   required = false,
   disabled = false,
   kind = "text",
+  sensitive = false,
 }: TextFieldProps) {
   return (
     <FormField
@@ -105,6 +108,7 @@ export function TextField({
           type={kind === "date" ? "date" : "text"}
           {...(kind === "numeric" ? { inputMode: "numeric" as const } : {})}
           autoComplete="off"
+          {...(sensitive ? { spellCheck: false, autoCorrect: "off" } : {})}
           value={value}
           onChange={(event) => {
             onChange(event.target.value);

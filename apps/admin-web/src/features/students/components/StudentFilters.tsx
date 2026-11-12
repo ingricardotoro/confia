@@ -33,6 +33,8 @@ export function StudentFilters({ search, status }: StudentFiltersProps) {
             {...control}
             type="search"
             autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
             maxLength={100}
             value={search.value}
             onChange={(event) => {

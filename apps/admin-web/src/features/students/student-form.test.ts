@@ -11,7 +11,7 @@ const FILLED: StudentValues = {
   birthDate: "2014-03-09",
   sex: "F",
 };
-const ROW = student({ hasNationalId: true, nationalIdMasked: "****2345" });
+const ROW = student({ hasNationalId: true });
 const EDIT: StudentValues = initialStudentValues(ROW);
 
 describe("the body of a create", () => {

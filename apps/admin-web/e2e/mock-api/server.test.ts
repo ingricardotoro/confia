@@ -644,7 +644,6 @@ describe("the students registry [students-registry]", { timeout: LIMIT }, () => 
     firstName: string;
     lastName: string;
     hasNationalId: boolean;
-    nationalIdMasked: string | null;
   }
   const rows = (reply: Reply) => (reply.json as { items: Row[] }).items;
   const total = (reply: Reply) => (reply.json as { total: number }).total;
@@ -714,16 +713,16 @@ describe("the students registry [students-registry]", { timeout: LIMIT }, () => 
     const found = await send("GET", `?q=${encodeURIComponent("Zúñiga")}`);
 
     expect(created.status).toBe(201);
-    expect(created.json).toMatchObject({ studentCode: "E-000061", firstName: "Marta", status: "ACTIVE", hasNationalId: true, nationalIdMasked: "****8765" });
+    expect(created.json).toMatchObject({ studentCode: "E-000061", firstName: "Marta", status: "ACTIVE", hasNationalId: true });
     expect(rows(found)).toHaveLength(1);
-    expect(rows(found)[0]).toMatchObject({ hasNationalId: true, nationalIdMasked: "****8765" });
+    expect(rows(found)[0]).toMatchObject({ hasNationalId: true });
     for (const reply of [created, found]) {
       expect(reply.text).not.toContain(DOCUMENT);
       expect(reply.text).not.toContain("0801201098765");
       expect(reply.json).not.toHaveProperty("nationalId");
     }
     const without = await send("POST", "", { ...NEW_STUDENT, studentCode: " MI-1 " });
-    expect(without.json).toMatchObject({ studentCode: "MI-1", hasNationalId: false, nationalIdMasked: null });
+    expect(without.json).toMatchObject({ studentCode: "MI-1", hasNationalId: false });
   });
 
   it("refuses a repeated code and a repeated national id, also with other hyphens or capitals, with 409", async () => {
@@ -781,15 +780,15 @@ describe("the students registry [students-registry]", { timeout: LIMIT }, () => 
     const target = rows(await send("GET", "?q=E-000042"))[0];
     const id = target?.id ?? "";
     const edit = { firstName: "Luis Alberto", lastName: "Pérez", birthDate: "2014-07-16", sex: "M", status: "ACTIVE" };
-    expect(target).toMatchObject({ hasNationalId: true, nationalIdMasked: "****0042" });
+    expect(target).toMatchObject({ hasNationalId: true });
 
     const kept = await send("PUT", `/${id}`, edit);
     const replaced = await send("PUT", `/${id}`, { ...edit, nationalId: DOCUMENT });
     const removed = await send("PUT", `/${id}`, { ...edit, nationalId: "" });
 
-    expect(kept.json).toMatchObject({ studentCode: "E-000042", firstName: "Luis Alberto", hasNationalId: true, nationalIdMasked: "****0042" });
-    expect(replaced.json).toMatchObject({ hasNationalId: true, nationalIdMasked: "****8765" });
-    expect(removed.json).toMatchObject({ hasNationalId: false, nationalIdMasked: null });
+    expect(kept.json).toMatchObject({ studentCode: "E-000042", firstName: "Luis Alberto", hasNationalId: true });
+    expect(replaced.json).toMatchObject({ hasNationalId: true });
+    expect(removed.json).toMatchObject({ hasNationalId: false });
     expect(replaced.text).not.toContain("98765");
   });
 
