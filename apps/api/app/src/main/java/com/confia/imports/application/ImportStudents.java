@@ -15,6 +15,7 @@ import com.confia.shared.security.Digests;
 import com.confia.shared.security.TransactionRunner;
 import com.confia.students.application.importing.CreateOutcome;
 import com.confia.students.application.importing.ImportRow;
+import com.confia.students.application.importing.PartialImportException;
 import com.confia.students.application.importing.RowProblem;
 import com.confia.students.application.importing.StudentImportGateway;
 import java.nio.ByteBuffer;
@@ -128,8 +129,14 @@ public final class ImportStudents {
         UUID simulationId = simulationOf(actor, auditRequestId, institution, sha256);
 
         Reading reading = read(actor, auditRequestId, file);
-        List<CreateOutcome> outcomes = reading.validRows().isEmpty() ? List.of()
-                : students.createAll(actor, auditRequestId.toString(), reading.validRows());
+        List<CreateOutcome> outcomes;
+        try {
+            outcomes = reading.validRows().isEmpty() ? List.of()
+                    : students.createAll(actor, auditRequestId.toString(), reading.validRows());
+        } catch (PartialImportException partial) {
+            throw failedAfterCommitting(actor, auditRequestId, sha256, reading.totalRows(), partial.created(),
+                    partial.failure());
+        }
         int created = 0;
         int lateSkipped = 0;
         List<Rejection> rejections = new ArrayList<>(reading.rejections());
@@ -152,8 +159,34 @@ public final class ImportStudents {
         ImportBatch batch = ImportBatch.applied(UUID.randomUUID(), ImportKind.STUDENTS, sha256, reading.totalRows(),
                 created, reading.rejectedRows() + lateRejected, reading.skippedRows() + lateSkipped, simulationId,
                 actor.accountId(), now());
-        record(actor, auditRequestId, institution, batch, true);
+        try {
+            record(actor, auditRequestId, institution, batch, true);
+        } catch (RuntimeException failure) {
+            throw failedAfterCommitting(actor, auditRequestId, sha256, reading.totalRows(), created, failure);
+        }
         return report(batch, rejections);
+    }
+
+    /**
+     * The application stopped after some students were committed, which stay: a trace with the counts and the
+     * fingerprint is left in the audit trail (in a transaction of its own, because the one of the failure is gone) and
+     * the original failure is the one that propagates. If the trace cannot be written either, that is added to the
+     * original failure as suppressed and does not replace it.
+     */
+    private RuntimeException failedAfterCommitting(AuthenticatedActor actor, UUID auditRequestId, String sha256,
+            int totalRows, int created, RuntimeException failure) {
+        if (created > 0) {
+            try {
+                transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
+                    auditLogWriter.append(ImportsAudit.failed(actor, auditRequestId, UUID.randomUUID(),
+                            ImportKind.STUDENTS, sha256, totalRows, created));
+                    return null;
+                });
+            } catch (RuntimeException traceFailure) {
+                failure.addSuppressed(traceFailure);
+            }
+        }
+        return failure;
     }
 
     public Page<ImportBatchView> list(AuthenticatedActor actor, String requestId, int page, int size) {

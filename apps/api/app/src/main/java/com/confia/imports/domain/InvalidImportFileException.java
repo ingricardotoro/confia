@@ -13,6 +13,9 @@ public final class InvalidImportFileException extends DomainException {
 
     public static final String CODE = "validation-failed";
 
+    /** The most problems one exception keeps; the rest are dropped, so a hostile file cannot make this list grow. */
+    public static final int MAX_PROBLEMS = 50;
+
     /** The field ({@code file}, a column of the template or {@code columns[n]}) and the reason. */
     public record Problem(String field, String reason) {
     }
@@ -25,7 +28,7 @@ public final class InvalidImportFileException extends DomainException {
 
     public InvalidImportFileException(List<Problem> problems) {
         super(CODE, "the import file is not valid");
-        this.problems = List.copyOf(problems);
+        this.problems = List.copyOf(problems.subList(0, Math.min(problems.size(), MAX_PROBLEMS)));
     }
 
     public List<Problem> problems() {

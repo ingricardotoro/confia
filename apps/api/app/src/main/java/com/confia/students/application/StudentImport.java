@@ -5,6 +5,7 @@ import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.TransactionRunner;
 import com.confia.students.application.importing.CreateOutcome;
 import com.confia.students.application.importing.ImportRow;
+import com.confia.students.application.importing.PartialImportException;
 import com.confia.students.application.importing.RowProblem;
 import com.confia.students.application.importing.StudentImportGateway;
 import com.confia.students.domain.DuplicateExternalRefException;
@@ -149,19 +150,28 @@ public final class StudentImport implements StudentImportGateway {
         Objects.requireNonNull(rows, "rows");
         UUID auditRequestId = StudentsAudit.requestId(Objects.requireNonNull(requestId, "requestId"));
         List<CreateOutcome> outcomes = new ArrayList<>(rows.size());
-        for (int from = 0; from < rows.size(); from += BLOCK_SIZE) {
-            List<ImportRow> block = rows.subList(from, Math.min(from + BLOCK_SIZE, rows.size()));
-            try {
-                transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
-                    block.forEach(row -> register(actor, auditRequestId.toString(), row));
-                    return null;
-                });
-                block.forEach(row -> outcomes.add(CreateOutcome.CREATED));
-            } catch (DuplicateExternalRefException | DuplicateNationalIdException conflict) {
-                for (ImportRow row : block) {
-                    outcomes.add(registerAlone(actor, auditRequestId, row));
+        try {
+            for (int from = 0; from < rows.size(); from += BLOCK_SIZE) {
+                List<ImportRow> block = rows.subList(from, Math.min(from + BLOCK_SIZE, rows.size()));
+                try {
+                    transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
+                        block.forEach(row -> register(actor, auditRequestId.toString(), row));
+                        return null;
+                    });
+                    block.forEach(row -> outcomes.add(CreateOutcome.CREATED));
+                } catch (DuplicateExternalRefException | DuplicateNationalIdException conflict) {
+                    for (ImportRow row : block) {
+                        outcomes.add(registerAlone(actor, auditRequestId, row));
+                    }
                 }
             }
+        } catch (RuntimeException failure) {
+            // Blocks already committed stay: the caller is told how many, to leave a trace of the partial result.
+            int created = (int) outcomes.stream().filter(outcome -> outcome == CreateOutcome.CREATED).count();
+            if (created > 0) {
+                throw new PartialImportException(created, failure);
+            }
+            throw failure;
         }
         return List.copyOf(outcomes);
     }

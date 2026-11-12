@@ -96,6 +96,9 @@ public final class StudentsCsv {
         Map<String, Integer> columns = new HashMap<>();
         List<InvalidImportFileException.Problem> problems = new ArrayList<>();
         List<String> names = header.cells();
+        if (names.size() > CsvParser.MAX_CELLS) {
+            throw new InvalidImportFileException("file", "too-many-columns");
+        }
         for (int i = 0; i < names.size(); i++) {
             String name = names.get(i).strip();
             if (!KNOWN.contains(name) || columns.putIfAbsent(name, i) != null) {

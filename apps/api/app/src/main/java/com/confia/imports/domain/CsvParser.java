@@ -13,7 +13,9 @@ import java.util.List;
  *       the cell; after the closing quote only a separator, a line end or the end of the file may follow;</li>
  *   <li>a quote inside an unquoted cell, or a quoted cell that never closes, makes the file malformed;</li>
  *   <li>{@code \r\n}, {@code \n} and {@code \r} end a record, and completely empty lines are skipped;</li>
- *   <li>more records than the limit refuse the file before the rest is read.</li>
+ *   <li>more records than the limit refuse the file before the rest is read, and so do more than {@link
+ *       #MAX_CELLS} cells in one record (checked as each cell is added, so a file of separators allocates nothing
+ *       beyond the limit).</li>
  * </ul>
  *
  * <p>It only splits text. It never interprets a cell: a cell that starts with {@code =}, {@code +}, {@code -} or
@@ -35,6 +37,9 @@ public final class CsvParser {
             return "CsvRecord[line=" + line + "]";
         }
     }
+
+    /** The most cells a record may have; the template has six columns, so this is a generous bound, not a feature. */
+    public static final int MAX_CELLS = 32;
 
     private static final String FILE = "file";
 
@@ -60,6 +65,12 @@ public final class CsvParser {
     private List<CsvRecord> records(int maxRecords) {
         List<CsvRecord> records = new ArrayList<>();
         while (position < text.length()) {
+            char first = text.charAt(position);
+            if (first == '\r' || first == '\n') {
+                // An empty line is skipped without building a record.
+                endOfLine();
+                continue;
+            }
             int startLine = line;
             List<String> cells = record();
             if (cells.size() == 1 && cells.getFirst().isEmpty() && !startedWithQuote) {
@@ -81,6 +92,9 @@ public final class CsvParser {
             if (cells.isEmpty()) {
                 startedWithQuote = quoted;
             }
+            if (cells.size() >= MAX_CELLS) {
+                throw new InvalidImportFileException(FILE, "too-many-columns");
+            }
             cells.add(quoted ? quotedCell() : plainCell());
             if (position >= text.length()) {
                 return cells;
@@ -89,6 +103,9 @@ public final class CsvParser {
             if (next == delimiter) {
                 position++;
                 if (position >= text.length()) {
+                    if (cells.size() >= MAX_CELLS) {
+                        throw new InvalidImportFileException(FILE, "too-many-columns");
+                    }
                     cells.add("");
                     return cells;
                 }

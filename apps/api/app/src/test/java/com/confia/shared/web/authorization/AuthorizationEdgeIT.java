@@ -1071,7 +1071,7 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
             AdminSecurityConfiguration.class, ObservabilityMetricsConfiguration.class,
             RateLimiterConfiguration.class, ThrottlingConfiguration.class,
             RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,
-            SessionTokenConfiguration.class, CsrfConfiguration.class,
+            com.confia.shared.web.edge.MultipartEdgeConfiguration.class, SessionTokenConfiguration.class, CsrfConfiguration.class,
             SessionCookieConfiguration.class, JobSchedulingConfiguration.class,
             AuthorizationConfiguration.class, AuthorizationTestController.class})
     static class Harness {

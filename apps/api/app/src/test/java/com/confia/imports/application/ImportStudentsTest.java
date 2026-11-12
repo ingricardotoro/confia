@@ -16,6 +16,7 @@ import com.confia.shared.security.AuthenticationMethod;
 import com.confia.shared.security.TransactionRunner;
 import com.confia.students.application.importing.CreateOutcome;
 import com.confia.students.application.importing.ImportRow;
+import com.confia.students.application.importing.PartialImportException;
 import com.confia.students.application.importing.RowProblem;
 import com.confia.students.application.importing.StudentImportGateway;
 import com.confia.support.JdbcStubTransactions;
@@ -438,6 +439,70 @@ class ImportStudentsTest {
         assertThat(apply(file).batch().createdRows()).isEqualTo(2);
     }
 
+    @Test
+    void ifTheRegistryFailsAfterCommittingSomeBlocksAFailedEntryWithThePartialCountsIsAuditedAndTheFailureRethrown() {
+        byte[] file = rows(3);
+        simulate(file);
+        IllegalStateException cause = new IllegalStateException("database down");
+        students.failure = new PartialImportException(2, cause);
+
+        assertThatThrownBy(() -> apply(file)).isSameAs(cause);
+
+        assertThat(batches.rows).as("no applied batch").hasSize(1);
+        assertThat(audit).hasSize(2);
+        AuditEntry failed = audit.getLast();
+        assertThat(failed.action()).isEqualTo("imports.batch.failed");
+        assertThat(failed.outcome()).isEqualTo("error");
+        assertThat(failed.entityType()).isEqualTo("imports.batch");
+        assertThat(failed.actorId()).isEqualTo(actor.accountId());
+        assertThat(failed.institutionId()).isEqualTo(institutionUuid);
+        assertThat(failed.afterValue()).contains("\"status\":\"FAILED\"", "\"totalRows\":3",
+                "\"createdRows\":2", "\"fileSha256\":\"" + sha256(file) + "\"")
+                .doesNotContain("Nombre", "Apellido", "R1", "database down");
+        assertThat(failed.reason()).isNull();
+    }
+
+    @Test
+    void ifTheBatchCannotBeRecordedAfterTheStudentsWereCreatedAFailedEntryIsAuditedToo() {
+        byte[] file = rows(2);
+        simulate(file);
+        IllegalStateException cause = new IllegalStateException("batch table down");
+        batches.insertFailure = cause;
+
+        assertThatThrownBy(() -> apply(file)).isSameAs(cause);
+
+        assertThat(audit.getLast().action()).isEqualTo("imports.batch.failed");
+        assertThat(audit.getLast().afterValue()).contains("\"createdRows\":2", "\"totalRows\":2");
+    }
+
+    @Test
+    void ifNothingWasCreatedBeforeTheFailureNoFailedEntryIsWritten() {
+        byte[] file = rows(2);
+        simulate(file);
+        batches.insertFailure = new IllegalStateException("batch table down");
+        students.outcomes = row -> CreateOutcome.ALREADY_IMPORTED;
+
+        assertThatThrownBy(() -> apply(file)).hasMessage("batch table down");
+
+        assertThat(audit).extracting(AuditEntry::action).containsExactly("imports.batch.simulated");
+    }
+
+    @Test
+    void ifTheFailedEntryCannotBeWrittenTheOriginalFailureStillPropagatesWithTheOtherSuppressed() {
+        byte[] file = rows(2);
+        simulate(file);
+        IllegalStateException cause = new IllegalStateException("database down");
+        students.failure = new PartialImportException(1, cause);
+        IllegalStateException auditDown = new IllegalStateException("audit down");
+        AuditLogWriter failing = entry -> {
+            throw auditDown;
+        };
+        ImportStudents broken = new ImportStudents(runner, batches, students, failing, Clock.fixed(NOW, ZoneOffset.UTC));
+
+        assertThatThrownBy(() -> broken.apply(actor, requestId, file)).isSameAs(cause)
+                .satisfies(e -> assertThat(e.getSuppressed()).containsExactly(auditDown));
+    }
+
     // --- Audit ---
 
     @Test
@@ -510,10 +575,14 @@ class ImportStudentsTest {
         }
 
         final List<ImportBatch> rows = new ArrayList<>();
+        RuntimeException insertFailure;
         private final List<Stored> stored = new ArrayList<>();
 
         @Override
         public void insert(InstitutionId institutionId, ImportBatch batch) {
+            if (insertFailure != null) {
+                throw insertFailure;
+            }
             rows.add(batch);
             stored.add(new Stored(institutionId.value(), batch));
         }

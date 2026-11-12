@@ -142,4 +142,48 @@ class CsvParserTest {
     void theTextOfARecordShowsOnlyItsLine() {
         assertThat(parse("secreto\n").getFirst().toString()).isEqualTo("CsvRecord[line=1]");
     }
+
+    @Test
+    void aRecordOfExactlyTheMaximumNumberOfCellsIsAccepted() {
+        String record = ",".repeat(CsvParser.MAX_CELLS - 1);
+
+        assertThat(cells(parse(record + "\n").getFirst())).hasSize(CsvParser.MAX_CELLS);
+    }
+
+    @Test
+    void aRecordWithOneCellOverTheMaximumRefusesTheFile() {
+        String record = ",".repeat(CsvParser.MAX_CELLS);
+
+        assertThatThrownBy(() -> parse(record + "\n")).isInstanceOfSatisfying(InvalidImportFileException.class,
+                e -> assertThat(e.problems()).containsExactly(
+                        new InvalidImportFileException.Problem("file", "too-many-columns")));
+        // The separator that ends the file adds an empty cell too.
+        assertThatThrownBy(() -> parse(record)).isInstanceOf(InvalidImportFileException.class);
+    }
+
+    @Test
+    void aFileOfFiveMegabytesOfSeparatorsIsRefusedAtTheFirstCellOverTheLimit() {
+        String text = ",".repeat(5 * 1024 * 1024);
+
+        assertThatThrownBy(() -> CsvParser.parse(text, 10_001)).isInstanceOfSatisfying(
+                InvalidImportFileException.class,
+                e -> assertThat(e.problems()).containsExactly(
+                        new InvalidImportFileException.Problem("file", "too-many-columns")));
+    }
+
+    @Test
+    void fiveMegabytesOfRowsOfSeparatorsStopAtTheRecordLimit() {
+        String text = ",\n".repeat(5 * 1024 * 1024 / 2);
+
+        assertThatThrownBy(() -> CsvParser.parse(text, 100)).isInstanceOfSatisfying(
+                InvalidImportFileException.class,
+                e -> assertThat(e.problems()).containsExactly(
+                        new InvalidImportFileException.Problem("file", "too-many-rows")));
+    }
+
+    @Test
+    void fiveMegabytesOfEmptyLinesBuildNoRecord() {
+        assertThat(parse("\n".repeat(5 * 1024 * 1024))).isEmpty();
+        assertThat(parse("\r\n".repeat(1024 * 1024))).isEmpty();
+    }
 }

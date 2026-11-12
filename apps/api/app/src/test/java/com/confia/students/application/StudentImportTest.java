@@ -10,6 +10,7 @@ import com.confia.shared.security.AuthenticationMethod;
 import com.confia.shared.security.TransactionRunner;
 import com.confia.students.application.importing.CreateOutcome;
 import com.confia.students.application.importing.ImportRow;
+import com.confia.students.application.importing.PartialImportException;
 import com.confia.students.application.importing.RowProblem;
 import com.confia.support.JdbcStubTransactions;
 import java.time.Clock;
@@ -246,5 +247,23 @@ class StudentImportTest {
     void noRowsRegisterNothing() {
         assertThat(imports.createAll(actor, requestId, List.of())).isEmpty();
         assertThat(transactionCalls).isEmpty();
+    }
+
+    @Test
+    void anUnexpectedFailureAfterSomeBlocksCommittedReportsHowManyWereCreatedAndKeepsTheCause() {
+        List<ImportRow> rows = new ArrayList<>();
+        for (int i = 0; i < StudentImport.BLOCK_SIZE; i++) {
+            rows.add(ok(i + 2, "L" + i));
+        }
+        // An unevaluated row that breaks a rule fails the second block with an error that is not a conflict.
+        rows.add(row(StudentImport.BLOCK_SIZE + 2, "BAD", "", "Perez", "2012-05-20", "F", null));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> imports.createAll(actor, requestId, rows))
+                .isInstanceOfSatisfying(PartialImportException.class, e -> {
+                    assertThat(e.created()).isEqualTo(StudentImport.BLOCK_SIZE);
+                    assertThat(e.failure()).isInstanceOf(com.confia.students.domain.InvalidStudentException.class);
+                    assertThat(e.getMessage()).doesNotContain("BAD", "Perez");
+                });
+        assertThat(store.rowsOf(institution)).as("the first block stays").hasSize(StudentImport.BLOCK_SIZE);
     }
 }

@@ -142,4 +142,39 @@ class StudentsCsvTest {
 
         assertThat(parsed.rows().getFirst().toString()).isEqualTo("Row[line=2]");
     }
+
+    @Test
+    void aHeaderOfFiveMegabytesOfCommasIsRefusedWithASingleProblem() {
+        assertThat(refused(",".repeat(5 * 1024 * 1024))).containsExactly(new Problem("file", "too-many-columns"));
+    }
+
+    @Test
+    void aHeaderOverTheCellLimitIsRefusedWithoutListingEachColumn() {
+        String header = HEADER + ",x".repeat(CsvParser.MAX_CELLS);
+
+        assertThat(refused(header + "\n")).containsExactly(new Problem("file", "too-many-columns"));
+    }
+
+    @Test
+    void aRowOverTheCellLimitRefusesTheFile() {
+        assertThat(refused(HEADER + "\n" + ",".repeat(CsvParser.MAX_CELLS) + "\n"))
+                .containsExactly(new Problem("file", "too-many-columns"));
+    }
+
+    @Test
+    void fiveMegabytesOfRowsOfCommasAreRefusedByRowCountWithASingleProblem() {
+        String text = HEADER + "\n" + ",\n".repeat(5 * 1024 * 1024 / 2);
+
+        assertThat(refused(text)).containsExactly(new Problem("file", "too-many-rows"));
+    }
+
+    @Test
+    void theProblemsOfAnExceptionAreBoundedWhateverTheCaller() {
+        List<Problem> many = java.util.stream.IntStream.range(0, 100_000)
+                .mapToObj(i -> new Problem("columns[" + i + "]", "unknown-column")).toList();
+
+        assertThat(new InvalidImportFileException(many).problems())
+                .hasSize(InvalidImportFileException.MAX_PROBLEMS).isEqualTo(many.subList(0,
+                        InvalidImportFileException.MAX_PROBLEMS));
+    }
 }

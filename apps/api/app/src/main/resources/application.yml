@@ -160,13 +160,17 @@ spring:
     keep-alive: true
   servlet:
     multipart:
-      # The student import (docs/cortes/imports-students.md) is the only multipart route. A file is at most 5 MB, and a
-      # request at most 6 MB (the file plus the headers of the parts); a larger one is refused while it is read, before
-      # any of it is kept, with 400 validation-failed. Nothing is written to disk below the threshold of 5 MB: the file
-      # is personal data of minors in bulk and is read into memory for the length of the call.
+      # The student import (docs/cortes/imports-students.md) is the only multipart route of the administrative process;
+      # the portal and the worker exclude this auto-configuration, and MultipartScopeFilter refuses a multipart request
+      # to any other path of the administrative process with 415 before it is read. A file is at most 5 MB, and a
+      # request at most 6 MB (the file plus the headers of the parts); a larger one is refused while it is read, with
+      # 400 validation-failed. file-size-threshold is left at the Spring default (0): the parts spill to a temporary
+      # file and are not held in the heap of the server. The container removes them when the request ends.
+      # resolve-lazily: the request is not parsed when it arrives but when the handler asks for the file, so the
+      # security chain, the permission decision and the rate limit answer first, without reading the body.
       max-file-size: 5MB
       max-request-size: 6MB
-      file-size-threshold: 5MB
+      resolve-lazily: true
   jackson:
     deserialization:
       # A JSON property the body does not declare is refused with 400 validation-failed and is never

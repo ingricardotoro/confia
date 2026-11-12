@@ -2,6 +2,7 @@ package com.confia.imports.web;
 
 import static com.confia.shared.web.harness.ProblemAssertions.assertProblem;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -35,6 +36,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -585,6 +587,172 @@ class ImportEndpointsIT extends CommittingPostgresIntegrationTest {
                 400, "validation-failed");
         assertProblem(post(SIMULATE, admin.token(), new Body("application/json", "{}".getBytes(StandardCharsets.UTF_8))),
                 415, "unsupported-media-type");
+    }
+
+    @Test
+    void multipartToAnyOtherRouteIsRefusedWith415BeforeItIsReadWithOrWithoutASession() throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        // Not a well-formed multipart body: if anything parsed it, the answer would be a 400, never a 415.
+        Body garbage = new Body("multipart/form-data; boundary=zzz",
+                "this is not multipart".getBytes(StandardCharsets.UTF_8));
+        Body mixedCase = new Body("Multipart/Mixed; boundary=zzz", garbage.bytes());
+        Body big = multipart("estudiantes.csv", new byte[5 * 1024 * 1024]);
+
+        assertProblem(post(STUDENTS, admin.token(), garbage), 415, "unsupported-media-type");
+        assertProblem(post(STUDENTS, admin.token(), mixedCase), 415, "unsupported-media-type");
+        assertProblem(post(STUDENTS, admin.token(), big), 415, "unsupported-media-type");
+        assertProblem(post(BATCHES, admin.token(), garbage), 415, "unsupported-media-type");
+        assertProblem(post("/api/v1/auth/sessions", null, garbage), 415, "unsupported-media-type");
+        assertProblem(post("/api/v1/does-not-exist", null, garbage), 415, "unsupported-media-type");
+        assertThat(countOf("students_student", admin.institution())).isZero();
+        assertThat(countOf("imports_batch", admin.institution())).isZero();
+
+        // The import routes still accept it, and parse it there (a body without the part is a 400).
+        assertProblem(post(SIMULATE, admin.token(), garbage), 400, "validation-failed");
+        assertThat(simulate(admin, clean(2)).statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void aThrottledAccountGets429BeforeTheBodyOfItsRequestIsParsed() throws Exception {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        Body garbage = new Body("multipart/form-data; boundary=zzz",
+                "this is not multipart".getBytes(StandardCharsets.UTF_8));
+        try (ConfigurableApplicationContext limited = AdminProcessLauncher.launch(SharedPostgresContainer.jdbcUrl(),
+                "confia_admin_app", TEST_PASSWORD, keys, Map.of("confia.web.trusted-proxies", "127.0.0.1,::1",
+                        "confia.crypto.blind-index.current-version", "v1",
+                        "confia.crypto.blind-index.keys.v1", BLIND_INDEX_KEY,
+                        RATE_LIMIT + "admin-import.request-limit", "10000",
+                        RATE_LIMIT + "admin-import-account.request-limit", "1"))) {
+            int limitedPort = ((WebServerApplicationContext) limited).getWebServer().getPort();
+
+            // Control: within its quota the body is parsed, and a body that is not multipart is a 400.
+            assertProblem(sendFrom(limitedPort, "203.0.113.50", SIMULATE, admin.token(), garbage), 400,
+                    "validation-failed");
+            // Over the quota the same body gets 429: the limiter answered before anything of the body was read.
+            HttpResponse<String> refused = sendFrom(limitedPort, "203.0.113.50", SIMULATE, admin.token(), garbage);
+            assertProblem(refused, 429, "too-many-requests");
+            assertThat(refused.headers().firstValue("Retry-After")).isPresent();
+        }
+    }
+
+    @Test
+    void aReferenceTakenByAConcurrentWriterNeverReachesTheServerLogEvenWithTheDetailEnabled() throws Exception {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        String raced = "RACE-REF-" + UUID.randomUUID();
+        String control = "CONTROL-REF-" + UUID.randomUUID();
+        String file = HEADER + raced + ",NombreSecreto1,ApellidoSecreto1,2012-05-20,,F\n"
+                + "OTHER-REF-" + UUID.randomUUID() + ",NombreSecreto2,ApellidoSecreto2,2012-05-20,,M\n";
+        assertThat(simulate(admin, file).statusCode()).isEqualTo(200);
+        try (Connection settings = SharedPostgresContainer.connectionAs("postgres");
+                Statement statement = settings.createStatement()) {
+            settings.setAutoCommit(true);
+            // The container starts with the terse log, a command-line setting. A setting of the role overrides it for the
+            // sessions that open afterwards; the application is not a superuser, so it also needs an explicit grant on
+            // the parameters (all revoked at the end). The process below starts after that. With the parameters of a
+            // failed statement logged in full, an error of the application would print the reference of the file.
+            List<String> verbose = List.of("log_error_verbosity = 'default'", "log_min_error_statement = 'error'",
+                    "log_parameter_max_length_on_error = '-1'");
+            for (String role : List.of("postgres", "confia_admin_app")) {
+                for (String setting : verbose) {
+                    statement.execute("alter role " + role + " set " + setting);
+                }
+            }
+            statement.execute("grant set on parameter log_error_verbosity, log_min_error_statement, "
+                    + "log_parameter_max_length_on_error to confia_admin_app");
+            try (ConfigurableApplicationContext verboseProcess = AdminProcessLauncher.launch(SharedPostgresContainer.jdbcUrl(),
+                    "confia_admin_app", TEST_PASSWORD, keys, Map.of(
+                            "confia.crypto.blind-index.current-version", "v1",
+                            "confia.crypto.blind-index.keys.v1", BLIND_INDEX_KEY,
+                            RATE_LIMIT + "admin-import.request-limit", "10000",
+                            RATE_LIMIT + "admin-import-account.request-limit", "10000"))) {
+                int verbosePort = ((WebServerApplicationContext) verboseProcess).getWebServer().getPort();
+                // Control: with this configuration a unique violation prints the reference in the log.
+                insertRawStudent(admin.institution(), control);
+                assertThatThrownBy(() -> insertRawStudent(admin.institution(), control))
+                        .isInstanceOfSatisfying(SQLException.class,
+                                e -> assertThat(e.getSQLState()).isEqualTo("23505"));
+                assertThat(serverLogMentions(control)).as("control: the log shows the violated key").isTrue();
+
+                // Another writer holds the reference in a transaction that has not committed.
+                try (Connection holder = SharedPostgresContainer.connectionAs("postgres")) {
+                    holder.setAutoCommit(false);
+                    insertRawStudent(holder, admin.institution(), raced);
+                    ExecutorService pool = Executors.newSingleThreadExecutor();
+                    try {
+                        Future<HttpResponse<String>> application = pool.submit(() -> sendFrom(verbosePort, null,
+                                APPLY, admin.token(), multipart("estudiantes.csv", file.getBytes(StandardCharsets.UTF_8))));
+                        awaitBlockedWriter(statement);
+                        holder.commit();
+                        HttpResponse<String> answer = application.get();
+                        assertThat(answer.statusCode()).as(answer.body()).isEqualTo(200);
+                        JsonNode batch = HarnessProcess.json(answer).get("batch");
+                        assertThat(batch.get("createdRows").asInt()).isEqualTo(1);
+                        assertThat(batch.get("skippedRows").asInt()).isEqualTo(1);
+                    } finally {
+                        pool.shutdownNow();
+                    }
+                }
+                assertThat(serverLogMentions(raced)).as("the reference of the file is not in the server log")
+                        .isFalse();
+            } finally {
+                for (String role : List.of("postgres", "confia_admin_app")) {
+                    statement.execute("alter role " + role + " reset log_error_verbosity");
+                    statement.execute("alter role " + role + " reset log_min_error_statement");
+                    statement.execute("alter role " + role + " reset log_parameter_max_length_on_error");
+                }
+                statement.execute("revoke set on parameter log_error_verbosity, log_min_error_statement, "
+                        + "log_parameter_max_length_on_error from confia_admin_app");
+            }
+        }
+    }
+
+    /** The writer of the application waits for the lock of the uncommitted row: the race is on. */
+    private static void awaitBlockedWriter(Statement statement) throws SQLException, InterruptedException {
+        long deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
+        while (System.nanoTime() < deadline) {
+            try (ResultSet waiting = statement.executeQuery(
+                    "select count(*) from pg_stat_activity where wait_event_type = 'Lock' "
+                            + "and query ilike '%students_student%'")) {
+                waiting.next();
+                if (waiting.getLong(1) > 0) {
+                    return;
+                }
+            }
+            Thread.sleep(50);
+        }
+        throw new AssertionError("the application never waited for the row of the other writer");
+    }
+
+    /** Whether the log of the server mentions {@code text}; the log lines of a past statement may arrive late. */
+    private static boolean serverLogMentions(String text) throws InterruptedException {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            if (SharedPostgresContainer.instance().getLogs().contains(text)) {
+                return true;
+            }
+            Thread.sleep(100);
+        }
+        return false;
+    }
+
+    private static void insertRawStudent(UUID institution, String reference) throws SQLException {
+        try (Connection connection = SharedPostgresContainer.connectionAs("postgres")) {
+            insertRawStudent(connection, institution, reference);
+        }
+    }
+
+    private static void insertRawStudent(Connection connection, UUID institution, String reference)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                insert into students_student (institution_id, id, student_code, first_name, last_name, birth_date, sex,
+                                              external_ref)
+                values (?, ?, ?, 'Raw', 'Student', date '2012-05-20', 'F', ?)
+                """)) {
+            statement.setObject(1, institution);
+            statement.setObject(2, UUID.randomUUID());
+            statement.setString(3, "RAW-" + UUID.randomUUID().toString().substring(0, 8));
+            statement.setString(4, reference);
+            statement.executeUpdate();
+        }
     }
 
     @Test

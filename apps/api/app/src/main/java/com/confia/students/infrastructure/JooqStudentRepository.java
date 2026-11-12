@@ -11,6 +11,7 @@ import com.confia.students.application.PageRequest;
 import com.confia.students.application.ProtectedNationalId;
 import com.confia.students.application.StudentFilter;
 import com.confia.students.application.StudentRepository;
+import com.confia.students.domain.DuplicateExternalRefException;
 import com.confia.students.domain.DuplicateNationalIdException;
 import com.confia.students.domain.ResourceNotFoundException;
 import com.confia.students.domain.Sex;
@@ -117,7 +118,7 @@ public final class JooqStudentRepository implements StudentRepository {
     private void insertRow(InstitutionId institutionId, Student student, ProtectedNationalId document,
             String externalRef) {
         refuseDocumentOfAnotherStudent(institutionId, student.id(), document);
-        StudentWrites.translating(() -> dsl.insertInto(STUDENTS_STUDENT)
+        var insert = dsl.insertInto(STUDENTS_STUDENT)
                 .set(STUDENTS_STUDENT.INSTITUTION_ID, institutionId.value())
                 .set(STUDENTS_STUDENT.ID, student.id())
                 .set(STUDENTS_STUDENT.STUDENT_CODE, student.studentCode())
@@ -130,8 +131,20 @@ public final class JooqStudentRepository implements StudentRepository {
                 .set(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX, document == null ? null : document.blindIndex())
                 .set(STUDENTS_STUDENT.STATUS, student.status().name())
                 .set(STUDENTS_STUDENT.CREATED_AT, StudentWrites.toDatabase(student.createdAt()))
-                .set(STUDENTS_STUDENT.UPDATED_AT, StudentWrites.toDatabase(student.updatedAt()))
-                .execute());
+                .set(STUDENTS_STUDENT.UPDATED_AT, StudentWrites.toDatabase(student.updatedAt()));
+        if (externalRef == null) {
+            StudentWrites.translating(insert::execute);
+            return;
+        }
+        // The reference of the source system is the user's data: a unique violation would print it in the DETAIL of the
+        // server log. ON CONFLICT settles the same race (it waits for a concurrent writer) without raising an error,
+        // so there is nothing for the log to print. The other uniqueness (code, document) still raise and translate.
+        int[] inserted = new int[1];
+        StudentWrites.translating(() -> inserted[0] = insert
+                .onConflict(STUDENTS_STUDENT.INSTITUTION_ID, STUDENTS_STUDENT.EXTERNAL_REF).doNothing().execute());
+        if (inserted[0] == 0) {
+            throw new DuplicateExternalRefException();
+        }
     }
 
     @Override
