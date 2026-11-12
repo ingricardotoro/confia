@@ -86,7 +86,7 @@ test.describe("the guardians registry, registering and editing", () => {
     await expect(resultNotice(page)).toContainText("Se desactivó «Rosa Aguilar». El encargado sigue vinculado a 1 estudiante.");
     await page.getByRole("button", { name: "Ver detalle de Rosa Aguilar" }).click();
     await expect(dialog(page).getByText(/sus vínculos siguen vigentes/)).toBeVisible();
-    await expect(dialog(page).getByRole("table")).toContainText("Ana Aguilar · E-000001");
+    await expect(dialog(page).getByRole("table", { name: "Estudiantes a los que el encargado está vinculado ahora" })).toContainText("Ana Aguilar · E-000001");
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Activar Rosa Aguilar" }).click();
     await expect(resultNotice(page)).toContainText("Se activó «Rosa Aguilar».");

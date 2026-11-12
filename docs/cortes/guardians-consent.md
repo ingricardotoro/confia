@@ -170,3 +170,56 @@ nombres y dirección). Actualizadas: `ProblemCodeTest`, `PermissionedEndpointsTe
   auditoría; evaluar registrarlos como `denied`.
 - **Revocar requiere un administrador**: hasta que exista la baja desde el portal, un encargado que pide dejar de recibir
   comunicaciones depende de que un miembro del personal con permiso lo registre.
+
+## Construido en el frontend
+
+Sección «Consentimientos» dentro del diálogo de detalle de «Encargados» (`/guardians`, botón «Ver detalle»). Código en
+`apps/admin-web/src/features/guardians/` (`GuardianConsentsContainer`, `components/GuardianConsents`, `use-consent-form`,
+`consent-model`), operaciones `getGuardianConsents` y `recordGuardianConsent` en `shared/api/guardian-operations.ts`. El cliente se
+regeneró con `pnpm --filter @confia/contracts generate`.
+
+**Decisiones**
+
+- **Matriz 3 × 2** (canal × finalidad) en una tabla con encabezados de fila y de columna. Cada celda muestra el estado que dice el
+  servidor («Concedido», «Revocado» o «Sin consentimiento registrado»), desde cuándo, la versión de política y la evidencia. No hay
+  casillas, botones de opción ni valor premarcado: la evidencia del formulario empieza en «Elija la evidencia» y la versión, vacía.
+- **Acciones por celda**: «Registrar consentimiento» y «Registrar revocación», con nombre accesible que incluye canal y finalidad.
+  Abren un formulario en línea (no un diálogo anidado): conceder pide versión de política y evidencia (`SIGNED_PAPER_FORM` o
+  `ADMIN_REGISTERED`); revocar solo evidencia y **no envía** `policyVersion`. Sin `Idempotency-Key` ni actualización optimista: el
+  botón queda en estado de envío y un segundo envío no hace nada; tras la respuesta se vuelve a leer `GET .../consents`.
+- **`changed`**: `true` produce «Se registró el consentimiento/la revocación…»; `false`, «Sin cambios: … ya estaba concedido/revocado.
+  No se agregó ningún evento al historial.». El mensaje vive en una región `aria-live="polite"` siempre montada.
+- **Foco**: al abrir va al primer campo (versión o evidencia); al cancelar o tras guardar vuelve al botón de la celda; un envío con
+  errores locales o de campo mueve el foco al resumen de errores (con enlaces a los campos); un fallo del servidor, al aviso
+  (`role="alert"`), conservando lo escrito.
+- **Errores**: `consent-channel-unavailable` y `guardian-not-active` con texto propio (el segundo, en esta pantalla, aclara que revocar
+  siempre es posible; `KNOWN_PROBLEM_CODES` pasa de 29 a 30 y `PROBLEM_KEYS` lo espeja), `forbidden`, `resource-not-found`, 429 con
+  cuenta regresiva, error inesperado con identificador de traza. Campos: `policyVersion` (`pattern`, `required`), `evidenceSource`
+  (`not-allowed`, `required`); `purpose`/`channel`/`action` (`not-consentable`, etc.) no tienen control y se dicen como «no se pudieron
+  procesar los datos». Un encargado inactivo muestra un aviso previo; el servidor sigue decidiendo.
+- **Historial**: tabla del más reciente al más antiguo (fecha y hora en la zona de la institución con `Intl.DateTimeFormat`, canal,
+  finalidad, acción, política, evidencia), vacío con texto propio y nota cuando el servidor corta en 100. Estados: esqueleto con la
+  forma de la matriz, error con reintento y traza, vacío, éxito.
+- **Sin datos de contacto** en la URL, el almacenamiento, la consola ni la sección: la API no los envía y el formulario no los toca.
+- Cambios compartidos mínimos: `formatInstant` en `shared/format/format-date.ts`, tres motivos nuevos en `fieldErrorKey`, `GuardianDetail`
+  gana la ranura opcional `consents`, y `classifyOrganizationFailure` reconoce `policyVersion` + `pattern`.
+
+**Simulador (e2e).** `mock-api/guardians-model.ts` atiende `GET` y `POST /guardians/{id}/consents` con un registro de eventos en
+memoria: estado derivado del último evento, `TRANSACTIONAL` y `PORTAL_FORM` rechazados con su campo, versión requerida, mal formada o
+sobrante, conceder exige encargado activo y dato del canal (correo para `EMAIL`, teléfono para `SMS` y `WHATSAPP`), revocar siempre se
+permite (también sobre `NEVER_GRANTED`), y la repetición del estado vigente no escribe (`changed: false`). **Una concesión sobre una
+concesión con otra versión o evidencia sí es un cambio** (`changed: true`), como el backend actual; la frase del apartado «Decisiones
+tomadas al construir» sobre «otra versión o evidencia en la repetición no cambia nada» quedó superada por ese comportamiento.
+
+**Pruebas del frontend.** `GuardianConsentsContainer.test.tsx` (21: matriz sin nada premarcado, estado y historial del servidor, límite de
+100, encargado inactivo, error con reintento, cuerpos exactos de conceder y revocar, un solo envío, `changed`, resumen de errores y foco,
+versión inválida, cancelar, cada código de problema, error de campo, 429, sin rastro de contacto), `format-instant.test.ts`,
+`guardians-model.test.ts` (7 nuevas) y las listas de códigos en `problem.test.ts` y `problem-keys.test.ts`. Recorridos:
+`e2e/specs/journeys/guardians-consents.e2e.ts` (7: el criterio de aceptación —conceder por correo con versión y papel firmado, revocar, el
+historial conserva ambos—, repetición, formulario vacío, canal sin dato, inactivo, teclado). Matriz de axe: `dialog-consents`,
+`dialog-consents-form-errors` y `dialog-consents-channel-error` en `/guardians`, en tema claro y oscuro.
+
+**Resultado de la verificación (frontend).** `tsc --noEmit` y `eslint` (src y e2e) limpios. Vitest dirigido (`features/guardians`, `shared`,
+`i18n`, `organization-failure`, `e2e/mock-api`, `e2e/support`): 49 archivos, 696 pruebas, todas pasan. Playwright, solo lo del corte: los
+cinco recorridos previos de encargados y el nuevo (33 pruebas) y la puerta de axe filtrada a encargados (28 evaluaciones, 14 estados en
+dos temas) pasan sin violaciones bloqueantes. No se ejecutó `test:e2e` completo.

@@ -164,13 +164,16 @@ describe("the states of the enrollments", () => {
 describe("the states of the guardians registry", () => {
   const guardians = MATRIX.filter((combination) => combination.route === "/guardians");
 
-  it("holds the list ready, three dialogs (new, edit with a document, errors), the detail, the no-match, empty and load-error states, each once", () => {
+  it("holds the list ready, three dialogs (new, edit with a document, errors), the detail, three states of its consents, the no-match, empty and load-error states, each once", () => {
     expect(guardians.map((combination) => [combination.state, combination.preset, combination.opensDialog])).toEqual([
       ["ready", undefined, undefined],
       ["dialog-open", undefined, true],
       ["dialog-edit-document", undefined, true],
       ["dialog-error-summary", undefined, true],
       ["dialog-detail", undefined, true],
+      ["dialog-consents", undefined, true],
+      ["dialog-consents-form-errors", undefined, true],
+      ["dialog-consents-channel-error", undefined, true],
       ["no-matches", undefined, undefined],
       ["empty", "guardians-empty", undefined],
       ["load-error", "guardians-server-error", undefined],

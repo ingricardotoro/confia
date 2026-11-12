@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import {
   AcademicYearPageResponse,
+  ConsentChangeResponse,
+  GuardianConsentsResponse,
   AcademicYearResponse,
   AuthenticatedSessionResponse,
   CurrentSessionResponse,
@@ -22,7 +24,11 @@ import {
   StudentResponse,
   type AcademicYearResponseOutput,
   type AuthenticatedSessionResponseOutput,
+  type ConsentChangeResponseOutput,
+  type ConsentEventResponseOutput,
+  type ConsentStandingResponseOutput,
   type CurrentSessionResponseOutput,
+  type GuardianConsentsResponseOutput,
   type EnrollmentResponseOutput,
   type EnrollmentTransferResponseOutput,
   type GradeResponseOutput,
@@ -446,6 +452,59 @@ export function studentGuardians(
     studentCode: "E-000001",
     totalPercent: links.length === 0 ? 0 : 100,
     links,
+    ...override,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+// The consents of a guardian (guardians-consent cut). The six standings always come: channel by channel, institutional first.
+const CONSENT_CHANNELS = ["EMAIL", "SMS", "WHATSAPP"] as const;
+const CONSENT_PURPOSES = ["INSTITUTIONAL", "MARKETING"] as const;
+
+/** The six standings, every one `NEVER_GRANTED` unless an override replaces it by `channel` and `purpose`. */
+export function consentStandings(overrides: readonly Partial<ConsentStandingResponseOutput>[] = []): ConsentStandingResponseOutput[] {
+  return CONSENT_CHANNELS.flatMap((channel) =>
+    CONSENT_PURPOSES.map((purpose) => {
+      const found = overrides.find((entry) => entry.channel === channel && entry.purpose === purpose);
+      return { channel, purpose, state: "NEVER_GRANTED" as const, since: null, policyVersion: null, evidenceSource: null, ...found };
+    }),
+  );
+}
+
+/** One event of the history of consents. */
+export function consentEvent(override: Partial<ConsentEventResponseOutput> = {}): ConsentEventResponseOutput {
+  return {
+    id: crypto.randomUUID(),
+    channel: "EMAIL",
+    purpose: "INSTITUTIONAL",
+    action: "GRANT",
+    evidenceSource: "SIGNED_PAPER_FORM",
+    policyVersion: "2026-01",
+    occurredAt: "2026-11-02T15:30:00Z",
+    ...override,
+  };
+}
+
+/** The answer of the read of the consents of a guardian. */
+export function guardianConsents(
+  states: readonly Partial<ConsentStandingResponseOutput>[] = [],
+  history: readonly ConsentEventResponseOutput[] = [],
+  guardianId: string = crypto.randomUUID(),
+): ContractResponse {
+  const body: GuardianConsentsResponseOutput = checked("guardian consents", GuardianConsentsResponse, { guardianId, states: consentStandings(states), history });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The answer of recording a consent. */
+export function consentChange(override: Partial<ConsentChangeResponseOutput> = {}): ContractResponse {
+  const body = checked("consent change", ConsentChangeResponse, {
+    channel: "EMAIL",
+    purpose: "INSTITUTIONAL",
+    state: "GRANTED",
+    since: "2026-11-02T15:30:00Z",
+    policyVersion: "2026-01",
+    evidenceSource: "SIGNED_PAPER_FORM",
+    changed: true,
     ...override,
   });
   return { status: 200, body, contentType: JSON_TYPE };

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Alert, Button, Dialog, ErrorState, Skeleton } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import { formatIsoDate } from "../../../shared/format/format-date.ts";
@@ -12,6 +13,8 @@ export type GuardianDetailState =
 export interface GuardianDetailProps {
   readonly state: GuardianDetailState;
   readonly onClose: () => void;
+  /** The consents section, already a container; it appears once the guardian is read. */
+  readonly consents?: ReactNode;
 }
 
 function Fact({ term, children }: { readonly term: string; readonly children: string }) {
@@ -28,7 +31,7 @@ function Fact({ term, children }: { readonly term: string; readonly children: st
  * whether a document and an RTN are registered, never their digits. Loading is a skeleton with the shape of the facts, a
  * failure offers a retry, and a guardian with no students says so.
  */
-export function GuardianDetail({ state, onClose }: GuardianDetailProps) {
+export function GuardianDetail({ state, onClose, consents }: GuardianDetailProps) {
   const { t } = useAdminText();
   return (
     <Dialog
@@ -44,17 +47,20 @@ export function GuardianDetail({ state, onClose }: GuardianDetailProps) {
         </Button>
       }
     >
-      <div aria-live="polite" className="flex flex-col gap-4">
-        {state.kind === "loading" ? (
-          <div aria-busy="true" className="flex flex-col gap-3">
-            <p className="sr-only">{t("guardians.detail.loading")}</p>
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-2/3" />
-          </div>
-        ) : null}
-        {state.kind === "failed" ? <ErrorState title={t("guardians.detail.loadFailed")} description={state.description} onRetry={state.onRetry} /> : null}
-        {state.kind === "ready" ? <Facts row={state.row} /> : null}
+      <div className="flex flex-col gap-4">
+        <div aria-live="polite" className="flex flex-col gap-4">
+          {state.kind === "loading" ? (
+            <div aria-busy="true" className="flex flex-col gap-3">
+              <p className="sr-only">{t("guardians.detail.loading")}</p>
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-2/3" />
+            </div>
+          ) : null}
+          {state.kind === "failed" ? <ErrorState title={t("guardians.detail.loadFailed")} description={state.description} onRetry={state.onRetry} /> : null}
+          {state.kind === "ready" ? <Facts row={state.row} /> : null}
+        </div>
+        {state.kind === "ready" ? consents : null}
       </div>
     </Dialog>
   );

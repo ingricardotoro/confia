@@ -241,3 +241,85 @@ describe("the set of a student", () => {
     expect(call(model(), "GET", "/students")).toBeUndefined();
   });
 });
+
+describe("the consents of a guardian", () => {
+  // Guardian 2 is active with an email; 1 has no contact data; 4 has an email and a phone; 10 is inactive with an email.
+  const consents = (target: GuardiansModel, n: number) => call(target, "GET", `/guardians/${guardianId(n)}/consents`);
+  const record = (target: GuardiansModel, n: number, body: Record<string, unknown>) => call(target, "POST", `/guardians/${guardianId(n)}/consents`, body);
+  const grant = { channel: "EMAIL", purpose: "INSTITUTIONAL", action: "GRANT", evidenceSource: "SIGNED_PAPER_FORM", policyVersion: "2026-01" };
+  const withdraw = { channel: "EMAIL", purpose: "INSTITUTIONAL", action: "WITHDRAW", evidenceSource: "ADMIN_REGISTERED" };
+  const stateOf = (answer: { body?: unknown } | undefined, channel: string, purpose: string) =>
+    (answer?.body as { states: { channel: string; purpose: string; state: string }[] }).states.find((entry) => entry.channel === channel && entry.purpose === purpose)?.state;
+
+  it("serves the six combinations as never granted, with no events", () => {
+    const answer = consents(model(), 2);
+
+    const body = answer?.body as { states: { state: string }[]; history: unknown[] };
+    expect(body.states).toHaveLength(6);
+    expect(body.states.every((entry) => entry.state === "NEVER_GRANTED")).toBe(true);
+    expect(body.history).toEqual([]);
+    expect(consents(model(), 999)?.status).toBe(404);
+  });
+
+  it("grants, withdraws and grants again: three events, newest first, and the state is the last one", () => {
+    const target = model();
+
+    expect(record(target, 2, grant)?.body).toMatchObject({ state: "GRANTED", changed: true });
+    expect(record(target, 2, withdraw)?.body).toMatchObject({ state: "WITHDRAWN", changed: true, policyVersion: null });
+    expect(record(target, 2, grant)?.body).toMatchObject({ state: "GRANTED", changed: true });
+
+    const answer = consents(target, 2);
+    expect(stateOf(answer, "EMAIL", "INSTITUTIONAL")).toBe("GRANTED");
+    expect((answer?.body as { history: { action: string }[] }).history.map((event) => event.action)).toEqual(["GRANT", "WITHDRAW", "GRANT"]);
+  });
+
+  it("writes nothing when the request repeats the state, but a grant with another version or evidence is a real change", () => {
+    const target = model();
+    record(target, 2, grant);
+
+    expect(record(target, 2, grant)?.body).toMatchObject({ changed: false });
+    expect(record(target, 2, { ...grant, policyVersion: "2026-02" })?.body).toMatchObject({ changed: true, policyVersion: "2026-02" });
+    expect(record(target, 2, { ...grant, policyVersion: "2026-02", evidenceSource: "ADMIN_REGISTERED" })?.body).toMatchObject({ changed: true });
+    record(target, 2, withdraw);
+    expect(record(target, 2, withdraw)?.body).toMatchObject({ changed: false });
+    expect((consents(target, 2)?.body as { history: unknown[] }).history).toHaveLength(4);
+  });
+
+  it("writes a withdrawal of a combination never granted", () => {
+    const target = model();
+
+    expect(record(target, 2, withdraw)?.body).toMatchObject({ state: "WITHDRAWN", changed: true });
+    expect((consents(target, 2)?.body as { history: unknown[] }).history).toHaveLength(1);
+  });
+
+  it("refuses the transactional purpose, the portal form and a bad or misplaced version, naming each field", () => {
+    const target = model();
+
+    expect(errorsOf(record(target, 2, { ...grant, purpose: "transactional" }))).toContainEqual({ field: "purpose", reason: "not-consentable" });
+    expect(errorsOf(record(target, 2, { ...grant, evidenceSource: "PORTAL_FORM" }))).toContainEqual({ field: "evidenceSource", reason: "not-allowed" });
+    expect(errorsOf(record(target, 2, { ...grant, policyVersion: "2026 01" }))).toContainEqual({ field: "policyVersion", reason: "pattern" });
+    expect(errorsOf(record(target, 2, { ...grant, policyVersion: undefined }))).toContainEqual({ field: "policyVersion", reason: "required" });
+    expect(errorsOf(record(target, 2, { ...withdraw, policyVersion: "2026-01" }))).toContainEqual({ field: "policyVersion", reason: "not-allowed" });
+    expect(errorsOf(record(target, 2, { ...grant, occurredAt: "2026-01-01T00:00:00Z" }))).toContainEqual({ field: "occurredAt", reason: "unknown" });
+    expect((consents(target, 2)?.body as { history: unknown[] }).history).toEqual([]);
+  });
+
+  it("refuses a grant for a channel without data and for an inactive guardian, but allows the withdrawal of an inactive one", () => {
+    const target = model();
+
+    expect(typeOf(record(target, 1, grant))).toBe("consent-channel-unavailable");
+    expect(typeOf(record(target, 2, { ...grant, channel: "SMS" }))).toBe("consent-channel-unavailable");
+    expect(record(target, 4, { ...grant, channel: "SMS" })?.status).toBe(200);
+    expect(typeOf(record(target, 10, grant))).toBe("guardian-not-active");
+    expect(record(target, 10, withdraw)?.status).toBe(200);
+    expect(record(target, 999, grant)?.status).toBe(404);
+  });
+
+  it("refuses every write with 403 and changes nothing when the writes are forbidden", () => {
+    const target = model({ writes: "forbidden" });
+
+    expect(record(target, 2, grant)?.status).toBe(403);
+    expect(consents(target, 2)?.status).toBe(200);
+    expect((consents(target, 2)?.body as { history: unknown[] }).history).toEqual([]);
+  });
+});

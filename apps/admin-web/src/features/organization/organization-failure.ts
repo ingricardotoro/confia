@@ -23,6 +23,7 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "invalid-enrollment-state",
   "transfer-year-mismatch",
   "guardian-not-active",
+  "consent-channel-unavailable",
 ]);
 
 /** The text of each reason the server gives for a split of the responsibility that does not hold. */
@@ -42,6 +43,8 @@ function fieldOf(error: { readonly field: string; readonly reason: string }): { 
   if (error.field === "nationalId" && error.reason === "pattern") return { field: "nationalId", reason: "national-id-format" };
   // The reason of a withdrawal or a transfer is 3 to 500 characters: `size` says it is too short as well as too long.
   if ((error.field === "withdrawalReason" || error.field === "reason") && error.reason === "size") return { field: error.field, reason: "reason-length" };
+  // The policy version of a consent: the server names a form it refuses (or more than 32 characters) `pattern`.
+  if (error.field === "policyVersion" && error.reason === "pattern") return { field: "policyVersion", reason: "policy-version-format" };
   // The contact data of a guardian: the server names a format it refuses `pattern`, and each has its own message.
   if (error.reason === "pattern" && (error.field === "rtn" || error.field === "email" || error.field === "phone")) {
     return { field: error.field, reason: `${error.field}-format` };

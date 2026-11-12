@@ -1,5 +1,6 @@
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { loadFailureOf } from "../organization/organization-failure.ts";
+import { GuardianConsentsContainer } from "./GuardianConsentsContainer.tsx";
 import { GuardianDetail } from "./components/GuardianDetail.tsx";
 import { useGuardianDetail } from "./use-guardians-queries.ts";
 
@@ -32,6 +33,11 @@ export function GuardianDetailContainer({ guardianId, onClose }: GuardianDetailC
                 onRetry: () => void detail.refetch(),
               }
             : { kind: "ready", row: detail.data }
+      }
+      consents={
+        detail.data === undefined || failure !== undefined ? undefined : (
+          <GuardianConsentsContainer guardianId={guardianId} guardianActive={detail.data.status === "ACTIVE"} />
+        )
       }
     />
   );

@@ -482,7 +482,48 @@ export const MATRIX: readonly GateCombination[] = [
       await openGuardiansRoute(page);
       await page.getByRole("button", { name: "Ver detalle de Rosa Aguilar" }).click();
     },
-    expected: (page) => page.getByRole("dialog", { name: "Detalle del encargado" }).getByRole("table"),
+    expected: (page) => page.getByRole("dialog", { name: "Detalle del encargado" }).getByRole("table", { name: "Estudiantes a los que el encargado está vinculado ahora" }),
+  },
+  {
+    route: GUARDIANS,
+    state: "dialog-consents",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openGuardiansRoute(page);
+      await page.getByRole("button", { name: "Ver detalle de Luis Alvarado" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Registrar consentimiento: Correo electrónico, Institucional" }).click();
+      await page.getByRole("dialog").getByRole("textbox", { name: /Versión de la política/ }).fill("2026-01");
+      await page.getByRole("dialog").getByRole("combobox", { name: /Evidencia/ }).selectOption({ label: "Formulario en papel firmado" });
+      await page.getByRole("dialog").getByRole("button", { name: "Registrar consentimiento", exact: true }).click();
+      await page.getByRole("dialog").getByText(/^Se registró el consentimiento/).waitFor();
+    },
+    expected: (page) => page.getByRole("dialog").getByRole("table", { name: "Eventos de consentimiento, del más reciente al más antiguo" }),
+  },
+  {
+    route: GUARDIANS,
+    state: "dialog-consents-form-errors",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openGuardiansRoute(page);
+      await page.getByRole("button", { name: "Ver detalle de Luis Alvarado" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Registrar consentimiento: Correo electrónico, Mercadeo" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Registrar consentimiento", exact: true }).click();
+    },
+    expected: (page) => page.getByRole("dialog").getByRole("group", { name: "Hay 2 campos con errores." }),
+  },
+  {
+    route: GUARDIANS,
+    state: "dialog-consents-channel-error",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openGuardiansRoute(page);
+      await page.getByRole("button", { name: "Ver detalle de Rosa Aguilar" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Registrar consentimiento: Correo electrónico, Institucional" }).click();
+      await page.getByRole("dialog").getByRole("textbox", { name: /Versión de la política/ }).fill("2026-01");
+      await page.getByRole("dialog").getByRole("combobox", { name: /Evidencia/ }).selectOption({ label: "Formulario en papel firmado" });
+      await page.getByRole("dialog").getByRole("button", { name: "Registrar consentimiento", exact: true }).click();
+    },
+    expected: (page) => page.getByRole("dialog").getByRole("alert").filter({ hasText: "no tiene registrado el dato de este canal" }),
   },
   {
     route: GUARDIANS,
