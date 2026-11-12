@@ -34,11 +34,12 @@ final class InMemoryStudents {
     final List<String> events = new ArrayList<>();
     final Map<Key, Stored> rows = new LinkedHashMap<>();
     final Map<UUID, Long> counters = new HashMap<>();
+    final Map<Key, String> externalRefs = new LinkedHashMap<>();
     PageRequest lastRequest;
     StudentFilter lastFilter;
 
     final StudentRepository students = new Repository();
-    final NationalIdProtector protector = new Protector();
+    final Protector protector = new Protector();
 
     private static Key key(InstitutionId institution, UUID id) {
         return new Key(institution.value(), id);
@@ -58,7 +59,13 @@ final class InMemoryStudents {
         return "bi:" + institution.value() + ":" + normalized;
     }
 
-    private final class Protector implements NationalIdProtector {
+    final class Protector implements NationalIdProtector, NationalIdIndexes {
+
+        @Override
+        public java.util.List<String> lookupIndexes(InstitutionId institution, NationalId nationalId) {
+            events.add("lookup-indexes");
+            return java.util.List.of(blindIndexOf(institution, nationalId.normalized()));
+        }
 
         @Override
         public ProtectedNationalId protect(InstitutionId institution, UUID studentId, NationalId nationalId) {
@@ -90,6 +97,41 @@ final class InMemoryStudents {
         public void insert(InstitutionId institution, Student student, ProtectedNationalId document) {
             guard(institution, student, document);
             rows.put(key(institution, student.id()), new Stored(student, document));
+        }
+
+        @Override
+        public void insertImported(InstitutionId institution, Student student, ProtectedNationalId document,
+                String externalRef) {
+            events.add("insert-imported");
+            if (references(institution).contains(externalRef)) {
+                throw new com.confia.students.domain.DuplicateExternalRefException();
+            }
+            guard(institution, student, document);
+            rows.put(key(institution, student.id()), new Stored(student, document));
+            externalRefs.put(key(institution, student.id()), externalRef);
+        }
+
+        private java.util.Set<String> references(InstitutionId institution) {
+            return externalRefs.entrySet().stream()
+                    .filter(e -> e.getKey().institution().equals(institution.value()))
+                    .map(Map.Entry::getValue).collect(java.util.stream.Collectors.toSet());
+        }
+
+        @Override
+        public java.util.Set<String> existingExternalRefs(InstitutionId institution,
+                java.util.Collection<String> references) {
+            events.add("existing-refs");
+            java.util.Set<String> stored = references(institution);
+            return references.stream().filter(stored::contains).collect(java.util.stream.Collectors.toSet());
+        }
+
+        @Override
+        public java.util.Set<String> existingBlindIndexes(InstitutionId institution,
+                java.util.Collection<String> blindIndexes) {
+            events.add("existing-indexes");
+            return rowsOf(institution).stream().map(Stored::document).filter(java.util.Objects::nonNull)
+                    .map(ProtectedNationalId::blindIndex).filter(blindIndexes::contains)
+                    .collect(java.util.stream.Collectors.toSet());
         }
 
         @Override

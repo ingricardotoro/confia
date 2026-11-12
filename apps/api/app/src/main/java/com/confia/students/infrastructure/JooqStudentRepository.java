@@ -20,8 +20,11 @@ import confia.generated.jooq.tables.records.StudentsStudentRecord;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
@@ -80,6 +83,39 @@ public final class JooqStudentRepository implements StudentRepository {
 
     @Override
     public void insert(InstitutionId institutionId, Student student, ProtectedNationalId document) {
+        insertRow(institutionId, student, document, null);
+    }
+
+    @Override
+    public void insertImported(InstitutionId institutionId, Student student, ProtectedNationalId document,
+            String externalRef) {
+        insertRow(institutionId, student, document, externalRef);
+    }
+
+    @Override
+    public Set<String> existingExternalRefs(InstitutionId institutionId, Collection<String> externalRefs) {
+        if (externalRefs.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(dsl.select(STUDENTS_STUDENT.EXTERNAL_REF).from(STUDENTS_STUDENT)
+                .where(STUDENTS_STUDENT.INSTITUTION_ID.eq(institutionId.value()))
+                .and(STUDENTS_STUDENT.EXTERNAL_REF.in(externalRefs))
+                .fetch(STUDENTS_STUDENT.EXTERNAL_REF));
+    }
+
+    @Override
+    public Set<String> existingBlindIndexes(InstitutionId institutionId, Collection<String> blindIndexes) {
+        if (blindIndexes.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(dsl.select(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX).from(STUDENTS_STUDENT)
+                .where(STUDENTS_STUDENT.INSTITUTION_ID.eq(institutionId.value()))
+                .and(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX.in(blindIndexes))
+                .fetch(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX));
+    }
+
+    private void insertRow(InstitutionId institutionId, Student student, ProtectedNationalId document,
+            String externalRef) {
         refuseDocumentOfAnotherStudent(institutionId, student.id(), document);
         StudentWrites.translating(() -> dsl.insertInto(STUDENTS_STUDENT)
                 .set(STUDENTS_STUDENT.INSTITUTION_ID, institutionId.value())
@@ -89,6 +125,7 @@ public final class JooqStudentRepository implements StudentRepository {
                 .set(STUDENTS_STUDENT.LAST_NAME, student.lastName())
                 .set(STUDENTS_STUDENT.BIRTH_DATE, student.birthDate())
                 .set(STUDENTS_STUDENT.SEX, student.sex().name())
+                .set(STUDENTS_STUDENT.EXTERNAL_REF, externalRef)
                 .set(STUDENTS_STUDENT.NATIONAL_ID_ENCRYPTED, document == null ? null : document.encrypted())
                 .set(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX, document == null ? null : document.blindIndex())
                 .set(STUDENTS_STUDENT.STATUS, student.status().name())

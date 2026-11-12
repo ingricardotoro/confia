@@ -58,6 +58,11 @@ class PermissionedEndpointsTest {
                 Permission.GUARDIANS_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/students/{studentId}/guardians",
                 Permission.GUARDIANS_UPDATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/imports/students/simulate",
+                Permission.STUDENTS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/imports/students/apply",
+                Permission.STUDENTS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/imports", Permission.STUDENTS_READ));
 
         assertThat(PermissionedEndpoints.forAdmin().endpoints()).containsExactlyElementsOf(expected);
     }

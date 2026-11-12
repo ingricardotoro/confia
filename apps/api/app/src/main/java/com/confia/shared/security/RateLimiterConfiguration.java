@@ -66,6 +66,20 @@ public class RateLimiterConfiguration {
         return new InMemoryRateLimiter(adminWriteAccountRateLimitPolicy);
     }
 
+    /** The limiter of the bulk imports (simulate and apply) per client address: a few runs an hour. */
+    @Bean("admin-import")
+    RateLimiter adminImportRateLimiter(
+            @Qualifier("adminImportRateLimitPolicy") RateLimitPolicy adminImportRateLimitPolicy) {
+        return new InMemoryRateLimiter(adminImportRateLimitPolicy);
+    }
+
+    /** The same imports counted per authenticated account. */
+    @Bean("admin-import-account")
+    RateLimiter adminImportAccountRateLimiter(
+            @Qualifier("adminImportAccountRateLimitPolicy") RateLimitPolicy adminImportAccountRateLimitPolicy) {
+        return new InMemoryRateLimiter(adminImportAccountRateLimitPolicy);
+    }
+
     @Bean("admin-write")
     RateLimiter adminWriteRateLimiter(
             @Qualifier("adminWriteRateLimitPolicy") RateLimitPolicy adminWriteRateLimitPolicy) {

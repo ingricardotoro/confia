@@ -15,7 +15,13 @@
  * port that {@code organization} publishes ({@code SectionDirectory}); this module never imports the domain of
  * {@code organization} nor reads its tables.
  *
- * <p>Out of scope: guardians and links, bulk import, consents, the financial
+ * <p>It also publishes, to {@code imports}, the write side of the bulk import of students
+ * (docs/cortes/imports-students.md): the port {@code StudentImportGateway} (nested package {@code
+ * application.importing}) and its implementation {@code StudentImport}, which judges the rows of a file with the rules of
+ * this registry and registers the valid ones through {@code ManageStudents}. The reference each imported student had in
+ * the source system is kept in {@code students_student.external_ref}.
+ *
+ * <p>Out of scope: guardians and links, consents, the financial
  * account of the student, and revealing the full document (it would need a permission and an access audit
  * of its own).
  */

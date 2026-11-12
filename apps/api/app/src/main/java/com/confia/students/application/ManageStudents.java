@@ -55,6 +55,24 @@ public final class ManageStudents {
 
     public StudentView create(AuthenticatedActor actor, String requestId, String studentCode, String firstName,
             String lastName, LocalDate birthDate, String sex, String nationalId) {
+        return register(actor, requestId, studentCode, null, firstName, lastName, birthDate, sex, nationalId);
+    }
+
+    /**
+     * The registration of a student that comes from a bulk import: the same rules, the same generated code, the same
+     * encrypted document with its blind index and the same audit entry as {@link #create}, plus the reference the
+     * student had in the source system. A reference the institution already has is a {@code
+     * DuplicateExternalRefException}. It joins the transaction of the caller when there is one, so the caller can
+     * commit a block of students together.
+     */
+    public StudentView createImported(AuthenticatedActor actor, String requestId, String externalRef,
+            String firstName, String lastName, LocalDate birthDate, String sex, String nationalId) {
+        return register(actor, requestId, null, Objects.requireNonNull(externalRef, "externalRef"), firstName,
+                lastName, birthDate, sex, nationalId);
+    }
+
+    private StudentView register(AuthenticatedActor actor, String requestId, String studentCode, String externalRef,
+            String firstName, String lastName, LocalDate birthDate, String sex, String nationalId) {
         Objects.requireNonNull(actor, "actor");
         UUID auditRequestId = StudentsAudit.requestId(Objects.requireNonNull(requestId, "requestId"));
         InstitutionId institution = new InstitutionId(actor.institutionId());
@@ -66,7 +84,11 @@ public final class ManageStudents {
                     now());
             ProtectedNationalId protectedDocument =
                     document == null ? null : protector.protect(institution, id, document);
-            students.insert(institution, student, protectedDocument);
+            if (externalRef == null) {
+                students.insert(institution, student, protectedDocument);
+            } else {
+                students.insertImported(institution, student, protectedDocument, externalRef);
+            }
             auditLogWriter.append(StudentsAudit.created(actor, auditRequestId, student));
             return StudentView.of(student);
         });

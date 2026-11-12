@@ -41,6 +41,8 @@ import com.confia.identity.web.wiring.IdentityWebConfiguration;
 import com.confia.kernel.Permission;
 import com.confia.guardians.infrastructure.wiring.GuardiansConfiguration;
 import com.confia.guardians.web.wiring.GuardiansWebConfiguration;
+import com.confia.imports.infrastructure.wiring.ImportsConfiguration;
+import com.confia.imports.web.wiring.ImportsWebConfiguration;
 import com.confia.organization.infrastructure.wiring.AcademicStructureConfiguration;
 import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
 import com.confia.organization.web.wiring.OrganizationWebConfiguration;
@@ -290,7 +292,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
                 .filter(candidate -> !candidate.pattern().startsWith("/api/v1/organization/")
                         && !candidate.pattern().startsWith("/api/v1/students")
                         && !candidate.pattern().startsWith("/api/v1/enrollments")
-                        && !candidate.pattern().startsWith("/api/v1/guardians"))
+                        && !candidate.pattern().startsWith("/api/v1/guardians")
+                        && !candidate.pattern().startsWith("/api/v1/imports"))
                 .toList()) {
             Session holder = sessionOf(StaffRole.SUPER_ADMIN);
             assertThat(StaffRole.SUPER_ADMIN.permissions()).contains(entry.permission());
@@ -1064,7 +1067,7 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
             OrganizationWebConfiguration.class, StudentsConfiguration.class,
             StudentsWebConfiguration.class, EnrollmentsConfiguration.class,
             EnrollmentsWebConfiguration.class, GuardiansConfiguration.class, GuardiansWebConfiguration.class,
-            WebEdgeConfiguration.class,
+            ImportsConfiguration.class, ImportsWebConfiguration.class, WebEdgeConfiguration.class,
             AdminSecurityConfiguration.class, ObservabilityMetricsConfiguration.class,
             RateLimiterConfiguration.class, ThrottlingConfiguration.class,
             RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,
