@@ -12,6 +12,8 @@ import {
   GradeResponse,
   GuardianPageResponse,
   GuardianResponse,
+  ImportBatchPageResponse,
+  ImportRunResponse,
   ModalityPageResponse,
   ModalityResponse,
   ProblemDetail,
@@ -26,6 +28,8 @@ import {
   type AuthenticatedSessionResponseOutput,
   type ConsentChangeResponseOutput,
   type ConsentEventResponseOutput,
+  type ImportBatchResponseOutput,
+  type RejectionResponseOutput,
   type ConsentStandingResponseOutput,
   type CurrentSessionResponseOutput,
   type GuardianConsentsResponseOutput,
@@ -506,6 +510,53 @@ export function consentChange(override: Partial<ConsentChangeResponseOutput> = {
     evidenceSource: "SIGNED_PAPER_FORM",
     changed: true,
     ...override,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+// The student import (imports-students cut). A batch holds counts and a hash, never a value of the file.
+const SHA256_OF_NOTHING = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+/** A batch as the API gives it: counts that add up (`total = valid + rejected + skipped`), and a lowercase SHA-256. */
+export function importBatch(override: Partial<ImportBatchResponseOutput> = {}): ImportBatchResponseOutput {
+  return {
+    id: crypto.randomUUID(),
+    kind: "STUDENTS",
+    status: "VALIDATED",
+    fileSha256: SHA256_OF_NOTHING,
+    totalRows: 10,
+    validRows: 8,
+    rejectedRows: 2,
+    createdRows: 0,
+    skippedRows: 0,
+    createdAt: "2026-11-10T15:30:00Z",
+    appliedAt: null,
+    ...override,
+  };
+}
+
+/** The answer of a simulation or an apply: the batch, up to 200 rejections (line, field, reason) and whether more were left out. */
+export function importRun(
+  run: { readonly batch?: Partial<ImportBatchResponseOutput>; readonly rejections?: readonly RejectionResponseOutput[]; readonly truncated?: boolean } = {},
+): ContractResponse {
+  const body = checked("import run", ImportRunResponse, {
+    batch: importBatch(run.batch),
+    rejections: run.rejections ?? [],
+    rejectionsTruncated: run.truncated ?? false,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** One page of batches, as the server serves it. */
+export function importBatchPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("import batches page", ImportBatchPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
   });
   return { status: 200, body, contentType: JSON_TYPE };
 }

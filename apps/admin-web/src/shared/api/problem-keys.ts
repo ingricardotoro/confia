@@ -38,5 +38,7 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "invalid-responsibility-split": "problem.invalidResponsibilitySplit",
   "guardian-not-active": "problem.guardianNotActive",
   "consent-channel-unavailable": "problem.consentChannelUnavailable",
+  "import-not-simulated": "problem.importNotSimulated",
+  "import-file-changed": "problem.importFileChanged",
   unknown: "problem.unexpected",
 };

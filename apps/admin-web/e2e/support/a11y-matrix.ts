@@ -101,6 +101,28 @@ async function openLinksDialog(page: Page): Promise<void> {
   await page.getByRole("dialog").getByText(/Suma guardada actualmente/).waitFor();
 }
 
+const IMPORTS = "/imports";
+const IMPORT_HEADER = "legacyId,firstName,lastName,birthDate,nationalId,sex";
+
+/** The imports screen with the cookies of a signed in session, as the control of the simulator does. */
+async function openImportsRoute(page: Page): Promise<void> {
+  await seed(page);
+  await page.getByRole("heading", { level: 1, name: "Sesión iniciada." }).waitFor();
+  await page.goto(IMPORTS);
+  await page.getByRole("heading", { level: 2, name: "Importar estudiantes" }).waitFor();
+}
+
+/** Chooses a fictitious file in memory and simulates it: `good` valid rows and the rows given, defective on purpose. */
+async function simulateImport(page: Page, good: number, ...defects: string[]): Promise<void> {
+  const rows = Array.from({ length: good }, (_, index) => `L${String(index + 1)},Nombre,Apellido,2013-05-01,,F`);
+  const buffer = Buffer.from([IMPORT_HEADER, ...rows, ...defects].join("\n"), "utf8");
+  await page.getByLabel("Archivo CSV de estudiantes").setInputFiles({ name: "estudiantes.csv", mimeType: "text/csv", buffer });
+  await page.getByRole("button", { name: "Simular la importación" }).click();
+  await page.getByRole("heading", { level: 3, name: "Resultado de la simulación" }).waitFor();
+}
+
+const importDefects = Array.from({ length: 12 }, (_, index) => `L9${String(index)},,Apellido,2013-05-01,,F`);
+
 /** The six combinations of the minimum, written apart from the matrix so a dropped one is noticed (BX74). */
 export const MINIMUM: readonly CombinationId[] = [
   { route: "/", state: "boot-restoring" },
@@ -573,6 +595,78 @@ export const MATRIX: readonly GateCombination[] = [
       await page.getByRole("dialog").getByRole("button", { name: "Guardar encargados" }).click();
     },
     expected: (page) => page.getByRole("alert").filter({ hasText: "Los porcentajes deben sumar exactamente 100.00." }),
+  },
+  {
+    route: IMPORTS,
+    state: "ready",
+    arrange: (page) => openImportsRoute(page),
+    expected: (page) => page.getByRole("cell", { name: "Aplicada" }),
+  },
+  {
+    route: IMPORTS,
+    state: "file-error",
+    arrange: async (page) => {
+      await openImportsRoute(page);
+      await page.getByRole("button", { name: "Simular la importación" }).click();
+    },
+    expected: (page) => page.getByText("Elija un archivo CSV.").last(),
+  },
+  {
+    route: IMPORTS,
+    state: "simulated-with-rejections",
+    arrange: async (page) => {
+      await openImportsRoute(page);
+      await simulateImport(page, 8, ...importDefects);
+    },
+    expected: (page) => page.getByRole("table", { name: /Filas del archivo con su línea/ }),
+  },
+  {
+    route: IMPORTS,
+    state: "dialog-apply",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openImportsRoute(page);
+      await simulateImport(page, 8);
+      await page.getByRole("button", { name: "Aplicar la importación" }).click();
+    },
+    expected: (page) => page.getByRole("dialog").getByText("Se crearán 8 estudiantes."),
+  },
+  {
+    route: IMPORTS,
+    state: "result",
+    arrange: async (page) => {
+      await openImportsRoute(page);
+      await simulateImport(page, 8);
+      await page.getByRole("button", { name: "Aplicar la importación" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Crear 8 estudiantes" }).click();
+    },
+    expected: (page) => page.getByRole("heading", { level: 3, name: "Importación aplicada" }),
+  },
+  {
+    route: IMPORTS,
+    state: "file-failure",
+    arrange: async (page) => {
+      await openImportsRoute(page);
+      const buffer = Buffer.from("legacyId,firstName,hobby\n1,Ana,x", "utf8");
+      await page.getByLabel("Archivo CSV de estudiantes").setInputFiles({ name: "estudiantes.csv", mimeType: "text/csv", buffer });
+      await page.getByRole("button", { name: "Simular la importación" }).click();
+    },
+    expected: (page) => page.getByRole("alert").filter({ hasText: "Falta la columna obligatoria" }),
+  },
+  {
+    route: IMPORTS,
+    state: "empty",
+    preset: "imports-empty",
+    arrange: (page) => openImportsRoute(page),
+    expected: (page) => page.getByText("Todavía no hay importaciones"),
+  },
+  {
+    route: IMPORTS,
+    state: "load-error",
+    preset: "imports-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openImportsRoute(page),
+    expected: (page) => page.getByText("No se pudo cargar el historial de importaciones"),
   },
   {
     route: YEARS,

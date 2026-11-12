@@ -24,6 +24,7 @@ export interface RequestOptions {
   readonly path: string;
   /** Extra headers, such as `Authorization` or the CSRF value: this module knows no session. */
   readonly headers?: Readonly<Record<string, string>>;
+  /** JSON by default; a `FormData` travels as multipart (the import of a file). */
   readonly body?: unknown;
 }
 
@@ -42,13 +43,15 @@ function assertRelativeApiPath(path: string): void {
 function initOf(options: RequestOptions, signal: AbortSignal): RequestInit {
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
-  if (options.body !== undefined && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  // A form is sent as it is and without a `Content-Type`: the browser writes the multipart one with its boundary.
+  const isForm = options.body instanceof FormData;
+  if (options.body !== undefined && !isForm && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   return {
     method: options.method,
     headers,
     credentials: "same-origin",
     signal,
-    ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+    ...(options.body === undefined ? {} : { body: isForm ? options.body : JSON.stringify(options.body) }),
   };
 }
 
