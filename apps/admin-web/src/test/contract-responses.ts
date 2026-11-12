@@ -4,6 +4,7 @@ import {
   AcademicYearResponse,
   AuthenticatedSessionResponse,
   CurrentSessionResponse,
+  EnrollmentPageResponse,
   EnrollmentResponse,
   GradePageResponse,
   GradeResponse,
@@ -13,16 +14,19 @@ import {
   SecondFactorPendingResponse,
   SectionPageResponse,
   SectionResponse,
+  StudentEnrollmentResponse,
   StudentPageResponse,
   StudentResponse,
   type AcademicYearResponseOutput,
   type AuthenticatedSessionResponseOutput,
   type CurrentSessionResponseOutput,
   type EnrollmentResponseOutput,
+  type EnrollmentTransferResponseOutput,
   type GradeResponseOutput,
   type ModalityResponseOutput,
   type SecondFactorPendingResponseOutput,
   type SectionResponseOutput,
+  type StudentEnrollmentResponseOutput,
   type StudentResponseOutput,
 } from "@confia/contracts/admin";
 import type { ProblemCode } from "../shared/api/problem.ts";
@@ -287,4 +291,65 @@ export function studentPage(
 /** The student a create (201) or an edit (200) answers with. */
 export function studentRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
   return { status, body: checked("student record", StudentResponse, row), contentType: JSON_TYPE };
+}
+
+// The enrollments cut. A list holds rows with no `transfers`; the detail and the three writes carry them, oldest first.
+// Never the document or the birth date of the student.
+export function studentEnrollment(override: Partial<StudentEnrollmentResponseOutput> = {}): StudentEnrollmentResponseOutput {
+  return checked("StudentEnrollmentResponse", StudentEnrollmentResponse, {
+    id: crypto.randomUUID(),
+    studentId: crypto.randomUUID(),
+    studentCode: "E-000001",
+    studentFirstName: "Ana",
+    studentLastName: "Pérez",
+    academicYearId: "11111111-1111-4111-8111-111111111111",
+    academicYearName: "Año lectivo 2026",
+    sectionId: "22222222-2222-4222-8222-222222222222",
+    sectionName: "A",
+    gradeId: "33333333-3333-4333-8333-333333333333",
+    gradeName: "Primero",
+    modalityName: "Primaria",
+    enrolledOn: "2026-02-02",
+    status: "ACTIVE",
+    withdrawnOn: null,
+    withdrawalReason: null,
+    createdAt: STAMP,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+/** A section change of an enrollment, as the detail lists it. */
+export function enrollmentTransfer(override: Partial<EnrollmentTransferResponseOutput> = {}): EnrollmentTransferResponseOutput {
+  return {
+    id: crypto.randomUUID(),
+    fromSectionId: "22222222-2222-4222-8222-222222222222",
+    fromSectionName: "A",
+    toSectionId: "44444444-4444-4444-8444-444444444444",
+    toSectionName: "B",
+    transferredOn: "2026-03-02",
+    reason: "Cambio de turno",
+    transferredBy: crypto.randomUUID(),
+    createdAt: STAMP,
+    ...override,
+  };
+}
+
+/** One page of enrollments, as the server serves it. */
+export function enrollmentPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("enrollments page", EnrollmentPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 50,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The enrollment a detail (200), an enroll (201), a transfer or an exit (200) answers with. */
+export function enrollmentRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("enrollment record", StudentEnrollmentResponse, row), contentType: JSON_TYPE };
 }

@@ -4,8 +4,8 @@ import { PROBLEM_KEYS } from "../../shared/api/problem-keys.ts";
 import { classifyAccessFailure, type AccessFailure } from "../../shared/forms/access-failure.ts";
 
 /**
- * The codes of the academic structure, the two every write can meet, and the two of the students registry (this
- * classifier serves both screens), that have a text of their own.
+ * The codes of the academic structure, the two every write can meet, and the two of the students registry and the five
+ * of the enrollments (this classifier serves the three screens), that have a text of their own.
  */
 const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "academic-year-overlap",
@@ -17,6 +17,11 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "resource-not-found",
   "duplicate-student-code",
   "duplicate-national-id",
+  "student-not-active",
+  "section-full",
+  "duplicate-active-enrollment",
+  "invalid-enrollment-state",
+  "transfer-year-mismatch",
 ]);
 
 /**
@@ -26,6 +31,8 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
 function fieldOf(error: { readonly field: string; readonly reason: string }): { readonly field: string; readonly reason: string } {
   if (error.field === "endAfterStart") return { field: "endDate", reason: "end-after-start" };
   if (error.field === "nationalId" && error.reason === "pattern") return { field: "nationalId", reason: "national-id-format" };
+  // The reason of a withdrawal or a transfer is 3 to 500 characters: `size` says it is too short as well as too long.
+  if ((error.field === "withdrawalReason" || error.field === "reason") && error.reason === "size") return { field: error.field, reason: "reason-length" };
   return error;
 }
 

@@ -38,6 +38,9 @@ describe("field error keys", () => {
     ["past-or-present", "field.birthDateFuture"],
     ["birth-date-floor", "field.birthDateFloor"],
     ["national-id-format", "field.nationalIdFormat"],
+    ["enrollment-date-out-of-range", "field.dateOutOfRange"],
+    ["same-section", "field.sameSection"],
+    ["reason-length", "field.reasonLength"],
   ] as const)("maps the reason %j to %s", (reason, key) => {
     expect(fieldErrorKey(reason)).toBe(key);
   });

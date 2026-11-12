@@ -53,7 +53,12 @@
     "duplicateName": "Ya existe un registro con ese nombre, código u orden. Escriba un valor distinto.",
     "inactiveReference": "Uno de los datos relacionados está inactivo. Actívelo o elija otro e intente de nuevo.",
     "duplicateStudentCode": "Ya existe un estudiante con ese código. Escriba otro código o déjelo vacío para que se genere uno.",
-    "duplicateNationalId": "Ya hay un estudiante registrado con ese documento de identidad. Revise el número; los guiones no cuentan."
+    "duplicateNationalId": "Ya hay un estudiante registrado con ese documento de identidad. Revise el número; los guiones no cuentan.",
+    "studentNotActive": "El estudiante está inactivo y no se puede matricular. Actívelo en la lista de estudiantes e intente de nuevo.",
+    "sectionFull": "La sección ya alcanzó su cupo. Elija otra sección o pida que se amplíe el cupo.",
+    "duplicateActiveEnrollment": "El estudiante ya tiene una matrícula activa en ese año lectivo. Registre su salida antes de matricularlo de nuevo o traslade su sección.",
+    "invalidEnrollmentState": "La matrícula ya no está activa, por lo que no admite este cambio. Actualice la lista para ver su estado actual.",
+    "transferYearMismatch": "La sección elegida es de otro año lectivo. Solo se puede trasladar a una sección del mismo año."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -65,7 +70,10 @@
     "wholeNumber": "Ingrese un número entero de cero en adelante.",
     "birthDateFuture": "La fecha de nacimiento no puede ser posterior a hoy.",
     "birthDateFloor": "La fecha de nacimiento no puede ser anterior al 1 de enero de 1990.",
-    "nationalIdFormat": "El documento debe tener de 8 a 20 letras, números o guiones."
+    "nationalIdFormat": "El documento debe tener de 8 a 20 letras, números o guiones.",
+    "dateOutOfRange": "La fecha está fuera del rango permitido: no puede ser futura, anterior a la matrícula ni fuera del año lectivo.",
+    "sameSection": "Elija una sección distinta de la actual.",
+    "reasonLength": "Escriba un motivo de 3 a 500 caracteres."
   },
   "countdown": {
     "remaining": "Puede intentar de nuevo en {seconds} s.",
@@ -96,7 +104,8 @@
   "navigation": {
     "home": "Inicio",
     "organization": "Estructura académica",
-    "students": "Estudiantes"
+    "students": "Estudiantes",
+    "enrollments": "Matrículas"
   },
   "organization": {
     "title": "Estructura académica",
@@ -299,6 +308,127 @@
     },
     "status": {
       "filter": "Estado"
+    }
+  },
+  "enrollments": {
+    "title": "Matrículas",
+    "heading": "Lista de matrículas",
+    "caption": "Matrículas de la institución",
+    "create": "Matricular",
+    "emptyTitle": "Todavía no hay matrículas",
+    "emptyDescription": "Matricule a un estudiante en una sección del año lectivo para que aparezca aquí.",
+    "emptyAction": "Matricular a un estudiante",
+    "loadFailed": "No se pudo cargar la lista de matrículas",
+    "columns": {
+      "studentCode": "Código",
+      "student": "Estudiante",
+      "gradeSection": "Grado y sección",
+      "enrolledOn": "Fecha de matrícula",
+      "status": "Estado",
+      "withdrawnOn": "Fecha de salida"
+    },
+    "noExitDate": "—",
+    "noExitDateText": "Sin fecha de salida",
+    "status": {
+      "ACTIVE": "Activa",
+      "WITHDRAWN": "Retirada",
+      "TRANSFERRED": "Trasladada a otra institución",
+      "GRADUATED": "Graduada"
+    },
+    "filters": {
+      "academicYear": "Año lectivo",
+      "allYears": "Todos los años",
+      "grade": "Grado",
+      "section": "Sección",
+      "status": "Estado",
+      "allGrades": "Todos",
+      "allSections": "Todas"
+    },
+    "actions": {
+      "detail": "Ver detalle",
+      "detailFor": "Ver detalle de la matrícula de {name}",
+      "transfer": "Trasladar de sección",
+      "transferFor": "Trasladar de sección a {name}",
+      "exit": "Registrar salida",
+      "exitFor": "Registrar salida de {name}"
+    },
+    "enroll": {
+      "title": "Matricular estudiante",
+      "description": "Busque al estudiante, elija la sección del año lectivo en curso y la fecha de matrícula.",
+      "submit": "Matricular",
+      "saving": "Matriculando al estudiante.",
+      "done": "Se matriculó a «{name}».",
+      "noActiveYear": "No hay un año lectivo en curso. Ponga un año en curso en la estructura académica para poder matricular.",
+      "sectionHelp": "Secciones activas del año lectivo en curso, agrupadas por modalidad y grado.",
+      "noSections": "El año lectivo en curso no tiene secciones activas.",
+      "optionsFailed": "No se pudieron cargar las secciones.",
+      "retryOptions": "Reintentar carga de secciones",
+      "date": "Fecha de matrícula",
+      "loadingSections": "Cargando las secciones del año lectivo en curso."
+    },
+    "student": {
+      "label": "Estudiante",
+      "searchLabel": "Buscar estudiante",
+      "help": "Escriba al menos 2 caracteres del nombre, apellido o código.",
+      "tooShort": "Escriba al menos 2 caracteres para buscar.",
+      "resultsLabel": "Estudiantes encontrados",
+      "searching": "Buscando estudiantes.",
+      "found": "{count, plural, one {Se encontró # estudiante.} other {Se encontraron # estudiantes.}} Use las flechas para recorrerlos y Enter para elegir.",
+      "none": "No se encontró ningún estudiante activo con ese dato.",
+      "failed": "No se pudo buscar estudiantes.",
+      "retry": "Reintentar búsqueda",
+      "chosen": "Estudiante elegido",
+      "change": "Cambiar estudiante",
+      "optionText": "{name} · {code}"
+    },
+    "transfer": {
+      "title": "Trasladar de sección",
+      "description": "Mueva la matrícula de {name} a otra sección del mismo año lectivo. El traslado queda en el historial.",
+      "submit": "Trasladar",
+      "saving": "Trasladando la matrícula.",
+      "done": "Se trasladó a «{name}» a la sección {section}.",
+      "toSection": "Sección nueva",
+      "date": "Fecha del traslado",
+      "reason": "Motivo",
+      "reasonHelp": "Opcional. De 3 a 500 caracteres.",
+      "noSections": "El año lectivo no tiene otra sección activa a la que trasladar."
+    },
+    "exit": {
+      "title": "Registrar salida",
+      "description": "Registre la salida de {name}. La matrícula deja de estar activa y no se puede revertir.",
+      "submit": "Registrar salida",
+      "saving": "Registrando la salida.",
+      "done": "Se registró la salida de «{name}».",
+      "kind": "Tipo de salida",
+      "date": "Fecha de salida",
+      "reason": "Motivo",
+      "reasonRequiredHelp": "Obligatorio. De 3 a 500 caracteres.",
+      "reasonOptionalHelp": "Opcional para una graduación. De 3 a 500 caracteres.",
+      "kinds": {
+        "WITHDRAWN": "Retiro",
+        "TRANSFERRED": "Traslado a otra institución",
+        "GRADUATED": "Graduación"
+      }
+    },
+    "detail": {
+      "title": "Detalle de la matrícula",
+      "description": "Datos de la matrícula y su historial de traslados de sección. Solo lectura.",
+      "close": "Cerrar",
+      "loading": "Cargando el detalle de la matrícula.",
+      "loadFailed": "No se pudo cargar el detalle de la matrícula",
+      "student": "Estudiante",
+      "year": "Año lectivo",
+      "modality": "Modalidad",
+      "gradeSection": "Grado y sección",
+      "exitReason": "Motivo de la salida",
+      "noReason": "Sin motivo",
+      "historyHeading": "Historial de traslados de sección",
+      "historyCaption": "Traslados de sección de la matrícula, del más antiguo al más reciente",
+      "historyEmpty": "Esta matrícula no tiene traslados de sección.",
+      "historyFrom": "De la sección",
+      "historyTo": "A la sección",
+      "historyDate": "Fecha",
+      "historyReason": "Motivo"
     }
   }
 }

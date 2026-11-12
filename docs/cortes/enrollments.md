@@ -187,3 +187,100 @@ dirección y por cuenta, auditoría y barrido de respuestas, filas de auditoría
 la fecha de nacimiento y los motivos). Además: `ProblemCodeTest`, `PermissionedEndpointsTest`, `PublicRouteAllowListTest`,
 `CurrentSessionEndpointIT`, `OpenApiContractSnapshotTest` (instantánea regenerada: 30 operaciones, 23 con permiso) y
 `AuthorizationEdgeIT`.
+
+## Construido en el frontend
+
+Ruta `/enrollments` («Matrículas» en la navegación, registrada en `app/features.ts`). Código en
+`apps/admin-web/src/features/enrollments/`, operaciones en `shared/api/enrollment-operations.ts`. Reutiliza la mecánica de
+los cortes anteriores sin cambiar su comportamiento: `ResourceScreen`, `ResourceFormDialog`, campos, `useListState`, la
+clasificación de fallos de `features/organization/`, `useAccessForm`, el cliente de recursos paginados
+(`shared/api/resource-client.ts`), los lookups de años, grados y modalidades, y la lista de estudiantes para buscar. El cliente
+se generó con `pnpm --filter @confia/contracts generate` (el nombre `EnrollmentResponse` es del segundo factor; la matrícula
+es `StudentEnrollmentResponse`).
+
+**Decisiones**
+
+- **Estado de la tabla en la URL**: `page`, `pageSize`, `sort=campo:asc|desc` (solo `enrolledOn`, `studentLastName`, `status`),
+  `academicYearId`, `gradeId`, `sectionId` y `status`. Un parámetro inválido se descarta. A la API viaja como `page` desde 0,
+  `size` y `sort=campo,dir`. Orden por omisión, el del servidor: apellido del estudiante ascendente (la cabecera lo marca sin
+  escribirlo en la URL). Cambiar un filtro reemplaza la entrada del historial y vuelve a la página 1.
+- **Año por omisión como lo hace el servidor.** Sin `academicYearId` en la URL la pantalla no lo envía: el servidor usa el año
+  `ACTIVE` y el filtro «Año lectivo» lo muestra elegido (lo toma de la lista de años). Con un año en curso el filtro no ofrece
+  «Todos los años», porque la API no puede listarlos todos en ese caso; sin año en curso sí lo ofrece. Cambiar el año borra el
+  filtro de sección (las secciones son de un año). El filtro de sección lista las secciones del año mostrado, cada una con su
+  «Modalidad · Grado · Sección», porque el mismo nombre existe en varios grados.
+- **Acciones por fila.** «Ver detalle» en todas; «Trasladar de sección» y «Registrar salida» solo en una matrícula `ACTIVE` (los
+  otros tres estados son finales). Cada botón nombra al estudiante en su etiqueta accesible. Tras una salida la fila pierde esos
+  botones y el foco pasa a su «Ver detalle».
+- **Matricular.** Diálogo con buscador de estudiante (combobox ARIA con listbox de resultados, flechas y Enter, sin dependencia
+  nueva), sección del año en curso agrupada por «Modalidad · Grado» (`optgroup` de un `select` nativo) y fecha nativa que
+  empieza en hoy (fecha de Honduras). Sin año en curso el diálogo lo dice y no ofrece secciones. El año no se envía: lo
+  deriva la sección. El cuerpo es exactamente `{ studentId, sectionId, enrolledOn }`.
+- **Búsqueda del estudiante.** Reutiliza `GET /api/v1/students` con `status=ACTIVE` (el servidor no matricula a otros), `size=10`,
+  orden por apellido y `q`. Solo pregunta con 2 o más caracteres, tras una pausa de 300 ms; con 1 carácter lo dice. Estados:
+  buscando, sin resultados, fallo con «Reintentar búsqueda» y resultados. El estudiante elegido reemplaza al cuadro (con
+  «Cambiar estudiante»); el foco va a ese botón al elegir y vuelve al cuadro al cambiar. El cuadro lleva `autocomplete="off"`,
+  `autocorrect="off"` y `spellcheck="false"`. Los nombres viven solo en el DOM (ni en la URL, ni en el almacenamiento, ni en la consola).
+- **Trasladar de sección.** Secciones activas del mismo año (se consultan por el año de la matrícula) distintas de la actual,
+  fecha (hoy por omisión) y motivo opcional de 3 a 500 caracteres; un motivo vacío no se envía.
+- **Registrar salida.** Tipo (`WITHDRAWN`, `TRANSFERRED`, `GRADUATED`), fecha y motivo; el motivo es obligatorio salvo en la
+  graduación y la ayuda del campo dice cuál aplica. La salida no se puede revertir y el diálogo lo advierte.
+- **Detalle.** Diálogo de solo lectura que lee `GET /api/v1/enrollments/{id}`: datos, motivo de la salida y tabla del historial de
+  traslados (el más antiguo primero) o «Esta matrícula no tiene traslados de sección». Cargando es un esqueleto; si falla, ofrece reintentar.
+- **Sin dinero, sin `Idempotency-Key`, sin actualización optimista.** Las tres escrituras invalidan todas las listas y todos los
+  detalles (`enrollmentKeys.all`); la mutación se libera al terminar (`gcTime: 0` y reinicio) para que el motivo escrito no quede
+  en la caché. Mientras una escritura está en vuelo el botón se bloquea y un segundo clic no envía nada.
+- **Errores.** Nuevos códigos con texto propio: `student-not-active`, `section-full`, `duplicate-active-enrollment`,
+  `invalid-enrollment-state`, `transfer-year-mismatch` (ya existían `academic-year-closed`, `inactive-reference`, `forbidden` y
+  `resource-not-found`). `KNOWN_PROBLEM_CODES` pasa de 22 a 27 y `PROBLEM_KEYS` los espeja. Errores de campo de
+  `validation-failed`: `enrollment-date-out-of-range` (texto «La fecha está fuera del rango permitido…»), `same-section` y `size` de
+  `reason`/`withdrawalReason`, que el cliente lee como «de 3 a 500 caracteres» (es lo único que puede significar `size` ahí, por
+  corto o por largo). Un 403 se dice en llano dentro del diálogo; nada cambia en pantalla.
+- **Accesibilidad.** Foco devuelto al botón que abrió el diálogo (a «Matricular» tras matricular), error resumido con el foco en
+  el resumen, `aria-live` en el aviso del resultado y en el estado del buscador, lista de resultados con `aria-activedescendant`.
+- **Texto.** Todo en el catálogo `es-HN` tipado (`enrollments.*`, `problem.*`, `field.*`).
+
+**Pruebas del frontend.** Vitest con Testing Library y MSW. `EnrollmentsContainer.test.tsx` recorre el listado (la petición
+exacta, el año en curso, página, orden, filtros en la URL y descarte de lo inválido, acciones ocultas en filas finales, vacío con
+y sin filtros, error con reintento, 403 de lectura), el detalle (historial, error con reintento y foco de vuelta), matricular
+(búsqueda solo desde 2 caracteres, resultados, elección con puntero y con teclado, cuerpo exacto, cada error de negocio, error de
+campo, un solo envío, sin año en curso, foco al cancelar, sin rastro de nombres), trasladar y salida (cuerpos exactos, cada error,
+errores de campo, motivo corto y obligatorio, sin rastro del motivo). Un archivo de prueba por componente de presentación
+(`components/*.test.tsx`, con su comentario de estados), `enrollment-model.test.ts` (fecha de Honduras, agrupación, búsqueda,
+formularios) y `shared/api/enrollment-operations.test.ts`.
+
+## Pruebas e2e
+
+Misma mecánica que los cortes anteriores (Playwright en Chromium contra `vite build && vite preview`, API simulada por
+`e2e/mock-api`: una simulación de las formas publicadas, no una prueba de la pila real ni de sus reglas).
+
+**Simulador.** `mock-api/enrollments-model.ts` atiende las cinco operaciones de `/api/v1/enrollments` con estado en memoria por
+escenario, sobre los estudiantes y la estructura académica del mismo escenario (`enrollments-seed.ts`: 37 matrículas del año en
+curso, 25 activas llenan «Segundo A» —cupo 25—, 12 más en los dos primeros, con 6 retiros, 1 graduación y 1 traslado en el
+historial; los estudiantes activos 36, 43 a 49 y 51 a 59 no tienen matrícula). Reglas delgadas: INV-31 (se puede volver a matricular
+tras un retiro), cupo, estudiante inactivo, año cerrado, sección inactiva, fecha dentro del año y no futura
+(`enrollment-date-out-of-range`), transición solo desde `ACTIVE`, motivo obligatorio salvo graduación, traslado a la misma
+sección, a otro año o a una sección llena. El listado pagina, ordena y filtra como el servidor y toma el año en curso por omisión.
+Perfiles nuevos: `enrollments-empty`, `enrollments-forbidden` (lecturas normales, escrituras `403`) y `enrollments-server-error` (las
+tres primeras lecturas responden `500` con `traceId`). Pruebas unitarias en `mock-api/enrollments-model.test.ts`.
+
+**Recorridos** (`e2e/specs/journeys/enrollments-*.e2e.ts`, apoyo en `e2e/support/enrollments.ts`):
+
+- `enrollments-crud`: matricular → trasladar → registrar salida con el historial en el detalle; la salida libera el cupo de una sección
+  llena y el mismo estudiante puede matricularse de nuevo; matricular tras un retiro y no dos veces a un activo; una matrícula final
+  solo ofrece su detalle.
+- `enrollments-lists`: año en curso sin escribirlo en la URL; paginación (37 filas, dos páginas); orden en el servidor; filtros de estado,
+  grado y sección en la URL y en la consulta; «Quitar filtros»; una dirección compartida.
+- `enrollments-states`: fecha fuera del año (un día antes del inicio y el primer día), formulario vacío, salida sin motivo (y graduación
+  sin él), traslado a una sección llena, un `403`, el vacío con su salida, el error con identificador y reintento, y la búsqueda que solo
+  llega al servidor desde 2 caracteres.
+- `enrollments-keyboard`: matricular solo con teclado (buscar, flechas y Enter, sección, fecha, enviar, foco de vuelta), errores,
+  trampa de foco con Escape y salida con el foco en el detalle de la fila.
+- `a11y/gate` (matriz en `support/a11y-matrix.ts`): `/enrollments` en listado, diálogo de matricular, resultados de búsqueda, diálogo de
+  trasladar, resumen de errores, detalle, vacío y error de carga, en tema claro y oscuro, sin violaciones bloqueantes y sin debilitar reglas.
+
+**Resultado de la verificación.** `typecheck` y `lint` limpios. Vitest completo: 1191 pruebas pasan; fallan las dos que dependen de
+cosas ajenas a este corte o ya corregidas (AW61 por el directorio `apps/portal-web` vacío, conocido; AW59 se actualizó con la ruta
+nueva y pasa). Playwright: los cuatro recorridos de matrículas (21 pruebas) y las 16 evaluaciones de axe de `/enrollments`
+(8 estados en dos temas) pasan sin violaciones bloqueantes. La ejecución completa de `test:e2e` se interrumpió por falta de memoria
+del equipo y queda pendiente de repetir.

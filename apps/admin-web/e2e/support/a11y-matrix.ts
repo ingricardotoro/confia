@@ -76,6 +76,15 @@ async function fillTakenCode(page: Page): Promise<void> {
   await dialog.getByLabel(/^Sexo/).selectOption({ label: "Masculino" });
 }
 
+const ENROLLMENTS = "/enrollments";
+
+/** The enrollments list with its rows on the screen: the surname of the first row of the seed proves it. */
+async function openEnrollmentsRoute(page: Page, path: string = ENROLLMENTS): Promise<void> {
+  await seed(page);
+  await page.getByRole("heading", { level: 1, name: "Sesión iniciada." }).waitFor();
+  await page.goto(path);
+}
+
 /** The six combinations of the minimum, written apart from the matrix so a dropped one is noticed (BX74). */
 export const MINIMUM: readonly CombinationId[] = [
   { route: "/", state: "boot-restoring" },
@@ -333,6 +342,83 @@ export const MATRIX: readonly GateCombination[] = [
     // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
     arrange: (page) => openStudentsRoute(page),
     expected: (page) => page.getByText("No se pudo cargar la lista de estudiantes"),
+  },
+  {
+    route: ENROLLMENTS,
+    state: "ready",
+    arrange: (page) => openEnrollmentsRoute(page),
+    expected: (page) => page.getByRole("cell", { name: "Aguilar, Ana", exact: true }).first(),
+  },
+  {
+    route: ENROLLMENTS,
+    state: "dialog-enroll",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openEnrollmentsRoute(page);
+      await page.getByRole("button", { name: "Matricular", exact: true }).click();
+      // The sections of the year in progress are in the select: the dialog is complete, not loading.
+      await page.getByRole("dialog").getByRole("option", { name: "B" }).first().waitFor({ state: "attached" });
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Matricular estudiante" }),
+  },
+  {
+    route: ENROLLMENTS,
+    state: "dialog-enroll-results",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openEnrollmentsRoute(page);
+      await page.getByRole("button", { name: "Matricular", exact: true }).click();
+      await page.getByRole("dialog").getByRole("combobox", { name: /Buscar estudiante/ }).fill("Zelaya");
+    },
+    expected: (page) => page.getByRole("option", { name: "Andrea Zelaya · E-000059" }),
+  },
+  {
+    route: ENROLLMENTS,
+    state: "dialog-transfer",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openEnrollmentsRoute(page);
+      await page.getByRole("button", { name: "Trasladar de sección a Ana Aguilar" }).click();
+      await page.getByRole("dialog").getByRole("option", { name: "B" }).first().waitFor({ state: "attached" });
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Trasladar de sección" }),
+  },
+  {
+    route: ENROLLMENTS,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openEnrollmentsRoute(page);
+      await page.getByRole("button", { name: "Registrar salida de Ana Aguilar" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Registrar salida" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 1 campo con error." }),
+  },
+  {
+    route: ENROLLMENTS,
+    state: "dialog-detail",
+    opensDialog: true,
+    arrange: async (page) => {
+      // Mateo Lagos is in "Primero A" (the seeded section 00...4001), with a section move in his history.
+      await openEnrollmentsRoute(page, `${ENROLLMENTS}?sectionId=00000000-0000-4000-8000-000000004001`);
+      await page.getByRole("button", { name: "Ver detalle de la matrícula de Mateo Lagos" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Detalle de la matrícula" }).getByRole("table"),
+  },
+  {
+    route: ENROLLMENTS,
+    state: "empty",
+    preset: "enrollments-empty",
+    arrange: (page) => openEnrollmentsRoute(page),
+    expected: (page) => page.getByText("Todavía no hay matrículas"),
+  },
+  {
+    route: ENROLLMENTS,
+    state: "load-error",
+    preset: "enrollments-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openEnrollmentsRoute(page),
+    expected: (page) => page.getByText("No se pudo cargar la lista de matrículas"),
   },
   {
     route: YEARS,
