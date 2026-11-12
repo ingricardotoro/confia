@@ -36,7 +36,7 @@ CREATE TABLE guardians_guardian_consent_event (
     recorded_by     UUID        NOT NULL,
     request_id      UUID        NOT NULL,
     CONSTRAINT guardians_guardian_consent_event_pk PRIMARY KEY (institution_id, id),
-    CONSTRAINT guardians_guardian_consent_event_seq_uq UNIQUE (seq),
+    CONSTRAINT guardians_guardian_consent_event_seq_uq UNIQUE (institution_id, seq),
     CONSTRAINT guardians_guardian_consent_event_guardian_fk FOREIGN KEY (institution_id, guardian_id)
         REFERENCES guardians_guardian (institution_id, id),
     CONSTRAINT guardians_guardian_consent_event_channel_chk CHECK (channel IN ('EMAIL', 'SMS', 'WHATSAPP')),
