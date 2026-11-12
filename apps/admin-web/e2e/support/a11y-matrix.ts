@@ -66,14 +66,6 @@ async function openStudentsRoute(page: Page, path: string = STUDENTS): Promise<v
   await page.goto(path);
 }
 
-/**
- * The form of a student with its error is taller than the dialog allows on the default 720 px viewport (90 vh), and the
- * focus that goes to the error summary scrolls the dialog, which takes the title and the description out of its clipped
- * area: axe cannot compute their background and reports `color-contrast` as incomplete, which the policy counts as
- * blocking. The states that show an error need the whole dialog in view, so they are measured on a taller viewport.
- */
-const tallViewport = (page: Page): Promise<void> => page.setViewportSize({ width: 1280, height: 1000 });
-
 /** Fills the open create dialog of a new student, with the code of the first student of the seed, which is taken. */
 async function fillTakenCode(page: Page): Promise<void> {
   const dialog = page.getByRole("dialog");
@@ -303,7 +295,6 @@ export const MATRIX: readonly GateCombination[] = [
     state: "dialog-error-summary",
     opensDialog: true,
     arrange: async (page) => {
-      await tallViewport(page);
       await openStudentsRoute(page);
       await page.getByRole("button", { name: "Nuevo estudiante" }).click();
       await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
@@ -315,7 +306,6 @@ export const MATRIX: readonly GateCombination[] = [
     state: "dialog-duplicate-code",
     opensDialog: true,
     arrange: async (page) => {
-      await tallViewport(page);
       await openStudentsRoute(page);
       await page.getByRole("button", { name: "Nuevo estudiante" }).click();
       await fillTakenCode(page);

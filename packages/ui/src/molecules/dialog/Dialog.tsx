@@ -24,7 +24,9 @@ export interface DialogProps {
 // A modal dialog on Radix: focus is trapped inside, Escape closes it, the page behind is inert and the
 // focus returns to the control that opened it. The close button comes after the content in the DOM so
 // that opening a form puts the focus on its first field and not on the corner button; it is placed in
-// the corner by CSS.
+// the corner by CSS. Layout: the header and the footer are pinned and the body is the only scroll area,
+// so moving the focus to a control deep in a long form never scrolls the title out of view. On a very
+// short viewport (20rem) the panel itself scrolls instead, with a static header and footer.
 export function Dialog({ open, onOpenChange, title, description, children, footer, container, className }: DialogProps) {
   const { t } = useUiText();
   // Radix returns the focus only to its own Trigger. This dialog is controlled, so whatever control
@@ -46,16 +48,27 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
             }
           }}
           className={cn(
-            "fixed top-1/2 left-1/2 z-(--z-overlay) flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-lg border border-border-subtle bg-bg-surface-elevated p-6 text-text-primary shadow-xl",
+            "fixed top-1/2 left-1/2 z-(--z-overlay) flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-border-subtle bg-bg-surface-elevated p-0 text-text-primary shadow-xl supports-[height:1dvh]:max-h-[90dvh] [@media(max-height:20rem)]:overflow-y-auto",
             className,
           )}
         >
-          <div className="flex flex-col gap-1 pr-10">
+          <div className="flex shrink-0 flex-col gap-1 bg-bg-surface-elevated px-4 pt-6 pr-14 pb-4 sm:px-6">
             <DialogPrimitive.Title className="text-lg font-semibold">{title}</DialogPrimitive.Title>
             <DialogPrimitive.Description className="text-sm text-text-secondary">{description}</DialogPrimitive.Description>
           </div>
-          {children}
-          {footer === undefined ? null : <div className="flex flex-wrap justify-end gap-2">{footer}</div>}
+          <div
+            className={cn(
+              "min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 [@media(max-height:20rem)]:overflow-visible",
+              footer === undefined ? "pb-6" : "pb-4",
+            )}
+          >
+            {children}
+          </div>
+          {footer === undefined ? null : (
+            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-border-subtle bg-bg-surface-elevated px-4 py-4 sm:px-6">
+              {footer}
+            </div>
+          )}
           <DialogPrimitive.Close asChild>
             <IconButton label={t("dialog.close")} variant="subtle" size="sm" className="absolute top-3 right-3">
               <X />

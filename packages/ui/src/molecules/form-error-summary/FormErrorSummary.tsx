@@ -55,7 +55,7 @@ export function FormErrorSummary({ errors, className, ...rest }: FormErrorSummar
       role="group"
       aria-labelledby={headingId}
       className={cn(
-        "rounded-md border border-(--alert-destructive-border) bg-(--alert-destructive-bg) p-4 text-sm text-(--alert-destructive-fg)",
+        "scroll-mt-2 rounded-md border border-(--alert-destructive-border) bg-(--alert-destructive-bg) p-4 text-sm text-(--alert-destructive-fg)",
         focusRing,
         className,
       )}
