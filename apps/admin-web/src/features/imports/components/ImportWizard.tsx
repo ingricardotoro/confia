@@ -29,7 +29,7 @@ export interface ImportWizardProps {
   readonly onReset: () => void;
 }
 
-/** The rejections shown at a time. They are paged here, from the answer of the simulation (at most 200 of them). */
+/** The rejections shown at a time. They are paged here, from the answer of the simulation or of the apply (at most 200 of them). */
 export const REJECTIONS_PAGE_SIZE = 10;
 const INPUT_ID = "import-file";
 const NUMBERS = new Intl.NumberFormat("es-HN");
@@ -43,7 +43,14 @@ function Count({ label, value }: { readonly label: string; readonly value: numbe
   );
 }
 
-function RejectionsTable({ rejections }: { readonly rejections: readonly RejectionResponseOutput[] }) {
+interface RejectionsTableProps {
+  readonly rejections: readonly RejectionResponseOutput[];
+  readonly caption: string;
+  /** Names the pagination, so the simulation and the result are never two landmarks called alike. */
+  readonly navigation: string;
+}
+
+function RejectionsTable({ rejections, caption, navigation }: RejectionsTableProps) {
   const { t } = useAdminText();
   const [page, setPage] = useState(0);
   const rows = rejections.slice(page * REJECTIONS_PAGE_SIZE, (page + 1) * REJECTIONS_PAGE_SIZE);
@@ -62,7 +69,7 @@ function RejectionsTable({ rejections }: { readonly rejections: readonly Rejecti
   return (
     <>
       <Table
-        caption={t("imports.rejections.caption")}
+        caption={caption}
         columns={columns}
         rows={rows}
         getRowId={(row) => `${String(row.line)}-${row.field}-${row.reason}`}
@@ -72,6 +79,7 @@ function RejectionsTable({ rejections }: { readonly rejections: readonly Rejecti
         page={page}
         size={REJECTIONS_PAGE_SIZE}
         total={rejections.length}
+        label={navigation}
         onPageChange={(next) => {
           setPage(next);
         }}
@@ -163,6 +171,24 @@ export function ImportWizard(props: ImportWizardProps) {
             <Count label={t("imports.summary.rejected")} value={result.batch.rejectedRows} />
             <Count label={t("imports.summary.skipped")} value={result.batch.skippedRows} />
           </dl>
+          {result.rejections.length === 0 ? null : (
+            <div className="flex flex-col gap-3">
+              <h4 className="text-base font-semibold text-text-primary">{t("imports.result.rejectionsHeading")}</h4>
+              <p className="text-sm text-text-secondary">{t("imports.result.rejectionsDescription")}</p>
+              {result.rejectionsTruncated ? <Alert variant="warning">{t("imports.rejections.truncated")}</Alert> : null}
+              <RejectionsTable
+                key={result.batch.id}
+                rejections={result.rejections}
+                caption={t("imports.result.rejectionsCaption")}
+                navigation={t("imports.result.rejectionsNavigation")}
+              />
+              <div>
+                <Button variant="secondary" onClick={props.onDownloadRejections}>
+                  {t("imports.rejections.download")}
+                </Button>
+              </div>
+            </div>
+          )}
           <p className="text-sm text-text-secondary">{t("imports.result.next")}</p>
           <div>
             <Button onClick={props.onReset}>{t("imports.result.another")}</Button>
@@ -222,7 +248,12 @@ export function ImportWizard(props: ImportWizardProps) {
                   <h4 className="text-base font-semibold text-text-primary">{t("imports.rejections.heading")}</h4>
                   <p className="text-sm text-text-secondary">{t("imports.rejections.description")}</p>
                   {simulation.rejectionsTruncated ? <Alert variant="warning">{t("imports.rejections.truncated")}</Alert> : null}
-                  <RejectionsTable key={simulation.batch.id} rejections={simulation.rejections} />
+                  <RejectionsTable
+                    key={simulation.batch.id}
+                    rejections={simulation.rejections}
+                    caption={t("imports.rejections.caption")}
+                    navigation={t("imports.rejections.navigation")}
+                  />
                   <div>
                     <Button variant="secondary" onClick={props.onDownloadRejections}>
                       {t("imports.rejections.download")}
@@ -268,6 +299,7 @@ export function ImportWizard(props: ImportWizardProps) {
             <p className="text-sm text-text-secondary">
               {t("imports.apply.notCreated", { rejected: simulation.batch.rejectedRows, skipped: simulation.batch.skippedRows })}
             </p>
+            <Alert variant="warning">{t("imports.apply.documentsLate")}</Alert>
             <p className="text-sm text-text-secondary">{t("imports.apply.sameFile")}</p>
           </div>
         </Dialog>

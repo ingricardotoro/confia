@@ -158,11 +158,13 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
           downloadText(TEMPLATE_FILE_NAME, `${TEMPLATE_HEADER}\r\n`);
         }}
         onDownloadRejections={() => {
-          if (simulation === undefined) return;
+          // On the result step the list is the one the apply answered, which may hold more rows than the simulation showed.
+          const shown = result ?? simulation;
+          if (shown === undefined) return;
           downloadText(
             REJECTIONS_FILE_NAME,
             rejectionsCsv(
-              simulation.rejections,
+              shown.rejections,
               [t("imports.rejections.csvHeader.line"), t("imports.rejections.csvHeader.field"), t("imports.rejections.csvHeader.reason")],
               (field) => {
                 const named = fieldNameOf(field);

@@ -42,7 +42,7 @@ export function ImportHistory({ rows, table, pagination }: ImportHistoryProps) {
         {t("imports.history.heading")}
       </h2>
       <Table {...table} caption={t("imports.history.caption")} columns={columns} rows={rows} getRowId={(row) => row.id} />
-      <Pagination page={pagination.page} size={pagination.size} total={pagination.total} onPageChange={pagination.onPageChange} disabled={pagination.busy} />
+      <Pagination page={pagination.page} size={pagination.size} total={pagination.total} onPageChange={pagination.onPageChange} label={t("imports.history.navigation")} disabled={pagination.busy} />
     </section>
   );
 }

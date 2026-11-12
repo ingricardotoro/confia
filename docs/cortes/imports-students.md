@@ -20,6 +20,11 @@ encargados y vínculos, matrículas y acta de conciliación.
   nueva columna nullable con índice único `(institution_id, external_ref)`). Reaplicar el mismo archivo o uno corregido
   omite las filas ya importadas (`already-imported`) y no duplica nada.
 - **Se aplican solo las filas válidas**; las rechazadas quedan en el reporte para corregir en origen y reintentar.
+- **La simulación no consulta los documentos ya guardados (decisión del propietario sobre A2).** Responder «este documento ya existe» para
+  un archivo entero sin que haya un alta sería un oráculo masivo sobre documentos de menores. La simulación detecta solo problemas del
+  propio archivo (reglas de campo, `legacyId` o documento repetidos en el archivo) y `already-imported` por `legacyId` (clave de bajo
+  riesgo). `duplicate-national-id` se detecta **solo al aplicar**, donde cada intento es un alta real y auditada como el alta manual. Por
+  eso el conteo de rechazadas de la aplicación puede ser mayor que el de la simulación; la respuesta y la documentación de la API lo dicen.
 
 ## Modelo y reglas
 
@@ -35,7 +40,7 @@ Cada fila pasa por **el mismo caso de uso y las mismas reglas** que el alta manu
 
 Motivos de rechazo (código estable, campo y número de línea; nunca el valor): `missing-column`, `unknown-column`,
 `required`, `invalid-format`, `too-long`, `invalid-date`, `future-birth-date`, `duplicate-in-file` (legacyId o documento
-repetidos en el archivo), `duplicate-national-id` (ya existe en la institución), `already-imported`.
+repetidos en el archivo), `duplicate-national-id` (ya existe en la institución; **solo al aplicar**, nunca en la simulación), `already-imported`.
 
 ## API
 
@@ -71,8 +76,9 @@ efecto, límites de tasa, ausencia de datos personales en bitácora, logs, lote 
 
 ## Criterio de aceptación
 
-Un administrador sube un CSV de 100 estudiantes con 5 filas defectuosas, ve exactamente esos 5 rechazos por línea y motivo,
-corrige y simula de nuevo, aplica, y los estudiantes aparecen en el registro; reaplicar el archivo no crea ninguno más.
+Un administrador sube un CSV de 100 estudiantes con 5 filas defectuosas **del propio archivo**, ve exactamente esos 5 rechazos por línea y
+motivo, corrige y simula de nuevo, aplica, y los estudiantes aparecen en el registro; reaplicar el archivo no crea ninguno más. Un documento
+que ya tiene otro estudiante no se anuncia en la simulación: aparece al aplicar como rechazo `duplicate-national-id` de esa fila, sin su valor.
 
 ## Construido en el backend
 
@@ -200,7 +206,15 @@ filas de auditoría, filas de lote y registros contra nombres, referencias, docu
   error, `log_min_error_statement` y los parámetros completos para el rol de la aplicación, deja a otro escritor con la referencia sin confirmar, aplica el archivo y comprueba que la
   referencia no aparece en el registro del servidor; con un control (una violación directa sí la muestra) y verificada contra la versión sin `ON CONFLICT`, donde falla. El contenedor de
   pruebas y la producción siguen con `log_error_verbosity=terse`, `log_statement=none` y `log_min_error_statement=panic` (`docs/05-infraestructura-y-despliegue.md`).
-- No se tocó A2 (el oráculo de `duplicate-national-id` en la simulación): decide el propietario.
+- **A2, resuelto por decisión del propietario**: la simulación ya no consulta los documentos guardados. `StudentImport.evaluate` solo juzga las reglas de
+  campo, los repetidos dentro del archivo (`legacyId` y documento) y `already-imported` por `legacyId` (una lectura por mil referencias); no usa
+  `NationalIdIndexes` ni `existingBlindIndexes` (el constructor de `StudentImport` ya no recibe `NationalIdIndexes`). `duplicate-national-id` sale de `createAll`
+  al aplicar (intento real y auditado como el alta manual; el bloque se revierte y se reintenta fila por fila) y se informa como rechazo de esa fila, sin valor.
+  **El `rejectedRows` de la aplicación puede ser mayor que el de la simulación**; se dice en las descripciones del OpenAPI de `simulate`, `apply` y
+  `rejections`. Los conteos siguen sumando (`totalRows = createdRows + rejectedRows + skippedRows` en la aplicación) y la forma de la respuesta no cambia
+  (`packages/contracts` no cambia, solo descripciones). Pruebas: `StudentImportTest` (la simulación no emite `lookup-indexes` ni `existing-indexes`; el documento
+  guardado solo se encuentra en `createAll`), `ImportStudentsTest` (rechazadas de la aplicación mayores que las de la simulación) e `ImportEndpointsIT` (el
+  documento guardado no aparece al simular y sí al aplicar).
 
 ## Construido en el frontend
 
@@ -221,14 +235,19 @@ Entrada «Importaciones» en `apps/admin-web` (`src/features/imports/`, ruta `/i
   máximo 200; aviso cuando `rejectionsTruncated`). «Descargar las líneas y los motivos» baja un CSV con BOM y solo esas tres columnas
   (textos de la pantalla; sin valores). Si `validRows = 0` no hay «Aplicar» y se explica por qué.
 - **Aplicar.** Diálogo de confirmación (F2): «Se crearán N estudiantes», cuántas filas rechazadas u ya importadas no se crean y el botón
-  «Crear N estudiantes»; no se cierra con Escape ni con Cancelar mientras la aplicación está en curso, y un doble clic envía una sola vez
+  «Crear N estudiantes» y un aviso: **los documentos de identidad que ya existen se revisan solo al aplicar** (la simulación no los mira),
+  así que la aplicación puede rechazar más filas que las que mostró la simulación; no se cierra con Escape ni con Cancelar mientras la aplicación está en curso, y un doble clic envía una sola vez
   (guarda síncrona, no solo estado). Al terminar, foco al encabezado «Importación aplicada» con creados, omitidos y rechazados, y
-  «Importar otro archivo».
+  «Importar otro archivo». El resultado lista las filas que **rechazó la aplicación** (línea, campo y motivo, paginadas de 10 en 10, con
+  aviso si se cortó en 200 y con la misma descarga, que usa la lista del resultado y no la de la simulación).
 - **Errores.** `import-not-simulated` e `import-file-changed`: el resumen anterior se descarta, el archivo sigue en memoria y la alerta ofrece
   «Simular de nuevo este archivo». `400 validation-failed` del archivo: una línea por problema (`empty-file`, `no-rows`, `too-large`,
   `too-many-rows`, `malformed-csv`, `invalid-encoding`, columna faltante por nombre de la plantilla, columna desconocida **por posición**,
   nunca por texto de la cabecera). `429`: texto propio (límite por hora). Red o 500 en la aplicación: se dice que reaplicar es seguro. Ningún
   `title` ni `detail` del servidor se muestra; el identificador de traza es visible.
+- **Paginación con nombre propio.** `Pagination` (`packages/ui`) acepta `label`; sin él conserva «Paginación». Los rechazos de la simulación,
+  los del resultado y el historial tienen cada uno el suyo («Páginas de las filas rechazadas en la simulación», «… al aplicar», «Páginas del
+  historial de importaciones»), con lo que `landmark-unique` ya no se incumple.
 - **Historial** (`GET /api/v1/imports`): tabla paginada **en el servidor** con la página en la URL (`page`, `pageSize`); esqueleto, vacío con
   acción que lleva al campo de archivo, error con reintento e identificador de traza.
 
@@ -256,18 +275,16 @@ Entrada «Importaciones» en `apps/admin-web` (`src/features/imports/`, ruta `/i
 - `imports-model.ts` aplica las mismas reglas que el backend para lo que un recorrido necesita: cabecera, obligatorios, fecha (formato, día
   real, piso 1990, futura), `legacyId` repetido, ya importado (omitido, no rechazado), los dos 409 distinguidos por el último lote, tope de 200
   rechazos, 403 y lectura que falla primero. Lee el multipart real que envía el navegador y guarda solo el SHA-256 y los `legacyId`
-  aplicados. **No crea estudiantes en el registro de estudiantes del escenario** (queda aparte), así que el criterio «aparecen en el registro» se
+  aplicados. La **simulación no revisa los documentos ya guardados**; la aplicación sí: una fila con `STORED_NATIONAL_ID` es válida al simular
+  y se rechaza al aplicar como `duplicate-national-id` (campo `nationalId`), y el documento de una fila creada pasa a estar guardado. **No crea estudiantes en el registro de estudiantes del escenario** (queda aparte), así que el criterio «aparecen en el registro» se
   verifica en la API real, no en el simulador. Presets `imports-empty`, `imports-forbidden`, `imports-server-error`.
 - Vitest: `import-operations.test.ts`, `import-model.test.ts`, componentes `ImportStepper`, `ImportHistory`, `ImportWizard`,
   `ImportsContainer.test.tsx` (MSW) y `imports-model.test.ts`.
 - Playwright: `imports-flow` (criterio de aceptación con 100 filas y 5 defectuosas, corrección, aplicación con confirmación, reaplicar sin crear,
-  nada en el almacenamiento, archivo cambiado), `imports-states` y `imports-keyboard`. Puerta de axe: 8 estados nuevos de `/imports` en los dos
+  nada en el almacenamiento, archivo cambiado, documento ya guardado que solo la aplicación rechaza), `imports-states` y `imports-keyboard`. Puerta de axe: 8 estados nuevos de `/imports` en los dos
   temas (`ready`, `file-error`, `simulated-with-rejections`, `dialog-apply`, `result`, `file-failure`, `empty`, `load-error`). La puerta atrapó un fallo
   de contraste en el paso completado (el carácter ✓ como texto) y se resolvió con un icono SVG.
 
 ### Pendiente
 
-- `GuardianConsents.tsx` no tiene su archivo de prueba (`presentation-states.test.ts` falla por eso; viene del corte de consentimientos) y
-  `AW61` falla como ya se sabía; ninguno es de este corte.
-- Dos barras de paginación con el mismo nombre «Paginación» en la pantalla (rechazos e historial): `landmark-unique` es moderada y no
-  bloquea, pero conviene que `Pagination` admita un nombre propio.
+- `AW61` falla como ya se sabía; no es de este corte. `GuardianConsents.tsx` ya tiene su prueba (`GuardianConsents.test.tsx`).

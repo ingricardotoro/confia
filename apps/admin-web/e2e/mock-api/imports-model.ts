@@ -23,6 +23,12 @@ const MAX_REJECTIONS = 200;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const TEMPLATE_COLUMNS = ["legacyId", "firstName", "lastName", "birthDate", "nationalId", "sex"] as const;
 const REQUIRED = ["legacyId", "firstName", "lastName", "birthDate"] as const;
+/**
+ * A national id the students registry of the simulated API already holds. The simulation does not look at documents already
+ * stored (the backend checks them only when applying), so a row with this document is valid in the simulation and rejected
+ * as `duplicate-national-id` by the apply.
+ */
+export const STORED_NATIONAL_ID = "0801-2000-00001";
 const FIRST_BIRTH_DATE = "1990-01-01";
 /** U+FEFF at the start of a file tells a spreadsheet that it is UTF-8. */
 const BYTE_ORDER_MARK = String.fromCharCode(0xfeff);
@@ -129,6 +135,7 @@ export function createImportsModel(options: ImportsOptions, now: () => Date = ()
   const batches: BatchRow[] = [];
   const simulated = new Set<string>();
   const imported = new Set<string>();
+  const storedDocuments = new Set<string>([STORED_NATIONAL_ID]);
   let reads = 0;
   let counter = 0;
   const today = (): string => new Date(now().getTime() - 6 * 3_600_000).toISOString().slice(0, 10);
@@ -156,7 +163,7 @@ export function createImportsModel(options: ImportsOptions, now: () => Date = ()
   }
 
   /** Reads the file as the backend does: the problems of the file as a 400, otherwise the counts and the rejections. */
-  function run(file: string): { readonly sha: string; readonly total: number; readonly valid: number; readonly rejected: number; readonly skipped: number; readonly rejections: Rejection[]; readonly legacyIds: string[] } | ModelResponse {
+  function run(file: string, checkStoredDocuments: boolean): { readonly sha: string; readonly total: number; readonly valid: number; readonly rejected: number; readonly skipped: number; readonly rejections: Rejection[]; readonly legacyIds: string[]; readonly documents: string[] } | ModelResponse {
     const size = Buffer.byteLength(file, "utf8");
     if (size === 0) return fileProblem([{ field: "file", reason: "empty-file" }]);
     if (size > MAX_FILE_BYTES) return fileProblem([{ field: "file", reason: "too-large" }]);
@@ -180,6 +187,7 @@ export function createImportsModel(options: ImportsOptions, now: () => Date = ()
     const omitted: Rejection[] = [];
     const seen = new Set<string>();
     const legacyIds: string[] = [];
+    const documents: string[] = [];
     let rejected = 0;
     let skipped = 0;
     for (const { line, cells } of rows) {
@@ -206,7 +214,13 @@ export function createImportsModel(options: ImportsOptions, now: () => Date = ()
       } else if (imported.has(legacyId)) {
         omitted.push({ line, field: "legacyId", reason: "already-imported" });
         skipped += 1;
-      } else legacyIds.push(legacyId);
+      } else if (checkStoredDocuments && cellOf(cells, "nationalId") !== "" && storedDocuments.has(cellOf(cells, "nationalId"))) {
+        defects.push({ line, field: "nationalId", reason: "duplicate-national-id" });
+        rejected += 1;
+      } else {
+        legacyIds.push(legacyId);
+        documents.push(cellOf(cells, "nationalId"));
+      }
     }
     return {
       sha: createHash("sha256").update(file).digest("hex"),
@@ -216,6 +230,7 @@ export function createImportsModel(options: ImportsOptions, now: () => Date = ()
       skipped,
       rejections: [...defects, ...omitted],
       legacyIds,
+      documents,
     };
   }
 
@@ -225,7 +240,8 @@ export function createImportsModel(options: ImportsOptions, now: () => Date = ()
     const file = fileOfMultipart(request.contentType, request.body);
     if (file === undefined) return fileProblem([]);
     const lastBatch = batches[batches.length - 1];
-    const result = run(file);
+    // Only the apply looks at the documents already stored, as the backend does.
+    const result = run(file, path === APPLY_PATH);
     if ("status" in result) return result;
     const rejections = result.rejections.slice(0, MAX_REJECTIONS);
     const truncated = result.rejections.length > MAX_REJECTIONS;
@@ -239,6 +255,9 @@ export function createImportsModel(options: ImportsOptions, now: () => Date = ()
     // The apply: the file must have a simulation of this account; otherwise the last batch tells the two cases apart.
     if (!simulated.has(result.sha)) return lastBatch?.status === "VALIDATED" ? failure("import-file-changed", 409) : failure("import-not-simulated", 409);
     result.legacyIds.forEach((legacyId) => imported.add(legacyId));
+    result.documents.forEach((document) => {
+      if (document !== "") storedDocuments.add(document);
+    });
     const at = now().toISOString();
     const batch = importBatch({ id: nextId(), status: "APPLIED", fileSha256: result.sha, totalRows: result.total, validRows: result.valid, createdRows: result.valid, rejectedRows: result.rejected, skippedRows: result.skipped, createdAt: at, appliedAt: at });
     batches.push(batch);

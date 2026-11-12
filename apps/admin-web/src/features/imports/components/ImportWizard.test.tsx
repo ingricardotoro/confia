@@ -205,6 +205,13 @@ describe("ImportWizard, apply", () => {
     expect(onCloseApply).toHaveBeenCalled();
   });
 
+  it("warns that the documents already stored are checked only when applying, so more rows may be rejected", () => {
+    renderWithAdminI18n(<ImportWizard {...props({ step: "apply", confirming: true, simulation: run({ validRows: 5 }) })} />);
+
+    const dialog = screen.getByRole("dialog", { name: "Aplicar la importación" });
+    expect(within(dialog).getByText(/se revisan solo al aplicar, no en la simulación.*más filas que las que mostró la simulación/)).toBeInTheDocument();
+  });
+
   it("says one student in the singular", () => {
     renderWithAdminI18n(<ImportWizard {...props({ step: "apply", confirming: true, simulation: run({ totalRows: 1, validRows: 1, rejectedRows: 0 }) })} />);
 
@@ -246,9 +253,37 @@ describe("ImportWizard, result", () => {
     expect(screen.getByRole("heading", { level: 3, name: "Importación aplicada" })).toHaveFocus();
     expect(screen.getByText(/Se crearon 95 estudiantes\. 2 filas ya importadas se omitieron\. 3 filas rechazadas no se crearon\./)).toBeInTheDocument();
     expect(screen.queryByLabelText("Archivo CSV de estudiantes")).toBeNull();
+    expect(screen.queryByRole("table")).toBeNull();
 
     await userEvent.setup().click(screen.getByRole("button", { name: "Importar otro archivo" }));
 
     expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists the rows the apply rejected with their line, field and reason, paged under its own navigation name", async () => {
+    const onDownloadRejections = vi.fn();
+    const rejections: readonly RejectionResponseOutput[] = Array.from({ length: 12 }, (_, index) => ({ line: index + 2, field: "nationalId", reason: "duplicate-national-id" }));
+    renderWithAdminI18n(
+      <ImportWizard {...props({ step: "result", onDownloadRejections, result: run({ status: "APPLIED", totalRows: 20, createdRows: 8, rejectedRows: 12 }, rejections) })} />,
+    );
+    const user = userEvent.setup();
+
+    const table = screen.getByRole("table", { name: /Filas rechazadas al aplicar/ });
+    expect(within(table).getAllByRole("row")).toHaveLength(REJECTIONS_PAGE_SIZE + 1);
+    expect(within(table).getAllByRole("row")[1]?.textContent).toBe("2nationalIdYa hay un estudiante con ese documento de identidad.");
+    expect(screen.getByRole("navigation", { name: "Páginas de las filas rechazadas al aplicar" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Páginas de las filas rechazadas en la simulación" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /Siguiente/ }));
+    await user.click(screen.getByRole("button", { name: "Descargar las líneas y los motivos" }));
+
+    expect(within(table).getAllByRole("row")).toHaveLength(2 + 1);
+    expect(onDownloadRejections).toHaveBeenCalledTimes(1);
+  });
+
+  it("names the pagination of the rejections of the simulation apart from the one of the result", () => {
+    renderWithAdminI18n(<ImportWizard {...props({ step: "simulate", simulation: run({ rejectedRows: 23, validRows: 0 }, REJECTIONS) })} />);
+
+    expect(screen.getByRole("navigation", { name: "Páginas de las filas rechazadas en la simulación" })).toBeInTheDocument();
   });
 });

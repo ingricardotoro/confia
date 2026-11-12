@@ -68,6 +68,27 @@ test.describe("the import of students", () => {
     expect((await Promise.all(responses)).join("")).not.toMatch(/Nombre\d|Apellido\d/);
   });
 
+  test("a document already stored is not flagged by the simulation, the apply warns about it and lists the rows it rejected", async ({ page, scenarioId }) => {
+    await openImports(page, scenarioId, "imports-empty");
+    // The registry of the simulated API holds this document; the simulation does not look at it, the apply does.
+    await choose(page, [csvOf(2), "L50,Nombre50,Apellido50,2013-05-01,0801-2000-00001,F"].join("\n"));
+    await simulateButton(page).click();
+
+    await expect(summaryHeading(page)).toBeFocused();
+    await expect(page.getByRole("status").filter({ hasText: "Simulación lista" })).toContainText("3 filas se pueden crear, 0 rechazadas y 0 ya importadas.");
+    await expect(page.getByText("Ninguna fila tiene defectos.")).toBeVisible();
+
+    await page.getByRole("button", { name: "Aplicar la importación" }).click();
+    await expect(dialog(page).getByText(/se revisan solo al aplicar/)).toBeVisible();
+    await dialog(page).getByRole("button", { name: "Crear 3 estudiantes" }).click();
+
+    await expect(resultHeading(page)).toBeFocused();
+    await expect(page.getByText(/Se crearon 2 estudiantes\./)).toBeVisible();
+    const table = page.getByRole("table", { name: /Filas rechazadas al aplicar/ });
+    await expect(table.getByRole("row")).toHaveCount(1 + 1);
+    await expect(table.getByRole("row").nth(1)).toContainText("4nationalIdYa hay un estudiante con ese documento de identidad.");
+  });
+
   test("keeps nothing of the file in the browser storage", async ({ page, scenarioId }) => {
     await openImports(page, scenarioId);
     await choose(page, csvOf(3));

@@ -14,12 +14,14 @@ export interface PaginationProps extends Omit<ComponentProps<"nav">, "children" 
   onPageChange: (page: number) => void;
   /** Blocks both buttons while a page is being fetched. */
   disabled?: boolean;
+  /** The accessible name of the navigation. Give one when a screen has several paginations, so they are told apart. */
+  label?: string;
 }
 
 // Server-side pagination (docs/ui-ux/02 section 5.3): the component never slices data, it only asks
 // for another page. With no rows there is nothing to page, so it renders no landmark at all. The
 // summary is a polite live region so a screen reader hears that the page changed.
-export function Pagination({ page, size, total, onPageChange, disabled = false, className, ...rest }: PaginationProps) {
+export function Pagination({ page, size, total, onPageChange, disabled = false, label, className, ...rest }: PaginationProps) {
   const { t } = useUiText();
   if (total <= 0 || size <= 0) return null;
 
@@ -29,7 +31,7 @@ export function Pagination({ page, size, total, onPageChange, disabled = false, 
   const to = Math.min(total, (current + 1) * size);
 
   return (
-    <nav {...rest} aria-label={t("pagination.label")} className={cn("flex flex-wrap items-center justify-between gap-3 text-sm", className)}>
+    <nav {...rest} aria-label={label ?? t("pagination.label")} className={cn("flex flex-wrap items-center justify-between gap-3 text-sm", className)}>
       <p aria-live="polite" className="text-text-secondary">
         {t("pagination.summary", { from, to, total })}
       </p>

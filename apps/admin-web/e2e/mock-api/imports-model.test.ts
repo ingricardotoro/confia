@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FAILING_IMPORT_READS, DEFAULT_IMPORTS, createImportsModel, fileOfMultipart, readCsv, type ImportsOptions } from "./imports-model.ts";
+import { FAILING_IMPORT_READS, DEFAULT_IMPORTS, STORED_NATIONAL_ID, createImportsModel, fileOfMultipart, readCsv, type ImportsOptions } from "./imports-model.ts";
 
 // The student import of the simulated API: the same rules the screen meets in a journey (the template, the required fields, the
 // birth date, the repeated and the already imported `legacyId`, the two 409 told apart by the last batch), the file problems of a
@@ -111,6 +111,19 @@ describe("apply", () => {
       { line: 3, field: "legacyId", reason: "already-imported" },
     ]);
     expect(imports.batches().map((batch) => batch.status)).toEqual(["VALIDATED", "APPLIED", "APPLIED"]);
+  });
+
+  it("does not look at the documents already stored when simulating, and rejects them when applying", () => {
+    const { post } = model();
+    const withDocument = "legacyId,firstName,lastName,birthDate,nationalId" + "\n" + "A1,N,A,2013-05-01," + "\n" + "A2,N,A,2013-05-02," + STORED_NATIONAL_ID;
+
+    const simulated = bodyOf(post("simulate", withDocument));
+    const applied = bodyOf(post("apply", withDocument));
+
+    expect(simulated.batch).toMatchObject({ totalRows: 2, validRows: 2, rejectedRows: 0 });
+    expect(simulated.rejections).toEqual([]);
+    expect(applied.batch).toMatchObject({ status: "APPLIED", totalRows: 2, validRows: 1, createdRows: 1, rejectedRows: 1 });
+    expect(applied.rejections).toEqual([{ line: 3, field: "nationalId", reason: "duplicate-national-id" }]);
   });
 
   it("keeps the counts adding up: total = valid + rejected + skipped", () => {

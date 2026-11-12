@@ -33,6 +33,9 @@ test.describe("the import screen by keyboard", () => {
     await dialog(page).getByRole("button", { name: "Crear 22 estudiantes" }).focus();
     await page.keyboard.press("Enter");
     await expect(resultHeading(page)).toBeFocused();
+    // The result lists the rows the apply rejected: the download comes first, then the way to start over.
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "Descargar las líneas y los motivos" })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(page.getByRole("button", { name: "Importar otro archivo" })).toBeFocused();
   });
