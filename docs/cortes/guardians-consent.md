@@ -67,3 +67,87 @@ auditoría y logs.
 
 Un administrador registra el consentimiento institucional por correo de un encargado con su versión de política y evidencia
 en papel firmado, lo revoca, y el historial conserva ambos eventos; el estado vigente queda revocado y nada viene premarcado.
+
+## Construido en el backend
+
+Módulo `com.confia.guardians` (cuatro capas, clases nuevas), migración `V20__create_guardians_guardian_consent_event.sql` y dos
+rutas con `@RateLimited` por dirección y por cuenta (lectura `admin-read` y `admin-read-account`; escritura `admin-write` y
+`admin-write-account`; `429` con `Retry-After`). Permisos en `PermissionedEndpoints.forAdmin()` y `x-required-permission` en el
+OpenAPI: `GET` con `guardians:read`, `POST` con `guardians:update` (no hay permiso nuevo; `StaffRole` no cambia: administrador y
+super administrador registran, los demás roles con lectura solo consultan). Auditoría `guardians.consent.granted|withdrawn`.
+Instantánea del OpenAPI regenerada (38 operaciones, 31 con permiso).
+
+### Base de datos
+
+Tabla `guardians_guardian_consent_event` (nombre fijado al construir; la nota decía `guardians_consent_event`): `institution_id`,
+`id`, `seq` (identidad `GENERATED ALWAYS`, es el orden de los eventos), `guardian_id`, `channel`, `purpose`, `action`,
+`evidence_source`, `policy_version`, `occurred_at` (por defecto `clock_timestamp()`) y `recorded_by`. Clave compuesta
+`(institution_id, guardian_id)` hacia `guardians_guardian`; `CHECK` de cada conjunto cerrado (la finalidad solo admite
+`INSTITUTIONAL` y `MARKETING`; la evidencia admite también `PORTAL_FORM` para el portal futuro, que la API administrativa
+rechaza), versión de política presente si y solo si la acción es `GRANT` y con la forma `^[A-Za-z0-9._-]{1,32}$`. Seguridad por
+fila forzada, `REVOKE ALL FROM PUBLIC`, solo `SELECT` e `INSERT` para la aplicación (`SELECT` para el rol de solo lectura) y un
+disparador `BEFORE UPDATE OR DELETE` que rechaza todo cambio a cualquier rol, el dueño incluido. No guarda correo, teléfono ni
+nombre.
+
+### Forma de la API que necesita el frontend
+
+- **Leer** `GET /api/v1/guardians/{id}/consents` → `200`: `{ guardianId, states, history }`. `states` son siempre las seis
+  combinaciones, canal por canal (`EMAIL`, `SMS`, `WHATSAPP`) y dentro de cada uno `INSTITUTIONAL` antes de `MARKETING`; cada
+  elemento: `channel`, `purpose`, `state` (`GRANTED`, `WITHDRAWN`, `NEVER_GRANTED`), `since`, `policyVersion`, `evidenceSource`
+  (los tres últimos son `null` si nunca se concedió; `policyVersion` es `null` si está revocado). `history`: el más reciente
+  primero, máximo 100; cada elemento: `id`, `channel`, `purpose`, `action` (`GRANT`, `WITHDRAW`), `evidenceSource`,
+  `policyVersion` (`null` en una revocación), `occurredAt`. Nunca trae correo, teléfono, nombres ni la cuenta que registró.
+- **Registrar** `POST /api/v1/guardians/{id}/consents` → `200`. Cuerpo: `channel` (`EMAIL|SMS|WHATSAPP`), `purpose`
+  (`INSTITUTIONAL|MARKETING`), `action` (`GRANT|WITHDRAW`), `evidenceSource` (`SIGNED_PAPER_FORM|ADMIN_REGISTERED`) y
+  `policyVersion` (obligatoria en `GRANT`, **se omite** en `WITHDRAW`). Todos obligatorios salvo la versión; un miembro desconocido
+  (por ejemplo `occurredAt` o `recordedBy`) es `400`. Respuesta: `{ channel, purpose, state, since, policyVersion,
+  evidenceSource, changed }` con el estado vigente de esa combinación; `changed` es `true` si se escribió un evento y `false` si
+  la petición repetía el estado vigente (el cliente puede refrescar la matriz con el `GET`).
+- **Errores**: `400 validation-failed` con `errors: [{ field, reason }]`: `channel` y `action` con `pattern` o `not-null`;
+  `purpose` con `not-consentable` (`TRANSACTIONAL`, en cualquier capitalización), `invalid` o `not-null`; `evidenceSource` con
+  `not-allowed` (`PORTAL_FORM`), `invalid` o `not-null`; `policyVersion` con `pattern` (forma o más de 32 caracteres), `required`
+  (`GRANT` sin versión) o `not-allowed` (`WITHDRAW` con versión). `404 resource-not-found` (encargado inexistente o de otra
+  institución). `409 guardian-not-active` (conceder a un encargado inactivo) y `409 consent-channel-unavailable` (conceder por un
+  canal sin dato: correo para `EMAIL`, teléfono para `SMS` y `WHATSAPP`). `403 forbidden` sin permiso, `401` sin sesión. Las
+  respuestas llevan `Cache-Control: no-store`; no hay `Idempotency-Key`.
+- `ProblemCode` gana `consent-channel-unavailable` (409); el catálogo `problems.properties` lo dice, y el detalle de
+  `guardian-not-active` ahora cubre también el consentimiento y aclara que revocar siempre es posible. El frontend debe sumar
+  ambos a `KNOWN_PROBLEM_CODES` (29 a 30) y a sus textos.
+
+### Decisiones tomadas al construir
+
+- **Orden y comprobaciones**: forma de la petición (`400`, antes de abrir la transacción), encargado (`404`, con
+  `SELECT ... FOR UPDATE` de su fila, que serializa los cambios del mismo encargado), conceder exige encargado activo y luego dato
+  del canal, y por último la idempotencia. Conceder a un inactivo es `409` aunque el estado ya fuera `GRANTED`.
+- **Idempotencia**: repetir la acción que ya es el estado (conceder lo `GRANTED`, revocar lo `WITHDRAWN`) no escribe evento ni
+  auditoría y responde `changed: false` con el estado vigente (otra versión o evidencia en la repetición no cambia nada).
+  **Revocar una combinación `NEVER_GRANTED` sí escribe un evento** (la persona declinó por adelantado; es evidencia útil para la
+  futura lista de supresión).
+- **Estado vigente** = último evento de cada combinación por `seq`, no por `occurred_at`; `occurred_at` la fija el servidor
+  (reloj de la aplicación truncado a microsegundos, igual que el resto del módulo).
+- **Auditoría**: entidad `guardians.consent` con el identificador del encargado; antes `{guardianCode, channel, purpose,
+  state}` y después ese mismo más `evidenceSource` y, solo en una concesión, `policyVersion`. Nunca correo, teléfono ni nombres.
+- **Desviación respecto de lo pedido**: la tabla **no** tiene un disparador `BEFORE TRUNCATE`. La limpieza de las pruebas de
+  integración trunca en una sola sentencia toda tabla sin ese disparador y no puede truncar `guardians_guardian` mientras una
+  tabla que la referencia quede fuera; el `TRUNCATE` queda vedado a la aplicación por privilegio (y `UPDATE` y `DELETE` por
+  privilegio y por disparador). Si se quiere el disparador de `TRUNCATE`, hay que ajustar antes `CommittingPostgresIntegrationTest`.
+- `RecordConsentRequest` redacta su `toString` (Spring lo registra al leer el cuerpo en TRACE). Observación ajena al corte: con el
+  nivel de registro en TRACE o DEBUG, el mensaje de validación del propio Spring ("rejected value [...]") repite el valor rechazado
+  de cualquier campo de cualquier DTO; en producción (INFO) no se registra.
+
+### Pruebas
+
+`GuardianConsentsTest` (38; máquina de estados: derivado del último evento, nada premarcado, conceder-revocar-conceder, repetición,
+revocar lo nunca concedido, canal sin dato, encargado inactivo conceder/revocar, `TRANSACTIONAL` y `PORTAL_FORM` rechazados, forma
+de la versión con casos válidos e inválidos), `ManageGuardianConsentsTest` (17; casos de uso con puertos en memoria: flujo de
+aceptación, historial de 100, orden de bloqueos —se bloquea la fila del encargado antes de leer y de escribir—, lectura de solo
+lectura, aislamiento, auditoría sin datos personales, nada se abre si la petición es inválida), `GuardiansGuardianConsentEventSchemaIT`
+(9; `CHECK` de conjuntos y de versión, clave compuesta entre instituciones, orden por `seq`, `UPDATE` y `DELETE` rechazados al dueño y
+sin privilegio a la aplicación, seguridad por fila, roles de solo lectura y portal) y `GuardianConsentEndpointsIT` (21; flujo de
+aceptación con dos eventos, nunca premarcado, tres eventos, forma exacta de las respuestas, tiempo del servidor, repetición,
+cada regla con su campo, canal sin dato, inactivo, 404/400, ocho concesiones simultáneas = un evento, doce cambios simultáneos sin
+dos acciones iguales seguidas, seis combinaciones simultáneas, concesión contra inactivación, aislamiento, `403` sin efecto, `401`,
+sesión cerrada, origen ausente, `429` por dirección y por cuenta, y barrido de auditoría y registros contra correo, teléfono,
+nombres y dirección). Actualizadas: `ProblemCodeTest`, `PermissionedEndpointsTest`, `OpenApiContractSnapshotTest`,
+`CurrentSessionEndpointIT` y `PublicRouteAllowListTest` (listas de rutas). Pendiente fuera de este paso: regenerar
+`packages/contracts` con orval y la pantalla.

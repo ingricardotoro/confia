@@ -439,6 +439,7 @@ class PublicRouteAllowListTest {
             "GET /api/v1/students/{studentId}/enrollments", "POST /api/v1/enrollments",
             "POST /api/v1/enrollments/{id}/transfer", "POST /api/v1/enrollments/{id}/exit", "GET /api/v1/guardians",
             "GET /api/v1/guardians/{id}", "POST /api/v1/guardians", "PUT /api/v1/guardians/{id}",
+            "GET /api/v1/guardians/{id}/consents", "POST /api/v1/guardians/{id}/consents",
             "GET /api/v1/students/{studentId}/guardians", "PUT /api/v1/students/{studentId}/guardians");
 
     /** BI20, the first control: an authenticated entry whose route answers {@code 200} to anyone. */

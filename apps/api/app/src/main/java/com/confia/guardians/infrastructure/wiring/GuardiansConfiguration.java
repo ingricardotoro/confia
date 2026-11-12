@@ -1,11 +1,14 @@
 package com.confia.guardians.infrastructure.wiring;
 
+import com.confia.guardians.application.GuardianConsentRepository;
 import com.confia.guardians.application.GuardianLinkRepository;
 import com.confia.guardians.application.GuardianRepository;
 import com.confia.guardians.application.GuardianSecretsProtector;
+import com.confia.guardians.application.ManageGuardianConsents;
 import com.confia.guardians.application.ManageGuardianLinks;
 import com.confia.guardians.application.ManageGuardians;
 import com.confia.guardians.infrastructure.ColumnEncryptionGuardianSecretsProtector;
+import com.confia.guardians.infrastructure.JooqGuardianConsentRepository;
 import com.confia.guardians.infrastructure.JooqGuardianLinkRepository;
 import com.confia.guardians.infrastructure.JooqGuardianRepository;
 import com.confia.shared.audit.AuditLogWriter;
@@ -38,6 +41,17 @@ public class GuardiansConfiguration {
     @Bean
     GuardianLinkRepository guardianLinkRepository(DSLContext dsl) {
         return new JooqGuardianLinkRepository(dsl);
+    }
+
+    @Bean
+    GuardianConsentRepository guardianConsentRepository(DSLContext dsl) {
+        return new JooqGuardianConsentRepository(dsl);
+    }
+
+    @Bean
+    ManageGuardianConsents manageGuardianConsents(TransactionRunner transactionRunner, GuardianRepository guardians,
+            GuardianConsentRepository consents, AuditLogWriter auditLogWriter, Clock clock) {
+        return new ManageGuardianConsents(transactionRunner, guardians, consents, auditLogWriter, clock);
     }
 
     @Bean

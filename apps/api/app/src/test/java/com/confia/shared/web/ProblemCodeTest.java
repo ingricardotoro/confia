@@ -38,7 +38,7 @@ class ProblemCodeTest {
                         "inactive-reference", "duplicate-student-code", "duplicate-national-id",
                         "student-not-active", "section-full", "duplicate-active-enrollment",
                         "invalid-enrollment-state", "transfer-year-mismatch", "invalid-responsibility-split",
-                        "guardian-not-active");
+                        "guardian-not-active", "consent-channel-unavailable");
     }
 
     @Test
@@ -61,7 +61,8 @@ class ProblemCodeTest {
             "inactive-reference, 409", "duplicate-student-code, 409", "duplicate-national-id, 409",
             "student-not-active, 409", "section-full, 409", "duplicate-active-enrollment, 409",
             "invalid-enrollment-state, 409", "transfer-year-mismatch, 409",
-            "invalid-responsibility-split, 400", "guardian-not-active, 409"})
+            "invalid-responsibility-split, 400", "guardian-not-active, 409",
+            "consent-channel-unavailable, 409"})
     void eachCodeCarriesItsHttpStatus(String code, int status) {
         assertThat(ProblemCode.ofCode(code)).get().extracting(ProblemCode::status)
                 .isEqualTo(status);
@@ -77,7 +78,8 @@ class ProblemCodeTest {
             "academic-year-already-active", "academic-year-closed", "duplicate-name",
             "inactive-reference", "duplicate-student-code", "duplicate-national-id",
             "student-not-active", "section-full", "duplicate-active-enrollment", "invalid-enrollment-state",
-            "transfer-year-mismatch", "invalid-responsibility-split", "guardian-not-active"})
+            "transfer-year-mismatch", "invalid-responsibility-split", "guardian-not-active",
+            "consent-channel-unavailable"})
     void theTypeIsTheStableBaseFollowedByTheCodeAndNothingElse(String code) {
         ProblemCode problem = ProblemCode.ofCode(code).orElseThrow();
         assertThat(problem.type()).isEqualTo(URI.create("https://confia.hn/problems/" + code));

@@ -1,5 +1,8 @@
 package com.confia.guardians.application;
 
+import com.confia.guardians.domain.ConsentAction;
+import com.confia.guardians.domain.ConsentEvent;
+import com.confia.guardians.domain.ConsentState;
 import com.confia.guardians.domain.Guardian;
 import com.confia.guardians.domain.GuardianLink;
 import com.confia.guardians.domain.ProtectedValueChange;
@@ -27,6 +30,7 @@ final class GuardiansAudit {
 
     static final String GUARDIAN = "guardians.guardian";
     static final String LINKS = "guardians.links";
+    static final String CONSENT = "guardians.consent";
 
     static final String CREATE_ACTION = GUARDIAN + ".created";
     static final String UPDATE_ACTION = GUARDIAN + ".updated";
@@ -109,6 +113,26 @@ final class GuardiansAudit {
             List<GuardianLink> before, List<GuardianLink> after, Map<UUID, String> codes) {
         return entry(actor, requestId, LINKS + ".replaced", LINKS, studentId, linksJson(studentCode, before, codes),
                 linksJson(studentCode, after, codes));
+    }
+
+    /**
+     * A recorded consent event: {@code guardians.consent.granted} or {@code guardians.consent.withdrawn}, about the
+     * guardian (entity id) with the code of the guardian, the channel, the purpose, the evidence, the policy version
+     * of a grant, and the state before and after. Never an e-mail, a phone or a name.
+     */
+    static AuditEntry consentRecorded(AuthenticatedActor actor, UUID requestId, ConsentEvent event,
+            String guardianCode, ConsentState before) {
+        String action = CONSENT + (event.action() == ConsentAction.GRANT ? ".granted" : ".withdrawn");
+        String beforeJson = AuditJson.object().text("guardianCode", guardianCode)
+                .text("channel", event.channel().name()).text("purpose", event.purpose().name())
+                .text("state", before.name()).toJson();
+        AuditJson.Builder after = AuditJson.object().text("guardianCode", guardianCode)
+                .text("channel", event.channel().name()).text("purpose", event.purpose().name())
+                .text("state", event.resultingState().name()).text("evidenceSource", event.evidenceSource().name());
+        if (event.policyVersion() != null) {
+            after.text("policyVersion", event.policyVersion());
+        }
+        return entry(actor, requestId, action, CONSENT, event.guardianId(), beforeJson, after.toJson());
     }
 
     private static String linksJson(String studentCode, List<GuardianLink> links, Map<UUID, String> codes) {

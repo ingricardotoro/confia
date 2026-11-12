@@ -95,6 +95,106 @@
         "required" : [ "accessToken", "accessTokenExpiresAt", "idleExpiresAt", "sessionExpiresAt", "status" ],
         "type" : "object"
       },
+      "ConsentChangeResponse" : {
+        "properties" : {
+          "changed" : {
+            "description" : "True when an event was written; false when the request repeated the current state",
+            "type" : "boolean"
+          },
+          "channel" : {
+            "enum" : [ "EMAIL", "SMS", "WHATSAPP" ],
+            "type" : "string"
+          },
+          "evidenceSource" : {
+            "enum" : [ "SIGNED_PAPER_FORM", "ADMIN_REGISTERED", "PORTAL_FORM" ],
+            "type" : [ "string", "null" ]
+          },
+          "policyVersion" : {
+            "type" : [ "string", "null" ]
+          },
+          "purpose" : {
+            "enum" : [ "INSTITUTIONAL", "MARKETING" ],
+            "type" : "string"
+          },
+          "since" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "state" : {
+            "enum" : [ "GRANTED", "WITHDRAWN", "NEVER_GRANTED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "changed", "channel", "purpose", "state" ],
+        "type" : "object"
+      },
+      "ConsentEventResponse" : {
+        "properties" : {
+          "action" : {
+            "enum" : [ "GRANT", "WITHDRAW" ],
+            "type" : "string"
+          },
+          "channel" : {
+            "enum" : [ "EMAIL", "SMS", "WHATSAPP" ],
+            "type" : "string"
+          },
+          "evidenceSource" : {
+            "enum" : [ "SIGNED_PAPER_FORM", "ADMIN_REGISTERED", "PORTAL_FORM" ],
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "occurredAt" : {
+            "description" : "Server time of the event",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "policyVersion" : {
+            "description" : "The policy version of a grant; null for a withdrawal",
+            "type" : [ "string", "null" ]
+          },
+          "purpose" : {
+            "enum" : [ "INSTITUTIONAL", "MARKETING" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "action", "channel", "evidenceSource", "id", "occurredAt", "purpose" ],
+        "type" : "object"
+      },
+      "ConsentStandingResponse" : {
+        "properties" : {
+          "channel" : {
+            "enum" : [ "EMAIL", "SMS", "WHATSAPP" ],
+            "type" : "string"
+          },
+          "evidenceSource" : {
+            "description" : "Evidence of the latest event; null when never granted",
+            "enum" : [ "SIGNED_PAPER_FORM", "ADMIN_REGISTERED", "PORTAL_FORM" ],
+            "type" : [ "string", "null" ]
+          },
+          "policyVersion" : {
+            "description" : "The policy version of the grant; null when withdrawn or never granted",
+            "type" : [ "string", "null" ]
+          },
+          "purpose" : {
+            "enum" : [ "INSTITUTIONAL", "MARKETING" ],
+            "type" : "string"
+          },
+          "since" : {
+            "description" : "When the latest event happened; null when never granted",
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "state" : {
+            "enum" : [ "GRANTED", "WITHDRAWN", "NEVER_GRANTED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "channel", "purpose", "state" ],
+        "type" : "object"
+      },
       "CreateAcademicYearRequest" : {
         "properties" : {
           "endDate" : {
@@ -534,6 +634,31 @@
         "required" : [ "createdAt", "id", "isActive", "modalityId", "name", "ordinal", "updatedAt" ],
         "type" : "object"
       },
+      "GuardianConsentsResponse" : {
+        "properties" : {
+          "guardianId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "history" : {
+            "description" : "The newest events first, at most 100",
+            "items" : {
+              "$ref" : "#/components/schemas/ConsentEventResponse"
+            },
+            "maxLength" : 100,
+            "type" : "array"
+          },
+          "states" : {
+            "description" : "Always the six combinations, channel by channel (EMAIL, SMS, WHATSAPP) and, inside each, INSTITUTIONAL before MARKETING",
+            "items" : {
+              "$ref" : "#/components/schemas/ConsentStandingResponse"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "guardianId", "history", "states" ],
+        "type" : "object"
+      },
       "GuardianLinkRequest" : {
         "properties" : {
           "financialResponsibilityPercent" : {
@@ -844,6 +969,43 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "RecordConsentRequest" : {
+        "properties" : {
+          "action" : {
+            "enum" : [ "GRANT", "WITHDRAW" ],
+            "pattern" : "GRANT|WITHDRAW",
+            "type" : "string"
+          },
+          "channel" : {
+            "enum" : [ "EMAIL", "SMS", "WHATSAPP" ],
+            "pattern" : "EMAIL|SMS|WHATSAPP",
+            "type" : "string"
+          },
+          "evidenceSource" : {
+            "description" : "PORTAL_FORM belongs to the portal and is refused here",
+            "enum" : [ "SIGNED_PAPER_FORM", "ADMIN_REGISTERED" ],
+            "maxLength" : 40,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "policyVersion" : {
+            "description" : "Version of the privacy policy the guardian accepted, for example 2026-01. Required to GRANT, omitted to WITHDRAW",
+            "maxLength" : 64,
+            "minLength" : 0,
+            "pattern" : "[A-Za-z0-9._-]{1,32}",
+            "type" : "string"
+          },
+          "purpose" : {
+            "description" : "The transactional purpose (billing, arrears, invoices, security) is not a consent and is refused",
+            "enum" : [ "INSTITUTIONAL", "MARKETING" ],
+            "maxLength" : 40,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "action", "channel", "evidenceSource", "purpose" ],
         "type" : "object"
       },
       "ReplaceStudentGuardiansRequest" : {
@@ -3164,6 +3326,228 @@
           "bearerAuth" : [ ]
         } ],
         "summary" : "Edits a guardian",
+        "tags" : [ "guardians" ],
+        "x-required-permission" : "guardians:update"
+      }
+    },
+    "/api/v1/guardians/{id}/consents" : {
+      "get" : {
+        "description" : "The standing of the six combinations of channel (EMAIL, SMS, WHATSAPP) and purpose (INSTITUTIONAL, MARKETING) of the guardian, derived from the latest event of each: GRANTED, WITHDRAWN or NEVER_GRANTED (nothing is pre-marked), with the instant, the policy version and the evidence; and the history of events, the newest first, at most 100. Needs the permission guardians:read.",
+        "operationId" : "getGuardianConsents",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GuardianConsentsResponse"
+                }
+              }
+            },
+            "description" : "The consents of the guardian"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The identifier is not valid (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold guardians:read (forbidden)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The guardian does not exist in the institution of the token (resource-not-found)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Reads the consents of a guardian",
+        "tags" : [ "guardians" ],
+        "x-required-permission" : "guardians:read"
+      },
+      "post" : {
+        "description" : "Records, on behalf of the guardian, that it grants or withdraws its consent for a channel and a purpose, with the evidence (SIGNED_PAPER_FORM or ADMIN_REGISTERED) and, to grant, the version of the privacy policy. The transactional purpose is not consentable. A grant needs an ACTIVE guardian with the contact data of the channel (an e-mail for EMAIL, a phone for SMS and WHATSAPP); a withdrawal is always allowed and immediate. Repeating the action that already is the current state writes no event and answers the current standing with changed false. The time of the event is the server's. Needs the permission guardians:update.",
+        "operationId" : "recordGuardianConsent",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RecordConsentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConsentChangeResponse"
+                }
+              }
+            },
+            "description" : "The standing of the combination after the change"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body or the identifier is not valid; errors names the field (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold guardians:update, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The guardian does not exist in the institution of the token (resource-not-found)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "A grant for a guardian that is not active (guardian-not-active), or for a channel the guardian has no contact data for (consent-channel-unavailable)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Records a consent or a withdrawal",
         "tags" : [ "guardians" ],
         "x-required-permission" : "guardians:update"
       }
