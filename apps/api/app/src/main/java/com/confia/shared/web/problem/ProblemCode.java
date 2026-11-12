@@ -41,7 +41,10 @@ import java.util.Optional;
  * {@code students} own {@link #STUDENT_NOT_ACTIVE}, {@link #SECTION_FULL}, {@link
  * #DUPLICATE_ACTIVE_ENROLLMENT}, {@link #INVALID_ENROLLMENT_STATE} and {@link #TRANSFER_YEAR_MISMATCH} (all
  * {@code 409}) and reuse {@link #INACTIVE_REFERENCE} (an inactive section), {@link #ACADEMIC_YEAR_CLOSED}
- * and {@link #VALIDATION_FAILED} (a date out of range, with the field). The
+ * and {@link #VALIDATION_FAILED} (a date out of range, with the field). The guardians of {@code guardians} own
+ * {@link #INVALID_RESPONSIBILITY_SPLIT} ({@code 400}, with the field and the rule that is broken) and {@link
+ * #GUARDIAN_NOT_ACTIVE} ({@code 409}), reuse {@link #DUPLICATE_NATIONAL_ID} and {@link #STUDENT_NOT_ACTIVE} and
+ * use {@link #RESOURCE_NOT_FOUND} for their {@code 404}. The
  * institution codes belong to a later change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
@@ -52,6 +55,7 @@ import java.util.Optional;
 public enum ProblemCode {
 
     VALIDATION_FAILED("validation-failed", 400),
+    INVALID_RESPONSIBILITY_SPLIT("invalid-responsibility-split", 400),
     IDEMPOTENCY_KEY_MISSING("idempotency-key-missing", 400),
     AUTHENTICATION_REQUIRED("authentication-required", 401),
     TOKEN_INVALID("token-invalid", 401),
@@ -77,6 +81,7 @@ public enum ProblemCode {
     DUPLICATE_ACTIVE_ENROLLMENT("duplicate-active-enrollment", 409),
     INVALID_ENROLLMENT_STATE("invalid-enrollment-state", 409),
     TRANSFER_YEAR_MISMATCH("transfer-year-mismatch", 409),
+    GUARDIAN_NOT_ACTIVE("guardian-not-active", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
     IDEMPOTENCY_PAYLOAD_MISMATCH("idempotency-payload-mismatch", 422),
     TOO_MANY_REQUESTS("too-many-requests", 429),

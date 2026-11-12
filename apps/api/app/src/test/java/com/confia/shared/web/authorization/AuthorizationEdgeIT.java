@@ -39,6 +39,8 @@ import com.confia.identity.web.RolesReportResponse;
 import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
 import com.confia.identity.web.wiring.IdentityWebConfiguration;
 import com.confia.kernel.Permission;
+import com.confia.guardians.infrastructure.wiring.GuardiansConfiguration;
+import com.confia.guardians.web.wiring.GuardiansWebConfiguration;
 import com.confia.organization.infrastructure.wiring.AcademicStructureConfiguration;
 import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
 import com.confia.organization.web.wiring.OrganizationWebConfiguration;
@@ -287,7 +289,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
         for (PermissionedEndpoint entry : endpoints.endpoints().stream()
                 .filter(candidate -> !candidate.pattern().startsWith("/api/v1/organization/")
                         && !candidate.pattern().startsWith("/api/v1/students")
-                        && !candidate.pattern().startsWith("/api/v1/enrollments"))
+                        && !candidate.pattern().startsWith("/api/v1/enrollments")
+                        && !candidate.pattern().startsWith("/api/v1/guardians"))
                 .toList()) {
             Session holder = sessionOf(StaffRole.SUPER_ADMIN);
             assertThat(StaffRole.SUPER_ADMIN.permissions()).contains(entry.permission());
@@ -1060,7 +1063,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
             OrganizationConfiguration.class, AcademicStructureConfiguration.class,
             OrganizationWebConfiguration.class, StudentsConfiguration.class,
             StudentsWebConfiguration.class, EnrollmentsConfiguration.class,
-            EnrollmentsWebConfiguration.class, WebEdgeConfiguration.class,
+            EnrollmentsWebConfiguration.class, GuardiansConfiguration.class, GuardiansWebConfiguration.class,
+            WebEdgeConfiguration.class,
             AdminSecurityConfiguration.class, ObservabilityMetricsConfiguration.class,
             RateLimiterConfiguration.class, ThrottlingConfiguration.class,
             RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,

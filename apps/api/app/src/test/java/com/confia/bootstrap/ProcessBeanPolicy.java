@@ -136,7 +136,14 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // (docs/cortes/students-registry.md). Administrative only, each exact.
                     "com.confia.students.infrastructure", "com.confia.students.infrastructure.wiring",
                     "com.confia.students.application", "com.confia.students.web",
-                    "com.confia.students.web.wiring"),
+                    "com.confia.students.web.wiring",
+                    // The guardians module as the packages its beans come from: the jOOQ adapters and the
+                    // protector of the document and the RTN, the named-interface package of its configuration, its
+                    // two use cases, its controllers and the named-interface package of the configuration that
+                    // registers them (docs/cortes/guardians-registry.md). Administrative only, each exact.
+                    "com.confia.guardians.infrastructure", "com.confia.guardians.infrastructure.wiring",
+                    "com.confia.guardians.application", "com.confia.guardians.web",
+                    "com.confia.guardians.web.wiring"),
             Map.of("com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON));
@@ -166,6 +173,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.identity", "staff-only module while identity has no guardian "
                             + "subdomain (ADR-0003)",
                     "com.confia.students", ADMIN_MODULE,
+                    "com.confia.guardians", ADMIN_MODULE,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON,
                     TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
                     CSRF_PACKAGE, CSRF_REASON,
@@ -218,7 +226,8 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     CSRF_PACKAGE, CSRF_REASON,
                     SESSION_PACKAGE, SESSION_COOKIE_REASON,
                     "com.confia.organization", STAFF_INSTITUTION,
-                    "com.confia.students", ADMIN_MODULE));
+                    "com.confia.students", ADMIN_MODULE,
+                    "com.confia.guardians", ADMIN_MODULE));
 
     /** A forbidden-package map from key, reason pairs: {@code Map.of} stops at ten entries. */
     private static Map<String, String> forbidden(String... pairs) {

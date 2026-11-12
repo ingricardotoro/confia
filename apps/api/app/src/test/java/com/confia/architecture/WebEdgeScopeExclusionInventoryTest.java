@@ -88,7 +88,7 @@ class WebEdgeScopeExclusionInventoryTest {
             "com.confia.shared.security", "com.confia.shared.web.edge", "com.confia.identity.web",
             // The student registry and the academic structure apply admin-read and admin-write, per address and per
             // account (docs/cortes/students-registry.md, M2 and the follow-ups).
-            "com.confia.students.web", "com.confia.organization.web");
+            "com.confia.students.web", "com.confia.organization.web", "com.confia.guardians.web");
 
     /** The types through which a class asks for a delay, and the packages that may. */
     private static final Set<String> MATERIALIZER_TYPES = Set.of(
