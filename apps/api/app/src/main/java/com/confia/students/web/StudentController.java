@@ -1,6 +1,7 @@
 package com.confia.students.web;
 
 import com.confia.shared.web.openapi.ContractSchemas;
+import com.confia.shared.web.ratelimit.RateLimited;
 import com.confia.students.application.ManageStudents;
 import com.confia.students.application.Page;
 import com.confia.students.application.StudentView;
@@ -8,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.extensions.Extension;
 import io.swagger.v3.oas.annotations.extensions.ExtensionProperty;
+import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -36,8 +38,9 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code PermissionedEndpoints}: {@code students:read} for the list and the detail, {@code
  * students:create} for the creation and {@code students:update} for the edit. The institution is the one
  * of the token, never a member of the request, and nothing is deleted: a student is made inactive with
- * {@code PUT}. The national identity document is never part of an answer: only whether there is one and
- * its mask. The approved answers are declared one by one, so the contract snapshot holds exactly these.
+ * {@code PUT}. Every route is rate limited per client address: the reads with {@code admin-read} (300 a
+ * minute) and the writes with {@code admin-write} (60 a minute). The national identity document is never part of an answer: only whether there is one. The
+ * approved answers are declared one by one, so the contract snapshot holds exactly these.
  */
 @RestController
 @RequestMapping("/api/v1/students")
@@ -55,6 +58,7 @@ public class StudentController {
     }
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    @RateLimited(policy = "admin-read")
     @Operation(operationId = "listStudents", tags = TAG, summary = "Lists the students",
             description = "One page of the students of the institution of the token, active and inactive. Needs "
                     + "the permission students:read. page counts from 0, size defaults to 50 and is at most 200, "
@@ -78,6 +82,11 @@ public class StudentController {
     @ApiResponse(responseCode = "403",
             description = "The account does not hold students:read (forbidden)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "429",
+            description = "Too many requests from this address (too-many-requests)",
+            headers = @Header(name = "Retry-After", schema = @Schema(type = "integer"),
+                    description = "Seconds to wait"),
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     public StudentPageResponse list(
@@ -99,9 +108,10 @@ public class StudentController {
     }
 
     @GetMapping(path = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @RateLimited(policy = "admin-read")
     @Operation(operationId = "getStudent", tags = TAG, summary = "Reads a student",
             description = "The student with this identifier in the institution of the token. The national "
-                    + "identity document is never returned: only hasNationalId and nationalIdMasked. Needs "
+                    + "identity document is never returned: only hasNationalId. Needs "
                     + "the permission students:read.",
             security = @SecurityRequirement(name = ContractSchemas.BEARER_AUTH),
             extensions = @Extension(properties =
@@ -121,6 +131,11 @@ public class StudentController {
     @ApiResponse(responseCode = "404",
             description = "The student does not exist in the institution of the token (resource-not-found)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "429",
+            description = "Too many requests from this address (too-many-requests)",
+            headers = @Header(name = "Retry-After", schema = @Schema(type = "integer"),
+                    description = "Seconds to wait"),
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     public StudentResponse get(@PathVariable("id") UUID id) {
@@ -129,6 +144,7 @@ public class StudentController {
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
+    @RateLimited(policy = "admin-write")
     @Operation(operationId = "createStudent", tags = TAG, summary = "Registers a student",
             description = "Registers a student; its code is unique in the institution and is generated "
                     + "(E-000001, E-000002...) when missing. The national identity document, if sent, is stored "
@@ -153,6 +169,11 @@ public class StudentController {
             description = "The code is taken (duplicate-student-code) or another student has the same "
                     + "document (duplicate-national-id)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "429",
+            description = "Too many requests from this address (too-many-requests)",
+            headers = @Header(name = "Retry-After", schema = @Schema(type = "integer"),
+                    description = "Seconds to wait"),
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     public StudentResponse create(@Valid @RequestBody CreateStudentRequest request) {
@@ -163,6 +184,7 @@ public class StudentController {
 
     @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
+    @RateLimited(policy = "admin-write")
     @Operation(operationId = "updateStudent", tags = TAG, summary = "Edits a student",
             description = "Replaces the editable members of the student, status included; INACTIVE takes it "
                     + "out of use and deletes nothing. The code never changes. An omitted nationalId keeps the "
@@ -190,6 +212,11 @@ public class StudentController {
     @ApiResponse(responseCode = "409",
             description = "Another student has the same document (duplicate-national-id)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "429",
+            description = "Too many requests from this address (too-many-requests)",
+            headers = @Header(name = "Retry-After", schema = @Schema(type = "integer"),
+                    description = "Seconds to wait"),
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     public StudentResponse update(@PathVariable("id") UUID id, @Valid @RequestBody UpdateStudentRequest request) {
@@ -200,7 +227,7 @@ public class StudentController {
 
     private static StudentResponse toResponse(StudentView view) {
         return new StudentResponse(view.id(), view.studentCode(), view.firstName(), view.lastName(),
-                view.birthDate(), view.sex(), view.status(), view.hasNationalId(), view.nationalIdMasked(),
+                view.birthDate(), view.sex(), view.status(), view.hasNationalId(),
                 view.createdAt(), view.updatedAt());
     }
 }

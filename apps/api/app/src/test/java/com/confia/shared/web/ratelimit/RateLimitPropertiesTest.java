@@ -38,7 +38,7 @@ class RateLimitPropertiesTest {
 
     private static final String ROOT = "confia.web.rate-limit";
     private static final List<String> POLICIES = List.of("admin-login", "admin-mfa",
-            "admin-session");
+            "admin-session", "admin-read", "admin-write");
 
     /** The real {@code application.yml}, flattened to the keys the binder reads. */
     private static Map<String, Object> shippedDefaults() {
@@ -74,6 +74,8 @@ class RateLimitPropertiesTest {
             case "admin-login" -> properties.adminLogin().policy();
             case "admin-mfa" -> properties.adminMfa().policy();
             case "admin-session" -> properties.adminSession().policy();
+            case "admin-read" -> properties.adminRead().policy();
+            case "admin-write" -> properties.adminWrite().policy();
             default -> throw new IllegalArgumentException(name);
         };
     }
@@ -93,8 +95,20 @@ class RateLimitPropertiesTest {
                 Duration.ofHours(1), 50_000));
     }
 
+    @Test
+    void theGeneralReadsAreLimitedTo300AMinuteAndTheWritesTo60PerAddress() {
+        RateLimitProperties properties = bind(shippedDefaults());
+
+        assertThat(properties.adminRead().policy().requestLimit()).isEqualTo(300);
+        assertThat(properties.adminRead().policy().requestWindow()).isEqualTo(Duration.ofMinutes(1));
+        assertThat(properties.adminWrite().policy().requestLimit()).isEqualTo(60);
+        assertThat(properties.adminWrite().policy().requestWindow()).isEqualTo(Duration.ofMinutes(1));
+        assertThat(properties.adminWrite().policy().requestLimit())
+                .as("writes are tighter than reads").isLessThan(properties.adminRead().policy().requestLimit());
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"admin-login", "admin-mfa", "admin-session"})
+    @ValueSource(strings = {"admin-login", "admin-mfa", "admin-session", "admin-read", "admin-write"})
     void layerTwoAdmitsOneAttemptAMinuteWithACapOfOneHourOnEveryPolicy(String name) {
         RateLimitPolicy policy = policyOf(bind(shippedDefaults()), name);
 
@@ -169,7 +183,7 @@ class RateLimitPropertiesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"admin-login", "admin-mfa", "admin-session"})
+    @ValueSource(strings = {"admin-login", "admin-mfa", "admin-session", "admin-read", "admin-write"})
     void anAbsentComponentStopsTheStartAndNamesTheProperty(String missing) {
         Map<String, Object> values = shippedDefaults();
         values.keySet().removeIf(key -> key.startsWith(ROOT + "." + missing + "."));

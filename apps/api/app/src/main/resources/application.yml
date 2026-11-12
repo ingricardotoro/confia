@@ -27,12 +27,12 @@ confia:
     # address.
     user-agent-max-length: 512
 
-    # The three rate-limit policies of the administrative process (session-endpoints-cookie-and-csrf
+    # The rate-limit policies of the administrative process (session-endpoints-cookie-and-csrf
     # design.md, decision 7; web-edge-foundations design.md, decision 17). The defaults live here and
     # not in annotations because three components of the same type need three sets of values. Layer 1
     # counts requests per client address; layer 2 counts failures: once the threshold is crossed the
     # client is admitted one attempt per restricted-interval, never for longer than restriction-cap.
-    # A component that is absent, or one that is not one of these three, stops the start.
+    # A component that is absent, or one that is not one of these, stops the start.
     rate-limit:
       admin-login:
         request-limit: 10
@@ -52,6 +52,24 @@ confia:
         max-entries: 50000
       admin-session:
         request-limit: 120
+        request-window: 1m
+        failure-threshold: 30
+        failure-window: 10m
+        restricted-interval: 1m
+        restriction-cap: 1h
+        max-entries: 50000
+      # General reads and writes of the administrative API (docs/03-seguridad.md section 10): 300 and 60
+      # a minute per client address. Layer 2 is not fed by these routes; the values are valid for it.
+      admin-read:
+        request-limit: 300
+        request-window: 1m
+        failure-threshold: 30
+        failure-window: 10m
+        restricted-interval: 1m
+        restriction-cap: 1h
+        max-entries: 50000
+      admin-write:
+        request-limit: 60
         request-window: 1m
         failure-threshold: 30
         failure-window: 10m

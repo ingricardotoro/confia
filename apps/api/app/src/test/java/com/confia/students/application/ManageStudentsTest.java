@@ -150,7 +150,6 @@ class ManageStudentsTest {
         assertThat(view.birthDate()).isEqualTo(BIRTH);
         assertThat(view.createdAt()).isEqualTo(NOW);
         assertThat(view.hasNationalId()).isFalse();
-        assertThat(view.nationalIdMasked()).isNull();
     }
 
     @Test
@@ -184,11 +183,11 @@ class ManageStudentsTest {
     // --- The document ---
 
     @Test
-    void aDocumentIsProtectedBeforeItIsStoredAndOnlyTheMaskIsReturned() {
+    void aDocumentIsProtectedBeforeItIsStoredAndOnlyThatThereIsOneIsReturned() {
         StudentView view = create(null, "Ana", "Perez", ID);
 
         assertThat(view.hasNationalId()).isTrue();
-        assertThat(view.nationalIdMasked()).isEqualTo("****1234");
+        assertThat(view.toString()).doesNotContain("1234");
         InMemoryStudents.Stored stored = store.rowsOf(institution).getFirst();
         assertThat(stored.document().encrypted()).isEqualTo("enc[" + ID_NORMALIZED + "]");
         assertThat(stored.document().blindIndex()).isEqualTo(InMemoryStudents.blindIndexOf(institution, ID_NORMALIZED));
@@ -256,7 +255,7 @@ class ManageStudentsTest {
         assertThat(edited.sex()).isEqualTo("M");
         assertThat(edited.status()).isEqualTo("INACTIVE");
         assertThat(edited.createdAt()).isEqualTo(NOW);
-        assertThat(edited.nationalIdMasked()).isEqualTo("****1234");
+        assertThat(edited.hasNationalId()).isTrue();
         assertThat(store.rowsOf(institution).getFirst().document().encrypted()).isEqualTo("enc[" + ID_NORMALIZED + "]");
     }
 
@@ -265,13 +264,12 @@ class ManageStudentsTest {
         StudentView created = create(null, "Ana", "Perez", ID);
 
         StudentView replaced = update(created.id(), "Ana", "Perez", "ACTIVE", "AB-99998888");
-        assertThat(replaced.nationalIdMasked()).isEqualTo("****8888");
+        assertThat(replaced.hasNationalId()).isTrue();
         assertThat(store.rowsOf(institution).getFirst().document().blindIndex())
                 .isEqualTo(InMemoryStudents.blindIndexOf(institution, "AB99998888"));
 
         StudentView removed = update(created.id(), "Ana", "Perez", "ACTIVE", "");
         assertThat(removed.hasNationalId()).isFalse();
-        assertThat(removed.nationalIdMasked()).isNull();
         assertThat(store.rowsOf(institution).getFirst().document()).isNull();
 
         StudentView removedAgain = update(created.id(), "Ana", "Perez", "ACTIVE", "   ");
@@ -290,8 +288,7 @@ class ManageStudentsTest {
     void resendingTheOwnDocumentInAnotherFormatIsNotADuplicate() {
         StudentView created = create(null, "Ana", "Perez", ID);
 
-        assertThat(update(created.id(), "Ana", "Perez", "ACTIVE", ID_NORMALIZED).nationalIdMasked())
-                .isEqualTo("****1234");
+        assertThat(update(created.id(), "Ana", "Perez", "ACTIVE", ID_NORMALIZED).hasNationalId()).isTrue();
     }
 
     @Test
@@ -304,8 +301,8 @@ class ManageStudentsTest {
                 .isInstanceOf(DuplicateNationalIdException.class);
 
         assertThat(audit).isEmpty();
-        assertThat(store.students.findById(institution, second.id()).orElseThrow().nationalIdMasked())
-                .isEqualTo("****2222");
+        assertThat(store.students.findById(institution, second.id()).orElseThrow().hasNationalId())
+                .isTrue();
     }
 
     @Test
@@ -378,24 +375,60 @@ class ManageStudentsTest {
             assertThat(entry.beforeValue()).isNull();
             JsonNode after = json(entry.afterValue());
             assertThat(after.get("studentCode").asString()).isEqualTo("MAT-1");
-            assertThat(after.get("firstName").asString()).isEqualTo("Ana");
-            assertThat(after.get("lastName").asString()).isEqualTo("Perez");
-            assertThat(after.get("birthDate").asString()).isEqualTo("2012-05-20");
-            assertThat(after.get("sex").asString()).isEqualTo("F");
             assertThat(after.get("status").asString()).isEqualTo("ACTIVE");
             assertThat(after.get("hasNationalId").asBoolean()).isTrue();
-            assertThat(after.get("nationalIdLast4").asString()).isEqualTo("1234");
+            assertThat(fieldNames(after)).containsExactlyInAnyOrder("studentCode", "status", "hasNationalId");
         });
         assertThat(committed()).isTrue();
     }
 
     @Test
-    void anAuditEntryWithoutADocumentSaysSoAndCarriesNoLastFour() {
+    void anAuditEntryWithoutADocumentSaysSo() {
         create(null, "Ana", "Perez", null);
 
         JsonNode after = json(audit.getFirst().afterValue());
         assertThat(after.get("hasNationalId").asBoolean()).isFalse();
-        assertThat(after.has("nationalIdLast4")).isFalse();
+    }
+
+    @Test
+    void theAuditTrailNeverHoldsTheNamesNorTheBirthDateNorAnyTailOfTheDocumentOfAMinor() {
+        String tailed = "0801-2012-0Q97X";
+        StudentView created = create("MAT-9", "Zuleyma", "Quintanilla", tailed);
+        students.update(actor, requestId, created.id(), "Zuleymita", "Quintanilla Mejia", LocalDate.of(2011, 2, 3),
+                "M", "INACTIVE", "ZZ-5555Q97X");
+        students.update(actor, requestId, created.id(), "Zuleymita", "Quintanilla Mejia", LocalDate.of(2011, 2, 3),
+                "M", "INACTIVE", "");
+
+        assertThat(audit).hasSize(3);
+        for (AuditEntry entry : audit) {
+            String values = entry.beforeValue() + " " + entry.afterValue();
+            assertThat(values).doesNotContain("Zuleyma").doesNotContain("Zuleymita").doesNotContain("Quintanilla")
+                    .doesNotContain("2012-05-20").doesNotContain("2011-02-03").doesNotContain("2012")
+                    .doesNotContain("Q97X").doesNotContain("97X").doesNotContain("7X").doesNotContain("0801");
+        }
+    }
+
+    @Test
+    void anUpdateEntryNamesTheFieldsThatChangedButNeverTheirValues() {
+        StudentView created = create("MAT-9", "Ana", "Perez", null);
+        audit.clear();
+
+        students.update(actor, requestId, created.id(), "Anita", "Perez", LocalDate.of(2011, 2, 3), "F", "ACTIVE",
+                "AB-99998888");
+        students.update(actor, requestId, created.id(), "Anita", "Perez", LocalDate.of(2011, 2, 3), "F", "ACTIVE",
+                null);
+
+        assertThat(json(audit.get(0).afterValue()).get("changedFields").asString())
+                .isEqualTo("firstName,birthDate,nationalId");
+        assertThat(json(audit.get(0).beforeValue()).has("changedFields")).isFalse();
+        assertThat(json(audit.get(1).afterValue()).get("changedFields").asString()).isEmpty();
+        assertThat(json(audit.get(1).afterValue()).get("studentCode").asString()).isEqualTo("MAT-9");
+    }
+
+    private static List<String> fieldNames(JsonNode node) {
+        List<String> names = new ArrayList<>();
+        node.propertyNames().forEach(names::add);
+        return names;
     }
 
     @Test
@@ -409,11 +442,10 @@ class ManageStudentsTest {
             assertThat(entry.action()).isEqualTo("students.student.updated");
             JsonNode before = json(entry.beforeValue());
             JsonNode after = json(entry.afterValue());
-            assertThat(before.get("firstName").asString()).isEqualTo("Ana");
+            assertThat(before.has("firstName")).isFalse();
             assertThat(before.get("status").asString()).isEqualTo("ACTIVE");
             assertThat(before.get("hasNationalId").asBoolean()).isTrue();
-            assertThat(before.get("nationalIdLast4").asString()).isEqualTo("1234");
-            assertThat(after.get("firstName").asString()).isEqualTo("Anita");
+            assertThat(after.get("changedFields").asString()).isEqualTo("firstName,status,nationalId");
             assertThat(after.get("status").asString()).isEqualTo("INACTIVE");
             assertThat(after.get("hasNationalId").asBoolean()).isFalse();
         });
@@ -472,7 +504,7 @@ class ManageStudentsTest {
 
     @Test
     void aSortFieldOutsideTheSetOrAMalformedDirectionIsRefused() {
-        for (String sort : List.of("password", "nationalId", "nationalIdMasked", "status", "id", "lastName,sideways",
+        for (String sort : List.of("password", "nationalId", "hasNationalId", "status", "id", "lastName,sideways",
                 "lastName,asc,desc", ",asc", "createdAt")) {
             assertThatThrownBy(() -> students.list(actor, requestId, 0, 50, sort, null, null))
                     .as(sort).isInstanceOf(InvalidStudentException.class);

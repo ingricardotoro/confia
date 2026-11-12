@@ -8,8 +8,9 @@
 -- (national_id_encrypted, the v1:<dek>:<iv>:<ciphertext>:<tag> format of ColumnEncryptionService, whose
 -- additional authenticated data is the row itself). Duplicates are detected without decrypting through
 -- national_id_blind_index, an HMAC of the normalised document under a key of its own, unique per
--- institution while present. national_id_last4 holds the last four characters of the normalised document,
--- the only part that the API ever shows (masked) so that no read has to decrypt anything.
+-- institution while present. No character of the document is kept in plain, not even its tail: with the birth date the last
+-- digits would nearly reveal the Honduran identity number. Whether a student has a document is derived
+-- from national_id_encrypted IS NOT NULL, so no read has to decrypt anything.
 --
 -- The codes E-000001, E-000002... come from students_student_code_counter, one row per institution, taken
 -- with a single INSERT ... ON CONFLICT DO UPDATE ... RETURNING: the row lock serializes concurrent
@@ -25,7 +26,6 @@ CREATE TABLE students_student (
     sex                     TEXT         NOT NULL,
     national_id_encrypted   TEXT,
     national_id_blind_index CHAR(64),
-    national_id_last4       VARCHAR(4),
     status                  TEXT         NOT NULL DEFAULT 'ACTIVE',
     created_at              TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
     updated_at              TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
@@ -34,10 +34,9 @@ CREATE TABLE students_student (
     CONSTRAINT students_student_sex_chk     CHECK (sex IN ('F', 'M', 'UNSPECIFIED')),
     CONSTRAINT students_student_status_chk  CHECK (status IN ('ACTIVE', 'INACTIVE')),
     CONSTRAINT students_student_names_chk   CHECK (length(btrim(first_name)) > 0 AND length(btrim(last_name)) > 0),
-    -- The three members of the document are present together or absent together.
+    -- The two members of the document are present together or absent together.
     CONSTRAINT students_student_national_id_chk CHECK (
-        (national_id_encrypted IS NULL) = (national_id_blind_index IS NULL)
-        AND (national_id_encrypted IS NULL) = (national_id_last4 IS NULL))
+        (national_id_encrypted IS NULL) = (national_id_blind_index IS NULL))
 );
 
 -- One document per institution while present: the duplicate is found without decrypting anything.
@@ -75,7 +74,7 @@ GRANT SELECT, INSERT, UPDATE ON students_student              TO confia_admin_ap
 GRANT SELECT, INSERT, UPDATE ON students_student_code_counter TO confia_admin_app;
 -- The read-only role never sees the encrypted document nor its blind index.
 GRANT SELECT (institution_id, id, student_code, first_name, last_name, birth_date, sex,
-              national_id_last4, status, created_at, updated_at)
+              status, created_at, updated_at)
     ON students_student TO confia_readonly;
 GRANT SELECT ON students_student_code_counter TO confia_readonly;
 -- confia_portal_app: no grant, staff data. confia_owner: schema owner, without BYPASSRLS.

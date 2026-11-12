@@ -7,16 +7,15 @@ import java.util.UUID;
 
 /**
  * A student as the web layer may see it. The national identity document is not here, nor can it be: the
- * view has only whether there is one and its mask.
+ * view has only whether there is one.
  */
 public record StudentView(UUID id, String studentCode, String firstName, String lastName, LocalDate birthDate,
-        String sex, String status, boolean hasNationalId, String nationalIdMasked, Instant createdAt,
-        Instant updatedAt) {
+        String sex, String status, boolean hasNationalId, Instant createdAt, Instant updatedAt) {
 
     static StudentView of(Student student) {
         return new StudentView(student.id(), student.studentCode(), student.firstName(), student.lastName(),
                 student.birthDate(), student.sex().name(), student.status().name(), student.hasNationalId(),
-                student.nationalIdMasked(), student.createdAt(), student.updatedAt());
+                student.createdAt(), student.updatedAt());
     }
 
     /** Personal data of a minor never reaches a log through this method. */

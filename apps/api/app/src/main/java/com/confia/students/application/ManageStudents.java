@@ -82,7 +82,7 @@ public final class ManageStudents {
             Student before = students.findById(institution, id).orElseThrow(ResourceNotFoundException::new);
             Student after = before.edit(firstName, lastName, birthDate, sex, status, change, now());
             students.update(institution, after, storageFor(institution, id, change));
-            auditLogWriter.append(StudentsAudit.updated(actor, auditRequestId, before, after));
+            auditLogWriter.append(StudentsAudit.updated(actor, auditRequestId, before, after, change));
             return StudentView.of(after);
         });
     }

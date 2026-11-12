@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -85,6 +86,10 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
     private static final String STUDENTS = "/api/v1/students";
     private static final String ID = "0801-2012-01234";
     private static final String ID_NORMALIZED = "0801201201234";
+    /** A document whose tail (Q97X) cannot appear by chance in a UUID, an instant or a name. */
+    private static final String TAILED_ID = "0801-2012-0Q97X";
+    private static final String TAILED_TAIL = "Q97X";
+    private static final String RATE_LIMIT = "confia.web.rate-limit.";
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .followRedirects(HttpClient.Redirect.NEVER)
@@ -100,6 +105,14 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
 
     private ListAppender<ILoggingEvent> logs;
     private Level rootLevelBefore;
+    /**
+     * Third-party wire dumps that production never enables: Tomcat prints the raw request body at DEBUG
+     * (Http11InputBuffer) and the PostgreSQL driver prints every bind value at TRACE. They stay at INFO, as in
+     * production, while the rest of the process logs at TRACE.
+     */
+    private static final List<String> TOMCAT_LOGGERS = List.of("org.apache.coyote", "org.apache.tomcat",
+            "org.postgresql", "org.jooq", "com.zaxxer.hikari");
+    private final java.util.Map<String, Level> tomcatLevelsBefore = new java.util.HashMap<>();
 
     @BeforeAll
     static void startTheProcess() throws NoSuchAlgorithmException {
@@ -107,7 +120,11 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
         jws = new CompactJws(SigningKeyRing.of(SigningKey.signing(
                 AdminProcessLauncher.signingKid(), keys.getPublic(), keys.getPrivate())));
         process = AdminProcessLauncher.launch(SharedPostgresContainer.jdbcUrl(),
-                "confia_admin_app", TEST_PASSWORD, keys);
+                "confia_admin_app", TEST_PASSWORD, keys, Map.of(
+                        // Every test shares one client address, so the production quotas would refuse them;
+                        // the rate-limit test below starts a process of its own with small ones.
+                        RATE_LIMIT + "admin-read.request-limit", "10000",
+                        RATE_LIMIT + "admin-write.request-limit", "10000"));
         port = ((WebServerApplicationContext) process).getWebServer().getPort();
     }
 
@@ -125,6 +142,11 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
         logs = new ListAppender<>();
         logs.start();
         root.setLevel(Level.TRACE);
+        for (String name : TOMCAT_LOGGERS) {
+            Logger tomcat = (Logger) LoggerFactory.getLogger(name);
+            tomcatLevelsBefore.put(name, tomcat.getLevel());
+            tomcat.setLevel(Level.INFO);
+        }
         root.addAppender(logs);
     }
 
@@ -137,6 +159,8 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
         Logger root = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
         root.detachAppender(logs);
         root.setLevel(rootLevelBefore);
+        tomcatLevelsBefore.forEach((name, level) -> ((Logger) LoggerFactory.getLogger(name)).setLevel(level));
+        tomcatLevelsBefore.clear();
 
         List<String> logLines = new ArrayList<>();
         for (ILoggingEvent event : new ArrayList<>(logs.list)) {
@@ -146,7 +170,8 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
             }
             logLines.add(String.valueOf(event.getMDCPropertyMap()));
         }
-        List<String> forbidden = new ArrayList<>(List.of(ID, ID_NORMALIZED, "AB-99998888", "AB99998888"));
+        List<String> forbidden = new ArrayList<>(List.of(ID, ID_NORMALIZED, "AB-99998888", "AB99998888",
+                TAILED_ID, "080120120Q97X", TAILED_TAIL));
         forbidden.addAll(storedCiphertexts());
         List<String> audit = auditRows();
         for (String forbiddenText : forbidden) {
@@ -185,19 +210,19 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
 
         assertThat(created.get("studentCode").asString()).isEqualTo("E-000001");
         assertThat(created.get("hasNationalId").asBoolean()).isTrue();
-        assertThat(created.get("nationalIdMasked").asString()).isEqualTo("****1234");
+        assertThat(created.has("nationalIdMasked")).isFalse();
         assertThat(created.get("status").asString()).isEqualTo("ACTIVE");
 
         JsonNode found = HarnessProcess.json(get(STUDENTS + "?q=quintanilla", admin));
         assertThat(found.get("total").asLong()).isEqualTo(1);
         assertThat(found.get("items").get(0).get("id").asString()).isEqualTo(id);
-        assertThat(found.get("items").get(0).get("nationalIdMasked").asString()).isEqualTo("****1234");
+        assertThat(found.get("items").get(0).get("hasNationalId").asBoolean()).isTrue();
 
         HttpResponse<String> edited = put(id, admin, putBody("Xiomara-Pseudonimo", "Zelaya-Quintanilla Mejia",
                 "2012-05-21", "F", "ACTIVE", null));
         assertThat(edited.statusCode()).isEqualTo(200);
         assertThat(HarnessProcess.json(edited).get("lastName").asString()).isEqualTo("Zelaya-Quintanilla Mejia");
-        assertThat(HarnessProcess.json(edited).get("nationalIdMasked").asString()).isEqualTo("****1234");
+        assertThat(HarnessProcess.json(edited).get("hasNationalId").asBoolean()).isTrue();
 
         HttpResponse<String> inactive = put(id, admin, putBody("Xiomara-Pseudonimo", "Zelaya-Quintanilla Mejia",
                 "2012-05-21", "F", "INACTIVE", null));
@@ -207,11 +232,10 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(HarnessProcess.json(get(STUDENTS + "/" + id, admin)).get("status").asString())
                 .isEqualTo("INACTIVE");
 
-        // In the database the document is encrypted, indexed blind and its last four are the only clear part.
+        // In the database the document is encrypted and indexed blind: no character of it is in plain.
         String[] row = storedDocument(UUID.fromString(id));
         assertThat(row[0]).startsWith("v1:").doesNotContain(ID).doesNotContain(ID_NORMALIZED);
         assertThat(row[1]).matches("[0-9a-f]{64}");
-        assertThat(row[2]).isEqualTo("1234");
         assertThat(decrypt(admin.institution(), UUID.fromString(id), row[0])).isEqualTo(ID_NORMALIZED);
     }
 
@@ -227,7 +251,7 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
                 .doesNotContain(admin.account().toString());
         JsonNode student = HarnessProcess.json(response);
         assertThat(student.propertyNames()).containsExactly("id", "studentCode", "firstName", "lastName",
-                "birthDate", "sex", "status", "hasNationalId", "nationalIdMasked", "createdAt", "updatedAt");
+                "birthDate", "sex", "status", "hasNationalId", "createdAt", "updatedAt");
         assertThat(student.get("birthDate").asString()).isEqualTo("2012-05-20");
         JsonNode page = HarnessProcess.json(get(STUDENTS, admin));
         assertThat(page.propertyNames()).containsExactly("items", "total", "page", "size");
@@ -235,14 +259,13 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
     }
 
     @Test
-    void aStudentWithoutDocumentHasNoMaskAndTheDocumentColumnsStayNull() throws SQLException {
+    void aStudentWithoutDocumentSaysSoAndTheDocumentColumnsStayNull() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
 
         JsonNode student = created(post(STUDENTS, admin, body(null, "Ana", "Perez", "2012-05-20", "F", null)));
 
         assertThat(student.get("hasNationalId").asBoolean()).isFalse();
-        assertThat(student.get("nationalIdMasked").isNull()).isTrue();
-        assertThat(storedDocument(UUID.fromString(student.get("id").asString()))).containsExactly(null, null, null);
+        assertThat(storedDocument(UUID.fromString(student.get("id").asString()))).containsExactly(null, null);
     }
 
     // --- The code ---
@@ -420,12 +443,12 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
         String blindOriginal = storedDocument(UUID.fromString(id))[1];
 
         JsonNode kept = HarnessProcess.json(put(id, admin, putBody("Ana", "Perez", "2012-05-20", "F", "ACTIVE", null)));
-        assertThat(kept.get("nationalIdMasked").asString()).isEqualTo("****1234");
+        assertThat(kept.get("hasNationalId").asBoolean()).isTrue();
         assertThat(storedDocument(UUID.fromString(id))[0]).isEqualTo(original);
 
         JsonNode replaced = HarnessProcess.json(put(id, admin,
                 putBody("Ana", "Perez", "2012-05-20", "F", "ACTIVE", "AB-99998888")));
-        assertThat(replaced.get("nationalIdMasked").asString()).isEqualTo("****8888");
+        assertThat(replaced.get("hasNationalId").asBoolean()).isTrue();
         String[] afterReplace = storedDocument(UUID.fromString(id));
         assertThat(afterReplace[0]).isNotEqualTo(original).startsWith("v1:");
         assertThat(afterReplace[1]).isNotEqualTo(blindOriginal).matches("[0-9a-f]{64}");
@@ -433,8 +456,7 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
 
         JsonNode removed = HarnessProcess.json(put(id, admin, putBody("Ana", "Perez", "2012-05-20", "F", "ACTIVE", "")));
         assertThat(removed.get("hasNationalId").asBoolean()).isFalse();
-        assertThat(removed.get("nationalIdMasked").isNull()).isTrue();
-        assertThat(storedDocument(UUID.fromString(id))).containsExactly(null, null, null);
+        assertThat(storedDocument(UUID.fromString(id))).containsExactly(null, null);
 
         // The document that was removed and the one that was replaced are free again.
         created(post(STUDENTS, admin, body(null, "Luis", "Lopez", "2012-05-20", "M", ID)));
@@ -453,8 +475,8 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
                 .statusCode()).isEqualTo(200);
         assertProblem(put(second, admin, putBody("Luis", "Lopez", "2012-05-20", "M", "ACTIVE", ID)), 409,
                 "duplicate-national-id");
-        assertThat(HarnessProcess.json(get(STUDENTS + "/" + second, admin)).get("nationalIdMasked").asString())
-                .isEqualTo("****2222");
+        assertThat(HarnessProcess.json(get(STUDENTS + "/" + second, admin)).get("hasNationalId").asBoolean())
+                .isTrue();
     }
 
     @Test
@@ -599,7 +621,7 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
     void aSortFieldOutsideTheAllowedSetAndOutOfRangePagesAreRefused() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
 
-        for (String sort : List.of("password", "nationalId", "nationalIdMasked", "status", "createdAt", "id",
+        for (String sort : List.of("password", "nationalId", "hasNationalId", "status", "createdAt", "id",
                 "lastName,sideways", "lastName,asc,desc")) {
             assertProblem(get(STUDENTS + "?sort=" + sort, admin), 400, "validation-failed");
         }
@@ -750,7 +772,7 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
     // --- Audit ---
 
     @Test
-    void everyWriteLeavesOneEntryWithTheStateBeforeAndAfterAndNeverTheDocument() throws SQLException {
+    void everyWriteLeavesOneEntryWithCodeStatusAndTheNamesOfTheChangedFieldsAndNeverPersonalData() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
 
         JsonNode student = created(post(STUDENTS, admin, body("MAT-1", "Ana", "Perez", "2012-05-20", "F", ID)));
@@ -768,21 +790,22 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(entries.get(0)[3]).as("a creation has no before state").isNull();
         JsonNode created = json(entries.get(0)[4]);
         assertThat(created.get("studentCode").asString()).isEqualTo("MAT-1");
-        assertThat(created.get("firstName").asString()).isEqualTo("Ana");
-        assertThat(created.get("birthDate").asString()).isEqualTo("2012-05-20");
+        assertThat(created.propertyNames()).containsExactlyInAnyOrder("studentCode", "status", "hasNationalId");
         assertThat(created.get("status").asString()).isEqualTo("ACTIVE");
         assertThat(created.get("hasNationalId").asBoolean()).isTrue();
-        assertThat(created.get("nationalIdLast4").asString()).isEqualTo("1234");
         JsonNode before = json(entries.get(1)[3]);
         JsonNode after = json(entries.get(1)[4]);
-        assertThat(before.get("firstName").asString()).isEqualTo("Ana");
+        assertThat(before.propertyNames()).containsExactlyInAnyOrder("studentCode", "status", "hasNationalId");
         assertThat(before.get("status").asString()).isEqualTo("ACTIVE");
-        assertThat(after.get("firstName").asString()).isEqualTo("Anita");
         assertThat(after.get("status").asString()).isEqualTo("INACTIVE");
-        assertThat(after.get("nationalIdLast4").asString()).isEqualTo("8888");
+        assertThat(after.get("changedFields").asString()).isEqualTo("firstName,status,nationalId");
         JsonNode removed = json(entries.get(2)[4]);
         assertThat(removed.get("hasNationalId").asBoolean()).isFalse();
-        assertThat(removed.has("nationalIdLast4")).isFalse();
+        assertThat(removed.get("changedFields").asString()).isEqualTo("nationalId");
+        for (String[] entry : entries) {
+            assertThat(entry[3] + " " + entry[4]).doesNotContain("Ana").doesNotContain("Anita")
+                    .doesNotContain("Perez").doesNotContain("2012");
+        }
         assertThat(actorsOfStudentEntries(admin.institution())).containsOnly(admin.account().toString());
     }
 
@@ -797,6 +820,67 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
 
         assertThat(countOf("students_student", admin.institution())).isEqualTo(1);
         assertThat(studentEntriesOf(admin.institution())).hasSize(entries);
+    }
+
+    @Test
+    void noTailOfTheDocumentReachesAResponseAnAuditRowOrALog() throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+
+        JsonNode created = created(post(STUDENTS, admin, body(null, "Ana", "Perez", "2012-05-20", "F", TAILED_ID)));
+        String id = created.get("id").asString();
+        put(id, admin, putBody("Ana", "Perez", "2012-05-20", "F", "ACTIVE", null));
+        get(STUDENTS + "?q=perez", admin);
+        get(STUDENTS + "/" + id, admin);
+        put(id, admin, putBody("Ana", "Perez", "2012-05-20", "F", "ACTIVE", "ZZ-5555Q97X"));
+
+        assertThat(created.has("nationalIdMasked")).isFalse();
+        assertThat(created.get("hasNationalId").asBoolean()).isTrue();
+        assertThat(RESPONSES).isNotEmpty().noneMatch(text -> text.contains(TAILED_TAIL));
+        assertThat(auditRows()).isNotEmpty().noneMatch(text -> text.contains(TAILED_TAIL));
+        // The sweep after the test repeats this for the logs and for the tails of every other document.
+    }
+
+    // --- Rate limit ---
+
+    @Test
+    void theFourRoutesAreRateLimitedPerAddressWithRetryAfterAndAnotherAddressIsNotAffected() throws Exception {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        try (ConfigurableApplicationContext limited = AdminProcessLauncher.launch(SharedPostgresContainer.jdbcUrl(),
+                "confia_admin_app", TEST_PASSWORD, keys, Map.of("confia.web.trusted-proxies", "127.0.0.1,::1",
+                        RATE_LIMIT + "admin-read.request-limit", "2", RATE_LIMIT + "admin-write.request-limit", "1"))) {
+            int limitedPort = ((WebServerApplicationContext) limited).getWebServer().getPort();
+            String noisy = "203.0.113.10";
+            String quiet = "203.0.113.11";
+
+            // Writes: one is admitted for the address, the creation and the edit share the quota.
+            String id = created(sendFrom(limitedPort, noisy, "POST", STUDENTS, admin.token(),
+                    body(null, "Ana", "Perez", "2012-05-20", "F", null))).get("id").asString();
+            HttpResponse<String> refusedEdit = sendFrom(limitedPort, noisy, "PUT", STUDENTS + "/" + id, admin.token(),
+                    putBody("Cambiada", "Perez", "2012-05-20", "F", "ACTIVE", null));
+            assertProblem(refusedEdit, 429, "too-many-requests");
+            assertThat(refusedEdit.headers().firstValue("Retry-After")).hasValueSatisfying(seconds ->
+                    assertThat(Long.parseLong(seconds)).isBetween(1L, 60L));
+            assertProblem(sendFrom(limitedPort, noisy, "POST", STUDENTS, admin.token(),
+                    body(null, "Luis", "Lopez", "2012-05-20", "M", null)), 429, "too-many-requests");
+
+            // Reads: two are admitted for the address, the list and the detail share the quota.
+            assertThat(sendFrom(limitedPort, noisy, "GET", STUDENTS, admin.token(), null).statusCode()).isEqualTo(200);
+            assertThat(sendFrom(limitedPort, noisy, "GET", STUDENTS + "/" + id, admin.token(), null).statusCode())
+                    .isEqualTo(200);
+            HttpResponse<String> refusedRead = sendFrom(limitedPort, noisy, "GET", STUDENTS, admin.token(), null);
+            assertProblem(refusedRead, 429, "too-many-requests");
+            assertThat(refusedRead.headers().firstValue("Retry-After")).isPresent();
+            assertProblem(sendFrom(limitedPort, noisy, "GET", STUDENTS + "/" + id, admin.token(), null), 429,
+                    "too-many-requests");
+
+            // Another address is not affected, for reads and for writes, and the refusals changed nothing.
+            assertThat(sendFrom(limitedPort, quiet, "GET", STUDENTS, admin.token(), null).statusCode()).isEqualTo(200);
+            created(sendFrom(limitedPort, quiet, "POST", STUDENTS, admin.token(),
+                    body(null, "Eva", "Mejia", "2012-05-20", "F", null)));
+            assertThat(countOf("students_student", admin.institution())).isEqualTo(2);
+            assertThat(HarnessProcess.json(get(STUDENTS + "/" + id, admin)).get("firstName").asString())
+                    .isEqualTo("Ana");
+        }
     }
 
     // --- Logs ---
@@ -934,17 +1018,17 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
         }
     }
 
-    /** national_id_encrypted, national_id_blind_index and national_id_last4 of one student. */
+    /** national_id_encrypted and national_id_blind_index of one student. */
     private static String[] storedDocument(UUID studentId) throws SQLException {
         try (Connection connection = SharedPostgresContainer.connectionAs("postgres");
                 PreparedStatement statement = connection.prepareStatement("""
-                        select national_id_encrypted, national_id_blind_index, national_id_last4
+                        select national_id_encrypted, national_id_blind_index
                           from students_student where id = ?
                         """)) {
             statement.setObject(1, studentId);
             try (ResultSet result = statement.executeQuery()) {
                 assertThat(result.next()).isTrue();
-                return new String[] {result.getString(1), result.getString(2), result.getString(3)};
+                return new String[] {result.getString(1), result.getString(2)};
             }
         }
     }
@@ -1104,6 +1188,25 @@ class StudentEndpointsIT extends CommittingPostgresIntegrationTest {
         if (token != null) {
             request.header("Authorization", "Bearer " + token);
         }
+        if (body != null) {
+            request.header("Content-Type", "application/json");
+        }
+        if (!method.equals("GET")) {
+            request.header("Origin", AdminProcessLauncher.ALLOWED_ORIGIN);
+        }
+        return execute(request.build());
+    }
+
+    /** The same request to another process, as the client at {@code address} (its proxy is the loopback). */
+    private static HttpResponse<String> sendFrom(int targetPort, String address, String method, String path,
+            String token, String body) {
+        HttpRequest.Builder request = HttpRequest
+                .newBuilder(URI.create("http://localhost:" + targetPort + path))
+                .timeout(Duration.ofSeconds(30))
+                .header("Authorization", "Bearer " + token)
+                .header("X-Forwarded-For", address)
+                .method(method, body == null ? HttpRequest.BodyPublishers.noBody()
+                        : HttpRequest.BodyPublishers.ofString(body));
         if (body != null) {
             request.header("Content-Type", "application/json");
         }

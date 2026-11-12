@@ -24,11 +24,12 @@ class NationalIdTest {
     }
 
     @Test
-    void theLastFourCharactersOfTheNormalFormAreTheOnlyPartThatIsExposed() {
+    void noPartOfTheDocumentIsExposedNotEvenItsTail() {
         NationalId id = NationalId.of("0801-1999-12345");
 
-        assertThat(id.last4()).isEqualTo("2345");
-        assertThat(id.masked()).isEqualTo("****2345");
+        assertThat(id.toString()).doesNotContain("2345").doesNotContain("0801");
+        assertThat(java.util.Arrays.stream(NationalId.class.getMethods()).map(java.lang.reflect.Method::getName))
+                .doesNotContain("last4", "masked");
     }
 
     @Test
@@ -79,7 +80,7 @@ class NationalIdTest {
         assertThat(NationalIdChange.of("   ")).isSameAs(NationalIdChange.Remove.INSTANCE);
         assertThat(NationalIdChange.of("0801-1999-12345"))
                 .isInstanceOfSatisfying(NationalIdChange.Replace.class,
-                        replace -> assertThat(replace.nationalId().last4()).isEqualTo("2345"));
+                        replace -> assertThat(replace.nationalId().normalized()).isEqualTo("0801199912345"));
         assertThatThrownBy(() -> NationalIdChange.of("short")).isInstanceOf(InvalidStudentException.class);
     }
 }

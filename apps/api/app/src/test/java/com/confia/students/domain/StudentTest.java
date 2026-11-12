@@ -176,21 +176,21 @@ class StudentTest {
     // --- The document ---
 
     @Test
-    void aStudentWithoutDocumentHasNoMask() {
+    void aStudentWithoutDocumentSaysSo() {
         Student created = student();
 
         assertThat(created.hasNationalId()).isFalse();
-        assertThat(created.nationalIdMasked()).isNull();
     }
 
     @Test
-    void createdWithADocumentItKeepsOnlyTheMask() {
+    void createdWithADocumentItKeepsOnlyThatThereIsOne() {
         Student created = Student.create(UUID.randomUUID(), "E-1", "Ana", "Perez", BIRTH, "F",
                 NationalId.of("0801-2012-01234"), NOW);
 
         assertThat(created.hasNationalId()).isTrue();
-        assertThat(created.nationalIdMasked()).isEqualTo("****1234");
-        assertThat(created.toString()).doesNotContain("0801").doesNotContain("20120");
+        assertThat(created.toString()).doesNotContain("0801").doesNotContain("20120").doesNotContain("1234");
+        assertThat(java.util.Arrays.stream(Student.class.getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                .noneMatch(name -> name.toLowerCase().contains("last4") || name.toLowerCase().contains("mask"));
     }
 
     @Test
@@ -203,9 +203,12 @@ class StudentTest {
                 LATER);
         Student removed = withId.edit("Ana", "Perez", BIRTH, "F", "ACTIVE", NationalIdChange.of(""), LATER);
 
-        assertThat(kept.nationalIdMasked()).isEqualTo("****1234");
-        assertThat(replaced.nationalIdMasked()).isEqualTo("****8888");
+        assertThat(kept.hasNationalId()).isTrue();
+        assertThat(replaced.hasNationalId()).isTrue();
         assertThat(removed.hasNationalId()).isFalse();
-        assertThat(removed.nationalIdMasked()).isNull();
+        assertThat(withId.edit("Ana", "Perez", BIRTH, "F", "ACTIVE", NationalIdChange.Keep.INSTANCE, LATER)
+                .edit("Ana", "Perez", BIRTH, "F", "ACTIVE", NationalIdChange.of(""), LATER)
+                .edit("Ana", "Perez", BIRTH, "F", "ACTIVE", NationalIdChange.Keep.INSTANCE, LATER)
+                .hasNationalId()).isFalse();
     }
 }

@@ -5,10 +5,10 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * The values of the three rate-limit policies of the administrative process, which an environment
+ * The values of the five rate-limit policies of the administrative process, which an environment
  * may change without recompiling (web-edge-foundations design.md, decision 17; session-endpoints-
  * cookie-and-csrf design.md, decision 7): {@code confia.web.rate-limit.admin-login.*}, {@code
- * ...admin-mfa.*} and {@code ...admin-session.*}. Bound through the constructor so that a bad value
+ * ...admin-mfa.*}, {@code ...admin-session.*}, {@code ...admin-read.*} and {@code ...admin-write.*}. Bound through the constructor so that a bad value
  * stops the start before a request is accepted, and the message names the whole property.
  *
  * <p>The defaults are in {@code application.yml} and not in annotations, because an annotation
@@ -19,10 +19,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param adminLogin the policy of the login route
  * @param adminMfa the policy of the verification and enrollment of the second factor
  * @param adminSession the policy of the refresh and the two ends of a session
+ * @param adminRead the policy of the general reads of the administrative API (300 a minute per address)
+ * @param adminWrite the policy of the writes of the administrative API (60 a minute per address)
  */
 @ConfigurationProperties(prefix = RateLimitProperties.PREFIX, ignoreUnknownFields = false)
 public record RateLimitProperties(PolicyValues adminLogin, PolicyValues adminMfa,
-        PolicyValues adminSession) {
+        PolicyValues adminSession, PolicyValues adminRead, PolicyValues adminWrite) {
 
     static final String PREFIX = "confia.web.rate-limit";
 
@@ -30,6 +32,8 @@ public record RateLimitProperties(PolicyValues adminLogin, PolicyValues adminMfa
         adminLogin = checked(adminLogin, "admin-login");
         adminMfa = checked(adminMfa, "admin-mfa");
         adminSession = checked(adminSession, "admin-session");
+        adminRead = checked(adminRead, "admin-read");
+        adminWrite = checked(adminWrite, "admin-write");
     }
 
     private static PolicyValues checked(PolicyValues values, String component) {

@@ -4,7 +4,7 @@
  * four routes under {@code /api/v1/students}.
  *
  * <p>The national identity document is personal data of a minor: it is stored only encrypted by column,
- * duplicates are found through a blind index, and the API shows only whether there is one and its mask.
+ * duplicates are found through a blind index, and the API shows only whether there is one.
  * Nothing in this module is ever deleted: a student is made inactive with an update, and every write
  * leaves an entry in the audit trail that never carries the document.
  *

@@ -46,11 +46,11 @@ class StudentsStudentSchemaIT extends CommittingPostgresIntegrationTest {
     }
 
     private static void student(Connection c, UUID institution, UUID id, String code, String sex, String status,
-            String encrypted, String blindIndex, String last4) throws SQLException {
+            String encrypted, String blindIndex) throws SQLException {
         try (PreparedStatement s = c.prepareStatement("""
                 insert into students_student (institution_id, id, student_code, first_name, last_name,
-                    birth_date, sex, status, national_id_encrypted, national_id_blind_index, national_id_last4)
-                values (?, ?, ?, 'Ana', 'Perez', date '2012-05-20', ?, ?, ?, ?, ?)
+                    birth_date, sex, status, national_id_encrypted, national_id_blind_index)
+                values (?, ?, ?, 'Ana', 'Perez', date '2012-05-20', ?, ?, ?, ?)
                 """)) {
             s.setObject(1, institution);
             s.setObject(2, id);
@@ -59,13 +59,12 @@ class StudentsStudentSchemaIT extends CommittingPostgresIntegrationTest {
             s.setString(5, status);
             s.setString(6, encrypted);
             s.setString(7, blindIndex);
-            s.setString(8, last4);
             s.executeUpdate();
         }
     }
 
     private static void plain(Connection c, UUID institution, String code) throws SQLException {
-        student(c, institution, UUID.randomUUID(), code, "F", "ACTIVE", null, null, null);
+        student(c, institution, UUID.randomUUID(), code, "F", "ACTIVE", null, null);
     }
 
     // --- Constraints ---
@@ -75,9 +74,9 @@ class StudentsStudentSchemaIT extends CommittingPostgresIntegrationTest {
         UUID institution = UUID.randomUUID();
         try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
             SQLException sex = rejected(owner, () -> student(owner, institution, UUID.randomUUID(), "A", "X",
-                    "ACTIVE", null, null, null));
+                    "ACTIVE", null, null));
             SQLException status = rejected(owner, () -> student(owner, institution, UUID.randomUUID(), "A", "F",
-                    "DELETED", null, null, null));
+                    "DELETED", null, null));
             SQLException blank = rejected(owner, () -> {
                 try (PreparedStatement s = owner.prepareStatement("""
                         insert into students_student (institution_id, id, student_code, first_name, last_name,
@@ -96,25 +95,39 @@ class StudentsStudentSchemaIT extends CommittingPostgresIntegrationTest {
             assertThat(blank.getSQLState()).isEqualTo("23514");
             assertThat(blank.getMessage()).contains("students_student_names_chk");
             for (String accepted : List.of("F", "M", "UNSPECIFIED")) {
-                student(owner, institution, UUID.randomUUID(), "S-" + accepted, accepted, "ACTIVE", null, null, null);
+                student(owner, institution, UUID.randomUUID(), "S-" + accepted, accepted, "ACTIVE", null, null);
             }
             owner.rollback();
         }
     }
 
     @Test
-    void theThreeMembersOfTheDocumentArePresentTogetherOrAbsentTogether() throws SQLException {
+    void noPlainTextPartOfTheDocumentIsStoredNotEvenItsTail() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution);
+                ResultSet columns = owner.createStatement().executeQuery(
+                        "select column_name from information_schema.columns where table_name = 'students_student'")) {
+            List<String> names = new java.util.ArrayList<>();
+            while (columns.next()) {
+                names.add(columns.getString(1));
+            }
+            assertThat(names).contains("national_id_encrypted", "national_id_blind_index")
+                    .noneMatch(name -> name.contains("last4") || name.contains("mask") || name.contains("tail"));
+        }
+    }
+
+    @Test
+    void theTwoMembersOfTheDocumentArePresentTogetherOrAbsentTogether() throws SQLException {
         UUID institution = UUID.randomUUID();
         try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
-            for (String[] partial : new String[][] {{"v1:x", null, null}, {null, BLIND_A, null}, {null, null, "1234"},
-                    {"v1:x", BLIND_A, null}, {"v1:x", null, "1234"}, {null, BLIND_A, "1234"}}) {
+            for (String[] partial : new String[][] {{"v1:x", null}, {null, BLIND_A}}) {
                 SQLException refusal = rejected(owner, () -> student(owner, institution, UUID.randomUUID(), "P",
-                        "F", "ACTIVE", partial[0], partial[1], partial[2]));
+                        "F", "ACTIVE", partial[0], partial[1]));
                 assertThat(refusal.getSQLState()).isEqualTo("23514");
                 assertThat(refusal.getMessage()).contains("students_student_national_id_chk");
             }
-            student(owner, institution, UUID.randomUUID(), "N", "F", "ACTIVE", null, null, null);
-            student(owner, institution, UUID.randomUUID(), "W", "F", "ACTIVE", "v1:x", BLIND_A, "1234");
+            student(owner, institution, UUID.randomUUID(), "N", "F", "ACTIVE", null, null);
+            student(owner, institution, UUID.randomUUID(), "W", "F", "ACTIVE", "v1:x", BLIND_A);
             owner.rollback();
         }
     }
@@ -141,18 +154,18 @@ class StudentsStudentSchemaIT extends CommittingPostgresIntegrationTest {
         UUID institution = UUID.randomUUID();
         UUID other = UUID.randomUUID();
         try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
-            student(owner, institution, UUID.randomUUID(), "A", "F", "ACTIVE", "v1:x", BLIND_A, "1234");
+            student(owner, institution, UUID.randomUUID(), "A", "F", "ACTIVE", "v1:x", BLIND_A);
             plain(owner, institution, "B");
             plain(owner, institution, "C");
 
             SQLException duplicate = rejected(owner, () -> student(owner, institution, UUID.randomUUID(), "D", "F",
-                    "ACTIVE", "v1:y", BLIND_A, "1234"));
+                    "ACTIVE", "v1:y", BLIND_A));
 
             assertThat(duplicate.getSQLState()).isEqualTo("23505");
             assertThat(duplicate.getMessage()).contains("students_student_national_id_uq");
-            student(owner, institution, UUID.randomUUID(), "E", "F", "ACTIVE", "v1:y", BLIND_B, "1234");
+            student(owner, institution, UUID.randomUUID(), "E", "F", "ACTIVE", "v1:y", BLIND_B);
             StaffRoleFixtures.fixInstitution(owner, other);
-            student(owner, other, UUID.randomUUID(), "A", "F", "ACTIVE", "v1:x", BLIND_A, "1234");
+            student(owner, other, UUID.randomUUID(), "A", "F", "ACTIVE", "v1:x", BLIND_A);
             owner.rollback();
         }
     }
@@ -265,9 +278,8 @@ class StudentsStudentSchemaIT extends CommittingPostgresIntegrationTest {
             readonly.setAutoCommit(false);
             StaffRoleFixtures.fixInstitution(readonly, institution);
             try (ResultSet rows = readonly.createStatement().executeQuery(
-                    "select student_code, first_name, last_name, birth_date, national_id_last4 from students_student")) {
+                    "select student_code, first_name, last_name, birth_date from students_student")) {
                 assertThat(rows.next()).isTrue();
-                assertThat(rows.getString("national_id_last4")).isEqualTo("1234");
             }
             for (String column : List.of("national_id_encrypted", "national_id_blind_index")) {
                 SQLException refusal = rejected(readonly, () -> readonly.createStatement()
@@ -289,7 +301,7 @@ class StudentsStudentSchemaIT extends CommittingPostgresIntegrationTest {
     /** One student with a document and the counter row, committed under the institution given. */
     private static void seed(UUID institution) throws SQLException {
         try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
-            student(owner, institution, UUID.randomUUID(), "E-000001", "F", "ACTIVE", "v1:x", BLIND_A, "1234");
+            student(owner, institution, UUID.randomUUID(), "E-000001", "F", "ACTIVE", "v1:x", BLIND_A);
             try (PreparedStatement s = owner.prepareStatement(
                     "insert into students_student_code_counter (institution_id, last_value) values (?, 1)")) {
                 s.setObject(1, institution);

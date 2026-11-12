@@ -25,8 +25,9 @@ Tabla `students_student` con `institution_id`, seguridad por fila forzada, sin `
 | `nationalId` | Opcional (muchos menores no tienen). 8 a 20 caracteres alfanuméricos y guiones. Se cifra con `ColumnEncryptionService` antes de guardar. Único por institución: se detecta con un **índice ciego** (HMAC con llave propia, columna `national_id_blind_index`) para rechazar duplicados sin descifrar |
 | `status` | `ACTIVE`, `INACTIVE`. No se borra: se inactiva con `PUT` |
 
-El documento **nunca** viaja completo en listados ni en logs. El detalle devuelve solo
-`nationalIdMasked` (los últimos 4 caracteres, `****1234`) y `hasNationalId`. Para cambiarlo se envía
+El documento **nunca** viaja, ni completo ni en parte (ni siquiera sus últimos caracteres: con la fecha de nacimiento
+revelarían casi todo el DNI hondureño), en listados, respuestas, logs ni auditoría. Las respuestas devuelven solo
+`hasNationalId`. Para cambiarlo se envía
 el valor nuevo completo; omitirlo lo conserva; enviarlo vacío lo elimina. Ver el valor completo
 queda fuera de este corte (requeriría un permiso y una auditoría de acceso propios).
 
@@ -40,8 +41,9 @@ queda fuera de este corte (requeriría un permiso y una auditoría de acceso pro
 | `PUT /{id}` → 200 (reemplaza campos editables e incluye `status`) | `STUDENTS_UPDATE` |
 
 - La institución sale del token. Sin `Idempotency-Key` (no mueve dinero).
-- Escrituras auditan `students.student.created|updated` con antes y después **sin el documento**: se
-  audita solo `hasNationalId` y los últimos 4. Nunca el valor ni el cifrado.
+- Escrituras auditan `students.student.created|updated` sin datos personales del menor (la
+  bitácora se conserva 7 años y no se borra): solo `studentCode`, `status`, `hasNationalId` y, en la edición, los
+  **nombres** de los campos que cambiaron. Nunca nombres, fecha de nacimiento ni documento (ni valor, ni cifrado, ni cola).
 - Prohibido registrar nombres, fechas o documentos en logs (regla 11).
 - Errores nuevos: `duplicate-student-code` (409), `duplicate-national-id` (409). `resource-not-found` ya existe.
 - Los permisos `STUDENTS_*` ya existen y ya están asignados a los roles.
@@ -70,13 +72,16 @@ inactiva; en la base el documento está cifrado y en ningún lugar de la API apa
 
 Módulo `com.confia.students` (dominio, aplicación, `infrastructure`, `web`), migración `V17__create_students_student.sql`
 (tablas `students_student` y `students_student_code_counter`, seguridad por fila forzada, sin `DELETE`). Cuatro rutas
-bajo `/api/v1/students`; las escrituras auditan `students.student.created|updated`.
+bajo `/api/v1/students`, cada una con `@RateLimited` (lecturas `admin-read`, 300 por minuto por IP; escrituras `admin-write`,
+60 por minuto por IP; `429` con `Retry-After`); las escrituras auditan `students.student.created|updated` con el estado
+antes y después reducido a `studentCode`, `status` y `hasNationalId`, más `changedFields` (nombres separados por coma,
+nunca valores) en el estado posterior de la edición.
 
 ### Forma de la API que necesita el frontend
 
 - **Estudiante** (misma forma en listado, detalle, alta y edición), en este orden: `id`, `studentCode`, `firstName`,
   `lastName`, `birthDate` (`YYYY-MM-DD`), `sex` (`F`, `M`, `UNSPECIFIED`), `status` (`ACTIVE`, `INACTIVE`),
-  `hasNationalId` (boolean), `nationalIdMasked` (`****1234`, o `null` sin documento), `createdAt`, `updatedAt`.
+  `hasNationalId` (boolean, derivado de `national_id_encrypted IS NOT NULL`), `createdAt`, `updatedAt`.
   El documento completo no es nunca un campo de ninguna respuesta.
 - **Listado**: `{ items, total, page, size }`. Parámetros: `page` (desde 0), `size` (50 por defecto, máximo 200),
   `sort` (`studentCode`, `lastName`, `firstName`, `birthDate`, con `,asc` o `,desc`; **por defecto `lastName` ascendente**),
@@ -100,16 +105,21 @@ bajo `/api/v1/students`; las escrituras auditan `students.student.created|update
 
 ### Decisiones tomadas al construir
 
-- **Últimos cuatro del documento en claro** (`national_id_last4`, solo los últimos 4 caracteres del documento
-  normalizado): permite devolver `nationalIdMasked` en el listado y auditar «los últimos 4» sin descifrar nunca nada
-  en la aplicación. Es lo mismo que la pantalla ya muestra enmascarado. El valor completo sigue únicamente cifrado
-  (`national_id_encrypted`, formato `v1:` de `ColumnEncryptionService`, ligado a la fila) y el rol de solo lectura no
-  puede leer esa columna ni el índice ciego.
+- **Ningún carácter del documento en claro** (hallazgo A1 de la revisión de seguridad): se eliminó `national_id_last4`
+  (la migración V17, aún no publicada, se editó en su lugar). La cola de 4 caracteres combinada con la fecha de nacimiento
+  casi reveló el DNI (municipio + año + secuencia). `hasNationalId` se deriva de `national_id_encrypted IS NOT NULL`, la
+  restricción de consistencia entre el cifrado y el índice ciego se conserva, y el valor completo sigue únicamente cifrado
+  (`national_id_encrypted`, formato `v1:` de `ColumnEncryptionService`, ligado a la fila); el rol de solo lectura no
+  puede leer esa columna ni el índice ciego. La API ya no tiene `nationalIdMasked`.
+- **Auditoría sin datos personales** (hallazgo A2): la bitácora no contiene nombres, fecha de nacimiento, sexo ni el
+  documento. `changedFields` es un texto con los nombres separados por coma porque `AuditJson` no tiene arreglos.
+- **Limitación de tasa** (hallazgo M2): políticas `admin-read` (300 por minuto) y `admin-write` (60 por minuto), por IP, en
+  `confia.web.rate-limit.*` de `application.yml`. El mecanismo `@RateLimited` solo cuenta por dirección; el límite por
+  cuenta de `docs/03-seguridad.md` sección 10 (600 y 120 por minuto) no es posible con él y queda en el seguimiento.
 - **Índice ciego**: HMAC-SHA-256 del documento normalizado (mayúsculas, sin guiones) junto con la institución, con una
   llave derivada de la llave maestra de columnas por propósito (`students.national-id`) en el nuevo
   `shared.crypto.BlindIndexService`. Rotar la llave maestra obliga a recalcular los índices.
-- **Normalizado mínimo**: tras quitar guiones el documento debe conservar al menos 5 caracteres (para que la máscara
-  oculte algo).
+- **Normalizado mínimo**: tras quitar guiones el documento debe conservar al menos 5 caracteres (longitud mínima razonable del documento).
 - **Código generado**: contador por institución en `students_student_code_counter`, tomado con
   `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` (el bloqueo de fila serializa altas simultáneas y un fallo devuelve
   el número). Si un código escrito a mano ya ocupa el siguiente número, se salta.
@@ -121,8 +131,24 @@ bajo `/api/v1/students`; las escrituras auditan `students.student.created|update
 
 `StudentTest`, `NationalIdTest`, `ManageStudentsTest` (reglas y casos límite de la nota con puertos en memoria),
 `BlindIndexServiceTest` (vectores RFC 4231), `StudentsStudentSchemaIT` (restricciones, RLS y privilegios) y
-`StudentEndpointsIT` (flujo de aceptación, concurrencia, aislamiento, roles, auditoría y barrido de respuestas,
-filas de auditoría y logs capturados contra el documento completo y su cifrado).
+`StudentEndpointsIT` (flujo de aceptación, concurrencia, aislamiento, roles, auditoría, `429` con `Retry-After` por
+dirección y barrido de respuestas, filas de auditoría y logs capturados contra el documento completo, su cifrado y su
+cola de 4 caracteres) y `RateLimitPropertiesTest` (valores de las políticas).
+
+### Seguimiento
+
+- **M1**: llave dedicada y versionada para el índice ciego, en vez de derivarla de la llave maestra de columnas, y un
+  trabajo de recálculo de índices ante rotación; antes de la primera rotación de la llave maestra.
+- **Límite por cuenta** (600 lecturas y 120 escrituras por minuto, `docs/03-seguridad.md` sección 10): el limitador solo
+  conoce la dirección; necesita una clave por cuenta.
+- **Limitación de tasa en `organization`**: los controladores de `organization` (años, grados, modalidades y secciones) no declaran `@RateLimited`;
+  hay que aplicar `admin-read` y `admin-write` como en `students`.
+- PostgreSQL con `log_error_verbosity=terse`, para que los errores de restricción no repitan en el registro del servidor
+  los valores de la fila que falló (nombres, fecha de nacimiento).
+- Los códigos de estudiante secuenciales (`E-000123`) revelan cuántos estudiantes tiene la institución.
+- El texto de la sección 10 de `docs/03-seguridad.md` y el frontend (`apps/admin-web`, `packages/contracts`) aún mencionan
+  `nationalIdMasked`; hay que regenerar los contratos y quitar el campo de la pantalla.
+
 
 
 ## Construido en el frontend

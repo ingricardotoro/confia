@@ -43,4 +43,18 @@ public class RateLimiterConfiguration {
             @Qualifier("adminSessionRateLimitPolicy") RateLimitPolicy adminSessionRateLimitPolicy) {
         return new InMemoryRateLimiter(adminSessionRateLimitPolicy);
     }
+
+    /** The limiter of the general reads of the administrative API (docs/03-seguridad.md section 10). */
+    @Bean("admin-read")
+    RateLimiter adminReadRateLimiter(
+            @Qualifier("adminReadRateLimitPolicy") RateLimitPolicy adminReadRateLimitPolicy) {
+        return new InMemoryRateLimiter(adminReadRateLimitPolicy);
+    }
+
+    /** The limiter of the writes of the administrative API, tighter than the reads. */
+    @Bean("admin-write")
+    RateLimiter adminWriteRateLimiter(
+            @Qualifier("adminWriteRateLimitPolicy") RateLimitPolicy adminWriteRateLimitPolicy) {
+        return new InMemoryRateLimiter(adminWriteRateLimitPolicy);
+    }
 }

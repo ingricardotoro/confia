@@ -335,7 +335,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     void aPathVariableGivesOneRowPerRequestWithTheTemplateAndNeitherValue() throws SQLException {
         Session cashier = sessionOf(StaffRole.CASHIER);
 
-        for (String id : List.of("123", "abc")) {
+        // Values that cannot occur by chance in the random UUIDs and instants of an audit row.
+        for (String id : List.of("zz-path-1", "zz-path-2")) {
             assertProblem(get(cashier, "/test/authorization/accounts/" + id), 403, "forbidden");
         }
 
@@ -347,7 +348,7 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
             assertThat(row.get("after_value"))
                     .isEqualTo("{\"routeTemplate\": \"/test/authorization/accounts/{id}\"}");
         });
-        assertThat(rows.toString()).doesNotContain("123", "abc");
+        assertThat(rows.toString()).doesNotContain("zz-path-1", "zz-path-2");
     }
 
     // --- AZ52, AZ53: the cap and the summary ---

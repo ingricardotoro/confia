@@ -689,10 +689,6 @@
           "lastName" : {
             "type" : "string"
           },
-          "nationalIdMasked" : {
-            "description" : "Four asterisks and the last four characters of the document; null without one",
-            "type" : [ "string", "null" ]
-          },
           "sex" : {
             "enum" : [ "F", "M", "UNSPECIFIED" ],
             "type" : "string"
@@ -709,7 +705,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "birthDate", "createdAt", "firstName", "hasNationalId", "id", "lastName", "nationalIdMasked", "sex", "status", "studentCode", "updatedAt" ],
+        "required" : [ "birthDate", "createdAt", "firstName", "hasNationalId", "id", "lastName", "sex", "status", "studentCode", "updatedAt" ],
         "type" : "object"
       },
       "UpdateAcademicYearRequest" : {
@@ -2842,6 +2838,25 @@
             },
             "description" : "The account does not hold students:read (forbidden)"
           },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
           "500" : {
             "content" : {
               "application/problem+json" : {
@@ -2924,6 +2939,25 @@
             },
             "description" : "The code is taken (duplicate-student-code) or another student has the same document (duplicate-national-id)"
           },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
           "500" : {
             "content" : {
               "application/problem+json" : {
@@ -2945,7 +2979,7 @@
     },
     "/api/v1/students/{id}" : {
       "get" : {
-        "description" : "The student with this identifier in the institution of the token. The national identity document is never returned: only hasNationalId and nationalIdMasked. Needs the permission students:read.",
+        "description" : "The student with this identifier in the institution of the token. The national identity document is never returned: only hasNationalId. Needs the permission students:read.",
         "operationId" : "getStudent",
         "parameters" : [ {
           "in" : "path",
@@ -3006,6 +3040,25 @@
               }
             },
             "description" : "The student does not exist in the institution of the token (resource-not-found)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
           },
           "500" : {
             "content" : {
@@ -3107,6 +3160,25 @@
               }
             },
             "description" : "Another student has the same document (duplicate-national-id)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many requests from this address (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
           },
           "500" : {
             "content" : {

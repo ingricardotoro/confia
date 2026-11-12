@@ -30,7 +30,7 @@ import org.jooq.impl.DSL;
 /**
  * The jOOQ adapter of {@link StudentRepository} over {@code students_student} and its code counter. It
  * never selects the encrypted document nor its blind index into a domain object: reading a student
- * yields the mask only, and the two columns are written on insert and on a replacement or removal.
+ * yields only whether there is one, and the two columns are written on insert and on a replacement or removal.
  */
 public final class JooqStudentRepository implements StudentRepository {
 
@@ -88,7 +88,6 @@ public final class JooqStudentRepository implements StudentRepository {
                 .set(STUDENTS_STUDENT.SEX, student.sex().name())
                 .set(STUDENTS_STUDENT.NATIONAL_ID_ENCRYPTED, document == null ? null : document.encrypted())
                 .set(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX, document == null ? null : document.blindIndex())
-                .set(STUDENTS_STUDENT.NATIONAL_ID_LAST4, student.nationalIdLast4())
                 .set(STUDENTS_STUDENT.STATUS, student.status().name())
                 .set(STUDENTS_STUDENT.CREATED_AT, StudentWrites.toDatabase(student.createdAt()))
                 .set(STUDENTS_STUDENT.UPDATED_AT, StudentWrites.toDatabase(student.updatedAt()))
@@ -104,7 +103,6 @@ public final class JooqStudentRepository implements StudentRepository {
                     .set(STUDENTS_STUDENT.BIRTH_DATE, student.birthDate())
                     .set(STUDENTS_STUDENT.SEX, student.sex().name())
                     .set(STUDENTS_STUDENT.STATUS, student.status().name())
-                    .set(STUDENTS_STUDENT.NATIONAL_ID_LAST4, student.nationalIdLast4())
                     .set(STUDENTS_STUDENT.UPDATED_AT, StudentWrites.toDatabase(student.updatedAt()));
             var withDocument = switch (storage) {
                 case NationalIdStorage.Keep keep -> update;
@@ -157,6 +155,6 @@ public final class JooqStudentRepository implements StudentRepository {
         OffsetDateTime updated = row.getUpdatedAt();
         return new Student(row.getId(), row.getStudentCode(), row.getFirstName(), row.getLastName(),
                 row.getBirthDate(), Sex.parse(row.getSex()), StudentStatus.parse(row.getStatus()),
-                row.getNationalIdLast4(), StudentWrites.fromDatabase(created), StudentWrites.fromDatabase(updated));
+                row.getNationalIdEncrypted() != null, StudentWrites.fromDatabase(created), StudentWrites.fromDatabase(updated));
     }
 }

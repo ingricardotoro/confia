@@ -85,7 +85,9 @@ class WebEdgeScopeExclusionInventoryTest {
             "com.confia.shared.web.ratelimit.RateLimiterRegistry",
             "com.confia.shared.web.ratelimit.RateLimitInterceptor");
     private static final Set<String> LIMITER_PACKAGES = Set.of("com.confia.shared.web.ratelimit",
-            "com.confia.shared.security", "com.confia.shared.web.edge", "com.confia.identity.web");
+            "com.confia.shared.security", "com.confia.shared.web.edge", "com.confia.identity.web",
+            // The student registry applies admin-read and admin-write (docs/cortes/students-registry.md, M2).
+            "com.confia.students.web");
 
     /** The types through which a class asks for a delay, and the packages that may. */
     private static final Set<String> MATERIALIZER_TYPES = Set.of(
@@ -410,8 +412,8 @@ class WebEdgeScopeExclusionInventoryTest {
                         "com.confia.shared.web.ratelimit.RateLimitPolicyCheck",
                         "com.confia.identity.web.LoginController");
         assertThat(usesOf(production, LIMITER_TYPES, LIMITER_PACKAGES))
-                .as("only the limiter's own packages, the edge and the web layer of identity use it: the "
-                        + "login endpoint applies it (condition H1), and no other package does")
+                .as("only the limiter's own packages, the edge and the web layers of identity and students use it: the "
+                        + "login endpoint applies it (condition H1) and so do the student routes, and no other package does")
                 .isEmpty();
     }
 

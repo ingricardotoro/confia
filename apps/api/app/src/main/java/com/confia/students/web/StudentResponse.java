@@ -8,7 +8,7 @@ import java.util.UUID;
 
 /**
  * A student, as the API answers it. The national identity document is never a member: only whether there
- * is one and its mask, the last four characters.
+ * is one.
  */
 public record StudentResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED) UUID id,
@@ -20,9 +20,12 @@ public record StudentResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"ACTIVE", "INACTIVE"}) String status,
         @Schema(requiredMode = RequiredMode.REQUIRED, description = "Whether the student has a national identity document")
         boolean hasNationalId,
-        @Schema(requiredMode = RequiredMode.REQUIRED, nullable = true,
-                description = "Four asterisks and the last four characters of the document; null without one")
-        String nationalIdMasked,
         @Schema(requiredMode = RequiredMode.REQUIRED) Instant createdAt,
         @Schema(requiredMode = RequiredMode.REQUIRED) Instant updatedAt) {
+
+    /** Spring logs the object it writes at DEBUG: the names and birth date of a minor never reach a log through it. */
+    @Override
+    public String toString() {
+        return "StudentResponse[id=" + id + "]";
+    }
 }
