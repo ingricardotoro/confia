@@ -65,9 +65,10 @@ class GuardiansGuardianConsentEventSchemaIT extends CommittingPostgresIntegratio
         UUID id = UUID.randomUUID();
         exec(c, """
                 insert into guardians_guardian_consent_event (institution_id, id, guardian_id, channel, purpose,
-                    action, evidence_source, policy_version, recorded_by)
-                values (?, ?, ?, ?, ?, ?, ?, cast(? as varchar), ?)
-                """, institution, id, guardian, channel, purpose, action, evidence, version, UUID.randomUUID());
+                    action, evidence_source, policy_version, recorded_by, request_id)
+                values (?, ?, ?, ?, ?, ?, ?, cast(? as varchar), ?, ?)
+                """, institution, id, guardian, channel, purpose, action, evidence, version, UUID.randomUUID(),
+                UUID.randomUUID());
         return id;
     }
 
@@ -184,9 +185,9 @@ class GuardiansGuardianConsentEventSchemaIT extends CommittingPostgresIntegratio
             assertThat(bySequence).containsExactly(first, second, third);
             SQLException plainSeq = rejected(owner, () -> exec(owner,
                     "insert into guardians_guardian_consent_event (institution_id, id, seq, guardian_id, channel, "
-                            + "purpose, action, evidence_source, policy_version, recorded_by) "
-                            + "values (?, ?, 1, ?, 'EMAIL', 'MARKETING', 'GRANT', 'ADMIN_REGISTERED', 'v1', ?)",
-                    institution, UUID.randomUUID(), guardian, UUID.randomUUID()));
+                            + "purpose, action, evidence_source, policy_version, recorded_by, request_id) "
+                            + "values (?, ?, 1, ?, 'EMAIL', 'MARKETING', 'GRANT', 'ADMIN_REGISTERED', 'v1', ?, ?)",
+                    institution, UUID.randomUUID(), guardian, UUID.randomUUID(), UUID.randomUUID()));
             // The order is the database's: a writer cannot choose it (GENERATED ALWAYS).
             assertThat(plainSeq.getMessage()).contains("seq");
             owner.rollback();
@@ -220,6 +221,43 @@ class GuardiansGuardianConsentEventSchemaIT extends CommittingPostgresIntegratio
                 assertThat(rows.getLong(1)).isEqualTo(1);
                 assertThat(rows.getString(2)).isEqualTo("GRANT");
             }
+            owner.rollback();
+        }
+    }
+
+    @Test
+    void noRoleTruncatesTheEventsNotEvenTheOwnerAndNotByCascadeFromTheGuardians() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            UUID guardian = guardian(owner, institution, "P-000001");
+            grant(owner, institution, guardian);
+
+            for (String sql : List.of("truncate " + TABLE, "truncate " + TABLE + " cascade",
+                    "truncate guardians_guardian cascade")) {
+                SQLException refused = rejected(owner, () -> owner.createStatement().execute(sql));
+                assertThat(refused.getSQLState()).as(sql).isEqualTo("23000");
+                assertThat(refused.getMessage()).as(sql).contains("immutable");
+            }
+            try (ResultSet rows = owner.createStatement().executeQuery("select count(*) from " + TABLE)) {
+                rows.next();
+                assertThat(rows.getLong(1)).isEqualTo(1);
+            }
+            owner.rollback();
+        }
+    }
+
+    @Test
+    void everyEventCarriesTheIdOfTheRequestThatRecordedIt() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            UUID guardian = guardian(owner, institution, "P-000001");
+            SQLException missing = rejected(owner, () -> exec(owner,
+                    "insert into guardians_guardian_consent_event (institution_id, id, guardian_id, channel, "
+                            + "purpose, action, evidence_source, policy_version, recorded_by) "
+                            + "values (?, ?, ?, 'EMAIL', 'MARKETING', 'GRANT', 'ADMIN_REGISTERED', 'v1', ?)",
+                    institution, UUID.randomUUID(), guardian, UUID.randomUUID()));
+            assertThat(missing.getSQLState()).isEqualTo("23502");
+            assertThat(missing.getMessage()).contains("request_id");
             owner.rollback();
         }
     }
@@ -306,7 +344,7 @@ class GuardiansGuardianConsentEventSchemaIT extends CommittingPostgresIntegratio
                 }
             }
             assertThat(columns).containsExactly("institution_id", "id", "seq", "guardian_id", "channel", "purpose",
-                    "action", "evidence_source", "policy_version", "occurred_at", "recorded_by");
+                    "action", "evidence_source", "policy_version", "occurred_at", "recorded_by", "request_id");
             try (ResultSet rows = owner.createStatement().executeQuery(
                     "select relrowsecurity, relforcerowsecurity from pg_class where relname = '" + TABLE + "'")) {
                 rows.next();

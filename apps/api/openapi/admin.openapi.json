@@ -992,7 +992,7 @@
           },
           "policyVersion" : {
             "description" : "Version of the privacy policy the guardian accepted, for example 2026-01. Required to GRANT, omitted to WITHDRAW",
-            "maxLength" : 64,
+            "maxLength" : 32,
             "minLength" : 0,
             "pattern" : "[A-Za-z0-9._-]{1,32}",
             "type" : "string"

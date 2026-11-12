@@ -28,7 +28,7 @@ public record RecordConsentRequest(
         @Schema(requiredMode = RequiredMode.NOT_REQUIRED, pattern = "^[A-Za-z0-9._-]{1,32}$", maxLength = 32,
                 description = "Version of the privacy policy the guardian accepted, for example 2026-01. Required to "
                         + "GRANT, omitted to WITHDRAW")
-        @Size(max = 64) @Pattern(regexp = "[A-Za-z0-9._-]{1,32}") String policyVersion) {
+        @Size(max = 32) @Pattern(regexp = "[A-Za-z0-9._-]{1,32}") String policyVersion) {
 
     /** Spring logs the object it reads at TRACE: whatever a client typed into a member never reaches a log through it. */
     @Override

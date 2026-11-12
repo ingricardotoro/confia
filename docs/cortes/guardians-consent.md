@@ -33,7 +33,7 @@ guarda un campo mutable.
 - Estado vigente: `GRANTED`, `WITHDRAWN` o `NEVER_GRANTED` (sin eventos). Nunca viene premarcado.
 - `GRANT` exige que el encargado tenga el dato del canal (correo para `EMAIL`; teléfono para `SMS` y `WHATSAPP`) y esté
   `ACTIVE` (`409 guardian-not-active`). `WITHDRAW` siempre se permite, incluso con el encargado inactivo, y es inmediato.
-- Repetir la acción que ya es el estado vigente no escribe evento y responde el estado actual (idempotente).
+- Repetir de forma idéntica la acción que ya es el estado vigente (revocar lo revocado; conceder lo concedido con la misma versión y la misma evidencia) no escribe evento y responde el estado actual (idempotente). Conceder lo ya concedido con otra versión de política u otra evidencia es un cambio real: escribe evento y auditoría.
 - Cada finalidad y canal es independiente: no existe consentimiento agrupado.
 - Se serializa por encargado (bloqueo de su fila) para que dos cambios simultáneos dejen un orden coherente.
 
@@ -58,7 +58,7 @@ revocación» por celda, e historial. Estados de carga, vacío, error y éxito; 
 ## Casos límite a probar
 
 Combinación sin eventos (`NEVER_GRANTED`), conceder, revocar y volver a conceder (historial de 3 eventos), repetir la acción
-vigente (sin evento nuevo), `transactional` rechazado, `PORTAL_FORM` rechazado, versión de política ausente o con caracteres
+vigente (sin evento nuevo; conceder con otra versión o evidencia sí lo escribe), `transactional` rechazado, `PORTAL_FORM` rechazado, versión de política ausente o con caracteres
 inválidos, canal sin dato, encargado inactivo (conceder 409, revocar permitido), dos cambios simultáneos, tabla sin
 `UPDATE`/`DELETE`, aislamiento entre instituciones, 403 sin efecto, límites de tasa, ausencia de datos de contacto en
 auditoría y logs.
@@ -81,12 +81,12 @@ Instantánea del OpenAPI regenerada (38 operaciones, 31 con permiso).
 
 Tabla `guardians_guardian_consent_event` (nombre fijado al construir; la nota decía `guardians_consent_event`): `institution_id`,
 `id`, `seq` (identidad `GENERATED ALWAYS`, es el orden de los eventos), `guardian_id`, `channel`, `purpose`, `action`,
-`evidence_source`, `policy_version`, `occurred_at` (por defecto `clock_timestamp()`) y `recorded_by`. Clave compuesta
+`evidence_source`, `policy_version`, `occurred_at` (por defecto `clock_timestamp()`), `recorded_by` y `request_id` (`UUID NOT NULL`, el mismo identificador de petición que lleva la entrada de auditoría del evento; no se expone en la API). Clave compuesta
 `(institution_id, guardian_id)` hacia `guardians_guardian`; `CHECK` de cada conjunto cerrado (la finalidad solo admite
 `INSTITUTIONAL` y `MARKETING`; la evidencia admite también `PORTAL_FORM` para el portal futuro, que la API administrativa
 rechaza), versión de política presente si y solo si la acción es `GRANT` y con la forma `^[A-Za-z0-9._-]{1,32}$`. Seguridad por
-fila forzada, `REVOKE ALL FROM PUBLIC`, solo `SELECT` e `INSERT` para la aplicación (`SELECT` para el rol de solo lectura) y un
-disparador `BEFORE UPDATE OR DELETE` que rechaza todo cambio a cualquier rol, el dueño incluido. No guarda correo, teléfono ni
+fila forzada, `REVOKE ALL FROM PUBLIC`, solo `SELECT` e `INSERT` para la aplicación (`SELECT` para el rol de solo lectura) y dos
+disparadores (`BEFORE UPDATE OR DELETE` por fila y `BEFORE TRUNCATE` por sentencia, como `shared_audit_log` en V2) que rechazan todo cambio a cualquier rol, el dueño incluido; también el `TRUNCATE ... CASCADE` desde `guardians_guardian`. No guarda correo, teléfono ni
 nombre.
 
 ### Forma de la API que necesita el frontend
@@ -119,31 +119,37 @@ nombre.
 - **Orden y comprobaciones**: forma de la petición (`400`, antes de abrir la transacción), encargado (`404`, con
   `SELECT ... FOR UPDATE` de su fila, que serializa los cambios del mismo encargado), conceder exige encargado activo y luego dato
   del canal, y por último la idempotencia. Conceder a un inactivo es `409` aunque el estado ya fuera `GRANTED`.
-- **Idempotencia**: repetir la acción que ya es el estado (conceder lo `GRANTED`, revocar lo `WITHDRAWN`) no escribe evento ni
-  auditoría y responde `changed: false` con el estado vigente (otra versión o evidencia en la repetición no cambia nada).
-  **Revocar una combinación `NEVER_GRANTED` sí escribe un evento** (la persona declinó por adelantado; es evidencia útil para la
-  futura lista de supresión).
+- **Idempotencia**: solo una repetición idéntica no escribe evento ni auditoría y responde `changed: false` con el estado vigente:
+  revocar lo `WITHDRAWN`, o conceder lo `GRANTED` con la misma versión **y** la misma evidencia. Conceder lo `GRANTED` con otra
+  versión de política u otra evidencia es un hecho nuevo: escribe evento, audita (`guardians.consent.granted`, antes y después
+  `GRANTED`) y responde `changed: true`. **Revocar una combinación `NEVER_GRANTED` sí escribe un evento** (la persona declinó por
+  adelantado; es evidencia útil para la futura lista de supresión).
 - **Estado vigente** = último evento de cada combinación por `seq`, no por `occurred_at`; `occurred_at` la fija el servidor
   (reloj de la aplicación truncado a microsegundos, igual que el resto del módulo).
 - **Auditoría**: entidad `guardians.consent` con el identificador del encargado; antes `{guardianCode, channel, purpose,
   state}` y después ese mismo más `evidenceSource` y, solo en una concesión, `policyVersion`. Nunca correo, teléfono ni nombres.
-- **Desviación respecto de lo pedido**: la tabla **no** tiene un disparador `BEFORE TRUNCATE`. La limpieza de las pruebas de
-  integración trunca en una sola sentencia toda tabla sin ese disparador y no puede truncar `guardians_guardian` mientras una
-  tabla que la referencia quede fuera; el `TRUNCATE` queda vedado a la aplicación por privilegio (y `UPDATE` y `DELETE` por
-  privilegio y por disparador). Si se quiere el disparador de `TRUNCATE`, hay que ajustar antes `CommittingPostgresIntegrationTest`.
+- **Disparador `BEFORE TRUNCATE`**: la tabla lo tiene (misma función que el de `UPDATE`/`DELETE`). La limpieza de
+  `CommittingPostgresIntegrationTest` sigue derivando las tablas del catálogo y, además, trunca las que tienen un disparador de
+  `TRUNCATE` **y** una clave foránea hacia una tabla truncada, en la misma transacción del dueño y envolviendo el truncado con
+  `ALTER TABLE ... DISABLE TRIGGER` y `ENABLE TRIGGER`. `shared_audit_log` y `shared_audit_chain_head` no tienen claves foráneas y
+  siguen excluidas.
+- **`request_id`**: se pasa por el puerto (`GuardianConsentRepository.append(institución, evento, requestId)`) con el
+  `auditRequestId` que el caso de uso ya calcula; `ConsentEvent` y las respuestas de la API no cambian.
+- **`policyVersion`**: `@Size(max = 32)` en `RecordConsentRequest`, igual que el límite real; el `maxLength` de
+  `admin.openapi.json` pasa de 64 a 32 (solo el de esa propiedad).
 - `RecordConsentRequest` redacta su `toString` (Spring lo registra al leer el cuerpo en TRACE). Observación ajena al corte: con el
   nivel de registro en TRACE o DEBUG, el mensaje de validación del propio Spring ("rejected value [...]") repite el valor rechazado
   de cualquier campo de cualquier DTO; en producción (INFO) no se registra.
 
 ### Pruebas
 
-`GuardianConsentsTest` (38; máquina de estados: derivado del último evento, nada premarcado, conceder-revocar-conceder, repetición,
+`GuardianConsentsTest` (39; máquina de estados: derivado del último evento, nada premarcado, conceder-revocar-conceder, repetición,
 revocar lo nunca concedido, canal sin dato, encargado inactivo conceder/revocar, `TRANSACTIONAL` y `PORTAL_FORM` rechazados, forma
-de la versión con casos válidos e inválidos), `ManageGuardianConsentsTest` (17; casos de uso con puertos en memoria: flujo de
+de la versión con casos válidos e inválidos), `ManageGuardianConsentsTest` (19; casos de uso con puertos en memoria: flujo de
 aceptación, historial de 100, orden de bloqueos —se bloquea la fila del encargado antes de leer y de escribir—, lectura de solo
 lectura, aislamiento, auditoría sin datos personales, nada se abre si la petición es inválida), `GuardiansGuardianConsentEventSchemaIT`
-(9; `CHECK` de conjuntos y de versión, clave compuesta entre instituciones, orden por `seq`, `UPDATE` y `DELETE` rechazados al dueño y
-sin privilegio a la aplicación, seguridad por fila, roles de solo lectura y portal) y `GuardianConsentEndpointsIT` (21; flujo de
+(11; `CHECK` de conjuntos y de versión, clave compuesta entre instituciones, orden por `seq`, `UPDATE` y `DELETE` rechazados al dueño y
+sin privilegio a la aplicación, seguridad por fila, roles de solo lectura y portal) y `GuardianConsentEndpointsIT` (23; flujo de
 aceptación con dos eventos, nunca premarcado, tres eventos, forma exacta de las respuestas, tiempo del servidor, repetición,
 cada regla con su campo, canal sin dato, inactivo, 404/400, ocho concesiones simultáneas = un evento, doce cambios simultáneos sin
 dos acciones iguales seguidas, seis combinaciones simultáneas, concesión contra inactivación, aislamiento, `403` sin efecto, `401`,
@@ -151,3 +157,16 @@ sesión cerrada, origen ausente, `429` por dirección y por cuenta, y barrido de
 nombres y dirección). Actualizadas: `ProblemCodeTest`, `PermissionedEndpointsTest`, `OpenApiContractSnapshotTest`,
 `CurrentSessionEndpointIT` y `PublicRouteAllowListTest` (listas de rutas). Pendiente fuera de este paso: regenerar
 `packages/contracts` con orval y la pantalla.
+
+## Seguimientos
+
+- **Retención y supresión frente a inmutabilidad**: la tabla no admite `DELETE` ni `UPDATE`. Antes del corte de retención
+  (`docs/08-datos-privacidad-y-retencion.md`) hace falta una función `SECURITY DEFINER` de purga o un mecanismo de
+  seudonimización que respete el registro como evidencia.
+- **Escritor del portal**: `FOR UPDATE` sobre la fila del encargado exige privilegio `UPDATE`, que el rol del portal no tiene; el
+  escritor del portal necesitará un bloqueo asesor compartido (`pg_advisory_xact_lock`) con el mismo orden que usa el
+  administrativo.
+- **Intentos rechazados sin auditoría**: los intentos de conceder o revocar rechazados no dejan entrada de
+  auditoría; evaluar registrarlos como `denied`.
+- **Revocar requiere un administrador**: hasta que exista la baja desde el portal, un encargado que pide dejar de recibir
+  comunicaciones depende de que un miembro del personal con permiso lo registre.

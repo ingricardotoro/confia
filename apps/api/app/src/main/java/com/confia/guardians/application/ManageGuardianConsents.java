@@ -29,7 +29,8 @@ import java.util.UUID;
  * appends, so two simultaneous changes of the same guardian take turns and the second decides against what the first
  * committed: the events keep a coherent order and a repeat is recognised as a repeat. The check of the request (closed
  * sets, shape of the version, the transactional purpose, the portal's evidence) happens before any lock is taken.
- * A repeat of the action that already is the state writes no event and no audit entry and answers the current state.
+ * A repeat that changes nothing (the same action, and for a grant the same policy version and evidence) writes no
+ * event and no audit entry and answers the current state; a grant of a different version or evidence is a change.
  */
 public final class ManageGuardianConsents {
 
@@ -88,7 +89,7 @@ public final class ManageGuardianConsents {
             if (event.isEmpty()) {
                 return new ConsentChangeView(GuardianConsentsView.Standing.of(before), false);
             }
-            consents.append(institution, event.get());
+            consents.append(institution, event.get(), auditRequestId);
             auditLogWriter.append(GuardiansAudit.consentRecorded(actor, auditRequestId, event.get(),
                     guardian.guardianCode(), before.state()));
             return new ConsentChangeView(GuardianConsentsView.Standing.of(

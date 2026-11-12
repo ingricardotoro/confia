@@ -61,7 +61,7 @@ class ManageGuardianConsentsTest {
 
         final List<StoredEvent> rows = new ArrayList<>();
 
-        record StoredEvent(UUID institution, ConsentEvent event) {
+        record StoredEvent(UUID institution, ConsentEvent event, UUID requestId) {
         }
 
         @Override
@@ -81,9 +81,9 @@ class ManageGuardianConsentsTest {
         }
 
         @Override
-        public void append(InstitutionId inst, ConsentEvent event) {
+        public void append(InstitutionId inst, ConsentEvent event, UUID requestId) {
             world.events.add("append-consent");
-            rows.add(new StoredEvent(inst.value(), event));
+            rows.add(new StoredEvent(inst.value(), event, requestId));
         }
 
         private List<ConsentEvent> eventsOf(InstitutionId inst, UUID guardianId) {
@@ -201,7 +201,7 @@ class ManageGuardianConsentsTest {
                     i % 2 == 0 ? com.confia.guardians.domain.ConsentAction.GRANT
                             : com.confia.guardians.domain.ConsentAction.WITHDRAW,
                     com.confia.guardians.domain.EvidenceSource.ADMIN_REGISTERED, i % 2 == 0 ? "2026-01" : null,
-                    NOW_MICROS.plusSeconds(i), actor.accountId())));
+                    NOW_MICROS.plusSeconds(i), actor.accountId()), UUID.randomUUID()));
         }
 
         GuardianConsentsView view = consents.of(actor, requestId, guardian.id());
@@ -234,6 +234,43 @@ class ManageGuardianConsentsTest {
         assertThat(store.rows).hasSize(events);
         assertThat(audit).hasSize(entries);
         assertThat(committed()).isTrue();
+    }
+
+    @Test
+    void aGrantUnderAnotherVersionOrEvidenceIsWrittenAndAuditedAndAnIdenticalRepeatIsNot() {
+        Guardian guardian = guardian();
+        grant(guardian, "EMAIL", "MARKETING");
+
+        ConsentChangeView newVersion = consents.record(actor, requestId, guardian.id(), "EMAIL", "MARKETING", "GRANT",
+                PAPER, "2027-01");
+        int events = store.rows.size();
+        int entries = audit.size();
+        ConsentChangeView identical = consents.record(actor, requestId, guardian.id(), "EMAIL", "MARKETING", "GRANT",
+                PAPER, "2027-01");
+        ConsentChangeView newEvidence = consents.record(actor, requestId, guardian.id(), "EMAIL", "MARKETING",
+                "GRANT", ADMIN, "2027-01");
+
+        assertThat(newVersion.changed()).isTrue();
+        assertThat(newVersion.standing().state()).isEqualTo("GRANTED");
+        assertThat(newVersion.standing().policyVersion()).isEqualTo("2027-01");
+        assertThat(identical.changed()).isFalse();
+        assertThat(newEvidence.changed()).isTrue();
+        assertThat(newEvidence.standing().evidenceSource()).isEqualTo(ADMIN);
+        assertThat(store.rows).hasSize(events + 1);
+        assertThat(audit).hasSize(entries + 1);
+        assertThat(audit.get(1).action()).isEqualTo("guardians.consent.granted");
+    }
+
+    @Test
+    void everyEventIsStoredWithTheIdOfTheRequestThatAuditsIt() {
+        Guardian guardian = guardian();
+
+        grant(guardian, "EMAIL", "MARKETING");
+
+        assertThat(store.rows).singleElement().satisfies(row ->
+                assertThat(row.requestId()).isEqualTo(UUID.fromString(requestId)));
+        assertThat(audit).singleElement().satisfies(entry ->
+                assertThat(entry.requestId()).isEqualTo(UUID.fromString(requestId)));
     }
 
     @Test

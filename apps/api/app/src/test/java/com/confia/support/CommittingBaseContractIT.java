@@ -32,6 +32,14 @@ class CommittingBaseContractIT extends CommittingPostgresIntegrationTest {
     }
 
     @Test
+    void theGuardedSetHoldsTheConsentEventsAndNeverTheAuditTables() throws SQLException {
+        List<String> guarded = guardedTablesReferencingTruncatedOnes().stream().map(GuardedTable::name).toList();
+
+        assertThat(guarded).contains("guardians_guardian_consent_event")
+                .doesNotContain("shared_audit_log", "shared_audit_chain_head");
+    }
+
+    @Test
     void truncatingCommittedTablesNeverThrowsEvenThoughTheAuditTablesAreSkipped()
             throws SQLException {
         truncateCommittedBusinessTables();

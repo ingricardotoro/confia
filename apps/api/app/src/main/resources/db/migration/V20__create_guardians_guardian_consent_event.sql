@@ -5,10 +5,10 @@
 -- A consent is a fact with evidence, not a mutable flag: every grant and every withdrawal is one row, and the current
 -- state of a (guardian, channel, purpose) is DERIVED from its latest event (the highest seq), never stored. The table
 -- is append-only: the application role holds INSERT and SELECT only (so it has no UPDATE, DELETE or TRUNCATE
--- privilege), and a trigger refuses every UPDATE and DELETE whatever the role (the owner included). There is no
--- BEFORE TRUNCATE trigger, unlike the audit trail: this table references guardians_guardian, and the cleanup of the
--- integration tests (which truncates every table without such a trigger, in one statement) could not truncate the
--- guardians otherwise. TRUNCATE stays out of reach of the application role by privilege.
+-- privilege), and triggers refuse every UPDATE, DELETE and TRUNCATE whatever the role (the owner included), as
+-- shared_audit_log does in V2. A TRUNCATE ... CASCADE from guardians_guardian is refused too. The cleanup of the
+-- integration tests disables the TRUNCATE trigger of this table around its own truncate (see
+-- CommittingPostgresIntegrationTest).
 --
 -- Rules that are local to a row live here as CHECKs: the closed sets of channel, purpose, action and evidence; the
 -- purpose can only be INSTITUTIONAL or MARKETING (the transactional purpose is based on contract or legitimate
@@ -19,7 +19,8 @@
 -- seq is the order of the events: the use case locks the guardian row before it reads the current state and inserts,
 -- so the events of one guardian are written one at a time and seq follows the commit order. occurred_at is a
 -- timestamp, not the order. Contact data never goes in this table: it holds the guardian, the combination, the
--- evidence and the staff account that recorded it.
+-- evidence, the staff account that recorded it and the id of the request that did (the same one the audit entry of
+-- the event carries, so the two can be joined).
 
 CREATE TABLE guardians_guardian_consent_event (
     institution_id  UUID        NOT NULL,
@@ -33,6 +34,7 @@ CREATE TABLE guardians_guardian_consent_event (
     policy_version  VARCHAR(32),
     occurred_at     TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     recorded_by     UUID        NOT NULL,
+    request_id      UUID        NOT NULL,
     CONSTRAINT guardians_guardian_consent_event_pk PRIMARY KEY (institution_id, id),
     CONSTRAINT guardians_guardian_consent_event_seq_uq UNIQUE (seq),
     CONSTRAINT guardians_guardian_consent_event_guardian_fk FOREIGN KEY (institution_id, guardian_id)
@@ -58,7 +60,7 @@ CREATE INDEX guardians_guardian_consent_event_history_idx
 CREATE FUNCTION guardians_guardian_consent_event_is_append_only() RETURNS trigger
     LANGUAGE plpgsql AS $$
 BEGIN
-    RAISE EXCEPTION 'a consent event is immutable: it cannot be updated or deleted'
+    RAISE EXCEPTION 'a consent event is immutable: it cannot be updated, deleted or truncated'
         USING ERRCODE = 'integrity_constraint_violation';
 END;
 $$;
@@ -66,6 +68,10 @@ $$;
 CREATE TRIGGER guardians_guardian_consent_event_no_update_delete
     BEFORE UPDATE OR DELETE ON guardians_guardian_consent_event
     FOR EACH ROW EXECUTE FUNCTION guardians_guardian_consent_event_is_append_only();
+
+CREATE TRIGGER guardians_guardian_consent_event_no_truncate
+    BEFORE TRUNCATE ON guardians_guardian_consent_event
+    FOR EACH STATEMENT EXECUTE FUNCTION guardians_guardian_consent_event_is_append_only();
 
 ALTER TABLE guardians_guardian_consent_event ENABLE ROW LEVEL SECURITY;
 ALTER TABLE guardians_guardian_consent_event FORCE  ROW LEVEL SECURITY;

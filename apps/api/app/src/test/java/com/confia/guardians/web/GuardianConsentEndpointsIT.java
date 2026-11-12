@@ -332,11 +332,11 @@ class GuardianConsentEndpointsIT extends CommittingPostgresIntegrationTest {
         ok(post(consents(guardian), admin, change("EMAIL", "INSTITUTIONAL", "GRANT", "SIGNED_PAPER_FORM", "2026-01")));
 
         JsonNode again = ok(post(consents(guardian), admin, change("EMAIL", "INSTITUTIONAL", "GRANT",
-                "ADMIN_REGISTERED", "2027-09")));
+                "SIGNED_PAPER_FORM", "2026-01")));
 
         assertThat(again.get("changed").asBoolean()).isFalse();
         assertThat(again.get("state").asString()).isEqualTo("GRANTED");
-        assertThat(again.get("policyVersion").asString()).as("the recorded grant stays").isEqualTo("2026-01");
+        assertThat(again.get("policyVersion").asString()).isEqualTo("2026-01");
         assertThat(again.get("evidenceSource").asString()).isEqualTo("SIGNED_PAPER_FORM");
         assertThat(events(guardian)).hasSize(1);
         assertThat(consentEntries(admin.institution())).hasSize(1);
@@ -348,6 +348,65 @@ class GuardianConsentEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(withdrawnAgain.get("state").asString()).isEqualTo("WITHDRAWN");
         assertThat(events(guardian)).hasSize(2);
         assertThat(consentEntries(admin.institution())).hasSize(2);
+    }
+
+    @Test
+    void aGrantUnderAnotherVersionOrEvidenceIsARealChangeWithItsEventAndItsEntry() throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        String guardian = guardian(admin, EMAIL, PHONE);
+        ok(post(consents(guardian), admin, change("EMAIL", "INSTITUTIONAL", "GRANT", "SIGNED_PAPER_FORM", "2026-01")));
+
+        JsonNode newVersion = ok(post(consents(guardian), admin, change("EMAIL", "INSTITUTIONAL", "GRANT",
+                "ADMIN_REGISTERED", "2027-09")));
+
+        assertThat(newVersion.get("changed").asBoolean()).isTrue();
+        assertThat(newVersion.get("state").asString()).isEqualTo("GRANTED");
+        assertThat(newVersion.get("policyVersion").asString()).isEqualTo("2027-09");
+        assertThat(newVersion.get("evidenceSource").asString()).isEqualTo("ADMIN_REGISTERED");
+        assertThat(events(guardian)).hasSize(2);
+        assertThat(consentEntries(admin.institution())).hasSize(2);
+        JsonNode repeat = ok(post(consents(guardian), admin, change("EMAIL", "INSTITUTIONAL", "GRANT",
+                "ADMIN_REGISTERED", "2027-09")));
+        assertThat(repeat.get("changed").asBoolean()).isFalse();
+        assertThat(events(guardian)).hasSize(2);
+    }
+
+    @Test
+    void eachEventStoresTheRequestIdOfItsAuditEntryAndTheResponseDoesNotExposeIt() throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        String guardian = guardian(admin, EMAIL, PHONE);
+
+        JsonNode granted = ok(post(consents(guardian), admin, change("EMAIL", "INSTITUTIONAL", "GRANT",
+                "SIGNED_PAPER_FORM", "2026-01")));
+        ok(post(consents(guardian), admin, change("EMAIL", "INSTITUTIONAL", "WITHDRAW", "ADMIN_REGISTERED", null)));
+
+        assertThat(granted.has("requestId")).isFalse();
+        assertThat(granted.has("request_id")).isFalse();
+        List<UUID> eventRequests = new ArrayList<>();
+        List<UUID> auditRequests = new ArrayList<>();
+        try (Connection connection = SharedPostgresContainer.connectionAs("postgres")) {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "select request_id from guardians_guardian_consent_event where guardian_id = ? order by seq")) {
+                statement.setObject(1, UUID.fromString(guardian));
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        eventRequests.add(result.getObject(1, UUID.class));
+                    }
+                }
+            }
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "select request_id from shared_audit_log where institution_id = ? "
+                            + "and action like 'guardians.consent.%' order by id")) {
+                statement.setObject(1, admin.institution());
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        auditRequests.add(result.getObject(1, UUID.class));
+                    }
+                }
+            }
+        }
+        assertThat(eventRequests).hasSize(2).doesNotContainNull().doesNotHaveDuplicates();
+        assertThat(eventRequests).containsExactlyElementsOf(auditRequests);
     }
 
     @Test
@@ -387,8 +446,14 @@ class GuardianConsentEndpointsIT extends CommittingPostgresIntegrationTest {
                 "2026 01")), "policyVersion", "pattern");
         assertField(post(consents(guardian), admin, change("EMAIL", "MARKETING", "GRANT", "ADMIN_REGISTERED",
                 "v1;drop")), "policyVersion", "pattern");
-        assertField(post(consents(guardian), admin, change("EMAIL", "MARKETING", "GRANT", "ADMIN_REGISTERED",
-                "a".repeat(33))), "policyVersion", "pattern");
+        // 33 characters break both the size (32) and the pattern: the two reasons are reported, for the same field.
+        HttpResponse<String> tooLong = post(consents(guardian), admin, change("EMAIL", "MARKETING", "GRANT",
+                "ADMIN_REGISTERED", "a".repeat(33)));
+        JsonNode tooLongProblem = assertProblem(tooLong, 400, "validation-failed");
+        assertThat(tooLongProblem.get("errors")).hasSize(2).allSatisfy(error ->
+                assertThat(error.get("field").asString()).isEqualTo("policyVersion"));
+        assertThat(tooLongProblem.get("errors").findValuesAsString("reason")).containsExactlyInAnyOrder("size",
+                "pattern");
         assertField(post(consents(guardian), admin, change("EMAIL", "MARKETING", "WITHDRAW", "ADMIN_REGISTERED",
                 "2026-01")), "policyVersion", "not-allowed");
         assertField(post(consents(guardian), admin, change("FAX", "MARKETING", "GRANT", "ADMIN_REGISTERED", "2026-01")),

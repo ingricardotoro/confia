@@ -19,8 +19,8 @@ import org.jooq.DSLContext;
 
 /**
  * The jOOQ adapter of {@link GuardianConsentRepository} over {@code guardians_guardian_consent_event}. It inserts and
- * reads and nothing else: the table is append-only (the application role holds INSERT and SELECT only and a trigger
- * refuses every update, delete and truncate), and this class has no statement that could change a row. The time of an
+ * reads and nothing else: the table is append-only (the application role holds INSERT and SELECT only and triggers
+ * refuse every update, delete and truncate), and this class has no statement that could change a row. The time of an
  * event is the one the use case gives; the order of the events of a guardian is {@code seq}, which follows the commit
  * order because the use case holds the lock of the guardian row. The table holds no contact data.
  */
@@ -59,7 +59,7 @@ public final class JooqGuardianConsentRepository implements GuardianConsentRepos
     }
 
     @Override
-    public void append(InstitutionId institutionId, ConsentEvent event) {
+    public void append(InstitutionId institutionId, ConsentEvent event, UUID requestId) {
         dsl.insertInto(GUARDIANS_GUARDIAN_CONSENT_EVENT)
                 .set(GUARDIANS_GUARDIAN_CONSENT_EVENT.INSTITUTION_ID, institutionId.value())
                 .set(GUARDIANS_GUARDIAN_CONSENT_EVENT.ID, event.id())
@@ -71,6 +71,7 @@ public final class JooqGuardianConsentRepository implements GuardianConsentRepos
                 .set(GUARDIANS_GUARDIAN_CONSENT_EVENT.POLICY_VERSION, event.policyVersion())
                 .set(GUARDIANS_GUARDIAN_CONSENT_EVENT.OCCURRED_AT, GuardianWrites.toDatabase(event.occurredAt()))
                 .set(GUARDIANS_GUARDIAN_CONSENT_EVENT.RECORDED_BY, event.recordedBy())
+                .set(GUARDIANS_GUARDIAN_CONSENT_EVENT.REQUEST_ID, requestId)
                 .execute();
     }
 

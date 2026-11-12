@@ -19,6 +19,9 @@ public interface GuardianConsentRepository {
     /** The newest events of the guardian first, at most {@code limit}. */
     List<ConsentEvent> recentOfGuardian(InstitutionId institutionId, UUID guardianId, int limit);
 
-    /** Appends an event; the table of the events is append-only. */
-    void append(InstitutionId institutionId, ConsentEvent event);
+    /**
+     * Appends an event; the table of the events is append-only. {@code requestId} is the id of the request that
+     * recorded it, the same one its audit entry carries.
+     */
+    void append(InstitutionId institutionId, ConsentEvent event, UUID requestId);
 }

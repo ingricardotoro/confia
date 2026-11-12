@@ -135,17 +135,41 @@ class GuardianConsentsTest {
     }
 
     @Test
-    void aRepeatedGrantWithAnotherVersionIsStillARepeatAndTheFirstEvidenceStays() {
+    void aGrantUnderAnotherVersionOrAnotherEvidenceIsARealChangeAndAnIdenticalRepeatIsNot() {
         Guardian guardian = full();
         List<ConsentEvent> events = new ArrayList<>();
         apply(guardian, events, grant(ConsentChannel.EMAIL, ConsentPurpose.INSTITUTIONAL), T0);
+        EvidenceSource first = events.get(0).evidenceSource();
 
-        Optional<ConsentEvent> again = apply(guardian, events, new ConsentChange(ConsentChannel.EMAIL,
-                ConsentPurpose.INSTITUTIONAL, ConsentAction.GRANT, EvidenceSource.ADMIN_REGISTERED, "2027-01"), T1);
+        Optional<ConsentEvent> newVersion = apply(guardian, events, new ConsentChange(ConsentChannel.EMAIL,
+                ConsentPurpose.INSTITUTIONAL, ConsentAction.GRANT, first, "2027-01"), T1);
+        Optional<ConsentEvent> identical = apply(guardian, events, new ConsentChange(ConsentChannel.EMAIL,
+                ConsentPurpose.INSTITUTIONAL, ConsentAction.GRANT, first, "2027-01"), T2);
+        EvidenceSource other = first == EvidenceSource.ADMIN_REGISTERED ? EvidenceSource.SIGNED_PAPER_FORM
+                : EvidenceSource.ADMIN_REGISTERED;
+        Optional<ConsentEvent> newEvidence = apply(guardian, events, new ConsentChange(ConsentChannel.EMAIL,
+                ConsentPurpose.INSTITUTIONAL, ConsentAction.GRANT, other, "2027-01"), T2);
 
-        assertThat(again).isEmpty();
-        assertThat(GuardianConsents.of(events).standing(ConsentChannel.EMAIL, ConsentPurpose.INSTITUTIONAL)
-                .policyVersion()).isEqualTo("2026-01");
+        assertThat(newVersion).isPresent();
+        assertThat(identical).isEmpty();
+        assertThat(newEvidence).isPresent();
+        assertThat(events).hasSize(3);
+        ConsentStanding standing = GuardianConsents.of(events).standing(ConsentChannel.EMAIL,
+                ConsentPurpose.INSTITUTIONAL);
+        assertThat(standing.policyVersion()).isEqualTo("2027-01");
+        assertThat(standing.evidenceSource()).isEqualTo(other);
+        assertThat(standing.state()).isEqualTo(ConsentState.GRANTED);
+    }
+
+    @Test
+    void aWithdrawalIgnoresTheEvidenceOfTheRepeat() {
+        Guardian guardian = full();
+        List<ConsentEvent> events = new ArrayList<>();
+        apply(guardian, events, withdraw(ConsentChannel.EMAIL, ConsentPurpose.MARKETING), T0);
+
+        assertThat(apply(guardian, events, new ConsentChange(ConsentChannel.EMAIL, ConsentPurpose.MARKETING,
+                ConsentAction.WITHDRAW, EvidenceSource.ADMIN_REGISTERED.equals(events.get(0).evidenceSource())
+                        ? EvidenceSource.SIGNED_PAPER_FORM : EvidenceSource.ADMIN_REGISTERED, null), T1)).isEmpty();
     }
 
     @Test

@@ -17,7 +17,9 @@ import java.util.UUID;
  *
  * <p>{@link #decide} is the state machine. A grant needs an active guardian and the contact data of the channel; a
  * withdrawal is always allowed, even for an inactive guardian or one without the data, and takes effect at once.
- * Repeating the action that already is the current state changes nothing and yields no event; a withdrawal of a
+ * Repeating the action that already is the current state changes nothing and yields no event, except a grant of an
+ * already granted combination under a different policy version or evidence, which is a real change and is recorded
+ * (only an identical repeat is a no-op); a withdrawal of a
  * combination that was never granted is a real fact (the guardian declined in advance) and is recorded. Each
  * combination is independent of the others.
  */
@@ -54,6 +56,13 @@ public final class GuardianConsents {
         return standings;
     }
 
+    /** A grant of a combination already granted under another policy version or evidence is a new fact. */
+    private static boolean changesTheGrant(ConsentStanding current, ConsentChange change) {
+        return change.action() == ConsentAction.GRANT
+                && (!Objects.equals(current.policyVersion(), change.policyVersion())
+                        || current.evidenceSource() != change.evidenceSource());
+    }
+
     /**
      * The event that records {@code change} for {@code guardian}, or empty when the combination already is in the
      * state the action leads to.
@@ -73,7 +82,8 @@ public final class GuardianConsents {
                 throw new ConsentChannelUnavailableException();
             }
         }
-        if (standing(change.channel(), change.purpose()).state() == change.action().resultingState()) {
+        ConsentStanding current = standing(change.channel(), change.purpose());
+        if (current.state() == change.action().resultingState() && !changesTheGrant(current, change)) {
             return Optional.empty();
         }
         return Optional.of(new ConsentEvent(eventId, guardian.id(), change.channel(), change.purpose(),
