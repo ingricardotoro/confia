@@ -68,6 +68,12 @@ public final class EnrollmentImport implements EnrollmentImportGateway {
     private record Facts(Map<String, EnrollmentImportRules.StudentFacts> students,
             Map<String, List<EnrollmentImportRules.SectionFacts>> sectionsByKey,
             Map<String, UUID> activeSectionByStudentYear) {
+
+        /** The maps are keyed by references of minors: only their sizes reach a log through this method. */
+        @Override
+        public String toString() {
+            return "Facts[students=" + students.size() + ", sections=" + sectionsByKey.size() + "]";
+        }
     }
 
     @Override

@@ -18,6 +18,6 @@ public record SectionNames(String academicYear, String modality, String grade, S
     }
 
     private static String normalized(String name) {
-        return Objects.requireNonNull(name, "name").strip().replaceAll("\s+", " ").toLowerCase(Locale.ROOT);
+        return Objects.requireNonNull(name, "name").strip().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
 }

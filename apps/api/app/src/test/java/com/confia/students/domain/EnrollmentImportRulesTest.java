@@ -149,6 +149,12 @@ class EnrollmentImportRulesTest {
     }
 
     @Test
+    void aRowPrintsOnlyItsLine() {
+        assertThat(row(7, "S-SECRETA", "A", "2026-02-01").toString()).isEqualTo("Row[line=7]")
+                .doesNotContain("S-SECRETA").doesNotContain("Septimo");
+    }
+
+    @Test
     void problemsComeInLineOrder() {
         sectionA(section(SECTION_A, true, false, 30, 0));
         List<Problem> problems = judge(row(5, "NOPE", "A", "2026-02-01"), row(3, "S-1", "Z", "2026-02-01"));

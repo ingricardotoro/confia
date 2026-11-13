@@ -53,6 +53,12 @@ public final class EnrollmentImportRules {
     /** A line of the file, every cell as it was read. */
     public record Row(int line, String studentLegacyId, String academicYear, String modality, String grade,
             String section, String enrolledOn) {
+
+        /** The cells hold references of minors: nothing of them reaches a log through this method. */
+        @Override
+        public String toString() {
+            return "Row[line=" + line + "]";
+        }
     }
 
     /** What the registry says about a reference of the source system. */
