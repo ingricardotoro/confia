@@ -7,8 +7,8 @@ import com.confia.imports.application.KindNotReadableException;
 import com.confia.imports.application.UnknownImportKindException;
 import com.confia.kernel.Permission;
 import com.confia.shared.security.AuthenticatedActor;
-import com.confia.shared.web.authorization.PermissionDecider;
-import com.confia.shared.web.authorization.PermissionDeniedException;
+import com.confia.shared.web.authorization.access.AccessRefusals;
+import com.confia.shared.web.authorization.access.ResolvedPermissions;
 import com.confia.imports.application.Page;
 import com.confia.imports.application.RejectedImportFileException;
 import com.confia.shared.web.openapi.ContractSchemas;
@@ -424,10 +424,7 @@ public class ImportController {
             @Parameter(hidden = true) HttpServletRequest request) {
         AuthenticatedActor actor = RequestContext.actor();
         // The decider of the edge resolved the permissions of this request already; they are read, not resolved again.
-        Object resolved = request.getAttribute(PermissionDecider.RESOLVED_PERMISSIONS);
-        if (!(resolved instanceof Set<?> held)) {
-            throw new IllegalStateException("the permission decider did not resolve the permissions of this request");
-        }
+        Set<Permission> held = ResolvedPermissions.of(request);
         Page<ImportBatchView> result;
         try {
             result = imports.list(actor, RequestContext.requestId(), page, size, kind,
@@ -435,7 +432,7 @@ public class ImportController {
         } catch (UnknownImportKindException e) {
             throw new ProblemCodeException(ProblemCode.VALIDATION_FAILED, List.of(new FieldViolation("kind", "invalid")));
         } catch (KindNotReadableException e) {
-            throw new PermissionDeniedException(e.students() ? Permission.STUDENTS_READ : Permission.GUARDIANS_READ,
+            throw AccessRefusals.missing(e.students() ? Permission.STUDENTS_READ : Permission.GUARDIANS_READ,
                     LIST_ROUTE, actor);
         }
         return new ImportBatchPageResponse(result.items().stream().map(ImportController::toResponse).toList(),

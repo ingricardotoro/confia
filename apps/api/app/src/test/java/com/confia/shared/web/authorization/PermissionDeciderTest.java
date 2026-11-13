@@ -12,6 +12,7 @@ import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.AuthenticationMethod;
 import com.confia.shared.security.PermissionResolver;
 import com.confia.shared.web.authentication.ActorAuthentication;
+import com.confia.shared.web.authorization.access.ResolvedPermissions;
 import com.confia.shared.web.harness.RecordingAuthorizationMetrics;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -124,7 +125,7 @@ class PermissionDeciderTest {
         PermissionDecider decider = new PermissionDecider(who -> Set.of(Permission.IDENTITY_READ, Permission.STUDENTS_READ), metrics);
         decider.forEndpoint(ENDPOINT).authorize(() -> new ActorAuthentication(fullSession()),
                 new RequestAuthorizationContext(request));
-        assertThat(request.getAttribute(PermissionDecider.RESOLVED_PERMISSIONS))
+        assertThat(request.getAttribute(ResolvedPermissions.ATTRIBUTE))
                 .isEqualTo(Set.of(Permission.IDENTITY_READ, Permission.STUDENTS_READ));
     }
 

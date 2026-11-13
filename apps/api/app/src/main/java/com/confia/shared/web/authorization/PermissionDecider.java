@@ -5,6 +5,7 @@ import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.AuthenticationMethod;
 import com.confia.shared.security.PermissionResolver;
 import com.confia.shared.web.authentication.ActorAuthentication;
+import com.confia.shared.web.authorization.access.ResolvedPermissions;
 import com.confia.shared.web.problem.DataAccessFailure;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Objects;
@@ -42,12 +43,6 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
  */
 public final class PermissionDecider {
 
-    /**
-     * The request attribute that holds the permissions the decider resolved for the actor ({@code Set<Permission>}), so a
-     * controller that refines the decision (the history of the imports) reads them instead of resolving a second time.
-     */
-    public static final String RESOLVED_PERMISSIONS = PermissionDecider.class.getName() + ".resolved";
-
     private static final Logger LOG = LoggerFactory.getLogger(PermissionDecider.class);
     private static final AuthorizationDecision DENIED = new AuthorizationDecision(false);
     private static final AuthorizationDecision GRANTED = new AuthorizationDecision(true);
@@ -78,7 +73,7 @@ public final class PermissionDecider {
             return DENIED;
         }
         Set<Permission> held = resolve(actor);
-        request.setAttribute(RESOLVED_PERMISSIONS, Set.copyOf(held));
+        ResolvedPermissions.store(request, held);
         if (!held.contains(endpoint.permission())) {
             throw new PermissionDeniedException(endpoint.permission(), endpoint.pattern(), actor);
         }
