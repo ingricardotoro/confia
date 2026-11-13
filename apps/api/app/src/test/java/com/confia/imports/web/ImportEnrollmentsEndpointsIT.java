@@ -574,6 +574,100 @@ class ImportEnrollmentsEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(countOf("students_enrollment", alice.institution())).isEqualTo(30);
     }
 
+    @Test
+    void simultaneousApplicationsEnrollingTheSameStudentsInTwoSectionsOfTheYearLeaveEachStudentWithOneActiveEnrollment()
+            throws Exception {
+        Member alice = member(StaffRole.ADMINISTRATOR.code());
+        Member bob = sameInstitution(alice.institution(), StaffRole.ADMINISTRATOR.code());
+        Structure org = structure(alice.institution());
+        importStudents(alice, 20);
+        int[] sizes = {1, 1, 1, 3, 3};
+        int cursor = 1;
+        for (int round = 0; round < sizes.length; round++) {
+            String first = sectionName("DosA" + round);
+            String second = sectionName("DosB" + round);
+            section(org, org.year(), org.grade(), first, null, true);
+            section(org, org.year(), org.grade(), second, null, true);
+            StringBuilder inFirst = new StringBuilder(HEADER);
+            StringBuilder inSecond = new StringBuilder(HEADER);
+            for (int k = 0; k < sizes[round]; k++) {
+                inFirst.append(line(cursor, first));
+                inSecond.append(line(cursor, second));
+                cursor++;
+            }
+            String forAlice = inFirst.toString();
+            String forBob = inSecond.toString();
+            assertThat(batchOf(run(ENROLLMENTS_SIMULATE, alice, forAlice)).get("validRows").asInt())
+                    .isEqualTo(sizes[round]);
+            assertThat(batchOf(run(ENROLLMENTS_SIMULATE, bob, forBob)).get("validRows").asInt())
+                    .isEqualTo(sizes[round]);
+
+            List<HttpResponse<String>> answers = inParallel(() -> run(ENROLLMENTS_APPLY, alice, forAlice),
+                    () -> run(ENROLLMENTS_APPLY, bob, forBob));
+
+            assertThat(answers).allSatisfy(r -> assertThat(r.statusCode()).as(r.body()).isEqualTo(200));
+            assertThat(answers.stream().mapToInt(r -> batchOf(r).get("createdRows").asInt()).sum())
+                    .as("round %d: one enrollment per student", round).isEqualTo(sizes[round]);
+            assertThat(answers.stream().mapToInt(r -> batchOf(r).get("rejectedRows").asInt()).sum())
+                    .as("round %d: the other row of each student is rejected", round).isEqualTo(sizes[round]);
+            for (HttpResponse<String> answer : answers) {
+                for (List<Object> rejection : rejectionsOf(json(answer))) {
+                    assertThat(rejection.get(1)).isEqualTo("studentLegacyId");
+                    assertThat(rejection.get(2)).isEqualTo("duplicate-active-enrollment");
+                }
+            }
+            assertThat(activeIn(sectionId(alice, "DosA" + round)) + activeIn(sectionId(alice, "DosB" + round)))
+                    .isEqualTo(sizes[round]);
+        }
+        assertThat(column("""
+                select count(*)::text from (select student_id, academic_year_id from students_enrollment
+                 where institution_id = ? and status = 'ACTIVE'
+                 group by student_id, academic_year_id having count(*) > 1) t
+                """, alice.institution())).containsExactly("0");
+        assertThat(countOf("students_enrollment", alice.institution())).isEqualTo(9);
+    }
+
+    @Test
+    void theEnrollmentRoutesAreRateLimitedPerAccountAndPerClientBeforeTheBodyIsParsed() throws Exception {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        Body garbage = new Body("multipart/form-data; boundary=zzz",
+                "this is not multipart".getBytes(StandardCharsets.UTF_8));
+        try (ConfigurableApplicationContext limited = AdminProcessLauncher.launch(SharedPostgresContainer.jdbcUrl(),
+                "confia_admin_app", TEST_PASSWORD, keys, Map.of("confia.web.trusted-proxies", "127.0.0.1,::1",
+                        "confia.crypto.blind-index.current-version", "v1",
+                        "confia.crypto.blind-index.keys.v1", BLIND_INDEX_KEY,
+                        RATE_LIMIT + "admin-import.request-limit", "10000",
+                        RATE_LIMIT + "admin-import-account.request-limit", "2"))) {
+            int limitedPort = ((WebServerApplicationContext) limited).getWebServer().getPort();
+
+            assertProblem(sendFrom(limitedPort, "203.0.113.80", ENROLLMENTS_SIMULATE, admin.token(), garbage), 400,
+                    "validation-failed");
+            assertProblem(sendFrom(limitedPort, "203.0.113.81", ENROLLMENTS_SIMULATE, admin.token(), garbage), 400,
+                    "validation-failed");
+            HttpResponse<String> refused = sendFrom(limitedPort, "203.0.113.82", ENROLLMENTS_APPLY, admin.token(),
+                    garbage);
+            assertProblem(refused, 429, "too-many-requests");
+            assertThat(refused.headers().firstValue("Retry-After")).isPresent();
+        }
+        try (ConfigurableApplicationContext limited = AdminProcessLauncher.launch(SharedPostgresContainer.jdbcUrl(),
+                "confia_admin_app", TEST_PASSWORD, keys, Map.of("confia.web.trusted-proxies", "127.0.0.1,::1",
+                        "confia.crypto.blind-index.current-version", "v1",
+                        "confia.crypto.blind-index.keys.v1", BLIND_INDEX_KEY,
+                        RATE_LIMIT + "admin-import.request-limit", "1",
+                        RATE_LIMIT + "admin-import-account.request-limit", "10000"))) {
+            int limitedPort = ((WebServerApplicationContext) limited).getWebServer().getPort();
+
+            assertProblem(sendFrom(limitedPort, "203.0.113.90", ENROLLMENTS_APPLY, admin.token(), garbage), 400,
+                    "validation-failed");
+            HttpResponse<String> refused = sendFrom(limitedPort, "203.0.113.90", ENROLLMENTS_SIMULATE, admin.token(),
+                    garbage);
+            assertProblem(refused, 429, "too-many-requests");
+            assertThat(refused.headers().firstValue("Retry-After")).isPresent();
+            assertProblem(sendFrom(limitedPort, "203.0.113.91", ENROLLMENTS_APPLY, admin.token(), garbage), 400,
+                    "validation-failed");
+        }
+    }
+
     // --- Isolation, permissions, history ---
 
     @Test
@@ -770,12 +864,24 @@ class ImportEnrollmentsEndpointsIT extends CommittingPostgresIntegrationTest {
         return execute(request(port, "POST", path, token, body), true);
     }
 
+    private static HttpResponse<String> sendFrom(int targetPort, String address, String path, String token, Body body) {
+        return execute(request(targetPort, address, "POST", path, token, body), true);
+    }
+
     private static HttpRequest request(int targetPort, String method, String path, String token, Body body) {
+        return request(targetPort, null, method, path, token, body);
+    }
+
+    private static HttpRequest request(int targetPort, String address, String method, String path, String token,
+            Body body) {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://localhost:" + targetPort + path))
                 .timeout(Duration.ofSeconds(120))
                 .method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                         : HttpRequest.BodyPublishers.ofByteArray(body.bytes()));
         request.header("Authorization", "Bearer " + token);
+        if (address != null) {
+            request.header("X-Forwarded-For", address);
+        }
         if (body != null) {
             request.header("Content-Type", body.contentType());
         }
