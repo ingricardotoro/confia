@@ -40,6 +40,9 @@ public interface SectionDirectory {
      */
     Map<SectionNames, List<SectionRef>> findByNames(InstitutionId institutionId, Collection<SectionNames> names);
 
+    /** Whether the academic year exists in the institution (a year of another institution is not found). */
+    boolean academicYearExists(InstitutionId institutionId, UUID academicYearId);
+
     /** The identifier of the academic year whose status is {@code ACTIVE}, or empty when there is none. */
     Optional<UUID> activeAcademicYearId(InstitutionId institutionId);
 }

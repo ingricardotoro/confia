@@ -112,6 +112,12 @@ final class InMemoryEnrollments {
         }
 
         @Override
+        public int countActiveInYear(InstitutionId institution, UUID academicYearId) {
+            return (int) rowsOf(institution).stream().filter(e -> e.academicYearId().equals(academicYearId))
+                    .filter(e -> e.status() == EnrollmentStatus.ACTIVE).count();
+        }
+
+        @Override
         public boolean hasActiveInYear(InstitutionId institution, UUID studentId, UUID academicYearId) {
             return rowsOf(institution).stream().anyMatch(e -> e.studentId().equals(studentId)
                     && e.academicYearId().equals(academicYearId) && e.status() == EnrollmentStatus.ACTIVE);
@@ -203,6 +209,12 @@ final class InMemoryEnrollments {
                         }
                     });
             return found;
+        }
+
+        @Override
+        public boolean academicYearExists(InstitutionId institution, UUID academicYearId) {
+            return sectionRows.entrySet().stream().filter(e -> e.getKey().institution().equals(institution.value()))
+                    .anyMatch(e -> e.getValue().academicYearId().equals(academicYearId));
         }
 
         @Override

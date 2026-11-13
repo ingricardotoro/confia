@@ -13,7 +13,9 @@ import confia.generated.jooq.tables.records.ImportsBatchRecord;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -89,6 +91,24 @@ public final class JooqImportBatchRepository implements ImportBatchRepository {
                 .fetch(JooqImportBatchRepository::toDomain);
         return new Page<>(rows, total, request.page(), request.size());
     }
+    @Override
+    public Map<ImportKind, AppliedTotals> appliedTotals(InstitutionId institutionId) {
+        Map<ImportKind, int[]> totals = new EnumMap<>(ImportKind.class);
+        dsl.selectFrom(IMPORTS_BATCH)
+                .where(IMPORTS_BATCH.INSTITUTION_ID.eq(institutionId.value()))
+                .and(IMPORTS_BATCH.STATUS.eq(ImportStatus.APPLIED.name()))
+                .orderBy(IMPORTS_BATCH.CREATED_AT.desc(), IMPORTS_BATCH.ID.desc())
+                .fetch().forEach(row -> {
+                    ImportKind kind = ImportKind.valueOf(row.getKind());
+                    // The rows come newest first: the first of a kind is the one whose rejections count.
+                    int[] total = totals.computeIfAbsent(kind, k -> new int[] {0, row.getRejectedRows()});
+                    total[0] = Math.addExact(total[0], row.getCreatedRows());
+                });
+        Map<ImportKind, AppliedTotals> result = new EnumMap<>(ImportKind.class);
+        totals.forEach((kind, total) -> result.put(kind, new AppliedTotals(total[0], total[1])));
+        return result;
+    }
+
 
     private static ImportBatch toDomain(ImportsBatchRecord row) {
         OffsetDateTime applied = row.getAppliedAt();

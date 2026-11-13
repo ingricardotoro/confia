@@ -1,7 +1,9 @@
 package com.confia.imports.web.wiring;
 
 import com.confia.imports.application.ManageImports;
+import com.confia.imports.application.ManageReconciliations;
 import com.confia.imports.web.ImportController;
+import com.confia.imports.web.ReconciliationController;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -20,5 +22,10 @@ public class ImportsWebConfiguration {
     @Bean
     ImportController importController(ManageImports imports) {
         return new ImportController(imports);
+    }
+
+    @Bean
+    ReconciliationController reconciliationController(ManageReconciliations reconciliations) {
+        return new ReconciliationController(reconciliations);
     }
 }

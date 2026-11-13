@@ -106,6 +106,13 @@ public final class PermissionedEndpoints {
         // The history needs students:read here; the controller adds guardians:read for the batches of the guardians
         // kinds (a batch of those kinds is listed only to an account that holds it).
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/imports", Permission.STUDENTS_READ));
+        // The reconciliation of the migration: signing is the work of whoever imports; reading is reading the registry.
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/imports/reconciliations",
+                Permission.STUDENTS_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/imports/reconciliations/preview",
+                Permission.STUDENTS_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/imports/reconciliations",
+                Permission.STUDENTS_READ));
         return new PermissionedEndpoints(endpoints);
     }
 

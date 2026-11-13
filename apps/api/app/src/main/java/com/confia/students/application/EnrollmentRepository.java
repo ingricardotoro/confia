@@ -36,6 +36,9 @@ public interface EnrollmentRepository {
     /** The active enrollments of the section: the seats taken. */
     int countActiveInSection(InstitutionId institutionId, UUID sectionId);
 
+    /** The active enrollments of the academic year, in any section. */
+    int countActiveInYear(InstitutionId institutionId, UUID academicYearId);
+
     /** Whether the student has an active enrollment in the academic year. */
     boolean hasActiveInYear(InstitutionId institutionId, UUID studentId, UUID academicYearId);
 

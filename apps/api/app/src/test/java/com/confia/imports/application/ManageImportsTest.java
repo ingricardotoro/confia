@@ -911,6 +911,11 @@ class ManageImportsTest {
         }
 
         @Override
+        public java.util.Map<ImportKind, AppliedTotals> appliedTotals(InstitutionId institutionId) {
+            throw new UnsupportedOperationException("the import does not read the totals of its applications");
+        }
+
+        @Override
         public Page<ImportBatch> list(InstitutionId institutionId, PageRequest request, Set<ImportKind> kinds) {
             List<ImportBatch> all = of(institutionId).stream().filter(b -> kinds.contains(b.kind())).toList();
             int from = (int) Math.min(request.offset(), all.size());

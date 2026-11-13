@@ -2,6 +2,7 @@ package com.confia.imports.web;
 
 import static com.confia.shared.web.harness.ProblemAssertions.assertProblem;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -172,7 +173,7 @@ class ImportEnrollmentsEndpointsIT extends CommittingPostgresIntegrationTest {
         List<String> forbidden = new ArrayList<>(PERSONAL);
         forbidden.add(BLIND_INDEX_KEY);
         List<String> audit = rows("select a::text from shared_audit_log a");
-        List<String> batches = rows("select b::text from imports_batch b");
+        List<String> batches = rows("select b::text from imports_batch b union all select r::text from imports_reconciliation r");
         for (String text : forbidden) {
             String shown = text.length() > 12 ? text.substring(0, 12) + "..." : text;
             assertThat(RESPONSES).as("responses must not contain %s", shown).noneMatch(r -> r.contains(text));
@@ -772,6 +773,225 @@ class ImportEnrollmentsEndpointsIT extends CommittingPostgresIntegrationTest {
         JsonNode wrong = assertProblem(run(ENROLLMENTS_SIMULATE, admin, studentsFile(1)), 400, "validation-failed");
         assertThat(wrong.get("errors").get(0).get("reason").asString()).isNotBlank();
         assertThat(countOf("students_enrollment", admin.institution())).isZero();
+    }
+
+    // --- The reconciliation of the migration (docs/cortes/imports-reconciliation.md) ---
+
+    private static final String RECONCILIATIONS = "/api/v1/imports/reconciliations";
+
+    private static String quoted(String text) {
+        return "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\"";
+    }
+
+    private static HttpResponse<String> sign(Member member, String year, String reference, String total) {
+        String body = "{\"academicYearId\":" + year + ",\"officialReference\":" + reference
+                + ",\"officialEnrollmentCount\":" + total + "}";
+        return post(RECONCILIATIONS, member.token(), new Body("application/json",
+                body.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static HttpResponse<String> sign(Member member, UUID year, String reference, int total) {
+        return sign(member, quoted(year.toString()), quoted(reference), String.valueOf(total));
+    }
+
+    private static JsonNode created(HttpResponse<String> response) {
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(201);
+        return HarnessProcess.json(response);
+    }
+
+    private static void assertCounts(JsonNode counts, int created, int rejected) {
+        assertThat(counts.get("created").asInt()).as("created").isEqualTo(created);
+        assertThat(counts.get("rejected").asInt()).as("rejected").isEqualTo(rejected);
+    }
+
+    @Test
+    void anAdministratorSignsTheReconciliationWithTheCountsOfTheMigrationAndTheOfficialTotal() throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        Structure org = structure(admin.institution());
+        section(org, org.year(), org.grade(), sectionName("Uno"), 50, true);
+        importStudents(admin, 5);
+        String enrollments = file(line(1, sectionName("Uno")), line(2, sectionName("Uno")),
+                line(3, sectionName("Uno")), line(4, sectionName("Uno")), line(5, sectionName("NoExiste")));
+        run(ENROLLMENTS_SIMULATE, admin, enrollments);
+        JsonNode applied = json(run(ENROLLMENTS_APPLY, admin, enrollments));
+        assertThat(applied.get("batch").get("createdRows").asInt()).isEqualTo(4);
+
+        JsonNode preview = json(get(RECONCILIATIONS + "/preview?academicYearId=" + org.year(), admin));
+        assertThat(preview.get("academicYearId").asString()).isEqualTo(org.year().toString());
+        assertThat(preview.get("enrollmentsActive").asInt()).isEqualTo(4);
+        assertCounts(preview.get("students"), 5, 0);
+        assertCounts(preview.get("guardians"), 0, 0);
+        assertCounts(preview.get("guardianLinks"), 0, 0);
+        assertCounts(preview.get("enrollments"), 4, 1);
+        assertThat(countOf("imports_reconciliation", admin.institution())).as("a preview writes nothing").isZero();
+
+        JsonNode signed = created(sign(admin, org.year(), "Oficio-123", 5));
+
+        assertThat(signed.get("id").asString()).isNotBlank();
+        assertThat(signed.get("academicYearId").asString()).isEqualTo(org.year().toString());
+        assertThat(signed.get("officialReference").asString()).isEqualTo("Oficio-123");
+        assertThat(signed.get("officialEnrollmentCount").asInt()).isEqualTo(5);
+        assertThat(signed.get("enrollmentsActive").asInt()).isEqualTo(4);
+        assertThat(signed.get("difference").asInt()).isEqualTo(-1);
+        assertCounts(signed.get("students"), 5, 0);
+        assertCounts(signed.get("enrollments"), 4, 1);
+        assertThat(signed.get("signedBy").asString()).isEqualTo(admin.account().toString());
+        assertThat(signed.get("signedAt").asString()).isNotBlank();
+
+        JsonNode history = json(get(RECONCILIATIONS, admin));
+        assertThat(history.get("total").asInt()).isEqualTo(1);
+        assertThat(history.get("items").get(0).get("id").asString()).isEqualTo(signed.get("id").asString());
+        assertThat(column("select official_reference || ':' || official_enrollment_count || ':' || enrollments_active "
+                + "|| ':' || students_created || ':' || enrollments_rejected from imports_reconciliation "
+                + "where institution_id = ?", admin.institution())).containsExactly("Oficio-123:5:4:5:1");
+        assertThat(auditActionsOf(admin.institution()).stream().filter(a -> a.equals("imports.reconciliation.signed")))
+                .hasSize(1);
+        assertThat(column("select after_value::text from shared_audit_log where institution_id = ? "
+                + "and action = 'imports.reconciliation.signed'", admin.institution()).getFirst())
+                .contains("Oficio-123", "\"enrollmentsActive\": 4");
+    }
+
+    @Test
+    void theRejectedCountIsThatOfTheNewestApplicationTheCreatedCountsAreSummedAndSimulationsDoNotCount()
+            throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        Structure org = structure(admin.institution());
+        section(org, org.year(), org.grade(), sectionName("Uno"), 50, true);
+        importStudents(admin, 4);
+        String first = file(line(1, sectionName("Uno")), line(2, sectionName("Uno")),
+                line(3, sectionName("NoExiste")), line(4, sectionName("NoExiste")));
+        run(ENROLLMENTS_SIMULATE, admin, first);
+        run(ENROLLMENTS_APPLY, admin, first);
+        JsonNode afterFirst = json(get(RECONCILIATIONS + "/preview?academicYearId=" + org.year(), admin));
+        assertCounts(afterFirst.get("enrollments"), 2, 2);
+
+        String corrected = file(line(1, sectionName("Uno")), line(2, sectionName("Uno")),
+                line(3, sectionName("Uno")), line(4, sectionName("NoExiste")));
+        run(ENROLLMENTS_SIMULATE, admin, corrected);
+        JsonNode afterSimulation = json(get(RECONCILIATIONS + "/preview?academicYearId=" + org.year(), admin));
+        assertCounts(afterSimulation.get("enrollments"), 2, 2);
+
+        run(ENROLLMENTS_APPLY, admin, corrected);
+        JsonNode afterSecond = json(get(RECONCILIATIONS + "/preview?academicYearId=" + org.year(), admin));
+        assertCounts(afterSecond.get("enrollments"), 3, 1);
+        assertThat(afterSecond.get("enrollmentsActive").asInt()).isEqualTo(3);
+        assertCounts(afterSecond.get("students"), 4, 0);
+    }
+
+    @Test
+    void signingTwiceKeepsBothRecordsAndNobodyCanUpdateOrDeleteOne() throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        Structure org = structure(admin.institution());
+        JsonNode first = created(sign(admin, org.year(), "Oficio-1", 0));
+        JsonNode second = created(sign(admin, org.year(), "Oficio-1", 0));
+
+        assertThat(first.get("id").asString()).isNotEqualTo(second.get("id").asString());
+        JsonNode history = json(get(RECONCILIATIONS + "?size=1", admin));
+        assertThat(history.get("total").asInt()).isEqualTo(2);
+        assertThat(history.get("items")).hasSize(1);
+        assertThat(history.get("items").get(0).get("id").asString()).isEqualTo(second.get("id").asString());
+        assertThat(countOf("imports_reconciliation", admin.institution())).isEqualTo(2);
+
+        try (Connection application = java.sql.DriverManager.getConnection(SharedPostgresContainer.jdbcUrl(),
+                "confia_admin_app", TEST_PASSWORD)) {
+            for (String statement : List.of("update imports_reconciliation set official_reference = 'x'",
+                    "delete from imports_reconciliation")) {
+                try (java.sql.Statement sql = application.createStatement()) {
+                    assertThatThrownBy(() -> sql.execute(statement))
+                            .isInstanceOf(SQLException.class).hasMessageContaining("permission denied");
+                }
+            }
+        }
+        assertThat(countOf("imports_reconciliation", admin.institution())).isEqualTo(2);
+    }
+
+    @Test
+    void aBodyThatTheRecordRefusesIsA400AndAYearThatIsNotTheInstitutionsIsA404AndNothingIsWritten()
+            throws SQLException {
+        Member alpha = member(StaffRole.ADMINISTRATOR.code());
+        Member beta = member(StaffRole.ADMINISTRATOR.code());
+        Structure alphaOrg = structure(alpha.institution());
+        String year = quoted(alphaOrg.year().toString());
+
+        for (String reference : List.of("\"\"", "\"   \"", quoted("x".repeat(101)), quoted("Oficio\n1"), "null")) {
+            assertProblem(sign(alpha, year, reference, "5"), 400, "validation-failed");
+        }
+        assertProblem(sign(alpha, year, quoted("Oficio-1"), "-1"), 400, "validation-failed");
+        assertProblem(sign(alpha, year, quoted("Oficio-1"), "1000001"), 400, "validation-failed");
+        assertProblem(sign(alpha, year, quoted("Oficio-1"), "null"), 400, "validation-failed");
+        assertProblem(sign(alpha, "null", quoted("Oficio-1"), "5"), 400, "validation-failed");
+        assertProblem(sign(alpha, quoted("not-a-uuid"), quoted("Oficio-1"), "5"), 400, "validation-failed");
+        assertProblem(post(RECONCILIATIONS, alpha.token(), new Body("application/json",
+                ("{\"academicYearId\":" + year + ",\"officialReference\":\"Oficio-1\",\"officialEnrollmentCount\":5,"
+                        + "\"enrollmentsActive\":999}").getBytes(StandardCharsets.UTF_8))), 400, "validation-failed");
+        assertProblem(post(RECONCILIATIONS, alpha.token(), new Body("text/plain", "x".getBytes(StandardCharsets.UTF_8))),
+                415, "unsupported-media-type");
+        assertProblem(get(RECONCILIATIONS + "/preview", alpha), 400, "validation-failed");
+        assertProblem(get(RECONCILIATIONS + "/preview?academicYearId=not-a-uuid", alpha), 400, "validation-failed");
+        assertProblem(get(RECONCILIATIONS + "?size=101", alpha), 400, "validation-failed");
+        assertProblem(get(RECONCILIATIONS + "?page=-1", alpha), 400, "validation-failed");
+
+        assertProblem(sign(alpha, UUID.randomUUID(), "Oficio-1", 5), 404, "resource-not-found");
+        assertProblem(sign(beta, alphaOrg.year(), "Oficio-1", 5), 404, "resource-not-found");
+        assertProblem(get(RECONCILIATIONS + "/preview?academicYearId=" + alphaOrg.year(), beta), 404,
+                "resource-not-found");
+
+        assertThat(countOf("imports_reconciliation", alpha.institution())).isZero();
+        assertThat(countOf("imports_reconciliation", beta.institution())).isZero();
+        assertThat(auditActionsOf(alpha.institution()).stream().filter(a -> a.startsWith("imports.reconciliation")))
+                .isEmpty();
+    }
+
+    @Test
+    void theReconciliationsOfOneInstitutionAreInvisibleToAnotherAndTheCountsAreItsOwn() throws SQLException {
+        Member alpha = member(StaffRole.ADMINISTRATOR.code());
+        Member beta = member(StaffRole.ADMINISTRATOR.code());
+        Structure alphaOrg = structure(alpha.institution());
+        Structure betaOrg = structure(beta.institution());
+        section(alphaOrg, alphaOrg.year(), alphaOrg.grade(), sectionName("Uno"), 5, true);
+        importStudents(alpha, 2);
+        String file = file(line(1, sectionName("Uno")), line(2, sectionName("Uno")));
+        run(ENROLLMENTS_SIMULATE, alpha, file);
+        run(ENROLLMENTS_APPLY, alpha, file);
+        created(sign(alpha, alphaOrg.year(), "Oficio-A", 2));
+
+        assertThat(json(get(RECONCILIATIONS, beta)).get("total").asInt()).isZero();
+        JsonNode betaPreview = json(get(RECONCILIATIONS + "/preview?academicYearId=" + betaOrg.year(), beta));
+        assertThat(betaPreview.get("enrollmentsActive").asInt()).isZero();
+        assertCounts(betaPreview.get("students"), 0, 0);
+        assertCounts(betaPreview.get("enrollments"), 0, 0);
+        JsonNode betaSigned = created(sign(beta, betaOrg.year(), "Oficio-B", 0));
+        assertThat(betaSigned.get("enrollmentsActive").asInt()).isZero();
+        assertThat(json(get(RECONCILIATIONS, alpha)).get("total").asInt()).isEqualTo(1);
+    }
+
+    @Test
+    void aRoleWithoutStudentsCreateCannotSignAndOneWithoutStudentsReadCannotSeeAnything() throws Exception {
+        install();
+        Member cashier = member(StaffRole.CASHIER.code());
+        Member auditor = sameInstitution(cashier.institution(), StaffRole.AUDITOR.code());
+        Member guardiansOnly = sameInstitution(cashier.institution(), StaffRole.ADMINISTRATOR.code());
+        SYNTHETIC.put(guardiansOnly.account(), Set.of(Permission.GUARDIANS_READ));
+        Member readerOnly = sameInstitution(cashier.institution(), StaffRole.ADMINISTRATOR.code());
+        SYNTHETIC.put(readerOnly.account(), Set.of(Permission.STUDENTS_READ));
+        Structure org = structure(cashier.institution());
+
+        assertProblem(sign(cashier, org.year(), "Oficio-1", 1), 403, "forbidden");
+        assertProblem(sign(auditor, org.year(), "Oficio-1", 1), 403, "forbidden");
+        assertProblem(sign(readerOnly, org.year(), "Oficio-1", 1), 403, "forbidden");
+        assertProblem(sign(guardiansOnly, org.year(), "Oficio-1", 1), 403, "forbidden");
+        assertProblem(get(RECONCILIATIONS, guardiansOnly), 403, "forbidden");
+        assertProblem(get(RECONCILIATIONS + "/preview?academicYearId=" + org.year(), guardiansOnly), 403,
+                "forbidden");
+        assertThat(denialsOf(cashier.institution())).contains("students:read");
+        assertThat(json(get(RECONCILIATIONS, readerOnly)).get("total").asInt()).isZero();
+        assertThat(json(get(RECONCILIATIONS + "/preview?academicYearId=" + org.year(), readerOnly))
+                .get("enrollmentsActive").asInt()).isZero();
+        assertThat(json(get(RECONCILIATIONS, auditor)).get("total").asInt()).isZero();
+
+        assertThat(countOf("imports_reconciliation", cashier.institution())).isZero();
+        assertThat(auditActionsOf(cashier.institution()).stream().filter(a -> a.startsWith("imports.reconciliation")))
+                .isEmpty();
     }
 
     // --- Permissions the real roles cannot show: a synthetic resolver for chosen accounts ---
