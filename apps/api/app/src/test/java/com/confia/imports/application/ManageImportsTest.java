@@ -56,8 +56,9 @@ class ManageImportsTest {
     private final String requestId = UUID.randomUUID().toString();
     private final FakeGuardianGateways.Guardians guardianPort = new FakeGuardianGateways.Guardians();
     private final FakeGuardianGateways.Links linkPort = new FakeGuardianGateways.Links();
+    private final FakeEnrollmentGateway enrollmentPort = new FakeEnrollmentGateway();
     private final ManageImports imports = new ManageImports(runner, batches, students, guardianPort,
-            linkPort, auditWriter,
+            linkPort, enrollmentPort, auditWriter,
             Clock.fixed(NOW, ZoneOffset.UTC));
 
     private static AuthenticatedActor actorOf(UUID institution, UUID account) {
@@ -519,7 +520,8 @@ class ManageImportsTest {
             throw auditDown;
         };
         ManageImports broken = new ManageImports(runner, batches, students, new FakeGuardianGateways.Guardians(),
-                new FakeGuardianGateways.Links(), failing, Clock.fixed(NOW, ZoneOffset.UTC));
+                new FakeGuardianGateways.Links(), new FakeEnrollmentGateway(), failing,
+                Clock.fixed(NOW, ZoneOffset.UTC));
 
         assertThatThrownBy(() -> broken.apply(ImportKind.STUDENTS, actor, requestId, file)).isSameAs(cause)
                 .satisfies(e -> assertThat(e.getSuppressed()).containsExactly(auditDown));
@@ -751,6 +753,83 @@ class ManageImportsTest {
 
         assertThatThrownBy(() -> apply(ImportKind.GUARDIAN_LINKS, text)).isSameAs(cause);
         assertThat(audit.getLast().afterValue()).contains("GUARDIAN_LINKS").contains("\"createdRows\":2");
+    }
+
+    private static final String ENROLLMENTS_HEADER = "studentLegacyId,academicYear,modality,grade,section,enrolledOn\n";
+
+    @Test
+    void theEnrollmentsAreJudgedByThePortAndTheRowsAlreadyThereAreSkippedNotRejected() {
+        enrollmentPort.problems.add(new com.confia.students.application.importing.RowProblem(2, "studentLegacyId", "already-imported"));
+        enrollmentPort.problems.add(new com.confia.students.application.importing.RowProblem(3, "section", "section-full"));
+        String text = ENROLLMENTS_HEADER + "S1,2026,Regular,Septimo,A,2026-02-01\n"
+                + "S2,2026,Regular,Septimo,A,2026-02-01\nS3,2026,Regular,Septimo,A,2026-02-01\n";
+
+        ImportRun simulation = simulate(ImportKind.ENROLLMENTS, text);
+
+        assertThat(simulation.batch().kind()).isEqualTo("ENROLLMENTS");
+        assertThat(simulation.batch().skippedRows()).isEqualTo(1);
+        assertThat(simulation.batch().rejectedRows()).isEqualTo(1);
+        assertThat(simulation.batch().validRows()).isEqualTo(1);
+        assertThat(simulation.rejections()).extracting(RejectionView::line).containsExactly(3, 2);
+        assertThat(enrollmentPort.evaluated).hasSize(3);
+        assertThat(enrollmentPort.evaluated.getFirst().section()).isEqualTo("A");
+        assertThat(enrollmentPort.evaluated.getFirst().enrolledOn()).isEqualTo("2026-02-01");
+        assertThat(enrollmentPort.applied).isEmpty();
+    }
+
+    @Test
+    void theOutcomesOfTheEnrollmentsAreReportedPerLine() {
+        enrollmentPort.outcomes = row -> switch (row.studentLegacyId()) {
+            case "S1" -> com.confia.students.application.importing.EnrollmentOutcome.CREATED;
+            case "S2" -> com.confia.students.application.importing.EnrollmentOutcome.ALREADY_IMPORTED;
+            case "S3" -> com.confia.students.application.importing.EnrollmentOutcome.DUPLICATE_ACTIVE_ENROLLMENT;
+            case "S4" -> com.confia.students.application.importing.EnrollmentOutcome.SECTION_FULL;
+            case "S5" -> com.confia.students.application.importing.EnrollmentOutcome.ACADEMIC_YEAR_CLOSED;
+            case "S6" -> com.confia.students.application.importing.EnrollmentOutcome.INACTIVE_SECTION;
+            case "S7" -> com.confia.students.application.importing.EnrollmentOutcome.STUDENT_NOT_ACTIVE;
+            default -> com.confia.students.application.importing.EnrollmentOutcome.DATE_OUT_OF_RANGE;
+        };
+        StringBuilder text = new StringBuilder(ENROLLMENTS_HEADER);
+        for (int i = 1; i <= 8; i++) {
+            text.append("S").append(i).append(",2026,Regular,Septimo,A,2026-02-01\n");
+        }
+        simulate(ImportKind.ENROLLMENTS, text.toString());
+
+        ImportRun applied = apply(ImportKind.ENROLLMENTS, text.toString());
+
+        assertThat(applied.batch().createdRows()).isEqualTo(1);
+        assertThat(applied.batch().skippedRows()).isEqualTo(1);
+        assertThat(applied.batch().rejectedRows()).isEqualTo(6);
+        assertThat(applied.rejections()).extracting(RejectionView::reason).containsExactly("duplicate-active-enrollment",
+                "section-full", "academic-year-closed", "inactive-reference", "student-not-active",
+                "enrollment-date-out-of-range", "already-imported");
+        assertThat(applied.rejections()).extracting(RejectionView::field).containsExactly("studentLegacyId", "section",
+                "academicYear", "section", "studentLegacyId", "enrolledOn", "studentLegacyId");
+        assertThat(enrollmentPort.applied).extracting(r -> r.studentLegacyId()).containsExactly("S1");
+    }
+
+    @Test
+    void aPartialFailureOfTheEnrollmentsLeavesTheTraceOfItsKind() {
+        IllegalStateException cause = new IllegalStateException("database down");
+        enrollmentPort.failure = new com.confia.students.application.importing.PartialEnrollmentImportException(2,
+                cause);
+        String text = ENROLLMENTS_HEADER + "S1,2026,Regular,Septimo,A,2026-02-01\n";
+        simulate(ImportKind.ENROLLMENTS, text);
+
+        assertThatThrownBy(() -> apply(ImportKind.ENROLLMENTS, text)).isSameAs(cause);
+        assertThat(audit.getLast().afterValue()).contains("ENROLLMENTS").contains("\"createdRows\":2");
+    }
+
+    @Test
+    void theEnrollmentsHistoryNeedsTheStudentsPermissionOfTheAccountAndNotTheGuardiansOne() {
+        simulate(ImportKind.ENROLLMENTS, ENROLLMENTS_HEADER + "S1,2026,Regular,Septimo,A,2026-02-01\n");
+
+        assertThat(imports.list(actor, requestId, 0, 10, "enrollments", true, false).items())
+                .extracting(ImportBatchView::kind).containsExactly("ENROLLMENTS");
+        assertThatThrownBy(() -> imports.list(actor, requestId, 0, 10, "enrollments", false, true))
+                .isInstanceOf(KindNotReadableException.class)
+                .satisfies(e -> assertThat(((KindNotReadableException) e).students()).isTrue());
+        assertThat(imports.list(actor, requestId, 0, 10, null, false, true).total()).isZero();
     }
 
     @Test

@@ -663,9 +663,9 @@
   "imports": {
     "title": "Importaciones",
     "heading": "Importar datos",
-    "intro": "Cargue desde un archivo CSV los datos de su sistema anterior: estudiantes, encargados y los vínculos entre ellos. Primero se simula: no se crea nada hasta que usted aplique la importación.",
+    "intro": "Cargue desde un archivo CSV los datos de su sistema anterior: estudiantes, encargados, los vínculos entre ellos y las matrículas vigentes. Primero se simula: no se crea nada hasta que usted aplique la importación.",
     "kindLabel": "Qué va a importar",
-    "kindOrder": "Orden recomendado: primero los estudiantes, después los encargados y por último los vínculos, porque cada archivo se apoya en el anterior.",
+    "kindOrder": "Orden recomendado: primero los estudiantes, después los encargados, los vínculos y por último las matrículas, porque cada archivo se apoya en el anterior.",
     "kinds": {
       "students": {
         "option": "Estudiantes",
@@ -714,6 +714,22 @@
         "resultRejections": "Estas filas no se crearon. Cuando una fila de un estudiante tiene un defecto, se rechazan todas las filas de ese estudiante. Corrija el origen, simule y aplique de nuevo el archivo corregido.",
         "resultNext": "Los vínculos ya están en la ficha de cada estudiante. Si corrigió filas rechazadas, simule y aplique el archivo corregido: los estudiantes que ya tienen vínculos se omiten.",
         "applyUnknown": "No se pudo confirmar si la importación terminó. Puede aplicarla de nuevo sin riesgo: los estudiantes que ya tienen vínculos se omiten."
+      },
+      "enrollments": {
+        "option": "Matrículas",
+        "fileLabel": "Archivo CSV de matrículas",
+        "fileHelp": "CSV en UTF-8 (en Excel: Guardar como, CSV UTF-8), separado por comas o por punto y coma, de hasta 5 MB y 10 000 filas. Importe antes a los estudiantes y cree la estructura académica: cada fila busca al estudiante por su legacyId y la sección por los nombres del año lectivo, la modalidad, el grado y la sección, sin distinguir mayúsculas. Las columnas obligatorias son studentLegacyId, academicYear, modality, grade, section y enrolledOn (AAAA-MM-DD). Solo se importa la matrícula vigente.",
+        "summaryDescription": "Esto es lo que pasaría al aplicar el archivo. Todavía no se creó ninguna matrícula. El cupo de cada sección es una estimación: manda el cupo real al aplicar.",
+        "dialogDescription": "Confirme la creación de las matrículas del archivo simulado.",
+        "willCreate": "{count, plural, one {Se creará # matrícula.} other {Se crearán # matrículas.}}",
+        "confirm": "{count, plural, one {Crear # matrícula} other {Crear # matrículas}}",
+        "applying": "Creando las matrículas. No cierre esta ventana.",
+        "lateNote": "El cupo se revisa de nuevo al aplicar: pueden rechazarse más filas. Una matrícula que ya existe se omite, nunca se traslada ni se reemplaza.",
+        "resultDone": "{created, plural, one {Se creó # matrícula.} other {Se crearon # matrículas.}} {skipped, plural, one {# fila ya importada se omitió.} other {# filas ya importadas se omitieron.}} {rejected, plural, one {# fila rechazada no se creó.} other {# filas rechazadas no se crearon.}}",
+        "resultCreated": "Matrículas creadas",
+        "resultRejections": "Estas filas no se crearon. Incluyen las secciones que ya no tenían cupo al aplicar. Corrija el origen, simule y aplique de nuevo el archivo corregido.",
+        "resultNext": "Las matrículas ya están en la lista de matrículas. Si corrigió filas rechazadas, simule y aplique el archivo corregido: las matrículas ya importadas se omiten.",
+        "applyUnknown": "No se pudo confirmar si la importación terminó. Puede aplicarla de nuevo sin riesgo: las matrículas ya creadas se omiten."
       }
     },
     "stepsLabel": "Pasos de la importación",
@@ -786,7 +802,14 @@
       "sum-not-100": "Los porcentajes de este estudiante no suman exactamente 100.00: se rechazan todas sus filas.",
       "multiple-primary-payer": "Este estudiante tiene más de un pagador principal: se rechazan todas sus filas.",
       "multiple-billing-recipient": "Este estudiante tiene más de un destinatario de factura: se rechazan todas sus filas.",
-      "duplicate-guardian": "El mismo encargado aparece más de una vez para este estudiante: se rechazan todas sus filas."
+      "duplicate-guardian": "El mismo encargado aparece más de una vez para este estudiante: se rechazan todas sus filas.",
+      "unknown-section": "No existe una sección con ese año lectivo, modalidad, grado y nombre: revise los nombres y que la estructura académica esté creada.",
+      "ambiguous-section": "Más de una sección coincide con esos nombres: revise el año lectivo, la modalidad y el grado.",
+      "section-full": "La sección no tiene cupo para esta matrícula.",
+      "duplicate-active-enrollment": "El estudiante ya tiene una matrícula activa en ese año en otra sección: la importación no la traslada ni la reemplaza.",
+      "academic-year-closed": "El año lectivo está cerrado: no admite matrículas.",
+      "inactive-reference": "La sección no está activa.",
+      "enrollment-date-out-of-range": "La fecha de matrícula está fuera del año lectivo o es posterior a hoy."
     },
     "noRows": {
       "title": "No hay nada que crear",

@@ -7,12 +7,15 @@ import static confia.generated.jooq.tables.OrganizationSection.ORGANIZATION_SECT
 
 import com.confia.kernel.InstitutionId;
 import com.confia.organization.application.directory.SectionDirectory;
+import com.confia.organization.application.directory.SectionNames;
 import com.confia.organization.application.directory.SectionRef;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
@@ -59,6 +62,28 @@ public final class JooqSectionDirectory implements SectionDirectory {
                     SectionRef ref = toRef(row);
                     found.put(ref.sectionId(), ref);
                 });
+        return found;
+    }
+
+    @Override
+    public Map<SectionNames, List<SectionRef>> findByNames(InstitutionId institutionId,
+            Collection<SectionNames> names) {
+        Map<SectionNames, List<SectionRef>> found = new HashMap<>();
+        if (names.isEmpty()) {
+            return found;
+        }
+        // The names are compared in Java, with the same normalization the request went through, and not in SQL: the
+        // sections of an institution are a few hundred at most, and a comparison in the database would depend on its
+        // collation for accents and capitals.
+        Set<SectionNames> wanted = Set.copyOf(names);
+        joined().where(inInstitution(institutionId)).fetch().forEach(row -> {
+            SectionRef ref = toRef(row);
+            SectionNames key = new SectionNames(ref.academicYearName(), ref.modalityName(), ref.gradeName(),
+                    ref.name());
+            if (wanted.contains(key)) {
+                found.computeIfAbsent(key, k -> new ArrayList<>()).add(ref);
+            }
+        });
         return found;
     }
 

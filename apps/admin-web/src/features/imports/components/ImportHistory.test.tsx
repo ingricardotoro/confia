@@ -44,27 +44,29 @@ describe("ImportHistory", () => {
   it("says the kind of each batch in words", () => {
     renderWithAdminI18n(
       <ImportHistory
-        {...props({ rows: [importBatch({ kind: "STUDENTS" }), importBatch({ kind: "GUARDIANS" }), importBatch({ kind: "GUARDIAN_LINKS" })], pagination: { ...onePage, total: 3 } })}
+        {...props({ rows: [importBatch({ kind: "STUDENTS" }), importBatch({ kind: "GUARDIANS" }), importBatch({ kind: "GUARDIAN_LINKS" }), importBatch({ kind: "ENROLLMENTS" })], pagination: { ...onePage, total: 4 } })}
       />,
     );
 
     const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
-    expect(rows.map((row) => within(row).getAllByRole("cell")[1]?.textContent)).toEqual(["Estudiantes", "Encargados", "Vínculos"]);
+    expect(rows.map((row) => within(row).getAllByRole("cell")[1]?.textContent)).toEqual(["Estudiantes", "Encargados", "Vínculos", "Matrículas"]);
   });
 
-  it("filters by kind: every kind first, the three kinds after it, and it only reports the choice", async () => {
+  it("filters by kind: every kind first, the four kinds after it, and it only reports the choice", async () => {
     const onKindChange = vi.fn();
     renderWithAdminI18n(<ImportHistory {...props({ onKindChange, kind: "guardians" })} />);
     const filter = screen.getByLabelText("Tipo de importación");
 
-    expect(within(filter).getAllByRole("option").map((option) => option.textContent)).toEqual(["Todos los tipos", "Estudiantes", "Encargados", "Vínculos"]);
+    expect(within(filter).getAllByRole("option").map((option) => option.textContent)).toEqual(["Todos los tipos", "Estudiantes", "Encargados", "Vínculos", "Matrículas"]);
     expect(filter).toHaveValue("guardians");
     const user = userEvent.setup();
     await user.selectOptions(filter, "guardian-links");
+    await user.selectOptions(filter, "enrollments");
     await user.selectOptions(filter, "");
 
     expect(onKindChange).toHaveBeenNthCalledWith(1, "guardian-links");
-    expect(onKindChange).toHaveBeenNthCalledWith(2, undefined);
+    expect(onKindChange).toHaveBeenNthCalledWith(2, "enrollments");
+    expect(onKindChange).toHaveBeenNthCalledWith(3, undefined);
   });
 
   it("shows the empty state with the way forward, and runs it", async () => {

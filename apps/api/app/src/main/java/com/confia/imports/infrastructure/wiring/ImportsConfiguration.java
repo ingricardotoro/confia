@@ -7,6 +7,7 @@ import com.confia.imports.application.ManageImports;
 import com.confia.imports.infrastructure.JooqImportBatchRepository;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.TransactionRunner;
+import com.confia.students.application.importing.EnrollmentImportGateway;
 import com.confia.students.application.importing.StudentImportGateway;
 import java.time.Clock;
 import org.jooq.DSLContext;
@@ -31,7 +32,9 @@ public class ImportsConfiguration {
     @Bean
     ManageImports manageImports(TransactionRunner transactionRunner, ImportBatchRepository batches,
             StudentImportGateway students, GuardianImportGateway guardians, GuardianLinkImportGateway links,
+            EnrollmentImportGateway enrollments,
             AuditLogWriter auditLogWriter, Clock clock) {
-        return new ManageImports(transactionRunner, batches, students, guardians, links, auditLogWriter, clock);
+        return new ManageImports(transactionRunner, batches, students, guardians, links, enrollments, auditLogWriter,
+                clock);
     }
 }

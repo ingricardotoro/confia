@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
-import { IMPORT_KINDS, KIND_OF_BATCH, MAX_FILE_BYTES, TEMPLATE_FILE_NAMES, TEMPLATE_HEADERS, failureOfImport, fieldNameOf, isImportKind, problemOfFile, rejectionsCsv } from "./import-model.ts";
+import { IMPORT_KINDS, KIND_OF_BATCH, MAX_FILE_BYTES, TEMPLATE_FILE_NAMES, TEMPLATE_HEADERS, failureOfImport, fieldNameOf, isImportKind, problemOfFile, rejectionsCsv, templateTextOf } from "./import-model.ts";
 
 const problemFailure = (code: string, status: number, errors: { field: string; reason: string }[] = [], traceId?: string) =>
   new ApiFailure({ kind: "problem", problem: { status, code, errors, ...(traceId === undefined ? {} : { traceId }) } as never });
@@ -27,19 +27,37 @@ describe("the name of a field", () => {
     expect(fieldNameOf("rtn", "students")).toEqual({ kind: "unknown" });
     expect(fieldNameOf("financialResponsibilityPercent", "guardian-links")).toEqual({ kind: "column", name: "financialResponsibilityPercent" });
     expect(fieldNameOf("birthDate", "guardian-links")).toEqual({ kind: "unknown" });
+    expect(fieldNameOf("enrolledOn", "enrollments")).toEqual({ kind: "column", name: "enrolledOn" });
+    expect(fieldNameOf("section", "enrollments")).toEqual({ kind: "column", name: "section" });
+    expect(fieldNameOf("legacyId", "enrollments")).toEqual({ kind: "unknown" });
+    expect(fieldNameOf("enrolledOn", "students")).toEqual({ kind: "unknown" });
   });
 });
 
 describe("the kinds", () => {
   it("lists them in the recommended order, with a template and a file name each, and knows only them", () => {
-    expect(IMPORT_KINDS).toEqual(["students", "guardians", "guardian-links"]);
+    expect(IMPORT_KINDS).toEqual(["students", "guardians", "guardian-links", "enrollments"]);
     expect(TEMPLATE_HEADERS.guardians).toBe("legacyId,firstName,lastName,nationalId,rtn,email,phone,address,preferredChannel");
     expect(TEMPLATE_HEADERS["guardian-links"]).toBe("studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,isBillingRecipient");
-    expect(new Set(Object.values(TEMPLATE_FILE_NAMES)).size).toBe(3);
-    expect(KIND_OF_BATCH).toEqual({ STUDENTS: "students", GUARDIANS: "guardians", GUARDIAN_LINKS: "guardian-links" });
+    expect(TEMPLATE_HEADERS.enrollments).toBe("studentLegacyId,academicYear,modality,grade,section,enrolledOn");
+    expect(new Set(Object.values(TEMPLATE_FILE_NAMES)).size).toBe(4);
+    expect(KIND_OF_BATCH).toEqual({ STUDENTS: "students", GUARDIANS: "guardians", GUARDIAN_LINKS: "guardian-links", ENROLLMENTS: "enrollments" });
+    expect(isImportKind("enrollments")).toBe(true);
     expect(isImportKind("guardians")).toBe(true);
     expect(isImportKind("GUARDIANS")).toBe(false);
     expect(isImportKind(undefined)).toBe(false);
+  });
+
+  it("builds the template of the enrollments with its header and one example row, and the others with the header alone", () => {
+    expect(templateTextOf("enrollments")).toBe("studentLegacyId,academicYear,modality,grade,section,enrolledOn\r\nL1001,2026,Diurna,Primero,A,2026-02-02\r\n");
+    expect(templateTextOf("students")).toBe(`${TEMPLATE_HEADERS.students}\r\n`);
+    expect(templateTextOf("guardian-links")).toBe(`${TEMPLATE_HEADERS["guardian-links"]}\r\n`);
+  });
+
+  it("names a missing column of the enrollments file", () => {
+    expect(failureOfImport(problemFailure("validation-failed", 400, [{ field: "enrolledOn", reason: "missing-column" }]), "enrollments").texts).toEqual([
+      { key: "imports.fileErrors.missingColumn", values: { column: "enrolledOn" } },
+    ]);
   });
 
   it("names a missing column only when the template of the kind has it", () => {

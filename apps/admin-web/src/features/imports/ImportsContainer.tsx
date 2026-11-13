@@ -10,11 +10,11 @@ import { downloadText } from "./download.ts";
 import {
   REJECTIONS_FILE_NAME,
   TEMPLATE_FILE_NAMES,
-  TEMPLATE_HEADERS,
   failureOfImport,
   fieldNameOf,
   problemOfFile,
   rejectionsCsv,
+  templateTextOf,
   type FileProblem,
   type ImportFailure,
   type ImportKind,
@@ -29,7 +29,7 @@ export interface ImportsContainerProps {
 }
 
 /**
- * The import of students, guardians and the links between them, and its history. The kind to load is a choice of the screen (local
+ * The import of students, guardians, the links between them and the enrollments, and its history. The kind to load is a choice of the screen (local
  * state, never the address); the history is filtered by kind from the address, like any other listing. The file is held here, in memory, from the moment it is chosen until the import is
  * applied, the person chooses another one or leaves the screen: it is never written to the address, to the storage, to the
  * query cache or to a log, and it is not read here (the browser sends it as it is). What the screen keeps of a run is its counts
@@ -168,7 +168,7 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
         onFileChange={onFileChange}
         onSimulate={() => void onSimulate()}
         onTemplate={() => {
-          downloadText(TEMPLATE_FILE_NAMES[kind], `${TEMPLATE_HEADERS[kind]}\r\n`);
+          downloadText(TEMPLATE_FILE_NAMES[kind], templateTextOf(kind));
         }}
         onDownloadRejections={() => {
           // On the result step the list is the one the apply answered, which may hold more rows than the simulation showed.

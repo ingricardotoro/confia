@@ -34,6 +34,12 @@ public interface SectionDirectory {
      */
     List<UUID> sectionIdsOfGrade(InstitutionId institutionId, UUID academicYearId, UUID gradeId);
 
+    /**
+     * The sections that go by these names (see {@link SectionNames}), by names, in one query; names nobody goes by are
+     * absent and names that more than one section goes by list all of them, so the caller can tell them apart.
+     */
+    Map<SectionNames, List<SectionRef>> findByNames(InstitutionId institutionId, Collection<SectionNames> names);
+
     /** The identifier of the academic year whose status is {@code ACTIVE}, or empty when there is none. */
     Optional<UUID> activeAcademicYearId(InstitutionId institutionId);
 }
