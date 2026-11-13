@@ -2,12 +2,16 @@ import type { ImportRunResponseOutput, RejectionResponseOutput } from "@confia/c
 import { Alert, Button, Dialog, FormField, Input, Pagination, Table, type TableColumn } from "@confia/ui";
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { fieldNameOf, type FileProblem, type ImportFailure, type ImportStep } from "../import-model.ts";
+import { IMPORT_KINDS, fieldNameOf, isImportKind, type FileProblem, type ImportFailure, type ImportKind, type ImportStep } from "../import-model.ts";
+import { OptionField } from "../../organization/components/fields.tsx";
 import { ImportStepper } from "./ImportStepper.tsx";
 
 export type ImportPhase = "idle" | "simulating" | "applying";
 
 export interface ImportWizardProps {
+  /** What the file loads. It decides the template, the texts and the route the container sends the file to. */
+  readonly kind: ImportKind;
+  readonly onKindChange: (kind: ImportKind) => void;
   readonly step: ImportStep;
   readonly phase: ImportPhase;
   /** Changes to give the file input a new, empty control: the file is let go and the input forgets it. */
@@ -32,6 +36,7 @@ export interface ImportWizardProps {
 /** The rejections shown at a time. They are paged here, from the answer of the simulation or of the apply (at most 200 of them). */
 export const REJECTIONS_PAGE_SIZE = 10;
 const INPUT_ID = "import-file";
+const KIND_ID = "import-kind";
 const NUMBERS = new Intl.NumberFormat("es-HN");
 
 function Count({ label, value }: { readonly label: string; readonly value: number }) {
@@ -45,12 +50,13 @@ function Count({ label, value }: { readonly label: string; readonly value: numbe
 
 interface RejectionsTableProps {
   readonly rejections: readonly RejectionResponseOutput[];
+  readonly kind: ImportKind;
   readonly caption: string;
   /** Names the pagination, so the simulation and the result are never two landmarks called alike. */
   readonly navigation: string;
 }
 
-function RejectionsTable({ rejections, caption, navigation }: RejectionsTableProps) {
+function RejectionsTable({ rejections, kind, caption, navigation }: RejectionsTableProps) {
   const { t } = useAdminText();
   const [page, setPage] = useState(0);
   const rows = rejections.slice(page * REJECTIONS_PAGE_SIZE, (page + 1) * REJECTIONS_PAGE_SIZE);
@@ -60,7 +66,7 @@ function RejectionsTable({ rejections, caption, navigation }: RejectionsTablePro
       id: "field",
       header: t("imports.rejections.field"),
       cell: (row) => {
-        const field = fieldNameOf(row.field);
+        const field = fieldNameOf(row.field, kind);
         return field.kind === "column" ? field.name : field.kind === "row" ? t("imports.rejections.rowField") : t("imports.rejections.unknownField");
       },
     },
@@ -96,7 +102,7 @@ function RejectionsTable({ rejections, caption, navigation }: RejectionsTablePro
  * announced in a polite region.
  */
 export function ImportWizard(props: ImportWizardProps) {
-  const { step, phase, inputKey, fileProblem, failure, simulation, result, confirming } = props;
+  const { kind, step, phase, inputKey, fileProblem, failure, simulation, result, confirming } = props;
   const { t } = useAdminText();
   const inputRef = useRef<HTMLInputElement>(null);
   const failureRef = useRef<HTMLDivElement>(null);
@@ -121,7 +127,7 @@ export function ImportWizard(props: ImportWizardProps) {
     phase === "simulating"
       ? t("imports.simulating")
       : phase === "applying"
-        ? t("imports.apply.applying")
+        ? t(`imports.kinds.${kind}.applying`)
         : simulation !== undefined && result === undefined
           ? t("imports.simulated", { valid: simulation.batch.validRows, rejected: simulation.batch.rejectedRows, skipped: simulation.batch.skippedRows })
           : "";
@@ -163,22 +169,23 @@ export function ImportWizard(props: ImportWizardProps) {
             {t("imports.result.heading")}
           </h3>
           <Alert variant="info">
-            {t("imports.result.done", { created: result.batch.createdRows, skipped: result.batch.skippedRows, rejected: result.batch.rejectedRows })}
+            {t(`imports.kinds.${kind}.resultDone`, { created: result.batch.createdRows, skipped: result.batch.skippedRows, rejected: result.batch.rejectedRows })}
           </Alert>
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Count label={t("imports.summary.total")} value={result.batch.totalRows} />
-            <Count label={t("imports.result.created")} value={result.batch.createdRows} />
+            <Count label={t(`imports.kinds.${kind}.resultCreated`)} value={result.batch.createdRows} />
             <Count label={t("imports.summary.rejected")} value={result.batch.rejectedRows} />
             <Count label={t("imports.summary.skipped")} value={result.batch.skippedRows} />
           </dl>
           {result.rejections.length === 0 ? null : (
             <div className="flex flex-col gap-3">
               <h4 className="text-base font-semibold text-text-primary">{t("imports.result.rejectionsHeading")}</h4>
-              <p className="text-sm text-text-secondary">{t("imports.result.rejectionsDescription")}</p>
+              <p className="text-sm text-text-secondary">{t(`imports.kinds.${kind}.resultRejections`)}</p>
               {result.rejectionsTruncated ? <Alert variant="warning">{t("imports.rejections.truncated")}</Alert> : null}
               <RejectionsTable
                 key={result.batch.id}
                 rejections={result.rejections}
+                kind={kind}
                 caption={t("imports.result.rejectionsCaption")}
                 navigation={t("imports.result.rejectionsNavigation")}
               />
@@ -189,7 +196,7 @@ export function ImportWizard(props: ImportWizardProps) {
               </div>
             </div>
           )}
-          <p className="text-sm text-text-secondary">{t("imports.result.next")}</p>
+          <p className="text-sm text-text-secondary">{t(`imports.kinds.${kind}.resultNext`)}</p>
           <div>
             <Button onClick={props.onReset}>{t("imports.result.another")}</Button>
           </div>
@@ -197,10 +204,23 @@ export function ImportWizard(props: ImportWizardProps) {
       ) : (
         <>
           <form noValidate onSubmit={submit} className="flex flex-col gap-3">
+            <div className="max-w-2xl">
+              <OptionField
+                label={t("imports.kindLabel")}
+                controlId={KIND_ID}
+                value={kind}
+                options={IMPORT_KINDS.map((option) => ({ value: option, label: t(`imports.kinds.${option}.option`) }))}
+                description={t("imports.kindOrder")}
+                disabled={busy}
+                onChange={(value) => {
+                  if (isImportKind(value)) props.onKindChange(value);
+                }}
+              />
+            </div>
             <FormField
-              label={t("imports.file.label")}
+              label={t(`imports.kinds.${kind}.fileLabel`)}
               controlId={INPUT_ID}
-              description={`${t("imports.file.help")} ${t("imports.file.privacy")}`}
+              description={`${t(`imports.kinds.${kind}.fileHelp`)} ${t("imports.file.privacy")}`}
               error={fileProblem === undefined ? "" : t(`imports.file.errors.${fileProblem === "too-large" ? "tooLarge" : fileProblem}`)}
               className="max-w-2xl"
             >
@@ -234,7 +254,7 @@ export function ImportWizard(props: ImportWizardProps) {
               <h3 id="imports-summary-heading" ref={summaryRef} tabIndex={-1} className="text-lg font-semibold text-text-primary">
                 {t("imports.summary.heading")}
               </h3>
-              <p className="text-sm text-text-secondary">{t("imports.summary.description")}</p>
+              <p className="text-sm text-text-secondary">{t(`imports.kinds.${kind}.summaryDescription`)}</p>
               <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Count label={t("imports.summary.total")} value={simulation.batch.totalRows} />
                 <Count label={t("imports.summary.valid")} value={simulation.batch.validRows} />
@@ -251,6 +271,7 @@ export function ImportWizard(props: ImportWizardProps) {
                   <RejectionsTable
                     key={simulation.batch.id}
                     rejections={simulation.rejections}
+                    kind={props.kind}
                     caption={t("imports.rejections.caption")}
                     navigation={t("imports.rejections.navigation")}
                   />
@@ -282,24 +303,24 @@ export function ImportWizard(props: ImportWizardProps) {
             if (!open && phase !== "applying") props.onCloseApply();
           }}
           title={t("imports.apply.dialogTitle")}
-          description={t("imports.apply.dialogDescription")}
+          description={t(`imports.kinds.${kind}.dialogDescription`)}
           footer={
             <>
               <Button variant="secondary" disabled={phase === "applying"} onClick={props.onCloseApply}>
                 {t("imports.apply.cancel")}
               </Button>
               <Button loading={phase === "applying"} onClick={props.onApply}>
-                {t("imports.apply.confirm", { count: simulation.batch.validRows })}
+                {t(`imports.kinds.${kind}.confirm`, { count: simulation.batch.validRows })}
               </Button>
             </>
           }
         >
           <div className="flex flex-col gap-2">
-            <p className="text-lg font-semibold text-text-primary">{t("imports.apply.willCreate", { count: simulation.batch.validRows })}</p>
+            <p className="text-lg font-semibold text-text-primary">{t(`imports.kinds.${kind}.willCreate`, { count: simulation.batch.validRows })}</p>
             <p className="text-sm text-text-secondary">
               {t("imports.apply.notCreated", { rejected: simulation.batch.rejectedRows, skipped: simulation.batch.skippedRows })}
             </p>
-            <Alert variant="warning">{t("imports.apply.documentsLate")}</Alert>
+            <Alert variant="warning">{t(`imports.kinds.${kind}.lateNote`)}</Alert>
             <p className="text-sm text-text-secondary">{t("imports.apply.sameFile")}</p>
           </div>
         </Dialog>

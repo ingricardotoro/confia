@@ -9,14 +9,15 @@ import { ImportWizard, type ImportPhase } from "./components/ImportWizard.tsx";
 import { downloadText } from "./download.ts";
 import {
   REJECTIONS_FILE_NAME,
-  TEMPLATE_FILE_NAME,
-  TEMPLATE_HEADER,
+  TEMPLATE_FILE_NAMES,
+  TEMPLATE_HEADERS,
   failureOfImport,
   fieldNameOf,
   problemOfFile,
   rejectionsCsv,
   type FileProblem,
   type ImportFailure,
+  type ImportKind,
   type ImportStep,
 } from "./import-model.ts";
 import type { ImportsSearch } from "./imports-search.ts";
@@ -28,7 +29,8 @@ export interface ImportsContainerProps {
 }
 
 /**
- * The import of students and its history. The file is held here, in memory, from the moment it is chosen until the import is
+ * The import of students, guardians and the links between them, and its history. The kind to load is a choice of the screen (local
+ * state, never the address); the history is filtered by kind from the address, like any other listing. The file is held here, in memory, from the moment it is chosen until the import is
  * applied, the person chooses another one or leaves the screen: it is never written to the address, to the storage, to the
  * query cache or to a log, and it is not read here (the browser sends it as it is). What the screen keeps of a run is its counts
  * and the line, field and reason of each rejection. The server decides everything: the summary is its answer, and the apply
@@ -36,8 +38,9 @@ export interface ImportsContainerProps {
  */
 export function ImportsContainer({ search, onSearchChange }: ImportsContainerProps) {
   const { t } = useAdminText();
-  const simulate = useSimulateImport();
-  const apply = useApplyImport();
+  const [kind, setKind] = useState<ImportKind>("students");
+  const simulate = useSimulateImport(kind);
+  const apply = useApplyImport(kind);
   const history = useImportHistory(toApiParams(search));
   const [file, setFile] = useState<File | undefined>();
   const [phase, setPhase] = useState<ImportPhase>("idle");
@@ -53,8 +56,8 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
     list: history,
     search,
     onSearchChange,
-    filtered: false,
-    cleared: search,
+    filtered: search.kind !== undefined,
+    cleared: { page: 1, pageSize: search.pageSize, kind: undefined },
     onCreate: () => {
       document.getElementById("import-file")?.focus();
     },
@@ -72,6 +75,14 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
     setSimulation(undefined);
     setConfirming(false);
     setInputKey((key) => key + 1);
+  };
+
+  /** Another kind is another file: what was chosen and shown for the previous one is let go. */
+  const onKindChange = (next: ImportKind) => {
+    if (inFlight.current || next === kind) return;
+    setKind(next);
+    setResult(undefined);
+    release();
   };
 
   const onFileChange = (chosen: File | undefined) => {
@@ -102,7 +113,7 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
     try {
       setSimulation(await simulate(file));
     } catch (error) {
-      setFailure(failureOfImport(error));
+      setFailure(failureOfImport(error, kind));
     } finally {
       inFlight.current = false;
       setPhase("idle");
@@ -119,12 +130,12 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
       setResult(applied);
       release();
     } catch (error) {
-      const failed = failureOfImport(error);
+      const failed = failureOfImport(error, kind);
       setConfirming(false);
       if (failed.kind === "other") {
         // Not knowing whether it finished is not a reason to be afraid of trying again: an applied row is skipped the next time.
         const unknown = failed.texts[0]?.key === "problem.unexpected" || failed.texts[0]?.key === "imports.errors.network";
-        setFailure(unknown ? { ...failed, texts: [...failed.texts, { key: "imports.errors.applyUnknown" }] } : failed);
+        setFailure(unknown ? { ...failed, texts: [...failed.texts, { key: `imports.kinds.${kind}.applyUnknown` as const }] } : failed);
       } else {
         // The server holds no simulation of this file: the one on the screen no longer counts.
         setSimulation(undefined);
@@ -144,6 +155,8 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
   return (
     <div className="flex flex-col gap-8">
       <ImportWizard
+        kind={kind}
+        onKindChange={onKindChange}
         step={step}
         phase={phase}
         inputKey={inputKey}
@@ -155,7 +168,7 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
         onFileChange={onFileChange}
         onSimulate={() => void onSimulate()}
         onTemplate={() => {
-          downloadText(TEMPLATE_FILE_NAME, `${TEMPLATE_HEADER}\r\n`);
+          downloadText(TEMPLATE_FILE_NAMES[kind], `${TEMPLATE_HEADERS[kind]}\r\n`);
         }}
         onDownloadRejections={() => {
           // On the result step the list is the one the apply answered, which may hold more rows than the simulation showed.
@@ -167,7 +180,7 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
               shown.rejections,
               [t("imports.rejections.csvHeader.line"), t("imports.rejections.csvHeader.field"), t("imports.rejections.csvHeader.reason")],
               (field) => {
-                const named = fieldNameOf(field);
+                const named = fieldNameOf(field, kind);
                 return named.kind === "column" ? named.name : named.kind === "row" ? t("imports.rejections.rowField") : t("imports.rejections.unknownField");
               },
               (reason) => t(`imports.reason.${reason}`),
@@ -183,7 +196,15 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
         onApply={() => void onApply()}
         onReset={onReset}
       />
-      <ImportHistory rows={historyState.rows} table={historyState.table} pagination={historyState.pagination} />
+      <ImportHistory
+        rows={historyState.rows}
+        table={historyState.table}
+        pagination={historyState.pagination}
+        kind={search.kind}
+        onKindChange={(next) => {
+          onSearchChange({ ...search, kind: next, page: 1 });
+        }}
+      />
     </div>
   );
 }

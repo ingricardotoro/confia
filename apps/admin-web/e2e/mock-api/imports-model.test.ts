@@ -189,3 +189,163 @@ describe("the history, the refused write and the failing read", () => {
     expect(model().imports.handle({ method: "DELETE", path: "/api/v1/imports", query: new URLSearchParams(), contentType: undefined, body: undefined })).toBeUndefined();
   });
 });
+
+// The guardians and the links (imports-guardians cut).
+describe("the three kinds", () => {
+  const GUARDIAN_HEADER = "legacyId,firstName,lastName,nationalId,rtn,email";
+  const LINK_HEADER = "studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,isBillingRecipient";
+  type Route = "students" | "guardians" | "guardian-links";
+
+  function kinds() {
+    const imports = createImportsModel({ ...DEFAULT_IMPORTS, seed: "empty" }, NOW);
+    const post = (route: Route, action: "simulate" | "apply", csv: string) =>
+      imports.handle({ method: "POST", path: `/api/v1/imports/${route}/${action}`, query: new URLSearchParams(), ...upload(csv) });
+    const get = (query = "") => imports.handle({ method: "GET", path: "/api/v1/imports", query: new URLSearchParams(query), contentType: undefined, body: undefined });
+    const students = (...ids: string[]) => {
+      const file = csvOf(...ids.map((id) => `${id},Ana,Pérez,2013-05-01`));
+      post("students", "simulate", file);
+      post("students", "apply", file);
+    };
+    const guardians = (...ids: string[]) => {
+      const file = [GUARDIAN_HEADER, ...ids.map((id) => `${id},Rosa,Mejía,,,`)].join("\n");
+      post("guardians", "simulate", file);
+      post("guardians", "apply", file);
+    };
+    return { imports, post, get, students, guardians };
+  }
+  const linksOf = (...rows: string[]) => [LINK_HEADER, ...rows].join("\n");
+  const reasons = (answer: ReturnType<ReturnType<typeof kinds>["post"]>) =>
+    bodyOf(answer).rejections.map((rejection) => `${String(rejection.line)}:${rejection.field}:${rejection.reason}`);
+
+  it("judges the guardians alone: the required fields, the RTN and the e-mail, a document twice in the file, and an imported legacyId skipped", () => {
+    const { post, guardians } = kinds();
+    guardians("P1");
+
+    const answer = post("guardians", "simulate", [GUARDIAN_HEADER, "P1,Rosa,Mejía,,,", "P2,,Mora,,12,", "P3,Eva,Ruiz,0801-1990-00001,,eva", "P4,Luis,Paz,0801-1990-00001,,"].join("\n"));
+
+    expect(reasons(answer)).toEqual(["3:firstName:required", "3:rtn:invalid-format", "4:email:invalid-format", "5:nationalId:duplicate-in-file", "2:legacyId:already-imported"]);
+    expect(bodyOf(answer).batch).toMatchObject({ kind: "GUARDIANS", totalRows: 4, validRows: 0, rejectedRows: 3, skippedRows: 1 });
+  });
+
+  it("checks the documents already stored only when applying, for the guardians too", () => {
+    const { post } = kinds();
+    const file = [GUARDIAN_HEADER, `P1,Rosa,Mejía,${STORED_NATIONAL_ID},,`].join("\n");
+
+    expect(bodyOf(post("guardians", "simulate", file)).batch).toMatchObject({ validRows: 1, rejectedRows: 0 });
+    const applied = post("guardians", "apply", file);
+
+    expect(reasons(applied)).toEqual(["2:nationalId:duplicate-national-id"]);
+    expect(bodyOf(applied).batch).toMatchObject({ kind: "GUARDIANS", createdRows: 0, rejectedRows: 1 });
+  });
+
+  it("takes the 409 of each kind from its own batches and simulations", () => {
+    const { post } = kinds();
+    const students = csvOf("1,Ana,Pérez,2013-05-01");
+    const guardians = [GUARDIAN_HEADER, "P1,Rosa,Mejía,,,"].join("\n");
+    post("students", "simulate", students);
+
+    expect(post("guardians", "apply", guardians)?.body).toMatchObject({ type: "https://confia.hn/problems/import-not-simulated" });
+    post("guardians", "simulate", guardians);
+    expect(post("guardians", "apply", [GUARDIAN_HEADER, "P2,Rosa,Mejía,,,"].join("\n"))?.body).toMatchObject({ type: "https://confia.hn/problems/import-file-changed" });
+    expect(post("students", "apply", students)?.status).toBe(200);
+  });
+
+  it("names the columns of each kind: a column of another kind is unknown", () => {
+    const { post } = kinds();
+
+    expect(post("guardians", "simulate", csvOf("1,Ana,Pérez,2013-05-01"))?.status).toBe(400);
+    const errors = (post("guardian-links", "simulate", [GUARDIAN_HEADER, "P1,Rosa,Mejía,,,"].join("\n"))?.body as { errors: unknown[] }).errors;
+    expect(errors).toContainEqual({ field: "studentLegacyId", reason: "missing-column" });
+  });
+
+  it("accepts a group of 33.33 + 33.33 + 33.34 and rejects 99.99 and 100.01 with the sum on every line, all in exact hundredths", () => {
+    const { post, students, guardians } = kinds();
+    students("S1", "S2", "S3");
+    guardians("G1", "G2", "G3");
+
+    const answer = post(
+      "guardian-links",
+      "simulate",
+      linksOf(
+        "S1,G1,FATHER,33.33,true,", "S1,G2,MOTHER,33.33,,", "S1,G3,OTHER,33.34,,",
+        "S2,G1,FATHER,33.33,,", "S2,G2,MOTHER,33.33,,", "S2,G3,OTHER,33.33,,",
+        "S3,G1,FATHER,33.34,,", "S3,G2,MOTHER,33.34,,", "S3,G3,OTHER,33.33,,",
+      ),
+    );
+
+    expect(bodyOf(answer).batch).toMatchObject({ kind: "GUARDIAN_LINKS", totalRows: 9, validRows: 3, rejectedRows: 6, skippedRows: 0 });
+    expect(reasons(answer)).toEqual([5, 6, 7, 8, 9, 10].map((line) => `${String(line)}:financialResponsibilityPercent:sum-not-100`));
+  });
+
+  it("rejects a whole group for a defect of one of its rows, the others as group-rejected, and the valid groups go on", () => {
+    const { post, students, guardians } = kinds();
+    students("S1", "S2");
+    guardians("G1", "G2");
+
+    const answer = post("guardian-links", "simulate", linksOf("S1,G1,FATHER,50,,", "S1,G2,MOTHER,50.555,,", "S2,G1,FATHER,100,,"));
+
+    expect(reasons(answer)).toEqual(["2:row:group-rejected", "3:financialResponsibilityPercent:invalid-percent"]);
+    expect(bodyOf(answer).batch).toMatchObject({ totalRows: 3, validRows: 1, rejectedRows: 2 });
+  });
+
+  it("rejects two primary payers, two billing recipients and a guardian twice, each on all the lines of the group", () => {
+    const { post, students, guardians } = kinds();
+    students("S1", "S2", "S3");
+    guardians("G1", "G2");
+
+    const answer = post(
+      "guardian-links",
+      "simulate",
+      linksOf("S1,G1,FATHER,50,true,", "S1,G2,MOTHER,50,true,", "S2,G1,FATHER,50,,true", "S2,G2,MOTHER,50,,true", "S3,G1,FATHER,50,,", "S3,G1,MOTHER,50,,"),
+    );
+
+    expect(reasons(answer)).toEqual([
+      "2:isPrimaryPayer:multiple-primary-payer", "3:isPrimaryPayer:multiple-primary-payer",
+      "4:isBillingRecipient:multiple-billing-recipient", "5:isBillingRecipient:multiple-billing-recipient",
+      "6:guardianLegacyId:duplicate-guardian", "7:guardianLegacyId:duplicate-guardian",
+    ]);
+  });
+
+  it("reports an unknown student or guardian by line, and only references this scenario imported count", () => {
+    const { post, students, guardians } = kinds();
+    students("S1");
+    guardians("G1");
+
+    const answer = post("guardian-links", "simulate", linksOf("S9,G1,FATHER,100,,", "S1,G9,FATHER,100,,"));
+
+    expect(reasons(answer)).toEqual(["2:studentLegacyId:unknown-student", "3:guardianLegacyId:unknown-guardian"]);
+  });
+
+  it("applies the valid groups once: the second time every line is student-already-linked and counts as skipped, not as an error", () => {
+    const { post, students, guardians, get } = kinds();
+    students("S1");
+    guardians("G1", "G2");
+    const file = linksOf("S1,G1,FATHER,60,true,true", "S1,G2,MOTHER,40,,");
+    post("guardian-links", "simulate", file);
+
+    const first = post("guardian-links", "apply", file);
+    const second = post("guardian-links", "simulate", file);
+    const again = post("guardian-links", "apply", file);
+
+    expect(bodyOf(first).batch).toMatchObject({ status: "APPLIED", createdRows: 2, validRows: 2, rejectedRows: 0, skippedRows: 0 });
+    expect(bodyOf(second).batch).toMatchObject({ validRows: 0, rejectedRows: 0, skippedRows: 2 });
+    expect(reasons(second)).toEqual(["2:studentLegacyId:student-already-linked", "3:studentLegacyId:student-already-linked"]);
+    expect(bodyOf(again).batch).toMatchObject({ createdRows: 0, skippedRows: 2 });
+    expect((get("kind=guardian-links")?.body as { total: number }).total).toBe(4);
+  });
+
+  it("filters the history by the kind of the routes and refuses a kind it does not know", () => {
+    const { post, get, students, guardians } = kinds();
+    students("S1");
+    guardians("G1");
+    post("guardians", "simulate", [GUARDIAN_HEADER, "P2,Rosa,Mejía,,,"].join("\n"));
+
+    const only = (kind: string) => get(`kind=${kind}`)?.body as { items: { kind: string }[]; total: number };
+
+    expect(only("students").items.map((item) => item.kind)).toEqual(["STUDENTS", "STUDENTS"]);
+    expect(only("guardians").items.map((item) => item.kind)).toEqual(["GUARDIANS", "GUARDIANS", "GUARDIANS"]);
+    expect(only("guardian-links").total).toBe(0);
+    expect((get("")?.body as { total: number }).total).toBe(5);
+    expect(get("kind=teachers")?.status).toBe(400);
+  });
+});

@@ -147,3 +147,75 @@ controlador (los dos de importación). Cobertura de ramas (JaCoCo, informe regen
   reintenta el bloque. La prueba comprueba una sola confirmación por bloque; el reintento real ante 40P01 no se probó (el doble en memoria no lo produce).
 - **I5**: descripción de las rutas de vínculos corregida. **I2**: `external_ref` de estudiantes y encargados en el inventario y en la tabla de anonimización de
   `docs/08-datos-privacidad-y-retencion.md`.
+
+## Construido en el frontend
+
+La pantalla «Importaciones» (`apps/admin-web/src/features/imports/`) ahora carga los tres tipos de archivo sobre el mismo asistente de cuatro
+pasos, el mismo reporte de rechazos, el mismo resultado y el mismo historial. Nada del archivo se muestra ni se guarda (el `File` sigue viviendo
+solo en el estado del contenedor; sin `localStorage`, caché de consultas ni parámetros de URL del archivo).
+
+### Pantalla
+
+- **Tipo y orden.** Un selector «Qué va a importar» (Estudiantes, Encargados, Vínculos) en el primer paso, con el orden recomendado como
+  descripción asociada. El tipo es estado local de la pantalla (no va en la URL). Cambiar de tipo suelta el archivo, el resumen y el resultado, y
+  el selector se bloquea mientras hay una petición en vuelo. Cada tipo tiene su etiqueta de campo, su ayuda de columnas, su plantilla vacía
+  descargable (`plantilla-estudiantes.csv`, `plantilla-encargados.csv`, `plantilla-vinculos.csv`, con la cabecera del backend) y sus textos de
+  resumen, confirmación, resultado y reintento. El título pasa a «Importar datos».
+- **Confirmación de vínculos.** Explica que cada estudiante se valida con todas sus filas juntas (suma exacta de 100.00, a lo sumo un pagador
+  principal y un destinatario de factura), que un defecto rechaza todo el grupo sin afectar a los demás estudiantes y que un estudiante con
+  vínculos vigentes se omite: la importación nunca los reemplaza. Encargados conserva el aviso de que los documentos ya guardados se revisan solo
+  al aplicar.
+- **Motivos nuevos** en el catálogo es-HN: `invalid-percent`, `unknown-student`, `unknown-guardian`, `student-not-active`,
+  `guardian-not-active`, `student-already-linked` (se lista como omitida, no como error), `group-rejected` (campo `row`), `sum-not-100`,
+  `multiple-primary-payer`, `multiple-billing-recipient` y `duplicate-guardian`. `duplicate-national-id` pasa a «Ya hay un registro con ese
+  documento de identidad» (vale para estudiantes y encargados). El nombre de un campo solo se muestra si es columna de la plantilla **del tipo**
+  en pantalla (`fieldNameOf(field, kind)`); cualquier otro sale como «Sin campo». No hay códigos de problema nuevos: `KNOWN_PROBLEM_CODES` y
+  `PROBLEM_KEYS` no cambian.
+- **Historial.** Columna «Tipo» y filtro «Tipo de importación» (`?kind=students|guardians|guardian-links`, validado con Zod; un valor inválido se
+  descarta). El filtro viaja al servidor como `kind`, reinicia la página y, si no deja filas, ofrece «Quitar filtros». Cada región paginada tiene
+  nombre propio (rechazos de la simulación, rechazos del resultado, historial).
+
+### Capa de datos
+
+- `shared/api/import-operations.ts`: `simulateImport(route, token, file)` y `applyImport(route, token, file)` sobre
+  `/api/v1/imports/{students|guardians|guardian-links}/{simulate|apply}`; `listImportBatches` no cambia (el `kind` va en los parámetros).
+- `useSimulateImport(kind)` y `useApplyImport(kind)`: sin actualización optimista ni reintentos. Tras aplicar se invalida `importKeys.all` y el
+  registro afectado (estudiantes, encargados, o ambos para vínculos).
+- `OptionField` (organización) gana la propiedad opcional `disabled`.
+- Se regeneró `packages/contracts` (ignorado por git). El OpenAPI declaraba `kind` solo como `STUDENTS` y los motivos sin los nuevos, de modo que
+  el Zod del cliente habría rechazado cualquier respuesta de encargados o vínculos; se corrigió en el backend (`ImportBatchResponse`,
+  `RejectionResponse` y `admin.openapi.json`).
+
+### Simulador (`e2e/mock-api`) y pruebas
+
+- `imports-model.ts` atiende los tres tipos. Encargados: obligatorios, RTN de 14 dígitos, correo, documento repetido en el archivo, `legacyId`
+  ya importado (omitido) y documento ya guardado solo al aplicar. Vínculos: las filas se agrupan por estudiante y cada grupo se juzga entero con
+  suma en centésimas enteras (sin `number` decimal; 33.33 + 33.33 + 33.34 pasa, 99.99 y 100.01 no), a lo sumo un pagador principal y un
+  destinatario, sin encargado repetido; un defecto rechaza el grupo (`group-rejected`); las referencias se buscan entre lo que el escenario ya
+  importó; un estudiante ya vinculado se reporta como omitido (`student-already-linked`). Los 409 y las simulaciones se llevan por tipo y el
+  historial filtra por `kind` (desconocido, 400). No modela estudiantes ni encargados inactivos (eso se prueba en el backend).
+- Vitest: `import-model`, `ImportWizard`, `ImportHistory`, `ImportsContainer` (MSW), `import-operations` y `imports-model` cubren tipos,
+  plantillas, filtro, motivos nuevos y rutas.
+- Playwright: `imports-guardians.e2e.ts` (criterio de aceptación con 100 estudiantes, 80 encargados y 120 vínculos con 6 grupos con suma 90,
+  corrección, aplicación y reaplicación sin cambios; grupo rechazado entero por un porcentaje inválido; referencias desconocidas y orden;
+  plantillas por tipo y soltar el archivo al cambiar de tipo; columna y filtro de tipo en el historial; nombres distintos de las paginaciones).
+  Puerta de axe: 5 estados nuevos de `/imports` (`kind-guardian-links`, `links-simulated-with-group-rejections`, `dialog-apply-links`,
+  `links-nothing-to-create`, `history-filtered-empty`).
+
+### Puerta de axe en los diálogos de aplicar
+
+- `dialog-apply` (estudiantes) y el nuevo `dialog-apply-links` fallaban con `color-contrast` en estado incompleto (`elmPartiallyObscuring`), en los dos
+  temas. La causa, leída del detalle de axe-core 4.14: el aviso del diálogo ocupaba dos líneas de texto y axe compara la pila de elementos de cada
+  línea hasta el fondo de la página (el diálogo está sobre un fondo semitransparente); detrás, un elemento de la pantalla (el contenedor del botón
+  «Aplicar la importación», o el párrafo del selector según el desplazamiento) cubría solo una de las dos líneas, y las pilas distintas hacen que axe
+  no pueda determinar el fondo. No hay cambio de código en `Alert` ni en `Dialog` desde el corte anterior: depende de la altura de la página detrás
+  y del número de líneas, y el selector de tipo desplazó esa página. Los demás diálogos pasan porque su texto cabe en una línea o queda sobre una
+  zona uniforme.
+- Corrección sin tocar reglas de axe: los avisos de los diálogos de aplicar (`imports.kinds.*.lateNote`) se acortaron a una sola línea de texto
+  (138 caracteres), conservando su contenido (documentos revisados solo al aplicar; grupos validados juntos, vínculos existentes nunca reemplazados).
+- Defecto latente, no tocado: `Dialog` usa `max-w-lg`, pero el tema de Tailwind está reiniciado y esa clase no se genera, así que todos los
+  diálogos ocupan el ancho de la ventana menos 2rem en lugar de 32rem. Conviene `max-w-[32rem]` en un cambio aparte, porque altera todos los diálogos.
+
+### Pendiente
+
+- `AW61` falla como ya se sabía.

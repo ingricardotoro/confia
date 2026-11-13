@@ -1,4 +1,4 @@
-import type { RejectionResponseOutput } from "@confia/contracts/admin";
+import type { ImportBatchResponseOutput, RejectionResponseOutput } from "@confia/contracts/admin";
 import type { AdminKey } from "../../i18n/resources.ts";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
 import { PROBLEM_KEYS } from "../../shared/api/problem-keys.ts";
@@ -6,13 +6,38 @@ import { PROBLEM_KEYS } from "../../shared/api/problem-keys.ts";
 /** The most a file may weigh. The check in the browser is a convenience: the server decides. */
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
-/** The header of the empty template, in the order of `StudentsCsv.TEMPLATE_HEADER` of the backend. */
-export const TEMPLATE_HEADER = "legacyId,firstName,lastName,birthDate,nationalId,sex";
-export const TEMPLATE_FILE_NAME = "plantilla-estudiantes.csv";
+/** What a file loads, named as the routes of the API name it. The recommended order is the order of this list. */
+export const IMPORT_KINDS = ["students", "guardians", "guardian-links"] as const;
+export type ImportKind = (typeof IMPORT_KINDS)[number];
+
+export function isImportKind(value: unknown): value is ImportKind {
+  return typeof value === "string" && (IMPORT_KINDS as readonly string[]).includes(value);
+}
+
+/** The header of the empty template of each kind, in the order of the `CsvTemplate` of the backend (required columns first). */
+export const TEMPLATE_HEADERS: Readonly<Record<ImportKind, string>> = {
+  students: "legacyId,firstName,lastName,birthDate,nationalId,sex",
+  guardians: "legacyId,firstName,lastName,nationalId,rtn,email,phone,address,preferredChannel",
+  "guardian-links": "studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,isBillingRecipient",
+};
+export const TEMPLATE_FILE_NAMES: Readonly<Record<ImportKind, string>> = {
+  students: "plantilla-estudiantes.csv",
+  guardians: "plantilla-encargados.csv",
+  "guardian-links": "plantilla-vinculos.csv",
+};
 export const REJECTIONS_FILE_NAME = "rechazos-importacion.csv";
 
-/** The columns of the template: the only names of a field the screen shows as they are. */
-const TEMPLATE_COLUMNS: ReadonlySet<string> = new Set(TEMPLATE_HEADER.split(","));
+/** The kind a batch of the history carries, as the kind of the routes. */
+export const KIND_OF_BATCH: Readonly<Record<ImportBatchResponseOutput["kind"], ImportKind>> = {
+  STUDENTS: "students",
+  GUARDIANS: "guardians",
+  GUARDIAN_LINKS: "guardian-links",
+};
+
+/** The columns of the template of a kind: the only names of a field the screen shows as they are. */
+function columnsOf(kind: ImportKind): ReadonlySet<string> {
+  return new Set(TEMPLATE_HEADERS[kind].split(","));
+}
 
 /** Why a file is refused in the browser before it is sent. The server refuses the same and more. */
 export type FileProblem = "extension" | "too-large" | "empty";
@@ -32,9 +57,9 @@ export type ImportStep = (typeof IMPORT_STEPS)[number];
 export type Reason = RejectionResponseOutput["reason"];
 
 /** The name of the field of a rejection as the screen shows it: a column of the template as it is, `row` as a text of its own. */
-export function fieldNameOf(field: string): { readonly kind: "column"; readonly name: string } | { readonly kind: "row" } | { readonly kind: "unknown" } {
+export function fieldNameOf(field: string, kind: ImportKind): { readonly kind: "column"; readonly name: string } | { readonly kind: "row" } | { readonly kind: "unknown" } {
   if (field === "row") return { kind: "row" };
-  return TEMPLATE_COLUMNS.has(field) ? { kind: "column", name: field } : { kind: "unknown" };
+  return columnsOf(kind).has(field) ? { kind: "column", name: field } : { kind: "unknown" };
 }
 
 /** A catalog key with the values it needs. */
@@ -64,9 +89,9 @@ const COLUMNS_INDEX = /^columns\[(\d+)\]$/;
 /** The most file problems the screen lists; a file with a broken header can have many. */
 const MAX_FILE_TEXTS = 10;
 
-function fileTextOf(error: { readonly field: string; readonly reason: string }): ImportText {
+function fileTextOf(error: { readonly field: string; readonly reason: string }, kind: ImportKind): ImportText {
   if (error.field === "file" && Object.hasOwn(FILE_REASON_KEYS, error.reason)) return { key: FILE_REASON_KEYS[error.reason] as AdminKey };
-  if (error.reason === "missing-column" && TEMPLATE_COLUMNS.has(error.field)) return { key: "imports.fileErrors.missingColumn", values: { column: error.field } };
+  if (error.reason === "missing-column" && columnsOf(kind).has(error.field)) return { key: "imports.fileErrors.missingColumn", values: { column: error.field } };
   const index = COLUMNS_INDEX.exec(error.field)?.[1];
   if (error.reason === "unknown-column" && index !== undefined) return { key: "imports.fileErrors.unknownColumn", values: { position: Number(index) + 1 } };
   return { key: "imports.fileErrors.other" };
@@ -76,7 +101,7 @@ function fileTextOf(error: { readonly field: string; readonly reason: string }):
  * Sorts a rejected request: the two 409 of the import (each with the step that follows), the file that cannot be read
  * (one text per problem, never with a value of the file), the limit of imports per hour, and the rest as the general case.
  */
-export function failureOfImport(error: unknown): ImportFailure {
+export function failureOfImport(error: unknown, kind: ImportKind): ImportFailure {
   if (!(error instanceof ApiFailure)) return { kind: "other", texts: [{ key: "problem.unexpected" }] };
   const { result } = error;
   if (result.kind === "network") return { kind: "other", texts: [{ key: "imports.errors.network" }] };
@@ -87,7 +112,7 @@ export function failureOfImport(error: unknown): ImportFailure {
   if (code === "import-file-changed") return { kind: "file-changed", texts: [{ key: PROBLEM_KEYS[code] }], ...trace };
   if (code === "too-many-requests") return { kind: "other", texts: [{ key: "imports.errors.rateLimited" }], ...trace };
   if (code === "validation-failed" && errors.length > 0) {
-    return { kind: "other", texts: errors.slice(0, MAX_FILE_TEXTS).map(fileTextOf), ...trace };
+    return { kind: "other", texts: errors.slice(0, MAX_FILE_TEXTS).map((problem) => fileTextOf(problem, kind)), ...trace };
   }
   if (code === "validation-failed") return { kind: "other", texts: [{ key: "imports.fileErrors.other" }], ...trace };
   return { kind: "other", texts: [{ key: PROBLEM_KEYS[code] }], ...trace };

@@ -20,6 +20,7 @@ export interface OptionFieldProps {
   readonly error?: string | undefined;
   readonly description?: string;
   readonly required?: boolean;
+  readonly disabled?: boolean;
 }
 
 /** A labelled native select, for a form or for a filter. */
@@ -34,6 +35,7 @@ export function OptionField({
   error,
   description,
   required = false,
+  disabled = false,
 }: OptionFieldProps) {
   return (
     <FormField
@@ -47,6 +49,7 @@ export function OptionField({
         <Select
           {...control}
           value={value}
+          disabled={disabled}
           onChange={(event) => {
             onChange(event.target.value);
           }}
