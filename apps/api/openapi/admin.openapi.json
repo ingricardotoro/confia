@@ -3728,7 +3728,7 @@
     },
     "/api/v1/imports" : {
       "get" : {
-        "description" : "One page of the batches (simulations and applications) of the institution of the token, newest first. A batch holds counts and the SHA-256 of the file, never a row of it. Needs the permission students:read. page counts from 0 and size defaults to 50 and is at most 100.",
+        "description" : "One page of the batches (simulations and applications) of the institution of the token, newest first. A batch holds counts and the SHA-256 of the file, never a row of it. Needs the permission students:read (and guardians:read for the batches of the guardians kinds, which are listed only to an account that holds it; asking for a kind it cannot read is a 403). page counts from 0 and size defaults to 50 and is at most 100.",
         "operationId" : "listImportBatches",
         "parameters" : [ {
           "description" : "Page, counted from 0",
@@ -3752,6 +3752,14 @@
             "maximum" : 100,
             "minimum" : 1,
             "type" : "integer"
+          }
+        }, {
+          "description" : "Only the batches of this kind: students, guardians or guardian-links. Without it, the kinds the account may read",
+          "in" : "query",
+          "name" : "kind",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "responses" : {
@@ -3831,6 +3839,462 @@
         "summary" : "Lists the import batches",
         "tags" : [ "imports" ],
         "x-required-permission" : "students:read"
+      }
+    },
+    "/api/v1/imports/guardian-links/apply" : {
+      "post" : {
+        "description" : "Applies the same file the account simulated: it only proceeds when the SHA-256 of the file matches a simulation of this kind by the same account in the institution. It judges the file again and registers each valid group, one transaction per student, with the same use case as the replacement of the set of guardians of a student (lock of the student, history, audit, INV-32). A student that already has current links, by hand or from an earlier application, is skipped (student-already-linked), so applying twice creates nothing twice. Needs the permissions guardians:create and guardians:update.",
+        "operationId" : "applyGuardianLinkImport",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "properties" : {
+                  "file" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "file" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportRunResponse"
+                }
+              }
+            },
+            "description" : "The APPLIED batch and the rejections"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The file cannot be read as a student import (validation-failed, with errors)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold guardians:create and guardians:update, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account never simulated a file with this fingerprint (import-not-simulated), or its last simulation was of another file (import-file-changed)"
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request is not multipart/form-data (unsupported-media-type)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many imports from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Applies the import of guardian links",
+        "tags" : [ "imports" ],
+        "x-required-permission" : "guardians:create"
+      }
+    },
+    "/api/v1/imports/guardian-links/simulate" : {
+      "post" : {
+        "description" : "Reads a CSV file (UTF-8, separator , or ; detected in the header, up to 5 MB and 10000 rows, columns studentLegacyId, guardianLegacyId, relationship, financialResponsibilityPercent and optionally isPrimaryPayer and isBillingRecipient), groups the rows by student and judges each group as the complete set the hand registration demands (INV-32: the percentages add up to exactly 100.00, at most one primary payer and one billing recipient, no guardian twice); a group with any problem is rejected whole. The students and guardians are the ones already imported, found by their legacyId; a student that already has current links is skipped (student-already-linked), the import never replaces links. It writes nothing and records a VALIDATED batch. The rejections (line, column, reason; never a value) are returned and not stored; at most 200 are listed. Needs the permissions guardians:create and guardians:update.",
+        "operationId" : "simulateGuardianLinkImport",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "properties" : {
+                  "file" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "file" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportRunResponse"
+                }
+              }
+            },
+            "description" : "The simulation batch and the rejections"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The file is missing, empty, too big, not UTF-8, not a well-formed CSV, has too many rows or its header is not the template (validation-failed, with errors)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold guardians:create and guardians:update, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request is not multipart/form-data (unsupported-media-type)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many imports from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Simulates the import of guardian links",
+        "tags" : [ "imports" ],
+        "x-required-permission" : "guardians:create"
+      }
+    },
+    "/api/v1/imports/guardians/apply" : {
+      "post" : {
+        "description" : "Applies the same file the account simulated: it only proceeds when the SHA-256 of the file matches a simulation by the same account in the institution. It judges the file again and registers the valid rows through the same use case as the hand registration (generated code, encrypted document, audit). A row imported before is skipped, so applying twice creates nothing twice. A national id already held by another guardian is found only here, when the row is registered (each attempt is a real, audited write like a hand registration), and the row is rejected as duplicate-national-id without its value: the rejected count of the application can therefore be higher than the one the simulation reported. Needs the permission guardians:create.",
+        "operationId" : "applyGuardianImport",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "properties" : {
+                  "file" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "file" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportRunResponse"
+                }
+              }
+            },
+            "description" : "The APPLIED batch and the rejections"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The file cannot be read as a guardian import (validation-failed, with errors)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold guardians:create, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account never simulated a file with this fingerprint (import-not-simulated), or its last simulation was of another file (import-file-changed)"
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request is not multipart/form-data (unsupported-media-type)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many imports from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Applies the import of guardians",
+        "tags" : [ "imports" ],
+        "x-required-permission" : "guardians:create"
+      }
+    },
+    "/api/v1/imports/guardians/simulate" : {
+      "post" : {
+        "description" : "Reads a CSV file (UTF-8, separator , or ; detected in the header, up to 5 MB and 10000 rows, columns legacyId, firstName, lastName and optionally nationalId, rtn, email, phone, address and preferredChannel), judges every row with the rules of the guardian registry and records a VALIDATED batch. It writes no guardian. It detects only the problems of the file itself (field rules, repeated legacyId or national id inside the file) and rows already imported by legacyId; it never checks the national ids already stored, so a national id held by another guardian is not reported here and the rejected count of the application can be higher. The rejections (line, column, reason; never a value) are returned and not stored; at most 200 are listed. Needs the permission guardians:create.",
+        "operationId" : "simulateGuardianImport",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "properties" : {
+                  "file" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "file" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportRunResponse"
+                }
+              }
+            },
+            "description" : "The simulation batch and the rejections"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The file is missing, empty, too big, not UTF-8, not a well-formed CSV, has too many rows or its header is not the template (validation-failed, with errors)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold guardians:create, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request is not multipart/form-data (unsupported-media-type)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many imports from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Simulates the import of guardians",
+        "tags" : [ "imports" ],
+        "x-required-permission" : "guardians:create"
       }
     },
     "/api/v1/imports/students/apply" : {

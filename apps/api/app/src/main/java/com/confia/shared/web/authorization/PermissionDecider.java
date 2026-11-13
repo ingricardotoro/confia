@@ -69,10 +69,16 @@ public final class PermissionDecider {
         if (!actor.methods().contains(AuthenticationMethod.ONE_TIME_PASSWORD)) {
             return DENIED;
         }
-        if (resolve(actor).contains(endpoint.permission())) {
-            return GRANTED;
+        Set<Permission> held = resolve(actor);
+        if (!held.contains(endpoint.permission())) {
+            throw new PermissionDeniedException(endpoint.permission(), endpoint.pattern(), actor);
         }
-        throw new PermissionDeniedException(endpoint.permission(), endpoint.pattern(), actor);
+        for (Permission also : endpoint.alsoRequired()) {
+            if (!held.contains(also)) {
+                throw new PermissionDeniedException(also, endpoint.pattern(), actor);
+            }
+        }
+        return GRANTED;
     }
 
     private Set<Permission> resolve(AuthenticatedActor actor) {

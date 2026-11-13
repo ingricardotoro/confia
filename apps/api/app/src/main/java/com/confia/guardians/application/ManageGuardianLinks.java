@@ -91,42 +91,73 @@ public final class ManageGuardianLinks {
         UUID auditRequestId = GuardiansAudit.requestId(Objects.requireNonNull(requestId, "requestId"));
         InstitutionId institution = new InstitutionId(actor.institutionId());
         ResponsibilitySplit split = split(requested);
-        return transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
-            StudentRef student = students.lock(institution, studentId).orElseThrow(ResourceNotFoundException::new);
-            if (!student.active()) {
-                throw new StudentNotActiveException();
-            }
-            List<GuardianLink> current = links.currentOfStudent(institution, studentId);
-            Set<UUID> involved = new LinkedHashSet<>(split.guardianIds());
-            involved.addAll(guardianIdsOf(current));
-            Map<UUID, Guardian> found = byId(guardians.lockAllShared(institution, involved));
-            if (!found.keySet().containsAll(split.guardianIds())) {
-                throw new ResourceNotFoundException();
-            }
-            Set<UUID> active = new HashSet<>();
-            found.values().forEach(guardian -> {
-                if (guardian.active()) {
-                    active.add(guardian.id());
-                }
-            });
-            split.requireActive(active);
+        return transactionRunner.execute(actor.securityContext(auditRequestId.toString()),
+                () -> replaceLocked(actor, auditRequestId, institution, studentId, split, false));
+    }
 
-            Instant now = now();
-            LinkReplacement replacement = LinkReplacement.of(current, split, studentId, LinkReplacement.dayOf(now),
-                    actor.accountId(), now, UUID::randomUUID);
-            List<GuardianLink> after = new ArrayList<>(replacement.kept());
-            after.addAll(replacement.opened());
-            if (replacement.changed()) {
-                LocalDate today = LinkReplacement.dayOf(now);
-                links.close(institution, replacement.closed().stream().map(GuardianLink::id).toList(), today);
-                links.insertAll(institution, replacement.opened());
-                Map<UUID, String> codes = new HashMap<>();
-                found.values().forEach(guardian -> codes.put(guardian.id(), guardian.guardianCode()));
-                auditLogWriter.append(GuardiansAudit.linksReplaced(actor, auditRequestId, studentId,
-                        student.studentCode(), current, after, codes));
+    /**
+     * The links of a bulk import (docs/cortes/imports-guardians.md): the set of a student registered with exactly the
+     * rules, the locks, the history and the audit of {@link #replace}, but <b>never replacing</b>: when the student
+     * already has current links, made by hand or by an earlier application of the file, nothing is written and the
+     * answer is {@code false}. Like {@link #replace}, it throws the domain errors of a set that breaks INV-32, of a
+     * student or a guardian that does not exist or is not active.
+     *
+     * @return {@code true} when the set was registered, {@code false} when the student already had links
+     */
+    public boolean registerImported(AuthenticatedActor actor, String requestId, UUID studentId,
+            List<LinkRequest> requested) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(requested, "requested");
+        UUID auditRequestId = GuardiansAudit.requestId(Objects.requireNonNull(requestId, "requestId"));
+        InstitutionId institution = new InstitutionId(actor.institutionId());
+        ResponsibilitySplit split = split(requested);
+        return transactionRunner.execute(actor.securityContext(auditRequestId.toString()),
+                () -> replaceLocked(actor, auditRequestId, institution, studentId, split, true) != null);
+    }
+
+    /**
+     * The body of the replacement, inside the transaction. With {@code onlyIfUnlinked} a student that already has
+     * current links is left alone and the answer is {@code null}.
+     */
+    private StudentGuardiansView replaceLocked(AuthenticatedActor actor, UUID auditRequestId,
+            InstitutionId institution, UUID studentId, ResponsibilitySplit split, boolean onlyIfUnlinked) {
+        StudentRef student = students.lock(institution, studentId).orElseThrow(ResourceNotFoundException::new);
+        if (!student.active()) {
+            throw new StudentNotActiveException();
+        }
+        List<GuardianLink> current = links.currentOfStudent(institution, studentId);
+        if (onlyIfUnlinked && !current.isEmpty()) {
+            return null;
+        }
+        Set<UUID> involved = new LinkedHashSet<>(split.guardianIds());
+        involved.addAll(guardianIdsOf(current));
+        Map<UUID, Guardian> found = byId(guardians.lockAllShared(institution, involved));
+        if (!found.keySet().containsAll(split.guardianIds())) {
+            throw new ResourceNotFoundException();
+        }
+        Set<UUID> active = new HashSet<>();
+        found.values().forEach(guardian -> {
+            if (guardian.active()) {
+                active.add(guardian.id());
             }
-            return view(student, after, found);
         });
+        split.requireActive(active);
+
+        Instant now = now();
+        LinkReplacement replacement = LinkReplacement.of(current, split, studentId, LinkReplacement.dayOf(now),
+                actor.accountId(), now, UUID::randomUUID);
+        List<GuardianLink> after = new ArrayList<>(replacement.kept());
+        after.addAll(replacement.opened());
+        if (replacement.changed()) {
+            LocalDate today = LinkReplacement.dayOf(now);
+            links.close(institution, replacement.closed().stream().map(GuardianLink::id).toList(), today);
+            links.insertAll(institution, replacement.opened());
+            Map<UUID, String> codes = new HashMap<>();
+            found.values().forEach(guardian -> codes.put(guardian.id(), guardian.guardianCode()));
+            auditLogWriter.append(GuardiansAudit.linksReplaced(actor, auditRequestId, studentId,
+                    student.studentCode(), current, after, codes));
+        }
+        return view(student, after, found);
     }
 
     private static ResponsibilitySplit split(List<LinkRequest> requested) {

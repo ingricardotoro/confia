@@ -9,6 +9,7 @@ import com.confia.guardians.application.Page;
 import com.confia.guardians.application.PageRequest;
 import com.confia.guardians.application.ProtectedNationalId;
 import com.confia.guardians.application.Storage;
+import com.confia.guardians.domain.DuplicateExternalRefException;
 import com.confia.guardians.domain.DuplicateNationalIdException;
 import com.confia.guardians.domain.Guardian;
 import com.confia.guardians.domain.GuardianStatus;
@@ -18,13 +19,17 @@ import com.confia.kernel.InstitutionId;
 import confia.generated.jooq.tables.records.GuardiansGuardianRecord;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.InsertSetMoreStep;
 import org.jooq.SortField;
 import org.jooq.impl.DSL;
 
@@ -113,12 +118,60 @@ public final class JooqGuardianRepository implements GuardianRepository {
     public void insert(InstitutionId institutionId, Guardian guardian, ProtectedNationalId document,
             String rtnEncrypted) {
         refuseDocumentOfAnotherGuardian(institutionId, guardian.id(), document);
-        GuardianWrites.translating(() -> dsl.insertInto(GUARDIANS_GUARDIAN)
+        GuardianWrites.translating(() -> insertStatement(institutionId, guardian, document, rtnEncrypted, null)
+                .execute());
+    }
+
+    @Override
+    public void insertImported(InstitutionId institutionId, Guardian guardian, ProtectedNationalId document,
+            String rtnEncrypted, String externalRef) {
+        refuseDocumentOfAnotherGuardian(institutionId, guardian.id(), document);
+        // The reference of the source system is the user's data: a unique violation would print it in the DETAIL of the
+        // server log. ON CONFLICT settles the same race (it waits for a concurrent writer) without raising an error,
+        // so there is nothing for the log to print. The other uniqueness (code, document) still raise and translate.
+        int[] inserted = new int[1];
+        GuardianWrites.translating(() -> inserted[0] = insertStatement(institutionId, guardian, document,
+                rtnEncrypted, externalRef)
+                .onConflict(GUARDIANS_GUARDIAN.INSTITUTION_ID, GUARDIANS_GUARDIAN.EXTERNAL_REF).doNothing()
+                .execute());
+        if (inserted[0] == 0) {
+            throw new DuplicateExternalRefException();
+        }
+    }
+
+    @Override
+    public Set<String> existingExternalRefs(InstitutionId institutionId, Collection<String> externalRefs) {
+        if (externalRefs.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(dsl.select(GUARDIANS_GUARDIAN.EXTERNAL_REF).from(GUARDIANS_GUARDIAN)
+                .where(GUARDIANS_GUARDIAN.INSTITUTION_ID.eq(institutionId.value()))
+                .and(GUARDIANS_GUARDIAN.EXTERNAL_REF.in(externalRefs))
+                .fetch(GUARDIANS_GUARDIAN.EXTERNAL_REF));
+    }
+
+    @Override
+    public Map<String, Guardian> findByExternalRefs(InstitutionId institutionId, Collection<String> externalRefs) {
+        Map<String, Guardian> found = new HashMap<>();
+        if (externalRefs.isEmpty()) {
+            return found;
+        }
+        dsl.selectFrom(GUARDIANS_GUARDIAN)
+                .where(GUARDIANS_GUARDIAN.INSTITUTION_ID.eq(institutionId.value()))
+                .and(GUARDIANS_GUARDIAN.EXTERNAL_REF.in(externalRefs))
+                .fetch().forEach(row -> found.put(row.getExternalRef(), toDomain(row)));
+        return found;
+    }
+
+    private InsertSetMoreStep<GuardiansGuardianRecord> insertStatement(InstitutionId institutionId, Guardian guardian,
+            ProtectedNationalId document, String rtnEncrypted, String externalRef) {
+        return dsl.insertInto(GUARDIANS_GUARDIAN)
                 .set(GUARDIANS_GUARDIAN.INSTITUTION_ID, institutionId.value())
                 .set(GUARDIANS_GUARDIAN.ID, guardian.id())
                 .set(GUARDIANS_GUARDIAN.GUARDIAN_CODE, guardian.guardianCode())
                 .set(GUARDIANS_GUARDIAN.FIRST_NAME, guardian.firstName())
                 .set(GUARDIANS_GUARDIAN.LAST_NAME, guardian.lastName())
+                .set(GUARDIANS_GUARDIAN.EXTERNAL_REF, externalRef)
                 .set(GUARDIANS_GUARDIAN.NATIONAL_ID_ENCRYPTED, document == null ? null : document.encrypted())
                 .set(GUARDIANS_GUARDIAN.NATIONAL_ID_BLIND_INDEX, document == null ? null : document.blindIndex())
                 .set(GUARDIANS_GUARDIAN.RTN_ENCRYPTED, rtnEncrypted)
@@ -128,8 +181,7 @@ public final class JooqGuardianRepository implements GuardianRepository {
                 .set(GUARDIANS_GUARDIAN.PREFERRED_CHANNEL, guardian.preferredChannel().name())
                 .set(GUARDIANS_GUARDIAN.STATUS, guardian.status().name())
                 .set(GUARDIANS_GUARDIAN.CREATED_AT, GuardianWrites.toDatabase(guardian.createdAt()))
-                .set(GUARDIANS_GUARDIAN.UPDATED_AT, GuardianWrites.toDatabase(guardian.updatedAt()))
-                .execute());
+                .set(GUARDIANS_GUARDIAN.UPDATED_AT, GuardianWrites.toDatabase(guardian.updatedAt()));
     }
 
     @Override

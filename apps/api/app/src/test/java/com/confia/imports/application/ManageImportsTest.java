@@ -3,6 +3,7 @@ package com.confia.imports.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.confia.guardians.application.importing.LinkOutcome;
 import com.confia.imports.domain.ImportBatch;
 import com.confia.imports.domain.ImportFileChangedException;
 import com.confia.imports.domain.ImportKind;
@@ -38,9 +39,10 @@ import org.junit.jupiter.api.Test;
  * does, the limits and the shape of the file, the counts that always add up, and that the batch, the audit entry and
  * every failure carry no value of the file. The rules of each value belong to {@code students} and are tested there.
  */
-class ImportStudentsTest {
+class ManageImportsTest {
 
     private static final Instant NOW = Instant.parse("2026-11-12T15:00:00Z");
+    private static final Set<ImportKind> ALL = java.util.EnumSet.allOf(ImportKind.class);
     private static final String HEADER = "legacyId,firstName,lastName,birthDate\n";
 
     private final List<String> transactionCalls = new ArrayList<>();
@@ -52,7 +54,10 @@ class ImportStudentsTest {
     private final UUID institutionUuid = UUID.randomUUID();
     private final AuthenticatedActor actor = actorOf(institutionUuid, UUID.randomUUID());
     private final String requestId = UUID.randomUUID().toString();
-    private final ImportStudents imports = new ImportStudents(runner, batches, students, auditWriter,
+    private final FakeGuardianGateways.Guardians guardianPort = new FakeGuardianGateways.Guardians();
+    private final FakeGuardianGateways.Links linkPort = new FakeGuardianGateways.Links();
+    private final ManageImports imports = new ManageImports(runner, batches, students, guardianPort,
+            linkPort, auditWriter,
             Clock.fixed(NOW, ZoneOffset.UTC));
 
     private static AuthenticatedActor actorOf(UUID institution, UUID account) {
@@ -75,11 +80,11 @@ class ImportStudentsTest {
     }
 
     private ImportRun simulate(byte[] file) {
-        return imports.simulate(actor, requestId, file);
+        return imports.simulate(ImportKind.STUDENTS, actor, requestId, file);
     }
 
     private ImportRun apply(byte[] file) {
-        return imports.apply(actor, requestId, file);
+        return imports.apply(ImportKind.STUDENTS, actor, requestId, file);
     }
 
     private static List<RejectedImportFileException.FileProblem> refusal(Runnable action) {
@@ -209,7 +214,7 @@ class ImportStudentsTest {
 
         ImportRun run = simulate(rows(300));
 
-        assertThat(run.rejections()).hasSize(ImportStudents.MAX_REPORTED);
+        assertThat(run.rejections()).hasSize(ManageImports.MAX_REPORTED);
         assertThat(run.rejectionsTruncated()).isTrue();
         assertThat(run.rejections().subList(0, 150)).extracting(RejectionView::reason).containsOnly("required");
         assertThat(run.rejections().subList(150, 200)).extracting(RejectionView::reason)
@@ -258,7 +263,7 @@ class ImportStudentsTest {
 
     @Test
     void theFileMayHaveFiveMegabytesAndNotOneByteMore() {
-        byte[] exactly = new byte[ImportStudents.MAX_BYTES];
+        byte[] exactly = new byte[ManageImports.MAX_BYTES];
         byte[] start = file(HEADER + "R1,Ana,");
         System.arraycopy(start, 0, exactly, 0, start.length);
         java.util.Arrays.fill(exactly, start.length, exactly.length - 12, (byte) 'x');
@@ -266,15 +271,15 @@ class ImportStudentsTest {
         System.arraycopy(end, 0, exactly, exactly.length - end.length, end.length);
 
         assertThat(simulate(exactly).batch().totalRows()).isEqualTo(1);
-        assertThat(refusal(() -> simulate(new byte[ImportStudents.MAX_BYTES + 1])))
+        assertThat(refusal(() -> simulate(new byte[ManageImports.MAX_BYTES + 1])))
                 .containsExactly(new RejectedImportFileException.FileProblem("file", "too-large"));
     }
 
     @Test
     void tenThousandRowsAreAcceptedAndTenThousandAndOneAreRefused() {
-        assertThat(simulate(rows(ImportStudents.MAX_ROWS)).batch().totalRows()).isEqualTo(10_000);
+        assertThat(simulate(rows(ManageImports.MAX_ROWS)).batch().totalRows()).isEqualTo(10_000);
 
-        assertThat(refusal(() -> simulate(rows(ImportStudents.MAX_ROWS + 1))))
+        assertThat(refusal(() -> simulate(rows(ManageImports.MAX_ROWS + 1))))
                 .containsExactly(new RejectedImportFileException.FileProblem("file", "too-many-rows"));
     }
 
@@ -343,8 +348,8 @@ class ImportStudentsTest {
     @Test
     void aSimulationOfAnotherAccountOrInstitutionDoesNotCount() {
         byte[] file = rows(2);
-        imports.simulate(actorOf(institutionUuid, UUID.randomUUID()), requestId, file);
-        imports.simulate(actorOf(UUID.randomUUID(), actor.accountId()), requestId, file);
+        imports.simulate(ImportKind.STUDENTS, actorOf(institutionUuid, UUID.randomUUID()), requestId, file);
+        imports.simulate(ImportKind.STUDENTS, actorOf(UUID.randomUUID(), actor.accountId()), requestId, file);
 
         assertThatThrownBy(() -> apply(file)).isInstanceOf(ImportNotSimulatedException.class);
     }
@@ -513,9 +518,10 @@ class ImportStudentsTest {
         AuditLogWriter failing = entry -> {
             throw auditDown;
         };
-        ImportStudents broken = new ImportStudents(runner, batches, students, failing, Clock.fixed(NOW, ZoneOffset.UTC));
+        ManageImports broken = new ManageImports(runner, batches, students, new FakeGuardianGateways.Guardians(),
+                new FakeGuardianGateways.Links(), failing, Clock.fixed(NOW, ZoneOffset.UTC));
 
-        assertThatThrownBy(() -> broken.apply(actor, requestId, file)).isSameAs(cause)
+        assertThatThrownBy(() -> broken.apply(ImportKind.STUDENTS, actor, requestId, file)).isSameAs(cause)
                 .satisfies(e -> assertThat(e.getSuppressed()).containsExactly(auditDown));
     }
 
@@ -563,10 +569,10 @@ class ImportStudentsTest {
         for (int i = 1; i <= 3; i++) {
             simulate(rows(i));
         }
-        imports.simulate(actorOf(UUID.randomUUID(), UUID.randomUUID()), requestId, rows(1));
+        imports.simulate(ImportKind.STUDENTS, actorOf(UUID.randomUUID(), UUID.randomUUID()), requestId, rows(1));
 
-        Page<ImportBatchView> first = imports.list(actor, requestId, 0, 2);
-        Page<ImportBatchView> second = imports.list(actor, requestId, 1, 2);
+        Page<ImportBatchView> first = imports.list(actor, requestId, 0, 2, ALL);
+        Page<ImportBatchView> second = imports.list(actor, requestId, 1, 2, ALL);
 
         assertThat(first.total()).isEqualTo(3);
         assertThat(first.items()).extracting(ImportBatchView::totalRows).containsExactly(3, 2);
@@ -577,10 +583,180 @@ class ImportStudentsTest {
 
     @Test
     void aPageOrSizeOutOfRangeIsRefusedBeforeReading() {
-        assertThatThrownBy(() -> imports.list(actor, requestId, -1, 10)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> imports.list(actor, requestId, 0, 0)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> imports.list(actor, requestId, 0, PageRequest.MAX_SIZE + 1))
+        assertThatThrownBy(() -> imports.list(actor, requestId, -1, 10, ALL)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> imports.list(actor, requestId, 0, 0, ALL)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> imports.list(actor, requestId, 0, PageRequest.MAX_SIZE + 1, ALL))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // --- Guardians and links (docs/cortes/imports-guardians.md) ---
+
+    private static final String GUARDIANS_HEADER = "legacyId,firstName,lastName,nationalId\n";
+    private static final String LINKS_HEADER =
+            "studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer\n";
+
+    private ImportRun simulate(ImportKind kind, String text) {
+        return imports.simulate(kind, actor, requestId, file(text));
+    }
+
+    private ImportRun apply(ImportKind kind, String text) {
+        return imports.apply(kind, actor, requestId, file(text));
+    }
+
+    @Test
+    void theGuardiansReachThePortRawAndAreCreatedOnApplicationWithTheirOwnKindOfBatch() {
+        String text = GUARDIANS_HEADER + "P1,Rosa,Aguilar,0801-1980-12345\nP2,Luis,Alvarado,\n";
+        ImportRun simulation = simulate(ImportKind.GUARDIANS, text);
+        assertThat(simulation.batch().kind()).isEqualTo("GUARDIANS");
+        assertThat(simulation.batch().validRows()).isEqualTo(2);
+        assertThat(guardianPort.created).isEmpty();
+        assertThat(guardianPort.evaluated).extracting(g -> g.legacyId()).containsExactly("P1", "P2");
+
+        ImportRun applied = apply(ImportKind.GUARDIANS, text);
+
+        assertThat(applied.batch().status()).isEqualTo("APPLIED");
+        assertThat(applied.batch().createdRows()).isEqualTo(2);
+        assertThat(guardianPort.created).hasSize(2);
+        assertThat(students.evaluated).isEmpty();
+        assertThat(audit.toString()).doesNotContain("Rosa", "Aguilar", "0801").doesNotContain("P1");
+    }
+
+    @Test
+    void aSimulationOfAnotherKindNeverAllowsTheApplication() {
+        String text = GUARDIANS_HEADER + "P1,Rosa,Aguilar,\n";
+        simulate(ImportKind.GUARDIANS, text);
+
+        assertThatThrownBy(() -> apply(ImportKind.GUARDIAN_LINKS, text)).isInstanceOf(ImportNotSimulatedException.class);
+        assertThatThrownBy(() -> apply(ImportKind.STUDENTS, text)).isInstanceOf(ImportNotSimulatedException.class);
+    }
+
+    @Test
+    void theGuardiansPortProblemsAndLateOutcomesAreCountedLikeThoseOfTheStudents() {
+        guardianPort.problems.add(FakeGuardianGateways.problem(2, "email", "invalid-format"));
+        guardianPort.problems.add(FakeGuardianGateways.problem(3, "legacyId", "already-imported"));
+        guardianPort.outcomes = row -> switch (row.legacyId()) {
+            case "P5" -> com.confia.guardians.application.importing.CreateOutcome.DUPLICATE_NATIONAL_ID;
+            case "P6" -> com.confia.guardians.application.importing.CreateOutcome.ALREADY_IMPORTED;
+            default -> com.confia.guardians.application.importing.CreateOutcome.CREATED;
+        };
+        String text = GUARDIANS_HEADER + "P1,a,b,\nP2,a,b,\nP4,a,b,\nP5,a,b,\nP6,a,b,\n";
+        ImportRun simulation = simulate(ImportKind.GUARDIANS, text);
+        assertThat(simulation.batch().rejectedRows()).isEqualTo(1);
+        assertThat(simulation.batch().skippedRows()).isEqualTo(1);
+        assertThat(simulation.batch().validRows()).isEqualTo(3);
+
+        ImportRun applied = apply(ImportKind.GUARDIANS, text);
+
+        assertThat(applied.batch().createdRows()).isEqualTo(1);
+        assertThat(applied.batch().rejectedRows()).isEqualTo(2);
+        assertThat(applied.batch().skippedRows()).isEqualTo(2);
+        assertThat(applied.batch().totalRows()).isEqualTo(5);
+        assertThat(applied.rejections()).extracting(RejectionView::reason).containsExactly("invalid-format",
+                "duplicate-national-id", "already-imported", "already-imported");
+    }
+
+    @Test
+    void aGuardiansFileWithTheHeaderOfStudentsIsRefusedWithAPositionAndNeverTheText() {
+        assertThat(refusal(() -> simulate(ImportKind.GUARDIANS, "legacyId,firstName,lastName,birthDate\nP1,a,b,c\n")))
+                .containsExactly(new RejectedImportFileException.FileProblem("columns[3]", "unknown-column"));
+    }
+
+    @Test
+    void aPartialFailureOfTheGuardiansLeavesTheTraceOfItsKindAndRethrowsTheCause() {
+        IllegalStateException cause = new IllegalStateException("database down");
+        guardianPort.failure = new com.confia.guardians.application.importing.PartialImportException(3, cause);
+        String text = GUARDIANS_HEADER + "P1,a,b,\n";
+        simulate(ImportKind.GUARDIANS, text);
+
+        assertThatThrownBy(() -> apply(ImportKind.GUARDIANS, text)).isSameAs(cause);
+
+        AuditEntry failed = audit.getLast();
+        assertThat(failed.action()).isEqualTo("imports.batch.failed");
+        assertThat(failed.afterValue()).contains("GUARDIANS").contains("\"createdRows\":3");
+    }
+
+    @Test
+    void theLinksAreGroupedByThePortAndAStudentAlreadyLinkedIsSkippedNotRejected() {
+        linkPort.problems.add(FakeGuardianGateways.problem(2, "studentLegacyId", "student-already-linked"));
+        linkPort.problems.add(FakeGuardianGateways.problem(3, "studentLegacyId", "student-already-linked"));
+        linkPort.problems.add(FakeGuardianGateways.problem(4, "row", "group-rejected"));
+        String text = LINKS_HEADER + "S1,G1,MOTHER,60,true\nS1,G2,FATHER,40,\nS2,G1,MOTHER,100,\nS3,G1,MOTHER,100,\n";
+
+        ImportRun simulation = simulate(ImportKind.GUARDIAN_LINKS, text);
+
+        assertThat(simulation.batch().kind()).isEqualTo("GUARDIAN_LINKS");
+        assertThat(simulation.batch().skippedRows()).isEqualTo(2);
+        assertThat(simulation.batch().rejectedRows()).isEqualTo(1);
+        assertThat(simulation.batch().validRows()).isEqualTo(1);
+        assertThat(simulation.rejections()).extracting(RejectionView::line).containsExactly(4, 2, 3);
+        assertThat(linkPort.evaluated).hasSize(4);
+        assertThat(linkPort.evaluated.getFirst().financialResponsibilityPercent()).isEqualTo("60");
+    }
+
+    @Test
+    void theOutcomesOfTheSetsOfLinksAreReportedPerLine() {
+        linkPort.outcomes = row -> switch (row.studentLegacyId()) {
+            case "S1" -> LinkOutcome.CREATED;
+            case "S2" -> LinkOutcome.ALREADY_LINKED;
+            case "S3" -> LinkOutcome.STUDENT_NOT_ACTIVE;
+            default -> LinkOutcome.GUARDIAN_NOT_ACTIVE;
+        };
+        String text = LINKS_HEADER + "S1,G1,MOTHER,100,\nS2,G1,MOTHER,100,\nS3,G1,MOTHER,100,\nS4,G1,MOTHER,100,\n";
+        simulate(ImportKind.GUARDIAN_LINKS, text);
+
+        ImportRun applied = apply(ImportKind.GUARDIAN_LINKS, text);
+
+        assertThat(applied.batch().createdRows()).isEqualTo(1);
+        assertThat(applied.batch().skippedRows()).isEqualTo(1);
+        assertThat(applied.batch().rejectedRows()).isEqualTo(2);
+        assertThat(applied.rejections()).extracting(RejectionView::reason).containsExactly("student-not-active",
+                "guardian-not-active", "student-already-linked");
+        assertThat(linkPort.applied).extracting(l -> l.studentLegacyId()).containsExactly("S1");
+    }
+
+    @Test
+    void aPartialFailureOfTheLinksLeavesTheTraceOfItsKind() {
+        IllegalStateException cause = new IllegalStateException("database down");
+        linkPort.failure = new com.confia.guardians.application.importing.PartialImportException(2, cause);
+        String text = LINKS_HEADER + "S1,G1,MOTHER,100,\n";
+        simulate(ImportKind.GUARDIAN_LINKS, text);
+
+        assertThatThrownBy(() -> apply(ImportKind.GUARDIAN_LINKS, text)).isSameAs(cause);
+        assertThat(audit.getLast().afterValue()).contains("GUARDIAN_LINKS").contains("\"createdRows\":2");
+    }
+
+    @Test
+    void theHistoryOnlyListsTheKindsItIsGiven() {
+        simulate(ImportKind.GUARDIANS, GUARDIANS_HEADER + "P1,a,b,\n");
+        simulate(ImportKind.GUARDIAN_LINKS, LINKS_HEADER + "S1,G1,MOTHER,100,\n");
+        simulate(rows(1));
+
+        assertThat(imports.list(actor, requestId, 0, 10, ALL).total()).isEqualTo(3);
+        assertThat(imports.list(actor, requestId, 0, 10, Set.of(ImportKind.GUARDIANS)).items())
+                .extracting(ImportBatchView::kind).containsExactly("GUARDIANS");
+        assertThat(imports.list(actor, requestId, 0, 10, Set.of()).total()).isZero();
+    }
+
+    @Test
+    void theRoutesNameTheKindAndTheHistoryFiltersByItAccordingToWhatTheAccountMayRead() {
+        String guardians = GUARDIANS_HEADER + "P1,a,b,\n";
+        ImportRun run = imports.simulate("guardians", actor, requestId, file(guardians));
+        assertThat(run.batch().kind()).isEqualTo("GUARDIANS");
+        imports.apply("guardians", actor, requestId, file(guardians));
+        assertThatThrownBy(() -> imports.simulate("nope", actor, requestId, rows(1)))
+                .isInstanceOf(UnknownImportKindException.class);
+        simulate(rows(1));
+
+        assertThat(imports.list(actor, requestId, 0, 10, null, true, true).total()).isEqualTo(3);
+        assertThat(imports.list(actor, requestId, 0, 10, null, true, false).total()).isEqualTo(1);
+        assertThat(imports.list(actor, requestId, 0, 10, null, false, false).total()).isZero();
+        assertThat(imports.list(actor, requestId, 0, 10, "guardians", true, true).total()).isEqualTo(2);
+        assertThatThrownBy(() -> imports.list(actor, requestId, 0, 10, "guardians", true, false))
+                .isInstanceOfSatisfying(KindNotReadableException.class, e -> assertThat(e.students()).isFalse());
+        assertThatThrownBy(() -> imports.list(actor, requestId, 0, 10, "students", false, true))
+                .isInstanceOfSatisfying(KindNotReadableException.class, e -> assertThat(e.students()).isTrue());
+        assertThatThrownBy(() -> imports.list(actor, requestId, 0, 10, "nope", true, true))
+                .isInstanceOf(UnknownImportKindException.class);
     }
 
     // --- Ports ---
@@ -628,8 +804,8 @@ class ImportStudentsTest {
         }
 
         @Override
-        public Page<ImportBatch> list(InstitutionId institutionId, PageRequest request) {
-            List<ImportBatch> all = of(institutionId);
+        public Page<ImportBatch> list(InstitutionId institutionId, PageRequest request, Set<ImportKind> kinds) {
+            List<ImportBatch> all = of(institutionId).stream().filter(b -> kinds.contains(b.kind())).toList();
             int from = (int) Math.min(request.offset(), all.size());
             int to = Math.min(from + request.size(), all.size());
             return new Page<>(all.subList(from, to), all.size(), request.page(), request.size());

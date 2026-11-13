@@ -17,6 +17,7 @@
  * its tables.
  *
  * <p>Out of scope: the account of a guardian in the portal, e-mail verification and the {@code GuardianLinked}
- * event (F6), consents and extra contact channels, and bulk import.
+ * event (F6) and consents and extra contact channels. The bulk import of guardians and links is offered to {@code imports} through the
+ * ports of the nested package {@code application.importing} (docs/cortes/imports-guardians.md).
  */
 package com.confia.guardians;

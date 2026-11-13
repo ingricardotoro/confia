@@ -63,3 +63,69 @@ límites de tasa, ausencia de datos personales en bitácora, logs, lotes y respu
 Con 100 estudiantes importados, un administrador importa 80 encargados y 120 vínculos con 6 grupos defectuosos (por ejemplo,
 suma 90), ve exactamente esos grupos rechazados, corrige, aplica, y cada estudiante queda con vínculos que suman 100; reaplicar
 los archivos no cambia nada.
+
+## Construido en el backend
+
+Se amplió el módulo `com.confia.imports` con dos tipos nuevos, `GUARDIANS` y `GUARDIAN_LINKS`, sobre el mismo analizador CSV, la misma tabla de
+lotes, el flujo simular y aplicar, la huella SHA-256 atada a cuenta y tipo, los límites de tasa (`admin-import`, `admin-import-account`), el filtro
+multipart, la traza `imports.batch.failed` y los topes de 5 MB, 10 000 filas y 200 rechazos. Migración `V22__import_guardians_and_links.sql`:
+`imports_batch.kind` admite los dos tipos y `guardians_guardian.external_ref` (`VARCHAR(64)`, nula, sin vacíos ni espacios en los bordes) con índice
+único `(institution_id, external_ref)`. El rol de solo lectura no la recibe.
+
+### Estructura
+
+- `guardians` publica dos puertos como `@NamedInterface` (`guardians.application.importing`, consumidor `imports`): `GuardianImportGateway`
+  (`evaluate`, `createAll`) y `GuardianLinkImportGateway` (`evaluate`, `applyAll`). `imports` no importa dominio ajeno ni lee tablas ajenas.
+- Encargados (`GuardianImport`): cada fila entra por `ManageGuardians` (`createImported` en bloques de 100 y `createImportedAlone` fila por fila si un
+  bloque choca; código `P-000001`, documento y RTN cifrados, índice ciego, auditoría). Un documento ya guardado solo se descubre al aplicar y deja
+  una entrada `denied` sin valores, como el alta manual; la simulación nunca consulta documentos. `already-imported` se decide al simular por
+  `legacyId` (`INSERT ... ON CONFLICT DO NOTHING`).
+- Vínculos (`GuardianLinkImport` + `LinkImportRules`, dominio puro): grupos por estudiante, juzgados con `ResponsibilitySplit.of` (INV-32, decimal
+  exacto) y `LinkDraft`; se aplican con `ManageGuardianLinks.registerImported`, que comparte con `replace` el cuerpo `replaceLocked` (bloqueo del
+  estudiante, bloqueo compartido de encargados, historial, auditoría, restricción diferida), una transacción por estudiante, y nunca reemplaza.
+  Referencias por `StudentDirectory.findByExternalRefs` (método nuevo del puerto existente) y `GuardianRepository.findByExternalRefs`.
+- `ImportStudents` pasó a `ManageImports` con un `ImportProcessor` por tipo y una plantilla `CsvTemplate` por tipo (`StudentsCsv` conserva su API).
+
+### Forma de la API
+
+Respuestas iguales a estudiantes (`{ batch, rejections, rejectionsTruncated }`, `batch.kind` `GUARDIANS` o `GUARDIAN_LINKS`, `no-store`, `409
+import-not-simulated` / `import-file-changed` por cuenta, tipo y huella).
+
+- Rutas literales por tipo: `/api/v1/imports/{students|guardians|guardian-links}/{simulate|apply}`. Permisos: estudiantes `students:create`; encargados
+  `guardians:create`; vínculos `guardians:create` y `guardians:update`. `GET /api/v1/imports?kind=` (borde `students:read`; los tipos de encargados
+  además `guardians:read`; `kind` desconocido `400`, no legible `403`).
+- Encargados: obligatorias `legacyId`, `firstName`, `lastName`; opcionales `nationalId`, `rtn`, `email`, `phone`, `address`, `preferredChannel`.
+  Motivos: `required`, `invalid-format`, `too-long`, `duplicate-in-file`, `already-imported` (omitida), `duplicate-national-id` (solo al aplicar).
+- Vínculos: obligatorias `studentLegacyId`, `guardianLegacyId`, `relationship`, `financialResponsibilityPercent` (`\d{1,3}(\.\d{1,2})?`); opcionales
+  `isPrimaryPayer`, `isBillingRecipient` (`true`/`false`, vacío `false`). Motivos: los de campo, `invalid-percent`, `unknown-student`,
+  `unknown-guardian`, `student-not-active`, `guardian-not-active`, y sobre todas las líneas del grupo `sum-not-100`, `multiple-primary-payer`,
+  `multiple-billing-recipient`, `duplicate-guardian`. `student-already-linked` cuenta como omitida (no rechazo).
+- `admin.openapi.json` regenerado (45 operaciones, 38 con permiso). `packages/contracts` no se regeneró.
+
+### Decisiones y desviaciones
+
+- Rutas literales por tipo (no `/{kind}`) para no alterar las operaciones de estudiantes y declarar un permiso por ruta.
+- `PermissionedEndpoint` gana `alsoRequired` y `PermissionDecider` lo respeta (todos deben cumplirse); solo lo usan las rutas de vínculos.
+- Historial: el borde exige `students:read`; el controlador agrega `guardians:read` para los tipos de encargados con `PermissionResolver`. Una cuenta con
+  solo `guardians:read` no podría listar (ningún rol actual es así).
+- Defecto en una línea de un grupo: esa línea lleva su motivo y columna; las demás del grupo `group-rejected` con `field = row` (motivo nuevo).
+  `invalid-percent` va solo en la línea defectuosa (la nota decía «todas»). `duplicate-in-file` no se emite para vínculos (es `duplicate-guardian`).
+- `student-already-linked` es siempre omitida, también si los vínculos vigentes son manuales y distintos.
+- Al aplicar, un estudiante o encargado desactivado tras la simulación rechaza el conjunto entero.
+
+### Pruebas
+
+Unitarias: `LinkImportRulesTest` (99.99, 100.01, 100.00 con 33.33 + 33.33 + 33.34, dos pagadores, dos destinatarios, encargado repetido, grupo rechazado entero,
+`student-already-linked`, estudiante o encargado inactivo, referencias desconocidas), `GuardianFieldCheckTest`, `ImportKindTest`, `GuardianImportTest` (puertos con el
+registro en memoria: bloques, reintento fila por fila, idempotencia, fallo parcial, conjuntos que nunca reemplazan, sin datos personales en la bitácora),
+`ManageImportsTest` (casos de uso por tipo, huella por tipo, conteos, traza `failed`, historial por tipos y por ruta), `PermissionDeciderTest` (dos permisos),
+`PermissionedEndpointsTest` y las listas de rutas (`PublicRouteAllowListTest`, `CurrentSessionEndpointIT`, `AuthorizationEdgeIT`, `OpenApiContractSnapshotTest`).
+Integración: `ImportGuardiansEndpointsIT` (criterio de aceptación con 100 estudiantes, 80 encargados y 120 vínculos con 6 grupos defectuosos; documento ya
+guardado solo al aplicar; tres aplicaciones simultáneas; aislamiento; 403 sin efecto; filtro por tipo; límites de tasa; sin datos personales), `ImportsBatchSchemaIT`
+(tipos y `external_ref` de encargados).
+
+Resultado (pruebas dirigidas, sin `verify` completo): 551 pruebas unitarias y de arquitectura sin fallos; 189 de integración sin fallos en la primera ronda
+(`ImportEndpointsIT` 30, `ImportGuardiansEndpointsIT` 11, `StudentEndpointsIT` 37, `GuardianEndpointsIT` 30, `MultiTenantSchemaIT` 11, `CommittingBaseContractIT` 3,
+`ImportsBatchSchemaIT` 14, `GuardiansGuardianSchemaIT` 16, `CurrentSessionEndpointIT` 12, `AuthorizationEdgeIT` 25) y 41 tras mover la lógica de `ImportKind` fuera del
+controlador (los dos de importación). Cobertura de ramas (JaCoCo, informe regenerado de `jacoco-ut.exec`): `imports.domain` 100 %, `guardians.domain` 99.7 %,
+`students.domain` 98.1 %.

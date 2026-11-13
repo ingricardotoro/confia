@@ -1,18 +1,12 @@
 package com.confia.imports.domain;
 
-import com.confia.imports.domain.CsvParser.CsvRecord;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * The template of the student import: the header it must have and the rows read under it. The header is checked by
  * name, in any order: {@code legacyId}, {@code firstName}, {@code lastName} and {@code birthDate} are required, {@code
- * nationalId} and {@code sex} are optional, and every other name is refused. The names of the header are never echoed
- * back (a file without a header would put a student in it): a column that is not part of the template is reported by
- * its position. A row with a different number of cells than the header is a rejection of that row, not of the file.
+ * nationalId} and {@code sex} are optional, and every other name is refused. The reading itself is that of {@link
+ * CsvTemplate}, shared by every kind of import; the names of the header are never echoed back.
  *
  * <p>This only reads the shape. The rules of each value (length, dates, document) belong to {@code students}, which
  * judges the cells through its published port.
@@ -27,8 +21,7 @@ public final class StudentsCsv {
     /** The first line of the empty template a person downloads. */
     public static final String TEMPLATE_HEADER = "legacyId,firstName,lastName,birthDate,nationalId,sex";
 
-    private static final Set<String> KNOWN = Set.copyOf(
-            java.util.stream.Stream.concat(REQUIRED.stream(), OPTIONAL.stream()).toList());
+    static final CsvTemplate TEMPLATE = new CsvTemplate(REQUIRED, OPTIONAL);
 
     /** One data row: the line where it starts and its cells, untrimmed; absent optional columns are null. */
     public record Row(int line, String legacyId, String firstName, String lastName, String birthDate, String nationalId,
@@ -61,52 +54,11 @@ public final class StudentsCsv {
      * has only the header, is malformed, has more than {@code maxRows} data rows, or has a wrong header.
      */
     public static Parsed parse(String text, int maxRows) {
-        if (text == null || text.isBlank()) {
-            throw new InvalidImportFileException("file", "empty-file");
-        }
-        List<CsvRecord> records = CsvParser.parse(text, maxRows + 1);
-        Map<String, Integer> columns = columnsOf(records.getFirst());
-        if (records.size() == 1) {
-            throw new InvalidImportFileException("file", "no-rows");
-        }
-        int width = records.getFirst().cells().size();
-        List<Row> rows = new ArrayList<>();
-        List<Rejection> shape = new ArrayList<>();
-        for (CsvRecord record : records.subList(1, records.size())) {
-            if (record.cells().size() != width) {
-                shape.add(new Rejection(record.line(), "row", "invalid-format"));
-                continue;
-            }
-            rows.add(new Row(record.line(), cell(record, columns, "legacyId"), cell(record, columns, "firstName"),
-                    cell(record, columns, "lastName"), cell(record, columns, "birthDate"),
-                    cell(record, columns, "nationalId"), cell(record, columns, "sex")));
-        }
-        return new Parsed(records.size() - 1, rows, shape);
-    }
-
-    private static String cell(CsvRecord record, Map<String, Integer> columns, String name) {
-        Integer index = columns.get(name);
-        return index == null ? null : record.cells().get(index);
-    }
-
-    private static Map<String, Integer> columnsOf(CsvRecord header) {
-        Map<String, Integer> columns = new HashMap<>();
-        List<InvalidImportFileException.Problem> problems = new ArrayList<>();
-        List<String> names = header.cells();
-        for (int i = 0; i < names.size(); i++) {
-            String name = names.get(i).strip();
-            if (!KNOWN.contains(name) || columns.putIfAbsent(name, i) != null) {
-                problems.add(new InvalidImportFileException.Problem("columns[" + i + "]", "unknown-column"));
-            }
-        }
-        for (String required : REQUIRED) {
-            if (!columns.containsKey(required)) {
-                problems.add(new InvalidImportFileException.Problem(required, "missing-column"));
-            }
-        }
-        if (!problems.isEmpty()) {
-            throw new InvalidImportFileException(problems);
-        }
-        return columns;
+        CsvTemplate.Parsed parsed = TEMPLATE.parse(text, maxRows);
+        List<Row> rows = parsed.rows().stream()
+                .map(row -> new Row(row.line(), row.cell("legacyId"), row.cell("firstName"), row.cell("lastName"),
+                        row.cell("birthDate"), row.cell("nationalId"), row.cell("sex")))
+                .toList();
+        return new Parsed(parsed.totalRows(), rows, parsed.shapeRejections());
     }
 }
