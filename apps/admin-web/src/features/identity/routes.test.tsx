@@ -83,6 +83,8 @@ describe("the routes and the screens", () => {
     expect(Object.keys(router.routesByPath).sort()).toEqual([
       "/",
       "/enrollments",
+      "/guardians",
+      "/imports",
       "/iniciar-sesion",
       "/iniciar-sesion/inscripcion",
       "/iniciar-sesion/verificacion",
