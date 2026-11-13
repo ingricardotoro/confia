@@ -70,3 +70,21 @@ personales en bitácora, logs, lotes y respuestas.
 Con 100 estudiantes importados y la estructura académica creada, un administrador importa 100 matrículas con 7 defectuosas (por
 ejemplo, una sección que no existe, una que ya está llena y una fecha fuera del año), ve exactamente esas 7 por línea y motivo,
 corrige, aplica, y cada estudiante queda matriculado en su sección sin exceder ningún cupo; reaplicar el archivo no cambia nada.
+
+## Lo construido
+
+- **Backend (`students`, `organization`, `imports`).** `EnrollmentImportRules` (dominio, puro) juzga las filas; `EnrollmentImport`
+  resuelve estudiantes y secciones y matricula cada fila con `ManageEnrollments.enroll`, una transacción por fila y en el orden del
+  archivo. `SectionDirectory.findByNames` resuelve la sección por nombres (la comparación sin mayúsculas ni espacios se hace en Java,
+  no en SQL, para no depender de la colación). `EnrollmentRepository.activeSeatsOf` entrega las matrículas activas por estudiante y año.
+  Migración V23 (solo amplía `imports_batch_kind_chk`). Rutas `POST /api/v1/imports/enrollments/simulate|apply` con `students:create`;
+  el historial `kind=enrollments` exige `students:read`. Contrato OpenAPI y motivos del rechazo ampliados.
+- **Pantalla.** «Matrículas» al final del selector, plantilla `plantilla-matriculas.csv` con una fila de ejemplo y textos es-HN de los
+  motivos nuevos; recorrido e2e con 100 matrículas y 7 defectuosas, y tres estados nuevos en la matriz de axe.
+- **Decisiones.** Las seis columnas son obligatorias. El cupo de la simulación es una estimación; manda el cupo real al escribir. Si
+  la matrícula aparece entre la lectura y la escritura, se relee: misma sección es `already-imported`, otra es
+  `duplicate-active-enrollment`. La importación nunca traslada ni reemplaza una matrícula.
+- **Verificación.** Pruebas unitarias de reglas (14) y del caso de uso (29), `ManageImportsTest` (51), `ImportEnrollmentsEndpointsIT`
+  (12, incluida la carrera por el último cupo) y `ImportGuardiansEndpointsIT` (14); vitest (526), Playwright de importaciones (23) y la
+  puerta de axe de `/imports` (32). No se corrieron PIT ni la cobertura global; los límites de tasa de las rutas nuevas no tienen
+  prueba propia (los cubre el limitador compartido).
