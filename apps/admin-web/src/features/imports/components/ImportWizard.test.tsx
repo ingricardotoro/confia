@@ -379,7 +379,7 @@ describe("ImportWizard, the enrollments", () => {
       "5sectionLa sección no tiene cupo para esta matrícula.",
       "6studentLegacyIdEl estudiante ya tiene una matrícula activa en ese año en otra sección: la importación no la traslada ni la reemplaza.",
       "7academicYearEl año lectivo está cerrado: no admite matrículas.",
-      "8sectionLa sección, el grado, la modalidad o el año lectivo no está activo.",
+      "8sectionLa sección no está activa.",
       "9studentLegacyIdEl estudiante no está activo.",
       "10enrolledOnLa fecha de matrícula está fuera del año lectivo o es posterior a hoy.",
       "11Sin campoFalta el dato obligatorio.",

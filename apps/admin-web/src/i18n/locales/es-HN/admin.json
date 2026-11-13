@@ -808,7 +808,7 @@
       "section-full": "La sección no tiene cupo para esta matrícula.",
       "duplicate-active-enrollment": "El estudiante ya tiene una matrícula activa en ese año en otra sección: la importación no la traslada ni la reemplaza.",
       "academic-year-closed": "El año lectivo está cerrado: no admite matrículas.",
-      "inactive-reference": "La sección, el grado, la modalidad o el año lectivo no está activo.",
+      "inactive-reference": "La sección no está activa.",
       "enrollment-date-out-of-range": "La fecha de matrícula está fuera del año lectivo o es posterior a hoy."
     },
     "noRows": {
