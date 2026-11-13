@@ -826,7 +826,7 @@
             "type" : "string"
           },
           "kind" : {
-            "enum" : [ "STUDENTS", "GUARDIANS", "GUARDIAN_LINKS" ],
+            "enum" : [ "STUDENTS", "GUARDIANS", "GUARDIAN_LINKS", "ENROLLMENTS" ],
             "type" : "string"
           },
           "rejectedRows" : {
@@ -3754,7 +3754,7 @@
             "type" : "integer"
           }
         }, {
-          "description" : "Only the batches of this kind: students, guardians or guardian-links. Without it, the kinds the account may read",
+          "description" : "Only the batches of this kind: students, guardians, guardian-links or enrollments. Without it, the kinds the account may read",
           "in" : "query",
           "name" : "kind",
           "required" : false,
@@ -3839,6 +3839,234 @@
         "summary" : "Lists the import batches",
         "tags" : [ "imports" ],
         "x-required-permission" : "students:read"
+      }
+    },
+    "/api/v1/imports/enrollments/apply" : {
+      "post" : {
+        "description" : "Applies the same file the account simulated: it only proceeds when the SHA-256 of the file matches a simulation of this kind by the same account in the institution. It judges the file again and enrolls each valid row in file order, one transaction per row, with the same use case as the hand enrollment (INV-31, the capacity decided under the lock of the section, audit). The rows that do not fit are rejected (section-full) in file order, and a student that already holds an active enrollment in the same section is skipped (already-imported), so applying twice creates nothing twice. Needs the permission students:create.",
+        "operationId" : "applyEnrollmentImport",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "properties" : {
+                  "file" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "file" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportRunResponse"
+                }
+              }
+            },
+            "description" : "The APPLIED batch and the rejections"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The file cannot be read as an enrollments import (validation-failed, with errors)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold students:create, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account never simulated a file with this fingerprint (import-not-simulated), or its last simulation was of another file (import-file-changed)"
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request is not multipart/form-data (unsupported-media-type)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many imports from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Applies the import of enrollments",
+        "tags" : [ "imports" ],
+        "x-required-permission" : "students:create"
+      }
+    },
+    "/api/v1/imports/enrollments/simulate" : {
+      "post" : {
+        "description" : "Reads a CSV file (UTF-8, separator , or ; detected in the header, up to 5 MB and 10000 rows, columns studentLegacyId, academicYear, modality, grade, section and enrolledOn as YYYY-MM-DD) and judges every row with the rules of the hand enrollment (INV-31, active section and student, open academic year, a date inside the year and not in the future) plus an estimate of the capacity with the seats taken and the rows before it in the file. The student is found by its legacyId and the section by the names of its year, modality, grade and section, ignoring case and surrounding spaces. A student that already holds an active enrollment in that same section is skipped (already-imported); in another section it is rejected (duplicate-active-enrollment): the import never moves or replaces an enrollment. It writes nothing and records a VALIDATED batch. The rejections (line, column, reason; never a value) are returned and not stored; at most 200 are listed. Needs the permission students:create.",
+        "operationId" : "simulateEnrollmentImport",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "properties" : {
+                  "file" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "file" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportRunResponse"
+                }
+              }
+            },
+            "description" : "The simulation batch and the rejections"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The file is missing, empty, too big, not UTF-8, not a well-formed CSV, has too many rows or its header is not the template (validation-failed, with errors)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold students:create, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "415" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The request is not multipart/form-data (unsupported-media-type)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too many imports from this address or account (too-many-requests)",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Simulates the import of enrollments",
+        "tags" : [ "imports" ],
+        "x-required-permission" : "students:create"
       }
     },
     "/api/v1/imports/guardian-links/apply" : {

@@ -397,10 +397,10 @@ class OpenApiContractSnapshotTest {
      * the student import: forty-five operations (the eight of the session and the report, plus twelve of the structure,
      * four of the registry, six of the enrollments, eight of the guardians, two of them the consents of a guardian, and
      * seven of the imports), and exactly thirty-eight declare a permission: the report, the twelve of the structure, the
-     * four of the registry, the six of the enrollments, the eight of the guardians and the seven of the imports.
+     * four of the registry, the six of the enrollments, the eight of the guardians and the nine of the imports.
      */
     @Test
-    void theAdministrativeDocumentHoldsFortyFiveOperationsAndThirtyEightDeclareAPermission() {
+    void theAdministrativeDocumentHoldsFortySevenOperationsAndFortyDeclareAPermission() {
         Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
         List<String> withPermission = new ArrayList<>();
         int operations = 0;
@@ -413,7 +413,7 @@ class OpenApiContractSnapshotTest {
             }
         }
 
-        assertThat(operations).isEqualTo(45);
+        assertThat(operations).isEqualTo(47);
         List<String> expected = new ArrayList<>(List.of("get " + ROLES_PATH));
         for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {
             String collection = "/api/v1/organization/" + resource;
