@@ -109,7 +109,7 @@ async function openImportsRoute(page: Page): Promise<void> {
   await seed(page);
   await page.getByRole("heading", { level: 1, name: "Sesión iniciada." }).waitFor();
   await page.goto(IMPORTS);
-  await page.getByRole("heading", { level: 2, name: "Importar estudiantes" }).waitFor();
+  await page.getByRole("heading", { level: 2, name: "Importar datos" }).waitFor();
 }
 
 /** Chooses a fictitious file in memory and simulates it: `good` valid rows and the rows given, defective on purpose. */
@@ -122,6 +122,39 @@ async function simulateImport(page: Page, good: number, ...defects: string[]): P
 }
 
 const importDefects = Array.from({ length: 12 }, (_, index) => `L9${String(index)},,Apellido,2013-05-01,,F`);
+
+const LINKS_HEADER = "studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,isBillingRecipient";
+const fileLabels = { students: "Archivo CSV de estudiantes", guardians: "Archivo CSV de encargados", "guardian-links": "Archivo CSV de vínculos" } as const;
+
+/** Chooses the kind and a fictitious file in memory, and simulates it. */
+async function simulateKind(page: Page, kind: keyof typeof fileLabels, lines: readonly string[]): Promise<void> {
+  await page.getByLabel("Qué va a importar").selectOption(kind);
+  const buffer = Buffer.from(lines.join("\n"), "utf8");
+  await page.getByLabel(fileLabels[kind]).setInputFiles({ name: "archivo.csv", mimeType: "text/csv", buffer });
+  await page.getByRole("button", { name: "Simular la importación" }).click();
+  await page.getByRole("heading", { level: 3, name: "Resultado de la simulación" }).waitFor();
+}
+
+/** Simulates and applies a file, and goes back to the first step. */
+async function importKind(page: Page, kind: keyof typeof fileLabels, lines: readonly string[]): Promise<void> {
+  await simulateKind(page, kind, lines);
+  await page.getByRole("button", { name: "Aplicar la importación" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /^Crear \d+/ }).click();
+  await page.getByRole("heading", { level: 3, name: "Importación aplicada" }).waitFor();
+  await page.getByRole("button", { name: "Importar otro archivo" }).click();
+}
+
+const studentLines = (count: number): string[] => [IMPORT_HEADER, ...Array.from({ length: count }, (_, index) => `S${String(index + 1)},Nombre,Apellido,2013-05-01,,F`)];
+const guardianLines = (count: number): string[] => ["legacyId,firstName,lastName", ...Array.from({ length: count }, (_, index) => `G${String(index + 1)},Nombre,Apellido`)];
+/** Three students with their guardians: the first valid, the second adding up to 90, the third with a percentage that is not valid. */
+const linkLines = [LINKS_HEADER, "S1,G1,FATHER,60,true,true", "S1,G2,MOTHER,40,,", "S2,G1,FATHER,50,,", "S2,G2,MOTHER,40,,", "S3,G1,FATHER,50,,", "S3,G2,MOTHER,50.555,,"];
+
+/** The screen with students and guardians already imported, ready to import the links. */
+async function openImportsWithReferences(page: Page): Promise<void> {
+  await openImportsRoute(page);
+  await importKind(page, "students", studentLines(3));
+  await importKind(page, "guardians", guardianLines(2));
+}
 
 /** The six combinations of the minimum, written apart from the matrix so a dropped one is noticed (BX74). */
 export const MINIMUM: readonly CombinationId[] = [
@@ -667,6 +700,57 @@ export const MATRIX: readonly GateCombination[] = [
     // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
     arrange: (page) => openImportsRoute(page),
     expected: (page) => page.getByText("No se pudo cargar el historial de importaciones"),
+  },
+  {
+    route: IMPORTS,
+    state: "kind-guardian-links",
+    arrange: async (page) => {
+      await openImportsRoute(page);
+      await page.getByLabel("Qué va a importar").selectOption("guardian-links");
+    },
+    expected: (page) => page.getByLabel("Archivo CSV de vínculos"),
+  },
+  {
+    route: IMPORTS,
+    state: "links-simulated-with-group-rejections",
+    preset: "imports-empty",
+    arrange: async (page) => {
+      await openImportsWithReferences(page);
+      await simulateKind(page, "guardian-links", linkLines);
+    },
+    expected: (page) => page.getByRole("table", { name: /Filas del archivo con su línea/ }).getByText(/no suman exactamente 100\.00/).first(),
+  },
+  {
+    route: IMPORTS,
+    state: "dialog-apply-links",
+    opensDialog: true,
+    preset: "imports-empty",
+    arrange: async (page) => {
+      await openImportsWithReferences(page);
+      await simulateKind(page, "guardian-links", linkLines);
+      await page.getByRole("button", { name: "Aplicar la importación" }).click();
+    },
+    expected: (page) => page.getByRole("dialog").getByText("Se crearán 2 vínculos."),
+  },
+  {
+    route: IMPORTS,
+    state: "links-nothing-to-create",
+    preset: "imports-empty",
+    arrange: async (page) => {
+      await openImportsWithReferences(page);
+      await importKind(page, "guardian-links", [LINKS_HEADER, "S1,G1,FATHER,60,true,true", "S1,G2,MOTHER,40,,"]);
+      await simulateKind(page, "guardian-links", [LINKS_HEADER, "S1,G1,FATHER,60,true,true", "S1,G2,MOTHER,40,,"]);
+    },
+    expected: (page) => page.getByText("No hay nada que crear"),
+  },
+  {
+    route: IMPORTS,
+    state: "history-filtered-empty",
+    arrange: async (page) => {
+      await openImportsRoute(page);
+      await page.getByLabel("Tipo de importación").selectOption("guardian-links");
+    },
+    expected: (page) => page.getByText("Ningún registro coincide con los filtros"),
   },
   {
     route: YEARS,

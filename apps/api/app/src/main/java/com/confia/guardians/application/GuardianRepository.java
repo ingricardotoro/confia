@@ -4,7 +4,9 @@ import com.confia.guardians.domain.Guardian;
 import com.confia.kernel.InstitutionId;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -47,4 +49,17 @@ public interface GuardianRepository {
             Storage<String> rtn);
 
     Page<Guardian> list(InstitutionId institutionId, PageRequest request, GuardianFilter filter);
+
+    /**
+     * Stores a new guardian imported from another system with its reference there. A reference the institution already
+     * has is refused as a {@code DuplicateExternalRefException}, whatever transaction holds it.
+     */
+    void insertImported(InstitutionId institutionId, Guardian guardian, ProtectedNationalId document,
+            String rtnEncrypted, String externalRef);
+
+    /** Which of these references of the source system the institution already has, in one query. */
+    Set<String> existingExternalRefs(InstitutionId institutionId, Collection<String> externalRefs);
+
+    /** The guardians imported with these references, by reference; a reference nobody holds is absent. */
+    Map<String, Guardian> findByExternalRefs(InstitutionId institutionId, Collection<String> externalRefs);
 }

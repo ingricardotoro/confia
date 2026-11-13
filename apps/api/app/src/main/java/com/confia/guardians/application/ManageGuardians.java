@@ -66,24 +66,68 @@ public final class ManageGuardians {
 
     public GuardianView create(AuthenticatedActor actor, String requestId, String firstName, String lastName,
             String nationalId, String rtn, String email, String phone, String address, String preferredChannel) {
+        return register(actor, requestId, null, firstName, lastName, nationalId, rtn, email, phone, address,
+                preferredChannel, false);
+    }
+
+    /**
+     * Registers a guardian of a bulk import with its reference in the system it comes from: the same code, the same
+     * protection of the document and the RTN and the same audit entry as {@link #create}. It runs <b>inside the
+     * transaction the caller already opened</b> (through the transactional component, with the security context set) and
+     * opens none of its own, so the caller commits a block of guardians together and a deadlock or serialization failure
+     * propagates to that one component, which retries the whole block. A block that fails is rolled back whole, so a
+     * refusal for a duplicate document is not audited here (see {@link #createImportedAlone}).
+     * A reference the institution already has is a {@code DuplicateExternalRefException}.
+     */
+    public GuardianView createImported(AuthenticatedActor actor, String requestId, String externalRef,
+            String firstName, String lastName, String nationalId, String rtn, String email, String phone,
+            String address, String preferredChannel) {
+        return register(actor, requestId, Objects.requireNonNull(externalRef, "externalRef"), firstName, lastName,
+                nationalId, rtn, email, phone, address, preferredChannel, true);
+    }
+
+    /**
+     * The same as {@link #createImported} for one row on its own transaction: a refusal because the document already
+     * belongs to another guardian is recorded, as a hand registration records it (outcome {@code denied}, a reason
+     * code, no value).
+     */
+    public GuardianView createImportedAlone(AuthenticatedActor actor, String requestId, String externalRef,
+            String firstName, String lastName, String nationalId, String rtn, String email, String phone,
+            String address, String preferredChannel) {
+        return register(actor, requestId, Objects.requireNonNull(externalRef, "externalRef"), firstName, lastName,
+                nationalId, rtn, email, phone, address, preferredChannel, false);
+    }
+
+    private GuardianView register(AuthenticatedActor actor, String requestId, String externalRef, String firstName,
+            String lastName, String nationalId, String rtn, String email, String phone, String address,
+            String preferredChannel, boolean withinCallerTransaction) {
         Objects.requireNonNull(actor, "actor");
         UUID auditRequestId = GuardiansAudit.requestId(Objects.requireNonNull(requestId, "requestId"));
         InstitutionId institution = new InstitutionId(actor.institutionId());
         NationalId document = nationalId == null || nationalId.isBlank() ? null : NationalId.of(nationalId);
         Rtn taxNumber = rtn == null || rtn.isBlank() ? null : Rtn.of(rtn);
         UUID id = UUID.randomUUID();
-        return rejectingDuplicates(actor, auditRequestId, GuardiansAudit.CREATE_ACTION, id,
-                () -> transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
+        Supplier<GuardianView> body = () -> {
             String code = generatedCode(institution);
             Guardian guardian = Guardian.create(id, code, firstName, lastName, document, taxNumber, email, phone,
                     address, preferredChannel, now());
             ProtectedNationalId protectedDocument =
                     document == null ? null : protector.protect(institution, id, document);
             String protectedRtn = taxNumber == null ? null : protector.protect(institution, id, taxNumber);
-            guardians.insert(institution, guardian, protectedDocument, protectedRtn);
+            if (externalRef == null) {
+                guardians.insert(institution, guardian, protectedDocument, protectedRtn);
+            } else {
+                guardians.insertImported(institution, guardian, protectedDocument, protectedRtn, externalRef);
+            }
             auditLogWriter.append(GuardiansAudit.created(actor, auditRequestId, guardian));
             return GuardianView.of(guardian, List.of());
-        }));
+        };
+        if (withinCallerTransaction) {
+            return body.get();
+        }
+        Supplier<GuardianView> write = () -> transactionRunner.execute(
+                actor.securityContext(auditRequestId.toString()), body);
+        return rejectingDuplicates(actor, auditRequestId, GuardiansAudit.CREATE_ACTION, id, write);
     }
 
     public GuardianView update(AuthenticatedActor actor, String requestId, UUID id, String firstName,

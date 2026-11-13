@@ -11,5 +11,8 @@ public record RejectionResponse(
                 + "does not have the cells of the header") String field,
         @Schema(requiredMode = RequiredMode.REQUIRED,
                 allowableValues = {"required", "invalid-format", "too-long", "invalid-date", "future-birth-date",
-                        "duplicate-in-file", "duplicate-national-id", "already-imported"}) String reason) {
+                        "duplicate-in-file", "duplicate-national-id", "already-imported", "invalid-percent", "unknown-student",
+                        "unknown-guardian", "student-not-active", "guardian-not-active", "student-already-linked",
+                        "group-rejected", "sum-not-100", "multiple-primary-payer", "multiple-billing-recipient",
+                        "duplicate-guardian"}) String reason) {
 }

@@ -57,7 +57,7 @@ test.describe("the import of students", () => {
     await expect(page.getByRole("button", { name: "Aplicar la importación" })).toHaveCount(0);
 
     // The history shows the batches, newest first, and the page asked the server for them.
-    const history = page.getByRole("table", { name: /Importaciones de estudiantes de la institución/ });
+    const history = page.getByRole("table", { name: /Importaciones de la institución/ });
     await expect(history.getByRole("row").nth(1)).toContainText("Simulada");
     expect(calls.filter((call) => call.startsWith("POST") && call.endsWith("/apply"))).toHaveLength(1);
 
@@ -86,7 +86,7 @@ test.describe("the import of students", () => {
     await expect(page.getByText(/Se crearon 2 estudiantes\./)).toBeVisible();
     const table = page.getByRole("table", { name: /Filas rechazadas al aplicar/ });
     await expect(table.getByRole("row")).toHaveCount(1 + 1);
-    await expect(table.getByRole("row").nth(1)).toContainText("4nationalIdYa hay un estudiante con ese documento de identidad.");
+    await expect(table.getByRole("row").nth(1)).toContainText("4nationalIdYa hay un registro con ese documento de identidad.");
   });
 
   test("keeps nothing of the file in the browser storage", async ({ page, scenarioId }) => {

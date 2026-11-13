@@ -61,6 +61,22 @@ public final class JooqStudentDirectory implements StudentDirectory {
         return found;
     }
 
+    @Override
+    public Map<String, StudentRef> findByExternalRefs(InstitutionId institutionId, Collection<String> externalRefs) {
+        Map<String, StudentRef> found = new HashMap<>();
+        if (externalRefs.isEmpty()) {
+            return found;
+        }
+        dsl.select(STUDENTS_STUDENT.EXTERNAL_REF, STUDENTS_STUDENT.ID, STUDENTS_STUDENT.STUDENT_CODE,
+                STUDENTS_STUDENT.FIRST_NAME, STUDENTS_STUDENT.LAST_NAME, STUDENTS_STUDENT.STATUS)
+                .from(STUDENTS_STUDENT)
+                .where(STUDENTS_STUDENT.INSTITUTION_ID.eq(institutionId.value()))
+                .and(STUDENTS_STUDENT.EXTERNAL_REF.in(externalRefs))
+                .fetch().forEach(row -> found.put(row.value1(), new StudentRef(row.value2(), row.value3(),
+                        row.value4(), row.value5(), StudentStatus.parse(row.value6()) == StudentStatus.ACTIVE)));
+        return found;
+    }
+
     /** The only columns a reference needs: never the document, its blind index nor the birth date. */
     private SelectSelectStep<Record5<UUID, String, String, String, String>> refSelect() {
         return dsl.select(STUDENTS_STUDENT.ID, STUDENTS_STUDENT.STUDENT_CODE, STUDENTS_STUDENT.FIRST_NAME,

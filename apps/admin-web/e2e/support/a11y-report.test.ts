@@ -186,7 +186,7 @@ describe("the states of the guardians registry", () => {
 describe("the states of the imports screen", () => {
   const imports = MATRIX.filter((combination) => combination.route === "/imports");
 
-  it("holds the ready screen, the file error, the simulation with rejections, the confirmation, the result, the file failure, the empty and the load-error states, each once", () => {
+  it("holds the ready screen, the file error, the simulation with rejections, the confirmation, the result, the file failure, the empty and the load-error states, and the states of the links and of the history by kind, each once", () => {
     expect(imports.map((combination) => [combination.state, combination.preset, combination.opensDialog])).toEqual([
       ["ready", undefined, undefined],
       ["file-error", undefined, undefined],
@@ -196,6 +196,11 @@ describe("the states of the imports screen", () => {
       ["file-failure", undefined, undefined],
       ["empty", "imports-empty", undefined],
       ["load-error", "imports-server-error", undefined],
+      ["kind-guardian-links", undefined, undefined],
+      ["links-simulated-with-group-rejections", "imports-empty", undefined],
+      ["dialog-apply-links", "imports-empty", true],
+      ["links-nothing-to-create", "imports-empty", undefined],
+      ["history-filtered-empty", undefined, undefined],
     ]);
     expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...imports])).toHaveLength(MATRIX.length * THEMES.length);
     expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);

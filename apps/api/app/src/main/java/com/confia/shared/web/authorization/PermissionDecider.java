@@ -5,7 +5,9 @@ import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.AuthenticationMethod;
 import com.confia.shared.security.PermissionResolver;
 import com.confia.shared.web.authentication.ActorAuthentication;
+import com.confia.shared.web.authorization.access.ResolvedPermissions;
 import com.confia.shared.web.problem.DataAccessFailure;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -58,10 +60,11 @@ public final class PermissionDecider {
     public AuthorizationManager<RequestAuthorizationContext> forEndpoint(
             PermissionedEndpoint endpoint) {
         Objects.requireNonNull(endpoint, "endpoint");
-        return (authentication, context) -> decide(endpoint, authentication.get());
+        return (authentication, context) -> decide(endpoint, authentication.get(), context.getRequest());
     }
 
-    private AuthorizationResult decide(PermissionedEndpoint endpoint, Authentication authentication) {
+    private AuthorizationResult decide(PermissionedEndpoint endpoint, Authentication authentication,
+            HttpServletRequest request) {
         if (!(authentication instanceof ActorAuthentication principal)) {
             return DENIED;
         }
@@ -69,10 +72,17 @@ public final class PermissionDecider {
         if (!actor.methods().contains(AuthenticationMethod.ONE_TIME_PASSWORD)) {
             return DENIED;
         }
-        if (resolve(actor).contains(endpoint.permission())) {
-            return GRANTED;
+        Set<Permission> held = resolve(actor);
+        ResolvedPermissions.store(request, held);
+        if (!held.contains(endpoint.permission())) {
+            throw new PermissionDeniedException(endpoint.permission(), endpoint.pattern(), actor);
         }
-        throw new PermissionDeniedException(endpoint.permission(), endpoint.pattern(), actor);
+        for (Permission also : endpoint.alsoRequired()) {
+            if (!held.contains(also)) {
+                throw new PermissionDeniedException(also, endpoint.pattern(), actor);
+            }
+        }
+        return GRANTED;
     }
 
     private Set<Permission> resolve(AuthenticatedActor actor) {

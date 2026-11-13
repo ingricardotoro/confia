@@ -1,12 +1,16 @@
 package com.confia.guardians.infrastructure.wiring;
 
 import com.confia.guardians.application.GuardianConsentRepository;
+import com.confia.guardians.application.GuardianImport;
+import com.confia.guardians.application.GuardianLinkImport;
 import com.confia.guardians.application.GuardianLinkRepository;
 import com.confia.guardians.application.GuardianRepository;
 import com.confia.guardians.application.GuardianSecretsProtector;
 import com.confia.guardians.application.ManageGuardianConsents;
 import com.confia.guardians.application.ManageGuardianLinks;
 import com.confia.guardians.application.ManageGuardians;
+import com.confia.guardians.application.importing.GuardianImportGateway;
+import com.confia.guardians.application.importing.GuardianLinkImportGateway;
 import com.confia.guardians.infrastructure.ColumnEncryptionGuardianSecretsProtector;
 import com.confia.guardians.infrastructure.JooqGuardianConsentRepository;
 import com.confia.guardians.infrastructure.JooqGuardianLinkRepository;
@@ -71,5 +75,20 @@ public class GuardiansConfiguration {
     ManageGuardianLinks manageGuardianLinks(TransactionRunner transactionRunner, GuardianRepository guardians,
             GuardianLinkRepository links, StudentDirectory students, AuditLogWriter auditLogWriter, Clock clock) {
         return new ManageGuardianLinks(transactionRunner, guardians, links, students, auditLogWriter, clock);
+    }
+
+    /** The port that {@code imports} uses to judge and register the guardians of a file (docs/cortes/imports-guardians.md). */
+    @Bean
+    GuardianImportGateway guardianImportGateway(TransactionRunner transactionRunner, GuardianRepository guardians,
+            ManageGuardians manageGuardians) {
+        return new GuardianImport(transactionRunner, guardians, manageGuardians);
+    }
+
+    /** The port that {@code imports} uses to judge and register the links of a file (docs/cortes/imports-guardians.md). */
+    @Bean
+    GuardianLinkImportGateway guardianLinkImportGateway(TransactionRunner transactionRunner,
+            GuardianRepository guardians, GuardianLinkRepository links, StudentDirectory students,
+            ManageGuardianLinks manageGuardianLinks) {
+        return new GuardianLinkImport(transactionRunner, guardians, links, students, manageGuardianLinks);
     }
 }

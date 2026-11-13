@@ -85,8 +85,13 @@ class ImportsBatchSchemaIT extends CommittingPostgresIntegrationTest {
         UUID institution = UUID.randomUUID();
         try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
             assertThat(simulation(owner, institution)).isNotNull();
-            assertThat(rejected(owner, () -> batch(owner, institution, "GUARDIANS", "VALIDATED", SHA, 0, 0, 0, 0, 0,
-                    null, false)).getMessage()).contains("imports_batch_kind_chk");
+            for (String kind : List.of("GUARDIANS", "GUARDIAN_LINKS")) {
+                assertThat(batch(owner, institution, kind, "VALIDATED", SHA, 0, 0, 0, 0, 0, null, false)).isNotNull();
+            }
+            for (String kind : List.of("ENROLLMENTS", "guardians", "")) {
+                assertThat(rejected(owner, () -> batch(owner, institution, kind, "VALIDATED", SHA, 0, 0, 0, 0, 0,
+                        null, false)).getMessage()).as(kind).contains("imports_batch_kind_chk");
+            }
             assertThat(rejected(owner, () -> batch(owner, institution, "STUDENTS", "PENDING", SHA, 0, 0, 0, 0, 0,
                     null, false)).getMessage()).contains("imports_batch_status_chk");
             for (String sha : List.of("AB".repeat(32), "ab".repeat(31), "zz".repeat(32), "")) {
@@ -292,6 +297,65 @@ class ImportsBatchSchemaIT extends CommittingPostgresIntegrationTest {
             StaffRoleFixtures.fixInstitution(readonly, institution);
             SQLException refusal = rejected(readonly, () -> readonly.createStatement()
                     .executeQuery("select external_ref from students_student").close());
+            assertThat(refusal.getSQLState()).isEqualTo("42501");
+            readonly.rollback();
+        }
+    }
+
+    // --- The external reference of the guardian (V22) ---
+
+    private static void guardian(Connection c, UUID institution, String code, String externalRef) throws SQLException {
+        exec(c, "insert into guardians_guardian (institution_id, id, guardian_code, first_name, last_name, external_ref) "
+                + "values (?, ?, ?, 'Ana', 'Lopez', ?)", institution, UUID.randomUUID(), code, externalRef);
+    }
+
+    @Test
+    void theGuardianReferenceIsUniquePerInstitutionAndGuardiansWithoutOneCoexist() throws SQLException {
+        UUID mine = UUID.randomUUID();
+        UUID theirs = UUID.randomUUID();
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(mine)) {
+            guardian(owner, mine, "P-000001", "LEGACY-1");
+            guardian(owner, mine, "P-000002", null);
+            guardian(owner, mine, "P-000003", null);
+            SQLException duplicate = rejected(owner, () -> guardian(owner, mine, "P-000004", "LEGACY-1"));
+            assertThat(duplicate.getSQLState()).isEqualTo("23505");
+            assertThat(duplicate.getMessage()).contains("guardians_guardian_external_ref_uq");
+            owner.commit();
+        }
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(theirs)) {
+            guardian(owner, theirs, "P-000001", "LEGACY-1");
+            owner.commit();
+        }
+    }
+
+    @Test
+    void theGuardianReferenceIsNeverBlankNorPaddedNorLongerThanSixtyFourCharacters() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            guardian(owner, institution, "P-000001", "R".repeat(64));
+            for (String reference : List.of("", " LEGACY", "LEGACY ")) {
+                SQLException refusal = rejected(owner, () -> guardian(owner, institution, "P-000002", reference));
+                assertThat(refusal.getMessage()).as("[" + reference + "]")
+                        .contains("guardians_guardian_external_ref_chk");
+            }
+            SQLException tooLong = rejected(owner, () -> guardian(owner, institution, "P-000002", "R".repeat(65)));
+            assertThat(tooLong.getSQLState()).isEqualTo("22001");
+            owner.rollback();
+        }
+    }
+
+    @Test
+    void theReadOnlyRoleStillCannotReadTheGuardianReferenceAndTheApplicationRoleCanWriteIt() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            guardian(owner, institution, "P-000001", "LEGACY-1");
+            owner.commit();
+        }
+        try (Connection readonly = SharedPostgresContainer.connectionAs("confia_readonly")) {
+            readonly.setAutoCommit(false);
+            StaffRoleFixtures.fixInstitution(readonly, institution);
+            SQLException refusal = rejected(readonly, () -> readonly.createStatement()
+                    .executeQuery("select external_ref from guardians_guardian").close());
             assertThat(refusal.getSQLState()).isEqualTo("42501");
             readonly.rollback();
         }

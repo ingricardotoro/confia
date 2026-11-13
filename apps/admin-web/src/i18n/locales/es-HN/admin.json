@@ -662,8 +662,60 @@
   },
   "imports": {
     "title": "Importaciones",
-    "heading": "Importar estudiantes",
-    "intro": "Cargue el listado de estudiantes de su sistema anterior desde un archivo CSV. Primero se simula: no se crea ningún estudiante hasta que usted aplique la importación.",
+    "heading": "Importar datos",
+    "intro": "Cargue desde un archivo CSV los datos de su sistema anterior: estudiantes, encargados y los vínculos entre ellos. Primero se simula: no se crea nada hasta que usted aplique la importación.",
+    "kindLabel": "Qué va a importar",
+    "kindOrder": "Orden recomendado: primero los estudiantes, después los encargados y por último los vínculos, porque cada archivo se apoya en el anterior.",
+    "kinds": {
+      "students": {
+        "option": "Estudiantes",
+        "fileLabel": "Archivo CSV de estudiantes",
+        "fileHelp": "CSV en UTF-8 (en Excel: Guardar como, CSV UTF-8), separado por comas o por punto y coma, de hasta 5 MB y 10 000 filas. Las columnas obligatorias son legacyId, firstName, lastName y birthDate (AAAA-MM-DD); nationalId y sex son opcionales.",
+        "summaryDescription": "Esto es lo que pasaría al aplicar el archivo. Todavía no se creó ningún estudiante.",
+        "dialogDescription": "Confirme la creación de los estudiantes del archivo simulado.",
+        "willCreate": "{count, plural, one {Se creará # estudiante.} other {Se crearán # estudiantes.}}",
+        "confirm": "{count, plural, one {Crear # estudiante} other {Crear # estudiantes}}",
+        "applying": "Creando los estudiantes. No cierre esta ventana.",
+        "lateNote": "Los documentos ya guardados se revisan solo al aplicar, no en la simulación: pueden rechazarse más filas que las que mostró la simulación.",
+        "resultDone": "{created, plural, one {Se creó # estudiante.} other {Se crearon # estudiantes.}} {skipped, plural, one {# fila ya importada se omitió.} other {# filas ya importadas se omitieron.}} {rejected, plural, one {# fila rechazada no se creó.} other {# filas rechazadas no se crearon.}}",
+        "resultCreated": "Estudiantes creados",
+        "resultRejections": "Estas filas no se crearon. Incluyen los documentos de identidad que ya existían en el sistema, que solo se revisan al aplicar. Corrija el origen, simule y aplique de nuevo el archivo corregido.",
+        "resultNext": "Los estudiantes ya están en la lista de estudiantes. Si corrigió filas rechazadas, simule y aplique el archivo corregido: las filas ya importadas se omiten.",
+        "applyUnknown": "No se pudo confirmar si la importación terminó. Puede aplicarla de nuevo sin riesgo: los estudiantes ya creados se omiten."
+      },
+      "guardians": {
+        "option": "Encargados",
+        "fileLabel": "Archivo CSV de encargados",
+        "fileHelp": "CSV en UTF-8 (en Excel: Guardar como, CSV UTF-8), separado por comas o por punto y coma, de hasta 5 MB y 10 000 filas. Las columnas obligatorias son legacyId, firstName y lastName; nationalId, rtn, email, phone, address y preferredChannel son opcionales.",
+        "summaryDescription": "Esto es lo que pasaría al aplicar el archivo. Todavía no se creó ningún encargado.",
+        "dialogDescription": "Confirme la creación de los encargados del archivo simulado.",
+        "willCreate": "{count, plural, one {Se creará # encargado.} other {Se crearán # encargados.}}",
+        "confirm": "{count, plural, one {Crear # encargado} other {Crear # encargados}}",
+        "applying": "Creando los encargados. No cierre esta ventana.",
+        "lateNote": "Los documentos ya guardados se revisan solo al aplicar, no en la simulación: pueden rechazarse más filas que las que mostró la simulación.",
+        "resultDone": "{created, plural, one {Se creó # encargado.} other {Se crearon # encargados.}} {skipped, plural, one {# fila ya importada se omitió.} other {# filas ya importadas se omitieron.}} {rejected, plural, one {# fila rechazada no se creó.} other {# filas rechazadas no se crearon.}}",
+        "resultCreated": "Encargados creados",
+        "resultRejections": "Estas filas no se crearon. Incluyen los documentos de identidad que ya existían en el sistema, que solo se revisan al aplicar. Corrija el origen, simule y aplique de nuevo el archivo corregido.",
+        "resultNext": "Los encargados ya están en la lista de encargados. Si corrigió filas rechazadas, simule y aplique el archivo corregido: las filas ya importadas se omiten. Cuando termine, siga con el archivo de vínculos.",
+        "applyUnknown": "No se pudo confirmar si la importación terminó. Puede aplicarla de nuevo sin riesgo: los encargados ya creados se omiten."
+      },
+      "guardian-links": {
+        "option": "Vínculos",
+        "fileLabel": "Archivo CSV de vínculos",
+        "fileHelp": "CSV en UTF-8 (en Excel: Guardar como, CSV UTF-8), separado por comas o por punto y coma, de hasta 5 MB y 10 000 filas. Importe antes a los estudiantes y a los encargados: cada fila los busca por su legacyId. Las columnas obligatorias son studentLegacyId, guardianLegacyId, relationship (FATHER, MOTHER, LEGAL_GUARDIAN, SELF u OTHER) y financialResponsibilityPercent; isPrimaryPayer e isBillingRecipient (true o false) son opcionales.",
+        "summaryDescription": "Esto es lo que pasaría al aplicar el archivo. Todavía no se creó ningún vínculo.",
+        "dialogDescription": "Confirme la creación de los vínculos del archivo simulado.",
+        "willCreate": "{count, plural, one {Se creará # vínculo.} other {Se crearán # vínculos.}}",
+        "confirm": "{count, plural, one {Crear # vínculo} other {Crear # vínculos}}",
+        "applying": "Creando los vínculos. No cierre esta ventana.",
+        "lateNote": "Cada estudiante se valida con todas sus filas juntas: si una falla, se rechazan todas. Si ya tiene vínculos se omite, nunca se reemplazan.",
+        "resultDone": "{created, plural, one {Se creó # vínculo.} other {Se crearon # vínculos.}} {skipped, plural, one {# fila de un estudiante que ya tenía vínculos se omitió.} other {# filas de estudiantes que ya tenían vínculos se omitieron.}} {rejected, plural, one {# fila rechazada no se creó.} other {# filas rechazadas no se crearon.}}",
+        "resultCreated": "Vínculos creados",
+        "resultRejections": "Estas filas no se crearon. Cuando una fila de un estudiante tiene un defecto, se rechazan todas las filas de ese estudiante. Corrija el origen, simule y aplique de nuevo el archivo corregido.",
+        "resultNext": "Los vínculos ya están en la ficha de cada estudiante. Si corrigió filas rechazadas, simule y aplique el archivo corregido: los estudiantes que ya tienen vínculos se omiten.",
+        "applyUnknown": "No se pudo confirmar si la importación terminó. Puede aplicarla de nuevo sin riesgo: los estudiantes que ya tienen vínculos se omiten."
+      }
+    },
     "stepsLabel": "Pasos de la importación",
     "steps": {
       "choose": "Elegir archivo",
@@ -677,9 +729,7 @@
       "pending": "pendiente"
     },
     "file": {
-      "label": "Archivo CSV de estudiantes",
-      "help": "CSV en UTF-8 (en Excel: Guardar como, CSV UTF-8), separado por comas o por punto y coma, de hasta 5 MB y 10 000 filas. Las columnas obligatorias son legacyId, firstName, lastName y birthDate (AAAA-MM-DD); nationalId y sex son opcionales.",
-      "privacy": "El archivo se envía para simularlo y para aplicarlo, y no se guarda: al terminar, esta pantalla lo suelta. Los nombres de los estudiantes no se muestran aquí.",
+      "privacy": "El archivo se envía para simularlo y para aplicarlo, y no se guarda: al terminar, esta pantalla lo suelta. Los datos de las personas no se muestran aquí.",
       "errors": {
         "required": "Elija un archivo CSV.",
         "extension": "El archivo debe ser un CSV con la extensión .csv.",
@@ -693,11 +743,10 @@
     "simulated": "Simulación lista: {valid, plural, one {# fila se puede crear} other {# filas se pueden crear}}, {rejected, plural, one {# rechazada} other {# rechazadas}} y {skipped, plural, one {# ya importada} other {# ya importadas}}.",
     "summary": {
       "heading": "Resultado de la simulación",
-      "description": "Esto es lo que pasaría al aplicar el archivo. Todavía no se creó ningún estudiante.",
       "total": "Filas del archivo",
       "valid": "Se crearán",
       "rejected": "Rechazadas",
-      "skipped": "Ya importadas, se omiten"
+      "skipped": "Omitidas, ya existían"
     },
     "rejections": {
       "heading": "Filas rechazadas",
@@ -725,8 +774,19 @@
       "invalid-date": "La fecha no existe o es anterior al 1 de enero de 1990.",
       "future-birth-date": "La fecha de nacimiento es posterior a hoy.",
       "duplicate-in-file": "El dato se repite en una fila anterior del archivo.",
-      "duplicate-national-id": "Ya hay un estudiante con ese documento de identidad.",
-      "already-imported": "Ya se importó antes: se omite."
+      "duplicate-national-id": "Ya hay un registro con ese documento de identidad.",
+      "already-imported": "Ya se importó antes: se omite.",
+      "invalid-percent": "El porcentaje no es válido: use de 0.01 a 100, con hasta dos decimales.",
+      "unknown-student": "El estudiante no está importado: importe primero el archivo de estudiantes.",
+      "unknown-guardian": "El encargado no está importado: importe primero el archivo de encargados.",
+      "student-not-active": "El estudiante no está activo.",
+      "guardian-not-active": "El encargado no está activo.",
+      "student-already-linked": "El estudiante ya tiene encargados vinculados: se omite y la importación no los reemplaza.",
+      "group-rejected": "Otra fila de este estudiante tiene un defecto: se rechazan todas sus filas juntas.",
+      "sum-not-100": "Los porcentajes de este estudiante no suman exactamente 100.00: se rechazan todas sus filas.",
+      "multiple-primary-payer": "Este estudiante tiene más de un pagador principal: se rechazan todas sus filas.",
+      "multiple-billing-recipient": "Este estudiante tiene más de un destinatario de factura: se rechazan todas sus filas.",
+      "duplicate-guardian": "El mismo encargado aparece más de una vez para este estudiante: se rechazan todas sus filas."
     },
     "noRows": {
       "title": "No hay nada que crear",
@@ -735,25 +795,16 @@
     "apply": {
       "action": "Aplicar la importación",
       "dialogTitle": "Aplicar la importación",
-      "dialogDescription": "Confirme la creación de los estudiantes del archivo simulado.",
-      "willCreate": "{count, plural, one {Se creará # estudiante.} other {Se crearán # estudiantes.}}",
       "notCreated": "{rejected, plural, one {# fila rechazada} other {# filas rechazadas}} y {skipped, plural, one {# fila ya importada} other {# filas ya importadas}} no se crean.",
-      "documentsLate": "Los documentos de identidad que ya existen en el sistema se revisan solo al aplicar, no en la simulación. Al aplicar pueden rechazarse más filas que las que mostró la simulación; esas filas no se crean y se listan con su línea, su campo y su motivo.",
       "sameFile": "Se vuelve a validar el archivo y solo se aplica si es el mismo que se simuló. Aplicarlo otra vez no duplica a nadie.",
-      "confirm": "{count, plural, one {Crear # estudiante} other {Crear # estudiantes}}",
-      "cancel": "Cancelar",
-      "applying": "Creando los estudiantes. No cierre esta ventana."
+      "cancel": "Cancelar"
     },
     "result": {
       "heading": "Importación aplicada",
-      "done": "{created, plural, one {Se creó # estudiante.} other {Se crearon # estudiantes.}} {skipped, plural, one {# fila ya importada se omitió.} other {# filas ya importadas se omitieron.}} {rejected, plural, one {# fila rechazada no se creó.} other {# filas rechazadas no se crearon.}}",
-      "created": "Estudiantes creados",
       "rejectionsHeading": "Filas rechazadas al aplicar",
-      "rejectionsDescription": "Estas filas no se crearon. Incluyen los documentos de identidad que ya existían en el sistema, que solo se revisan al aplicar. Corrija el origen, simule y aplique de nuevo el archivo corregido.",
       "rejectionsCaption": "Filas rechazadas al aplicar, con su línea, su campo y su motivo",
       "rejectionsNavigation": "Páginas de las filas rechazadas al aplicar",
-      "another": "Importar otro archivo",
-      "next": "Los estudiantes ya están en la lista de estudiantes. Si corrigió filas rechazadas, simule y aplique el archivo corregido: las filas ya importadas se omiten."
+      "another": "Importar otro archivo"
     },
     "failed": {
       "title": "No se pudo completar la operación",
@@ -761,7 +812,7 @@
     },
     "fileErrors": {
       "emptyFile": "El archivo está vacío.",
-      "noRows": "El archivo solo tiene la cabecera. Agregue al menos una fila de estudiantes.",
+      "noRows": "El archivo solo tiene la cabecera. Agregue al menos una fila de datos.",
       "tooLarge": "El archivo pesa más de 5 MB. Divídalo en varios archivos.",
       "tooManyRows": "El archivo tiene más de 10 000 filas. Divídalo en varios archivos.",
       "malformedCsv": "El archivo no se pudo leer como CSV: revise las comillas de los campos.",
@@ -772,12 +823,11 @@
     },
     "errors": {
       "network": "No se pudo enviar el archivo al servidor. Revise su conexión; si el archivo cambió en su equipo desde que lo eligió, elíjalo otra vez.",
-      "rateLimited": "Se alcanzó el límite de importaciones por hora. Espere un rato e intente de nuevo.",
-      "applyUnknown": "No se pudo confirmar si la importación terminó. Puede aplicarla de nuevo sin riesgo: los estudiantes ya creados se omiten."
+      "rateLimited": "Se alcanzó el límite de importaciones por hora. Espere un rato e intente de nuevo."
     },
     "history": {
       "heading": "Historial de importaciones",
-      "caption": "Importaciones de estudiantes de la institución, de la más reciente a la más antigua",
+      "caption": "Importaciones de la institución, de la más reciente a la más antigua",
       "navigation": "Páginas del historial de importaciones",
       "date": "Fecha",
       "status": "Estado",
@@ -789,8 +839,11 @@
       "statusApplied": "Aplicada",
       "loadFailed": "No se pudo cargar el historial de importaciones",
       "emptyTitle": "Todavía no hay importaciones",
-      "emptyDescription": "Aquí aparecerá cada simulación y cada aplicación que haga, con sus conteos. Los archivos y los datos de los estudiantes no se guardan.",
-      "emptyAction": "Elegir un archivo"
+      "emptyDescription": "Aquí aparecerá cada simulación y cada aplicación que haga, con sus conteos. Los archivos y los datos de las personas no se guardan.",
+      "emptyAction": "Elegir un archivo",
+      "kind": "Tipo",
+      "kindFilter": "Tipo de importación",
+      "allKinds": "Todos los tipos"
     }
   }
 }

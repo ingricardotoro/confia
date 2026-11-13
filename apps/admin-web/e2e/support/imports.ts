@@ -1,5 +1,5 @@
 import type { Locator, Page, Request } from "@playwright/test";
-import { applyPreset } from "./organization.ts";
+import { applyPreset, dialog } from "./organization.ts";
 import { expect, seedSession } from "./scenario.ts";
 
 export { applyPreset, dialog, test } from "./organization.ts";
@@ -13,7 +13,7 @@ export async function openImportsPage(page: Page): Promise<void> {
   await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Importaciones" }).click();
   await expect(page).toHaveURL(/\/imports$/);
   await expect(page.getByRole("heading", { level: 1, name: "Importaciones" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Importar estudiantes" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Importar datos" })).toBeVisible();
 }
 
 /** Opens the imports screen with a preset already applied and the session seeded. */
@@ -59,3 +59,37 @@ export function recordImportResponses(page: Page): Promise<string>[] {
   });
   return seen;
 }
+
+/** The kinds of file the screen offers, by the label of the field of each. */
+export const FILE_LABELS = { students: "Archivo CSV de estudiantes", guardians: "Archivo CSV de encargados", "guardian-links": "Archivo CSV de vínculos" } as const;
+export type ImportKindName = keyof typeof FILE_LABELS;
+
+/** Chooses what the next file loads, as a person does with the select of the first step. */
+export async function chooseKind(page: Page, kind: ImportKindName): Promise<void> {
+  await page.getByLabel("Qué va a importar").selectOption(kind);
+  await expect(page.getByLabel(FILE_LABELS[kind])).toBeVisible();
+}
+
+/** Chooses a file in memory for the kind on the screen. */
+export async function chooseFile(page: Page, kind: ImportKindName, content: string, name = "archivo.csv"): Promise<void> {
+  await page.getByLabel(FILE_LABELS[kind]).setInputFiles({ name, mimeType: "text/csv", buffer: Buffer.from(content, "utf8") });
+}
+
+/** Simulates and applies a file of a kind, and goes back to the first step: how a person loads the three files one after the other. */
+export async function importKind(page: Page, kind: ImportKindName, content: string, expectedCreated: number): Promise<void> {
+  await chooseKind(page, kind);
+  await chooseFile(page, kind, content);
+  await simulateButton(page).click();
+  await expect(summaryHeading(page)).toBeFocused();
+  await page.getByRole("button", { name: "Aplicar la importación" }).click();
+  await dialog(page).getByRole("button", { name: new RegExp(`^Crear ${String(expectedCreated)} `) }).click();
+  await expect(resultHeading(page)).toBeFocused();
+  await page.getByRole("button", { name: "Importar otro archivo" }).click();
+}
+
+/** Fictitious rows only, as the rest of the journeys: the names appear nowhere on the screen. */
+export const GUARDIANS_HEADER = "legacyId,firstName,lastName";
+export const LINKS_HEADER = "studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,isBillingRecipient";
+export const studentsCsv = (count: number): string => csvOf(count);
+export const guardiansCsv = (count: number): string =>
+  [GUARDIANS_HEADER, ...Array.from({ length: count }, (_, index) => `G${String(index + 1)},Encargado${String(index + 1)},Apellido${String(index + 1)}`)].join("\n");

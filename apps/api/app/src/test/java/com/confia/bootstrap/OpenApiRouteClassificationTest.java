@@ -75,6 +75,33 @@ class OpenApiRouteClassificationTest {
         }
     }
 
+    /** Every permission an operation declares is the one of its entry on the list, the second one included. */
+    @Test
+    void everyDeclaredPermissionOfTheRealDocumentIsTheOneOfItsEntryIncludingTheAlsoRequiredOnes() {
+        try (OpenApiProcess process = OpenApiProcess.start("admin", "local")) {
+            JsonNode document = JSON.readTree(process.get(OpenApiProcess.API_DOCS_PATH).body());
+            int checked = 0;
+            int withAlso = 0;
+            for (var entry : PermissionedEndpoints.forAdmin().endpoints()) {
+                JsonNode operation = document.get("paths").get(entry.pattern())
+                        .get(entry.method().name().toLowerCase(Locale.ROOT));
+                assertThat(operation).as(entry.method() + " " + entry.pattern()).isNotNull();
+                assertThat(operation.get("x-required-permission").asString()).as(entry.pattern())
+                        .isEqualTo(entry.permission().code());
+                List<String> declared = new ArrayList<>();
+                if (operation.has("x-also-required-permissions")) {
+                    operation.get("x-also-required-permissions").forEach(code -> declared.add(code.asString()));
+                }
+                assertThat(declared).as(entry.pattern() + " also-required")
+                        .containsExactlyElementsOf(entry.alsoRequired().stream().map(permission -> permission.code()).toList());
+                checked++;
+                withAlso += entry.alsoRequired().isEmpty() ? 0 : 1;
+            }
+            assertThat(checked).as("non-vacuous").isGreaterThan(30);
+            assertThat(withAlso).as("the two link routes").isEqualTo(2);
+        }
+    }
+
     @Test
     void anOperationOnNoListIsNamedByMethodAndPath() {
         JsonNode document = JSON.readTree("""
