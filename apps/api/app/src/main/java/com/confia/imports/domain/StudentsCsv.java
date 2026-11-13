@@ -65,9 +65,6 @@ public final class StudentsCsv {
             throw new InvalidImportFileException("file", "empty-file");
         }
         List<CsvRecord> records = CsvParser.parse(text, maxRows + 1);
-        if (records.isEmpty()) {
-            throw new InvalidImportFileException("file", "empty-file");
-        }
         Map<String, Integer> columns = columnsOf(records.getFirst());
         if (records.size() == 1) {
             throw new InvalidImportFileException("file", "no-rows");
@@ -96,9 +93,6 @@ public final class StudentsCsv {
         Map<String, Integer> columns = new HashMap<>();
         List<InvalidImportFileException.Problem> problems = new ArrayList<>();
         List<String> names = header.cells();
-        if (names.size() > CsvParser.MAX_CELLS) {
-            throw new InvalidImportFileException("file", "too-many-columns");
-        }
         for (int i = 0; i < names.size(); i++) {
             String name = names.get(i).strip();
             if (!KNOWN.contains(name) || columns.putIfAbsent(name, i) != null) {

@@ -46,6 +46,28 @@ class ImportBatchTest {
     }
 
     @Test
+    void everyCountMustBeZeroOrMore() {
+        assertThatThrownBy(() -> simulated(-1, 0, 0, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> simulated(0, -1, 0, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> simulated(0, 0, -1, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> simulated(0, 0, 0, -1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ImportBatch(UUID.randomUUID(), ImportKind.STUDENTS, ImportStatus.APPLIED, SHA,
+                0, 0, 0, -1, 0, UUID.randomUUID(), ACCOUNT, NOW, NOW)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private static ImportBatch simulated(int total, int valid, int rejected, int skipped) {
+        return ImportBatch.simulated(UUID.randomUUID(), ImportKind.STUDENTS, SHA, total, valid, rejected, skipped,
+                ACCOUNT, NOW);
+    }
+
+    @Test
+    void aSimulationCannotPointToAnotherSimulation() {
+        assertThatThrownBy(() -> new ImportBatch(UUID.randomUUID(), ImportKind.STUDENTS, ImportStatus.VALIDATED, SHA,
+                10, 6, 3, 0, 1, UUID.randomUUID(), ACCOUNT, NOW, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void aSimulationWithCreatedRowsOrAnApplicationTimeIsRefused() {
         assertThatThrownBy(() -> new ImportBatch(UUID.randomUUID(), ImportKind.STUDENTS, ImportStatus.VALIDATED, SHA,
                 10, 6, 3, 6, 1, null, ACCOUNT, NOW, null)).isInstanceOf(IllegalArgumentException.class);

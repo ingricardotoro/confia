@@ -47,7 +47,6 @@ public final class CsvParser {
     private final char delimiter;
     private int position;
     private int line = 1;
-    private boolean startedWithQuote;
 
     private CsvParser(String text) {
         this.text = text;
@@ -73,9 +72,6 @@ public final class CsvParser {
             }
             int startLine = line;
             List<String> cells = record();
-            if (cells.size() == 1 && cells.getFirst().isEmpty() && !startedWithQuote) {
-                continue;
-            }
             if (records.size() >= maxRecords) {
                 throw new InvalidImportFileException(FILE, "too-many-rows");
             }
@@ -86,12 +82,8 @@ public final class CsvParser {
 
     private List<String> record() {
         List<String> cells = new ArrayList<>();
-        startedWithQuote = false;
         while (true) {
-            boolean quoted = position < text.length() && text.charAt(position) == '"';
-            if (cells.isEmpty()) {
-                startedWithQuote = quoted;
-            }
+            boolean quoted = text.charAt(position) == '"';
             if (cells.size() >= MAX_CELLS) {
                 throw new InvalidImportFileException(FILE, "too-many-columns");
             }

@@ -109,6 +109,29 @@ class CsvParserTest {
                 .containsExactly("a", "=HYPERLINK(\"http://x\")", "+1", "-2", "@SUM(A1)");
     }
 
+    @Test
+    void aQuotedCellMayEndTheTextAndMayBeFollowedByAnyLineEnding() {
+        assertThat(cells(parse("a\n\"x\"").get(1))).containsExactly("x");
+        assertThat(parse("\"a\"\r\n\"b\"\r\"c\"\n")).extracting(r -> cells(r).getFirst())
+                .containsExactly("a", "b", "c");
+        assertThat(cells(parse("\"a\";\"b\"\n").getFirst())).containsExactly("a", "b");
+    }
+
+    @Test
+    void aLoneCarriageReturnInsideACellIsALineBreakAndATrailingOneEndsTheLastRecord() {
+        List<CsvRecord> records = parse("a\n\"x\ry\"\nlast\r");
+
+        assertThat(cells(records.get(1))).containsExactly("x\ny");
+        assertThat(records.get(2).line()).isEqualTo(4);
+        assertThat(parse("a\r")).hasSize(1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a,\"b\r", "\"a"})
+    void aQuotedCellThatEndsTheTextWithoutClosingIsMalformed(String text) {
+        assertThatThrownBy(() -> parse(text)).isInstanceOf(InvalidImportFileException.class);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"a,b\"c\n", "a,\"b\n", "\"a\"x,b\n", "a,\"b\"\"\n", "a, \"b\"\n"})
     void aMalformedFileIsRefusedWithoutEchoingIt(String text) {
