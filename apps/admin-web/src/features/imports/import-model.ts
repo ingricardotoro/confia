@@ -7,7 +7,7 @@ import { PROBLEM_KEYS } from "../../shared/api/problem-keys.ts";
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 /** What a file loads, named as the routes of the API name it. The recommended order is the order of this list. */
-export const IMPORT_KINDS = ["students", "guardians", "guardian-links"] as const;
+export const IMPORT_KINDS = ["students", "guardians", "guardian-links", "enrollments"] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
 export function isImportKind(value: unknown): value is ImportKind {
@@ -19,11 +19,26 @@ export const TEMPLATE_HEADERS: Readonly<Record<ImportKind, string>> = {
   students: "legacyId,firstName,lastName,birthDate,nationalId,sex",
   guardians: "legacyId,firstName,lastName,nationalId,rtn,email,phone,address,preferredChannel",
   "guardian-links": "studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,isBillingRecipient",
+  enrollments: "studentLegacyId,academicYear,modality,grade,section,enrolledOn",
 };
+/**
+ * One example row for the kinds whose template carries one: made-up values that show the shape of each column (the academic year,
+ * the modality, the grade and the section go by name, the date as `YYYY-MM-DD`). It holds no data of a person.
+ */
+export const TEMPLATE_EXAMPLES: Readonly<Partial<Record<ImportKind, string>>> = {
+  enrollments: "L1001,2026,Diurna,Primero,A,2026-02-02",
+};
+
+/** The text of the template file of a kind: its header and, when the kind has one, its example row. */
+export function templateTextOf(kind: ImportKind): string {
+  const example = TEMPLATE_EXAMPLES[kind];
+  return example === undefined ? `${TEMPLATE_HEADERS[kind]}\r\n` : `${TEMPLATE_HEADERS[kind]}\r\n${example}\r\n`;
+}
 export const TEMPLATE_FILE_NAMES: Readonly<Record<ImportKind, string>> = {
   students: "plantilla-estudiantes.csv",
   guardians: "plantilla-encargados.csv",
   "guardian-links": "plantilla-vinculos.csv",
+  enrollments: "plantilla-matriculas.csv",
 };
 export const REJECTIONS_FILE_NAME = "rechazos-importacion.csv";
 
@@ -32,6 +47,7 @@ export const KIND_OF_BATCH: Readonly<Record<ImportBatchResponseOutput["kind"], I
   STUDENTS: "students",
   GUARDIANS: "guardians",
   GUARDIAN_LINKS: "guardian-links",
+  ENROLLMENTS: "enrollments",
 };
 
 /** The columns of the template of a kind: the only names of a field the screen shows as they are. */

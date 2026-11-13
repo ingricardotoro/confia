@@ -132,14 +132,14 @@ describe("ImportWizard, choose", () => {
 });
 
 describe("ImportWizard, the kind", () => {
-  it("offers the three kinds in the recommended order, with the order described, and hands over the one chosen", async () => {
+  it("offers the four kinds in the recommended order, with the order described, and hands over the one chosen", async () => {
     const onKindChange = vi.fn();
     renderWithAdminI18n(<ImportWizard {...props({ onKindChange })} />);
 
     const select = screen.getByLabelText("Qué va a importar");
-    expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual(["Estudiantes", "Encargados", "Vínculos"]);
+    expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual(["Estudiantes", "Encargados", "Vínculos", "Matrículas"]);
     expect(select).toHaveValue("students");
-    expect(select).toHaveAccessibleDescription(/primero los estudiantes, después los encargados y por último los vínculos/);
+    expect(select).toHaveAccessibleDescription(/primero los estudiantes, después los encargados, los vínculos y por último las matrículas/);
 
     await userEvent.setup().selectOptions(select, "guardian-links");
 
@@ -155,6 +155,7 @@ describe("ImportWizard, the kind", () => {
   it.each([
     ["guardians", "Archivo CSV de encargados", /legacyId, firstName y lastName.*no se guarda/],
     ["guardian-links", "Archivo CSV de vínculos", /studentLegacyId, guardianLegacyId, relationship.*financialResponsibilityPercent.*no se guarda/],
+    ["enrollments", "Archivo CSV de matrículas", /studentLegacyId, academicYear, modality, grade, section y enrolledOn.*Solo se importa la matrícula vigente.*no se guarda/],
   ] as const)("names the file field of %s and describes its own columns", (kind, label, help) => {
     renderWithAdminI18n(<ImportWizard {...props({ kind })} />);
 
@@ -337,6 +338,61 @@ describe("ImportWizard, apply of the guardians and the links", () => {
 
     expect(screen.getByText(/Se crearon 6 vínculos\. 1 fila de un estudiante que ya tenía vínculos se omitió\. 3 filas rechazadas no se crearon\./)).toBeInTheDocument();
     expect(screen.getByText("Vínculos creados")).toBeInTheDocument();
+  });
+});
+
+/** A rejection with a reason the published contract does not list yet (see the note of the cut): the screen shows it by its catalog key. */
+const rejectionOf = (line: number, field: string, reason: string): RejectionResponseOutput => ({ line, field, reason }) as RejectionResponseOutput;
+
+describe("ImportWizard, the enrollments", () => {
+  it("confirms the creation of enrollments with the quota that is checked again and the promise that none is moved", () => {
+    renderWithAdminI18n(<ImportWizard {...props({ kind: "enrollments", step: "apply", confirming: true, simulation: run({ validRows: 1, skippedRows: 2, rejectedRows: 1 }) })} />);
+
+    const dialog = screen.getByRole("dialog", { name: "Aplicar la importación" });
+    expect(within(dialog).getByText("Se creará 1 matrícula.")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Crear 1 matrícula" })).toBeInTheDocument();
+    expect(within(dialog).getByText(/cupo se revisa de nuevo al aplicar.*nunca se traslada ni se reemplaza/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/documentos de identidad/)).toBeNull();
+  });
+
+  it("tells every reason of the enrollments in plain words, with the column of the template it belongs to, and no column of another kind", () => {
+    const rejections = [
+      rejectionOf(2, "studentLegacyId", "unknown-student"),
+      rejectionOf(3, "section", "unknown-section"),
+      rejectionOf(4, "section", "ambiguous-section"),
+      rejectionOf(5, "section", "section-full"),
+      rejectionOf(6, "studentLegacyId", "duplicate-active-enrollment"),
+      rejectionOf(7, "academicYear", "academic-year-closed"),
+      rejectionOf(8, "section", "inactive-reference"),
+      rejectionOf(9, "studentLegacyId", "student-not-active"),
+      rejectionOf(10, "enrolledOn", "enrollment-date-out-of-range"),
+      rejectionOf(11, "birthDate", "required"),
+    ];
+    renderWithAdminI18n(<ImportWizard {...props({ kind: "enrollments", step: "simulate", simulation: run({ rejectedRows: 10, validRows: 0 }, rejections) })} />);
+
+    const table = screen.getByRole("table", { name: /Filas del archivo con su línea/ });
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "2studentLegacyIdEl estudiante no está importado: importe primero el archivo de estudiantes.",
+      "3sectionNo existe una sección con ese año lectivo, modalidad, grado y nombre: revise los nombres y que la estructura académica esté creada.",
+      "4sectionMás de una sección coincide con esos nombres: revise el año lectivo, la modalidad y el grado.",
+      "5sectionLa sección no tiene cupo para esta matrícula.",
+      "6studentLegacyIdEl estudiante ya tiene una matrícula activa en ese año en otra sección: la importación no la traslada ni la reemplaza.",
+      "7academicYearEl año lectivo está cerrado: no admite matrículas.",
+      "8sectionLa sección, el grado, la modalidad o el año lectivo no está activo.",
+      "9studentLegacyIdEl estudiante no está activo.",
+      "10enrolledOnLa fecha de matrícula está fuera del año lectivo o es posterior a hoy.",
+      "11Sin campoFalta el dato obligatorio.",
+    ]);
+  });
+
+  it("says the result of the enrollments in its own words", () => {
+    renderWithAdminI18n(
+      <ImportWizard {...props({ kind: "enrollments", step: "result", result: run({ status: "APPLIED", totalRows: 10, createdRows: 6, rejectedRows: 3, skippedRows: 1 }) })} />,
+    );
+
+    expect(screen.getByText(/Se crearon 6 matrículas\. 1 fila ya importada se omitió\. 3 filas rechazadas no se crearon\./)).toBeInTheDocument();
+    expect(screen.getByText("Matrículas creadas")).toBeInTheDocument();
   });
 });
 

@@ -61,7 +61,12 @@ export function recordImportResponses(page: Page): Promise<string>[] {
 }
 
 /** The kinds of file the screen offers, by the label of the field of each. */
-export const FILE_LABELS = { students: "Archivo CSV de estudiantes", guardians: "Archivo CSV de encargados", "guardian-links": "Archivo CSV de vínculos" } as const;
+export const FILE_LABELS = {
+  students: "Archivo CSV de estudiantes",
+  guardians: "Archivo CSV de encargados",
+  "guardian-links": "Archivo CSV de vínculos",
+  enrollments: "Archivo CSV de matrículas",
+} as const;
 export type ImportKindName = keyof typeof FILE_LABELS;
 
 /** Chooses what the next file loads, as a person does with the select of the first step. */
@@ -90,6 +95,7 @@ export async function importKind(page: Page, kind: ImportKindName, content: stri
 /** Fictitious rows only, as the rest of the journeys: the names appear nowhere on the screen. */
 export const GUARDIANS_HEADER = "legacyId,firstName,lastName";
 export const LINKS_HEADER = "studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,isBillingRecipient";
+export const ENROLLMENTS_HEADER = "studentLegacyId,academicYear,modality,grade,section,enrolledOn";
 export const studentsCsv = (count: number): string => csvOf(count);
 export const guardiansCsv = (count: number): string =>
   [GUARDIANS_HEADER, ...Array.from({ length: count }, (_, index) => `G${String(index + 1)},Encargado${String(index + 1)},Apellido${String(index + 1)}`)].join("\n");

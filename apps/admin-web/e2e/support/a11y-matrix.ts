@@ -124,7 +124,13 @@ async function simulateImport(page: Page, good: number, ...defects: string[]): P
 const importDefects = Array.from({ length: 12 }, (_, index) => `L9${String(index)},,Apellido,2013-05-01,,F`);
 
 const LINKS_HEADER = "studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,isBillingRecipient";
-const fileLabels = { students: "Archivo CSV de estudiantes", guardians: "Archivo CSV de encargados", "guardian-links": "Archivo CSV de vínculos" } as const;
+const ENROLLMENTS_HEADER = "studentLegacyId,academicYear,modality,grade,section,enrolledOn";
+const fileLabels = {
+  students: "Archivo CSV de estudiantes",
+  guardians: "Archivo CSV de encargados",
+  "guardian-links": "Archivo CSV de vínculos",
+  enrollments: "Archivo CSV de matrículas",
+} as const;
 
 /** Chooses the kind and a fictitious file in memory, and simulates it. */
 async function simulateKind(page: Page, kind: keyof typeof fileLabels, lines: readonly string[]): Promise<void> {
@@ -148,6 +154,15 @@ const studentLines = (count: number): string[] => [IMPORT_HEADER, ...Array.from(
 const guardianLines = (count: number): string[] => ["legacyId,firstName,lastName", ...Array.from({ length: count }, (_, index) => `G${String(index + 1)},Nombre,Apellido`)];
 /** Three students with their guardians: the first valid, the second adding up to 90, the third with a percentage that is not valid. */
 const linkLines = [LINKS_HEADER, "S1,G1,FATHER,60,true,true", "S1,G2,MOTHER,40,,", "S2,G1,FATHER,50,,", "S2,G2,MOTHER,40,,", "S3,G1,FATHER,50,,", "S3,G2,MOTHER,50.555,,"];
+
+/** Three students for the enrollments: the first and the third fit, the second names a section that does not exist. */
+const enrollmentLines = [ENROLLMENTS_HEADER, "S1,2026,Diurna,Primero,A,2026-02-02", "S2,2026,Diurna,Primero,X,2026-02-02", "S3,2026,Diurna,Primero,B,2026-02-02"];
+
+/** The screen with students already imported, ready to import their enrollments. */
+async function openImportsWithStudents(page: Page): Promise<void> {
+  await openImportsRoute(page);
+  await importKind(page, "students", studentLines(3));
+}
 
 /** The screen with students and guardians already imported, ready to import the links. */
 async function openImportsWithReferences(page: Page): Promise<void> {
@@ -742,6 +757,37 @@ export const MATRIX: readonly GateCombination[] = [
       await simulateKind(page, "guardian-links", [LINKS_HEADER, "S1,G1,FATHER,60,true,true", "S1,G2,MOTHER,40,,"]);
     },
     expected: (page) => page.getByText("No hay nada que crear"),
+  },
+  {
+    route: IMPORTS,
+    state: "kind-enrollments",
+    arrange: async (page) => {
+      await openImportsRoute(page);
+      await page.getByLabel("Qué va a importar").selectOption("enrollments");
+    },
+    expected: (page) => page.getByLabel("Archivo CSV de matrículas"),
+  },
+  {
+    route: IMPORTS,
+    state: "enrollments-simulated-with-rejections",
+    preset: "imports-empty",
+    arrange: async (page) => {
+      await openImportsWithStudents(page);
+      await simulateKind(page, "enrollments", enrollmentLines);
+    },
+    expected: (page) => page.getByRole("table", { name: /Filas del archivo con su línea/ }).getByText(/No existe una sección con ese año lectivo/).first(),
+  },
+  {
+    route: IMPORTS,
+    state: "dialog-apply-enrollments",
+    opensDialog: true,
+    preset: "imports-empty",
+    arrange: async (page) => {
+      await openImportsWithStudents(page);
+      await simulateKind(page, "enrollments", enrollmentLines);
+      await page.getByRole("button", { name: "Aplicar la importación" }).click();
+    },
+    expected: (page) => page.getByRole("dialog").getByText("Se crearán 2 matrículas."),
   },
   {
     route: IMPORTS,

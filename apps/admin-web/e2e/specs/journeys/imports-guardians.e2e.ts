@@ -127,7 +127,7 @@ test.describe("the import of guardians and links", () => {
 
   test("says a student or guardian that is not imported yet, and points to the order of the files", async ({ page, scenarioId }) => {
     await openImports(page, scenarioId, "imports-empty");
-    await expect(page.getByLabel("Qué va a importar")).toHaveAccessibleDescription(/primero los estudiantes, después los encargados y por último los vínculos/);
+    await expect(page.getByLabel("Qué va a importar")).toHaveAccessibleDescription(/los vínculos y por último las matrículas/);
 
     await chooseKind(page, "guardian-links");
     await chooseFile(page, "guardian-links", [LINKS_HEADER, "L1,G1,FATHER,100,,"].join("\n"));
