@@ -119,6 +119,16 @@ class PermissionDeciderTest {
     }
 
     @Test
+    void thePermissionsItResolvedTravelOnTheRequestSoNoOneResolvesThemAgain() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/test/accounts/1");
+        PermissionDecider decider = new PermissionDecider(who -> Set.of(Permission.IDENTITY_READ, Permission.STUDENTS_READ), metrics);
+        decider.forEndpoint(ENDPOINT).authorize(() -> new ActorAuthentication(fullSession()),
+                new RequestAuthorizationContext(request));
+        assertThat(request.getAttribute(PermissionDecider.RESOLVED_PERMISSIONS))
+                .isEqualTo(Set.of(Permission.IDENTITY_READ, Permission.STUDENTS_READ));
+    }
+
+    @Test
     void aRouteThatNeedsTwoPermissionsGrantsOnlyWhoHoldsBothAndNamesTheMissingOne() {
         PermissionedEndpoint both = new PermissionedEndpoint(HttpMethod.POST, "/test/both", Permission.GUARDIANS_CREATE,
                 java.util.List.of(Permission.GUARDIANS_UPDATE));

@@ -157,6 +157,14 @@ class GuardianImportTest {
     }
 
     @Test
+    void aBlockRunsInOneTransactionOfTheCallerWithoutOpeningAnotherPerRow() {
+        transactionCalls.clear();
+        guardians.createAll(actor, requestId, List.of(row(2, "P1", "Rosa", "Aguilar", null),
+                row(3, "P2", "Luis", "Alvarado", null), row(4, "P3", "Eva", "Mejia", null)));
+        assertThat(transactionCalls.stream().filter("commit"::equals)).as("one transaction for the block").hasSize(1);
+    }
+
+    @Test
     void moreThanABlockOfRowsAreAllRegistered() {
         List<GuardianImportRow> rows = new ArrayList<>();
         for (int i = 0; i < GuardianImport.BLOCK_SIZE + 5; i++) {

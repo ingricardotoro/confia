@@ -7,6 +7,7 @@ import com.confia.guardians.application.importing.PartialImportException;
 import com.confia.guardians.application.importing.RowProblem;
 import com.confia.imports.domain.CsvTemplate;
 import com.confia.imports.domain.ImportKind;
+import com.confia.imports.domain.InvalidImportFileException;
 import com.confia.imports.domain.Rejection;
 import com.confia.shared.security.AuthenticatedActor;
 import java.util.ArrayList;
@@ -23,6 +24,11 @@ import java.util.Set;
  */
 final class GuardianLinksProcessor implements ImportProcessor {
 
+    /** The reason of a file refused because a row cannot be attributed to the set of a student. */
+    static final String ROW_SHAPE = "row-shape";
+
+    private static final Set<String> UNUSABLE = Set.of("required", "invalid-format", "too-long");
+
     private final GuardianLinkImportGateway links;
 
     GuardianLinksProcessor(GuardianLinkImportGateway links) {
@@ -37,12 +43,21 @@ final class GuardianLinksProcessor implements ImportProcessor {
     @Override
     public Judgement judge(AuthenticatedActor actor, String requestId, String text, int maxRows) {
         CsvTemplate.Parsed parsed = ImportKind.GUARDIAN_LINKS.template().parse(text, maxRows);
+        if (!parsed.shapeRejections().isEmpty()) {
+            // A row of the wrong shape cannot be attributed to the set of any student: importing the others could
+            // register a set without it, so the whole file is refused.
+            throw new InvalidImportFileException("file", ROW_SHAPE);
+        }
         List<LinkImportRow> rows = parsed.rows().stream()
                 .map(row -> new LinkImportRow(row.line(), row.cell("studentLegacyId"), row.cell("guardianLegacyId"),
                         row.cell("relationship"), row.cell("financialResponsibilityPercent"),
                         row.cell("isPrimaryPayer"), row.cell("isBillingRecipient")))
                 .toList();
         List<RowProblem> problems = rows.isEmpty() ? List.of() : links.evaluate(actor, requestId, rows);
+        if (problems.stream().anyMatch(GuardianLinksProcessor::studentReferenceUnusable)) {
+            // Nor can a row without a usable student reference: it may belong to the set of any student.
+            throw new InvalidImportFileException("file", ROW_SHAPE);
+        }
 
         List<Rejection> rejections = new ArrayList<>(parsed.shapeRejections());
         Set<Integer> problemLines = new HashSet<>();
@@ -52,6 +67,10 @@ final class GuardianLinksProcessor implements ImportProcessor {
         }
         List<LinkImportRow> valid = rows.stream().filter(row -> !problemLines.contains(row.line())).toList();
         return new Judgement(parsed.totalRows(), rejections, () -> register(actor, requestId, valid));
+    }
+
+    private static boolean studentReferenceUnusable(RowProblem problem) {
+        return problem.field().equals("studentLegacyId") && UNUSABLE.contains(problem.reason());
     }
 
     private Registration register(AuthenticatedActor actor, String requestId, List<LinkImportRow> valid) {

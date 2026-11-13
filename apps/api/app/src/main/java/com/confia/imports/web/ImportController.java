@@ -7,7 +7,7 @@ import com.confia.imports.application.KindNotReadableException;
 import com.confia.imports.application.UnknownImportKindException;
 import com.confia.kernel.Permission;
 import com.confia.shared.security.AuthenticatedActor;
-import com.confia.shared.security.PermissionResolver;
+import com.confia.shared.web.authorization.PermissionDecider;
 import com.confia.shared.web.authorization.PermissionDeniedException;
 import com.confia.imports.application.Page;
 import com.confia.imports.application.RejectedImportFileException;
@@ -28,6 +28,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
@@ -70,11 +71,9 @@ public class ImportController {
     private static final String LIST_ROUTE = "/api/v1/imports";
 
     private final ManageImports imports;
-    private final PermissionResolver permissions;
 
-    public ImportController(ManageImports imports, PermissionResolver permissions) {
+    public ImportController(ManageImports imports) {
         this.imports = imports;
-        this.permissions = permissions;
     }
 
     @PostMapping(path = "/students/simulate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
@@ -291,12 +290,16 @@ public class ImportController {
                     + "100.00, at most one primary payer and one billing recipient, no guardian twice); a group with any "
                     + "problem is rejected whole. The students and guardians are the ones already imported, found by "
                     + "their legacyId; a student that already has current links is skipped (student-already-linked), "
-                    + "the import never replaces links. It writes nothing and records a VALIDATED batch. The rejections "
+                    + "the import never replaces links. It writes nothing and records a VALIDATED batch. A file with a row "
+                    + "of the wrong shape or without a usable student reference is refused whole (400, file / row-shape), because "
+                    + "such a row cannot be attributed to a student's set. The rejections "
                     + "(line, column, reason; never a value) are returned and not stored; at most 200 are listed. Needs "
                     + "the permissions guardians:create and guardians:update.",
             security = @SecurityRequirement(name = ContractSchemas.BEARER_AUTH),
             extensions = @Extension(properties =
-                    @ExtensionProperty(name = "x-required-permission", value = "guardians:create")))
+                    {@ExtensionProperty(name = "x-required-permission", value = "guardians:create"),
+                            @ExtensionProperty(name = "x-also-required-permissions", value = "[\"guardians:update\"]",
+                                    parseValue = true)}))
     @ApiResponse(responseCode = "200", description = "The simulation batch and the rejections",
             content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                     schema = @Schema(implementation = ImportRunResponse.class)))
@@ -343,12 +346,14 @@ public class ImportController {
                     + "guardians:create and guardians:update.",
             security = @SecurityRequirement(name = ContractSchemas.BEARER_AUTH),
             extensions = @Extension(properties =
-                    @ExtensionProperty(name = "x-required-permission", value = "guardians:create")))
+                    {@ExtensionProperty(name = "x-required-permission", value = "guardians:create"),
+                            @ExtensionProperty(name = "x-also-required-permissions", value = "[\"guardians:update\"]",
+                                    parseValue = true)}))
     @ApiResponse(responseCode = "200", description = "The APPLIED batch and the rejections",
             content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                     schema = @Schema(implementation = ImportRunResponse.class)))
     @ApiResponse(responseCode = "400",
-            description = "The file cannot be read as a student import (validation-failed, with errors)",
+            description = "The file cannot be read as a guardian links import (validation-failed, with errors)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "401",
             description = "No credential (authentication-required), or a credential that cannot be "
@@ -415,9 +420,14 @@ public class ImportController {
             @RequestParam(name = "size", defaultValue = "50") @Min(1) @Max(100) int size,
             @Parameter(description = "Only the batches of this kind: students, guardians or guardian-links. Without it, "
                     + "the kinds the account may read")
-            @RequestParam(name = "kind", required = false) String kind) {
+            @RequestParam(name = "kind", required = false) String kind,
+            @Parameter(hidden = true) HttpServletRequest request) {
         AuthenticatedActor actor = RequestContext.actor();
-        Set<Permission> held = permissions.resolve(actor);
+        // The decider of the edge resolved the permissions of this request already; they are read, not resolved again.
+        Object resolved = request.getAttribute(PermissionDecider.RESOLVED_PERMISSIONS);
+        if (!(resolved instanceof Set<?> held)) {
+            throw new IllegalStateException("the permission decider did not resolve the permissions of this request");
+        }
         Page<ImportBatchView> result;
         try {
             result = imports.list(actor, RequestContext.requestId(), page, size, kind,

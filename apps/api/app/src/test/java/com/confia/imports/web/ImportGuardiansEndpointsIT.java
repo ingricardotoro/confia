@@ -594,6 +594,114 @@ class ImportGuardiansEndpointsIT extends CommittingPostgresIntegrationTest {
         }
     }
 
+    // --- A malformed or unattributable row refuses the whole links file ---
+
+    @Test
+    void aLinksFileWithAHundredPercentRowAndAMalformedRowOfTheSameStudentCreatesNothing() throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        run(STUDENTS_SIMULATE, admin, studentsFile(2));
+        run(STUDENTS_APPLY, admin, studentsFile(2));
+        run(GUARDIANS_SIMULATE, admin, guardiansFile(2));
+        run(GUARDIANS_APPLY, admin, guardiansFile(2));
+        long batches = countOf("imports_batch", admin.institution());
+        String malformed = LINKS_HEADER + linkRow(1, 1, "100.00", "true", "true") + "EST-REF-1,ENC-REF-2,MOTHER\n";
+        String noStudent = LINKS_HEADER + linkRow(1, 1, "100.00", "true", "true")
+                + ",ENC-REF-2,MOTHER,50.00,false,false\n";
+
+        for (String file : List.of(malformed, noStudent)) {
+            JsonNode refusal = assertProblem(run(LINKS_SIMULATE, admin, file), 400, "validation-failed");
+            assertThat(refusal.get("errors")).hasSize(1);
+            assertThat(refusal.get("errors").get(0).get("field").asString()).isEqualTo("file");
+            assertThat(refusal.get("errors").get(0).get("reason").asString()).isEqualTo("row-shape");
+            // No simulation exists for such a file, so it cannot be applied either.
+            assertProblem(run(LINKS_APPLY, admin, file), 409, "import-not-simulated");
+        }
+        assertThat(countOf("guardians_guardian_student", admin.institution())).isZero();
+        assertThat(countOf("imports_batch", admin.institution())).as("nothing was recorded").isEqualTo(batches);
+    }
+
+    // --- Permissions the real roles cannot show: a synthetic resolver for chosen accounts ---
+
+    private static final Map<UUID, Set<com.confia.kernel.Permission>> SYNTHETIC =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Makes the decider of the running process answer these permissions for this account (the others as before). */
+    private static void install() throws ReflectiveOperationException {
+        com.confia.shared.web.authorization.PermissionDecider decider =
+                process.getBean(com.confia.shared.web.authorization.PermissionDecider.class);
+        java.lang.reflect.Field field = com.confia.shared.web.authorization.PermissionDecider.class
+                .getDeclaredField("resolver");
+        field.setAccessible(true);
+        com.confia.shared.security.PermissionResolver real = (com.confia.shared.security.PermissionResolver) field
+                .get(decider);
+        if (real.getClass().getName().contains("SyntheticResolver")) {
+            return;
+        }
+        field.set(decider, new SyntheticResolver(real));
+    }
+
+    private record SyntheticResolver(com.confia.shared.security.PermissionResolver real)
+            implements com.confia.shared.security.PermissionResolver {
+
+        @Override
+        public Set<com.confia.kernel.Permission> resolve(com.confia.shared.security.AuthenticatedActor actor) {
+            Set<com.confia.kernel.Permission> chosen = SYNTHETIC.get(actor.accountId());
+            return chosen != null ? chosen : real.resolve(actor);
+        }
+    }
+
+    @AfterEach
+    void forgetTheSyntheticPermissions() {
+        SYNTHETIC.clear();
+    }
+
+    private static List<String> denialsOf(UUID institution) throws SQLException {
+        return column("select entity_id from shared_audit_log where institution_id = ? "
+                + "and action = 'authorization.access.denied'", institution);
+    }
+
+    @Test
+    void anAccountThatCanCreateGuardiansButNotUpdateThemIsRefusedOnTheLinkRoutesBeforeTheBodyIsReadAndLeavesOnlyTheDenial()
+            throws Exception {
+        install();
+        Member member = member(StaffRole.ADMINISTRATOR.code());
+        SYNTHETIC.put(member.account(), Set.of(com.confia.kernel.Permission.GUARDIANS_CREATE,
+                com.confia.kernel.Permission.GUARDIANS_READ, com.confia.kernel.Permission.STUDENTS_READ));
+        Body garbage = new Body("multipart/form-data; boundary=zzz",
+                "this is not multipart".getBytes(StandardCharsets.UTF_8));
+
+        // A body that would be a 400 if anything read it is a 403: the edge answered first.
+        assertProblem(post(LINKS_SIMULATE, member.token(), garbage), 403, "forbidden");
+        assertProblem(post(LINKS_APPLY, member.token(), garbage), 403, "forbidden");
+        assertProblem(run(LINKS_SIMULATE, member, LINKS_HEADER + linkRow(1, 1, "100", "true", "true")), 403,
+                "forbidden");
+
+        assertThat(column("select count(*)::text from imports_batch where institution_id = ?",
+                member.institution())).containsExactly("0");
+        assertThat(denialsOf(member.institution())).contains("guardians:update").doesNotContain("guardians:create");
+        // It does hold guardians:create, so the guardians routes work.
+        assertThat(run(GUARDIANS_SIMULATE, member, guardiansFile(1)).statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void theHistoryOfAKindTheAccountCannotReadIsA403WithTheDenialOfTheMissingPermissionAndTheOtherKindsAreListed()
+            throws Exception {
+        install();
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        run(STUDENTS_SIMULATE, admin, studentsFile(1));
+        run(GUARDIANS_SIMULATE, admin, guardiansFile(1));
+        Member reader = sameInstitution(admin.institution(), StaffRole.ADMINISTRATOR.code());
+        SYNTHETIC.put(reader.account(), Set.of(com.confia.kernel.Permission.STUDENTS_READ));
+
+        assertProblem(get(BATCHES + "?kind=guardians", reader), 403, "forbidden");
+        assertProblem(get(BATCHES + "?kind=guardian-links", reader), 403, "forbidden");
+        assertThat(denialsOf(admin.institution())).contains("guardians:read");
+        assertThat(json(get(BATCHES, reader)).get("total").asInt()).as("only the students kind is listed")
+                .isEqualTo(1);
+        assertThat(json(get(BATCHES + "?kind=students", reader)).get("total").asInt()).isEqualTo(1);
+        assertThat(countOf("imports_batch", admin.institution())).isEqualTo(2);
+    }
+
     // --- Bodies and helpers ---
 
     private record Body(String contentType, byte[] bytes) {

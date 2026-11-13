@@ -80,6 +80,7 @@ disco y de respaldo, que ya es obligatorio para toda la base de datos.
 |---|---|---|---|---|---|
 | Nombre y apellidos del estudiante | Identificación | Media | **Sí** | `student.first_name`, `student.last_name` | Disco |
 | Código de estudiante | Identificación interna | Baja | Sí | `student.student_code` | Disco |
+| Referencia del estudiante en el sistema de origen (`legacyId` de la importación) | Identificación interna | Media: puede ser el número de cuenta o de matrícula del sistema anterior, que identifica al estudiante para quien tenga acceso a ese sistema | **Sí** | `students_student.external_ref` (nula en los registrados a mano; única por institución) | Disco. El rol de solo lectura no la recibe |
 | Fecha de nacimiento | Identificación | Media | **Sí** | `student.birth_date` | Disco |
 | Número de documento de identidad del estudiante | Identificación oficial | **Alta** | **Sí** | `student.national_id_encrypted` | **Columna** |
 | Sexo | Demográfico | Media | **Sí** | `student.sex` | Disco |
@@ -89,6 +90,7 @@ disco y de respaldo, que ya es obligatorio para toda la base de datos.
 | Nombre y apellidos del encargado | Identificación | Media | No | `guardian.first_name`, `guardian.last_name` | Disco |
 | Documento de identidad del encargado | Identificación oficial | **Alta** | No | `guardian.national_id_encrypted` | **Columna** |
 | RTN del encargado | Fiscal | Media | No | `guardian.rtn`, `fiscal_document.customer_rtn` | Disco. Obligatorio en el documento fiscal |
+| Referencia del encargado en el sistema de origen (`legacyId` de la importación) | Identificación interna | Media | No | `guardians_guardian.external_ref` (nula en los registrados a mano; única por institución) | Disco. El rol de solo lectura no la recibe |
 | Correo electrónico del encargado | Contacto | Media | No | `guardian.email`, `user.email` | Disco |
 | Teléfono del encargado | Contacto | Media | No | `guardian.phone` | Disco |
 | Dirección del encargado | Contacto | Media | No | `guardian.address` | Disco |
@@ -428,6 +430,7 @@ lo es, porque esa reversión no es posible con medios razonables.
 |---|---|---|
 | Nombre y apellidos | **Sustitución** por una etiqueta estable derivada del identificador interno, del tipo `Estudiante 4f2a` | Nada del nombre. La etiqueta permite leer un reporte histórico sin exponer identidad |
 | Documento de identidad | **Eliminación** del valor cifrado y de la llave de datos asociada | Nada. El dato no tiene valor analítico |
+| Referencia del sistema de origen (`external_ref` de estudiantes y de encargados) | **Eliminación** del valor (queda nula, que la restricción de unicidad admite). Es el dato que permite reconocer a la persona en el sistema anterior | Nada. La importación ya no puede reconocer la fila; reimportar el archivo original la crearía de nuevo, por lo que el archivo de origen debe depurarse en el sistema anterior |
 | Fecha de nacimiento | **Generalización** al año de nacimiento, y a la cohorte de edad en los reportes | Distribución por edad y cohorte |
 | Dirección | **Generalización** al municipio o al departamento | Distribución geográfica de la matrícula |
 | Correo y teléfono | **Eliminación**, conservando un hash con sal en la lista de supresión | Capacidad de respetar una baja para siempre, sin conservar el contacto |

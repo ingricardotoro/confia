@@ -13,7 +13,7 @@ import java.util.UUID;
  */
 public record ImportBatchResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED) UUID id,
-        @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"STUDENTS"}) String kind,
+        @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"STUDENTS", "GUARDIANS", "GUARDIAN_LINKS"}) String kind,
         @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"VALIDATED", "APPLIED"}) String status,
         @Schema(requiredMode = RequiredMode.REQUIRED, pattern = "^[0-9a-f]{64}$",
                 description = "SHA-256 of the file, in lowercase hexadecimal") String fileSha256,

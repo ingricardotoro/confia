@@ -604,6 +604,34 @@ class ManageImportsTest {
     }
 
     @Test
+    void aLinksFileWithARowOfTheWrongShapeIsRefusedWholeAndNothingIsRecorded() {
+        String text = LINKS_HEADER + "S1,G1,MOTHER,100,true\nS1,G2,FATHER,50\n";
+        assertThat(refusal(() -> simulate(ImportKind.GUARDIAN_LINKS, text)))
+                .containsExactly(new RejectedImportFileException.FileProblem("file", "row-shape"));
+        // Such a file has no simulation, so applying it stops at the binding before it is read.
+        assertThatThrownBy(() -> apply(ImportKind.GUARDIAN_LINKS, text)).isInstanceOf(ImportNotSimulatedException.class);
+        assertThat(batches.rows).isEmpty();
+        assertThat(linkPort.evaluated).isEmpty();
+        assertThat(linkPort.applied).isEmpty();
+    }
+
+    @Test
+    void aLinksFileWithARowWithoutAUsableStudentReferenceIsRefusedWholeButOtherProblemsAreNot() {
+        String text = LINKS_HEADER + "S1,G1,MOTHER,100,true\n,G2,FATHER,50,\n";
+        for (String reason : java.util.List.of("required", "invalid-format", "too-long")) {
+            linkPort.problems.clear();
+            linkPort.problems.add(FakeGuardianGateways.problem(3, "studentLegacyId", reason));
+            assertThat(refusal(() -> simulate(ImportKind.GUARDIAN_LINKS, text)))
+                    .containsExactly(new RejectedImportFileException.FileProblem("file", "row-shape"));
+        }
+        assertThat(batches.rows).isEmpty();
+        linkPort.problems.clear();
+        linkPort.problems.add(FakeGuardianGateways.problem(3, "studentLegacyId", "unknown-student"));
+        linkPort.problems.add(FakeGuardianGateways.problem(3, "guardianLegacyId", "required"));
+        assertThat(simulate(ImportKind.GUARDIAN_LINKS, text).batch().rejectedRows()).isEqualTo(1);
+    }
+
+    @Test
     void theGuardiansReachThePortRawAndAreCreatedOnApplicationWithTheirOwnKindOfBatch() {
         String text = GUARDIANS_HEADER + "P1,Rosa,Aguilar,0801-1980-12345\nP2,Luis,Alvarado,\n";
         ImportRun simulation = simulate(ImportKind.GUARDIANS, text);

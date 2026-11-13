@@ -129,3 +129,21 @@ Resultado (pruebas dirigidas, sin `verify` completo): 551 pruebas unitarias y de
 `ImportsBatchSchemaIT` 14, `GuardiansGuardianSchemaIT` 16, `CurrentSessionEndpointIT` 12, `AuthorizationEdgeIT` 25) y 41 tras mover la lógica de `ImportKind` fuera del
 controlador (los dos de importación). Cobertura de ramas (JaCoCo, informe regenerado de `jacoco-ut.exec`): `imports.domain` 100 %, `guardians.domain` 99.7 %,
 `students.domain` 98.1 %.
+
+### Correcciones de la auditoría de seguridad (backend)
+
+- **M1**: en `GUARDIAN_LINKS` una fila con número de celdas distinto o sin referencia de estudiante utilizable (`required`, `invalid-format`, `too-long` en
+  `studentLegacyId`) rechaza el archivo entero (`400 validation-failed`, `file` / `row-shape`), porque no se puede atribuir a un grupo y el resto del grupo
+  podría registrarse incompleto. Un archivo así nunca tiene simulación, de modo que aplicarlo da `409 import-not-simulated` sin leerlo. Pruebas:
+  `ManageImportsTest` y `ImportGuardiansEndpointsIT` (fila de 100 más fila mal formada del mismo estudiante: nada creado, ningún lote).
+- **B1**: las rutas de vínculos declaran `x-also-required-permissions: ["guardians:update"]` además de `x-required-permission`; una prueba en
+  `OpenApiRouteClassificationTest` compara cada operación con su `PermissionedEndpoint`, `alsoRequired` incluido.
+- **B2**: `PermissionDecider` deja los permisos resueltos en el atributo de petición `PermissionDecider.RESOLVED_PERMISSIONS`; `ImportController` los lee y ya no
+  tiene `PermissionResolver`.
+- **B3**: `ImportGuardiansEndpointsIT` prueba, con un resolvedor sintético para cuentas elegidas (sustituye por reflexión el resolvedor del decisor; ningún rol real
+  tiene `guardians:create` sin `guardians:update`), el `403` de las rutas de vínculos antes de leer el cuerpo y la denegación auditada con `guardians:update`, y el
+  `403` del historial de un tipo no legible con la denegación `guardians:read`.
+- **B4**: `ManageGuardians.createImported` corre dentro de la transacción del llamador y no abre otra, así un 40P01 llega al único componente transaccional, que
+  reintenta el bloque. La prueba comprueba una sola confirmación por bloque; el reintento real ante 40P01 no se probó (el doble en memoria no lo produce).
+- **I5**: descripción de las rutas de vínculos corregida. **I2**: `external_ref` de estudiantes y encargados en el inventario y en la tabla de anonimización de
+  `docs/08-datos-privacidad-y-retencion.md`.

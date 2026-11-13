@@ -826,7 +826,7 @@
             "type" : "string"
           },
           "kind" : {
-            "enum" : [ "STUDENTS" ],
+            "enum" : [ "STUDENTS", "GUARDIANS", "GUARDIAN_LINKS" ],
             "type" : "string"
           },
           "rejectedRows" : {
@@ -1121,7 +1121,7 @@
             "type" : "integer"
           },
           "reason" : {
-            "enum" : [ "required", "invalid-format", "too-long", "invalid-date", "future-birth-date", "duplicate-in-file", "duplicate-national-id", "already-imported" ],
+            "enum" : [ "required", "invalid-format", "too-long", "invalid-date", "future-birth-date", "duplicate-in-file", "duplicate-national-id", "already-imported", "invalid-percent", "unknown-student", "unknown-guardian", "student-not-active", "guardian-not-active", "student-already-linked", "group-rejected", "sum-not-100", "multiple-primary-payer", "multiple-billing-recipient", "duplicate-guardian" ],
             "type" : "string"
           }
         },
@@ -3880,7 +3880,7 @@
                 }
               }
             },
-            "description" : "The file cannot be read as a student import (validation-failed, with errors)"
+            "description" : "The file cannot be read as a guardian links import (validation-failed, with errors)"
           },
           "401" : {
             "content" : {
@@ -3957,12 +3957,13 @@
         } ],
         "summary" : "Applies the import of guardian links",
         "tags" : [ "imports" ],
+        "x-also-required-permissions" : [ "guardians:update" ],
         "x-required-permission" : "guardians:create"
       }
     },
     "/api/v1/imports/guardian-links/simulate" : {
       "post" : {
-        "description" : "Reads a CSV file (UTF-8, separator , or ; detected in the header, up to 5 MB and 10000 rows, columns studentLegacyId, guardianLegacyId, relationship, financialResponsibilityPercent and optionally isPrimaryPayer and isBillingRecipient), groups the rows by student and judges each group as the complete set the hand registration demands (INV-32: the percentages add up to exactly 100.00, at most one primary payer and one billing recipient, no guardian twice); a group with any problem is rejected whole. The students and guardians are the ones already imported, found by their legacyId; a student that already has current links is skipped (student-already-linked), the import never replaces links. It writes nothing and records a VALIDATED batch. The rejections (line, column, reason; never a value) are returned and not stored; at most 200 are listed. Needs the permissions guardians:create and guardians:update.",
+        "description" : "Reads a CSV file (UTF-8, separator , or ; detected in the header, up to 5 MB and 10000 rows, columns studentLegacyId, guardianLegacyId, relationship, financialResponsibilityPercent and optionally isPrimaryPayer and isBillingRecipient), groups the rows by student and judges each group as the complete set the hand registration demands (INV-32: the percentages add up to exactly 100.00, at most one primary payer and one billing recipient, no guardian twice); a group with any problem is rejected whole. The students and guardians are the ones already imported, found by their legacyId; a student that already has current links is skipped (student-already-linked), the import never replaces links. It writes nothing and records a VALIDATED batch. A file with a row of the wrong shape or without a usable student reference is refused whole (400, file / row-shape), because such a row cannot be attributed to a student's set. The rejections (line, column, reason; never a value) are returned and not stored; at most 200 are listed. Needs the permissions guardians:create and guardians:update.",
         "operationId" : "simulateGuardianLinkImport",
         "requestBody" : {
           "content" : {
@@ -4066,6 +4067,7 @@
         } ],
         "summary" : "Simulates the import of guardian links",
         "tags" : [ "imports" ],
+        "x-also-required-permissions" : [ "guardians:update" ],
         "x-required-permission" : "guardians:create"
       }
     },
