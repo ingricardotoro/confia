@@ -233,7 +233,8 @@ class OpenApiContractSnapshotTest {
                 "/api/v1/guardians/{id}", "/api/v1/guardians/{id}/consents", "/api/v1/students/{studentId}/guardians",
                 "/api/v1/imports", "/api/v1/imports/students/simulate", "/api/v1/imports/students/apply",
                 "/api/v1/imports/guardians/simulate", "/api/v1/imports/guardians/apply",
-                "/api/v1/imports/guardian-links/simulate", "/api/v1/imports/guardian-links/apply");
+                "/api/v1/imports/guardian-links/simulate", "/api/v1/imports/guardian-links/apply",
+                "/api/v1/imports/enrollments/simulate", "/api/v1/imports/enrollments/apply");
         Map<String, Object> refresh = asMap(asMap(asMap(admin.get("paths")).get(REFRESH_PATH))
                 .get("post"));
         assertThat(asMap(refresh.get("responses"))).containsOnlyKeys("200", "401", "403", "429", "503");
@@ -431,6 +432,7 @@ class OpenApiContractSnapshotTest {
         expected.addAll(List.of("post /api/v1/imports/students/simulate", "post /api/v1/imports/students/apply",
                 "post /api/v1/imports/guardians/simulate", "post /api/v1/imports/guardians/apply",
                 "post /api/v1/imports/guardian-links/simulate", "post /api/v1/imports/guardian-links/apply",
+                "post /api/v1/imports/enrollments/simulate", "post /api/v1/imports/enrollments/apply",
                 "get /api/v1/imports"));
         assertThat(withPermission).containsExactlyInAnyOrderElementsOf(expected);
     }

@@ -384,6 +384,107 @@ public class ImportController {
         }
     }
 
+    @PostMapping(path = "/enrollments/simulate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    @RateLimited(policy = "admin-import")
+    @RateLimited(policy = "admin-import-account", key = RateLimitKey.ACCOUNT)
+    @Operation(operationId = "simulateEnrollmentImport", tags = TAG, summary = "Simulates the import of enrollments",
+            description = "Reads a CSV file (UTF-8, separator , or ; detected in the header, up to 5 MB and 10000 "
+                    + "rows, columns studentLegacyId, academicYear, modality, grade, section and enrolledOn as "
+                    + "YYYY-MM-DD) and judges every row with the rules of the hand enrollment (INV-31, active section "
+                    + "and student, open academic year, a date inside the year and not in the future) plus an estimate "
+                    + "of the capacity with the seats taken and the rows before it in the file. The student is found by "
+                    + "its legacyId and the section by the names of its year, modality, grade and section, ignoring "
+                    + "case and surrounding spaces. A student that already holds an active enrollment in that same "
+                    + "section is skipped (already-imported); in another section it is rejected "
+                    + "(duplicate-active-enrollment): the import never moves or replaces an enrollment. It writes "
+                    + "nothing and records a VALIDATED batch. The rejections (line, column, reason; never a value) are "
+                    + "returned and not stored; at most 200 are listed. Needs the permission students:create.",
+            security = @SecurityRequirement(name = ContractSchemas.BEARER_AUTH),
+            extensions = @Extension(properties =
+                    @ExtensionProperty(name = "x-required-permission", value = "students:create")))
+    @ApiResponse(responseCode = "200", description = "The simulation batch and the rejections",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = @Schema(implementation = ImportRunResponse.class)))
+    @ApiResponse(responseCode = "400",
+            description = "The file is missing, empty, too big, not UTF-8, not a well-formed CSV, has too many rows "
+                    + "or its header is not the template (validation-failed, with errors)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "401",
+            description = "No credential (authentication-required), or a credential that cannot be "
+                    + "accepted (token-expired, token-invalid)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "403",
+            description = "The account does not hold students:create, or the Origin is missing or not allowed "
+                    + "(forbidden, csrf-invalid)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "415", description = "The request is not multipart/form-data (unsupported-media-type)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "429",
+            description = "Too many imports from this address or account (too-many-requests)",
+            headers = @Header(name = "Retry-After", schema = @Schema(type = "integer"),
+                    description = "Seconds to wait"),
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    public ImportRunResponse simulateEnrollments(@RequestPart("file") MultipartFile file) {
+        try {
+            return toResponse(imports.simulate("enrollments", RequestContext.actor(), RequestContext.requestId(), bytesOf(file)));
+        } catch (RejectedImportFileException e) {
+            throw invalid(e);
+        }
+    }
+
+    @PostMapping(path = "/enrollments/apply", consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    @RateLimited(policy = "admin-import")
+    @RateLimited(policy = "admin-import-account", key = RateLimitKey.ACCOUNT)
+    @Operation(operationId = "applyEnrollmentImport", tags = TAG, summary = "Applies the import of enrollments",
+            description = "Applies the same file the account simulated: it only proceeds when the SHA-256 of the file "
+                    + "matches a simulation of this kind by the same account in the institution. It judges the file again "
+                    + "and enrolls each valid row in file order, one transaction per row, with the same use case as the "
+                    + "hand enrollment (INV-31, the capacity decided under the lock of the section, audit). The rows "
+                    + "that do not fit are rejected (section-full) in file order, and a student that already holds an "
+                    + "active enrollment in the same section is skipped (already-imported), so applying twice creates "
+                    + "nothing twice. Needs the permission students:create.",
+            security = @SecurityRequirement(name = ContractSchemas.BEARER_AUTH),
+            extensions = @Extension(properties =
+                    @ExtensionProperty(name = "x-required-permission", value = "students:create")))
+    @ApiResponse(responseCode = "200", description = "The APPLIED batch and the rejections",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = @Schema(implementation = ImportRunResponse.class)))
+    @ApiResponse(responseCode = "400",
+            description = "The file cannot be read as an enrollments import (validation-failed, with errors)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "401",
+            description = "No credential (authentication-required), or a credential that cannot be "
+                    + "accepted (token-expired, token-invalid)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "403",
+            description = "The account does not hold students:create, or the Origin is missing or not allowed "
+                    + "(forbidden, csrf-invalid)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "409",
+            description = "The account never simulated a file with this fingerprint (import-not-simulated), or its "
+                    + "last simulation was of another file (import-file-changed)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "415", description = "The request is not multipart/form-data (unsupported-media-type)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "429",
+            description = "Too many imports from this address or account (too-many-requests)",
+            headers = @Header(name = "Retry-After", schema = @Schema(type = "integer"),
+                    description = "Seconds to wait"),
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    public ImportRunResponse applyEnrollments(@RequestPart("file") MultipartFile file) {
+        try {
+            return toResponse(imports.apply("enrollments", RequestContext.actor(), RequestContext.requestId(), bytesOf(file)));
+        } catch (RejectedImportFileException e) {
+            throw invalid(e);
+        }
+    }
+
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @RateLimited(policy = "admin-read")
     @RateLimited(policy = "admin-read-account", key = RateLimitKey.ACCOUNT)
@@ -418,7 +519,7 @@ public class ImportController {
             @RequestParam(name = "page", defaultValue = "0") @Min(0) int page,
             @Parameter(description = "Rows per page, 1 to 100; 50 when absent")
             @RequestParam(name = "size", defaultValue = "50") @Min(1) @Max(100) int size,
-            @Parameter(description = "Only the batches of this kind: students, guardians or guardian-links. Without it, "
+            @Parameter(description = "Only the batches of this kind: students, guardians, guardian-links or enrollments. Without it, "
                     + "the kinds the account may read")
             @RequestParam(name = "kind", required = false) String kind,
             @Parameter(hidden = true) HttpServletRequest request) {
