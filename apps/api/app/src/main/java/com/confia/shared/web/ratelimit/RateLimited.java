@@ -1,6 +1,7 @@
 package com.confia.shared.web.ratelimit;
 
 import java.lang.annotation.Documented;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -30,8 +31,15 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
+@Repeatable(RateLimitedPolicies.class)
 public @interface RateLimited {
 
     /** The policy that limits the method, such as {@code admin-login}. */
     String policy();
+
+    /**
+     * What the policy counts by; {@link RateLimitKey#ADDRESS} unless stated. A method may carry several, in
+     * the order they are asked: the address layer first, then the account layer.
+     */
+    RateLimitKey key() default RateLimitKey.ADDRESS;
 }

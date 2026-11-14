@@ -1223,6 +1223,25 @@ Llave maestra (KEK)              en gestor de secretos, nunca en la base de dato
 > de negocio. El estado `retired` ya existe y decide con qué llave se cifra cada valor nuevo, pero el
 > recifrado progresivo por lotes de esta tabla **todavía no existe**: depende de db-scheduler
 > (ADR-0016) y llega con el cambio 9, `background-jobs-with-db-scheduler`.
+>
+> **Nota editorial, 2026-11-11 (`students-registry`, seguimiento M1): llave de búsqueda dedicada y
+> versionada.** La llave de HMAC de búsqueda **ya no se deriva de la KEK**: cada versión tiene material
+> propio, con rotación propia, y rotar la KEK deja de tocar los índices. Se configura con
+> `confia.crypto.blind-index.current-version` (`CONFIA_CRYPTO_BLINDINDEX_CURRENTVERSION`, por ejemplo
+> `v2`) y una llave Base64 de 32 bytes por versión en `confia.crypto.blind-index.keys.<versión>`
+> (`CONFIA_CRYPTO_BLINDINDEX_KEYS_V1`, `..._V2`). Los valores viven en el gestor de secretos, nunca en el
+> repositorio, nunca se registran, y el proceso administrativo no arranca si falta la versión vigente o su
+> llave, o si alguna no es válida; el mensaje nombra la propiedad y jamás el valor. El índice almacenado
+> lleva su versión, `v1:<64 hex>`, y la columna `national_id_blind_index` es `VARCHAR(80)` con una
+> restricción de formato. **Rotación:** (1) añadir la versión nueva y hacerla vigente, conservando la
+> anterior; mientras ambas estén configuradas, la búsqueda de duplicados prueba el índice de cada versión,
+> de modo que un documento indexado con la versión anterior sigue detectándose; (2) recalcular los índices
+> almacenados arrancando el proceso administrativo una vez con
+> `CONFIA_STUDENTS_REINDEX_INSTITUTIONS=<uuid>,<uuid>`, que descifra cada documento por lotes de 200 en una
+> transacción por lote, actor `system`, una entrada de auditoría con cantidades por lote (nunca un
+> documento, un cifrado ni un índice) y es idempotente; (3) retirar la llave anterior. No es un trabajo del
+> `worker`: recalcular exige descifrar, y el trabajador no tiene llaves de columna por diseño (ADR-0023).
+> El bloque original de esta sección queda sin cambios.
 
 **Cómo se comprueba.** Una prueba de integración inserta un registro con documento de identidad,
 consulta la columna directamente con SQL crudo y verifica que el valor almacenado **no contiene**

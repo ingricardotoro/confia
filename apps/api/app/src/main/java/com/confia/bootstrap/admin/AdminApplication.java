@@ -22,6 +22,8 @@ import com.confia.shared.web.edge.ThrottlingConfiguration;
 import com.confia.shared.web.edge.WebEdgeConfiguration;
 import com.confia.shared.web.openapi.ContractSchemas;
 import com.confia.shared.web.openapi.ProcessApiInfo;
+import com.confia.students.infrastructure.wiring.StudentsConfiguration;
+import com.confia.students.web.wiring.StudentsWebConfiguration;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
@@ -37,7 +39,7 @@ import org.springframework.context.annotation.Import;
  * web-edge-foundations), the {@code identity} module's use cases and secrets (decision 3), the
  * adapter that resolves the current institution from the authenticated token ({@code organization},
  * session-tokens-and-web-layer decision 6; ADR-0009), the academic structure of {@code organization}
- * with its controllers, and the web edge: the request filters, the
+ * with its controllers, the student registry of {@code students} with its controller, and the web edge: the request filters, the
  * Problem Details catalog and the deny-by-default security chain (decisions 4 to 8), the rate
  * limiter at the edge with the adapter of its capacity signal (decision 17), the materializer of
  * the required delay (decision 18), and the HTTP edge of idempotency (decision 19).
@@ -82,7 +84,7 @@ import org.springframework.context.annotation.Import;
 @Import({ContractSchemas.class, ProcessApiInfo.class, SharedPlatformConfiguration.class,
         IdentityConfiguration.class, IdentityWebConfiguration.class, OrganizationConfiguration.class,
         AcademicStructureConfiguration.class, OrganizationWebConfiguration.class,
-        WebEdgeConfiguration.class, AdminSecurityConfiguration.class,
+        StudentsConfiguration.class, StudentsWebConfiguration.class, WebEdgeConfiguration.class, AdminSecurityConfiguration.class,
         ObservabilityMetricsConfiguration.class, RateLimiterConfiguration.class,
         ThrottlingConfiguration.class, RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,
         SessionTokenConfiguration.class, CsrfConfiguration.class,

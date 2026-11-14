@@ -172,6 +172,11 @@ Prioridad: **P0** necesario para la fase F0 a F4, **P1** para F5 a F8, **P2** po
 | `FileUpload` | P1 | Ambas | Comprobantes de transferencia y adjuntos |
 | `PrintLayout` | P0 | Panel | Diseño de impresión sin navegación |
 
+> **Nota (2026-11-11) — disposición del `Dialog`.** Encabezado (título y descripción) y pie de acciones van fijos
+> (`shrink-0`, fondo elevado); el cuerpo es la única zona con desplazamiento (`min-h-0 flex-1 overflow-y-auto`) y el panel
+> mide como máximo 90 dvh. Así el foco que va a un control o al resumen de errores nunca saca el título del área visible.
+> En viewports de menos de 20 rem de alto el panel completo se desplaza, con encabezado y pie estáticos.
+
 ## 5. Especificación de los componentes de dominio
 
 ### 5.1 `MoneyAmount`

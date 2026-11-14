@@ -66,6 +66,25 @@ const organizationReady = (route: string, firstCell: string): GateCombination =>
   expected: (page) => page.getByRole("cell", { name: firstCell, exact: true }).first(),
 });
 
+const STUDENTS = "/students";
+
+/** The registry with its rows on the screen: the surname of the first row of the seed proves it. */
+async function openStudentsRoute(page: Page, path: string = STUDENTS): Promise<void> {
+  await seed(page);
+  await page.getByRole("heading", { level: 1, name: "Sesión iniciada." }).waitFor();
+  await page.goto(path);
+}
+
+/** Fills the open create dialog of a new student, with the code of the first student of the seed, which is taken. */
+async function fillTakenCode(page: Page): Promise<void> {
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/^Código/).fill("E-000001");
+  await dialog.getByLabel(/^Nombres/).fill("Nuevo");
+  await dialog.getByLabel(/^Apellidos/).fill("Estudiante");
+  await dialog.getByLabel(/^Fecha de nacimiento/).fill("2013-04-04");
+  await dialog.getByLabel(/^Sexo/).selectOption({ label: "Masculino" });
+}
+
 /**
  * The 22 combinations of the minimum, written apart from the matrix so a dropped one is noticed (BX74, BX109): the six of the
  * part 1, the eight of the sign in screen, the three of the verification and the five of the enrollment.
@@ -272,6 +291,76 @@ export const MATRIX: readonly GateCombination[] = [
       await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
     },
     expected: (page) => page.getByRole("group", { name: "Hay 2 campos con errores." }),
+  },
+  {
+    route: STUDENTS,
+    state: "ready",
+    arrange: (page) => openStudentsRoute(page),
+    expected: (page) => page.getByRole("cell", { name: "Aguilar", exact: true }).first(),
+  },
+  {
+    route: STUDENTS,
+    state: "dialog-open",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openStudentsRoute(page);
+      await page.getByRole("button", { name: "Nuevo estudiante" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Nuevo estudiante" }),
+  },
+  {
+    route: STUDENTS,
+    state: "dialog-edit-document",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openStudentsRoute(page, `${STUDENTS}?q=P%C3%A9rez`);
+      await page.getByRole("button", { name: "Editar Luis Pérez" }).click();
+    },
+    expected: (page) => page.getByRole("checkbox", { name: "Quitar documento" }),
+  },
+  {
+    route: STUDENTS,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openStudentsRoute(page);
+      await page.getByRole("button", { name: "Nuevo estudiante" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 4 campos con errores." }),
+  },
+  {
+    route: STUDENTS,
+    state: "dialog-duplicate-code",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openStudentsRoute(page);
+      await page.getByRole("button", { name: "Nuevo estudiante" }).click();
+      await fillTakenCode(page);
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+    },
+    expected: (page) => page.getByRole("alert").filter({ hasText: "Ya existe un estudiante con ese código." }),
+  },
+  {
+    route: STUDENTS,
+    state: "no-matches",
+    arrange: (page) => openStudentsRoute(page, `${STUDENTS}?q=zzzz&status=INACTIVE`),
+    expected: (page) => page.getByText("Ningún registro coincide con los filtros"),
+  },
+  {
+    route: STUDENTS,
+    state: "empty",
+    preset: "students-empty",
+    arrange: (page) => openStudentsRoute(page),
+    expected: (page) => page.getByText("Todavía no hay estudiantes"),
+  },
+  {
+    route: STUDENTS,
+    state: "load-error",
+    preset: "students-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openStudentsRoute(page),
+    expected: (page) => page.getByText("No se pudo cargar la lista de estudiantes"),
   },
   {
     route: YEARS,

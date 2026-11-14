@@ -4,6 +4,8 @@ import com.confia.organization.application.ManageModalities;
 import com.confia.organization.application.ModalityView;
 import com.confia.organization.application.Page;
 import com.confia.shared.web.openapi.ContractSchemas;
+import com.confia.shared.web.ratelimit.RateLimitKey;
+import com.confia.shared.web.ratelimit.RateLimited;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.extensions.Extension;
@@ -53,6 +55,8 @@ public class ModalityController {
         this.modalities = modalities;
     }
 
+    @RateLimited(policy = "admin-read")
+    @RateLimited(policy = "admin-read-account", key = RateLimitKey.ACCOUNT)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "listModalities", tags = TAG, summary = "Lists the modalities",
             description = "One page of the modalities of the institution of the token, active and "
@@ -90,6 +94,8 @@ public class ModalityController {
                 result.total(), result.page(), result.size());
     }
 
+    @RateLimited(policy = "admin-write")
+    @RateLimited(policy = "admin-write-account", key = RateLimitKey.ACCOUNT)
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(operationId = "createModality", tags = TAG, summary = "Creates a modality",
@@ -119,6 +125,8 @@ public class ModalityController {
                 request.code(), request.name()));
     }
 
+    @RateLimited(policy = "admin-write")
+    @RateLimited(policy = "admin-write-account", key = RateLimitKey.ACCOUNT)
     @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "updateModality", tags = TAG, summary = "Edits a modality",

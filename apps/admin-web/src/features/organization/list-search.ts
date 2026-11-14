@@ -8,11 +8,11 @@ import { z } from "zod";
  */
 export const DEFAULT_PAGE_SIZE = 25;
 
-const pageSize = z.union([z.literal(25), z.literal(50), z.literal(100)]).catch(DEFAULT_PAGE_SIZE);
-const page = z.number().int().min(1).catch(1);
+export const pageSize = z.union([z.literal(25), z.literal(50), z.literal(100)]).catch(DEFAULT_PAGE_SIZE);
+export const page = z.number().int().min(1).catch(1);
 const id = z.uuid().optional().catch(undefined);
 
-function sortOf(fields: readonly string[]) {
+export function sortOf(fields: readonly string[]) {
   return z
     .string()
     .refine((value) => {

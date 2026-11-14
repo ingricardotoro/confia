@@ -42,6 +42,8 @@ import com.confia.kernel.Permission;
 import com.confia.organization.infrastructure.wiring.AcademicStructureConfiguration;
 import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
 import com.confia.organization.web.wiring.OrganizationWebConfiguration;
+import com.confia.students.infrastructure.wiring.StudentsConfiguration;
+import com.confia.students.web.wiring.StudentsWebConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.JobSchedulingConfiguration;
 import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
 import com.confia.shared.platform.infrastructure.SharedPlatformConfiguration;
@@ -174,6 +176,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     @DynamicPropertySource
     static void secretsOfTheAdministrativeProcess(DynamicPropertyRegistry registry) {
         registry.add("confia.crypto.column-master-key", () -> randomBase64());
+        registry.add("confia.crypto.blind-index.current-version", () -> "v1");
+        registry.add("confia.crypto.blind-index.keys.v1", () -> randomBase64());
         registry.add("confia.identity.argon2-pepper", () -> randomBase64());
         registry.add("confia.identity.login-institution-id", () -> UUID.randomUUID().toString());
         registry.add("confia.security.csrf.key", () -> randomBase64());
@@ -275,10 +279,13 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     void everyPermissionedEntryRejectsARevokedSession() throws SQLException {
         assertThat(endpoints.endpoints()).as("the walk is non-vacuous").hasSizeGreaterThanOrEqualTo(2)
                 .anyMatch(entry -> entry.pattern().contains("{"));
-        // The routes of the academic structure take a JSON body, which this walk does not send; their
-        // revoked-session case has its own test in AcademicStructureEndpointsIT.
+        // The routes of the academic structure and of the student registry take a JSON body or a typed
+        // identifier, which this walk does not send; their revoked-session case has its own test in
+        // AcademicStructureEndpointsIT and StudentEndpointsIT.
         for (PermissionedEndpoint entry : endpoints.endpoints().stream()
-                .filter(candidate -> !candidate.pattern().startsWith("/api/v1/organization/")).toList()) {
+                .filter(candidate -> !candidate.pattern().startsWith("/api/v1/organization/")
+                        && !candidate.pattern().startsWith("/api/v1/students"))
+                .toList()) {
             Session holder = sessionOf(StaffRole.SUPER_ADMIN);
             assertThat(StaffRole.SUPER_ADMIN.permissions()).contains(entry.permission());
             HttpResponse<String> live = send(entry, holder, "a-valid-key-0002");
@@ -330,7 +337,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     void aPathVariableGivesOneRowPerRequestWithTheTemplateAndNeitherValue() throws SQLException {
         Session cashier = sessionOf(StaffRole.CASHIER);
 
-        for (String id : List.of("123", "abc")) {
+        // Values that cannot occur by chance in the random UUIDs and instants of an audit row.
+        for (String id : List.of("zz-path-1", "zz-path-2")) {
             assertProblem(get(cashier, "/test/authorization/accounts/" + id), 403, "forbidden");
         }
 
@@ -342,7 +350,7 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
             assertThat(row.get("after_value"))
                     .isEqualTo("{\"routeTemplate\": \"/test/authorization/accounts/{id}\"}");
         });
-        assertThat(rows.toString()).doesNotContain("123", "abc");
+        assertThat(rows.toString()).doesNotContain("zz-path-1", "zz-path-2");
     }
 
     // --- AZ52, AZ53: the cap and the summary ---
@@ -1047,7 +1055,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     @Import({ContractSchemas.class, ProcessApiInfo.class, SharedPlatformConfiguration.class,
             IdentityConfiguration.class, IdentityWebConfiguration.class,
             OrganizationConfiguration.class, AcademicStructureConfiguration.class,
-            OrganizationWebConfiguration.class, WebEdgeConfiguration.class,
+            OrganizationWebConfiguration.class, StudentsConfiguration.class,
+            StudentsWebConfiguration.class, WebEdgeConfiguration.class,
             AdminSecurityConfiguration.class, ObservabilityMetricsConfiguration.class,
             RateLimiterConfiguration.class, ThrottlingConfiguration.class,
             RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,

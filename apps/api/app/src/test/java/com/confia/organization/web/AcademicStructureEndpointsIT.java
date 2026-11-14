@@ -35,6 +35,7 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -66,6 +67,24 @@ class AcademicStructureEndpointsIT extends CommittingPostgresIntegrationTest {
     private static final String MODALITIES = "/api/v1/organization/modalities";
     private static final String GRADES = "/api/v1/organization/grades";
     private static final String SECTIONS = "/api/v1/organization/sections";
+    private static final String RATE_LIMIT = "confia.web.rate-limit.";
+
+    /** The twelve routes of the academic structure: the list, the creation and the edit of each resource. */
+    private record Route(String method, String path) {
+        String body() {
+            return method.equals("GET") ? null : "{}";
+        }
+    }
+
+    private static List<Route> allRoutes() {
+        List<Route> routes = new java.util.ArrayList<>();
+        for (String base : List.of(YEARS, MODALITIES, GRADES, SECTIONS)) {
+            routes.add(new Route("GET", base));
+            routes.add(new Route("POST", base));
+            routes.add(new Route("PUT", base + "/" + UUID.randomUUID()));
+        }
+        return routes;
+    }
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .followRedirects(HttpClient.Redirect.NEVER)
@@ -82,7 +101,13 @@ class AcademicStructureEndpointsIT extends CommittingPostgresIntegrationTest {
         jws = new CompactJws(SigningKeyRing.of(SigningKey.signing(
                 AdminProcessLauncher.signingKid(), keys.getPublic(), keys.getPrivate())));
         process = AdminProcessLauncher.launch(SharedPostgresContainer.jdbcUrl(),
-                "confia_admin_app", TEST_PASSWORD, keys);
+                "confia_admin_app", TEST_PASSWORD, keys, Map.of(
+                        // Every test shares one client address, so the production quotas would refuse them; the
+                        // rate-limit tests below start processes of their own with small ones.
+                        RATE_LIMIT + "admin-read.request-limit", "10000",
+                        RATE_LIMIT + "admin-write.request-limit", "10000",
+                        RATE_LIMIT + "admin-read-account.request-limit", "10000",
+                        RATE_LIMIT + "admin-write-account.request-limit", "10000"));
         port = ((WebServerApplicationContext) process).getWebServer().getPort();
     }
 
@@ -605,6 +630,64 @@ class AcademicStructureEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(structureEntriesOf(admin.institution())).hasSize(entries);
     }
 
+    // --- Rate limit ---
+
+    @Test
+    void everyOneOfTheTwelveRoutesIsRateLimitedPerAddressWithRetryAfterAndAnotherAddressIsNotAffected() throws Exception {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        try (ConfigurableApplicationContext limited = AdminProcessLauncher.launch(SharedPostgresContainer.jdbcUrl(),
+                "confia_admin_app", TEST_PASSWORD, keys, Map.of("confia.web.trusted-proxies", "127.0.0.1,::1",
+                        RATE_LIMIT + "admin-read.request-limit", "1", RATE_LIMIT + "admin-write.request-limit", "1",
+                        RATE_LIMIT + "admin-read-account.request-limit", "10000",
+                        RATE_LIMIT + "admin-write-account.request-limit", "10000"))) {
+            int limitedPort = ((WebServerApplicationContext) limited).getWebServer().getPort();
+            List<Route> routes = allRoutes();
+            assertThat(routes).hasSize(12);
+            for (int i = 0; i < routes.size(); i++) {
+                Route route = routes.get(i);
+                String noisy = "198.51.100." + (10 + i);
+                HttpResponse<String> admitted = sendFrom(limitedPort, noisy, route, admin.token());
+                assertThat(admitted.statusCode()).as("first %s %s", route.method(), route.path())
+                        .isNotIn(429, 503);
+                HttpResponse<String> refused = sendFrom(limitedPort, noisy, route, admin.token());
+                assertProblem(refused, 429, "too-many-requests");
+                assertThat(refused.headers().firstValue("Retry-After")).as(route.path()).hasValueSatisfying(
+                        seconds -> assertThat(Long.parseLong(seconds)).isBetween(1L, 60L));
+                // Reads share the quota of the address; writes share another one: an address untouched by this
+                // method is admitted.
+                assertThat(sendFrom(limitedPort, "192.0.2." + (10 + i), route, admin.token()).statusCode())
+                        .as("another address, %s %s", route.method(), route.path()).isNotIn(429, 503);
+            }
+        }
+    }
+
+    @Test
+    void everyOneOfTheTwelveRoutesIsRateLimitedPerAccountAcrossAddressesAndAnotherAccountIsNotAffected()
+            throws Exception {
+        try (ConfigurableApplicationContext limited = AdminProcessLauncher.launch(SharedPostgresContainer.jdbcUrl(),
+                "confia_admin_app", TEST_PASSWORD, keys, Map.of("confia.web.trusted-proxies", "127.0.0.1,::1",
+                        RATE_LIMIT + "admin-read.request-limit", "10000",
+                        RATE_LIMIT + "admin-write.request-limit", "10000",
+                        RATE_LIMIT + "admin-read-account.request-limit", "1",
+                        RATE_LIMIT + "admin-write-account.request-limit", "1"))) {
+            int limitedPort = ((WebServerApplicationContext) limited).getWebServer().getPort();
+            for (Route route : allRoutes()) {
+                Member heavy = member(StaffRole.ADMINISTRATOR.code());
+                Member other = member(StaffRole.ADMINISTRATOR.code());
+                assertThat(sendFrom(limitedPort, "203.0.113.31", route, heavy.token()).statusCode())
+                        .as("first %s %s", route.method(), route.path()).isNotIn(429, 503);
+                // The same account from another address shares the quota.
+                HttpResponse<String> refused = sendFrom(limitedPort, "203.0.113.32", route, heavy.token());
+                assertProblem(refused, 429, "too-many-requests");
+                assertThat(refused.headers().firstValue("Retry-After")).as(route.path()).hasValueSatisfying(
+                        seconds -> assertThat(Long.parseLong(seconds)).isBetween(1L, 60L));
+                // Another account from the very same address is not affected.
+                assertThat(sendFrom(limitedPort, "203.0.113.32", route, other.token()).statusCode())
+                        .as("another account, %s %s", route.method(), route.path()).isNotIn(429, 503);
+            }
+        }
+    }
+
     // --- The races the database and the lock settle ---
 
     @Test
@@ -897,6 +980,23 @@ class AcademicStructureEndpointsIT extends CommittingPostgresIntegrationTest {
             request.header("Content-Type", "application/json");
         }
         if (!method.equals("GET")) {
+            request.header("Origin", AdminProcessLauncher.ALLOWED_ORIGIN);
+        }
+        return execute(request.build());
+    }
+
+    private static HttpResponse<String> sendFrom(int targetPort, String address, Route route, String token) {
+        HttpRequest.Builder request = HttpRequest
+                .newBuilder(URI.create("http://localhost:" + targetPort + route.path()))
+                .timeout(Duration.ofSeconds(30))
+                .header("Authorization", "Bearer " + token)
+                .header("X-Forwarded-For", address)
+                .method(route.method(), route.body() == null ? HttpRequest.BodyPublishers.noBody()
+                        : HttpRequest.BodyPublishers.ofString(route.body()));
+        if (route.body() != null) {
+            request.header("Content-Type", "application/json");
+        }
+        if (!route.method().equals("GET")) {
             request.header("Origin", AdminProcessLauncher.ALLOWED_ORIGIN);
         }
         return execute(request.build());

@@ -1311,6 +1311,21 @@ registro y el despliegue es determinista.
 
 ---
 
+
+> **Nota fechada 2026-11-11 (`students-registry`, seguimiento de seguridad): registros de PostgreSQL y de
+> acceso del borde.** Requisito para la infraestructura de producción, que aún no existe (F0, CI/CD
+> pendiente): (1) PostgreSQL con `log_error_verbosity = terse`, `log_statement = none` y
+> `log_min_error_statement = panic`. Con el nivel por omisión, una violación de unicidad escribe una línea
+> `DETAIL: Key (institution_id, national_id_blind_index)=(…)` con los valores de la fila rechazada
+> (índices ciegos, y en otras tablas nombres y fechas de nacimiento), y la línea `STATEMENT` repite la
+> sentencia con sus parámetros; el servidor no debe volver a escribir esos valores en su registro.
+> (2) El registro de acceso de nginx no debe incluir la cadena de consulta: usar `$uri` y nunca
+> `$request` ni `$request_uri` en `log_format`, porque la búsqueda de estudiantes (`GET
+> /api/v1/students?q=…`) lleva nombres de menores en `q`. Lo mismo vale para el registro del balanceador
+> o del CDN. Los contenedores de prueba de integración arrancan con la primera configuración desde este
+> cambio (`PostgresImageSingleSourceTest` y `SharedPostgresContainer`).
+
+## 10. Configuración de nginx detrás de Cloudflare
 ## 10. Configuración de nginx detrás de Cloudflare
 
 Las cabeceras de seguridad completas, la política de contenido con nonce y la protección CSRF

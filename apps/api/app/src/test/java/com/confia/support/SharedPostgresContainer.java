@@ -89,7 +89,12 @@ public final class SharedPostgresContainer {
                 .withUsername("postgres")
                 .withPassword(PostgresIntegrationTest.TEST_PASSWORD)
                 .withCommand("postgres", "-c", "fsync=off", "-c", "synchronous_commit=off",
-                        "-c", "max_connections=200")
+                        "-c", "max_connections=200",
+                        // The server log must not repeat the values of a failed row (a unique violation prints
+                        // them in DETAIL) nor the statement with its parameters; production needs the same
+                        // (docs/05-infraestructura-y-despliegue.md, dated note of 2026-11-11).
+                        "-c", "log_error_verbosity=terse", "-c", "log_statement=none",
+                        "-c", "log_min_error_statement=panic")
                 .withTmpFs(Map.of("/var/lib/postgresql", "rw,size=1024m"))
                 .withClasspathResourceMapping("db/testing/create-test-roles.sql",
                         "/docker-entrypoint-initdb.d/01-create-test-roles.sql", BindMode.READ_ONLY);

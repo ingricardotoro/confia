@@ -86,7 +86,12 @@ public final class InMemoryRateLimiter implements RateLimiter {
 
     @Override
     public RateLimitDecision tryAcquire(ClientAddress client) {
-        ClientKey key = client.rateLimitKey();
+        return tryAcquire(client.rateLimitKey());
+    }
+
+    @Override
+    public RateLimitDecision tryAcquire(ClientKey key) {
+        Objects.requireNonNull(key, "key");
         RateLimitDecision decision = decide(key);
         if (decision instanceof CapacityExhausted && sweepIfDue(now())) {
             decision = decide(key);

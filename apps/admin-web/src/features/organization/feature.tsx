@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { createRoute, redirect, stripSearchParams, useNavigate, useSearch, type AnyRoute } from "@tanstack/react-router";
+import { createRoute, redirect, stripSearchParams, type AnyRoute } from "@tanstack/react-router";
 import type { FeatureModule } from "../../shared/navigation/navigation-entry.ts";
 import { AcademicYearsContainer } from "./academic-years/AcademicYearsContainer.tsx";
 import { GradesContainer } from "./grades/GradesContainer.tsx";
@@ -9,7 +9,6 @@ import {
   gradesSearch,
   modalitiesSearch,
   sectionsSearch,
-  toUrlSearch,
   type AcademicYearsSearch,
   type GradesSearch,
   type ModalitiesSearch,
@@ -18,26 +17,10 @@ import {
 import { ModalitiesContainer } from "./modalities/ModalitiesContainer.tsx";
 import { OrganizationContainer } from "./OrganizationContainer.tsx";
 import { ORGANIZATION_PATH, ORGANIZATION_PATHS } from "./organization-paths.ts";
-import type { SearchChange } from "./search-change.ts";
 import { SectionsContainer } from "./sections/SectionsContainer.tsx";
+import { useListSearch } from "./use-list-search.ts";
 
 export { ORGANIZATION_PATH };
-
-/**
- * The search of a listing and the way to change it. The state of the table lives in the address (docs/ui-ux/04,
- * section 3.2): a link shows the same page, order and filters to whoever opens it, and the default values are not
- * written. The router has already validated the search; reading it through the schema again gives its type.
- */
-function useListSearch<S extends { page: number; pageSize: number; sort?: string | undefined }>(parse: (raw: unknown) => S): [S, SearchChange<S>] {
-  const raw: unknown = useSearch({ strict: false });
-  const navigate = useNavigate();
-  return [
-    parse(raw),
-    (next, options) => {
-      void navigate({ search: toUrlSearch(next) as never, replace: options?.replace ?? false });
-    },
-  ];
-}
 
 function AcademicYearsRoute() {
   const [search, onSearchChange] = useListSearch<AcademicYearsSearch>((raw) => academicYearsSearch.parse(raw));

@@ -71,7 +71,9 @@
     "academicYearAlreadyActive": "Ya hay otro año lectivo en curso. Solo puede haber uno a la vez; cambie la etapa de ese año antes de poner este en curso.",
     "academicYearClosed": "El año lectivo está cerrado. Un año cerrado no se edita ni se reabre, y sus secciones tampoco se pueden crear ni editar.",
     "duplicateName": "Ya existe un registro con ese nombre, código u orden. Escriba un valor distinto.",
-    "inactiveReference": "Uno de los datos relacionados está inactivo. Actívelo o elija otro e intente de nuevo."
+    "inactiveReference": "Uno de los datos relacionados está inactivo. Actívelo o elija otro e intente de nuevo.",
+    "duplicateStudentCode": "Ya existe un estudiante con ese código. Escriba otro código o déjelo vacío para que se genere uno.",
+    "duplicateNationalId": "Ya hay un estudiante registrado con ese documento de identidad. Revise el número; los guiones no cuentan."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -80,7 +82,10 @@
     "unknown": "Uno de los datos enviados no es válido.",
     "endAfterStart": "La fecha de fin debe ser posterior a la de inicio.",
     "positiveWhole": "Ingrese un número entero mayor que cero.",
-    "wholeNumber": "Ingrese un número entero de cero en adelante."
+    "wholeNumber": "Ingrese un número entero de cero en adelante.",
+    "birthDateFuture": "La fecha de nacimiento no puede ser posterior a hoy.",
+    "birthDateFloor": "La fecha de nacimiento no puede ser anterior al 1 de enero de 1990.",
+    "nationalIdFormat": "El documento debe tener de 8 a 20 letras, números o guiones."
   },
   "countdown": {
     "remaining": "Puede intentar de nuevo en {seconds} s.",
@@ -110,7 +115,8 @@
   },
   "navigation": {
     "home": "Inicio",
-    "organization": "Estructura académica"
+    "organization": "Estructura académica",
+    "students": "Estudiantes"
   },
   "organization": {
     "title": "Estructura académica",
@@ -258,6 +264,61 @@
       "capacityHelp": "Déjelo vacío si la sección no tiene un límite de estudiantes.",
       "filterAcademicYear": "Año lectivo",
       "filterGrade": "Grado"
+    }
+  },
+  "students": {
+    "title": "Estudiantes",
+    "heading": "Lista de estudiantes",
+    "caption": "Estudiantes de la institución",
+    "create": "Nuevo estudiante",
+    "createTitle": "Nuevo estudiante",
+    "createDescription": "Complete los datos del estudiante. El documento de identidad es opcional y se guarda cifrado.",
+    "editTitle": "Editar estudiante",
+    "editDescription": "Cambie los datos del estudiante. El código no se puede cambiar. Desactivar a un estudiante no borra nada.",
+    "emptyTitle": "Todavía no hay estudiantes",
+    "emptyDescription": "Registre al primer estudiante para poder matricularlo más adelante.",
+    "emptyAction": "Registrar al primer estudiante",
+    "loadFailed": "No se pudo cargar la lista de estudiantes",
+    "columns": {
+      "studentCode": "Código",
+      "lastName": "Apellidos",
+      "firstName": "Nombres",
+      "birthDate": "Fecha de nacimiento",
+      "sex": "Sexo",
+      "nationalId": "Documento"
+    },
+    "fields": {
+      "studentCode": "Código",
+      "firstName": "Nombres",
+      "lastName": "Apellidos",
+      "birthDate": "Fecha de nacimiento",
+      "sex": "Sexo",
+      "nationalId": "Documento de identidad",
+      "status": "Estado"
+    },
+    "codeHelp": "Si lo deja vacío, el sistema genera uno.",
+    "nationalIdHelp": "De 8 a 20 letras, números o guiones. Es opcional.",
+    "currentDocument": "Documento actual",
+    "replaceDocument": "Reemplazar documento",
+    "replaceDocumentHelp": "Déjelo vacío para conservar el documento actual. Escriba el número completo para reemplazarlo.",
+    "removeDocument": "Quitar documento",
+    "removeDocumentHelp": "Marque esta casilla para borrar el documento guardado. Si no la marca, el documento no se toca.",
+    "documentRegistered": "Registrado",
+    "documentRegisteredText": "Documento registrado",
+    "noDocumentMark": "—",
+    "noDocumentText": "Sin documento",
+    "sex": {
+      "F": "Femenino",
+      "M": "Masculino",
+      "UNSPECIFIED": "No especificado"
+    },
+    "search": {
+      "label": "Buscar",
+      "help": "Por nombre, apellido o código.",
+      "tooShort": "Escriba al menos 2 caracteres para buscar."
+    },
+    "status": {
+      "filter": "Estado"
     }
   }
 }

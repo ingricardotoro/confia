@@ -649,3 +649,228 @@ describe("the academic structure [organization-academic-structure]", { timeout: 
     expect(page(await theirs("GET", "/modalities")).total).toBe(3);
   });
 });
+
+
+describe("the students registry [students-registry]", { timeout: LIMIT }, () => {
+  const BASE = "/api/v1/students";
+  const DOCUMENT = "0801-2010-98765";
+  const NEW_STUDENT = { firstName: "Marta", lastName: "Zúñiga", birthDate: "2012-05-20", sex: "F" };
+
+  /** Signs in on a scenario (after the preset, if any) and answers the call helper bound to its bearer token. */
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const headers = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path: string, body?: unknown) =>
+      call(method, `${BASE}${path}`, { headers, scenario: id, ...(body === undefined ? {} : { body }) });
+  }
+
+  interface Row {
+    id: string;
+    studentCode: string;
+    firstName: string;
+    lastName: string;
+    hasNationalId: boolean;
+  }
+  const rows = (reply: Reply) => (reply.json as { items: Row[] }).items;
+  const total = (reply: Reply) => (reply.json as { total: number }).total;
+  const verdict = (reply: Reply) => [reply.status, typeOf(reply)];
+  const fieldsOf = (reply: Reply) => (reply.json as { errors: { field: string; reason: string }[] }).errors;
+
+  it("answers 401 to every operation without an access token, and 404 to a path it does not simulate", async () => {
+    const anonymous = [await call("GET", BASE, { scenario: "stu-401" }), await call("POST", BASE, { scenario: "stu-401", body: NEW_STUDENT })];
+    const send = await session("stu-404");
+
+    expect(anonymous.map(verdict)).toEqual([
+      [401, "authentication-required"],
+      [401, "authentication-required"],
+    ]);
+    expect((await send("DELETE", "/x")).status).toBe(404);
+    expect((await send("GET", "/x/y")).status).toBe(404);
+  });
+
+  it("lists the sixty seeded students by last name, with `total` counting every page, and pages them", async () => {
+    const send = await session("stu-page");
+
+    const first = await send("GET", "?page=0&size=25");
+    const last = await send("GET", "?page=2&size=25");
+
+    expect(total(first)).toBe(60);
+    expect(rows(first)).toHaveLength(25);
+    expect(rows(first)[0]).toMatchObject({ studentCode: "E-000001", lastName: "Aguilar" });
+    expect(rows(last)).toHaveLength(10);
+    expect(rows(last).at(-1)?.lastName).toBe("Zelaya");
+  });
+
+  it("sorts on the server in either direction and refuses a field that is not allowed, a bad page or a bad size", async () => {
+    const send = await session("stu-sort");
+
+    expect(rows(await send("GET", "?sort=lastName,desc&size=1")).map((row) => row.lastName)).toEqual(["Zelaya"]);
+    expect(rows(await send("GET", "?sort=studentCode,desc&size=1")).map((row) => row.studentCode)).toEqual(["E-000060"]);
+    for (const query of ["sort=nationalId,asc", "sort=lastName,sideways", "page=-1", "size=0", "size=201"]) {
+      expect([query, ...verdict(await send("GET", `?${query}`))]).toEqual([query, 400, "validation-failed"]);
+    }
+  });
+
+  it("searches name, last name and code without regard to capitals, and refuses a text under two characters, empty included", async () => {
+    const send = await session("stu-search");
+
+    expect(total(await send("GET", `?q=${encodeURIComponent("PÉREZ")}`))).toBe(2);
+    expect(rows(await send("GET", "?q=e-000042")).map((row) => row.firstName)).toEqual(["Luis"]);
+    expect(total(await send("GET", "?q=valeria"))).toBe(3);
+    for (const query of ["q=a", "q=", "q=%20%20", `q=${"x".repeat(101)}`]) {
+      const reply = await send("GET", `?${query}`);
+      expect([query.slice(0, 6), ...verdict(reply)]).toEqual([query.slice(0, 6), 400, "validation-failed"]);
+      expect(fieldsOf(reply).map((error) => error.field)).toEqual(["q"]);
+    }
+  });
+
+  it("filters by status and refuses one it does not know", async () => {
+    const send = await session("stu-status");
+
+    expect(total(await send("GET", "?status=INACTIVE"))).toBe(6);
+    expect(total(await send("GET", "?status=ACTIVE"))).toBe(54);
+    expect(verdict(await send("GET", "?status=BORRADO"))).toEqual([400, "validation-failed"]);
+  });
+
+  it("registers a student with 201, generates the next code, masks the document, and never returns it", async () => {
+    const send = await session("stu-create");
+
+    const created = await send("POST", "", { ...NEW_STUDENT, nationalId: DOCUMENT });
+    const found = await send("GET", `?q=${encodeURIComponent("Zúñiga")}`);
+
+    expect(created.status).toBe(201);
+    expect(created.json).toMatchObject({ studentCode: "E-000061", firstName: "Marta", status: "ACTIVE", hasNationalId: true });
+    expect(rows(found)).toHaveLength(1);
+    expect(rows(found)[0]).toMatchObject({ hasNationalId: true });
+    for (const reply of [created, found]) {
+      expect(reply.text).not.toContain(DOCUMENT);
+      expect(reply.text).not.toContain("0801201098765");
+      expect(reply.json).not.toHaveProperty("nationalId");
+    }
+    const without = await send("POST", "", { ...NEW_STUDENT, studentCode: " MI-1 " });
+    expect(without.json).toMatchObject({ studentCode: "MI-1", hasNationalId: false });
+  });
+
+  it("refuses a repeated code and a repeated national id, also with other hyphens or capitals, with 409", async () => {
+    const send = await session("stu-duplicate");
+    await send("POST", "", { ...NEW_STUDENT, nationalId: "ab-12-34-56-78" });
+
+    const replies = [
+      await send("POST", "", { ...NEW_STUDENT, studentCode: "E-000001" }),
+      await send("POST", "", { ...NEW_STUDENT, nationalId: "AB12345678" }),
+      await send("POST", "", { ...NEW_STUDENT, nationalId: "0801201210003" }),
+    ];
+
+    expect(replies.map(verdict)).toEqual([
+      [409, "duplicate-student-code"],
+      [409, "duplicate-national-id"],
+      [409, "duplicate-national-id"],
+    ]);
+  });
+
+  it("answers validation-failed with the fields at fault: names, birth date limits, sex, and the format of the document", async () => {
+    const send = await session("stu-validation", "students-empty");
+
+    const blank = await send("POST", "", { ...NEW_STUDENT, firstName: "  ", lastName: "x".repeat(101) });
+    const early = await send("POST", "", { ...NEW_STUDENT, birthDate: "1989-12-31" });
+    const future = await send("POST", "", { ...NEW_STUDENT, birthDate: "2999-01-01" });
+    const format = await send("POST", "", { ...NEW_STUDENT, nationalId: "123 45" });
+    const short = await send("POST", "", { ...NEW_STUDENT, nationalId: "1----2----" });
+    const sex = await send("POST", "", { ...NEW_STUDENT, sex: "X" });
+
+    expect(fieldsOf(blank)).toEqual([
+      { field: "firstName", reason: "not-blank" },
+      { field: "lastName", reason: "size" },
+    ]);
+    expect(fieldsOf(early)).toEqual([{ field: "birthDate", reason: "birth-date-floor" }]);
+    expect(fieldsOf(future)).toEqual([{ field: "birthDate", reason: "past-or-present" }]);
+    expect(fieldsOf(format)).toEqual([{ field: "nationalId", reason: "pattern" }]);
+    expect(fieldsOf(short)).toEqual([{ field: "nationalId", reason: "pattern" }]);
+    expect(fieldsOf(sex).map((error) => error.field)).toEqual(["sex"]);
+  });
+
+  it("refuses a member it does not know on a create, and the code on an edit", async () => {
+    const send = await session("stu-unknown");
+    const id = rows(await send("GET", "?size=1"))[0]?.id ?? "";
+    const edit = { firstName: "A", lastName: "B", birthDate: "2012-05-20", sex: "F", status: "ACTIVE" };
+
+    const create = await send("POST", "", { ...NEW_STUDENT, institutionId: "x" });
+    const withCode = await send("PUT", `/${id}`, { ...edit, studentCode: "E-9" });
+
+    expect(fieldsOf(create)).toEqual([{ field: "institutionId", reason: "unknown" }]);
+    expect(fieldsOf(withCode)).toEqual([{ field: "studentCode", reason: "unknown" }]);
+  });
+
+  it("edits with 200: an omitted document is kept, an empty one removes it, any other replaces it, and the code stays", async () => {
+    const send = await session("stu-edit");
+    const target = rows(await send("GET", "?q=E-000042"))[0];
+    const id = target?.id ?? "";
+    const edit = { firstName: "Luis Alberto", lastName: "Pérez", birthDate: "2014-07-16", sex: "M", status: "ACTIVE" };
+    expect(target).toMatchObject({ hasNationalId: true });
+
+    const kept = await send("PUT", `/${id}`, edit);
+    const replaced = await send("PUT", `/${id}`, { ...edit, nationalId: DOCUMENT });
+    const removed = await send("PUT", `/${id}`, { ...edit, nationalId: "" });
+
+    expect(kept.json).toMatchObject({ studentCode: "E-000042", firstName: "Luis Alberto", hasNationalId: true });
+    expect(replaced.json).toMatchObject({ hasNationalId: true });
+    expect(removed.json).toMatchObject({ hasNationalId: false });
+    expect(replaced.text).not.toContain("98765");
+  });
+
+  it("inactivates with a PUT, deletes nothing, and a student may keep their own document in an edit", async () => {
+    const send = await session("stu-inactivate");
+    const target = rows(await send("GET", "?q=E-000042"))[0];
+    const id = target?.id ?? "";
+    const edit = { firstName: "Luis", lastName: "Pérez", birthDate: "2014-07-16", sex: "M", status: "INACTIVE" };
+
+    const own = await send("PUT", `/${id}`, { ...edit, nationalId: "0801-2012-10042" });
+    const missing = await send("PUT", "/00000000-0000-4000-8000-999999999999", edit);
+
+    expect(own.json).toMatchObject({ status: "INACTIVE", hasNationalId: true });
+    expect(verdict(missing)).toEqual([404, "resource-not-found"]);
+    expect(total(await send("GET", "?status=INACTIVE"))).toBe(7);
+    expect(total(await send("GET", ""))).toBe(60);
+  });
+
+  it("starts an empty scenario with no students", async () => {
+    const send = await session("stu-empty", "students-empty");
+
+    expect(total(await send("GET", ""))).toBe(0);
+    expect((await send("POST", "", NEW_STUDENT)).json).toMatchObject({ studentCode: "E-000001" });
+  });
+
+  it("refuses a write with 403 forbidden and changes nothing, while the reads keep answering", async () => {
+    const send = await session("stu-forbidden", "students-forbidden");
+    const id = rows(await send("GET", "?size=1"))[0]?.id ?? "";
+
+    const create = await send("POST", "", NEW_STUDENT);
+    const edit = await send("PUT", `/${id}`, { firstName: "A", lastName: "B", birthDate: "2012-05-20", sex: "F", status: "INACTIVE" });
+
+    expect(verdict(create)).toEqual([403, "forbidden"]);
+    expect(verdict(edit)).toEqual([403, "forbidden"]);
+    expect(total(await send("GET", ""))).toBe(60);
+    expect(total(await send("GET", "?status=INACTIVE"))).toBe(6);
+  });
+
+  it("fails the first three reads with 500 and a trace id, then recovers", async () => {
+    const send = await session("stu-server-error", "students-server-error");
+
+    const failed = [await send("GET", ""), await send("GET", ""), await send("GET", "")];
+    const recovered = await send("GET", "");
+
+    expect(failed.map(verdict)).toEqual(Array(3).fill([500, "internal-error"]));
+    expect(failed[0]?.json).toMatchObject({ traceId: "01J8Z4K2QF9P0X" });
+    expect(recovered.status).toBe(200);
+  });
+
+  it("keeps one registry for each scenario", async () => {
+    const mine = await session("stu-mine", "students-empty");
+    const theirs = await session("stu-theirs");
+    await mine("POST", "", NEW_STUDENT);
+
+    expect(total(await mine("GET", ""))).toBe(1);
+    expect(total(await theirs("GET", ""))).toBe(60);
+  });
+});

@@ -35,7 +35,9 @@ import java.util.Optional;
  * accepted, whatever the reason: unknown, revoked, expired, reused or bound elsewhere). The
  * academic structure of {@code organization} owns {@link #ACADEMIC_YEAR_OVERLAP}, {@link
  * #ACADEMIC_YEAR_ALREADY_ACTIVE}, {@link #ACADEMIC_YEAR_CLOSED}, {@link #DUPLICATE_NAME} and {@link
- * #INACTIVE_REFERENCE} (all {@code 409}); its {@code 404} is {@link #RESOURCE_NOT_FOUND}. The
+ * #INACTIVE_REFERENCE} (all {@code 409}); its {@code 404} is {@link #RESOURCE_NOT_FOUND}. The student
+ * registry of {@code students} owns {@link #DUPLICATE_STUDENT_CODE} and {@link #DUPLICATE_NATIONAL_ID}
+ * (both {@code 409}) and uses {@link #RESOURCE_NOT_FOUND} for its {@code 404}. The
  * institution codes belong to a later change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
@@ -64,6 +66,8 @@ public enum ProblemCode {
     ACADEMIC_YEAR_CLOSED("academic-year-closed", 409),
     DUPLICATE_NAME("duplicate-name", 409),
     INACTIVE_REFERENCE("inactive-reference", 409),
+    DUPLICATE_STUDENT_CODE("duplicate-student-code", 409),
+    DUPLICATE_NATIONAL_ID("duplicate-national-id", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
     IDEMPOTENCY_PAYLOAD_MISMATCH("idempotency-payload-mismatch", 422),
     TOO_MANY_REQUESTS("too-many-requests", 429),

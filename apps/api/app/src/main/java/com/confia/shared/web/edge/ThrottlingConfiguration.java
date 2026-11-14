@@ -55,6 +55,30 @@ public class ThrottlingConfiguration {
         return properties.adminSession().policy();
     }
 
+    /** The values of the policy of the general reads of the administrative API. */
+    @Bean
+    RateLimitPolicy adminReadRateLimitPolicy(RateLimitProperties properties) {
+        return properties.adminRead().policy();
+    }
+
+    /** The values of the policy of the writes of the administrative API. */
+    @Bean
+    RateLimitPolicy adminWriteRateLimitPolicy(RateLimitProperties properties) {
+        return properties.adminWrite().policy();
+    }
+
+    /** The values of the policy of the same reads per authenticated account. */
+    @Bean
+    RateLimitPolicy adminReadAccountRateLimitPolicy(RateLimitProperties properties) {
+        return properties.adminReadAccount().policy();
+    }
+
+    /** The values of the policy of the same writes per authenticated account. */
+    @Bean
+    RateLimitPolicy adminWriteAccountRateLimitPolicy(RateLimitProperties properties) {
+        return properties.adminWriteAccount().policy();
+    }
+
     /** Reports a failure of the client of the request to the limiter of a policy. */
     @Bean
     RateLimitFailures rateLimitFailures(RateLimiterRegistry limiters) {

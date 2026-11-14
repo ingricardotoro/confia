@@ -20,4 +20,13 @@ public interface RateLimiter {
 
     /** Reports a failure of {@code client}, the second dimension of the policy. */
     void recordFailure(ClientAddress client);
+
+    /**
+     * The same decision for a key that is not an address, such as the account of the request
+     * ({@link ClientKey#ofAccount}). A limiter that serves a per-account policy overrides it; one that
+     * does not refuses, and the interceptor turns that refusal into a {@code 503} that fails closed.
+     */
+    default RateLimitDecision tryAcquire(ClientKey key) {
+        throw new UnsupportedOperationException("this limiter counts addresses only");
+    }
 }

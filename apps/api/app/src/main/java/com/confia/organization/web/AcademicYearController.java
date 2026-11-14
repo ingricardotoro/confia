@@ -1,9 +1,11 @@
 package com.confia.organization.web;
 
-import com.confia.organization.application.ManageAcademicYears;
 import com.confia.organization.application.AcademicYearView;
+import com.confia.organization.application.ManageAcademicYears;
 import com.confia.organization.application.Page;
 import com.confia.shared.web.openapi.ContractSchemas;
+import com.confia.shared.web.ratelimit.RateLimitKey;
+import com.confia.shared.web.ratelimit.RateLimited;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.extensions.Extension;
@@ -53,6 +55,8 @@ public class AcademicYearController {
         this.years = years;
     }
 
+    @RateLimited(policy = "admin-read")
+    @RateLimited(policy = "admin-read-account", key = RateLimitKey.ACCOUNT)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "listAcademicYears", tags = TAG, summary = "Lists the academic years",
             description = "One page of the academic years of the institution of the token, active and "
@@ -90,6 +94,8 @@ public class AcademicYearController {
                 result.total(), result.page(), result.size());
     }
 
+    @RateLimited(policy = "admin-write")
+    @RateLimited(policy = "admin-write-account", key = RateLimitKey.ACCOUNT)
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(operationId = "createAcademicYear", tags = TAG, summary = "Creates an academic year",
@@ -119,6 +125,8 @@ public class AcademicYearController {
                 request.name(), request.startDate(), request.endDate(), request.status()));
     }
 
+    @RateLimited(policy = "admin-write")
+    @RateLimited(policy = "admin-write-account", key = RateLimitKey.ACCOUNT)
     @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "updateAcademicYear", tags = TAG, summary = "Edits an academic year",

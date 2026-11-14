@@ -130,7 +130,15 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.organization.infrastructure",
                     "com.confia.organization.infrastructure.wiring",
                     "com.confia.organization.application", "com.confia.organization.web",
-                    "com.confia.organization.web.wiring"),
+                    "com.confia.organization.web.wiring",
+                    // The students module as the packages its beans come from: the jOOQ adapter and
+                    // the protector of the national identity document, the named-interface package of
+                    // its configuration, the use case of the registry, its controller and the
+                    // named-interface package of the configuration that registers it
+                    // (docs/cortes/students-registry.md). Administrative only, each exact.
+                    "com.confia.students.infrastructure", "com.confia.students.infrastructure.wiring",
+                    "com.confia.students.application", "com.confia.students.web",
+                    "com.confia.students.web.wiring"),
             Map.of("com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON));
@@ -161,6 +169,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // the edit visible in its pull request.
                     "com.confia.identity", "staff-only module while identity has no guardian "
                             + "subdomain (ADR-0003)",
+                    "com.confia.students", ADMIN_MODULE,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON,
                     TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
                     CSRF_PACKAGE, CSRF_REASON,
@@ -213,6 +222,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     CSRF_PACKAGE, CSRF_REASON,
                     SESSION_PACKAGE, SESSION_COOKIE_REASON,
                     "com.confia.organization", STAFF_INSTITUTION,
+                    "com.confia.students", ADMIN_MODULE,
                     "com.confia.shared.observability.health",
                     "the worker serves no route; its health is a heartbeat file (WE100)"));
 

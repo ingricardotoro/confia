@@ -93,9 +93,9 @@ class LogRateLimitMetricsTest {
     }
 
     @Test
-    void theReasonsAreExactlyTheFiveCausesTheEdgeKnows() {
+    void theReasonsAreExactlyTheSixCausesTheEdgeKnows() {
         assertThat(CapacityReason.values()).containsExactly(TABLE_FULL, NO_ORIGIN, NO_ADDRESS,
-                UNKNOWN_POLICY, LIMITER_FAILURE);
+                UNKNOWN_POLICY, LIMITER_FAILURE, CapacityReason.NO_ACCOUNT);
     }
 
     @Test
