@@ -434,7 +434,9 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
                     "PUT /api/v1/organization/" + resource + "/{id}"));
         }
         expected.addAll(List.of("GET /api/v1/students", "GET /api/v1/students/{id}", "POST /api/v1/students",
-                "PUT /api/v1/students/{id}"));
+                "PUT /api/v1/students/{id}", "GET /api/v1/enrollments", "GET /api/v1/enrollments/{id}",
+                "GET /api/v1/students/{studentId}/enrollments", "POST /api/v1/enrollments",
+                "POST /api/v1/enrollments/{id}/transfer", "POST /api/v1/enrollments/{id}/exit"));
         assertThat(AdminProcessLauncher.routesOf(process)).containsExactlyInAnyOrderElementsOf(expected);
 
         assertProblem(get("/api/v1/auth/sessions"), 401, "authentication-required");

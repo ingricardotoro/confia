@@ -30,7 +30,8 @@ public final class PermissionedEndpoints {
      * {@code organization}: {@code GET} needs {@code organization:read}, {@code POST} needs {@code
      * organization:create} and {@code PUT} needs {@code organization:update}, and the four routes of the
      * student registry: the list and the detail need {@code students:read}, {@code POST} needs {@code
-     * students:create} and {@code PUT} needs {@code students:update}. A route of a later
+     * students:create} and {@code PUT} needs {@code students:update}, and the six routes of the enrollments: the reads need {@code students:read}, the
+     * enrollment {@code students:create} and the transfer and the exit {@code students:update}. A route of a later
      * change is added here, in the same commit as its controller.
      */
     public static PermissionedEndpoints forAdmin() {
@@ -52,6 +53,17 @@ public final class PermissionedEndpoints {
         endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/students",
                 Permission.STUDENTS_CREATE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/students/{id}",
+                Permission.STUDENTS_UPDATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/enrollments", Permission.STUDENTS_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/enrollments/{id}",
+                Permission.STUDENTS_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/students/{studentId}/enrollments",
+                Permission.STUDENTS_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/enrollments",
+                Permission.STUDENTS_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/enrollments/{id}/transfer",
+                Permission.STUDENTS_UPDATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/enrollments/{id}/exit",
                 Permission.STUDENTS_UPDATE));
         return new PermissionedEndpoints(endpoints);
     }

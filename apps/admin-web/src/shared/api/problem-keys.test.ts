@@ -9,7 +9,7 @@ import { PROBLEM_KEYS } from "./problem-keys.ts";
 const CATALOG_KEYS = flattenCatalogKeys(admin);
 
 describe("PROBLEM_KEYS", () => {
-  it("names exactly the twenty two codes and the unknown case", () => {
+  it("names exactly the twenty seven codes and the unknown case", () => {
     expect(Object.keys(PROBLEM_KEYS).sort()).toEqual([...KNOWN_PROBLEM_CODES, "unknown"].sort());
   });
 
@@ -40,6 +40,11 @@ describe("PROBLEM_KEYS", () => {
     ["inactive-reference", "problem.inactiveReference"],
     ["duplicate-student-code", "problem.duplicateStudentCode"],
     ["duplicate-national-id", "problem.duplicateNationalId"],
+    ["student-not-active", "problem.studentNotActive"],
+    ["section-full", "problem.sectionFull"],
+    ["duplicate-active-enrollment", "problem.duplicateActiveEnrollment"],
+    ["invalid-enrollment-state", "problem.invalidEnrollmentState"],
+    ["transfer-year-mismatch", "problem.transferYearMismatch"],
   ] as const)("maps %s to %s", (code, key) => {
     expect(PROBLEM_KEYS[code]).toBe(key);
   });

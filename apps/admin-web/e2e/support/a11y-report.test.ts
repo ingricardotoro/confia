@@ -160,6 +160,25 @@ describe("the states of the students registry", () => {
   });
 });
 
+describe("the states of the enrollments", () => {
+  const enrollments = MATRIX.filter((combination) => combination.route === "/enrollments");
+
+  it("holds the list ready, the five dialogs (enroll, results, transfer, errors, detail), the empty and the load-error states, each once", () => {
+    expect(enrollments.map((combination) => [combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["ready", undefined, undefined],
+      ["dialog-enroll", undefined, true],
+      ["dialog-enroll-results", undefined, true],
+      ["dialog-transfer", undefined, true],
+      ["dialog-error-summary", undefined, true],
+      ["dialog-detail", undefined, true],
+      ["empty", "enrollments-empty", undefined],
+      ["load-error", "enrollments-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...enrollments])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+});
+
 describe("the verdict [BX75]", () => {
   it("names route, state, theme, rule and impact of every blocking violation", () => {
     expect(() => {

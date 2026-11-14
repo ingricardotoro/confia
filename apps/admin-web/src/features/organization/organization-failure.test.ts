@@ -16,6 +16,11 @@ describe("classifyOrganizationFailure", () => {
     ["inactive-reference", "problem.inactiveReference"],
     ["duplicate-student-code", "problem.duplicateStudentCode"],
     ["duplicate-national-id", "problem.duplicateNationalId"],
+    ["student-not-active", "problem.studentNotActive"],
+    ["section-full", "problem.sectionFull"],
+    ["duplicate-active-enrollment", "problem.duplicateActiveEnrollment"],
+    ["invalid-enrollment-state", "problem.invalidEnrollmentState"],
+    ["transfer-year-mismatch", "problem.transferYearMismatch"],
     ["forbidden", "problem.forbidden"],
     ["resource-not-found", "problem.notFound"],
   ] as const)("gives %s its own message, with the trace id", (code, key) => {
@@ -41,6 +46,29 @@ describe("classifyOrganizationFailure", () => {
       errors: [
         { field: "name", reason: "size" },
         { field: "endDate", reason: "end-after-start" },
+      ],
+    });
+  });
+
+  it("tells a reason of a withdrawal or a transfer that is out of its 3 to 500 characters with one reason, and keeps the date and section reasons", () => {
+    const failure = classifyOrganizationFailure(
+      problem("validation-failed", 400, {
+        errors: [
+          { field: "withdrawalReason", reason: "size" },
+          { field: "reason", reason: "size" },
+          { field: "withdrawnOn", reason: "enrollment-date-out-of-range" },
+          { field: "toSectionId", reason: "same-section" },
+        ],
+      }),
+    );
+
+    expect(failure).toEqual({
+      kind: "fields",
+      errors: [
+        { field: "withdrawalReason", reason: "reason-length" },
+        { field: "reason", reason: "reason-length" },
+        { field: "withdrawnOn", reason: "enrollment-date-out-of-range" },
+        { field: "toSectionId", reason: "same-section" },
       ],
     });
   });

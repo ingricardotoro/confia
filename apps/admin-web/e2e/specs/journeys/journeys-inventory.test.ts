@@ -49,6 +49,10 @@ describe("the seven journeys of access", () => {
     expect(readdirSync(FOLDER).filter((name) => name.endsWith(".e2e.ts")).sort()).toEqual([
       "boot.e2e.ts",
       "enrollment.e2e.ts",
+      "enrollments-crud.e2e.ts",
+      "enrollments-keyboard.e2e.ts",
+      "enrollments-lists.e2e.ts",
+      "enrollments-states.e2e.ts",
       "keyboard.e2e.ts",
       "organization-crud.e2e.ts",
       "organization-keyboard.e2e.ts",

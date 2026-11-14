@@ -17,6 +17,7 @@ import {
   type Scenario,
 } from "./scenarios.ts";
 import { ORGANIZATION_BASE } from "./organization-model.ts";
+import { ENROLLMENTS_BASE } from "./enrollments-model.ts";
 import { STUDENTS_BASE } from "./students-model.ts";
 import { base32Encode } from "../support/totp.ts";
 import { parseCookieHeader, type ModelResponse } from "./session-model.ts";
@@ -70,6 +71,7 @@ const SUCCESS_SCHEMAS: Readonly<Record<Operation, Schema | undefined>> = {
   organization: undefined,
   // The same for the students registry (students-model.ts).
   students: undefined,
+  enrollments: undefined,
 };
 
 /** The fields of a response that break the contract; empty when it meets it. The `instance` of an error is not checked (I306). */
@@ -200,6 +202,14 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
       const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
       const answer = scenario.students.handle({ method, path, query: url.searchParams, body });
       if (answer !== undefined) { deliver(res, scenario, "students", answer); return; }
+    }
+    if (path === ENROLLMENTS_BASE || path.startsWith(`${ENROLLMENTS_BASE}/`)) {
+      const session = scenario.model.currentSession(bearerOf(req));
+      if (session.status !== 200) { deliver(res, scenario, "enrollments", session); return; }
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body = method === "POST" ? await readBody(req) : undefined;
+      const answer = scenario.enrollments.handle({ method, path, query: url.searchParams, body });
+      if (answer !== undefined) { deliver(res, scenario, "enrollments", answer); return; }
     }
     write(res, failure("resource-not-found", 404));
   }

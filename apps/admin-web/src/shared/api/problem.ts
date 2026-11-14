@@ -1,6 +1,6 @@
 import { reportUnknownProblem, stripQueryAndFragment, type UnknownProblemFinding } from "./report-unknown-problem.ts";
 
-/** The twenty two codes the backend publishes today (docs/ui-ux/04, §9, its dated note, the academic structure and the students cuts). */
+/** The twenty seven codes the backend publishes today (docs/ui-ux/04, §9, its dated note, the academic structure, the students and the enrollments cuts). */
 export const KNOWN_PROBLEM_CODES = [
   "authentication-failed",
   "second-factor-invalid",
@@ -24,6 +24,11 @@ export const KNOWN_PROBLEM_CODES = [
   "inactive-reference",
   "duplicate-student-code",
   "duplicate-national-id",
+  "student-not-active",
+  "section-full",
+  "duplicate-active-enrollment",
+  "invalid-enrollment-state",
+  "transfer-year-mismatch",
 ] as const;
 
 export type ProblemCode = (typeof KNOWN_PROBLEM_CODES)[number];

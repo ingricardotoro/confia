@@ -46,6 +46,12 @@ export function fieldErrorKey(reason: string): AdminKey {
       return "field.birthDateFloor";
     case "national-id-format":
       return "field.nationalIdFormat";
+    case "reason-length":
+      return "field.reasonLength";
+    case "enrollment-date-out-of-range":
+      return "field.dateOutOfRange";
+    case "same-section":
+      return "field.sameSection";
     default:
       return "field.invalid";
   }
