@@ -17,7 +17,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * The two tables of the enrollment (V18) against a real PostgreSQL (docs/cortes/enrollments.md): the
+ * The two tables of the enrollment (V20) against a real PostgreSQL (docs/cortes/enrollments.md): the
  * constraints that enforce the rules of the cut, INV-31 as a partial unique index, the row-level security
  * that keeps one institution from reading or writing the rows of another, and the privileges (nobody
  * deletes, nobody edits the history of transfers, the portal sees nothing). Constraint rejections run as

@@ -5,7 +5,7 @@
  * com.confia.shared.observability.queue.QueueHealth}), the port that publishes it ({@link
  * com.confia.shared.observability.queue.QueueMetrics}) with its structured-log adapter ({@link
  * com.confia.shared.observability.queue.LogQueueMetrics}) and the recurring job that connects them ({@link
- * com.confia.shared.observability.queue.QueueObservation}). There is no Actuator and no Micrometer registry: the
+ * com.confia.shared.observability.queue.QueueObservation}). Actuator is present as the health module only and there is no Micrometer registry: the
  * adapter is replaced by the observability changes without touching the rest.
  *
  * <p>The package carries no layer segment, like {@link com.confia.shared.observability.metrics}. The only

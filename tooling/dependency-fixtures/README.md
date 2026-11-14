@@ -23,3 +23,9 @@ almacén de tokens. `features/identity/enrollment/imports-enrollment-draft.ts` l
 `admin-token-store-is-private`. Los casos aceptados son `features/identity/enrollment/uses-session-index.ts`, que pasa por la entrada
 pública `session/index.ts`, y esa misma entrada, que importa su propio borrador. `session/enrollment-draft.ts` y `session/index.ts` son
 módulos mínimos para que esos imports resuelvan.
+
+Las dos reglas del ciclo de vida de la sesión (`admin-session-lifecycle-planner-is-pure` y
+`admin-session-lifecycle-is-private`, decisión H16 del cambio `admin-web-shell-and-session-lifecycle`) tienen sus
+violaciones bajo `apps/admin-web/src/features/`. `identity/session/lifecycle/planner-imports-react.ts` es un planificador
+que importa React y viola la primera. `shell/imports-lifecycle-internals.ts` importa un archivo interno de la carpeta
+`lifecycle/` desde fuera de `features/identity/` y viola la segunda; solo `lifecycle/index.ts` es público.

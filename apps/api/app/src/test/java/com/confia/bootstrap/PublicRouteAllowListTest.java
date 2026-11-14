@@ -410,8 +410,9 @@ class PublicRouteAllowListTest {
     /** The public routes production registers in a process: the login and the refresh, in the administrative one. */
     private static List<String> publicRoutesOf(String process) {
         return "admin".equals(process) ? List.of("POST /api/v1/auth/sessions",
-                "POST /api/v1/auth/sessions/refresh", "DELETE /api/v1/auth/sessions/current")
-                : List.of();
+                "POST /api/v1/auth/sessions/refresh", "DELETE /api/v1/auth/sessions/current",
+                "GET /health/live", "GET /health/ready")
+                : List.of("GET /health/live", "GET /health/ready");
     }
 
     /** Every route production registers in a process: its public ones plus its authenticated ones. */
@@ -441,6 +442,54 @@ class PublicRouteAllowListTest {
             "GET /api/v1/guardians/{id}", "POST /api/v1/guardians", "PUT /api/v1/guardians/{id}",
             "GET /api/v1/guardians/{id}/consents", "POST /api/v1/guardians/{id}/consents",
             "GET /api/v1/students/{studentId}/guardians", "PUT /api/v1/students/{studentId}/guardians");
+
+    /** WE96, WE99: the two health routes admit GET only, so every other method is denied with 401. */
+    @ParameterizedTest
+    @CsvSource({"admin", "portal"})
+    void theHealthRoutesAnswer401ToEveryMethodButGet(String process) {
+        try (OpenApiProcess running = OpenApiProcess.start(process)) {
+            int checked = 0;
+            for (String path : List.of("/health/live", "/health/ready")) {
+                for (String method : List.of("POST", "PUT", "DELETE", "PATCH")) {
+                    assertThat(anonymous(method, path, running.port())).as("%s %s in %s", method, path, process)
+                            .isEqualTo(401);
+                    checked++;
+                }
+            }
+            assertThat(checked).as("non-vacuous: eight requests").isEqualTo(8);
+        }
+    }
+
+    /** WE95, WE98, CR14: no other Actuator path, and no other path under /health, is served. */
+    @ParameterizedTest
+    @CsvSource({"admin", "portal"})
+    void everyOtherActuatorPathAndAnyOtherHealthPathAnswers401(String process) {
+        try (OpenApiProcess running = OpenApiProcess.start(process)) {
+            for (String path : List.of("/actuator", "/actuator/health", "/actuator/env", "/actuator/metrics",
+                    "/actuator/prometheus", "/actuator/info", "/health/other", "/health")) {
+                assertThat(anonymous("GET", path, running.port())).as("GET %s in %s", path, process)
+                        .isEqualTo(401);
+            }
+        }
+    }
+
+    /** WE97: a health route that is registered and not on the list is named by the exact-lists check. */
+    @Test
+    void aHealthRouteMissingFromTheAllowListFailsNamingTheRoute() {
+        try (OpenApiProcess running = OpenApiProcess.start("admin")) {
+            PublicEndpoints real = PublicEndpoints.forAdmin(running.context().getEnvironment());
+            PublicEndpoints withoutReady = new PublicEndpoints(real.endpoints().stream()
+                    .filter(entry -> !"/health/ready".equals(entry.pattern())).toList());
+
+            List<Route> unclassified = routesOnNeitherList(running.context(), withoutReady,
+                    AuthenticatedEndpoints.forAdmin(), PermissionedEndpoints.forAdmin());
+
+            assertThat(unclassified).as("non-vacuous: the route is registered").extracting(Route::toString)
+                    .contains("GET /health/ready");
+            assertThat(routesOnNeitherList(running.context(), real, AuthenticatedEndpoints.forAdmin(),
+                    PermissionedEndpoints.forAdmin())).as("with the real list nothing is left over").isEmpty();
+        }
+    }
 
     /** BI20, the first control: an authenticated entry whose route answers {@code 200} to anyone. */
     @Test

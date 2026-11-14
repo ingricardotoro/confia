@@ -68,7 +68,8 @@ test.describe("the enrollments with the keyboard only", () => {
     await page.keyboard.press("Tab");
     // The date is typed by segments (day, month, year in the Spanish order), which the field moves through by itself.
     await expect(dialog(page).getByLabel(/^Fecha de matrícula/)).toBeFocused();
-    await page.keyboard.type("02032026");
+    // The order of the segments of a date field follows the language of the browser itself, not the locale of the page, so the value is set whole.
+    await dialog(page).getByLabel(/^Fecha de matrícula/).fill("2026-03-02");
     await expect(dialog(page).getByLabel(/^Fecha de matrícula/)).toHaveValue("2026-03-02");
     await tabTo(page, dialog(page).getByRole("button", { name: "Cancelar" }));
     await page.keyboard.press("Tab");
@@ -126,7 +127,7 @@ test.describe("the enrollments with the keyboard only", () => {
     await expect(dialog(page).getByLabel(/^Tipo de salida/)).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(dialog(page).getByLabel(/^Fecha de salida/)).toBeFocused();
-    await page.keyboard.type("01042026");
+    await dialog(page).getByLabel(/^Fecha de salida/).fill("2026-04-01");
     await tabTo(page, dialog(page).getByLabel(/^Motivo/));
     await page.keyboard.type("Cambio de ciudad");
     await tabTo(page, dialog(page).getByRole("button", { name: "Registrar salida" }));
