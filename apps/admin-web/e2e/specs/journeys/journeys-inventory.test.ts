@@ -58,6 +58,10 @@ describe("the seven journeys of access", () => {
       "secrets.e2e.ts",
       "sign-in.e2e.ts",
       "signed-in.e2e.ts",
+      "students-crud.e2e.ts",
+      "students-keyboard.e2e.ts",
+      "students-lists.e2e.ts",
+      "students-states.e2e.ts",
     ]);
   });
 });
