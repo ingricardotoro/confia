@@ -93,7 +93,8 @@ describe("what the staff sign in leaves out", () => {
     const paths = [...new Set([...literals, ...suffixes])].sort();
 
     expect(operations.sort()).toEqual(["completeSecondFactor", "endCurrentSession", "enrollSecondFactor", "getCurrentSession", "logIn", "refreshSession"]);
-    expect(paths).toEqual(["/api/v1/auth/mfa/enrollments", "/api/v1/auth/mfa/verifications", "/api/v1/auth/sessions", "/api/v1/auth/sessions/current", "/api/v1/auth/sessions/refresh"]);
+    // The academic structure screens (organization-academic-structure) add the one path of their client.
+    expect(paths).toEqual(["/api/v1/auth/mfa/enrollments", "/api/v1/auth/mfa/verifications", "/api/v1/auth/sessions", "/api/v1/auth/sessions/current", "/api/v1/auth/sessions/refresh", "/api/v1/organization"]);
     expect(text(join(PACKAGE_ROOT, "src", "features", "identity", "routes.tsx"))).toMatch(
       /ACCESS_PATHS = \{\s*home: "\/",\s*signIn: "\/iniciar-sesion",\s*verification: "\/iniciar-sesion\/verificacion",\s*enrollment: "\/iniciar-sesion\/inscripcion",\s*\} as const/,
     );

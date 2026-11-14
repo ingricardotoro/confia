@@ -25,9 +25,9 @@ describe("the evaluations of the matrix [BX74, BX77]", () => {
       const themes = evaluations.filter((e) => e.route === wanted.route && e.state === wanted.state).map((e) => e.theme);
       expect(themes).toEqual([...THEMES]);
     }
-    // Every combination of the matrix is evaluated, in both themes: 22 states, 44 evaluations (BX109).
-    expect(evaluations).toHaveLength(44);
-    expect(MATRIX).toHaveLength(MINIMUM.length);
+    // Every combination of the matrix is evaluated, in both themes: the 22 of the minimum (BX109) and the screens added since.
+    expect(evaluations).toHaveLength(MATRIX.length * THEMES.length);
+    expect(MATRIX.length).toBeGreaterThanOrEqual(MINIMUM.length);
   });
 
   it("fails on zero combinations instead of passing", () => {
