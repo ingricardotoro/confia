@@ -19,19 +19,22 @@
     "lint": {
       "dependsOn": [
         "^generate",
-        "generate"
+        "generate",
+        "@confia/contracts#generate"
       ]
     },
     "typecheck": {
       "dependsOn": [
         "^generate",
-        "generate"
+        "generate",
+        "@confia/contracts#generate"
       ]
     },
     "test": {
       "dependsOn": [
         "^generate",
-        "generate"
+        "generate",
+        "@confia/contracts#generate"
       ]
     },
     "test:a11y": {
