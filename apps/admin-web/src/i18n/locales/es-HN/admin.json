@@ -867,6 +867,76 @@
       "kind": "Tipo",
       "kindFilter": "Tipo de importación",
       "allKinds": "Todos los tipos"
+    },
+    "reconciliation": {
+      "heading": "Acta de conciliación",
+      "intro": "Deje constancia de lo que la migración dejó en el sistema para un año lectivo y de lo que declara el listado oficial de la institución. El acta es un registro: no compara archivos.",
+      "year": {
+        "label": "Año lectivo",
+        "placeholder": "Elija un año lectivo",
+        "loading": "Cargando los años lectivos.",
+        "failedTitle": "No se pudieron cargar los años lectivos",
+        "retry": "Reintentar",
+        "failedDescription": "Sin el año lectivo no se puede preparar el acta. Intente de nuevo; si el problema sigue, es posible que su cuenta no pueda ver la estructura académica.",
+        "emptyTitle": "Todavía no hay años lectivos",
+        "emptyDescription": "Cree el año lectivo en la estructura académica antes de firmar su acta."
+      },
+      "form": {
+        "label": "Formulario del acta de conciliación",
+        "referenceLabel": "Referencia del listado oficial",
+        "referenceHelp": "El número del documento del listado, por ejemplo «Oficio 123-2026»: letras, números, espacios y . , / # ° _ - con al menos un número, hasta {max} caracteres. No escriba nombres ni números de identidad: el acta no se puede corregir.",
+        "countLabel": "Total de matrículas del listado oficial",
+        "countHelp": "Número entero de 0 a 1 000 000, tal como lo declara el listado.",
+        "submit": "Firmar acta",
+        "signing": "Firmando el acta. No cierre esta pantalla.",
+        "signHelp": "Un acta firmada no se puede cambiar ni borrar. Si firma otra vez, se conservan ambas actas."
+      },
+      "signed": {
+        "title": "Acta firmada",
+        "body": "Quedó registrada el acta del año lectivo {year} con la referencia «{reference}»."
+      },
+      "preview": {
+        "heading": "Lo que dejó la migración",
+        "description": "Estos son los conteos que el servidor registrará al firmar. Se calculan de nuevo en ese momento. Los conteos de importación son de toda la institución; solo las matrículas activas son del año lectivo.",
+        "choose": "Elija un año lectivo para ver sus conteos.",
+        "failedTitle": "No se pudieron calcular los conteos del año lectivo",
+        "caption": "Registros creados y rechazados por tipo de importación",
+        "kind": "Tipo",
+        "created": "Creados",
+        "rejected": "Rechazados en la última aplicación",
+        "rejectedNote": "Rechazados es lo que la última aplicación de cada tipo dejó sin cargar.",
+        "active": "Matrículas activas del año lectivo",
+        "official": "Total del listado oficial",
+        "differenceHeading": "Diferencia con el listado oficial",
+        "differenceHint": "Escriba el total del listado oficial para ver la diferencia."
+      },
+      "difference": {
+        "more": "El sistema tiene {count, plural, one {# matrícula activa más} other {# matrículas activas más}} que el listado oficial.",
+        "fewer": "El sistema tiene {count, plural, one {# matrícula activa menos} other {# matrículas activas menos}} que el listado oficial.",
+        "same": "El sistema tiene las mismas matrículas activas que el listado oficial.",
+        "cellMore": "{count, number} más",
+        "cellFewer": "{count, number} menos",
+        "cellSame": "Coincide"
+      },
+      "history": {
+        "heading": "Actas firmadas",
+        "caption": "Actas de conciliación firmadas, de la más reciente a la más antigua",
+        "navigation": "Páginas de las actas firmadas",
+        "date": "Firmada",
+        "year": "Año lectivo",
+        "reference": "Referencia",
+        "official": "Total oficial",
+        "active": "Matrículas activas al firmar",
+        "difference": "Diferencia",
+        "unknownYear": "Año lectivo no disponible",
+        "loadFailed": "No se pudieron cargar las actas firmadas",
+        "emptyTitle": "Aún no hay actas firmadas",
+        "emptyDescription": "Cuando firme el acta de un año lectivo, quedará aquí con su fecha y sus conteos.",
+        "emptyAction": "Ir al formulario del acta"
+      },
+      "errors": {
+        "yearNotFound": "El año lectivo no existe o ya no está disponible. Elija otro año lectivo."
+      }
     }
   }
 }

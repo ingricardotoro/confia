@@ -799,6 +799,37 @@ export const MATRIX: readonly GateCombination[] = [
     expected: (page) => page.getByText("Ningún registro coincide con los filtros"),
   },
   {
+    route: IMPORTS,
+    state: "reconciliation-difference",
+    arrange: async (page) => {
+      await openImportsRoute(page);
+      await page.getByLabel(/^Referencia del listado oficial/).fill("Oficio 0123-2026");
+      await page.getByLabel(/^Total de matrículas del listado oficial/).fill("5");
+    },
+    expected: (page) => page.getByText(/^El sistema tiene .* que el listado oficial\.$/),
+  },
+  {
+    route: IMPORTS,
+    state: "reconciliation-form-errors",
+    arrange: async (page) => {
+      await openImportsRoute(page);
+      await page.getByRole("button", { name: "Firmar acta" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: /campos? con errores?/ }),
+  },
+  {
+    route: IMPORTS,
+    state: "reconciliation-signed",
+    preset: "imports-empty",
+    arrange: async (page) => {
+      await openImportsRoute(page);
+      await page.getByLabel(/^Referencia del listado oficial/).fill("Oficio 0123-2026");
+      await page.getByLabel(/^Total de matrículas del listado oficial/).fill("5");
+      await page.getByRole("button", { name: "Firmar acta" }).click();
+    },
+    expected: (page) => page.getByRole("table", { name: /Actas de conciliación firmadas/ }).getByText("Oficio 0123-2026"),
+  },
+  {
     route: YEARS,
     state: "empty",
     preset: "organization-empty",

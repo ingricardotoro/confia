@@ -1,7 +1,7 @@
-import type { ImportRunResponseOutput } from "@confia/contracts/admin";
+import type { ImportRunResponseOutput, SignReconciliationRequest } from "@confia/contracts/admin";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthorizedSend } from "../../shared/api/authorized-send.tsx";
-import { applyImport, listImportBatches, simulateImport } from "../../shared/api/import-operations.ts";
+import { applyImport, listImportBatches, listReconciliations, previewReconciliation, signReconciliation, simulateImport } from "../../shared/api/import-operations.ts";
 import type { PageParams } from "../../shared/api/resource-client.ts";
 import { enrollmentKeys } from "../enrollments/enrollments-keys.ts";
 import { guardianKeys } from "../guardians/guardians-keys.ts";
@@ -62,4 +62,38 @@ const AFFECTED: Readonly<Record<ImportKind, readonly (readonly unknown[])[]>> = 
 /** Creates what the valid rows describe. The registries it fills are read again afterwards, and so is the history. */
 export function useApplyImport(kind: ImportKind): Send {
   return useImportRun((token, file) => applyImport(kind, token, file), [importKeys.all, ...AFFECTED[kind]]);
+}
+
+/** The actas of the reconciliation, as the server pages them (newest first): the rows come back as they were served. */
+export function useReconciliationHistory(params: PageParams) {
+  const send = useAuthorizedSend();
+  return useQuery({
+    queryKey: importKeys.reconciliationList(params),
+    queryFn: () => send((token) => listReconciliations(token, params)),
+  });
+}
+
+/** What the acta of a year would hold now, counted by the server. Nothing is asked until a year is chosen. */
+export function useReconciliationPreview(academicYearId: string | undefined) {
+  const send = useAuthorizedSend();
+  return useQuery({
+    queryKey: importKeys.reconciliationPreview(academicYearId ?? ""),
+    queryFn: () => send((token) => previewReconciliation(token, academicYearId ?? "")),
+    enabled: academicYearId !== undefined,
+  });
+}
+
+/**
+ * Signs an acta. It moves no money and nothing is optimistic: the answer is the server's record. It never repeats by itself
+ * (a repeat would be a second acta, which the server keeps), so the form blocks a second send while one is in flight. Afterwards
+ * the actas and the previews are read again, because the history has a new row and the live counts of a year may have moved.
+ */
+export function useSignReconciliation() {
+  const send = useAuthorizedSend();
+  const queryClient = useQueryClient();
+  return useMutation({
+    retry: false,
+    mutationFn: (body: SignReconciliationRequest) => send((token) => signReconciliation(token, body)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: importKeys.reconciliations() }),
+  });
 }

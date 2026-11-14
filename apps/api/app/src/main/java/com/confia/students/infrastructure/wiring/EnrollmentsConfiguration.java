@@ -4,7 +4,9 @@ import com.confia.organization.application.directory.SectionDirectory;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.TransactionRunner;
 import com.confia.students.application.EnrollmentImport;
+import com.confia.students.application.EnrollmentCensusReader;
 import com.confia.students.application.EnrollmentRepository;
+import com.confia.students.application.directory.EnrollmentCensus;
 import com.confia.students.application.directory.StudentDirectory;
 import com.confia.students.application.importing.EnrollmentImportGateway;
 import com.confia.students.application.ManageEnrollments;
@@ -43,5 +45,11 @@ public class EnrollmentsConfiguration {
             SectionDirectory sections, EnrollmentRepository enrollments, ManageEnrollments manageEnrollments,
             Clock clock) {
         return new EnrollmentImport(transactionRunner, students, sections, enrollments, manageEnrollments, clock);
+    }
+
+    /** What {@code imports} reads to count the active enrollments of a year when it records a reconciliation. */
+    @Bean
+    EnrollmentCensus enrollmentCensus(EnrollmentRepository enrollments) {
+        return new EnrollmentCensusReader(enrollments);
     }
 }

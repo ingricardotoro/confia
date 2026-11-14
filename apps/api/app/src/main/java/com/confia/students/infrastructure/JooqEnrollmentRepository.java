@@ -134,6 +134,13 @@ public final class JooqEnrollmentRepository implements EnrollmentRepository {
     }
 
     @Override
+    public int countActiveInYear(InstitutionId institutionId, UUID academicYearId) {
+        return dsl.fetchCount(STUDENTS_ENROLLMENT, STUDENTS_ENROLLMENT.INSTITUTION_ID.eq(institutionId.value())
+                .and(STUDENTS_ENROLLMENT.ACADEMIC_YEAR_ID.eq(academicYearId))
+                .and(STUDENTS_ENROLLMENT.STATUS.eq(EnrollmentStatus.ACTIVE.name())));
+    }
+
+    @Override
     public boolean hasActiveInYear(InstitutionId institutionId, UUID studentId, UUID academicYearId) {
         return dsl.fetchExists(STUDENTS_ENROLLMENT, STUDENTS_ENROLLMENT.INSTITUTION_ID.eq(institutionId.value())
                 .and(STUDENTS_ENROLLMENT.STUDENT_ID.eq(studentId))

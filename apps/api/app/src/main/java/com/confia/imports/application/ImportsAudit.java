@@ -2,6 +2,7 @@ package com.confia.imports.application;
 
 import com.confia.imports.domain.ImportBatch;
 import com.confia.imports.domain.ImportKind;
+import com.confia.imports.domain.Reconciliation;
 import com.confia.shared.audit.AuditEntry;
 import com.confia.shared.audit.AuditJson;
 import com.confia.shared.security.AuthenticatedActor;
@@ -16,6 +17,7 @@ import java.util.UUID;
 final class ImportsAudit {
 
     static final String BATCH = "imports.batch";
+    static final String RECONCILIATION = "imports.reconciliation";
 
     private static final String ACTOR_KIND_STAFF = "staff";
     private static final String OUTCOME_SUCCESS = "success";
@@ -62,5 +64,26 @@ final class ImportsAudit {
                 .text("fileSha256", batch.fileSha256()).number("totalRows", batch.totalRows())
                 .number("validRows", batch.validRows()).number("rejectedRows", batch.rejectedRows())
                 .number("createdRows", batch.createdRows()).number("skippedRows", batch.skippedRows()).toJson();
+    }
+
+    /**
+     * The signing of a reconciliation: the year and the counts, nothing of a person. The reference the signer typed is
+     * not copied here (the identifier of the record leads to it): the audit trail is never corrected.
+     */
+    static AuditEntry reconciliationSigned(AuthenticatedActor actor, UUID requestId, Reconciliation record) {
+        String after = AuditJson.object().text("academicYearId", record.academicYearId().toString())
+                .number("officialEnrollmentCount", record.officialEnrollmentCount())
+                .number("enrollmentsActive", record.enrollmentsActive())
+                .number("studentsCreated", record.students().created())
+                .number("studentsRejected", record.students().rejected())
+                .number("guardiansCreated", record.guardians().created())
+                .number("guardiansRejected", record.guardians().rejected())
+                .number("guardianLinksCreated", record.guardianLinks().created())
+                .number("guardianLinksRejected", record.guardianLinks().rejected())
+                .number("enrollmentsCreated", record.enrollments().created())
+                .number("enrollmentsRejected", record.enrollments().rejected()).toJson();
+        return new AuditEntry(actor.institutionId(), actor.accountId(), ACTOR_KIND_STAFF,
+                actor.accountId().toString(), null, null, requestId, null, RECONCILIATION + ".signed",
+                RECONCILIATION, record.id().toString(), OUTCOME_SUCCESS, null, after, null, null);
     }
 }

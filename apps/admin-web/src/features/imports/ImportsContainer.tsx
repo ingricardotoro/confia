@@ -6,6 +6,7 @@ import type { SearchChange } from "../organization/search-change.ts";
 import { useListState } from "../organization/use-list-state.ts";
 import { ImportHistory } from "./components/ImportHistory.tsx";
 import { ImportWizard, type ImportPhase } from "./components/ImportWizard.tsx";
+import { ReconciliationContainer } from "./ReconciliationContainer.tsx";
 import { downloadText } from "./download.ts";
 import {
   REJECTIONS_FILE_NAME,
@@ -41,7 +42,7 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
   const [kind, setKind] = useState<ImportKind>("students");
   const simulate = useSimulateImport(kind);
   const apply = useApplyImport(kind);
-  const history = useImportHistory(toApiParams(search));
+  const history = useImportHistory(toApiParams({ page: search.page, pageSize: search.pageSize, kind: search.kind }));
   const [file, setFile] = useState<File | undefined>();
   const [phase, setPhase] = useState<ImportPhase>("idle");
   const [fileProblem, setFileProblem] = useState<FileProblem | "required" | undefined>();
@@ -57,7 +58,7 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
     search,
     onSearchChange,
     filtered: search.kind !== undefined,
-    cleared: { page: 1, pageSize: search.pageSize, kind: undefined },
+    cleared: { page: 1, pageSize: search.pageSize, kind: undefined, actsPage: search.actsPage },
     onCreate: () => {
       document.getElementById("import-file")?.focus();
     },
@@ -196,6 +197,7 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
         onApply={() => void onApply()}
         onReset={onReset}
       />
+      <ReconciliationContainer search={search} onSearchChange={onSearchChange} />
       <ImportHistory
         rows={historyState.rows}
         table={historyState.table}

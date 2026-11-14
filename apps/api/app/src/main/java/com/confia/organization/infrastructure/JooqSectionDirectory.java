@@ -99,6 +99,12 @@ public final class JooqSectionDirectory implements SectionDirectory {
     }
 
     @Override
+    public boolean academicYearExists(InstitutionId institutionId, UUID academicYearId) {
+        return dsl.fetchExists(ORGANIZATION_ACADEMIC_YEAR, ORGANIZATION_ACADEMIC_YEAR.INSTITUTION_ID
+                .eq(institutionId.value()).and(ORGANIZATION_ACADEMIC_YEAR.ID.eq(academicYearId)));
+    }
+
+    @Override
     public Optional<UUID> activeAcademicYearId(InstitutionId institutionId) {
         return dsl.select(ORGANIZATION_ACADEMIC_YEAR.ID).from(ORGANIZATION_ACADEMIC_YEAR)
                 .where(ORGANIZATION_ACADEMIC_YEAR.INSTITUTION_ID.eq(institutionId.value()))
