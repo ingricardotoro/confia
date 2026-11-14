@@ -1,4 +1,4 @@
--- Sixteenth migration (F1, deliverable 1; docs/cortes/organization-academic-structure.md). Creates the
+-- Eighteenth migration (F1, deliverable 1; docs/cortes/organization-academic-structure.md). Creates the
 -- academic structure of an institution: the school year, the modalities, the grades of a modality and
 -- the sections of a grade within a year. Every table carries institution_id, forced row-level
 -- security, is_active and timestamps. Nothing is ever deleted (no DELETE grant): a row is
