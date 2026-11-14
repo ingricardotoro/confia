@@ -1,0 +1,26 @@
+package com.confia.imports.application;
+
+import com.confia.imports.domain.ImportBatch;
+import com.confia.imports.domain.ImportKind;
+import com.confia.kernel.InstitutionId;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Output port of the batches of an institution. A batch is only inserted and read: it holds counts and the fingerprint
+ * of a file, and nothing is updated or deleted.
+ */
+public interface ImportBatchRepository {
+
+    void insert(InstitutionId institutionId, ImportBatch batch);
+
+    /** The newest simulation of this fingerprint by this account, if any. */
+    Optional<ImportBatch> findValidated(InstitutionId institutionId, UUID createdBy, ImportKind kind,
+            String fileSha256);
+
+    /** The newest batch of any status by this account, if any. */
+    Optional<ImportBatch> latestOf(InstitutionId institutionId, UUID createdBy, ImportKind kind);
+
+    /** The batches of the institution, newest first. */
+    Page<ImportBatch> list(InstitutionId institutionId, PageRequest request);
+}

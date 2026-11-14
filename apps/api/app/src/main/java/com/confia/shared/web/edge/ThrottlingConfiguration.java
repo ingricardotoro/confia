@@ -79,6 +79,18 @@ public class ThrottlingConfiguration {
         return properties.adminWriteAccount().policy();
     }
 
+    /** The values of the policy of the bulk imports per client address. */
+    @Bean
+    RateLimitPolicy adminImportRateLimitPolicy(RateLimitProperties properties) {
+        return properties.adminImport().policy();
+    }
+
+    /** The values of the policy of the bulk imports per authenticated account. */
+    @Bean
+    RateLimitPolicy adminImportAccountRateLimitPolicy(RateLimitProperties properties) {
+        return properties.adminImportAccount().policy();
+    }
+
     /** Reports a failure of the client of the request to the limiter of a policy. */
     @Bean
     RateLimitFailures rateLimitFailures(RateLimiterRegistry limiters) {

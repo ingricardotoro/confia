@@ -1,6 +1,6 @@
 import { reportUnknownProblem, stripQueryAndFragment, type UnknownProblemFinding } from "./report-unknown-problem.ts";
 
-/** The thirty codes the backend publishes today (docs/ui-ux/04, §9, its dated note, the academic structure, the students, the enrollments, the guardians and the guardian consents cuts). */
+/** The thirty-two codes the backend publishes today (docs/ui-ux/04, §9, its dated note, the academic structure, the students, the enrollments, the guardians, the guardian consents and the student import cuts). */
 export const KNOWN_PROBLEM_CODES = [
   "authentication-failed",
   "second-factor-invalid",
@@ -32,6 +32,8 @@ export const KNOWN_PROBLEM_CODES = [
   "invalid-responsibility-split",
   "guardian-not-active",
   "consent-channel-unavailable",
+  "import-not-simulated",
+  "import-file-changed",
 ] as const;
 
 export type ProblemCode = (typeof KNOWN_PROBLEM_CODES)[number];

@@ -24,7 +24,7 @@ function backendBody(code: string, extra: Record<string, unknown> = {}) {
 }
 
 describe("the known codes", () => {
-  it("AW46: lists the thirty codes of the specification", () => {
+  it("AW46: lists the thirty-two codes of the specification", () => {
     expect([...KNOWN_PROBLEM_CODES].sort()).toEqual(
       [
         "authentication-failed",
@@ -57,6 +57,8 @@ describe("the known codes", () => {
         "invalid-responsibility-split",
         "guardian-not-active",
         "consent-channel-unavailable",
+        "import-not-simulated",
+        "import-file-changed",
       ].sort(),
     );
   });

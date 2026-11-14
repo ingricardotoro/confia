@@ -9,7 +9,7 @@ import { PROBLEM_KEYS } from "./problem-keys.ts";
 const CATALOG_KEYS = flattenCatalogKeys(admin);
 
 describe("PROBLEM_KEYS", () => {
-  it("names exactly the thirty codes and the unknown case", () => {
+  it("names exactly the thirty-two codes and the unknown case", () => {
     expect(Object.keys(PROBLEM_KEYS).sort()).toEqual([...KNOWN_PROBLEM_CODES, "unknown"].sort());
   });
 
@@ -48,6 +48,8 @@ describe("PROBLEM_KEYS", () => {
     ["invalid-responsibility-split", "problem.invalidResponsibilitySplit"],
     ["guardian-not-active", "problem.guardianNotActive"],
     ["consent-channel-unavailable", "problem.consentChannelUnavailable"],
+    ["import-not-simulated", "problem.importNotSimulated"],
+    ["import-file-changed", "problem.importFileChanged"],
   ] as const)("maps %s to %s", (code, key) => {
     expect(PROBLEM_KEYS[code]).toBe(key);
   });

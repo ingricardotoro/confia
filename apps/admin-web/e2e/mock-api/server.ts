@@ -20,6 +20,7 @@ import { ORGANIZATION_BASE } from "./organization-model.ts";
 import { ENROLLMENTS_BASE } from "./enrollments-model.ts";
 import { STUDENTS_BASE } from "./students-model.ts";
 import { GUARDIANS_BASE } from "./guardians-model.ts";
+import { IMPORTS_BASE } from "./imports-model.ts";
 import { base32Encode } from "../support/totp.ts";
 import { parseCookieHeader, type ModelResponse } from "./session-model.ts";
 
@@ -33,6 +34,8 @@ import { parseCookieHeader, type ModelResponse } from "./session-model.ts";
 export const SCENARIO_HEADER = "x-confia-mock-scenario";
 export const PAGE_ORIGIN = "http://localhost:5173";
 const MAX_BODY_BYTES = 64 * 1024;
+/** A file of the imports is read whole to be told apart by its content: the simulator takes a little more than the 5 MB it enforces. */
+const MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
 const LOCAL_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const LOOPBACK: ReadonlySet<string> = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 
@@ -75,6 +78,8 @@ const SUCCESS_SCHEMAS: Readonly<Record<Operation, Schema | undefined>> = {
   enrollments: undefined,
   // The same for the guardians (guardians-model.ts).
   guardians: undefined,
+  // The same for the student imports (imports-model.ts).
+  imports: undefined,
 };
 
 /** The fields of a response that break the contract; empty when it meets it. The `instance` of an error is not checked (I306). */
@@ -121,6 +126,20 @@ function readBody(req: IncomingMessage): Promise<unknown> {
         resolve(undefined);
       }
     });
+    req.on("error", () => { resolve(undefined); });
+  });
+}
+
+/** The body as it came, up to a limit, for the routes that take a file. A larger one is not kept: the model answers it as a file that is too large. */
+function readRaw(req: IncomingMessage): Promise<Buffer | undefined> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size <= MAX_UPLOAD_BYTES) chunks.push(chunk);
+    });
+    req.on("end", () => { resolve(size === 0 ? undefined : Buffer.concat(chunks)); });
     req.on("error", () => { resolve(undefined); });
   });
 }
@@ -205,6 +224,15 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
       const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
       const answer = scenario.guardians.handle({ method, path, query: url.searchParams, body });
       if (answer !== undefined) { deliver(res, scenario, "guardians", answer); return; }
+    }
+    // The student imports: the two writes carry a file as multipart, which is read raw.
+    if (path === IMPORTS_BASE || path.startsWith(`${IMPORTS_BASE}/`)) {
+      const session = scenario.model.currentSession(bearerOf(req));
+      if (session.status !== 200) { deliver(res, scenario, "imports", session); return; }
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body = method === "POST" ? await readRaw(req) : undefined;
+      const answer = scenario.imports.handle({ method, path, query: url.searchParams, contentType: header(req, "content-type"), body });
+      if (answer !== undefined) { deliver(res, scenario, "imports", answer); return; }
     }
     if (path === STUDENTS_BASE || path.startsWith(`${STUDENTS_BASE}/`)) {
       // Every operation of the registry is a bearer route too: no access token, no answer.

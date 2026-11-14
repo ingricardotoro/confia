@@ -25,7 +25,7 @@ describe("the signed in shell", () => {
     openAt("/");
 
     const nav = await screen.findByRole("navigation", { name: "Navegación principal" }, TIMEOUT);
-    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual(["Inicio", "Estructura académica", "Estudiantes", "Matrículas", "Encargados"]);
+    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual(["Inicio", "Estructura académica", "Estudiantes", "Matrículas", "Encargados", "Importaciones"]);
     expect(within(screen.getByRole("banner")).getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
     expect(within(screen.getByRole("main")).getByRole("heading", { level: 1, name: "Sesión iniciada." })).toBeVisible();
     expect(screen.getAllByRole("main")).toHaveLength(1);

@@ -145,7 +145,14 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // registers them (docs/cortes/guardians-registry.md). Administrative only, each exact.
                     "com.confia.guardians.infrastructure", "com.confia.guardians.infrastructure.wiring",
                     "com.confia.guardians.application", "com.confia.guardians.web",
-                    "com.confia.guardians.web.wiring"),
+                    "com.confia.guardians.web.wiring",
+                    // The imports module as the packages its beans come from: the jOOQ adapter of the batches, the
+                    // named-interface package of its configuration, its use case, its controller and the
+                    // named-interface package of the configuration that registers it
+                    // (docs/cortes/imports-students.md). Administrative only, each exact.
+                    "com.confia.imports.infrastructure", "com.confia.imports.infrastructure.wiring",
+                    "com.confia.imports.application", "com.confia.imports.web",
+                    "com.confia.imports.web.wiring"),
             Map.of("com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON));
@@ -178,6 +185,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                             + "subdomain (ADR-0003)",
                     "com.confia.students", ADMIN_MODULE,
                     "com.confia.guardians", ADMIN_MODULE,
+                    "com.confia.imports", ADMIN_MODULE,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON,
                     TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
                     CSRF_PACKAGE, CSRF_REASON,
@@ -232,6 +240,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.organization", STAFF_INSTITUTION,
                     "com.confia.students", ADMIN_MODULE,
                     "com.confia.guardians", ADMIN_MODULE,
+                    "com.confia.imports", ADMIN_MODULE,
                     "com.confia.shared.observability.health",
                     "the worker serves no route; its health is a heartbeat file (WE100)"));
 

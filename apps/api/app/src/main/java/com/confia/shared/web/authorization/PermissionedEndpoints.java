@@ -34,7 +34,9 @@ public final class PermissionedEndpoints {
      * enrollment {@code students:create} and the transfer and the exit {@code students:update}, and the six routes of
      * the guardians: the reads need {@code guardians:read}, the creation {@code guardians:create} and the edit and the
      * replacement of the guardians of a student {@code guardians:update}, and the two routes of the consent of a
-     * guardian for communications: the read needs {@code guardians:read} and the recording {@code guardians:update}. A route of a later
+     * guardian for communications: the read needs {@code guardians:read} and the recording {@code guardians:update},
+     * and the three routes of the student import: the simulation and the application need {@code students:create}
+     * and the history of batches {@code students:read}. A route of a later
      * change is added here, in the same commit as its controller.
      */
     public static PermissionedEndpoints forAdmin() {
@@ -83,6 +85,11 @@ public final class PermissionedEndpoints {
                 Permission.GUARDIANS_READ));
         endpoints.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/students/{studentId}/guardians",
                 Permission.GUARDIANS_UPDATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/imports/students/simulate",
+                Permission.STUDENTS_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/imports/students/apply",
+                Permission.STUDENTS_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/imports", Permission.STUDENTS_READ));
         return new PermissionedEndpoints(endpoints);
     }
 

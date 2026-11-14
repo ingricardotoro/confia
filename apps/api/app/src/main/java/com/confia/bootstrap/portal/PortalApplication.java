@@ -53,6 +53,7 @@ import org.springframework.context.annotation.Import;
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {UserDetailsServiceAutoConfiguration.class,
         ErrorMvcAutoConfiguration.class, WebMvcHealthEndpointExtensionAutoConfiguration.class}, excludeName = {
+        "org.springframework.boot.servlet.autoconfigure.MultipartAutoConfiguration",
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration",
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerMetricsAutoConfiguration",
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerActuatorAutoConfiguration"})

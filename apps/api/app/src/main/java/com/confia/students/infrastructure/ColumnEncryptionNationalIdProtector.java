@@ -4,6 +4,7 @@ import com.confia.kernel.AeadIntegrityException;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.crypto.BlindIndexService;
 import com.confia.shared.crypto.ColumnEncryptionService;
+import com.confia.students.application.NationalIdIndexes;
 import com.confia.students.application.NationalIdProtector;
 import com.confia.students.application.NationalIdReindexer;
 import com.confia.students.application.ProtectedNationalId;
@@ -22,7 +23,7 @@ import java.util.UUID;
  * <p>It must run inside the transaction of the use case: the first encryption of an institution creates
  * its data-encryption key. Nothing here is ever logged.
  */
-public final class ColumnEncryptionNationalIdProtector implements NationalIdProtector, NationalIdReindexer {
+public final class ColumnEncryptionNationalIdProtector implements NationalIdProtector, NationalIdReindexer, NationalIdIndexes {
 
     static final String TABLE = "students_student";
     static final String COLUMN = "national_id_encrypted";
@@ -42,6 +43,11 @@ public final class ColumnEncryptionNationalIdProtector implements NationalIdProt
                 nationalId.normalized().getBytes(StandardCharsets.UTF_8));
         List<String> candidates = blindIndexes.candidates(BLIND_INDEX_PURPOSE, institutionId, nationalId.normalized());
         return new ProtectedNationalId(encrypted, candidates.getFirst(), candidates);
+    }
+
+    @Override
+    public List<String> lookupIndexes(InstitutionId institutionId, NationalId nationalId) {
+        return blindIndexes.candidates(BLIND_INDEX_PURPOSE, institutionId, nationalId.normalized());
     }
 
     @Override

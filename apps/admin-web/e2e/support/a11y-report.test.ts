@@ -204,6 +204,25 @@ describe("the states of the guardians registry", () => {
   });
 });
 
+describe("the states of the imports screen", () => {
+  const imports = MATRIX.filter((combination) => combination.route === "/imports");
+
+  it("holds the ready screen, the file error, the simulation with rejections, the confirmation, the result, the file failure, the empty and the load-error states, each once", () => {
+    expect(imports.map((combination) => [combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["ready", undefined, undefined],
+      ["file-error", undefined, undefined],
+      ["simulated-with-rejections", undefined, undefined],
+      ["dialog-apply", undefined, true],
+      ["result", undefined, undefined],
+      ["file-failure", undefined, undefined],
+      ["empty", "imports-empty", undefined],
+      ["load-error", "imports-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...imports])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+});
+
 describe("the verdict [BX75]", () => {
   it("names route, state, theme, rule and impact of every blocking violation", () => {
     expect(() => {
