@@ -147,6 +147,15 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
    > (`CLAUDE.md`, reglas 11 y 13). Ningún endpoint de identidad usa el mecanismo, y la regla de
    > ArchUnit W5 (`IdempotencyNotInIdentityTest`) rompe la construcción si alguno lo usa. El texto
    > original se conserva como histórico.
+   >
+   > **Nota fechada 2026-11-09 (cambio `transactional-email-adapter`): división del cambio 14.** El propietario
+   > partió el cambio 14 en **14a, `transactional-email-adapter`**, que entrega el adaptador de envío del
+   > enlace (pendiente *b*, primera mitad) con el módulo `notifications` mínimo en el trabajador, y **14b,
+   > `account-security-notices`**, dueño del aviso al titular tras el restablecimiento con IP y momento
+   > (pendiente *b*, segunda mitad), del aviso de códigos de recuperación de MFA bajos y del aviso por
+   > reutilización de refresco detectada. 14b depende de 14a y, para la IP, de `password-recovery-endpoints`.
+   > Rebotes, supresión, baja, correo HTML, plantillas en base de datos y purga de la bitácora de envío siguen
+   > en F6. El texto original se conserva.
 4. **Matriz de autorización** documentada y verificada por pruebas: qué rol puede hacer qué operación (brecha A7).
 5. Bitácora de auditoría de solo inserción, encadenada por hash, sin permiso de actualización ni borrado para el rol de aplicación (brecha B6).
 6. Infraestructura de idempotencia: marcador con clave primaria natural, espera acotada
@@ -302,7 +311,21 @@ técnica en el módulo financiero, que es exactamente donde no se puede pagar.
       declarada rompe la construcción, y la integración continua adjunta el documento generado a
       cada ejecución como artefacto. `OpenApiExposureByProfileTest` demuestra que el documento y
       Swagger UI solo responden con los perfiles `local` y `preprod`.
-- [ ] La verificación de accesibilidad no reporta violaciones críticas en las pantallas existentes.
+- [x] La verificación de accesibilidad no reporta violaciones críticas en las pantallas existentes.
+      **Cerrado; nota fechada 2026-11-09 (cambios `admin-web-foundations-and-session` y
+      `admin-web-staff-sign-in`, 13b-1, PR 9 `access-journeys-and-criterion-8`).** El cambio 13b se dividió
+      en 13b-1 y 13b-2. 13b-1 entrega las fundaciones de `apps/admin-web`, la sesión y las tres pantallas de
+      acceso del personal (inicio de sesión, verificación en dos pasos e inscripción obligatoria), en dos
+      cambios: `admin-web-foundations-and-session` y `admin-web-staff-sign-in`. 13b-2 entrega el shell, la
+      vida completa de la sesión y el aviso de inactividad. La semilla de datos y CORS salen de 13b: no
+      forman parte de 13b-1 ni de 13b-2 y `apps/api` no cambió. La puerta de accesibilidad con axe-core
+      (`e2e/specs/a11y/gate.e2e.ts`, `pnpm --filter @confia/admin-web test:e2e`) corrió en verde sobre las
+      cinco pantallas, inicio de sesión, verificación, inscripción, arranque y página autenticada: 22 estados
+      en los dos temas, 44 evaluaciones sin violaciones bloqueantes. Los recorridos de Playwright (los siete
+      recorridos de acceso, con teclado y con centinelas) corren contra una API simulada (`e2e/mock-api/`):
+      no prueban la pila real. La prueba contra la pila real es del cambio 11, brecha fechada 2026-11-04
+      que usa la cuenta de personal que crea el cambio 8b. Revertir la puerta o una pantalla evaluada
+      desmarca este criterio, y el commit de reversión lo explica con una nota fechada.
 
 **Riesgos:** sobredimensionar la infraestructura y consumir semanas en configuración que no
 entrega valor visible. Mitigación: la infraestructura de F0 es la mínima que soporta un sistema

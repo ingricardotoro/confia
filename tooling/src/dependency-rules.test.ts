@@ -25,6 +25,8 @@ const RULES = [
   "admin-presentation-is-pure",
   "admin-shared-never-imports-features",
   "admin-token-store-is-private",
+  "admin-session-lifecycle-planner-is-pure",
+  "admin-session-lifecycle-is-private",
 ] as const;
 
 // design-system-foundations-and-a11y, design.md decision 10 (task 6.3): each layer rule of packages/ui
@@ -54,6 +56,9 @@ const APP_VIOLATIONS = [
   ["D3", "admin-token-store-is-private", "features/billing/reads-token-store.ts"],
   // admin-web-staff-sign-in, design.md E2 (task 1.1): the enrollment draft is as private as the token store.
   ["E2", "admin-token-store-is-private", "features/identity/enrollment/imports-enrollment-draft.ts"],
+  // admin-web-shell-and-session-lifecycle, design.md H16 (task 1.5): the planner is pure and the lifecycle folder is private.
+  ["H16", "admin-session-lifecycle-planner-is-pure", "features/identity/session/lifecycle/planner-imports-react.ts"],
+  ["H16", "admin-session-lifecycle-is-private", "features/shell/imports-lifecycle-internals.ts"],
 ] as const;
 const APP_ACCEPTED = [
   "uses-ui-public-entry.ts",
@@ -166,6 +171,29 @@ describe("the frontend dependency rules", () => {
       expect(() => {
         assertNotEmpty("(^|/)apps/admin-web/src/presentation/");
       }).toThrow("matches no real file");
+    });
+  });
+
+  // admin-web-shell-and-session-lifecycle, design.md H16 (task 1.5). The cruise keeps files of the repository
+  // only, so `import "react"` in the real planner would reach no rule; its source is read instead. The set
+  // is declared non-empty (ADR-0018): both files exist, and each one has to be read.
+  describe("the real planner and policy of the session lifecycle", () => {
+    const lifecycle = "apps/admin-web/src/features/identity/session/lifecycle";
+    const specifiersOf = (file: string): string[] =>
+      [...readFileSync(join(repositoryRoot, lifecycle, file), "utf8").matchAll(/(?:from|import)\s+"([^"]+)"/g)].map(
+        (match) => match[1] ?? "",
+      );
+
+    it.each(["planner.ts", "policy.ts"])("H16: %s imports only files of its own folder", (file) => {
+      const source = readFileSync(join(repositoryRoot, lifecycle, file), "utf8");
+      const specifiers = specifiersOf(file);
+
+      expect(source.length).toBeGreaterThan(0);
+      expect(specifiers.filter((specifier) => !specifier.startsWith("./"))).toEqual([]);
+    });
+
+    it("H16: the reader finds a package import when there is one, so an empty answer means something", () => {
+      expect(specifiersOf("planner.test.ts")).toContain("vitest");
     });
   });
 

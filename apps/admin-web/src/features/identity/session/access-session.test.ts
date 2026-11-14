@@ -314,6 +314,28 @@ describe("signing in and the second factor", () => {
     expect(session.getEnrollment()).toBeUndefined();
   });
 
+  it("does not keep a rejected start: the person's retry sends the next request", async () => {
+    route("post", SESSIONS, secondFactorEnrollmentRequired());
+    route("post", ENROLLMENTS, enrollment());
+    let calls = 0;
+    const flaky = {
+      ...api,
+      // The wrapper returns results and never throws; this stands for a bug or a stub that does.
+      enrollSecondFactor: (token: string) => {
+        calls += 1;
+        return calls === 1 ? Promise.reject(new Error("unexpected")) : api.enrollSecondFactor(token);
+      },
+    };
+    const session = createAccessSession({ api: flaky, locks: createFakeLocks(), now: () => NOW, readCsrf: () => "csrf-A" });
+    await session.signIn(CREDENTIALS);
+
+    await expect(session.startEnrollment()).resolves.toMatchObject({ kind: "failed" });
+    await expect(session.startEnrollment()).resolves.toEqual({ kind: "ready" });
+
+    expect(calls).toBe(2);
+    expect(session.getEnrollment()).toMatchObject({ step: "secret" });
+  });
+
   it("discards the restricted token and arrives at the sign in page with the notice", async () => {
     route("post", SESSIONS, secondFactorRequired());
     const session = build();

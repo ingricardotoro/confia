@@ -44,6 +44,19 @@ class BootstrapEntryPointRulesTest {
                         + "(ADR-0024)");
     }
 
+
+    @Test
+    void productionHasExactlyOneSubPackagePerProcessIncludingMigrate() {
+        java.util.Set<String> subPackages = new java.util.TreeSet<>();
+        productionClasses().stream()
+                .map(javaClass -> javaClass.getPackageName())
+                .filter(name -> name.startsWith(PRODUCTION_ROOT + "."))
+                .forEach(name -> subPackages.add(name.substring(PRODUCTION_ROOT.length() + 1)
+                        .split("[.]")[0]));
+
+        org.assertj.core.api.Assertions.assertThat(subPackages)
+                .containsExactly("admin", "migrate", "portal", "worker");
+    }
     @Test
     void productionEntryPointsDoNotDependOnEachOther() {
         entryPointsDoNotDependOnEachOther(PRODUCTION_ROOT).check(productionClasses());

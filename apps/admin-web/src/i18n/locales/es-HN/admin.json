@@ -20,7 +20,27 @@
     "waiting": "Verificando el código. Esto puede tardar hasta 30 segundos."
   },
   "enrollment": {
-    "title": "Configure su verificación en dos pasos"
+    "title": "Configure su verificación en dos pasos",
+    "loading": "Preparando su verificación en dos pasos.",
+    "failed": "No se pudo preparar la verificación en dos pasos.",
+    "secret": {
+      "title": "Escanee el código QR",
+      "intro": "Escanee el código con su aplicación de autenticación o escriba la clave manualmente."
+    },
+    "codes": {
+      "title": "Guarde sus códigos de recuperación",
+      "intro": "Cada código sirve una sola vez si pierde acceso a su aplicación. No se volverán a mostrar.",
+      "confirm": "He guardado mis códigos de recuperación",
+      "confirmRequired": "Confirme que guardó sus códigos de recuperación para continuar."
+    },
+    "firstCode": {
+      "title": "Escriba el primer código",
+      "submit": "Activar",
+      "reviewSecret": "Ver de nuevo el código QR"
+    },
+    "qrLabel": "Código QR para su aplicación de autenticación",
+    "manualKey": "Clave para escribir manualmente",
+    "continue": "Continuar"
   },
   "notice": {
     "sessionExpired": "Su sesión se cerró por seguridad. Vuelva a iniciar sesión.",

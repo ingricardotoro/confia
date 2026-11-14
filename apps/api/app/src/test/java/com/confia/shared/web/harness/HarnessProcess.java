@@ -91,6 +91,9 @@ public final class HarnessProcess implements AutoCloseable {
         return java.util.Base64.getEncoder().encodeToString(key);
     }
 
+    /** The members of the readiness group; the harness keeps only the state of the application. */
+    private static final String READINESS_GROUP_PROPERTY = "management.endpoint.health.group.readiness.include";
+
     /** The one origin the harness allows unless a test sets {@code confia.web.allowed-origins}. */
     public static final String ALLOWED_ORIGIN = "https://admin.colegio.edu.hn";
 
@@ -106,6 +109,12 @@ public final class HarnessProcess implements AutoCloseable {
         if (Arrays.stream(all).noneMatch(p -> p.startsWith(ALLOWED_ORIGINS_PROPERTY + "="))) {
             all = Arrays.copyOf(all, all.length + 1);
             all[all.length - 1] = ALLOWED_ORIGINS_PROPERTY + "=" + ALLOWED_ORIGIN;
+        }
+        if (Arrays.stream(all).noneMatch(p -> p.startsWith(READINESS_GROUP_PROPERTY + "="))) {
+            // The harness has no DataSource, so the "db" contributor of the production readiness group
+            // does not exist and Actuator would refuse to start on the dangling group member.
+            all = Arrays.copyOf(all, all.length + 1);
+            all[all.length - 1] = READINESS_GROUP_PROPERTY + "=readinessState";
         }
         return all;
     }

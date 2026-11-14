@@ -257,13 +257,7 @@ describe("SignInContainer: the arrival notices", () => {
       route("post", ENROLLMENTS, problem("mfa-already-enrolled", 409));
       const { user, ...app } = await open();
       await fillAndSubmit(user, "ana@colegio.edu.hn", crypto.randomUUID());
-      await screen.findByRole("heading", { level: 1, name: "Configure su verificación en dos pasos" }, TIMEOUT);
-      await act(async () => {
-        // The enrollment screen of a later task does this when the server says the account is enrolled (SS86).
-        const outcome = await app.session.startEnrollment();
-        if (outcome.kind === "failed") app.session.discardSecondFactor("second-factor-already-enrolled");
-      });
-      await app.router.navigate({ to: "/iniciar-sesion" });
+      // The enrollment screen asks for the secret, is told that the account is enrolled and leads back here (SS86).
       return app;
     }
     const path = reason === "second-factor-interrupted" ? "/iniciar-sesion/verificacion" : "/iniciar-sesion/inscripcion";
