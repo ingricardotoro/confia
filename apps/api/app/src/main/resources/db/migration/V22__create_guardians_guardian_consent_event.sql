@@ -1,4 +1,4 @@
--- Twentieth migration (F1, deliverable 5; docs/cortes/guardians-consent.md, docs/08-datos-privacidad-y-retencion.md
+-- Twenty-second migration (F1, deliverable 5; docs/cortes/guardians-consent.md, docs/08-datos-privacidad-y-retencion.md
 -- section 8). Creates the event log of the consent of a guardian to receive communications, per channel and per
 -- purpose, with its evidence.
 --
