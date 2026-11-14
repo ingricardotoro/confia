@@ -1,5 +1,6 @@
 import { render, type RenderResult } from "@testing-library/react";
 import { createMemoryHistory } from "@tanstack/react-router";
+import { StrictMode } from "react";
 import { App } from "../app/App.tsx";
 import { AppProviders } from "../app/AppProviders.tsx";
 import { createQueryClient } from "../app/query-client.ts";
@@ -31,18 +32,21 @@ export interface RenderAppOptions extends TestSessionOptions {
   readonly path?: string;
   /** Defaults to a new session built from the same options. */
   readonly session?: AccessSession;
+  /** Wraps the app in StrictMode, which mounts every effect twice in development (SS75). */
+  readonly strict?: boolean;
 }
 
 /** The whole app, as `main.tsx` mounts it, over a memory history at `path`. */
-export function renderApp({ path = "/", session, ...sessionOptions }: RenderAppOptions = {}): RenderedApp {
+export function renderApp({ path = "/", session, strict = false, ...sessionOptions }: RenderAppOptions = {}): RenderedApp {
   const readCsrf = sessionOptions.readCsrf ?? (() => undefined);
   const held = session ?? createTestSession(sessionOptions);
   const queryClient = createQueryClient();
   const router = createAppRouter({ session: held, history: createMemoryHistory({ initialEntries: [path] }) });
-  const rendered = render(
+  const tree = (
     <AppProviders queryClient={queryClient} i18n={createAdminI18n()}>
       <App router={router} session={held} readCsrf={readCsrf} />
-    </AppProviders>,
+    </AppProviders>
   );
+  const rendered = render(strict ? <StrictMode>{tree}</StrictMode> : tree);
   return Object.assign(rendered, { router, session: held, queryClient });
 }
