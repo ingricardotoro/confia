@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
 import { importBatch, importBatchPage, importRun, problem, type ContractResponse } from "../../src/test/contract-responses.ts";
+import { acta, actaPage, jsonReply, preview } from "../../src/shared/api/reconciliation-fixtures.ts";
+import type { ReconciliationResponseOutput } from "@confia/contracts/admin";
+import { FIRST_YEAR, LAST_YEAR, yearId } from "./organization-seed.ts";
 import type { ModelResponse } from "./session-model.ts";
 
 /**
@@ -31,6 +34,14 @@ const DEFAULT_SIZE = 50;
 const MAX_SIZE = 100;
 const MAX_REJECTIONS = 200;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
+/** The limits of an acta, as the contract states them. */
+const MAX_REFERENCE = 100;
+const MAX_OFFICIAL_COUNT = 1_000_000;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** The account that signs every acta of the simulation; the screen never shows it. */
+export const SIGNER_ID = "99999999-9999-4999-8999-999999999999";
+const RECONCILIATIONS_PATH = "/api/v1/imports/reconciliations";
+const PREVIEW_PATH = `${RECONCILIATIONS_PATH}/preview`;
 export type ImportRoute = "students" | "guardians" | "guardian-links" | "enrollments";
 interface KindSpec {
   readonly batchKind: "STUDENTS" | "GUARDIANS" | "GUARDIAN_LINKS" | "ENROLLMENTS";
@@ -141,6 +152,8 @@ export interface ImportsRequest {
 export interface ImportsModel {
   /** The answer to a request of the imports, or `undefined` when the path is not one of the three operations. */
   handle(request: ImportsRequest): ModelResponse | undefined;
+  /** The actas of the reconciliation the scenario holds, oldest first, for a unit test; never the page. */
+  actas(): readonly ReconciliationResponseOutput[];
   /** What the scenario holds now, for a unit test; never the page. */
   batches(): readonly BatchRow[];
 }
@@ -620,10 +633,100 @@ export function createImportsModel(options: ImportsOptions, now: () => Date = ()
     return runOf(batch, rejections, truncated);
   }
 
+  // --- The acta of the reconciliation (imports-reconciliation cut) ---------------------------------------------------------
+  const actas: ReconciliationResponseOutput[] = [];
+  const yearOfId = new Map<string, number>();
+  for (let calendarYear = FIRST_YEAR; calendarYear <= LAST_YEAR; calendarYear += 1) yearOfId.set(yearId(calendarYear), calendarYear);
+
+  /** What the imports left, counted as the server counts it: created summed over every applied batch of the kind, rejected from the newest applied one. */
+  function countsOf(batchKind: KindSpec["batchKind"]): { created: number; rejected: number } {
+    const applied = batches.filter((batch) => batch.kind === batchKind && batch.status === "APPLIED");
+    return { created: applied.reduce((sum, batch) => sum + batch.createdRows, 0), rejected: applied.at(-1)?.rejectedRows ?? 0 };
+  }
+
+  /** The active enrollments of a calendar year the scenario holds (this scenario's imports; the registries of the other models are not read). */
+  const activeEnrollmentsOf = (calendarYear: number): number => [...enrolled.keys()].filter((key) => key.endsWith(`|${String(calendarYear)}`)).length;
+
+  function snapshotOf(calendarYear: number) {
+    return {
+      enrollmentsActive: activeEnrollmentsOf(calendarYear),
+      students: countsOf("STUDENTS"),
+      guardians: countsOf("GUARDIANS"),
+      guardianLinks: countsOf("GUARDIAN_LINKS"),
+      enrollments: countsOf("ENROLLMENTS"),
+    };
+  }
+
+  const answer = (body: object, status = 200): ModelResponse => wrap(jsonReply(body, status));
+
+  function previewOf(query: URLSearchParams): ModelResponse {
+    const academicYearId = query.get("academicYearId");
+    if (academicYearId === null || !UUID.test(academicYearId)) return fileProblem([{ field: "academicYearId", reason: "invalid-format" }]);
+    const calendarYear = yearOfId.get(academicYearId);
+    if (calendarYear === undefined) return failure("resource-not-found", 404);
+    return answer(preview({ academicYearId, ...snapshotOf(calendarYear) }));
+  }
+
+  function actasOf(query: URLSearchParams): ModelResponse {
+    const page = Number(query.get("page") ?? "0");
+    const size = Number(query.get("size") ?? String(DEFAULT_SIZE));
+    if (!Number.isInteger(page) || page < 0 || !Number.isInteger(size) || size < 1 || size > MAX_SIZE) return fileProblem([]);
+    const newestFirst = [...actas].reverse();
+    return answer(actaPage(newestFirst.slice(page * size, (page + 1) * size), { page, size, total: newestFirst.length }));
+  }
+
+  /** The reasons a body is refused with, named as the backend names them: one error per field, in the order of the request. */
+  function reconciliationErrors(body: Record<string, unknown>): { field: string; reason: string }[] {
+    const errors: { field: string; reason: string }[] = [];
+    const { academicYearId, officialReference, officialEnrollmentCount } = body;
+    if (typeof academicYearId !== "string" || !UUID.test(academicYearId)) errors.push({ field: "academicYearId", reason: academicYearId === undefined ? "not-null" : "invalid-format" });
+    if (typeof officialReference !== "string" || officialReference.trim() === "") errors.push({ field: "officialReference", reason: "not-blank" });
+    else if (officialReference.length > MAX_REFERENCE) errors.push({ field: "officialReference", reason: "size" });
+    else if (/\p{Cc}/u.test(officialReference)) errors.push({ field: "officialReference", reason: "pattern" });
+    if (typeof officialEnrollmentCount !== "number" || !Number.isInteger(officialEnrollmentCount)) errors.push({ field: "officialEnrollmentCount", reason: "not-null" });
+    else if (officialEnrollmentCount < 0) errors.push({ field: "officialEnrollmentCount", reason: "min" });
+    else if (officialEnrollmentCount > MAX_OFFICIAL_COUNT) errors.push({ field: "officialEnrollmentCount", reason: "max" });
+    return errors;
+  }
+
+  function sign(request: ImportsRequest): ModelResponse {
+    if (options.writes === "forbidden") return failure("forbidden", 403);
+    if (!/^application\/json/i.test(request.contentType ?? "")) return failure("unsupported-media-type", 415);
+    let body: unknown;
+    try {
+      body = JSON.parse(request.body?.toString("utf8") ?? "");
+    } catch {
+      return fileProblem([]);
+    }
+    if (typeof body !== "object" || body === null || Array.isArray(body)) return fileProblem([]);
+    const errors = reconciliationErrors(body as Record<string, unknown>);
+    if (errors.length > 0) return fileProblem(errors);
+    const { academicYearId, officialReference, officialEnrollmentCount } = body as { academicYearId: string; officialReference: string; officialEnrollmentCount: number };
+    const calendarYear = yearOfId.get(academicYearId);
+    if (calendarYear === undefined) return failure("resource-not-found", 404);
+    const snapshot = snapshotOf(calendarYear);
+    const record = acta({
+      id: nextId(),
+      academicYearId,
+      officialReference: officialReference.trim(),
+      officialEnrollmentCount,
+      difference: snapshot.enrollmentsActive - officialEnrollmentCount,
+      signedBy: SIGNER_ID,
+      signedAt: now().toISOString(),
+      ...snapshot,
+    });
+    actas.push(record);
+    return answer(record, 201);
+  }
+
   return {
     batches: () => batches,
+    actas: () => actas,
     handle(request) {
       if (request.method === "GET" && request.path === IMPORTS_BASE) return failingRead() ?? list(request.query);
+      if (request.method === "GET" && request.path === PREVIEW_PATH) return previewOf(request.query);
+      if (request.method === "GET" && request.path === RECONCILIATIONS_PATH) return actasOf(request.query);
+      if (request.method === "POST" && request.path === RECONCILIATIONS_PATH) return sign(request);
       const match = request.method === "POST" ? ROUTE_PATH.exec(request.path) : null;
       if (match !== null) return write(match[1] as ImportRoute, match[2] as "simulate" | "apply", request);
       return undefined;

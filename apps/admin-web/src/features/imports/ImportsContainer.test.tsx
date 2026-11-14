@@ -1,7 +1,8 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { importBatch, importBatchPage, importRun, problem } from "../../test/contract-responses.ts";
+import { academicYear, importBatch, importBatchPage, importRun, organizationPage, problem } from "../../test/contract-responses.ts";
+import { YEAR_ID, actaPage, jsonReply, preview } from "../../shared/api/reconciliation-fixtures.ts";
 import { installMswServer, requests, route } from "../../test/msw-server.ts";
 import { renderFeature } from "../../test/render-feature.tsx";
 import { importsFeature } from "./feature.tsx";
@@ -27,8 +28,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** The lists the section of the acta of the reconciliation loads next to the wizard; its own states are tested in its own file. */
+function routeReconciliation() {
+  route("get", "/api/v1/organization/academic-years", organizationPage("academic-years", [academicYear({ id: YEAR_ID, status: "ACTIVE" })]));
+  route("get", `${IMPORTS}/reconciliations`, jsonReply(actaPage([])));
+  route("get", `${IMPORTS}/reconciliations/preview`, jsonReply(preview()));
+}
+
 async function openScreen(history = importBatchPage([])) {
   route("get", IMPORTS, history);
+  routeReconciliation();
   const app = renderFeature(importsFeature, "/imports");
   const user = userEvent.setup();
   await screen.findByRole("heading", { level: 2, name: "Importar datos" }, TIMEOUT);
@@ -65,6 +74,7 @@ describe("the first step and the history", () => {
 
   it("shows the failed load of the history with a retry that loads it", async () => {
     route("get", IMPORTS, problem("internal-error", 500, { traceId: "01J8Z4K2QF9P0X" }), importBatchPage([importBatch()]));
+    routeReconciliation();
     renderFeature(importsFeature, "/imports");
     const user = userEvent.setup();
 
@@ -77,6 +87,7 @@ describe("the first step and the history", () => {
 
   it("asks the server for the page of the address and writes the next one in it", async () => {
     route("get", IMPORTS, importBatchPage([importBatch()], { page: 1, size: 25, total: 60 }));
+    routeReconciliation();
     const app = renderFeature(importsFeature, "/imports?page=2");
     const user = userEvent.setup();
     await screen.findByText("Simulada", undefined, TIMEOUT);
@@ -93,9 +104,10 @@ describe("the first step and the history", () => {
 describe("the history by kind", () => {
   it("asks the server for the kind of the address, and writes the one chosen in it, from the first page", async () => {
     route("get", IMPORTS, importBatchPage([importBatch({ kind: "GUARDIANS" })], { page: 1, size: 25, total: 60 }));
+    routeReconciliation();
     const app = renderFeature(importsFeature, "/imports?page=2&kind=guardians");
     const user = userEvent.setup();
-    await screen.findByText("Encargados", { selector: "td" }, TIMEOUT);
+    await within(await screen.findByRole("table", { name: /Importaciones de la institución/ }, TIMEOUT)).findByText("Encargados", { selector: "td" }, TIMEOUT);
 
     expect(Object.fromEntries(new URLSearchParams(histories()[0]?.search))).toEqual({ page: "1", size: "25", kind: "guardians" });
     expect(screen.getByLabelText("Tipo de importación")).toHaveValue("guardians");
@@ -111,6 +123,7 @@ describe("the history by kind", () => {
 
   it("drops a kind the address cannot hold and asks for every kind", async () => {
     route("get", IMPORTS, importBatchPage([importBatch()]));
+    routeReconciliation();
     renderFeature(importsFeature, "/imports?kind=teachers");
     await screen.findByText("Simulada", undefined, TIMEOUT);
 
@@ -120,6 +133,7 @@ describe("the history by kind", () => {
 
   it("with a kind that has no batches, says so and offers to clear the filter", async () => {
     route("get", IMPORTS, importBatchPage([]));
+    routeReconciliation();
     const app = renderFeature(importsFeature, "/imports?kind=guardian-links");
     const user = userEvent.setup();
     await screen.findByText("Ningún registro coincide con los filtros", undefined, TIMEOUT);
@@ -185,7 +199,8 @@ describe("simulate", () => {
     expect(summary).toHaveFocus();
     expect(posts(SIMULATE)).toHaveLength(1);
     expect(posts(SIMULATE)[0]?.body).toContain('name="file"');
-    expect(screen.getAllByRole("definition").map((count) => count.textContent)).toEqual(["100", "95", "5", "0"]);
+    const summaryRegion = within(summary.closest("section") ?? document.body);
+    expect(summaryRegion.getAllByRole("definition").map((count) => count.textContent)).toEqual(["100", "95", "5", "0"]);
     const table = screen.getByRole("table", { name: /Filas del archivo con su línea/ });
     expect(within(table).getAllByRole("row").slice(1).map((row) => row.textContent)).toEqual([
       "4birthDateLa fecha no existe o es anterior al 1 de enero de 1990.",
@@ -622,6 +637,6 @@ describe("what never leaves the screen", () => {
     const cached = JSON.stringify(app.queryClient.getQueryCache().getAll().map((query) => [query.queryKey, query.state.data]));
     expect(cached).not.toMatch(/Zoila|Quintanilla|listado-secreto/);
     expect(app.queryClient.getMutationCache().getAll()).toHaveLength(0);
-    expect(app.queryClient.getQueryCache().getAll().every((query) => query.queryKey[0] === "imports" || query.queryKey[0] === "students")).toBe(true);
+    expect(app.queryClient.getQueryCache().getAll().every((query) => query.queryKey[0] === "imports" || query.queryKey[0] === "students" || query.queryKey[0] === "organization")).toBe(true);
   });
 });

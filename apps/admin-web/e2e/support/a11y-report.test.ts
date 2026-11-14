@@ -186,7 +186,7 @@ describe("the states of the guardians registry", () => {
 describe("the states of the imports screen", () => {
   const imports = MATRIX.filter((combination) => combination.route === "/imports");
 
-  it("holds the ready screen, the file error, the simulation with rejections, the confirmation, the result, the file failure, the empty and the load-error states, and the states of the links, of the enrollments and of the history by kind, each once", () => {
+  it("holds the ready screen, the file error, the simulation with rejections, the confirmation, the result, the file failure, the empty and the load-error states, the states of the links, of the enrollments and of the history by kind, and the states of the acta of the reconciliation (the difference, the form errors and the signed acta), each once", () => {
     expect(imports.map((combination) => [combination.state, combination.preset, combination.opensDialog])).toEqual([
       ["ready", undefined, undefined],
       ["file-error", undefined, undefined],
@@ -204,6 +204,9 @@ describe("the states of the imports screen", () => {
       ["enrollments-simulated-with-rejections", "imports-empty", undefined],
       ["dialog-apply-enrollments", "imports-empty", true],
       ["history-filtered-empty", undefined, undefined],
+      ["reconciliation-difference", undefined, undefined],
+      ["reconciliation-form-errors", undefined, undefined],
+      ["reconciliation-signed", "imports-empty", undefined],
     ]);
     expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...imports])).toHaveLength(MATRIX.length * THEMES.length);
     expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
