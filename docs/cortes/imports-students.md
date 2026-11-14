@@ -82,7 +82,7 @@ que ya tiene otro estudiante no se anuncia en la simulación: aparece al aplicar
 
 ## Construido en el backend
 
-Módulo `com.confia.imports` (dominio, aplicación, `infrastructure`, `web`), migración `V21__create_imports_batch.sql` y tres rutas
+Módulo `com.confia.imports` (dominio, aplicación, `infrastructure`, `web`), migración `V23__create_imports_batch.sql` y tres rutas
 bajo `/api/v1/imports`. Las filas pasan por el caso de uso de `students` (`ManageStudents`) a través de un puerto que ese módulo
 publica como `@NamedInterface` (`students.application.importing.StudentImportGateway`, consumidor: `imports`); `imports` no importa el
 dominio de `students` ni lee sus tablas.

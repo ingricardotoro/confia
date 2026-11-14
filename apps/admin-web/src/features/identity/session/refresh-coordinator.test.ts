@@ -161,6 +161,30 @@ describe("the refresh coordinator", () => {
     expect(requests()).toHaveLength(0);
   });
 
+  it("admin-web-shell-and-session-lifecycle H3: a refreshed outcome carries the server date and the arrival of the answer", async () => {
+    route("post", REFRESH, { ...authenticatedSession(), headers: { Date: "Tue, 10 Nov 2026 10:00:00 GMT" } });
+    const before = Date.now();
+
+    const outcome = await coordinator().refreshOnce();
+
+    expect(outcome.kind).toBe("refreshed");
+    if (outcome.kind !== "refreshed") return;
+    expect(outcome.serverDate).toBe(Date.UTC(2026, 10, 10, 10, 0, 0));
+    expect(outcome.receivedAt).toBeGreaterThanOrEqual(before);
+  });
+
+  it("H3: without a Date header the server date of the outcome is absent", async () => {
+    route("post", REFRESH, authenticatedSession());
+
+    const outcome = await coordinator().refreshOnce();
+
+    expect(outcome.kind === "refreshed" && outcome.serverDate).toBeUndefined();
+    expect(outcome.kind === "refreshed" && typeof outcome.receivedAt).toBe("number");
+  });
+
+  // Dated note 2026-11-10 (admin-web-shell-and-session-lifecycle, design.md section 2, SS19 precisado): the
+  // invariant below used to read "no timer". It is now "no timer or background query asks for a refresh": the
+  // lifecycle scheduler holds at most one timer, and it never calls the coordinator. Only a caller starts one.
   it("SS18: without Web Locks it still makes one shared request, with no error and no polling timer", async () => {
     route("post", REFRESH, authenticatedSession());
     const interval = vi.spyOn(globalThis, "setInterval");

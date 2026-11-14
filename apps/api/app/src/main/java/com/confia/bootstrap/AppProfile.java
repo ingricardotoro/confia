@@ -4,8 +4,8 @@ package com.confia.bootstrap;
  * The four process kinds a single {@code confia-api} artifact can start as, selected by the
  * {@code APP_PROFILE} environment variable (ADR-0003, ADR-0013, design.md decision 4).
  *
- * <p>{@code MIGRATE} is recognized here with no behavior yet: applying Flyway migrations arrives
- * with change 5. An absent, blank or unrecognized value fails closed via {@link
+ * <p>{@code MIGRATE} applies the pending Flyway migrations in a closed context and exits (see
+ * {@code bootstrap.migrate.MigrateApplication}). An absent, blank or unrecognized value fails closed via {@link
  * UnknownAppProfileException}.
  */
 enum AppProfile {

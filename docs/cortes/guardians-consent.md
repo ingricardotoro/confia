@@ -70,7 +70,7 @@ en papel firmado, lo revoca, y el historial conserva ambos eventos; el estado vi
 
 ## Construido en el backend
 
-Módulo `com.confia.guardians` (cuatro capas, clases nuevas), migración `V20__create_guardians_guardian_consent_event.sql` y dos
+Módulo `com.confia.guardians` (cuatro capas, clases nuevas), migración `V22__create_guardians_guardian_consent_event.sql` y dos
 rutas con `@RateLimited` por dirección y por cuenta (lectura `admin-read` y `admin-read-account`; escritura `admin-write` y
 `admin-write-account`; `429` con `Retry-After`). Permisos en `PermissionedEndpoints.forAdmin()` y `x-required-permission` en el
 OpenAPI: `GET` con `guardians:read`, `POST` con `guardians:update` (no hay permiso nuevo; `StaffRole` no cambia: administrador y

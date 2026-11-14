@@ -90,7 +90,7 @@ luego registra su retiro; el historial lo muestra y el cupo de la sección se li
 ## Construido en el backend
 
 Módulo `com.confia.students` (clases nuevas; el comportamiento del registro de estudiantes no cambió), migración
-`V18__create_students_enrollment.sql` (tablas `students_enrollment` y `students_enrollment_transfer`, seguridad por fila
+`V20__create_students_enrollment.sql` (tablas `students_enrollment` y `students_enrollment_transfer`, seguridad por fila
 forzada, `REVOKE ALL FROM PUBLIC`, sin `DELETE`; el historial de traslados solo admite `INSERT` y `SELECT`). Seis rutas,
 todas con `@RateLimited` por dirección y por cuenta (lecturas `admin-read` y `admin-read-account`; escrituras `admin-write`
 y `admin-write-account`; `429` con `Retry-After`). Permisos en `PermissionedEndpoints.forAdmin()` y `x-required-permission`

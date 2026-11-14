@@ -27,25 +27,23 @@ test.describe("the signed in page", () => {
     const second = await context.newPage();
     await second.goto("/");
     await expect(second.getByRole("button", SIGN_OUT)).toBeVisible();
-    // Concurrency as the browser sends it: a refresh is in flight from its request until it finishes or fails.
+    // Concurrency measured where the browser's request is held: the interceptor counts a refresh from the moment it
+    // receives it until just before it hands the answer back. The page cannot continue before that answer, so a second
+    // tab's refresh can only reach the interceptor after the first one was counted out. The browser's own
+    // `requestfinished` event cannot be used: it can reach the test after the other tab already sent its request.
     let inFlight = 0;
     let maximum = 0;
     let refreshes = 0;
-    const isRefresh = (request: Request) => new URL(request.url()).pathname === "/api/v1/auth/sessions/refresh";
-    for (const tab of [page, second]) {
-      tab.on("request", (request) => {
-        if (!isRefresh(request)) return;
-        inFlight += 1;
-        refreshes += 1;
-        maximum = Math.max(maximum, inFlight);
-      });
-      const finished = (request: Request) => {
-        if (isRefresh(request)) inFlight -= 1;
-      };
-      tab.on("requestfinished", finished);
-      tab.on("requestfailed", finished);
-    }
-
+    await context.route("**/api/v1/auth/sessions/refresh", async (route) => {
+      inFlight += 1;
+      refreshes += 1;
+      maximum = Math.max(maximum, inFlight);
+      // Long enough for a second refresh to start if the lock did not hold it back.
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const response = await route.fetch();
+      inFlight -= 1;
+      await route.fulfill({ response });
+    });
     await Promise.all([page.reload(), second.reload()]);
 
     await expect(page.getByRole("button", SIGN_OUT)).toBeVisible();

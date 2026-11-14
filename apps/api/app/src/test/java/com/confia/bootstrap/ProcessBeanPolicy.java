@@ -94,6 +94,8 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // of the second. Administrative only, and each exact for the same reason.
                     "com.confia.shared.web.ratelimit",
                     "com.confia.shared.observability.metrics",
+                    // The health probe routes (dockerfiles-and-local-compose decision 4): exact.
+                    "com.confia.shared.observability.health",
                     // The delay materializer and its properties: the bounded semaphore a
                     // login-like endpoint takes a permit from before its use case runs.
                     // Administrative only, and exact like every entry.
@@ -167,7 +169,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // wiring comes with them: no jOOQ context, no repository, no business module.
                     // Each is exact and contributes a bean.
                     "com.confia.shared.security", "com.confia.shared.jobs.infrastructure",
-                    "com.confia.shared.jobs.infrastructure.wiring"),
+                    "com.confia.shared.jobs.infrastructure.wiring",
+                    // The health probe routes (dockerfiles-and-local-compose decision 4): exact.
+                    "com.confia.shared.observability.health"),
             forbidden("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     "com.confia.invoicing", ADMIN_MODULE,
@@ -236,7 +240,23 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.organization", STAFF_INSTITUTION,
                     "com.confia.students", ADMIN_MODULE,
                     "com.confia.guardians", ADMIN_MODULE,
-                    "com.confia.imports", ADMIN_MODULE));
+                    "com.confia.imports", ADMIN_MODULE,
+                    "com.confia.shared.observability.health",
+                    "the worker serves no route; its health is a heartbeat file (WE100)"));
+
+    /**
+     * The migrate process (dockerfiles-and-local-compose design.md decision 2): a closed context of
+     * the DataSource and Flyway. It is not part of {@link #all()} because it never returns a live
+     * context; {@code MigrateContextIsolationTest} checks it against the context its builder makes.
+     */
+    static final ProcessBeanPolicy MIGRATE = new ProcessBeanPolicy("migrate",
+            "com.confia.bootstrap.migrate",
+            // The sensitive log guard the initializer of every entry point installs (exact, like
+            // every entry); the design listed only the entry package, but the guard is a bean.
+            Set.of("com.confia.bootstrap.migrate", "com.confia.shared.logging"),
+            Map.of(SCHEDULER_PACKAGE, SCHEDULER_REASON,
+                    "org.springframework.security", SPRING_SECURITY,
+                    "com.confia.shared.web", WEB_EDGE));
 
     /** A forbidden-package map from key, reason pairs: {@code Map.of} stops at ten entries. */
     private static Map<String, String> forbidden(String... pairs) {

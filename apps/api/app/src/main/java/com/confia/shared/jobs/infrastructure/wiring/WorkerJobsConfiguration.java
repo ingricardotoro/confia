@@ -10,8 +10,10 @@ import com.confia.shared.jobs.infrastructure.JobCalendars;
 import com.confia.shared.jobs.infrastructure.JobRunner;
 import com.confia.shared.jobs.infrastructure.RecurringJobRunner;
 import com.confia.shared.jobs.infrastructure.TracedJobSerializer;
+import com.confia.shared.jobs.infrastructure.WorkerHeartbeatListener;
 import com.confia.shared.jobs.infrastructure.WorkerSchedulerStarter;
 import com.github.kagkarlsson.scheduler.Scheduler;
+import com.github.kagkarlsson.scheduler.SchedulerBuilder;
 import com.github.kagkarlsson.scheduler.boot.config.DbSchedulerProperties;
 import com.github.kagkarlsson.scheduler.jdbc.PostgreSqlJdbcCustomization;
 import com.github.kagkarlsson.scheduler.task.Task;
@@ -79,7 +81,7 @@ public class WorkerJobsConfiguration {
     @Bean
     Scheduler scheduler(DbSchedulerProperties properties, DataSource dataSource, TracedJobSerializer serializer,
             JobRunner runner, RecurringJobRunner recurringRunner, Clock clock,
-            ObjectProvider<JobDefinition> definitions) {
+            ObjectProvider<JobDefinition> definitions, Environment environment) {
         List<Task<?>> tasks = tasksOf(definitions.orderedStream().toList(), runner, recurringRunner, clock);
         List<RecurringTask<Void>> recurring = new ArrayList<>();
         List<Task<?>> oneTime = new ArrayList<>();
@@ -92,7 +94,7 @@ public class WorkerJobsConfiguration {
                 oneTime.add(task);
             }
         }
-        return Scheduler.create(dataSource, oneTime)
+        SchedulerBuilder builder = Scheduler.create(dataSource, oneTime)
                 .startTasks(recurring)
                 .serializer(serializer)
                 .jdbcCustomization(
@@ -101,8 +103,11 @@ public class WorkerJobsConfiguration {
                 .pollingInterval(properties.getPollingInterval())
                 .heartbeatInterval(properties.getHeartbeatInterval())
                 .missedHeartbeatsLimit(properties.getMissedHeartbeatsLimit())
-                .shutdownMaxWait(properties.getShutdownMaxWait())
-                .build();
+                .shutdownMaxWait(properties.getShutdownMaxWait());
+        // The health of the worker is the date of a file the polling cycle refreshes (CR16, decision 6).
+        WorkerHeartbeatListener.forProperty(environment.getProperty(WorkerHeartbeatListener.PROPERTY))
+                .ifPresent(builder::addSchedulerListener);
+        return builder.build();
     }
 
     /** One task per definition; a repeated name stops the start (scenario BJ63). */

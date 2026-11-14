@@ -66,3 +66,57 @@ describe("what this change leaves out", () => {
     ).toEqual(["main.tsx"]);
   });
 });
+
+// admin-web-staff-sign-in, task 9.1 (SS05 static part, SS127, I307). What the access screens must not deliver, and what no test may
+// claim. Each of these stops being true on the day the change named in its scenario ships what it forbids.
+describe("what the staff sign in leaves out", () => {
+  const sourcesOf = (directory: string) => filesUnder(directory).filter((file) => /\.tsx?$/.test(file) && !/\.test(-d)?\.tsx?$/.test(file));
+  const sources = sourcesOf(join(PACKAGE_ROOT, "src"));
+  const text = (file: string) => readFileSync(file, "utf8");
+
+  it("SS05: no source of the app assigns document.cookie, so the only cookie it reads is the CSRF one", () => {
+    const assignment = /document\s*\.\s*cookie\s*(?:=(?!=)|\+=)/;
+
+    expect(sources.length).toBeGreaterThan(0);
+    expect(sources.filter((file) => assignment.test(text(file)))).toEqual([]);
+    expect(sources.filter((file) => /document\s*\.\s*cookie/.test(text(file))).map((file) => file.replaceAll("\\", "/").split("/src/")[1])).toEqual([
+      "shared/api/csrf-cookie.ts",
+    ]);
+  });
+
+  it("SS127: the API client has the six operations of access and no other, and the routes are the four screens", () => {
+    const client = text(join(PACKAGE_ROOT, "src", "shared", "api", "auth-operations.ts"));
+    const operations = [...client.matchAll(/^export (?:async )?function (\w+)/gm)].map((match) => match[1]);
+    // A path is a literal, or the sessions path followed by a suffix.
+    const literals = sources.flatMap((file) => [...text(file).matchAll(/"(\/api\/v1\/[^"]*)"/g)].map((match) => match[1]));
+    const suffixes = sources.flatMap((file) => [...text(file).matchAll(/`\$\{SESSIONS\}(\/[^`]*)`/g)].map((match) => `/api/v1/auth/sessions${match[1] ?? ""}`));
+    const paths = [...new Set([...literals, ...suffixes])].sort();
+
+    expect(operations.sort()).toEqual(["completeSecondFactor", "endCurrentSession", "enrollSecondFactor", "getCurrentSession", "logIn", "refreshSession"]);
+    // The academic structure screens (organization-academic-structure) add the one path of their client.
+    expect(paths).toEqual(["/api/v1/auth/mfa/enrollments", "/api/v1/auth/mfa/verifications", "/api/v1/auth/sessions", "/api/v1/auth/sessions/current", "/api/v1/auth/sessions/refresh", "/api/v1/organization"]);
+    expect(text(join(PACKAGE_ROOT, "src", "features", "identity", "routes.tsx"))).toMatch(
+      /ACCESS_PATHS = \{\s*home: "\/",\s*signIn: "\/iniciar-sesion",\s*verification: "\/iniciar-sesion\/verificacion",\s*enrollment: "\/iniciar-sesion\/inscripcion",\s*\} as const/,
+    );
+  });
+
+  it("SS127: nothing in the app names the first Super Admin, an administrative password reset or a voluntary enrollment or removal", () => {
+    const forbidden = /first[-_ ]?super[-_ ]?admin|primer[-_ ]?super[-_ ]?admin|password[-_ ]?reset|reset[-_ ]?password|restablec\w*[-_ ]?contrase|(?:remove|disable|unenroll|delete)[-_ ]?(?:second[-_ ]?factor|mfa)|(?:baja|desactivar)[-_ ]?(?:del[-_ ])?(?:segundo[-_ ]?factor|mfa)/i;
+    const catalog = text(join(PACKAGE_ROOT, "src", "i18n", "locales", "es-HN", "admin.json"));
+
+    expect(sources.filter((file) => forbidden.test(text(file)))).toEqual([]);
+    expect(forbidden.test(catalog)).toBe(false);
+  });
+
+  it("I307: no test names an origin other than the page and the simulated API, and the e2e run starts the simulator", () => {
+    const tests = [...filesUnder(join(PACKAGE_ROOT, "e2e", "specs")), ...filesUnder(join(PACKAGE_ROOT, "e2e", "support"))].filter((file) => file.endsWith(".ts"));
+    const origins = tests.flatMap((file) => [...text(file).matchAll(/https?:\/\/localhost:\d+/g)].map((match) => match[0]));
+    const config = text(join(PACKAGE_ROOT, "playwright.config.ts"));
+
+    expect(tests.length).toBeGreaterThan(0);
+    expect([...new Set(origins)].sort()).toEqual(["http://localhost:5173", "http://localhost:8099"]);
+    expect(tests.filter((file) => /__Secure-confia_admin_sid/.test(text(file)))).toEqual([]);
+    expect(config).toContain('command: "node e2e/mock-api/start.mjs"');
+    expect(config).toContain("CONFIA_API_PROXY_TARGET: MOCK_API_URL");
+  });
+});
