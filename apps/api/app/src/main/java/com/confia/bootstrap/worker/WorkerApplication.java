@@ -66,7 +66,8 @@ import org.springframework.context.annotation.Import;
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {SecurityAutoConfiguration.class,
-        UserDetailsServiceAutoConfiguration.class})
+        UserDetailsServiceAutoConfiguration.class}, excludeName = {
+        "org.springframework.boot.servlet.autoconfigure.MultipartAutoConfiguration"})
 @Import({WorkerPlatformConfiguration.class, WorkerJobsConfiguration.class,
         IdentityWorkerConfiguration.class, SharedWorkerJobsConfiguration.class})
 public class WorkerApplication {

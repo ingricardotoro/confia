@@ -5,6 +5,7 @@ import {
   type OrganizationModel,
   type OrganizationOptions,
 } from "./organization-model.ts";
+import { DEFAULT_IMPORTS, createImportsModel, type ImportsModel, type ImportsOptions } from "./imports-model.ts";
 import { DEFAULT_GUARDIANS, createGuardiansModel, type GuardiansModel, type GuardiansOptions } from "./guardians-model.ts";
 import { DEFAULT_ENROLLMENTS, createEnrollmentsModel, type EnrollmentsModel, type EnrollmentsOptions } from "./enrollments-model.ts";
 import { DEFAULT_STUDENTS, createStudentsModel, type StudentsModel, type StudentsOptions } from "./students-model.ts";
@@ -23,7 +24,7 @@ const RETRY_AFTER_SECONDS = "30";
 const TRACE_ID = "01J8Z4K2QF9P0X";
 const EXPIRY_PUSH_MS = 301_000;
 
-export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify" | "organization" | "students" | "enrollments" | "guardians";
+export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify" | "organization" | "students" | "enrollments" | "guardians" | "imports";
 
 type LoginBehavior =
   | "authenticated"
@@ -49,6 +50,8 @@ interface PresetDefinition {
   readonly enrollments?: EnrollmentsOptions;
   /** The guardians the scenario holds, over its students; the seeded ones, with every write allowed, when absent. */
   readonly guardians?: GuardiansOptions;
+  /** The student imports the scenario holds; the seeded history, with every write allowed, when absent. */
+  readonly imports?: ImportsOptions;
   /** A fault injected after the model answered, to prove the server refuses to send it. */
   readonly tamper?: (operation: Operation, response: ModelResponse) => ModelResponse;
 }
@@ -82,6 +85,10 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   "guardians-empty": { login: "authenticated", enrolled: false, guardians: { ...DEFAULT_GUARDIANS, seed: "empty" } },
   "guardians-forbidden": { login: "authenticated", enrolled: false, guardians: { ...DEFAULT_GUARDIANS, writes: "forbidden" } },
   "guardians-server-error": { login: "authenticated", enrolled: false, guardians: { ...DEFAULT_GUARDIANS, reads: "failing-first" } },
+  // The student import (imports-students cut). Each one signs in as the default does.
+  "imports-empty": { login: "authenticated", enrolled: false, imports: { ...DEFAULT_IMPORTS, seed: "empty" } },
+  "imports-forbidden": { login: "authenticated", enrolled: false, imports: { ...DEFAULT_IMPORTS, writes: "forbidden" } },
+  "imports-server-error": { login: "authenticated", enrolled: false, imports: { ...DEFAULT_IMPORTS, reads: "failing-first" } },
   "contract-violation": {
     login: "second-factor-enrollment-required",
     enrolled: false,
@@ -102,6 +109,7 @@ export interface Scenario {
   readonly students: StudentsModel;
   readonly enrollments: EnrollmentsModel;
   readonly guardians: GuardiansModel;
+  readonly imports: ImportsModel;
   readonly calls: RecordedCall[];
   readonly tamper: PresetDefinition["tamper"];
   signIn(sleep: (ms: number) => Promise<void>): Promise<ModelResponse>;
@@ -130,6 +138,7 @@ function build(preset: string, definition: PresetDefinition): Scenario {
     students,
     enrollments: createEnrollmentsModel(definition.enrollments ?? DEFAULT_ENROLLMENTS, { organization, students }),
     guardians: createGuardiansModel(definition.guardians ?? DEFAULT_GUARDIANS, { students }),
+    imports: createImportsModel(definition.imports ?? DEFAULT_IMPORTS),
     calls: [],
     tamper: definition.tamper,
     async signIn(sleep) {

@@ -5,10 +5,10 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * The values of the seven rate-limit policies of the administrative process, which an environment
+ * The values of the nine rate-limit policies of the administrative process, which an environment
  * may change without recompiling (web-edge-foundations design.md, decision 17; session-endpoints-
  * cookie-and-csrf design.md, decision 7): {@code confia.web.rate-limit.admin-login.*}, {@code
- * ...admin-mfa.*}, {@code ...admin-session.*}, {@code ...admin-read.*} and {@code ...admin-write.*}, {@code ...admin-read-account.*} and {@code ...admin-write-account.*}. Bound through the constructor so that a bad value
+ * ...admin-mfa.*}, {@code ...admin-session.*}, {@code ...admin-read.*} and {@code ...admin-write.*}, {@code ...admin-read-account.*}, {@code ...admin-write-account.*}, {@code ...admin-import.*} and {@code ...admin-import-account.*}. Bound through the constructor so that a bad value
  * stops the start before a request is accepted, and the message names the whole property.
  *
  * <p>The defaults are in {@code application.yml} and not in annotations, because an annotation
@@ -23,11 +23,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param adminWrite the policy of the writes of the administrative API (60 a minute per address)
  * @param adminReadAccount the policy of the same reads per authenticated account (600 a minute)
  * @param adminWriteAccount the policy of the same writes per authenticated account (120 a minute)
+ * @param adminImport the policy of the bulk imports (simulate and apply) per client address (20 an hour)
+ * @param adminImportAccount the policy of the same imports per authenticated account (20 an hour)
  */
 @ConfigurationProperties(prefix = RateLimitProperties.PREFIX, ignoreUnknownFields = false)
 public record RateLimitProperties(PolicyValues adminLogin, PolicyValues adminMfa,
         PolicyValues adminSession, PolicyValues adminRead, PolicyValues adminWrite,
-        PolicyValues adminReadAccount, PolicyValues adminWriteAccount) {
+        PolicyValues adminReadAccount, PolicyValues adminWriteAccount, PolicyValues adminImport,
+        PolicyValues adminImportAccount) {
 
     static final String PREFIX = "confia.web.rate-limit";
 
@@ -39,6 +42,8 @@ public record RateLimitProperties(PolicyValues adminLogin, PolicyValues adminMfa
         adminWrite = checked(adminWrite, "admin-write");
         adminReadAccount = checked(adminReadAccount, "admin-read-account");
         adminWriteAccount = checked(adminWriteAccount, "admin-write-account");
+        adminImport = checked(adminImport, "admin-import");
+        adminImportAccount = checked(adminImportAccount, "admin-import-account");
     }
 
     private static PolicyValues checked(PolicyValues values, String component) {

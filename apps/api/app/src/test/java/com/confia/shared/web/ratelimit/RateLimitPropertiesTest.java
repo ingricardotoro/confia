@@ -38,7 +38,8 @@ class RateLimitPropertiesTest {
 
     private static final String ROOT = "confia.web.rate-limit";
     private static final List<String> POLICIES = List.of("admin-login", "admin-mfa",
-            "admin-session", "admin-read", "admin-write", "admin-read-account", "admin-write-account");
+            "admin-session", "admin-read", "admin-write", "admin-read-account", "admin-write-account", "admin-import",
+            "admin-import-account");
 
     /** The real {@code application.yml}, flattened to the keys the binder reads. */
     private static Map<String, Object> shippedDefaults() {
@@ -78,6 +79,8 @@ class RateLimitPropertiesTest {
             case "admin-write" -> properties.adminWrite().policy();
             case "admin-read-account" -> properties.adminReadAccount().policy();
             case "admin-write-account" -> properties.adminWriteAccount().policy();
+            case "admin-import" -> properties.adminImport().policy();
+            case "admin-import-account" -> properties.adminImportAccount().policy();
             default -> throw new IllegalArgumentException(name);
         };
     }
@@ -120,6 +123,19 @@ class RateLimitPropertiesTest {
     }
 
     @Test
+    void theBulkImportsAreLimitedToTwentyAnHourPerAddressAndPerAccount() {
+        RateLimitProperties properties = bind(shippedDefaults());
+
+        assertThat(properties.adminImport().policy().requestLimit()).isEqualTo(20);
+        assertThat(properties.adminImport().policy().requestWindow()).isEqualTo(Duration.ofHours(1));
+        assertThat(properties.adminImportAccount().policy().requestLimit()).isEqualTo(20);
+        assertThat(properties.adminImportAccount().policy().requestWindow()).isEqualTo(Duration.ofHours(1));
+        assertThat(properties.adminImport().policy().requestLimit())
+                .as("imports are far stricter than the general writes")
+                .isLessThan(properties.adminWrite().policy().requestLimit() * 60);
+    }
+
+    @Test
     void theExistingPoliciesKeepTheirShippedValuesAfterTheAccountPoliciesWereAdded() {
         RateLimitProperties properties = bind(shippedDefaults());
 
@@ -132,7 +148,7 @@ class RateLimitPropertiesTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"admin-login", "admin-mfa", "admin-session", "admin-read", "admin-write",
-            "admin-read-account", "admin-write-account"})
+            "admin-read-account", "admin-write-account", "admin-import", "admin-import-account"})
     void layerTwoAdmitsOneAttemptAMinuteWithACapOfOneHourOnEveryPolicy(String name) {
         RateLimitPolicy policy = policyOf(bind(shippedDefaults()), name);
 
@@ -208,7 +224,7 @@ class RateLimitPropertiesTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"admin-login", "admin-mfa", "admin-session", "admin-read", "admin-write",
-            "admin-read-account", "admin-write-account"})
+            "admin-read-account", "admin-write-account", "admin-import", "admin-import-account"})
     void anAbsentComponentStopsTheStartAndNamesTheProperty(String missing) {
         Map<String, Object> values = shippedDefaults();
         values.keySet().removeIf(key -> key.startsWith(ROOT + "." + missing + "."));

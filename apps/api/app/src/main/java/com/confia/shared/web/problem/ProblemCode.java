@@ -46,7 +46,10 @@ import java.util.Optional;
  * #GUARDIAN_NOT_ACTIVE} ({@code 409}, also the answer to a grant of consent for an inactive guardian), reuse
  * {@link #DUPLICATE_NATIONAL_ID} and {@link #STUDENT_NOT_ACTIVE} and use {@link #RESOURCE_NOT_FOUND} for their
  * {@code 404}. The consents of {@code guardians} own {@link #CONSENT_CHANNEL_UNAVAILABLE} ({@code 409}: a grant for a
- * channel the guardian has no contact data for) and use {@link #VALIDATION_FAILED} with the field. The
+ * channel the guardian has no contact data for) and use {@link #VALIDATION_FAILED} with the field. The imports of
+ * {@code imports} own {@link #IMPORT_NOT_SIMULATED} (a file applied that the account never simulated) and {@link
+ * #IMPORT_FILE_CHANGED} (a file that is not the one the account simulated last), both {@code 409}, and use {@link
+ * #VALIDATION_FAILED} with the list {@code errors} for a file that cannot be read. The
  * institution codes belong to a later change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
@@ -85,6 +88,8 @@ public enum ProblemCode {
     TRANSFER_YEAR_MISMATCH("transfer-year-mismatch", 409),
     GUARDIAN_NOT_ACTIVE("guardian-not-active", 409),
     CONSENT_CHANNEL_UNAVAILABLE("consent-channel-unavailable", 409),
+    IMPORT_NOT_SIMULATED("import-not-simulated", 409),
+    IMPORT_FILE_CHANGED("import-file-changed", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
     IDEMPOTENCY_PAYLOAD_MISMATCH("idempotency-payload-mismatch", 422),
     TOO_MANY_REQUESTS("too-many-requests", 429),

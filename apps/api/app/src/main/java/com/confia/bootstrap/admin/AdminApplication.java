@@ -4,6 +4,8 @@ import com.confia.guardians.infrastructure.wiring.GuardiansConfiguration;
 import com.confia.guardians.web.wiring.GuardiansWebConfiguration;
 import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
 import com.confia.identity.web.wiring.IdentityWebConfiguration;
+import com.confia.imports.infrastructure.wiring.ImportsConfiguration;
+import com.confia.imports.web.wiring.ImportsWebConfiguration;
 import com.confia.organization.infrastructure.wiring.AcademicStructureConfiguration;
 import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
 import com.confia.organization.web.wiring.OrganizationWebConfiguration;
@@ -18,6 +20,7 @@ import com.confia.shared.security.token.SessionTokenConfiguration;
 import com.confia.shared.web.edge.AdminSecurityConfiguration;
 import com.confia.shared.web.edge.AuthorizationConfiguration;
 import com.confia.shared.web.edge.IdempotencyEdgeConfiguration;
+import com.confia.shared.web.edge.MultipartEdgeConfiguration;
 import com.confia.shared.web.edge.RequiredDelayConfiguration;
 import com.confia.shared.web.edge.SessionCookieConfiguration;
 import com.confia.shared.web.edge.ThrottlingConfiguration;
@@ -90,9 +93,11 @@ import org.springframework.context.annotation.Import;
         AcademicStructureConfiguration.class, OrganizationWebConfiguration.class,
         StudentsConfiguration.class, StudentsWebConfiguration.class, EnrollmentsConfiguration.class,
         EnrollmentsWebConfiguration.class, GuardiansConfiguration.class, GuardiansWebConfiguration.class,
+        ImportsConfiguration.class, ImportsWebConfiguration.class,
         WebEdgeConfiguration.class, AdminSecurityConfiguration.class,
         ObservabilityMetricsConfiguration.class, RateLimiterConfiguration.class,
         ThrottlingConfiguration.class, RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,
+        MultipartEdgeConfiguration.class,
         SessionTokenConfiguration.class, CsrfConfiguration.class,
         SessionCookieConfiguration.class, JobSchedulingConfiguration.class,
         AuthorizationConfiguration.class,

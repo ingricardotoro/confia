@@ -9,7 +9,9 @@ import com.confia.students.application.ManageStudents;
 import com.confia.students.application.NationalIdProtector;
 import com.confia.students.application.NationalIdReindexer;
 import com.confia.students.application.ReindexNationalIds;
+import com.confia.students.application.StudentImport;
 import com.confia.students.application.StudentRepository;
+import com.confia.students.application.importing.StudentImportGateway;
 import com.confia.students.application.directory.StudentDirectory;
 import com.confia.students.infrastructure.ColumnEncryptionNationalIdProtector;
 import com.confia.students.infrastructure.JooqStudentDirectory;
@@ -123,5 +125,15 @@ public class StudentsConfiguration {
     ManageStudents manageStudents(TransactionRunner transactionRunner, StudentRepository students,
             NationalIdProtector protector, AuditLogWriter auditLogWriter, Clock clock) {
         return new ManageStudents(transactionRunner, students, protector, auditLogWriter, clock);
+    }
+
+    /**
+     * The bulk import of students that {@code imports} consumes (docs/cortes/imports-students.md): it judges the rows
+     * with the rules of the registry and registers the valid ones through {@link ManageStudents}.
+     */
+    @Bean
+    StudentImportGateway studentImportGateway(TransactionRunner transactionRunner, StudentRepository students,
+            ManageStudents manageStudents, Clock clock) {
+        return new StudentImport(transactionRunner, students, manageStudents, clock);
     }
 }

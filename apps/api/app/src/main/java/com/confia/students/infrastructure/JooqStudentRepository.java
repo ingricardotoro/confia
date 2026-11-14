@@ -11,6 +11,7 @@ import com.confia.students.application.PageRequest;
 import com.confia.students.application.ProtectedNationalId;
 import com.confia.students.application.StudentFilter;
 import com.confia.students.application.StudentRepository;
+import com.confia.students.domain.DuplicateExternalRefException;
 import com.confia.students.domain.DuplicateNationalIdException;
 import com.confia.students.domain.ResourceNotFoundException;
 import com.confia.students.domain.Sex;
@@ -20,8 +21,11 @@ import confia.generated.jooq.tables.records.StudentsStudentRecord;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
@@ -80,8 +84,41 @@ public final class JooqStudentRepository implements StudentRepository {
 
     @Override
     public void insert(InstitutionId institutionId, Student student, ProtectedNationalId document) {
+        insertRow(institutionId, student, document, null);
+    }
+
+    @Override
+    public void insertImported(InstitutionId institutionId, Student student, ProtectedNationalId document,
+            String externalRef) {
+        insertRow(institutionId, student, document, externalRef);
+    }
+
+    @Override
+    public Set<String> existingExternalRefs(InstitutionId institutionId, Collection<String> externalRefs) {
+        if (externalRefs.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(dsl.select(STUDENTS_STUDENT.EXTERNAL_REF).from(STUDENTS_STUDENT)
+                .where(STUDENTS_STUDENT.INSTITUTION_ID.eq(institutionId.value()))
+                .and(STUDENTS_STUDENT.EXTERNAL_REF.in(externalRefs))
+                .fetch(STUDENTS_STUDENT.EXTERNAL_REF));
+    }
+
+    @Override
+    public Set<String> existingBlindIndexes(InstitutionId institutionId, Collection<String> blindIndexes) {
+        if (blindIndexes.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(dsl.select(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX).from(STUDENTS_STUDENT)
+                .where(STUDENTS_STUDENT.INSTITUTION_ID.eq(institutionId.value()))
+                .and(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX.in(blindIndexes))
+                .fetch(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX));
+    }
+
+    private void insertRow(InstitutionId institutionId, Student student, ProtectedNationalId document,
+            String externalRef) {
         refuseDocumentOfAnotherStudent(institutionId, student.id(), document);
-        StudentWrites.translating(() -> dsl.insertInto(STUDENTS_STUDENT)
+        var insert = dsl.insertInto(STUDENTS_STUDENT)
                 .set(STUDENTS_STUDENT.INSTITUTION_ID, institutionId.value())
                 .set(STUDENTS_STUDENT.ID, student.id())
                 .set(STUDENTS_STUDENT.STUDENT_CODE, student.studentCode())
@@ -89,12 +126,25 @@ public final class JooqStudentRepository implements StudentRepository {
                 .set(STUDENTS_STUDENT.LAST_NAME, student.lastName())
                 .set(STUDENTS_STUDENT.BIRTH_DATE, student.birthDate())
                 .set(STUDENTS_STUDENT.SEX, student.sex().name())
+                .set(STUDENTS_STUDENT.EXTERNAL_REF, externalRef)
                 .set(STUDENTS_STUDENT.NATIONAL_ID_ENCRYPTED, document == null ? null : document.encrypted())
                 .set(STUDENTS_STUDENT.NATIONAL_ID_BLIND_INDEX, document == null ? null : document.blindIndex())
                 .set(STUDENTS_STUDENT.STATUS, student.status().name())
                 .set(STUDENTS_STUDENT.CREATED_AT, StudentWrites.toDatabase(student.createdAt()))
-                .set(STUDENTS_STUDENT.UPDATED_AT, StudentWrites.toDatabase(student.updatedAt()))
-                .execute());
+                .set(STUDENTS_STUDENT.UPDATED_AT, StudentWrites.toDatabase(student.updatedAt()));
+        if (externalRef == null) {
+            StudentWrites.translating(insert::execute);
+            return;
+        }
+        // The reference of the source system is the user's data: a unique violation would print it in the DETAIL of the
+        // server log. ON CONFLICT settles the same race (it waits for a concurrent writer) without raising an error,
+        // so there is nothing for the log to print. The other uniqueness (code, document) still raise and translate.
+        int[] inserted = new int[1];
+        StudentWrites.translating(() -> inserted[0] = insert
+                .onConflict(STUDENTS_STUDENT.INSTITUTION_ID, STUDENTS_STUDENT.EXTERNAL_REF).doNothing().execute());
+        if (inserted[0] == 0) {
+            throw new DuplicateExternalRefException();
+        }
     }
 
     @Override

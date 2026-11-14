@@ -2,8 +2,10 @@ package com.confia.students.application;
 
 import com.confia.kernel.InstitutionId;
 import com.confia.students.domain.Student;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -27,6 +29,19 @@ public interface StudentRepository {
 
     /** Stores a new student; {@code document} is null for a student without national identity document. */
     void insert(InstitutionId institutionId, Student student, ProtectedNationalId document);
+
+    /**
+     * Stores a new student that comes from a bulk import, with the reference it had in the source system. A reference
+     * the institution already has is refused as a {@code DuplicateExternalRefException}, whatever transaction holds it.
+     */
+    void insertImported(InstitutionId institutionId, Student student, ProtectedNationalId document,
+            String externalRef);
+
+    /** Which of these references the institution already has; one read, nothing locked. */
+    Set<String> existingExternalRefs(InstitutionId institutionId, Collection<String> externalRefs);
+
+    /** Which of these blind indexes the institution already holds; one read, nothing locked. */
+    Set<String> existingBlindIndexes(InstitutionId institutionId, Collection<String> blindIndexes);
 
     void update(InstitutionId institutionId, Student student, NationalIdStorage storage);
 

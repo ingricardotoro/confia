@@ -1,5 +1,6 @@
 package com.confia.students.infrastructure;
 
+import com.confia.students.domain.DuplicateExternalRefException;
 import com.confia.students.domain.DuplicateNationalIdException;
 import com.confia.students.domain.DuplicateStudentCodeException;
 import java.time.Instant;
@@ -22,6 +23,7 @@ final class StudentWrites {
     private static final String UNIQUE_VIOLATION = "23505";
     static final String CODE_CONSTRAINT = "students_student_code_uq";
     static final String NATIONAL_ID_CONSTRAINT = "students_student_national_id_uq";
+    static final String EXTERNAL_REF_CONSTRAINT = "students_student_external_ref_uq";
 
     private StudentWrites() {
     }
@@ -37,6 +39,9 @@ final class StudentWrites {
             }
             if (NATIONAL_ID_CONSTRAINT.equals(constraint)) {
                 throw new DuplicateNationalIdException();
+            }
+            if (EXTERNAL_REF_CONSTRAINT.equals(constraint)) {
+                throw new DuplicateExternalRefException();
             }
             throw e;
         }

@@ -88,7 +88,9 @@
     "duplicateGuardianNationalId": "Ya hay un encargado registrado con ese documento de identidad. Revise el número; los guiones no cuentan.",
     "studentNotActiveForGuardians": "El estudiante está inactivo y no admite cambios en sus encargados. Actívelo en la lista de estudiantes e intente de nuevo.",
     "consentChannelUnavailable": "El encargado no tiene registrado el dato de este canal: correo electrónico para el canal de correo, teléfono para mensaje de texto y WhatsApp. Agréguelo en la lista de encargados e intente de nuevo.",
-    "guardianNotActiveForConsent": "El encargado está inactivo y no se puede registrar un consentimiento nuevo. Actívelo en la lista de encargados; registrar una revocación siempre es posible."
+    "guardianNotActiveForConsent": "El encargado está inactivo y no se puede registrar un consentimiento nuevo. Actívelo en la lista de encargados; registrar una revocación siempre es posible.",
+    "importNotSimulated": "Este archivo todavía no se ha simulado. Simúlelo primero para revisar el resultado y después aplíquelo.",
+    "importFileChanged": "El archivo no es el mismo que se simuló la última vez. Simule de nuevo este archivo, revise el resultado y después aplíquelo."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -144,7 +146,8 @@
     "organization": "Estructura académica",
     "students": "Estudiantes",
     "enrollments": "Matrículas",
-    "guardians": "Encargados"
+    "guardians": "Encargados",
+    "imports": "Importaciones"
   },
   "organization": {
     "title": "Estructura académica",
@@ -675,6 +678,139 @@
         "action_WITHDRAW": "Revocación",
         "noPolicy": "—"
       }
+    }
+  },
+  "imports": {
+    "title": "Importaciones",
+    "heading": "Importar estudiantes",
+    "intro": "Cargue el listado de estudiantes de su sistema anterior desde un archivo CSV. Primero se simula: no se crea ningún estudiante hasta que usted aplique la importación.",
+    "stepsLabel": "Pasos de la importación",
+    "steps": {
+      "choose": "Elegir archivo",
+      "simulate": "Simular",
+      "apply": "Aplicar",
+      "result": "Resultado"
+    },
+    "stepState": {
+      "done": "completado",
+      "current": "paso actual",
+      "pending": "pendiente"
+    },
+    "file": {
+      "label": "Archivo CSV de estudiantes",
+      "help": "CSV en UTF-8 (en Excel: Guardar como, CSV UTF-8), separado por comas o por punto y coma, de hasta 5 MB y 10 000 filas. Las columnas obligatorias son legacyId, firstName, lastName y birthDate (AAAA-MM-DD); nationalId y sex son opcionales.",
+      "privacy": "El archivo se envía para simularlo y para aplicarlo, y no se guarda: al terminar, esta pantalla lo suelta. Los nombres de los estudiantes no se muestran aquí.",
+      "errors": {
+        "required": "Elija un archivo CSV.",
+        "extension": "El archivo debe ser un CSV con la extensión .csv.",
+        "tooLarge": "El archivo pesa más de 5 MB. Divídalo en varios archivos.",
+        "empty": "El archivo está vacío."
+      }
+    },
+    "template": "Descargar la plantilla vacía",
+    "simulate": "Simular la importación",
+    "simulating": "Simulando la importación. Esto puede tardar unos segundos.",
+    "simulated": "Simulación lista: {valid, plural, one {# fila se puede crear} other {# filas se pueden crear}}, {rejected, plural, one {# rechazada} other {# rechazadas}} y {skipped, plural, one {# ya importada} other {# ya importadas}}.",
+    "summary": {
+      "heading": "Resultado de la simulación",
+      "description": "Esto es lo que pasaría al aplicar el archivo. Todavía no se creó ningún estudiante.",
+      "total": "Filas del archivo",
+      "valid": "Se crearán",
+      "rejected": "Rechazadas",
+      "skipped": "Ya importadas, se omiten"
+    },
+    "rejections": {
+      "heading": "Filas rechazadas",
+      "caption": "Filas del archivo con su línea, su campo y su motivo",
+      "line": "Línea",
+      "field": "Campo",
+      "reason": "Motivo",
+      "description": "Corrija estas filas en el sistema de origen y simule de nuevo. El número de línea cuenta la cabecera como línea 1.",
+      "none": "Ninguna fila tiene defectos.",
+      "navigation": "Páginas de las filas rechazadas en la simulación",
+      "truncated": "Se muestran las primeras 200; hay más filas con defectos. Corrija estas y simule de nuevo para ver las demás.",
+      "download": "Descargar las líneas y los motivos",
+      "rowField": "Fila completa",
+      "unknownField": "Sin campo",
+      "csvHeader": {
+        "line": "Línea",
+        "field": "Campo",
+        "reason": "Motivo"
+      }
+    },
+    "reason": {
+      "required": "Falta el dato obligatorio.",
+      "invalid-format": "El formato no es válido.",
+      "too-long": "El dato es demasiado largo.",
+      "invalid-date": "La fecha no existe o es anterior al 1 de enero de 1990.",
+      "future-birth-date": "La fecha de nacimiento es posterior a hoy.",
+      "duplicate-in-file": "El dato se repite en una fila anterior del archivo.",
+      "duplicate-national-id": "Ya hay un estudiante con ese documento de identidad.",
+      "already-imported": "Ya se importó antes: se omite."
+    },
+    "noRows": {
+      "title": "No hay nada que crear",
+      "body": "Ninguna fila del archivo se puede crear. Corrija el archivo, o confirme que ya se importó, y simule de nuevo."
+    },
+    "apply": {
+      "action": "Aplicar la importación",
+      "dialogTitle": "Aplicar la importación",
+      "dialogDescription": "Confirme la creación de los estudiantes del archivo simulado.",
+      "willCreate": "{count, plural, one {Se creará # estudiante.} other {Se crearán # estudiantes.}}",
+      "notCreated": "{rejected, plural, one {# fila rechazada} other {# filas rechazadas}} y {skipped, plural, one {# fila ya importada} other {# filas ya importadas}} no se crean.",
+      "documentsLate": "Los documentos de identidad que ya existen en el sistema se revisan solo al aplicar, no en la simulación. Al aplicar pueden rechazarse más filas que las que mostró la simulación; esas filas no se crean y se listan con su línea, su campo y su motivo.",
+      "sameFile": "Se vuelve a validar el archivo y solo se aplica si es el mismo que se simuló. Aplicarlo otra vez no duplica a nadie.",
+      "confirm": "{count, plural, one {Crear # estudiante} other {Crear # estudiantes}}",
+      "cancel": "Cancelar",
+      "applying": "Creando los estudiantes. No cierre esta ventana."
+    },
+    "result": {
+      "heading": "Importación aplicada",
+      "done": "{created, plural, one {Se creó # estudiante.} other {Se crearon # estudiantes.}} {skipped, plural, one {# fila ya importada se omitió.} other {# filas ya importadas se omitieron.}} {rejected, plural, one {# fila rechazada no se creó.} other {# filas rechazadas no se crearon.}}",
+      "created": "Estudiantes creados",
+      "rejectionsHeading": "Filas rechazadas al aplicar",
+      "rejectionsDescription": "Estas filas no se crearon. Incluyen los documentos de identidad que ya existían en el sistema, que solo se revisan al aplicar. Corrija el origen, simule y aplique de nuevo el archivo corregido.",
+      "rejectionsCaption": "Filas rechazadas al aplicar, con su línea, su campo y su motivo",
+      "rejectionsNavigation": "Páginas de las filas rechazadas al aplicar",
+      "another": "Importar otro archivo",
+      "next": "Los estudiantes ya están en la lista de estudiantes. Si corrigió filas rechazadas, simule y aplique el archivo corregido: las filas ya importadas se omiten."
+    },
+    "failed": {
+      "title": "No se pudo completar la operación",
+      "simulateAgain": "Simular de nuevo este archivo"
+    },
+    "fileErrors": {
+      "emptyFile": "El archivo está vacío.",
+      "noRows": "El archivo solo tiene la cabecera. Agregue al menos una fila de estudiantes.",
+      "tooLarge": "El archivo pesa más de 5 MB. Divídalo en varios archivos.",
+      "tooManyRows": "El archivo tiene más de 10 000 filas. Divídalo en varios archivos.",
+      "malformedCsv": "El archivo no se pudo leer como CSV: revise las comillas de los campos.",
+      "invalidEncoding": "El archivo no está en UTF-8. En Excel use Guardar como, CSV UTF-8.",
+      "missingColumn": "Falta la columna obligatoria «{column}» en la cabecera.",
+      "unknownColumn": "La columna número {position} de la cabecera no está en la plantilla o está repetida. Descargue la plantilla vacía para ver las columnas válidas.",
+      "other": "El archivo no se pudo procesar. Revise que use la plantilla y vuelva a intentarlo."
+    },
+    "errors": {
+      "network": "No se pudo enviar el archivo al servidor. Revise su conexión; si el archivo cambió en su equipo desde que lo eligió, elíjalo otra vez.",
+      "rateLimited": "Se alcanzó el límite de importaciones por hora. Espere un rato e intente de nuevo.",
+      "applyUnknown": "No se pudo confirmar si la importación terminó. Puede aplicarla de nuevo sin riesgo: los estudiantes ya creados se omiten."
+    },
+    "history": {
+      "heading": "Historial de importaciones",
+      "caption": "Importaciones de estudiantes de la institución, de la más reciente a la más antigua",
+      "navigation": "Páginas del historial de importaciones",
+      "date": "Fecha",
+      "status": "Estado",
+      "total": "Filas",
+      "created": "Creados",
+      "rejected": "Rechazadas",
+      "skipped": "Omitidas",
+      "statusValidated": "Simulada",
+      "statusApplied": "Aplicada",
+      "loadFailed": "No se pudo cargar el historial de importaciones",
+      "emptyTitle": "Todavía no hay importaciones",
+      "emptyDescription": "Aquí aparecerá cada simulación y cada aplicación que haga, con sus conteos. Los archivos y los datos de los estudiantes no se guardan.",
+      "emptyAction": "Elegir un archivo"
     }
   }
 }

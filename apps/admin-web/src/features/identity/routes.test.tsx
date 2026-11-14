@@ -85,6 +85,7 @@ describe("the routes and the screens", () => {
       "/",
       "/enrollments",
       "/guardians",
+      "/imports",
       "/iniciar-sesion",
       "/iniciar-sesion/inscripcion",
       "/iniciar-sesion/verificacion",

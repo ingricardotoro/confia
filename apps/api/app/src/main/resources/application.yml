@@ -95,6 +95,25 @@ confia:
         restricted-interval: 1m
         restriction-cap: 1h
         max-entries: 50000
+      # The bulk imports (simulate and apply a file of students, docs/cortes/imports-students.md): a few runs an hour,
+      # per client address and per authenticated account. Each run reads a file of up to 5 MB and judges up to 10000
+      # rows, so the quota is far stricter than the general writes.
+      admin-import:
+        request-limit: 20
+        request-window: 1h
+        failure-threshold: 30
+        failure-window: 10m
+        restricted-interval: 1m
+        restriction-cap: 1h
+        max-entries: 50000
+      admin-import-account:
+        request-limit: 20
+        request-window: 1h
+        failure-threshold: 30
+        failure-window: 10m
+        restricted-interval: 1m
+        restriction-cap: 1h
+        max-entries: 50000
 
     delay:
       # The longest the answer of an authentication route is held back for its required delay
@@ -139,6 +158,19 @@ spring:
     # The worker has no web server, so without this the JVM would end when main returns (probe P-10;
     # WorkerStaysAliveTest). Inert in the web processes, whose server threads keep them alive.
     keep-alive: true
+  servlet:
+    multipart:
+      # The student import (docs/cortes/imports-students.md) is the only multipart route of the administrative process;
+      # the portal and the worker exclude this auto-configuration, and MultipartScopeFilter refuses a multipart request
+      # to any other path of the administrative process with 415 before it is read. A file is at most 5 MB, and a
+      # request at most 6 MB (the file plus the headers of the parts); a larger one is refused while it is read, with
+      # 400 validation-failed. file-size-threshold is left at the Spring default (0): the parts spill to a temporary
+      # file and are not held in the heap of the server. The container removes them when the request ends.
+      # resolve-lazily: the request is not parsed when it arrives but when the handler asks for the file, so the
+      # security chain, the permission decision and the rate limit answer first, without reading the body.
+      max-file-size: 5MB
+      max-request-size: 6MB
+      resolve-lazily: true
   jackson:
     deserialization:
       # A JSON property the body does not declare is refused with 400 validation-failed and is never

@@ -55,8 +55,8 @@ test.describe("paging and order, on the server and in the URL", () => {
     await expect(page.getByRole("columnheader", { name: "Fecha de nacimiento" })).toHaveAttribute("aria-sort", "ascending");
     expect(queries.at(-1)).toContain("sort=birthDate,asc");
     // The browser did not order them: the server did, so the page holds the 25 oldest by birth date of the whole registry.
-    const dates = (await bodyRows(page)).map((cells) => cells[3]);
-    expect(dates).toHaveLength(25);
+    // The rows are the 5 skeleton ones until the response lands, so wait for the full page instead of reading once.
+    await expect.poll(async () => (await bodyRows(page)).map((cells) => cells[3]).filter((date) => date !== "").length).toBe(25);
 
     await page.getByRole("columnheader", { name: "Código" }).getByRole("button").click();
     await expect.poll(async () => (await bodyRows(page))[0]?.[0]).toBe("E-000001");

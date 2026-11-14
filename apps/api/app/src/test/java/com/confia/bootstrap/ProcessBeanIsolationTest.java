@@ -130,7 +130,7 @@ class ProcessBeanIsolationTest {
                 assertThat(context.getBeansOfType(RateLimitMetrics.class)).hasSize(1);
                 assertThat(context.getBeansOfType(RateLimiter.class)).as("one limiter per policy")
                         .containsOnlyKeys("admin-login", "admin-mfa", "admin-session", "admin-read", "admin-write",
-                                "admin-read-account", "admin-write-account");
+                                "admin-read-account", "admin-write-account", "admin-import", "admin-import-account");
             } else {
                 assertThat(held).as("no rate limiter and no metrics adapter in the %s process",
                         policy.process()).isEmpty();

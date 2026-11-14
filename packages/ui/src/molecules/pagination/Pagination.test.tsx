@@ -13,6 +13,13 @@ describe("Pagination", () => {
     expect(screen.getByText("Página 2 de 5")).toBeVisible();
   });
 
+  it("takes its own accessible name when the screen has more than one pagination", () => {
+    renderWithI18n(<Pagination page={0} size={10} total={30} label="Filas rechazadas" onPageChange={vi.fn()} />);
+
+    expect(screen.getByRole("navigation", { name: "Filas rechazadas" })).toBeVisible();
+    expect(screen.queryByRole("navigation", { name: "Paginación" })).not.toBeInTheDocument();
+  });
+
   it("asks the server for the next and the previous page, zero-based", async () => {
     const user = userEvent.setup();
     const onPageChange = vi.fn();
