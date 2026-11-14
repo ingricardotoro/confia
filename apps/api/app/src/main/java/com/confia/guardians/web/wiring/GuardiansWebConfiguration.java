@@ -1,7 +1,9 @@
 package com.confia.guardians.web.wiring;
 
+import com.confia.guardians.application.ManageGuardianConsents;
 import com.confia.guardians.application.ManageGuardianLinks;
 import com.confia.guardians.application.ManageGuardians;
+import com.confia.guardians.web.GuardianConsentController;
 import com.confia.guardians.web.GuardianController;
 import com.confia.guardians.web.StudentGuardiansController;
 import org.springframework.context.annotation.Bean;
@@ -22,6 +24,11 @@ public class GuardiansWebConfiguration {
     @Bean
     GuardianController guardianController(ManageGuardians guardians) {
         return new GuardianController(guardians);
+    }
+
+    @Bean
+    GuardianConsentController guardianConsentController(ManageGuardianConsents consents) {
+        return new GuardianConsentController(consents);
     }
 
     @Bean

@@ -53,6 +53,7 @@ describe("the seven journeys of access", () => {
       "enrollments-keyboard.e2e.ts",
       "enrollments-lists.e2e.ts",
       "enrollments-states.e2e.ts",
+      "guardians-consents.e2e.ts",
       "guardians-crud.e2e.ts",
       "guardians-keyboard.e2e.ts",
       "guardians-links.e2e.ts",

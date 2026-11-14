@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import admin from "../../i18n/locales/es-HN/admin.json";
-import { guardian, guardianPage, guardianRecord, linkedStudent, problem } from "../../test/contract-responses.ts";
+import { guardian, guardianConsents, guardianPage, guardianRecord, linkedStudent, problem } from "../../test/contract-responses.ts";
 import { installMswServer, requests, route } from "../../test/msw-server.ts";
 import { renderFeature, TEST_TOKEN } from "../../test/render-feature.tsx";
 import { guardiansFeature } from "./feature.tsx";
@@ -38,6 +38,8 @@ async function loaded() {
 
 async function openList(rows: unknown[] = [guardian()], options: { path?: string; total?: number } = {}) {
   route("get", GUARDIANS, guardianPage(rows, options.total === undefined ? {} : { total: options.total }));
+  // The detail opens the consents section too: every detail test has them to read.
+  route("get", `${GUARDIANS}/:id/consents`, guardianConsents());
   const app = renderFeature(guardiansFeature, options.path ?? OPEN);
   await loaded();
   return app;

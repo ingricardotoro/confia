@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,13 +84,68 @@ public abstract class CommittingPostgresIntegrationTest extends PostgresIntegrat
         // targets untrusted, attacker-reachable input; these names come from pg_class, the server's
         // own catalog, never from a caller). Double-quoted so a mixed-case or reserved-word table
         // name — none exist today — would still truncate correctly instead of silently failing.
-        String quotedTableList = tables.stream()
+        List<GuardedTable> guarded = guardedTablesReferencingTruncatedOnes();
+        String fullList = Stream.concat(tables.stream(), guarded.stream().map(GuardedTable::name).distinct())
                 .map(name -> "\"" + name + "\"")
                 .collect(Collectors.joining(", "));
         try (Connection connection = SharedPostgresContainer.connectionAs("confia_owner");
                 var statement = connection.createStatement()) {
-            statement.execute("truncate table " + quotedTableList);
+            // One owner transaction: the TRUNCATE trigger of each guarded table (an append-only table that has a
+            // foreign key to a truncated table, for example the consent events of the guardians) is disabled, the
+            // tables are truncated together, and the trigger is enabled again before the commit. A failure rolls
+            // everything back, trigger state included. shared_audit_log and shared_audit_chain_head have no foreign
+            // key, so they never enter this set and stay out of the cleanup.
+            connection.setAutoCommit(false);
+            try {
+                for (GuardedTable table : guarded) {
+                    statement.execute("alter table \"" + table.name() + "\" disable trigger \"" + table.trigger()
+                            + "\"");
+                }
+                statement.execute("truncate table " + fullList);
+                for (GuardedTable table : guarded) {
+                    statement.execute("alter table \"" + table.name() + "\" enable trigger \"" + table.trigger()
+                            + "\"");
+                }
+                connection.commit();
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            }
         }
+    }
+
+    /** A table with a TRUNCATE trigger and the name of that trigger. */
+    record GuardedTable(String name, String trigger) {
+    }
+
+    /**
+     * The tables that carry a BEFORE TRUNCATE trigger and a foreign key to a table of {@link
+     * #tablesWithoutABeforeTruncateTrigger()}: a truncate of the referenced table cannot succeed without them.
+     * Derived from the catalog, like the main set.
+     */
+    List<GuardedTable> guardedTablesReferencingTruncatedOnes() throws SQLException {
+        List<GuardedTable> guarded = new ArrayList<>();
+        try (Connection connection = SharedPostgresContainer.connectionAs("confia_owner");
+                PreparedStatement statement = connection.prepareStatement("""
+                        select c.relname, t.tgname
+                          from pg_class c
+                          join pg_namespace n on n.oid = c.relnamespace
+                          join pg_trigger t on t.tgrelid = c.oid and not t.tgisinternal and (t.tgtype & 32) <> 0
+                         where n.nspname = 'public' and c.relkind = 'r'
+                           and exists (select 1 from pg_constraint k
+                                         join pg_class r on r.oid = k.confrelid
+                                         where k.conrelid = c.oid and k.contype = 'f'
+                                           and r.relnamespace = n.oid
+                                           and not exists (select 1 from pg_trigger rt
+                                                            where rt.tgrelid = r.oid and not rt.tgisinternal
+                                                              and (rt.tgtype & 32) <> 0))
+                        """);
+                ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                guarded.add(new GuardedTable(resultSet.getString(1), resultSet.getString(2)));
+            }
+        }
+        return guarded;
     }
 
     /**

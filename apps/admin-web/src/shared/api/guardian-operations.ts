@@ -1,10 +1,15 @@
 import {
+  ConsentChangeResponse,
+  GuardianConsentsResponse,
   GuardianPageResponse,
   GuardianResponse,
   StudentGuardiansResponse,
+  type ConsentChangeResponseOutput,
   type CreateGuardianRequest,
+  type GuardianConsentsResponseOutput,
   type GuardianPageResponseOutput,
   type GuardianResponseOutput,
+  type RecordConsentRequest,
   type ReplaceStudentGuardiansRequest,
   type StudentGuardiansResponseOutput,
   type UpdateGuardianRequest,
@@ -51,3 +56,20 @@ export const replaceStudentGuardians = (
   body: ReplaceStudentGuardiansRequest,
 ): Promise<ApiResult<StudentGuardiansResponseOutput>> =>
   request({ method: "PUT", path: studentLinksPath(studentId), headers: bearer(token), body, schema: StudentGuardiansResponse });
+
+const consentsPath = (guardianId: string): string => `/api/v1/guardians/${encodeURIComponent(guardianId)}/consents`;
+
+/** The current state of the six combinations of channel and purpose, and the history of events (newest first). Never holds contact data. */
+export const getGuardianConsents = (token: string, guardianId: string): Promise<ApiResult<GuardianConsentsResponseOutput>> =>
+  request({ method: "GET", path: consentsPath(guardianId), headers: bearer(token), schema: GuardianConsentsResponse });
+
+/**
+ * Records a grant or a withdrawal of one combination. It moves no money, so it has no `Idempotency-Key`: repeating the
+ * action that is already the current state is a no-op of the server (`changed: false`).
+ */
+export const recordGuardianConsent = (
+  token: string,
+  guardianId: string,
+  body: RecordConsentRequest,
+): Promise<ApiResult<ConsentChangeResponseOutput>> =>
+  request({ method: "POST", path: consentsPath(guardianId), headers: bearer(token), body, schema: ConsentChangeResponse });

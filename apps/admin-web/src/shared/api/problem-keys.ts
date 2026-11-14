@@ -37,5 +37,6 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "transfer-year-mismatch": "problem.transferYearMismatch",
   "invalid-responsibility-split": "problem.invalidResponsibilitySplit",
   "guardian-not-active": "problem.guardianNotActive",
+  "consent-channel-unavailable": "problem.consentChannelUnavailable",
   unknown: "problem.unexpected",
 };

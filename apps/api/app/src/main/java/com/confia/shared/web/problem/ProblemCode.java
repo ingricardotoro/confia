@@ -43,8 +43,10 @@ import java.util.Optional;
  * {@code 409}) and reuse {@link #INACTIVE_REFERENCE} (an inactive section), {@link #ACADEMIC_YEAR_CLOSED}
  * and {@link #VALIDATION_FAILED} (a date out of range, with the field). The guardians of {@code guardians} own
  * {@link #INVALID_RESPONSIBILITY_SPLIT} ({@code 400}, with the field and the rule that is broken) and {@link
- * #GUARDIAN_NOT_ACTIVE} ({@code 409}), reuse {@link #DUPLICATE_NATIONAL_ID} and {@link #STUDENT_NOT_ACTIVE} and
- * use {@link #RESOURCE_NOT_FOUND} for their {@code 404}. The
+ * #GUARDIAN_NOT_ACTIVE} ({@code 409}, also the answer to a grant of consent for an inactive guardian), reuse
+ * {@link #DUPLICATE_NATIONAL_ID} and {@link #STUDENT_NOT_ACTIVE} and use {@link #RESOURCE_NOT_FOUND} for their
+ * {@code 404}. The consents of {@code guardians} own {@link #CONSENT_CHANNEL_UNAVAILABLE} ({@code 409}: a grant for a
+ * channel the guardian has no contact data for) and use {@link #VALIDATION_FAILED} with the field. The
  * institution codes belong to a later change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
@@ -82,6 +84,7 @@ public enum ProblemCode {
     INVALID_ENROLLMENT_STATE("invalid-enrollment-state", 409),
     TRANSFER_YEAR_MISMATCH("transfer-year-mismatch", 409),
     GUARDIAN_NOT_ACTIVE("guardian-not-active", 409),
+    CONSENT_CHANNEL_UNAVAILABLE("consent-channel-unavailable", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
     IDEMPOTENCY_PAYLOAD_MISMATCH("idempotency-payload-mismatch", 422),
     TOO_MANY_REQUESTS("too-many-requests", 429),

@@ -1,5 +1,5 @@
 import { CreateGuardianRequest, ReplaceStudentGuardiansRequest, UpdateGuardianRequest } from "@confia/contracts/admin";
-import { guardianPage, guardianRecord, problem, studentGuardians, type ContractResponse } from "../../src/test/contract-responses.ts";
+import { consentChange, guardianConsents, guardianPage, guardianRecord, problem, studentGuardians, type ContractResponse } from "../../src/test/contract-responses.ts";
 import { emptyGuardians, seededGuardians, type GuardianRow, type GuardianRows, type LinkRow } from "./guardians-seed.ts";
 import type { ModelResponse } from "./session-model.ts";
 import type { StudentsModel } from "./students-model.ts";
@@ -32,7 +32,28 @@ const RTN = /^\d{4}-?\d{4}-?\d{6}$/;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const PHONE = /^\+?[0-9(][0-9 ()-]{5,18}[0-9]$/;
 const TWO_DECIMALS = /^\d+(?:\.\d{1,2})?$/;
+const CONSENT_CHANNELS = ["EMAIL", "SMS", "WHATSAPP"] as const;
+const CONSENT_PURPOSES = ["INSTITUTIONAL", "MARKETING"] as const;
+const CONSENT_MEMBERS = ["channel", "purpose", "action", "evidenceSource", "policyVersion"];
+const POLICY_VERSION = /^[A-Za-z0-9._-]{1,32}$/;
+const HISTORY_LIMIT = 100;
 const collator = new Intl.Collator("es");
+
+type ConsentChannel = (typeof CONSENT_CHANNELS)[number];
+type ConsentPurpose = (typeof CONSENT_PURPOSES)[number];
+type ConsentEvidence = "SIGNED_PAPER_FORM" | "ADMIN_REGISTERED";
+
+/** One event of the append-only log of consents the simulator keeps; the current state is always the last event of a combination. */
+interface ConsentEventRow {
+  id: string;
+  guardianId: string;
+  channel: ConsentChannel;
+  purpose: ConsentPurpose;
+  action: "GRANT" | "WITHDRAW";
+  evidenceSource: ConsentEvidence;
+  policyVersion: string | null;
+  occurredAt: string;
+}
 
 export interface GuardiansOptions {
   readonly seed: "empty" | "seeded";
@@ -82,6 +103,8 @@ export function createGuardiansModel(
   let reads = 0;
   let counter = data.guardians.length;
   let linkCounter = 100;
+  const consentEvents: ConsentEventRow[] = [];
+  let consentCounter = 0;
 
   const today = (): string => new Date(now().getTime() - 6 * 3_600_000).toISOString().slice(0, 10);
   const studentOf = (id: string) => context.students.rows().students.find((row) => row.id === id);
@@ -238,6 +261,94 @@ export function createGuardiansModel(
     return row === undefined ? failure("resource-not-found", 404) : wrap(guardianRecord(present(row, true)));
   }
 
+  const lastEvent = (guardianId: string, channel: ConsentChannel, purpose: ConsentPurpose): ConsentEventRow | undefined =>
+    consentEvents.findLast((event) => event.guardianId === guardianId && event.channel === channel && event.purpose === purpose);
+
+  function standing(guardianId: string, channel: ConsentChannel, purpose: ConsentPurpose) {
+    const last = lastEvent(guardianId, channel, purpose);
+    if (last === undefined) return { channel, purpose, state: "NEVER_GRANTED" as const, since: null, policyVersion: null, evidenceSource: null };
+    return {
+      channel,
+      purpose,
+      state: last.action === "GRANT" ? ("GRANTED" as const) : ("WITHDRAWN" as const),
+      since: last.occurredAt,
+      policyVersion: last.policyVersion,
+      evidenceSource: last.evidenceSource,
+    };
+  }
+
+  function readConsents(id: string): ModelResponse {
+    if (!data.guardians.some((row) => row.id === id)) return failure("resource-not-found", 404);
+    const states = CONSENT_CHANNELS.flatMap((channel) => CONSENT_PURPOSES.map((purpose) => standing(id, channel, purpose)));
+    const history = consentEvents
+      .filter((event) => event.guardianId === id)
+      .reverse()
+      .slice(0, HISTORY_LIMIT)
+      .map((event) => ({
+        id: event.id,
+        channel: event.channel,
+        purpose: event.purpose,
+        action: event.action,
+        evidenceSource: event.evidenceSource,
+        policyVersion: event.policyVersion,
+        occurredAt: event.occurredAt,
+      }));
+    return wrap(guardianConsents(states, history, id));
+  }
+
+  /** The rules of the shape of a consent request, with the field and reason the server names. */
+  function consentViolations(body: Record<string, unknown>): Violation[] {
+    const errors: Violation[] = [];
+    if (!(CONSENT_CHANNELS as readonly unknown[]).includes(body.channel)) errors.push({ field: "channel", reason: body.channel === undefined ? "not-null" : "pattern" });
+    if (body.action !== "GRANT" && body.action !== "WITHDRAW") errors.push({ field: "action", reason: body.action === undefined ? "not-null" : "pattern" });
+    if (typeof body.purpose === "string" && body.purpose.toUpperCase() === "TRANSACTIONAL") errors.push({ field: "purpose", reason: "not-consentable" });
+    else if (!(CONSENT_PURPOSES as readonly unknown[]).includes(body.purpose)) errors.push({ field: "purpose", reason: body.purpose === undefined ? "not-null" : "invalid" });
+    if (body.evidenceSource === "PORTAL_FORM") errors.push({ field: "evidenceSource", reason: "not-allowed" });
+    else if (body.evidenceSource !== "SIGNED_PAPER_FORM" && body.evidenceSource !== "ADMIN_REGISTERED") errors.push({ field: "evidenceSource", reason: body.evidenceSource === undefined ? "not-null" : "invalid" });
+    const version = body.policyVersion;
+    if (body.action === "GRANT" && version === undefined) errors.push({ field: "policyVersion", reason: "required" });
+    else if (body.action === "WITHDRAW" && version !== undefined) errors.push({ field: "policyVersion", reason: "not-allowed" });
+    else if (version !== undefined && (typeof version !== "string" || !POLICY_VERSION.test(version))) errors.push({ field: "policyVersion", reason: "pattern" });
+    return errors;
+  }
+
+  function recordConsent(id: string, body: unknown): ModelResponse {
+    if (options.writes === "forbidden") return failure("forbidden", 403);
+    if (typeof body !== "object" || body === null || Array.isArray(body)) return invalid([{ field: "body", reason: "invalid" }]);
+    const unknown = Object.keys(body).filter((name) => !CONSENT_MEMBERS.includes(name));
+    if (unknown.length > 0) return invalid(unknown.map((field) => ({ field, reason: "unknown" })));
+    const errors = consentViolations(body as Record<string, unknown>);
+    if (errors.length > 0) return invalid(errors);
+    const request = body as { channel: ConsentChannel; purpose: ConsentPurpose; action: "GRANT" | "WITHDRAW"; evidenceSource: ConsentEvidence; policyVersion?: string };
+    const guardian = data.guardians.find((row) => row.id === id);
+    if (guardian === undefined) return failure("resource-not-found", 404);
+    if (request.action === "GRANT") {
+      if (guardian.status !== "ACTIVE") return failure("guardian-not-active", 409);
+      const contact = request.channel === "EMAIL" ? guardian.email : guardian.phone;
+      if (contact === null || contact === "") return failure("consent-channel-unavailable", 409);
+    }
+    const current = lastEvent(id, request.channel, request.purpose);
+    // Repeating the current state writes nothing. A grant over a grant that carries another policy version or another evidence is a real change.
+    const repeats =
+      current !== undefined &&
+      current.action === request.action &&
+      (request.action === "WITHDRAW" || (current.policyVersion === (request.policyVersion ?? null) && current.evidenceSource === request.evidenceSource));
+    if (!repeats) {
+      consentCounter += 1;
+      consentEvents.push({
+        id: `00000000-0000-4000-8000-${String(7000 + consentCounter).padStart(12, "0")}`,
+        guardianId: id,
+        channel: request.channel,
+        purpose: request.purpose,
+        action: request.action,
+        evidenceSource: request.evidenceSource,
+        policyVersion: request.action === "GRANT" ? (request.policyVersion ?? null) : null,
+        occurredAt: now().toISOString().replace(/\.\d+Z$/, "Z"),
+      });
+    }
+    return wrap(consentChange({ ...standing(id, request.channel, request.purpose), changed: !repeats }));
+  }
+
   const linksOf = (studentId: string): LinkRow[] => data.links.filter((link) => link.studentId === studentId);
 
   function setOf(studentId: string): ModelResponse {
@@ -338,6 +449,12 @@ export function createGuardiansModel(
   return {
     rows: () => data,
     handle({ method, path, query, body }) {
+      const consents = /^\/api\/v1\/guardians\/([^/]+)\/consents$/.exec(path);
+      if (consents?.[1] !== undefined) {
+        if (method === "GET") return readConsents(consents[1]);
+        if (method === "POST") return recordConsent(consents[1], body);
+        return undefined;
+      }
       const guardians = /^\/api\/v1\/guardians(?:\/([^/]+))?$/.exec(path);
       if (guardians !== null) {
         const id = guardians[1];

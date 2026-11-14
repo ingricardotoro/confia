@@ -1,10 +1,17 @@
-import type { ReplaceStudentGuardiansRequest, StudentGuardiansResponseOutput } from "@confia/contracts/admin";
+import type {
+  ConsentChangeResponseOutput,
+  RecordConsentRequest,
+  ReplaceStudentGuardiansRequest,
+  StudentGuardiansResponseOutput,
+} from "@confia/contracts/admin";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthorizedSend } from "../../shared/api/authorized-send.tsx";
 import {
   getGuardian,
+  getGuardianConsents,
   getStudentGuardians,
   listGuardians,
+  recordGuardianConsent,
   replaceStudentGuardians,
   type GuardianListParams,
 } from "../../shared/api/guardian-operations.ts";
@@ -97,6 +104,40 @@ export function useReplaceStudentGuardians(studentId: string) {
   const { mutateAsync, reset } = mutation;
 
   return async (body: ReplaceStudentGuardiansRequest): Promise<StudentGuardiansResponseOutput> => {
+    try {
+      return await mutateAsync(body);
+    } finally {
+      reset();
+    }
+  };
+}
+
+/** The state of the six combinations of channel and purpose of a guardian, and the history of events. It is read while the section is open. */
+export function useGuardianConsents(guardianId: string) {
+  const send = useAuthorizedSend();
+  return useQuery({
+    queryKey: guardianKeys.consents(guardianId),
+    queryFn: () => send((token) => getGuardianConsents(token, guardianId)),
+  });
+}
+
+/**
+ * A grant or a withdrawal of one combination. It moves no money, so it sends no `Idempotency-Key`, nothing is optimistic (the
+ * matrix shows what the server answers on the next read) and it never repeats by itself; the form blocks a second send while
+ * one is in flight. Afterwards the consents of this guardian are read again: the server decides the state, and a repeat of the
+ * current state wrote nothing (`changed: false`).
+ */
+export function useRecordConsent(guardianId: string) {
+  const send = useAuthorizedSend();
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    gcTime: 0,
+    mutationFn: (body: RecordConsentRequest) => send((token) => recordGuardianConsent(token, guardianId, body)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: guardianKeys.consents(guardianId) }),
+  });
+  const { mutateAsync, reset } = mutation;
+
+  return async (body: RecordConsentRequest): Promise<ConsentChangeResponseOutput> => {
     try {
       return await mutateAsync(body);
     } finally {

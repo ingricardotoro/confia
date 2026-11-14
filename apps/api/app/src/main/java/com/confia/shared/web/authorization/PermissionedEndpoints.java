@@ -33,7 +33,8 @@ public final class PermissionedEndpoints {
      * students:create} and {@code PUT} needs {@code students:update}, and the six routes of the enrollments: the reads need {@code students:read}, the
      * enrollment {@code students:create} and the transfer and the exit {@code students:update}, and the six routes of
      * the guardians: the reads need {@code guardians:read}, the creation {@code guardians:create} and the edit and the
-     * replacement of the guardians of a student {@code guardians:update}. A route of a later
+     * replacement of the guardians of a student {@code guardians:update}, and the two routes of the consent of a
+     * guardian for communications: the read needs {@code guardians:read} and the recording {@code guardians:update}. A route of a later
      * change is added here, in the same commit as its controller.
      */
     public static PermissionedEndpoints forAdmin() {
@@ -73,6 +74,10 @@ public final class PermissionedEndpoints {
         endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/guardians",
                 Permission.GUARDIANS_CREATE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/guardians/{id}",
+                Permission.GUARDIANS_UPDATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/guardians/{id}/consents",
+                Permission.GUARDIANS_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/guardians/{id}/consents",
                 Permission.GUARDIANS_UPDATE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/students/{studentId}/guardians",
                 Permission.GUARDIANS_READ));

@@ -86,7 +86,9 @@
     "splitMultipleBillingRecipient": "Solo un encargado puede ser el destinatario de la factura. Deje marcado a uno solo.",
     "splitDuplicateGuardian": "Un mismo encargado aparece más de una vez. Deje una sola fila por encargado.",
     "duplicateGuardianNationalId": "Ya hay un encargado registrado con ese documento de identidad. Revise el número; los guiones no cuentan.",
-    "studentNotActiveForGuardians": "El estudiante está inactivo y no admite cambios en sus encargados. Actívelo en la lista de estudiantes e intente de nuevo."
+    "studentNotActiveForGuardians": "El estudiante está inactivo y no admite cambios en sus encargados. Actívelo en la lista de estudiantes e intente de nuevo.",
+    "consentChannelUnavailable": "El encargado no tiene registrado el dato de este canal: correo electrónico para el canal de correo, teléfono para mensaje de texto y WhatsApp. Agréguelo en la lista de encargados e intente de nuevo.",
+    "guardianNotActiveForConsent": "El encargado está inactivo y no se puede registrar un consentimiento nuevo. Actívelo en la lista de encargados; registrar una revocación siempre es posible."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -106,7 +108,10 @@
     "emailFormat": "Escriba un correo con el formato nombre@dominio.com.",
     "phoneFormat": "El teléfono debe tener de 7 a 20 caracteres: dígitos, espacios, paréntesis y guiones, con un signo más al inicio si lo necesita.",
     "percentFormat": "Escriba el porcentaje con punto y a lo sumo dos decimales, por ejemplo 33.33.",
-    "percentRange": "El porcentaje debe estar entre 0.01 y 100."
+    "percentRange": "El porcentaje debe estar entre 0.01 y 100.",
+    "policyVersionFormat": "La versión de la política debe tener de 1 a 32 caracteres: letras, números, puntos, guiones y guiones bajos, sin espacios.",
+    "notConsentable": "Esta finalidad no se basa en consentimiento y no se registra aquí.",
+    "notAllowed": "Este dato no se admite aquí."
   },
   "countdown": {
     "remaining": "Puede intentar de nuevo en {seconds} s.",
@@ -608,6 +613,68 @@
       "failed": "No se pudo buscar encargados.",
       "retry": "Reintentar búsqueda",
       "optionText": "{name} · {code}"
+    },
+    "consents": {
+      "heading": "Consentimientos",
+      "intro": "Estado vigente de cada canal y finalidad, tal como lo guarda el servidor. Nada viene marcado de antemano: cada consentimiento se registra por separado, con su evidencia. Los avisos de cobro, mora, facturas y seguridad no necesitan consentimiento y no se registran aquí.",
+      "loading": "Cargando los consentimientos del encargado.",
+      "loadFailed": "No se pudieron cargar los consentimientos",
+      "inactiveNote": "El encargado está inactivo: no se puede registrar un consentimiento nuevo, pero sí una revocación.",
+      "matrixCaption": "Estado vigente del consentimiento por canal y finalidad",
+      "channelHeader": "Canal",
+      "purpose": {
+        "INSTITUTIONAL": "Institucional",
+        "MARKETING": "Mercadeo"
+      },
+      "state": {
+        "GRANTED": "Concedido",
+        "WITHDRAWN": "Revocado",
+        "NEVER_GRANTED": "Sin consentimiento registrado"
+      },
+      "since": "Desde {date}",
+      "policy": "Política {version}",
+      "evidence": {
+        "SIGNED_PAPER_FORM": "Formulario en papel firmado",
+        "ADMIN_REGISTERED": "Registrado por el personal",
+        "PORTAL_FORM": "Formulario del portal"
+      },
+      "grant": "Registrar consentimiento",
+      "grantFor": "Registrar consentimiento: {channel}, {purpose}",
+      "withdraw": "Registrar revocación",
+      "withdrawFor": "Registrar revocación: {channel}, {purpose}",
+      "form": {
+        "grantTitle": "Registrar consentimiento · {channel} · {purpose}",
+        "withdrawTitle": "Registrar revocación · {channel} · {purpose}",
+        "withdrawHelp": "La revocación es inmediata y queda en el historial. No lleva versión de política.",
+        "policyVersion": "Versión de la política de privacidad",
+        "policyVersionHelp": "Por ejemplo 2026-01. De 1 a 32 letras, números, puntos, guiones o guiones bajos.",
+        "evidence": "Evidencia",
+        "evidenceHelp": "Cómo consta la decisión del encargado.",
+        "evidencePlaceholder": "Elija la evidencia",
+        "cancel": "Cancelar",
+        "saving": "Registrando el cambio de consentimiento."
+      },
+      "result": {
+        "grantChanged": "Se registró el consentimiento de {channel} para la finalidad {purpose}.",
+        "withdrawChanged": "Se registró la revocación de {channel} para la finalidad {purpose}.",
+        "grantUnchanged": "Sin cambios: el consentimiento de {channel} para la finalidad {purpose} ya estaba concedido. No se agregó ningún evento al historial.",
+        "withdrawUnchanged": "Sin cambios: el consentimiento de {channel} para la finalidad {purpose} ya estaba revocado. No se agregó ningún evento al historial."
+      },
+      "history": {
+        "heading": "Historial de consentimientos",
+        "caption": "Eventos de consentimiento, del más reciente al más antiguo",
+        "empty": "Todavía no hay eventos de consentimiento para este encargado.",
+        "limit": "Se muestran los {count} eventos más recientes.",
+        "date": "Fecha y hora",
+        "channel": "Canal",
+        "purpose": "Finalidad",
+        "action": "Acción",
+        "policy": "Política",
+        "evidence": "Evidencia",
+        "action_GRANT": "Concesión",
+        "action_WITHDRAW": "Revocación",
+        "noPolicy": "—"
+      }
     }
   }
 }

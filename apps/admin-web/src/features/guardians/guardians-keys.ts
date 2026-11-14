@@ -1,6 +1,6 @@
 /**
  * Query keys of the guardians, general to specific, so a prefix invalidates what it covers: all of them, every list,
- * every detail, every set of links of a student, one of each. Nothing writes a literal key inline. A key holds the search
+ * every detail, every set of links of a student, every set of consents of a guardian, one of each. Nothing writes a literal key inline. A key holds the search
  * the server was asked and ids; it never holds a name, a document or an RTN.
  */
 export const guardianKeys = {
@@ -9,6 +9,8 @@ export const guardianKeys = {
   list: (params: object) => [...guardianKeys.lists(), params] as const,
   details: () => [...guardianKeys.all, "detail"] as const,
   detail: (id: string) => [...guardianKeys.details(), id] as const,
+  consentsAll: () => [...guardianKeys.all, "consents"] as const,
+  consents: (id: string) => [...guardianKeys.consentsAll(), id] as const,
   studentLinksAll: () => [...guardianKeys.all, "student-links"] as const,
   studentLinks: (studentId: string) => [...guardianKeys.studentLinksAll(), studentId] as const,
 };

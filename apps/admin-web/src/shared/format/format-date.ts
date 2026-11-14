@@ -8,3 +8,11 @@ export function formatIsoDate(isoDate: string, locale: string = DEFAULT_ADMIN_LA
   const [year = 0, month = 1, day = 1] = isoDate.split("-").map(Number);
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, day)));
 }
+
+/** The zone of the institution (Honduras has no daylight saving time), so an instant reads the same wherever the browser is. */
+const INSTITUTION_TIME_ZONE = "America/Tegucigalpa";
+
+/** An instant with its zone offset, as the server sends it (`2026-11-02T15:30:00Z`), written as a date and a time in the institution's zone. */
+export function formatInstant(instant: string, locale: string = DEFAULT_ADMIN_LANGUAGE): string {
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: INSTITUTION_TIME_ZONE }).format(new Date(instant));
+}

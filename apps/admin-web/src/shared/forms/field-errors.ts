@@ -66,6 +66,12 @@ export function fieldErrorKey(reason: string): AdminKey {
     case "decimal-min":
     case "decimal-max":
       return "field.percentRange";
+    case "policy-version-format":
+      return "field.policyVersionFormat";
+    case "not-consentable":
+      return "field.notConsentable";
+    case "not-allowed":
+      return "field.notAllowed";
     default:
       return "field.invalid";
   }
