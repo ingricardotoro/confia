@@ -682,7 +682,7 @@ export function createImportsModel(options: ImportsOptions, now: () => Date = ()
     if (typeof academicYearId !== "string" || !UUID.test(academicYearId)) errors.push({ field: "academicYearId", reason: academicYearId === undefined ? "not-null" : "invalid-format" });
     if (typeof officialReference !== "string" || officialReference.trim() === "") errors.push({ field: "officialReference", reason: "not-blank" });
     else if (officialReference.length > MAX_REFERENCE) errors.push({ field: "officialReference", reason: "size" });
-    else if (/\p{Cc}/u.test(officialReference)) errors.push({ field: "officialReference", reason: "pattern" });
+    else if (!/^(?=.*\d)[\p{L}\p{N} .,/#°_-]+$/u.test(officialReference)) errors.push({ field: "officialReference", reason: "pattern" });
     if (typeof officialEnrollmentCount !== "number" || !Number.isInteger(officialEnrollmentCount)) errors.push({ field: "officialEnrollmentCount", reason: "not-null" });
     else if (officialEnrollmentCount < 0) errors.push({ field: "officialEnrollmentCount", reason: "min" });
     else if (officialEnrollmentCount > MAX_OFFICIAL_COUNT) errors.push({ field: "officialEnrollmentCount", reason: "max" });

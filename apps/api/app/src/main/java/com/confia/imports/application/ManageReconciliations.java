@@ -28,6 +28,9 @@ import java.util.UUID;
  */
 public final class ManageReconciliations {
 
+    /** The largest total of an official roster the record accepts (also limited at the web edge). */
+    public static final int MAX_OFFICIAL_COUNT = 1_000_000;
+
     private final TransactionRunner transactionRunner;
     private final ImportBatchRepository batches;
     private final ReconciliationRepository reconciliations;
@@ -67,7 +70,7 @@ public final class ManageReconciliations {
      * transaction. The reference is trimmed first.
      *
      * @throws ResourceNotFoundException when the year does not exist in the institution
-     * @throws IllegalArgumentException when the reference or the total is not one the record accepts (the edge
+     * @throws RejectedReconciliationException when the reference or the total is not one the record accepts (the edge
      *     validates the same bounds first)
      */
     public ReconciliationView sign(AuthenticatedActor actor, String requestId, UUID academicYearId,
@@ -78,6 +81,12 @@ public final class ManageReconciliations {
         UUID auditRequestId = ImportsAudit.requestId(Objects.requireNonNull(requestId, "requestId"));
         InstitutionId institution = new InstitutionId(actor.institutionId());
         String reference = officialReference.strip();
+        if (!Reconciliation.isValidReference(reference)) {
+            throw new RejectedReconciliationException("officialReference");
+        }
+        if (officialEnrollmentCount < 0 || officialEnrollmentCount > MAX_OFFICIAL_COUNT) {
+            throw new RejectedReconciliationException("officialEnrollmentCount");
+        }
         return transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
             Counts counts = countsOf(institution, academicYearId);
             Reconciliation signed = new Reconciliation(UUID.randomUUID(), academicYearId, reference,

@@ -1411,10 +1411,10 @@
             "type" : "integer"
           },
           "officialReference" : {
-            "description" : "Reference of the official roster (for example an office document number); never a name or a document of a person",
+            "description" : "Number of the document of the official roster (for example Oficio 123-2026): letters, digits, spaces and . , / # ° _ - only, with at least one digit and nothing shaped like an identity number. It is kept forever in a record nobody can correct: never a name or a document of a person",
             "maxLength" : 100,
             "minLength" : 0,
-            "pattern" : "^[^\\p{Cc}]*$",
+            "pattern" : "^(?=.*\\d)[\\p{L}\\p{N} .,/#°_-]+$",
             "type" : "string"
           }
         },
@@ -4780,7 +4780,7 @@
         "x-required-permission" : "students:read"
       },
       "post" : {
-        "description" : "Records, for an academic year, what the import created and left rejected of each kind and the active enrollments of the year, next to the total the official roster declares and the reference of that roster. The server computes every count; the signer only says the year, the reference and the total. The record is never changed or deleted: signing again keeps both. Needs the permission students:create.",
+        "description" : "Records, for an academic year, what the import created and left rejected of each kind and the active enrollments of the year, next to the total the official roster declares and the reference of that roster. The server computes every count; the signer only says the year, the reference and the total. The record is never changed or deleted: signing again keeps both. The import counts are those of the whole institution (a batch has no academic year); only the active enrollments are of the year. Needs the permission students:create.",
         "operationId" : "signReconciliation",
         "requestBody" : {
           "content" : {
@@ -4883,7 +4883,7 @@
     },
     "/api/v1/imports/reconciliations/preview" : {
       "get" : {
-        "description" : "The counts a reconciliation signed now for the academic year would record: what the import created and left rejected of each kind and the active enrollments of the year. Nothing is written. Needs the permission students:read.",
+        "description" : "The counts a reconciliation signed now for the academic year would record: what the import created and left rejected of each kind and the active enrollments of the year. Nothing is written. The import counts are those of the whole institution (a batch has no academic year); only the active enrollments are of the year. Needs the permission students:read.",
         "operationId" : "previewReconciliation",
         "parameters" : [ {
           "description" : "The academic year",

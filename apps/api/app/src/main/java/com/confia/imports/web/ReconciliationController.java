@@ -2,10 +2,14 @@ package com.confia.imports.web;
 
 import com.confia.imports.application.ManageReconciliations;
 import com.confia.imports.application.Page;
+import com.confia.imports.application.RejectedReconciliationException;
 import com.confia.imports.application.ReconciliationPreview;
 import com.confia.imports.application.ReconciliationView;
 import com.confia.imports.application.ReconciliationView.KindCountView;
 import com.confia.shared.web.openapi.ContractSchemas;
+import com.confia.shared.web.problem.FieldViolation;
+import com.confia.shared.web.problem.ProblemCode;
+import com.confia.shared.web.problem.ProblemCodeException;
 import com.confia.shared.web.ratelimit.RateLimitKey;
 import com.confia.shared.web.ratelimit.RateLimited;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,6 +24,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -62,7 +67,8 @@ public class ReconciliationController {
                     + "active enrollments of the year, next to the total the official roster declares and the "
                     + "reference of that roster. The server computes every count; the signer only says the year, the "
                     + "reference and the total. The record is never changed or deleted: signing again keeps both. "
-                    + "Needs the permission students:create.",
+                    + "The import counts are those of the whole institution (a batch has no academic year); only the active "
+                    + "enrollments are of the year. Needs the permission students:create.",
             security = @SecurityRequirement(name = ContractSchemas.BEARER_AUTH),
             extensions = @Extension(properties =
                     @ExtensionProperty(name = "x-required-permission", value = "students:create")))
@@ -89,8 +95,13 @@ public class ReconciliationController {
     @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     public ReconciliationResponse sign(@Valid @RequestBody SignReconciliationRequest request) {
-        return toResponse(reconciliations.sign(RequestContext.actor(), RequestContext.requestId(),
-                request.academicYearId(), request.officialReference(), request.officialEnrollmentCount()));
+        try {
+            return toResponse(reconciliations.sign(RequestContext.actor(), RequestContext.requestId(),
+                    request.academicYearId(), request.officialReference(), request.officialEnrollmentCount()));
+        } catch (RejectedReconciliationException e) {
+            throw new ProblemCodeException(ProblemCode.VALIDATION_FAILED,
+                    List.of(new FieldViolation(e.field(), "invalid")));
+        }
     }
 
     @GetMapping(path = "/preview", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -99,7 +110,8 @@ public class ReconciliationController {
     @Operation(operationId = "previewReconciliation", tags = TAG, summary = "Previews the reconciliation of the migration",
             description = "The counts a reconciliation signed now for the academic year would record: what the import "
                     + "created and left rejected of each kind and the active enrollments of the year. Nothing is "
-                    + "written. Needs the permission students:read.",
+                    + "written. The import counts are those of the whole institution (a batch has no academic year); only "
+                    + "the active enrollments are of the year. Needs the permission students:read.",
             security = @SecurityRequirement(name = ContractSchemas.BEARER_AUTH),
             extensions = @Extension(properties =
                     @ExtensionProperty(name = "x-required-permission", value = "students:read")))

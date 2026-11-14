@@ -34,13 +34,24 @@ describe("the validation of the form of the acta", () => {
 
   it("takes a reference of only spaces as empty, of 1 and of the longest length as valid, and one character more as too long", () => {
     expect(validateReconciliation({ ...valid, officialReference: "   " }).officialReference).toBe("required");
-    expect(validateReconciliation({ ...valid, officialReference: "A" })).toEqual({});
-    expect(validateReconciliation({ ...valid, officialReference: "A".repeat(MAX_REFERENCE_LENGTH) })).toEqual({});
-    expect(validateReconciliation({ ...valid, officialReference: "A".repeat(MAX_REFERENCE_LENGTH + 1) }).officialReference).toBe("too-long");
+    expect(validateReconciliation({ ...valid, officialReference: "7" })).toEqual({});
+    expect(validateReconciliation({ ...valid, officialReference: "1".repeat(MAX_REFERENCE_LENGTH) })).toEqual({});
+    expect(validateReconciliation({ ...valid, officialReference: "1".repeat(MAX_REFERENCE_LENGTH + 1) }).officialReference).toBe("too-long");
   });
 
   it("refuses a reference with a control character", () => {
     expect(validateReconciliation({ ...valid, officialReference: "Oficio\u0007" }).officialReference).toBe("format");
+  });
+
+  it.each(["Juan Perez", "Oficio", "Oficio 1‮", "Oficio <b>1</b>", "Oficio 1;"])(
+    "refuses the reference %s: it is the number of a document, not a name or a symbol",
+    (reference) => {
+      expect(validateReconciliation({ ...valid, officialReference: reference }).officialReference).toBe("format");
+    },
+  );
+
+  it.each(["Oficio 123-2026", "No. 45/2026 #3", "OF_2026-0045"])("accepts the reference %s", (reference) => {
+    expect(validateReconciliation({ ...valid, officialReference: reference })).toEqual({});
   });
 
   it.each(["-1", "1.5", "12a", "1 000", "-0"])("refuses the total %s with the message of a whole number", (total) => {

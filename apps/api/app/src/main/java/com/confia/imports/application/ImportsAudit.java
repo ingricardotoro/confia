@@ -66,10 +66,12 @@ final class ImportsAudit {
                 .number("createdRows", batch.createdRows()).number("skippedRows", batch.skippedRows()).toJson();
     }
 
-    /** The signing of a reconciliation: the year, the counts and the reference of the roster, nothing of a person. */
+    /**
+     * The signing of a reconciliation: the year and the counts, nothing of a person. The reference the signer typed is
+     * not copied here (the identifier of the record leads to it): the audit trail is never corrected.
+     */
     static AuditEntry reconciliationSigned(AuthenticatedActor actor, UUID requestId, Reconciliation record) {
         String after = AuditJson.object().text("academicYearId", record.academicYearId().toString())
-                .text("officialReference", record.officialReference())
                 .number("officialEnrollmentCount", record.officialEnrollmentCount())
                 .number("enrollmentsActive", record.enrollmentsActive())
                 .number("studentsCreated", record.students().created())

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.imports.domain.Reconciliation.KindCount;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -27,8 +28,8 @@ class ReconciliationTest {
 
     @Test
     void aReferenceOfOneAndOfTheMaximumLengthIsAccepted() {
-        assertThat(record("A", 0, 0).officialReference()).isEqualTo("A");
-        String longest = "x".repeat(Reconciliation.MAX_REFERENCE_LENGTH);
+        assertThat(record("7", 0, 0).officialReference()).isEqualTo("7");
+        String longest = "1" + "x".repeat(Reconciliation.MAX_REFERENCE_LENGTH - 1);
         assertThat(record(longest, 0, 0).officialReference()).isEqualTo(longest);
     }
 
@@ -44,6 +45,19 @@ class ReconciliationTest {
         assertThat(Reconciliation.isValidReference(null)).isFalse();
         assertThatThrownBy(() -> record(" OF-1", 0, 0)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> record("", 0, 0)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aReferenceIsTheNumberOfADocumentNotAPersonNorAnIdentityNumber() {
+        for (String accepted : List.of("Oficio 123-2026", "No. 45/2026 #3", "OF_2026-0045", "Memorando 7, 2026",
+                "Ofício 12")) {
+            assertThat(Reconciliation.isValidReference(accepted)).as(accepted).isTrue();
+        }
+        for (String refused : List.of("Juan Perez", "Oficio", "0801-1990-12345", "0801199012345",
+                "Oficio 0801-1990-12345", "Oficio 0801 1990 12345 x 1", "Oficio <b>1</b>", "Oficio 1; drop", "Oficio\t1",
+                "Oficio 1‮", "Oficio​1", "Oficio 1 ", "Oficio 1\"")) {
+            assertThat(Reconciliation.isValidReference(refused)).as(refused).isFalse();
+        }
     }
 
     @Test

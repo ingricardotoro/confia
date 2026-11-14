@@ -32,14 +32,14 @@ export const MAX_OFFICIAL_COUNT = signReconciliationRequestOfficialEnrollmentCou
 /** What the schema checks. The total is a number when it is written as a whole one, and the text itself otherwise, so the schema refuses it. */
 const candidateOf = (values: ReconciliationValues): unknown => ({
   academicYearId: values.academicYearId,
-  officialReference: values.officialReference,
+  officialReference: values.officialReference.trim(),
   officialEnrollmentCount: wholeNumberOf(values.officialEnrollmentCount),
 });
 
 /** The body of the signing. Only valid values reach it; the server counts everything else. */
 export const reconciliationBodyOf = (values: ReconciliationValues): SignReconciliationRequest => ({
   academicYearId: values.academicYearId,
-  officialReference: values.officialReference,
+  officialReference: values.officialReference.trim(),
   officialEnrollmentCount: Number(values.officialEnrollmentCount),
 });
 

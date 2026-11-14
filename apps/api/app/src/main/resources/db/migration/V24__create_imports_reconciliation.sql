@@ -32,7 +32,7 @@ CREATE TABLE imports_reconciliation (
         REFERENCES organization_academic_year (institution_id, id),
     CONSTRAINT imports_reconciliation_reference_chk CHECK (
         length(official_reference) > 0 AND official_reference = btrim(official_reference)
-        AND official_reference !~ '[[:cntrl:]]'),
+        AND official_reference ~ '^[^\u0001-\u001F\u007F-\u009F​-‏ -‮⁠-⁯]+$'),
     CONSTRAINT imports_reconciliation_counts_chk CHECK (
         official_enrollment_count >= 0 AND enrollments_active >= 0
         AND students_created >= 0 AND students_rejected >= 0
@@ -40,6 +40,24 @@ CREATE TABLE imports_reconciliation (
         AND guardian_links_created >= 0 AND guardian_links_rejected >= 0
         AND enrollments_created >= 0 AND enrollments_rejected >= 0)
 );
+
+-- A signed reconciliation is evidence: it is never edited or deleted, by any role (the owner included), and the table
+-- is never truncated. The grants above are the first barrier; these triggers are the last.
+CREATE FUNCTION imports_reconciliation_is_append_only() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'a reconciliation is immutable: it cannot be updated, deleted or truncated'
+        USING ERRCODE = 'integrity_constraint_violation';
+END;
+$$;
+
+CREATE TRIGGER imports_reconciliation_no_update_delete
+    BEFORE UPDATE OR DELETE ON imports_reconciliation
+    FOR EACH ROW EXECUTE FUNCTION imports_reconciliation_is_append_only();
+
+CREATE TRIGGER imports_reconciliation_no_truncate
+    BEFORE TRUNCATE ON imports_reconciliation
+    FOR EACH STATEMENT EXECUTE FUNCTION imports_reconciliation_is_append_only();
 
 -- The history, newest first.
 CREATE INDEX imports_reconciliation_history_idx

@@ -3,6 +3,7 @@ package com.confia.imports.domain;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * The record of a signed reconciliation of the migration (docs/cortes/imports-reconciliation.md): for an academic year,
@@ -44,15 +45,26 @@ public record Reconciliation(UUID id, UUID academicYearId, String officialRefere
             throw new IllegalArgumentException("a count is never negative");
         }
         if (!isValidReference(officialReference)) {
-            throw new IllegalArgumentException("the reference is 1 to " + MAX_REFERENCE_LENGTH
-                    + " characters, without border spaces or control characters");
+            throw new IllegalArgumentException("the reference is the number of a document: 1 to "
+                    + MAX_REFERENCE_LENGTH + " letters, digits and . , / # ° _ -, with a digit and no identity number");
         }
     }
 
-    /** Whether the text is a reference the record accepts: not blank, trimmed, short and without control characters. */
+    /** The characters of a reference: letters, digits, spaces and a few separators of document numbers. */
+    private static final Pattern ALLOWED = Pattern.compile("[\\p{L}\\p{N} .,/#°_-]+");
+    /** An identity number as it is written, with or without hyphens or spaces (thirteen digits). */
+    private static final Pattern IDENTITY_NUMBER = Pattern.compile("(?<!\\d)\\d{4}[- ]?\\d{4}[- ]?\\d{5}(?!\\d)|\\d{13}");
+
+    /**
+     * Whether the text is a reference the record accepts. The reference is kept forever in a record nobody can correct
+     * and in the audit trail, so it is the number of a document ("Oficio 123-2026"), not free text: letters, digits and
+     * a few separators, at least one digit (a name alone has none) and nothing shaped like an identity number. It
+     * cannot keep a person out of the text by itself; the screen asks the signer not to write names.
+     */
     public static boolean isValidReference(String reference) {
         return reference != null && !reference.isEmpty() && reference.equals(reference.strip())
-                && reference.length() <= MAX_REFERENCE_LENGTH && reference.chars().noneMatch(Character::isISOControl);
+                && reference.length() <= MAX_REFERENCE_LENGTH && ALLOWED.matcher(reference).matches()
+                && reference.chars().anyMatch(Character::isDigit) && !IDENTITY_NUMBER.matcher(reference).find();
     }
 
     /** The active enrollments minus the official total: positive when the system holds more than the roster says. */

@@ -146,7 +146,7 @@ describe("signing", () => {
   it.each([
     [{ ...valid, officialReference: "" }, [{ field: "officialReference", reason: "not-blank" }]],
     [{ ...valid, officialReference: "   " }, [{ field: "officialReference", reason: "not-blank" }]],
-    [{ ...valid, officialReference: "A".repeat(101) }, [{ field: "officialReference", reason: "size" }]],
+    [{ ...valid, officialReference: "1".repeat(101) }, [{ field: "officialReference", reason: "size" }]],
     [{ ...valid, officialReference: "Oficio\u0007" }, [{ field: "officialReference", reason: "pattern" }]],
     [{ ...valid, officialEnrollmentCount: -1 }, [{ field: "officialEnrollmentCount", reason: "min" }]],
     [{ ...valid, officialEnrollmentCount: 1_000_001 }, [{ field: "officialEnrollmentCount", reason: "max" }]],
@@ -165,8 +165,8 @@ describe("signing", () => {
   it("accepts a reference of 1 and of 100 characters and a total of 1 000 000", () => {
     const { sign } = model();
 
-    expect(sign({ ...valid, officialReference: "A" })?.status).toBe(201);
-    expect(sign({ ...valid, officialReference: "A".repeat(100) })?.status).toBe(201);
+    expect(sign({ ...valid, officialReference: "7" })?.status).toBe(201);
+    expect(sign({ ...valid, officialReference: "1".repeat(100) })?.status).toBe(201);
     expect(sign({ ...valid, officialEnrollmentCount: 1_000_000 })?.status).toBe(201);
   });
 

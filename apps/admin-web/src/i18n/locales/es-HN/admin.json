@@ -884,7 +884,7 @@
       "form": {
         "label": "Formulario del acta de conciliación",
         "referenceLabel": "Referencia del listado oficial",
-        "referenceHelp": "Por ejemplo, el número de oficio, hasta {max} caracteres. No escriba nombres ni documentos de personas.",
+        "referenceHelp": "El número del documento del listado, por ejemplo «Oficio 123-2026»: letras, números, espacios y . , / # ° _ - con al menos un número, hasta {max} caracteres. No escriba nombres ni números de identidad: el acta no se puede corregir.",
         "countLabel": "Total de matrículas del listado oficial",
         "countHelp": "Número entero de 0 a 1 000 000, tal como lo declara el listado.",
         "submit": "Firmar acta",
@@ -897,7 +897,7 @@
       },
       "preview": {
         "heading": "Lo que dejó la migración",
-        "description": "Estos son los conteos que el servidor registrará al firmar. Se calculan de nuevo en ese momento.",
+        "description": "Estos son los conteos que el servidor registrará al firmar. Se calculan de nuevo en ese momento. Los conteos de importación son de toda la institución; solo las matrículas activas son del año lectivo.",
         "choose": "Elija un año lectivo para ver sus conteos.",
         "failedTitle": "No se pudieron calcular los conteos del año lectivo",
         "caption": "Registros creados y rechazados por tipo de importación",

@@ -848,7 +848,7 @@ class ImportEnrollmentsEndpointsIT extends CommittingPostgresIntegrationTest {
                 .hasSize(1);
         assertThat(column("select after_value::text from shared_audit_log where institution_id = ? "
                 + "and action = 'imports.reconciliation.signed'", admin.institution()).getFirst())
-                .contains("Oficio-123", "\"enrollmentsActive\": 4");
+                .contains("\"enrollmentsActive\": 4").doesNotContain("Oficio-123");
     }
 
     @Test
@@ -902,6 +902,19 @@ class ImportEnrollmentsEndpointsIT extends CommittingPostgresIntegrationTest {
                 }
             }
         }
+        // Not even the owner or a superuser (who bypass the grants and the row security) can change or empty it.
+        for (String role : List.of("confia_owner", "postgres")) {
+            try (Connection owner = SharedPostgresContainer.connectionAs(role)) {
+                for (String statement : List.of("update imports_reconciliation set official_reference = 'x'",
+                        "delete from imports_reconciliation", "truncate imports_reconciliation")) {
+                    try (java.sql.Statement sql = owner.createStatement()) {
+                        sql.execute("select set_config('app.institution_id', '" + admin.institution() + "', false)");
+                        assertThatThrownBy(() -> sql.execute(statement)).as(role + ": " + statement)
+                                .isInstanceOf(SQLException.class).hasMessageContaining("immutable");
+                    }
+                }
+            }
+        }
         assertThat(countOf("imports_reconciliation", admin.institution())).isEqualTo(2);
     }
 
@@ -913,7 +926,9 @@ class ImportEnrollmentsEndpointsIT extends CommittingPostgresIntegrationTest {
         Structure alphaOrg = structure(alpha.institution());
         String year = quoted(alphaOrg.year().toString());
 
-        for (String reference : List.of("\"\"", "\"   \"", quoted("x".repeat(101)), quoted("Oficio\n1"), "null")) {
+        for (String reference : List.of("\"\"", "\"   \"", quoted("x".repeat(101)), quoted("Oficio\n1"), "null",
+                quoted("Juan Perez"), quoted("0801-1990-12345"), quoted("Oficio 0801199012345"),
+                quoted("Oficio 1‮"), quoted("Oficio <b>1</b>"), quoted("Oficio 1​"))) {
             assertProblem(sign(alpha, year, reference, "5"), 400, "validation-failed");
         }
         assertProblem(sign(alpha, year, quoted("Oficio-1"), "-1"), 400, "validation-failed");
@@ -953,14 +968,14 @@ class ImportEnrollmentsEndpointsIT extends CommittingPostgresIntegrationTest {
         String file = file(line(1, sectionName("Uno")), line(2, sectionName("Uno")));
         run(ENROLLMENTS_SIMULATE, alpha, file);
         run(ENROLLMENTS_APPLY, alpha, file);
-        created(sign(alpha, alphaOrg.year(), "Oficio-A", 2));
+        created(sign(alpha, alphaOrg.year(), "Oficio-A1", 2));
 
         assertThat(json(get(RECONCILIATIONS, beta)).get("total").asInt()).isZero();
         JsonNode betaPreview = json(get(RECONCILIATIONS + "/preview?academicYearId=" + betaOrg.year(), beta));
         assertThat(betaPreview.get("enrollmentsActive").asInt()).isZero();
         assertCounts(betaPreview.get("students"), 0, 0);
         assertCounts(betaPreview.get("enrollments"), 0, 0);
-        JsonNode betaSigned = created(sign(beta, betaOrg.year(), "Oficio-B", 0));
+        JsonNode betaSigned = created(sign(beta, betaOrg.year(), "Oficio-B2", 0));
         assertThat(betaSigned.get("enrollmentsActive").asInt()).isZero();
         assertThat(json(get(RECONCILIATIONS, alpha)).get("total").asInt()).isEqualTo(1);
     }
@@ -992,6 +1007,54 @@ class ImportEnrollmentsEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(countOf("imports_reconciliation", cashier.institution())).isZero();
         assertThat(auditActionsOf(cashier.institution()).stream().filter(a -> a.startsWith("imports.reconciliation")))
                 .isEmpty();
+    }
+
+    @Test
+    void theReconciliationRoutesAreRateLimitedPerAccountAndPerClientAndARefusedSigningWritesNothing() throws Exception {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        Structure org = structure(admin.institution());
+        Body body = new Body("application/json", ("{\"academicYearId\":\"" + org.year()
+                + "\",\"officialReference\":\"Oficio-1\",\"officialEnrollmentCount\":1}")
+                .getBytes(StandardCharsets.UTF_8));
+        try (ConfigurableApplicationContext limited = AdminProcessLauncher.launch(SharedPostgresContainer.jdbcUrl(),
+                "confia_admin_app", TEST_PASSWORD, keys, Map.of("confia.web.trusted-proxies", "127.0.0.1,::1",
+                        "confia.crypto.blind-index.current-version", "v1",
+                        "confia.crypto.blind-index.keys.v1", BLIND_INDEX_KEY,
+                        RATE_LIMIT + "admin-write.request-limit", "10000",
+                        RATE_LIMIT + "admin-write-account.request-limit", "2"))) {
+            int limitedPort = ((WebServerApplicationContext) limited).getWebServer().getPort();
+
+            assertThat(sendFrom(limitedPort, "203.0.113.100", RECONCILIATIONS, admin.token(), body).statusCode())
+                    .isEqualTo(201);
+            assertThat(sendFrom(limitedPort, "203.0.113.101", RECONCILIATIONS, admin.token(), body).statusCode())
+                    .isEqualTo(201);
+            HttpResponse<String> refused = sendFrom(limitedPort, "203.0.113.102", RECONCILIATIONS, admin.token(), body);
+            assertProblem(refused, 429, "too-many-requests");
+            assertThat(refused.headers().firstValue("Retry-After")).isPresent();
+        }
+        assertThat(countOf("imports_reconciliation", admin.institution())).isEqualTo(2);
+        try (ConfigurableApplicationContext limited = AdminProcessLauncher.launch(SharedPostgresContainer.jdbcUrl(),
+                "confia_admin_app", TEST_PASSWORD, keys, Map.of("confia.web.trusted-proxies", "127.0.0.1,::1",
+                        "confia.crypto.blind-index.current-version", "v1",
+                        "confia.crypto.blind-index.keys.v1", BLIND_INDEX_KEY,
+                        RATE_LIMIT + "admin-write.request-limit", "1",
+                        RATE_LIMIT + "admin-write-account.request-limit", "10000",
+                        RATE_LIMIT + "admin-read.request-limit", "1",
+                        RATE_LIMIT + "admin-read-account.request-limit", "10000"))) {
+            int limitedPort = ((WebServerApplicationContext) limited).getWebServer().getPort();
+
+            assertThat(sendFrom(limitedPort, "203.0.113.110", RECONCILIATIONS, admin.token(), body).statusCode())
+                    .isEqualTo(201);
+            assertProblem(sendFrom(limitedPort, "203.0.113.110", RECONCILIATIONS, admin.token(), body), 429,
+                    "too-many-requests");
+            assertThat(sendFrom(limitedPort, "203.0.113.111", RECONCILIATIONS, admin.token(), body).statusCode())
+                    .isEqualTo(201);
+            assertThat(execute(request(limitedPort, "203.0.113.120", "GET", RECONCILIATIONS, admin.token(), null),
+                    true).statusCode()).isEqualTo(200);
+            assertProblem(execute(request(limitedPort, "203.0.113.120", "GET", RECONCILIATIONS + "/preview?academicYearId="
+                    + org.year(), admin.token(), null), true), 429, "too-many-requests");
+        }
+        assertThat(countOf("imports_reconciliation", admin.institution())).isEqualTo(4);
     }
 
     // --- Permissions the real roles cannot show: a synthetic resolver for chosen accounts ---

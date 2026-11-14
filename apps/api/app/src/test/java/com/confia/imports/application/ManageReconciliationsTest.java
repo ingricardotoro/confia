@@ -135,10 +135,14 @@ class ManageReconciliationsTest {
     @Test
     void aReferenceTheRecordRefusesNeverReachesTheStore() {
         theYearExists();
-        assertThatThrownBy(() -> sign("   ", 10)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> sign("x".repeat(101), 10)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> sign("OF\n1", 10)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> sign("Oficio 1", -1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> sign("   ", 10)).isInstanceOf(RejectedReconciliationException.class);
+        assertThatThrownBy(() -> sign("1".repeat(101), 10)).isInstanceOf(RejectedReconciliationException.class);
+        assertThatThrownBy(() -> sign("OF\n1", 10)).isInstanceOf(RejectedReconciliationException.class);
+        assertThatThrownBy(() -> sign("Juan Perez", 10)).isInstanceOf(RejectedReconciliationException.class);
+        assertThatThrownBy(() -> sign("0801-1990-12345", 10)).isInstanceOf(RejectedReconciliationException.class);
+        assertThatThrownBy(() -> sign("Oficio 1", ManageReconciliations.MAX_OFFICIAL_COUNT + 1))
+                .isInstanceOf(RejectedReconciliationException.class);
+        assertThatThrownBy(() -> sign("Oficio 1", -1)).isInstanceOf(RejectedReconciliationException.class);
         assertThat(records.rows).isEmpty();
         assertThat(audit).isEmpty();
     }
@@ -160,7 +164,8 @@ class ManageReconciliationsTest {
         assertThat(entry.actorId()).isEqualTo(account);
         assertThat(entry.institutionId()).isEqualTo(institutionUuid);
         assertThat(entry.outcome()).isEqualTo("success");
-        assertThat(entry.afterValue()).contains("\"academicYearId\"", "\"officialReference\":\"Oficio 77\"",
+        assertThat(entry.afterValue()).doesNotContain("Oficio 77").doesNotContain("officialReference")
+                .contains("\"academicYearId\"",
                 "\"officialEnrollmentCount\":6", "\"enrollmentsActive\":5", "\"studentsCreated\":5",
                 "\"studentsRejected\":1");
     }
@@ -228,7 +233,7 @@ class ManageReconciliationsTest {
     }
 
     private Reconciliation foreign() {
-        Reconciliation other = new Reconciliation(UUID.randomUUID(), year, "Otra institucion", 1, 1,
+        Reconciliation other = new Reconciliation(UUID.randomUUID(), year, "Otra 1", 1, 1,
                 new Reconciliation.KindCount(0, 0), new Reconciliation.KindCount(0, 0),
                 new Reconciliation.KindCount(0, 0), new Reconciliation.KindCount(0, 0), UUID.randomUUID(), NOW);
         records.owners.put(other.id(), UUID.randomUUID());
