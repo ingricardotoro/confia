@@ -21,6 +21,10 @@ import org.junit.jupiter.api.Test;
  * time or wait. No class of the named tests, nested classes included, calls {@code Thread.sleep},
  * {@code Instant.now}, {@code Clock.systemUTC} or the time sources of the JDK a clock could be read
  * from. The rule is shown on a fixture that does all of it, so it is known to find what it looks for.
+ *
+ * <p>The test of exit criterion 2 ({@code ExitCriterion2EndToEndIT}) is among them: it reads no time
+ * itself. The one-time code it needs is computed by {@code TotpCodes}, which is outside the rule on
+ * purpose, because the real process under test reads the real clock and has none to inject (design.md D19).
  */
 class NoRealTimeInDenialTestsTest {
 
@@ -28,6 +32,7 @@ class NoRealTimeInDenialTestsTest {
             "com.confia.shared.web.authorization.DenialWindowsTest",
             "com.confia.shared.web.authorization.PermissionDenialAuditIT",
             "com.confia.shared.web.authorization.AuthorizationEdgeIT",
+            "com.confia.identity.web.ExitCriterion2EndToEndIT",
             "com.confia.shared.web.harness.MutableClock",
             "com.confia.shared.web.harness.RecordingAuthorizationMetrics");
 
@@ -43,7 +48,7 @@ class NoRealTimeInDenialTestsTest {
             .because("the tests of the cap and the window run on a manual clock (design.md D19)");
 
     private static JavaClasses named() {
-        return new ClassFileImporter().importPackages("com.confia.shared.web")
+        return new ClassFileImporter().importPackages("com.confia.shared.web", "com.confia.identity.web")
                 .that(describe("are one of the named tests or nested in one", (JavaClass javaClass) ->
                         NAMED.stream().anyMatch(name -> javaClass.getName().equals(name)
                                 || javaClass.getName().startsWith(name + "$"))));

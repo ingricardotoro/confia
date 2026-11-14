@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.confia.architecture.fixture.cookie.identity.web.BadControllerUsingCookie;
 import com.confia.identity.application.SessionLiveness;
 import com.confia.shared.security.RateLimiter;
+import com.confia.shared.web.authorization.PermissionedEndpoints;
 import com.confia.shared.security.SessionValidity;
 import com.confia.shared.web.testsupport.fixture.WebEdgeScopeViolationFixtures;
 import com.tngtech.archunit.core.domain.Dependency;
@@ -301,6 +302,46 @@ class WebEdgeScopeExclusionInventoryTest {
                         + " applies hasRole(...) to a route");
     }
 
+    /**
+     * Scenario BI134, the positive half: the absence of a permission model this inventory used to assert
+     * is inverted into the assertion that the chain decides by the list of routes with a permission, a
+     * list that is not empty. The negative control is a chain that applies the manager of its own to a
+     * route without the list.
+     */
+    @Test
+    void theChainDecidesByTheNonEmptyListOfRoutesWithAPermission() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+
+        assertThat(PermissionedEndpoints.forAdmin().endpoints())
+                .as("the list is not empty: the report of the roles needs identity:read and the "
+                        + "academic structure needs the organization permissions")
+                .extracting(entry -> entry.method() + " " + entry.pattern())
+                .contains("GET /api/v1/identity/roles", "GET /api/v1/organization/academic-years",
+                        "POST /api/v1/organization/sections",
+                        "PUT /api/v1/organization/modalities/{id}");
+        assertThat(classesApplying(production, ACCESS_RULE))
+                .as("the scan sees the chain that decides by manager").isNotEmpty();
+        assertThat(managersAppliedWithoutTheList(production)).isEmpty();
+    }
+
+    @Test
+    void theListDetectorRejectsAChainThatAppliesTheManagerWithoutTheList() {
+        JavaClasses fixtures = new ClassFileImporter().importClasses(
+                WebEdgeScopeViolationFixtures.AccessRuleChain.class);
+
+        assertThat(managersAppliedWithoutTheList(fixtures))
+                .containsExactly(WebEdgeScopeViolationFixtures.AccessRuleChain.class.getName());
+    }
+
+    /** The classes that apply the manager of the {@code access} rule and do not depend on the list. */
+    private static List<String> managersAppliedWithoutTheList(JavaClasses classes) {
+        return classesApplying(classes, ACCESS_RULE).stream()
+                .filter(name -> classes.get(name).getDirectDependenciesFromSelf().stream()
+                        .noneMatch(dependency -> dependency.getTargetClass().getName().equals(
+                                PermissionedEndpoints.class.getName())))
+                .toList();
+    }
+
     @Test
     void noProductionMethodOrClassCarriesAPermissionAnnotation() {
         JavaClasses production = assertNonEmptyProductionClasses();
@@ -312,7 +353,8 @@ class WebEdgeScopeExclusionInventoryTest {
                         + "looking at an empty set")
                 .isNotEmpty();
         assertThat(classesWithAPermissionAnnotation(production))
-                .as("no class or method carries a permission annotation: RBAC is change 8's")
+                .as("no class or method carries a permission annotation: the decision is the list of routes "
+                        + "with a permission, not a method-level model (ADR-0027)")
                 .isEmpty();
     }
 

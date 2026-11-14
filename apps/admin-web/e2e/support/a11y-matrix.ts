@@ -45,6 +45,27 @@ async function reachVerification(page: Page): Promise<void> {
   await page.getByRole("textbox", { name: /Código de verificación/ }).waitFor();
 }
 
+const ORGANIZATION = "/organization";
+const YEARS = `${ORGANIZATION}/academic-years`;
+const MODALITIES = `${ORGANIZATION}/modalities`;
+const GRADES = `${ORGANIZATION}/grades`;
+const SECTIONS = `${ORGANIZATION}/sections`;
+
+/** Lands on a view of the academic structure with the cookies of a signed in session, as the control of the simulator does. */
+async function openOrganizationView(page: Page, path: string): Promise<void> {
+  await seed(page);
+  await page.getByRole("heading", { level: 1, name: "Sesión iniciada." }).waitFor();
+  await page.goto(path);
+}
+
+/** A view of the academic structure with its rows on the screen: a cell of the seeded table proves it. */
+const organizationReady = (route: string, firstCell: string): GateCombination => ({
+  route,
+  state: "ready",
+  arrange: (page) => openOrganizationView(page, route),
+  expected: (page) => page.getByRole("cell", { name: firstCell, exact: true }).first(),
+});
+
 /**
  * The 22 combinations of the minimum, written apart from the matrix so a dropped one is noticed (BX74, BX109): the six of the
  * part 1, the eight of the sign in screen, the three of the verification and the five of the enrollment.
@@ -226,6 +247,46 @@ export const MATRIX: readonly GateCombination[] = [
       await page.getByRole("button", { name: "Verificar" }).click();
     },
     expected: (page) => page.getByRole("alert").filter({ hasText: "El código de recuperación no es correcto o ya se usó." }),
+  },
+  organizationReady(YEARS, "Año lectivo 2026"),
+  organizationReady(MODALITIES, "Primaria"),
+  organizationReady(GRADES, "Primero"),
+  organizationReady(SECTIONS, "Primaria · Primero"),
+  {
+    route: MODALITIES,
+    state: "dialog-open",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openOrganizationView(page, MODALITIES);
+      await page.getByRole("button", { name: "Nueva modalidad" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Nueva modalidad" }),
+  },
+  {
+    route: MODALITIES,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openOrganizationView(page, MODALITIES);
+      await page.getByRole("button", { name: "Nueva modalidad" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 2 campos con errores." }),
+  },
+  {
+    route: YEARS,
+    state: "empty",
+    preset: "organization-empty",
+    arrange: (page) => openOrganizationView(page, YEARS),
+    expected: (page) => page.getByText("Todavía no hay años lectivos"),
+  },
+  {
+    route: YEARS,
+    state: "load-error",
+    preset: "organization-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openOrganizationView(page, YEARS),
+    expected: (page) => page.getByText("No se pudo cargar la lista de años lectivos"),
   },
   {
     route: ENROLLMENT,

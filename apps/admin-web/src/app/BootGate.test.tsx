@@ -166,7 +166,10 @@ describe("the boot screen", () => {
 
     fireEvent.click(screen.getByRole("button"));
 
-    expect(await screen.findByRole("heading", { level: 1, name: SIGNED_IN })).toBeInTheDocument();
+    // The loading page of the session read has the same heading as the shell's home page, and the shell replaces
+    // it, so the confirmation text (only in the ready state) is what tells the page is the settled one.
+    expect(await screen.findByText("Su sesión está activa.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: SIGNED_IN })).toBeInTheDocument();
     await waitFor(() => {
       expect(refreshes()).toHaveLength(2);
     });

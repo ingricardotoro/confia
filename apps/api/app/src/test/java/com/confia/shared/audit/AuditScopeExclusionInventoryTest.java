@@ -2,6 +2,9 @@ package com.confia.shared.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.confia.architecture.authorizationscope.AuthorizationScopeViolationFixtures;
+import com.confia.identity.domain.StaffRole;
+import com.confia.kernel.Permission;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -212,19 +215,109 @@ public class AuditScopeExclusionInventoryTest {
         }
     }
 
+    /**
+     * Scenario BI136 and the audit-trail scenario "Ningún endpoint expone la bitácora" (rbac-permission-
+     * matrix-and-audit-integration): the permission {@code audit:read} exists in the catalog and is
+     * granted to the Super Administrator and the Auditor alone, but no route exposes the trail. The
+     * endpoint that reads it with that permission is change 8b's, and this test stops being true the day
+     * that change delivers it.
+     */
     @Test
     void noOpenApiRouteOfTheAdministrativeApplicationExposesTheAuditLog() {
         JavaClasses classes = assertNonEmptyProductionClasses();
 
+        assertThat(Permission.AUDIT_READ.code()).as("the permission exists in the catalog")
+                .isEqualTo("audit:read");
+        assertThat(java.util.Arrays.stream(StaffRole.values())
+                .filter(role -> role.permissions().contains(Permission.AUDIT_READ))
+                .map(StaffRole::code).toList())
+                .as("and is granted to the Super Administrator and the Auditor alone")
+                .containsExactly("super_admin", "auditor");
+        assertThat(classes.stream().mapToLong(type -> routePathsOf(type).size()).sum())
+                .as("the scan sees real routes, so the absence below is not vacuous").isPositive();
+        assertThat(auditLogRoutes(classes))
+                .as("no route exposes shared_audit_log with the audit:read permission "
+                        + "(brecha con destino: cambio 8b)")
+                .isEmpty();
+    }
+
+    @Test
+    void theAuditRouteDetectorRejectsTheFixtureEndpointThatReadsTheTrail() {
+        JavaClasses fixture = new ClassFileImporter().importClasses(
+                AuthorizationScopeViolationFixtures.AuditLogController.class);
+
+        assertThat(auditLogRoutes(fixture)).singleElement().asString()
+                .contains("/api/v1/audit/entries", "AuditLogController");
+    }
+
+    /** The routes, class by class, whose path names the audit trail. */
+    private static List<String> auditLogRoutes(JavaClasses classes) {
+        List<String> found = new ArrayList<>();
         for (JavaClass javaClass : classes) {
             for (String path : routePathsOf(javaClass)) {
-                assertThat(path.toLowerCase(Locale.ROOT))
-                        .as("route '%s' of %s must not expose shared_audit_log with the audit:read "
-                                        + "permission — cambios 7 y 8 own the controller that adds it",
-                                path, javaClass.getFullName())
-                        .doesNotContain("audit");
+                if (path.toLowerCase(Locale.ROOT).contains("audit")) {
+                    found.add(path + " of " + javaClass.getFullName());
+                }
             }
         }
+        return found;
+    }
+
+    /**
+     * The audit-trail scenario "La política de fila filtra solo por institución": the policies of
+     * {@code shared_audit_log} in the migrations read the institution of the session and nothing else,
+     * so the permission {@code audit:read} is applied in the web layer, never in the row policy. The
+     * behavior against a real engine is the row-security test of the audit tables; this is the static
+     * half, with the fixture of a policy that asks for a permission.
+     */
+    @Test
+    void theRowPolicyOfTheAuditLogFiltersOnlyByInstitution() {
+        Map<String, String> migrations = migrationSqlByFile();
+
+        List<String> policies = policiesOn("shared_audit_log", migrations);
+
+        assertThat(policies).as("the scan sees the real policy of the trail, so the absence is not vacuous")
+                .isNotEmpty().allSatisfy(policy -> assertThat(policy).contains("institution_id"));
+        assertThat(policiesThatAskForAnythingButTheInstitution(policies)).isEmpty();
+    }
+
+    @Test
+    void thePolicyDetectorRejectsAFixturePolicyThatAsksForAPermission() {
+        Map<String, String> fixture = new TreeMap<>(Map.of("V99__audit_permission.sql", """
+                CREATE POLICY shared_audit_log_reader ON shared_audit_log
+                    USING (institution_id = NULLIF(current_setting('app.institution_id', true), '')::uuid
+                           AND current_setting('app.permissions', true) LIKE '%audit:read%');
+                """));
+
+        assertThat(policiesThatAskForAnythingButTheInstitution(policiesOn("shared_audit_log", fixture)))
+                .singleElement().asString().contains("app.permissions");
+    }
+
+    private static List<String> policiesOn(String table, Map<String, String> migrations) {
+        Pattern policy = Pattern.compile("create\\s+policy\\s+\\w+\\s+on\\s+" + table + "\\b[^;]*;",
+                Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+        List<String> found = new ArrayList<>();
+        migrations.values().forEach(sql -> {
+            Matcher matcher = policy.matcher(sql);
+            while (matcher.find()) {
+                found.add(matcher.group().replaceAll("--[^\n]*", ""));
+            }
+        });
+        return found;
+    }
+
+    private static List<String> policiesThatAskForAnythingButTheInstitution(List<String> policies) {
+        Pattern settings = Pattern.compile("current_setting\\('([^']+)'");
+        return policies.stream().filter(policy -> {
+            Matcher matcher = settings.matcher(policy);
+            while (matcher.find()) {
+                if (!matcher.group(1).equals("app.institution_id")) {
+                    return true;
+                }
+            }
+            String lower = policy.toLowerCase(Locale.ROOT);
+            return lower.contains("permission") || lower.contains("audit:read") || lower.contains("role");
+        }).toList();
     }
 
     /**

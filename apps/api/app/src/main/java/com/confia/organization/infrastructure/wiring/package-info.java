@@ -2,7 +2,9 @@
  * The administrative process's registration of the {@code organization} module: {@link
  * com.confia.organization.infrastructure.wiring.OrganizationConfiguration} declares, explicitly,
  * the adapter that resolves the current institution from the authenticated token
- * (session-tokens-and-web-layer design.md, decision 6; ADR-0009).
+ * (session-tokens-and-web-layer design.md, decision 6; ADR-0009), and {@link
+ * com.confia.organization.infrastructure.wiring.AcademicStructureConfiguration} declares the use cases
+ * of the academic structure with their jOOQ adapters.
  *
  * <p><b>{@code @NamedInterface}, and who consumes it</b> (ADR-0022: every new named interface
  * names the real consumer that justifies it). The consumer is {@code

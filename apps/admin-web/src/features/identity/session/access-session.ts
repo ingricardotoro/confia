@@ -1,5 +1,6 @@
 import type { CurrentSessionResponseOutput } from "@confia/contracts/admin";
 import { ApiFailure, type ApiFailureResult } from "../../../shared/api/api-failure.ts";
+import type { ApiResult } from "../../../shared/api/http.ts";
 import type * as authOperations from "../../../shared/api/auth-operations.ts";
 import type { Credentials, SecondFactorProof } from "../../../shared/api/auth-operations.ts";
 import { readCsrfToken } from "../../../shared/api/csrf-cookie.ts";
@@ -74,6 +75,12 @@ export interface AccessSession {
   discardSecondFactor(notice?: ArrivalNotice): void;
   /** Throws `ApiFailure`; it is the query function of the current session. */
   readCurrentSession(): Promise<CurrentSessionResponseOutput>;
+  /**
+   * Runs one authenticated request with an access token (refreshed first when little is left of it) and
+   * returns its data. Anything but `ok` throws `ApiFailure`; a 401 also ends the session, as it does for
+   * the current session read. The token never leaves this call.
+   */
+  authorized<T>(operation: (accessToken: string) => Promise<ApiResult<T>>): Promise<T>;
   signOut(): Promise<SignOutOutcome>;
   /**
    * The one way to extend the session: the refresh of the coordinator, shared with every other trigger
@@ -351,6 +358,12 @@ export function createAccessSession({
         return result.data;
       }
       // A 401 to a request with a token ends the session here: no refresh to try again (SS25).
+      if (result.kind === "problem" && result.problem.status === 401) endLocally("session-expired");
+      throw new ApiFailure(result);
+    },
+    async authorized(operation) {
+      const result = await operation(await accessTokenForRequest());
+      if (result.kind === "ok") return result.data;
       if (result.kind === "problem" && result.problem.status === 401) endLocally("session-expired");
       throw new ApiFailure(result);
     },

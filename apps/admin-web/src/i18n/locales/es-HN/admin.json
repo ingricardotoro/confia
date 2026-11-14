@@ -64,13 +64,23 @@
     "capacityExceeded": "El servicio está ocupado en este momento. Espere un momento e intente de nuevo.",
     "network": "No se pudo conectar con el servidor. Revise su conexión e intente de nuevo.",
     "recoveryInvalid": "El código de recuperación no es correcto o ya se usó. Revíselo e intente de nuevo.",
-    "notProcessed": "No se pudieron procesar los datos enviados. Revíselos e intente de nuevo."
+    "notProcessed": "No se pudieron procesar los datos enviados. Revíselos e intente de nuevo.",
+    "forbidden": "No tiene permiso para realizar esta acción. Si la necesita para su trabajo, solicítela a un administrador de su institución.",
+    "notFound": "El registro ya no existe o no está disponible. Actualice la lista e intente de nuevo.",
+    "academicYearOverlap": "Las fechas se cruzan con las de otro año lectivo. El día de inicio y el de fin cuentan como parte del año; ajuste alguno de los dos.",
+    "academicYearAlreadyActive": "Ya hay otro año lectivo en curso. Solo puede haber uno a la vez; cambie la etapa de ese año antes de poner este en curso.",
+    "academicYearClosed": "El año lectivo está cerrado. Un año cerrado no se edita ni se reabre, y sus secciones tampoco se pueden crear ni editar.",
+    "duplicateName": "Ya existe un registro con ese nombre, código u orden. Escriba un valor distinto.",
+    "inactiveReference": "Uno de los datos relacionados está inactivo. Actívelo o elija otro e intente de nuevo."
   },
   "field": {
     "required": "Este dato es obligatorio.",
     "tooLong": "Este dato es demasiado largo.",
     "invalid": "Este dato no es válido.",
-    "unknown": "Uno de los datos enviados no es válido."
+    "unknown": "Uno de los datos enviados no es válido.",
+    "endAfterStart": "La fecha de fin debe ser posterior a la de inicio.",
+    "positiveWhole": "Ingrese un número entero mayor que cero.",
+    "wholeNumber": "Ingrese un número entero de cero en adelante."
   },
   "countdown": {
     "remaining": "Puede intentar de nuevo en {seconds} s.",
@@ -91,5 +101,163 @@
   "notFound": {
     "title": "Esta página no existe.",
     "link": "Ir a inicio de sesión"
+  },
+  "shell": {
+    "brand": "CONFIA",
+    "skipToContent": "Saltar al contenido",
+    "navigationLabel": "Navegación principal",
+    "accountLabel": "Su cuenta"
+  },
+  "navigation": {
+    "home": "Inicio",
+    "organization": "Estructura académica"
+  },
+  "organization": {
+    "title": "Estructura académica",
+    "tabsLabel": "Vistas de la estructura académica",
+    "tabs": {
+      "academicYears": "Años lectivos",
+      "modalities": "Modalidades",
+      "grades": "Grados",
+      "sections": "Secciones"
+    },
+    "common": {
+      "state": "Estado",
+      "actions": "Acciones",
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "edit": "Editar",
+      "activate": "Activar",
+      "deactivate": "Desactivar",
+      "editFor": "Editar {name}",
+      "activateFor": "Activar {name}",
+      "deactivateFor": "Desactivar {name}",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "saving": "Guardando los datos.",
+      "created": "Se creó el registro «{name}».",
+      "updated": "Se guardaron los cambios de «{name}».",
+      "activated": "Se activó «{name}».",
+      "deactivated": "Se desactivó «{name}».",
+      "fixedNote": "Este dato no se puede cambiar después de crear el registro.",
+      "allOption": "Todos",
+      "chooseOption": "Elija una opción",
+      "filters": "Filtros",
+      "clearFilters": "Quitar filtros",
+      "noResultsTitle": "Ningún registro coincide con los filtros",
+      "noResultsDescription": "Cambie o quite los filtros para ver más registros.",
+      "optionsFailed": "No se pudieron cargar las opciones de los filtros y de los formularios.",
+      "retryOptions": "Reintentar",
+      "trace": "Identificador para soporte: {traceId}",
+      "unknownReference": "No disponible",
+      "noCapacity": "Sin cupo definido"
+    },
+    "academicYears": {
+      "heading": "Años lectivos",
+      "caption": "Años lectivos de la institución",
+      "create": "Nuevo año lectivo",
+      "createTitle": "Nuevo año lectivo",
+      "createDescription": "Complete los datos del año. El día de inicio y el de fin cuentan como parte del año.",
+      "editTitle": "Editar año lectivo",
+      "editDescription": "Cambie los datos del año. Un año cerrado no se puede editar ni reabrir.",
+      "emptyTitle": "Todavía no hay años lectivos",
+      "emptyDescription": "Cree el primer año lectivo para poder organizar sus secciones.",
+      "emptyAction": "Crear el primer año lectivo",
+      "loadFailed": "No se pudo cargar la lista de años lectivos",
+      "columns": {
+        "name": "Nombre",
+        "startDate": "Inicio",
+        "endDate": "Fin",
+        "status": "Etapa"
+      },
+      "fields": {
+        "name": "Nombre",
+        "startDate": "Fecha de inicio",
+        "endDate": "Fecha de fin",
+        "status": "Etapa",
+        "isActive": "Estado"
+      },
+      "status": {
+        "PLANNED": "Planificado",
+        "ACTIVE": "En curso",
+        "CLOSED": "Cerrado"
+      }
+    },
+    "modalities": {
+      "heading": "Modalidades",
+      "caption": "Modalidades de la institución",
+      "create": "Nueva modalidad",
+      "createTitle": "Nueva modalidad",
+      "createDescription": "Complete el código y el nombre de la modalidad. El código no se puede repetir.",
+      "editTitle": "Editar modalidad",
+      "editDescription": "Cambie el código o el nombre de la modalidad. Desactivarla no afecta las secciones ya creadas.",
+      "emptyTitle": "Todavía no hay modalidades",
+      "emptyDescription": "Cree la primera modalidad para poder definir sus grados.",
+      "emptyAction": "Crear la primera modalidad",
+      "loadFailed": "No se pudo cargar la lista de modalidades",
+      "columns": {
+        "code": "Código",
+        "name": "Nombre"
+      },
+      "fields": {
+        "code": "Código",
+        "name": "Nombre",
+        "isActive": "Estado"
+      }
+    },
+    "grades": {
+      "heading": "Grados",
+      "caption": "Grados de la institución",
+      "create": "Nuevo grado",
+      "createTitle": "Nuevo grado",
+      "createDescription": "Elija la modalidad y complete el nombre y el orden. Ni el nombre ni el orden se pueden repetir dentro de la modalidad.",
+      "editTitle": "Editar grado",
+      "editDescription": "Cambie el nombre o el orden del grado. La modalidad no se puede cambiar. Desactivarlo no afecta las secciones ya creadas.",
+      "emptyTitle": "Todavía no hay grados",
+      "emptyDescription": "Cree el primer grado de una modalidad para poder abrir secciones.",
+      "emptyAction": "Crear el primer grado",
+      "loadFailed": "No se pudo cargar la lista de grados",
+      "columns": {
+        "name": "Nombre",
+        "ordinal": "Orden",
+        "modality": "Modalidad"
+      },
+      "fields": {
+        "modalityId": "Modalidad",
+        "name": "Nombre",
+        "ordinal": "Orden",
+        "isActive": "Estado"
+      },
+      "filterModality": "Modalidad"
+    },
+    "sections": {
+      "heading": "Secciones",
+      "caption": "Secciones de la institución",
+      "create": "Nueva sección",
+      "createTitle": "Nueva sección",
+      "createDescription": "Elija el año lectivo y el grado, y complete el nombre. El nombre no se puede repetir en el mismo año y grado.",
+      "editTitle": "Editar sección",
+      "editDescription": "Cambie el nombre o el cupo de la sección. El año lectivo y el grado no se pueden cambiar.",
+      "emptyTitle": "Todavía no hay secciones",
+      "emptyDescription": "Cree la primera sección de un grado en un año lectivo.",
+      "emptyAction": "Crear la primera sección",
+      "loadFailed": "No se pudo cargar la lista de secciones",
+      "columns": {
+        "name": "Nombre",
+        "academicYear": "Año lectivo",
+        "grade": "Grado",
+        "capacity": "Cupo"
+      },
+      "fields": {
+        "academicYearId": "Año lectivo",
+        "gradeId": "Grado",
+        "name": "Nombre",
+        "capacity": "Cupo",
+        "isActive": "Estado"
+      },
+      "capacityHelp": "Déjelo vacío si la sección no tiene un límite de estudiantes.",
+      "filterAcademicYear": "Año lectivo",
+      "filterGrade": "Grado"
+    }
   }
 }

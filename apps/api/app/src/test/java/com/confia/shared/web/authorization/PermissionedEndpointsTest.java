@@ -20,10 +20,21 @@ class PermissionedEndpointsTest {
             "/test/pay", Permission.PAYMENTS_CREATE);
 
     @Test
-    void theProductionListIsExactlyTheReportOfTheRolesAndNeedsIdentityRead() {
-        assertThat(PermissionedEndpoints.forAdmin().endpoints()).containsExactly(
-                new PermissionedEndpoint(HttpMethod.GET, "/api/v1/identity/roles",
-                        Permission.IDENTITY_READ));
+    void theProductionListIsTheReportOfTheRolesAndTheTwelveRoutesOfTheAcademicStructure() {
+        List<PermissionedEndpoint> expected = new ArrayList<>();
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/identity/roles",
+                Permission.IDENTITY_READ));
+        for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {
+            String collection = "/api/v1/organization/" + resource;
+            expected.add(new PermissionedEndpoint(HttpMethod.GET, collection,
+                    Permission.ORGANIZATION_READ));
+            expected.add(new PermissionedEndpoint(HttpMethod.POST, collection,
+                    Permission.ORGANIZATION_CREATE));
+            expected.add(new PermissionedEndpoint(HttpMethod.PUT, collection + "/{id}",
+                    Permission.ORGANIZATION_UPDATE));
+        }
+
+        assertThat(PermissionedEndpoints.forAdmin().endpoints()).containsExactlyElementsOf(expected);
     }
 
     @Test

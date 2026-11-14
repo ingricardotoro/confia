@@ -348,6 +348,21 @@ registra la partición y el reparto.
 >   desde la base de datos queda para la fase 2; hasta entonces, una institución mal configurada se purga en vacío y
 >   lo señala la advertencia `audit_chain_empty_for_configured_institution`.
 
+> **Nota fechada 2026-11-10 (cambio `rbac-permission-matrix-and-audit-integration`, PR 6 `roles-report-and-criterion-2`): el cambio 8 se
+> divide en 8 y 8b.** Esta nota no modifica el texto original de ninguna condición ni de ninguna fila de las tablas, en particular la
+> fila 8. Por decisión O6 del propietario, el cambio **8** entrega el catálogo de permisos y la matriz en código, la asignación por
+> cuenta e institución solo en pruebas, la resolución de permisos por petición, la decisión en la cadena de filtros sobre una lista
+> cerrada, la MFA obligatoria derivada, la auditoría de las denegaciones con tope y el informe `GET /api/v1/identity/roles`, y con ello
+> cierra el **criterio de salida 2** de F0, que prueba `ExitCriterion2EndToEndIT`. ADR-0027 queda en estado Propuesto hasta la
+> aprobación del propietario. El cambio **8b** entrega lo que el 8 deja fuera: la asignación de roles por endpoint y la regla «un usuario
+> nunca modifica su propio rol»; la desactivación de cuentas y el motivo de revocación `admin_revoke` (con la inversión de
+> `AccountDeactivationAbsenceTest`); la inscripción y la retirada voluntarias de MFA (con la inversión de `NoFullSessionMfaRoutesTest`);
+> la reautenticación reforzada (*step-up*); el restablecimiento administrativo de contraseña; el endpoint de lectura de la bitácora con
+> `audit:read`; la creación del primer Super Admin sin secreto en migración ni en el repositorio; y la revisión del riesgo aceptado
+> DA-15 (Q2), más la revocación de sesiones al cambiar un rol y la revisión del rechazo sin `otp` (D12) si 8b introduce rutas de
+> elevación. Los iniciadores sin permiso de `docs/03-seguridad.md` §5.3 (ajuste manual del libro mayor, baja por incobrable y reembolso a
+> un tercero) quedan pendientes de los cambios que construyan cada operación (Q4).
+
 **Nota (2026-11-09, división del cambio 11).** El propietario aprobó el 2026-11-09 dividir el cambio 11,
 `containerization-and-cicd-pipeline`, en **seis** cambios SDD. La exploración vive en Engram
 (`sdd/containerization-and-cicd-pipeline/explore`) y la parte que corresponde al primero, en

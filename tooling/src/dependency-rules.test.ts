@@ -140,7 +140,8 @@ describe("the frontend dependency rules", () => {
   // ADR-0018: a rule that evaluated nothing proves nothing. These two evaluate the real files of the app.
   describe("over the real apps/admin-web", () => {
     const real = cruise(["apps/admin-web/src"]);
-    const container = "apps/admin-web/src/features/identity/signed-in/SignedInContainer.tsx";
+    // The signed in page left its container for the shell; the data of a feature is read in its query module, which is the file that holds both imports now.
+    const container = "apps/admin-web/src/features/organization/use-organization-queries.ts";
 
     it("BX61: a real container imports TanStack Query and shared/api without a violation", () => {
       const module = real.modules.find((candidate) => candidate.source === container);

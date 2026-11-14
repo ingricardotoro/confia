@@ -33,7 +33,9 @@ class ProblemCodeTest {
                         "idempotency-key-missing", "idempotency-payload-mismatch",
                         "too-many-requests", "internal-error", "capacity-exceeded", "token-invalid",
                         "token-expired", "csrf-invalid", "authentication-failed", "second-factor-invalid",
-                        "session-expired", "mfa-already-enrolled");
+                        "session-expired", "mfa-already-enrolled", "academic-year-overlap",
+                        "academic-year-already-active", "academic-year-closed", "duplicate-name",
+                        "inactive-reference");
     }
 
     @Test
@@ -51,7 +53,9 @@ class ProblemCodeTest {
             "too-many-requests, 429", "internal-error, 500", "capacity-exceeded, 503",
             "token-invalid, 401", "token-expired, 401", "csrf-invalid, 403",
             "authentication-failed, 401", "second-factor-invalid, 401", "session-expired, 401",
-            "mfa-already-enrolled, 409"})
+            "mfa-already-enrolled, 409", "academic-year-overlap, 409",
+            "academic-year-already-active, 409", "academic-year-closed, 409", "duplicate-name, 409",
+            "inactive-reference, 409"})
     void eachCodeCarriesItsHttpStatus(String code, int status) {
         assertThat(ProblemCode.ofCode(code)).get().extracting(ProblemCode::status)
                 .isEqualTo(status);
@@ -63,7 +67,9 @@ class ProblemCodeTest {
             "too-many-requests", "internal-error", "capacity-exceeded", "idempotency-conflict",
             "idempotency-payload-mismatch", "idempotency-key-missing", "token-invalid",
             "token-expired", "csrf-invalid", "authentication-failed", "second-factor-invalid",
-            "session-expired", "mfa-already-enrolled"})
+            "session-expired", "mfa-already-enrolled", "academic-year-overlap",
+            "academic-year-already-active", "academic-year-closed", "duplicate-name",
+            "inactive-reference"})
     void theTypeIsTheStableBaseFollowedByTheCodeAndNothingElse(String code) {
         ProblemCode problem = ProblemCode.ofCode(code).orElseThrow();
         assertThat(problem.type()).isEqualTo(URI.create("https://confia.hn/problems/" + code));

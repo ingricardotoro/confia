@@ -11,6 +11,8 @@ import type { ContractResponse } from "./contract-responses.ts";
 export interface RecordedRequest {
   readonly method: string;
   readonly path: string;
+  /** The query string, with its `?`, or an empty string. */
+  readonly search: string;
   readonly headers: Headers;
   readonly body: string;
   readonly credentials: RequestCredentials;
@@ -45,6 +47,7 @@ export function route(method: Method, path: string, ...replies: readonly [Reply,
       recorded.push({
         method: request.method,
         path: new URL(request.url).pathname,
+        search: new URL(request.url).search,
         headers: new Headers(request.headers),
         body: await request.clone().text(),
         credentials: request.credentials,

@@ -441,3 +441,211 @@ describe("the account control of the fictitious test account [I304]", { timeout:
     expect((await call("POST", "/__control/account/mine")).status).toBe(404);
   });
 });
+
+describe("the academic structure [organization-academic-structure]", { timeout: LIMIT }, () => {
+  const BASE = "/api/v1/organization";
+
+  /** Signs in on a scenario (after the preset, if any) and answers the call helper bound to its bearer token. */
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const headers = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path: string, body?: unknown) =>
+      call(method, `${BASE}${path}`, { headers, scenario: id, ...(body === undefined ? {} : { body }) });
+  }
+
+  const items = (reply: Reply) => (reply.json as { items: { id: string; name: string; code?: string; ordinal?: number }[] }).items;
+  const page = (reply: Reply) => reply.json as { items: unknown[]; page: number; size: number; total: number };
+  const names = (reply: Reply) => items(reply).map((row) => row.name);
+  const year = (name: string, startDate: string, endDate: string, extra: object = {}) => ({ name, startDate, endDate, ...extra });
+  const verdict = (reply: Reply) => [reply.status, typeOf(reply)];
+
+  it("answers 401 to every operation without an access token, and 404 to a path it does not simulate", async () => {
+    const anonymous = [
+      await call("GET", `${BASE}/academic-years`, { scenario: "org-401" }),
+      await call("POST", `${BASE}/modalities`, { scenario: "org-401", body: { code: "X", name: "X" } }),
+    ];
+    const send = await session("org-404");
+
+    expect(anonymous.map(verdict)).toEqual([
+      [401, "authentication-required"],
+      [401, "authentication-required"],
+    ]);
+    expect((await send("GET", "/unknown")).status).toBe(404);
+    expect((await send("DELETE", "/academic-years/x")).status).toBe(404);
+  });
+
+  it("lists the seeded rows by page, newest year first, with `total` counting every page", async () => {
+    const send = await session("org-page");
+
+    const first = await send("GET", "/academic-years?page=0&size=25");
+    const second = await send("GET", "/academic-years?page=1&size=25");
+
+    expect(page(first)).toMatchObject({ page: 0, size: 25, total: 30 });
+    expect(items(first)).toHaveLength(25);
+    expect(names(first)[0]).toBe("Año lectivo 2026");
+    expect(names(second)).toHaveLength(5);
+    expect(names(second).at(-1)).toBe("Año lectivo 1997");
+  });
+
+  it("sorts on the server, in either direction, and refuses a field that is not allowed, a bad page or a bad size", async () => {
+    const send = await session("org-sort");
+
+    expect(names(await send("GET", "/academic-years?sort=name,asc&size=2"))).toEqual(["Año lectivo 1997", "Año lectivo 1998"]);
+    expect(names(await send("GET", "/sections?sort=name,desc&size=1"))).toEqual(["B"]);
+    for (const query of ["sort=isActive,asc", "sort=name,sideways", "page=-1", "size=0", "size=201"]) {
+      const reply = await send("GET", `/modalities?${query}`);
+      expect([query, ...verdict(reply)]).toEqual([query, 400, "validation-failed"]);
+    }
+  });
+
+  it("filters the grades by modality and the sections by year and grade, on the server", async () => {
+    const send = await session("org-filter");
+    const primary = items(await send("GET", "/modalities")).find((row) => row.code === "PRI")?.id ?? "";
+    const grades = items(await send("GET", `/grades?modalityId=${primary}`));
+    const first = grades.find((row) => row.name === "Primero")?.id ?? "";
+    const last = items(await send("GET", "/academic-years")).find((row) => row.name === "Año lectivo 2026")?.id ?? "";
+
+    expect(grades.map((row) => row.name).sort()).toEqual(["Primero", "Segundo", "Tercero"]);
+    expect(page(await send("GET", `/sections?academicYearId=${last}`)).total).toBe(3);
+    expect(page(await send("GET", `/sections?academicYearId=${last}&gradeId=${first}`)).total).toBe(2);
+    expect(page(await send("GET", `/sections?gradeId=${first}`)).total).toBe(3);
+  });
+
+  it("creates with 201 and the full row, lists it, and edits with 200, keeping what is fixed at creation", async () => {
+    const send = await session("org-write", "organization-empty");
+    expect(page(await send("GET", "/modalities")).total).toBe(0);
+
+    const created = await send("POST", "/modalities", { code: "PRI", name: "Primaria" });
+    const id = (created.json as { id: string }).id;
+    const grade = await send("POST", "/grades", { modalityId: id, name: "Primero", ordinal: 1 });
+    const edited = await send("PUT", `/modalities/${id}`, { code: "PRI", name: "Primaria básica", isActive: false });
+    const gradeEdit = await send("PUT", `/grades/${(grade.json as { id: string }).id}`, { name: "Primero A", ordinal: 1, isActive: true });
+
+    expect(created.status).toBe(201);
+    expect(created.json).toMatchObject({ code: "PRI", name: "Primaria", isActive: true });
+    expect(grade.status).toBe(201);
+    expect(edited.status).toBe(200);
+    expect(edited.json).toMatchObject({ id, name: "Primaria básica", isActive: false });
+    expect(names(await send("GET", "/modalities"))).toEqual(["Primaria básica"]);
+    expect(gradeEdit.json).toMatchObject({ modalityId: id, name: "Primero A" });
+  });
+
+  it("starts an empty scenario with no rows, and gives a new year the status PLANNED and a section with no capacity null", async () => {
+    const send = await session("org-empty", "organization-empty");
+    const created = await send("POST", "/academic-years", year("Año lectivo 2027", "2027-01-15", "2027-11-30"));
+    const modality = await send("POST", "/modalities", { code: "PRI", name: "Primaria" });
+    const grade = await send("POST", "/grades", { modalityId: (modality.json as { id: string }).id, name: "Primero", ordinal: 1 });
+    const section = await send("POST", "/sections", {
+      academicYearId: (created.json as { id: string }).id,
+      gradeId: (grade.json as { id: string }).id,
+      name: "A",
+    });
+
+    expect(created.json).toMatchObject({ status: "PLANNED" });
+    expect(section.status).toBe(201);
+    expect(section.json).toMatchObject({ name: "A", capacity: null });
+  });
+
+  it("refuses a year that overlaps another by one day, and accepts the one that starts the next day", async () => {
+    const send = await session("org-overlap");
+
+    const touching = await send("POST", "/academic-years", year("Año lectivo 2027", "2026-11-30", "2027-10-30"));
+    const nextDay = await send("POST", "/academic-years", year("Año lectivo 2027", "2026-12-01", "2027-10-30"));
+
+    expect(verdict(touching)).toEqual([409, "academic-year-overlap"]);
+    expect(nextDay.status).toBe(201);
+  });
+
+  it("refuses a repeated name, code or order with duplicate-name, and a second year in progress with academic-year-already-active", async () => {
+    const send = await session("org-duplicate");
+    const modalityId = items(await send("GET", "/modalities")).find((row) => row.code === "PRI")?.id ?? "";
+
+    const replies = [
+      await send("POST", "/academic-years", year("Año lectivo 2026", "2030-01-15", "2030-11-30")),
+      await send("POST", "/modalities", { code: "PRI", name: "Otra" }),
+      await send("POST", "/grades", { modalityId, name: "Cuarto", ordinal: 1 }),
+      await send("POST", "/grades", { modalityId, name: "Primero", ordinal: 9 }),
+      await send("POST", "/academic-years", year("Año lectivo 2030", "2030-01-15", "2030-11-30", { status: "ACTIVE" })),
+    ];
+
+    expect(replies.map(verdict)).toEqual([
+      [409, "duplicate-name"],
+      [409, "duplicate-name"],
+      [409, "duplicate-name"],
+      [409, "duplicate-name"],
+      [409, "academic-year-already-active"],
+    ]);
+  });
+
+  it("does not edit a closed year, nor create a section in one, and answers 404 for a row that does not exist", async () => {
+    const send = await session("org-closed");
+    const closed = items(await send("GET", "/academic-years?sort=name,asc&size=1"))[0];
+    const grade = items(await send("GET", "/grades")).find((row) => row.name === "Primero")?.id ?? "";
+
+    const edit = await send("PUT", `/academic-years/${closed?.id ?? ""}`, { ...year("Otro nombre", "1997-01-15", "1997-11-30"), status: "CLOSED", isActive: true });
+    const section = await send("POST", "/sections", { academicYearId: closed?.id, gradeId: grade, name: "Z" });
+    const missing = await send("PUT", "/modalities/00000000-0000-4000-8000-999999999999", { code: "X", name: "X", isActive: true });
+
+    expect(verdict(edit)).toEqual([409, "academic-year-closed"]);
+    expect(verdict(section)).toEqual([409, "academic-year-closed"]);
+    expect(verdict(missing)).toEqual([404, "resource-not-found"]);
+  });
+
+  it("refuses a grade under an inactive modality with inactive-reference", async () => {
+    const send = await session("org-inactive");
+    const modality = items(await send("GET", "/modalities")).find((row) => row.code === "PRE");
+    await send("PUT", `/modalities/${modality?.id ?? ""}`, { code: "PRE", name: "Prebásica", isActive: false });
+
+    const reply = await send("POST", "/grades", { modalityId: modality?.id, name: "Kinder", ordinal: 1 });
+
+    expect(verdict(reply)).toEqual([409, "inactive-reference"]);
+  });
+
+  it("answers validation-failed with the fields at fault: an end that is not after the start, a blank name and a capacity of zero", async () => {
+    const send = await session("org-validation");
+    const ids = { academicYearId: "00000000-0000-4000-8000-000000000001", gradeId: "00000000-0000-4000-8000-000000000002" };
+
+    const range = await send("POST", "/academic-years", year("Año lectivo 2031", "2031-05-01", "2031-05-01"));
+    const blank = await send("POST", "/modalities", { code: "X", name: "  " });
+    const capacity = await send("POST", "/sections", { ...ids, name: "A", capacity: 0 });
+
+    expect(range.status).toBe(400);
+    expect((range.json as { errors: unknown[] }).errors).toEqual([{ field: "endAfterStart", reason: "invalid" }]);
+    expect((blank.json as { errors: unknown[] }).errors).toEqual([{ field: "name", reason: "required" }]);
+    expect((capacity.json as { errors: { field: string }[] }).errors.map((error) => error.field)).toEqual(["capacity"]);
+  });
+
+  it("refuses a write with 403 forbidden and changes nothing, while the reads keep answering", async () => {
+    const send = await session("org-forbidden", "organization-forbidden");
+
+    const create = await send("POST", "/modalities", { code: "NEW", name: "Nueva" });
+    const edit = await send("PUT", `/modalities/${items(await send("GET", "/modalities"))[0]?.id ?? ""}`, { code: "PRI", name: "x", isActive: false });
+
+    expect(verdict(create)).toEqual([403, "forbidden"]);
+    expect(verdict(edit)).toEqual([403, "forbidden"]);
+    expect(names(await send("GET", "/modalities?sort=name,asc"))).toEqual(["Prebásica", "Primaria", "Secundaria"]);
+  });
+
+  it("fails the first three reads of a resource with 500 and a trace id, then recovers, each resource on its own count", async () => {
+    const send = await session("org-server-error", "organization-server-error");
+
+    const failed = [await send("GET", "/academic-years"), await send("GET", "/academic-years"), await send("GET", "/academic-years")];
+    const other = await send("GET", "/modalities");
+    const recovered = await send("GET", "/academic-years");
+
+    expect(failed.map(verdict)).toEqual(Array(3).fill([500, "internal-error"]));
+    expect(failed[0]?.json).toMatchObject({ traceId: "01J8Z4K2QF9P0X" });
+    expect(other.status).toBe(500);
+    expect(recovered.status).toBe(200);
+  });
+
+  it("keeps one academic structure for each scenario", async () => {
+    const mine = await session("org-mine", "organization-empty");
+    const theirs = await session("org-theirs");
+    await mine("POST", "/modalities", { code: "ONE", name: "Una" });
+
+    expect(page(await mine("GET", "/modalities")).total).toBe(1);
+    expect(page(await theirs("GET", "/modalities")).total).toBe(3);
+  });
+});

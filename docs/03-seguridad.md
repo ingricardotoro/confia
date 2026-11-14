@@ -859,6 +859,17 @@ segregación de funciones no debe listar ningún usuario con ambos permisos del 
 > cada operación sensible resuelta en el trimestre con su iniciador y su aprobador, y señala toda en la que coinciden. El informe llega
 > con el cambio que entregue la primera operación con aprobación.
 
+> **Nota fechada 2026-11-10 (cambio `rbac-permission-matrix-and-audit-integration`, PR 6 `roles-report-and-criterion-2`): registro del
+> cambio 8b.** El texto anterior no se reescribe. El alcance del cambio 8 se dividió por decisión O6 del propietario, y lo que sigue
+> queda para el cambio **8b**, que se crea cuando llegue su turno: la asignación de roles por endpoint, con la regla «un usuario nunca
+> modifica su propio rol» de la fila «Alta o cambio de rol de usuario»; la desactivación de cuentas y el motivo de revocación
+> `admin_revoke` (con la inversión de `AccountDeactivationAbsenceTest`); la inscripción y la retirada voluntarias de MFA (con la
+> inversión de `NoFullSessionMfaRoutesTest`); la reautenticación reforzada (*step-up*); el restablecimiento administrativo de
+> contraseña; el endpoint de lectura de la bitácora con `audit:read`; la creación del primer Super Admin sin secreto en migración ni en
+> el repositorio; y la revisión del riesgo aceptado DA-15 (Q2). Con ellas, el cambio 8b decide la revocación de sesiones al cambiar un
+> rol y revisa el rechazo sin `otp` (D12) si introduce rutas de elevación. Los iniciadores sin permiso de esta sección (ajuste manual
+> del libro mayor, baja por incobrable y reembolso a un tercero) quedan pendientes de los cambios que construyan cada operación (Q4).
+
 ### 5.4 Autorización a nivel de objeto
 
 El control de acceso a nivel de función (¿puede este rol llamar a este endpoint?) es necesario
@@ -1266,6 +1277,15 @@ Content-Security-Policy:
 > no es necesario mientras API y aplicación compartan origen. Si el despliegue los separara, esa
 > decisión se toma con su propio cambio: la cookie de CSRF `__Host-` no admite `Domain`, y la lista de
 > orígenes permitidos (`confia.web.allowed-origins`) debe actualizarse a la vez que la política.
+
+> **Nota fechada 2026-11-11 (corte `organization-academic-structure`).** El `Dialog` modal del panel
+> (Radix) bloquea el desplazamiento de la página con `react-remove-scroll`, que agrega **un** elemento
+> `<style>` en tiempo de ejecución. La política del panel pasa a `style-src 'self' 'nonce-{NONCE}'`: el
+> **mismo tipo de nonce de 128 bits por respuesta HTML** que usarán los scripts en el cambio 11, nunca reutilizado y con `Cache-Control: no-store`, entra en la
+> cabecera y en `<meta name="csp-nonce">`, y la aplicación se lo entrega a esa biblioteca al arrancar
+> (`src/main.tsx`). Sigue sin existir `unsafe-inline`. Hoy lo emite `vite preview`; en producción lo
+> emite la aplicación, junto con el nonce de scripts, en el cambio 11, que también debe actualizar el bloque normativo de arriba. La política del portal no cambia
+> hasta que tenga un diálogo modal.
 
 Política del **portal de encargados**, que además debe permitir el marco de la pasarela cuando se
 usen campos alojados:

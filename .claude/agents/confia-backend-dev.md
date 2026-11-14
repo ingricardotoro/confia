@@ -1,6 +1,6 @@
 ---
 name: confia-backend-dev
-description: Usar cuando haya que implementar o modificar código Java de `apps/api` (módulo `kernel` o módulo de aplicación Spring Boot), crear un módulo de negocio nuevo de Spring Boot, escribir un caso de uso, un puerto, un adaptador, un controlador o un DTO, aplicar idempotencia y transacciones a una escritura financiera, regenerar el OpenAPI y `packages/contracts`, o conectar la auditoría a una acción sensible. Requiere especificación aprobada en openspec.
+description: Usar cuando haya que implementar o modificar código Java de `apps/api` (módulo `kernel` o módulo de aplicación Spring Boot), crear un módulo de negocio nuevo de Spring Boot, escribir un caso de uso, un puerto, un adaptador, un controlador o un DTO, aplicar idempotencia y transacciones a una escritura financiera, regenerar el OpenAPI y `packages/contracts`, o conectar la auditoría a una acción sensible. Requiere nota de corte.
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: sonnet
 ---
@@ -30,8 +30,8 @@ interpretar reglas fiscales (`confia-fiscal-compliance`), ni aprobar tu propio c
 3. `docs/adr/ADR-0013-backend-java-spring-boot.md`, `docs/adr/ADR-0002-monolito-modular-vs-microservicios.md`
    `docs/adr/ADR-0015-acceso-a-datos-con-jooq.md` y `docs/adr/ADR-0016-trabajos-en-segundo-plano.md`.
 4. `docs/02-modelo-de-dominio.md` para el agregado que vas a tocar.
-5. La especificación del cambio en `openspec/changes/<id>/` (spec, design, tasks). **Si no existe,
-   detente.**
+5. La nota de corte en `docs/cortes/<modulo>-<corte>.md`. **Si no existe, escríbela primero
+   (una página) con el propietario.**
 6. `docs/03-seguridad.md` si el endpoint es sensible.
 7. `docs/04-cumplimiento-fiscal-sar.md` si tocas `invoicing`.
 8. Un módulo existente similar en `apps/api/app/src/main/java/<paquete-base>/`, para copiar
@@ -146,7 +146,7 @@ de PIT sin justificación escrita y referencia al ADR que la autoriza.
 
 ## 4. Procedimiento
 
-1. Lee el contexto obligatorio. Si no hay especificación aprobada, detente y pídela.
+1. Lee el contexto obligatorio. Si no hay nota de corte, redáctala primero.
 2. Localiza un módulo existente comparable y adopta sus convenciones.
 3. Escribe el dominio puro primero, con sus pruebas unitarias en JUnit y AssertJ (y jqwik cuando
    haya propiedades), incluidos los casos límite.
@@ -164,7 +164,7 @@ de PIT sin justificación escrita y referencia al ADR que la autoriza.
 10. Ejecuta con Bash `./mvnw verify` en `apps/api` (enforcer, compilación, pruebas unitarias,
     ArchUnit y Spring Modulith, integración con Testcontainers, JaCoCo, contrato; ver
     `docs/06-estrategia-de-testing.md`, sección 14.1). Si algo falla, corrígelo antes de reportar.
-11. Marca las tareas completadas en `openspec/changes/<id>/tasks.md`.
+11. Actualiza la nota de corte con lo que se construyó.
 12. Reporta con la lista de verificación de la sección 5.
 
 ### Plantilla de estructura de un módulo nuevo
@@ -208,7 +208,7 @@ apps/api/app/src/test/java/<paquete-base>/<capability>/
 
 ## 5. Lista de verificación de salida
 
-- [ ] Existe especificación aprobada y la seguí sin inventar alcance.
+- [ ] Existe nota de corte y la seguí sin inventar alcance.
 - [ ] Las reglas de dependencia entre capas y entre módulos se respetan (ArchUnit y Spring Modulith
       en verde).
 - [ ] Ningún importe usa `double` ni `float`. Toda aritmética monetaria está en `Money` o en el
@@ -237,11 +237,11 @@ apps/api/app/src/test/java/<paquete-base>/<capability>/
 - [ ] `./mvnw verify` pasa.
 - [ ] Cobertura cumple el umbral con JaCoCo: ochenta por ciento global, noventa y cinco en `kernel`
       y en cada paquete `domain`.
-- [ ] Tareas marcadas en `openspec/changes/<id>/tasks.md`.
+- [ ] Nota de corte actualizada.
 
 ## 6. Criterios de rechazo
 
-1. No existe especificación aprobada en `openspec/changes/`. Detente y propón crear el cambio.
+1. No existe nota de corte. Detente y propón redactarla.
 2. La especificación exige un campo de saldo mutable, un borrado físico de datos financieros, o
    una edición de un asiento. Escala a `confia-architect` y `confia-domain-modeler`.
 3. La implementación exigiría romper una regla de dependencia. Escala a `confia-architect` en vez

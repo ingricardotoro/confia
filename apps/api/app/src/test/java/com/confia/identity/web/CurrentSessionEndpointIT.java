@@ -422,13 +422,18 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
     // --- WE29 ---
 
     @Test
-    void theProductionRoutesAreExactlyTheSevenSessionRoutesAndTheRolesReportAndEveryOtherAnonymousRequestIs401() {
-        assertThat(AdminProcessLauncher.routesOf(process))
-                .containsExactlyInAnyOrder("POST /api/v1/auth/sessions",
-                        "GET /api/v1/auth/sessions/current", "POST /api/v1/auth/mfa/enrollments",
-                        "POST /api/v1/auth/mfa/verifications", "POST /api/v1/auth/sessions/refresh",
-                        "DELETE /api/v1/auth/sessions/current", "DELETE /api/v1/auth/sessions",
-                        "GET /api/v1/identity/roles");
+    void theProductionRoutesAreExactlyTheSevenSessionRoutesTheRolesReportAndTheTwelveOfTheAcademicStructureAndEveryOtherAnonymousRequestIs401() {
+        List<String> expected = new java.util.ArrayList<>(List.of("POST /api/v1/auth/sessions",
+                "GET /api/v1/auth/sessions/current", "POST /api/v1/auth/mfa/enrollments",
+                "POST /api/v1/auth/mfa/verifications", "POST /api/v1/auth/sessions/refresh",
+                "DELETE /api/v1/auth/sessions/current", "DELETE /api/v1/auth/sessions",
+                "GET /api/v1/identity/roles"));
+        for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {
+            expected.addAll(List.of("GET /api/v1/organization/" + resource,
+                    "POST /api/v1/organization/" + resource,
+                    "PUT /api/v1/organization/" + resource + "/{id}"));
+        }
+        assertThat(AdminProcessLauncher.routesOf(process)).containsExactlyInAnyOrderElementsOf(expected);
 
         assertProblem(get("/api/v1/auth/sessions"), 401, "authentication-required");
         assertProblem(get("/api/v1/anything"), 401, "authentication-required");

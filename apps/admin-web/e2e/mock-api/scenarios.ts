@@ -1,4 +1,10 @@
 import { problem, type ProblemOptions } from "../../src/test/contract-responses.ts";
+import {
+  DEFAULT_ORGANIZATION,
+  createOrganizationModel,
+  type OrganizationModel,
+  type OrganizationOptions,
+} from "./organization-model.ts";
 import { createSessionModel, type ModelResponse, type SessionModel } from "./session-model.ts";
 
 /**
@@ -14,7 +20,7 @@ const RETRY_AFTER_SECONDS = "30";
 const TRACE_ID = "01J8Z4K2QF9P0X";
 const EXPIRY_PUSH_MS = 301_000;
 
-export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify";
+export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify" | "organization";
 
 type LoginBehavior =
   | "authenticated"
@@ -32,6 +38,8 @@ type LoginBehavior =
 interface PresetDefinition {
   readonly login: LoginBehavior;
   readonly enrolled: boolean;
+  /** The academic structure the scenario holds; the seeded one, with every write allowed, when absent. */
+  readonly organization?: OrganizationOptions;
   /** A fault injected after the model answered, to prove the server refuses to send it. */
   readonly tamper?: (operation: Operation, response: ModelResponse) => ModelResponse;
 }
@@ -49,6 +57,10 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   "restricted-expired": { login: "restricted-expired", enrolled: true },
   "enrollment-expired": { login: "enrollment-expired", enrolled: false },
   "already-enrolled": { login: "second-factor-enrollment-required", enrolled: true },
+  // The academic structure (organization-academic-structure cut). Each one signs in as the default does.
+  "organization-empty": { login: "authenticated", enrolled: false, organization: { ...DEFAULT_ORGANIZATION, seed: "empty" } },
+  "organization-forbidden": { login: "authenticated", enrolled: false, organization: { ...DEFAULT_ORGANIZATION, writes: "forbidden" } },
+  "organization-server-error": { login: "authenticated", enrolled: false, organization: { ...DEFAULT_ORGANIZATION, reads: "failing-first" } },
   "contract-violation": {
     login: "second-factor-enrollment-required",
     enrolled: false,
@@ -65,6 +77,7 @@ export interface RecordedCall {
 export interface Scenario {
   readonly preset: string;
   readonly model: SessionModel;
+  readonly organization: OrganizationModel;
   readonly calls: RecordedCall[];
   readonly tamper: PresetDefinition["tamper"];
   signIn(sleep: (ms: number) => Promise<void>): Promise<ModelResponse>;
@@ -87,6 +100,7 @@ function build(preset: string, definition: PresetDefinition): Scenario {
   return {
     preset,
     model,
+    organization: createOrganizationModel(definition.organization ?? DEFAULT_ORGANIZATION),
     calls: [],
     tamper: definition.tamper,
     async signIn(sleep) {

@@ -3,8 +3,14 @@ package com.confia.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.confia.architecture.AuthorizationAbsences;
+import com.confia.architecture.RouteInventory;
+import com.confia.architecture.authorizationscope.AuthorizationScopeViolationFixtures;
+import com.confia.architecture.fixture.sessionroutes.BadMfaDisableController;
+import com.confia.architecture.fixture.sessionroutes.BadPasswordRecoveryController;
 import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.AuthenticationCommand;
+import com.confia.identity.application.SessionRevocationReason;
 import com.confia.identity.application.PasswordResetDeliveryUnavailableException;
 import com.confia.identity.application.PasswordResetIssuanceScheduler;
 import com.confia.identity.application.PasswordResetLinkSender;
@@ -469,6 +475,101 @@ class IdentityScopeExclusionInventoryTest {
         assertThat(writersOfThePasswordHashColumn(fixtures))
                 .containsExactly(PasswordRecoveryScopeViolationFixtures.PasswordHashColumnWriter
                         .class.getName() + ".overwrite");
+    }
+
+    /**
+     * Scenario I300 (rbac-permission-matrix-and-audit-integration, specs/identity): no use case of
+     * {@code identity} inserts or changes a role assignment or creates the first Super Admin, and no
+     * migration creates an account or an assignment. Roles are assigned only by tests until change 8b,
+     * which delivers all of it and makes this test fail on purpose. The base set is proven non-empty
+     * first, and the detectors are shown on fixtures below.
+     */
+    @Test
+    void noUseCaseOfIdentityAssignsOrChangesRolesOrCreatesTheFirstSuperAdmin() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+
+        List<String> useCases = AuthorizationAbsences.simpleNamesIn(production,
+                "com.confia.identity.application");
+        assertThat(useCases).as("the scan sees the real use cases, so the absence is not vacuous")
+                .contains("LogIn", "ListRolePermissions");
+        assertThat(AuthorizationAbsences.roleManagementNames(useCases))
+                .as("no use case assigns or changes roles or creates the first Super Admin "
+                        + "(brecha con destino: cambio 8b)")
+                .isEmpty();
+        assertThat(AuthorizationAbsences.roleAssignmentWriters(production))
+                .as("no production class inserts into the assignment table (cambio 8b)").isEmpty();
+        assertThat(AuthorizationAbsences.migrationsThatInsertAccountsOrAssignments(
+                AuthorizationAbsences.migrationSqlByFile()))
+                .as("no migration inserts an account or an assignment (cambio 8b)").isEmpty();
+    }
+
+    @Test
+    void theRoleManagementDetectorRejectsTheFixtureUseCasesAndTheAssignmentWriter() {
+        List<String> names = List.of(
+                AuthorizationScopeViolationFixtures.AssignStaffRole.class.getSimpleName(),
+                AuthorizationScopeViolationFixtures.ChangeStaffRole.class.getSimpleName(),
+                AuthorizationScopeViolationFixtures.CreateFirstSuperAdmin.class.getSimpleName());
+
+        assertThat(AuthorizationAbsences.roleManagementNames(names)).containsExactlyElementsOf(names);
+        assertThat(AuthorizationAbsences.roleAssignmentWriters(new ClassFileImporter().importClasses(
+                AuthorizationScopeViolationFixtures.AssignmentWriter.class)))
+                .containsExactly(AuthorizationScopeViolationFixtures.AssignmentWriter.class.getName());
+    }
+
+    /**
+     * Scenario I215 (identity spec; the owner passed from change 8 to change 8b when the owner divided
+     * the change, decision O6): no use case deactivates an account and {@code admin_revoke} is not a
+     * revocation reason. The assertion is the one of {@code AccountDeactivationAbsenceTest}, kept here
+     * with the fixture of a use case that does, so it is known to find one.
+     */
+    @Test
+    void noUseCaseDeactivatesAnAccountAndAdminRevokeIsNotARevocationReasonUntilChange8b() {
+        JavaClasses production = assertNonEmptyProductionClasses();
+        List<String> useCases = AuthorizationAbsences.simpleNamesIn(production,
+                "com.confia.identity.application");
+
+        assertThat(useCases).as("the scan sees the real use cases").contains("LogIn", "EndAllSessions");
+        assertThat(AuthorizationAbsences.deactivationNames(useCases))
+                .as("no use case deactivates an account (brecha con destino: cambio 8b)").isEmpty();
+        assertThat(Arrays.stream(SessionRevocationReason.values()).map(SessionRevocationReason::code))
+                .as("admin_revoke is not a revocation reason (cambio 8b)")
+                .doesNotContain("admin_revoke");
+    }
+
+    @Test
+    void theDeactivationDetectorRejectsTheFixtureUseCase() {
+        assertThat(AuthorizationAbsences.deactivationNames(List.of(
+                AuthorizationScopeViolationFixtures.DeactivateStaffAccount.class.getSimpleName(),
+                "LogIn", "EndAllSessions"))).containsExactly("DeactivateStaffAccount");
+    }
+
+    /**
+     * The two absences of the second factor and the password that change 8b delivers (identity spec,
+     * scenario I216 and the administrative reset of {@code docs/03-seguridad.md} section 4.7): the only
+     * routes of the second factor are the two restricted ones, so no voluntary enrollment or removal
+     * exists with a full session, and no route resets a password or recovers one.
+     */
+    @Test
+    void theSecondFactorRoutesAreOnlyTheRestrictedOnesAndNoRouteResetsAPasswordUntilChange8b() {
+        List<String> routes = RouteInventory.routesOf(assertNonEmptyProductionClasses());
+
+        assertThat(routes).as("the scan sees the real routes").contains("POST /api/v1/auth/sessions");
+        assertThat(routes.stream().filter(route -> route.contains("/auth/mfa")).toList())
+                .as("no voluntary enrollment or removal with a full session (cambio 8b)")
+                .containsExactlyInAnyOrderElementsOf(AuthorizationAbsences.RESTRICTED_MFA_ROUTES);
+        assertThat(RouteInventory.passwordRecoveryRoutes(routes))
+                .as("no route resets another account's password or recovers one (cambio 8b)")
+                .isEmpty();
+    }
+
+    @Test
+    void theRouteDetectorsRejectTheFixturesOfTheEnrollmentAndTheReset() {
+        List<String> routes = RouteInventory.routesOf(new ClassFileImporter().importClasses(
+                BadMfaDisableController.class, BadPasswordRecoveryController.class));
+
+        assertThat(routes.stream().filter(route -> route.contains("/auth/mfa")).toList())
+                .isNotEmpty();
+        assertThat(RouteInventory.passwordRecoveryRoutes(routes)).isNotEmpty();
     }
 
     private static List<String> writersOfThePasswordHashColumn(JavaClasses classes) {

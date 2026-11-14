@@ -13,9 +13,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Specs/identity, scenario [I215]: there is no use case that deactivates an account and {@code
- * admin_revoke} is not a revocation reason. Both are gaps with an owner (change 8) and stop being true
- * the day that change delivers them. That the constraint of {@code revoked_reason} in the database
- * refuses the text is proven where the migration is tested; here the application refuses it as well:
+ * admin_revoke} is not a revocation reason. Both are gaps with an owner (change 8b, the division of
+ * change 8 by the owner's decision O6) and stop being true the day that change delivers them. That
+ * the constraint of {@code revoked_reason} in the database refuses the text is proven where the
+ * migration is tested; here the application refuses it as well:
  * the enumeration the use cases write from has no such code.
  *
  * <p>The detector looks at the names of the classes of {@code identity.application}, the use cases,

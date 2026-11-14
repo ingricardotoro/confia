@@ -1,7 +1,6 @@
 import { createRoute, redirect, type AnyRoute } from "@tanstack/react-router";
 import { EnrollmentContainer } from "./enrollment/EnrollmentContainer.tsx";
 import { SecondFactorContainer } from "./second-factor/SecondFactorContainer.tsx";
-import { SignedInContainer } from "./signed-in/SignedInContainer.tsx";
 import { SignInContainer } from "./sign-in/SignInContainer.tsx";
 import type { AccessSession } from "./session/index.ts";
 
@@ -40,18 +39,18 @@ function toHome(): void {
 
 const isAuthenticated = (session: AccessSession) => session.getView().status === "authenticated";
 
-/** The routes of access, children of the root, each behind its guard. */
+/** The guard of every signed in page (SS27): without a session the person goes to sign in. */
+export function requireAuthentication(session: AccessSession): void {
+  if (!isAuthenticated(session)) toSignIn();
+}
+
+/**
+ * The public routes of access, children of the root, each behind its guard. The signed in pages are not
+ * here: they live under the shell, which the app builds around `requireAuthentication`.
+ */
 export function createIdentityRoutes(root: AnyRoute, session: AccessSession): AnyRoute[] {
   const getParentRoute = () => root;
   return [
-    createRoute({
-      getParentRoute,
-      path: ACCESS_PATHS.home,
-      beforeLoad: () => {
-        if (!isAuthenticated(session)) toSignIn();
-      },
-      component: () => <SignedInContainer session={session} signInPath={ACCESS_PATHS.signIn} />,
-    }),
     createRoute({
       getParentRoute,
       path: ACCESS_PATHS.signIn,

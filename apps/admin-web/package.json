@@ -17,6 +17,7 @@
     "@tanstack/react-form": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
+    "get-nonce": "catalog:",
     "i18next": "catalog:",
     "i18next-icu": "catalog:",
     "lucide-react": "catalog:",

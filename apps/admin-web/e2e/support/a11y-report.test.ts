@@ -25,9 +25,9 @@ describe("the evaluations of the matrix [BX74, BX77]", () => {
       const themes = evaluations.filter((e) => e.route === wanted.route && e.state === wanted.state).map((e) => e.theme);
       expect(themes).toEqual([...THEMES]);
     }
-    // Every combination of the matrix is evaluated, in both themes: 22 states, 44 evaluations (BX109).
-    expect(evaluations).toHaveLength(44);
-    expect(MATRIX).toHaveLength(MINIMUM.length);
+    // Every combination of the matrix is evaluated, in both themes: the 22 of the minimum (BX109) and the screens added since.
+    expect(evaluations).toHaveLength(MATRIX.length * THEMES.length);
+    expect(MATRIX.length).toBeGreaterThanOrEqual(MINIMUM.length);
   });
 
   it("fails on zero combinations instead of passing", () => {
@@ -119,6 +119,25 @@ describe("the states of the enrollment screen [BX109]", () => {
   it("has the five states in the minimum, and the whole matrix is the 22 states of the three screens and the part 1 [BX109]", () => {
     expect(MINIMUM.filter((wanted) => wanted.route === ENROLLMENT)).toHaveLength(5);
     expect(MINIMUM).toHaveLength(6 + 8 + 3 + 5);
+  });
+});
+
+describe("the states of the academic structure", () => {
+  const organization = MATRIX.filter((combination) => combination.route.startsWith("/organization/"));
+
+  it("holds the four views ready, the open dialog and its error summary, the empty state and the load error, each once", () => {
+    expect(organization.map((combination) => [combination.route, combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["/organization/academic-years", "ready", undefined, undefined],
+      ["/organization/modalities", "ready", undefined, undefined],
+      ["/organization/grades", "ready", undefined, undefined],
+      ["/organization/sections", "ready", undefined, undefined],
+      ["/organization/modalities", "dialog-open", undefined, true],
+      ["/organization/modalities", "dialog-error-summary", undefined, true],
+      ["/organization/academic-years", "empty", "organization-empty", undefined],
+      ["/organization/academic-years", "load-error", "organization-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...organization])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
   });
 });
 

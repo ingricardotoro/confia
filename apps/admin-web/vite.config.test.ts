@@ -30,14 +30,15 @@ function listen(server: Server): Promise<number> {
   });
 }
 
-function send(port: number, method: string, path: string): Promise<{ status: number; headers: IncomingHttpHeaders }> {
+function send(port: number, method: string, path: string): Promise<{ status: number; headers: IncomingHttpHeaders; body: string }> {
   return new Promise((resolve, reject) => {
     const req = request(
       { host: "localhost", port, method, path, headers: { Origin: PAGE_ORIGIN } },
       (res) => {
-        res.resume();
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
         res.on("end", () => {
-          resolve({ status: res.statusCode ?? 0, headers: res.headers });
+          resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks).toString("utf8") });
         });
       },
     );
@@ -118,6 +119,29 @@ describe("the same-origin proxy", { timeout: 20_000 }, () => {
     expect(policy).toContain("connect-src 'self'");
     expect(policy).not.toContain("unsafe-inline");
     expect(policy).not.toContain("unsafe-eval");
+  });
+
+  it("AW08b: a page answer carries a fresh nonce in the policy and in the meta tag, and assets carry none", async () => {
+    writeFileSync(join(outDir, "index.html"), '<!doctype html><meta name="csp-nonce" content="__CSP_NONCE__" /><title>t</title>');
+    writeFileSync(join(outDir, "app.js"), "export {};");
+    served = await preview({ configFile: CONFIG_FILE, root: PACKAGE_ROOT, logLevel: "silent", build: { outDir }, preview: { port: 0, strictPort: false } });
+    const port = (served.httpServer.address() as AddressInfo).port;
+
+    const first = await send(port, "GET", "/organization/grades");
+    const second = await send(port, "GET", "/");
+    const asset = await send(port, "GET", "/app.js");
+
+    const nonceOf = (policy: string): string => /style-src 'self' 'nonce-([A-Za-z0-9+/=]{22,})'/.exec(policy)?.[1] ?? "";
+    const firstNonce = nonceOf(String(first.headers["content-security-policy"]));
+    const secondNonce = nonceOf(String(second.headers["content-security-policy"]));
+    expect(firstNonce).not.toBe("");
+    expect(secondNonce).not.toBe(firstNonce);
+    expect(first.body).toContain(`content="${firstNonce}"`);
+    expect(first.body).not.toContain("__CSP_NONCE__");
+    expect(first.headers["cache-control"]).toBe("no-store");
+    expect(String(first.headers["content-security-policy"])).not.toContain("unsafe-inline");
+    expect(String(asset.headers["content-security-policy"])).toContain("style-src 'self'; ");
+    expect(String(asset.headers["content-security-policy"])).not.toContain("nonce-");
   });
 
   it("AW11: adds no CORS header to a proxied answer", async () => {

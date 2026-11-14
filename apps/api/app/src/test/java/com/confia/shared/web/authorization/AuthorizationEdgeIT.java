@@ -32,11 +32,16 @@ import com.confia.shared.audit.AuditChainVerification;
 import com.confia.kernel.InstitutionId;
 import ch.qos.logback.core.read.ListAppender;
 import ch.qos.logback.classic.spi.ILoggingEvent;
+import com.confia.identity.application.ListRolePermissions;
 import com.confia.identity.domain.UserAgentFingerprint;
+import com.confia.identity.web.RolesReportController;
+import com.confia.identity.web.RolesReportResponse;
 import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
 import com.confia.identity.web.wiring.IdentityWebConfiguration;
 import com.confia.kernel.Permission;
+import com.confia.organization.infrastructure.wiring.AcademicStructureConfiguration;
 import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
+import com.confia.organization.web.wiring.OrganizationWebConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.JobSchedulingConfiguration;
 import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
 import com.confia.shared.platform.infrastructure.SharedPlatformConfiguration;
@@ -89,6 +94,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntSupplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -142,6 +148,12 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
 
     /** While set, the resolution of the permissions fails. */
     static final AtomicBoolean FAIL_RESOLUTION = new AtomicBoolean();
+
+    /** How many times the controller of the roles report ran: a denied request must leave it where it was. */
+    static final AtomicInteger ROLES_REPORT_INVOCATIONS = new AtomicInteger();
+
+    private static final String ROLES_ROUTE = "/api/v1/identity/roles";
+    private static final String TEST_READ_ROUTE = "/test/authorization/accounts/1";
 
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1).followRedirects(HttpClient.Redirect.NEVER).build();
@@ -263,7 +275,10 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     void everyPermissionedEntryRejectsARevokedSession() throws SQLException {
         assertThat(endpoints.endpoints()).as("the walk is non-vacuous").hasSizeGreaterThanOrEqualTo(2)
                 .anyMatch(entry -> entry.pattern().contains("{"));
-        for (PermissionedEndpoint entry : endpoints.endpoints()) {
+        // The routes of the academic structure take a JSON body, which this walk does not send; their
+        // revoked-session case has its own test in AcademicStructureEndpointsIT.
+        for (PermissionedEndpoint entry : endpoints.endpoints().stream()
+                .filter(candidate -> !candidate.pattern().startsWith("/api/v1/organization/")).toList()) {
             Session holder = sessionOf(StaffRole.SUPER_ADMIN);
             assertThat(StaffRole.SUPER_ADMIN.permissions()).contains(entry.permission());
             HttpResponse<String> live = send(entry, holder, "a-valid-key-0002");
@@ -573,6 +588,237 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
                 "SENTINEL-HEADER-4", cashier.token());
     }
 
+    // =========================================================================================
+    // Third part (task 7): exit criterion 2 over the harness, with its controls (design.md D19;
+    // scenarios AZ65 to AZ70 and AZ22). Two routes need identity:read: the one of the harness and the
+    // real roles report, whose controller counts its runs here. The harness cap is 3, so the cap
+    // control of AZ69 uses the fourth denial where the scenario says the third at T=2 (the cap is a
+    // property of the context shared by the class). AZ69 is proven only here: the real process has
+    // no manual clock and no broken writer without a test bean (D19).
+    // =========================================================================================
+
+    private record Probe(String name, String path, IntSupplier invocations) {
+    }
+
+    private List<Probe> probes() {
+        return List.of(new Probe("test route", TEST_READ_ROUTE, controller::invocations),
+                new Probe("roles report", ROLES_ROUTE, ROLES_REPORT_INVOCATIONS::get));
+    }
+
+    // --- AZ65: no permission, 403, no invocation and one row whose request id is the trace id ---
+
+    @Test
+    void aCashierIsDeniedAndLeavesExactlyOneRowWhoseRequestIdIsTheTraceIdOfTheProblem()
+            throws SQLException {
+        for (Probe probe : probes()) {
+            Session cashier = sessionOf(StaffRole.CASHIER);
+            int before = probe.invocations().getAsInt();
+
+            HttpResponse<String> response = get(cashier, probe.path());
+
+            JsonNode problem = assertProblem(response, 403, "forbidden");
+            assertThat(probe.invocations().getAsInt()).as("invocations of the %s", probe.name())
+                    .isEqualTo(before);
+            List<Map<String, String>> rows = rowsOf(cashier.institution());
+            assertThat(rows).as("rows for the %s", probe.name()).hasSize(1);
+            Map<String, String> row = rows.get(0);
+            assertThat(row.get("action")).isEqualTo("authorization.access.denied");
+            assertThat(row.get("entity_id")).isEqualTo("identity:read");
+            assertThat(row.get("outcome")).isEqualTo("denied");
+            assertThat(row.get("actor_id")).isEqualTo(cashier.account().toString());
+            assertThat(row.get("request_id")).isEqualTo(problem.get("traceId").asString());
+        }
+    }
+
+    // --- AZ66: with the permission, 200 and no denial row ---
+
+    @Test
+    void anAuditorIsAnsweredByTheControllerAndLeavesNoDenialRow() throws SQLException {
+        for (Probe probe : probes()) {
+            Session auditor = sessionOf(StaffRole.AUDITOR);
+            int before = probe.invocations().getAsInt();
+
+            HttpResponse<String> response = get(auditor, probe.path());
+
+            assertThat(response.statusCode()).as("status of the %s", probe.name()).isEqualTo(200);
+            assertThat(probe.invocations().getAsInt()).as("invocations of the %s", probe.name())
+                    .isEqualTo(before + 1);
+            assertThat(rowsOf(auditor.institution())).as("rows for the %s", probe.name()).isEmpty();
+        }
+    }
+
+    // --- AZ67: the chain still verifies after both ---
+
+    @Test
+    void theChainOfTheInstitutionStaysIntactAfterADenialAndAGrantedRead() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        Session cashier = sessionIn(institution, UUID.randomUUID(), StaffRole.CASHIER);
+        Session auditor = sessionIn(institution, UUID.randomUUID(), StaffRole.AUDITOR);
+
+        assertProblem(get(cashier, ROLES_ROUTE), 403, "forbidden");
+        assertThat(get(auditor, ROLES_ROUTE).statusCode()).isEqualTo(200);
+
+        assertThat(rowsOf(institution)).hasSize(1);
+        assertChainIntact(institution, 1);
+    }
+
+    // --- AZ68: sentinels of the query and of foreign headers reach neither the trail nor the logs ---
+
+    @Test
+    void sentinelsOnTheRealRouteReachNeitherTheRowsNorTheLogs() throws Exception {
+        Session cashier = sessionOf(StaffRole.CASHIER);
+        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory
+                .getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        ch.qos.logback.classic.Level level = root.getLevel();
+        ListAppender<ILoggingEvent> logged = new ListAppender<>();
+        logged.start();
+        root.addAppender(logged);
+        root.setLevel(ch.qos.logback.classic.Level.DEBUG);
+        HttpResponse<String> response;
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port
+                            + ROLES_ROUTE + "?q=SENTINEL-QUERY-6&role=SENTINEL-ROLE-7"))
+                    .header("Authorization", "Bearer " + cashier.token())
+                    .header("Origin", "https://admin.colegio.edu.hn")
+                    .header("X-Sentinel", "SENTINEL-HEADER-8")
+                    .header("X-Permission", "SENTINEL-PERMISSION-9").GET().build();
+            response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+        } finally {
+            root.setLevel(level);
+            root.detachAppender(logged);
+        }
+
+        assertProblem(response, 403, "forbidden");
+        String rows = rowsOf(cashier.institution()).toString();
+        assertThat(rows).contains("authorization.access.denied");
+        String[] sentinels = {"SENTINEL-QUERY-6", "SENTINEL-ROLE-7", "SENTINEL-HEADER-8",
+                "SENTINEL-PERMISSION-9", cashier.token()};
+        assertThat(rows).doesNotContain(sentinels);
+        String ours = logged.list.stream()
+                .filter(event -> event.getLoggerName().startsWith("com.confia"))
+                .map(event -> event.getFormattedMessage() + event.getKeyValuePairs()
+                        + (event.getThrowableProxy() == null ? "" : event.getThrowableProxy()
+                                .getMessage()))
+                .collect(Collectors.joining("\n"));
+        assertThat(ours).doesNotContain(sentinels);
+        assertThat(response.body()).doesNotContain(sentinels);
+    }
+
+    // --- AZ69: a broken writer changes nothing of the answer; the cap and its summary ---
+
+    @Test
+    void aBrokenWriterStillAnswers403WithNoInvocationOnBothRoutes() throws SQLException {
+        for (Probe probe : probes()) {
+            Session cashier = sessionOf(StaffRole.CASHIER);
+            int invocationsBefore = probe.invocations().getAsInt();
+            int failedBefore = METRICS.denialAuditFailedCount();
+            FAIL_AUDIT_WRITES.set(true);
+            HttpResponse<String> response;
+            try {
+                response = get(cashier, probe.path());
+            } finally {
+                FAIL_AUDIT_WRITES.set(false);
+            }
+
+            assertProblem(response, 403, "forbidden");
+            assertThat(probe.invocations().getAsInt()).as("invocations of the %s", probe.name())
+                    .isEqualTo(invocationsBefore);
+            assertThat(METRICS.denialAuditFailedCount() - failedBefore).isEqualTo(1);
+            assertThat(rowsOf(cashier.institution())).as("the broken write left nothing").isEmpty();
+        }
+    }
+
+    @Test
+    void theDenialAfterTheCapWritesNoFullRowCountsOneOmissionAndTheNextWindowCarriesTheSummary()
+            throws SQLException {
+        emptyTheSharedQueue();
+        Session cashier = sessionOf(StaffRole.CASHIER);
+        int omittedBefore = METRICS.denialsOmitted().size();
+        int invocationsBefore = ROLES_REPORT_INVOCATIONS.get();
+
+        for (int i = 0; i < 3; i++) {
+            assertProblem(get(cashier, ROLES_ROUTE), 403, "forbidden");
+        }
+        assertThat(METRICS.denialsOmitted().size()).as("within the cap nothing is omitted")
+                .isEqualTo(omittedBefore);
+        HttpResponse<String> beyond = get(cashier, ROLES_ROUTE);
+
+        assertProblem(beyond, 403, "forbidden");
+        assertThat(rowsOf(cashier.institution())).as("no fourth full row").hasSize(3);
+        assertThat(METRICS.denialsOmitted().subList(omittedBefore, METRICS.denialsOmitted().size()))
+                .containsExactly(Permission.IDENTITY_READ);
+        closeTheWindowAndFireTheEmissionOf(cashier.institution());
+
+        List<Map<String, String>> rows = rowsOf(cashier.institution());
+        assertThat(rows).hasSize(4);
+        assertThat(rows.get(3).get("action")).isEqualTo("authorization.access.denied_summary");
+        assertThat(rows.get(3).get("after_value")).contains("\"omittedCount\": 1");
+        assertThat(rows.get(3).get("entity_id")).isEqualTo("identity:read");
+        assertThat(ROLES_REPORT_INVOCATIONS.get()).isEqualTo(invocationsBefore);
+        assertChainIntact(cashier.institution(), 4);
+    }
+
+    // --- AZ70: the result does not depend on what another test did to the same account ---
+
+    @Test
+    void theSameAccountInAnotherInstitutionIsNotAffectedByACapSpentElsewhere() throws SQLException {
+        UUID account = UUID.randomUUID();
+        UUID spentInstitution = UUID.randomUUID();
+        Session spent = sessionIn(spentInstitution, account, StaffRole.CASHIER);
+        for (int i = 0; i < 5; i++) {
+            assertProblem(get(spent, ROLES_ROUTE), 403, "forbidden");
+        }
+        assertThat(rowsOf(spentInstitution)).as("the cap of the first one is spent").hasSize(3);
+
+        UUID freshInstitution = UUID.randomUUID();
+        Session fresh = sessionIn(freshInstitution, account, StaffRole.CASHIER);
+        int invocationsBefore = ROLES_REPORT_INVOCATIONS.get();
+        HttpResponse<String> response = get(fresh, ROLES_ROUTE);
+
+        JsonNode problem = assertProblem(response, 403, "forbidden");
+        List<Map<String, String>> rows = rowsOf(freshInstitution);
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).get("action")).isEqualTo("authorization.access.denied");
+        assertThat(rows.get(0).get("request_id")).isEqualTo(problem.get("traceId").asString());
+        assertThat(ROLES_REPORT_INVOCATIONS.get()).isEqualTo(invocationsBefore);
+    }
+
+    // --- AZ22: a change of role takes effect on the next request with the same token ---
+
+    @Test
+    void aChangeFromAuditorToCashierDeniesTheNextRequestWithTheSameToken() throws SQLException {
+        for (Probe probe : probes()) {
+            Session session = sessionOf(StaffRole.AUDITOR);
+            assertThat(get(session, probe.path()).statusCode()).as("%s before the change",
+                    probe.name()).isEqualTo(200);
+            int invocationsBefore = probe.invocations().getAsInt();
+
+            changeRole(session, StaffRole.CASHIER);
+            HttpResponse<String> after = get(session, probe.path());
+
+            assertProblem(after, 403, "forbidden");
+            assertThat(probe.invocations().getAsInt()).as("invocations of the %s", probe.name())
+                    .isEqualTo(invocationsBefore);
+            assertThat(rowsOf(session.institution())).as("rows for the %s", probe.name())
+                    .hasSize(1).allSatisfy(row -> assertThat(row.get("entity_id"))
+                            .isEqualTo("identity:read"));
+        }
+    }
+
+    private static void changeRole(Session session, StaffRole role) throws SQLException {
+        try (Connection connection = StaffRoleFixtures.ownerTransaction(session.institution());
+                PreparedStatement statement = connection.prepareStatement("""
+                        update identity_staff_account_role set role_code = ?
+                         where institution_id = ? and account_id = ?
+                        """)) {
+            statement.setString(1, role.code());
+            statement.setObject(2, session.institution());
+            statement.setObject(3, session.account());
+            assertThat(statement.executeUpdate()).isEqualTo(1);
+            connection.commit();
+        }
+    }
+
     // --- Helpers of the second part ---
 
     private void emptyTheSharedQueue() {
@@ -709,8 +955,11 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
     }
 
     private Session sessionOf(StaffRole role) throws SQLException {
-        UUID institution = UUID.randomUUID();
-        UUID account = UUID.randomUUID();
+        return sessionIn(UUID.randomUUID(), UUID.randomUUID(), role);
+    }
+
+    /** A session of the account {@code account} of {@code institution}, which holds the role {@code role}. */
+    private Session sessionIn(UUID institution, UUID account, StaffRole role) throws SQLException {
         StaffRoleFixtures.committed(institution, account, role.code());
         UUID family = UUID.randomUUID();
         try (Connection connection = StaffRoleFixtures.ownerTransaction(institution);
@@ -797,7 +1046,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
             "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerActuatorAutoConfiguration"})
     @Import({ContractSchemas.class, ProcessApiInfo.class, SharedPlatformConfiguration.class,
             IdentityConfiguration.class, IdentityWebConfiguration.class,
-            OrganizationConfiguration.class, WebEdgeConfiguration.class,
+            OrganizationConfiguration.class, AcademicStructureConfiguration.class,
+            OrganizationWebConfiguration.class, WebEdgeConfiguration.class,
             AdminSecurityConfiguration.class, ObservabilityMetricsConfiguration.class,
             RateLimiterConfiguration.class, ThrottlingConfiguration.class,
             RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,
@@ -844,6 +1094,9 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
                     if (bean instanceof PermissionedEndpoints) {
                         return new PermissionedEndpoints(HARNESS_ENTRIES);
                     }
+                    if (bean instanceof RolesReportController) {
+                        return new CountingRolesReportController();
+                    }
                     if (bean instanceof RateLimiterRegistry registry) {
                         Map<String, RateLimiter> counting = new ConcurrentHashMap<>();
                         registry.policies().forEach(policy -> counting.put(policy,
@@ -853,6 +1106,20 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
                     return bean;
                 }
             };
+        }
+    }
+
+    /** The real controller of the roles report, which counts the times it ran. */
+    private static final class CountingRolesReportController extends RolesReportController {
+
+        CountingRolesReportController() {
+            super(new ListRolePermissions());
+        }
+
+        @Override
+        public RolesReportResponse roles() {
+            ROLES_REPORT_INVOCATIONS.incrementAndGet();
+            return super.roles();
         }
     }
 

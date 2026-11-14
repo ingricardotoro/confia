@@ -18,6 +18,8 @@ export interface CombinationId {
 export interface GateCombination extends CombinationId {
   /** A preset of the simulated API, applied to the scenario of the test before `arrange` runs. */
   readonly preset?: string;
+  /** The state opens a modal dialog, whose scroll lock raises the one known CSP report (organization.ts); the gate drops it and no other. */
+  readonly opensDialog?: boolean;
   arrange(page: Page): Promise<void>;
   expected(page: Page): Locator;
 }

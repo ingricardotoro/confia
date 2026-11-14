@@ -9,7 +9,7 @@ import { PROBLEM_KEYS } from "./problem-keys.ts";
 const CATALOG_KEYS = flattenCatalogKeys(admin);
 
 describe("PROBLEM_KEYS", () => {
-  it("names exactly the fifteen codes and the unknown case", () => {
+  it("names exactly the twenty codes and the unknown case", () => {
     expect(Object.keys(PROBLEM_KEYS).sort()).toEqual([...KNOWN_PROBLEM_CODES, "unknown"].sort());
   });
 
@@ -31,12 +31,19 @@ describe("PROBLEM_KEYS", () => {
     ["token-expired", "notice.verificationInterrupted"],
     ["internal-error", "problem.unexpected"],
     ["unknown", "problem.unexpected"],
+    ["forbidden", "problem.forbidden"],
+    ["resource-not-found", "problem.notFound"],
+    ["academic-year-overlap", "problem.academicYearOverlap"],
+    ["academic-year-already-active", "problem.academicYearAlreadyActive"],
+    ["academic-year-closed", "problem.academicYearClosed"],
+    ["duplicate-name", "problem.duplicateName"],
+    ["inactive-reference", "problem.inactiveReference"],
   ] as const)("maps %s to %s", (code, key) => {
     expect(PROBLEM_KEYS[code]).toBe(key);
   });
 
   it("shows the generic message for every code that has no text of its own (design.md section 7)", () => {
-    for (const code of ["csrf-invalid", "unsupported-media-type", "authentication-required", "forbidden", "resource-not-found"] as const) {
+    for (const code of ["csrf-invalid", "unsupported-media-type", "authentication-required"] as const) {
       expect(PROBLEM_KEYS[code], code).toBe("problem.unexpected");
     }
   });

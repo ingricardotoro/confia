@@ -2,7 +2,9 @@ package com.confia.bootstrap.admin;
 
 import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
 import com.confia.identity.web.wiring.IdentityWebConfiguration;
+import com.confia.organization.infrastructure.wiring.AcademicStructureConfiguration;
 import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
+import com.confia.organization.web.wiring.OrganizationWebConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.JobSchedulingConfiguration;
 import com.confia.shared.observability.health.HealthProbeRoutesConfiguration;
 import com.confia.shared.observability.health.ReadinessDatabaseHealthConfiguration;
@@ -34,7 +36,8 @@ import org.springframework.context.annotation.Import;
  * accident. This process registers the shared platform wiring (decision 2 of
  * web-edge-foundations), the {@code identity} module's use cases and secrets (decision 3), the
  * adapter that resolves the current institution from the authenticated token ({@code organization},
- * session-tokens-and-web-layer decision 6; ADR-0009) and the web edge: the request filters, the
+ * session-tokens-and-web-layer decision 6; ADR-0009), the academic structure of {@code organization}
+ * with its controllers, and the web edge: the request filters, the
  * Problem Details catalog and the deny-by-default security chain (decisions 4 to 8), the rate
  * limiter at the edge with the adapter of its capacity signal (decision 17), the materializer of
  * the required delay (decision 18), and the HTTP edge of idempotency (decision 19).
@@ -78,6 +81,7 @@ import org.springframework.context.annotation.Import;
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerActuatorAutoConfiguration"})
 @Import({ContractSchemas.class, ProcessApiInfo.class, SharedPlatformConfiguration.class,
         IdentityConfiguration.class, IdentityWebConfiguration.class, OrganizationConfiguration.class,
+        AcademicStructureConfiguration.class, OrganizationWebConfiguration.class,
         WebEdgeConfiguration.class, AdminSecurityConfiguration.class,
         ObservabilityMetricsConfiguration.class, RateLimiterConfiguration.class,
         ThrottlingConfiguration.class, RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,
