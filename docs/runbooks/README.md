@@ -20,6 +20,7 @@ momento**. Un runbook desactualizado es peor que ninguno, porque genera confianz
 | Runbook | Severidad | Cuándo |
 |---|---|---|
 | [restauracion-de-respaldo.md](restauracion-de-respaldo.md) | Crítica | Pérdida o corrupción de datos, o restauración a un punto anterior |
+| [simulacro-de-restauracion.md](simulacro-de-restauracion.md) | Procedimiento | Cómo ensayar la restauración cada mes y dejar el acta |
 | [rango-cai-agotado.md](rango-cai-agotado.md) | Crítica | El sistema no puede emitir facturas |
 | [descuadre-de-libro-mayor.md](descuadre-de-libro-mayor.md) | Crítica | La verificación de integridad detectó una transacción descuadrada |
 | [incidente-de-seguridad.md](incidente-de-seguridad.md) | Crítica | Sospecha o confirmación de acceso no autorizado |

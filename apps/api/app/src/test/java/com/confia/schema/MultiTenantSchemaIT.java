@@ -309,6 +309,31 @@ class MultiTenantSchemaIT extends TransactionalPostgresIntegrationTest {
                 .allSatisfy(index -> assertThat(index.columns()).contains("institution_id"));
     }
 
+    /**
+     * Scenario BI156 (transactional-email-adapter specs/build-integrity/spec.md): the delivery log of
+     * {@code V16} passes the same generic gates with no entry in any exclusion set, and its name
+     * carries the prefix of a module that really exists. The log has one ordinary index besides the
+     * primary key, so the unique-index gate sees the primary key alone, led by the institution.
+     */
+    @Test
+    void theEmailDeliveryLogPassesTheGenericGatesWithoutAnyExclusion() {
+        String name = "notifications_email_delivery";
+        assertThat(TECHNICAL_TABLES).doesNotContain(name);
+        assertThat(CLOSED_CATALOGUE_TABLES).doesNotContain(name);
+        assertThat(baseTablesInPublicSchema()).filteredOn(table -> table.name().equals(name))
+                .singleElement()
+                .satisfies(table -> assertThat(table.hasNotNullInstitutionId()).isTrue());
+        RowSecurityFlags flags = rowSecurityFlagsOf(name);
+        assertThat(flags.rowSecurity()).as("ENABLE ROW LEVEL SECURITY").isTrue();
+        assertThat(flags.forceRowSecurity()).as("FORCE ROW LEVEL SECURITY").isTrue();
+        assertThat(policyCountOn(name)).as("one policy").isEqualTo(1L);
+        assertThat(uniqueIndexesInPublicSchema()).filteredOn(index -> index.tableName().equals(name))
+                .as("unique indexes of %s", name).isNotEmpty()
+                .allSatisfy(index -> assertThat(index.columns()).contains("institution_id"));
+        assertThat(productionModuleNames()).as("the prefix names a real module")
+                .contains(name.substring(0, name.indexOf('_')));
+    }
+
     private static final String PASSWORD_RESET_TOKEN_INSERT = """
             insert into identity_password_reset_token
                 (institution_id, id, account_id, token_hash, issued_at, expires_at)

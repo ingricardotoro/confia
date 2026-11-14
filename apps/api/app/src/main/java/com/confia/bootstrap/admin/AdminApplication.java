@@ -8,6 +8,8 @@ import com.confia.organization.infrastructure.wiring.AcademicStructureConfigurat
 import com.confia.organization.infrastructure.wiring.OrganizationConfiguration;
 import com.confia.organization.web.wiring.OrganizationWebConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.JobSchedulingConfiguration;
+import com.confia.shared.observability.health.HealthProbeRoutesConfiguration;
+import com.confia.shared.observability.health.ReadinessDatabaseHealthConfiguration;
 import com.confia.shared.observability.metrics.ObservabilityMetricsConfiguration;
 import com.confia.shared.platform.infrastructure.SharedPlatformConfiguration;
 import com.confia.shared.security.RateLimiterConfiguration;
@@ -29,6 +31,7 @@ import com.confia.students.web.wiring.StudentsWebConfiguration;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
+import org.springframework.boot.webmvc.autoconfigure.actuate.endpoint.web.WebMvcHealthEndpointExtensionAutoConfiguration;
 import org.springframework.boot.webmvc.autoconfigure.error.ErrorMvcAutoConfiguration;
 import org.springframework.context.annotation.Import;
 
@@ -69,12 +72,16 @@ import org.springframework.context.annotation.Import;
  * naming any entry missing here. A property such as {@code db-scheduler.enabled=false} is not
  * used: an environment can flip a property, not the code of an entry point.
  *
+ * <p>The health probes (dockerfiles-and-local-compose decision 4): {@link HealthProbeRoutesConfiguration} and {@link ReadinessDatabaseHealthConfiguration}
+ * serves {@code GET /health/live} and {@code GET /health/ready}, and the framework's own mapping for the
+ * additional paths of the probe groups is excluded because it takes one segment only (probe P-2).
+ *
  * <p>The class is public only so the launcher in the parent package can start it; nothing else
  * may reference it (enforced by ArchUnit).
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {UserDetailsServiceAutoConfiguration.class,
-        ErrorMvcAutoConfiguration.class}, excludeName = {
+        ErrorMvcAutoConfiguration.class, WebMvcHealthEndpointExtensionAutoConfiguration.class}, excludeName = {
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration",
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerMetricsAutoConfiguration",
         "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerActuatorAutoConfiguration"})
@@ -88,6 +95,7 @@ import org.springframework.context.annotation.Import;
         ThrottlingConfiguration.class, RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,
         SessionTokenConfiguration.class, CsrfConfiguration.class,
         SessionCookieConfiguration.class, JobSchedulingConfiguration.class,
-        AuthorizationConfiguration.class})
+        AuthorizationConfiguration.class,
+        HealthProbeRoutesConfiguration.class, ReadinessDatabaseHealthConfiguration.class})
 public class AdminApplication {
 }

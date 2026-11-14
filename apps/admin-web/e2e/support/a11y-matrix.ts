@@ -4,8 +4,8 @@ import { problem } from "../../src/test/contract-responses.ts";
 import type { CombinationId, GateCombination } from "./a11y-report.ts";
 import { MOCK_API_URL } from "./scenario-header.ts";
 
-// The states of the screens that exist in this part (build-integrity, matrix of the gate): the boot, the
-// signed in page, the route that is not found and, since the sign in screen, its eight states. The gate evaluates each one in both themes. The states
+// The states of the screens of the gate (build-integrity, matrix of the gate; BX109): the boot, the signed in page, the route
+// that is not found and the sign in screen with its eight states, the verification with three and the enrollment with five. The gate evaluates each one in both themes. The states
 // are reached with the simulated API and with page.route, never by calling the code of the app.
 const REFRESH = "**/api/v1/auth/sessions/refresh";
 const CURRENT = "**/api/v1/auth/sessions/current";
@@ -20,6 +20,8 @@ const seed = (page: Page) => page.goto(`${MOCK_API_URL}/__control/seed-session`)
 
 const SIGN_IN = "/iniciar-sesion";
 const VERIFICATION = "/iniciar-sesion/verificacion";
+const ENROLLMENT = "/iniciar-sesion/inscripcion";
+const ENROLLMENTS = "**/api/v1/auth/mfa/enrollments";
 const IDENTIFIER = "docente.prueba@example.test";
 
 /** Types fictitious credentials and sends the form; the password is made at run time, so none is written here. */
@@ -28,6 +30,13 @@ async function submitCredentials(page: Page): Promise<void> {
   await page.locator("#sign-in-identifier").fill(IDENTIFIER);
   await page.locator("#sign-in-password").fill(randomUUID());
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
+}
+
+/** Signs in with the preset that asks for an enrollment and presses Continue on the secret, which leads to the codes. */
+async function reachRecoveryCodes(page: Page): Promise<void> {
+  await submitCredentials(page);
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await page.getByRole("heading", { level: 2, name: "Guarde sus códigos de recuperación" }).waitFor();
 }
 
 /** Signs in with the preset that asks for the second factor and waits on the verification screen, on its own field. */
@@ -76,10 +85,10 @@ async function fillTakenCode(page: Page): Promise<void> {
   await dialog.getByLabel(/^Sexo/).selectOption({ label: "Masculino" });
 }
 
-const ENROLLMENTS = "/enrollments";
+const ENROLLMENTS_LIST = "/enrollments";
 
 /** The enrollments list with its rows on the screen: the surname of the first row of the seed proves it. */
-async function openEnrollmentsRoute(page: Page, path: string = ENROLLMENTS): Promise<void> {
+async function openEnrollmentsRoute(page: Page, path: string = ENROLLMENTS_LIST): Promise<void> {
   await seed(page);
   await page.getByRole("heading", { level: 1, name: "Sesión iniciada." }).waitFor();
   await page.goto(path);
@@ -101,7 +110,10 @@ async function openLinksDialog(page: Page): Promise<void> {
   await page.getByRole("dialog").getByText(/Suma guardada actualmente/).waitFor();
 }
 
-/** The six combinations of the minimum, written apart from the matrix so a dropped one is noticed (BX74). */
+/**
+ * The 22 combinations of the minimum, written apart from the matrix so a dropped one is noticed (BX74, BX109): the six of the
+ * part 1, the eight of the sign in screen, the three of the verification and the five of the enrollment.
+ */
 export const MINIMUM: readonly CombinationId[] = [
   { route: "/", state: "boot-restoring" },
   { route: "/", state: "boot-failed" },
@@ -109,6 +121,22 @@ export const MINIMUM: readonly CombinationId[] = [
   { route: "/", state: "signed-in-ready" },
   { route: "/", state: "signed-in-error" },
   { route: "/no-existe", state: "not-found" },
+  { route: SIGN_IN, state: "initial" },
+  { route: SIGN_IN, state: "error-summary" },
+  { route: SIGN_IN, state: "credentials-rejected" },
+  { route: SIGN_IN, state: "rate-limited-countdown" },
+  { route: SIGN_IN, state: "service-busy" },
+  { route: SIGN_IN, state: "sending" },
+  { route: SIGN_IN, state: "password-visible" },
+  { route: SIGN_IN, state: "with-notice" },
+  { route: VERIFICATION, state: "totp" },
+  { route: VERIFICATION, state: "recovery" },
+  { route: VERIFICATION, state: "code-rejected" },
+  { route: ENROLLMENT, state: "loading" },
+  { route: ENROLLMENT, state: "secret" },
+  { route: ENROLLMENT, state: "recovery-codes" },
+  { route: ENROLLMENT, state: "first-code" },
+  { route: ENROLLMENT, state: "network-error" },
 ];
 
 export const MATRIX: readonly GateCombination[] = [
@@ -360,13 +388,13 @@ export const MATRIX: readonly GateCombination[] = [
     expected: (page) => page.getByText("No se pudo cargar la lista de estudiantes"),
   },
   {
-    route: ENROLLMENTS,
+    route: ENROLLMENTS_LIST,
     state: "ready",
     arrange: (page) => openEnrollmentsRoute(page),
     expected: (page) => page.getByRole("cell", { name: "Aguilar, Ana", exact: true }).first(),
   },
   {
-    route: ENROLLMENTS,
+    route: ENROLLMENTS_LIST,
     state: "dialog-enroll",
     opensDialog: true,
     arrange: async (page) => {
@@ -378,7 +406,7 @@ export const MATRIX: readonly GateCombination[] = [
     expected: (page) => page.getByRole("dialog", { name: "Matricular estudiante" }),
   },
   {
-    route: ENROLLMENTS,
+    route: ENROLLMENTS_LIST,
     state: "dialog-enroll-results",
     opensDialog: true,
     arrange: async (page) => {
@@ -389,7 +417,7 @@ export const MATRIX: readonly GateCombination[] = [
     expected: (page) => page.getByRole("option", { name: "Andrea Zelaya · E-000059" }),
   },
   {
-    route: ENROLLMENTS,
+    route: ENROLLMENTS_LIST,
     state: "dialog-transfer",
     opensDialog: true,
     arrange: async (page) => {
@@ -400,7 +428,7 @@ export const MATRIX: readonly GateCombination[] = [
     expected: (page) => page.getByRole("dialog", { name: "Trasladar de sección" }),
   },
   {
-    route: ENROLLMENTS,
+    route: ENROLLMENTS_LIST,
     state: "dialog-error-summary",
     opensDialog: true,
     arrange: async (page) => {
@@ -411,25 +439,25 @@ export const MATRIX: readonly GateCombination[] = [
     expected: (page) => page.getByRole("group", { name: "Hay 1 campo con error." }),
   },
   {
-    route: ENROLLMENTS,
+    route: ENROLLMENTS_LIST,
     state: "dialog-detail",
     opensDialog: true,
     arrange: async (page) => {
       // Mateo Lagos is in "Primero A" (the seeded section 00...4001), with a section move in his history.
-      await openEnrollmentsRoute(page, `${ENROLLMENTS}?sectionId=00000000-0000-4000-8000-000000004001`);
+      await openEnrollmentsRoute(page, `${ENROLLMENTS_LIST}?sectionId=00000000-0000-4000-8000-000000004001`);
       await page.getByRole("button", { name: "Ver detalle de la matrícula de Mateo Lagos" }).click();
     },
     expected: (page) => page.getByRole("dialog", { name: "Detalle de la matrícula" }).getByRole("table"),
   },
   {
-    route: ENROLLMENTS,
+    route: ENROLLMENTS_LIST,
     state: "empty",
     preset: "enrollments-empty",
     arrange: (page) => openEnrollmentsRoute(page),
     expected: (page) => page.getByText("Todavía no hay matrículas"),
   },
   {
-    route: ENROLLMENTS,
+    route: ENROLLMENTS_LIST,
     state: "load-error",
     preset: "enrollments-server-error",
     // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
@@ -547,5 +575,50 @@ export const MATRIX: readonly GateCombination[] = [
     // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
     arrange: (page) => openOrganizationView(page, YEARS),
     expected: (page) => page.getByText("No se pudo cargar la lista de años lectivos"),
+  },
+  {
+    route: ENROLLMENT,
+    state: "loading",
+    preset: "enrollment-required",
+    arrange: async (page) => {
+      await page.route(ENROLLMENTS, hold);
+      await submitCredentials(page);
+    },
+    expected: (page) => page.getByText("Preparando su verificación en dos pasos."),
+  },
+  {
+    route: ENROLLMENT,
+    state: "secret",
+    preset: "enrollment-required",
+    arrange: submitCredentials,
+    expected: (page) => page.getByRole("img", { name: "Código QR para su aplicación de autenticación" }),
+  },
+  {
+    route: ENROLLMENT,
+    state: "recovery-codes",
+    preset: "enrollment-required",
+    arrange: reachRecoveryCodes,
+    expected: (page) => page.getByRole("checkbox", { name: /He guardado mis códigos de recuperación/ }),
+  },
+  {
+    route: ENROLLMENT,
+    state: "first-code",
+    preset: "enrollment-required",
+    arrange: async (page) => {
+      await reachRecoveryCodes(page);
+      await page.getByRole("checkbox", { name: /He guardado mis códigos de recuperación/ }).click();
+      await page.getByRole("button", { name: "Continuar" }).click();
+    },
+    expected: (page) => page.getByRole("textbox", { name: /Código de verificación/ }),
+  },
+  {
+    route: ENROLLMENT,
+    state: "network-error",
+    preset: "enrollment-required",
+    arrange: async (page) => {
+      await page.route(ENROLLMENTS, cut);
+      await submitCredentials(page);
+    },
+    expected: (page) => page.getByRole("alert").filter({ hasText: "No se pudo preparar la verificación en dos pasos." }),
   },
 ];

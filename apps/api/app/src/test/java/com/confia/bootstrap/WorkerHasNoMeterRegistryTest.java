@@ -12,6 +12,7 @@ import org.springframework.context.ConfigurableApplicationContext;
  * Probe P-3 (background-jobs-with-db-scheduler design.md decision 2): {@code micrometer-core} arrives
  * with the db-scheduler starter, but nothing registers a {@code MeterRegistry} in any process,
  * because the metrics of the queue go through a log adapter until the observability changes (P8).
+ * Since dockerfiles-and-local-compose it is proven with the health module present (BJ73, BJ75).
  */
 class WorkerHasNoMeterRegistryTest {
 
@@ -23,6 +24,9 @@ class WorkerHasNoMeterRegistryTest {
         ConfigurableApplicationContext context = outcome.context();
         assertThat(context).as("the %s process must start", process).isNotNull();
         try {
+            // Non-vacuous (BJ73, BJ75): the absence is proven with the health module active, the very
+            // module whose starter would have brought a fallback registry.
+            assertThat(context.containsBean("healthEndpoint")).as("the health endpoint of %s", process).isTrue();
             assertThat(context.getBeansOfType(MeterRegistry.class)).isEmpty();
         } finally {
             context.close();
