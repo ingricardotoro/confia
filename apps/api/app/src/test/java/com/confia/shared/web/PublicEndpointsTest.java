@@ -33,6 +33,9 @@ class PublicEndpointsTest {
     private static final PublicEndpoint CLOSING = new PublicEndpoint(HttpMethod.DELETE,
             "/api/v1/auth/sessions/current");
 
+    private static final PublicEndpoint LIVE = new PublicEndpoint(HttpMethod.GET, "/health/live");
+    private static final PublicEndpoint READY = new PublicEndpoint(HttpMethod.GET, "/health/ready");
+
     private static MockEnvironment springdoc(boolean apiDocs, boolean swaggerUi) {
         return new MockEnvironment()
                 .withProperty("springdoc.api-docs.enabled", Boolean.toString(apiDocs))
@@ -41,29 +44,29 @@ class PublicEndpointsTest {
 
     @Test
     void withNothingConfiguredTheAdministrativeAllowListHoldsOnlyTheLoginAndTheRefreshAndThePortalOneIsEmpty() {
-        assertThat(PublicEndpoints.forAdmin(new MockEnvironment()).endpoints()).containsExactly(LOGIN, REFRESH, CLOSING);
-        assertThat(PublicEndpoints.forPortal(new MockEnvironment()).endpoints()).isEmpty();
+        assertThat(PublicEndpoints.forAdmin(new MockEnvironment()).endpoints()).containsExactly(LOGIN, REFRESH, CLOSING, LIVE, READY);
+        assertThat(PublicEndpoints.forPortal(new MockEnvironment()).endpoints()).containsExactly(LIVE, READY);
     }
 
     @Test
     void withSpringdocOffTheAdministrativeAllowListHoldsOnlyTheLoginAndTheRefresh() {
         assertThat(PublicEndpoints.forAdmin(springdoc(false, false)).endpoints())
-                .containsExactly(LOGIN, REFRESH, CLOSING);
+                .containsExactly(LOGIN, REFRESH, CLOSING, LIVE, READY);
     }
 
     @Test
     void withBothSpringdocSwitchesOnTheAllowListHoldsTheFourDocumentationEntriesAndTheLogin() {
         assertThat(PublicEndpoints.forAdmin(springdoc(true, true)).endpoints())
                 .containsExactlyInAnyOrder(API_DOCS, SWAGGER_CONFIG, SWAGGER_PAGE,
-                        SWAGGER_ASSETS, LOGIN, REFRESH, CLOSING);
+                        SWAGGER_ASSETS, LOGIN, REFRESH, CLOSING, LIVE, READY);
     }
 
     @Test
     void eachSwitchOpensOnlyItsOwnEntries() {
         assertThat(PublicEndpoints.forAdmin(springdoc(true, false)).endpoints())
-                .containsExactlyInAnyOrder(API_DOCS, SWAGGER_CONFIG, LOGIN, REFRESH, CLOSING);
+                .containsExactlyInAnyOrder(API_DOCS, SWAGGER_CONFIG, LOGIN, REFRESH, CLOSING, LIVE, READY);
         assertThat(PublicEndpoints.forAdmin(springdoc(false, true)).endpoints())
-                .containsExactlyInAnyOrder(SWAGGER_PAGE, SWAGGER_ASSETS, LOGIN, REFRESH, CLOSING);
+                .containsExactlyInAnyOrder(SWAGGER_PAGE, SWAGGER_ASSETS, LOGIN, REFRESH, CLOSING, LIVE, READY);
     }
 
     @Test
@@ -72,7 +75,7 @@ class PublicEndpointsTest {
         assertThat(PublicEndpoints.forPortal(local).endpoints())
                 .containsExactlyInAnyOrderElementsOf(PublicEndpoints.forAdmin(local).endpoints().stream()
                         .filter(entry -> !entry.equals(LOGIN) && !entry.equals(REFRESH) && !entry.equals(CLOSING)).toList());
-        assertThat(PublicEndpoints.forPortal(springdoc(false, false)).endpoints()).isEmpty();
+        assertThat(PublicEndpoints.forPortal(springdoc(false, false)).endpoints()).containsExactly(LIVE, READY);
     }
 
     @Test

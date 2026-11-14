@@ -1,8 +1,13 @@
 # APP_PROFILE=migrate (docs/05-infraestructura-y-despliegue.md): applies pending Flyway migrations
-# and exits. Configuration only for this change: ConfiaApplication.MIGRATE still just recognizes
-# the profile and exits with code 0 (design.md decision 12); the actual executor that reads this
-# profile, runs Flyway and exits is change 11's responsibility.
+# and exits. ConfiaApplication activates this Spring profile explicitly for the MIGRATE launcher
+# branch (dockerfiles-and-local-compose design.md decision 2); no other process reads this file.
 spring:
+  main:
+    # The process ends when the migrations are applied: application.yml keeps the JVM alive for the
+    # worker, which here would leave the container running.
+    keep-alive: false
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # A jar packaged without db/migration must fail, never "apply nothing" and exit 0.
+    fail-on-missing-locations: true

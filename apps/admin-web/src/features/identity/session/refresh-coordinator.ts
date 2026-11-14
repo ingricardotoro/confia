@@ -19,7 +19,14 @@ export interface RefreshDependencies {
 
 /** Every way a refresh ends, as a value: the coordinator does not throw for what the server said. */
 export type RefreshOutcome =
-  | { readonly kind: "refreshed"; readonly session: AuthenticatedSessionResponseOutput }
+  | {
+      readonly kind: "refreshed";
+      readonly session: AuthenticatedSessionResponseOutput;
+      /** The `Date` header of the answer as an instant, or `undefined`; the session measures its clock with it (H3). */
+      readonly serverDate: number | undefined;
+      /** The local `Date.now()` when the answer arrived. */
+      readonly receivedAt: number;
+    }
   /** No CSRF cookie when the lock was granted: nothing was sent. */
   | { readonly kind: "no-session" }
   /** No HTTP answer. It is never repeated: the server may have rotated the token already. */
@@ -41,14 +48,17 @@ export function withCrossTabLock<T>(locks: CrossTabLocks | undefined, run: () =>
 }
 
 function classify(result: ApiResult<AuthenticatedSessionResponseOutput>): RefreshOutcome {
-  if (result.kind === "ok") return { kind: "refreshed", session: result.data };
+  if (result.kind === "ok") {
+    return { kind: "refreshed", session: result.data, serverDate: result.serverDate, receivedAt: result.receivedAt };
+  }
   return result.kind === "network" ? { kind: "network" } : { kind: "rejected" };
 }
 
 /**
  * One refresh at a time per tab, through a shared promise, and one at a time across tabs, through the
- * exclusive Web Lock (SS14 to SS16, SS18). There is no timer here: only a caller starts a refresh
- * (design.md D8).
+ * exclusive Web Lock (SS14 to SS16, SS18). No timer and no background query asks for a refresh here:
+ * only a caller starts one (design.md D8; precised by admin-web-shell-and-session-lifecycle, design.md
+ * section 2, SS19). The lifecycle scheduler holds at most one timer and never calls this coordinator.
  */
 export function createRefreshCoordinator({ refresh, readCsrf, locks }: RefreshDependencies): RefreshCoordinator {
   let inFlight: Promise<RefreshOutcome> | undefined;

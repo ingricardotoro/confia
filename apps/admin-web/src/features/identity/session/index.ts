@@ -18,6 +18,7 @@ export { sessionKeys } from "./current-session-query.ts";
 export type {
   AccessSession,
   ArrivalNotice,
+  ExtendOutcome,
   EnrollmentSnapshot,
   EnrollmentStep,
   SessionView,

@@ -86,7 +86,7 @@ rechaza 60/30, conserva el historial del primer reparto y nunca muestra el docum
 
 ## Construido en el backend
 
-Módulo `com.confia.guardians` (cuatro capas, clases nuevas), migración `V19__create_guardians_guardian.sql` (tablas
+Módulo `com.confia.guardians` (cuatro capas, clases nuevas), migración `V21__create_guardians_guardian.sql` (tablas
 `guardians_guardian`, `guardians_guardian_code_counter` y `guardians_guardian_student`, seguridad por fila forzada,
 `REVOKE ALL FROM PUBLIC`, sin `DELETE`). Seis rutas, todas con `@RateLimited` por dirección y por cuenta (lecturas
 `admin-read` y `admin-read-account`; escrituras `admin-write` y `admin-write-account`; `429` con `Retry-After`). Permisos en
@@ -201,7 +201,7 @@ banderas, suma) se juzgan antes de abrir la transacción.
   ahora de forma explícita. No se agregó una verificación al arranque: los estudiantes tampoco la tienen (solo documentan
   la rotación) y una verificación de versiones por filas exigiría leer la tabla de cada institución al arrancar.
 
-- **Endurecimiento tras la auditoría de seguridad** (V19 editada en su lugar: no estaba aplicada en ningún entorno):
+- **Endurecimiento tras la auditoría de seguridad** (V21 editada en su lugar: no estaba aplicada en ningún entorno):
   INV-32 ya no depende solo del caso de uso: un disparador de restricción `DEFERRABLE INITIALLY DEFERRED`
   (`guardians_guardian_student_check_split`, `AFTER INSERT OR UPDATE`) exige, al confirmar y por estudiante afectado,
   que los vínculos vigentes sean ninguno o sumen exactamente 100.00 (`23514`); un reemplazo cierra los vínculos y abre el

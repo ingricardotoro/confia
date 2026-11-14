@@ -17,7 +17,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * The record of the import batches (V21) and the external reference of the students against a real PostgreSQL
+ * The record of the import batches (V23) and the external reference of the students against a real PostgreSQL
  * (docs/cortes/imports-students.md): the checks on the closed sets, the fingerprint and the counts, the shape of a
  * simulation and of an application, the composite key that keeps an application inside the institution of its
  * simulation, row-level security, the privileges (insert and read only), and the unique reference per institution.
@@ -302,7 +302,7 @@ class ImportsBatchSchemaIT extends CommittingPostgresIntegrationTest {
         }
     }
 
-    // --- The external reference of the guardian (V22) ---
+    // --- The external reference of the guardian (V24) ---
 
     private static void guardian(Connection c, UUID institution, String code, String externalRef) throws SQLException {
         exec(c, "insert into guardians_guardian (institution_id, id, guardian_code, first_name, last_name, external_ref) "

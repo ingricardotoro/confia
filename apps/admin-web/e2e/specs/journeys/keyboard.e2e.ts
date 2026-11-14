@@ -27,7 +27,8 @@ async function press(page: Page, key: string): Promise<void> {
   await expectVisibleFocus(page);
 }
 
-test.describe("the sign in with a code, with the keyboard only, against the simulated API", () => {
+// The annotation reaches the report: every journey says that it ran against the simulation.
+test.describe("the sign in with a code, with the keyboard only, against the simulated API", { annotation: { type: "api", description: "simulated; not the real stack" } }, () => {
   test("[SS113] reaches the signed in page with Tab, Shift+Tab, Enter, Space and typing, and the focus is always visible", async ({
     page,
     request,
@@ -73,6 +74,67 @@ test.describe("the sign in with a code, with the keyboard only, against the simu
     await expect(page.getByRole("textbox", { name: /Código de verificación/ })).toBeFocused();
     // The code is computed right before it is sent, so a 30 s step boundary cannot fall between the two.
     await page.keyboard.type(currentCode(account));
+    await page.keyboard.press("Enter");
+
+    await expect(page.getByRole("heading", { level: 1, name: "Sesión iniciada." })).toBeVisible();
+  });
+
+  test("[SS114] completes the mandatory enrollment with the keyboard alone, the box and the copy of the key included, and the focus is always visible", async ({
+    page,
+    context,
+    request,
+    scenarioId,
+  }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://localhost:5173" });
+    const reply = await page.request.post(`${MOCK_API_URL}/__control/scenarios/${scenarioId}`, { data: { preset: "enrollment-required" } });
+    expect(reply.status()).toBe(200);
+
+    await page.goto("/iniciar-sesion");
+    await expect(page.getByRole("heading", { level: 1, name: "Iniciar sesión" })).toBeFocused();
+    await press(page, "Tab");
+    await page.keyboard.type(IDENTIFIER);
+    await press(page, "Tab");
+    await page.keyboard.type(makeSentinel("password"));
+    await press(page, "Tab");
+    await press(page, "Tab");
+    await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    // Step 1, the secret: the heading holds the focus, then the copy of the key, then Continue.
+    await expect(page.getByRole("heading", { level: 2, name: "Escanee el código QR" })).toBeFocused();
+    // The simulator hands out a new secret at every enrollment, so the account is read once the screen has its one.
+    const account = await accountOf(request, scenarioId);
+    await press(page, "Tab");
+    await expect(page.getByRole("button", { name: "Copiar clave" })).toBeFocused();
+    await press(page, "Enter");
+    await expect(page.getByRole("status").filter({ hasText: "Clave copiada." })).toBeVisible();
+    // A boolean, so a failure does not print the key.
+    expect((await page.evaluate(() => navigator.clipboard.readText())) === account.secret, "the clipboard holds the key without spaces").toBe(true);
+    await press(page, "Tab");
+    await expect(page.getByRole("button", { name: "Continuar" })).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    // Step 2, the codes: Continue without the box is refused, the box is marked with Space and then Continue goes on.
+    await expect(page.getByRole("heading", { level: 2, name: "Guarde sus códigos de recuperación" })).toBeFocused();
+    await press(page, "Tab");
+    const box = page.getByRole("checkbox", { name: /He guardado mis códigos de recuperación/ });
+    await expect(box).toBeFocused();
+    await expect(box).not.toBeChecked();
+    await press(page, "Space");
+    await expect(box).toBeChecked();
+    await press(page, "Tab");
+    await expect(page.getByRole("button", { name: "Continuar" })).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    // Step 3, the first code: the heading, the copy of the key again, the field, Activate.
+    await expect(page.getByRole("heading", { level: 2, name: "Escriba el primer código" })).toBeFocused();
+    await press(page, "Tab");
+    await expect(page.getByRole("button", { name: "Copiar clave" })).toBeFocused();
+    await press(page, "Tab");
+    await expect(page.getByRole("textbox", { name: /Código de verificación/ })).toBeFocused();
+    await page.keyboard.type(currentCode(account));
+    await press(page, "Tab");
+    await expect(page.getByRole("button", { name: "Activar" })).toBeFocused();
     await page.keyboard.press("Enter");
 
     await expect(page.getByRole("heading", { level: 1, name: "Sesión iniciada." })).toBeVisible();

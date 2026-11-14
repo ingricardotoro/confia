@@ -82,10 +82,15 @@ class ConfiaApplicationTest {
     }
 
     @Test
-    void recognizesMigrateWithoutStartingAnyContext() {
-        LaunchOutcome outcome = ConfiaApplication.launch(new String[0], "migrate");
+    void migrateAgainstAnUnreachableDatabaseExitsWithOneAndNeverKeepsAContext() {
+        // CR05: the connection refused at once; the short timeout only bounds the pool's retries.
+        LaunchOutcome outcome = ConfiaApplication.launch(new String[] {
+                "--spring.datasource.url=" + TestProcessArguments.UNREACHABLE_JDBC_URL,
+                "--spring.datasource.username=confia_owner",
+                "--spring.datasource.password=unreachable-test-value",
+                "--spring.datasource.hikari.connection-timeout=1000"}, "migrate");
 
-        assertThat(outcome.exitCode()).isZero();
+        assertThat(outcome.exitCode()).isEqualTo(1);
         assertThat(outcome.context()).isNull();
     }
 

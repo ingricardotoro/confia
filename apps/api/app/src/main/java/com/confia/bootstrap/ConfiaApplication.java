@@ -1,6 +1,7 @@
 package com.confia.bootstrap;
 
 import com.confia.bootstrap.admin.AdminApplication;
+import com.confia.bootstrap.migrate.MigrateApplication;
 import com.confia.bootstrap.portal.PortalApplication;
 import com.confia.bootstrap.worker.WorkerApplication;
 import com.confia.shared.logging.SensitiveLogGuardInitializer;
@@ -21,7 +22,7 @@ import org.springframework.context.ConfigurableApplicationContext;
  *      admin   ──&gt; bootstrap.admin.AdminApplication     (web)
  *      portal  ──&gt; bootstrap.portal.PortalApplication   (web)
  *      worker  ──&gt; bootstrap.worker.WorkerApplication   (no HTTP)
- *      migrate ──&gt; recognized, no behavior yet (change 11)
+ *      migrate ──&gt; bootstrap.migrate.MigrateApplication (closed context: applies Flyway, exits)
  *      other   ──&gt; aborts, non-zero exit code
  * </pre>
  *
@@ -60,7 +61,8 @@ public final class ConfiaApplication {
     /**
      * Testable core of {@link #main(String[])}. Resolves {@code rawProfile} and either starts the
      * matching process (returning its context, running) or returns a terminal exit code with no
-     * context (invalid profile, or {@code migrate} which is recognized but has no behavior yet).
+     * context (invalid profile, or {@code migrate}, which runs to completion and never
+     * returns a context).
      *
      * <p>Never calls {@link System#exit(int)} itself, so callers (tests included) fully control
      * process termination and can close a started context explicitly.
@@ -93,11 +95,56 @@ public final class ConfiaApplication {
                             .initializers(new SensitiveLogGuardInitializer())
                             .listeners(SigningKeyPlacementGuard.forNonAdministrativeProcess())
                             .run(args));
-            // Recognized only: applying Flyway migrations and exiting arrives with change 11
-            // (design.md decision 12 of jooq-flyway-testcontainers-wiring — no deployed
-            // environment or Compose invokes this profile before then).
-            case MIGRATE -> LaunchOutcome.exit(0);
+            case MIGRATE -> migrate(args);
         };
+    }
+
+    /**
+     * The builder of the {@code migrate} process: the closed {@link MigrateApplication} context, no
+     * web server, the Spring profile {@code migrate} (which turns Flyway on and the keep-alive off)
+     * and the same two guards as every other process. Package-private so the isolation test can
+     * build and inspect the very context the launcher runs.
+     */
+    static SpringApplicationBuilder migrateBuilder() {
+        return new SpringApplicationBuilder(MigrateApplication.class)
+                .web(WebApplicationType.NONE)
+                .profiles("migrate")
+                .initializers(new SensitiveLogGuardInitializer())
+                .listeners(SigningKeyPlacementGuard.forNonAdministrativeProcess());
+    }
+
+    /**
+     * Applies the pending Flyway migrations and returns the exit code: the context is closed here
+     * and never handed back, so the process ends and holds no port or thread. Any failure (database
+     * unreachable, credentials rejected, a migration that fails, a diverging checksum) is exit code
+     * 1. Only the exception class and, for Flyway, its own message are logged: that message names
+     * the migration and never carries the connection's URL or password (CR06).
+     */
+    private static LaunchOutcome migrate(String[] args) {
+        try (ConfigurableApplicationContext ignored = migrateBuilder().run(args)) {
+            LOG.info("Migrations applied; closing the migrate context.");
+            return LaunchOutcome.exit(0);
+        } catch (Exception ex) {
+            LOG.error("Migration failed: {}", describe(ex));
+            return LaunchOutcome.exit(1);
+        }
+    }
+
+    /** The failure as a log line that is safe to print: classes, plus Flyway messages only. */
+    private static String describe(Throwable failure) {
+        StringBuilder text = new StringBuilder();
+        for (Throwable t = failure; t != null && text.length() < 2000; t = t.getCause()) {
+            text.append(t.getClass().getName());
+            if (t.getClass().getName().startsWith("org.flywaydb.")) {
+                text.append(": ").append(t.getMessage());
+            }
+            if (t.getCause() != null && t.getCause() != t) {
+                text.append(" <- ");
+            } else {
+                break;
+            }
+        }
+        return text.toString();
     }
 
     /**

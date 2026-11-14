@@ -13,6 +13,9 @@ export default defineConfig({
     // Several suites import the whole app cold or start real servers; with the default worker count a busy
     // machine turns that into 5 s timeouts in unrelated tests (staff sign in, tasks 1 and 3). Four is enough.
     maxWorkers: 4,
+    // The runners of CI are slower than a developer machine and the coverage instrumentation slows every render: the long
+    // form tests of the registries (a dialog with a dozen fields) took more than the default 5 s there while passing in 2 s here.
+    testTimeout: 15_000,
     setupFiles: ["./src/test/setup.ts"],
     passWithNoTests: false,
     coverage: {

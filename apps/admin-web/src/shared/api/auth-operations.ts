@@ -14,7 +14,8 @@ import { request, requestEmpty, type ApiResult, type ResponseSchema } from "./ht
  * The six operations of access (design.md D6). Each takes the token or the CSRF value it needs as a
  * parameter: this module knows no session, keeps nothing between calls and never reads a cookie. None
  * of them moves money, so none sends an `Idempotency-Key`; the account and the credentials are not a
- * ledger entry (AW39).
+ * ledger entry (AW39). Each result is the one the transport gave, so an `ok` carries `serverDate` and
+ * `receivedAt` as they came (AW65 to AW67): the session reads them and these operations add nothing.
  */
 const SESSIONS = "/api/v1/auth/sessions";
 const CSRF_HEADER = "X-CSRF-Token";
