@@ -229,7 +229,8 @@ class OpenApiContractSnapshotTest {
                 "/api/v1/organization/grades/{id}", "/api/v1/organization/sections",
                 "/api/v1/organization/sections/{id}", "/api/v1/students", "/api/v1/students/{id}",
                 "/api/v1/enrollments", "/api/v1/enrollments/{id}", "/api/v1/enrollments/{id}/transfer",
-                "/api/v1/enrollments/{id}/exit", "/api/v1/students/{studentId}/enrollments");
+                "/api/v1/enrollments/{id}/exit", "/api/v1/students/{studentId}/enrollments", "/api/v1/guardians",
+                "/api/v1/guardians/{id}", "/api/v1/students/{studentId}/guardians");
         Map<String, Object> refresh = asMap(asMap(asMap(admin.get("paths")).get(REFRESH_PATH))
                 .get("post"));
         assertThat(asMap(refresh.get("responses"))).containsOnlyKeys("200", "401", "403", "429", "503");
@@ -388,13 +389,13 @@ class OpenApiContractSnapshotTest {
     }
 
     /**
-     * BI139, BI24 and BI59, extended by the academic structure, the student registry and the enrollments:
-     * thirty operations (the eight of the session and the report, plus twelve of the structure, four of the
-     * registry and six of the enrollments), and exactly twenty-three declare a permission: the report, the
-     * twelve of the structure, the four of the registry and the six of the enrollments.
+     * BI139, BI24 and BI59, extended by the academic structure, the student registry, the enrollments and the guardians:
+     * thirty-six operations (the eight of the session and the report, plus twelve of the structure, four of the
+     * registry, six of the enrollments and six of the guardians), and exactly twenty-nine declare a permission: the report, the
+     * twelve of the structure, the four of the registry, the six of the enrollments and the six of the guardians.
      */
     @Test
-    void theAdministrativeDocumentHoldsThirtyOperationsAndTwentyThreeDeclareAPermission() {
+    void theAdministrativeDocumentHoldsThirtySixOperationsAndTwentyNineDeclareAPermission() {
         Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
         List<String> withPermission = new ArrayList<>();
         int operations = 0;
@@ -407,7 +408,7 @@ class OpenApiContractSnapshotTest {
             }
         }
 
-        assertThat(operations).isEqualTo(30);
+        assertThat(operations).isEqualTo(36);
         List<String> expected = new ArrayList<>(List.of("get " + ROLES_PATH));
         for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {
             String collection = "/api/v1/organization/" + resource;
@@ -419,6 +420,9 @@ class OpenApiContractSnapshotTest {
         expected.addAll(List.of("get /api/v1/enrollments", "post /api/v1/enrollments",
                 "get /api/v1/enrollments/{id}", "post /api/v1/enrollments/{id}/transfer",
                 "post /api/v1/enrollments/{id}/exit", "get /api/v1/students/{studentId}/enrollments"));
+        expected.addAll(List.of("get /api/v1/guardians", "post /api/v1/guardians", "get /api/v1/guardians/{id}",
+                "put /api/v1/guardians/{id}", "get /api/v1/students/{studentId}/guardians",
+                "put /api/v1/students/{studentId}/guardians"));
         assertThat(withPermission).containsExactlyInAnyOrderElementsOf(expected);
     }
 

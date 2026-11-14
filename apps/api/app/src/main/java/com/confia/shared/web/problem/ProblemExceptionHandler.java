@@ -110,6 +110,10 @@ public final class ProblemExceptionHandler {
         } else if (code.get().status() >= 500) {
             LOG.error("A domain exception answered with a server error", e);
         }
+        if (e instanceof ProblemCodeException coded && !coded.violations().isEmpty()) {
+            answer(request, response, coded.problem(), coded.violations());
+            return;
+        }
         answer(request, response, code.orElse(ProblemCode.INTERNAL_ERROR));
     }
 

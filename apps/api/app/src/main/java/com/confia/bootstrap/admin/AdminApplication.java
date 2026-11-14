@@ -1,5 +1,7 @@
 package com.confia.bootstrap.admin;
 
+import com.confia.guardians.infrastructure.wiring.GuardiansConfiguration;
+import com.confia.guardians.web.wiring.GuardiansWebConfiguration;
 import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
 import com.confia.identity.web.wiring.IdentityWebConfiguration;
 import com.confia.organization.infrastructure.wiring.AcademicStructureConfiguration;
@@ -87,7 +89,8 @@ import org.springframework.context.annotation.Import;
         IdentityConfiguration.class, IdentityWebConfiguration.class, OrganizationConfiguration.class,
         AcademicStructureConfiguration.class, OrganizationWebConfiguration.class,
         StudentsConfiguration.class, StudentsWebConfiguration.class, EnrollmentsConfiguration.class,
-        EnrollmentsWebConfiguration.class, WebEdgeConfiguration.class, AdminSecurityConfiguration.class,
+        EnrollmentsWebConfiguration.class, GuardiansConfiguration.class, GuardiansWebConfiguration.class,
+        WebEdgeConfiguration.class, AdminSecurityConfiguration.class,
         ObservabilityMetricsConfiguration.class, RateLimiterConfiguration.class,
         ThrottlingConfiguration.class, RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,
         SessionTokenConfiguration.class, CsrfConfiguration.class,

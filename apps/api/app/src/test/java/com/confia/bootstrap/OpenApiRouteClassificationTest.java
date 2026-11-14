@@ -80,11 +80,11 @@ class OpenApiRouteClassificationTest {
         JsonNode document = JSON.readTree("""
                 {"paths": {
                   "/api/v1/auth/sessions": {"post": {}},
-                  "/api/v1/guardians/{id}": {"get": {}, "parameters": []}
+                  "/api/v1/invoices/{id}": {"get": {}, "parameters": []}
                 }}""");
 
         assertThat(unclassified(document, classified())).containsExactly(
-                "operation GET /api/v1/guardians/{id} of the OpenAPI document is on no list");
+                "operation GET /api/v1/invoices/{id} of the OpenAPI document is on no list");
     }
 
     @Test

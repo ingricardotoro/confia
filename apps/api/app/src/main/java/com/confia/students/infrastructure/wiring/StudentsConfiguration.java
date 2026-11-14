@@ -10,7 +10,9 @@ import com.confia.students.application.NationalIdProtector;
 import com.confia.students.application.NationalIdReindexer;
 import com.confia.students.application.ReindexNationalIds;
 import com.confia.students.application.StudentRepository;
+import com.confia.students.application.directory.StudentDirectory;
 import com.confia.students.infrastructure.ColumnEncryptionNationalIdProtector;
+import com.confia.students.infrastructure.JooqStudentDirectory;
 import com.confia.students.infrastructure.JooqStudentRepository;
 import com.confia.students.infrastructure.ReindexNationalIdsRunner;
 import java.time.Clock;
@@ -39,6 +41,12 @@ public class StudentsConfiguration {
     @Bean
     StudentRepository studentRepository(DSLContext dsl) {
         return new JooqStudentRepository(dsl);
+    }
+
+    /** The read-only view of the students that {@code guardians} consumes (docs/cortes/guardians-registry.md). */
+    @Bean
+    StudentDirectory studentDirectory(DSLContext dsl) {
+        return new JooqStudentDirectory(dsl);
     }
 
     /** The institutions whose blind indexes are recomputed at startup (empty: none). */

@@ -320,6 +320,31 @@ class ProblemExceptionHandlerTest {
         assertThat(logged.list.get(1).getFormattedMessage()).contains("payment-frozen");
     }
 
+    @Test
+    void aCodedExceptionWithViolationsListsThemInErrorsWithTheStatusOfItsCode() throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.domain(new com.confia.shared.web.problem.ProblemCodeException(ProblemCode.INVALID_RESPONSIBILITY_SPLIT,
+                List.of(new com.confia.shared.web.problem.FieldViolation("links", "sum-not-100"))),
+                new MockHttpServletRequest("PUT", "/x"), response);
+
+        assertThat(response.getStatus()).isEqualTo(400);
+        assertThat(response.getContentAsString()).contains("invalid-responsibility-split")
+                .contains("\"errors\":[{\"field\":\"links\",\"reason\":\"sum-not-100\"}]");
+        assertThat(logged.list).isEmpty();
+    }
+
+    @Test
+    void aCodedExceptionWithoutViolationsHasNoErrorsMember() throws IOException {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.domain(new com.confia.shared.web.problem.ProblemCodeException(ProblemCode.GUARDIAN_NOT_ACTIVE),
+                new MockHttpServletRequest("PUT", "/x"), response);
+
+        assertThat(response.getStatus()).isEqualTo(409);
+        assertThat(response.getContentAsString()).contains("guardian-not-active").doesNotContain("errors");
+    }
+
     /** A business error with a code of the caller's choosing. */
     private static final class TestDomainException extends DomainException {
         TestDomainException(String code) {

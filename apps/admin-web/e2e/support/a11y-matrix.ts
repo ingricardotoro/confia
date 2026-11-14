@@ -94,6 +94,22 @@ async function openEnrollmentsRoute(page: Page, path: string = ENROLLMENTS_LIST)
   await page.goto(path);
 }
 
+const GUARDIANS = "/guardians";
+
+/** The guardians list with its rows on the screen: the surname of the first row of the seed proves it. */
+async function openGuardiansRoute(page: Page, path: string = GUARDIANS): Promise<void> {
+  await seed(page);
+  await page.getByRole("heading", { level: 1, name: "Sesión iniciada." }).waitFor();
+  await page.goto(path);
+}
+
+/** The dialog of the guardians of Ana Aguilar (two guardians in the seed), open and loaded. */
+async function openLinksDialog(page: Page): Promise<void> {
+  await openStudentsRoute(page, `${STUDENTS}?q=Aguilar`);
+  await page.getByRole("button", { name: "Encargados de Ana Aguilar" }).click();
+  await page.getByRole("dialog").getByText(/Suma guardada actualmente/).waitFor();
+}
+
 /**
  * The 22 combinations of the minimum, written apart from the matrix so a dropped one is noticed (BX74, BX109): the six of the
  * part 1, the eight of the sign in screen, the three of the verification and the five of the enrollment.
@@ -447,6 +463,103 @@ export const MATRIX: readonly GateCombination[] = [
     // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
     arrange: (page) => openEnrollmentsRoute(page),
     expected: (page) => page.getByText("No se pudo cargar la lista de matrículas"),
+  },
+  {
+    route: GUARDIANS,
+    state: "ready",
+    arrange: (page) => openGuardiansRoute(page),
+    expected: (page) => page.getByRole("cell", { name: "Aguilar", exact: true }).first(),
+  },
+  {
+    route: GUARDIANS,
+    state: "dialog-open",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openGuardiansRoute(page);
+      await page.getByRole("button", { name: "Nuevo encargado" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Nuevo encargado" }),
+  },
+  {
+    route: GUARDIANS,
+    state: "dialog-edit-document",
+    opensDialog: true,
+    arrange: async (page) => {
+      // Carmen Banegas (P-000003) has a national id in the seed.
+      await openGuardiansRoute(page, `${GUARDIANS}?q=Banegas`);
+      await page.getByRole("button", { name: "Editar Carmen Banegas" }).click();
+    },
+    expected: (page) => page.getByRole("checkbox", { name: "Quitar documento" }),
+  },
+  {
+    route: GUARDIANS,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openGuardiansRoute(page);
+      await page.getByRole("button", { name: "Nuevo encargado" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 2 campos con errores." }),
+  },
+  {
+    route: GUARDIANS,
+    state: "dialog-detail",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openGuardiansRoute(page);
+      await page.getByRole("button", { name: "Ver detalle de Rosa Aguilar" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Detalle del encargado" }).getByRole("table"),
+  },
+  {
+    route: GUARDIANS,
+    state: "no-matches",
+    arrange: (page) => openGuardiansRoute(page, `${GUARDIANS}?q=zzzz&status=INACTIVE`),
+    expected: (page) => page.getByText("Ningún registro coincide con los filtros"),
+  },
+  {
+    route: GUARDIANS,
+    state: "empty",
+    preset: "guardians-empty",
+    arrange: (page) => openGuardiansRoute(page),
+    expected: (page) => page.getByText("Todavía no hay encargados"),
+  },
+  {
+    route: GUARDIANS,
+    state: "load-error",
+    preset: "guardians-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openGuardiansRoute(page),
+    expected: (page) => page.getByText("No se pudo cargar la lista de encargados"),
+  },
+  {
+    route: STUDENTS,
+    state: "dialog-guardians",
+    opensDialog: true,
+    arrange: (page) => openLinksDialog(page),
+    expected: (page) => page.getByRole("group", { name: "Rosa Aguilar · P-000001" }),
+  },
+  {
+    route: STUDENTS,
+    state: "dialog-guardians-results",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openLinksDialog(page);
+      await page.getByRole("dialog").getByRole("combobox", { name: /Agregar un encargado/ }).fill("Banegas");
+    },
+    expected: (page) => page.getByRole("option", { name: "Carmen Banegas · P-000003" }),
+  },
+  {
+    route: STUDENTS,
+    state: "dialog-guardians-split-error",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openLinksDialog(page);
+      await page.getByRole("dialog").getByRole("group", { name: "Luis Alvarado · P-000002" }).getByLabel(/^Porcentaje/).fill("30");
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar encargados" }).click();
+    },
+    expected: (page) => page.getByRole("alert").filter({ hasText: "Los porcentajes deben sumar exactamente 100.00." }),
   },
   {
     route: YEARS,

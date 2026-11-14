@@ -78,7 +78,15 @@
     "sectionFull": "La sección ya alcanzó su cupo. Elija otra sección o pida que se amplíe el cupo.",
     "duplicateActiveEnrollment": "El estudiante ya tiene una matrícula activa en ese año lectivo. Registre su salida antes de matricularlo de nuevo o traslade su sección.",
     "invalidEnrollmentState": "La matrícula ya no está activa, por lo que no admite este cambio. Actualice la lista para ver su estado actual.",
-    "transferYearMismatch": "La sección elegida es de otro año lectivo. Solo se puede trasladar a una sección del mismo año."
+    "transferYearMismatch": "La sección elegida es de otro año lectivo. Solo se puede trasladar a una sección del mismo año.",
+    "invalidResponsibilitySplit": "El reparto de la responsabilidad no es válido. Revise los porcentajes y las marcas de pagador principal y de destinatario de la factura.",
+    "guardianNotActive": "Uno de los encargados está inactivo y no puede recibir vínculos. Quítelo del reparto o actívelo en la lista de encargados e intente de nuevo.",
+    "splitSumNot100": "Los porcentajes deben sumar exactamente 100.00. Ajuste los porcentajes de los encargados e intente de nuevo.",
+    "splitMultiplePrimaryPayer": "Solo un encargado puede ser el pagador principal. Deje marcado a uno solo.",
+    "splitMultipleBillingRecipient": "Solo un encargado puede ser el destinatario de la factura. Deje marcado a uno solo.",
+    "splitDuplicateGuardian": "Un mismo encargado aparece más de una vez. Deje una sola fila por encargado.",
+    "duplicateGuardianNationalId": "Ya hay un encargado registrado con ese documento de identidad. Revise el número; los guiones no cuentan.",
+    "studentNotActiveForGuardians": "El estudiante está inactivo y no admite cambios en sus encargados. Actívelo en la lista de estudiantes e intente de nuevo."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -93,7 +101,12 @@
     "nationalIdFormat": "El documento debe tener de 8 a 20 letras, números o guiones.",
     "dateOutOfRange": "La fecha está fuera del rango permitido: no puede ser futura, anterior a la matrícula ni fuera del año lectivo.",
     "sameSection": "Elija una sección distinta de la actual.",
-    "reasonLength": "Escriba un motivo de 3 a 500 caracteres."
+    "reasonLength": "Escriba un motivo de 3 a 500 caracteres.",
+    "rtnFormat": "El RTN debe tener 14 dígitos; los guiones son opcionales.",
+    "emailFormat": "Escriba un correo con el formato nombre@dominio.com.",
+    "phoneFormat": "El teléfono debe tener de 7 a 20 caracteres: dígitos, espacios, paréntesis y guiones, con un signo más al inicio si lo necesita.",
+    "percentFormat": "Escriba el porcentaje con punto y a lo sumo dos decimales, por ejemplo 33.33.",
+    "percentRange": "El porcentaje debe estar entre 0.01 y 100."
   },
   "countdown": {
     "remaining": "Puede intentar de nuevo en {seconds} s.",
@@ -125,7 +138,8 @@
     "home": "Inicio",
     "organization": "Estructura académica",
     "students": "Estudiantes",
-    "enrollments": "Matrículas"
+    "enrollments": "Matrículas",
+    "guardians": "Encargados"
   },
   "organization": {
     "title": "Estructura académica",
@@ -328,7 +342,9 @@
     },
     "status": {
       "filter": "Estado"
-    }
+    },
+    "guardiansAction": "Encargados",
+    "guardiansActionFor": "Encargados de {name}"
   },
   "enrollments": {
     "title": "Matrículas",
@@ -449,6 +465,149 @@
       "historyTo": "A la sección",
       "historyDate": "Fecha",
       "historyReason": "Motivo"
+    }
+  },
+  "guardians": {
+    "title": "Encargados",
+    "heading": "Lista de encargados",
+    "caption": "Encargados de la institución",
+    "create": "Nuevo encargado",
+    "createTitle": "Nuevo encargado",
+    "createDescription": "Complete los datos del encargado. El documento de identidad y el RTN son opcionales y se guardan cifrados; después de guardarlos no se vuelven a mostrar.",
+    "editTitle": "Editar encargado",
+    "editDescription": "Cambie los datos del encargado. El código no se puede cambiar. Desactivar a un encargado no borra nada ni quita sus vínculos con los estudiantes.",
+    "emptyTitle": "Todavía no hay encargados",
+    "emptyDescription": "Registre al primer encargado para poder vincularlo a sus estudiantes.",
+    "emptyAction": "Registrar al primer encargado",
+    "loadFailed": "No se pudo cargar la lista de encargados",
+    "columns": {
+      "code": "Código",
+      "lastName": "Apellidos",
+      "firstName": "Nombres",
+      "nationalId": "Documento",
+      "rtn": "RTN",
+      "status": "Estado"
+    },
+    "fields": {
+      "code": "Código",
+      "firstName": "Nombres",
+      "lastName": "Apellidos",
+      "nationalId": "Documento de identidad",
+      "rtn": "RTN",
+      "email": "Correo electrónico",
+      "phone": "Teléfono",
+      "address": "Dirección",
+      "preferredChannel": "Canal preferido",
+      "status": "Estado"
+    },
+    "codeNote": "El sistema genera el código al guardar.",
+    "nationalIdHelp": "De 8 a 20 letras, números o guiones. Es opcional y no se vuelve a mostrar.",
+    "rtnHelp": "14 dígitos; los guiones son opcionales. Es opcional y no se vuelve a mostrar.",
+    "currentDocument": "Documento actual",
+    "replaceDocument": "Reemplazar documento",
+    "replaceDocumentHelp": "Déjelo vacío para conservar el documento actual. Escriba el número completo para reemplazarlo.",
+    "removeDocument": "Quitar documento",
+    "removeDocumentHelp": "Marque esta casilla para borrar el documento guardado. Si no la marca, el documento no se toca.",
+    "currentRtn": "RTN actual",
+    "replaceRtn": "Reemplazar RTN",
+    "replaceRtnHelp": "Déjelo vacío para conservar el RTN actual. Escriba los 14 dígitos para reemplazarlo.",
+    "removeRtn": "Quitar RTN",
+    "removeRtnHelp": "Marque esta casilla para borrar el RTN guardado. Si no la marca, el RTN no se toca.",
+    "registered": "Registrado",
+    "registeredText": "Dato registrado",
+    "noneMark": "—",
+    "noneText": "Sin registrar",
+    "channel": {
+      "EMAIL": "Correo electrónico",
+      "SMS": "Mensaje de texto",
+      "WHATSAPP": "WhatsApp",
+      "NONE": "Ninguno"
+    },
+    "relationship": {
+      "FATHER": "Padre",
+      "MOTHER": "Madre",
+      "LEGAL_GUARDIAN": "Tutor legal",
+      "SELF": "El propio estudiante",
+      "OTHER": "Otro"
+    },
+    "search": {
+      "label": "Buscar",
+      "help": "Por nombre, apellido o código.",
+      "tooShort": "Escriba al menos 2 caracteres para buscar."
+    },
+    "statusFilter": "Estado",
+    "actions": {
+      "detail": "Ver detalle",
+      "detailFor": "Ver detalle de {name}"
+    },
+    "deactivatedWithLinks": "El encargado sigue vinculado a {count, plural, one {# estudiante} other {# estudiantes}}. Los vínculos no se quitan solos: cámbielos desde la lista de estudiantes.",
+    "detail": {
+      "title": "Detalle del encargado",
+      "description": "Datos del encargado y los estudiantes a los que está vinculado ahora. Solo lectura.",
+      "close": "Cerrar",
+      "loading": "Cargando el detalle del encargado.",
+      "loadFailed": "No se pudo cargar el detalle del encargado",
+      "name": "Nombre",
+      "email": "Correo electrónico",
+      "phone": "Teléfono",
+      "address": "Dirección",
+      "notProvided": "Sin registrar",
+      "studentsHeading": "Estudiantes vinculados",
+      "studentsCaption": "Estudiantes a los que el encargado está vinculado ahora",
+      "studentsEmpty": "Este encargado no está vinculado a ningún estudiante.",
+      "inactiveWithLinks": "El encargado está inactivo, pero sus vínculos siguen vigentes. Quítelo del reparto de cada estudiante desde la lista de estudiantes.",
+      "student": "Estudiante",
+      "relationship": "Parentesco",
+      "percent": "Responsabilidad",
+      "primaryPayer": "Pagador principal",
+      "billingRecipient": "Destinatario de la factura",
+      "since": "Desde",
+      "yes": "Sí",
+      "no": "No"
+    },
+    "percentValue": "{percent} %",
+    "links": {
+      "title": "Encargados de {name}",
+      "description": "Defina el conjunto completo de encargados del estudiante. Al guardar, el sistema reemplaza los vínculos vigentes por este conjunto; los anteriores quedan en el historial.",
+      "loading": "Cargando los encargados del estudiante.",
+      "loadFailed": "No se pudieron cargar los encargados del estudiante",
+      "retry": "Reintentar",
+      "rule": "Los porcentajes deben sumar exactamente 100.00. Puede haber un solo pagador principal y un solo destinatario de la factura.",
+      "savedTotal": "Suma guardada actualmente (la calcula el servidor): {percent} %",
+      "noGuardians": "Este estudiante no tiene encargados. Agregue uno con el buscador.",
+      "removeAllWarning": "Si guarda sin encargados, se quitarán todos los vínculos vigentes del estudiante.",
+      "listLabel": "Encargados del estudiante",
+      "rowLegend": "{name} · {code}",
+      "relationship": "Parentesco",
+      "percent": "Porcentaje",
+      "percentHelp": "De 0.01 a 100, con a lo sumo dos decimales.",
+      "primaryPayer": "Pagador principal",
+      "billingRecipient": "Destinatario de la factura",
+      "remove": "Quitar",
+      "removeFor": "Quitar a {name} del reparto",
+      "removed": "Se quitó a {name} del reparto. Falta guardar.",
+      "added": "Se agregó a {name}. Complete el parentesco y el porcentaje.",
+      "inactiveGuardian": "Este encargado está inactivo. Quítelo del reparto para poder guardar.",
+      "chooseRelationship": "Elija el parentesco",
+      "save": "Guardar encargados",
+      "saving": "Guardando los encargados.",
+      "done": "Se guardaron los encargados de «{name}». Suma: {percent} %.",
+      "doneNone": "Se quitaron todos los encargados de «{name}».",
+      "close": "Cancelar",
+      "count": "Encargados en el conjunto: {count}",
+      "maxReached": "Se alcanzó el máximo de 20 encargados por estudiante."
+    },
+    "picker": {
+      "label": "Agregar un encargado",
+      "help": "Escriba al menos 2 caracteres del nombre, apellido o código. Solo se ofrecen encargados activos.",
+      "tooShort": "Escriba al menos 2 caracteres para buscar.",
+      "resultsLabel": "Encargados encontrados",
+      "searching": "Buscando encargados.",
+      "found": "{count, plural, one {Se encontró # encargado.} other {Se encontraron # encargados.}} Use las flechas para recorrerlos y Enter para agregar.",
+      "none": "No se encontró ningún encargado activo con ese dato que no esté ya en el reparto.",
+      "failed": "No se pudo buscar encargados.",
+      "retry": "Reintentar búsqueda",
+      "optionText": "{name} · {code}"
     }
   }
 }

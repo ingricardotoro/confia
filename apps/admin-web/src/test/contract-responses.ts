@@ -8,6 +8,8 @@ import {
   EnrollmentResponse,
   GradePageResponse,
   GradeResponse,
+  GuardianPageResponse,
+  GuardianResponse,
   ModalityPageResponse,
   ModalityResponse,
   ProblemDetail,
@@ -15,6 +17,7 @@ import {
   SectionPageResponse,
   SectionResponse,
   StudentEnrollmentResponse,
+  StudentGuardiansResponse,
   StudentPageResponse,
   StudentResponse,
   type AcademicYearResponseOutput,
@@ -23,10 +26,14 @@ import {
   type EnrollmentResponseOutput,
   type EnrollmentTransferResponseOutput,
   type GradeResponseOutput,
+  type GuardianResponseOutput,
+  type LinkedStudentResponseOutput,
   type ModalityResponseOutput,
   type SecondFactorPendingResponseOutput,
   type SectionResponseOutput,
   type StudentEnrollmentResponseOutput,
+  type StudentGuardianResponseOutput,
+  type StudentGuardiansResponseOutput,
   type StudentResponseOutput,
 } from "@confia/contracts/admin";
 import type { ProblemCode } from "../shared/api/problem.ts";
@@ -352,4 +359,94 @@ export function enrollmentPage(
 /** The enrollment a detail (200), an enroll (201), a transfer or an exit (200) answers with. */
 export function enrollmentRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
   return { status, body: checked("enrollment record", StudentEnrollmentResponse, row), contentType: JSON_TYPE };
+}
+
+// The guardians cut. A guardian is never shown with a document or an RTN: only whether there is one. A list holds rows with
+// no `students`; the detail and the two writes carry them.
+export function guardian(override: Partial<GuardianResponseOutput> = {}): GuardianResponseOutput {
+  return checked("GuardianResponse", GuardianResponse, {
+    id: crypto.randomUUID(),
+    guardianCode: "P-000001",
+    firstName: "Rosa",
+    lastName: "Mejía",
+    hasNationalId: false,
+    hasRtn: false,
+    email: null,
+    phone: null,
+    address: null,
+    preferredChannel: "NONE",
+    status: "ACTIVE",
+    createdAt: STAMP,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+/** The student a guardian detail lists as linked now. */
+export function linkedStudent(override: Partial<LinkedStudentResponseOutput> = {}): LinkedStudentResponseOutput {
+  return {
+    linkId: crypto.randomUUID(),
+    studentId: crypto.randomUUID(),
+    studentCode: "E-000001",
+    studentFirstName: "Ana",
+    studentLastName: "Pérez",
+    relationship: "MOTHER",
+    financialResponsibilityPercent: 100,
+    isPrimaryPayer: true,
+    isBillingRecipient: true,
+    validFrom: "2026-03-02",
+    ...override,
+  };
+}
+
+/** One page of guardians, as the server serves it. */
+export function guardianPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("guardians page", GuardianPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The guardian a detail (200), a create (201) or an edit (200) answers with. */
+export function guardianRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("guardian record", GuardianResponse, row), contentType: JSON_TYPE };
+}
+
+/** One current link of a student, as the read of the guardians of a student lists it. */
+export function studentLink(override: Partial<StudentGuardianResponseOutput> = {}): StudentGuardianResponseOutput {
+  return {
+    linkId: crypto.randomUUID(),
+    guardianId: crypto.randomUUID(),
+    guardianCode: "P-000001",
+    guardianFirstName: "Rosa",
+    guardianLastName: "Mejía",
+    guardianStatus: "ACTIVE",
+    relationship: "MOTHER",
+    financialResponsibilityPercent: 100,
+    isPrimaryPayer: true,
+    isBillingRecipient: true,
+    validFrom: "2026-03-02",
+    ...override,
+  };
+}
+
+/** The set of guardians of a student (read, and answer of the replace), with the sum the server calculated. */
+export function studentGuardians(
+  links: readonly StudentGuardianResponseOutput[],
+  override: Partial<Omit<StudentGuardiansResponseOutput, "links">> = {},
+): ContractResponse {
+  const body = checked("student guardians", StudentGuardiansResponse, {
+    studentId: "00000000-0000-4000-8000-000000005001",
+    studentCode: "E-000001",
+    totalPercent: links.length === 0 ? 0 : 100,
+    links,
+    ...override,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
 }

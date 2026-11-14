@@ -1242,6 +1242,16 @@ Llave maestra (KEK)              en gestor de secretos, nunca en la base de dato
 > documento, un cifrado ni un índice) y es idempotente; (3) retirar la llave anterior. No es un trabajo del
 > `worker`: recalcular exige descifrar, y el trabajador no tiene llaves de columna por diseño (ADR-0023).
 > El bloque original de esta sección queda sin cambios.
+>
+> **Advertencia (`guardians-registry`, seguimiento M1): los encargados todavía no tienen reindexado.**
+> `guardians_guardian.national_id_blind_index` lleva versión igual que el de estudiantes y la detección de
+> duplicados prueba todas las versiones configuradas, pero **no existe aún un camino de reindexado para los
+> encargados**: `CONFIA_STUDENTS_REINDEX_INSTITUTIONS` solo recalcula `students_student`. **No se debe retirar una
+> versión anterior de la llave mientras alguna fila de `guardians_guardian` use esa versión** (se comprueba con
+> `SELECT DISTINCT split_part(national_id_blind_index, ':', 1) FROM guardians_guardian WHERE national_id_blind_index
+> IS NOT NULL`, por institución): retirarla deja sin detección de duplicados a esos encargados. El reindexado de
+> encargados debe construirse antes de la primera rotación de llave; hasta entonces el paso (3) de la rotación queda
+> bloqueado.
 
 **Cómo se comprueba.** Una prueba de integración inserta un registro con documento de identidad,
 consulta la columna directamente con SQL crudo y verifica que el valor almacenado **no contiene**

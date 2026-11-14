@@ -4,8 +4,8 @@ import { PROBLEM_KEYS } from "../../shared/api/problem-keys.ts";
 import { classifyAccessFailure, type AccessFailure } from "../../shared/forms/access-failure.ts";
 
 /**
- * The codes of the academic structure, the two every write can meet, and the two of the students registry and the five
- * of the enrollments (this classifier serves the three screens), that have a text of their own.
+ * The codes of the academic structure, the two every write can meet, and the two of the students registry, the five
+ * of the enrollments and the one of the guardians (this classifier serves the four screens), that have a text of their own.
  */
 const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "academic-year-overlap",
@@ -22,7 +22,16 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "duplicate-active-enrollment",
   "invalid-enrollment-state",
   "transfer-year-mismatch",
+  "guardian-not-active",
 ]);
+
+/** The text of each reason the server gives for a split of the responsibility that does not hold. */
+const SPLIT_KEYS: Readonly<Record<string, AdminKey>> = {
+  "sum-not-100": "problem.splitSumNot100",
+  "multiple-primary-payer": "problem.splitMultiplePrimaryPayer",
+  "multiple-billing-recipient": "problem.splitMultipleBillingRecipient",
+  "duplicate-guardian": "problem.splitDuplicateGuardian",
+};
 
 /**
  * The year's rule that the end is after the start is a method of the request, so the server names it `endAfterStart`.
@@ -33,6 +42,10 @@ function fieldOf(error: { readonly field: string; readonly reason: string }): { 
   if (error.field === "nationalId" && error.reason === "pattern") return { field: "nationalId", reason: "national-id-format" };
   // The reason of a withdrawal or a transfer is 3 to 500 characters: `size` says it is too short as well as too long.
   if ((error.field === "withdrawalReason" || error.field === "reason") && error.reason === "size") return { field: error.field, reason: "reason-length" };
+  // The contact data of a guardian: the server names a format it refuses `pattern`, and each has its own message.
+  if (error.reason === "pattern" && (error.field === "rtn" || error.field === "email" || error.field === "phone")) {
+    return { field: error.field, reason: `${error.field}-format` };
+  }
   return error;
 }
 
@@ -45,6 +58,12 @@ export function classifyOrganizationFailure(result: ApiFailureResult): AccessFai
   if (result.kind === "problem" && MESSAGE_CODES.has(result.problem.code)) {
     const { code, traceId } = result.problem;
     return { kind: "message", key: PROBLEM_KEYS[code], ...(traceId === undefined ? {} : { traceId }) };
+  }
+  if (result.kind === "problem" && result.problem.code === "invalid-responsibility-split") {
+    const { errors, traceId } = result.problem;
+    const reason = errors[0]?.reason ?? "";
+    const key = Object.hasOwn(SPLIT_KEYS, reason) ? SPLIT_KEYS[reason] : undefined;
+    return { kind: "message", key: key ?? PROBLEM_KEYS["invalid-responsibility-split"], ...(traceId === undefined ? {} : { traceId }) };
   }
   const general = classifyAccessFailure(result);
   return general.kind === "fields" ? { kind: "fields", errors: general.errors.map(fieldOf) } : general;

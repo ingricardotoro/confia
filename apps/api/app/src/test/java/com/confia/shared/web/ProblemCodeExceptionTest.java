@@ -40,4 +40,23 @@ class ProblemCodeExceptionTest {
         assertThatThrownBy(() -> new ProblemCodeException(null))
                 .isInstanceOf(NullPointerException.class).hasMessageContaining("code");
     }
+
+    @Test
+    void canCarryTheViolationsTheTranslatorListsInErrors() {
+        ProblemCodeException exception = new ProblemCodeException(ProblemCode.INVALID_RESPONSIBILITY_SPLIT,
+                java.util.List.of(new com.confia.shared.web.problem.FieldViolation("links", "sum-not-100")));
+
+        assertThat(exception.problem()).isEqualTo(ProblemCode.INVALID_RESPONSIBILITY_SPLIT);
+        assertThat(exception.code()).isEqualTo("invalid-responsibility-split");
+        assertThat(exception.violations()).extracting("field", "reason").containsExactly(
+                org.assertj.core.groups.Tuple.tuple("links", "sum-not-100"));
+        assertThat(exception.getMessage()).doesNotContain("sum-not-100");
+        assertThat(new ProblemCodeException(ProblemCode.FORBIDDEN).violations()).isEmpty();
+    }
+
+    @Test
+    void rejectsNullViolations() {
+        assertThatThrownBy(() -> new ProblemCodeException(ProblemCode.FORBIDDEN, null))
+                .isInstanceOf(NullPointerException.class).hasMessageContaining("violations");
+    }
 }

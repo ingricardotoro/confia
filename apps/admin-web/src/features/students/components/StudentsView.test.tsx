@@ -18,6 +18,7 @@ function props(override: Partial<StudentsViewProps> = {}): StudentsViewProps {
     onCreate: vi.fn(),
     onEdit: vi.fn(),
     onToggle: vi.fn(),
+    onGuardians: vi.fn(),
     ...override,
   };
 }
@@ -143,5 +144,17 @@ describe("StudentsView", () => {
     const group = screen.getByRole("group", { name: "Filtros" });
     expect(within(group).getByLabelText("Buscar")).toBeInTheDocument();
     expect(within(group).getByLabelText("Estado")).toBeInTheDocument();
+  });
+
+  it("offers the guardians of each student in a button that names the student, and calls back with the row", async () => {
+    const user = userEvent.setup();
+    const onGuardians = vi.fn();
+    const ana = student({ firstName: "Ana", lastName: "Pérez" });
+    renderWithAdminI18n(<StudentsView {...props({ rows: [ana], onGuardians })} />);
+
+    await user.click(screen.getByRole("button", { name: "Encargados de Ana Pérez" }));
+
+    expect(screen.getByRole("button", { name: "Encargados de Ana Pérez" })).toHaveTextContent("Encargados");
+    expect(onGuardians).toHaveBeenCalledWith(ana);
   });
 });

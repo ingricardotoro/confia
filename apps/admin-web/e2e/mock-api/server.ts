@@ -19,6 +19,7 @@ import {
 import { ORGANIZATION_BASE } from "./organization-model.ts";
 import { ENROLLMENTS_BASE } from "./enrollments-model.ts";
 import { STUDENTS_BASE } from "./students-model.ts";
+import { GUARDIANS_BASE } from "./guardians-model.ts";
 import { base32Encode } from "../support/totp.ts";
 import { parseCookieHeader, type ModelResponse } from "./session-model.ts";
 
@@ -72,6 +73,8 @@ const SUCCESS_SCHEMAS: Readonly<Record<Operation, Schema | undefined>> = {
   // The same for the students registry (students-model.ts).
   students: undefined,
   enrollments: undefined,
+  // The same for the guardians (guardians-model.ts).
+  guardians: undefined,
 };
 
 /** The fields of a response that break the contract; empty when it meets it. The `instance` of an error is not checked (I306). */
@@ -193,6 +196,15 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
       const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
       const answer = scenario.organization.handle({ method, path, query: url.searchParams, body });
       if (answer !== undefined) { deliver(res, scenario, "organization", answer); return; }
+    }
+    // The guardians, and the guardians of one student (a route below the students that this model owns).
+    if (path === GUARDIANS_BASE || path.startsWith(`${GUARDIANS_BASE}/`) || /^\/api\/v1\/students\/[^/]+\/guardians$/.test(path)) {
+      const session = scenario.model.currentSession(bearerOf(req));
+      if (session.status !== 200) { deliver(res, scenario, "guardians", session); return; }
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
+      const answer = scenario.guardians.handle({ method, path, query: url.searchParams, body });
+      if (answer !== undefined) { deliver(res, scenario, "guardians", answer); return; }
     }
     if (path === STUDENTS_BASE || path.startsWith(`${STUDENTS_BASE}/`)) {
       // Every operation of the registry is a bearer route too: no access token, no answer.

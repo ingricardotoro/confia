@@ -7,7 +7,20 @@ import { resolveFieldErrors, type FieldIssue } from "./field-errors.ts";
 import { useRetryCountdown } from "./use-retry-countdown.ts";
 
 /** What a form's own validation says about a field. Reasons, not texts: the hook turns them into catalog keys. */
-export type FieldReason = "required" | "too-long" | "format" | "end-after-start" | "positive-whole" | "whole" | "national-id-format" | "reason-length";
+export type FieldReason =
+  | "required"
+  | "too-long"
+  | "format"
+  | "end-after-start"
+  | "positive-whole"
+  | "whole"
+  | "national-id-format"
+  | "reason-length"
+  | "rtn-format"
+  | "email-format"
+  | "phone-format"
+  | "percent-format"
+  | "percent-range";
 
 export interface AccessFieldSpec {
   /** The fixed `id` of the control, which the error summary links to. */
