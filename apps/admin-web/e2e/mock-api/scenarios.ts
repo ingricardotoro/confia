@@ -33,7 +33,8 @@ type LoginBehavior =
   | "validation-failed"
   | "internal-error"
   | "slow"
-  | "restricted-expired";
+  | "restricted-expired"
+  | "enrollment-expired";
 
 interface PresetDefinition {
   readonly login: LoginBehavior;
@@ -57,6 +58,7 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   "internal-error": { login: "internal-error", enrolled: false },
   slow: { login: "slow", enrolled: false },
   "restricted-expired": { login: "restricted-expired", enrolled: true },
+  "enrollment-expired": { login: "enrollment-expired", enrolled: false },
   "already-enrolled": { login: "second-factor-enrollment-required", enrolled: true },
   // The academic structure (organization-academic-structure cut). Each one signs in as the default does.
   "organization-empty": { login: "authenticated", enrolled: false, organization: { ...DEFAULT_ORGANIZATION, seed: "empty" } },
@@ -131,8 +133,9 @@ function build(preset: string, definition: PresetDefinition): Scenario {
         case "slow":
           await sleep(SLOW_RESPONSE_MS);
           return model.openSession();
-        case "restricted-expired": {
-          const issued = model.startSecondFactor("mfa-verify");
+        case "restricted-expired":
+        case "enrollment-expired": {
+          const issued = model.startSecondFactor(definition.login === "enrollment-expired" ? "mfa-enroll" : "mfa-verify");
           offsetMs += EXPIRY_PUSH_MS;
           return issued;
         }

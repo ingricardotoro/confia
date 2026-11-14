@@ -49,7 +49,7 @@ Desactivar una modalidad o un grado no afecta secciones ya creadas.
 
 ## Construido en el backend
 
-Migración `V16__create_organization_academic_structure.sql`; código en
+Migración `V18__create_organization_academic_structure.sql`; código en
 `com.confia.organization.{domain,application,infrastructure,web}`.
 
 **Decisiones de forma de la API** (la nota no las fijaba; el OpenAPI de `apps/api/openapi/admin.openapi.json`

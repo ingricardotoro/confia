@@ -1,17 +1,18 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { authenticatedSession, currentSession, secondFactorEnrollmentRequired, secondFactorRequired } from "../../test/contract-responses.ts";
+import { authenticatedSession, currentSession, enrollment, secondFactorEnrollmentRequired, secondFactorRequired } from "../../test/contract-responses.ts";
 import { installMswServer, route } from "../../test/msw-server.ts";
 import { createTestSession, renderApp } from "../../test/render-app.tsx";
 
 // admin-web-foundations-and-session, task 9.1 (part 9a; SS27, SS30, SS32, AW18, AW19, AW59 and design.md D5).
-// The whole app over the test server. The screens of sign in, verification and enrollment are
-// placeholders in this change, so what is asserted is their guard, their heading and their focus.
+// The whole app over the test server. What is asserted here is the guard, the heading and the focus of each
+// screen; the screens themselves have their own tests.
 installMswServer();
 
 const SESSIONS = "/api/v1/auth/sessions";
 const REFRESH = `${SESSIONS}/refresh`;
 const CURRENT = `${SESSIONS}/current`;
+const ENROLLMENTS = "/api/v1/auth/mfa/enrollments";
 const CREDENTIALS = { identifier: "ana@colegio.edu.hn", password: "not-a-real-password" };
 
 const SIGN_IN = "Iniciar sesión";
@@ -104,7 +105,10 @@ describe("the routes and the screens", () => {
       },
       {
         name: ENROLLMENT,
-        open: async () => renderApp({ path: "/iniciar-sesion/inscripcion", session: await withToken("enroll") }),
+        open: async () => {
+          route("post", ENROLLMENTS, enrollment());
+          return renderApp({ path: "/iniciar-sesion/inscripcion", session: await withToken("enroll") });
+        },
       },
       {
         name: SIGNED_IN,
@@ -123,8 +127,10 @@ describe("the routes and the screens", () => {
 
       expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
       expect(screen.getByRole("main")).toContainElement(heading);
+      // The enrollment has sections, and each one takes the focus on its own level 2 heading when it appears (E10).
+      const focused = name === ENROLLMENT ? await screen.findByRole("heading", { level: 2, name: "Escanee el código QR" }) : heading;
       await waitFor(() => {
-        expect(heading).toHaveFocus();
+        expect(focused).toHaveFocus();
       });
       titles.push(document.title);
       unmount();
@@ -133,13 +139,13 @@ describe("the routes and the screens", () => {
     expect(titles).toEqual([SIGN_IN, SECOND_FACTOR, ENROLLMENT, SIGNED_IN, NOT_FOUND]);
   });
 
-  it("the placeholder at the enrollment route offers no field: its form comes with a later task", async () => {
+  it("admin-web-staff-sign-in task 7: the enrollment route renders its secret step with the QR code and Continue", async () => {
+    route("post", ENROLLMENTS, enrollment());
     renderApp({ path: "/iniciar-sesion/inscripcion", session: await withToken("enroll") });
-    await screen.findByRole("heading", { level: 1, name: ENROLLMENT });
 
-    expect(document.forms).toHaveLength(0);
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "Escanee el código QR" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Código QR para su aplicación de autenticación" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continuar" })).toBeInTheDocument();
   });
 
   it("admin-web-staff-sign-in task 5: the verification route renders its form with the code field and the verify button", async () => {

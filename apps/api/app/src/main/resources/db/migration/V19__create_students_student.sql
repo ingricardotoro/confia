@@ -1,4 +1,4 @@
--- Seventeenth migration (F1, deliverable 2; docs/cortes/students-registry.md). Creates the student
+-- Nineteenth migration (F1, deliverable 2; docs/cortes/students-registry.md). Creates the student
 -- registry of an institution and the per-institution counter that generates student codes.
 --
 -- students_student carries institution_id, forced row-level security, a status and timestamps. Nothing is
