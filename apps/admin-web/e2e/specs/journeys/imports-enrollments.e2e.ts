@@ -64,7 +64,7 @@ test.describe("the import of enrollments", () => {
     await expect(rows.nth(2)).toContainText("94sectionLa sección no tiene cupo para esta matrícula.");
     await expect(rows.nth(3)).toContainText("95sectionNo existe una sección con ese año lectivo, modalidad, grado y nombre");
     await expect(rows.nth(4)).toContainText("96sectionMás de una sección coincide con esos nombres");
-    await expect(rows.nth(5)).toContainText("97sectionLa sección, el grado, la modalidad o el año lectivo no está activo.");
+    await expect(rows.nth(5)).toContainText("97sectionLa sección no está activa.");
     await expect(rows.nth(6)).toContainText("98academicYearEl año lectivo está cerrado: no admite matrículas.");
     await expect(rows.nth(7)).toContainText("99enrolledOnLa fecha de matrícula está fuera del año lectivo o es posterior a hoy.");
 
