@@ -234,7 +234,8 @@ class OpenApiContractSnapshotTest {
                 "/api/v1/imports", "/api/v1/imports/students/simulate", "/api/v1/imports/students/apply",
                 "/api/v1/imports/guardians/simulate", "/api/v1/imports/guardians/apply",
                 "/api/v1/imports/guardian-links/simulate", "/api/v1/imports/guardian-links/apply",
-                "/api/v1/imports/enrollments/simulate", "/api/v1/imports/enrollments/apply");
+                "/api/v1/imports/enrollments/simulate", "/api/v1/imports/enrollments/apply",
+                "/api/v1/imports/reconciliations", "/api/v1/imports/reconciliations/preview");
         Map<String, Object> refresh = asMap(asMap(asMap(admin.get("paths")).get(REFRESH_PATH))
                 .get("post"));
         assertThat(asMap(refresh.get("responses"))).containsOnlyKeys("200", "401", "403", "429", "503");
@@ -400,7 +401,7 @@ class OpenApiContractSnapshotTest {
      * four of the registry, the six of the enrollments, the eight of the guardians and the nine of the imports.
      */
     @Test
-    void theAdministrativeDocumentHoldsFortySevenOperationsAndFortyDeclareAPermission() {
+    void theAdministrativeDocumentHoldsFiftyOperationsAndFortyThreeDeclareAPermission() {
         Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
         List<String> withPermission = new ArrayList<>();
         int operations = 0;
@@ -413,7 +414,7 @@ class OpenApiContractSnapshotTest {
             }
         }
 
-        assertThat(operations).isEqualTo(47);
+        assertThat(operations).isEqualTo(50);
         List<String> expected = new ArrayList<>(List.of("get " + ROLES_PATH));
         for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {
             String collection = "/api/v1/organization/" + resource;
@@ -433,7 +434,8 @@ class OpenApiContractSnapshotTest {
                 "post /api/v1/imports/guardians/simulate", "post /api/v1/imports/guardians/apply",
                 "post /api/v1/imports/guardian-links/simulate", "post /api/v1/imports/guardian-links/apply",
                 "post /api/v1/imports/enrollments/simulate", "post /api/v1/imports/enrollments/apply",
-                "get /api/v1/imports"));
+                "get /api/v1/imports", "post /api/v1/imports/reconciliations",
+                "get /api/v1/imports/reconciliations/preview", "get /api/v1/imports/reconciliations"));
         assertThat(withPermission).containsExactlyInAnyOrderElementsOf(expected);
     }
 

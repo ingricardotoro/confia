@@ -33,7 +33,7 @@ export const importsFeature: FeatureModule = {
       path: IMPORTS_PATH,
       validateSearch: (raw: Record<string, unknown>) => importsSearch.parse(raw),
       // A parameter that holds its default is not written in the address (docs/ui-ux/04, section 3.2, rule 1).
-      search: { middlewares: [stripSearchParams({ page: 1, pageSize: DEFAULT_PAGE_SIZE })] },
+      search: { middlewares: [stripSearchParams({ page: 1, pageSize: DEFAULT_PAGE_SIZE, actsPage: 1 })] },
       component: ImportsRoute,
     }),
   ],

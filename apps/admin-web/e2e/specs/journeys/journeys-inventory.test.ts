@@ -63,6 +63,7 @@ describe("the seven journeys of access", () => {
       "imports-flow.e2e.ts",
       "imports-guardians.e2e.ts",
       "imports-keyboard.e2e.ts",
+      "imports-reconciliation.e2e.ts",
       "imports-states.e2e.ts",
       "keyboard.e2e.ts",
       "organization-crud.e2e.ts",

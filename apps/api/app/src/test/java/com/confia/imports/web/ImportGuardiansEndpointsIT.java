@@ -92,7 +92,13 @@ class ImportGuardiansEndpointsIT extends CommittingPostgresIntegrationTest {
     /** Fragments of the personal values of every file of these tests: they appear nowhere but in the registries. */
     private static final List<String> PERSONAL = List.of("EST-REF-", "EstNombreSecreto", "EstApellidoSecreto",
             "ENC-REF-", "EncNombreSecreto", "EncApellidoSecreto", "DireccionSecreta", "secreto", "0801-1980-",
-            "08011980", "9999-00");
+            "08011980");
+    /**
+     * The phones of the file, whole ("9999-0012"): a shorter fragment such as "9999-00" can occur inside a random UUID of an
+     * audit row of another test that shares the database, and would fail this test by chance.
+     */
+    private static final List<String> PHONES = java.util.stream.IntStream.range(0, 100)
+            .mapToObj(n -> "9999-00" + String.format("%02d", n)).toList();
 
     private static KeyPair keys;
     private static CompactJws jws;
@@ -166,6 +172,7 @@ class ImportGuardiansEndpointsIT extends CommittingPostgresIntegrationTest {
             logLines.add(String.valueOf(event.getMDCPropertyMap()));
         }
         List<String> forbidden = new ArrayList<>(PERSONAL);
+        forbidden.addAll(PHONES);
         forbidden.addAll(storedSecrets());
         forbidden.add(BLIND_INDEX_KEY);
         List<String> audit = rows("select a::text from shared_audit_log a");

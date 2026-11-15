@@ -446,7 +446,8 @@ class PublicRouteAllowListTest {
             "POST /api/v1/imports/guardians/simulate", "POST /api/v1/imports/guardians/apply",
             "POST /api/v1/imports/guardian-links/simulate", "POST /api/v1/imports/guardian-links/apply",
             "POST /api/v1/imports/enrollments/simulate", "POST /api/v1/imports/enrollments/apply",
-            "GET /api/v1/imports");
+            "GET /api/v1/imports", "POST /api/v1/imports/reconciliations",
+            "GET /api/v1/imports/reconciliations/preview", "GET /api/v1/imports/reconciliations");
 
     /** WE96, WE99: the two health routes admit GET only, so every other method is denied with 401. */
     @ParameterizedTest
