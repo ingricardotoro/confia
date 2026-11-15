@@ -14,10 +14,10 @@ import org.junit.jupiter.api.Test;
 /**
  * {@code V16} adds the email delivery log and nothing else, and {@code V1} to {@code V14} were not
  * edited (transactional-email-adapter design.md decision 7 and section 7; specs/build-integrity/spec.md,
- * requirements on {@code notifications_email_delivery}). The catalogue is read after {@code V14} and
+ * requirements on {@code notifications_email_delivery}). The catalogue is read after {@code V15} and
  * after {@code V16} with the snapshot {@link V9SchemaDiffIT} already uses: everything that appears is
- * part of the new table, nothing disappears or changes. {@code V15} is reserved by another change and
- * is not in this tree; Flyway accepts the gap, and the target below names the versions that exist.
+ * part of the new table, nothing disappears or changes. {@code V15} drops the MFA flag of the staff account, so it is the
+ * baseline: the diff is read from it, not from {@code V14}.
  *
  * <p>The checksums of the fourteen earlier migrations are recorded below: a migration applied in
  * production is never edited, so a number that moves means a file was touched.
@@ -31,12 +31,12 @@ class V16SchemaDiffIT {
 
     @Test
     void v16AddsOnlyTheDeliveryLogItsIndexConstraintsPolicyAndPrivileges() throws SQLException {
-        try (StepwiseDatabase database = StepwiseDatabase.migratedTo("14")) {
-            Map<String, String> afterV14 = V9SchemaDiffIT.snapshot(database);
+        try (StepwiseDatabase database = StepwiseDatabase.migratedTo("15")) {
+            Map<String, String> afterV15 = V9SchemaDiffIT.snapshot(database);
             database.migrate("16");
             Map<String, String> afterV16 = V9SchemaDiffIT.snapshot(database);
 
-            Difference difference = Difference.between(afterV14, afterV16);
+            Difference difference = Difference.between(afterV15, afterV16);
 
             assertThat(difference.removed()).as("definitions V16 removes").isEmpty();
             assertThat(difference.changed()).as("definitions V16 changes").isEmpty();

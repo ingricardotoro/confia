@@ -1057,7 +1057,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
      */
     @SpringBootConfiguration
     @EnableAutoConfiguration(exclude = {UserDetailsServiceAutoConfiguration.class,
-            ErrorMvcAutoConfiguration.class}, excludeName = {
+            ErrorMvcAutoConfiguration.class,
+            org.springframework.boot.webmvc.autoconfigure.actuate.endpoint.web.WebMvcHealthEndpointExtensionAutoConfiguration.class}, excludeName = {
             "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerAutoConfiguration",
             "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerMetricsAutoConfiguration",
             "com.github.kagkarlsson.scheduler.boot.autoconfigure.DbSchedulerActuatorAutoConfiguration"})
@@ -1073,7 +1074,9 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
             RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,
             com.confia.shared.web.edge.MultipartEdgeConfiguration.class, SessionTokenConfiguration.class, CsrfConfiguration.class,
             SessionCookieConfiguration.class, JobSchedulingConfiguration.class,
-            AuthorizationConfiguration.class, AuthorizationTestController.class})
+            AuthorizationConfiguration.class, com.confia.shared.observability.health.HealthProbeRoutesConfiguration.class,
+            com.confia.shared.observability.health.ReadinessDatabaseHealthConfiguration.class,
+            AuthorizationTestController.class})
     static class Harness {
 
         @Bean

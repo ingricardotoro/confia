@@ -31,7 +31,7 @@ import org.springframework.context.annotation.Configuration;
  */
 class JobContextIT extends WorkerJobIT {
 
-    private static final UUID SECOND_INSTITUTION = UUID.fromString("00000000-0000-0000-0000-0000000000d2");
+    private static final UUID SECOND_INSTITUTION = UUID.fromString("00000000-0000-0000-0000-0000000000c2");
     static final JobType<Probe> CONTEXT_PROBE = fastType("identity.context-probe", Probe.class, 1);
     static final Map<String, Map<String, String>> MDC_SEEN = new ConcurrentHashMap<>();
     static final Map<String, Long> VISIBLE_AUDIT_ROWS = new ConcurrentHashMap<>();
