@@ -5,6 +5,7 @@ import com.confia.kernel.InstitutionId;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -20,6 +21,9 @@ public interface GuardianLinkRepository {
 
     /** The current links of the guardian, the oldest first. */
     List<GuardianLink> currentOfGuardian(InstitutionId institutionId, UUID guardianId);
+
+    /** Which of these students have at least one current link, in one query. */
+    Set<UUID> studentIdsWithCurrentLinks(InstitutionId institutionId, Collection<UUID> studentIds);
 
     /** Every link of the student, closed ones included, the oldest first (for tests and audit reading). */
     List<GuardianLink> historyOfStudent(InstitutionId institutionId, UUID studentId);

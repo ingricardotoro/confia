@@ -231,7 +231,9 @@ class OpenApiContractSnapshotTest {
                 "/api/v1/enrollments", "/api/v1/enrollments/{id}", "/api/v1/enrollments/{id}/transfer",
                 "/api/v1/enrollments/{id}/exit", "/api/v1/students/{studentId}/enrollments", "/api/v1/guardians",
                 "/api/v1/guardians/{id}", "/api/v1/guardians/{id}/consents", "/api/v1/students/{studentId}/guardians",
-                "/api/v1/imports", "/api/v1/imports/students/simulate", "/api/v1/imports/students/apply");
+                "/api/v1/imports", "/api/v1/imports/students/simulate", "/api/v1/imports/students/apply",
+                "/api/v1/imports/guardians/simulate", "/api/v1/imports/guardians/apply",
+                "/api/v1/imports/guardian-links/simulate", "/api/v1/imports/guardian-links/apply");
         Map<String, Object> refresh = asMap(asMap(asMap(admin.get("paths")).get(REFRESH_PATH))
                 .get("post"));
         assertThat(asMap(refresh.get("responses"))).containsOnlyKeys("200", "401", "403", "429", "503");
@@ -391,13 +393,13 @@ class OpenApiContractSnapshotTest {
 
     /**
      * BI139, BI24 and BI59, extended by the academic structure, the student registry, the enrollments, the guardians and
-     * the student import: forty-one operations (the eight of the session and the report, plus twelve of the structure,
+     * the student import: forty-five operations (the eight of the session and the report, plus twelve of the structure,
      * four of the registry, six of the enrollments, eight of the guardians, two of them the consents of a guardian, and
-     * three of the imports), and exactly thirty-four declare a permission: the report, the twelve of the structure, the
-     * four of the registry, the six of the enrollments, the eight of the guardians and the three of the imports.
+     * seven of the imports), and exactly thirty-eight declare a permission: the report, the twelve of the structure, the
+     * four of the registry, the six of the enrollments, the eight of the guardians and the seven of the imports.
      */
     @Test
-    void theAdministrativeDocumentHoldsFortyOneOperationsAndThirtyFourDeclareAPermission() {
+    void theAdministrativeDocumentHoldsFortyFiveOperationsAndThirtyEightDeclareAPermission() {
         Map<String, Object> admin = parse(normalizedDocumentOf("admin"));
         List<String> withPermission = new ArrayList<>();
         int operations = 0;
@@ -410,7 +412,7 @@ class OpenApiContractSnapshotTest {
             }
         }
 
-        assertThat(operations).isEqualTo(41);
+        assertThat(operations).isEqualTo(45);
         List<String> expected = new ArrayList<>(List.of("get " + ROLES_PATH));
         for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {
             String collection = "/api/v1/organization/" + resource;
@@ -427,6 +429,8 @@ class OpenApiContractSnapshotTest {
                 "post /api/v1/guardians/{id}/consents", "get /api/v1/students/{studentId}/guardians",
                 "put /api/v1/students/{studentId}/guardians"));
         expected.addAll(List.of("post /api/v1/imports/students/simulate", "post /api/v1/imports/students/apply",
+                "post /api/v1/imports/guardians/simulate", "post /api/v1/imports/guardians/apply",
+                "post /api/v1/imports/guardian-links/simulate", "post /api/v1/imports/guardian-links/apply",
                 "get /api/v1/imports"));
         assertThat(withPermission).containsExactlyInAnyOrderElementsOf(expected);
     }

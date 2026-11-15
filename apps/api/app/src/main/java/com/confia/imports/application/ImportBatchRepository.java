@@ -4,6 +4,7 @@ import com.confia.imports.domain.ImportBatch;
 import com.confia.imports.domain.ImportKind;
 import com.confia.kernel.InstitutionId;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -21,6 +22,6 @@ public interface ImportBatchRepository {
     /** The newest batch of any status by this account, if any. */
     Optional<ImportBatch> latestOf(InstitutionId institutionId, UUID createdBy, ImportKind kind);
 
-    /** The batches of the institution, newest first. */
-    Page<ImportBatch> list(InstitutionId institutionId, PageRequest request);
+    /** The batches of the institution of the given kinds, newest first. */
+    Page<ImportBatch> list(InstitutionId institutionId, PageRequest request, Set<ImportKind> kinds);
 }

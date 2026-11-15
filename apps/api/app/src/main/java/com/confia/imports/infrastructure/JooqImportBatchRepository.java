@@ -15,7 +15,9 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 
 /**
@@ -76,10 +78,12 @@ public final class JooqImportBatchRepository implements ImportBatchRepository {
     }
 
     @Override
-    public Page<ImportBatch> list(InstitutionId institutionId, PageRequest request) {
-        long total = dsl.fetchCount(IMPORTS_BATCH, IMPORTS_BATCH.INSTITUTION_ID.eq(institutionId.value()));
+    public Page<ImportBatch> list(InstitutionId institutionId, PageRequest request, Set<ImportKind> kinds) {
+        Condition scope = IMPORTS_BATCH.INSTITUTION_ID.eq(institutionId.value())
+                .and(IMPORTS_BATCH.KIND.in(kinds.stream().map(Enum::name).toList()));
+        long total = dsl.fetchCount(IMPORTS_BATCH, scope);
         List<ImportBatch> rows = dsl.selectFrom(IMPORTS_BATCH)
-                .where(IMPORTS_BATCH.INSTITUTION_ID.eq(institutionId.value()))
+                .where(scope)
                 .orderBy(IMPORTS_BATCH.CREATED_AT.desc(), IMPORTS_BATCH.ID.desc())
                 .limit(request.size()).offset(request.offset())
                 .fetch(JooqImportBatchRepository::toDomain);

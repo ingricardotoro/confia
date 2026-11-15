@@ -89,6 +89,17 @@ public final class PermissionedEndpoints {
                 Permission.STUDENTS_CREATE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/imports/students/apply",
                 Permission.STUDENTS_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/imports/guardians/simulate",
+                Permission.GUARDIANS_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/imports/guardians/apply",
+                Permission.GUARDIANS_CREATE));
+        // The links are guardians' links that this import creates for students: it needs both permissions.
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/imports/guardian-links/simulate",
+                Permission.GUARDIANS_CREATE, List.of(Permission.GUARDIANS_UPDATE)));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/imports/guardian-links/apply",
+                Permission.GUARDIANS_CREATE, List.of(Permission.GUARDIANS_UPDATE)));
+        // The history needs students:read here; the controller adds guardians:read for the batches of the guardians
+        // kinds (a batch of those kinds is listed only to an account that holds it).
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/imports", Permission.STUDENTS_READ));
         return new PermissionedEndpoints(endpoints);
     }

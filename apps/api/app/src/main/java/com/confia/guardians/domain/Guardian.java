@@ -17,6 +17,7 @@ public record Guardian(UUID id, String guardianCode, String firstName, String la
 
     static final int MAX_EMAIL_LENGTH = 254;
     static final int MAX_ADDRESS_LENGTH = 300;
+    static final int MAX_PHONE_LENGTH = 20;
 
     private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
     /** An optional plus and 7 to 20 characters in all: digits, spaces, parentheses and hyphens inside; it may open with a parenthesis. */
@@ -57,7 +58,7 @@ public record Guardian(UUID id, String guardianCode, String firstName, String la
         return status == GuardianStatus.ACTIVE;
     }
 
-    private static String email(String value) {
+    static String email(String value) {
         String text = Names.optional(value, MAX_EMAIL_LENGTH);
         if (text != null && !EMAIL.matcher(text).matches()) {
             throw new InvalidGuardianException();
@@ -65,8 +66,8 @@ public record Guardian(UUID id, String guardianCode, String firstName, String la
         return text;
     }
 
-    private static String phone(String value) {
-        String text = Names.optional(value, 20);
+    static String phone(String value) {
+        String text = Names.optional(value, MAX_PHONE_LENGTH);
         if (text != null && !PHONE.matcher(text).matches()) {
             throw new InvalidGuardianException();
         }

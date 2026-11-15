@@ -1,5 +1,6 @@
 package com.confia.guardians.application;
 
+import com.confia.guardians.domain.DuplicateExternalRefException;
 import com.confia.guardians.domain.DuplicateNationalIdException;
 import com.confia.guardians.domain.Guardian;
 import com.confia.guardians.domain.GuardianLink;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -44,6 +46,13 @@ final class InMemoryGuardians {
     final Map<Key, GuardianLink> linkRows = new LinkedHashMap<>();
     final Map<Key, LocalDate> closedOn = new HashMap<>();
     final Map<UUID, Long> counters = new HashMap<>();
+    /** The references of the source system: {@code institution|reference} to the identifier. */
+    final Map<String, UUID> guardianRefs = new HashMap<>();
+    final Map<String, UUID> studentRefs = new HashMap<>();
+
+    static String refKey(InstitutionId institution, String reference) {
+        return institution.value() + "|" + reference;
+    }
     PageRequest lastRequest;
     GuardianFilter lastFilter;
 
@@ -124,6 +133,18 @@ final class InMemoryGuardians {
         }
 
         @Override
+        public Map<String, StudentRef> findByExternalRefs(InstitutionId institution, Collection<String> refs) {
+            Map<String, StudentRef> found = new HashMap<>();
+            refs.forEach(ref -> {
+                UUID id = studentRefs.get(refKey(institution, ref));
+                if (id != null) {
+                    find(institution, id).ifPresent(student -> found.put(ref, student));
+                }
+            });
+            return found;
+        }
+
+        @Override
         public Map<UUID, StudentRef> findAll(InstitutionId institution, Collection<UUID> studentIds) {
             Map<UUID, StudentRef> found = new HashMap<>();
             studentIds.forEach(id -> find(institution, id).ifPresent(ref -> found.put(id, ref)));
@@ -172,6 +193,34 @@ final class InMemoryGuardians {
             refuseDuplicate(institution, guardian.id(), document);
             events.add("insert-guardian");
             guardianRows.put(key(institution, guardian.id()), new Stored(guardian, document, rtnEncrypted));
+        }
+
+        @Override
+        public void insertImported(InstitutionId institution, Guardian guardian, ProtectedNationalId document,
+                String rtnEncrypted, String externalRef) {
+            if (guardianRefs.containsKey(refKey(institution, externalRef))) {
+                throw new DuplicateExternalRefException();
+            }
+            insert(institution, guardian, document, rtnEncrypted);
+            guardianRefs.put(refKey(institution, externalRef), guardian.id());
+        }
+
+        @Override
+        public Set<String> existingExternalRefs(InstitutionId institution, Collection<String> refs) {
+            return refs.stream().filter(ref -> guardianRefs.containsKey(refKey(institution, ref)))
+                    .collect(java.util.stream.Collectors.toSet());
+        }
+
+        @Override
+        public Map<String, Guardian> findByExternalRefs(InstitutionId institution, Collection<String> refs) {
+            Map<String, Guardian> found = new HashMap<>();
+            refs.forEach(ref -> {
+                UUID id = guardianRefs.get(refKey(institution, ref));
+                if (id != null) {
+                    findById(institution, id).ifPresent(guardian -> found.put(ref, guardian));
+                }
+            });
+            return found;
         }
 
         @Override
@@ -244,6 +293,12 @@ final class InMemoryGuardians {
                     .filter(e -> e.getKey().institution().equals(institution.value())
                             && e.getValue().guardianId().equals(guardianId))
                     .map(e -> closed(e.getKey(), e.getValue())).filter(GuardianLink::current).toList();
+        }
+
+        @Override
+        public Set<UUID> studentIdsWithCurrentLinks(InstitutionId institution, Collection<UUID> studentIds) {
+            return studentIds.stream().filter(id -> !currentOfStudent(institution, id).isEmpty())
+                    .collect(java.util.stream.Collectors.toSet());
         }
 
         @Override

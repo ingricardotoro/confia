@@ -87,7 +87,7 @@ class ImportBatchTest {
     void anEmptyFileHasAZeroBatchAndAnAlreadyImportedRejectionIsRecognised() {
         assertThat(ImportBatch.simulated(UUID.randomUUID(), ImportKind.STUDENTS, SHA, 0, 0, 0, 0, ACCOUNT, NOW)
                 .totalRows()).isZero();
-        assertThat(new Rejection(2, "legacyId", "already-imported").isAlreadyImported()).isTrue();
-        assertThat(new Rejection(2, "legacyId", "required").isAlreadyImported()).isFalse();
+        assertThat(new Rejection(2, "legacyId", "already-imported").isSkipped()).isTrue();
+        assertThat(new Rejection(2, "legacyId", "required").isSkipped()).isFalse();
     }
 }

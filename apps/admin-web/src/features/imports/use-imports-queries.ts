@@ -1,9 +1,11 @@
 import type { ImportRunResponseOutput } from "@confia/contracts/admin";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthorizedSend } from "../../shared/api/authorized-send.tsx";
-import { applyStudentImport, listImportBatches, simulateStudentImport } from "../../shared/api/import-operations.ts";
+import { applyImport, listImportBatches, simulateImport } from "../../shared/api/import-operations.ts";
 import type { PageParams } from "../../shared/api/resource-client.ts";
+import { guardianKeys } from "../guardians/guardians-keys.ts";
 import { studentKeys } from "../students/students-keys.ts";
+import type { ImportKind } from "./import-model.ts";
 import { importKeys } from "./imports-keys.ts";
 
 /** The history of batches, as the server pages it: the rows come back as they were served. */
@@ -23,7 +25,7 @@ type Send = (file: File) => Promise<ImportRunResponseOutput>;
  * the counts and the lines of the rejections and nothing else). Nothing is optimistic and nothing repeats by itself: a
  * second send waits for the screen, which blocks it while one is in flight.
  */
-function useImportRun(operation: (token: string, file: File) => ReturnType<typeof simulateStudentImport>, invalidates: readonly (readonly unknown[])[]): Send {
+function useImportRun(operation: (token: string, file: File) => ReturnType<typeof simulateImport>, invalidates: readonly (readonly unknown[])[]): Send {
   const send = useAuthorizedSend();
   const queryClient = useQueryClient();
   const mutation = useMutation({
@@ -43,12 +45,19 @@ function useImportRun(operation: (token: string, file: File) => ReturnType<typeo
   };
 }
 
-/** Validates a file and counts what an apply would do. It writes no student, only its own batch in the history. */
-export function useSimulateImport(): Send {
-  return useImportRun(simulateStudentImport, [importKeys.all]);
+/** Validates a file of this kind and counts what an apply would do. It writes nothing, only its own batch in the history. */
+export function useSimulateImport(kind: ImportKind): Send {
+  return useImportRun((token, file) => simulateImport(kind, token, file), [importKeys.all]);
 }
 
-/** Creates the students of the valid rows. They are in the registry afterwards, so the registry and the history are read again. */
-export function useApplyImport(): Send {
-  return useImportRun(applyStudentImport, [importKeys.all, studentKeys.all]);
+/** What the registries show again once the rows of a kind are created: the students, the guardians, or both for the links. */
+const AFFECTED: Readonly<Record<ImportKind, readonly (readonly unknown[])[]>> = {
+  students: [studentKeys.all],
+  guardians: [guardianKeys.all],
+  "guardian-links": [guardianKeys.all, studentKeys.all],
+};
+
+/** Creates what the valid rows describe. The registries it fills are read again afterwards, and so is the history. */
+export function useApplyImport(kind: ImportKind): Send {
+  return useImportRun((token, file) => applyImport(kind, token, file), [importKeys.all, ...AFFECTED[kind]]);
 }

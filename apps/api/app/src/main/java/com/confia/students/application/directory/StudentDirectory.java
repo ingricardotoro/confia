@@ -25,4 +25,10 @@ public interface StudentDirectory {
 
     /** The students with these identifiers, by identifier, in one query; unknown identifiers are absent. */
     Map<UUID, StudentRef> findAll(InstitutionId institutionId, Collection<UUID> studentIds);
+
+    /**
+     * The students imported with these references of the source system (the {@code legacyId} of the import file), by
+     * reference, in one query; a reference nobody holds is absent. It reveals no more than {@link StudentRef} does.
+     */
+    Map<String, StudentRef> findByExternalRefs(InstitutionId institutionId, Collection<String> externalRefs);
 }

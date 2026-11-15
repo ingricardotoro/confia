@@ -9,7 +9,9 @@ import com.confia.kernel.InstitutionId;
 import confia.generated.jooq.tables.records.GuardiansGuardianStudentRecord;
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
@@ -45,6 +47,18 @@ public final class JooqGuardianLinkRepository implements GuardianLinkRepository 
     public List<GuardianLink> historyOfStudent(InstitutionId institutionId, UUID studentId) {
         return fetch(GUARDIANS_GUARDIAN_STUDENT.INSTITUTION_ID.eq(institutionId.value())
                 .and(GUARDIANS_GUARDIAN_STUDENT.STUDENT_ID.eq(studentId)));
+    }
+
+    @Override
+    public Set<UUID> studentIdsWithCurrentLinks(InstitutionId institutionId, Collection<UUID> studentIds) {
+        if (studentIds.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(dsl.selectDistinct(GUARDIANS_GUARDIAN_STUDENT.STUDENT_ID).from(GUARDIANS_GUARDIAN_STUDENT)
+                .where(GUARDIANS_GUARDIAN_STUDENT.INSTITUTION_ID.eq(institutionId.value()))
+                .and(GUARDIANS_GUARDIAN_STUDENT.STUDENT_ID.in(studentIds))
+                .and(GUARDIANS_GUARDIAN_STUDENT.VALID_TO.isNull())
+                .fetch(GUARDIANS_GUARDIAN_STUDENT.STUDENT_ID));
     }
 
     private List<GuardianLink> fetch(Condition scope) {

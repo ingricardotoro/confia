@@ -31,7 +31,7 @@ async function openScreen(history = importBatchPage([])) {
   route("get", IMPORTS, history);
   const app = renderFeature(importsFeature, "/imports");
   const user = userEvent.setup();
-  await screen.findByRole("heading", { level: 2, name: "Importar estudiantes" }, TIMEOUT);
+  await screen.findByRole("heading", { level: 2, name: "Importar datos" }, TIMEOUT);
   return { user, app };
 }
 
@@ -57,9 +57,10 @@ describe("the first step and the history", () => {
   it("lists the batches of the server, newest first, with their counts", async () => {
     await openScreen(importBatchPage([importBatch({ status: "APPLIED", totalRows: 40, createdRows: 38, validRows: 38, rejectedRows: 1, skippedRows: 1 })]));
 
-    const table = await screen.findByRole("table", { name: /Importaciones de estudiantes de la institución/ }, TIMEOUT);
+    const table = await screen.findByRole("table", { name: /Importaciones de la institución/ }, TIMEOUT);
     expect(within(table).getByText("Aplicada")).toBeInTheDocument();
-    expect(within(table).getAllByRole("cell").map((cell) => cell.textContent).slice(2)).toEqual(["40", "38", "1", "1"]);
+    expect(within(table).getAllByRole("cell").map((cell) => cell.textContent).slice(3)).toEqual(["40", "38", "1", "1"]);
+    expect(within(table).getByText("Estudiantes")).toBeInTheDocument();
   });
 
   it("shows the failed load of the history with a retry that loads it", async () => {
@@ -85,6 +86,48 @@ describe("the first step and the history", () => {
 
     await waitFor(() => {
       expect(app.router.state.location.searchStr).toContain("page=3");
+    }, TIMEOUT);
+  });
+});
+
+describe("the history by kind", () => {
+  it("asks the server for the kind of the address, and writes the one chosen in it, from the first page", async () => {
+    route("get", IMPORTS, importBatchPage([importBatch({ kind: "GUARDIANS" })], { page: 1, size: 25, total: 60 }));
+    const app = renderFeature(importsFeature, "/imports?page=2&kind=guardians");
+    const user = userEvent.setup();
+    await screen.findByText("Encargados", { selector: "td" }, TIMEOUT);
+
+    expect(Object.fromEntries(new URLSearchParams(histories()[0]?.search))).toEqual({ page: "1", size: "25", kind: "guardians" });
+    expect(screen.getByLabelText("Tipo de importación")).toHaveValue("guardians");
+    await user.selectOptions(screen.getByLabelText("Tipo de importación"), "guardian-links");
+
+    await waitFor(() => {
+      expect(app.router.state.location.searchStr).toBe("?kind=guardian-links");
+    }, TIMEOUT);
+    await waitFor(() => {
+      expect(new URLSearchParams(histories().at(-1)?.search).get("kind")).toBe("guardian-links");
+    }, TIMEOUT);
+  });
+
+  it("drops a kind the address cannot hold and asks for every kind", async () => {
+    route("get", IMPORTS, importBatchPage([importBatch()]));
+    renderFeature(importsFeature, "/imports?kind=teachers");
+    await screen.findByText("Simulada", undefined, TIMEOUT);
+
+    expect(new URLSearchParams(histories()[0]?.search).has("kind")).toBe(false);
+    expect(screen.getByLabelText("Tipo de importación")).toHaveValue("");
+  });
+
+  it("with a kind that has no batches, says so and offers to clear the filter", async () => {
+    route("get", IMPORTS, importBatchPage([]));
+    const app = renderFeature(importsFeature, "/imports?kind=guardian-links");
+    const user = userEvent.setup();
+    await screen.findByText("Ningún registro coincide con los filtros", undefined, TIMEOUT);
+
+    await user.click(screen.getByRole("button", { name: "Quitar filtros" }));
+
+    await waitFor(() => {
+      expect(app.router.state.location.searchStr).toBe("");
     }, TIMEOUT);
   });
 });
@@ -369,6 +412,106 @@ describe("apply", () => {
 
     expect(await screen.findByRole("alert", undefined, TIMEOUT)).toHaveTextContent("No tiene permiso para realizar esta acción.");
     expect(screen.getByRole("heading", { level: 3, name: "Resultado de la simulación" })).toBeInTheDocument();
+  });
+});
+
+describe("the other kinds", () => {
+  const GUARDIANS = `${IMPORTS}/guardians`;
+  const LINKS = `${IMPORTS}/guardian-links`;
+  const chooseKind = (user: ReturnType<typeof userEvent.setup>, kind: string) => user.selectOptions(screen.getByLabelText("Qué va a importar"), kind);
+
+  async function simulateLinks(user: ReturnType<typeof userEvent.setup>) {
+    await chooseKind(user, "guardian-links");
+    await user.upload(screen.getByLabelText("Archivo CSV de vínculos"), csv());
+    await user.click(simulateButton());
+    return screen.findByRole("heading", { level: 3, name: "Resultado de la simulación" }, TIMEOUT);
+  }
+
+  it("changes the field, and sends the file to the route of the kind with the reasons of the whole group", async () => {
+    const rejections = [2, 3, 4].map((line) => ({ line, field: "row", reason: "sum-not-100" as const }));
+    route("post", `${LINKS}/simulate`, importRun({ batch: { kind: "GUARDIAN_LINKS", totalRows: 3, validRows: 0, rejectedRows: 3 }, rejections }));
+    const { user } = await openScreen();
+
+    await simulateLinks(user);
+
+    expect(posts(`${LINKS}/simulate`)).toHaveLength(1);
+    expect(posts(SIMULATE)).toHaveLength(0);
+    expect(screen.getAllByText("Los porcentajes de este estudiante no suman exactamente 100.00: se rechazan todas sus filas.")).toHaveLength(3);
+    expect(screen.getByText(/Todavía no se creó ningún vínculo\./)).toBeInTheDocument();
+  });
+
+  it("lets go of the file and of its summary when the kind changes", async () => {
+    route("post", SIMULATE, importRun());
+    const { user } = await openScreen();
+    await simulate(user);
+
+    await chooseKind(user, "guardians");
+
+    expect(screen.queryByRole("heading", { level: 3, name: "Resultado de la simulación" })).toBeNull();
+    expect(screen.getByLabelText<HTMLInputElement>("Archivo CSV de encargados").files).toHaveLength(0);
+    expect(screen.getByText("Elegir archivo").closest("li")).toHaveAttribute("aria-current", "step");
+  });
+
+  it.each([
+    ["guardians", "legacyId,firstName,lastName,nationalId,rtn,email,phone,address,preferredChannel", "plantilla-encargados.csv"],
+    ["guardian-links", "studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,isBillingRecipient", "plantilla-vinculos.csv"],
+  ] as const)("downloads the empty template of %s", async (kind, header, fileName) => {
+    let saved = "";
+    let savedName = "";
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: (blob: Blob) => {
+          void blob.text().then((text) => {
+            saved = text;
+          });
+          return "blob:test";
+        },
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      savedName = this.download;
+    });
+    const { user } = await openScreen();
+    await chooseKind(user, kind);
+
+    await user.click(screen.getByRole("button", { name: "Descargar la plantilla vacía" }));
+
+    await waitFor(() => {
+      expect(saved).toBe(`${header}\r\n`);
+    });
+    expect(savedName).toBe(fileName);
+    vi.unstubAllGlobals();
+  });
+
+  it("simulates and applies the guardians over their own routes", async () => {
+    route("post", `${GUARDIANS}/simulate`, importRun({ batch: { kind: "GUARDIANS", totalRows: 80, validRows: 80, rejectedRows: 0 } }));
+    route("post", `${GUARDIANS}/apply`, importRun({ batch: { kind: "GUARDIANS", status: "APPLIED", totalRows: 80, validRows: 80, createdRows: 80, appliedAt: "2026-11-10T16:00:00Z" } }));
+    const { user } = await openScreen();
+    await chooseKind(user, "guardians");
+    await user.upload(screen.getByLabelText("Archivo CSV de encargados"), csv());
+    await user.click(simulateButton());
+    await screen.findByRole("heading", { level: 3, name: "Resultado de la simulación" }, TIMEOUT);
+    await user.click(screen.getByRole("button", { name: "Aplicar la importación" }));
+
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Crear 80 encargados" }));
+
+    expect(await screen.findByRole("heading", { level: 3, name: "Importación aplicada" }, TIMEOUT)).toHaveFocus();
+    expect(posts(`${GUARDIANS}/apply`)).toHaveLength(1);
+    expect(screen.getByText(/Se crearon 80 encargados\./)).toBeInTheDocument();
+  });
+
+  it("when the apply of the links cannot be confirmed, says that trying again is safe because a student with links is skipped", async () => {
+    route("post", `${LINKS}/simulate`, importRun({ batch: { kind: "GUARDIAN_LINKS", totalRows: 4, validRows: 4 } }));
+    route("post", `${LINKS}/apply`, "network-error");
+    const { user } = await openScreen();
+    await simulateLinks(user);
+    await user.click(screen.getByRole("button", { name: "Aplicar la importación" }));
+
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Crear 4 vínculos" }));
+
+    expect(await screen.findByRole("alert", undefined, TIMEOUT)).toHaveTextContent("los estudiantes que ya tienen vínculos se omiten");
   });
 });
 

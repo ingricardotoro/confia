@@ -12,6 +12,7 @@ import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.AuthenticationMethod;
 import com.confia.shared.security.PermissionResolver;
 import com.confia.shared.web.authentication.ActorAuthentication;
+import com.confia.shared.web.authorization.access.ResolvedPermissions;
 import com.confia.shared.web.harness.RecordingAuthorizationMetrics;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -116,6 +117,35 @@ class PermissionDeciderTest {
                             .isEqualTo("/test/accounts/{id}").doesNotContain("123");
                     assertThat(denied.actor()).isEqualTo(actor);
                 });
+    }
+
+    @Test
+    void thePermissionsItResolvedTravelOnTheRequestSoNoOneResolvesThemAgain() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/test/accounts/1");
+        PermissionDecider decider = new PermissionDecider(who -> Set.of(Permission.IDENTITY_READ, Permission.STUDENTS_READ), metrics);
+        decider.forEndpoint(ENDPOINT).authorize(() -> new ActorAuthentication(fullSession()),
+                new RequestAuthorizationContext(request));
+        assertThat(request.getAttribute(ResolvedPermissions.ATTRIBUTE))
+                .isEqualTo(Set.of(Permission.IDENTITY_READ, Permission.STUDENTS_READ));
+    }
+
+    @Test
+    void aRouteThatNeedsTwoPermissionsGrantsOnlyWhoHoldsBothAndNamesTheMissingOne() {
+        PermissionedEndpoint both = new PermissionedEndpoint(HttpMethod.POST, "/test/both", Permission.GUARDIANS_CREATE,
+                java.util.List.of(Permission.GUARDIANS_UPDATE));
+        PermissionDecider decider = new PermissionDecider(actor -> Set.of(Permission.GUARDIANS_CREATE), metrics);
+        AuthenticatedActor actor = fullSession();
+        assertThatThrownBy(() -> decide(decider.forEndpoint(both), new ActorAuthentication(actor), "/test/both"))
+                .isInstanceOfSatisfying(PermissionDeniedException.class,
+                        denied -> assertThat(denied.permission()).isEqualTo(Permission.GUARDIANS_UPDATE));
+        PermissionDecider holder = new PermissionDecider(
+                who -> Set.of(Permission.GUARDIANS_CREATE, Permission.GUARDIANS_UPDATE), metrics);
+        assertThat(decide(holder.forEndpoint(both), new ActorAuthentication(actor), "/test/both").isGranted())
+                .isTrue();
+        PermissionDecider onlyUpdate = new PermissionDecider(who -> Set.of(Permission.GUARDIANS_UPDATE), metrics);
+        assertThatThrownBy(() -> decide(onlyUpdate.forEndpoint(both), new ActorAuthentication(actor), "/test/both"))
+                .isInstanceOfSatisfying(PermissionDeniedException.class,
+                        denied -> assertThat(denied.permission()).isEqualTo(Permission.GUARDIANS_CREATE));
     }
 
     @Test

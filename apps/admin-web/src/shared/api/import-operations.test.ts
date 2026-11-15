@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { importBatch, importBatchPage, importRun, problem } from "../../test/contract-responses.ts";
 import { installMswServer, requests, route } from "../../test/msw-server.ts";
-import { applyStudentImport, listImportBatches, simulateStudentImport } from "./import-operations.ts";
+import { applyImport, listImportBatches, simulateImport } from "./import-operations.ts";
 
 // The three operations of the imports over the real transport and the test server: the path, the multipart body in the part
 // `file`, the bearer token, that nothing moves money (no Idempotency-Key), and the schema each answer must meet.
@@ -11,12 +11,16 @@ const file = () => new File(["legacyId,firstName\n1,Ana\n"], "estudiantes.csv", 
 
 describe("simulate and apply", () => {
   it.each([
-    ["simulate", simulateStudentImport, "/api/v1/imports/students/simulate"],
-    ["apply", applyStudentImport, "/api/v1/imports/students/apply"],
-  ] as const)("%s POSTs the file as multipart in the part `file`, with the bearer token and no JSON content type", async (_name, operation, path) => {
+    ["simulate", simulateImport, "students", "/api/v1/imports/students/simulate"],
+    ["apply", applyImport, "students", "/api/v1/imports/students/apply"],
+    ["simulate", simulateImport, "guardians", "/api/v1/imports/guardians/simulate"],
+    ["apply", applyImport, "guardians", "/api/v1/imports/guardians/apply"],
+    ["simulate", simulateImport, "guardian-links", "/api/v1/imports/guardian-links/simulate"],
+    ["apply", applyImport, "guardian-links", "/api/v1/imports/guardian-links/apply"],
+  ] as const)("%s of %s POSTs the file as multipart in the part `file`, with the bearer token and no JSON content type", async (_name, operation, kind, path) => {
     route("post", path, importRun());
 
-    const result = await operation("tok-1", file());
+    const result = await operation(kind, "tok-1", file());
 
     expect(result.kind).toBe("ok");
     const [sent] = requests();
@@ -30,8 +34,8 @@ describe("simulate and apply", () => {
   it("answers the two 409 of the import as problems with their code", async () => {
     route("post", "/api/v1/imports/students/apply", problem("import-file-changed", 409), problem("import-not-simulated", 409));
 
-    const changed = await applyStudentImport("tok", file());
-    const notSimulated = await applyStudentImport("tok", file());
+    const changed = await applyImport("students", "tok", file());
+    const notSimulated = await applyImport("students", "tok", file());
 
     expect(changed).toMatchObject({ kind: "problem", problem: { status: 409, code: "import-file-changed" } });
     expect(notSimulated).toMatchObject({ kind: "problem", problem: { status: 409, code: "import-not-simulated" } });
@@ -40,7 +44,7 @@ describe("simulate and apply", () => {
   it("keeps the field errors of a file that cannot be read", async () => {
     route("post", "/api/v1/imports/students/simulate", problem("validation-failed", 400, { errors: [{ field: "file", reason: "no-rows" }] }));
 
-    const result = await simulateStudentImport("tok", file());
+    const result = await simulateImport("students", "tok", file());
 
     expect(result).toMatchObject({ kind: "problem", problem: { code: "validation-failed", errors: [{ field: "file", reason: "no-rows" }] } });
   });
@@ -52,7 +56,7 @@ describe("simulate and apply", () => {
       contentType: "application/json",
     });
 
-    expect(await simulateStudentImport("tok", file())).toEqual({ kind: "unexpected-response", status: 200 });
+    expect(await simulateImport("students", "tok", file())).toEqual({ kind: "unexpected-response", status: 200 });
   });
 });
 

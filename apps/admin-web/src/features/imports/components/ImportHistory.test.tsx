@@ -16,6 +16,7 @@ function props(override: Partial<ImportHistoryProps> = {}): ImportHistoryProps {
     ],
     table: loadedTable,
     pagination: { ...onePage, total: 2 },
+    onKindChange: vi.fn(),
     ...override,
   };
 }
@@ -24,9 +25,10 @@ describe("ImportHistory", () => {
   it("lists each batch with its state in words and its counts aligned to the end, and never a name", () => {
     renderWithAdminI18n(<ImportHistory {...props()} />);
 
-    const table = screen.getByRole("table", { name: /Importaciones de estudiantes de la institución/ });
+    const table = screen.getByRole("table", { name: /Importaciones de la institución/ });
     expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
       "Fecha",
+      "Tipo",
       "Estado",
       "Filas",
       "Creados",
@@ -35,8 +37,34 @@ describe("ImportHistory", () => {
     ]);
     const [applied, simulated] = within(table).getAllByRole("row").slice(1);
     expect(within(applied as HTMLElement).getByText("Aplicada")).toBeInTheDocument();
-    expect(within(applied as HTMLElement).getAllByRole("cell").map((cell) => cell.textContent).slice(2)).toEqual(["100", "95", "3", "2"]);
+    expect(within(applied as HTMLElement).getAllByRole("cell").map((cell) => cell.textContent).slice(3)).toEqual(["100", "95", "3", "2"]);
     expect(within(simulated as HTMLElement).getByText("Simulada")).toBeInTheDocument();
+  });
+
+  it("says the kind of each batch in words", () => {
+    renderWithAdminI18n(
+      <ImportHistory
+        {...props({ rows: [importBatch({ kind: "STUDENTS" }), importBatch({ kind: "GUARDIANS" }), importBatch({ kind: "GUARDIAN_LINKS" })], pagination: { ...onePage, total: 3 } })}
+      />,
+    );
+
+    const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+    expect(rows.map((row) => within(row).getAllByRole("cell")[1]?.textContent)).toEqual(["Estudiantes", "Encargados", "Vínculos"]);
+  });
+
+  it("filters by kind: every kind first, the three kinds after it, and it only reports the choice", async () => {
+    const onKindChange = vi.fn();
+    renderWithAdminI18n(<ImportHistory {...props({ onKindChange, kind: "guardians" })} />);
+    const filter = screen.getByLabelText("Tipo de importación");
+
+    expect(within(filter).getAllByRole("option").map((option) => option.textContent)).toEqual(["Todos los tipos", "Estudiantes", "Encargados", "Vínculos"]);
+    expect(filter).toHaveValue("guardians");
+    const user = userEvent.setup();
+    await user.selectOptions(filter, "guardian-links");
+    await user.selectOptions(filter, "");
+
+    expect(onKindChange).toHaveBeenNthCalledWith(1, "guardian-links");
+    expect(onKindChange).toHaveBeenNthCalledWith(2, undefined);
   });
 
   it("shows the empty state with the way forward, and runs it", async () => {

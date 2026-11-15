@@ -1,6 +1,6 @@
 package com.confia.imports.web.wiring;
 
-import com.confia.imports.application.ImportStudents;
+import com.confia.imports.application.ManageImports;
 import com.confia.imports.web.ImportController;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Configuration;
 public class ImportsWebConfiguration {
 
     @Bean
-    ImportController importController(ImportStudents imports) {
+    ImportController importController(ManageImports imports) {
         return new ImportController(imports);
     }
 }

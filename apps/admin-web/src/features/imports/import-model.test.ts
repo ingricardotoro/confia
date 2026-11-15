@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
-import { MAX_FILE_BYTES, failureOfImport, fieldNameOf, problemOfFile, rejectionsCsv } from "./import-model.ts";
+import { IMPORT_KINDS, KIND_OF_BATCH, MAX_FILE_BYTES, TEMPLATE_FILE_NAMES, TEMPLATE_HEADERS, failureOfImport, fieldNameOf, isImportKind, problemOfFile, rejectionsCsv } from "./import-model.ts";
 
 const problemFailure = (code: string, status: number, errors: { field: string; reason: string }[] = [], traceId?: string) =>
   new ApiFailure({ kind: "problem", problem: { status, code, errors, ...(traceId === undefined ? {} : { traceId }) } as never });
@@ -17,20 +17,52 @@ describe("the check of the file in the browser", () => {
 
 describe("the name of a field", () => {
   it("shows a column of the template as it is, `row` apart, and nothing else the server could send", () => {
-    expect(fieldNameOf("birthDate")).toEqual({ kind: "column", name: "birthDate" });
-    expect(fieldNameOf("row")).toEqual({ kind: "row" });
-    expect(fieldNameOf("Ana Pérez")).toEqual({ kind: "unknown" });
+    expect(fieldNameOf("birthDate", "students")).toEqual({ kind: "column", name: "birthDate" });
+    expect(fieldNameOf("row", "students")).toEqual({ kind: "row" });
+    expect(fieldNameOf("Ana Pérez", "students")).toEqual({ kind: "unknown" });
+  });
+
+  it("takes the columns from the template of the kind", () => {
+    expect(fieldNameOf("rtn", "guardians")).toEqual({ kind: "column", name: "rtn" });
+    expect(fieldNameOf("rtn", "students")).toEqual({ kind: "unknown" });
+    expect(fieldNameOf("financialResponsibilityPercent", "guardian-links")).toEqual({ kind: "column", name: "financialResponsibilityPercent" });
+    expect(fieldNameOf("birthDate", "guardian-links")).toEqual({ kind: "unknown" });
+  });
+});
+
+describe("the kinds", () => {
+  it("lists them in the recommended order, with a template and a file name each, and knows only them", () => {
+    expect(IMPORT_KINDS).toEqual(["students", "guardians", "guardian-links"]);
+    expect(TEMPLATE_HEADERS.guardians).toBe("legacyId,firstName,lastName,nationalId,rtn,email,phone,address,preferredChannel");
+    expect(TEMPLATE_HEADERS["guardian-links"]).toBe("studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,isBillingRecipient");
+    expect(new Set(Object.values(TEMPLATE_FILE_NAMES)).size).toBe(3);
+    expect(KIND_OF_BATCH).toEqual({ STUDENTS: "students", GUARDIANS: "guardians", GUARDIAN_LINKS: "guardian-links" });
+    expect(isImportKind("guardians")).toBe(true);
+    expect(isImportKind("GUARDIANS")).toBe(false);
+    expect(isImportKind(undefined)).toBe(false);
+  });
+
+  it("names a missing column only when the template of the kind has it", () => {
+    const errors = [
+      { field: "guardianLegacyId", reason: "missing-column" },
+      { field: "birthDate", reason: "missing-column" },
+    ];
+
+    expect(failureOfImport(problemFailure("validation-failed", 400, errors), "guardian-links").texts).toEqual([
+      { key: "imports.fileErrors.missingColumn", values: { column: "guardianLegacyId" } },
+      { key: "imports.fileErrors.other" },
+    ]);
   });
 });
 
 describe("the failures of an import", () => {
   it("sorts the two 409 with the step that follows", () => {
-    expect(failureOfImport(problemFailure("import-not-simulated", 409, [], "T1"))).toEqual({
+    expect(failureOfImport(problemFailure("import-not-simulated", 409, [], "T1"), "students")).toEqual({
       kind: "not-simulated",
       texts: [{ key: "problem.importNotSimulated" }],
       traceId: "T1",
     });
-    expect(failureOfImport(problemFailure("import-file-changed", 409)).kind).toBe("file-changed");
+    expect(failureOfImport(problemFailure("import-file-changed", 409), "students").kind).toBe("file-changed");
   });
 
   it("gives one text per problem of the file, by position for an unknown column and never a value", () => {
@@ -41,6 +73,7 @@ describe("the failures of an import", () => {
         { field: "columns[2]", reason: "unknown-column" },
         { field: "Ana Pérez", reason: "missing-column" },
       ]),
+      "students",
     );
 
     expect(failure.texts).toEqual([
@@ -52,10 +85,10 @@ describe("the failures of an import", () => {
   });
 
   it("tells the limit of imports per hour, the network and the rest in plain words", () => {
-    expect(failureOfImport(problemFailure("too-many-requests", 429)).texts).toEqual([{ key: "imports.errors.rateLimited" }]);
-    expect(failureOfImport(new ApiFailure({ kind: "network" })).texts).toEqual([{ key: "imports.errors.network" }]);
-    expect(failureOfImport(problemFailure("forbidden", 403)).texts).toEqual([{ key: "problem.forbidden" }]);
-    expect(failureOfImport(new Error("boom")).texts).toEqual([{ key: "problem.unexpected" }]);
+    expect(failureOfImport(problemFailure("too-many-requests", 429), "students").texts).toEqual([{ key: "imports.errors.rateLimited" }]);
+    expect(failureOfImport(new ApiFailure({ kind: "network" }), "students").texts).toEqual([{ key: "imports.errors.network" }]);
+    expect(failureOfImport(problemFailure("forbidden", 403), "students").texts).toEqual([{ key: "problem.forbidden" }]);
+    expect(failureOfImport(new Error("boom"), "students").texts).toEqual([{ key: "problem.unexpected" }]);
   });
 });
 
