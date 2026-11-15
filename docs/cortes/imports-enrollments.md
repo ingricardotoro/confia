@@ -77,7 +77,7 @@ corrige, aplica, y cada estudiante queda matriculado en su sección sin exceder 
   resuelve estudiantes y secciones y matricula cada fila con `ManageEnrollments.enroll`, una transacción por fila y en el orden del
   archivo. `SectionDirectory.findByNames` resuelve la sección por nombres (la comparación sin mayúsculas ni espacios se hace en Java,
   no en SQL, para no depender de la colación). `EnrollmentRepository.activeSeatsOf` entrega las matrículas activas por estudiante y año.
-  Migración V23 (solo amplía `imports_batch_kind_chk`). Rutas `POST /api/v1/imports/enrollments/simulate|apply` con `students:create`;
+  Migración V25 (solo amplía `imports_batch_kind_chk`). Rutas `POST /api/v1/imports/enrollments/simulate|apply` con `students:create`;
   el historial `kind=enrollments` exige `students:read`. Contrato OpenAPI y motivos del rechazo ampliados.
 - **Pantalla.** «Matrículas» al final del selector, plantilla `plantilla-matriculas.csv` con una fila de ejemplo y textos es-HN de los
   motivos nuevos; recorrido e2e con 100 matrículas y 7 defectuosas, y tres estados nuevos en la matriz de axe.

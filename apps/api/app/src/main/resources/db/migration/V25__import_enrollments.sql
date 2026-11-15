@@ -1,4 +1,4 @@
--- Twenty-third migration (F1, deliverable 6; docs/cortes/imports-enrollments.md). The third cut of the bulk import
+-- Twenty-fifth migration (F1, deliverable 6; docs/cortes/imports-enrollments.md). The third cut of the bulk import
 -- loads the current enrollments of the students already imported. The only thing that changes is that
 -- imports_batch.kind admits the new kind. The table keeps the same shape: counts and the SHA-256 of the file, never a
 -- row of it, a value or a rejected value. The enrollments themselves are created through the hand enrollment's use
