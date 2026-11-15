@@ -1,4 +1,4 @@
--- Twenty-fourth migration (F1, deliverable 6; docs/cortes/imports-reconciliation.md). The fourth and last cut of the
+-- Twenty-sixth migration (F1, deliverable 6; docs/cortes/imports-reconciliation.md). The fourth and last cut of the
 -- migration tool: the record a signed reconciliation leaves of what the migration left in the system for an academic
 -- year, next to the total the official roster of the institution declares.
 --

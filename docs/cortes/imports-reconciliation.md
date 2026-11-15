@@ -17,7 +17,7 @@ Subir el listado oficial y compararlo fila a fila; editar, anular o borrar un ac
 
 ## Modelo
 
-`imports_reconciliation` (migración V24, solo inserción): `id`, `institution_id`, `academic_year_id`, `official_reference` (el
+`imports_reconciliation` (migración V26, solo inserción): `id`, `institution_id`, `academic_year_id`, `official_reference` (el
 **número del documento** del listado oficial, p. ej. «Oficio 123-2026»: solo letras, números, espacios y `. , / # ° _ -`, al menos un
 número, sin nada con forma de número de identidad; hasta 100 caracteres), `official_enrollment_count` (entero de 0 a 1 000 000, el
 total que declara el listado), `enrollments_active` (matrículas `ACTIVE` del año al firmar), por cada tipo de importación
@@ -78,7 +78,7 @@ la base de datos.
 
 ## Lo construido
 
-- **Backend (`imports`, con puertos de `organization` y `students`).** Migración V24 (`imports_reconciliation`, con permisos y disparadores
+- **Backend (`imports`, con puertos de `organization` y `students`).** Migración V26 (`imports_reconciliation`, con permisos y disparadores
   de solo inserción). `Reconciliation` (dominio) con la regla de la referencia; `ManageReconciliations` calcula los conteos
   (`ImportBatchRepository.appliedTotals`, `SectionDirectory.academicYearExists`, `EnrollmentCensus.activeInYear`), firma, lista y
   previsualiza; `ReconciliationController` con las tres rutas, permisos `students:create|read` y los límites de tasa `admin-write` y
