@@ -228,6 +228,16 @@ describe("the scenarios", { timeout: LIMIT }, () => {
     expect([reply.status, typeOf(reply)]).toEqual([401, "token-expired"]);
   });
 
+  it("issues an enrollment token that is already expired under enrollment-expired", async () => {
+    await preset("early", "enrollment-expired");
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: "early" });
+    const bearer = { Authorization: `Bearer ${(login.json as { secondFactorToken: string }).secondFactorToken}` };
+
+    const reply = await call("POST", "/api/v1/auth/mfa/enrollments", { headers: bearer, scenario: "early" });
+
+    expect([(login.json as { status: string }).status, reply.status, typeOf(reply)]).toEqual(["second-factor-enrollment-required", 401, "token-expired"]);
+  });
+
   it("answers 409 mfa-already-enrolled under already-enrolled", async () => {
     await preset("again", "already-enrolled");
     const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: "again" });
@@ -383,6 +393,23 @@ describe("the account control of the fictitious test account [I304]", { timeout:
     });
 
     expect(done.status).toBe(200);
+  });
+
+  it("two enrollments in a row answer different secrets and codes, and the account control follows the last one [SS100]", async () => {
+    await preset("twice", "enrollment-required");
+    const enroll = async () => {
+      const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: "twice" });
+      const bearer = { Authorization: `Bearer ${(login.json as { secondFactorToken: string }).secondFactorToken}` };
+      return (await call("POST", "/api/v1/auth/mfa/enrollments", { headers: bearer, scenario: "twice" })).json as { secret: string; recoveryCodes: string[] };
+    };
+
+    const first = await enroll();
+    const second = await enroll();
+    const account = (await call("GET", "/__control/account/twice")).json as { secret: string; recoveryCodes: string[] };
+
+    expect(second.secret).not.toBe(first.secret);
+    expect(second.recoveryCodes.filter((code) => first.recoveryCodes.includes(code))).toEqual([]);
+    expect(account).toEqual(second);
   });
 
   it("lists only the recovery codes still valid, and keeps one account for each scenario", async () => {

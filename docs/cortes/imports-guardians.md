@@ -68,7 +68,7 @@ los archivos no cambia nada.
 
 Se amplió el módulo `com.confia.imports` con dos tipos nuevos, `GUARDIANS` y `GUARDIAN_LINKS`, sobre el mismo analizador CSV, la misma tabla de
 lotes, el flujo simular y aplicar, la huella SHA-256 atada a cuenta y tipo, los límites de tasa (`admin-import`, `admin-import-account`), el filtro
-multipart, la traza `imports.batch.failed` y los topes de 5 MB, 10 000 filas y 200 rechazos. Migración `V22__import_guardians_and_links.sql`:
+multipart, la traza `imports.batch.failed` y los topes de 5 MB, 10 000 filas y 200 rechazos. Migración `V24__import_guardians_and_links.sql`:
 `imports_batch.kind` admite los dos tipos y `guardians_guardian.external_ref` (`VARCHAR(64)`, nula, sin vacíos ni espacios en los bordes) con índice
 único `(institution_id, external_ref)`. El rol de solo lectura no la recibe.
 

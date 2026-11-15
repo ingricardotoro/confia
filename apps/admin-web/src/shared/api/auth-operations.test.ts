@@ -127,6 +127,17 @@ describe("refreshSession", () => {
     expect(result).toMatchObject({ kind: "ok", status: 200, data: { status: "authenticated" } });
   });
 
+  it("AW65: the operations pass on the server date and the arrival of the answer, and add no header to the request", async () => {
+    route("post", REFRESH, { ...authenticatedSession(), headers: { Date: "Tue, 10 Nov 2026 10:00:00 GMT" } });
+
+    const result = await refreshSession("csrf-A");
+
+    expect(result).toMatchObject({ kind: "ok", serverDate: Date.UTC(2026, 10, 10, 10, 0, 0) });
+    expect(result.kind === "ok" && Number.isFinite(result.receivedAt)).toBe(true);
+    expect(only().headers.get("X-CSRF-Token")).toBe("csrf-A");
+    expect(only().headers.has("Authorization")).toBe(false);
+  });
+
   it("AW41: a refresh whose body does not meet the schema is an unexpected response", async () => {
     route("post", REFRESH, { status: 200, body: { status: "authenticated" }, contentType: "application/json" });
 
@@ -145,7 +156,7 @@ describe("endCurrentSession", () => {
     expect(sent.path).toBe(CURRENT);
     expect(sent.headers.get("X-CSRF-Token")).toBe("csrf-A");
     expect(sent.headers.has("Authorization")).toBe(false);
-    expect(result).toEqual({ kind: "ok", status: 204, data: undefined });
+    expect(result).toMatchObject({ kind: "ok", status: 204, data: undefined });
   });
 
   it("AW36: with no CSRF value it sends no X-CSRF-Token header and invents none", async () => {
@@ -159,7 +170,7 @@ describe("endCurrentSession", () => {
   it("reports the status it got, so the caller can tell a 204 from any other 2xx", async () => {
     route("delete", CURRENT, { status: 200, body: undefined, contentType: undefined });
 
-    expect(await endCurrentSession("csrf-A")).toEqual({ kind: "ok", status: 200, data: undefined });
+    expect(await endCurrentSession("csrf-A")).toMatchObject({ kind: "ok", status: 200, data: undefined });
   });
 });
 

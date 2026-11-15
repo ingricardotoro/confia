@@ -17,7 +17,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * The two tables of the student registry (V17) against a real PostgreSQL
+ * The two tables of the student registry (V19) against a real PostgreSQL
  * (docs/cortes/students-registry.md): the constraints that enforce the rules of the cut, the row-level
  * security that keeps one institution from reading or writing the rows of another, and the privileges (no
  * one deletes, the read-only role never sees the encrypted document or its blind index, the portal sees

@@ -17,7 +17,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * The three tables of the guardians (V19) against a real PostgreSQL (docs/cortes/guardians-registry.md): the
+ * The three tables of the guardians (V21) against a real PostgreSQL (docs/cortes/guardians-registry.md): the
  * constraints that enforce what is local to the rows (one current link per guardian and student, one primary payer,
  * one billing recipient, the percentage between 0.01 and 100, the document and its blind index together, the
  * composite keys that keep a link inside one institution), the row-level security that keeps one institution from

@@ -1,6 +1,7 @@
 package com.confia.bootstrap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.net.URL;
@@ -65,6 +66,46 @@ class StarterAutoConfigurationExcludedTest {
 
         assertThat(notExcluded(Class.forName(entryPoint), entries)).containsExactly(
                 "com.github.kagkarlsson.scheduler.boot.autoconfigure.InventedAutoConfiguration");
+    }
+
+    /**
+     * Scenario BI151 (transactional-email-adapter design.md decision 2): the mail transport is
+     * built by hand in {@code notifications}, so Spring Boot's mail auto-configuration is on the
+     * class path of no process. A starter in a dependency would put a sender one
+     * {@code spring.mail.host} away from the portal; the absence, not an exclusion list, is the
+     * guarantee.
+     */
+    @Test
+    void noMailAutoConfigurationIsOnTheClassPath() {
+        List<String> all = allAutoConfigurations();
+
+        assertThat(all)
+                .as("non-vacuous: the scan must see Spring Boot's own auto-configuration imports")
+                .anyMatch(entry -> entry.endsWith(".DataSourceAutoConfiguration"));
+        assertThat(all)
+                .as("Spring Boot mail auto-configurations on the class path")
+                .noneMatch(entry -> entry.matches(".*\\.Mail[A-Za-z]*AutoConfiguration"));
+        assertThatThrownBy(() -> Class.forName(
+                "org.springframework.boot.mail.autoconfigure.MailSenderAutoConfiguration"))
+                .isInstanceOf(ClassNotFoundException.class);
+    }
+
+    private static List<String> allAutoConfigurations() {
+        List<String> entries = new ArrayList<>();
+        try {
+            for (URL url : Collections.list(StarterAutoConfigurationExcludedTest.class
+                    .getClassLoader().getResources(IMPORTS_FILE))) {
+                try (var in = url.openStream()) {
+                    new String(in.readAllBytes(), StandardCharsets.UTF_8).lines()
+                            .map(String::strip)
+                            .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                            .forEach(entries::add);
+                }
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("could not read " + IMPORTS_FILE, e);
+        }
+        return entries;
     }
 
     private static List<String> notExcluded(Class<?> entryPoint, List<String> entries) {

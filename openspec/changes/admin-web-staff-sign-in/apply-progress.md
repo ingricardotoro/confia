@@ -376,3 +376,205 @@ Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, 
 | PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 (14 de la caché de turbo) |
 
 Guarda de `*.spec.*` vacía y `git diff --name-only 5199e0c -- apps/api packages/ui packages/contracts` vacío. Sin dependencias nuevas.
+
+
+## Tarea 7: `enrollment-secret-and-qr`
+
+### Dependencias (subtarea 7.1), 2026-11-09
+
+| Paquete | Versión | Publicada | Sección | Licencia |
+|---|---|---|---|---|
+| `qrcode.react` | 4.2.0 | 2024-12-11 | `dependencies` de la app, por catálogo | ISC; par `react ^16.8 \|\| … \|\| ^19`, sin dependencias de ejecución |
+| `jsqr` | 1.4.0 | 2021-04-24 | `devDependencies` de la app, por catálogo | Apache-2.0; sin dependencias |
+
+Ambas son las últimas de su serie y llevan más de 14 días publicadas. `pnpm audit --audit-level high` termina con código 0 (quedan 2 avisos moderados ya existentes, de `glob` y `minimatch` por `packages/ui` y `packages/config`, ajenos a estas entradas); `pnpm why react` muestra una sola `react@19.3.0`; `pnpm install --frozen-lockfile --prefer-offline` pasa. `jsqr` queda declarado sin uso hasta el PR 8 (SS81).
+
+### Medida (regla de las 800 líneas), 2026-11-09
+
+Medida con `git reset`, `git add -A` y `git diff --cached --numstat -M af20884` (sin `openspec/`, archivo de bloqueo ni código generado): 661 adiciones y 26 eliminaciones, **687 líneas**. Bajo 800: sin excepción y sin corte 7a / 7b.
+
+### Evidencia del ciclo TDD
+
+| Paso | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| SS83 (`TotpQrCode.test.tsx`), antes de escribir `TotpQrCode` | Sí | `Failed to resolve import "./TotpQrCode.tsx"` | 2 pruebas: **`QRCodeSVG` cumple SS83** con `level="M"`, `marginSize={4}`, `role="img"` y `title`: el elemento tiene el nombre del catálogo y ningún elemento del subárbol lleva `style`. No hubo punto de detención |
+| URI y clave | Sí | `Failed to resolve import "./otpauth-uri.ts"` y `"./manual-key.ts"` | 5 pruebas |
+| `SecretStep` | Sí (corrida aparte quitando el archivo) | `Failed to resolve import "./SecretStep.tsx"`. **Escribí el componente en el mismo paso que su prueba**; el rojo se registró después, moviendo el archivo fuera, y se restauró | 4 pruebas |
+| `EnrollmentContainer` y ruta | Sí | 11 de 12 fallan por comportamiento (la ruta aún dibujaba el provisional): `Unable to find role="heading" and name "Escanee el código QR"`, `Unable to find role="alert"`, `Unable to find an element with the text: Preparando su verificación…`. SS29 ya pasaba con la guarda | 12 pruebas más la de `routes.test.tsx` |
+| Preset `enrollment-expired` | Sí | `expected 400 to be 200` (preset desconocido) | 32 pruebas del simulador |
+| 3 filas de la puerta | Sí | `expected [] to deeply equal [ [ 'loading', …(1) ], …(2) ]` | 14 pruebas |
+| Recorrido `enrollment.e2e.ts` | **No hubo rojo de navegador**: se escribió con la pantalla ya en verde | 2 de 2 en verde | 76 de 76 en E |
+
+### Demostraciones deliberadas (tarea 7.6)
+
+Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, restauración desde la copia y `cmp` sin salida.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 1 | `style={{ width: 200 }}` en `QRCodeSVG` | SS83: `expected '<svg height="128" width="128" viewBox…' not to match /\sstyle=/`, y la de igualdad con la salida de la biblioteca | idéntico |
+| 2 | Promesa de inscripción sin memorizar en `access-session.ts` (se quitó el `return starting.promise`) | SS75 bajo `StrictMode`: `expected [ …(2) ] to have a length of 1 but got 2` | idéntico |
+| 3 | *Adicional:* clave sin agrupar (`join("")`) | SS77: `expected 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' to be 'JBSW Y3DP EHPK 3PXP …'` en `manual-key.test.ts` y en `SecretStep.test.tsx` | idéntico |
+
+### Desviaciones y decisiones
+
+1. **«Continuar» avanza el borrador, pero el contenedor solo dibuja `secret`.** Los pasos `recovery-codes` y `first-code` son de la tarea 8; hasta que se fusione, pulsar «Continuar» deja el contenedor sin contenido de sección. La cadena 7 a 8 se fusiona en orden.
+2. **El `h2` toma el foco y el `h1` ya no.** Al aparecer la sección, su `h2` enfoca (E10). Por eso la prueba de SS32 de `routes.test.tsx` espera el foco en el `h2` para la inscripción; el `h1` lo recibe solo al montar la pantalla, durante la carga.
+3. **`SignInContainer.states.test.tsx`** (fuera de la lista de la tarea pero dentro de `features/identity/**`): su prueba de SS60 simulaba a mano lo que ahora hace el contenedor real ante `409` (descartar con el aviso y volver); se quitó esa simulación y se espera el aviso.
+4. **`strict` en `renderApp`** (`src/test/render-app.tsx`): envuelve la aplicación en `StrictMode` para SS75.
+5. **`account.ts`** del simulador expone también `secret` en base32 (`TestAccount.secret`), para comparar con el portapapeles.
+6. **Tamaño del QR.** Se dibuja con el tamaño por defecto de la biblioteca (128 px): el diseño prohíbe `style` y `imageSettings`, y SS83 compara con la salida de la biblioteca. Si el propietario lo quiere más grande, se decide aparte.
+7. **Contenedor con carga y error en línea.** Sin archivos de presentación aparte para ellos; usan `Spinner` y `ErrorState` de `@confia/ui`. El detalle del error reutiliza `problem.*`; el identificador de traza se muestra con `CopyButton`.
+8. **Textos.** Las siete claves son las de la sección 8; ninguna fuera de ella (`enrollment.title` ya existía).
+9. **`routes.test.tsx`:** la prueba del provisional («sin campo») se reemplazó por una que comprueba la sección con su QR. `AccessPlaceholder` ya no se usa; su retiro es de la tarea 9.
+
+### Verificación de cierre
+
+| Suite | Resultado |
+|---|---|
+| U `pnpm --filter @confia/admin-web test` | 67 archivos, 696 pruebas y 1 `todo` |
+| T `pnpm --filter ./tooling test` | 9 archivos, 286 pruebas |
+| E `pnpm --filter @confia/admin-web test:e2e` | 76 de 76 (68 previas, 2 recorridos de inscripción, 6 evaluaciones de la puerta) |
+| PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 |
+
+Guarda de `*.spec.*` vacía y `git diff --name-only af20884 -- apps/api packages/ui packages/contracts` vacío (índice y árbol). Sin caracteres invisibles en los 24 archivos.
+
+
+## Tarea 8: `enrollment-codes-and-activation`
+
+### Corte aplicado, 2026-11-09
+
+La tarea 8 se parte en **8a** `codes-first-code-and-activation` (rama `change/admin-web-staff-sign-in-8-enrollment-codes-and-activation`) y **8b** `simulator-and-qr-browser-tests` (rama `change/admin-web-staff-sign-in-8b-enrollment-browser-checks`, desde el commit de 8a). Esta sección documenta 8a; 8b agrega la suya al terminar.
+
+### Medida de 8a (regla de las 800 líneas)
+
+Medida con `git reset`, `git add -A` y `git diff --cached --numstat -M b923a63` (sin `openspec/`, archivo de bloqueo ni código generado): 781 adiciones y 11 eliminaciones, **792 líneas**. Bajo 800: sin excepción. Se midió el trabajo de 8a antes de escribir 8b porque la estimación de 8b (simulador, matriz y recorrido del QR) llevaba el total de la tarea muy por encima de 880.
+
+### Evidencia del ciclo TDD
+
+| Paso | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| `RecoveryCodesStep.test.tsx`, `FirstCodeStep.test.tsx` | Sí, antes del código | `Failed to resolve import "./RecoveryCodesStep.tsx"` y `"./FirstCodeStep.tsx"` | 7 y 7 pruebas |
+| `EnrollmentContainer.test.tsx` (nuevas SS89 a SS94, SS96 a SS99) | Sí, antes del código | 12 de 12 fallan por comportamiento: `Unable to find role="heading" and name "Guarde sus códigos de recuperación"` (tras «Continuar» solo se dibujaba el vacío) | 24 pruebas |
+
+### Demostraciones deliberadas (tarea 8.3, las de 8a)
+
+Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, restauración desde la copia y `cmp` sin salida.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 1 | *Adicional:* `disabled={!confirmed}` en «Continuar» de `RecoveryCodesStep.tsx` | SS90 en la presentación y en el contenedor: `Error: expect(element).toBeEnabled()` (2 de 2) | idéntico |
+| 3 | *Adicional:* `advance()` de `enrollment-draft.ts` conserva los códigos al pasar a `first-code` | SS93 del contenedor: `AssertionError: expected [ '8fef6ed967', '1d007b855f', …(8) ] to be undefined` | idéntico |
+
+La demostración 2 (matriz sin las filas nuevas) es de 8b.
+
+### Desviaciones y decisiones
+
+1. **`SecretStep.tsx` no cambia.** La lista de la tarea lo nombra para que «Continuar» salte a `first-code` sin códigos, pero `advance()` del borrador (tarea 1) ya lo hace: la prueba de SS94 lo demuestra con el contenedor.
+2. **Archivos fuera de la lista de la tarea, dentro de la superficie permitida.** `enrollment/enrollment-controls.ts` (los dos `controlId` fijos), `features/identity/routes.tsx` (el contenedor recibe `homePath`) y `src/test/setup.ts`: jsdom no tiene `ResizeObserver`, que el `Checkbox` de `@confia/ui` usa dentro de un `form`, así que se agregó un sustituto que no mide nada.
+3. **Navegación tras activar.** El `200` borra el borrador y desmonta la sección antes de que su propia respuesta llegue, de modo que «estar montado» no dice si la persona sigue ahí. La sección compara la ruta de entrada con la actual (`useRouter`): navega al inicio o al inicio de sesión solo si la persona sigue en ella. La primera versión usaba una guarda de montaje y la prueba de SS96 la puso en rojo (el recorrido se quedaba en la carga).
+4. **Casilla y resumen.** La confirmación y el «Continuar» sin marcar son estado local de `RecoveryCodesEntry`; no usan `useAccessForm`, cuyos valores son cadenas con normalización. Se muestran el resumen (con el foco y el enlace) y el mensaje bajo la casilla, que lleva «obligatorio» por el `FormField`.
+5. **El primer código repite el QR y la clave.** El diseño (E10) y SS97 lo piden; «Ver de nuevo el código QR» vuelve a `secret` sin petición (SS94).
+6. **Textos.** Las ocho claves nuevas son las de la sección 8 (`codes.title`, `intro`, `confirm`, `confirmRequired`, `firstCode.title`, `submit`, `reviewSecret`); ninguna fuera de ella. Se reutilizan `secondFactor.code`, `secondFactor.codeFormat`, `secondFactor.waiting` y `problem.secondFactorInvalid`.
+7. **`startEnrollment` sin `catch`.** No se corrigió: las operaciones de `shared/api` devuelven resultados en lugar de lanzar, y la prueba que lo justificaría no existe todavía.
+8. **Sin prueba de respuesta tardía.** La rama de `stillHere()` falso (la persona se fue con la petición en vuelo) no tiene prueba propia: hacerla exige simular una activación que llega después de que la guarda descartó el token, un caso del módulo de sesión que no se investigó aquí.
+
+### Verificación de cierre de 8a
+
+| Suite | Resultado |
+|---|---|
+| U `pnpm --filter @confia/admin-web test` | 69 archivos, 724 pruebas y 1 `todo` |
+| E `pnpm --filter @confia/admin-web test:e2e` | 76 de 76 |
+| PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 (14 de la caché de turbo) |
+
+Guarda de `*.spec.*` vacía y `git diff --name-only b923a63 -- apps/api packages/ui packages/contracts` vacío. Sin caracteres invisibles en los 10 archivos. T no se tocó (`tooling/` sin cambios).
+
+### Parte 8b `simulator-and-qr-browser-tests` (rama `change/admin-web-staff-sign-in-8b-enrollment-browser-checks`)
+
+Medida con `git reset`, `git add -A` y `git diff --cached --numstat -M 6ff4c32` (sin `openspec/`): 265 adiciones y 22 eliminaciones, **287 líneas**. La tarea completa suma 792 + 287 = 1 079 contra `b923a63`, sobre las 880 del umbral del propietario: por eso se aplicó el corte.
+
+| Paso | ROJO observado | Causa observada | VERDE |
+|---|---|---|---|
+| Simulador (`session-model.test.ts` y `server.test.ts`) | Sí, antes del código | 2 pruebas: `expected 'VYP4P7CWNNUE62ST3WFBFBTA3YN57QOA' not to be 'VYP4P7CWNNUE62ST3WFBFBTA3YN57QOA'`: el secreto era idéntico entre inscripciones | 64 pruebas del simulador |
+| Matriz y mínimo (`a11y-report.test.ts`) | Sí, antes del código | 5 pruebas: `expected [ { route: '/', …(1) }, …(5) ] to have a length of 22 but got 6`, más las filas de inscripción (`…(2)` contra `…(4)`) | 15 pruebas; 22 estados y 44 evaluaciones |
+| Recorridos SS81, SS82, SS84, SS85, SS100 | **No hubo rojo de navegador** de entrada: la pantalla y el simulador ya estaban en verde cuando se escribieron. SS100 sí se puso en rojo con la demostración 3 | 5 de 5 en verde a la primera | 85 de 85 en E |
+
+### Demostraciones deliberadas (tarea 8.3, las de 8b)
+
+Procedimiento: copia a `$CLAUDE_JOB_DIR/tmp/demo`, ruptura, rojo por aserción, restauración desde la copia y `cmp` sin salida.
+
+| # | Ruptura | Rojo observado | `cmp` |
+|---|---|---|---|
+| 2 | Matriz sin las filas `recovery-codes` y `first-code` | `Error: The matrix lacks: /iniciar-sesion/inscripcion [recovery-codes], /iniciar-sesion/inscripcion [first-code].` en la prueba del mínimo y en las de cada pantalla, y `AssertionError: expected [ [ 'loading', …(1) ], …(2) ] to deeply equal [ [ 'loading', …(1) ], …(4) ]` en la de inscripción (4 de 15) | idéntico |
+| 4 | *Adicional:* `value={`${uri}x`}` en `TotpQrCode.tsx` | SS81: el texto decodificado difiere del URI (`Expected` y `Received` distan en la `x` final) | idéntico |
+| 5 | *Adicional:* el simulador no vuelve a generar la clave tras la primera inscripción | SS100: `Error: the second secret differs from the first` (`Expected: true`, `Received: false`) | idéntico |
+
+La demostración 1 (continuar deshabilitado) y la 3 de la tarea (códigos conservados) están en 8a.
+
+### Desviaciones y decisiones de 8b
+
+1. **El `SS78` de la tarea 7 cambió.** Leía la cuenta antes de iniciar sesión; con un secreto nuevo por inscripción, la lee cuando la pantalla ya muestra el suyo.
+2. **Sin cambio en `server.ts`.** La lista de la tarea lo nombra, pero `enroll` vive en `session-model.ts`; el control de la cuenta ya leía el modelo. Se agregó una prueba de servidor (`server.test.ts`).
+3. **Comparaciones sin imprimir secretos.** SS81 y SS100 comparan con un booleano y un mensaje, para que un fallo no escriba el secreto en el informe (regla 11). El `SS78` de la tarea 7 sigue comparando el texto del portapapeles directamente y un fallo lo imprimiría; es un secreto ficticio de la ejecución, pero queda anotado.
+4. **`MINIMUM` son los 22 estados.** Se escribe a mano, aparte de la matriz, con los ocho del inicio de sesión, los tres de la verificación y los cinco de la inscripción además de los seis de la parte 1. Las pruebas que decían «el mínimo sigue en seis» ahora dicen que contiene cada pantalla.
+5. **SS84.** Se leen los rellenos calculados de los dos `path` del SVG y se comprueba que el fondo cubre todo el dibujo y que los módulos empiezan a 4 unidades del borde; no se mide un contraste.
+6. **SS85.** Cubre URL, cabeceras y cuerpos de todas las peticiones de una inscripción completa. El identificador aparece en una sola petición (el cuerpo del inicio de sesión).
+
+### Verificación de cierre de 8b (y de la tarea 8)
+
+| Suite | Resultado |
+|---|---|
+| U `pnpm --filter @confia/admin-web test` | 69 archivos, 727 pruebas y 1 `todo` |
+| E `pnpm --filter @confia/admin-web test:e2e` | 85 de 85 (76 previas, 5 recorridos, 4 evaluaciones de la puerta de los dos estados nuevos) |
+| PR `pnpm turbo run lint typecheck test build --filter=!@confia/api --concurrency=1` | 18 de 18 (14 de la caché de turbo) |
+
+T no se corrió: `tooling/` no cambió en esta tarea. Guarda de `*.spec.*` vacía y `git diff --name-only b923a63 -- apps/api packages/ui packages/contracts` vacío. Sin caracteres invisibles en los archivos de 8b.
+
+### Correcciones de la revisión de 8a, 2026-11-09 (rama 8b)
+
+Dos advertencias de la revisión, corregidas en 8b con su prueba primero. (1) La guarda de ubicación de `FirstCodeEntry` ahora tiene la prueba de su rama falsa: una activación retenida, la persona sale al inicio de sesión, se libera la respuesta y la ubicación sigue en el inicio de sesión. Demostración: guarda reemplazada por `entered.current !== ""`; rojo `AssertionError: expected '/' to be '/iniciar-sesion'`; `cmp` idéntico. (2) Un paso `recovery-codes` sin códigos ya no dibuja una lista vacía confirmable: muestra `ErrorState` con `enrollment.failed` y `problem.unexpected` (textos ya aprobados), y «Reintentar» descarta la inscripción y lleva al inicio de sesión con el aviso de inscripción interrumpida. Rojo observado: `Unable to find role="alert"` (se dibujaba el paso con la casilla). Además, una prueba de que «Ver de nuevo el código QR» no hace nada mientras la activación está en vuelo (ya estaba en verde: sin rojo posible) y los elementos de la lista de códigos se identifican por posición. Medida de 8b acumulada contra `6ff4c32`: 409 líneas. U 730 pruebas y 1 `todo`; E 85 de 85; PR 18 de 18.
+
+## Tarea 9 `access-journeys-and-criterion-8` (rama `change/admin-web-staff-sign-in-9-access-journeys-and-criterion-8`)
+
+### Medida y detención, 2026-11-09
+
+Medida con `git reset`, `git add -A` y `git diff --cached --numstat -M 3edc501 -- . ':(exclude)openspec' ':(exclude)pnpm-lock.yaml' ':(exclude)packages/contracts/src/generated'`: 948 adiciones y 44 eliminaciones, **992 líneas**, sobre el umbral de 880. **Nada se comprometió.** El trabajo está preparado en el área de preparación (staged) y sin commits.
+
+Corte propuesto, por archivos completos con sus pruebas (sin quitar pruebas ni comentarios):
+
+| Parte | Archivos | Líneas |
+|---|---|---|
+| 9a: navegador y centinelas | `e2e/specs/journeys/secrets.e2e.ts` (374), `journeys-inventory.test.ts` (65), `keyboard.e2e.ts` (64), `enrollment.e2e.ts` (26), `e2e/support/sentinels.ts` (16) y `sentinels.test.ts` (29), `session-secrets.flow.test.tsx` (149) | 723 |
+| 9b: documentos y limpieza | `src/app/docs-notes.test.ts` (158), `src/app/structure.test.ts` (53), borrado de `AccessPlaceholder.tsx` y su prueba (38), `docs/09-roadmap-y-fases.md` (16), `docs/ui-ux/04` y `06` (4) | 269 |
+
+Verificación del conjunto completo, ya observada: U 69 archivos, 752 pruebas y 2 `todo`; E 96 de 96 (la puerta: 44 evaluaciones, 22 estados por 2 temas, en verde antes de marcar el criterio 8); `lint` y `typecheck` de `admin-web` sin salida de error; guarda de `*.spec.*` vacía; `apps/api`, `packages/ui` y `packages/contracts` sin diferencias frente a `3edc501`; sin caracteres invisibles en los 12 archivos. Faltan, tras el corte, la prueba de PR completo y T (no aplica: `tooling/` no cambió).
+
+### Decisión del propietario y cierre de la tarea 9, 2026-11-09
+
+El propietario aprobó el corte. Dos ramas encadenadas, sin empujar:
+
+| Parte | Rama | Commits | Medida (adiciones + eliminaciones) |
+|---|---|---|---|
+| 9a | `change/admin-web-staff-sign-in-9-access-journeys-and-criterion-8` | `1b6de8f test(admin-web): cover the full enrollment and every secret surface in the browser` | 719 + 4 = **723** contra `3edc501` |
+| 9b | `change/admin-web-staff-sign-in-9b-cleanup-and-criterion-8` | `432c16f refactor(identity): remove the access placeholder`, `b0460bd docs(ui-ux): record the access screens in the interaction and flow guides`, `8eb38f8 docs(roadmap): close exit criterion 8 with the simulated journeys`, y este cierre | 229 + 40 = **269** contra `1b6de8f` |
+
+Los 992 de la tarea completa quedan repartidos en 723 y 269; ninguna parte pasa de 800. El árbol de 9a se verificó solo, sin los archivos de 9b (se movieron a una carpeta temporal y se restauraron con `cmp` idéntico).
+
+**Verificación.** 9a: U 70 archivos y 741 pruebas con 2 `todo`; E 96 de 96; PR 18 de 18. 9b: U 69 archivos y 752 pruebas con 2 `todo`; E 96 de 96; PR 18 de 18. T no se corrió: `tooling/` no cambió. Guarda de `*.spec.*` vacía; `apps/api`, `packages/ui` y `packages/contracts` sin diferencias contra `3edc501`; sin caracteres invisibles.
+
+**ROJO.** `secrets.e2e.ts`: `Error: No tests found.`; `variantsOf`: `TypeError: variantsOf is not a function`; inventario: `ENOENT` de `secrets.e2e.ts`; notas de `docs-notes.test.ts`: 10 fallos con las notas vacías. Sin ROJO posible, por existir ya el comportamiento: los flujos de `session-secrets.flow.test.tsx` y las ausencias de `structure.test.ts`. Se protegen de un verde vacío con una prueba que planta un valor en cada superficie (almacenamientos, IndexedDB, URL, historial, `window`, cookies y consola) y con conjuntos positivos exactos.
+
+**Demostraciones (con `cmp` idéntico).** (1) Quitar la nota de `docs/09`: rojo en BX102 (`the criterion is marked without a dated note`), BX103 y BX104. (2) Quitar la fila `signed-in-ready` de la matriz: `Error: The matrix lacks: / [signed-in-ready].` (3) Adicional: `SignInContainer` guarda la contraseña en `sessionStorage`: el recorrido TOTP falla con `the verification: sessionStorage` y las etiquetas `password, base64` y `password, base64url`, sin imprimir el valor.
+
+**Criterio 8.** Marcado solo en 9b, con la puerta en verde observada sobre las cinco pantallas (44 evaluaciones, 22 estados por 2 temas).
+
+**Desviaciones.** El commit de `docs/ui-ux` va antes que el de `docs/09` porque `docs-notes.test.ts` prueba los tres documentos y cada commit debe quedar en verde; el commit de `docs/ui-ux` lleva una versión parcial de ese archivo y el de `docs/09` la completa. Se agregó el recorrido de inscripción solo con teclado (SS114) a `keyboard.e2e.ts`. `routes.tsx` no necesitó limpieza.
+
+**Pendiente.** 9.4 es del propietario tras fusionar la cadena. Siguen pendientes las mediciones remotas 4.4, BX86 y BX89, que dependen de empujar. Con todo lo demás cerrado, el cambio queda **listo para `sdd-verify` y `sdd-archive`**, con esas evidencias remotas como condición.
+
+### Revisión de 9a: advertencias R3-001, R3-002 y R3-003, 2026-11-09
+
+La revisión de Gentle AI aprobó 9a con tres advertencias. Las dos primeras se corrigieron en la rama 9b con su prueba:
+
+- **R3-001.** El recorrido de inscripción comprobaba al final que había diez etiquetas `recovery code`, pero la cuenta del simulador ya las agregaba con los mismos nombres, así que la aserción no podía fallar si el oyente nunca leía la respuesta. Los valores aprendidos de las respuestas de la API van ahora en un conjunto aparte (`learned`) y el recorrido exige que la clave y los diez códigos aprendidos sean exactamente los de la cuenta. Demostración: el oyente sin leer `recoveryCodes` pone en rojo `the ten codes of the enrollment answer were learned`; `cmp` idéntico.
+- **R3-002.** El código TOTP escrito se buscaba como subcadena y podía coincidir por azar dentro de un número más largo. Ahora se busca como token completo (`findTokenLeaks`, con su prueba unitaria: primero en rojo con `TypeError: findTokenLeaks is not a function`), también en sus codificaciones. Demostración: `SecondFactorContainer` guarda el código en `sessionStorage`; el recorrido TOTP falla con `the signed in page: sessionStorage, the typed code`; `cmp` idéntico.
+- **R3-003, aceptada sin cambio.** La espera fija de 2 s de `enrollment.e2e.ts` (SS82) se mantiene: una petición tardía (fuente o recurso) solo puede aparecer si se deja pasar un tiempo tras mostrarse el QR, y `networkidle` ya se resolvió. Queda registrada como decisión aceptada.

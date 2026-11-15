@@ -17,7 +17,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * The four tables of the academic structure (V16) against a real PostgreSQL
+ * The four tables of the academic structure (V18) against a real PostgreSQL
  * (docs/cortes/organization-academic-structure.md): the constraints that enforce the rules of the cut,
  * the row-level security that keeps one institution from reading or writing the rows of another, and
  * the privileges (no one deletes, the portal sees nothing). Constraint rejections run as

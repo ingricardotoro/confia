@@ -17,8 +17,10 @@ import org.springframework.http.HttpMethod;
  * documentation. The condition is the
  * very property that enables springdoc, not the name of a profile: one source decides both whether
  * the documentation exists and whether it is public, and a new or misspelled profile leaves it
- * closed. There are no health or readiness routes because there is no actuator; the change that
- * adds one edits this class, and the allow-list test of change 7 part 4a then obliges it.
+ * closed. Both lists also hold exactly the two health probes, {@code GET /health/live} and {@code GET
+ * /health/ready}, with no profile condition (dockerfiles-and-local-compose design.md decision 4.6): the
+ * orchestrator calls them without a credential in every environment, and their bodies carry only the
+ * status. Any other Actuator or health path is not listed, so the chain answers it {@code 401}.
  *
  * <p>The public constructor exists for the test harnesses, which add routes of their own to the
  * real list and nothing else.
@@ -53,6 +55,12 @@ public final class PublicEndpoints {
     static final PublicEndpoint END_CURRENT_SESSION =
             new PublicEndpoint(HttpMethod.DELETE, "/api/v1/auth/sessions/current");
 
+    /** The liveness probe: the process is up, and nothing external is checked. */
+    static final PublicEndpoint HEALTH_LIVE = new PublicEndpoint(HttpMethod.GET, "/health/live");
+
+    /** The readiness probe: the process can take traffic and its database answers. */
+    static final PublicEndpoint HEALTH_READY = new PublicEndpoint(HttpMethod.GET, "/health/ready");
+
     private final List<PublicEndpoint> endpoints;
 
     public PublicEndpoints(List<PublicEndpoint> endpoints) {
@@ -65,17 +73,23 @@ public final class PublicEndpoints {
         entries.add(LOGIN);
         entries.add(REFRESH);
         entries.add(END_CURRENT_SESSION);
+        entries.add(HEALTH_LIVE);
+        entries.add(HEALTH_READY);
         entries.addAll(documentation(environment).endpoints());
         return new PublicEndpoints(entries);
     }
 
     /**
-     * The allow-list of the portal process: the same documentation entries and nothing of its
-     * own, so with the default (production) configuration it is empty and the portal denies
-     * everything.
+     * The allow-list of the portal process: the two health probes plus the same documentation
+     * entries, so with the default (production) configuration it holds the probes alone and the
+     * portal denies everything else.
      */
     public static PublicEndpoints forPortal(Environment environment) {
-        return documentation(environment);
+        List<PublicEndpoint> entries = new ArrayList<>();
+        entries.add(HEALTH_LIVE);
+        entries.add(HEALTH_READY);
+        entries.addAll(documentation(environment).endpoints());
+        return new PublicEndpoints(entries);
     }
 
     /** The routes, in a list that cannot be modified. */

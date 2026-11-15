@@ -70,7 +70,7 @@ inactiva; en la base el documento está cifrado y en ningún lugar de la API apa
 
 ## Construido en el backend
 
-Módulo `com.confia.students` (dominio, aplicación, `infrastructure`, `web`), migración `V17__create_students_student.sql`
+Módulo `com.confia.students` (dominio, aplicación, `infrastructure`, `web`), migración `V19__create_students_student.sql`
 (tablas `students_student` y `students_student_code_counter`, seguridad por fila forzada, sin `DELETE`). Cuatro rutas
 bajo `/api/v1/students`, cada una con `@RateLimited` (lecturas `admin-read`, 300 por minuto por IP; escrituras `admin-write`,
 60 por minuto por IP; `429` con `Retry-After`); las escrituras auditan `students.student.created|updated` con el estado
@@ -106,7 +106,7 @@ nunca valores) en el estado posterior de la edición.
 ### Decisiones tomadas al construir
 
 - **Ningún carácter del documento en claro** (hallazgo A1 de la revisión de seguridad): se eliminó `national_id_last4`
-  (la migración V17, aún no publicada, se editó en su lugar). La cola de 4 caracteres combinada con la fecha de nacimiento
+  (la migración V19, aún no publicada, se editó en su lugar). La cola de 4 caracteres combinada con la fecha de nacimiento
   casi reveló el DNI (municipio + año + secuencia). `hasNationalId` se deriva de `national_id_encrypted IS NOT NULL`, la
   restricción de consistencia entre el cifrado y el índice ciego se conserva, y el valor completo sigue únicamente cifrado
   (`national_id_encrypted`, formato `v1:` de `ColumnEncryptionService`, ligado a la fila); el rol de solo lectura no
@@ -142,7 +142,7 @@ Cerrado el 2026-11-11 (rama `feat/students-registry`):
 - **M1 (cerrado)**: llave dedicada y versionada para el índice ciego. `shared.crypto.BlindIndexKeys` (llaves Base64 de 32
   bytes por versión, `confia.crypto.blind-index.current-version` y `confia.crypto.blind-index.keys.<versión>`, fallo de
   arranque sin ellas, redactado en `toString`) y `BlindIndexService` (índice `v1:<64 hex>`; `candidates` prueba cada
-  versión configurada). V17 se editó en su sitio: `national_id_blind_index VARCHAR(80)` con restricción de formato. La
+  versión configurada). V19 se editó en su sitio: `national_id_blind_index VARCHAR(80)` con restricción de formato. La
   detección de duplicados en `JooqStudentRepository` busca bajo todas las versiones durante una rotación. El recálculo es
   el caso de uso `ReindexNationalIds` (lotes de 200, una transacción y una entrada de auditoría por lote, idempotente) y se
   ejecuta una vez arrancando el proceso administrativo con `confia.students.reindex.institutions`
