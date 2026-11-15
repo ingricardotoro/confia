@@ -349,3 +349,136 @@ describe("the three kinds", () => {
     expect(get("kind=teachers")?.status).toBe(400);
   });
 });
+
+// The enrollments (imports-enrollments cut).
+describe("the enrollments", () => {
+  const ENROLLMENT_HEADER = "studentLegacyId,academicYear,modality,grade,section,enrolledOn";
+  type Route = "students" | "enrollments";
+
+  function enrollments() {
+    const imports = createImportsModel({ ...DEFAULT_IMPORTS, seed: "empty" }, NOW);
+    const post = (route: Route, action: "simulate" | "apply", csv: string) =>
+      imports.handle({ method: "POST", path: `/api/v1/imports/${route}/${action}`, query: new URLSearchParams(), ...upload(csv) });
+    const students = (...ids: string[]) => {
+      const file = csvOf(...ids.map((id) => `${id},Ana,Pérez,2013-05-01`));
+      post("students", "simulate", file);
+      post("students", "apply", file);
+    };
+    const fileOf = (...rows: string[]) => [ENROLLMENT_HEADER, ...rows].join("\n");
+    const run = (action: "simulate" | "apply", ...rows: string[]) => post("enrollments", action, fileOf(...rows));
+    return { imports, post, students, fileOf, run };
+  }
+  const reasons = (answer: ReturnType<ReturnType<typeof enrollments>["run"]>) =>
+    bodyOf(answer).rejections.map((rejection) => `${String(rejection.line)}:${rejection.field}:${rejection.reason}`);
+
+  it("names its columns, requires all six, and refuses a column of another kind", () => {
+    const { post } = enrollments();
+
+    expect(post("enrollments", "simulate", "legacyId,academicYear,modality,grade,section,enrolledOn\nS1,2026,Diurna,Primero,A,2026-02-02")?.body).toMatchObject({
+      errors: [{ field: "columns[0]", reason: "unknown-column" }, { field: "studentLegacyId", reason: "missing-column" }],
+    });
+    expect(post("enrollments", "simulate", "studentLegacyId,academicYear\nS1,2026")?.body).toMatchObject({
+      errors: [{ field: "modality", reason: "missing-column" }, { field: "grade", reason: "missing-column" }, { field: "section", reason: "missing-column" }, { field: "enrolledOn", reason: "missing-column" }],
+    });
+  });
+
+  it("finds the section by its names, with other capitals and spare spaces, and reports each defect by line, column and reason", () => {
+    const { students, run } = enrollments();
+    students("S1", "S2", "S3", "S4", "S5", "S6", "S7");
+
+    const answer = run(
+      "simulate",
+      " S1 ,2026, DIURNA ,primero, a ,2026-02-02",
+      "S2,2026,Diurna,Primero,X,2026-02-02",
+      "S3,2026,Diurna,Segundo,Z,2026-02-02",
+      "S4,2025,Diurna,Primero,A,2025-02-02",
+      "S5,2026,Diurna,Primero,C,2026-02-02",
+      "S6,2026,Diurna,Primero,,2026-02-02",
+      "S9,2026,Diurna,Primero,A,2026-02-02",
+      "S1,2026,Diurna,Primero,B,2026-02-02",
+      "S7,2026,Diurna,Primero,A,2026-02-30",
+    );
+
+    expect(reasons(answer)).toEqual([
+      "3:section:unknown-section",
+      "4:section:ambiguous-section",
+      "5:academicYear:academic-year-closed",
+      "6:section:inactive-reference",
+      "7:section:required",
+      "8:studentLegacyId:unknown-student",
+      "9:studentLegacyId:duplicate-in-file",
+      "10:enrolledOn:invalid-date",
+    ]);
+    expect(bodyOf(answer).batch).toMatchObject({ kind: "ENROLLMENTS", status: "VALIDATED", totalRows: 9, validRows: 1, rejectedRows: 8, skippedRows: 0 });
+  });
+
+  it("rejects a date a day before the start of the year, accepts the first and the last day, rejects a day after the end and a future date", () => {
+    const { students, run } = enrollments();
+    students("S1", "S2", "S3", "S4");
+
+    const answer = run(
+      "simulate",
+      "S1,2026,Diurna,Primero,A,2026-01-14",
+      "S2,2026,Diurna,Primero,A,2026-01-15",
+      "S3,2026,Diurna,Primero,A,2026-12-16",
+      "S4,2026,Diurna,Primero,A,2026-11-11",
+    );
+
+    expect(reasons(answer)).toEqual(["2:enrolledOn:enrollment-date-out-of-range", "4:enrolledOn:enrollment-date-out-of-range", "5:enrolledOn:enrollment-date-out-of-range"]);
+    expect(bodyOf(answer).batch).toMatchObject({ validRows: 1, rejectedRows: 3 });
+  });
+
+  it("counts the quota with the rows of the file in order: the third row of a section of two does not fit", () => {
+    const { students, run } = enrollments();
+    students("S1", "S2", "S3");
+
+    const answer = run("simulate", "S1,2026,Diurna,Primero,B,2026-02-02", "S2,2026,Diurna,Primero,B,2026-02-02", "S3,2026,Diurna,Primero,B,2026-02-02");
+
+    expect(reasons(answer)).toEqual(["4:section:section-full"]);
+    expect(bodyOf(answer).batch).toMatchObject({ validRows: 2, rejectedRows: 1 });
+  });
+
+  it("applies once, takes the seats, skips the student already in that section, and never moves one that is in another", () => {
+    const { students, run } = enrollments();
+    students("S1", "S2", "S3");
+    const first = ["S1,2026,Diurna,Primero,B,2026-02-02", "S2,2026,Diurna,Primero,B,2026-02-02"];
+    run("simulate", ...first);
+
+    const applied = run("apply", ...first);
+    const again = run("simulate", ...first);
+    const reapplied = run("apply", ...first);
+    const elsewhere = run("simulate", "S1,2026,Diurna,Primero,A,2026-02-02", "S3,2026,Diurna,Primero,B,2026-02-02");
+
+    expect(bodyOf(applied).batch).toMatchObject({ status: "APPLIED", createdRows: 2, validRows: 2 });
+    expect(reasons(again)).toEqual(["2:studentLegacyId:already-imported", "3:studentLegacyId:already-imported"]);
+    expect(bodyOf(again).batch).toMatchObject({ validRows: 0, rejectedRows: 0, skippedRows: 2 });
+    expect(bodyOf(reapplied).batch).toMatchObject({ createdRows: 0, skippedRows: 2 });
+    expect(reasons(elsewhere)).toEqual(["2:studentLegacyId:duplicate-active-enrollment", "3:section:section-full"]);
+  });
+
+  it("takes the 409 of the kind from its own batches and keeps no value of the file", () => {
+    const { imports, students, run } = enrollments();
+    students("S1");
+
+    expect(run("apply", "S1,2026,Diurna,Primero,A,2026-02-02")?.body).toMatchObject({ type: "https://confia.hn/problems/import-not-simulated" });
+    run("simulate", "S1,2026,Diurna,Primero,A,2026-02-02");
+    expect(run("apply", "S1,2026,Diurna,Primero,A,2026-02-03")?.body).toMatchObject({ type: "https://confia.hn/problems/import-file-changed" });
+    expect(JSON.stringify(imports.batches())).not.toMatch(/S1|Diurna|2026-02/);
+  });
+
+  it("refuses the write with 403 and is filtered in the history by its kind", () => {
+    const { run, imports } = enrollments();
+    run("simulate", "S1,2026,Diurna,Primero,A,2026-02-02");
+
+    const only = imports.handle({ method: "GET", path: "/api/v1/imports", query: new URLSearchParams("kind=enrollments"), contentType: undefined, body: undefined })?.body as { total: number; items: { kind: string }[] };
+    const forbidden = createImportsModel({ ...DEFAULT_IMPORTS, seed: "empty", writes: "forbidden" }, NOW).handle({
+      method: "POST",
+      path: "/api/v1/imports/enrollments/simulate",
+      query: new URLSearchParams(),
+      ...upload(`${ENROLLMENT_HEADER}\nS1,2026,Diurna,Primero,A,2026-02-02`),
+    });
+
+    expect(only.items.map((item) => item.kind)).toEqual(["ENROLLMENTS"]);
+    expect(forbidden?.status).toBe(403);
+  });
+});

@@ -14,6 +14,7 @@ import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.Digests;
 import com.confia.shared.security.TransactionRunner;
+import com.confia.students.application.importing.EnrollmentImportGateway;
 import com.confia.students.application.importing.StudentImportGateway;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -71,11 +72,11 @@ public final class ManageImports {
 
     public ManageImports(TransactionRunner transactionRunner, ImportBatchRepository batches,
             StudentImportGateway students, GuardianImportGateway guardians, GuardianLinkImportGateway links,
-            AuditLogWriter auditLogWriter, Clock clock) {
+            EnrollmentImportGateway enrollments, AuditLogWriter auditLogWriter, Clock clock) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.batches = Objects.requireNonNull(batches, "batches");
         for (ImportProcessor processor : List.of(new StudentsProcessor(students), new GuardiansProcessor(guardians),
-                new GuardianLinksProcessor(links))) {
+                new GuardianLinksProcessor(links), new EnrollmentsProcessor(enrollments))) {
             processors.put(processor.kind(), processor);
         }
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
@@ -125,6 +126,7 @@ public final class ManageImports {
         Set<ImportKind> readable = java.util.EnumSet.noneOf(ImportKind.class);
         if (canReadStudents) {
             readable.add(ImportKind.STUDENTS);
+            readable.add(ImportKind.ENROLLMENTS);
         }
         if (canReadGuardians) {
             readable.add(ImportKind.GUARDIANS);
@@ -135,7 +137,7 @@ public final class ManageImports {
         }
         ImportKind kind = kindOf(route);
         if (!readable.contains(kind)) {
-            throw new KindNotReadableException(kind == ImportKind.STUDENTS);
+            throw new KindNotReadableException(kind == ImportKind.STUDENTS || kind == ImportKind.ENROLLMENTS);
         }
         return list(actor, requestId, page, size, Set.of(kind));
     }

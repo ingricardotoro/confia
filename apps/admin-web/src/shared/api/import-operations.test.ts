@@ -3,7 +3,7 @@ import { importBatch, importBatchPage, importRun, problem } from "../../test/con
 import { installMswServer, requests, route } from "../../test/msw-server.ts";
 import { applyImport, listImportBatches, simulateImport } from "./import-operations.ts";
 
-// The three operations of the imports over the real transport and the test server: the path, the multipart body in the part
+// The operations of the imports over the real transport and the test server: the path, the multipart body in the part
 // `file`, the bearer token, that nothing moves money (no Idempotency-Key), and the schema each answer must meet.
 installMswServer();
 
@@ -17,6 +17,8 @@ describe("simulate and apply", () => {
     ["apply", applyImport, "guardians", "/api/v1/imports/guardians/apply"],
     ["simulate", simulateImport, "guardian-links", "/api/v1/imports/guardian-links/simulate"],
     ["apply", applyImport, "guardian-links", "/api/v1/imports/guardian-links/apply"],
+    ["simulate", simulateImport, "enrollments", "/api/v1/imports/enrollments/simulate"],
+    ["apply", applyImport, "enrollments", "/api/v1/imports/enrollments/apply"],
   ] as const)("%s of %s POSTs the file as multipart in the part `file`, with the bearer token and no JSON content type", async (_name, operation, kind, path) => {
     route("post", path, importRun());
 

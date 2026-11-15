@@ -453,9 +453,10 @@ describe("the other kinds", () => {
   });
 
   it.each([
-    ["guardians", "legacyId,firstName,lastName,nationalId,rtn,email,phone,address,preferredChannel", "plantilla-encargados.csv"],
-    ["guardian-links", "studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,isBillingRecipient", "plantilla-vinculos.csv"],
-  ] as const)("downloads the empty template of %s", async (kind, header, fileName) => {
+    ["guardians", "legacyId,firstName,lastName,nationalId,rtn,email,phone,address,preferredChannel\r\n", "plantilla-encargados.csv"],
+    ["guardian-links", "studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,isBillingRecipient\r\n", "plantilla-vinculos.csv"],
+    ["enrollments", "studentLegacyId,academicYear,modality,grade,section,enrolledOn\r\nL1001,2026,Diurna,Primero,A,2026-02-02\r\n", "plantilla-matriculas.csv"],
+  ] as const)("downloads the template of %s", async (kind, content, fileName) => {
     let saved = "";
     let savedName = "";
     vi.stubGlobal(
@@ -479,7 +480,7 @@ describe("the other kinds", () => {
     await user.click(screen.getByRole("button", { name: "Descargar la plantilla vacía" }));
 
     await waitFor(() => {
-      expect(saved).toBe(`${header}\r\n`);
+      expect(saved).toBe(content);
     });
     expect(savedName).toBe(fileName);
     vi.unstubAllGlobals();
@@ -500,6 +501,91 @@ describe("the other kinds", () => {
     expect(await screen.findByRole("heading", { level: 3, name: "Importación aplicada" }, TIMEOUT)).toHaveFocus();
     expect(posts(`${GUARDIANS}/apply`)).toHaveLength(1);
     expect(screen.getByText(/Se crearon 80 encargados\./)).toBeInTheDocument();
+  });
+
+  describe("the enrollments", () => {
+    const ENROLLMENTS = `${IMPORTS}/enrollments`;
+    // Only reasons the published contract already lists: the texts of the new ones are proven in the wizard, which takes props alone.
+    const reasons = [
+      { line: 3, field: "studentLegacyId", reason: "unknown-student" },
+      { line: 4, field: "studentLegacyId", reason: "student-not-active" },
+      { line: 5, field: "enrolledOn", reason: "invalid-date" },
+    ] as const;
+
+    async function simulateEnrollments(user: ReturnType<typeof userEvent.setup>) {
+      await chooseKind(user, "enrollments");
+      await user.upload(screen.getByLabelText("Archivo CSV de matrículas"), csv());
+      await user.click(simulateButton());
+      return screen.findByRole("heading", { level: 3, name: "Resultado de la simulación" }, TIMEOUT);
+    }
+
+    it("sends the file to the enrollments route and shows the reason of each rejected row by line and column", async () => {
+      route("post", `${ENROLLMENTS}/simulate`, importRun({ batch: { kind: "ENROLLMENTS", totalRows: 100, validRows: 97, rejectedRows: 3 }, rejections: [...reasons] }));
+      const { user } = await openScreen();
+
+      await simulateEnrollments(user);
+
+      expect(posts(`${ENROLLMENTS}/simulate`)).toHaveLength(1);
+      expect(posts(`${IMPORTS}/students/simulate`)).toHaveLength(0);
+      const rows = within(screen.getByRole("table", { name: /Filas del archivo con su línea/ })).getAllByRole("row").slice(1);
+      expect(rows.map((row) => row.textContent)).toEqual([
+        "3studentLegacyIdEl estudiante no está importado: importe primero el archivo de estudiantes.",
+        "4studentLegacyIdEl estudiante no está activo.",
+        "5enrolledOnLa fecha no existe o es anterior al 1 de enero de 1990.",
+      ]);
+      expect(screen.getByText(/Todavía no se creó ninguna matrícula\./)).toBeInTheDocument();
+    });
+
+    it("applies over its own route and reads the history, the enrollments and the students again, and never the guardians", async () => {
+      route("post", `${ENROLLMENTS}/simulate`, importRun({ batch: { kind: "ENROLLMENTS", totalRows: 98, validRows: 98 } }));
+      route("post", `${ENROLLMENTS}/apply`, importRun({ batch: { kind: "ENROLLMENTS", status: "APPLIED", totalRows: 98, validRows: 98, createdRows: 98, appliedAt: "2026-11-10T16:00:00Z" } }));
+      const { user, app } = await openScreen();
+      await simulateEnrollments(user);
+      const invalidated = vi.spyOn(app.queryClient, "invalidateQueries");
+      await user.click(screen.getByRole("button", { name: "Aplicar la importación" }));
+
+      await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Crear 98 matrículas" }));
+
+      expect(await screen.findByRole("heading", { level: 3, name: "Importación aplicada" }, TIMEOUT)).toHaveFocus();
+      expect(posts(`${ENROLLMENTS}/apply`)).toHaveLength(1);
+      expect(screen.getByText(/Se crearon 98 matrículas\./)).toBeInTheDocument();
+      expect(invalidated.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([["imports"], ["enrollments"], ["students"]]);
+    });
+
+    it("simulating reads only the history again, because nothing is written", async () => {
+      route("post", `${ENROLLMENTS}/simulate`, importRun({ batch: { kind: "ENROLLMENTS" } }));
+      const { user, app } = await openScreen();
+      const invalidated = vi.spyOn(app.queryClient, "invalidateQueries");
+
+      await simulateEnrollments(user);
+
+      expect(invalidated.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([["imports"]]);
+    });
+
+    it("tells a 403 on the apply in plain words and keeps the summary", async () => {
+      route("post", `${ENROLLMENTS}/simulate`, importRun({ batch: { kind: "ENROLLMENTS", totalRows: 2, validRows: 2 } }));
+      route("post", `${ENROLLMENTS}/apply`, problem("forbidden", 403));
+      const { user } = await openScreen();
+      await simulateEnrollments(user);
+      await user.click(screen.getByRole("button", { name: "Aplicar la importación" }));
+
+      await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Crear 2 matrículas" }));
+
+      expect(await screen.findByRole("alert", undefined, TIMEOUT)).toHaveTextContent("No tiene permiso para realizar esta acción.");
+      expect(screen.queryByRole("heading", { level: 3, name: "Importación aplicada" })).toBeNull();
+    });
+
+    it("when the apply cannot be confirmed, says that trying again is safe because an enrollment already made is skipped", async () => {
+      route("post", `${ENROLLMENTS}/simulate`, importRun({ batch: { kind: "ENROLLMENTS", totalRows: 4, validRows: 4 } }));
+      route("post", `${ENROLLMENTS}/apply`, "network-error");
+      const { user } = await openScreen();
+      await simulateEnrollments(user);
+      await user.click(screen.getByRole("button", { name: "Aplicar la importación" }));
+
+      await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Crear 4 matrículas" }));
+
+      expect(await screen.findByRole("alert", undefined, TIMEOUT)).toHaveTextContent("las matrículas ya creadas se omiten");
+    });
   });
 
   it("when the apply of the links cannot be confirmed, says that trying again is safe because a student with links is skipped", async () => {

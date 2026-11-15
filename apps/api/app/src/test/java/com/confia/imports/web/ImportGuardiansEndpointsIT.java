@@ -515,7 +515,7 @@ class ImportGuardiansEndpointsIT extends CommittingPostgresIntegrationTest {
             assertThat(page.get("items").get(0).get("kind").asString())
                     .isEqualTo(kind.toUpperCase().replace('-', '_'));
         }
-        assertProblem(get(BATCHES + "?kind=enrollments", admin), 400, "validation-failed");
+        assertProblem(get(BATCHES + "?kind=nope", admin), 400, "validation-failed");
         assertProblem(get(BATCHES + "?kind=STUDENTS", admin), 400, "validation-failed");
         // An auditor reads both; the guardian batches of the institution are listed to it.
         Member auditor = sameInstitution(admin.institution(), StaffRole.AUDITOR.code());

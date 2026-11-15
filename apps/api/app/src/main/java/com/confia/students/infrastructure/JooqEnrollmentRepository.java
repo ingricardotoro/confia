@@ -17,6 +17,7 @@ import com.confia.students.domain.ResourceNotFoundException;
 import confia.generated.jooq.tables.records.StudentsEnrollmentRecord;
 import confia.generated.jooq.tables.records.StudentsEnrollmentTransferRecord;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -138,6 +139,21 @@ public final class JooqEnrollmentRepository implements EnrollmentRepository {
                 .and(STUDENTS_ENROLLMENT.STUDENT_ID.eq(studentId))
                 .and(STUDENTS_ENROLLMENT.ACADEMIC_YEAR_ID.eq(academicYearId))
                 .and(STUDENTS_ENROLLMENT.STATUS.eq(EnrollmentStatus.ACTIVE.name())));
+    }
+
+    @Override
+    public List<ActiveSeat> activeSeatsOf(InstitutionId institutionId, Collection<UUID> studentIds) {
+        if (studentIds.isEmpty()) {
+            return List.of();
+        }
+        return dsl.select(STUDENTS_ENROLLMENT.STUDENT_ID, STUDENTS_ENROLLMENT.ACADEMIC_YEAR_ID,
+                        STUDENTS_ENROLLMENT.SECTION_ID)
+                .from(STUDENTS_ENROLLMENT)
+                .where(STUDENTS_ENROLLMENT.INSTITUTION_ID.eq(institutionId.value()))
+                .and(STUDENTS_ENROLLMENT.STUDENT_ID.in(studentIds))
+                .and(STUDENTS_ENROLLMENT.STATUS.eq(EnrollmentStatus.ACTIVE.name()))
+                .fetch(row -> new ActiveSeat(row.get(STUDENTS_ENROLLMENT.STUDENT_ID),
+                        row.get(STUDENTS_ENROLLMENT.ACADEMIC_YEAR_ID), row.get(STUDENTS_ENROLLMENT.SECTION_ID)));
     }
 
     @Override

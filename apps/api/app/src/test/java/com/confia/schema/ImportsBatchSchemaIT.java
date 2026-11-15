@@ -85,10 +85,10 @@ class ImportsBatchSchemaIT extends CommittingPostgresIntegrationTest {
         UUID institution = UUID.randomUUID();
         try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
             assertThat(simulation(owner, institution)).isNotNull();
-            for (String kind : List.of("GUARDIANS", "GUARDIAN_LINKS")) {
+            for (String kind : List.of("GUARDIANS", "GUARDIAN_LINKS", "ENROLLMENTS")) {
                 assertThat(batch(owner, institution, kind, "VALIDATED", SHA, 0, 0, 0, 0, 0, null, false)).isNotNull();
             }
-            for (String kind : List.of("ENROLLMENTS", "guardians", "")) {
+            for (String kind : List.of("ENROLLMENT", "enrollments", "guardians", "")) {
                 assertThat(rejected(owner, () -> batch(owner, institution, kind, "VALIDATED", SHA, 0, 0, 0, 0, 0,
                         null, false)).getMessage()).as(kind).contains("imports_batch_kind_chk");
             }

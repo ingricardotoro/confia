@@ -2,6 +2,7 @@ package com.confia.students.application;
 
 import com.confia.kernel.InstitutionId;
 import com.confia.organization.application.directory.SectionDirectory;
+import com.confia.organization.application.directory.SectionNames;
 import com.confia.organization.application.directory.SectionRef;
 import com.confia.students.domain.DuplicateActiveEnrollmentException;
 import com.confia.students.domain.Enrollment;
@@ -117,6 +118,13 @@ final class InMemoryEnrollments {
         }
 
         @Override
+        public List<ActiveSeat> activeSeatsOf(InstitutionId institution, Collection<UUID> studentIds) {
+            return rowsOf(institution).stream()
+                    .filter(e -> studentIds.contains(e.studentId()) && e.status() == EnrollmentStatus.ACTIVE)
+                    .map(e -> new ActiveSeat(e.studentId(), e.academicYearId(), e.sectionId())).toList();
+        }
+
+        @Override
         public Page<EnrollmentRow> list(InstitutionId institution, PageRequest request, EnrollmentFilter filter) {
             lastRequest = request;
             lastFilter = filter;
@@ -180,6 +188,21 @@ final class InMemoryEnrollments {
                     .filter(s -> s.gradeId().equals(gradeId))
                     .filter(s -> academicYearId == null || s.academicYearId().equals(academicYearId))
                     .map(SectionRef::sectionId).toList();
+        }
+
+        @Override
+        public Map<SectionNames, List<SectionRef>> findByNames(InstitutionId institution,
+                Collection<SectionNames> names) {
+            Map<SectionNames, List<SectionRef>> found = new HashMap<>();
+            sectionRows.entrySet().stream().filter(e -> e.getKey().institution().equals(institution.value()))
+                    .map(Map.Entry::getValue).forEach(ref -> {
+                        SectionNames key = new SectionNames(ref.academicYearName(), ref.modalityName(),
+                                ref.gradeName(), ref.name());
+                        if (names.contains(key)) {
+                            found.computeIfAbsent(key, k -> new ArrayList<>()).add(ref);
+                        }
+                    });
+            return found;
         }
 
         @Override

@@ -4,7 +4,7 @@ import { IMPORT_KINDS } from "./import-model.ts";
 
 /**
  * The search parameters of the history of batches: `page` and `pageSize`, as every listing has them, and `kind`, the one filter
- * the API offers (students, guardians or guardian-links; absent means every kind). There is no order: the history is newest
+ * the API offers (students, guardians, guardian-links or enrollments; absent means every kind). There is no order: the history is newest
  * first. A parameter that does not hold is dropped.
  */
 export const importsSearch = z.object({ page, pageSize, kind: z.enum(IMPORT_KINDS).optional().catch(undefined) });

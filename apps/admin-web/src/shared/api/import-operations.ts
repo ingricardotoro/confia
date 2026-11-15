@@ -9,7 +9,7 @@ import { resourceClient, type PageParams } from "./resource-client.ts";
 
 /**
  * The operations of `/api/v1/imports`. Each takes the access token as a parameter: this module knows no session. The two
- * that read a file (one pair per kind: students, guardians and guardian links) send it as a `multipart/form-data` body in the part `file` and keep nothing of it: the `FormData` lives
+ * that read a file (one pair per kind: students, guardians, guardian links and enrollments) send it as a `multipart/form-data` body in the part `file` and keep nothing of it: the `FormData` lives
  * for the call, and what comes back holds only counts and the line, field and reason of each rejection (never a value).
  * None moves money, so none sends an `Idempotency-Key`; an import is repeatable by design (the same file simulates again, and
  * applying it again creates nothing new). The history is paged by the server.
@@ -24,8 +24,8 @@ function formOf(file: File): FormData {
   return form;
 }
 
-/** What a file loads, as the routes name it: `students`, `guardians` or `guardian-links`. */
-export type ImportRoute = "students" | "guardians" | "guardian-links";
+/** What a file loads, as the routes name it: `students`, `guardians`, `guardian-links` or `enrollments`. */
+export type ImportRoute = "students" | "guardians" | "guardian-links" | "enrollments";
 
 /** Validates the file and counts what an apply would do. Writes nothing but its own batch. */
 export const simulateImport = (route: ImportRoute, token: string, file: File): Promise<ApiResult<ImportRunResponseOutput>> =>

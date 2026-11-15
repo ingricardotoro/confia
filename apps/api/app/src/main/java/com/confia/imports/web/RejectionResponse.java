@@ -14,5 +14,7 @@ public record RejectionResponse(
                         "duplicate-in-file", "duplicate-national-id", "already-imported", "invalid-percent", "unknown-student",
                         "unknown-guardian", "student-not-active", "guardian-not-active", "student-already-linked",
                         "group-rejected", "sum-not-100", "multiple-primary-payer", "multiple-billing-recipient",
-                        "duplicate-guardian"}) String reason) {
+                        "duplicate-guardian", "unknown-section", "ambiguous-section", "section-full",
+                        "duplicate-active-enrollment", "academic-year-closed", "inactive-reference",
+                        "enrollment-date-out-of-range"}) String reason) {
 }

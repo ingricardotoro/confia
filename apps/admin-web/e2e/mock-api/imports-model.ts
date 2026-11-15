@@ -3,21 +3,27 @@ import { importBatch, importBatchPage, importRun, problem, type ContractResponse
 import type { ModelResponse } from "./session-model.ts";
 
 /**
- * The imports of the simulated API (imports-students and imports-guardians cuts): the operations of `/api/v1/imports` for the
- * three kinds (`students`, `guardians`, `guardian-links`), over batches kept in memory for one scenario. It is a thin simulation of
+ * The imports of the simulated API (imports-students, imports-guardians and imports-enrollments cuts): the operations of
+ * `/api/v1/imports` for the four kinds (`students`, `guardians`, `guardian-links`, `enrollments`), over batches kept in memory for one scenario. It is a thin simulation of
  * the published shapes and of the rules a journey needs: the template header of each kind, the required fields, the shape and
  * window of the birth date, a `legacyId` repeated in the file, a `legacyId` already imported (skipped, not rejected), the two 409
  * (`import-not-simulated`, `import-file-changed`, told apart by the last batch of the kind exactly as the backend does), the
  * file problems of a 400, a refused write and a read that fails first. The links are judged as the backend judges them: the rows
  * are grouped by student and each group is imported whole or not at all (a sum of exactly 100.00 in hundredths of a percent, at most
  * one primary payer and one billing recipient, no guardian twice), the references are looked up among what this scenario imported,
- * and a student that already has links is skipped (`student-already-linked`, never a rejection). It keeps the SHA-256 of a
+ * and a student that already has links is skipped (`student-already-linked`, never a rejection). The enrollments are judged row by
+ * row against a small fixed academic structure (see `ENROLLMENT_STRUCTURE`): the section is found by its names, without capital
+ * letters or spare spaces, and a row is rejected for the first thing wrong with it (the section, the closed year, the inactive
+ * section, the date out of the year or in the future, a student not imported, a student twice in the file, another active
+ * enrollment of the student that year) or skipped when the student is already in that same section; the quota counts the
+ * enrollments of this scenario plus the rows of the file in order. A rejection of the enrollments carries reasons that the published
+ * contract may not list yet, so the answer is put together here and not by the contract-checked builder. It keeps the SHA-256 of a
  * simulated file and the `legacyId` of the rows it applied, never a name, and it does not create anything in the registries of
  * the scenario. The documents already stored are checked only when applying. The real rules, and their limits (10 000 rows, 5 MB,
  * the inactive students and guardians), are tested in the backend.
  */
 export const IMPORTS_BASE = "/api/v1/imports";
-const ROUTE_PATH = /^\/api\/v1\/imports\/(students|guardians|guardian-links)\/(simulate|apply)$/;
+const ROUTE_PATH = /^\/api\/v1\/imports\/(students|guardians|guardian-links|enrollments)\/(simulate|apply)$/;
 /** How many reads fail first in the `server-error` behavior: the first try and the two retries of the page. */
 export const FAILING_IMPORT_READS = 3;
 const TRACE_ID = "01J8Z4K2QF9P0X";
@@ -25,9 +31,9 @@ const DEFAULT_SIZE = 50;
 const MAX_SIZE = 100;
 const MAX_REJECTIONS = 200;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
-export type ImportRoute = "students" | "guardians" | "guardian-links";
+export type ImportRoute = "students" | "guardians" | "guardian-links" | "enrollments";
 interface KindSpec {
-  readonly batchKind: "STUDENTS" | "GUARDIANS" | "GUARDIAN_LINKS";
+  readonly batchKind: "STUDENTS" | "GUARDIANS" | "GUARDIAN_LINKS" | "ENROLLMENTS";
   readonly required: readonly string[];
   readonly optional: readonly string[];
 }
@@ -39,7 +45,30 @@ const KINDS: Readonly<Record<ImportRoute, KindSpec>> = {
     required: ["studentLegacyId", "guardianLegacyId", "relationship", "financialResponsibilityPercent"],
     optional: ["isPrimaryPayer", "isBillingRecipient"],
   },
+  enrollments: { batchKind: "ENROLLMENTS", required: ["studentLegacyId", "academicYear", "modality", "grade", "section", "enrolledOn"], optional: [] },
 };
+
+interface SectionSpec {
+  readonly year: string;
+  readonly modality: string;
+  readonly grade: string;
+  readonly name: string;
+  readonly capacity: number;
+  readonly active: boolean;
+}
+/** The academic structure the simulated enrollment import knows: the years (2025 is closed) and the sections, by their names. */
+export const ENROLLMENT_YEARS: Readonly<Record<string, { readonly start: string; readonly end: string; readonly closed: boolean }>> = {
+  "2025": { start: "2025-01-15", end: "2025-12-15", closed: true },
+  "2026": { start: "2026-01-15", end: "2026-12-15", closed: false },
+};
+export const ENROLLMENT_STRUCTURE: readonly SectionSpec[] = [
+  { year: "2026", modality: "Diurna", grade: "Primero", name: "A", capacity: 100, active: true },
+  { year: "2026", modality: "Diurna", grade: "Primero", name: "B", capacity: 2, active: true },
+  { year: "2026", modality: "Diurna", grade: "Primero", name: "C", capacity: 30, active: false },
+  { year: "2026", modality: "Diurna", grade: "Segundo", name: "Z", capacity: 30, active: true },
+  { year: "2026", modality: "Diurna", grade: "Segundo", name: "Z", capacity: 30, active: true },
+  { year: "2025", modality: "Diurna", grade: "Primero", name: "A", capacity: 30, active: true },
+];
 export const TEMPLATE_COLUMNS = [...KINDS.students.required, ...KINDS.students.optional] as const;
 const RELATIONSHIPS: ReadonlySet<string> = new Set(["FATHER", "MOTHER", "LEGAL_GUARDIAN", "SELF", "OTHER"]);
 const PERCENT = /^\d{1,3}(\.\d{1,2})?$/;
@@ -75,7 +104,14 @@ type Reason =
   | "sum-not-100"
   | "multiple-primary-payer"
   | "multiple-billing-recipient"
-  | "duplicate-guardian";
+  | "duplicate-guardian"
+  | "unknown-section"
+  | "ambiguous-section"
+  | "section-full"
+  | "duplicate-active-enrollment"
+  | "academic-year-closed"
+  | "inactive-reference"
+  | "enrollment-date-out-of-range";
 interface Rejection {
   line: number;
   field: string;
@@ -199,7 +235,10 @@ interface Table {
 
 export function createImportsModel(options: ImportsOptions, now: () => Date = () => new Date()): ImportsModel {
   const batches: BatchRow[] = [];
-  const simulated: Record<ImportRoute, Set<string>> = { students: new Set(), guardians: new Set(), "guardian-links": new Set() };
+  const simulated: Record<ImportRoute, Set<string>> = { students: new Set(), guardians: new Set(), "guardian-links": new Set(), enrollments: new Set() };
+  /** The active enrollment of a student in a year (`student|year`) with the index of its section, and the seats taken of each section. */
+  const enrolled = new Map<string, number>();
+  const seatsTaken = new Map<number, number>();
   const importedStudents = new Set<string>();
   const importedGuardians = new Set<string>();
   const linkedStudents = new Set<string>();
@@ -418,13 +457,139 @@ export function createImportsModel(options: ImportsOptions, now: () => Date = ()
     };
   }
 
+  const normalized = (text: string): string => text.trim().toLowerCase();
+
+  /**
+   * The enrollments, row by row: each row is rejected for the first thing wrong with it, skipped when the student is already in
+   * that section, and counted against the quota of its section (what the scenario holds plus the rows before it).
+   */
+  function judgeEnrollments(table: Table): Judgment {
+    const problems: Rejection[] = [];
+    const seen = new Set<string>();
+    const added = new Map<number, number>();
+    const created: { key: string; section: number }[] = [];
+    let rejected = 0;
+    let skipped = 0;
+    for (const { line, cells } of table.rows) {
+      const cell = (name: string): string => table.cellOf(cells, name).trim();
+      const reject = (field: string, reason: Reason): void => {
+        problems.push({ line, field, reason });
+        rejected += 1;
+      };
+      if (cells.length !== table.names.length) {
+        reject("row", "invalid-format");
+        continue;
+      }
+      const empty = KINDS.enrollments.required.filter((field) => cell(field) === "");
+      if (empty.length > 0) {
+        empty.forEach((field) => problems.push({ line, field, reason: "required" }));
+        rejected += 1;
+        continue;
+      }
+      const date = cell("enrolledOn");
+      const shape = DATE.exec(date);
+      if (shape === null) {
+        reject("enrolledOn", "invalid-format");
+        continue;
+      }
+      const [year, month, day] = [Number(shape[1]), Number(shape[2]), Number(shape[3])];
+      const real = new Date(Date.UTC(year, month - 1, day));
+      if (real.getUTCFullYear() !== year || real.getUTCMonth() !== month - 1 || real.getUTCDate() !== day || date < FIRST_BIRTH_DATE) {
+        reject("enrolledOn", "invalid-date");
+        continue;
+      }
+      const student = cell("studentLegacyId");
+      const yearName = normalized(cell("academicYear"));
+      const repeated = `${student}|${yearName}`;
+      if (seen.has(repeated)) {
+        reject("studentLegacyId", "duplicate-in-file");
+        continue;
+      }
+      seen.add(repeated);
+      if (!importedStudents.has(student)) {
+        reject("studentLegacyId", "unknown-student");
+        continue;
+      }
+      const matches = ENROLLMENT_STRUCTURE.flatMap((section, index) =>
+        normalized(section.year) === yearName &&
+        normalized(section.modality) === normalized(cell("modality")) &&
+        normalized(section.grade) === normalized(cell("grade")) &&
+        normalized(section.name) === normalized(cell("section"))
+          ? [index]
+          : [],
+      );
+      if (matches.length === 0) {
+        reject("section", "unknown-section");
+        continue;
+      }
+      if (matches.length > 1) {
+        reject("section", "ambiguous-section");
+        continue;
+      }
+      const index = matches[0] as number;
+      const section = ENROLLMENT_STRUCTURE[index] as SectionSpec;
+      const academicYear = ENROLLMENT_YEARS[section.year] as { start: string; end: string; closed: boolean };
+      if (academicYear.closed) {
+        reject("academicYear", "academic-year-closed");
+        continue;
+      }
+      if (!section.active) {
+        reject("section", "inactive-reference");
+        continue;
+      }
+      if (date < academicYear.start || date > academicYear.end || date > today()) {
+        reject("enrolledOn", "enrollment-date-out-of-range");
+        continue;
+      }
+      const key = `${student}|${section.year}`;
+      const current = enrolled.get(key);
+      if (current === index) {
+        problems.push({ line, field: "studentLegacyId", reason: "already-imported" });
+        skipped += 1;
+        continue;
+      }
+      if (current !== undefined) {
+        reject("studentLegacyId", "duplicate-active-enrollment");
+        continue;
+      }
+      const taken = (seatsTaken.get(index) ?? 0) + (added.get(index) ?? 0);
+      if (taken >= section.capacity) {
+        reject("section", "section-full");
+        continue;
+      }
+      added.set(index, (added.get(index) ?? 0) + 1);
+      created.push({ key, section: index });
+    }
+    return {
+      sha: table.sha,
+      total: table.rows.length,
+      valid: created.length,
+      rejected,
+      skipped,
+      rejections: problems,
+      commit: () => {
+        for (const { key, section } of created) {
+          enrolled.set(key, section);
+          seatsTaken.set(section, (seatsTaken.get(section) ?? 0) + 1);
+        }
+      },
+    };
+  }
+
   function judge(route: ImportRoute, file: string, checkStoredDocuments: boolean): Judgment | ModelResponse {
     const spec = KINDS[route];
     const table = tableOf(file, spec);
     if ("status" in table) return table;
     if (route === "students") return judgeRows(table, spec, studentProblems, importedStudents, storedStudentDocuments, checkStoredDocuments);
     if (route === "guardians") return judgeRows(table, spec, guardianProblems, importedGuardians, storedGuardianDocuments, checkStoredDocuments);
-    return judgeLinks(table);
+    if (route === "guardian-links") return judgeLinks(table);
+    return judgeEnrollments(table);
+  }
+
+  /** The answer of a run. The rejections go in after the contract-checked builder made the rest: their reasons may be newer than the published contract. */
+  function runOf(batch: BatchRow, rejections: Rejection[], truncated: boolean): ModelResponse {
+    const built = importRun({ batch, rejections: [], truncated });
+    return wrap({ ...built, body: { ...(built.body as object), rejections } });
   }
 
   function write(route: ImportRoute, action: "simulate" | "apply", request: ImportsRequest): ModelResponse {
@@ -444,7 +609,7 @@ export function createImportsModel(options: ImportsOptions, now: () => Date = ()
       const batch = importBatch({ id: nextId(), kind, status: "VALIDATED", fileSha256: result.sha, totalRows: result.total, validRows: result.valid, rejectedRows: result.rejected, skippedRows: result.skipped, createdAt: now().toISOString() });
       batches.push(batch);
       simulated[route].add(result.sha);
-      return wrap(importRun({ batch, rejections, truncated }));
+      return runOf(batch, rejections, truncated);
     }
     // The apply: the file must have a simulation of this account and kind; otherwise the last batch of the kind tells the two cases apart.
     if (!simulated[route].has(result.sha)) return lastBatch?.status === "VALIDATED" ? failure("import-file-changed", 409) : failure("import-not-simulated", 409);
@@ -452,7 +617,7 @@ export function createImportsModel(options: ImportsOptions, now: () => Date = ()
     const at = now().toISOString();
     const batch = importBatch({ id: nextId(), kind, status: "APPLIED", fileSha256: result.sha, totalRows: result.total, validRows: result.valid, createdRows: result.valid, rejectedRows: result.rejected, skippedRows: result.skipped, createdAt: at, appliedAt: at });
     batches.push(batch);
-    return wrap(importRun({ batch, rejections, truncated }));
+    return runOf(batch, rejections, truncated);
   }
 
   return {

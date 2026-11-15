@@ -3,6 +3,7 @@ package com.confia.students.application;
 import com.confia.kernel.InstitutionId;
 import com.confia.students.domain.Enrollment;
 import com.confia.students.domain.EnrollmentTransfer;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +38,16 @@ public interface EnrollmentRepository {
 
     /** Whether the student has an active enrollment in the academic year. */
     boolean hasActiveInYear(InstitutionId institutionId, UUID studentId, UUID academicYearId);
+
+    /** The section of an active enrollment, with the student and the academic year it belongs to. */
+    record ActiveSeat(UUID studentId, UUID academicYearId, UUID sectionId) {
+    }
+
+    /**
+     * The active enrollments these students hold, one per student and year (INV-31), in one query. Students with none
+     * are absent.
+     */
+    List<ActiveSeat> activeSeatsOf(InstitutionId institutionId, Collection<UUID> studentIds);
 
     Page<EnrollmentRow> list(InstitutionId institutionId, PageRequest request, EnrollmentFilter filter);
 

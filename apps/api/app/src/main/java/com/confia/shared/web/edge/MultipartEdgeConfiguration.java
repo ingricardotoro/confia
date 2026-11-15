@@ -20,7 +20,7 @@ public class MultipartEdgeConfiguration {
 
     /** The servlet-path prefixes that accept {@code multipart/*}. */
     static final List<String> UPLOAD_PATHS = List.of("/api/v1/imports/students/", "/api/v1/imports/guardians/",
-            "/api/v1/imports/guardian-links/");
+            "/api/v1/imports/guardian-links/", "/api/v1/imports/enrollments/");
 
     @Bean
     MultipartScopeFilter multipartScopeFilter(ProblemResponses problems) {

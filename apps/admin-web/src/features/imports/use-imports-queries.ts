@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthorizedSend } from "../../shared/api/authorized-send.tsx";
 import { applyImport, listImportBatches, simulateImport } from "../../shared/api/import-operations.ts";
 import type { PageParams } from "../../shared/api/resource-client.ts";
+import { enrollmentKeys } from "../enrollments/enrollments-keys.ts";
 import { guardianKeys } from "../guardians/guardians-keys.ts";
 import { studentKeys } from "../students/students-keys.ts";
 import type { ImportKind } from "./import-model.ts";
@@ -50,11 +51,12 @@ export function useSimulateImport(kind: ImportKind): Send {
   return useImportRun((token, file) => simulateImport(kind, token, file), [importKeys.all]);
 }
 
-/** What the registries show again once the rows of a kind are created: the students, the guardians, or both for the links. */
+/** What the registries show again once the rows of a kind are created: the students, the guardians, both for the links, or the enrollments and the students (their enrollment) for the enrollments. */
 const AFFECTED: Readonly<Record<ImportKind, readonly (readonly unknown[])[]>> = {
   students: [studentKeys.all],
   guardians: [guardianKeys.all],
   "guardian-links": [guardianKeys.all, studentKeys.all],
+  enrollments: [enrollmentKeys.all, studentKeys.all],
 };
 
 /** Creates what the valid rows describe. The registries it fills are read again afterwards, and so is the history. */

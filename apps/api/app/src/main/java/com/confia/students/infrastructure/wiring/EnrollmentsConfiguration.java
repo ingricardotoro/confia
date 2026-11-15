@@ -3,7 +3,10 @@ package com.confia.students.infrastructure.wiring;
 import com.confia.organization.application.directory.SectionDirectory;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.TransactionRunner;
+import com.confia.students.application.EnrollmentImport;
 import com.confia.students.application.EnrollmentRepository;
+import com.confia.students.application.directory.StudentDirectory;
+import com.confia.students.application.importing.EnrollmentImportGateway;
 import com.confia.students.application.ManageEnrollments;
 import com.confia.students.application.StudentRepository;
 import com.confia.students.infrastructure.JooqEnrollmentRepository;
@@ -32,5 +35,13 @@ public class EnrollmentsConfiguration {
     ManageEnrollments manageEnrollments(TransactionRunner transactionRunner, EnrollmentRepository enrollments,
             StudentRepository students, SectionDirectory sections, AuditLogWriter auditLogWriter, Clock clock) {
         return new ManageEnrollments(transactionRunner, enrollments, students, sections, auditLogWriter, clock);
+    }
+
+    /** What {@code imports} uses to judge and register the enrollments of a file, through the use case above. */
+    @Bean
+    EnrollmentImportGateway enrollmentImportGateway(TransactionRunner transactionRunner, StudentDirectory students,
+            SectionDirectory sections, EnrollmentRepository enrollments, ManageEnrollments manageEnrollments,
+            Clock clock) {
+        return new EnrollmentImport(transactionRunner, students, sections, enrollments, manageEnrollments, clock);
     }
 }

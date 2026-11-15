@@ -3,10 +3,10 @@ package com.confia.imports.domain;
 import java.util.List;
 
 /**
- * What a batch loads: the students, the guardians (each with the reference it has in the source system) and the links
- * between guardians and students already imported. Enrollments come in a later cut. Each kind has the template of its
- * file ({@link CsvTemplate}) and the name it has in the routes ({@code students}, {@code guardians}, {@code
- * guardian-links}).
+ * What a batch loads: the students, the guardians (each with the reference it has in the source system), the links
+ * between guardians and students already imported and the current enrollments of those students. Each kind has the
+ * template of its file ({@link CsvTemplate}) and the name it has in the routes ({@code students}, {@code guardians},
+ * {@code guardian-links}, {@code enrollments}).
  */
 public enum ImportKind {
     STUDENTS("students", StudentsCsv.TEMPLATE),
@@ -14,7 +14,9 @@ public enum ImportKind {
             List.of("nationalId", "rtn", "email", "phone", "address", "preferredChannel"))),
     GUARDIAN_LINKS("guardian-links", new CsvTemplate(
             List.of("studentLegacyId", "guardianLegacyId", "relationship", "financialResponsibilityPercent"),
-            List.of("isPrimaryPayer", "isBillingRecipient")));
+            List.of("isPrimaryPayer", "isBillingRecipient"))),
+    ENROLLMENTS("enrollments", new CsvTemplate(
+            List.of("studentLegacyId", "academicYear", "modality", "grade", "section", "enrolledOn"), List.of()));
 
     private final String route;
     private final CsvTemplate template;

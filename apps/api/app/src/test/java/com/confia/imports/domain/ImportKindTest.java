@@ -12,7 +12,7 @@ class ImportKindTest {
     @Test
     void everyKindHasItsNameInTheRoutesAndItIsFoundByIt() {
         assertThat(ImportKind.values()).extracting(ImportKind::route)
-                .containsExactly("students", "guardians", "guardian-links");
+                .containsExactly("students", "guardians", "guardian-links", "enrollments");
         for (ImportKind kind : ImportKind.values()) {
             assertThat(ImportKind.ofRoute(kind.route())).isSameAs(kind);
         }
@@ -28,6 +28,8 @@ class ImportKindTest {
         assertThat(ImportKind.GUARDIAN_LINKS.template().header()).isEqualTo(
                 "studentLegacyId,guardianLegacyId,relationship,financialResponsibilityPercent,isPrimaryPayer,"
                         + "isBillingRecipient");
+        assertThat(ImportKind.ENROLLMENTS.template().header())
+                .isEqualTo("studentLegacyId,academicYear,modality,grade,section,enrolledOn");
     }
 
     @Test
