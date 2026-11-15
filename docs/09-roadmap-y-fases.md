@@ -361,6 +361,10 @@ algo administrativo) y tres reglas de ArchUnit, **antes** de `session-tokens-and
 6. **Herramienta de migración** desde el sistema actual: importación validada, reporte de rechazos y acta de conciliación.
 7. Registro de consentimiento para comunicaciones.
 
+**Avance (2026-11-14).** Entregables 1 al 7 construidos de punta a punta y fusionados en `main` (PR #304 al #312): estructura
+académica, estudiantes, matrículas, encargados, consentimiento, importación de estudiantes, encargados y vínculos, matrículas
+y acta de conciliación. Los criterios de salida siguen abiertos hasta cargar y conciliar la matrícula real de la institución.
+
 **Criterios de salida:**
 
 - [ ] La matrícula completa del año lectivo vigente está cargada y conciliada contra el listado oficial de la institución, con acta firmada.
