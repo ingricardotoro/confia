@@ -17,7 +17,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * The event log of the consents of the guardians (V20) against a real PostgreSQL (docs/cortes/guardians-consent.md): the
+ * The event log of the consents of the guardians (V22) against a real PostgreSQL (docs/cortes/guardians-consent.md): the
  * checks on the closed sets and on the policy version (present exactly when the consent is granted, with its shape), the
  * composite key that keeps an event inside the institution of its guardian, the row-level security, and the privileges:
  * the application role can only insert and read (no UPDATE, DELETE or TRUNCATE privilege), and a trigger refuses every

@@ -7,6 +7,8 @@ import { base32Decode, totpCode } from "./totp.ts";
  * authenticator would hold and the recovery codes still valid. Test support only; the values exist for one run.
  */
 export interface TestAccount {
+  /** The key as the simulator holds it, in base32. */
+  readonly secret: string;
   readonly key: Uint8Array;
   readonly recoveryCodes: readonly string[];
 }
@@ -15,7 +17,7 @@ export async function accountOf(request: APIRequestContext, scenarioId: string):
   const reply = await request.get(`${MOCK_API_URL}/__control/account/${scenarioId}`);
   expect(reply.status()).toBe(200);
   const body = (await reply.json()) as { secret: string; recoveryCodes: string[] };
-  return { key: base32Decode(body.secret), recoveryCodes: body.recoveryCodes };
+  return { secret: body.secret, key: base32Decode(body.secret), recoveryCodes: body.recoveryCodes };
 }
 
 /** The code an authenticator shows now. */

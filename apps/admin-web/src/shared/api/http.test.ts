@@ -40,7 +40,7 @@ describe("a successful request", () => {
 
     const result = await request({ method: "GET", path: "/api/v1/greeting", schema: greetingSchema });
 
-    expect(result).toEqual({ kind: "ok", status: 200, data: { hello: "mundo" } });
+    expect(result).toMatchObject({ kind: "ok", status: 200, data: { hello: "mundo" } });
   });
 
   it("sends a relative path, the same origin credentials and the given headers", async () => {
@@ -78,11 +78,107 @@ describe("a successful request", () => {
   it("requestEmpty accepts a 204 and ignores any body", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
 
-    expect(await requestEmpty({ method: "DELETE", path: "/api/v1/sessions/current" })).toEqual({
+    expect(await requestEmpty({ method: "DELETE", path: "/api/v1/sessions/current" })).toMatchObject({
       kind: "ok",
       status: 204,
       data: undefined,
     });
+  });
+});
+
+// admin-web-shell-and-session-lifecycle, task 1.1 (AW65 to AW67, design.md H3). An ok result tells when
+// the server said it was and when the answer arrived, so the session can correct a wrong local clock.
+describe("the server date of an ok result", () => {
+  const ARRIVED_AT = Date.parse("2026-11-10T09:57:00Z");
+  const IMF_FIXDATE = "Tue, 10 Nov 2026 10:00:00 GMT";
+
+  function withDate(date: string | undefined, init: ResponseInit = {}, body: BodyInit | null = JSON.stringify({ hello: "mundo" })): Response {
+    const headers = new Headers(init.headers);
+    if (date !== undefined) headers.set("Date", date);
+    return new Response(body, { status: 200, ...init, headers });
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(ARRIVED_AT);
+  });
+
+  it("AW65: exposes the instant of a valid Date header and the local instant of arrival", async () => {
+    fetchMock.mockResolvedValue(withDate(IMF_FIXDATE));
+
+    const result = await request({ method: "GET", path: "/api/v1/greeting", schema: greetingSchema });
+
+    expect(result).toEqual({
+      kind: "ok",
+      status: 200,
+      data: { hello: "mundo" },
+      serverDate: Date.UTC(2026, 10, 10, 10, 0, 0),
+      receivedAt: ARRIVED_AT,
+    });
+  });
+
+  it("AW65: a second header gives another instant, so the value is read from the response", async () => {
+    fetchMock.mockResolvedValue(withDate("Wed, 11 Nov 2026 23:59:59 GMT"));
+
+    const result = await request({ method: "GET", path: "/api/v1/greeting", schema: greetingSchema });
+
+    expect(result).toMatchObject({ kind: "ok", serverDate: Date.UTC(2026, 10, 11, 23, 59, 59) });
+  });
+
+  it("AW65: requestEmpty exposes it too", async () => {
+    fetchMock.mockResolvedValue(withDate(IMF_FIXDATE, { status: 204 }, null));
+
+    const result = await requestEmpty({ method: "DELETE", path: "/api/v1/sessions/current" });
+
+    expect(result).toEqual({
+      kind: "ok",
+      status: 204,
+      data: undefined,
+      serverDate: Date.UTC(2026, 10, 10, 10, 0, 0),
+      receivedAt: ARRIVED_AT,
+    });
+  });
+
+  it("AW66: without a Date header the date is absent and the rest of the result is the same", async () => {
+    fetchMock.mockResolvedValue(withDate(undefined));
+
+    const result = await request({ method: "GET", path: "/api/v1/greeting", schema: greetingSchema });
+
+    expect(result).toEqual({ kind: "ok", status: 200, data: { hello: "mundo" }, serverDate: undefined, receivedAt: ARRIVED_AT });
+    expect(result).toHaveProperty("serverDate", undefined);
+  });
+
+  it.each([
+    ["is not a date", "abc"],
+    ["is empty", ""],
+    ["names a day that does not exist", "Tue, 31 Feb 2026 10:00:00 GMT"],
+    ["names an hour that does not exist", "Tue, 10 Nov 2026 25:00:00 GMT"],
+    ["is a date but not an HTTP date", "2026-11-10T10:00:00Z"],
+  ])("AW67: a Date header that %s gives an absent date, with no error and no log", async (_name, header) => {
+    const logs = [vi.spyOn(console, "error"), vi.spyOn(console, "warn"), vi.spyOn(console, "log")];
+    fetchMock.mockResolvedValue(withDate(header));
+
+    const result = await request({ method: "GET", path: "/api/v1/greeting", schema: greetingSchema });
+
+    expect(result).toMatchObject({ kind: "ok", status: 200, data: { hello: "mundo" } });
+    expect(result.kind === "ok" && result.serverDate).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain("NaN");
+    for (const log of logs) expect(log).not.toHaveBeenCalled();
+  });
+
+  it("does not add the fields to a problem, to the network result or to an unexpected response", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    fetchMock.mockResolvedValueOnce(withDate(IMF_FIXDATE, { status: 403, headers: { "Content-Type": "application/problem+json" } }, JSON.stringify({ type: "https://confia.hn/problems/forbidden" })));
+    fetchMock.mockResolvedValueOnce(withDate(IMF_FIXDATE, {}, "<html/>"));
+    fetchMock.mockRejectedValueOnce(new TypeError("offline"));
+
+    const problem = await request({ method: "GET", path: "/api/v1/greeting", schema: greetingSchema });
+    const unexpected = await request({ method: "GET", path: "/api/v1/greeting", schema: greetingSchema });
+    const network = await request({ method: "GET", path: "/api/v1/greeting", schema: greetingSchema });
+
+    expect(problem).toEqual({ kind: "problem", problem: { status: 403, code: "forbidden", errors: [] } });
+    expect(unexpected).toEqual({ kind: "unexpected-response", status: 200 });
+    expect(network).toEqual({ kind: "network" });
   });
 });
 
@@ -197,7 +293,7 @@ describe("the time limit", () => {
     const pending = request({ method: "GET", path: "/api/v1/greeting", schema: greetingSchema });
     await vi.advanceTimersByTimeAsync(31_000);
 
-    expect(await pending).toEqual({ kind: "ok", status: 200, data: { hello: "lento" } });
+    expect(await pending).toMatchObject({ kind: "ok", status: 200, data: { hello: "lento" } });
     expect(signal?.aborted).toBe(false);
   });
 

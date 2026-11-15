@@ -35,13 +35,19 @@ class PortalRouteMapSnapshotTest {
     private static final Path SNAPSHOT_DIRECTORY = Path.of("..", "routes");
     private static final Path GENERATED_DIRECTORY = Path.of("target", "routes");
     private static final String FILE = "portal.routes.json";
+    private static final List<String> HEALTH_ROUTES = List.of("GET /health/live", "GET /health/ready");
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     @Test
     void thePortalServesExactlyItsApprovedRouteMap() throws IOException {
         List<Route> routes;
         try (OpenApiProcess portal = OpenApiProcess.start("portal")) {
-            routes = RegisteredRoutes.of(portal.context());
+            List<Route> all = RegisteredRoutes.of(portal.context());
+            // The two health probes are not application routes and are not in the snapshot (web-edge,
+            // dockerfiles-and-local-compose WE98); they are asserted exactly, so a third one still fails.
+            assertThat(all).as("the portal serves its two probes").extracting(Route::toString)
+                    .contains("GET /health/live", "GET /health/ready");
+            routes = all.stream().filter(route -> !HEALTH_ROUTES.contains(route.toString())).toList();
         }
 
         verifyAgainstSnapshot(routes, SNAPSHOT_DIRECTORY, GENERATED_DIRECTORY,

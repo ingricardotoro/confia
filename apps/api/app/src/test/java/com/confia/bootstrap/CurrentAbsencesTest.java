@@ -54,13 +54,22 @@ import org.w3c.dom.NodeList;
 class CurrentAbsencesTest {
 
     static final String BJ38_EXPIRES = "BJ38 stops being true when changes 10 and 11 add the metrics exporters";
+    static final String BJ38_HEALTH_ONLY =
+            "BJ38: Actuator is admitted as the health module only (dockerfiles-and-local-compose, probe P-1)";
     static final String BJ39_EXPIRES = "BJ39 stops being true when phase 2 delivers the discovery of institutions";
     static final String BJ40_EXPIRES = "BJ40 stops being true when each module that owns a business job delivers it";
     static final String AT17_EXPIRES =
             "AT17 stops being true when audit-chain-hourly-anchor-verification closes (depends on changes 9 and 11)";
 
+    /** What no pom may declare: the metrics starter, the Micrometer modules and any Prometheus artifact. */
     private static final Pattern EXPORTER_ARTIFACT = Pattern.compile(
-            "micrometer-.*|spring-boot-starter-actuator|spring-boot-actuator.*|.*prometheus.*");
+            "micrometer-.*|spring-boot-starter-actuator|spring-boot-micrometer-.*|.*prometheus.*");
+
+    /** Every artifact that belongs to the Actuator family, whatever it is for. */
+    private static final Pattern ACTUATOR_ARTIFACT = Pattern.compile("spring-boot-(starter-)?actuator.*|spring-boot-health");
+
+    /** The Actuator artifacts the health probes need and nothing more (probe P-1). */
+    static final Set<String> HEALTH_ARTIFACTS = Set.of("spring-boot-health", "spring-boot-actuator-autoconfigure");
 
     /** The one-time task and the eight recurring ones this change registers, and nothing else. */
     private static final Set<String> THE_JOBS_OF_THIS_CHANGE = Set.of("identity.password-reset-issuance",
@@ -78,6 +87,14 @@ class CurrentAbsencesTest {
     // --- BJ38: no exporters in the tree ---------------------------------------------------------
 
     static List<String> exporterDependencies(String pomXml) throws Exception {
+        return declaredArtifacts(pomXml, EXPORTER_ARTIFACT);
+    }
+
+    static List<String> actuatorDependencies(String pomXml) throws Exception {
+        return declaredArtifacts(pomXml, ACTUATOR_ARTIFACT);
+    }
+
+    private static List<String> declaredArtifacts(String pomXml, Pattern wanted) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -88,7 +105,7 @@ class CurrentAbsencesTest {
         for (int i = 0; i < dependencies.getLength(); i++) {
             NodeList artifact = ((Element) dependencies.item(i)).getElementsByTagName("artifactId");
             String name = artifact.getLength() == 0 ? "" : artifact.item(0).getTextContent().trim();
-            if (EXPORTER_ARTIFACT.matcher(name).matches()) {
+            if (wanted.matcher(name).matches()) {
                 found.add(name);
             }
         }
@@ -109,14 +126,38 @@ class CurrentAbsencesTest {
     }
 
     @Test
-    void aPomThatDeclaresActuatorOrAPrometheusRegistryIsReported() throws Exception {
+    void theOnlyActuatorArtifactsTheApiDeclaresAreTheHealthOnes() throws Exception {
+        Path api = repoRoot().resolve("apps/api");
+        Set<String> declared = new TreeSet<>();
+        for (String pom : List.of("pom.xml", "app/pom.xml", "kernel/pom.xml")) {
+            declared.addAll(actuatorDependencies(Files.readString(api.resolve(pom), StandardCharsets.UTF_8)));
+        }
+        assertThat(declared).as(BJ38_HEALTH_ONLY).containsExactlyInAnyOrderElementsOf(HEALTH_ARTIFACTS);
+    }
+
+    @Test
+    void aPomThatDeclaresTheMetricsStarterOrAPrometheusRegistryIsReported() throws Exception {
         String pom = "<project><dependencies>"
                 + "<dependency><groupId>g</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>"
                 + "<dependency><groupId>g</groupId><artifactId>micrometer-registry-prometheus</artifactId></dependency>"
+                + "<dependency><groupId>g</groupId><artifactId>spring-boot-micrometer-metrics</artifactId></dependency>"
                 + "<dependency><groupId>g</groupId><artifactId>jooq</artifactId></dependency>"
                 + "</dependencies></project>";
         assertThat(exporterDependencies(pom)).containsExactly("spring-boot-starter-actuator",
-                "micrometer-registry-prometheus");
+                "micrometer-registry-prometheus", "spring-boot-micrometer-metrics");
+    }
+
+    @Test
+    void anActuatorArtifactBeyondTheHealthOnesIsReported() throws Exception {
+        String pom = "<project><dependencies>"
+                + "<dependency><groupId>g</groupId><artifactId>spring-boot-health</artifactId></dependency>"
+                + "<dependency><groupId>g</groupId><artifactId>spring-boot-actuator-autoconfigure</artifactId></dependency>"
+                + "<dependency><groupId>g</groupId><artifactId>spring-boot-actuator</artifactId></dependency>"
+                + "<dependency><groupId>g</groupId><artifactId>jooq</artifactId></dependency>"
+                + "</dependencies></project>";
+        assertThat(actuatorDependencies(pom)).containsExactly("spring-boot-health",
+                "spring-boot-actuator-autoconfigure", "spring-boot-actuator");
+        assertThat(exporterDependencies(pom)).as("the health artifacts are not exporters").isEmpty();
     }
 
     @ParameterizedTest(name = "{0}")

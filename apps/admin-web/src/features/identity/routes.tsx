@@ -1,6 +1,5 @@
 import { createRoute, redirect, type AnyRoute } from "@tanstack/react-router";
-import { useAdminText } from "../../i18n/use-admin-text.ts";
-import { AccessPlaceholder } from "./components/AccessPlaceholder.tsx";
+import { EnrollmentContainer } from "./enrollment/EnrollmentContainer.tsx";
 import { SecondFactorContainer } from "./second-factor/SecondFactorContainer.tsx";
 import { SignInContainer } from "./sign-in/SignInContainer.tsx";
 import type { AccessSession } from "./session/index.ts";
@@ -43,11 +42,6 @@ const isAuthenticated = (session: AccessSession) => session.getView().status ===
 /** The guard of every signed in page (SS27): without a session the person goes to sign in. */
 export function requireAuthentication(session: AccessSession): void {
   if (!isAuthenticated(session)) toSignIn();
-}
-
-function EnrollmentContainer() {
-  const { t } = useAdminText();
-  return <AccessPlaceholder title={t("enrollment.title")} />;
 }
 
 /**
@@ -94,7 +88,7 @@ export function createIdentityRoutes(root: AnyRoute, session: AccessSession): An
           toSignIn();
         }
       },
-      component: EnrollmentContainer,
+      component: () => <EnrollmentContainer session={session} signInPath={ACCESS_PATHS.signIn} homePath={ACCESS_PATHS.home} />,
     }),
   ];
 }

@@ -213,7 +213,20 @@
           <configuration>
             <!-- Carries the integration-phase JaCoCo agent (jacoco-prepare-agent-integration). -->
             <argLine>@{failsafeArgLine}</argLine>
+            <!-- After the repackage of the app module, Failsafe would otherwise put the
+                 repackaged jar (classes under BOOT-INF/classes) on the class path of every *IT.
+                 Pointing it at the compiled classes keeps the integration tests exactly as before
+                 (dockerfiles-and-local-compose design.md decision 1; probe P-8). -->
+            <classesDirectory>${project.build.outputDirectory}</classesDirectory>
           </configuration>
+        </plugin>
+        <!-- The BOM of Spring Boot is imported as a dependency, so its pluginManagement never
+             applies: the plugin needs its own version. Declared here, activated only in the app
+             module, so the kernel stays a plain library (scenario CR02). -->
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <version>${spring-boot.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>

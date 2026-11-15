@@ -218,9 +218,14 @@ class DocumentationNotesTest {
                 .contains("JobSchedulingAtomicityIT")
                 .contains("OnlyWorkerExecutesIT")
                 .contains("ExitCriterion5EndToEndIT");
-        assertThat(all).as("the backup and accessibility criteria stay open")
-                .contains("- [ ] **Un respaldo se restaura en un entorno limpio y el acta de simulacro está firmada.**",
-                        "- [ ] La verificación de accesibilidad no reporta violaciones críticas en las pantallas existentes.");
+        assertThat(all).as("the backup criterion stays open")
+                .contains("- [ ] **Un respaldo se restaura en un entorno limpio y el acta de simulacro está firmada.**");
+        // Criterion 8 (accessibility) is closed by admin-web-staff-sign-in with its own dated note, which the admin web
+        // docs-notes test checks; here it only has to keep its text, open or checked.
+        assertThat(all).as("the accessibility criterion keeps its text")
+                .containsAnyOf(
+                        "- [ ] La verificación de accesibilidad no reporta violaciones críticas en las pantallas existentes.",
+                        "- [x] La verificación de accesibilidad no reporta violaciones críticas en las pantallas existentes.");
     }
 
     @Test

@@ -323,6 +323,26 @@ describe("SS121: the restricted tokens", () => {
     expect(typeOf(model.verify(token, { code: totpCode(model.testSecret(), clock.now / 1000) }))).toBe("token-invalid");
   });
 
+  it("hands out a new secret and new recovery codes at every enrollment, as the backend does [SS100]", () => {
+    const { model, clock } = fixture();
+    const token = bearerOf(model.startSecondFactor("mfa-enroll"));
+    const first = model.enroll(token).body as { secret: string; recoveryCodes: string[] };
+    const firstKey = model.testSecret();
+
+    const second = model.enroll(bearerOf(model.startSecondFactor("mfa-enroll"))).body as { secret: string; recoveryCodes: string[] };
+
+    expect(second.secret).toMatch(/^[A-Z2-7]{32}$/);
+    expect(second.secret).not.toBe(first.secret);
+    expect(second.recoveryCodes).toHaveLength(10);
+    expect(second.recoveryCodes.filter((code) => first.recoveryCodes.includes(code))).toEqual([]);
+    // What the control of the account hands out is the secret of the last enrollment, and the first one no longer works.
+    expect(model.recoveryCodes()).toEqual(second.recoveryCodes);
+    expect(model.testSecret()).not.toEqual(firstKey);
+    const stale = model.startSecondFactor("mfa-enroll");
+    expect(typeOf(model.verify(bearerOf(stale), { code: totpCode(firstKey, clock.now / 1000) }))).toBe("second-factor-invalid");
+    expect(model.verify(bearerOf(stale), { code: totpCode(model.testSecret(), clock.now / 1000) }).status).toBe(200);
+  });
+
   it("accepts the current code and one step either side, and refuses a wrong one", () => {
     const { model, clock } = fixture({ enrolled: true });
     const seconds = clock.now / 1000;
