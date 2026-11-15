@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { academicYear, importBatch, importBatchPage, importRun, organizationPage, problem } from "../../test/contract-responses.ts";
-import { YEAR_ID, actaPage, jsonReply, preview } from "../../shared/api/reconciliation-fixtures.ts";
+import { YEAR_ID, actaPage, jsonReply, preview } from "../../test/reconciliation-fixtures.ts";
 import { installMswServer, requests, route } from "../../test/msw-server.ts";
 import { renderFeature } from "../../test/render-feature.tsx";
 import { importsFeature } from "./feature.tsx";

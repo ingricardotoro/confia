@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { importBatch, importBatchPage, importRun, problem, type ContractResponse } from "../../src/test/contract-responses.ts";
-import { acta, actaPage, jsonReply, preview } from "../../src/shared/api/reconciliation-fixtures.ts";
+import { acta, actaPage, jsonReply, preview } from "../../src/test/reconciliation-fixtures.ts";
 import type { ReconciliationResponseOutput } from "@confia/contracts/admin";
 import { FIRST_YEAR, LAST_YEAR, yearId } from "./organization-seed.ts";
 import type { ModelResponse } from "./session-model.ts";

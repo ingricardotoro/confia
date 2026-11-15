@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { importBatch, importBatchPage, importRun, problem } from "../../test/contract-responses.ts";
 import { installMswServer, requests, route } from "../../test/msw-server.ts";
-import { acta, actaPage, preview } from "./reconciliation-fixtures.ts";
+import { acta, actaPage, preview } from "../../test/reconciliation-fixtures.ts";
 import { applyImport, listImportBatches, listReconciliations, previewReconciliation, signReconciliation, simulateImport } from "./import-operations.ts";
 
 // The operations of the imports over the real transport and the test server: the path, the multipart body in the part

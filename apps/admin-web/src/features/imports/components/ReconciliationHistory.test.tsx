@@ -1,6 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { acta } from "../../../shared/api/reconciliation-fixtures.ts";
+import { acta } from "../../../test/reconciliation-fixtures.ts";
 import { loadedTable, onePage } from "../../../test/form-view.ts";
 import { renderWithAdminI18n } from "../../../test/render.tsx";
 import { ReconciliationHistory, type ReconciliationHistoryProps } from "./ReconciliationHistory.tsx";

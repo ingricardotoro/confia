@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { preview } from "../../../shared/api/reconciliation-fixtures.ts";
+import { preview } from "../../../test/reconciliation-fixtures.ts";
 import { renderWithAdminI18n } from "../../../test/render.tsx";
 import { ReconciliationPreview } from "./ReconciliationPreview.tsx";
 
