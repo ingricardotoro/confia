@@ -435,6 +435,8 @@ class PublicRouteAllowListTest {
             "GET /api/v1/organization/grades", "POST /api/v1/organization/grades",
             "PUT /api/v1/organization/grades/{id}", "GET /api/v1/organization/sections",
             "POST /api/v1/organization/sections", "PUT /api/v1/organization/sections/{id}",
+            "GET /api/v1/catalog/payment-concepts", "POST /api/v1/catalog/payment-concepts",
+            "PUT /api/v1/catalog/payment-concepts/{id}",
             "GET /api/v1/students", "GET /api/v1/students/{id}", "POST /api/v1/students",
             "PUT /api/v1/students/{id}", "GET /api/v1/enrollments", "GET /api/v1/enrollments/{id}",
             "GET /api/v1/students/{studentId}/enrollments", "POST /api/v1/enrollments",

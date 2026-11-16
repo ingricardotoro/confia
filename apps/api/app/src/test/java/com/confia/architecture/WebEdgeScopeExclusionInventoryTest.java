@@ -90,7 +90,10 @@ class WebEdgeScopeExclusionInventoryTest {
             // account (docs/cortes/students-registry.md, M2 and the follow-ups).
             "com.confia.students.web", "com.confia.organization.web", "com.confia.guardians.web",
             // The student import applies admin-import (and admin-read for its history), per address and per account.
-            "com.confia.imports.web");
+            "com.confia.imports.web",
+            // The payment concepts apply admin-read and admin-write, per address and per account
+            // (docs/cortes/catalog-payment-concepts.md).
+            "com.confia.catalog.web");
 
     /** The types through which a class asks for a delay, and the packages that may. */
     private static final Set<String> MATERIALIZER_TYPES = Set.of(
