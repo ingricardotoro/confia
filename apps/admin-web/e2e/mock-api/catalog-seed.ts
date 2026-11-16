@@ -77,7 +77,7 @@ export interface PriceItemRow {
   id: string;
   priceListId: string;
   paymentConceptId: string;
-  /** Exactly as stored: up to four decimals. The response rounds it, as the server does. */
+  /** Exactly as stored: up to two decimals. Answered as stored. */
   amount: string;
   currency: "HNL" | "USD";
   validFrom: string;

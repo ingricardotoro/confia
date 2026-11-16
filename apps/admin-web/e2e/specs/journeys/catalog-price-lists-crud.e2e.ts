@@ -183,11 +183,11 @@ test.describe("the detail of a price list", () => {
     expect(oldest?.at(-1)).toBe("Cerrada");
   });
 
-  test("sets a price in dollars with a closing date, and the amount comes back with two decimals", async ({ page, scenarioId }) => {
+  test("sets a price in dollars with a closing date, and the amount comes back as sent, with two decimals", async ({ page, scenarioId }) => {
     await openPriceListDetail(page, scenarioId, SEEDED_LISTS.first2026, "2026 — Primero");
     await expect(page.getByText("Esta lista todavía no tiene precios")).toBeVisible();
 
-    await addPrice(page, { concept: "Libros y útiles", amount: "12.5", currency: "Dólar estadounidense (USD)", from: "2026-02-01", to: "2026-02-28" });
+    await addPrice(page, { concept: "Libros y útiles", amount: "12.50", currency: "Dólar estadounidense (USD)", from: "2026-02-01", to: "2026-02-28" });
 
     await expect(dialog(page)).toBeHidden(SAVE_TIMEOUT);
     await expect.poll(() => validityRows(page, "Vigencias de Libros y útiles")).toHaveLength(1);

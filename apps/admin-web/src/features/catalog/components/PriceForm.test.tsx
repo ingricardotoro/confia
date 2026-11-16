@@ -49,7 +49,7 @@ describe("PriceForm", () => {
   it("tells how to write the amount and what an empty end means", () => {
     renderWithAdminI18n(<PriceForm {...props()} />);
 
-    expect(screen.getByLabelText(/Importe/)).toHaveAccessibleDescription(/punto decimal y hasta cuatro decimales/);
+    expect(screen.getByLabelText(/Importe/)).toHaveAccessibleDescription(/punto decimal y hasta dos decimales/);
     expect(screen.getByLabelText(/Vigente hasta/)).toHaveAccessibleDescription(/Déjela vacía si el precio no tiene fecha de fin/);
   });
 

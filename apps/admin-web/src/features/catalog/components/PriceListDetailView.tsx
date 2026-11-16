@@ -163,14 +163,14 @@ export function PriceListDetailView({ state, notice, lookupFailure, changingStat
         />
       ) : (
         concepts.map((concept) => (
-          <ConceptTable key={concept.paymentConceptId} concept={concept} />
+          <ConceptTable key={concept.paymentConceptId} concept={concept} onAddPrice={onAddPrice} />
         ))
       )}
     </section>
   );
 }
 
-function ConceptTable({ concept }: { readonly concept: ConceptPricesView }) {
+function ConceptTable({ concept, onAddPrice }: { readonly concept: ConceptPricesView; readonly onAddPrice: () => void }) {
   const { t } = useAdminText();
   const label =
     concept.name === undefined
@@ -205,7 +205,7 @@ function ConceptTable({ concept }: { readonly concept: ConceptPricesView }) {
         columns={columns}
         rows={concept.items}
         getRowId={(item) => item.id}
-        empty={{ title: t("catalog.priceLists.detail.emptyTitle"), action: { label: t("catalog.priceLists.detail.emptyAction"), onAction: () => undefined } }}
+        empty={{ title: t("catalog.priceLists.detail.emptyTitle"), action: { label: t("catalog.priceLists.detail.emptyAction"), onAction: onAddPrice } }}
       />
     </div>
   );

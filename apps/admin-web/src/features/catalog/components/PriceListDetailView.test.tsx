@@ -101,6 +101,15 @@ describe("PriceListDetailView", () => {
     expect(onAddPrice).toHaveBeenCalledTimes(1);
   });
 
+  it("the empty table of a concept offers the new price instead of a dead button", async () => {
+    const user = userEvent.setup();
+    const onAddPrice = vi.fn();
+    renderWithAdminI18n(<PriceListDetailView {...props({ onAddPrice })} />);
+    expect(screen.queryByRole("button", { name: "Agregar el primer precio" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Nuevo precio / nueva vigencia" }));
+    expect(onAddPrice).toHaveBeenCalledTimes(1);
+  });
+
   it("reports the new price, the archive and the way back", async () => {
     const user = userEvent.setup();
     const handlers = { onAddPrice: vi.fn(), onToggleStatus: vi.fn(), onBack: vi.fn() };

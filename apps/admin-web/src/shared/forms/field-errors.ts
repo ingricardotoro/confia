@@ -78,6 +78,9 @@ export function fieldErrorKey(reason: string): AdminKey {
       return "catalog.priceLists.errors.amountFormat";
     case "amount-positive":
       return "catalog.priceLists.errors.amountPositive";
+    case "date-range":
+    case "validity-day":
+      return "catalog.priceLists.errors.dateRange";
     case "validity-order":
       return "catalog.priceLists.errors.validityOrder";
     case "not-allowed":

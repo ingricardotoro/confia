@@ -254,8 +254,9 @@
         "USD": "Dólar estadounidense (USD)"
       },
       "errors": {
-        "amountFormat": "Escriba el importe con punto decimal y hasta cuatro decimales, por ejemplo 1500.00.",
+        "amountFormat": "Escriba el importe con punto decimal y hasta dos decimales, por ejemplo 1500.00.",
         "amountPositive": "El importe debe ser mayor que cero.",
+        "dateRange": "La fecha debe estar entre el 1 de enero de 2000 y el 31 de diciembre de 2100.",
         "validityOrder": "La fecha de fin no puede ser anterior a la de inicio."
       },
       "detail": {
@@ -294,7 +295,7 @@
         "submit": "Guardar precio",
         "saved": "Se registró el precio de «{name}» desde el {date}.",
         "noActiveConcepts": "No hay conceptos de pago activos. Cree o active un concepto en la pestaña Conceptos de pago.",
-        "amountHelp": "Use punto decimal y hasta cuatro decimales, por ejemplo 1500.00. Debe ser mayor que cero.",
+        "amountHelp": "Use punto decimal y hasta dos decimales, por ejemplo 1500.00. Debe ser mayor que cero.",
         "validToHelp": "Déjela vacía si el precio no tiene fecha de fin. El último día cuenta como vigente.",
         "fields": {
           "concept": "Concepto",

@@ -146,8 +146,8 @@ ninguna otra; las piezas genéricas vienen de `shared/resource-screen` y `shared
   archivada deshabilita la acción y lo dice.
 - **Dinero.** El importe viaja y se muestra como cadena. Se pinta con `MoneyAmount` del sistema de diseño
   (`Intl.NumberFormat`, numeración tabular, alineado a la derecha) más una columna de moneda. El navegador no convierte,
-  redondea ni calcula: solo valida los caracteres (hasta diez enteros y cuatro decimales, sin signo, con algún dígito
-  distinto de cero) para avisar antes de enviar; el redondeo a dos decimales lo entrega el servidor.
+  redondea ni calcula: solo valida los caracteres (hasta diez enteros y dos decimales, sin signo, con algún dígito
+  distinto de cero) para avisar antes de enviar; el servidor solo admite dos decimales (`PriceInput`) y devuelve el importe tal como lo guardó. Las fechas de vigencia se validan también en el cliente dentro de 2000-01-01 a 2100-12-31, con un mensaje propio.
 - **Contrato.** Zod generado para todas las peticiones y respuestas; sin `Idempotency-Key` y sin actualización
   optimista. Las mutaciones invalidan todo el prefijo `["catalog", "price-lists"]` (detalle y listados).
 - **Concurrencia (cierra B-1 en pantalla).** El `PUT` del concepto envía la `version` cargada; ante 409 `stale-version`
@@ -156,8 +156,7 @@ ninguna otra; las piezas genéricas vienen de `shared/resource-screen` y `shared
   agregaron los tres códigos a `KNOWN_PROBLEM_CODES` (ahora treinta y cinco) y a `PROBLEM_KEYS`.
 - **Textos y estados.** Todo en el catálogo es-HN (`catalog.tabs`, `catalog.priceLists.*`, `problem.*`, `field.*`);
   carga con esqueleto, vacío con acción, error con reintento e identificador de soporte, y éxito en la región `aria-live`.
-- **Simulador (`e2e/mock-api`).** Versiones en conceptos y listas, las cinco rutas nuevas con redondeo a dos decimales
-  por dígitos, cierre de la vigencia abierta, solape y lista archivada; escenarios `catalog-price-lists-empty` y
+- **Simulador (`e2e/mock-api`).** Versiones en conceptos y listas, las cinco rutas nuevas, sin redondear importes y rechazando más de dos decimales y fechas fuera de 2000-01-01 a 2100-12-31 como el servidor, cierre de la vigencia abierta, solape y lista archivada; escenarios `catalog-price-lists-empty` y
   `catalog-stale-version` (la primera edición responde 409 una vez).
 - **Pruebas.** Vitest: cliente, lógica de formularios, vistas, formularios, contenedores (lista y detalle) y simulador.
   Playwright: `catalog-price-lists-{crud,lists,states,keyboard}`, y trece estados nuevos en la matriz de accesibilidad.

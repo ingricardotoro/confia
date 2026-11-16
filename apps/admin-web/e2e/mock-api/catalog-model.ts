@@ -27,8 +27,8 @@ import type { ModelResponse } from "./session-model.ts";
  * whatever its capitals, a code that cannot be sent in an edit, a stale version, a price validity that overlaps or closes
  * the open one, an archived list, a record that does not exist, and a refused write). The real rules, and their limits,
  * are tested in the backend. Paging, order and filters are done here as the server does them; the page never does them.
- * An amount is kept as the text it was sent in and answered rounded to two decimals, half up, by its digits: the
- * simulator, like the page, never turns an amount into a number.
+ * An amount is kept and answered as the text it was sent in (at most two decimals, as the server takes it): the
+ * simulator, like the page, never turns an amount into a number and never rounds one.
  */
 export const CATALOG_BASE = "/api/v1/catalog";
 /** How many reads fail first in the `failing-first` behavior: the first try and the two retries of the page. */
@@ -178,20 +178,11 @@ export function createCatalogModel(options: CatalogOptions = DEFAULT_CATALOG, no
 
   // ---- The price lists (catalog-price-lists cut) ----
 
-  /** The amount as the server answers it: two decimals, half up, worked on its digits so it never becomes a number. */
-  function roundedAmount(amount: string): string {
-    const [whole = "0", fraction = ""] = amount.split(".");
-    const padded = fraction.padEnd(4, "0");
-    const cents = BigInt(`${whole}${padded.slice(0, 2)}`) + (padded.charCodeAt(2) >= "5".charCodeAt(0) ? 1n : 0n);
-    const text = cents.toString().padStart(3, "0");
-    return `${text.slice(0, -2)}.${text.slice(-2)}`;
-  }
-
   const itemBody = (item: PriceItemRow) => ({
     id: item.id,
     priceListId: item.priceListId,
     paymentConceptId: item.paymentConceptId,
-    price: { amount: roundedAmount(item.amount), currency: item.currency },
+    price: { amount: item.amount, currency: item.currency },
     validFrom: item.validFrom,
     validTo: item.validTo,
     createdAt: item.createdAt,
@@ -309,7 +300,14 @@ export function createCatalogModel(options: CatalogOptions = DEFAULT_CATALOG, no
     const { paymentConceptId, price, validFrom } = parsed.data;
     const validTo = parsed.data.validTo ?? null;
     // The input pattern has no sign; the domain refuses zero and an end before the start, with no field named.
-    if (!/^\d{1,10}(\.\d{1,4})?$/.test(price.amount) || !/[1-9]/.test(price.amount) || !["HNL", "USD"].includes(price.currency)) return invalid([]);
+    if (!/^\d{1,10}(\.\d{1,2})?$/.test(price.amount) || !/[1-9]/.test(price.amount) || !["HNL", "USD"].includes(price.currency)) return invalid([]);
+    // A day of a validity is between 2000-01-01 and 2100-12-31, as the server judges it, naming the field.
+    const outside = (day: string): boolean => day < "2000-01-01" || day > "2100-12-31";
+    const days = [
+      ...(outside(validFrom) ? [{ field: "validFrom", reason: "validity-day" }] : []),
+      ...(validTo !== null && outside(validTo) ? [{ field: "validTo", reason: "validity-day" }] : []),
+    ];
+    if (days.length > 0) return invalid(days);
     if (validTo !== null && validTo < validFrom) return invalid([]);
     if (self.status === "ARCHIVED") return failure("price-list-archived", 409);
     const concept = rows.find((row) => row.id === paymentConceptId);
@@ -326,7 +324,7 @@ export function createCatalogModel(options: CatalogOptions = DEFAULT_CATALOG, no
       priceListId: id,
       paymentConceptId,
       amount: price.amount,
-      currency: price.currency as "HNL" | "USD",
+      currency: price.currency,
       validFrom,
       validTo,
       createdAt: now().toISOString(),

@@ -82,9 +82,9 @@ test.describe("a rule of the server refuses a price", () => {
     await field(page, "Importe").fill("-5");
     await dialog(page).getByRole("button", { name: SAVE_PRICE }).click();
     await expect(field(page, "Importe")).toHaveAccessibleDescription(/El importe debe ser mayor que cero\./);
-    await field(page, "Importe").fill("12.34567");
+    await field(page, "Importe").fill("12.345");
     await dialog(page).getByRole("button", { name: SAVE_PRICE }).click();
-    await expect(field(page, "Importe")).toHaveAccessibleDescription(/hasta cuatro decimales/);
+    await expect(field(page, "Importe")).toHaveAccessibleDescription(/hasta dos decimales/);
     const writes = (await recordedCalls(request, scenarioId)).filter((call) => call.method === "POST" && call.path.endsWith("/items"));
     expect(writes).toEqual([]);
   });

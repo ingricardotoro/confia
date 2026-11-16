@@ -950,7 +950,7 @@ describe("the catalog versions and the price lists [catalog-price-lists]", { tim
   it("closes the open validity the day before a new open one, and keeps the history", async () => {
     const send = await session("pl-new-validity");
 
-    const added = await send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(COL, "1700", "2026-09-01"));
+    const added = await send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(COL, "1700.00", "2026-09-01"));
     const detail = (await send("GET", `${LISTS}/${SEEDED_LIST}`)).json as { items: ItemRow[] };
     const colegiatura = detail.items.filter((item) => item.paymentConceptId === COL).map((item) => [item.price.amount, item.validFrom, item.validTo]);
 
@@ -963,17 +963,29 @@ describe("the catalog versions and the price lists [catalog-price-lists]", { tim
     ]);
   });
 
-  it("rounds the amount to two decimals half up by its digits, and answers it as text", async () => {
+  it("answers the amount as the text that was sent, without rounding it, and refuses a third decimal", async () => {
     const send = await session("pl-round");
-    const add = async (amount: string, from: string, to?: string) => {
-      const reply = await send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(MUL, amount, from, to));
-      return (reply.json as ItemRow).price.amount;
-    };
+    const add = async (amount: string, from: string) => send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(MUL, amount, from));
 
-    expect(await add("10.005", "2026-01-01", "2026-12-31")).toBe("10.01");
-    expect(await add("20.0049", "2027-01-01")).toBe("20.00");
-    expect(await add("30.5", "2027-02-01")).toBe("30.50");
-    expect(await add("9999999999.9949", "2027-03-01")).toBe("9999999999.99");
+    expect(((await add("10.5", "2027-01-01")).json as ItemRow).price.amount).toBe("10.5");
+    expect(((await add("9999999999.99", "2027-02-01")).json as ItemRow).price.amount).toBe("9999999999.99");
+    const third = await add("10.005", "2027-03-01");
+    expect(verdict(third)).toEqual([400, "validation-failed"]);
+    expect((third.json as { errors: unknown[] }).errors).toEqual([{ field: "price.amount", reason: "pattern" }]);
+  });
+
+  it("refuses a validity day outside 2000-01-01 to 2100-12-31 naming the field, and accepts the two ends", async () => {
+    const send = await session("pl-window");
+    const add = async (from: string, to?: string) => send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(MUL, "1.00", from, to));
+
+    const early = await add("1999-12-31");
+    const late = await add("2026-01-01", "2101-01-01");
+
+    expect(verdict(early)).toEqual([400, "validation-failed"]);
+    expect((early.json as { errors: unknown[] }).errors).toEqual([{ field: "validFrom", reason: "validity-day" }]);
+    expect((late.json as { errors: unknown[] }).errors).toEqual([{ field: "validTo", reason: "validity-day" }]);
+    expect((await add("2000-01-01", "2000-12-31")).status).toBe(201);
+    expect((await add("2100-01-01", "2100-12-31")).status).toBe(201);
   });
 
   it("refuses an exact, partial and contained overlap with 409, and allows a contiguous validity and one before the open one", async () => {
@@ -1026,7 +1038,7 @@ describe("the catalog versions and the price lists [catalog-price-lists]", { tim
     const backwards = await send("POST", url, price(MUL, "1.00", "2026-02-01", "2026-01-01"));
     const currency = await send("POST", url, price(MUL, "1.00", "2026-01-01", undefined, "EUR"));
     const number = await send("POST", url, { ...price(MUL, "1.00", "2026-01-01"), price: { amount: 1, currency: "HNL" } });
-    const decimals = await send("POST", url, price(MUL, "1.23456", "2026-01-01"));
+    const decimals = await send("POST", url, price(MUL, "1.234", "2026-01-01"));
 
     expect([zero, backwards, currency, number, decimals].map(verdict)).toEqual(Array(5).fill([400, "validation-failed"]));
   });

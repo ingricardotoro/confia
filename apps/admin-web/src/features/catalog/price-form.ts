@@ -20,8 +20,8 @@ export type PriceValues = Readonly<Record<PriceField, string>>;
 
 export const initialPriceValues = (): PriceValues => ({ paymentConceptId: "", amount: "", currency: "HNL", validFrom: "", validTo: "" });
 
-/** What the server takes as an amount: digits, up to ten before the point and four after. No sign, no separators. */
-const AMOUNT_FORMAT = /^\d{1,10}(\.\d{1,4})?$/;
+/** What the server takes as an amount: digits, up to ten before the point and two after. No sign, no separators. */
+const AMOUNT_FORMAT = /^\d{1,10}(\.\d{1,2})?$/;
 
 /**
  * The request of a new price. The amount stays the text that was typed: the browser neither parses nor rounds it, and
@@ -29,10 +29,15 @@ const AMOUNT_FORMAT = /^\d{1,10}(\.\d{1,4})?$/;
  */
 export const addBodyOf = (values: PriceValues): AddBody => ({
   paymentConceptId: values.paymentConceptId,
-  price: { amount: values.amount, currency: values.currency },
+  // An unknown currency is refused by `validatePrice` before anything is sent: the cast only lets the schema judge it.
+  price: { amount: values.amount, currency: values.currency as (typeof CURRENCIES)[number] },
   validFrom: values.validFrom,
   ...(values.validTo === "" ? {} : { validTo: values.validTo }),
 });
+
+/** The first and the last day the server accepts for a validity (ISO dates compare correctly as text). */
+export const DATE_WINDOW = { first: "2000-01-01", last: "2100-12-31" } as const;
+const outsideWindow = (date: string): boolean => date < DATE_WINDOW.first || date > DATE_WINDOW.last;
 
 /** The reason an amount typed as text is refused, judged on its characters and never on its value as a number. */
 function amountReason(amount: string): FieldReason | undefined {
@@ -57,6 +62,8 @@ export function validatePrice(values: PriceValues): Partial<Record<PriceField, F
     ...(values.currency === "" ? { currency: "required" as const } : (CURRENCIES as readonly string[]).includes(values.currency) ? {} : { currency: "format" as const }),
     ...requiredReasons(values, ["paymentConceptId", "validFrom"]),
   };
+  if (reasons.validFrom === undefined && outsideWindow(values.validFrom)) reasons.validFrom = "date-range";
+  if (reasons.validTo === undefined && values.validTo !== "" && outsideWindow(values.validTo)) reasons.validTo = "date-range";
   if (reasons.validFrom === undefined && reasons.validTo === undefined && values.validTo !== "" && values.validTo < values.validFrom) {
     reasons.validTo = "validity-order";
   }

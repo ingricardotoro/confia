@@ -11,9 +11,9 @@ describe("the form of a price", () => {
   });
 
   it("sends the amount exactly as it was typed, never as a number, and leaves out an end date that is empty", () => {
-    const body = addBodyOf({ ...complete, amount: "1500.5000" });
+    const body = addBodyOf({ ...complete, amount: "1500.50" });
 
-    expect(body).toEqual({ paymentConceptId: CONCEPT, price: { amount: "1500.5000", currency: "HNL" }, validFrom: "2027-01-01" });
+    expect(body).toEqual({ paymentConceptId: CONCEPT, price: { amount: "1500.50", currency: "HNL" }, validFrom: "2027-01-01" });
     expect(typeof body.price.amount).toBe("string");
     expect(addBodyOf({ ...complete, validTo: "2027-06-30" }).validTo).toBe("2027-06-30");
   });
@@ -31,10 +31,11 @@ describe("the form of a price", () => {
   it.each([
     ["0", "amount-positive"],
     ["0.00", "amount-positive"],
-    ["0.0000", "amount-positive"],
+    ["0.0", "amount-positive"],
     ["-5", "amount-positive"],
     ["-0.01", "amount-positive"],
-    ["1500.12345", "amount-format"],
+    ["1500.123", "amount-format"],
+    ["1500.1234", "amount-format"],
     ["12345678901", "amount-format"],
     ["1,500.00", "amount-format"],
     ["1500,00", "amount-format"],
@@ -45,12 +46,24 @@ describe("the form of a price", () => {
     expect(validatePrice({ ...complete, amount })).toEqual({ amount: reason });
   });
 
-  it.each(["0.0001", "1", "9999999999.9999", "1500.5"])("accepts the amount %s", (amount) => {
+  it.each(["0.01", "1", "9999999999.99", "1500.5"])("accepts the amount %s", (amount) => {
     expect(validatePrice({ ...complete, amount })).toEqual({});
   });
 
   it("refuses an end date before the start", () => {
     expect(validatePrice({ ...complete, validTo: "2026-12-31" })).toEqual({ validTo: "validity-order" });
+  });
+
+  it.each([
+    ["validFrom", { validFrom: "1999-12-31" }],
+    ["validFrom", { validFrom: "2101-01-01" }],
+    ["validTo", { validTo: "2101-01-01" }],
+  ] as const)("refuses %s outside 2000-01-01 to 2100-12-31", (field, override) => {
+    expect(validatePrice({ ...complete, ...override })).toEqual({ [field]: "date-range" });
+  });
+
+  it("accepts the two ends of the window", () => {
+    expect(validatePrice({ ...complete, validFrom: "2000-01-01", validTo: "2100-12-31" })).toEqual({});
   });
 
   it("refuses a currency the system does not operate with", () => {

@@ -238,8 +238,8 @@ describe("a new price or validity", () => {
   it.each([
     ["0", "El importe debe ser mayor que cero."],
     ["-5", "El importe debe ser mayor que cero."],
-    ["12.34567", "hasta cuatro decimales"],
-    ["mil", "hasta cuatro decimales"],
+    ["12.345", "hasta dos decimales"],
+    ["mil", "hasta dos decimales"],
   ])("refuses the amount %s before sending", async (amount, text) => {
     const user = userEvent.setup();
     await openDetail();
@@ -250,6 +250,20 @@ describe("a new price or validity", () => {
 
     await waitFor(() => {
       expect(within(dialog).getByLabelText(/Importe/)).toHaveAccessibleDescription(new RegExp(text));
+    });
+    expect(posts()).toHaveLength(0);
+  });
+
+  it("refuses a day outside 2000 to 2100 before sending, with its own message", async () => {
+    const user = userEvent.setup();
+    await openDetail();
+    const dialog = await openAddDialog(user);
+    await fillPrice(dialog, user, { from: "1999-12-31" });
+
+    await user.click(within(dialog).getByRole("button", { name: "Guardar precio" }));
+
+    await waitFor(() => {
+      expect(within(dialog).getByLabelText(/Vigente desde/)).toHaveAccessibleDescription(/entre el 1 de enero de 2000 y el 31 de diciembre de 2100/);
     });
     expect(posts()).toHaveLength(0);
   });
@@ -319,7 +333,7 @@ describe("a new price or validity", () => {
     await user.click(within(dialog).getByRole("button", { name: "Guardar precio" }));
 
     await waitFor(() => {
-      expect(within(dialog).getByLabelText(/Importe/)).toHaveAccessibleDescription(/hasta cuatro decimales/);
+      expect(within(dialog).getByLabelText(/Importe/)).toHaveAccessibleDescription(/hasta dos decimales/);
     });
   });
 
