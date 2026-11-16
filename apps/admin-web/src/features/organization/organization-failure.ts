@@ -5,7 +5,8 @@ import { classifyAccessFailure, type AccessFailure } from "../../shared/forms/ac
 
 /**
  * The codes of the academic structure, the two every write can meet, and the two of the students registry, the five
- * of the enrollments and the one of the guardians (this classifier serves the four screens), that have a text of their own.
+ * of the enrollments and the one of the guardians, that have a text of their own. This classifier serves the screens
+ * of the academic structure, the students, the enrollments, the guardians and the catalog.
  */
 const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "academic-year-overlap",
@@ -40,6 +41,8 @@ const SPLIT_KEYS: Readonly<Record<string, AdminKey>> = {
  */
 function fieldOf(error: { readonly field: string; readonly reason: string }): { readonly field: string; readonly reason: string } {
   if (error.field === "endAfterStart") return { field: "endDate", reason: "end-after-start" };
+  // The code of a payment concept: the server names a code outside its whitelist `pattern`.
+  if (error.field === "code" && error.reason === "pattern") return { field: "code", reason: "code-format" };
   if (error.field === "nationalId" && error.reason === "pattern") return { field: "nationalId", reason: "national-id-format" };
   // The reason of a withdrawal or a transfer is 3 to 500 characters: `size` says it is too short as well as too long.
   if ((error.field === "withdrawalReason" || error.field === "reason") && error.reason === "size") return { field: error.field, reason: "reason-length" };
@@ -61,6 +64,10 @@ export function classifyOrganizationFailure(result: ApiFailureResult): AccessFai
   if (result.kind === "problem" && MESSAGE_CODES.has(result.problem.code)) {
     const { code, traceId } = result.problem;
     return { kind: "message", key: PROBLEM_KEYS[code], ...(traceId === undefined ? {} : { traceId }) };
+  }
+  // A repeated code of a payment concept belongs to its `code` field, not to the form as a whole.
+  if (result.kind === "problem" && result.problem.code === "duplicate-payment-concept-code") {
+    return { kind: "fields", errors: [{ field: "code", reason: "duplicate-payment-concept-code" }] };
   }
   if (result.kind === "problem" && result.problem.code === "invalid-responsibility-split") {
     const { errors, traceId } = result.problem;

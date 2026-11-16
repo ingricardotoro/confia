@@ -159,9 +159,9 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
         created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true)));
         int entries = conceptEntriesOf(admin.institution()).size();
 
-        assertProblem(post(CONCEPTS, admin, body("COLEG", "Otro", "OTHER", false, false)), 409, "duplicate-name");
-        assertProblem(post(CONCEPTS, admin, body("coleg", "Otro", "OTHER", false, false)), 409, "duplicate-name");
-        assertProblem(post(CONCEPTS, admin, body("CoLeG", "Otro", "OTHER", false, false)), 409, "duplicate-name");
+        assertProblem(post(CONCEPTS, admin, body("COLEG", "Otro", "OTHER", false, false)), 409, "duplicate-payment-concept-code");
+        assertProblem(post(CONCEPTS, admin, body("coleg", "Otro", "OTHER", false, false)), 409, "duplicate-payment-concept-code");
+        assertProblem(post(CONCEPTS, admin, body("CoLeG", "Otro", "OTHER", false, false)), 409, "duplicate-payment-concept-code");
         created(post(CONCEPTS, admin, body("MATRI", "Matricula", "ENROLLMENT", false, false)));
 
         assertThat(countOf(admin.institution())).isEqualTo(2);
@@ -222,6 +222,40 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(conceptEntriesOf(admin.institution())).isEmpty();
         assertThat(created(post(CONCEPTS, admin, body("C".repeat(30), "N".repeat(120), "FINE", false, false))))
                 .isNotNull();
+    }
+
+    @Test
+    void aCodeOutsideTheWhitelistIsRefusedWith400AndLeavesNoRow() throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+
+        for (String code : List.of("CO\\u200bLEG", "\\u202eGELOC", "COLEG\\n", "CO\\nLEG", "=SUM(A1)", "-COLEG",
+                "CO LEG", " COLEG", "Matr\\u00edcula", "C.O", "C/O", "\\u200bCOLEG")) {
+            assertProblem(post(CONCEPTS, admin, body(code, "Colegiatura", "TUITION", true, true)), 400,
+                    "validation-failed");
+        }
+
+        assertThat(countOf(admin.institution())).isZero();
+        assertThat(conceptEntriesOf(admin.institution())).isEmpty();
+        created(post(CONCEPTS, admin, body("A-1_b", "Colegiatura", "TUITION", true, true)));
+    }
+
+    @Test
+    void aNameWithControlOrFormatCharactersIsRefusedWith400OnCreateAndOnEdit() throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true)))
+                .get("id").asString();
+
+        for (String name : List.of("Cole\\ngiatura", "Cole\\tgiatura", "Cole\\u200bgiatura", "\\u202earuta",
+                "Cole\\u0000g")) {
+            assertProblem(post(CONCEPTS, admin, body("OTRO", name, "TUITION", true, true)), 400,
+                    "validation-failed");
+            assertProblem(put(id, admin, putBody(name, "TUITION", true, true, true)), 400, "validation-failed");
+        }
+
+        assertThat(countOf(admin.institution())).isEqualTo(1);
+        assertThat(conceptEntriesOf(admin.institution())).hasSize(1);
+        assertThat(created(post(CONCEPTS, admin, body("MATRI", "Matrícula año", "ENROLLMENT", false, false)))
+                .get("name").asString()).isEqualTo("Matrícula año");
     }
 
     @Test

@@ -152,17 +152,20 @@ describe("creating, editing and deactivating a payment concept", () => {
     expect(writes("POST")).toHaveLength(0);
   });
 
-  it("tells a repeated code in its own words, and keeps what was typed", async () => {
+  it("tells a repeated code in its own words, under the code field, and keeps what was typed", async () => {
     const user = userEvent.setup();
     await openList([]);
-    route("post", CONCEPTS, problem("duplicate-name", 409));
+    route("post", CONCEPTS, problem("duplicate-payment-concept-code", 409));
     await user.click(screen.getByRole("button", { name: "Nuevo concepto" }));
     const dialog = await screen.findByRole("dialog", { name: "Nuevo concepto de pago" });
     await fillNew(dialog, user, "col");
 
     await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
 
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent(admin.problem.duplicateName);
+    await waitFor(() => {
+      expect(within(dialog).getByLabelText(/Código/)).toHaveAccessibleDescription(new RegExp(admin.problem.duplicatePaymentConceptCode));
+    });
+    expect(within(dialog).getByLabelText(/Código/)).toBeInvalid();
     expect(within(dialog).getByLabelText(/Código/)).toHaveValue("col");
   });
 
@@ -177,7 +180,55 @@ describe("creating, editing and deactivating a payment concept", () => {
     await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
 
     await waitFor(() => {
-      expect(within(dialog).getByLabelText(/Código/)).toHaveAccessibleDescription("Este dato es demasiado largo.");
+      expect(within(dialog).getByLabelText(/Código/)).toHaveAccessibleDescription(/Este dato es demasiado largo\./);
+    });
+  });
+
+  it("trims the code before it validates and sends it", async () => {
+    const user = userEvent.setup();
+    await openList([]);
+    route("post", CONCEPTS, paymentConceptRecord(paymentConcept({ code: "COL", name: "Colegiatura" }), 201));
+    await user.click(screen.getByRole("button", { name: "Nuevo concepto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Nuevo concepto de pago" });
+    await fillNew(dialog, user, "  COL-1  ");
+
+    await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
+
+    expect(await screen.findByText("Se creó el registro «Colegiatura».")).toBeInTheDocument();
+    expect(JSON.parse(writes("POST")[0]?.body ?? "{}")).toMatchObject({ code: "COL-1" });
+  });
+
+  it("refuses a code outside the whitelist before sending, with the message of its shape", async () => {
+    const user = userEvent.setup();
+    await openList([]);
+    await user.click(screen.getByRole("button", { name: "Nuevo concepto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Nuevo concepto de pago" });
+
+    for (const code of ["CO L", "-COL", "CÓL", "C.O"]) {
+      await user.clear(within(dialog).getByLabelText(/Código/));
+      await user.clear(within(dialog).getByLabelText(/Nombre/));
+      await fillNew(dialog, user, code);
+      await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
+      await waitFor(() => {
+        expect(within(dialog).getByLabelText(/Código/)).toHaveAccessibleDescription(/Use solo letras, números, guion y guion bajo/);
+      });
+    }
+
+    expect(writes("POST")).toHaveLength(0);
+  });
+
+  it("puts the pattern error of the server under the code field too", async () => {
+    const user = userEvent.setup();
+    await openList([]);
+    route("post", CONCEPTS, problem("validation-failed", 400, { errors: [{ field: "code", reason: "pattern" }] }));
+    await user.click(screen.getByRole("button", { name: "Nuevo concepto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Nuevo concepto de pago" });
+    await fillNew(dialog, user);
+
+    await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => {
+      expect(within(dialog).getByLabelText(/Código/)).toHaveAccessibleDescription(/Use solo letras, números, guion y guion bajo/);
     });
   });
 

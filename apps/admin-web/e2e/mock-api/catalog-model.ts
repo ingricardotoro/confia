@@ -97,7 +97,11 @@ export function createCatalogModel(options: CatalogOptions = DEFAULT_CATALOG, no
     if (!creating && typeof body === "object" && body !== null && "code" in body) return invalid([{ field: "code", reason: "not-allowed" }]);
     const parsed = (creating ? CreatePaymentConceptRequest : UpdatePaymentConceptRequest).safeParse(body);
     if (!parsed.success) {
-      const errors = parsed.error.issues.map((issue) => ({ field: issue.path.map(String).join(".") || "body", reason: "invalid" }));
+      // The server names a value that breaks a pattern (the code whitelist, the name without control characters) `pattern`.
+      const errors = parsed.error.issues.map((issue) => ({
+        field: issue.path.map(String).join(".") || "body",
+        reason: issue.code === "invalid_format" ? "pattern" : "invalid",
+      }));
       return invalid(errors.length === 0 ? [{ field: "body", reason: "invalid" }] : errors);
     }
     const values = parsed.data as Record<string, unknown>;
@@ -106,7 +110,7 @@ export function createCatalogModel(options: CatalogOptions = DEFAULT_CATALOG, no
     const stamp = now().toISOString();
     if (self === undefined) {
       const code = String(values["code"]);
-      if (rows.some((row) => row.code.toLowerCase() === code.toLowerCase())) return failure("duplicate-name", 409);
+      if (rows.some((row) => row.code.toLowerCase() === code.toLowerCase())) return failure("duplicate-payment-concept-code", 409);
       const row = {
         id: crypto.randomUUID(),
         code,

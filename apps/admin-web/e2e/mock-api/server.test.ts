@@ -733,7 +733,7 @@ describe("the catalog [catalog-payment-concepts]", { timeout: LIMIT }, () => {
     expect(rows(await send("GET")).map((row) => row.name)).toEqual(["Concepto editado"]);
   });
 
-  it("refuses a repeated code whatever its capitals with 409 duplicate-name, and an edit that sends the code or targets a missing concept", async () => {
+  it("refuses a repeated code whatever its capitals with 409 duplicate-payment-concept-code, and an edit that sends the code or targets a missing concept", async () => {
     const send = await session("cat-rules");
     const id = rows(await send("GET")).find((row) => row.code === "COL")?.id ?? "";
     const edit = { name: "x", category: "TUITION", isRecurring: true, isTaxable: true, isActive: true };
@@ -742,7 +742,7 @@ describe("the catalog [catalog-payment-concepts]", { timeout: LIMIT }, () => {
     const withCode = await send("PUT", `/${id}`, { ...edit, code: "NEW" });
     const missing = await send("PUT", "/00000000-0000-4000-8000-000000000001", edit);
 
-    expect(verdict(repeated)).toEqual([409, "duplicate-name"]);
+    expect(verdict(repeated)).toEqual([409, "duplicate-payment-concept-code"]);
     expect(verdict(withCode)).toEqual([400, "validation-failed"]);
     expect(verdict(missing)).toEqual([404, "resource-not-found"]);
   });
@@ -757,6 +757,22 @@ describe("the catalog [catalog-payment-concepts]", { timeout: LIMIT }, () => {
     expect((category.json as { errors: { field: string }[] }).errors.map((error) => error.field)).toEqual(["category"]);
     expect((blank.json as { errors: unknown[] }).errors).toEqual([{ field: "name", reason: "required" }]);
     expect(verdict(long)).toEqual([400, "validation-failed"]);
+  });
+
+  it("refuses a code outside the whitelist, or a name with a control character, with the reason pattern", async () => {
+    const send = await session("cat-pattern");
+
+    const codes = [
+      await send("POST", "", { ...NEW_CONCEPT, code: "CO L" }),
+      await send("POST", "", { ...NEW_CONCEPT, code: "-COL" }),
+      await send("POST", "", { ...NEW_CONCEPT, code: "CÓL" }),
+    ];
+    const name = await send("POST", "", { ...NEW_CONCEPT, name: "Nuevo\u0000concepto" });
+    const accepted = await send("POST", "", { ...NEW_CONCEPT, code: "A_b-9" });
+
+    for (const reply of codes) expect((reply.json as { errors: unknown[] }).errors).toEqual([{ field: "code", reason: "pattern" }]);
+    expect((name.json as { errors: unknown[] }).errors).toEqual([{ field: "name", reason: "pattern" }]);
+    expect(accepted.status).toBe(201);
   });
 
   it("refuses a write with 403 forbidden and changes nothing, while the reads keep answering", async () => {

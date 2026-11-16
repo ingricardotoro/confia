@@ -1,6 +1,6 @@
 package com.confia.catalog.application;
 
-import com.confia.catalog.domain.InvalidPaymentConceptException;
+import com.confia.catalog.domain.InvalidCatalogValueException;
 import java.util.Set;
 
 /**
@@ -20,7 +20,7 @@ public record PageRequest(int page, int size, String sortField, boolean ascendin
 
     public PageRequest {
         if (page < 0 || size < 1 || size > MAX_SIZE) {
-            throw new InvalidPaymentConceptException();
+            throw new InvalidCatalogValueException();
         }
     }
 
@@ -37,14 +37,14 @@ public record PageRequest(int page, int size, String sortField, boolean ascendin
         String field = parts[0].strip();
         boolean ascending = true;
         if (parts.length > 2 || !allowedFields.contains(field)) {
-            throw new InvalidPaymentConceptException();
+            throw new InvalidCatalogValueException();
         }
         if (parts.length == 2) {
             String direction = parts[1].strip();
             if (direction.equalsIgnoreCase("desc")) {
                 ascending = false;
             } else if (!direction.equalsIgnoreCase("asc")) {
-                throw new InvalidPaymentConceptException();
+                throw new InvalidCatalogValueException();
             }
         }
         return new PageRequest(page, size, field, ascending);

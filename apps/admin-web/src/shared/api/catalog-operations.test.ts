@@ -79,11 +79,11 @@ describe("the writes", () => {
   });
 
   it("answers a repeated code as a problem with its code", async () => {
-    route("post", BASE, problem("duplicate-name", 409));
+    route("post", BASE, problem("duplicate-payment-concept-code", 409));
 
     expect(await createPaymentConcept("tok", { code: "COL", name: "N", category: "OTHER", isRecurring: false, isTaxable: false })).toMatchObject({
       kind: "problem",
-      problem: { status: 409, code: "duplicate-name" },
+      problem: { status: 409, code: "duplicate-payment-concept-code" },
     });
   });
 });

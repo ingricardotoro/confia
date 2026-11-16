@@ -21,12 +21,15 @@ CREATE TABLE catalog_payment_concept (
     created_at     TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
     updated_at     TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
     CONSTRAINT catalog_payment_concept_pk           PRIMARY KEY (institution_id, id),
+    -- The code is a whitelist: letters, digits, underscore and hyphen, starting with a letter or digit. It keeps
+    -- spaces, accents, control and format characters (zero-width, right-to-left override) and a leading symbol out.
+    CONSTRAINT catalog_payment_concept_code_chk     CHECK (code ~ '^[A-Za-z0-9][A-Za-z0-9_-]{0,29}$'),
     CONSTRAINT catalog_payment_concept_category_chk CHECK (category IN
         ('TUITION', 'ENROLLMENT', 'TRANSPORT', 'MATERIAL', 'FINE', 'OTHER'))
 );
 
 -- One code per institution, whatever its capitals. The name ends in _uq so the adapter translates a violation of it
--- into the duplicate-name answer.
+-- into the duplicate-payment-concept-code answer.
 CREATE UNIQUE INDEX catalog_payment_concept_code_uq
     ON catalog_payment_concept (institution_id, lower(code));
 

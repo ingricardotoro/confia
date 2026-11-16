@@ -13,7 +13,7 @@ import jakarta.validation.constraints.Size;
  * code: the code is immutable, and a body that carries one is refused as an unknown member.
  */
 public record UpdatePaymentConceptRequest(
-        @Schema(requiredMode = RequiredMode.REQUIRED, maxLength = 120) @NotBlank @Size(max = 120) String name,
+        @Schema(requiredMode = RequiredMode.REQUIRED, maxLength = 120) @NotBlank @Size(max = 120) @Pattern(regexp = "^[^\\p{Cc}\\p{Cf}]*$") String name,
         @Schema(requiredMode = RequiredMode.REQUIRED,
                 allowableValues = {"TUITION", "ENROLLMENT", "TRANSPORT", "MATERIAL", "FINE", "OTHER"})
         @NotBlank @Pattern(regexp = "TUITION|ENROLLMENT|TRANSPORT|MATERIAL|FINE|OTHER") String category,

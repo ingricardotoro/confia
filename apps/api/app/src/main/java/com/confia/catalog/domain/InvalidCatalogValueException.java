@@ -7,11 +7,11 @@ import com.confia.kernel.DomainException;
  * validates the same rules first, so this is the second line of defense. Published to clients as the Problem Details
  * code {@code validation-failed}.
  */
-public final class InvalidPaymentConceptException extends DomainException {
+public final class InvalidCatalogValueException extends DomainException {
 
     public static final String CODE = "validation-failed";
 
-    public InvalidPaymentConceptException() {
+    public InvalidCatalogValueException() {
         super(CODE, "the catalog value breaks a domain rule");
     }
 }

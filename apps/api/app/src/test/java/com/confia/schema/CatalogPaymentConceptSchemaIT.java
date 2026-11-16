@@ -102,6 +102,25 @@ class CatalogPaymentConceptSchemaIT extends CommittingPostgresIntegrationTest {
         }
     }
 
+    @Test
+    void theCodeIsAWhitelistAndTheDatabaseRefusesSpacesAccentsControlAndFormatCharactersAndALeadingSymbol()
+            throws SQLException {
+        UUID institution = UUID.randomUUID();
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            for (String code : List.of("CO LEG", " COLEG", "COLEG ", "CO​LEG", "‮GELOC", "COLEG\n",
+                    "CO\nLEG", "=SUM(A1)", "-COLEG", "_COLEG", "Matrícula", "Ñ", "C.O", "")) {
+                SQLException refused = rejected(owner,
+                        () -> concept(owner, institution, UUID.randomUUID(), code, "OTHER"));
+                assertThat(refused.getSQLState()).as("code %s", code.replace("\n", "\\n")).isEqualTo("23514");
+                assertThat(refused.getMessage()).contains("catalog_payment_concept_code_chk");
+            }
+            for (String code : List.of("COLEG", "a", "9", "A-1_b", "0".repeat(30))) {
+                concept(owner, institution, UUID.randomUUID(), code, "OTHER");
+            }
+            owner.rollback();
+        }
+    }
+
     // --- Row-level security ---
 
     @Test

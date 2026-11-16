@@ -21,7 +21,8 @@ test.describe("a rule of the server refuses a save", () => {
 
     await save(page).click();
 
-    await expect(alert(page)).toContainText("Ya existe un registro con ese nombre, código u orden. Escriba un valor distinto.");
+    await expect(dialog(page).getByRole("group", { name: "Hay 1 campo con error." })).toBeVisible();
+    await expect(field(page, "Código")).toHaveAccessibleDescription(/Ya existe un concepto con ese código\./);
     await expect(dialog(page)).toBeVisible();
     await expect(field(page, "Código")).toHaveValue("col");
 
@@ -38,7 +39,7 @@ test.describe("a rule of the server refuses a save", () => {
     await openCreate(page, "Nuevo concepto");
     await fillConcept(page, "MAT", "Otra matrícula");
     await save(page).click();
-    await expect(alert(page)).toBeVisible();
+    await expect(field(page, "Código")).toHaveAccessibleDescription(/Ya existe un concepto con ese código\./);
 
     await dialog(page).getByRole("button", { name: "Cancelar" }).click();
 
@@ -57,6 +58,28 @@ test.describe("a rule of the server refuses a save", () => {
     await expect(field(page, "Código")).toHaveAccessibleDescription(/Este dato es demasiado largo\./);
     const writes = (await recordedCalls(request, scenarioId)).filter((call) => call.method !== "GET" && call.path.startsWith("/api/v1/catalog"));
     expect(writes).toEqual([]);
+  });
+});
+
+test.describe("a code outside the whitelist", () => {
+  test("is refused before sending, with the shape a code may have, and a trimmed code is saved", async ({ page, request, scenarioId }) => {
+    await openCatalog(page, scenarioId);
+    await openCreate(page, "Nuevo concepto");
+    await expect(field(page, "Código")).toHaveAccessibleDescription(/Letras, números, guion y guion bajo; empiece por una letra o un número/);
+    await fillConcept(page, "CO L", "Concepto");
+
+    await save(page).click();
+
+    await expect(dialog(page).getByRole("group", { name: "Hay 1 campo con error." })).toBeVisible();
+    await expect(field(page, "Código")).toHaveAccessibleDescription(/Use solo letras, números, guion y guion bajo/);
+    const writes = (await recordedCalls(request, scenarioId)).filter((call) => call.method === "POST" && call.path.startsWith("/api/v1/catalog"));
+    expect(writes).toEqual([]);
+
+    await field(page, "Código").fill("  CO_L-1  ");
+    await save(page).click();
+
+    await expect(dialog(page)).toBeHidden(SAVE_TIMEOUT);
+    await expect(page.getByRole("row", { name: /Concepto/ }).filter({ hasText: "CO_L-1" })).toBeVisible();
   });
 });
 

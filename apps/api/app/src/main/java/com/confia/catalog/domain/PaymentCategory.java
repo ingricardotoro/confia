@@ -13,6 +13,6 @@ public enum PaymentCategory {
                 }
             }
         }
-        throw new InvalidPaymentConceptException();
+        throw new InvalidCatalogValueException();
     }
 }

@@ -20,7 +20,8 @@ export type FieldReason =
   | "email-format"
   | "phone-format"
   | "percent-format"
-  | "percent-range";
+  | "percent-range"
+  | "code-format";
 
 export interface AccessFieldSpec {
   /** The fixed `id` of the control, which the error summary links to. */

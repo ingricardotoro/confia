@@ -8,6 +8,12 @@ import { PaymentConceptFormContainer } from "./PaymentConceptFormContainer.tsx";
 import { updateBodyOf, type PaymentConcept } from "./payment-concept-form.ts";
 import { usePaymentConceptList, usePaymentConceptWrite } from "./use-catalog-queries.ts";
 
+/** The `active` filter as the API takes it: only strings travel in a query string. */
+function activeParamOf(active: boolean | undefined): "true" | "false" | undefined {
+  if (active === undefined) return undefined;
+  return active ? "true" : "false";
+}
+
 export interface PaymentConceptsContainerProps {
   readonly search: PaymentConceptsSearch;
   readonly onSearchChange: SearchChange<PaymentConceptsSearch>;
@@ -18,7 +24,7 @@ export interface PaymentConceptsContainerProps {
  * and activate or deactivate from the row. There is no delete: a concept that is not offered any more is deactivated.
  */
 export function PaymentConceptsContainer({ search, onSearchChange }: PaymentConceptsContainerProps) {
-  const list = usePaymentConceptList({ ...toApiParams(search), active: search.active === undefined ? undefined : search.active ? "true" : "false" });
+  const list = usePaymentConceptList({ ...toApiParams(search), active: activeParamOf(search.active) });
   const write = usePaymentConceptWrite();
   const view = useResourceView<PaymentConcept>();
   const state = useListState({

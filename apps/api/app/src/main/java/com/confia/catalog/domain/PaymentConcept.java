@@ -17,10 +17,10 @@ public record PaymentConcept(UUID id, String code, String name, PaymentCategory 
         Objects.requireNonNull(createdAt, "createdAt");
         Objects.requireNonNull(updatedAt, "updatedAt");
         if (category == null) {
-            throw new InvalidPaymentConceptException();
+            throw new InvalidCatalogValueException();
         }
-        code = Names.required(code, Names.MAX_CODE_LENGTH);
-        name = Names.required(name, Names.MAX_NAME_LENGTH);
+        code = Names.code(code);
+        name = Names.name(name);
     }
 
     public static PaymentConcept create(UUID id, String code, String name, PaymentCategory category,

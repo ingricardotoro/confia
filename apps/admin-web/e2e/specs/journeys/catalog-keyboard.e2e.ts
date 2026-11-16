@@ -112,7 +112,7 @@ test.describe("the payment concepts with the keyboard only", () => {
     await expect(opener).toBeFocused();
   });
 
-  test("edits a row from the keyboard, toggles the active switch with Space, and the focus returns to the button of that row", async ({ page, scenarioId }) => {
+  test("edits a row from the keyboard, toggles the active checkbox with Space, and the focus returns to the button of that row", async ({ page, scenarioId }) => {
     await openCatalog(page, scenarioId);
     const edit = page.getByRole("button", { name: "Editar Multa por retraso" });
     await tabTo(page, edit);

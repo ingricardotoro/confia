@@ -1,6 +1,6 @@
 package com.confia.catalog.infrastructure;
 
-import com.confia.catalog.domain.DuplicateNameException;
+import com.confia.catalog.domain.DuplicateCodeException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -19,8 +19,7 @@ import org.postgresql.util.PSQLException;
 final class CatalogWrites {
 
     private static final String UNIQUE_VIOLATION = "23505";
-    private static final String UNIQUE_SUFFIX = "_uq";
-    private static final String MODULE_PREFIX = "catalog_";
+    private static final String CODE_UNIQUE_INDEX = "catalog_payment_concept_code_uq";
 
     private CatalogWrites() {
     }
@@ -31,9 +30,8 @@ final class CatalogWrites {
             write.run();
         } catch (DataAccessException e) {
             String constraint = violatedUniqueConstraint(e);
-            if (constraint != null && constraint.startsWith(MODULE_PREFIX)
-                    && constraint.endsWith(UNIQUE_SUFFIX)) {
-                throw new DuplicateNameException();
+            if (CODE_UNIQUE_INDEX.equals(constraint)) {
+                throw new DuplicateCodeException();
             }
             throw e;
         }

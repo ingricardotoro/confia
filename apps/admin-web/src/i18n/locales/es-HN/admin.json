@@ -71,6 +71,7 @@
     "academicYearAlreadyActive": "Ya hay otro año lectivo en curso. Solo puede haber uno a la vez; cambie la etapa de ese año antes de poner este en curso.",
     "academicYearClosed": "El año lectivo está cerrado. Un año cerrado no se edita ni se reabre, y sus secciones tampoco se pueden crear ni editar.",
     "duplicateName": "Ya existe un registro con ese nombre, código u orden. Escriba un valor distinto.",
+    "duplicatePaymentConceptCode": "Ya existe un concepto con ese código.",
     "inactiveReference": "Uno de los datos relacionados está inactivo. Actívelo o elija otro e intente de nuevo.",
     "duplicateStudentCode": "Ya existe un estudiante con ese código. Escriba otro código o déjelo vacío para que se genere uno.",
     "duplicateNationalId": "Ya hay un estudiante registrado con ese documento de identidad. Revise el número; los guiones no cuentan.",
@@ -176,6 +177,11 @@
       "emptyDescription": "Cree el primer concepto de pago para definir qué se cobra en la institución.",
       "emptyAction": "Crear el primer concepto",
       "loadFailed": "No se pudo cargar la lista de conceptos de pago",
+      "codeHelp": "Letras, números, guion y guion bajo; empiece por una letra o un número. Hasta 30 caracteres.",
+      "errors": {
+        "codeFormat": "Use solo letras, números, guion y guion bajo; el código debe empezar por una letra o un número.",
+        "duplicateCode": "Ya existe un concepto con ese código."
+      },
       "filterCategory": "Categoría",
       "filterActive": "Estado",
       "recurringHelp": "Marque esta casilla si el concepto se cobra de forma periódica, como la colegiatura mensual.",

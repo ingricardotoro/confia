@@ -328,9 +328,10 @@
             "type" : "string"
           },
           "code" : {
-            "description" : "Code, unique in the institution whatever its capitals; it cannot be changed later",
+            "description" : "Letters, digits, underscore and hyphen, starting with a letter or digit; unique in the institution whatever its capitals; it cannot be changed later",
             "maxLength" : 30,
             "minLength" : 0,
+            "pattern" : "^[A-Za-z0-9][A-Za-z0-9_-]{0,29}$",
             "type" : "string"
           },
           "isRecurring" : {
@@ -342,6 +343,7 @@
           "name" : {
             "maxLength" : 120,
             "minLength" : 0,
+            "pattern" : "^[^\\p{Cc}\\p{Cf}]*$",
             "type" : "string"
           }
         },
@@ -1917,6 +1919,7 @@
           "name" : {
             "maxLength" : 120,
             "minLength" : 0,
+            "pattern" : "^[^\\p{Cc}\\p{Cf}]*$",
             "type" : "string"
           }
         },
@@ -2825,7 +2828,7 @@
                 }
               }
             },
-            "description" : "The code is taken (duplicate-name)"
+            "description" : "The code is taken (duplicate-payment-concept-code)"
           },
           "500" : {
             "content" : {

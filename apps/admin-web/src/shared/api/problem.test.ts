@@ -46,6 +46,7 @@ describe("the known codes", () => {
         "academic-year-already-active",
         "academic-year-closed",
         "duplicate-name",
+        "duplicate-payment-concept-code",
         "inactive-reference",
         "duplicate-student-code",
         "duplicate-national-id",

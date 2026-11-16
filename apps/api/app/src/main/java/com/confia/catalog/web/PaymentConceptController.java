@@ -124,7 +124,7 @@ public class PaymentConceptController {
             description = "The account does not hold catalog:create, or the Origin is missing or "
                     + "not allowed (forbidden, csrf-invalid)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
-    @ApiResponse(responseCode = "409", description = "The code is taken (duplicate-name)",
+    @ApiResponse(responseCode = "409", description = "The code is taken (duplicate-payment-concept-code)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))

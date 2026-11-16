@@ -3,8 +3,8 @@ package com.confia.catalog.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.confia.catalog.domain.DuplicateNameException;
-import com.confia.catalog.domain.InvalidPaymentConceptException;
+import com.confia.catalog.domain.DuplicateCodeException;
+import com.confia.catalog.domain.InvalidCatalogValueException;
 import com.confia.catalog.domain.PaymentCategory;
 import com.confia.catalog.domain.PaymentConcept;
 import com.confia.catalog.domain.ResourceNotFoundException;
@@ -84,7 +84,7 @@ class ManagePaymentConceptsTest {
         audit.clear();
 
         assertThatThrownBy(() -> concepts.create(actor, requestId, "coleg", "Otro", "OTHER", false, false))
-                .isInstanceOf(DuplicateNameException.class);
+                .isInstanceOf(DuplicateCodeException.class);
 
         assertThat(audit).isEmpty();
         assertThat(store.rows).hasSize(1);
@@ -102,13 +102,13 @@ class ManagePaymentConceptsTest {
     @Test
     void aBlankCodeAnUnknownCategoryAndATooLongNameAreRefusedBeforeAnythingIsWritten() {
         assertThatThrownBy(() -> concepts.create(actor, requestId, " ", "Nombre", "OTHER", false, false))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> concepts.create(actor, requestId, "C".repeat(31), "Nombre", "OTHER", false, false))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> concepts.create(actor, requestId, "COD", "Nombre", "SCHOLARSHIP", false, false))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> concepts.create(actor, requestId, "COD", "N".repeat(121), "OTHER", false, false))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
 
         assertThat(audit).isEmpty();
         assertThat(store.rows).isEmpty();
@@ -157,7 +157,7 @@ class ManagePaymentConceptsTest {
         PaymentConcept concept = arranged(institution, "COLEG", "Colegiatura", PaymentCategory.TUITION, true);
 
         assertThatThrownBy(() -> concepts.update(actor, requestId, concept.id(), "X", "nope", false, false, true))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThat(audit).isEmpty();
     }
 
@@ -187,13 +187,13 @@ class ManagePaymentConceptsTest {
     @Test
     void theListRefusesAFieldCategoryOrSizeOutsideItsSet() {
         assertThatThrownBy(() -> concepts.list(actor, requestId, 0, 50, "isActive", null, null))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> concepts.list(actor, requestId, 0, 50, null, "NOPE", null))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> concepts.list(actor, requestId, 0, 201, null, null, null))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> concepts.list(actor, requestId, -1, 50, null, null, null))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
     }
 
     private record Key(InstitutionId institution, UUID id) {
@@ -214,7 +214,7 @@ class ManagePaymentConceptsTest {
             boolean taken = rows.entrySet().stream().anyMatch(entry -> entry.getKey().institution().equals(institution)
                     && entry.getValue().code().equalsIgnoreCase(concept.code()));
             if (taken) {
-                throw new DuplicateNameException();
+                throw new DuplicateCodeException();
             }
             rows.put(new Key(institution, concept.id()), concept);
         }

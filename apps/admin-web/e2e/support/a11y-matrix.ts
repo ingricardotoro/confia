@@ -976,7 +976,7 @@ export const MATRIX: readonly GateCombination[] = [
       await dialog.getByLabel(/^Categoría/).selectOption({ label: "Otro" });
       await dialog.getByRole("button", { name: "Guardar" }).click();
     },
-    expected: (page) => page.getByRole("alert").filter({ hasText: "Ya existe un registro con ese nombre, código u orden." }),
+    expected: (page) => page.getByRole("group", { name: "Hay 1 campo con error." }),
   },
   {
     route: CATALOG,

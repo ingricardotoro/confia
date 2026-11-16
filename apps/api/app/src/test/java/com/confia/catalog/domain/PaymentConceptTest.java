@@ -13,12 +13,12 @@ class PaymentConceptTest {
     private static final Instant T1 = Instant.parse("2026-02-10T12:00:00Z");
 
     private static PaymentConcept concept() {
-        return PaymentConcept.create(UUID.randomUUID(), " COLEG ", " Colegiatura ", PaymentCategory.TUITION,
+        return PaymentConcept.create(UUID.randomUUID(), "COLEG", " Colegiatura ", PaymentCategory.TUITION,
                 true, true, T0);
     }
 
     @Test
-    void aConceptStripsItsCodeAndNameAndIsBornActive() {
+    void aConceptStripsItsNameKeepsItsCodeAndIsBornActive() {
         PaymentConcept created = concept();
 
         assertThat(created.code()).isEqualTo("COLEG");
@@ -37,17 +37,52 @@ class PaymentConceptTest {
         PaymentCategory category = PaymentCategory.OTHER;
 
         assertThatThrownBy(() -> PaymentConcept.create(id, "  ", "Nombre", category, false, false, T0))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> PaymentConcept.create(id, null, "Nombre", category, false, false, T0))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> PaymentConcept.create(id, "C".repeat(31), "Nombre", category, false, false, T0))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> PaymentConcept.create(id, "COD", "", category, false, false, T0))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> PaymentConcept.create(id, "COD", null, category, false, false, T0))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> PaymentConcept.create(id, "COD", "N".repeat(121), category, false, false, T0))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
+    }
+
+    @Test
+    void aCodeIsAWhitelistOfLettersDigitsUnderscoreAndHyphenStartingWithALetterOrDigit() {
+        UUID id = UUID.randomUUID();
+        for (String code : new String[] {"COLEG", "a", "9", "A-1_b", "0".repeat(30)}) {
+            assertThat(PaymentConcept.create(id, code, "N", PaymentCategory.OTHER, false, false, T0).code())
+                    .isEqualTo(code);
+        }
+        for (String code : new String[] {" COLEG", "COLEG ", "CO LEG", "CO​LEG", "‮GELOC", "COLEG\n",
+                "CO\nLEG", "=SUM(A1)", "-COLEG", "_COLEG", "+1", "@x", "Matrícula", "Ñandú", "C.O",
+                "C/O", "C\u0000O", "​COLEG"}) {
+            assertThatThrownBy(() -> PaymentConcept.create(id, code, "N", PaymentCategory.OTHER, false, false, T0))
+                    .as("code %s", code.replace("\n", "\\n")).isInstanceOf(InvalidCatalogValueException.class);
+        }
+    }
+
+    @Test
+    void aNameWithControlOrFormatCharactersIsRefusedAndOtherUnicodeIsKept() {
+        UUID id = UUID.randomUUID();
+        for (String name : new String[] {"Co\nlegiatura", "Co\tlegiatura", "Co​legiatura", "‮atarutaigeloC",
+                "Co\u0000l", "Co­l", "Co⁦l"}) {
+            assertThatThrownBy(() -> PaymentConcept.create(id, "COD", name, PaymentCategory.OTHER, false, false, T0))
+                    .as("name %s", name.replace("\n", "\\n")).isInstanceOf(InvalidCatalogValueException.class);
+        }
+        assertThat(PaymentConcept.create(id, "COD", "Matrícula año 2026 (Niños)",
+                PaymentCategory.OTHER, false, false, T0).name()).isEqualTo("Matrícula año 2026 (Niños)");
+    }
+
+    @Test
+    void anEditRefusesANameWithControlCharacters() {
+        PaymentConcept before = concept();
+
+        assertThatThrownBy(() -> before.edit("Nueva\nlinea", PaymentCategory.TUITION, true, true, true, T1))
+                .isInstanceOf(InvalidCatalogValueException.class);
     }
 
     @Test
@@ -62,7 +97,7 @@ class PaymentConceptTest {
     @Test
     void aConceptWithoutACategoryIsRefused() {
         assertThatThrownBy(() -> PaymentConcept.create(UUID.randomUUID(), "COD", "Nombre", null, false, false, T0))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
     }
 
     @Test
@@ -72,10 +107,10 @@ class PaymentConceptTest {
         for (PaymentCategory category : PaymentCategory.values()) {
             assertThat(PaymentCategory.parse(category.name())).isEqualTo(category);
         }
-        assertThatThrownBy(() -> PaymentCategory.parse("tuition")).isInstanceOf(InvalidPaymentConceptException.class);
-        assertThatThrownBy(() -> PaymentCategory.parse("OTHERS")).isInstanceOf(InvalidPaymentConceptException.class);
-        assertThatThrownBy(() -> PaymentCategory.parse("")).isInstanceOf(InvalidPaymentConceptException.class);
-        assertThatThrownBy(() -> PaymentCategory.parse(null)).isInstanceOf(InvalidPaymentConceptException.class);
+        assertThatThrownBy(() -> PaymentCategory.parse("tuition")).isInstanceOf(InvalidCatalogValueException.class);
+        assertThatThrownBy(() -> PaymentCategory.parse("OTHERS")).isInstanceOf(InvalidCatalogValueException.class);
+        assertThatThrownBy(() -> PaymentCategory.parse("")).isInstanceOf(InvalidCatalogValueException.class);
+        assertThatThrownBy(() -> PaymentCategory.parse(null)).isInstanceOf(InvalidCatalogValueException.class);
     }
 
     @Test
@@ -100,13 +135,13 @@ class PaymentConceptTest {
         PaymentConcept before = concept();
 
         assertThatThrownBy(() -> before.edit(" ", PaymentCategory.TUITION, true, true, true, T1))
-                .isInstanceOf(InvalidPaymentConceptException.class);
+                .isInstanceOf(InvalidCatalogValueException.class);
     }
 
     @Test
     void theErrorCodesAreTheOnesTheEdgePublishes() {
-        assertThat(new InvalidPaymentConceptException().code()).isEqualTo("validation-failed");
-        assertThat(new DuplicateNameException().code()).isEqualTo("duplicate-name");
+        assertThat(new InvalidCatalogValueException().code()).isEqualTo("validation-failed");
+        assertThat(new DuplicateCodeException().code()).isEqualTo("duplicate-payment-concept-code");
         assertThat(new ResourceNotFoundException().code()).isEqualTo("resource-not-found");
     }
 }

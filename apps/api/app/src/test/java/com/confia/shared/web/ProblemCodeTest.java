@@ -39,7 +39,7 @@ class ProblemCodeTest {
                         "student-not-active", "section-full", "duplicate-active-enrollment",
                         "invalid-enrollment-state", "transfer-year-mismatch", "invalid-responsibility-split",
                         "guardian-not-active", "consent-channel-unavailable", "import-not-simulated",
-                        "import-file-changed");
+                        "import-file-changed", "duplicate-payment-concept-code");
     }
 
     @Test
@@ -63,7 +63,8 @@ class ProblemCodeTest {
             "student-not-active, 409", "section-full, 409", "duplicate-active-enrollment, 409",
             "invalid-enrollment-state, 409", "transfer-year-mismatch, 409",
             "invalid-responsibility-split, 400", "guardian-not-active, 409",
-            "consent-channel-unavailable, 409", "import-not-simulated, 409", "import-file-changed, 409"})
+            "consent-channel-unavailable, 409", "import-not-simulated, 409", "import-file-changed, 409",
+            "duplicate-payment-concept-code, 409"})
     void eachCodeCarriesItsHttpStatus(String code, int status) {
         assertThat(ProblemCode.ofCode(code)).get().extracting(ProblemCode::status)
                 .isEqualTo(status);
@@ -80,7 +81,8 @@ class ProblemCodeTest {
             "inactive-reference", "duplicate-student-code", "duplicate-national-id",
             "student-not-active", "section-full", "duplicate-active-enrollment", "invalid-enrollment-state",
             "transfer-year-mismatch", "invalid-responsibility-split", "guardian-not-active",
-            "consent-channel-unavailable", "import-not-simulated", "import-file-changed"})
+            "consent-channel-unavailable", "import-not-simulated", "import-file-changed",
+            "duplicate-payment-concept-code"})
     void theTypeIsTheStableBaseFollowedByTheCodeAndNothingElse(String code) {
         ProblemCode problem = ProblemCode.ofCode(code).orElseThrow();
         assertThat(problem.type()).isEqualTo(URI.create("https://confia.hn/problems/" + code));

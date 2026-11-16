@@ -9,7 +9,7 @@ import { PaymentConceptForm, type PaymentConceptFormProps } from "./PaymentConce
 
 // States. AW57, AW58: the form of a payment concept rendered with props alone. Loading: `form.submitting`, drawn by the dialog.
 // Error: `fieldErrors` under each field. Empty does not apply: a form lists no data. Success: a create form and an
-// edit form, which differ in the code (fixed once created) and in the active switch.
+// edit form, which differ in the code (fixed once created) and in the active checkbox.
 function props(override: Partial<PaymentConceptFormProps> = {}): PaymentConceptFormProps {
   return {
     mode: "create",
@@ -24,7 +24,7 @@ function props(override: Partial<PaymentConceptFormProps> = {}): PaymentConceptF
 }
 
 describe("PaymentConceptForm", () => {
-  it("a new concept has a code, a name and a category, all required, and no active switch", () => {
+  it("a new concept has a code, a name and a category, all required, and no active checkbox", () => {
     renderWithAdminI18n(<PaymentConceptForm {...props()} />);
 
     const dialog = screen.getByRole("dialog", { name: "Nuevo concepto de pago" });
@@ -36,7 +36,7 @@ describe("PaymentConceptForm", () => {
     expect(within(dialog).queryByRole("checkbox", { name: "Activo" })).not.toBeInTheDocument();
   });
 
-  it("an existing concept shows its code as read only and has the active switch", () => {
+  it("an existing concept shows its code as read only and has the active checkbox", () => {
     const row = paymentConcept({ code: "COL" });
     renderWithAdminI18n(<PaymentConceptForm {...props({ mode: "edit", values: initialPaymentConceptValues(row) })} />);
 
@@ -64,9 +64,19 @@ describe("PaymentConceptForm", () => {
   it("the error state describes each field with its message", () => {
     renderWithAdminI18n(<PaymentConceptForm {...props({ fieldErrors: { code: "Este dato es demasiado largo.", category: "Este dato es obligatorio." } })} />);
 
-    expect(screen.getByLabelText(/Código/)).toHaveAccessibleDescription("Este dato es demasiado largo.");
-    expect(screen.getByLabelText(/Categoría/)).toHaveAccessibleDescription("Este dato es obligatorio.");
+    expect(screen.getByLabelText(/Código/)).toHaveAccessibleDescription(/Este dato es demasiado largo\./);
+    expect(screen.getByLabelText(/Categoría/)).toHaveAccessibleDescription(/Este dato es obligatorio\./);
     expect(screen.getByLabelText(/Nombre/)).toBeValid();
+  });
+
+  it("tells the shape of a code in its help, and keeps it next to the message of the error", () => {
+    const { rerender } = renderWithAdminI18n(<PaymentConceptForm {...props()} />);
+    expect(screen.getByLabelText(/Código/)).toHaveAccessibleDescription(/Letras, números, guion y guion bajo; empiece por una letra o un número/);
+
+    rerender(<PaymentConceptForm {...props({ fieldErrors: { code: "Use solo letras, números, guion y guion bajo; el código debe empezar por una letra o un número." } })} />);
+
+    expect(screen.getByLabelText(/Código/)).toHaveAccessibleDescription(/Use solo letras, números, guion y guion bajo/);
+    expect(screen.getByLabelText(/Código/)).toHaveAccessibleDescription(/Letras, números, guion y guion bajo; empiece/);
   });
 
   it("describes each checkbox with its help text", () => {

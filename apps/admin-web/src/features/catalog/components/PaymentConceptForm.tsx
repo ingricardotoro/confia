@@ -87,7 +87,7 @@ export function PaymentConceptForm({ mode, values, fieldErrors, form, onChange, 
       onClose={onClose}
     >
       {mode === "create" ? (
-        <TextField label={t("catalog.paymentConcepts.fields.code")} required {...text("code")} />
+        <TextField label={t("catalog.paymentConcepts.fields.code")} required description={t("catalog.paymentConcepts.codeHelp")} {...text("code")} />
       ) : (
         <ReadOnlyField label={t("catalog.paymentConcepts.fields.code")} controlId={PAYMENT_CONCEPT_CONTROL_IDS.code} value={values.code} />
       )}

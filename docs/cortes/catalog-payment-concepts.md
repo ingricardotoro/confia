@@ -32,7 +32,7 @@ recurrente y si es gravado. Sin precios todavía: el precio llega con las listas
 | Ruta | Permiso | Resultado |
 |---|---|---|
 | `GET /api/v1/catalog/payment-concepts` | `catalog:read` | Página (orden por código o nombre; filtro por categoría y activo) |
-| `POST /api/v1/catalog/payment-concepts` | `catalog:create` | 201 con el concepto; 409 `duplicate-name` si el código existe |
+| `POST /api/v1/catalog/payment-concepts` | `catalog:create` | 201 con el concepto; 409 `duplicate-payment-concept-code` si el código existe |
 | `PUT /api/v1/catalog/payment-concepts/{id}` | `catalog:update` | 200; el código no se envía; 404 si no es de la institución |
 
 ## Pantallas (admin-web)
@@ -60,7 +60,7 @@ base rechaza duplicados y categorías inválidas y ningún usuario ve conceptos 
 - Rutas `GET|POST /api/v1/catalog/payment-concepts` y `PUT /api/v1/catalog/payment-concepts/{id}`; el código no viaja en
   la edición y un cuerpo que lo traiga se rechaza con 400 `validation-failed`. La lista filtra por `category` y `active`
   y ordena por `code` (sin distinguir mayúsculas) o `name`.
-- Un código duplicado (con cualquier capitalización) responde 409 `duplicate-name`; un identificador de otra
+- Un código duplicado (con cualquier capitalización) responde 409 `duplicate-payment-concept-code`; un identificador de otra
   institución responde 404 `resource-not-found`.
 
 ## Construido (frontend)
@@ -71,10 +71,16 @@ base rechaza duplicados y categorías inválidas y ningún usuario ve conceptos 
 - Alta y edición en un diálogo con el patrón de los formularios de organización (resumen de errores, alerta, foco). En
   la edición el código se muestra solo de lectura y no se envía. No hay borrar: el concepto se desactiva con la casilla
   «Activo» (o desde la fila) y se vuelve a activar igual. Se usó una casilla porque `@confia/ui` no tiene un interruptor.
-- `409 duplicate-name` y `400 validation-failed` se muestran como en los demás formularios (alerta y errores por campo).
+- El código se recorta (espacios al inicio y al final) antes de validarlo y enviarlo, porque el servidor ya no lo
+  recorta, y se valida con el patrón generado (`^[A-Za-z0-9][A-Za-z0-9_-]{0,29}$`): un código fuera de la lista
+  permitida muestra bajo el campo «Use solo letras, números, guion y guion bajo…», y la ayuda del campo dice la forma
+  permitida. El patrón que rechaza el servidor (`400`, motivo `pattern`) se muestra igual.
+- `409 duplicate-payment-concept-code` se muestra bajo el campo del código («Ya existe un concepto con ese código.») y
+  `400 validation-failed` bajo sus campos, con el resumen de errores de los demás formularios.
 - Cliente `shared/api/catalog-operations.ts` con los esquemas generados `PaymentConcept*`; claves de consulta
   `paymentConceptKeys`; tras cada escritura se invalida todo el catálogo. Sin `Idempotency-Key` ni actualización
   optimista: el concepto no mueve dinero.
 - Textos en el catálogo es-HN (`catalog.*`, `navigation.catalog`). Presentación pura bajo `components/`.
-- Pruebas: cliente, formulario, búsqueda, vista, formulario y contenedor; simulador (`e2e/mock-api/catalog-*`) con su
+- Pruebas: cliente, lógica del formulario (`payment-concept-form`), búsqueda, vista, componente del formulario
+  (`PaymentConceptForm`) y contenedor; simulador (`e2e/mock-api/catalog-*`) con su
   prueba; recorridos de Playwright `catalog-crud|keyboard|lists|states` y ocho estados en la matriz de accesibilidad.

@@ -7,7 +7,7 @@ import java.util.UUID;
 
 /**
  * Output port of the payment concepts of an institution. A code already taken (whatever its capitals) is refused by
- * {@link #insert} as a {@code DuplicateNameException}. There is no delete.
+ * {@link #insert} as a {@code DuplicateCodeException}. There is no delete.
  */
 public interface PaymentConceptRepository {
 

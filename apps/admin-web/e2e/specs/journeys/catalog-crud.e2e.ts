@@ -89,7 +89,7 @@ test.describe("the payment concepts, creating and editing", () => {
     await expect(page.getByRole("row", { name: /Transporte rutas norte/ })).toContainText("Otro");
   });
 
-  test("deactivates a concept from the edit form with the active switch, and reactivates it from its row", async ({ page, scenarioId }) => {
+  test("deactivates a concept from the edit form with the active checkbox, and reactivates it from its row", async ({ page, scenarioId }) => {
     await openCatalog(page, scenarioId);
 
     await page.getByRole("button", { name: "Editar Colegiatura" }).first().click();
