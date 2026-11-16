@@ -1,7 +1,7 @@
 import { Button, type TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { ActiveBadge, RowActions } from "../../organization/components/fields.tsx";
-import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../organization/components/ResourceScreen.tsx";
+import { ActiveBadge, RowActions } from "../../../shared/resource-screen/components/fields.tsx";
+import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import { nameOf, type Guardian } from "../guardian-form.ts";
 import { GuardianFilters, type GuardianFiltersProps } from "./GuardianFilters.tsx";
 
@@ -50,7 +50,7 @@ export function GuardiansView({ rows, table, pagination, notice, togglingId, fil
     { id: "status", header: t("guardians.columns.status"), sortable: true, cell: (row) => <ActiveBadge active={row.status === "ACTIVE"} /> },
     {
       id: "actions",
-      header: t("organization.common.actions"),
+      header: t("resource.actions"),
       cell: (row) => (
         <RowActions
           name={nameOf(row)}

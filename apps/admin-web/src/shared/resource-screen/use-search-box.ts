@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { searchTextOf } from "./students-search.ts";
+import { searchTextOf } from "./search-text.ts";
 
 /** How long the box waits after the last key before it asks the server. */
 export const SEARCH_DEBOUNCE_MS = 300;

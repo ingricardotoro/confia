@@ -1,7 +1,7 @@
 import { Badge, Button, type TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import { formatIsoDate } from "../../../shared/format/format-date.ts";
-import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../organization/components/ResourceScreen.tsx";
+import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import { detailButtonId, studentNameOf, type Enrollment } from "../enrollment-model.ts";
 import { EnrollmentFilters, type EnrollmentFiltersProps } from "./EnrollmentFilters.tsx";
 
@@ -57,7 +57,7 @@ export function EnrollmentsView({ rows, table, pagination, notice, filters, look
     },
     {
       id: "actions",
-      header: t("organization.common.actions"),
+      header: t("resource.actions"),
       cell: (row) => {
         const name = studentNameOf(row);
         return (

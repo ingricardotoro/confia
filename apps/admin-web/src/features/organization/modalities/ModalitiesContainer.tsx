@@ -1,9 +1,10 @@
 import { listModalities } from "../../../shared/api/organization-operations.ts";
-import { toApiParams, type ModalitiesSearch } from "../list-search.ts";
-import type { SearchChange } from "../search-change.ts";
-import { useListState } from "../use-list-state.ts";
-import { useResourceList, useResourceWrite } from "../use-organization-queries.ts";
-import { useResourceView } from "../use-resource-view.ts";
+import { type ModalitiesSearch } from "../organization-search.ts";
+import { toApiParams } from "../../../shared/resource-screen/list-search.ts";
+import type { SearchChange } from "../../../shared/resource-screen/search-change.ts";
+import { useListState } from "../../../shared/resource-screen/use-list-state.ts";
+import { useResourceList, useResourceWrite } from "../../../shared/organization-lookups/use-organization-queries.ts";
+import { useResourceView } from "../../../shared/resource-screen/use-resource-view.ts";
 import { ModalitiesView } from "./components/ModalitiesView.tsx";
 import { updateBodyOf, writeModality, type Modality, type ModalitySave } from "./modality-form.ts";
 import { ModalityFormContainer } from "./ModalityFormContainer.tsx";

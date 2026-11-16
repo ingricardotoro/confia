@@ -1,5 +1,5 @@
 import { useAdminText } from "../../i18n/use-admin-text.ts";
-import { loadFailureOf } from "../organization/organization-failure.ts";
+import { loadFailureOf } from "../../shared/resource-screen/resource-failure.ts";
 import { GuardianConsentsContainer } from "./GuardianConsentsContainer.tsx";
 import { GuardianDetail } from "./components/GuardianDetail.tsx";
 import { useGuardianDetail } from "./use-guardians-queries.ts";
@@ -26,7 +26,7 @@ export function GuardianDetailContainer({ guardianId, onClose }: GuardianDetailC
                 kind: "failed",
                 description: [
                   t(failure?.key ?? "problem.unexpected"),
-                  failure?.traceId === undefined ? "" : t("organization.common.trace", { traceId: failure.traceId }),
+                  failure?.traceId === undefined ? "" : t("resource.trace", { traceId: failure.traceId }),
                 ]
                   .filter((part) => part !== "")
                   .join(" "),

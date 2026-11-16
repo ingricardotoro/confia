@@ -83,7 +83,7 @@ function Facts({ row }: { readonly row: Guardian }) {
         <Fact term={t("guardians.detail.phone")}>{optional(row.phone)}</Fact>
         <Fact term={t("guardians.detail.address")}>{optional(row.address)}</Fact>
         <Fact term={t("guardians.fields.preferredChannel")}>{t(`guardians.channel.${row.preferredChannel}`)}</Fact>
-        <Fact term={t("guardians.fields.status")}>{t(row.status === "ACTIVE" ? "organization.common.active" : "organization.common.inactive")}</Fact>
+        <Fact term={t("guardians.fields.status")}>{t(row.status === "ACTIVE" ? "resource.active" : "resource.inactive")}</Fact>
       </dl>
       <section aria-labelledby="guardian-students-heading" className="flex flex-col gap-2">
         <h3 id="guardian-students-heading" className="text-base font-semibold text-text-primary">

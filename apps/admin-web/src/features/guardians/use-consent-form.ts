@@ -4,7 +4,7 @@ import type { AdminKey } from "../../i18n/resources.ts";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { resolveFieldErrors } from "../../shared/forms/field-errors.ts";
 import { useRetryCountdown } from "../../shared/forms/use-retry-countdown.ts";
-import { failureOf } from "../organization/organization-failure.ts";
+import { failureOf } from "../../shared/resource-screen/resource-failure.ts";
 import {
   CONSENT_CONTROL_IDS,
   EMPTY_CONSENT_DRAFT,

@@ -1,7 +1,7 @@
 import type { TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../../i18n/use-admin-text.ts";
-import { ActiveBadge, RowActions } from "../../components/fields.tsx";
-import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../components/ResourceScreen.tsx";
+import { ActiveBadge, RowActions } from "../../../../shared/resource-screen/components/fields.tsx";
+import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../../../shared/resource-screen/components/ResourceScreen.tsx";
 import type { Modality } from "../modality-form.ts";
 
 export interface ModalitiesViewProps {
@@ -22,10 +22,10 @@ export function ModalitiesView({ rows, table, pagination, notice, togglingId, on
   const columns: readonly TableColumn<Modality>[] = [
     { id: "code", header: t("organization.modalities.columns.code"), sortable: true, cell: (row) => row.code },
     { id: "name", header: t("organization.modalities.columns.name"), sortable: true, cell: (row) => row.name },
-    { id: "isActive", header: t("organization.common.state"), cell: (row) => <ActiveBadge active={row.isActive} /> },
+    { id: "isActive", header: t("resource.state"), cell: (row) => <ActiveBadge active={row.isActive} /> },
     {
       id: "actions",
-      header: t("organization.common.actions"),
+      header: t("resource.actions"),
       cell: (row) => (
         <RowActions
           name={row.name}

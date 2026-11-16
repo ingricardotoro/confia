@@ -1,7 +1,7 @@
 import type { TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../../i18n/use-admin-text.ts";
-import { ActiveBadge, OptionField, RowActions, type Option } from "../../components/fields.tsx";
-import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../components/ResourceScreen.tsx";
+import { ActiveBadge, OptionField, RowActions, type Option } from "../../../../shared/resource-screen/components/fields.tsx";
+import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../../../shared/resource-screen/components/ResourceScreen.tsx";
 import type { Grade } from "../grade-form.ts";
 
 export interface GradesViewProps {
@@ -41,12 +41,12 @@ export function GradesView({
     {
       id: "modality",
       header: t("organization.grades.columns.modality"),
-      cell: (row) => modalityNames.get(row.modalityId) ?? t("organization.common.unknownReference"),
+      cell: (row) => modalityNames.get(row.modalityId) ?? t("resource.unknownReference"),
     },
-    { id: "isActive", header: t("organization.common.state"), cell: (row) => <ActiveBadge active={row.isActive} /> },
+    { id: "isActive", header: t("resource.state"), cell: (row) => <ActiveBadge active={row.isActive} /> },
     {
       id: "actions",
-      header: t("organization.common.actions"),
+      header: t("resource.actions"),
       cell: (row) => (
         <RowActions
           name={row.name}
@@ -76,7 +76,7 @@ export function GradesView({
           controlId="grades-filter-modality"
           value={modalityFilter.value}
           options={modalityFilter.options}
-          placeholder={t("organization.common.allOption")}
+          placeholder={t("resource.allOption")}
           onChange={modalityFilter.onChange}
         />
       }

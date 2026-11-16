@@ -1,5 +1,5 @@
 import { useAdminText } from "../../i18n/use-admin-text.ts";
-import { loadFailureOf } from "../organization/organization-failure.ts";
+import { loadFailureOf } from "../../shared/resource-screen/resource-failure.ts";
 import { EnrollmentDetail } from "./components/EnrollmentDetail.tsx";
 import { useEnrollmentDetail } from "./use-enrollments-queries.ts";
 
@@ -25,7 +25,7 @@ export function EnrollmentDetailContainer({ enrollmentId, onClose }: EnrollmentD
                 kind: "failed",
                 description: [
                   t(failure?.key ?? "problem.unexpected"),
-                  failure?.traceId === undefined ? "" : t("organization.common.trace", { traceId: failure.traceId }),
+                  failure?.traceId === undefined ? "" : t("resource.trace", { traceId: failure.traceId }),
                 ]
                   .filter((part) => part !== "")
                   .join(" "),

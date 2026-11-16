@@ -1,6 +1,6 @@
 import { useAccessForm } from "../../shared/forms/use-access-form.ts";
-import { failureOf } from "../organization/organization-failure.ts";
-import { fieldSpecs } from "../organization/organization-form.ts";
+import { failureOf } from "../../shared/resource-screen/resource-failure.ts";
+import { fieldSpecs } from "../../shared/resource-screen/resource-form.ts";
 import type { AccessFailure } from "../../shared/forms/access-failure.ts";
 import { GuardianForm } from "./components/GuardianForm.tsx";
 import {
@@ -45,7 +45,7 @@ export function GuardianFormContainer({ row, save, onClose }: GuardianFormContai
         return guardianFailureOf(error);
       }
     },
-    waitingKey: "organization.common.saving",
+    waitingKey: "resource.saving",
   });
 
   return (

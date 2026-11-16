@@ -1,15 +1,15 @@
 import type { TableSort } from "@confia/ui";
 import { useState } from "react";
 import { StudentGuardiansContainer } from "../guardians/StudentGuardiansContainer.tsx";
-import { toApiParams } from "../organization/list-search.ts";
-import type { SearchChange } from "../organization/search-change.ts";
-import { useListState } from "../organization/use-list-state.ts";
-import { useResourceView } from "../organization/use-resource-view.ts";
+import { toApiParams } from "../../shared/resource-screen/list-search.ts";
+import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
+import { useListState } from "../../shared/resource-screen/use-list-state.ts";
+import { useResourceView } from "../../shared/resource-screen/use-resource-view.ts";
 import { StudentsView } from "./components/StudentsView.tsx";
 import { StudentFormContainer } from "./StudentFormContainer.tsx";
 import { nameOf, toggleBodyOf, type Student } from "./student-form.ts";
 import type { StudentsSearch } from "./students-search.ts";
-import { useSearchBox } from "./use-search-box.ts";
+import { useSearchBox } from "../../shared/resource-screen/use-search-box.ts";
 import { useStudentList, useStudentWrite } from "./use-students-queries.ts";
 
 export interface StudentsContainerProps {

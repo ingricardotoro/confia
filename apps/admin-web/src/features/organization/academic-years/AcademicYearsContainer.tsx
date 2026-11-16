@@ -1,9 +1,10 @@
 import { listAcademicYears } from "../../../shared/api/organization-operations.ts";
-import { toApiParams, type AcademicYearsSearch } from "../list-search.ts";
-import type { SearchChange } from "../search-change.ts";
-import { useListState } from "../use-list-state.ts";
-import { useResourceList, useResourceWrite } from "../use-organization-queries.ts";
-import { useResourceView } from "../use-resource-view.ts";
+import { type AcademicYearsSearch } from "../organization-search.ts";
+import { toApiParams } from "../../../shared/resource-screen/list-search.ts";
+import type { SearchChange } from "../../../shared/resource-screen/search-change.ts";
+import { useListState } from "../../../shared/resource-screen/use-list-state.ts";
+import { useResourceList, useResourceWrite } from "../../../shared/organization-lookups/use-organization-queries.ts";
+import { useResourceView } from "../../../shared/resource-screen/use-resource-view.ts";
 import { updateBodyOf, writeYear, type AcademicYear, type YearSave } from "./academic-year-form.ts";
 import { AcademicYearFormContainer } from "./AcademicYearFormContainer.tsx";
 import { AcademicYearsView } from "./components/AcademicYearsView.tsx";

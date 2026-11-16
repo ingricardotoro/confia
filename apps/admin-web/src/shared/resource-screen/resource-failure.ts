@@ -1,12 +1,13 @@
 import type { AdminKey } from "../../i18n/resources.ts";
-import { ApiFailure, type ApiFailureResult } from "../../shared/api/api-failure.ts";
-import { PROBLEM_KEYS } from "../../shared/api/problem-keys.ts";
-import { classifyAccessFailure, type AccessFailure } from "../../shared/forms/access-failure.ts";
+import { ApiFailure, type ApiFailureResult } from "../api/api-failure.ts";
+import { PROBLEM_KEYS } from "../api/problem-keys.ts";
+import { classifyAccessFailure, type AccessFailure } from "../forms/access-failure.ts";
 
 /**
  * The codes of the academic structure, the two every write can meet, and the two of the students registry, the five
- * of the enrollments and the one of the guardians, that have a text of their own. This classifier serves the screens
- * of the academic structure, the students, the enrollments, the guardians and the catalog.
+ * of the enrollments and the one of the guardians, that have a text of their own. This classifier is shared by every
+ * screen built on the resource infrastructure of this folder (the academic structure, the students, the enrollments, the
+ * guardians, the imports and the catalog); a new feature adds its codes here, never a classifier of its own.
  */
 const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "academic-year-overlap",

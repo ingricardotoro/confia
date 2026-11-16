@@ -85,7 +85,7 @@ describe("the list of grades", () => {
     route("get", MODALITIES, problem("internal-error", 500), organizationPage("modalities", [PRIMARY]));
     renderOrganization("/organization/grades");
 
-    const warning = await screen.findByText(admin.organization.common.optionsFailed, undefined, TIMEOUT);
+    const warning = await screen.findByText(admin.resource.optionsFailed, undefined, TIMEOUT);
     expect(warning).toBeInTheDocument();
     // The list itself still loads: a lookup that fails is a partial error.
     expect(await screen.findByRole("row", { name: /Primero/ })).toBeInTheDocument();
@@ -163,7 +163,7 @@ describe("creating, editing and deactivating a grade", () => {
     const fixed = within(dialog).getByLabelText(/Modalidad/);
     expect(fixed).toHaveValue("Primaria");
     expect(fixed).toHaveAttribute("readonly");
-    expect(fixed).toHaveAccessibleDescription(admin.organization.common.fixedNote);
+    expect(fixed).toHaveAccessibleDescription(admin.resource.fixedNote);
     await user.clear(within(dialog).getByLabelText(/Orden/));
     await user.type(within(dialog).getByLabelText(/Orden/), "5");
     await user.click(within(dialog).getByRole("button", { name: "Guardar" }));

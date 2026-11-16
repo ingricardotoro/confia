@@ -11,11 +11,11 @@ import {
 } from "../../shared/api/enrollment-operations.ts";
 import { listSections } from "../../shared/api/organization-operations.ts";
 import { listStudents } from "../../shared/api/student-operations.ts";
-import { organizationKeys } from "../organization/organization-keys.ts";
-import { LOOKUP_PAGE_SIZE } from "../organization/use-organization-queries.ts";
-import { studentKeys } from "../students/students-keys.ts";
+import { organizationKeys } from "../../shared/organization-lookups/organization-keys.ts";
+import { LOOKUP_PAGE_SIZE } from "../../shared/organization-lookups/use-organization-queries.ts";
+import { studentKeys } from "../../shared/query-keys/students-keys.ts";
 import type { Enrollment } from "./enrollment-model.ts";
-import { enrollmentKeys } from "./enrollments-keys.ts";
+import { enrollmentKeys } from "../../shared/query-keys/enrollments-keys.ts";
 
 /** A listing of enrollments, as the server pages, orders and filters it: the rows come back as they were served. */
 export function useEnrollmentList(params: EnrollmentListParams) {

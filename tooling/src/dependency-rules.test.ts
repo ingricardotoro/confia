@@ -24,6 +24,7 @@ const RULES = [
   "apps-use-ui-public-entry",
   "admin-presentation-is-pure",
   "admin-shared-never-imports-features",
+  "admin-features-never-import-features",
   "admin-token-store-is-private",
   "admin-session-lifecycle-planner-is-pure",
   "admin-session-lifecycle-is-private",
@@ -54,6 +55,8 @@ const APP_VIOLATIONS = [
   ["D3", "admin-presentation-is-pure", "features/identity/components/imports-form.ts"],
   ["D3", "admin-shared-never-imports-features", "shared/imports-a-feature.ts"],
   ["D3", "admin-token-store-is-private", "features/billing/reads-token-store.ts"],
+  // A feature never reaches into another feature: shared code lives in src/shared/.
+  ["F1", "admin-features-never-import-features", "features/billing/imports-another-feature.ts"],
   // admin-web-staff-sign-in, design.md E2 (task 1.1): the enrollment draft is as private as the token store.
   ["E2", "admin-token-store-is-private", "features/identity/enrollment/imports-enrollment-draft.ts"],
   // admin-web-shell-and-session-lifecycle, design.md H16 (task 1.5): the planner is pure and the lifecycle folder is private.
@@ -141,7 +144,7 @@ describe("the frontend dependency rules", () => {
   describe("over the real apps/admin-web", () => {
     const real = cruise(["apps/admin-web/src"]);
     // The signed in page left its container for the shell; the data of a feature is read in its query module, which is the file that holds both imports now.
-    const container = "apps/admin-web/src/features/organization/use-organization-queries.ts";
+    const container = "apps/admin-web/src/shared/organization-lookups/use-organization-queries.ts";
 
     it("BX61: a real container imports TanStack Query and shared/api without a violation", () => {
       const module = real.modules.find((candidate) => candidate.source === container);

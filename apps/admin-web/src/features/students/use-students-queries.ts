@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthorizedSend } from "../../shared/api/authorized-send.tsx";
 import { listStudents, type StudentListParams } from "../../shared/api/student-operations.ts";
 import { writeStudent, type Student, type StudentSave } from "./student-form.ts";
-import { studentKeys } from "./students-keys.ts";
+import { studentKeys } from "../../shared/query-keys/students-keys.ts";
 
 /** A listing of students, as the server pages, orders and searches it: the rows come back as they were served. */
 export function useStudentList(params: StudentListParams) {

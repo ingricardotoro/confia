@@ -5,7 +5,7 @@ import { useAdminText } from "../../i18n/use-admin-text.ts";
 import type { AccessFailure } from "../../shared/forms/access-failure.ts";
 import { fieldErrorKey } from "../../shared/forms/field-errors.ts";
 import { useRetryCountdown } from "../../shared/forms/use-retry-countdown.ts";
-import { failureOf } from "../organization/organization-failure.ts";
+import { failureOf } from "../../shared/resource-screen/resource-failure.ts";
 import {
   MAX_LINKS,
   bodyOf,

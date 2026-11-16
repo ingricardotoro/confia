@@ -4,7 +4,6 @@ import type { FeatureModule } from "../../shared/navigation/navigation-entry.ts"
 import { AcademicYearsContainer } from "./academic-years/AcademicYearsContainer.tsx";
 import { GradesContainer } from "./grades/GradesContainer.tsx";
 import {
-  DEFAULT_PAGE_SIZE,
   academicYearsSearch,
   gradesSearch,
   modalitiesSearch,
@@ -13,12 +12,13 @@ import {
   type GradesSearch,
   type ModalitiesSearch,
   type SectionsSearch,
-} from "./list-search.ts";
+} from "./organization-search.ts";
 import { ModalitiesContainer } from "./modalities/ModalitiesContainer.tsx";
 import { OrganizationContainer } from "./OrganizationContainer.tsx";
 import { ORGANIZATION_PATH, ORGANIZATION_PATHS } from "./organization-paths.ts";
 import { SectionsContainer } from "./sections/SectionsContainer.tsx";
-import { useListSearch } from "./use-list-search.ts";
+import { DEFAULT_PAGE_SIZE } from "../../shared/resource-screen/list-search.ts";
+import { useListSearch } from "../../shared/resource-screen/use-list-search.ts";
 
 export { ORGANIZATION_PATH };
 

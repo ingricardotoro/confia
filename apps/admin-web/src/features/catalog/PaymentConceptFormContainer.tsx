@@ -1,6 +1,6 @@
 import { useAccessForm } from "../../shared/forms/use-access-form.ts";
-import { failureOf } from "../organization/organization-failure.ts";
-import { fieldSpecs } from "../organization/organization-form.ts";
+import { failureOf } from "../../shared/resource-screen/resource-failure.ts";
+import { fieldSpecs } from "../../shared/resource-screen/resource-form.ts";
 import { PaymentConceptForm } from "./components/PaymentConceptForm.tsx";
 import {
   PAYMENT_CONCEPT_CONTROL_IDS,
@@ -33,7 +33,7 @@ export function PaymentConceptFormContainer({ row, save, onClose }: PaymentConce
         return failureOf(error);
       }
     },
-    waitingKey: "organization.common.saving",
+    waitingKey: "resource.saving",
   });
 
   return (

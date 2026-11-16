@@ -10,7 +10,7 @@ export const DEFAULT_PAGE_SIZE = 25;
 
 export const pageSize = z.union([z.literal(25), z.literal(50), z.literal(100)]).catch(DEFAULT_PAGE_SIZE);
 export const page = z.number().int().min(1).catch(1);
-const id = z.uuid().optional().catch(undefined);
+export const optionalId = z.uuid().optional().catch(undefined);
 
 export function sortOf(fields: readonly string[]) {
   return z
@@ -22,22 +22,6 @@ export function sortOf(fields: readonly string[]) {
     .optional()
     .catch(undefined);
 }
-
-export const academicYearsSearch = z.object({ page, pageSize, sort: sortOf(["name", "startDate", "endDate", "status"]) });
-export const modalitiesSearch = z.object({ page, pageSize, sort: sortOf(["code", "name"]) });
-export const gradesSearch = z.object({ page, pageSize, sort: sortOf(["name", "ordinal"]), modalityId: id });
-export const sectionsSearch = z.object({
-  page,
-  pageSize,
-  sort: sortOf(["name", "capacity"]),
-  academicYearId: id,
-  gradeId: id,
-});
-
-export type AcademicYearsSearch = z.infer<typeof academicYearsSearch>;
-export type ModalitiesSearch = z.infer<typeof modalitiesSearch>;
-export type GradesSearch = z.infer<typeof gradesSearch>;
-export type SectionsSearch = z.infer<typeof sectionsSearch>;
 
 interface BaseSearch {
   readonly page: number;

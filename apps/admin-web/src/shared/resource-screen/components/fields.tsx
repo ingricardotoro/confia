@@ -128,7 +128,7 @@ export function TextField({
 export function ReadOnlyField({ label, controlId, value }: { readonly label: string; readonly controlId: string; readonly value: string }) {
   const { t } = useAdminText();
   return (
-    <FormField label={label} controlId={controlId} description={t("organization.common.fixedNote")}>
+    <FormField label={label} controlId={controlId} description={t("resource.fixedNote")}>
       {(control) => <Input {...control} readOnly value={value} />}
     </FormField>
   );
@@ -137,7 +137,7 @@ export function ReadOnlyField({ label, controlId, value }: { readonly label: str
 /** Active or inactive, in text. */
 export function ActiveBadge({ active }: { readonly active: boolean }) {
   const { t } = useAdminText();
-  return <Badge variant={active ? "primary" : "outline"}>{active ? t("organization.common.active") : t("organization.common.inactive")}</Badge>;
+  return <Badge variant={active ? "primary" : "outline"}>{active ? t("resource.active") : t("resource.inactive")}</Badge>;
 }
 
 export interface RowActionsProps {
@@ -156,17 +156,17 @@ export function RowActions({ name, active, busy, onEdit, onToggle, extra }: RowA
   const { t } = useAdminText();
   return (
     <div className="flex flex-wrap gap-2">
-      <Button variant="secondary" size="sm" aria-label={t("organization.common.editFor", { name })} onClick={onEdit}>
-        {t("organization.common.edit")}
+      <Button variant="secondary" size="sm" aria-label={t("resource.editFor", { name })} onClick={onEdit}>
+        {t("resource.edit")}
       </Button>
       <Button
         variant="secondary"
         size="sm"
         loading={busy}
-        aria-label={t(active ? "organization.common.deactivateFor" : "organization.common.activateFor", { name })}
+        aria-label={t(active ? "resource.deactivateFor" : "resource.activateFor", { name })}
         onClick={onToggle}
       >
-        {t(active ? "organization.common.deactivate" : "organization.common.activate")}
+        {t(active ? "resource.deactivate" : "resource.activate")}
       </Button>
       {extra}
     </div>

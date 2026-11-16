@@ -9,7 +9,7 @@ import type { ApiResult } from "../../../shared/api/http.ts";
 import { createGrade, updateGrade } from "../../../shared/api/organization-operations.ts";
 import { reasonsFromSchema, requiredReasons } from "../../../shared/forms/schema-reasons.ts";
 import type { FieldReason } from "../../../shared/forms/use-access-form.ts";
-import { activeValueOf, wholeNumberOf } from "../organization-form.ts";
+import { activeValueOf, wholeNumberOf } from "../../../shared/resource-screen/resource-form.ts";
 
 export type Grade = GradeResponseOutput;
 export type GradeField = "modalityId" | "name" | "ordinal" | "isActive";

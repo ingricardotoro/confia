@@ -1,8 +1,8 @@
 import { Button, type TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import { formatIsoDate } from "../../../shared/format/format-date.ts";
-import { ActiveBadge, RowActions } from "../../organization/components/fields.tsx";
-import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../organization/components/ResourceScreen.tsx";
+import { ActiveBadge, RowActions } from "../../../shared/resource-screen/components/fields.tsx";
+import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import { nameOf, type Student } from "../student-form.ts";
 import { StudentFilters, type StudentFiltersProps } from "./StudentFilters.tsx";
 
@@ -49,10 +49,10 @@ export function StudentsView({ rows, table, pagination, notice, togglingId, filt
           </>
         ),
     },
-    { id: "status", header: t("organization.common.state"), cell: (row) => <ActiveBadge active={row.status === "ACTIVE"} /> },
+    { id: "status", header: t("resource.state"), cell: (row) => <ActiveBadge active={row.status === "ACTIVE"} /> },
     {
       id: "actions",
-      header: t("organization.common.actions"),
+      header: t("resource.actions"),
       cell: (row) => (
         <RowActions
           name={nameOf(row)}

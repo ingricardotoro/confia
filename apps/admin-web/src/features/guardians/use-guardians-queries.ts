@@ -16,7 +16,7 @@ import {
   type GuardianListParams,
 } from "../../shared/api/guardian-operations.ts";
 import { writeGuardian, type Guardian, type GuardianSave } from "./guardian-form.ts";
-import { guardianKeys } from "./guardians-keys.ts";
+import { guardianKeys } from "../../shared/query-keys/guardians-keys.ts";
 
 /** A listing of guardians, as the server pages, orders and searches it: the rows come back as they were served. */
 export function useGuardianList(params: GuardianListParams) {

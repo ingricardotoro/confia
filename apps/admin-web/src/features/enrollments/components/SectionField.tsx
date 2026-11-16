@@ -35,7 +35,7 @@ export function SectionField({ label, controlId, value, groups, onChange, onBlur
           }}
           onBlur={onBlur}
         >
-          <option value="">{t("organization.common.chooseOption")}</option>
+          <option value="">{t("resource.chooseOption")}</option>
           {groups.map((group) => (
             <optgroup key={group.label} label={group.label}>
               {group.options.map((option) => (

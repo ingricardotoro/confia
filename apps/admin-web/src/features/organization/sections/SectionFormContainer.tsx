@@ -1,7 +1,7 @@
 import { useAccessForm } from "../../../shared/forms/use-access-form.ts";
-import type { Option } from "../components/fields.tsx";
-import { failureOf } from "../organization-failure.ts";
-import { fieldSpecs } from "../organization-form.ts";
+import type { Option } from "../../../shared/resource-screen/components/fields.tsx";
+import { failureOf } from "../../../shared/resource-screen/resource-failure.ts";
+import { fieldSpecs } from "../../../shared/resource-screen/resource-form.ts";
 import { SectionForm } from "./components/SectionForm.tsx";
 import { SECTION_CONTROL_IDS, initialSectionValues, saveOf, validateSection, type Section, type SectionField, type SectionSave } from "./section-form.ts";
 
@@ -32,7 +32,7 @@ export function SectionFormContainer({ row, defaults, yearOptions, gradeOptions,
         return failureOf(error);
       }
     },
-    waitingKey: "organization.common.saving",
+    waitingKey: "resource.saving",
   });
 
   return (

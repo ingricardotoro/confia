@@ -1,8 +1,8 @@
 import { Checkbox, Label } from "@confia/ui";
 import { useId } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { OptionField, ReadOnlyField, TextField } from "../../organization/components/fields.tsx";
-import { ResourceFormDialog, type ResourceFormView } from "../../organization/components/ResourceFormDialog.tsx";
+import { OptionField, ReadOnlyField, TextField } from "../../../shared/resource-screen/components/fields.tsx";
+import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { PAYMENT_CATEGORIES } from "../catalog-search.ts";
 import { CATEGORY_LABEL_KEYS } from "../category-options.ts";
 import { PAYMENT_CONCEPT_CONTROL_IDS, type PaymentConceptField, type PaymentConceptValues } from "../payment-concept-form.ts";
@@ -82,7 +82,7 @@ export function PaymentConceptForm({ mode, values, fieldErrors, form, onChange, 
     <ResourceFormDialog
       title={t(mode === "create" ? "catalog.paymentConcepts.createTitle" : "catalog.paymentConcepts.editTitle")}
       description={t(mode === "create" ? "catalog.paymentConcepts.createDescription" : "catalog.paymentConcepts.editDescription")}
-      submitLabel={t("organization.common.save")}
+      submitLabel={t("resource.save")}
       form={form}
       onClose={onClose}
     >
@@ -96,7 +96,7 @@ export function PaymentConceptForm({ mode, values, fieldErrors, form, onChange, 
         label={t("catalog.paymentConcepts.fields.category")}
         required
         options={PAYMENT_CATEGORIES.map((category) => ({ value: category, label: t(CATEGORY_LABEL_KEYS[category]) }))}
-        placeholder={t("organization.common.chooseOption")}
+        placeholder={t("resource.chooseOption")}
         {...text("category")}
       />
       {check("isRecurring", t("catalog.paymentConcepts.fields.isRecurring"), t("catalog.paymentConcepts.recurringHelp"))}

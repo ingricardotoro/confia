@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { page, pageSize, sortOf } from "../organization/list-search.ts";
+import { page, pageSize, sortOf } from "../../shared/resource-screen/list-search.ts";
 
 export const ENROLLMENT_STATUSES = ["ACTIVE", "WITHDRAWN", "TRANSFERRED", "GRADUATED"] as const;
 

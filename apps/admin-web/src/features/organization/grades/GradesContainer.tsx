@@ -1,11 +1,12 @@
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import { listGrades } from "../../../shared/api/organization-operations.ts";
-import { toApiParams, type GradesSearch } from "../list-search.ts";
-import type { SearchChange } from "../search-change.ts";
-import { useListState } from "../use-list-state.ts";
-import { nameMapOf, optionsOf, useModalityLookup } from "../use-lookups.ts";
-import { useResourceList, useResourceWrite } from "../use-organization-queries.ts";
-import { useResourceView } from "../use-resource-view.ts";
+import { type GradesSearch } from "../organization-search.ts";
+import { toApiParams } from "../../../shared/resource-screen/list-search.ts";
+import type { SearchChange } from "../../../shared/resource-screen/search-change.ts";
+import { useListState } from "../../../shared/resource-screen/use-list-state.ts";
+import { nameMapOf, optionsOf, useModalityLookup } from "../../../shared/organization-lookups/use-lookups.ts";
+import { useResourceList, useResourceWrite } from "../../../shared/organization-lookups/use-organization-queries.ts";
+import { useResourceView } from "../../../shared/resource-screen/use-resource-view.ts";
 import { GradesView } from "./components/GradesView.tsx";
 import { updateBodyOf, writeGrade, type Grade, type GradeSave } from "./grade-form.ts";
 import { GradeFormContainer } from "./GradeFormContainer.tsx";
@@ -70,7 +71,7 @@ export function GradesContainer({ search, onSearchChange }: GradesContainerProps
           {...(view.dialog.kind === "edit" ? { row: view.dialog.row } : {})}
           {...(search.modalityId === undefined ? {} : { defaultModalityId: search.modalityId })}
           modalityOptions={optionsOf(modalities.rows.filter((modality) => modality.isActive))}
-          modalityName={view.dialog.kind === "edit" ? (modalityNames.get(view.dialog.row.modalityId) ?? t("organization.common.unknownReference")) : ""}
+          modalityName={view.dialog.kind === "edit" ? (modalityNames.get(view.dialog.row.modalityId) ?? t("resource.unknownReference")) : ""}
           save={async (save) => {
             const saved = await write.mutateAsync(save);
             view.saved(save.mode === "create" ? "created" : "updated", saved.name);

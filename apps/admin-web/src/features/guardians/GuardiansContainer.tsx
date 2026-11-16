@@ -1,10 +1,10 @@
 import type { TableSort } from "@confia/ui";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
-import { toApiParams } from "../organization/list-search.ts";
-import type { SearchChange } from "../organization/search-change.ts";
-import { useListState } from "../organization/use-list-state.ts";
-import { useResourceView } from "../organization/use-resource-view.ts";
-import { useSearchBox } from "../students/use-search-box.ts";
+import { toApiParams } from "../../shared/resource-screen/list-search.ts";
+import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
+import { useListState } from "../../shared/resource-screen/use-list-state.ts";
+import { useResourceView } from "../../shared/resource-screen/use-resource-view.ts";
+import { useSearchBox } from "../../shared/resource-screen/use-search-box.ts";
 import { GuardiansView } from "./components/GuardiansView.tsx";
 import { GuardianDetailContainer } from "./GuardianDetailContainer.tsx";
 import { GuardianFormContainer } from "./GuardianFormContainer.tsx";

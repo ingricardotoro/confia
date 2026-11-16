@@ -1,7 +1,7 @@
 import type { AdminKey } from "../../../../i18n/resources.ts";
 import { useAdminText } from "../../../../i18n/use-admin-text.ts";
-import { OptionField, TextField } from "../../components/fields.tsx";
-import { ResourceFormDialog, type ResourceFormView } from "../../components/ResourceFormDialog.tsx";
+import { OptionField, TextField } from "../../../../shared/resource-screen/components/fields.tsx";
+import { ResourceFormDialog, type ResourceFormView } from "../../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { YEAR_CONTROL_IDS, type YearField, type YearValues } from "../academic-year-form.ts";
 
 export const STATUS_KEYS: Readonly<Record<"PLANNED" | "ACTIVE" | "CLOSED", AdminKey>> = {
@@ -44,7 +44,7 @@ export function AcademicYearForm({ mode, values, fieldErrors, form, onChange, on
     <ResourceFormDialog
       title={t(mode === "create" ? "organization.academicYears.createTitle" : "organization.academicYears.editTitle")}
       description={t(mode === "create" ? "organization.academicYears.createDescription" : "organization.academicYears.editDescription")}
-      submitLabel={t("organization.common.save")}
+      submitLabel={t("resource.save")}
       form={form}
       onClose={onClose}
     >
@@ -61,8 +61,8 @@ export function AcademicYearForm({ mode, values, fieldErrors, form, onChange, on
         <OptionField
           label={t("organization.academicYears.fields.isActive")}
           options={[
-            { value: "true", label: t("organization.common.active") },
-            { value: "false", label: t("organization.common.inactive") },
+            { value: "true", label: t("resource.active") },
+            { value: "false", label: t("resource.inactive") },
           ]}
           {...text("isActive")}
         />

@@ -1,12 +1,12 @@
 import type { TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { ActiveBadge, OptionField, RowActions, type Option } from "../../organization/components/fields.tsx";
+import { ActiveBadge, OptionField, RowActions, type Option } from "../../../shared/resource-screen/components/fields.tsx";
 import {
   ResourceScreen,
   type ListTableState,
   type ResourceNotice,
   type ResourcePagination,
-} from "../../organization/components/ResourceScreen.tsx";
+} from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import { PAYMENT_CATEGORIES } from "../catalog-search.ts";
 import { CATEGORY_LABEL_KEYS } from "../category-options.ts";
 import type { PaymentConcept } from "../payment-concept-form.ts";
@@ -34,8 +34,8 @@ export function PaymentConceptsView({ rows, table, pagination, notice, togglingI
   const yesNo = (value: boolean) => t(value ? "catalog.common.yes" : "catalog.common.no");
   const categoryOptions: readonly Option[] = PAYMENT_CATEGORIES.map((category) => ({ value: category, label: t(CATEGORY_LABEL_KEYS[category]) }));
   const activeOptions: readonly Option[] = [
-    { value: "true", label: t("organization.common.active") },
-    { value: "false", label: t("organization.common.inactive") },
+    { value: "true", label: t("resource.active") },
+    { value: "false", label: t("resource.inactive") },
   ];
   const columns: readonly TableColumn<PaymentConcept>[] = [
     { id: "code", header: t("catalog.paymentConcepts.columns.code"), sortable: true, cell: (row) => row.code },
@@ -43,10 +43,10 @@ export function PaymentConceptsView({ rows, table, pagination, notice, togglingI
     { id: "category", header: t("catalog.paymentConcepts.columns.category"), cell: (row) => t(CATEGORY_LABEL_KEYS[row.category]) },
     { id: "isRecurring", header: t("catalog.paymentConcepts.columns.recurring"), cell: (row) => yesNo(row.isRecurring) },
     { id: "isTaxable", header: t("catalog.paymentConcepts.columns.taxable"), cell: (row) => yesNo(row.isTaxable) },
-    { id: "isActive", header: t("organization.common.state"), cell: (row) => <ActiveBadge active={row.isActive} /> },
+    { id: "isActive", header: t("resource.state"), cell: (row) => <ActiveBadge active={row.isActive} /> },
     {
       id: "actions",
-      header: t("organization.common.actions"),
+      header: t("resource.actions"),
       cell: (row) => (
         <RowActions
           name={row.name}
@@ -76,7 +76,7 @@ export function PaymentConceptsView({ rows, table, pagination, notice, togglingI
             controlId="payment-concepts-filter-category"
             value={filters.category.value}
             options={categoryOptions}
-            placeholder={t("organization.common.allOption")}
+            placeholder={t("resource.allOption")}
             onChange={filters.category.onChange}
           />
           <OptionField
@@ -84,7 +84,7 @@ export function PaymentConceptsView({ rows, table, pagination, notice, togglingI
             controlId="payment-concepts-filter-active"
             value={filters.active.value}
             options={activeOptions}
-            placeholder={t("organization.common.allOption")}
+            placeholder={t("resource.allOption")}
             onChange={filters.active.onChange}
           />
         </>

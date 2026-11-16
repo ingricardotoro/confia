@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ApiResult } from "../../shared/api/http.ts";
-import { useAuthorizedSend } from "../../shared/api/authorized-send.tsx";
+import type { ApiResult } from "../api/http.ts";
+import { useAuthorizedSend } from "../api/authorized-send.tsx";
 import { organizationKeys, type OrganizationResource } from "./organization-keys.ts";
 
 /** The most a lookup list asks for: the API's own limit per page. */

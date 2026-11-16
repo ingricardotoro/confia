@@ -53,15 +53,15 @@ export function ResourceScreen<Row>({ heading, createLabel, onCreate, filters, n
         <Button onClick={onCreate}>{createLabel}</Button>
       </div>
       {filters === undefined ? null : (
-        <div role="group" aria-label={t("organization.common.filters")} className="flex flex-wrap items-end gap-3">
+        <div role="group" aria-label={t("resource.filters")} className="flex flex-wrap items-end gap-3">
           {filters}
         </div>
       )}
       {lookupFailure === undefined ? null : (
         <Alert variant="warning">
-          <p>{t("organization.common.optionsFailed")}</p>
+          <p>{t("resource.optionsFailed")}</p>
           <Button variant="secondary" size="sm" className="mt-2" onClick={lookupFailure.onRetry}>
-            {t("organization.common.retryOptions")}
+            {t("resource.retryOptions")}
           </Button>
         </Alert>
       )}
@@ -69,7 +69,7 @@ export function ResourceScreen<Row>({ heading, createLabel, onCreate, filters, n
         {notice === undefined ? null : (
           <Alert variant={notice.tone === "error" ? "destructive" : "info"}>
             <p>{notice.message}</p>
-            {notice.traceId === undefined ? null : <p className="mt-1">{t("organization.common.trace", { traceId: notice.traceId })}</p>}
+            {notice.traceId === undefined ? null : <p className="mt-1">{t("resource.trace", { traceId: notice.traceId })}</p>}
           </Alert>
         )}
       </div>

@@ -9,7 +9,7 @@ import type { ApiResult } from "../../../shared/api/http.ts";
 import { createModality, updateModality } from "../../../shared/api/organization-operations.ts";
 import { reasonsFromSchema, requiredReasons } from "../../../shared/forms/schema-reasons.ts";
 import type { FieldReason } from "../../../shared/forms/use-access-form.ts";
-import { activeValueOf } from "../organization-form.ts";
+import { activeValueOf } from "../../../shared/resource-screen/resource-form.ts";
 
 export type Modality = ModalityResponseOutput;
 export type ModalityField = "code" | "name" | "isActive";

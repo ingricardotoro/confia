@@ -1,6 +1,6 @@
 import { useAccessForm } from "../../shared/forms/use-access-form.ts";
-import { failureOf } from "../organization/organization-failure.ts";
-import { fieldSpecs } from "../organization/organization-form.ts";
+import { failureOf } from "../../shared/resource-screen/resource-failure.ts";
+import { fieldSpecs } from "../../shared/resource-screen/resource-form.ts";
 import { ExitForm } from "./components/ExitForm.tsx";
 import { EXIT_CONTROL_IDS, exitBodyOf, initialExitValues, validateExit, type ExitField } from "./enrollment-forms.ts";
 import { studentNameOf, type Enrollment } from "./enrollment-model.ts";

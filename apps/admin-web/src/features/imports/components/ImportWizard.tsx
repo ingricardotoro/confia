@@ -3,7 +3,7 @@ import { Alert, Button, Dialog, FormField, Input, Pagination, Table, type TableC
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import { IMPORT_KINDS, fieldNameOf, isImportKind, type FileProblem, type ImportFailure, type ImportKind, type ImportStep } from "../import-model.ts";
-import { OptionField } from "../../organization/components/fields.tsx";
+import { OptionField } from "../../../shared/resource-screen/components/fields.tsx";
 import { ImportStepper } from "./ImportStepper.tsx";
 
 export type ImportPhase = "idle" | "simulating" | "applying";
@@ -154,7 +154,7 @@ export function ImportWizard(props: ImportWizardProps) {
               <li key={`${text.key}-${String(index)}`}>{t(text.key, text.values)}</li>
             ))}
           </ul>
-          {failure.traceId === undefined ? null : <p className="mt-1">{t("organization.common.trace", { traceId: failure.traceId })}</p>}
+          {failure.traceId === undefined ? null : <p className="mt-1">{t("resource.trace", { traceId: failure.traceId })}</p>}
           {failure.kind === "other" ? null : (
             <Button variant="secondary" size="sm" className="mt-2" loading={phase === "simulating"} onClick={props.onSimulate}>
               {t("imports.failed.simulateAgain")}

@@ -1,5 +1,5 @@
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { OptionField, type Option } from "../../organization/components/fields.tsx";
+import { OptionField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
 import type { EnrollmentStatus } from "../enrollment-model.ts";
 import { ENROLLMENT_STATUSES } from "../enrollments-search.ts";
 
@@ -52,7 +52,7 @@ export function EnrollmentFilters({ year, grade, section, status }: EnrollmentFi
         controlId="enrollments-filter-status"
         value={status.value}
         options={ENROLLMENT_STATUSES.map((value) => ({ value, label: t(`enrollments.status.${value}`) }))}
-        placeholder={t("organization.common.allOption")}
+        placeholder={t("resource.allOption")}
         onChange={(value) => {
           status.onChange(ENROLLMENT_STATUSES.find((known) => known === value) ?? "");
         }}

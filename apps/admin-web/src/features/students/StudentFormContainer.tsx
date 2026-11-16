@@ -1,6 +1,6 @@
 import { useAccessForm } from "../../shared/forms/use-access-form.ts";
-import { failureOf } from "../organization/organization-failure.ts";
-import { fieldSpecs } from "../organization/organization-form.ts";
+import { failureOf } from "../../shared/resource-screen/resource-failure.ts";
+import { fieldSpecs } from "../../shared/resource-screen/resource-form.ts";
 import { StudentForm } from "./components/StudentForm.tsx";
 import {
   STUDENT_CONTROL_IDS,
@@ -38,7 +38,7 @@ export function StudentFormContainer({ row, save, onClose }: StudentFormContaine
         return failureOf(error);
       }
     },
-    waitingKey: "organization.common.saving",
+    waitingKey: "resource.saving",
   });
 
   return (
