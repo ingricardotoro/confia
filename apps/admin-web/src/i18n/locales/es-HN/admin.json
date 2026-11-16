@@ -91,7 +91,10 @@
     "consentChannelUnavailable": "El encargado no tiene registrado el dato de este canal: correo electrónico para el canal de correo, teléfono para mensaje de texto y WhatsApp. Agréguelo en la lista de encargados e intente de nuevo.",
     "guardianNotActiveForConsent": "El encargado está inactivo y no se puede registrar un consentimiento nuevo. Actívelo en la lista de encargados; registrar una revocación siempre es posible.",
     "importNotSimulated": "Este archivo todavía no se ha simulado. Simúlelo primero para revisar el resultado y después aplíquelo.",
-    "importFileChanged": "El archivo no es el mismo que se simuló la última vez. Simule de nuevo este archivo, revise el resultado y después aplíquelo."
+    "importFileChanged": "El archivo no es el mismo que se simuló la última vez. Simule de nuevo este archivo, revise el resultado y después aplíquelo.",
+    "priceValidityOverlap": "Ese concepto ya tiene un precio vigente en parte de esas fechas. Ajuste las fechas para que no coincidan con otra vigencia e intente de nuevo.",
+    "priceListArchived": "La lista de precios está archivada y no admite precios nuevos. Reactívela para agregar precios.",
+    "staleVersion": "El registro cambió desde que lo abrió y sus cambios no se guardaron. Los datos ya se recargaron: cierre y vuelva a abrir el registro, revíselo y repita el cambio."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -153,6 +156,11 @@
   },
   "catalog": {
     "title": "Catálogo",
+    "tabsLabel": "Vistas del catálogo",
+    "tabs": {
+      "paymentConcepts": "Conceptos de pago",
+      "priceLists": "Listas de precios"
+    },
     "common": {
       "yes": "Sí",
       "no": "No"
@@ -201,6 +209,100 @@
         "isRecurring": "Recurrente",
         "isTaxable": "Gravado",
         "isActive": "Activo"
+      }
+    },
+    "priceLists": {
+      "heading": "Listas de precios",
+      "caption": "Listas de precios de la institución",
+      "create": "Nueva lista de precios",
+      "createTitle": "Nueva lista de precios",
+      "createDescription": "Una lista fija los precios de un año lectivo, para toda la institución o solo para una modalidad o un grado. El año, el ámbito y su referencia no se pueden cambiar después.",
+      "emptyTitle": "Todavía no hay listas de precios",
+      "emptyDescription": "Cree la primera lista de precios para definir cuánto cuesta cada concepto en un año lectivo.",
+      "emptyAction": "Crear la primera lista",
+      "loadFailed": "No se pudieron cargar las listas de precios",
+      "filterYear": "Año lectivo",
+      "filterScope": "Ámbito",
+      "filterStatus": "Estado",
+      "notApplicable": "No aplica",
+      "nameHelp": "Por ejemplo «2027 — Institución». Hasta 120 caracteres.",
+      "columns": {
+        "name": "Nombre",
+        "year": "Año lectivo",
+        "scope": "Ámbito",
+        "reference": "Modalidad o grado",
+        "status": "Estado"
+      },
+      "fields": {
+        "academicYear": "Año lectivo",
+        "scope": "Ámbito",
+        "modality": "Modalidad",
+        "grade": "Grado",
+        "name": "Nombre"
+      },
+      "scopes": {
+        "INSTITUTION": "Toda la institución",
+        "MODALITY": "Una modalidad",
+        "GRADE": "Un grado"
+      },
+      "statuses": {
+        "ACTIVE": "Activa",
+        "ARCHIVED": "Archivada"
+      },
+      "currencies": {
+        "HNL": "Lempira (HNL)",
+        "USD": "Dólar estadounidense (USD)"
+      },
+      "errors": {
+        "amountFormat": "Escriba el importe con punto decimal y hasta cuatro decimales, por ejemplo 1500.00.",
+        "amountPositive": "El importe debe ser mayor que cero.",
+        "validityOrder": "La fecha de fin no puede ser anterior a la de inicio."
+      },
+      "detail": {
+        "back": "Volver a las listas de precios",
+        "loadFailed": "No se pudo cargar la lista de precios",
+        "summary": "Datos de la lista",
+        "lookupFailed": "No se pudieron cargar los nombres de los conceptos, del año lectivo o de la modalidad o el grado. Mientras tanto aparecen como no disponibles.",
+        "archivedNote": "Esta lista está archivada y no admite precios nuevos. Reactívela para agregar precios.",
+        "archive": "Archivar lista",
+        "archiveFor": "Archivar lista {name}",
+        "reactivate": "Reactivar lista",
+        "reactivateFor": "Reactivar lista {name}",
+        "archived": "Se archivó la lista «{name}».",
+        "reactivated": "Se reactivó la lista «{name}».",
+        "pricesHeading": "Precios por concepto",
+        "addPrice": "Nuevo precio / nueva vigencia",
+        "emptyTitle": "Esta lista todavía no tiene precios",
+        "emptyDescription": "Agregue el precio de un concepto con la fecha desde la que rige. Un cambio de precio crea una vigencia nueva y la anterior se conserva.",
+        "emptyAction": "Agregar el primer precio",
+        "conceptHeading": "{code} — {name}",
+        "conceptCaption": "Vigencias de {name}",
+        "openEnded": "Sin fecha de fin",
+        "validityOpen": "Abierta",
+        "validityClosed": "Cerrada",
+        "columns": {
+          "amount": "Importe",
+          "currency": "Moneda",
+          "validFrom": "Vigente desde",
+          "validTo": "Vigente hasta",
+          "state": "Vigencia"
+        }
+      },
+      "addPrice": {
+        "title": "Nuevo precio / nueva vigencia",
+        "description": "Fije el precio de un concepto desde una fecha. Si el concepto ya tiene un precio abierto, el sistema lo cierra el día anterior y conserva el historial. Un precio guardado no se edita.",
+        "submit": "Guardar precio",
+        "saved": "Se registró el precio de «{name}» desde el {date}.",
+        "noActiveConcepts": "No hay conceptos de pago activos. Cree o active un concepto en la pestaña Conceptos de pago.",
+        "amountHelp": "Use punto decimal y hasta cuatro decimales, por ejemplo 1500.00. Debe ser mayor que cero.",
+        "validToHelp": "Déjela vacía si el precio no tiene fecha de fin. El último día cuenta como vigente.",
+        "fields": {
+          "concept": "Concepto",
+          "amount": "Importe",
+          "currency": "Moneda",
+          "validFrom": "Vigente desde",
+          "validTo": "Vigente hasta (opcional)"
+        }
       }
     }
   },

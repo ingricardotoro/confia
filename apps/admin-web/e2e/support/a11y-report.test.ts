@@ -160,6 +160,30 @@ describe("the states of the catalog", () => {
   });
 });
 
+describe("the states of the price lists", () => {
+  const priceLists = MATRIX.filter((combination) => combination.route.startsWith("/catalog/price-lists"));
+
+  it("holds the list with its dialogs and its no-match, empty and load-error states, and the detail ready, with no prices, archived, with the dialogs of a new price and with its load error, each once", () => {
+    expect(priceLists.map((combination) => [combination.route.replace(/\/0{8}-[\w-]+$/, "/<id>"), combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["/catalog/price-lists", "ready", undefined, undefined],
+      ["/catalog/price-lists", "dialog-open", undefined, true],
+      ["/catalog/price-lists", "dialog-error-summary", undefined, true],
+      ["/catalog/price-lists", "no-matches", undefined, undefined],
+      ["/catalog/price-lists", "empty", "catalog-price-lists-empty", undefined],
+      ["/catalog/price-lists", "load-error", "catalog-server-error", undefined],
+      ["/catalog/price-lists/<id>", "ready", undefined, undefined],
+      ["/catalog/price-lists/<id>", "dialog-add-price", undefined, true],
+      ["/catalog/price-lists/<id>", "dialog-error-summary", undefined, true],
+      ["/catalog/price-lists/<id>", "dialog-overlap", undefined, true],
+      ["/catalog/price-lists/<id>", "empty", undefined, undefined],
+      ["/catalog/price-lists/<id>", "archived", undefined, undefined],
+      ["/catalog/price-lists/<id>", "load-error", "catalog-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...priceLists])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+});
+
 describe("the states of the students registry", () => {
   const students = MATRIX.filter((combination) => combination.route === "/students");
 

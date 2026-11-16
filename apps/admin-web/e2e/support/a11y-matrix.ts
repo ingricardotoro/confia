@@ -111,6 +111,11 @@ async function openLinksDialog(page: Page): Promise<void> {
 }
 
 const CATALOG = "/catalog";
+const PRICE_LISTS = "/catalog/price-lists";
+/** The seeded lists: with prices (a closed and an open validity of one concept), with none, and archived. */
+const PRICE_LIST_DETAIL = `${PRICE_LISTS}/00000000-0000-4000-8000-000000009001`;
+const PRICE_LIST_BLANK = `${PRICE_LISTS}/00000000-0000-4000-8000-000000009002`;
+const PRICE_LIST_ARCHIVED = `${PRICE_LISTS}/00000000-0000-4000-8000-000000009003`;
 
 /** The payment concepts list with the cookies of a signed in session, as the control of the simulator does. */
 async function openCatalogRoute(page: Page, path: string = CATALOG): Promise<void> {
@@ -998,5 +1003,119 @@ export const MATRIX: readonly GateCombination[] = [
     // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
     arrange: (page) => openCatalogRoute(page),
     expected: (page) => page.getByText("No se pudo cargar la lista de conceptos de pago"),
+  },
+  // The price lists (catalog-price-lists cut): the list, the detail of a list with prices, of a list with none and of an
+  // archived one, and the dialogs of a new list and of a new price or validity.
+  {
+    route: PRICE_LISTS,
+    state: "ready",
+    arrange: (page) => openCatalogRoute(page, PRICE_LISTS),
+    expected: (page) => page.getByRole("link", { name: "2026 — Institución", exact: true }),
+  },
+  {
+    route: PRICE_LISTS,
+    state: "dialog-open",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, PRICE_LISTS);
+      await page.getByRole("button", { name: "Nueva lista de precios" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Nueva lista de precios" }),
+  },
+  {
+    route: PRICE_LISTS,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, PRICE_LISTS);
+      await page.getByRole("button", { name: "Nueva lista de precios" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 2 campos con errores." }),
+  },
+  {
+    route: PRICE_LISTS,
+    state: "no-matches",
+    arrange: (page) => openCatalogRoute(page, `${PRICE_LISTS}?scope=MODALITY&status=ARCHIVED`),
+    expected: (page) => page.getByText("Ningún registro coincide con los filtros"),
+  },
+  {
+    route: PRICE_LISTS,
+    state: "empty",
+    preset: "catalog-price-lists-empty",
+    arrange: (page) => openCatalogRoute(page, PRICE_LISTS),
+    expected: (page) => page.getByText("Todavía no hay listas de precios"),
+  },
+  {
+    route: PRICE_LISTS,
+    state: "load-error",
+    preset: "catalog-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openCatalogRoute(page, PRICE_LISTS),
+    expected: (page) => page.getByText("No se pudieron cargar las listas de precios"),
+  },
+  {
+    route: PRICE_LIST_DETAIL,
+    state: "ready",
+    arrange: (page) => openCatalogRoute(page, PRICE_LIST_DETAIL),
+    expected: (page) => page.getByRole("table", { name: "Vigencias de Colegiatura" }),
+  },
+  {
+    route: PRICE_LIST_DETAIL,
+    state: "dialog-add-price",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, PRICE_LIST_DETAIL);
+      await page.getByRole("button", { name: "Nuevo precio / nueva vigencia" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Nuevo precio / nueva vigencia" }),
+  },
+  {
+    route: PRICE_LIST_DETAIL,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, PRICE_LIST_DETAIL);
+      await page.getByRole("button", { name: "Nuevo precio / nueva vigencia" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar precio" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 3 campos con errores." }),
+  },
+  {
+    route: PRICE_LIST_DETAIL,
+    state: "dialog-overlap",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, PRICE_LIST_DETAIL);
+      await page.getByRole("button", { name: "Nuevo precio / nueva vigencia" }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.getByLabel(/^Concepto/).selectOption({ label: "Colegiatura" });
+      await dialog.getByLabel(/^Importe/).fill("1700.00");
+      // Inside the open validity of the seed: the server refuses it with 409.
+      await dialog.getByLabel(/^Vigente desde/).fill("2026-08-01");
+      await dialog.getByLabel(/^Vigente hasta/).fill("2026-08-31");
+      await dialog.getByRole("button", { name: "Guardar precio" }).click();
+    },
+    expected: (page) => page.getByRole("dialog").getByRole("alert").filter({ hasText: "ya tiene un precio vigente" }),
+  },
+  {
+    route: PRICE_LIST_BLANK,
+    state: "empty",
+    arrange: (page) => openCatalogRoute(page, PRICE_LIST_BLANK),
+    expected: (page) => page.getByText("Esta lista todavía no tiene precios"),
+  },
+  {
+    route: PRICE_LIST_ARCHIVED,
+    state: "archived",
+    arrange: (page) => openCatalogRoute(page, PRICE_LIST_ARCHIVED),
+    expected: (page) => page.getByText(/está archivada y no admite precios nuevos/),
+  },
+  {
+    route: PRICE_LIST_DETAIL,
+    state: "load-error",
+    preset: "catalog-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openCatalogRoute(page, PRICE_LIST_DETAIL),
+    expected: (page) => page.getByText("No se pudo cargar la lista de precios"),
   },
 ];

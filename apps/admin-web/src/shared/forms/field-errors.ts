@@ -74,6 +74,12 @@ export function fieldErrorKey(reason: string): AdminKey {
       return "catalog.paymentConcepts.errors.codeFormat";
     case "duplicate-payment-concept-code":
       return "catalog.paymentConcepts.errors.duplicateCode";
+    case "amount-format":
+      return "catalog.priceLists.errors.amountFormat";
+    case "amount-positive":
+      return "catalog.priceLists.errors.amountPositive";
+    case "validity-order":
+      return "catalog.priceLists.errors.validityOrder";
     case "not-allowed":
       return "field.notAllowed";
     default:

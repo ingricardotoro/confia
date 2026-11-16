@@ -26,6 +26,9 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "transfer-year-mismatch",
   "guardian-not-active",
   "consent-channel-unavailable",
+  "price-validity-overlap",
+  "price-list-archived",
+  "stale-version",
 ]);
 
 /** The text of each reason the server gives for a split of the responsibility that does not hold. */
@@ -44,6 +47,9 @@ function fieldOf(error: { readonly field: string; readonly reason: string }): { 
   if (error.field === "endAfterStart") return { field: "endDate", reason: "end-after-start" };
   // The code of a payment concept: the server names a code outside its whitelist `pattern`.
   if (error.field === "code" && error.reason === "pattern") return { field: "code", reason: "code-format" };
+  // The price of a new validity travels nested (`price.amount`): the form has the amount and the currency as fields of its own.
+  if (error.field === "price.amount") return { field: "amount", reason: error.reason === "pattern" ? "amount-format" : error.reason };
+  if (error.field === "price.currency") return { field: "currency", reason: error.reason };
   if (error.field === "nationalId" && error.reason === "pattern") return { field: "nationalId", reason: "national-id-format" };
   // The reason of a withdrawal or a transfer is 3 to 500 characters: `size` says it is too short as well as too long.
   if ((error.field === "withdrawalReason" || error.field === "reason") && error.reason === "size") return { field: error.field, reason: "reason-length" };

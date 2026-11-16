@@ -119,3 +119,50 @@ cualquier solape y ningún usuario ve listas de otra institución.
   `/api/v1/catalog/price-lists` y los esquemas `Money` (ya fijado), `AddPriceRequest`, `CreatePriceListRequest`,
   `UpdatePriceListRequest`, `PriceListResponse`, `PriceListDetailResponse`, `PriceListItemResponse` y
   `PriceListPageResponse`.
+
+## Construido (frontend)
+
+Pestaña «Listas de precios» dentro de Catálogo, en `apps/admin-web/src/features/catalog` (la funcionalidad no importa de
+ninguna otra; las piezas genéricas vienen de `shared/resource-screen` y `shared/organization-lookups`).
+
+- **Rutas.** `/catalog` pasa a ser el área (encabezado, subnavegación `CatalogTabs` y la vista hija) y conserva en su
+  dirección la lista de conceptos de pago, de modo que los enlaces existentes siguen valiendo. Se agregan
+  `/catalog/price-lists` (lista) y `/catalog/price-lists/$priceListId` (detalle). La lista valida su búsqueda con Zod
+  (página, tamaño, orden por `name` o `createdAt`, año lectivo, ámbito y estado) y la lleva en la URL; paginación, orden
+  y filtros los hace el servidor.
+- **Lista.** Tabla con nombre (enlace al detalle), año lectivo, ámbito, modalidad o grado y estado; diálogo «Nueva lista
+  de precios» con año (de las consultas de `organization`), ámbito y, para modalidad o grado, el selector de la
+  referencia, que se olvida al cambiar el ámbito. Sin edición ni borrado: el año, el ámbito y la referencia no cambian.
+- **Detalle.** Datos de la lista, archivar y reactivar (con la `version` leída) y, por cada concepto, una tabla con todas
+  sus vigencias, la más reciente primero, con la abierta marcada «Abierta» y las demás «Cerrada». Diálogo «Nuevo precio /
+  nueva vigencia» con el concepto (solo conceptos activos), el importe, la moneda (`HNL` o `USD`), `validFrom` y `validTo`
+  opcional. Tras agregar un precio se vuelve a leer el detalle, porque el servidor cierra la vigencia anterior; una lista
+  archivada deshabilita la acción y lo dice.
+- **Dinero.** El importe viaja y se muestra como cadena. Se pinta con `MoneyAmount` del sistema de diseño
+  (`Intl.NumberFormat`, numeración tabular, alineado a la derecha) más una columna de moneda. El navegador no convierte,
+  redondea ni calcula: solo valida los caracteres (hasta diez enteros y cuatro decimales, sin signo, con algún dígito
+  distinto de cero) para avisar antes de enviar; el redondeo a dos decimales lo entrega el servidor.
+- **Contrato.** Zod generado para todas las peticiones y respuestas; sin `Idempotency-Key` y sin actualización
+  optimista. Las mutaciones invalidan todo el prefijo `["catalog", "price-lists"]` (detalle y listados).
+- **Concurrencia (cierra B-1 en pantalla).** El `PUT` del concepto envía la `version` cargada; ante 409 `stale-version`
+  (concepto o lista) se muestra «El registro cambió desde que lo abrió…» y se vuelve a leer la consulta. Mensajes propios
+  para `price-validity-overlap` y `price-list-archived`; `inactive-reference` y 404 reutilizan los existentes. Se
+  agregaron los tres códigos a `KNOWN_PROBLEM_CODES` (ahora treinta y cinco) y a `PROBLEM_KEYS`.
+- **Textos y estados.** Todo en el catálogo es-HN (`catalog.tabs`, `catalog.priceLists.*`, `problem.*`, `field.*`);
+  carga con esqueleto, vacío con acción, error con reintento e identificador de soporte, y éxito en la región `aria-live`.
+- **Simulador (`e2e/mock-api`).** Versiones en conceptos y listas, las cinco rutas nuevas con redondeo a dos decimales
+  por dígitos, cierre de la vigencia abierta, solape y lista archivada; escenarios `catalog-price-lists-empty` y
+  `catalog-stale-version` (la primera edición responde 409 una vez).
+- **Pruebas.** Vitest: cliente, lógica de formularios, vistas, formularios, contenedores (lista y detalle) y simulador.
+  Playwright: `catalog-price-lists-{crud,lists,states,keyboard}`, y trece estados nuevos en la matriz de accesibilidad.
+
+### Decisiones y supuestos (frontend)
+
+- `CatalogTabs` repite el patrón de `OrganizationTabs` en lugar de importarlo, porque una funcionalidad no puede importar
+  de otra (`admin-features-never-import-features`). Moverlo a `shared` queda para cuando haya un tercer consumidor.
+- Los nombres de concepto, año, modalidad y grado salen de consultas de una sola página del tamaño máximo (200), como el
+  resto de las pantallas; con más de 200 conceptos el nombre faltante se muestra como «No disponible».
+- El diálogo de edición de un concepto no se refresca solo tras un 409: se cierra y se vuelve a abrir con la versión
+  vigente, y el mensaje lo dice. Hacerlo sin perder lo escrito exigiría decidir qué valor gana, y eso es del usuario.
+- Un importe cero o una vigencia con fin anterior al inicio los rechaza ya el cliente; si el servidor los rechazara sin
+  nombrar un campo, se muestra el mensaje general «No se pudieron procesar los datos enviados».

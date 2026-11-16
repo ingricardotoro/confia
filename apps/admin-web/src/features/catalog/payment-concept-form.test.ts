@@ -21,7 +21,7 @@ describe("the form of a payment concept", () => {
   });
 
   it("creates with the code and no state, and edits with the state and no code", () => {
-    const row = paymentConcept();
+    const row = paymentConcept({ version: 4 });
     const values = { ...initialPaymentConceptValues(row), isTaxable: "false" };
 
     expect(saveOf(undefined, { ...values, code: "COL" })).toEqual({
@@ -31,12 +31,13 @@ describe("the form of a payment concept", () => {
     expect(saveOf(row, values)).toEqual({
       mode: "update",
       id: row.id,
-      body: { name: "Colegiatura", category: "TUITION", isRecurring: true, isTaxable: false, isActive: true },
+      body: { version: 4, name: "Colegiatura", category: "TUITION", isRecurring: true, isTaxable: false, isActive: true },
     });
   });
 
-  it("builds the toggle body from the row, so nothing else changes", () => {
-    expect(updateBodyOf(paymentConcept({ isTaxable: true }), false)).toEqual({
+  it("builds the toggle body from the row and the version it was read at, so nothing else changes", () => {
+    expect(updateBodyOf(paymentConcept({ isTaxable: true, version: 7 }), false)).toEqual({
+      version: 7,
       name: "Colegiatura",
       category: "TUITION",
       isRecurring: true,
