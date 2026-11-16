@@ -102,7 +102,7 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
         String id = created.get("id").asString();
 
         assertThat(created.propertyNames()).containsExactly("id", "code", "name", "category", "isTaxable",
-                "isRecurring", "isActive", "createdAt", "updatedAt");
+                "isRecurring", "isActive", "createdAt", "updatedAt", "version");
         assertThat(created.get("code").asString()).isEqualTo("COLEG");
         assertThat(created.get("category").asString()).isEqualTo("TUITION");
         assertThat(created.get("isTaxable").asBoolean()).isTrue();
@@ -123,10 +123,14 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(HarnessProcess.json(edited).get("category").asString()).isEqualTo("OTHER");
         assertThat(HarnessProcess.json(edited).get("isTaxable").asBoolean()).isFalse();
 
-        HttpResponse<String> off = put(id, admin, putBody("Mensualidad", "OTHER", false, false, false));
+        assertThat(created.get("version").asLong()).isZero();
+        assertThat(HarnessProcess.json(edited).get("version").asLong()).isEqualTo(1);
+        HttpResponse<String> off = put(id, admin, putBody(1, "Mensualidad", "OTHER", false, false, false));
         assertThat(HarnessProcess.json(off).get("isActive").asBoolean()).isFalse();
-        HttpResponse<String> on = put(id, admin, putBody("Mensualidad", "OTHER", false, false, true));
+        assertThat(HarnessProcess.json(off).get("version").asLong()).isEqualTo(2);
+        HttpResponse<String> on = put(id, admin, putBody(2, "Mensualidad", "OTHER", false, false, true));
         assertThat(HarnessProcess.json(on).get("isActive").asBoolean()).isTrue();
+        assertThat(HarnessProcess.json(on).get("version").asLong()).isEqualTo(3);
 
         assertThat(conceptEntriesOf(admin.institution())).extracting(entry -> entry[0]).containsExactly(
                 "catalog.payment_concept.created", "catalog.payment_concept.updated",
@@ -192,6 +196,56 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
 
         assertThat(storedCode(admin.institution(), id)).isEqualTo("COLEG");
         assertThat(conceptEntriesOf(admin.institution())).hasSize(entries);
+    }
+
+    // --- Optimistic version (closes finding B-1 of the first cut) ---
+
+    @Test
+    void anEditWithAStaleOrMissingVersionIsRefusedAndTheFirstEditSurvives() throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true)))
+                .get("id").asString();
+        assertThat(put(id, admin, putBody(0, "Primero", "OTHER", false, false, true)).statusCode()).isEqualTo(200);
+        int entries = conceptEntriesOf(admin.institution()).size();
+
+        assertProblem(put(id, admin, putBody(0, "Segundo", "OTHER", false, false, true)), 409, "stale-version");
+        assertProblem(put(id, admin, putBody(7, "Tercero", "OTHER", false, false, true)), 409, "stale-version");
+        assertProblem(put(id, admin, "{\"name\":\"Sin version\",\"category\":\"OTHER\",\"isTaxable\":false,"
+                + "\"isRecurring\":false,\"isActive\":true}"), 400, "validation-failed");
+        assertProblem(put(id, admin, putBody(-1, "Negativa", "OTHER", false, false, true)), 400,
+                "validation-failed");
+
+        assertThat(HarnessProcess.json(get(CONCEPTS, admin)).get("items").get(0).get("name").asString())
+                .isEqualTo("Primero");
+        assertThat(conceptEntriesOf(admin.institution())).hasSize(entries);
+    }
+
+    @Test
+    void twoEditsWithTheSameVersionAtTheSameTimeLetExactlyOneWin() throws Exception {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true)))
+                .get("id").asString();
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            List<java.util.concurrent.Future<HttpResponse<String>>> answers = new ArrayList<>();
+            for (String name : List.of("Ana", "Beto")) {
+                answers.add(pool.submit(() -> {
+                    start.await();
+                    return put(id, admin, putBody(0, name, "OTHER", false, false, true));
+                }));
+            }
+            start.countDown();
+            List<Integer> statuses = new ArrayList<>();
+            for (java.util.concurrent.Future<HttpResponse<String>> answer : answers) {
+                statuses.add(answer.get().statusCode());
+            }
+            assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(HarnessProcess.json(get(CONCEPTS, admin)).get("items").get(0).get("version").asLong())
+                .isEqualTo(1);
     }
 
     // --- Validation at the edge ---
@@ -445,8 +499,13 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
 
     private static String putBody(String name, String category, boolean taxable, boolean recurring,
             boolean active) {
-        return "{\"name\":\"" + name + "\",\"category\":\"" + category + "\",\"isTaxable\":" + taxable
-                + ",\"isRecurring\":" + recurring + ",\"isActive\":" + active + "}";
+        return putBody(0, name, category, taxable, recurring, active);
+    }
+
+    private static String putBody(long version, String name, String category, boolean taxable,
+            boolean recurring, boolean active) {
+        return "{\"version\":" + version + ",\"name\":\"" + name + "\",\"category\":\"" + category
+                + "\",\"isTaxable\":" + taxable + ",\"isRecurring\":" + recurring + ",\"isActive\":" + active + "}";
     }
 
     private static List<String> codes(JsonNode page) {

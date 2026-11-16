@@ -15,8 +15,14 @@ public interface PaymentConceptRepository {
 
     void insert(InstitutionId institutionId, PaymentConcept concept);
 
-    /** Writes the editable members; the code is never written. */
-    void update(InstitutionId institutionId, PaymentConcept concept);
+    /**
+     * Writes the editable members and the new version; the code is never written.
+     *
+     * @param expectedVersion the version the row must still have
+     * @throws com.confia.catalog.domain.StaleVersionException when the row no longer has it
+     * @throws com.confia.catalog.domain.ResourceNotFoundException when the row does not exist in the institution
+     */
+    void update(InstitutionId institutionId, PaymentConcept concept, long expectedVersion);
 
     Page<PaymentConcept> list(InstitutionId institutionId, PageRequest request, PaymentConceptFilter filter);
 }

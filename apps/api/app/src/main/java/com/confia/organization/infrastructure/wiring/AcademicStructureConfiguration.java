@@ -8,7 +8,9 @@ import com.confia.organization.application.ManageModalities;
 import com.confia.organization.application.ManageSections;
 import com.confia.organization.application.ModalityRepository;
 import com.confia.organization.application.SectionRepository;
+import com.confia.organization.application.directory.AcademicStructureDirectory;
 import com.confia.organization.application.directory.SectionDirectory;
+import com.confia.organization.infrastructure.JooqAcademicStructureDirectory;
 import com.confia.organization.infrastructure.JooqAcademicYearRepository;
 import com.confia.organization.infrastructure.JooqGradeRepository;
 import com.confia.organization.infrastructure.JooqModalityRepository;
@@ -55,6 +57,12 @@ public class AcademicStructureConfiguration {
     @Bean
     SectionDirectory sectionDirectory(DSLContext dsl) {
         return new JooqSectionDirectory(dsl);
+    }
+
+    /** The existence check of years, modalities and grades that {@code catalog} consumes (docs/cortes/catalog-price-lists.md). */
+    @Bean
+    AcademicStructureDirectory academicStructureDirectory(DSLContext dsl) {
+        return new JooqAcademicStructureDirectory(dsl);
     }
 
     @Bean

@@ -17,5 +17,6 @@ public record PaymentConceptResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED) @JsonProperty("isRecurring") boolean isRecurring,
         @Schema(requiredMode = RequiredMode.REQUIRED) @JsonProperty("isActive") boolean isActive,
         @Schema(requiredMode = RequiredMode.REQUIRED) Instant createdAt,
-        @Schema(requiredMode = RequiredMode.REQUIRED) Instant updatedAt) {
+        @Schema(requiredMode = RequiredMode.REQUIRED) Instant updatedAt,
+        @Schema(requiredMode = RequiredMode.REQUIRED, description = "Send it back in the next PUT") long version) {
 }

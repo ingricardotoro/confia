@@ -139,7 +139,8 @@ public class PaymentConceptController {
             produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "updatePaymentConcept", tags = TAG, summary = "Edits a payment concept",
             description = "Replaces the editable members of the payment concept (never its code); false in isActive "
-                    + "deactivates it. Needs the permission catalog:update.",
+                    + "deactivates it. The body carries the version the editor read: a different one answers 409 "
+                    + "stale-version. Needs the permission catalog:update.",
             security = @SecurityRequirement(name = ContractSchemas.BEARER_AUTH),
             extensions = @Extension(properties =
                     @ExtensionProperty(name = "x-required-permission", value = "catalog:update")))
@@ -160,16 +161,20 @@ public class PaymentConceptController {
     @ApiResponse(responseCode = "404",
             description = "The payment concept does not exist in the institution of the token (resource-not-found)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "409",
+            description = "The version of the body is not the current one (stale-version)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     public PaymentConceptResponse update(@PathVariable("id") UUID id,
             @Valid @RequestBody UpdatePaymentConceptRequest request) {
-        return toResponse(concepts.update(RequestContext.actor(), RequestContext.requestId(), id, request.name(),
-                request.category(), request.isTaxable(), request.isRecurring(), request.isActive()));
+        return toResponse(concepts.update(RequestContext.actor(), RequestContext.requestId(), id, request.version(),
+                request.name(), request.category(), request.isTaxable(), request.isRecurring(),
+                request.isActive()));
     }
 
     private static PaymentConceptResponse toResponse(PaymentConceptView view) {
         return new PaymentConceptResponse(view.id(), view.code(), view.name(), view.category(), view.taxable(),
-                view.recurring(), view.active(), view.createdAt(), view.updatedAt());
+                view.recurring(), view.active(), view.createdAt(), view.updatedAt(), view.version());
     }
 }

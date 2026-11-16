@@ -9,6 +9,7 @@ import com.confia.catalog.application.PaymentConceptRepository;
 import com.confia.catalog.domain.PaymentCategory;
 import com.confia.catalog.domain.PaymentConcept;
 import com.confia.catalog.domain.ResourceNotFoundException;
+import com.confia.catalog.domain.StaleVersionException;
 import com.confia.kernel.InstitutionId;
 import confia.generated.jooq.tables.records.CatalogPaymentConceptRecord;
 import java.util.List;
@@ -53,13 +54,14 @@ public final class JooqPaymentConceptRepository implements PaymentConceptReposit
                 .set(CATALOG_PAYMENT_CONCEPT.IS_TAXABLE, concept.taxable())
                 .set(CATALOG_PAYMENT_CONCEPT.IS_RECURRING, concept.recurring())
                 .set(CATALOG_PAYMENT_CONCEPT.IS_ACTIVE, concept.active())
+                .set(CATALOG_PAYMENT_CONCEPT.VERSION, concept.version())
                 .set(CATALOG_PAYMENT_CONCEPT.CREATED_AT, CatalogWrites.toDatabase(concept.createdAt()))
                 .set(CATALOG_PAYMENT_CONCEPT.UPDATED_AT, CatalogWrites.toDatabase(concept.updatedAt()))
                 .execute());
     }
 
     @Override
-    public void update(InstitutionId institutionId, PaymentConcept concept) {
+    public void update(InstitutionId institutionId, PaymentConcept concept, long expectedVersion) {
         CatalogWrites.translating(() -> {
             // The code is never written: it is immutable once the concept exists.
             int rows = dsl.update(CATALOG_PAYMENT_CONCEPT)
@@ -68,12 +70,19 @@ public final class JooqPaymentConceptRepository implements PaymentConceptReposit
                     .set(CATALOG_PAYMENT_CONCEPT.IS_TAXABLE, concept.taxable())
                     .set(CATALOG_PAYMENT_CONCEPT.IS_RECURRING, concept.recurring())
                     .set(CATALOG_PAYMENT_CONCEPT.IS_ACTIVE, concept.active())
+                    .set(CATALOG_PAYMENT_CONCEPT.VERSION, concept.version())
                     .set(CATALOG_PAYMENT_CONCEPT.UPDATED_AT, CatalogWrites.toDatabase(concept.updatedAt()))
                     .where(CATALOG_PAYMENT_CONCEPT.INSTITUTION_ID.eq(institutionId.value()))
                     .and(CATALOG_PAYMENT_CONCEPT.ID.eq(concept.id()))
+                    .and(CATALOG_PAYMENT_CONCEPT.VERSION.eq(expectedVersion))
                     .execute();
             if (rows == 0) {
-                throw new ResourceNotFoundException();
+                // Nothing matched: either the row is not in the institution, or somebody else edited it after the
+                // editor read it (the version moved on).
+                boolean exists = dsl.fetchExists(CATALOG_PAYMENT_CONCEPT,
+                        CATALOG_PAYMENT_CONCEPT.INSTITUTION_ID.eq(institutionId.value())
+                                .and(CATALOG_PAYMENT_CONCEPT.ID.eq(concept.id())));
+                throw exists ? new StaleVersionException() : new ResourceNotFoundException();
             }
         });
     }
@@ -106,7 +115,7 @@ public final class JooqPaymentConceptRepository implements PaymentConceptReposit
     private static PaymentConcept toDomain(CatalogPaymentConceptRecord row) {
         return new PaymentConcept(row.getId(), row.getCode(), row.getName(),
                 PaymentCategory.parse(row.getCategory()), row.getIsTaxable(), row.getIsRecurring(),
-                row.getIsActive(), CatalogWrites.fromDatabase(row.getCreatedAt()),
+                row.getIsActive(), row.getVersion(), CatalogWrites.fromDatabase(row.getCreatedAt()),
                 CatalogWrites.fromDatabase(row.getUpdatedAt()));
     }
 }
