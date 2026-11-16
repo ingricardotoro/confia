@@ -1,11 +1,12 @@
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import { listSections } from "../../../shared/api/organization-operations.ts";
-import { toApiParams, type SectionsSearch } from "../list-search.ts";
-import type { SearchChange } from "../search-change.ts";
-import { useListState } from "../use-list-state.ts";
-import { nameMapOf, optionsOf, useGradeLookup, useModalityLookup, useYearLookup } from "../use-lookups.ts";
-import { useResourceList, useResourceWrite } from "../use-organization-queries.ts";
-import { useResourceView } from "../use-resource-view.ts";
+import { type SectionsSearch } from "../organization-search.ts";
+import { toApiParams } from "../../../shared/resource-screen/list-search.ts";
+import type { SearchChange } from "../../../shared/resource-screen/search-change.ts";
+import { useListState } from "../../../shared/resource-screen/use-list-state.ts";
+import { nameMapOf, optionsOf, useGradeLookup, useModalityLookup, useYearLookup } from "../../../shared/organization-lookups/use-lookups.ts";
+import { useResourceList, useResourceWrite } from "../../../shared/organization-lookups/use-organization-queries.ts";
+import { useResourceView } from "../../../shared/resource-screen/use-resource-view.ts";
 import { SectionsView } from "./components/SectionsView.tsx";
 import { SectionFormContainer } from "./SectionFormContainer.tsx";
 import { updateBodyOf, writeSection, type Section, type SectionSave } from "./section-form.ts";
@@ -33,7 +34,7 @@ export function SectionsContainer({ search, onSearchChange }: SectionsContainerP
     return { id: grade.id, name: modality === undefined ? grade.name : `${modality} · ${grade.name}`, isActive: grade.isActive };
   });
   const gradeNames = nameMapOf(gradeLabels);
-  const unknown = t("organization.common.unknownReference");
+  const unknown = t("resource.unknownReference");
 
   const state = useListState({
     list,

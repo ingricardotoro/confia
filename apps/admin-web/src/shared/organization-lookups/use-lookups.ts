@@ -1,5 +1,5 @@
-import { listAcademicYears, listGrades, listModalities } from "../../shared/api/organization-operations.ts";
-import type { Option } from "./components/fields.tsx";
+import { listAcademicYears, listGrades, listModalities } from "../api/organization-operations.ts";
+import type { Option } from "../resource-screen/components/fields.tsx";
 import { LOOKUP_PAGE_SIZE, useResourceList } from "./use-organization-queries.ts";
 
 /**

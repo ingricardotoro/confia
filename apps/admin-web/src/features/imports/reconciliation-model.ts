@@ -8,8 +8,8 @@ import { ApiFailure } from "../../shared/api/api-failure.ts";
 import type { AccessFailure } from "../../shared/forms/access-failure.ts";
 import { reasonsFromSchema, requiredReasons } from "../../shared/forms/schema-reasons.ts";
 import type { FieldReason } from "../../shared/forms/use-access-form.ts";
-import { failureOf, loadFailureOf, type LoadFailure } from "../organization/organization-failure.ts";
-import { wholeNumberOf } from "../organization/organization-form.ts";
+import { failureOf, loadFailureOf, type LoadFailure } from "../../shared/resource-screen/resource-failure.ts";
+import { wholeNumberOf } from "../../shared/resource-screen/resource-form.ts";
 
 /** The fields of the form of the acta. The year and the official total are chosen or typed; the server counts the rest. */
 export type ReconciliationField = "academicYearId" | "officialReference" | "officialEnrollmentCount";

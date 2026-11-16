@@ -1,4 +1,4 @@
-import type { AccessFieldSpec } from "../../shared/forms/use-access-form.ts";
+import type { AccessFieldSpec } from "../forms/use-access-form.ts";
 
 /**
  * The spec of each field of a form for `useAccessForm`: the fixed id of its control, its starting value, and a

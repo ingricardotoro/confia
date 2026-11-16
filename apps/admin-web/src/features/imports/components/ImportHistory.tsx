@@ -1,9 +1,9 @@
 import type { ImportBatchResponseOutput } from "@confia/contracts/admin";
 import { Badge, Pagination, Table, type TableColumn, type TableProps } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import type { ResourcePagination } from "../../organization/components/ResourceScreen.tsx";
+import type { ResourcePagination } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import { formatInstant } from "../../../shared/format/format-date.ts";
-import { OptionField } from "../../organization/components/fields.tsx";
+import { OptionField } from "../../../shared/resource-screen/components/fields.tsx";
 import { IMPORT_KINDS, KIND_OF_BATCH, isImportKind, type ImportKind } from "../import-model.ts";
 
 type Batch = ImportBatchResponseOutput;

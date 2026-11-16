@@ -1,6 +1,6 @@
 import { createRef } from "react";
 import { vi } from "vitest";
-import type { ResourceFormView } from "../features/organization/components/ResourceFormDialog.tsx";
+import type { ResourceFormView } from "../shared/resource-screen/components/ResourceFormDialog.tsx";
 
 /** What a form container hands its presentation, with nothing wrong and nothing in flight, for a presentation test. */
 export function formView(override: Partial<ResourceFormView> = {}): ResourceFormView {

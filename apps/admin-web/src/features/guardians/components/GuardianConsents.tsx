@@ -197,7 +197,7 @@ function ConsentForm({ form }: { readonly form: ConsentFormView }) {
       {alert === undefined ? null : (
         <Alert ref={attachAlert} variant="destructive">
           <p>{alert.message}</p>
-          {alert.traceId === undefined ? null : <p className="mt-1">{t("organization.common.trace", { traceId: alert.traceId })}</p>}
+          {alert.traceId === undefined ? null : <p className="mt-1">{t("resource.trace", { traceId: alert.traceId })}</p>}
         </Alert>
       )}
       {countdown === undefined ? null : <p className="text-sm text-text-secondary">{countdown.remaining}</p>}

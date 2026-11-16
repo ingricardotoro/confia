@@ -9,7 +9,7 @@ import type { ApiResult } from "../../shared/api/http.ts";
 import { createPaymentConcept, updatePaymentConcept, type PaymentCategory } from "../../shared/api/catalog-operations.ts";
 import { reasonsFromSchema, requiredReasons } from "../../shared/forms/schema-reasons.ts";
 import type { FieldReason } from "../../shared/forms/use-access-form.ts";
-import { activeValueOf } from "../organization/organization-form.ts";
+import { activeValueOf } from "../../shared/resource-screen/resource-form.ts";
 
 export type PaymentConcept = PaymentConceptResponseOutput;
 export type PaymentConceptField = "code" | "name" | "category" | "isRecurring" | "isTaxable" | "isActive";

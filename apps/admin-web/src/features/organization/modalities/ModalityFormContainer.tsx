@@ -1,6 +1,6 @@
 import { useAccessForm } from "../../../shared/forms/use-access-form.ts";
-import { failureOf } from "../organization-failure.ts";
-import { fieldSpecs } from "../organization-form.ts";
+import { failureOf } from "../../../shared/resource-screen/resource-failure.ts";
+import { fieldSpecs } from "../../../shared/resource-screen/resource-form.ts";
 import { ModalityForm } from "./components/ModalityForm.tsx";
 import {
   MODALITY_CONTROL_IDS,
@@ -33,7 +33,7 @@ export function ModalityFormContainer({ row, save, onClose }: ModalityFormContai
         return failureOf(error);
       }
     },
-    waitingKey: "organization.common.saving",
+    waitingKey: "resource.saving",
   });
 
   return (

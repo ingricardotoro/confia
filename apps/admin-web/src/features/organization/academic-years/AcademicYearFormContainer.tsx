@@ -1,6 +1,6 @@
 import { useAccessForm } from "../../../shared/forms/use-access-form.ts";
-import { failureOf } from "../organization-failure.ts";
-import { fieldSpecs } from "../organization-form.ts";
+import { failureOf } from "../../../shared/resource-screen/resource-failure.ts";
+import { fieldSpecs } from "../../../shared/resource-screen/resource-form.ts";
 import { YEAR_CONTROL_IDS, initialYearValues, saveOf, validateYear, type AcademicYear, type YearField, type YearSave } from "./academic-year-form.ts";
 import { AcademicYearForm } from "./components/AcademicYearForm.tsx";
 
@@ -25,7 +25,7 @@ export function AcademicYearFormContainer({ row, save, onClose }: AcademicYearFo
         return failureOf(error);
       }
     },
-    waitingKey: "organization.common.saving",
+    waitingKey: "resource.saving",
   });
 
   return (

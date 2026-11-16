@@ -2,7 +2,7 @@ import type { ReconciliationResponseOutput } from "@confia/contracts/admin";
 import { Pagination, Table, type TableColumn, type TableProps } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import { formatInstant } from "../../../shared/format/format-date.ts";
-import type { ResourcePagination } from "../../organization/components/ResourceScreen.tsx";
+import type { ResourcePagination } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import { differenceKindOf } from "../reconciliation-model.ts";
 
 type Acta = ReconciliationResponseOutput;

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { page, pageSize } from "../organization/list-search.ts";
+import { page, pageSize } from "../../shared/resource-screen/list-search.ts";
 import { IMPORT_KINDS } from "./import-model.ts";
 
 /**

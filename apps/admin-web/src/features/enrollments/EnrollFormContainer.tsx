@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { useAccessForm } from "../../shared/forms/use-access-form.ts";
-import { failureOf } from "../organization/organization-failure.ts";
-import { fieldSpecs } from "../organization/organization-form.ts";
+import { failureOf } from "../../shared/resource-screen/resource-failure.ts";
+import { fieldSpecs } from "../../shared/resource-screen/resource-form.ts";
 import { EnrollForm, type SectionOptionsState } from "./components/EnrollForm.tsx";
 import type { StudentSearchState } from "./components/StudentPicker.tsx";
 import {
@@ -15,7 +15,7 @@ import {
 import { groupSections, type StudentChoice } from "./enrollment-model.ts";
 import type { EnrollmentWrite } from "./use-enrollments-queries.ts";
 import { useStudentSearch, useYearSections } from "./use-enrollments-queries.ts";
-import { useDebouncedSearch } from "./use-debounced-search.ts";
+import { useDebouncedSearch } from "../../shared/resource-screen/use-debounced-search.ts";
 
 export interface EnrollFormContainerProps {
   /** The year in progress, whose sections are offered; absent when there is none (or it is still loading). */
@@ -87,7 +87,7 @@ export function EnrollFormContainer({ yearId, yearLoading, gradeLabels, save, on
         },
       }}
       sectionsState={sectionsState}
-      sectionGroups={groupSections(sections.data?.items ?? [], gradeLabels, t("organization.common.unknownReference"))}
+      sectionGroups={groupSections(sections.data?.items ?? [], gradeLabels, t("resource.unknownReference"))}
       onRetrySections={() => void sections.refetch()}
       form={form}
       onChange={form.onChange}

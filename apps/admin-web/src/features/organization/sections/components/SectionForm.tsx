@@ -1,6 +1,6 @@
 import { useAdminText } from "../../../../i18n/use-admin-text.ts";
-import { OptionField, ReadOnlyField, TextField, type Option } from "../../components/fields.tsx";
-import { ResourceFormDialog, type ResourceFormView } from "../../components/ResourceFormDialog.tsx";
+import { OptionField, ReadOnlyField, TextField, type Option } from "../../../../shared/resource-screen/components/fields.tsx";
+import { ResourceFormDialog, type ResourceFormView } from "../../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { SECTION_CONTROL_IDS, type SectionField, type SectionValues } from "../section-form.ts";
 
 export interface SectionFormProps {
@@ -51,7 +51,7 @@ export function SectionForm({
     <ResourceFormDialog
       title={t(mode === "create" ? "organization.sections.createTitle" : "organization.sections.editTitle")}
       description={t(mode === "create" ? "organization.sections.createDescription" : "organization.sections.editDescription")}
-      submitLabel={t("organization.common.save")}
+      submitLabel={t("resource.save")}
       form={form}
       onClose={onClose}
     >
@@ -61,14 +61,14 @@ export function SectionForm({
             label={t("organization.sections.fields.academicYearId")}
             required
             options={yearOptions}
-            placeholder={t("organization.common.chooseOption")}
+            placeholder={t("resource.chooseOption")}
             {...text("academicYearId")}
           />
           <OptionField
             label={t("organization.sections.fields.gradeId")}
             required
             options={gradeOptions}
-            placeholder={t("organization.common.chooseOption")}
+            placeholder={t("resource.chooseOption")}
             {...text("gradeId")}
           />
         </>
@@ -89,8 +89,8 @@ export function SectionForm({
         <OptionField
           label={t("organization.sections.fields.isActive")}
           options={[
-            { value: "true", label: t("organization.common.active") },
-            { value: "false", label: t("organization.common.inactive") },
+            { value: "true", label: t("resource.active") },
+            { value: "false", label: t("resource.inactive") },
           ]}
           {...text("isActive")}
         />

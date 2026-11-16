@@ -1,7 +1,7 @@
 import type { TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../../i18n/use-admin-text.ts";
-import { ActiveBadge, OptionField, RowActions, type Option } from "../../components/fields.tsx";
-import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../components/ResourceScreen.tsx";
+import { ActiveBadge, OptionField, RowActions, type Option } from "../../../../shared/resource-screen/components/fields.tsx";
+import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../../../shared/resource-screen/components/ResourceScreen.tsx";
 import type { Section } from "../section-form.ts";
 
 interface SelectFilter {
@@ -45,7 +45,7 @@ export function SectionsView({
   onToggle,
 }: SectionsViewProps) {
   const { t } = useAdminText();
-  const unknown = t("organization.common.unknownReference");
+  const unknown = t("resource.unknownReference");
   const columns: readonly TableColumn<Section>[] = [
     { id: "name", header: t("organization.sections.columns.name"), sortable: true, cell: (row) => row.name },
     { id: "academicYear", header: t("organization.sections.columns.academicYear"), cell: (row) => yearNames.get(row.academicYearId) ?? unknown },
@@ -55,12 +55,12 @@ export function SectionsView({
       header: t("organization.sections.columns.capacity"),
       sortable: true,
       align: "end",
-      cell: (row) => row.capacity ?? t("organization.common.noCapacity"),
+      cell: (row) => row.capacity ?? t("organization.noCapacity"),
     },
-    { id: "isActive", header: t("organization.common.state"), cell: (row) => <ActiveBadge active={row.isActive} /> },
+    { id: "isActive", header: t("resource.state"), cell: (row) => <ActiveBadge active={row.isActive} /> },
     {
       id: "actions",
-      header: t("organization.common.actions"),
+      header: t("resource.actions"),
       cell: (row) => (
         <RowActions
           name={row.name}
@@ -91,7 +91,7 @@ export function SectionsView({
             controlId="sections-filter-year"
             value={yearFilter.value}
             options={yearFilter.options}
-            placeholder={t("organization.common.allOption")}
+            placeholder={t("resource.allOption")}
             onChange={yearFilter.onChange}
           />
           <OptionField
@@ -99,7 +99,7 @@ export function SectionsView({
             controlId="sections-filter-grade"
             value={gradeFilter.value}
             options={gradeFilter.options}
-            placeholder={t("organization.common.allOption")}
+            placeholder={t("resource.allOption")}
             onChange={gradeFilter.onChange}
           />
         </>

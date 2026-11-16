@@ -1,7 +1,7 @@
-import { toApiParams } from "../organization/list-search.ts";
-import type { SearchChange } from "../organization/search-change.ts";
-import { useListState } from "../organization/use-list-state.ts";
-import { useResourceView } from "../organization/use-resource-view.ts";
+import { toApiParams } from "../../shared/resource-screen/list-search.ts";
+import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
+import { useListState } from "../../shared/resource-screen/use-list-state.ts";
+import { useResourceView } from "../../shared/resource-screen/use-resource-view.ts";
 import { PAYMENT_CATEGORIES, type PaymentConceptsSearch } from "./catalog-search.ts";
 import { PaymentConceptsView } from "./components/PaymentConceptsView.tsx";
 import { PaymentConceptFormContainer } from "./PaymentConceptFormContainer.tsx";

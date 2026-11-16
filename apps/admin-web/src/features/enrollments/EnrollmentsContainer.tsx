@@ -1,11 +1,11 @@
 import type { TableSort } from "@confia/ui";
 import { useEffect, useRef, useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
-import { toApiParams } from "../organization/list-search.ts";
-import type { ResourceNotice } from "../organization/components/ResourceScreen.tsx";
-import type { SearchChange } from "../organization/search-change.ts";
-import { useListState } from "../organization/use-list-state.ts";
-import { optionsOf, useYearLookup } from "../organization/use-lookups.ts";
+import { toApiParams } from "../../shared/resource-screen/list-search.ts";
+import type { ResourceNotice } from "../../shared/resource-screen/components/ResourceScreen.tsx";
+import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
+import { useListState } from "../../shared/resource-screen/use-list-state.ts";
+import { optionsOf, useYearLookup } from "../../shared/organization-lookups/use-lookups.ts";
 import { EnrollmentsView } from "./components/EnrollmentsView.tsx";
 import { EnrollFormContainer } from "./EnrollFormContainer.tsx";
 import { EnrollmentDetailContainer } from "./EnrollmentDetailContainer.tsx";
@@ -114,7 +114,7 @@ export function EnrollmentsContainer({ search, onSearchChange }: EnrollmentsCont
             // The same section name exists in several grades, so each option says its grade.
             options: (sections.data?.items ?? []).map((item) => ({
               value: item.id,
-              label: `${grades.labels.get(item.gradeId) ?? t("organization.common.unknownReference")} · ${item.name}`,
+              label: `${grades.labels.get(item.gradeId) ?? t("resource.unknownReference")} · ${item.name}`,
             })),
             onChange: (id) => {
               onSearchChange({ ...search, sectionId: id === "" ? undefined : id, page: 1 }, { replace: true });

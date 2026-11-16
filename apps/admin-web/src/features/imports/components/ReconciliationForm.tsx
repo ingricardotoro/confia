@@ -1,7 +1,7 @@
 import { Alert, Button, FormErrorSummary, Skeleton } from "@confia/ui";
 import type { Ref, SyntheticEvent } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { OptionField, TextField, type Option } from "../../organization/components/fields.tsx";
+import { OptionField, TextField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
 import { MAX_REFERENCE_LENGTH, RECONCILIATION_CONTROL_IDS, type ReconciliationField, type ReconciliationValues } from "../reconciliation-model.ts";
 
 /** What the person is told about the years of the selector: still loading, not readable, none exist, or ready to choose from. */
@@ -83,7 +83,7 @@ export function ReconciliationForm({
       {alert === undefined ? null : (
         <Alert ref={alertRef} variant="destructive">
           <p>{alert.message}</p>
-          {alert.traceId === undefined ? null : <p className="mt-1">{t("organization.common.trace", { traceId: alert.traceId })}</p>}
+          {alert.traceId === undefined ? null : <p className="mt-1">{t("resource.trace", { traceId: alert.traceId })}</p>}
         </Alert>
       )}
       {countdown === undefined ? null : <p className="text-sm text-text-secondary">{countdown.remaining}</p>}

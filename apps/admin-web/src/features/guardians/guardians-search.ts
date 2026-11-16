@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { page, pageSize, sortOf } from "../organization/list-search.ts";
-import { MIN_QUERY_LENGTH } from "../students/students-search.ts";
+import { page, pageSize, sortOf } from "../../shared/resource-screen/list-search.ts";
+import { MIN_QUERY_LENGTH } from "../../shared/resource-screen/search-text.ts";
 
 const MAX_QUERY_LENGTH = 100;
 

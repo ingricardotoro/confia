@@ -1,8 +1,8 @@
 import type { TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../../i18n/use-admin-text.ts";
 import { formatIsoDate } from "../../../../shared/format/format-date.ts";
-import { ActiveBadge, RowActions } from "../../components/fields.tsx";
-import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../components/ResourceScreen.tsx";
+import { ActiveBadge, RowActions } from "../../../../shared/resource-screen/components/fields.tsx";
+import { ResourceScreen, type ListTableState, type ResourceNotice, type ResourcePagination } from "../../../../shared/resource-screen/components/ResourceScreen.tsx";
 import type { AcademicYear } from "../academic-year-form.ts";
 import { STATUS_KEYS } from "./AcademicYearForm.tsx";
 
@@ -26,10 +26,10 @@ export function AcademicYearsView({ rows, table, pagination, notice, togglingId,
     { id: "startDate", header: t("organization.academicYears.columns.startDate"), sortable: true, cell: (row) => formatIsoDate(row.startDate) },
     { id: "endDate", header: t("organization.academicYears.columns.endDate"), sortable: true, cell: (row) => formatIsoDate(row.endDate) },
     { id: "status", header: t("organization.academicYears.columns.status"), sortable: true, cell: (row) => t(STATUS_KEYS[row.status]) },
-    { id: "isActive", header: t("organization.common.state"), cell: (row) => <ActiveBadge active={row.isActive} /> },
+    { id: "isActive", header: t("resource.state"), cell: (row) => <ActiveBadge active={row.isActive} /> },
     {
       id: "actions",
-      header: t("organization.common.actions"),
+      header: t("resource.actions"),
       cell: (row) => (
         <RowActions
           name={row.name}

@@ -1,5 +1,5 @@
 import { useAdminText } from "../../i18n/use-admin-text.ts";
-import { loadFailureOf } from "../organization/organization-failure.ts";
+import { loadFailureOf } from "../../shared/resource-screen/resource-failure.ts";
 import { GuardianConsents } from "./components/GuardianConsents.tsx";
 import { useGuardianConsents, useRecordConsent } from "./use-guardians-queries.ts";
 import { useConsentForm } from "./use-consent-form.ts";
@@ -40,7 +40,7 @@ export function GuardianConsentsContainer({ guardianId, guardianActive }: Guardi
                   t(failure?.key ?? "problem.unexpected"),
                   failure?.traceId === undefined
                     ? ""
-                    : t("organization.common.trace", {
+                    : t("resource.trace", {
                         traceId: failure.traceId,
                       }),
                 ]

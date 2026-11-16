@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { SEARCH_DEBOUNCE_MS } from "../students/use-search-box.ts";
-import { searchTextOf } from "../students/students-search.ts";
+import { SEARCH_DEBOUNCE_MS } from "./use-search-box.ts";
+import { searchTextOf } from "./search-text.ts";
 
 export interface DebouncedSearch {
   /** What the person has typed. */

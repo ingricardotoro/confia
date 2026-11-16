@@ -1,8 +1,8 @@
 import { Checkbox, FormField, Input, Label } from "@confia/ui";
 import { useId } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { OptionField, ReadOnlyField, TextField } from "../../organization/components/fields.tsx";
-import { ResourceFormDialog, type ResourceFormView } from "../../organization/components/ResourceFormDialog.tsx";
+import { OptionField, ReadOnlyField, TextField } from "../../../shared/resource-screen/components/fields.tsx";
+import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { STUDENT_CONTROL_IDS, type Student, type StudentField, type StudentValues } from "../student-form.ts";
 
 export interface StudentFormProps {
@@ -45,7 +45,7 @@ export function StudentForm({ mode, values, fieldErrors, row, form, onChange, on
     <ResourceFormDialog
       title={t(editing ? "students.editTitle" : "students.createTitle")}
       description={t(editing ? "students.editDescription" : "students.createDescription")}
-      submitLabel={t("organization.common.save")}
+      submitLabel={t("resource.save")}
       form={form}
       onClose={onClose}
     >
@@ -61,7 +61,7 @@ export function StudentForm({ mode, values, fieldErrors, row, form, onChange, on
         label={t("students.fields.sex")}
         required
         options={(["F", "M", "UNSPECIFIED"] as const).map((sex) => ({ value: sex, label: t(`students.sex.${sex}`) }))}
-        placeholder={t("organization.common.chooseOption")}
+        placeholder={t("resource.chooseOption")}
         {...text("sex")}
       />
       {editing ? (
@@ -99,8 +99,8 @@ export function StudentForm({ mode, values, fieldErrors, row, form, onChange, on
           <OptionField
             label={t("students.fields.status")}
             options={[
-              { value: "ACTIVE", label: t("organization.common.active") },
-              { value: "INACTIVE", label: t("organization.common.inactive") },
+              { value: "ACTIVE", label: t("resource.active") },
+              { value: "INACTIVE", label: t("resource.inactive") },
             ]}
             {...text("status")}
           />

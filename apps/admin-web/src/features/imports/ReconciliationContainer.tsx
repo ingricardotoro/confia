@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { useAccessForm } from "../../shared/forms/use-access-form.ts";
-import { toApiParams } from "../organization/list-search.ts";
-import { fieldSpecs } from "../organization/organization-form.ts";
-import type { SearchChange } from "../organization/search-change.ts";
-import { useListState } from "../organization/use-list-state.ts";
-import { nameMapOf, optionsOf, useYearLookup } from "../organization/use-lookups.ts";
+import { toApiParams } from "../../shared/resource-screen/list-search.ts";
+import { fieldSpecs } from "../../shared/resource-screen/resource-form.ts";
+import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
+import { useListState } from "../../shared/resource-screen/use-list-state.ts";
+import { nameMapOf, optionsOf, useYearLookup } from "../../shared/organization-lookups/use-lookups.ts";
 import { ReconciliationForm, type SignedNotice, type YearsState } from "./components/ReconciliationForm.tsx";
 import { ReconciliationHistory } from "./components/ReconciliationHistory.tsx";
 import { ReconciliationPreview, type PreviewView } from "./components/ReconciliationPreview.tsx";
@@ -98,7 +98,7 @@ export function ReconciliationContainer({ search, onSearchChange }: Reconciliati
       : previewFailure !== undefined
         ? {
             kind: "failed",
-            message: [t(previewFailure.key), previewFailure.traceId === undefined ? "" : t("organization.common.trace", { traceId: previewFailure.traceId })]
+            message: [t(previewFailure.key), previewFailure.traceId === undefined ? "" : t("resource.trace", { traceId: previewFailure.traceId })]
               .filter((part) => part !== "")
               .join(" "),
             onRetry: () => void preview.refetch(),

@@ -53,7 +53,7 @@ export function ResourceFormDialog({
       footer={
         <>
           <Button variant="secondary" disabled={submitting} onClick={onClose}>
-            {t("organization.common.cancel")}
+            {t("resource.cancel")}
           </Button>
           <Button type="submit" form={formId} loading={submitting}>
             {submitLabel}
@@ -67,7 +67,7 @@ export function ResourceFormDialog({
           <Alert ref={alertRef} variant="destructive">
             <p>{alert.message}</p>
             {alert.traceId === undefined ? null : (
-              <p className="mt-1">{t("organization.common.trace", { traceId: alert.traceId })}</p>
+              <p className="mt-1">{t("resource.trace", { traceId: alert.traceId })}</p>
             )}
           </Alert>
         )}

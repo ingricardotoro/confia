@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ApiFailure } from "../../shared/api/api-failure.ts";
-import type { ApiProblem } from "../../shared/api/problem.ts";
-import { classifyOrganizationFailure, failureMessageOf, failureOf, loadFailureOf } from "./organization-failure.ts";
+import { ApiFailure } from "../api/api-failure.ts";
+import type { ApiProblem } from "../api/problem.ts";
+import { classifyOrganizationFailure, failureMessageOf, failureOf, loadFailureOf } from "./resource-failure.ts";
 
 // How a failed request of the academic structure becomes what a form or a screen shows. Texts are catalog keys.
 const problem = (code: ApiProblem["code"], status: number, extra: Partial<ApiProblem> = {}) =>

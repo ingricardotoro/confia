@@ -1,6 +1,6 @@
 import { useAdminText } from "../../../../i18n/use-admin-text.ts";
-import { OptionField, TextField } from "../../components/fields.tsx";
-import { ResourceFormDialog, type ResourceFormView } from "../../components/ResourceFormDialog.tsx";
+import { OptionField, TextField } from "../../../../shared/resource-screen/components/fields.tsx";
+import { ResourceFormDialog, type ResourceFormView } from "../../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { MODALITY_CONTROL_IDS, type ModalityField, type ModalityValues } from "../modality-form.ts";
 
 export interface ModalityFormProps {
@@ -33,7 +33,7 @@ export function ModalityForm({ mode, values, fieldErrors, form, onChange, onBlur
     <ResourceFormDialog
       title={t(mode === "create" ? "organization.modalities.createTitle" : "organization.modalities.editTitle")}
       description={t(mode === "create" ? "organization.modalities.createDescription" : "organization.modalities.editDescription")}
-      submitLabel={t("organization.common.save")}
+      submitLabel={t("resource.save")}
       form={form}
       onClose={onClose}
     >
@@ -43,8 +43,8 @@ export function ModalityForm({ mode, values, fieldErrors, form, onChange, onBlur
         <OptionField
           label={t("organization.modalities.fields.isActive")}
           options={[
-            { value: "true", label: t("organization.common.active") },
-            { value: "false", label: t("organization.common.inactive") },
+            { value: "true", label: t("resource.active") },
+            { value: "false", label: t("resource.inactive") },
           ]}
           {...text("isActive")}
         />

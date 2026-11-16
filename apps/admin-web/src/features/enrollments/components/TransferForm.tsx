@@ -1,7 +1,7 @@
 import { Alert, Button } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { TextField } from "../../organization/components/fields.tsx";
-import { ResourceFormDialog, type ResourceFormView } from "../../organization/components/ResourceFormDialog.tsx";
+import { TextField } from "../../../shared/resource-screen/components/fields.tsx";
+import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { TRANSFER_CONTROL_IDS, type TransferField, type TransferValues } from "../enrollment-forms.ts";
 import type { OptionGroup } from "../enrollment-model.ts";
 import type { SectionOptionsState } from "./EnrollForm.tsx";

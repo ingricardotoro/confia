@@ -2,8 +2,8 @@ import { createRoute, stripSearchParams, type AnyRoute } from "@tanstack/react-r
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { PageContent } from "../../shared/layout/components/PageContent.tsx";
 import type { FeatureModule } from "../../shared/navigation/navigation-entry.ts";
-import { DEFAULT_PAGE_SIZE } from "../organization/list-search.ts";
-import { useListSearch } from "../organization/use-list-search.ts";
+import { DEFAULT_PAGE_SIZE } from "../../shared/resource-screen/list-search.ts";
+import { useListSearch } from "../../shared/resource-screen/use-list-search.ts";
 import { EnrollmentsContainer } from "./EnrollmentsContainer.tsx";
 import { ENROLLMENTS_PATH } from "./enrollments-paths.ts";
 import { enrollmentsSearch, type EnrollmentsSearch } from "./enrollments-search.ts";

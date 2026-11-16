@@ -4,7 +4,7 @@ import type { AdminKey } from "../../i18n/resources.ts";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import type { ListTableState, ResourcePagination } from "./components/ResourceScreen.tsx";
 import { searchSortOf, tableSortOf } from "./list-search.ts";
-import { loadFailureOf } from "./organization-failure.ts";
+import { loadFailureOf } from "./resource-failure.ts";
 import type { SearchChange } from "./search-change.ts";
 
 interface Page<Row> {
@@ -67,7 +67,7 @@ export function useListState<Row, S extends ListSearch>({
         : {
             error: {
               title: t(loadFailedKey),
-              description: [t(failure.key), failure.traceId === undefined ? "" : t("organization.common.trace", { traceId: failure.traceId })]
+              description: [t(failure.key), failure.traceId === undefined ? "" : t("resource.trace", { traceId: failure.traceId })]
                 .filter((part) => part !== "")
                 .join(" "),
               onRetry: () => void list.refetch(),
@@ -75,10 +75,10 @@ export function useListState<Row, S extends ListSearch>({
           }),
       empty: noMatches
         ? {
-            title: t("organization.common.noResultsTitle"),
-            description: t("organization.common.noResultsDescription"),
+            title: t("resource.noResultsTitle"),
+            description: t("resource.noResultsDescription"),
             action: {
-              label: t("organization.common.clearFilters"),
+              label: t("resource.clearFilters"),
               onAction: () => {
                 onSearchChange(cleared, { replace: true });
               },

@@ -1,9 +1,9 @@
 import type { ImportRunResponseOutput } from "@confia/contracts/admin";
 import { useRef, useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
-import { toApiParams } from "../organization/list-search.ts";
-import type { SearchChange } from "../organization/search-change.ts";
-import { useListState } from "../organization/use-list-state.ts";
+import { toApiParams } from "../../shared/resource-screen/list-search.ts";
+import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
+import { useListState } from "../../shared/resource-screen/use-list-state.ts";
 import { ImportHistory } from "./components/ImportHistory.tsx";
 import { ImportWizard, type ImportPhase } from "./components/ImportWizard.tsx";
 import { ReconciliationContainer } from "./ReconciliationContainer.tsx";

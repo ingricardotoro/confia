@@ -1,7 +1,7 @@
 import { useAccessForm } from "../../../shared/forms/use-access-form.ts";
-import type { Option } from "../components/fields.tsx";
-import { failureOf } from "../organization-failure.ts";
-import { fieldSpecs } from "../organization-form.ts";
+import type { Option } from "../../../shared/resource-screen/components/fields.tsx";
+import { failureOf } from "../../../shared/resource-screen/resource-failure.ts";
+import { fieldSpecs } from "../../../shared/resource-screen/resource-form.ts";
 import { GradeForm } from "./components/GradeForm.tsx";
 import { GRADE_CONTROL_IDS, initialGradeValues, saveOf, validateGrade, type Grade, type GradeField, type GradeSave } from "./grade-form.ts";
 
@@ -30,7 +30,7 @@ export function GradeFormContainer({ row, defaultModalityId, modalityOptions, mo
         return failureOf(error);
       }
     },
-    waitingKey: "organization.common.saving",
+    waitingKey: "resource.saving",
   });
 
   return (

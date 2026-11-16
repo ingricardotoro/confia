@@ -113,6 +113,26 @@ module.exports = {
       to: { path: "(^|/)apps/admin-web/src/(features|app)/" },
     },
     {
+      name: "admin-features-never-import-features",
+      comment:
+        "A feature folder of apps/admin-web never imports files of another one: what two features share lives in " +
+        "src/shared/ (resource-screen for the list and form infrastructure, query-keys for the keys other features " +
+        "invalidate, organization-lookups for the academic structure lookups) and the app shell composes the features. " +
+        "One composition is accepted, the dialog that manages the guardians of a student, opened from the students " +
+        "screen: StudentsContainer.tsx renders guardians/StudentGuardiansContainer.tsx, and that container test " +
+        "renders the students feature as its host. Both are named below; any other import fails.",
+      severity: "error",
+      from: { path: "(^|/)apps/admin-web/src/features/([^/]+)/" },
+      to: {
+        path: "(^|/)apps/admin-web/src/features/",
+        // The two targets of the accepted composition above; nothing else of another feature is reachable.
+        pathNot:
+          "(^|/)apps/admin-web/src/features/$2/" +
+          "|(^|/)apps/admin-web/src/features/guardians/StudentGuardiansContainer\\.tsx$" +
+          "|(^|/)apps/admin-web/src/features/students/feature\\.tsx$",
+      },
+    },
+    {
       name: "admin-token-store-is-private",
       comment:
         "Only the session module reads the in-memory token store and the enrollment draft; every other module asks the session.",

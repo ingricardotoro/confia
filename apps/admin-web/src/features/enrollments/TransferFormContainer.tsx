@@ -1,7 +1,7 @@
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { useAccessForm } from "../../shared/forms/use-access-form.ts";
-import { failureOf } from "../organization/organization-failure.ts";
-import { fieldSpecs } from "../organization/organization-form.ts";
+import { failureOf } from "../../shared/resource-screen/resource-failure.ts";
+import { fieldSpecs } from "../../shared/resource-screen/resource-form.ts";
 import { TransferForm } from "./components/TransferForm.tsx";
 import {
   TRANSFER_CONTROL_IDS,
@@ -45,7 +45,7 @@ export function TransferFormContainer({ row, gradeLabels, save, onClose }: Trans
       values={form.values}
       fieldErrors={form.fieldErrors}
       sectionsState={sections.isError ? "failed" : sections.isPending ? "loading" : "ready"}
-      sectionGroups={groupSections(sections.data?.items ?? [], gradeLabels, t("organization.common.unknownReference"), row.sectionId)}
+      sectionGroups={groupSections(sections.data?.items ?? [], gradeLabels, t("resource.unknownReference"), row.sectionId)}
       onRetrySections={() => void sections.refetch()}
       form={form}
       onChange={form.onChange}

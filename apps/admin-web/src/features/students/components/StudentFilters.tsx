@@ -1,6 +1,6 @@
 import { FormField, Input } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { OptionField } from "../../organization/components/fields.tsx";
+import { OptionField } from "../../../shared/resource-screen/components/fields.tsx";
 import type { StudentStatus } from "../student-form.ts";
 
 export interface StudentFiltersProps {
@@ -48,10 +48,10 @@ export function StudentFilters({ search, status }: StudentFiltersProps) {
         controlId="students-filter-status"
         value={status.value}
         options={[
-          { value: "ACTIVE", label: t("organization.common.active") },
-          { value: "INACTIVE", label: t("organization.common.inactive") },
+          { value: "ACTIVE", label: t("resource.active") },
+          { value: "INACTIVE", label: t("resource.inactive") },
         ]}
-        placeholder={t("organization.common.allOption")}
+        placeholder={t("resource.allOption")}
         onChange={(value) => {
           status.onChange(value === "ACTIVE" || value === "INACTIVE" ? value : "");
         }}

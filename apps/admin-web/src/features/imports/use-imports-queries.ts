@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthorizedSend } from "../../shared/api/authorized-send.tsx";
 import { applyImport, listImportBatches, listReconciliations, previewReconciliation, signReconciliation, simulateImport } from "../../shared/api/import-operations.ts";
 import type { PageParams } from "../../shared/api/resource-client.ts";
-import { enrollmentKeys } from "../enrollments/enrollments-keys.ts";
-import { guardianKeys } from "../guardians/guardians-keys.ts";
-import { studentKeys } from "../students/students-keys.ts";
+import { enrollmentKeys } from "../../shared/query-keys/enrollments-keys.ts";
+import { guardianKeys } from "../../shared/query-keys/guardians-keys.ts";
+import { studentKeys } from "../../shared/query-keys/students-keys.ts";
 import type { ImportKind } from "./import-model.ts";
 import { importKeys } from "./imports-keys.ts";
 

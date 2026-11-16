@@ -1,6 +1,6 @@
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { OptionField, TextField } from "../../organization/components/fields.tsx";
-import { ResourceFormDialog, type ResourceFormView } from "../../organization/components/ResourceFormDialog.tsx";
+import { OptionField, TextField } from "../../../shared/resource-screen/components/fields.tsx";
+import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { EXIT_CONTROL_IDS, EXIT_KINDS, reasonRequiredFor, type ExitField, type ExitValues } from "../enrollment-forms.ts";
 import { ReasonField } from "./ReasonField.tsx";
 

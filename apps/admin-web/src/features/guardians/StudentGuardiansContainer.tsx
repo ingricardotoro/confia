@@ -2,8 +2,8 @@ import type { ReplaceStudentGuardiansRequest } from "@confia/contracts/admin";
 import { useMemo } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { formatPercent } from "../../shared/format/format-percent.ts";
-import { useDebouncedSearch } from "../enrollments/use-debounced-search.ts";
-import { loadFailureOf } from "../organization/organization-failure.ts";
+import { useDebouncedSearch } from "../../shared/resource-screen/use-debounced-search.ts";
+import { loadFailureOf } from "../../shared/resource-screen/resource-failure.ts";
 import { StudentGuardiansDialog, type StudentGuardiansState } from "./components/StudentGuardiansDialog.tsx";
 import type { GuardianSearchState } from "./components/GuardianPicker.tsx";
 import { draftsOf } from "./link-model.ts";
@@ -69,7 +69,7 @@ export function StudentGuardiansContainer({ studentId, studentName, onSaved, onC
             kind: "failed",
             description: [
               t(failure?.key ?? "problem.unexpected"),
-              failure?.traceId === undefined ? "" : t("organization.common.trace", { traceId: failure.traceId }),
+              failure?.traceId === undefined ? "" : t("resource.trace", { traceId: failure.traceId }),
             ]
               .filter((part) => part !== "")
               .join(" "),

@@ -1,6 +1,6 @@
 import { useAdminText } from "../../../../i18n/use-admin-text.ts";
-import { OptionField, ReadOnlyField, TextField, type Option } from "../../components/fields.tsx";
-import { ResourceFormDialog, type ResourceFormView } from "../../components/ResourceFormDialog.tsx";
+import { OptionField, ReadOnlyField, TextField, type Option } from "../../../../shared/resource-screen/components/fields.tsx";
+import { ResourceFormDialog, type ResourceFormView } from "../../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { GRADE_CONTROL_IDS, type GradeField, type GradeValues } from "../grade-form.ts";
 
 export interface GradeFormProps {
@@ -37,7 +37,7 @@ export function GradeForm({ mode, values, fieldErrors, modalityOptions, modality
     <ResourceFormDialog
       title={t(mode === "create" ? "organization.grades.createTitle" : "organization.grades.editTitle")}
       description={t(mode === "create" ? "organization.grades.createDescription" : "organization.grades.editDescription")}
-      submitLabel={t("organization.common.save")}
+      submitLabel={t("resource.save")}
       form={form}
       onClose={onClose}
     >
@@ -46,7 +46,7 @@ export function GradeForm({ mode, values, fieldErrors, modalityOptions, modality
           label={t("organization.grades.fields.modalityId")}
           required
           options={modalityOptions}
-          placeholder={t("organization.common.chooseOption")}
+          placeholder={t("resource.chooseOption")}
           {...text("modalityId")}
         />
       ) : (
@@ -58,8 +58,8 @@ export function GradeForm({ mode, values, fieldErrors, modalityOptions, modality
         <OptionField
           label={t("organization.grades.fields.isActive")}
           options={[
-            { value: "true", label: t("organization.common.active") },
-            { value: "false", label: t("organization.common.inactive") },
+            { value: "true", label: t("resource.active") },
+            { value: "false", label: t("resource.inactive") },
           ]}
           {...text("isActive")}
         />

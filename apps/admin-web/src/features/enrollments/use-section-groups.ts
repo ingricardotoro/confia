@@ -1,5 +1,5 @@
-import { nameMapOf, useGradeLookup, useModalityLookup } from "../organization/use-lookups.ts";
-import type { Option } from "../organization/components/fields.tsx";
+import { nameMapOf, useGradeLookup, useModalityLookup } from "../../shared/organization-lookups/use-lookups.ts";
+import type { Option } from "../../shared/resource-screen/components/fields.tsx";
 
 export interface GradeLabels {
   /** Grade id to "Modalidad · Grado": the same grade name can exist in two modalities. */

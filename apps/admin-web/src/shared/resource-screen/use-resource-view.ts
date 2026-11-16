@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import type { ResourceNotice } from "./components/ResourceScreen.tsx";
-import { failureMessageOf, failureOf } from "./organization-failure.ts";
+import { failureMessageOf, failureOf } from "./resource-failure.ts";
 
 export type DialogState<Row> = { readonly kind: "closed" } | { readonly kind: "create" } | { readonly kind: "edit"; readonly row: Row };
 
@@ -35,7 +35,7 @@ export function useResourceView<Row>() {
     /** A create or an edit was saved: the dialog closes and the region says so. */
     saved: (kind: "created" | "updated", name: string, warning?: string) => {
       setDialog({ kind: "closed" });
-      const message = t(kind === "created" ? "organization.common.created" : "organization.common.updated", { name });
+      const message = t(kind === "created" ? "resource.created" : "resource.updated", { name });
       setNotice({ tone: "success", message: warning === undefined ? message : `${message} ${warning}` });
     },
     /** Empties the region of the screen, as opening a dialog does. */
@@ -53,7 +53,7 @@ export function useResourceView<Row>() {
       setNotice(undefined);
       try {
         const result = await run();
-        const message = t(nextActive ? "organization.common.activated" : "organization.common.deactivated", { name });
+        const message = t(nextActive ? "resource.activated" : "resource.deactivated", { name });
         const warning = warningOf?.(result);
         setNotice({ tone: "success", message: warning === undefined ? message : `${message} ${warning}` });
       } catch (error) {
