@@ -203,10 +203,20 @@ class CatalogPriceListSchemaIT extends CommittingPostgresIntegrationTest {
             assertThat(tooBig.getSQLState()).as("NUMERIC(14,4) range").isEqualTo("22003");
             assertThat(euro.getMessage()).contains("catalog_price_list_item_currency_chk");
             assertThat(lower.getMessage()).contains("catalog_price_list_item_currency_chk");
+            SQLException fractionOfACent = rejected(owner,
+                    () -> price(owner, base, base.concept(), "10.005", "HNL", "2027-03-01", null));
+            SQLException earlyYear = rejected(owner,
+                    () -> price(owner, base, base.concept(), "10", "HNL", "0202-03-01", null));
+            SQLException lateEnd = rejected(owner,
+                    () -> price(owner, base, base.concept(), "10", "HNL", "2027-03-01", "2101-01-01"));
+            assertThat(fractionOfACent.getSQLState()).isEqualTo("23514");
+            assertThat(fractionOfACent.getMessage()).contains("catalog_price_list_item_minor_unit_chk");
+            assertThat(earlyYear.getMessage()).contains("catalog_price_list_item_window_chk");
+            assertThat(lateEnd.getMessage()).contains("catalog_price_list_item_window_chk");
             assertThat(reversed.getSQLState()).isEqualTo("23514");
             assertThat(reversed.getMessage()).contains("catalog_price_list_item_dates_chk");
-            price(owner, base, base.concept(), "0.0001", "USD", "2027-02-01", "2027-02-01");
-            price(owner, base, base.otherConcept(), "9999999999.9999", "HNL", "2027-01-01", null);
+            price(owner, base, base.concept(), "0.01", "USD", "2027-02-01", "2027-02-01");
+            price(owner, base, base.otherConcept(), "9999999999.99", "HNL", "2027-01-01", null);
             owner.rollback();
         }
     }
@@ -483,6 +493,40 @@ class CatalogPriceListSchemaIT extends CommittingPostgresIntegrationTest {
                 rows.next();
                 assertThat(rows.getObject(1, UUID.class)).isEqualTo(year);
                 assertThat(rows.getString(2)).isEqualTo("ARCHIVED");
+            }
+            admin.rollback();
+        }
+    }
+
+    @Test
+    void theApplicationRoleCannotChangeTheCodeOrTheInstitutionOfAConceptButEditsTheRest() throws SQLException {
+        UUID institution = UUID.randomUUID();
+        UUID id = UUID.randomUUID();
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
+            concept(owner, institution, id, "COLEG");
+            owner.commit();
+        }
+        try (Connection admin = SharedPostgresContainer.connectionAs("confia_admin_app")) {
+            admin.setAutoCommit(false);
+            StaffRoleFixtures.fixInstitution(admin, institution);
+
+            SQLException code = rejected(admin,
+                    () -> update(admin, "update catalog_payment_concept set code = 'OTRO' where id = ?", id));
+            SQLException owner = rejected(admin, () -> update(admin,
+                    "update catalog_payment_concept set institution_id = ? where id = ?", UUID.randomUUID(), id));
+            SQLException created = rejected(admin, () -> update(admin,
+                    "update catalog_payment_concept set created_at = clock_timestamp() where id = ?", id));
+
+            assertThat(code.getSQLState()).isEqualTo("42501");
+            assertThat(owner.getSQLState()).isEqualTo("42501");
+            assertThat(created.getSQLState()).isEqualTo("42501");
+            update(admin, "update catalog_payment_concept set name = 'Nuevo', category = 'FINE', "
+                    + "is_taxable = false, is_recurring = false, is_active = false, version = 1, "
+                    + "updated_at = clock_timestamp() where id = ?", id);
+            try (ResultSet rows = admin.createStatement().executeQuery(
+                    "select code from catalog_payment_concept where is_active = false")) {
+                rows.next();
+                assertThat(rows.getString(1)).isEqualTo("COLEG");
             }
             admin.rollback();
         }

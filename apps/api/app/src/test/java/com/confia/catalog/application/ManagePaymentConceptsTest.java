@@ -230,6 +230,11 @@ class ManagePaymentConceptsTest {
         }
 
         @Override
+        public Optional<PaymentConcept> lockShareById(InstitutionId institution, UUID id) {
+            return findById(institution, id);
+        }
+
+        @Override
         public void insert(InstitutionId institution, PaymentConcept concept) {
             boolean taken = rows.entrySet().stream().anyMatch(entry -> entry.getKey().institution().equals(institution)
                     && entry.getValue().code().equalsIgnoreCase(concept.code()));

@@ -4,7 +4,6 @@ import com.confia.kernel.CurrencyCode;
 import com.confia.kernel.InvalidMoneyAmountException;
 import com.confia.kernel.Money;
 import com.confia.kernel.UnsupportedCurrencyException;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
@@ -23,6 +22,12 @@ import java.util.UUID;
 public record PriceListItem(UUID id, UUID priceListId, UUID paymentConceptId, Money price, LocalDate validFrom,
         LocalDate validTo, UUID createdBy, Instant createdAt) {
 
+    /** The first day a validity may start or end on. */
+    public static final LocalDate EARLIEST_DAY = LocalDate.of(2000, 1, 1);
+
+    /** The last day a validity may start or end on. */
+    public static final LocalDate LATEST_DAY = LocalDate.of(2100, 12, 31);
+
     public PriceListItem {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(priceListId, "priceListId");
@@ -30,13 +35,13 @@ public record PriceListItem(UUID id, UUID priceListId, UUID paymentConceptId, Mo
         Objects.requireNonNull(createdBy, "createdBy");
         Objects.requireNonNull(createdAt, "createdAt");
         if (price == null || !price.isPositive() || validFrom == null
-                || (validTo != null && validTo.isBefore(validFrom))) {
+                || outOfBounds(validFrom) || (validTo != null && (outOfBounds(validTo) || validTo.isBefore(validFrom)))) {
             throw new InvalidCatalogValueException();
         }
     }
 
     /**
-     * A new price, read from the text of the API. The amount is exact (at most four decimals) and greater than zero, the
+     * A new price, read from the text of the API. The amount is greater than zero and has at most the decimals of the minor unit of its currency (two), the
      * currency is one the system operates with, and the end, when there is one, is not before the start.
      */
     public static PriceListItem create(UUID id, UUID priceListId, UUID paymentConceptId, String amount,
@@ -45,12 +50,17 @@ public record PriceListItem(UUID id, UUID priceListId, UUID paymentConceptId, Mo
                 createdBy, now);
     }
 
+    private static boolean outOfBounds(LocalDate day) {
+        return day.isBefore(EARLIEST_DAY) || day.isAfter(LATEST_DAY);
+    }
+
     static Money priceOf(String amount, String currency) {
         try {
             Money price = Money.of(amount, CurrencyCode.fromIsoCode(currency));
-            // The amount is shown rounded to the minor unit of its currency: one that cannot be (it would carry
-            // past the largest amount) is refused here and never stored.
-            price.roundToMinorUnit(RoundingMode.HALF_UP);
+            // A price has at most the decimals of the minor unit of its currency, so what is stored is what is shown.
+            if (price.amount().stripTrailingZeros().scale() > price.currency().minorUnitDigits()) {
+                throw new InvalidCatalogValueException();
+            }
             return price;
         } catch (InvalidMoneyAmountException | UnsupportedCurrencyException | NullPointerException e) {
             throw new InvalidCatalogValueException();

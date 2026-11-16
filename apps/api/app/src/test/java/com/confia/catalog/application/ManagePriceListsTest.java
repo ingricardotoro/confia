@@ -43,6 +43,9 @@ import org.junit.jupiter.api.Test;
  */
 class ManagePriceListsTest {
 
+    /** The order the fakes were locked in, to prove the lock order of the use case. */
+    private static final List<String> LOCKS = new ArrayList<>();
+
     private static final Instant NOW = Instant.parse("2026-11-16T15:00:00Z");
 
     private final List<String> transactionCalls = new ArrayList<>();
@@ -64,6 +67,11 @@ class ManagePriceListsTest {
     private final Concepts concepts = new Concepts();
     private final ManagePriceLists service =
             new ManagePriceLists(runner, lists, items, concepts, structure, auditWriter, clock);
+
+    @org.junit.jupiter.api.BeforeEach
+    void clearTheLocks() {
+        LOCKS.clear();
+    }
 
     private PriceListView institutionList() {
         structure.years.add(new Ref(institution, year));
@@ -251,19 +259,21 @@ class ManagePriceListsTest {
     }
 
     @Test
-    void thePriceOfPresentationIsRoundedByTheServerHalfUpToTheMinorUnitWhileTheStoredPriceKeepsFourDecimals() {
+    void thePriceShownIsExactlyTheOneStoredAndAThirdDecimalIsRefused() {
         PriceListView list = institutionList();
         PaymentConcept colegiatura = concept(true);
 
-        PriceListItemView up = add(list.id(), colegiatura.id(), "10.005", "2027-01-01", "2027-01-31");
-        PriceListItemView down = add(list.id(), colegiatura.id(), "10.0049", "2027-02-01", "2027-02-28");
-        PriceListItemView exact = add(list.id(), colegiatura.id(), "7", "2027-03-01", "2027-03-31");
+        PriceListItemView cents = add(list.id(), colegiatura.id(), "10.05", "2027-01-01", "2027-01-31");
+        PriceListItemView whole = add(list.id(), colegiatura.id(), "7", "2027-03-01", "2027-03-31");
 
-        assertThat(up.amount()).isEqualTo("10.01");
-        assertThat(down.amount()).isEqualTo("10.00");
-        assertThat(exact.amount()).isEqualTo("7.00");
+        assertThat(cents.amount()).isEqualTo("10.05");
+        assertThat(whole.amount()).isEqualTo("7.00");
+        assertThatThrownBy(() -> add(list.id(), colegiatura.id(), "10.005", "2027-04-01", null))
+                .isInstanceOf(InvalidCatalogValueException.class);
+        assertThatThrownBy(() -> add(list.id(), colegiatura.id(), "0.0001", "2027-04-01", null))
+                .isInstanceOf(InvalidCatalogValueException.class);
         assertThat(items.rows.values()).extracting(item -> item.price().toPlainString())
-                .containsExactly("10.0050", "10.0049", "7.0000");
+                .containsExactly("10.0500", "7.0000");
     }
 
     @Test
@@ -377,6 +387,17 @@ class ManagePriceListsTest {
         assertThat(items.rows.values()).extracting(PriceListItem::createdBy).containsExactly(actor.accountId());
     }
 
+    @Test
+    void addingAPriceLocksTheListFirstAndThenTheConceptInShareModeInTheSameTransaction() {
+        PriceListView list = institutionList();
+        PaymentConcept colegiatura = concept(true);
+        LOCKS.clear();
+
+        add(list.id(), colegiatura.id(), "1500", "2027-01-01", null);
+
+        assertThat(LOCKS).containsExactly("lock list", "lock concept");
+    }
+
     // --- read and list ---
 
     @Test
@@ -464,6 +485,12 @@ class ManagePriceListsTest {
         }
 
         @Override
+        public Optional<PaymentConcept> lockShareById(InstitutionId institution, UUID id) {
+            LOCKS.add("lock concept");
+            return findById(institution, id);
+        }
+
+        @Override
         public void insert(InstitutionId institution, PaymentConcept concept) {
             throw new UnsupportedOperationException();
         }
@@ -490,6 +517,7 @@ class ManagePriceListsTest {
 
         @Override
         public Optional<PriceList> lockById(InstitutionId institution, UUID id) {
+            LOCKS.add("lock list");
             return findById(institution, id);
         }
 

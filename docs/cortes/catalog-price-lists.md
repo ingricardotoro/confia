@@ -58,7 +58,7 @@ con moneda. Estados de carga, vacío, error y éxito. Textos en el catálogo es-
 ## Casos límite a probar
 
 Solape exacto, parcial, contiguo (permitido) y contenido; vigencia abierta cerrada por la nueva; `valid_to` anterior a
-`valid_from`; importe cero, negativo y con más de cuatro decimales; moneda inválida; concepto inactivo o de otra
+`valid_from`; importe cero, negativo y con más de dos decimales; moneda inválida; concepto inactivo o de otra
 institución; lista archivada; otra institución no ve ni escribe; rol sin permiso (403); `version` desfasada (409); dos
 altas concurrentes del mismo concepto (una gana, la otra 409); la base rechaza `UPDATE` del importe y `DELETE`.
 
@@ -105,18 +105,24 @@ cualquier solape y ningún usuario ve listas de otra institución.
 - La nueva vigencia reemplaza a la abierta solo cuando es también abierta (sin `validTo`) y empieza después; un precio
   acotado que cae dentro de una vigencia abierta se rechaza con 409, porque cerrarla dejaría días sin precio. Un precio
   acotado enteramente anterior a la vigencia abierta se agrega sin tocarla (historial cargado a posteriori).
-- El importe de respuesta sale redondeado por el servidor a la unidad menor de la moneda (`HALF_UP`, dos decimales);
-  la base conserva hasta cuatro. Un importe que no pueda redondearse sin salir de rango (por ejemplo `9999999999.9999`) se
-  rechaza con 400 en lugar de guardarse y fallar al responder. El importe de entrada debe ser una cadena JSON: un número
-  se rechaza con 400.
-- Un importe con más de cuatro decimales lo rechaza el dominio y el borde; la base, por ser `NUMERIC(14,4)`, redondearía
-  en silencio, por eso esa regla no se prueba a nivel de base.
+- **Precisión del precio:** un precio admite como máximo dos decimales (la unidad menor de `HNL` y `USD`), de modo que lo
+  guardado es lo mostrado; el servidor ya no redondea al responder. Se exige en el borde (patrón sin signo, dos decimales),
+  en el dominio (`PriceListItem`) y en la base (`CHECK amount = round(amount, 2)`); la columna sigue siendo
+  `NUMERIC(14,4)`, el tipo de todo importe del sistema. El importe de entrada debe ser una cadena JSON: un número se
+  rechaza con 400. La petición usa el esquema `PriceInput` (sin signo); la respuesta usa `Money`.
+- **Fechas:** `validFrom` y `validTo` deben estar entre 2000-01-01 y 2100-12-31, en el borde (400), en el dominio y en la
+  base (`CHECK`), para que un año mal tecleado nunca llegue a un 500.
+- **Carrera con el concepto:** al agregar un precio se bloquea primero la lista (`FOR UPDATE`) y luego el concepto
+  (`FOR SHARE`) en la misma transacción, así un concepto no se desactiva mientras se le agrega un precio.
+- **Permisos del concepto:** la migración restringe `UPDATE` de `catalog_payment_concept` a las columnas que la aplicación
+  edita; el código y la institución ya no los puede cambiar el rol de la aplicación.
 - No hay `Idempotency-Key` en estas rutas: fijar un precio no mueve dinero ni toca el libro mayor.
-- No existe aún un convertidor compartido de `Money` con `NUMERIC(14,4)` y moneda; el adaptador de precios lo construye en
-  un único punto (`JooqPriceListItemRepository.toDomain`) y queda para consolidarlo cuando haya un segundo módulo.
+- Un convertidor compartido (`shared.infrastructure.money.MoneyColumns`) construye y descompone el par `NUMERIC(14,4)` más
+  moneda; ningún repositorio usa `Money.of` ni `CurrencyCode` directamente (ADR-0015, regla 5).
+- `btree_gist` queda documentada en `docs/03-seguridad.md` (§6.3.1).
 - Cambios de contrato sobre el corte 1: `PUT /api/v1/catalog/payment-concepts/{id}` pasa a exigir `version` en el cuerpo
   y puede responder 409 `stale-version`; `PaymentConceptResponse` agrega `version`. Rutas nuevas: las cinco de
-  `/api/v1/catalog/price-lists` y los esquemas `Money` (ya fijado), `AddPriceRequest`, `CreatePriceListRequest`,
+  `/api/v1/catalog/price-lists` y los esquemas `Money` (ya fijado), `PriceInput`, `AddPriceRequest`, `CreatePriceListRequest`,
   `UpdatePriceListRequest`, `PriceListResponse`, `PriceListDetailResponse`, `PriceListItemResponse` y
   `PriceListPageResponse`.
 

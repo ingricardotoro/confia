@@ -15,11 +15,11 @@ import java.util.UUID;
 public record AddPriceRequest(
         @Schema(requiredMode = RequiredMode.REQUIRED, description = "An active payment concept of the institution")
         @NotNull UUID paymentConceptId,
-        @Schema(requiredMode = RequiredMode.REQUIRED, description = "Greater than zero, up to four decimals")
-        @NotNull @Valid MoneyDto price,
-        @Schema(requiredMode = RequiredMode.REQUIRED, format = "date", description = "First day of the validity")
-        @NotNull LocalDate validFrom,
+        @Schema(requiredMode = RequiredMode.REQUIRED, description = "Greater than zero, up to two decimals")
+        @NotNull @Valid PriceInputDto price,
+        @Schema(requiredMode = RequiredMode.REQUIRED, format = "date", description = "First day of the validity, from 2000-01-01 to 2100-12-31")
+        @NotNull @ValidityDay LocalDate validFrom,
         @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true, format = "date",
                 description = "Last day of the validity, inclusive; absent for no end. Not before validFrom")
-        LocalDate validTo) {
+        @ValidityDay LocalDate validTo) {
 }

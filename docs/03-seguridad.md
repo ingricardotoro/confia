@@ -1027,6 +1027,23 @@ Tablas con política obligatoria y su criterio:
 | `cashbox_session` | Institución, y el propio cajero salvo rol supervisor | Personal |
 | `shared_audit_log` | Institución | Personal con permiso `audit:read` |
 
+### 6.3.1 Extensiones de PostgreSQL (`btree_gist`)
+
+La migración `V28` instala la extensión `btree_gist` para la restricción de exclusión que impide que dos vigencias de
+precio del mismo concepto se solapen (INV-11). Se instala en un esquema propio, `extensions`, y no en `public`.
+
+- **Propiedad de los objetos.** `btree_gist` es una extensión de confianza desde PostgreSQL 13, de modo que la puede crear
+  quien tenga el privilegio `CREATE` sobre la base de datos (`confia_owner`). PostgreSQL asigna sus funciones y operadores
+  al superusuario de arranque, no a quien la instala. Por eso va en un esquema aparte: las pruebas de migración exigen que
+  `public` contenga solo objetos de `confia_owner`.
+- **Privilegios en producción.** El servidor debe tener disponible el paquete de extensiones (`contrib`), y `confia_owner`
+  debe conservar `CREATE` sobre la base de datos. Ningún otro rol necesita acceso al esquema `extensions`: el índice
+  localiza la clase de operador por el tipo `uuid`.
+- **Recomendación.** Que el administrador de la plataforma cree la extensión antes del despliegue
+  (`CREATE EXTENSION btree_gist SCHEMA extensions;`). La migración usa `IF NOT EXISTS`, así que no hace nada si ya existe, y
+  `confia_owner` no necesita ejecutar nada con privilegios elevados durante el despliegue.
+- **Alcance.** No se agrega ninguna otra extensión sin registrarla aquí con el mismo análisis de propiedad y privilegios.
+
 ### 6.4 Cómo se prueba
 
 Esta sección es la razón por la que el control es real y no una declaración.

@@ -4,7 +4,7 @@ import static confia.generated.jooq.tables.CatalogPriceListItem.CATALOG_PRICE_LI
 
 import com.confia.catalog.application.PriceListItemRepository;
 import com.confia.catalog.domain.PriceListItem;
-import com.confia.kernel.CurrencyCode;
+import com.confia.shared.infrastructure.money.MoneyColumns;
 import com.confia.kernel.InstitutionId;
 import com.confia.kernel.Money;
 import confia.generated.jooq.tables.records.CatalogPriceListItemRecord;
@@ -53,8 +53,8 @@ public final class JooqPriceListItemRepository implements PriceListItemRepositor
                 .set(CATALOG_PRICE_LIST_ITEM.ID, item.id())
                 .set(CATALOG_PRICE_LIST_ITEM.PRICE_LIST_ID, item.priceListId())
                 .set(CATALOG_PRICE_LIST_ITEM.PAYMENT_CONCEPT_ID, item.paymentConceptId())
-                .set(CATALOG_PRICE_LIST_ITEM.AMOUNT, item.price().amount())
-                .set(CATALOG_PRICE_LIST_ITEM.CURRENCY, item.price().currency().name())
+                .set(CATALOG_PRICE_LIST_ITEM.AMOUNT, MoneyColumns.amountColumn(item.price()))
+                .set(CATALOG_PRICE_LIST_ITEM.CURRENCY, MoneyColumns.currencyColumn(item.price()))
                 .set(CATALOG_PRICE_LIST_ITEM.VALID_FROM, item.validFrom())
                 .set(CATALOG_PRICE_LIST_ITEM.VALID_TO, item.validTo())
                 .set(CATALOG_PRICE_LIST_ITEM.CREATED_BY, item.createdBy())
@@ -78,7 +78,7 @@ public final class JooqPriceListItemRepository implements PriceListItemRepositor
 
     private static PriceListItem toDomain(CatalogPriceListItemRecord row) {
         // The one place that builds an amount from NUMERIC(14,4) and its currency column.
-        Money price = Money.of(row.getAmount(), CurrencyCode.fromIsoCode(row.getCurrency()));
+        Money price = MoneyColumns.toMoney(row.getAmount(), row.getCurrency());
         return new PriceListItem(row.getId(), row.getPriceListId(), row.getPaymentConceptId(), price,
                 row.getValidFrom(), row.getValidTo(), row.getCreatedBy(),
                 CatalogWrites.fromDatabase(row.getCreatedAt()));

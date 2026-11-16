@@ -125,7 +125,8 @@ public final class ManagePriceLists {
         return transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
             PriceList list = lists.lockById(institution, priceListId).orElseThrow(ResourceNotFoundException::new);
             list.requireAcceptsPrices();
-            PaymentConcept concept = concepts.findById(institution, paymentConceptId)
+            // Lock order: the list, then the concept, so a concept cannot be deactivated while its price is being added.
+            PaymentConcept concept = concepts.lockShareById(institution, paymentConceptId)
                     .orElseThrow(ResourceNotFoundException::new);
             if (!concept.active()) {
                 throw new InactiveReferenceException();

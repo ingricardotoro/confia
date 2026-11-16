@@ -11,6 +11,11 @@
 -- schema keeps holding only objects of confia_owner (a rule the migration tests check). A gist index finds the operator
 -- class of uuid by its type, whatever schema it is in, so no role needs to see that schema.
 --
+-- REQUIREMENT OF THE ENVIRONMENT: CREATE EXTENSION needs the CREATE privilege on the database (confia_owner owns it) and
+-- the extension must be available on the server (the contrib package; managed services offer it). A platform
+-- administrator may create it beforehand in the schema "extensions" ("CREATE EXTENSION btree_gist SCHEMA extensions"), and
+-- then this statement does nothing. See docs/03-seguridad.md.
+--
 -- INV-12, anticipated (there are no charges yet): a price is immutable. The only change a row of
 -- catalog_price_list_item ever accepts is closing an open validity once (valid_to from null to a date). It is enforced
 -- twice: the application role holds UPDATE on the single column valid_to, and a trigger refuses any other change and
@@ -79,6 +84,13 @@ CREATE TABLE catalog_price_list_item (
     -- The enabled currencies, as CurrencyCode of the kernel and organization_institution.default_currency.
     CONSTRAINT catalog_price_list_item_currency_chk CHECK (currency IN ('HNL', 'USD')),
     CONSTRAINT catalog_price_list_item_dates_chk    CHECK (valid_to IS NULL OR valid_to >= valid_from),
+    -- Days outside this window are a typing mistake (a year 0202, a year 20271), never a real validity.
+    CONSTRAINT catalog_price_list_item_window_chk   CHECK (
+        valid_from BETWEEN date '2000-01-01' AND date '2100-12-31'
+        AND (valid_to IS NULL OR valid_to BETWEEN date '2000-01-01' AND date '2100-12-31')),
+    -- At most the decimals of the minor unit of HNL and USD, so what is stored is what is shown. The column keeps four
+    -- decimals, the type of every amount of the system (ADR-0004), so a later currency with more digits needs no change.
+    CONSTRAINT catalog_price_list_item_minor_unit_chk CHECK (amount = round(amount, 2)),
     -- INV-11. A null valid_to is an unbounded range, so an open validity overlaps every later one.
     CONSTRAINT catalog_price_list_item_validity_excl EXCLUDE USING gist (
         institution_id WITH =, price_list_id WITH =, payment_concept_id WITH =,
@@ -154,6 +166,12 @@ CREATE POLICY catalog_price_list_item_institution_isolation ON catalog_price_lis
 
 REVOKE ALL ON catalog_price_list      FROM PUBLIC;
 REVOKE ALL ON catalog_price_list_item FROM PUBLIC;
+
+-- The payment concept already granted UPDATE on the whole table (V27); the application only edits these columns, so the
+-- code and the institution can no longer be changed by the application role (the code is immutable once created).
+REVOKE UPDATE ON catalog_payment_concept FROM confia_admin_app;
+GRANT UPDATE (name, category, is_taxable, is_recurring, is_active, version, updated_at)
+    ON catalog_payment_concept TO confia_admin_app;
 
 -- No DELETE for anybody. A list changes only its name, its status and its version; a price changes only its valid_to.
 GRANT SELECT, INSERT ON catalog_price_list TO confia_admin_app;

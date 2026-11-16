@@ -72,11 +72,11 @@
             "type" : "string"
           },
           "price" : {
-            "$ref" : "#/components/schemas/Money",
-            "description" : "Greater than zero, up to four decimals"
+            "$ref" : "#/components/schemas/PriceInput",
+            "description" : "Greater than zero, up to two decimals"
           },
           "validFrom" : {
-            "description" : "First day of the validity",
+            "description" : "First day of the validity, from 2000-01-01 to 2100-12-31",
             "format" : "date",
             "type" : "string"
           },
@@ -1193,6 +1193,24 @@
           }
         },
         "required" : [ "category", "code", "createdAt", "id", "isActive", "isRecurring", "isTaxable", "name", "updatedAt", "version" ],
+        "type" : "object"
+      },
+      "PriceInput" : {
+        "description" : "A price as it is sent to the API: positive, at most two decimals, as a string",
+        "properties" : {
+          "amount" : {
+            "description" : "Decimal amount greater than zero with up to two decimals, as a string",
+            "pattern" : "^\\d{1,10}(\\.\\d{1,2})?$",
+            "type" : "string"
+          },
+          "currency" : {
+            "description" : "ISO 4217 currency code",
+            "enum" : [ "HNL", "USD" ],
+            "pattern" : "HNL|USD",
+            "type" : "string"
+          }
+        },
+        "required" : [ "amount", "currency" ],
         "type" : "object"
       },
       "PriceListDetailResponse" : {

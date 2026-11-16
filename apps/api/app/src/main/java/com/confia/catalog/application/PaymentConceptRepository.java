@@ -13,6 +13,13 @@ public interface PaymentConceptRepository {
 
     Optional<PaymentConcept> findById(InstitutionId institutionId, UUID id);
 
+    /**
+     * The concept, locked in share mode until the end of the transaction ({@code SELECT ... FOR SHARE}): nobody can
+     * deactivate or edit it until the caller commits, so a price is never added to a concept that is deactivated in
+     * between. Empty when it does not exist in the institution.
+     */
+    Optional<PaymentConcept> lockShareById(InstitutionId institutionId, UUID id);
+
     void insert(InstitutionId institutionId, PaymentConcept concept);
 
     /**

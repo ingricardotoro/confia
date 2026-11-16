@@ -462,7 +462,7 @@ class PriceListEndpointsIT extends CommittingPostgresIntegrationTest {
         String id = created(post(LISTS, admin, listBody(structure.year(), "L", "INSTITUTION", null))).get("id").asString();
         int entries = priceListEntriesOf(admin.institution()).size();
 
-        for (String amount : List.of("0", "0.0000", "-1", "-1500.00", "1500.00001", "1,500.00", "1e3", "abc", "",
+        for (String amount : List.of("0", "0.0000", "-1", "-1500.00", "1500.00001", "0.0001", "1500.005", "1500.001", "10.123", "1,500.00", "1e3", "abc", "",
                 "+5", "12345678901")) {
             assertProblem(post(items(id), admin, itemBody(concept, amount, "HNL", "2027-01-01", null)), 400,
                     "validation-failed");
@@ -491,30 +491,69 @@ class PriceListEndpointsIT extends CommittingPostgresIntegrationTest {
 
         assertThat(HarnessProcess.json(get(LISTS + "/" + id, admin)).get("items")).isEmpty();
         assertThat(priceListEntriesOf(admin.institution())).hasSize(entries);
-        // The largest amount that can still be shown rounded to the minor unit; one more is refused, never stored.
         assertProblem(post(items(id), admin, itemBody(concept, "9999999999.9999", "HNL", "2027-03-01", null)), 400,
                 "validation-failed");
-        JsonNode accepted = created(post(items(id), admin, itemBody(concept, "0.0001", "USD", "2027-02-01", "2027-02-01")));
-        assertThat(accepted.get("price").get("amount").asString()).isEqualTo("0.00");
+        assertThat(created(post(items(id), admin, itemBody(concept, "0.01", "USD", "2027-02-01", "2027-02-01")))
+                .get("price").get("amount").asString()).isEqualTo("0.01");
         assertThat(created(post(items(id), admin, itemBody(concept, "9999999999.99", "HNL", "2027-03-01", null)))
                 .get("price").get("amount").asString()).isEqualTo("9999999999.99");
     }
 
     @Test
-    void thePresentationAmountIsRoundedHalfUpByTheServerWhileTheStoredAmountKeepsFourDecimals() throws SQLException {
+    void theAmountShownIsExactlyTheAmountStoredWithTwoDecimals() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
         Structure structure = structure(admin.institution());
         String concept = concept(admin, "COLEG");
         String id = created(post(LISTS, admin, listBody(structure.year(), "L", "INSTITUTION", null))).get("id").asString();
 
-        assertThat(created(post(items(id), admin, itemBody(concept, "10.005", "HNL", "2027-01-01", "2027-01-31")))
-                .get("price").get("amount").asString()).isEqualTo("10.01");
-        assertThat(created(post(items(id), admin, itemBody(concept, "10.0049", "HNL", "2027-02-01", "2027-02-28")))
-                .get("price").get("amount").asString()).isEqualTo("10.00");
+        assertThat(created(post(items(id), admin, itemBody(concept, "10.05", "HNL", "2027-01-01", "2027-01-31")))
+                .get("price").get("amount").asString()).isEqualTo("10.05");
         assertThat(created(post(items(id), admin, itemBody(concept, "7", "USD", "2027-03-01", "2027-03-31")))
                 .get("price").get("amount").asString()).isEqualTo("7.00");
 
-        assertThat(storedAmounts(admin.institution())).containsExactly("10.0050", "10.0049", "7.0000");
+        assertThat(storedAmounts(admin.institution())).containsExactly("10.0500", "7.0000");
+    }
+
+    @Test
+    void aDateOutsideTwoThousandToTwentyOneHundredIsRefusedWith400NeverWith500AndTheBoundsAreAccepted()
+            throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        Structure structure = structure(admin.institution());
+        String concept = concept(admin, "COLEG");
+        String id = created(post(LISTS, admin, listBody(structure.year(), "L", "INSTITUTION", null))).get("id").asString();
+
+        for (String[] range : new String[][] {{"1999-12-31", null}, {"0001-01-01", null}, {"2101-01-01", null},
+                {"+10000-01-01", null}, {"2027-01-01", "2101-01-01"}, {"2027-01-01", "9999-12-31"},
+                {"2027-01-01", "1999-12-31"}}) {
+            assertProblem(post(items(id), admin, itemBody(concept, "10", "HNL", range[0], range[1])), 400,
+                    "validation-failed");
+        }
+
+        assertThat(HarnessProcess.json(get(LISTS + "/" + id, admin)).get("items")).isEmpty();
+        created(post(items(id), admin, itemBody(concept, "10", "HNL", "2000-01-01", "2100-12-31")));
+    }
+
+    @Test
+    void aPriceAddedWhileTheConceptIsBeingDeactivatedWaitsForItAndIsRefusedAsInactive() throws Exception {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        Structure structure = structure(admin.institution());
+        String concept = concept(admin, "COLEG");
+        String id = created(post(LISTS, admin, listBody(structure.year(), "L", "INSTITUTION", null))).get("id").asString();
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(admin.institution())) {
+            // The deactivation is in flight (its row lock is held) when the price arrives.
+            execute(owner, "update catalog_payment_concept set is_active = false where id = ?", UUID.fromString(concept));
+            Future<HttpResponse<String>> add = pool.submit(
+                    () -> post(items(id), admin, itemBody(concept, "10", "HNL", "2027-01-01", null)));
+            Thread.sleep(1500);
+            assertThat(add.isDone()).as("the price waits for the lock of the concept").isFalse();
+            owner.commit();
+
+            assertProblem(add.get(), 409, "inactive-reference");
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(HarnessProcess.json(get(LISTS + "/" + id, admin)).get("items")).isEmpty();
     }
 
     // --- Archived lists, inactive and foreign concepts ---

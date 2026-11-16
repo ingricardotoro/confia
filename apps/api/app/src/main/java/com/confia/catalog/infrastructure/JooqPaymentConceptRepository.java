@@ -44,6 +44,15 @@ public final class JooqPaymentConceptRepository implements PaymentConceptReposit
     }
 
     @Override
+    public Optional<PaymentConcept> lockShareById(InstitutionId institutionId, UUID id) {
+        return dsl.selectFrom(CATALOG_PAYMENT_CONCEPT)
+                .where(CATALOG_PAYMENT_CONCEPT.INSTITUTION_ID.eq(institutionId.value()))
+                .and(CATALOG_PAYMENT_CONCEPT.ID.eq(id))
+                .forShare()
+                .fetchOptional().map(JooqPaymentConceptRepository::toDomain);
+    }
+
+    @Override
     public void insert(InstitutionId institutionId, PaymentConcept concept) {
         CatalogWrites.translating(() -> dsl.insertInto(CATALOG_PAYMENT_CONCEPT)
                 .set(CATALOG_PAYMENT_CONCEPT.INSTITUTION_ID, institutionId.value())

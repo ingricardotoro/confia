@@ -39,28 +39,30 @@ class PriceListItemTest {
     // --- The amount and the currency ---
 
     @Test
-    void anAmountGreaterThanZeroWithUpToFourDecimalsIsKeptExactAtScaleFour() {
+    void anAmountGreaterThanZeroWithUpToTwoDecimalsIsKeptExactAtScaleFour() {
         PriceListItem item = price("1500", "2027-01-01", null);
 
         assertThat(item.price()).isEqualTo(Money.of("1500.0000", CurrencyCode.HNL));
         assertThat(item.price().toPlainString()).isEqualTo("1500.0000");
-        assertThat(price("0.0001", "2027-01-01", null).price().isPositive()).isTrue();
+        assertThat(price("0.01", "2027-01-01", null).price().isPositive()).isTrue();
+        assertThat(price("1500.50", "2027-01-01", null).price().toPlainString()).isEqualTo("1500.5000");
+        assertThat(price("1500.500", "2027-01-01", null).price().toPlainString()).isEqualTo("1500.5000");
         assertThat(price("9999999999.99", "2027-01-01", null).price().toPlainString())
                 .isEqualTo("9999999999.9900");
-        assertThat(price("9999999999.9949", "2027-01-01", null).price().toPlainString())
-                .isEqualTo("9999999999.9949");
     }
 
     @Test
-    void anAmountThatCannotBeRoundedToTheMinorUnitWithoutLeavingTheRangeIsRefusedInsteadOfStoredAndFailingLater() {
+    void anAmountWithMoreDecimalsThanTheMinorUnitIsRefusedSoWhatIsStoredIsWhatIsShown() {
+        assertThatThrownBy(() -> price("0.0001", "2027-01-01", null)).isInstanceOf(InvalidCatalogValueException.class);
+        assertThatThrownBy(() -> price("1500.001", "2027-01-01", null)).isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> price("9999999999.9999", "2027-01-01", null))
                 .isInstanceOf(InvalidCatalogValueException.class);
-        assertThatThrownBy(() -> price("9999999999.995", "2027-01-01", null))
+        assertThatThrownBy(() -> price("1500.005", "2027-01-01", null))
                 .isInstanceOf(InvalidCatalogValueException.class);
     }
 
     @Test
-    void zeroNegativeAndMoreThanFourDecimalsAreRefusedWithTheDomainErrorOfTheCatalog() {
+    void zeroNegativeAndMoreThanTwoDecimalsAreRefusedWithTheDomainErrorOfTheCatalog() {
         for (String amount : new String[] {"0", "0.0000", "-1", "-0.0001", "1.00001", "1,500.00", "1e3", " 1", "",
                 "abc", "10000000000"}) {
             assertThatThrownBy(() -> price(amount, "2027-01-01", null)).as("amount '%s'", amount)
@@ -99,6 +101,16 @@ class PriceListItemTest {
         assertThat(price("1.00", "2027-01-10", "2027-01-10").validTo()).isEqualTo(d("2027-01-10"));
         assertThatThrownBy(() -> PriceListItem.create(UUID.randomUUID(), LIST, CONCEPT, "1.00", "HNL", null, null,
                 STAFF, NOW)).isInstanceOf(InvalidCatalogValueException.class);
+    }
+
+    @Test
+    void aDateOutsideTwoThousandToTwentyOneHundredIsRefusedAndTheBoundsAreAccepted() {
+        assertThatThrownBy(() -> price("1.00", "1999-12-31", null)).isInstanceOf(InvalidCatalogValueException.class);
+        assertThatThrownBy(() -> price("1.00", "2101-01-01", null)).isInstanceOf(InvalidCatalogValueException.class);
+        assertThatThrownBy(() -> price("1.00", "2027-01-01", "2101-01-01"))
+                .isInstanceOf(InvalidCatalogValueException.class);
+        assertThatThrownBy(() -> price("1.00", "9999-12-31", null)).isInstanceOf(InvalidCatalogValueException.class);
+        assertThat(price("1.00", "2000-01-01", "2100-12-31").validTo()).isEqualTo(d("2100-12-31"));
     }
 
     // --- Overlap (INV-11) ---
