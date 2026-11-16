@@ -62,3 +62,19 @@ base rechaza duplicados y categorías inválidas y ningún usuario ve conceptos 
   y ordena por `code` (sin distinguir mayúsculas) o `name`.
 - Un código duplicado (con cualquier capitalización) responde 409 `duplicate-name`; un identificador de otra
   institución responde 404 `resource-not-found`.
+
+## Construido (frontend)
+
+- Funcionalidad nueva `apps/admin-web/src/features/catalog` («Catálogo» en la navegación, ruta `/catalog`): lista de
+  conceptos de pago con paginación, orden (código, nombre) y filtros por categoría y estado en el servidor; el estado de
+  la tabla vive en la URL (`page`, `pageSize`, `sort`, `category`, `active`).
+- Alta y edición en un diálogo con el patrón de los formularios de organización (resumen de errores, alerta, foco). En
+  la edición el código se muestra solo de lectura y no se envía. No hay borrar: el concepto se desactiva con la casilla
+  «Activo» (o desde la fila) y se vuelve a activar igual. Se usó una casilla porque `@confia/ui` no tiene un interruptor.
+- `409 duplicate-name` y `400 validation-failed` se muestran como en los demás formularios (alerta y errores por campo).
+- Cliente `shared/api/catalog-operations.ts` con los esquemas generados `PaymentConcept*`; claves de consulta
+  `paymentConceptKeys`; tras cada escritura se invalida todo el catálogo. Sin `Idempotency-Key` ni actualización
+  optimista: el concepto no mueve dinero.
+- Textos en el catálogo es-HN (`catalog.*`, `navigation.catalog`). Presentación pura bajo `components/`.
+- Pruebas: cliente, formulario, búsqueda, vista, formulario y contenedor; simulador (`e2e/mock-api/catalog-*`) con su
+  prueba; recorridos de Playwright `catalog-crud|keyboard|lists|states` y ocho estados en la matriz de accesibilidad.

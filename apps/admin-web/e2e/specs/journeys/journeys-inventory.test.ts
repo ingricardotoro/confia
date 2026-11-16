@@ -48,6 +48,10 @@ describe("the seven journeys of access", () => {
   it("covers every journey file in the folder: a file added later is neither a journey nor unlabeled by accident", () => {
     expect(readdirSync(FOLDER).filter((name) => name.endsWith(".e2e.ts")).sort()).toEqual([
       "boot.e2e.ts",
+      "catalog-crud.e2e.ts",
+      "catalog-keyboard.e2e.ts",
+      "catalog-lists.e2e.ts",
+      "catalog-states.e2e.ts",
       "enrollment.e2e.ts",
       "enrollments-crud.e2e.ts",
       "enrollments-keyboard.e2e.ts",
