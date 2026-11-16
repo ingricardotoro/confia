@@ -70,6 +70,10 @@ export function fieldErrorKey(reason: string): AdminKey {
       return "field.policyVersionFormat";
     case "not-consentable":
       return "field.notConsentable";
+    case "code-format":
+      return "catalog.paymentConcepts.errors.codeFormat";
+    case "duplicate-payment-concept-code":
+      return "catalog.paymentConcepts.errors.duplicateCode";
     case "not-allowed":
       return "field.notAllowed";
     default:

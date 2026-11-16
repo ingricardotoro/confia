@@ -71,6 +71,7 @@
     "academicYearAlreadyActive": "Ya hay otro año lectivo en curso. Solo puede haber uno a la vez; cambie la etapa de ese año antes de poner este en curso.",
     "academicYearClosed": "El año lectivo está cerrado. Un año cerrado no se edita ni se reabre, y sus secciones tampoco se pueden crear ni editar.",
     "duplicateName": "Ya existe un registro con ese nombre, código u orden. Escriba un valor distinto.",
+    "duplicatePaymentConceptCode": "Ya existe un concepto con ese código.",
     "inactiveReference": "Uno de los datos relacionados está inactivo. Actívelo o elija otro e intente de nuevo.",
     "duplicateStudentCode": "Ya existe un estudiante con ese código. Escriba otro código o déjelo vacío para que se genere uno.",
     "duplicateNationalId": "Ya hay un estudiante registrado con ese documento de identidad. Revise el número; los guiones no cuentan.",
@@ -147,7 +148,61 @@
     "students": "Estudiantes",
     "enrollments": "Matrículas",
     "guardians": "Encargados",
-    "imports": "Importaciones"
+    "imports": "Importaciones",
+    "catalog": "Catálogo"
+  },
+  "catalog": {
+    "title": "Catálogo",
+    "common": {
+      "yes": "Sí",
+      "no": "No"
+    },
+    "categories": {
+      "TUITION": "Colegiatura",
+      "ENROLLMENT": "Matrícula",
+      "TRANSPORT": "Transporte",
+      "MATERIAL": "Materiales",
+      "FINE": "Multa",
+      "OTHER": "Otro"
+    },
+    "paymentConcepts": {
+      "heading": "Conceptos de pago",
+      "caption": "Conceptos de pago de la institución",
+      "create": "Nuevo concepto",
+      "createTitle": "Nuevo concepto de pago",
+      "createDescription": "Defina qué se cobra. El código no se puede repetir ni cambiar después de crear el concepto.",
+      "editTitle": "Editar concepto de pago",
+      "editDescription": "Cambie los datos del concepto. El código no se puede cambiar. Un concepto no se borra: se desactiva y deja de ofrecerse.",
+      "emptyTitle": "Todavía no hay conceptos de pago",
+      "emptyDescription": "Cree el primer concepto de pago para definir qué se cobra en la institución.",
+      "emptyAction": "Crear el primer concepto",
+      "loadFailed": "No se pudo cargar la lista de conceptos de pago",
+      "codeHelp": "Letras, números, guion y guion bajo; empiece por una letra o un número. Hasta 30 caracteres.",
+      "errors": {
+        "codeFormat": "Use solo letras, números, guion y guion bajo; el código debe empezar por una letra o un número.",
+        "duplicateCode": "Ya existe un concepto con ese código."
+      },
+      "filterCategory": "Categoría",
+      "filterActive": "Estado",
+      "recurringHelp": "Marque esta casilla si el concepto se cobra de forma periódica, como la colegiatura mensual.",
+      "taxableHelp": "Marque esta casilla si el concepto está gravado con impuesto.",
+      "activeHelp": "Un concepto desactivado deja de ofrecerse para listas nuevas. Lo ya registrado no cambia.",
+      "columns": {
+        "code": "Código",
+        "name": "Nombre",
+        "category": "Categoría",
+        "recurring": "Recurrente",
+        "taxable": "Gravado"
+      },
+      "fields": {
+        "code": "Código",
+        "name": "Nombre",
+        "category": "Categoría",
+        "isRecurring": "Recurrente",
+        "isTaxable": "Gravado",
+        "isActive": "Activo"
+      }
+    }
   },
   "organization": {
     "title": "Estructura académica",

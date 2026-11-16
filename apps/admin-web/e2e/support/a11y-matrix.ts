@@ -110,6 +110,15 @@ async function openLinksDialog(page: Page): Promise<void> {
   await page.getByRole("dialog").getByText(/Suma guardada actualmente/).waitFor();
 }
 
+const CATALOG = "/catalog";
+
+/** The payment concepts list with the cookies of a signed in session, as the control of the simulator does. */
+async function openCatalogRoute(page: Page, path: string = CATALOG): Promise<void> {
+  await seed(page);
+  await page.getByRole("heading", { level: 1, name: "Sesión iniciada." }).waitFor();
+  await page.goto(path);
+}
+
 const IMPORTS = "/imports";
 const IMPORT_HEADER = "legacyId,firstName,lastName,birthDate,nationalId,sex";
 
@@ -916,5 +925,78 @@ export const MATRIX: readonly GateCombination[] = [
       await submitCredentials(page);
     },
     expected: (page) => page.getByRole("alert").filter({ hasText: "No se pudo preparar la verificación en dos pasos." }),
+  },
+  {
+    route: CATALOG,
+    state: "ready",
+    arrange: (page) => openCatalogRoute(page),
+    expected: (page) => page.getByRole("cell", { name: "Colegiatura", exact: true }).first(),
+  },
+  {
+    route: CATALOG,
+    state: "dialog-open",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page);
+      await page.getByRole("button", { name: "Nuevo concepto" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Nuevo concepto de pago" }),
+  },
+  {
+    route: CATALOG,
+    state: "dialog-edit",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page);
+      await page.getByRole("button", { name: "Editar Colegiatura" }).click();
+    },
+    expected: (page) => page.getByRole("checkbox", { name: "Activo" }),
+  },
+  {
+    route: CATALOG,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page);
+      await page.getByRole("button", { name: "Nuevo concepto" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 3 campos con errores." }),
+  },
+  {
+    route: CATALOG,
+    state: "dialog-duplicate-code",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page);
+      await page.getByRole("button", { name: "Nuevo concepto" }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.getByLabel(/^Código/).fill("col");
+      await dialog.getByLabel(/^Nombre/).fill("Otra colegiatura");
+      await dialog.getByLabel(/^Categoría/).selectOption({ label: "Otro" });
+      await dialog.getByRole("button", { name: "Guardar" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 1 campo con error." }),
+  },
+  {
+    route: CATALOG,
+    state: "no-matches",
+    arrange: (page) => openCatalogRoute(page, `${CATALOG}?category=FINE&active=false`),
+    expected: (page) => page.getByText("Ningún registro coincide con los filtros"),
+  },
+  {
+    route: CATALOG,
+    state: "empty",
+    preset: "catalog-empty",
+    arrange: (page) => openCatalogRoute(page),
+    expected: (page) => page.getByText("Todavía no hay conceptos de pago"),
+  },
+  {
+    route: CATALOG,
+    state: "load-error",
+    preset: "catalog-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openCatalogRoute(page),
+    expected: (page) => page.getByText("No se pudo cargar la lista de conceptos de pago"),
   },
 ];

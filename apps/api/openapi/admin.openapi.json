@@ -319,6 +319,37 @@
         "required" : [ "code", "name" ],
         "type" : "object"
       },
+      "CreatePaymentConceptRequest" : {
+        "properties" : {
+          "category" : {
+            "enum" : [ "TUITION", "ENROLLMENT", "TRANSPORT", "MATERIAL", "FINE", "OTHER" ],
+            "minLength" : 1,
+            "pattern" : "TUITION|ENROLLMENT|TRANSPORT|MATERIAL|FINE|OTHER",
+            "type" : "string"
+          },
+          "code" : {
+            "description" : "Letters, digits, underscore and hyphen, starting with a letter or digit; unique in the institution whatever its capitals; it cannot be changed later",
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "^[A-Za-z0-9][A-Za-z0-9_-]{0,29}$",
+            "type" : "string"
+          },
+          "isRecurring" : {
+            "type" : "boolean"
+          },
+          "isTaxable" : {
+            "type" : "boolean"
+          },
+          "name" : {
+            "maxLength" : 120,
+            "minLength" : 0,
+            "pattern" : "^[^\\p{Cc}\\p{Cf}]*$",
+            "type" : "string"
+          }
+        },
+        "required" : [ "category", "code", "isRecurring", "isTaxable", "name" ],
+        "type" : "object"
+      },
       "CreateSectionRequest" : {
         "properties" : {
           "academicYearId" : {
@@ -1040,6 +1071,70 @@
           }
         },
         "required" : [ "amount", "currency" ],
+        "type" : "object"
+      },
+      "PaymentConceptPageResponse" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PaymentConceptResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "description" : "The page served, from 0",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "description" : "The page size served",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "description" : "Rows that match, in all pages",
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "items", "page", "size", "total" ],
+        "type" : "object"
+      },
+      "PaymentConceptResponse" : {
+        "properties" : {
+          "category" : {
+            "enum" : [ "TUITION", "ENROLLMENT", "TRANSPORT", "MATERIAL", "FINE", "OTHER" ],
+            "type" : "string"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "isActive" : {
+            "type" : "boolean"
+          },
+          "isRecurring" : {
+            "type" : "boolean"
+          },
+          "isTaxable" : {
+            "type" : "boolean"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "category", "code", "createdAt", "id", "isActive", "isRecurring", "isTaxable", "name", "updatedAt" ],
         "type" : "object"
       },
       "ProblemDetail" : {
@@ -1803,6 +1898,34 @@
         "required" : [ "code", "isActive", "name" ],
         "type" : "object"
       },
+      "UpdatePaymentConceptRequest" : {
+        "properties" : {
+          "category" : {
+            "enum" : [ "TUITION", "ENROLLMENT", "TRANSPORT", "MATERIAL", "FINE", "OTHER" ],
+            "minLength" : 1,
+            "pattern" : "TUITION|ENROLLMENT|TRANSPORT|MATERIAL|FINE|OTHER",
+            "type" : "string"
+          },
+          "isActive" : {
+            "description" : "False deactivates the concept",
+            "type" : "boolean"
+          },
+          "isRecurring" : {
+            "type" : "boolean"
+          },
+          "isTaxable" : {
+            "type" : "boolean"
+          },
+          "name" : {
+            "maxLength" : 120,
+            "minLength" : 0,
+            "pattern" : "^[^\\p{Cc}\\p{Cf}]*$",
+            "type" : "string"
+          }
+        },
+        "required" : [ "category", "isActive", "isRecurring", "isTaxable", "name" ],
+        "type" : "object"
+      },
       "UpdateSectionRequest" : {
         "properties" : {
           "capacity" : {
@@ -2525,6 +2648,298 @@
         },
         "summary" : "Rotates the refresh token of the session cookie",
         "tags" : [ "auth-sessions" ]
+      }
+    },
+    "/api/v1/catalog/payment-concepts" : {
+      "get" : {
+        "description" : "One page of the payment concepts of the institution of the token, optionally filtered by category and by active. Needs the permission catalog:read. page counts from 0, size defaults to 50 and is at most 200, sort is a field of code or name optionally followed by ,asc or ,desc.",
+        "operationId" : "listPaymentConcepts",
+        "parameters" : [ {
+          "description" : "Page, counted from 0",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Rows per page, 1 to 200; 50 when absent",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 50,
+            "format" : "int32",
+            "maximum" : 200,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Field of code or name, optionally followed by ,asc or ,desc",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 40,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }, {
+          "description" : "Only the concepts of this category",
+          "in" : "query",
+          "name" : "category",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "TUITION", "ENROLLMENT", "TRANSPORT", "MATERIAL", "FINE", "OTHER" ],
+            "maxLength" : 20,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }, {
+          "description" : "Only the active (true) or the inactive (false) concepts",
+          "in" : "query",
+          "name" : "active",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentConceptPageResponse"
+                }
+              }
+            },
+            "description" : "One page of the payment concepts"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "A parameter is out of range, the category is not one of the set or the sort field is not allowed (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold catalog:read (forbidden)"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Lists the payment concepts",
+        "tags" : [ "catalog-payment-concepts" ],
+        "x-required-permission" : "catalog:read"
+      },
+      "post" : {
+        "description" : "Creates a payment concept; its code is unique in the institution whatever its capitals and cannot be changed later. Needs the permission catalog:create.",
+        "operationId" : "createPaymentConcept",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreatePaymentConceptRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentConceptResponse"
+                }
+              }
+            },
+            "description" : "The payment concept created"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not valid (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold catalog:create, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The code is taken (duplicate-payment-concept-code)"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Creates a payment concept",
+        "tags" : [ "catalog-payment-concepts" ],
+        "x-required-permission" : "catalog:create"
+      }
+    },
+    "/api/v1/catalog/payment-concepts/{id}" : {
+      "put" : {
+        "description" : "Replaces the editable members of the payment concept (never its code); false in isActive deactivates it. Needs the permission catalog:update.",
+        "operationId" : "updatePaymentConcept",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdatePaymentConceptRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentConceptResponse"
+                }
+              }
+            },
+            "description" : "The payment concept after the edit"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body or the identifier is not valid, or the body carries a code (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold catalog:update, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The payment concept does not exist in the institution of the token (resource-not-found)"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Edits a payment concept",
+        "tags" : [ "catalog-payment-concepts" ],
+        "x-required-permission" : "catalog:update"
       }
     },
     "/api/v1/enrollments" : {

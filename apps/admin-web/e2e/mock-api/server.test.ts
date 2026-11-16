@@ -650,6 +650,160 @@ describe("the academic structure [organization-academic-structure]", { timeout: 
   });
 });
 
+describe("the catalog [catalog-payment-concepts]", { timeout: LIMIT }, () => {
+  const BASE = "/api/v1/catalog/payment-concepts";
+  const NEW_CONCEPT = { code: "NUE", name: "Nuevo concepto", category: "OTHER", isRecurring: false, isTaxable: true };
+
+  /** Signs in on a scenario (after the preset, if any) and answers the call helper bound to its bearer token. */
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const headers = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path = "", body?: unknown) => call(method, `${BASE}${path}`, { headers, scenario: id, ...(body === undefined ? {} : { body }) });
+  }
+
+  interface Row {
+    id: string;
+    code: string;
+    name: string;
+    category: string;
+    isActive: boolean;
+  }
+  const rows = (reply: Reply) => (reply.json as { items: Row[] }).items;
+  const total = (reply: Reply) => (reply.json as { total: number }).total;
+  const codes = (reply: Reply) => rows(reply).map((row) => row.code);
+  const verdict = (reply: Reply) => [reply.status, typeOf(reply)];
+
+  it("answers 401 to every operation without an access token, and 404 to a path it does not simulate", async () => {
+    const anonymous = [await call("GET", BASE, { scenario: "cat-401" }), await call("POST", BASE, { scenario: "cat-401", body: NEW_CONCEPT })];
+    const send = await session("cat-404");
+
+    expect(anonymous.map(verdict)).toEqual([
+      [401, "authentication-required"],
+      [401, "authentication-required"],
+    ]);
+    expect((await send("DELETE", "/x")).status).toBe(404);
+    expect((await send("GET", "/x/y")).status).toBe(404);
+  });
+
+  it("lists the thirty seeded concepts by code, without telling capitals apart, with `total` counting every page", async () => {
+    const send = await session("cat-page");
+
+    const first = await send("GET", "?page=0&size=25");
+    const second = await send("GET", "?page=1&size=25");
+
+    expect(total(first)).toBe(30);
+    expect(codes(first).slice(0, 6)).toEqual(["COL", "LIB", "MAT", "MUL", "OTR", "TRA"]);
+    expect(rows(first)).toHaveLength(25);
+    expect(rows(second)).toHaveLength(5);
+  });
+
+  it("sorts on the server, in either direction, and refuses a field that is not allowed, a bad page, a bad size or a bad filter", async () => {
+    const send = await session("cat-sort");
+
+    expect(rows(await send("GET", "?sort=name,asc&size=2")).map((row) => row.name)).toEqual(["Colegiatura", "Concepto genérico 01"]);
+    expect(codes(await send("GET", "?sort=code,desc&size=1"))).toEqual(["X-24"]);
+    for (const query of ["sort=category,asc", "sort=code,sideways", "page=-1", "size=0", "size=201", "category=BOOKS", "active=maybe"]) {
+      const reply = await send("GET", `?${query}`);
+      expect([query, ...verdict(reply)]).toEqual([query, 400, "validation-failed"]);
+    }
+  });
+
+  it("filters by category and by state on the server", async () => {
+    const send = await session("cat-filter");
+
+    expect(codes(await send("GET", "?category=FINE"))).toEqual(["MUL"]);
+    expect(codes(await send("GET", "?active=false"))).toEqual(["OTR"]);
+    expect(total(await send("GET", "?category=OTHER&active=true"))).toBe(24);
+    expect(total(await send("GET", "?category=TUITION&active=false"))).toBe(0);
+  });
+
+  it("creates with 201, lists it, and edits with 200 without the code, keeping the code as it was created", async () => {
+    const send = await session("cat-write", "catalog-empty");
+    expect(total(await send("GET"))).toBe(0);
+
+    const created = await send("POST", "", NEW_CONCEPT);
+    const id = (created.json as { id: string }).id;
+    const edited = await send("PUT", `/${id}`, { name: "Concepto editado", category: "FINE", isRecurring: true, isTaxable: false, isActive: false });
+
+    expect(created.status).toBe(201);
+    expect(created.json).toMatchObject({ code: "NUE", name: "Nuevo concepto", category: "OTHER", isTaxable: true, isActive: true });
+    expect(edited.status).toBe(200);
+    expect(edited.json).toMatchObject({ id, code: "NUE", name: "Concepto editado", category: "FINE", isRecurring: true, isActive: false });
+    expect(rows(await send("GET")).map((row) => row.name)).toEqual(["Concepto editado"]);
+  });
+
+  it("refuses a repeated code whatever its capitals with 409 duplicate-payment-concept-code, and an edit that sends the code or targets a missing concept", async () => {
+    const send = await session("cat-rules");
+    const id = rows(await send("GET")).find((row) => row.code === "COL")?.id ?? "";
+    const edit = { name: "x", category: "TUITION", isRecurring: true, isTaxable: true, isActive: true };
+
+    const repeated = await send("POST", "", { ...NEW_CONCEPT, code: "col" });
+    const withCode = await send("PUT", `/${id}`, { ...edit, code: "NEW" });
+    const missing = await send("PUT", "/00000000-0000-4000-8000-000000000001", edit);
+
+    expect(verdict(repeated)).toEqual([409, "duplicate-payment-concept-code"]);
+    expect(verdict(withCode)).toEqual([400, "validation-failed"]);
+    expect(verdict(missing)).toEqual([404, "resource-not-found"]);
+  });
+
+  it("refuses a body that breaks the contract with 400 and the fields", async () => {
+    const send = await session("cat-invalid");
+
+    const category = await send("POST", "", { ...NEW_CONCEPT, category: "BOOKS" });
+    const blank = await send("POST", "", { ...NEW_CONCEPT, name: "  " });
+    const long = await send("POST", "", { ...NEW_CONCEPT, code: "C".repeat(31) });
+
+    expect((category.json as { errors: { field: string }[] }).errors.map((error) => error.field)).toEqual(["category"]);
+    expect((blank.json as { errors: unknown[] }).errors).toEqual([{ field: "name", reason: "required" }]);
+    expect(verdict(long)).toEqual([400, "validation-failed"]);
+  });
+
+  it("refuses a code outside the whitelist, or a name with a control character, with the reason pattern", async () => {
+    const send = await session("cat-pattern");
+
+    const codes = [
+      await send("POST", "", { ...NEW_CONCEPT, code: "CO L" }),
+      await send("POST", "", { ...NEW_CONCEPT, code: "-COL" }),
+      await send("POST", "", { ...NEW_CONCEPT, code: "CÓL" }),
+    ];
+    const name = await send("POST", "", { ...NEW_CONCEPT, name: "Nuevo\u0000concepto" });
+    const accepted = await send("POST", "", { ...NEW_CONCEPT, code: "A_b-9" });
+
+    for (const reply of codes) expect((reply.json as { errors: unknown[] }).errors).toEqual([{ field: "code", reason: "pattern" }]);
+    expect((name.json as { errors: unknown[] }).errors).toEqual([{ field: "name", reason: "pattern" }]);
+    expect(accepted.status).toBe(201);
+  });
+
+  it("refuses a write with 403 forbidden and changes nothing, while the reads keep answering", async () => {
+    const send = await session("cat-forbidden", "catalog-forbidden");
+
+    const create = await send("POST", "", NEW_CONCEPT);
+
+    expect(verdict(create)).toEqual([403, "forbidden"]);
+    expect(total(await send("GET"))).toBe(30);
+  });
+
+  it("fails the first three reads with 500 and a trace id, then recovers", async () => {
+    const send = await session("cat-server-error", "catalog-server-error");
+
+    const failed = [await send("GET"), await send("GET"), await send("GET")];
+    const recovered = await send("GET");
+
+    expect(failed.map(verdict)).toEqual(Array(3).fill([500, "internal-error"]));
+    expect(failed[0]?.json).toMatchObject({ traceId: "01J8Z4K2QF9P0X" });
+    expect(recovered.status).toBe(200);
+  });
+
+  it("keeps one catalog for each scenario", async () => {
+    const mine = await session("cat-mine", "catalog-empty");
+    const theirs = await session("cat-theirs");
+    await mine("POST", "", NEW_CONCEPT);
+
+    expect(total(await mine("GET"))).toBe(1);
+    expect(total(await theirs("GET"))).toBe(30);
+  });
+});
 
 describe("the students registry [students-registry]", { timeout: LIMIT }, () => {
   const BASE = "/api/v1/students";

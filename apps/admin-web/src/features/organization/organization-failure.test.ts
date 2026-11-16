@@ -145,6 +145,26 @@ describe("classifyOrganizationFailure", () => {
   });
 });
 
+describe("the codes of the catalog", () => {
+  it("attaches a repeated payment concept code to the code field, whatever the trace id", () => {
+    expect(classifyOrganizationFailure(problem("duplicate-payment-concept-code", 409, { traceId: "t-1" }))).toEqual({
+      kind: "fields",
+      errors: [{ field: "code", reason: "duplicate-payment-concept-code" }],
+    });
+  });
+
+  it("reads the whitelist `pattern` of a code as its own reason, and leaves the other reasons of the code alone", () => {
+    expect(classifyOrganizationFailure(problem("validation-failed", 400, { errors: [{ field: "code", reason: "pattern" }] }))).toEqual({
+      kind: "fields",
+      errors: [{ field: "code", reason: "code-format" }],
+    });
+    expect(classifyOrganizationFailure(problem("validation-failed", 400, { errors: [{ field: "code", reason: "size" }] }))).toEqual({
+      kind: "fields",
+      errors: [{ field: "code", reason: "size" }],
+    });
+  });
+});
+
 describe("failureOf", () => {
   it("reads an ApiFailure, and treats anything else as unexpected", () => {
     expect(failureOf(new ApiFailure(problem("duplicate-name", 409)))).toEqual({ kind: "message", key: "problem.duplicateName" });

@@ -398,6 +398,9 @@ reporte de rechazos se revisa con la administración registro por registro.
 6. Descuentos por campaña, pronto pago o convenio, con regla de acumulación explícita.
 7. Simulador: dado un estudiante y un período, mostrar el monto resultante con beneficios aplicados.
 
+**Avance (2026-11-15).** Entregable 1 construido de punta a punta en el PR #315 (corte `catalog-payment-concepts`): conceptos de
+pago con categoría, recurrencia y condición de gravado. Siguen las listas de precios con vigencia (corte 2).
+
 **Criterios de salida:**
 
 - [ ] Dos vigencias del mismo concepto en la misma lista no pueden solaparse. La base de datos lo rechaza (INV-11).

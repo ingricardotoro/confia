@@ -16,6 +16,8 @@ import {
   ImportRunResponse,
   ModalityPageResponse,
   ModalityResponse,
+  PaymentConceptPageResponse,
+  PaymentConceptResponse,
   ProblemDetail,
   SecondFactorPendingResponse,
   SectionPageResponse,
@@ -39,6 +41,7 @@ import {
   type GuardianResponseOutput,
   type LinkedStudentResponseOutput,
   type ModalityResponseOutput,
+  type PaymentConceptResponseOutput,
   type SecondFactorPendingResponseOutput,
   type SectionResponseOutput,
   type StudentEnrollmentResponseOutput,
@@ -559,4 +562,37 @@ export function importBatchPage(
     total: paging.total ?? items.length,
   });
   return { status: 200, body, contentType: JSON_TYPE };
+}
+
+// The catalog cut: the payment concepts.
+export function paymentConcept(override: Partial<PaymentConceptResponseOutput> = {}): PaymentConceptResponseOutput {
+  return checked("PaymentConceptResponse", PaymentConceptResponse, {
+    id: crypto.randomUUID(),
+    code: "COL",
+    name: "Colegiatura",
+    category: "TUITION",
+    isRecurring: true,
+    isTaxable: true,
+    ...stamped,
+    ...override,
+  });
+}
+
+/** One page of payment concepts, as the server serves it: `total` counts every page, `items` only this one. */
+export function paymentConceptPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("payment concepts page", PaymentConceptPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The payment concept a create (201) or an edit (200) answers with. */
+export function paymentConceptRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("payment concept record", PaymentConceptResponse, row), contentType: JSON_TYPE };
 }

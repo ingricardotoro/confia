@@ -50,6 +50,9 @@ import java.util.Optional;
  * {@code imports} own {@link #IMPORT_NOT_SIMULATED} (a file applied that the account never simulated) and {@link
  * #IMPORT_FILE_CHANGED} (a file that is not the one the account simulated last), both {@code 409}, and use {@link
  * #VALIDATION_FAILED} with the list {@code errors} for a file that cannot be read. The
+ * payment concepts of {@code catalog} own {@link #DUPLICATE_PAYMENT_CONCEPT_CODE} ({@code 409}: a code the
+ * institution already uses, whatever its capitals) and use {@link #VALIDATION_FAILED} and {@link
+ * #RESOURCE_NOT_FOUND}. The
  * institution codes belong to a later change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
@@ -90,6 +93,7 @@ public enum ProblemCode {
     CONSENT_CHANNEL_UNAVAILABLE("consent-channel-unavailable", 409),
     IMPORT_NOT_SIMULATED("import-not-simulated", 409),
     IMPORT_FILE_CHANGED("import-file-changed", 409),
+    DUPLICATE_PAYMENT_CONCEPT_CODE("duplicate-payment-concept-code", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
     IDEMPOTENCY_PAYLOAD_MISMATCH("idempotency-payload-mismatch", 422),
     TOO_MANY_REQUESTS("too-many-requests", 429),

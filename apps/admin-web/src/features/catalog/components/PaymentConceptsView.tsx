@@ -1,0 +1,96 @@
+import type { TableColumn } from "@confia/ui";
+import { useAdminText } from "../../../i18n/use-admin-text.ts";
+import { ActiveBadge, OptionField, RowActions, type Option } from "../../organization/components/fields.tsx";
+import {
+  ResourceScreen,
+  type ListTableState,
+  type ResourceNotice,
+  type ResourcePagination,
+} from "../../organization/components/ResourceScreen.tsx";
+import { PAYMENT_CATEGORIES } from "../catalog-search.ts";
+import { CATEGORY_LABEL_KEYS } from "../category-options.ts";
+import type { PaymentConcept } from "../payment-concept-form.ts";
+
+export interface PaymentConceptsViewProps {
+  readonly rows: readonly PaymentConcept[];
+  readonly table: ListTableState;
+  readonly pagination: ResourcePagination;
+  readonly notice?: ResourceNotice | undefined;
+  /** The id of the row being activated or deactivated, if any. */
+  readonly togglingId?: string | undefined;
+  /** The two filters. An empty value means "all". */
+  readonly filters: {
+    readonly category: { readonly value: string; readonly onChange: (category: string) => void };
+    readonly active: { readonly value: string; readonly onChange: (active: string) => void };
+  };
+  readonly onCreate: () => void;
+  readonly onEdit: (row: PaymentConcept) => void;
+  readonly onToggle: (row: PaymentConcept) => void;
+}
+
+/** The payment concepts as a table: code, name, category, recurrence, tax condition, state and actions, with two filters. */
+export function PaymentConceptsView({ rows, table, pagination, notice, togglingId, filters, onCreate, onEdit, onToggle }: PaymentConceptsViewProps) {
+  const { t } = useAdminText();
+  const yesNo = (value: boolean) => t(value ? "catalog.common.yes" : "catalog.common.no");
+  const categoryOptions: readonly Option[] = PAYMENT_CATEGORIES.map((category) => ({ value: category, label: t(CATEGORY_LABEL_KEYS[category]) }));
+  const activeOptions: readonly Option[] = [
+    { value: "true", label: t("organization.common.active") },
+    { value: "false", label: t("organization.common.inactive") },
+  ];
+  const columns: readonly TableColumn<PaymentConcept>[] = [
+    { id: "code", header: t("catalog.paymentConcepts.columns.code"), sortable: true, cell: (row) => row.code },
+    { id: "name", header: t("catalog.paymentConcepts.columns.name"), sortable: true, cell: (row) => row.name },
+    { id: "category", header: t("catalog.paymentConcepts.columns.category"), cell: (row) => t(CATEGORY_LABEL_KEYS[row.category]) },
+    { id: "isRecurring", header: t("catalog.paymentConcepts.columns.recurring"), cell: (row) => yesNo(row.isRecurring) },
+    { id: "isTaxable", header: t("catalog.paymentConcepts.columns.taxable"), cell: (row) => yesNo(row.isTaxable) },
+    { id: "isActive", header: t("organization.common.state"), cell: (row) => <ActiveBadge active={row.isActive} /> },
+    {
+      id: "actions",
+      header: t("organization.common.actions"),
+      cell: (row) => (
+        <RowActions
+          name={row.name}
+          active={row.isActive}
+          busy={togglingId === row.id}
+          onEdit={() => {
+            onEdit(row);
+          }}
+          onToggle={() => {
+            onToggle(row);
+          }}
+        />
+      ),
+    },
+  ];
+
+  return (
+    <ResourceScreen
+      heading={t("catalog.paymentConcepts.heading")}
+      createLabel={t("catalog.paymentConcepts.create")}
+      onCreate={onCreate}
+      notice={notice}
+      filters={
+        <>
+          <OptionField
+            label={t("catalog.paymentConcepts.filterCategory")}
+            controlId="payment-concepts-filter-category"
+            value={filters.category.value}
+            options={categoryOptions}
+            placeholder={t("organization.common.allOption")}
+            onChange={filters.category.onChange}
+          />
+          <OptionField
+            label={t("catalog.paymentConcepts.filterActive")}
+            controlId="payment-concepts-filter-active"
+            value={filters.active.value}
+            options={activeOptions}
+            placeholder={t("organization.common.allOption")}
+            onChange={filters.active.onChange}
+          />
+        </>
+      }
+      table={{ ...table, caption: t("catalog.paymentConcepts.caption"), columns, rows, getRowId: (row) => row.id }}
+      pagination={pagination}
+    />
+  );
+}

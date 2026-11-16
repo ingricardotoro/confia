@@ -27,6 +27,7 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "academic-year-already-active": "problem.academicYearAlreadyActive",
   "academic-year-closed": "problem.academicYearClosed",
   "duplicate-name": "problem.duplicateName",
+  "duplicate-payment-concept-code": "problem.duplicatePaymentConceptCode",
   "inactive-reference": "problem.inactiveReference",
   "duplicate-student-code": "problem.duplicateStudentCode",
   "duplicate-national-id": "problem.duplicateNationalId",

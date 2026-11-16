@@ -141,6 +141,25 @@ describe("the states of the academic structure", () => {
   });
 });
 
+describe("the states of the catalog", () => {
+  const catalog = MATRIX.filter((combination) => combination.route === "/catalog");
+
+  it("holds the list ready, three dialogs (new, edit, errors), the duplicate code, the no-match, empty and load-error states, each once", () => {
+    expect(catalog.map((combination) => [combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["ready", undefined, undefined],
+      ["dialog-open", undefined, true],
+      ["dialog-edit", undefined, true],
+      ["dialog-error-summary", undefined, true],
+      ["dialog-duplicate-code", undefined, true],
+      ["no-matches", undefined, undefined],
+      ["empty", "catalog-empty", undefined],
+      ["load-error", "catalog-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...catalog])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+});
+
 describe("the states of the students registry", () => {
   const students = MATRIX.filter((combination) => combination.route === "/students");
 

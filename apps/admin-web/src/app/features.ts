@@ -1,3 +1,4 @@
+import { catalogFeature } from "../features/catalog/feature.tsx";
 import { enrollmentsFeature } from "../features/enrollments/feature.tsx";
 import { guardiansFeature } from "../features/guardians/feature.tsx";
 import { importsFeature } from "../features/imports/feature.tsx";
@@ -9,4 +10,11 @@ import type { FeatureModule } from "../shared/navigation/navigation-entry.ts";
  * The features of the app, in the order of the side navigation. A new feature registers here, with
  * its entry and its routes, and the shell picks both up. Home is not a feature: the app owns it.
  */
-export const FEATURES: readonly FeatureModule[] = [organizationFeature, studentsFeature, enrollmentsFeature, guardiansFeature, importsFeature];
+export const FEATURES: readonly FeatureModule[] = [
+  organizationFeature,
+  catalogFeature,
+  studentsFeature,
+  enrollmentsFeature,
+  guardiansFeature,
+  importsFeature,
+];
