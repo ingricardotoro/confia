@@ -435,6 +435,9 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
         }
         expected.addAll(List.of("GET /api/v1/catalog/payment-concepts", "POST /api/v1/catalog/payment-concepts",
                 "PUT /api/v1/catalog/payment-concepts/{id}"));
+        expected.addAll(List.of("GET /api/v1/catalog/price-lists", "POST /api/v1/catalog/price-lists",
+                "GET /api/v1/catalog/price-lists/{id}", "PUT /api/v1/catalog/price-lists/{id}",
+                "POST /api/v1/catalog/price-lists/{id}/items"));
         expected.addAll(List.of("GET /api/v1/students", "GET /api/v1/students/{id}", "POST /api/v1/students",
                 "PUT /api/v1/students/{id}", "GET /api/v1/enrollments", "GET /api/v1/enrollments/{id}",
                 "GET /api/v1/students/{studentId}/enrollments", "POST /api/v1/enrollments",

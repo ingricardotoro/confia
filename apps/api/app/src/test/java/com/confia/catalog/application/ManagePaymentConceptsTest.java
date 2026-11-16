@@ -8,6 +8,7 @@ import com.confia.catalog.domain.InvalidCatalogValueException;
 import com.confia.catalog.domain.PaymentCategory;
 import com.confia.catalog.domain.PaymentConcept;
 import com.confia.catalog.domain.ResourceNotFoundException;
+import com.confia.catalog.domain.StaleVersionException;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
 import com.confia.shared.audit.AuditLogWriter;
@@ -49,7 +50,7 @@ class ManagePaymentConceptsTest {
 
     private PaymentConcept arranged(InstitutionId owner, String code, String name, PaymentCategory category,
             boolean active) {
-        PaymentConcept concept = new PaymentConcept(UUID.randomUUID(), code, name, category, true, true, active,
+        PaymentConcept concept = new PaymentConcept(UUID.randomUUID(), code, name, category, true, true, active, 0,
                 EARLIER, EARLIER);
         store.rows.put(new Key(owner, concept.id()), concept);
         return concept;
@@ -120,12 +121,14 @@ class ManagePaymentConceptsTest {
     void anEditKeepsTheCodeWritesBeforeAndAfterAndDeactivatesAndReactivates() {
         PaymentConcept concept = arranged(institution, "COLEG", "Colegiatura", PaymentCategory.TUITION, true);
 
-        PaymentConceptView off = concepts.update(actor, requestId, concept.id(), "Mensualidad", "OTHER", false,
+        PaymentConceptView off = concepts.update(actor, requestId, concept.id(), 0, "Mensualidad", "OTHER", false,
                 false, false);
-        PaymentConceptView on = concepts.update(actor, requestId, concept.id(), "Mensualidad", "OTHER", false,
+        PaymentConceptView on = concepts.update(actor, requestId, concept.id(), 1, "Mensualidad", "OTHER", false,
                 false, true);
 
         assertThat(off.code()).isEqualTo("COLEG");
+        assertThat(off.version()).isEqualTo(1);
+        assertThat(on.version()).isEqualTo(2);
         assertThat(off.active()).isFalse();
         assertThat(off.updatedAt()).isEqualTo(NOW);
         assertThat(off.createdAt()).isEqualTo(EARLIER);
@@ -139,13 +142,30 @@ class ManagePaymentConceptsTest {
     }
 
     @Test
+    void anEditWithAStaleVersionIsRefusedAndLeavesTheRowAndTheAuditUntouched() {
+        PaymentConcept concept = arranged(institution, "COLEG", "Colegiatura", PaymentCategory.TUITION, true);
+        concepts.update(actor, requestId, concept.id(), 0, "Primero", "OTHER", false, false, true);
+        audit.clear();
+
+        assertThatThrownBy(() -> concepts.update(actor, requestId, concept.id(), 0, "Segundo", "OTHER", false,
+                false, true)).isInstanceOf(StaleVersionException.class);
+
+        assertThat(audit).isEmpty();
+        assertThat(store.rows.values()).singleElement().satisfies(stored -> {
+            assertThat(stored.name()).isEqualTo("Primero");
+            assertThat(stored.version()).isEqualTo(1);
+        });
+        assertThat(transactionCalls).contains("rollback");
+    }
+
+    @Test
     void anUnknownConceptOrOneOfAnotherInstitutionIsNotFoundAndLeavesNoEntry() {
         PaymentConcept foreign = arranged(new InstitutionId(UUID.randomUUID()), "COLEG", "Otra",
                 PaymentCategory.TUITION, true);
 
-        assertThatThrownBy(() -> concepts.update(actor, requestId, UUID.randomUUID(), "X", "OTHER", false, false,
+        assertThatThrownBy(() -> concepts.update(actor, requestId, UUID.randomUUID(), 0, "X", "OTHER", false, false,
                 true)).isInstanceOf(ResourceNotFoundException.class);
-        assertThatThrownBy(() -> concepts.update(actor, requestId, foreign.id(), "X", "OTHER", false, false, true))
+        assertThatThrownBy(() -> concepts.update(actor, requestId, foreign.id(), 0, "X", "OTHER", false, false, true))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         assertThat(audit).isEmpty();
@@ -156,7 +176,7 @@ class ManagePaymentConceptsTest {
     void anEditWithAnUnknownCategoryIsRefused() {
         PaymentConcept concept = arranged(institution, "COLEG", "Colegiatura", PaymentCategory.TUITION, true);
 
-        assertThatThrownBy(() -> concepts.update(actor, requestId, concept.id(), "X", "nope", false, false, true))
+        assertThatThrownBy(() -> concepts.update(actor, requestId, concept.id(), 0, "X", "nope", false, false, true))
                 .isInstanceOf(InvalidCatalogValueException.class);
         assertThat(audit).isEmpty();
     }
@@ -210,6 +230,11 @@ class ManagePaymentConceptsTest {
         }
 
         @Override
+        public Optional<PaymentConcept> lockShareById(InstitutionId institution, UUID id) {
+            return findById(institution, id);
+        }
+
+        @Override
         public void insert(InstitutionId institution, PaymentConcept concept) {
             boolean taken = rows.entrySet().stream().anyMatch(entry -> entry.getKey().institution().equals(institution)
                     && entry.getValue().code().equalsIgnoreCase(concept.code()));
@@ -220,10 +245,13 @@ class ManagePaymentConceptsTest {
         }
 
         @Override
-        public void update(InstitutionId institution, PaymentConcept concept) {
+        public void update(InstitutionId institution, PaymentConcept concept, long expectedVersion) {
             Key key = new Key(institution, concept.id());
             if (!rows.containsKey(key)) {
                 throw new ResourceNotFoundException();
+            }
+            if (rows.get(key).version() != expectedVersion) {
+                throw new StaleVersionException();
             }
             rows.put(key, concept);
         }

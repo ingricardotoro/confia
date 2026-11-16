@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { paymentConceptsSearch } from "./catalog-search.ts";
+import { paymentConceptsSearch, priceListsSearch } from "./catalog-search.ts";
 
 describe("the search of the payment concepts list", () => {
   it("holds the defaults when the address says nothing", () => {
@@ -18,6 +18,27 @@ describe("the search of the payment concepts list", () => {
 
   it("drops each parameter that does not hold, so a bad link never breaks the screen", () => {
     expect(paymentConceptsSearch.parse({ page: -4, pageSize: 7, sort: "category:asc", category: "BOOKS", active: "maybe" })).toEqual({
+      page: 1,
+      pageSize: 25,
+    });
+  });
+});
+
+describe("the search of the price lists list", () => {
+  const YEAR = "00000000-0000-4000-8000-000000000a01";
+
+  it("holds the defaults when the address says nothing", () => {
+    expect(priceListsSearch.parse({})).toEqual({ page: 1, pageSize: 25 });
+  });
+
+  it("keeps a valid page, order and the three filters", () => {
+    const search = { page: 2, pageSize: 100, sort: "createdAt:desc", academicYearId: YEAR, scope: "GRADE", status: "ARCHIVED" };
+
+    expect(priceListsSearch.parse(search)).toEqual(search);
+  });
+
+  it("drops each parameter that does not hold", () => {
+    expect(priceListsSearch.parse({ page: 0, pageSize: 3, sort: "code:asc", academicYearId: "not-an-id", scope: "ALL", status: "DELETED" })).toEqual({
       page: 1,
       pageSize: 25,
     });

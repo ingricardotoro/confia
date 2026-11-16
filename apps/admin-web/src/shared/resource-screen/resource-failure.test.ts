@@ -23,8 +23,26 @@ describe("classifyOrganizationFailure", () => {
     ["transfer-year-mismatch", "problem.transferYearMismatch"],
     ["forbidden", "problem.forbidden"],
     ["resource-not-found", "problem.notFound"],
+    ["price-validity-overlap", "problem.priceValidityOverlap"],
+    ["price-list-archived", "problem.priceListArchived"],
+    ["stale-version", "problem.staleVersion"],
   ] as const)("gives %s its own message, with the trace id", (code, key) => {
     expect(classifyOrganizationFailure(problem(code, 409, { traceId: "t-1" }))).toEqual({ kind: "message", key, traceId: "t-1" });
+  });
+
+  it("names the nested amount and currency of a price after the fields of the form, and the pattern of an amount by its own reason", () => {
+    const errors = [
+      { field: "price.amount", reason: "pattern" },
+      { field: "price.currency", reason: "pattern" },
+    ];
+
+    expect(classifyOrganizationFailure(problem("validation-failed", 400, { errors }))).toEqual({
+      kind: "fields",
+      errors: [
+        { field: "amount", reason: "amount-format" },
+        { field: "currency", reason: "pattern" },
+      ],
+    });
   });
 
   it.each([

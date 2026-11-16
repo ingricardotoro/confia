@@ -50,17 +50,17 @@ public final class ManagePaymentConcepts {
         });
     }
 
-    public PaymentConceptView update(AuthenticatedActor actor, String requestId, UUID id, String name,
-            String category, boolean taxable, boolean recurring, boolean active) {
+    public PaymentConceptView update(AuthenticatedActor actor, String requestId, UUID id, long version,
+            String name, String category, boolean taxable, boolean recurring, boolean active) {
         Objects.requireNonNull(actor, "actor");
         UUID auditRequestId = CatalogAudit.requestId(Objects.requireNonNull(requestId, "requestId"));
         InstitutionId institution = new InstitutionId(actor.institutionId());
         return transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
             PaymentConcept before = concepts.findById(institution, id)
                     .orElseThrow(ResourceNotFoundException::new);
-            PaymentConcept after = before.edit(name, PaymentCategory.parse(category), taxable, recurring, active,
-                    clock.instant());
-            concepts.update(institution, after);
+            PaymentConcept after = before.edit(version, name, PaymentCategory.parse(category), taxable, recurring,
+                    active, clock.instant());
+            concepts.update(institution, after, version);
             auditLogWriter.append(CatalogAudit.updated(actor, auditRequestId, id, CatalogAudit.json(before),
                     CatalogAudit.json(after)));
             return PaymentConceptView.of(after);

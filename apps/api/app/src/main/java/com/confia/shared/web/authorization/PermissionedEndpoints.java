@@ -38,7 +38,9 @@ public final class PermissionedEndpoints {
      * and the three routes of the student import: the simulation and the application need {@code students:create}
      * and the history of batches {@code students:read}, and the three routes of the payment concepts of {@code
      * catalog}: the list needs {@code catalog:read}, {@code POST} needs {@code catalog:create} and {@code PUT}
-     * needs {@code catalog:update}. A route of a later
+     * needs {@code catalog:update}, and the five routes of the price lists of {@code catalog}: the list and the
+     * detail need {@code catalog:read}, the creation of a list and of a price {@code catalog:create} and the edit
+     * of a list {@code catalog:update}. A route of a later
      * change is added here, in the same commit as its controller.
      */
     public static PermissionedEndpoints forAdmin() {
@@ -60,6 +62,16 @@ public final class PermissionedEndpoints {
                 Permission.CATALOG_CREATE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/catalog/payment-concepts/{id}",
                 Permission.CATALOG_UPDATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/catalog/price-lists",
+                Permission.CATALOG_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/catalog/price-lists",
+                Permission.CATALOG_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/catalog/price-lists/{id}",
+                Permission.CATALOG_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/catalog/price-lists/{id}",
+                Permission.CATALOG_UPDATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/catalog/price-lists/{id}/items",
+                Permission.CATALOG_CREATE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/students", Permission.STUDENTS_READ));
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/students/{id}",
                 Permission.STUDENTS_READ));

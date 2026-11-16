@@ -724,19 +724,20 @@ describe("the catalog [catalog-payment-concepts]", { timeout: LIMIT }, () => {
 
     const created = await send("POST", "", NEW_CONCEPT);
     const id = (created.json as { id: string }).id;
-    const edited = await send("PUT", `/${id}`, { name: "Concepto editado", category: "FINE", isRecurring: true, isTaxable: false, isActive: false });
+    const edited = await send("PUT", `/${id}`, { version: 0, name: "Concepto editado", category: "FINE", isRecurring: true, isTaxable: false, isActive: false });
 
     expect(created.status).toBe(201);
     expect(created.json).toMatchObject({ code: "NUE", name: "Nuevo concepto", category: "OTHER", isTaxable: true, isActive: true });
     expect(edited.status).toBe(200);
-    expect(edited.json).toMatchObject({ id, code: "NUE", name: "Concepto editado", category: "FINE", isRecurring: true, isActive: false });
+    expect(created.json).toMatchObject({ version: 0 });
+    expect(edited.json).toMatchObject({ id, code: "NUE", name: "Concepto editado", category: "FINE", isRecurring: true, isActive: false, version: 1 });
     expect(rows(await send("GET")).map((row) => row.name)).toEqual(["Concepto editado"]);
   });
 
   it("refuses a repeated code whatever its capitals with 409 duplicate-payment-concept-code, and an edit that sends the code or targets a missing concept", async () => {
     const send = await session("cat-rules");
     const id = rows(await send("GET")).find((row) => row.code === "COL")?.id ?? "";
-    const edit = { name: "x", category: "TUITION", isRecurring: true, isTaxable: true, isActive: true };
+    const edit = { version: 0, name: "x", category: "TUITION", isRecurring: true, isTaxable: true, isActive: true };
 
     const repeated = await send("POST", "", { ...NEW_CONCEPT, code: "col" });
     const withCode = await send("PUT", `/${id}`, { ...edit, code: "NEW" });
@@ -802,6 +803,279 @@ describe("the catalog [catalog-payment-concepts]", { timeout: LIMIT }, () => {
 
     expect(total(await mine("GET"))).toBe(1);
     expect(total(await theirs("GET"))).toBe(30);
+  });
+});
+
+describe("the catalog versions and the price lists [catalog-price-lists]", { timeout: LIMIT }, () => {
+  const CONCEPTS = "/api/v1/catalog/payment-concepts";
+  const LISTS = "/api/v1/catalog/price-lists";
+  const YEAR = "00000000-0000-4000-8000-000000001030";
+  const COL = "00000000-0000-4000-8000-000000007001";
+  const MUL = "00000000-0000-4000-8000-000000007005";
+  const OTR = "00000000-0000-4000-8000-000000007006";
+  const SEEDED_LIST = "00000000-0000-4000-8000-000000009001";
+  const ARCHIVED_LIST = "00000000-0000-4000-8000-000000009003";
+  const NEW_LIST = { academicYearId: YEAR, name: "2027 — Institución", scope: "INSTITUTION" };
+  const edit = { version: 0, name: "x", category: "TUITION", isRecurring: true, isTaxable: true, isActive: true };
+
+  /** Signs in on a scenario (after the preset, if any) and answers the call helper bound to its bearer token. */
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const headers = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path: string, body?: unknown) => call(method, path, { headers, scenario: id, ...(body === undefined ? {} : { body }) });
+  }
+
+  interface ListRow {
+    id: string;
+    name: string;
+    status: string;
+    scope: string;
+    version: number;
+  }
+  interface ItemRow {
+    id: string;
+    paymentConceptId: string;
+    price: { amount: string; currency: string };
+    validFrom: string;
+    validTo: string | null;
+  }
+  const names = (reply: Reply) => (reply.json as { items: ListRow[] }).items.map((row) => row.name);
+  const total = (reply: Reply) => (reply.json as { total: number }).total;
+  const verdict = (reply: Reply) => [reply.status, typeOf(reply)];
+  const price = (concept: string, amount: string, validFrom: string, validTo?: string, currency = "HNL") => ({
+    paymentConceptId: concept,
+    price: { amount, currency },
+    validFrom,
+    ...(validTo === undefined ? {} : { validTo }),
+  });
+
+  it("refuses an edit of a concept with another version with 409 stale-version, and moves the version on after each edit", async () => {
+    const send = await session("ver-concept");
+
+    const first = await send("PUT", `${CONCEPTS}/${COL}`, edit);
+    const repeated = await send("PUT", `${CONCEPTS}/${COL}`, edit);
+    const next = await send("PUT", `${CONCEPTS}/${COL}`, { ...edit, version: 1 });
+    const missing = await send("PUT", `${CONCEPTS}/${COL}`, { name: "x", category: "TUITION", isRecurring: true, isTaxable: true, isActive: true });
+
+    expect(first.json).toMatchObject({ version: 1 });
+    expect(verdict(repeated)).toEqual([409, "stale-version"]);
+    expect(next.json).toMatchObject({ version: 2 });
+    expect(verdict(missing)).toEqual([400, "validation-failed"]);
+  });
+
+  it("serves a stale version first in the stale-first scenario, once, and moves the record on", async () => {
+    const send = await session("ver-first", "catalog-stale-version");
+
+    const first = await send("PUT", `${CONCEPTS}/${COL}`, edit);
+    const reread = (await send("GET", `${CONCEPTS}?size=200`)).json as { items: { id: string; version: number }[] };
+    const retry = await send("PUT", `${CONCEPTS}/${COL}`, { ...edit, version: reread.items.find((row) => row.id === COL)?.version });
+
+    expect(verdict(first)).toEqual([409, "stale-version"]);
+    expect(reread.items.find((row) => row.id === COL)?.version).toBe(1);
+    expect(retry.status).toBe(200);
+  });
+
+  it("lists the twenty seven seeded price lists by name, paged, and filters by year, scope and status on the server", async () => {
+    const send = await session("pl-list");
+
+    const first = await send("GET", `${LISTS}?size=25`);
+    const second = await send("GET", `${LISTS}?size=25&page=1`);
+
+    expect(total(first)).toBe(27);
+    expect(names(first).slice(0, 3)).toEqual(["2025 — Institución", "2026 — Institución", "2026 — Primero"]);
+    expect(names(second)).toHaveLength(2);
+    expect(names(await send("GET", `${LISTS}?status=ARCHIVED`))).toEqual(["2025 — Institución"]);
+    expect(names(await send("GET", `${LISTS}?scope=GRADE`))).toEqual(["2026 — Primero"]);
+    expect(total(await send("GET", `${LISTS}?academicYearId=${YEAR}`))).toBe(2);
+    expect(names(await send("GET", `${LISTS}?sort=name,desc&size=1`))).toEqual(["Lista genérica 24"]);
+  });
+
+  it("refuses a bad page, size, sort, id or filter with 400", async () => {
+    const send = await session("pl-bad");
+
+    for (const query of ["page=-1", "size=0", "size=201", "sort=version,asc", "sort=name,sideways", "academicYearId=x", "scope=ALL", "status=DELETED"]) {
+      const reply = await send("GET", `${LISTS}?${query}`);
+      expect([query, ...verdict(reply)]).toEqual([query, 400, "validation-failed"]);
+    }
+  });
+
+  it("answers one list with all the validities of its prices, the amounts rounded as text, and 404 to one that is not there", async () => {
+    const send = await session("pl-detail");
+
+    const detail = await send("GET", `${LISTS}/${SEEDED_LIST}`);
+    const missing = await send("GET", `${LISTS}/00000000-0000-4000-8000-000000000001`);
+
+    expect(detail.json).toMatchObject({ id: SEEDED_LIST, name: "2026 — Institución", version: 0 });
+    expect((detail.json as { items: ItemRow[] }).items.map((item) => [item.paymentConceptId, item.price.amount, item.validFrom, item.validTo])).toEqual([
+      [COL, "1500.00", "2026-01-01", "2026-06-30"],
+      [COL, "1650.00", "2026-07-01", null],
+      ["00000000-0000-4000-8000-000000007002", "800.00", "2026-01-01", null],
+      ["00000000-0000-4000-8000-000000007003", "35.50", "2026-01-01", null],
+    ]);
+    expect(verdict(missing)).toEqual([404, "resource-not-found"]);
+  });
+
+  it("creates a list with 201, lists it, and refuses a reference that does not fit the scope, a blank name and a body that breaks the contract", async () => {
+    const send = await session("pl-create", "catalog-price-lists-empty");
+    expect(total(await send("GET", LISTS))).toBe(0);
+
+    const created = await send("POST", LISTS, NEW_LIST);
+    const withoutReference = await send("POST", LISTS, { ...NEW_LIST, scope: "GRADE" });
+    const withReference = await send("POST", LISTS, { ...NEW_LIST, scopeRefId: "00000000-0000-4000-8000-000000003001" });
+    const blank = await send("POST", LISTS, { ...NEW_LIST, name: "  " });
+    const broken = await send("POST", LISTS, { ...NEW_LIST, scope: "ALL" });
+
+    expect(created.status).toBe(201);
+    expect(created.json).toMatchObject({ name: "2027 — Institución", scope: "INSTITUTION", scopeRefId: null, status: "ACTIVE", version: 0 });
+    expect([withoutReference, withReference, blank, broken].map(verdict)).toEqual(Array(4).fill([400, "validation-failed"]));
+    expect(names(await send("GET", LISTS))).toEqual(["2027 — Institución"]);
+  });
+
+  it("archives and reactivates with the version, answers 409 stale-version to another one, and moves the version on", async () => {
+    const send = await session("pl-update");
+    const body = { version: 0, name: "2026 — Institución", status: "ARCHIVED" };
+
+    const archived = await send("PUT", `${LISTS}/${SEEDED_LIST}`, body);
+    const stale = await send("PUT", `${LISTS}/${SEEDED_LIST}`, { ...body, status: "ACTIVE" });
+    const reactivated = await send("PUT", `${LISTS}/${SEEDED_LIST}`, { ...body, version: 1, status: "ACTIVE" });
+    const missing = await send("PUT", `${LISTS}/00000000-0000-4000-8000-000000000001`, body);
+
+    expect(archived.json).toMatchObject({ status: "ARCHIVED", version: 1 });
+    expect(verdict(stale)).toEqual([409, "stale-version"]);
+    expect(reactivated.json).toMatchObject({ status: "ACTIVE", version: 2 });
+    expect(verdict(missing)).toEqual([404, "resource-not-found"]);
+  });
+
+  it("closes the open validity the day before a new open one, and keeps the history", async () => {
+    const send = await session("pl-new-validity");
+
+    const added = await send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(COL, "1700.00", "2026-09-01"));
+    const detail = (await send("GET", `${LISTS}/${SEEDED_LIST}`)).json as { items: ItemRow[] };
+    const colegiatura = detail.items.filter((item) => item.paymentConceptId === COL).map((item) => [item.price.amount, item.validFrom, item.validTo]);
+
+    expect(added.status).toBe(201);
+    expect(added.json).toMatchObject({ price: { amount: "1700.00", currency: "HNL" }, validFrom: "2026-09-01", validTo: null });
+    expect(colegiatura).toEqual([
+      ["1500.00", "2026-01-01", "2026-06-30"],
+      ["1650.00", "2026-07-01", "2026-08-31"],
+      ["1700.00", "2026-09-01", null],
+    ]);
+  });
+
+  it("answers the amount as the text that was sent, without rounding it, and refuses a third decimal", async () => {
+    const send = await session("pl-round");
+    const add = async (amount: string, from: string) => send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(MUL, amount, from));
+
+    expect(((await add("10.5", "2027-01-01")).json as ItemRow).price.amount).toBe("10.5");
+    expect(((await add("9999999999.99", "2027-02-01")).json as ItemRow).price.amount).toBe("9999999999.99");
+    const third = await add("10.005", "2027-03-01");
+    expect(verdict(third)).toEqual([400, "validation-failed"]);
+    expect((third.json as { errors: unknown[] }).errors).toEqual([{ field: "price.amount", reason: "pattern" }]);
+  });
+
+  it("refuses a validity day outside 2000-01-01 to 2100-12-31 naming the field, and accepts the two ends", async () => {
+    const send = await session("pl-window");
+    const add = async (from: string, to?: string) => send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(MUL, "1.00", from, to));
+
+    const early = await add("1999-12-31");
+    const late = await add("2026-01-01", "2101-01-01");
+
+    expect(verdict(early)).toEqual([400, "validation-failed"]);
+    expect((early.json as { errors: unknown[] }).errors).toEqual([{ field: "validFrom", reason: "validity-day" }]);
+    expect((late.json as { errors: unknown[] }).errors).toEqual([{ field: "validTo", reason: "validity-day" }]);
+    expect((await add("2000-01-01", "2000-12-31")).status).toBe(201);
+    expect((await add("2100-01-01", "2100-12-31")).status).toBe(201);
+  });
+
+  it("refuses an exact, partial and contained overlap with 409, and allows a contiguous validity and one before the open one", async () => {
+    const send = await session("pl-overlap");
+    const add = async (from: string, to?: string) => {
+      const reply = await send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(MUL, "10.00", from, to));
+      return reply.status < 400 ? [reply.status] : verdict(reply);
+    };
+
+    expect(await add("2026-03-01", "2026-03-31")).toEqual([201]);
+    expect(await add("2026-03-01", "2026-03-31")).toEqual([409, "price-validity-overlap"]);
+    expect(await add("2026-03-15", "2026-04-15")).toEqual([409, "price-validity-overlap"]);
+    expect(await add("2026-03-10", "2026-03-20")).toEqual([409, "price-validity-overlap"]);
+    expect(await add("2026-04-01", "2026-04-30")).toEqual([201]);
+    expect(await add("2026-02-01", "2026-02-28")).toEqual([201]);
+    // An open one that starts inside a closed validity would leave no way to close the earlier one: refused too.
+    expect(await add("2026-04-15")).toEqual([409, "price-validity-overlap"]);
+  });
+
+  it("refuses a bounded price inside the open validity of the same concept with 409, and a new open one that starts on or before it", async () => {
+    const send = await session("pl-open");
+
+    const inside = await send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(COL, "1.00", "2026-08-01", "2026-08-31"));
+    const same = await send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(COL, "1.00", "2026-07-01"));
+
+    expect([inside, same].map(verdict)).toEqual(Array(2).fill([409, "price-validity-overlap"]));
+  });
+
+  it("refuses a price on an archived list, for an inactive concept, for a concept that does not exist and for a list that does not exist", async () => {
+    const send = await session("pl-refs");
+
+    const archived = await send("POST", `${LISTS}/${ARCHIVED_LIST}/items`, price(COL, "1.00", "2030-01-01"));
+    const inactive = await send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(OTR, "1.00", "2026-01-01"));
+    const foreign = await send("POST", `${LISTS}/${SEEDED_LIST}/items`, price("00000000-0000-4000-8000-000000000001", "1.00", "2026-01-01"));
+    const missing = await send("POST", `${LISTS}/00000000-0000-4000-8000-000000000001/items`, price(COL, "1.00", "2026-01-01"));
+
+    expect([archived, inactive, foreign, missing].map(verdict)).toEqual([
+      [409, "price-list-archived"],
+      [409, "inactive-reference"],
+      [404, "resource-not-found"],
+      [404, "resource-not-found"],
+    ]);
+  });
+
+  it("refuses an amount of zero, an end before the start, an unknown currency and an amount that is a JSON number", async () => {
+    const send = await session("pl-amount");
+    const url = `${LISTS}/${SEEDED_LIST}/items`;
+
+    const zero = await send("POST", url, price(MUL, "0.00", "2026-01-01"));
+    const backwards = await send("POST", url, price(MUL, "1.00", "2026-02-01", "2026-01-01"));
+    const currency = await send("POST", url, price(MUL, "1.00", "2026-01-01", undefined, "EUR"));
+    const number = await send("POST", url, { ...price(MUL, "1.00", "2026-01-01"), price: { amount: 1, currency: "HNL" } });
+    const decimals = await send("POST", url, price(MUL, "1.234", "2026-01-01"));
+
+    expect([zero, backwards, currency, number, decimals].map(verdict)).toEqual(Array(5).fill([400, "validation-failed"]));
+  });
+
+  it("refuses every write of the price lists with 403 in the forbidden scenario, while the reads answer", async () => {
+    const send = await session("pl-forbidden", "catalog-forbidden");
+
+    const writes = [
+      await send("POST", LISTS, NEW_LIST),
+      await send("PUT", `${LISTS}/${SEEDED_LIST}`, { version: 0, name: "x", status: "ARCHIVED" }),
+      await send("POST", `${LISTS}/${SEEDED_LIST}/items`, price(COL, "1.00", "2030-01-01")),
+    ];
+
+    expect(writes.map(verdict)).toEqual(Array(3).fill([403, "forbidden"]));
+    expect(total(await send("GET", LISTS))).toBe(27);
+  });
+
+  it("fails the first three reads of the price lists with 500 and a trace id, then recovers", async () => {
+    const send = await session("pl-server-error", "catalog-server-error");
+
+    const failed = [await send("GET", LISTS), await send("GET", `${LISTS}/${SEEDED_LIST}`), await send("GET", LISTS)];
+    const recovered = await send("GET", `${LISTS}/${SEEDED_LIST}`);
+
+    expect(failed.map(verdict)).toEqual(Array(3).fill([500, "internal-error"]));
+    expect(failed[0]?.json).toMatchObject({ traceId: "01J8Z4K2QF9P0X" });
+    expect(recovered.status).toBe(200);
+  });
+
+  it("keeps one set of price lists for each scenario, and does not send them without an access token", async () => {
+    const mine = await session("pl-mine", "catalog-price-lists-empty");
+    const theirs = await session("pl-theirs");
+    await mine("POST", LISTS, NEW_LIST);
+
+    expect(total(await mine("GET", LISTS))).toBe(1);
+    expect(total(await theirs("GET", LISTS))).toBe(27);
+    expect(verdict(await call("GET", LISTS, { scenario: "pl-anonymous" }))).toEqual([401, "authentication-required"]);
+    expect((await theirs("DELETE", `${LISTS}/${SEEDED_LIST}`)).status).toBe(404);
   });
 });
 

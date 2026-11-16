@@ -81,7 +81,7 @@ class PaymentConceptTest {
     void anEditRefusesANameWithControlCharacters() {
         PaymentConcept before = concept();
 
-        assertThatThrownBy(() -> before.edit("Nueva\nlinea", PaymentCategory.TUITION, true, true, true, T1))
+        assertThatThrownBy(() -> before.edit(0, "Nueva\nlinea", PaymentCategory.TUITION, true, true, true, T1))
                 .isInstanceOf(InvalidCatalogValueException.class);
     }
 
@@ -92,6 +92,12 @@ class PaymentConceptTest {
 
         assertThat(created.code()).hasSize(30);
         assertThat(created.name()).hasSize(120);
+    }
+
+    @Test
+    void aNegativeVersionIsRefused() {
+        assertThatThrownBy(() -> new PaymentConcept(UUID.randomUUID(), "COD", "Nombre", PaymentCategory.OTHER, false,
+                false, true, -1, T0, T0)).isInstanceOf(InvalidCatalogValueException.class);
     }
 
     @Test
@@ -117,7 +123,7 @@ class PaymentConceptTest {
     void anEditKeepsTheCodeTheIdentifierAndTheCreationInstantAndCanDeactivate() {
         PaymentConcept before = concept();
 
-        PaymentConcept edited = before.edit("Mensualidad", PaymentCategory.OTHER, false, false, false, T1);
+        PaymentConcept edited = before.edit(0, "Mensualidad", PaymentCategory.OTHER, false, false, false, T1);
 
         assertThat(edited.id()).isEqualTo(before.id());
         assertThat(edited.code()).isEqualTo("COLEG");
@@ -131,10 +137,43 @@ class PaymentConceptTest {
     }
 
     @Test
+    void aNewConceptStartsAtVersionZeroAndEveryEditAdvancesItByOne() {
+        PaymentConcept created = concept();
+
+        PaymentConcept first = created.edit(0, "Uno", PaymentCategory.OTHER, false, false, true, T1);
+        PaymentConcept second = first.edit(1, "Dos", PaymentCategory.OTHER, false, false, true, T1);
+
+        assertThat(created.version()).isZero();
+        assertThat(first.version()).isEqualTo(1);
+        assertThat(second.version()).isEqualTo(2);
+    }
+
+    @Test
+    void anEditThatNamesAnotherVersionThanTheCurrentOneIsStaleInBothDirections() {
+        PaymentConcept current = concept().edit(0, "Uno", PaymentCategory.OTHER, false, false, true, T1);
+
+        assertThatThrownBy(() -> current.edit(0, "X", PaymentCategory.OTHER, false, false, true, T1))
+                .isInstanceOf(StaleVersionException.class);
+        assertThatThrownBy(() -> current.edit(2, "X", PaymentCategory.OTHER, false, false, true, T1))
+                .isInstanceOf(StaleVersionException.class);
+        assertThatThrownBy(() -> current.edit(-1, "X", PaymentCategory.OTHER, false, false, true, T1))
+                .isInstanceOf(StaleVersionException.class);
+        assertThat(StaleVersionException.CODE).isEqualTo("stale-version");
+    }
+
+    @Test
+    void aStaleEditIsRefusedBeforeItsContentIsJudged() {
+        PaymentConcept current = concept();
+
+        assertThatThrownBy(() -> current.edit(5, " ", PaymentCategory.OTHER, false, false, true, T1))
+                .isInstanceOf(StaleVersionException.class);
+    }
+
+    @Test
     void anEditWithABlankNameIsRefused() {
         PaymentConcept before = concept();
 
-        assertThatThrownBy(() -> before.edit(" ", PaymentCategory.TUITION, true, true, true, T1))
+        assertThatThrownBy(() -> before.edit(0, " ", PaymentCategory.TUITION, true, true, true, T1))
                 .isInstanceOf(InvalidCatalogValueException.class);
     }
 

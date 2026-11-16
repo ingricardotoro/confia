@@ -58,7 +58,7 @@ const REPO = join(DOCS, "..");
 const NOTE_DATE = /Nota fechada 2026-11-09 \(cambio `admin-web-staff-sign-in`/;
 const PATTERNS_AFTER_FIRST_NOTE = { length: 66959, sha256: "454fe93143bf3a10ed63802285019f6cc269949018412d03893597a86b668fc9" } as const;
 const FLOWS = { path: "ui-ux/06-flujos-clave.md", length: 16930, sha256: "8395f2c42e2819fc502c6fc88934a07de644bdf2f439c91c6fe7ad88636670d3" } as const;
-const ROADMAP = { path: "09-roadmap-y-fases.md", length: 60239, sha256: "d7d77f6a91ace08f1f4a6b8a42a53a57ae92a59e43e91bcc10a5443299a84e53" } as const;
+const ROADMAP = { path: "09-roadmap-y-fases.md", length: 60410, sha256: "8c67f0893327e7e5880c13eece79cf3dcaa11479c95d02a4ea644bb78c4af8f4" } as const;
 const CRITERION = "La verificación de accesibilidad no reporta violaciones críticas en las pantallas existentes.";
 
 const digest = (text: string) => createHash("sha256").update(text).digest("hex");

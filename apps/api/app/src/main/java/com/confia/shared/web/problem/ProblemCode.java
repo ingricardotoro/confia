@@ -52,7 +52,10 @@ import java.util.Optional;
  * #VALIDATION_FAILED} with the list {@code errors} for a file that cannot be read. The
  * payment concepts of {@code catalog} own {@link #DUPLICATE_PAYMENT_CONCEPT_CODE} ({@code 409}: a code the
  * institution already uses, whatever its capitals) and use {@link #VALIDATION_FAILED} and {@link
- * #RESOURCE_NOT_FOUND}. The
+ * #RESOURCE_NOT_FOUND}. The price lists of {@code catalog} own {@link #PRICE_VALIDITY_OVERLAP} ({@code 409}: a price
+ * whose validity overlaps another of the same concept in the list), {@link #PRICE_LIST_ARCHIVED} ({@code 409}: a price
+ * for an archived list) and {@link #STALE_VERSION} ({@code 409}: an edit of a list or of a payment concept that names a
+ * version other than the current one), and reuse {@link #INACTIVE_REFERENCE} for a price of an inactive concept. The
  * institution codes belong to a later change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
@@ -94,6 +97,9 @@ public enum ProblemCode {
     IMPORT_NOT_SIMULATED("import-not-simulated", 409),
     IMPORT_FILE_CHANGED("import-file-changed", 409),
     DUPLICATE_PAYMENT_CONCEPT_CODE("duplicate-payment-concept-code", 409),
+    PRICE_VALIDITY_OVERLAP("price-validity-overlap", 409),
+    PRICE_LIST_ARCHIVED("price-list-archived", 409),
+    STALE_VERSION("stale-version", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
     IDEMPOTENCY_PAYLOAD_MISMATCH("idempotency-payload-mismatch", 422),
     TOO_MANY_REQUESTS("too-many-requests", 429),

@@ -21,7 +21,11 @@ export type FieldReason =
   | "phone-format"
   | "percent-format"
   | "percent-range"
-  | "code-format";
+  | "code-format"
+  | "amount-format"
+  | "amount-positive"
+  | "validity-order"
+  | "date-range";
 
 export interface AccessFieldSpec {
   /** The fixed `id` of the control, which the error summary links to. */

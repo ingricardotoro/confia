@@ -124,3 +124,13 @@ describe("resolving the errors of a response against the fields of a form", () =
     expect(resolveFieldErrors([], controlIds)).toEqual({ byField: {}, summary: [] });
   });
 });
+
+describe("the reasons of a price", () => {
+  it.each([
+    ["amount-format", "catalog.priceLists.errors.amountFormat"],
+    ["amount-positive", "catalog.priceLists.errors.amountPositive"],
+    ["validity-order", "catalog.priceLists.errors.validityOrder"],
+  ] as const)("gives %s its own text", (reason, key) => {
+    expect(fieldErrorKey(reason)).toBe(key);
+  });
+});

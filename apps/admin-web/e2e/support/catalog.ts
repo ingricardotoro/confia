@@ -34,3 +34,46 @@ export function recordCatalogQueries(page: Page): string[] {
 
 export const summary = (page: Page) => page.getByRole("navigation", { name: "Paginación" });
 export const filters = (page: Page) => page.getByRole("group", { name: "Filtros" });
+
+/** The path of the price lists, and the seeded lists the journeys name (catalog-price-lists cut). */
+export const PRICE_LISTS_PATH = "/catalog/price-lists";
+export const SEEDED_LISTS = {
+  institution2026: "00000000-0000-4000-8000-000000009001",
+  first2026: "00000000-0000-4000-8000-000000009002",
+  archived2025: "00000000-0000-4000-8000-000000009003",
+} as const;
+
+/** Opens the price lists from the tab of the catalog, with a preset already applied when one is given. */
+export async function openPriceLists(page: Page, scenarioId: string, preset?: string): Promise<void> {
+  await openCatalog(page, scenarioId, preset);
+  await page.getByRole("navigation", { name: "Vistas del catálogo" }).getByRole("link", { name: "Listas de precios" }).click();
+  await expect(page).toHaveURL(/\/catalog\/price-lists$/);
+  await expect(page.getByRole("heading", { level: 2, name: "Listas de precios" })).toBeVisible();
+}
+
+/** Opens the detail of a seeded list by its address, with a preset already applied when one is given. */
+export async function openPriceListDetail(page: Page, scenarioId: string, listId: string, name: string, preset?: string): Promise<void> {
+  if (preset !== undefined) await applyPreset(page, scenarioId, preset);
+  await seedSession(page);
+  await page.goto(`${PRICE_LISTS_PATH}/${listId}`);
+  await expect(page.getByRole("heading", { level: 2, name })).toBeVisible({ timeout: 20_000 });
+}
+
+/** The query of the requests the page makes to the listing of price lists, decoded. */
+export function recordPriceListQueries(page: Page): string[] {
+  const seen: string[] = [];
+  page.on("request", (request: Request) => {
+    const url = new URL(request.url());
+    if (request.method() === "GET" && url.pathname === "/api/v1/catalog/price-lists") seen.push(decodeURIComponent(url.search));
+  });
+  return seen;
+}
+
+/** The rows of the table of validities of one concept, as text. */
+export async function validityRows(page: Page, tableName: string): Promise<string[][]> {
+  return page
+    // Hidden too: a dialog that is open hides the page behind it from the accessibility tree, and the table is still there.
+    .getByRole("table", { name: tableName, includeHidden: true })
+    .locator("tbody tr")
+    .evaluateAll((rows) => rows.map((row) => [...row.querySelectorAll("td")].map((cell) => cell.textContent.trim())));
+}

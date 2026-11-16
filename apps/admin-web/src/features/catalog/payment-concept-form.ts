@@ -41,8 +41,12 @@ export type PaymentConceptSave =
   | { readonly mode: "create"; readonly body: CreateBody }
   | { readonly mode: "update"; readonly id: string; readonly body: UpdateBody };
 
-/** The body that only changes the state of a concept, keeping every other field as the row has it. */
+/**
+ * The body that only changes the state of a concept, keeping every other field as the row has it. It carries the
+ * version the row was read at: if the concept changed since, the server answers 409 `stale-version`.
+ */
 export const updateBodyOf = (row: PaymentConcept, isActive: boolean): UpdateBody => ({
+  version: row.version,
   name: row.name,
   category: row.category,
   isRecurring: row.isRecurring,
@@ -56,7 +60,7 @@ export function saveOf(row: PaymentConcept | undefined, values: PaymentConceptVa
   const isRecurring = values.isRecurring === "true";
   const isTaxable = values.isTaxable === "true";
   if (row === undefined) return { mode: "create", body: { code: values.code, name: values.name, category, isRecurring, isTaxable } };
-  return { mode: "update", id: row.id, body: { name: values.name, category, isRecurring, isTaxable, isActive: values.isActive === "true" } };
+  return { mode: "update", id: row.id, body: { version: row.version, name: values.name, category, isRecurring, isTaxable, isActive: values.isActive === "true" } };
 }
 
 /**

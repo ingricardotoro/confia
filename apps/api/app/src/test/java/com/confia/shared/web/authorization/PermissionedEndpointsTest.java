@@ -39,6 +39,16 @@ class PermissionedEndpointsTest {
                 Permission.CATALOG_CREATE));
         expected.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/catalog/payment-concepts/{id}",
                 Permission.CATALOG_UPDATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/catalog/price-lists",
+                Permission.CATALOG_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/catalog/price-lists",
+                Permission.CATALOG_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/catalog/price-lists/{id}",
+                Permission.CATALOG_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/catalog/price-lists/{id}",
+                Permission.CATALOG_UPDATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/catalog/price-lists/{id}/items",
+                Permission.CATALOG_CREATE));
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/students", Permission.STUDENTS_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/students/{id}", Permission.STUDENTS_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/students", Permission.STUDENTS_CREATE));

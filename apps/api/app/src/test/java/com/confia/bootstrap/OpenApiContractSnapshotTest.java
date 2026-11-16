@@ -228,7 +228,9 @@ class OpenApiContractSnapshotTest {
                 "/api/v1/organization/modalities/{id}", "/api/v1/organization/grades",
                 "/api/v1/organization/grades/{id}", "/api/v1/organization/sections",
                 "/api/v1/organization/sections/{id}", "/api/v1/catalog/payment-concepts",
-                "/api/v1/catalog/payment-concepts/{id}", "/api/v1/students", "/api/v1/students/{id}",
+                "/api/v1/catalog/payment-concepts/{id}", "/api/v1/catalog/price-lists",
+                "/api/v1/catalog/price-lists/{id}", "/api/v1/catalog/price-lists/{id}/items",
+                "/api/v1/students", "/api/v1/students/{id}",
                 "/api/v1/enrollments", "/api/v1/enrollments/{id}", "/api/v1/enrollments/{id}/transfer",
                 "/api/v1/enrollments/{id}/exit", "/api/v1/students/{studentId}/enrollments", "/api/v1/guardians",
                 "/api/v1/guardians/{id}", "/api/v1/guardians/{id}/consents", "/api/v1/students/{studentId}/guardians",
@@ -415,10 +417,12 @@ class OpenApiContractSnapshotTest {
             }
         }
 
-        assertThat(operations).isEqualTo(53);
+        assertThat(operations).isEqualTo(58);
         List<String> expected = new ArrayList<>(List.of("get " + ROLES_PATH,
                 "get /api/v1/catalog/payment-concepts", "post /api/v1/catalog/payment-concepts",
-                "put /api/v1/catalog/payment-concepts/{id}"));
+                "put /api/v1/catalog/payment-concepts/{id}", "get /api/v1/catalog/price-lists",
+                "post /api/v1/catalog/price-lists", "get /api/v1/catalog/price-lists/{id}",
+                "put /api/v1/catalog/price-lists/{id}", "post /api/v1/catalog/price-lists/{id}/items"));
         for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {
             String collection = "/api/v1/organization/" + resource;
             expected.addAll(List.of("get " + collection, "post " + collection,

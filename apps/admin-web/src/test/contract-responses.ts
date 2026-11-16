@@ -18,6 +18,10 @@ import {
   ModalityResponse,
   PaymentConceptPageResponse,
   PaymentConceptResponse,
+  PriceListDetailResponse,
+  PriceListItemResponse,
+  PriceListPageResponse,
+  PriceListResponse,
   ProblemDetail,
   SecondFactorPendingResponse,
   SectionPageResponse,
@@ -42,6 +46,9 @@ import {
   type LinkedStudentResponseOutput,
   type ModalityResponseOutput,
   type PaymentConceptResponseOutput,
+  type PriceListDetailResponseOutput,
+  type PriceListItemResponseOutput,
+  type PriceListResponseOutput,
   type SecondFactorPendingResponseOutput,
   type SectionResponseOutput,
   type StudentEnrollmentResponseOutput,
@@ -573,6 +580,7 @@ export function paymentConcept(override: Partial<PaymentConceptResponseOutput> =
     category: "TUITION",
     isRecurring: true,
     isTaxable: true,
+    version: 0,
     ...stamped,
     ...override,
   });
@@ -595,4 +603,66 @@ export function paymentConceptPage(
 /** The payment concept a create (201) or an edit (200) answers with. */
 export function paymentConceptRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
   return { status, body: checked("payment concept record", PaymentConceptResponse, row), contentType: JSON_TYPE };
+}
+
+// The catalog cut of the price lists. Amounts are strings, as the server rounds and sends them.
+export function priceList(override: Partial<PriceListResponseOutput> = {}): PriceListResponseOutput {
+  return checked("PriceListResponse", PriceListResponse, {
+    id: crypto.randomUUID(),
+    academicYearId: "00000000-0000-4000-8000-000000000a01",
+    name: "2027 — Institución",
+    scope: "INSTITUTION",
+    scopeRefId: null,
+    status: "ACTIVE",
+    version: 0,
+    createdAt: STAMP,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+/** One price of a list: a concept, an amount as text and its validity (`validTo` null while it is open). */
+export function priceListItem(override: Partial<PriceListItemResponseOutput> = {}): PriceListItemResponseOutput {
+  return checked("PriceListItemResponse", PriceListItemResponse, {
+    id: crypto.randomUUID(),
+    priceListId: "00000000-0000-4000-8000-000000000b01",
+    paymentConceptId: "00000000-0000-4000-8000-000000007001",
+    price: { amount: "1500.00", currency: "HNL" },
+    validFrom: "2027-01-01",
+    validTo: null,
+    createdAt: STAMP,
+    ...override,
+  });
+}
+
+/** The list with all its prices, as `GET /price-lists/{id}` answers. */
+export function priceListDetail(override: Partial<PriceListDetailResponseOutput> = {}): PriceListDetailResponseOutput {
+  return checked("PriceListDetailResponse", PriceListDetailResponse, { ...priceList(), items: [], ...override });
+}
+
+export function priceListPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("price lists page", PriceListPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The list a create (201) or an edit (200) answers with. */
+export function priceListRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("price list record", PriceListResponse, row), contentType: JSON_TYPE };
+}
+
+export function priceListDetailRecord(row: unknown): ContractResponse {
+  return { status: 200, body: checked("price list detail", PriceListDetailResponse, row), contentType: JSON_TYPE };
+}
+
+/** The 201 of a new price. */
+export function priceListItemRecord(row: unknown): ContractResponse {
+  return { status: 201, body: checked("price list item", PriceListItemResponse, row), contentType: JSON_TYPE };
 }

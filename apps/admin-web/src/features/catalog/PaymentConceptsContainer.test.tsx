@@ -247,9 +247,9 @@ describe("creating, editing and deactivating a payment concept", () => {
 
   it("edits with every editable field and the state, in one PUT that carries no code", async () => {
     const user = userEvent.setup();
-    const row = paymentConcept({ code: "COL", name: "Colegiatura" });
+    const row = paymentConcept({ code: "COL", name: "Colegiatura", version: 2 });
     await openList([row]);
-    route("put", `${CONCEPTS}/${row.id}`, paymentConceptRecord({ ...row, name: "Colegiatura mensual", isActive: false }));
+    route("put", `${CONCEPTS}/${row.id}`, paymentConceptRecord({ ...row, name: "Colegiatura mensual", isActive: false, version: 3 }));
     await user.click(screen.getByRole("button", { name: "Editar Colegiatura" }));
     const dialog = await screen.findByRole("dialog", { name: "Editar concepto de pago" });
     expect(within(dialog).getByLabelText(/Código/)).toHaveAttribute("readonly");
@@ -263,12 +263,46 @@ describe("creating, editing and deactivating a payment concept", () => {
 
     expect(await screen.findByText("Se guardaron los cambios de «Colegiatura mensual».")).toBeInTheDocument();
     expect(JSON.parse(writes("PUT")[0]?.body ?? "{}")).toEqual({
+      version: 2,
       name: "Colegiatura mensual",
       category: "OTHER",
       isRecurring: true,
       isTaxable: false,
       isActive: false,
     });
+  });
+
+  it("tells the concept changed, and reads the list again, when the edit answers 409 stale-version", async () => {
+    const user = userEvent.setup();
+    const row = paymentConcept({ name: "Colegiatura", version: 1 });
+    await openList([row]);
+    route("put", `${CONCEPTS}/${row.id}`, problem("stale-version", 409));
+    route("get", CONCEPTS, paymentConceptPage([{ ...row, name: "Colegiatura nueva", version: 2 }]));
+    await user.click(screen.getByRole("button", { name: "Editar Colegiatura" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar concepto de pago" });
+    const before = gets().length;
+
+    await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(admin.problem.staleVersion);
+    await waitFor(() => {
+      expect(gets().length).toBeGreaterThan(before);
+    });
+    expect(await screen.findByRole("row", { name: /Colegiatura nueva/, hidden: true })).toBeInTheDocument();
+    // The dialog stays open with what was typed: nothing was lost, and nothing was saved.
+    expect(dialog).toBeInTheDocument();
+    expect(writes("PUT")).toHaveLength(1);
+  });
+
+  it("tells the concept changed when a deactivation from the row answers 409 stale-version", async () => {
+    const user = userEvent.setup();
+    const row = paymentConcept({ name: "Colegiatura", version: 1 });
+    await openList([row]);
+    route("put", `${CONCEPTS}/${row.id}`, problem("stale-version", 409));
+
+    await user.click(screen.getByRole("button", { name: "Desactivar Colegiatura" }));
+
+    expect(await screen.findByText(admin.problem.staleVersion)).toBeInTheDocument();
   });
 
   it("tells a concept that no longer exists when the edit answers 404", async () => {
@@ -286,15 +320,22 @@ describe("creating, editing and deactivating a payment concept", () => {
 
   it("deactivates from the row with a PUT that keeps every other field, and activates it again", async () => {
     const user = userEvent.setup();
-    const row = paymentConcept({ name: "Colegiatura", isTaxable: true });
+    const row = paymentConcept({ name: "Colegiatura", isTaxable: true, version: 3 });
     await openList([row]);
-    route("put", `${CONCEPTS}/${row.id}`, paymentConceptRecord({ ...row, isActive: false }));
+    route("put", `${CONCEPTS}/${row.id}`, paymentConceptRecord({ ...row, isActive: false, version: 4 }));
     route("get", CONCEPTS, paymentConceptPage([{ ...row, isActive: false }]));
 
     await user.click(screen.getByRole("button", { name: "Desactivar Colegiatura" }));
 
     expect(await screen.findByText("Se desactivó «Colegiatura».")).toBeInTheDocument();
-    expect(JSON.parse(writes("PUT")[0]?.body ?? "{}")).toEqual({ name: "Colegiatura", category: "TUITION", isRecurring: true, isTaxable: true, isActive: false });
+    expect(JSON.parse(writes("PUT")[0]?.body ?? "{}")).toEqual({
+      version: 3,
+      name: "Colegiatura",
+      category: "TUITION",
+      isRecurring: true,
+      isTaxable: true,
+      isActive: false,
+    });
 
     route("put", `${CONCEPTS}/${row.id}`, paymentConceptRecord(row));
     await user.click(await screen.findByRole("button", { name: "Activar Colegiatura" }));

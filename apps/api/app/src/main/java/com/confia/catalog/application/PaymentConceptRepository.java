@@ -13,10 +13,23 @@ public interface PaymentConceptRepository {
 
     Optional<PaymentConcept> findById(InstitutionId institutionId, UUID id);
 
+    /**
+     * The concept, locked in share mode until the end of the transaction ({@code SELECT ... FOR SHARE}): nobody can
+     * deactivate or edit it until the caller commits, so a price is never added to a concept that is deactivated in
+     * between. Empty when it does not exist in the institution.
+     */
+    Optional<PaymentConcept> lockShareById(InstitutionId institutionId, UUID id);
+
     void insert(InstitutionId institutionId, PaymentConcept concept);
 
-    /** Writes the editable members; the code is never written. */
-    void update(InstitutionId institutionId, PaymentConcept concept);
+    /**
+     * Writes the editable members and the new version; the code is never written.
+     *
+     * @param expectedVersion the version the row must still have
+     * @throws com.confia.catalog.domain.StaleVersionException when the row no longer has it
+     * @throws com.confia.catalog.domain.ResourceNotFoundException when the row does not exist in the institution
+     */
+    void update(InstitutionId institutionId, PaymentConcept concept, long expectedVersion);
 
     Page<PaymentConcept> list(InstitutionId institutionId, PageRequest request, PaymentConceptFilter filter);
 }
