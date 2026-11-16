@@ -399,7 +399,9 @@ reporte de rechazos se revisa con la administración registro por registro.
 7. Simulador: dado un estudiante y un período, mostrar el monto resultante con beneficios aplicados.
 
 **Avance (2026-11-15).** Entregable 1 construido de punta a punta en el PR #315 (corte `catalog-payment-concepts`): conceptos de
-pago con categoría, recurrencia y condición de gravado. Siguen las listas de precios con vigencia (corte 2).
+pago con categoría, recurrencia y condición de gravado. Entregable 2 construido en el corte `catalog-price-lists`: listas de
+precios por año lectivo y ámbito, con vigencias que no se solapan (INV-11) y cambio de precio como vigencia nueva. Siguen las
+tasas de impuesto (corte 3).
 
 **Criterios de salida:**
 
