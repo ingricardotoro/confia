@@ -39,7 +39,9 @@ jobs:
     # timeout covers the whole job, including dependency downloads and every other phase. PIT does
     # not run here: it needs 30 to 45 minutes on its own, which no 15-minute job can hold, so it runs
     # in the parallel `backend mutation` job below (ci-green-main, owner decision 2026-10-29).
-    timeout-minutes: 15
+    # Raised from 15 to 25 minutes on 2026-11-16: the suite grew with the catalog cuts and the
+    # job reached 14m46s on #316 and was cancelled at 15m19s on #317 with no failing test.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
