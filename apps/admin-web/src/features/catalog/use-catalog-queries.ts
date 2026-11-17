@@ -165,7 +165,8 @@ export function useTaxRateDetail(id: string) {
 /**
  * The active tax rates a taxable concept can name, for the select of its form: one page of the largest size the API
  * gives, in the order of the code. A lookup is a label and an option, never a filter of a table; the server decides
- * what is active.
+ * what is active. It reads one page of `LOOKUP_PAGE_SIZE` rates, like the other lookups of the app; an institution with
+ * more active rates than that would need a searchable selector instead.
  */
 export function useActiveTaxRateLookup() {
   const list = useTaxRateList({ page: 0, size: LOOKUP_PAGE_SIZE, sort: "code,asc", active: "true" });

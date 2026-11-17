@@ -11,5 +11,6 @@ describe("formatRatePercent", () => {
   it("does not round a text the number type cannot hold exactly", () => {
     expect(formatRatePercent("12.3456")).toBe("12.3456");
     expect(formatRatePercent("0.0001")).toBe("0.0001");
+    expect(formatRatePercent("99.9999")).toBe("99.9999");
   });
 });

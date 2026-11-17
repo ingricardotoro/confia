@@ -400,8 +400,9 @@ reporte de rechazos se revisa con la administración registro por registro.
 
 **Avance (2026-11-15).** Entregable 1 construido de punta a punta en el PR #315 (corte `catalog-payment-concepts`): conceptos de
 pago con categoría, recurrencia y condición de gravado. Entregable 2 construido en el corte `catalog-price-lists`: listas de
-precios por año lectivo y ámbito, con vigencias que no se solapan (INV-11) y cambio de precio como vigencia nueva. Siguen las
-tasas de impuesto (corte 3).
+precios por año lectivo y ámbito, con vigencias que no se solapan (INV-11) y cambio de precio como vigencia nueva (PR #317).
+Entregable 3 construido en el corte `catalog-tax-rates`: tasas de impuesto con vigencia sin solape, sin ninguna cifra
+precargada, y el concepto gravado apunta a su tasa. Siguen becas, descuentos y el simulador.
 
 **Criterios de salida:**
 
