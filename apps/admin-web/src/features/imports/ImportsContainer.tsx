@@ -154,7 +154,7 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
   };
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-5">
       <ImportWizard
         kind={kind}
         onKindChange={onKindChange}

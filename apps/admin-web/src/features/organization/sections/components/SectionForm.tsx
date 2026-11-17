@@ -1,5 +1,5 @@
 import { useAdminText } from "../../../../i18n/use-admin-text.ts";
-import { OptionField, ReadOnlyField, TextField, type Option } from "../../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, OptionField, ReadOnlyField, TextField, type Option } from "../../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { SECTION_CONTROL_IDS, type SectionField, type SectionValues } from "../section-form.ts";
 
@@ -55,6 +55,7 @@ export function SectionForm({
       form={form}
       onClose={onClose}
     >
+      <FieldGrid>
       {mode === "create" ? (
         <>
           <OptionField
@@ -95,6 +96,7 @@ export function SectionForm({
           {...text("isActive")}
         />
       ) : null}
+      </FieldGrid>
     </ResourceFormDialog>
   );
 }

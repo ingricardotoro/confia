@@ -1,7 +1,7 @@
 import { Checkbox, FormField, Input, Label } from "@confia/ui";
 import { useId } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { OptionField, ReadOnlyField, TextField } from "../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, FullRow, OptionField, ReadOnlyField, TextField } from "../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { STUDENT_CONTROL_IDS, type Student, type StudentField, type StudentValues } from "../student-form.ts";
 
@@ -49,11 +49,14 @@ export function StudentForm({ mode, values, fieldErrors, row, form, onChange, on
       form={form}
       onClose={onClose}
     >
+      <FieldGrid>
+      <FullRow>
       {editing ? (
         <ReadOnlyField label={t("students.fields.studentCode")} controlId={STUDENT_CONTROL_IDS.studentCode} value={values.studentCode} />
       ) : (
         <TextField label={t("students.fields.studentCode")} description={t("students.codeHelp")} {...text("studentCode")} />
       )}
+      </FullRow>
       <TextField label={t("students.fields.firstName")} required sensitive {...text("firstName")} />
       <TextField label={t("students.fields.lastName")} required sensitive {...text("lastName")} />
       <TextField label={t("students.fields.birthDate")} kind="date" required sensitive {...text("birthDate")} />
@@ -77,7 +80,7 @@ export function StudentForm({ mode, values, fieldErrors, row, form, onChange, on
             {...text("nationalId")}
           />
           {row?.hasNationalId === true ? (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1 sm:col-span-2">
               <div className="flex items-center gap-2">
                 <Checkbox
                   id={STUDENT_CONTROL_IDS.removeNationalId}
@@ -106,8 +109,11 @@ export function StudentForm({ mode, values, fieldErrors, row, form, onChange, on
           />
         </>
       ) : (
-        <TextField label={t("students.fields.nationalId")} description={t("students.nationalIdHelp")} sensitive {...text("nationalId")} />
+        <FullRow>
+          <TextField label={t("students.fields.nationalId")} description={t("students.nationalIdHelp")} sensitive {...text("nationalId")} />
+        </FullRow>
       )}
+      </FieldGrid>
     </ResourceFormDialog>
   );
 }

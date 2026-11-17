@@ -1,6 +1,6 @@
 import { Alert, Button } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { TextField } from "../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, TextField } from "../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { ENROLL_CONTROL_IDS, type EnrollField, type EnrollValues } from "../enrollment-forms.ts";
 import type { OptionGroup } from "../enrollment-model.ts";
@@ -45,11 +45,12 @@ export function EnrollForm({ values, fieldErrors, picker, sectionsState, section
       {sectionsState === "failed" ? (
         <Alert variant="warning">
           <p>{t("enrollments.enroll.optionsFailed")}</p>
-          <Button variant="secondary" size="sm" className="mt-2" onClick={onRetrySections}>
+          <Button variant="secondary" size="xs" className="mt-2" onClick={onRetrySections}>
             {t("enrollments.enroll.retryOptions")}
           </Button>
         </Alert>
       ) : null}
+      <FieldGrid>
       <SectionField
         label={t("enrollments.filters.section")}
         controlId={ENROLL_CONTROL_IDS.sectionId}
@@ -81,6 +82,7 @@ export function EnrollForm({ values, fieldErrors, picker, sectionsState, section
           onBlur("enrolledOn");
         }}
       />
+      </FieldGrid>
     </ResourceFormDialog>
   );
 }

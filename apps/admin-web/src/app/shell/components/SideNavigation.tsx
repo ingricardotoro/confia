@@ -1,4 +1,6 @@
+import { useId } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
+import confiaLogo from "../../../shared/brand/confia-logo.png";
 
 export interface SideNavigationItem {
   readonly id: string;
@@ -8,45 +10,127 @@ export interface SideNavigationItem {
   readonly current: boolean;
 }
 
-export interface SideNavigationProps {
+/** A section of the navigation: a labelled list of entries. */
+export interface SideNavigationGroup {
+  readonly id: string;
+  /** Already translated. The visible name of the section and the accessible name of its list. */
+  readonly label: string;
   readonly items: readonly SideNavigationItem[];
+}
+
+export interface SideNavigationProps {
+  /** The entries listed first, with no section label (Home). */
+  readonly items: readonly SideNavigationItem[];
+  /** The labelled sections, in the order they are listed. */
+  readonly groups?: readonly SideNavigationGroup[];
   /** Called on a plain click, which the caller turns into a navigation of the router. */
   readonly onNavigate: (href: string) => void;
+  readonly className?: string;
+}
+
+const LINK_CLASS = [
+  "relative flex h-9 items-center rounded-md px-3 text-sm text-sidebar-fg hover:bg-sidebar-hover-bg",
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-focus",
+].join(" ");
+
+// The current page is told by three things at once, never by color alone: aria-current, a heavier
+// weight and a 3 px bar on the left (docs/ui-ux/07 section 6.1).
+const CURRENT_CLASS =
+  "bg-sidebar-active-bg font-semibold text-sidebar-active-fg before:absolute before:inset-y-1.5 before:left-0 before:w-0.75 before:rounded-full before:bg-sidebar-indicator";
+
+function NavigationLinks({
+  items,
+  onNavigate,
+}: Pick<SideNavigationProps, "items" | "onNavigate">) {
+  return items.map((item) => (
+    <li key={item.id}>
+      <a
+        href={item.href}
+        aria-current={item.current ? "page" : undefined}
+        onClick={(event) => {
+          // A modified click keeps its browser meaning (new tab, new window).
+          if (
+            event.defaultPrevented ||
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+          )
+            return;
+          event.preventDefault();
+          onNavigate(item.href);
+        }}
+        className={[LINK_CLASS, item.current ? CURRENT_CLASS : ""].join(" ")}
+      >
+        {item.label}
+      </a>
+    </li>
+  ));
+}
+
+function Group({
+  group,
+  onNavigate,
+}: {
+  readonly group: SideNavigationGroup;
+  readonly onNavigate: (href: string) => void;
+}) {
+  const labelId = useId();
+  return (
+    <div className="flex flex-col">
+      <p
+        id={labelId}
+        className="px-3 pt-5 pb-1.5 text-xs font-semibold tracking-caps text-sidebar-fg-muted uppercase"
+      >
+        {group.label}
+      </p>
+      <ul aria-labelledby={labelId} className="flex flex-col gap-0.5">
+        <NavigationLinks items={group.items} onNavigate={onNavigate} />
+      </ul>
+    </div>
+  );
 }
 
 /**
- * The main navigation: a landmark with one link per entry, the current page marked with
- * `aria-current` and with a heavier weight and a bar, so it is never told by color alone. Links keep
- * their `href`, so a modified click (new tab) and a no-script visit still work.
+ * The main navigation: a navy landmark with the product name, the entries without a section and then one
+ * labelled list per section. Links keep their `href`, so a modified click (new tab) and a no-script visit
+ * still work.
  */
-export function SideNavigation({ items, onNavigate }: SideNavigationProps) {
+export function SideNavigation({
+  items,
+  groups = [],
+  onNavigate,
+  className,
+}: SideNavigationProps) {
   const { t } = useAdminText();
 
   return (
-    <nav aria-label={t("shell.navigationLabel")} className="w-56 shrink-0 border-r border-border-subtle bg-bg-surface p-3">
-      <ul className="flex flex-col gap-1">
-        {items.map((item) => (
-          <li key={item.id}>
-            <a
-              href={item.href}
-              aria-current={item.current ? "page" : undefined}
-              onClick={(event) => {
-                // A modified click keeps its browser meaning (new tab, new window).
-                if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                event.preventDefault();
-                onNavigate(item.href);
-              }}
-              className={[
-                "block rounded-md border-l-4 px-3 py-2 text-sm text-text-primary hover:bg-bg-canvas",
-                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus",
-                item.current ? "border-border-focus bg-bg-canvas font-semibold" : "border-transparent",
-              ].join(" ")}
-            >
-              {item.label}
-            </a>
-          </li>
+    <nav
+      aria-label={t("shell.navigationLabel")}
+      className={[
+        "flex w-60 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar-bg",
+        className ?? "",
+      ].join(" ")}
+    >
+      {/* The logo is dark navy on transparent, so its strip is white in both themes (the sidebar-active white is fixed). */}
+      <div className="shrink-0 bg-sidebar-active-fg px-4 py-3">
+        <img
+          src={confiaLogo}
+          alt={t("shell.logoAlt")}
+          width={720}
+          height={181}
+          className="block h-auto w-full"
+        />
+      </div>
+      <div className="flex flex-col gap-1 px-3 pb-4">
+        <ul className="flex flex-col gap-0.5">
+          <NavigationLinks items={items} onNavigate={onNavigate} />
+        </ul>
+        {groups.map((group) => (
+          <Group key={group.id} group={group} onNavigate={onNavigate} />
         ))}
-      </ul>
+      </div>
     </nav>
   );
 }

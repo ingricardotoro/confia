@@ -143,9 +143,14 @@
   },
   "shell": {
     "brand": "CONFIA",
+    "logoAlt": "CONFIA, control financiero académico",
     "skipToContent": "Saltar al contenido",
     "navigationLabel": "Navegación principal",
-    "accountLabel": "Su cuenta"
+    "accountLabel": "Su cuenta",
+    "tagline": "Control financiero académico",
+    "breadcrumbLabel": "Ruta de navegación",
+    "openNavigation": "Abrir menú",
+    "closeNavigation": "Cerrar menú"
   },
   "navigation": {
     "home": "Inicio",
@@ -154,7 +159,12 @@
     "enrollments": "Matrículas",
     "guardians": "Encargados",
     "imports": "Importaciones",
-    "catalog": "Catálogo"
+    "catalog": "Catálogo",
+    "groups": {
+      "community": "Comunidad educativa",
+      "finance": "Finanzas",
+      "settings": "Configuración"
+    }
   },
   "catalog": {
     "title": "Catálogo",
@@ -178,6 +188,7 @@
     },
     "paymentConcepts": {
       "heading": "Conceptos de pago",
+      "description": "Conceptos que la institución cobra, con su categoría y su condición fiscal.",
       "caption": "Conceptos de pago de la institución",
       "create": "Nuevo concepto",
       "createTitle": "Nuevo concepto de pago",
@@ -223,6 +234,7 @@
     },
     "priceLists": {
       "heading": "Listas de precios",
+      "description": "Precios por año lectivo y alcance, con su vigencia.",
       "caption": "Listas de precios de la institución",
       "create": "Nueva lista de precios",
       "createTitle": "Nueva lista de precios",
@@ -318,6 +330,7 @@
     },
     "taxRates": {
       "heading": "Tasas de impuesto",
+      "description": "Tasas de impuesto y sus períodos de vigencia.",
       "caption": "Tasas de impuesto de la institución",
       "create": "Nueva tasa",
       "createTitle": "Nueva tasa de impuesto",
@@ -389,6 +402,7 @@
     }
   },
   "resource": {
+    "totalRecords": "{count, plural, one {# registro} other {# registros}}",
     "state": "Estado",
     "actions": "Acciones",
     "active": "Activo",

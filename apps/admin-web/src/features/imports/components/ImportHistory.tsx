@@ -44,7 +44,7 @@ export function ImportHistory({ rows, table, pagination, kind, onKindChange }: I
 
   return (
     <section aria-labelledby="imports-history-heading" className="flex flex-col gap-3">
-      <h2 id="imports-history-heading" className="text-xl font-semibold text-text-primary">
+      <h2 id="imports-history-heading" className="text-base font-semibold text-text-primary">
         {t("imports.history.heading")}
       </h2>
       <div className="max-w-xs">

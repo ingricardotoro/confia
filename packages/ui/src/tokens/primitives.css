@@ -1,7 +1,8 @@
 /* Level 1: primitives (docs/ui-ux/01 sections 1, 2.1 and 2.2; design-system-foundations-and-a11y,
    design decision 3). The palette namespace has no Tailwind utility, so no component can consume a
-   primitive: only semantic.css references these variables. Provisional brand: changing it means
-   editing this file only. */
+   primitive: only semantic.css references these variables. Changing the brand means editing this
+   file only. The institutional primary is the sapphire navy of docs/ui-ux/07 section 3 (it replaced
+   the provisional #2563EB on 2026-11-16); its contrast ratios are published in 07 section 3.6. */
 @theme static {
   /* Neutral base */
   --palette-neutral-50: #F8FAFC;
@@ -16,15 +17,16 @@
   --palette-neutral-900: #0F172A;
   --palette-neutral-950: #020617;
 
-  /* Institutional primary */
-  --palette-primary-50: #EFF6FF;
-  --palette-primary-100: #DBEAFE;
-  --palette-primary-200: #BFDBFE;
-  --palette-primary-300: #93C5FD;
-  --palette-primary-400: #60A5FA;
-  --palette-primary-500: #3B82F6;
-  --palette-primary-600: #2563EB;
-  --palette-primary-700: #1D4ED8;
-  --palette-primary-800: #1E40AF;
-  --palette-primary-900: #1E3A8A;
+  /* Institutional primary: sapphire navy (docs/ui-ux/07 section 3.1) */
+  --palette-primary-50: #EEF3FB;
+  --palette-primary-100: #DCE6F6;
+  --palette-primary-200: #B9CCEC;
+  --palette-primary-300: #9DB5E6;
+  --palette-primary-400: #7096DE;
+  --palette-primary-500: #3D6BC9;
+  --palette-primary-600: #1D4FB0;
+  --palette-primary-700: #183F8E;
+  --palette-primary-800: #13306C;
+  --palette-primary-900: #0F2552;
+  --palette-primary-950: #0B1834;
 }

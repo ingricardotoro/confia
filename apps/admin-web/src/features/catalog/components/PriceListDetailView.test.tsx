@@ -117,9 +117,9 @@ describe("PriceListDetailView", () => {
 
     await user.click(screen.getByRole("button", { name: "Nuevo precio / nueva vigencia" }));
     await user.click(screen.getByRole("button", { name: "Archivar lista 2027 — Institución" }));
-    fireEvent.click(screen.getByRole("link", { name: "Volver a las listas de precios" }), { metaKey: true });
+    fireEvent.click(screen.getByRole("link", { name: "Listas de precios" }), { metaKey: true });
     expect(handlers.onBack).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("link", { name: "Volver a las listas de precios" }));
+    await user.click(screen.getByRole("link", { name: "Listas de precios" }));
 
     expect(handlers.onAddPrice).toHaveBeenCalledTimes(1);
     expect(handlers.onToggleStatus).toHaveBeenCalledTimes(1);

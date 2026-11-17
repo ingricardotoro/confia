@@ -33,6 +33,30 @@ const sharedPairs: Pair[] = [
     { foreground: "--color-text-tertiary", background, minimum: TEXT },
     { foreground: "--color-text-link", background, minimum: TEXT },
   ]),
+  // Dense-data surfaces (docs/ui-ux/07 section 3.3). Tertiary text on bg-subtle is not asserted: it is
+  // forbidden there in the light theme (4.34:1) and only valid as an icon.
+  ...["--color-text-primary", "--color-text-secondary"].map((foreground) => ({
+    foreground,
+    background: "--color-bg-subtle",
+    minimum: TEXT,
+  })),
+  ...["--color-text-primary", "--color-text-secondary", "--color-text-tertiary", "--color-text-link"].map((foreground) => ({
+    foreground,
+    background: "--color-bg-hover",
+    minimum: TEXT,
+  })),
+  { foreground: "--color-feedback-success-fg", background: "--color-feedback-success-bg", minimum: TEXT },
+  // The navy sidebar (docs/ui-ux/07 section 3.4 and 3.6).
+  { foreground: "--color-sidebar-fg", background: "--color-sidebar-bg", minimum: TEXT },
+  { foreground: "--color-sidebar-fg-muted", background: "--color-sidebar-bg", minimum: TEXT },
+  { foreground: "--color-sidebar-active-fg", background: "--color-sidebar-bg", minimum: TEXT },
+  { foreground: "--color-sidebar-active-fg", background: "--color-sidebar-active-bg", minimum: TEXT },
+  { foreground: "--color-sidebar-fg", background: "--color-sidebar-hover-bg", minimum: TEXT },
+  { foreground: "--color-sidebar-indicator", background: "--color-sidebar-bg", minimum: COMPONENT },
+  { foreground: "--color-sidebar-indicator", background: "--color-sidebar-active-bg", minimum: COMPONENT },
+  { foreground: "--color-sidebar-focus", background: "--color-sidebar-bg", minimum: COMPONENT },
+  { foreground: "--color-sidebar-focus", background: "--color-sidebar-active-bg", minimum: COMPONENT },
+  ...[1, 2, 3, 4, 5, 6].map((index) => ({ foreground: `--color-chart-${String(index)}`, background: SURFACE, minimum: COMPONENT })),
   { foreground: "--color-border-interactive", background: SURFACE, minimum: COMPONENT },
   { foreground: "--color-border-focus", background: SURFACE, minimum: COMPONENT },
   SOFT,

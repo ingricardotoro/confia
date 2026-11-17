@@ -1,6 +1,6 @@
 import { Alert, Button } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { OptionField, TextField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, OptionField, TextField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { CURRENCIES, PRICE_CONTROL_IDS, type PriceField, type PriceValues } from "../price-form.ts";
 
@@ -50,7 +50,7 @@ export function PriceForm({ values, fieldErrors, form, conceptOptions, lookupFai
       {lookupFailure === undefined ? null : (
         <Alert variant="warning">
           <p>{t("resource.optionsFailed")}</p>
-          <Button variant="secondary" size="sm" className="mt-2" onClick={lookupFailure.onRetry}>
+          <Button variant="secondary" size="xs" className="mt-2" onClick={lookupFailure.onRetry}>
             {t("resource.retryOptions")}
           </Button>
         </Alert>
@@ -67,6 +67,7 @@ export function PriceForm({ values, fieldErrors, form, conceptOptions, lookupFai
         placeholder={t("resource.chooseOption")}
         {...bind("paymentConceptId")}
       />
+      <FieldGrid>
       <TextField
         label={t("catalog.priceLists.addPrice.fields.amount")}
         required
@@ -80,6 +81,8 @@ export function PriceForm({ values, fieldErrors, form, conceptOptions, lookupFai
         options={CURRENCIES.map((currency) => ({ value: currency, label: t(`catalog.priceLists.currencies.${currency}`) }))}
         {...bind("currency")}
       />
+      </FieldGrid>
+      <FieldGrid>
       <TextField label={t("catalog.priceLists.addPrice.fields.validFrom")} required kind="date" {...bind("validFrom")} />
       <TextField
         label={t("catalog.priceLists.addPrice.fields.validTo")}
@@ -87,6 +90,7 @@ export function PriceForm({ values, fieldErrors, form, conceptOptions, lookupFai
         description={t("catalog.priceLists.addPrice.validToHelp")}
         {...bind("validTo")}
       />
+      </FieldGrid>
     </ResourceFormDialog>
   );
 }

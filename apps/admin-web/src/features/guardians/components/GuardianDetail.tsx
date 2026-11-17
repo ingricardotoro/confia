@@ -36,19 +36,20 @@ export function GuardianDetail({ state, onClose, consents }: GuardianDetailProps
   return (
     <Dialog
       open
+      size="lg"
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
       title={t("guardians.detail.title")}
       description={t("guardians.detail.description")}
       footer={
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" size="sm" onClick={onClose}>
           {t("guardians.detail.close")}
         </Button>
       }
     >
-      <div className="flex flex-col gap-4">
-        <div aria-live="polite" className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
+        <div aria-live="polite" className="flex flex-col gap-3">
           {state.kind === "loading" ? (
             <div aria-busy="true" className="flex flex-col gap-3">
               <p className="sr-only">{t("guardians.detail.loading")}</p>

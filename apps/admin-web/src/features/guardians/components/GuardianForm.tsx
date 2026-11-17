@@ -2,7 +2,7 @@ import { Checkbox, FormField, Input, Label } from "@confia/ui";
 import { useId } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import type { AdminKey } from "../../../i18n/resources.ts";
-import { OptionField, ReadOnlyField, TextField } from "../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, FullRow, OptionField, ReadOnlyField, TextField } from "../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { CHANNELS, GUARDIAN_CONTROL_IDS, type Guardian, type GuardianField, type GuardianValues } from "../guardian-form.ts";
 
@@ -82,7 +82,7 @@ function WriteOnlyValue({ kind, has, values, fieldErrors, onChange, onBlur }: Wr
         }}
       />
       {has ? (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1 sm:col-span-2">
           <div className="flex items-center gap-2">
             <Checkbox
               id={removeId}
@@ -132,8 +132,14 @@ export function GuardianForm({ mode, values, fieldErrors, row, form, onChange, o
       submitLabel={t("resource.save")}
       form={form}
       onClose={onClose}
+      size="lg"
     >
-      {editing ? <ReadOnlyField label={t("guardians.fields.code")} controlId="guardian-code" value={row?.guardianCode ?? ""} /> : null}
+      <FieldGrid>
+      {editing ? (
+        <FullRow>
+          <ReadOnlyField label={t("guardians.fields.code")} controlId="guardian-code" value={row?.guardianCode ?? ""} />
+        </FullRow>
+      ) : null}
       <TextField label={t("guardians.fields.firstName")} required sensitive {...text("firstName")} />
       <TextField label={t("guardians.fields.lastName")} required sensitive {...text("lastName")} />
       {editing ? (
@@ -149,7 +155,9 @@ export function GuardianForm({ mode, values, fieldErrors, row, form, onChange, o
       )}
       <TextField label={t("guardians.fields.email")} sensitive {...text("email")} />
       <TextField label={t("guardians.fields.phone")} sensitive {...text("phone")} />
-      <TextField label={t("guardians.fields.address")} sensitive {...text("address")} />
+      <FullRow>
+        <TextField label={t("guardians.fields.address")} sensitive {...text("address")} />
+      </FullRow>
       <OptionField
         label={t("guardians.fields.preferredChannel")}
         options={CHANNELS.map((channel) => ({ value: channel, label: t(`guardians.channel.${channel}`) }))}
@@ -165,6 +173,7 @@ export function GuardianForm({ mode, values, fieldErrors, row, form, onChange, o
           {...text("status")}
         />
       ) : null}
+      </FieldGrid>
     </ResourceFormDialog>
   );
 }

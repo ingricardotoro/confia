@@ -26,7 +26,7 @@ function GuardiansRoute() {
  * here and lives in the address.
  */
 export const guardiansFeature: FeatureModule = {
-  navigation: { id: "guardians", labelKey: "navigation.guardians", to: GUARDIANS_PATH },
+  navigation: { id: "guardians", labelKey: "navigation.guardians", to: GUARDIANS_PATH, group: "community" },
   createRoutes: (parent: AnyRoute) => [
     createRoute({
       getParentRoute: () => parent,

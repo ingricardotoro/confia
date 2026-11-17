@@ -137,7 +137,7 @@ export function ReadOnlyField({ label, controlId, value }: { readonly label: str
 /** Active or inactive, in text. */
 export function ActiveBadge({ active }: { readonly active: boolean }) {
   const { t } = useAdminText();
-  return <Badge variant={active ? "primary" : "outline"}>{active ? t("resource.active") : t("resource.inactive")}</Badge>;
+  return <Badge variant={active ? "success" : "neutral"} dot={active ? "filled" : "hollow"}>{active ? t("resource.active") : t("resource.inactive")}</Badge>;
 }
 
 export interface RowActionsProps {
@@ -155,13 +155,13 @@ export interface RowActionsProps {
 export function RowActions({ name, active, busy, onEdit, onToggle, extra }: RowActionsProps) {
   const { t } = useAdminText();
   return (
-    <div className="flex flex-wrap gap-2">
-      <Button variant="secondary" size="sm" aria-label={t("resource.editFor", { name })} onClick={onEdit}>
+    <div className="flex flex-wrap gap-1.5">
+      <Button variant="secondary" size="xs" aria-label={t("resource.editFor", { name })} onClick={onEdit}>
         {t("resource.edit")}
       </Button>
       <Button
-        variant="secondary"
-        size="sm"
+        variant={active ? "destructive-soft" : "success-soft"}
+        size="xs"
         loading={busy}
         aria-label={t(active ? "resource.deactivateFor" : "resource.activateFor", { name })}
         onClick={onToggle}
@@ -171,4 +171,17 @@ export function RowActions({ name, active, busy, onEdit, onToggle, extra }: RowA
       {extra}
     </div>
   );
+}
+
+/**
+ * Lays the short fields of a form out in two columns from the small breakpoint up (dates, amount and currency, code and
+ * name). A field that needs the whole row goes in a `FullRow`.
+ */
+export function FieldGrid({ children }: { readonly children: ReactNode }) {
+  return <div className="grid grid-cols-1 gap-x-3 gap-y-3 sm:grid-cols-2">{children}</div>;
+}
+
+/** A child of a `FieldGrid` that spans both columns. */
+export function FullRow({ children }: { readonly children: ReactNode }) {
+  return <div className="sm:col-span-2">{children}</div>;
 }

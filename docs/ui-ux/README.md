@@ -1,6 +1,6 @@
 # Documentación de UI/UX de CONFIA
 
-Estos siete documentos definen cómo se ve, cómo se comporta y cómo habla el producto. No son
+Estos ocho documentos definen cómo se ve, cómo se comporta y cómo habla el producto. No son
 sugerencias: son criterio de aceptación.
 
 ## Regla de uso
@@ -20,6 +20,7 @@ nadie repara, porque reparar diseño ya construido siempre pierde contra la sigu
 | [04-patrones-de-interaccion.md](04-patrones-de-interaccion.md) | Navegación, listados, formularios, confirmaciones, errores y atajos | Antes de construir una pantalla del tipo correspondiente |
 | [05-guia-de-contenido-y-voz.md](05-guia-de-contenido-y-voz.md) | Voz, formato de datos, catálogo de mensajes y plantillas de cobranza | Al escribir cualquier texto visible |
 | [06-flujos-clave.md](06-flujos-clave.md) | Los trece recorridos críticos con sus criterios de aceptación | Antes de implementar el flujo correspondiente |
+| [07-direccion-visual-financiera.md](07-direccion-visual-financiera.md) | Dirección visual del panel: paleta marino, armazón, encabezado de página, tablas, insignias, inicio de sesión y plan de implementación | Antes de tocar el armazón, una tabla o un encabezado de página |
 
 ## Orden de lectura recomendado
 

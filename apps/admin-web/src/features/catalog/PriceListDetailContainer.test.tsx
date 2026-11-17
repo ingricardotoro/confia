@@ -92,7 +92,7 @@ describe("the detail of a price list", () => {
   it("shows the data of the list and every validity of each concept, closed and open, with the amounts as the server sent them", async () => {
     await openDetail();
 
-    expect(screen.getByRole("link", { name: "Listas de precios" })).toHaveAttribute("aria-current", "page");
+    expect(within(screen.getByRole("navigation", { name: "Vistas del catálogo" })).getByRole("link", { name: "Listas de precios" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("Año lectivo 2027")).toBeInTheDocument();
     expect(screen.getByText("Toda la institución")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 4, name: "COL — Colegiatura" })).toBeInTheDocument();
@@ -166,7 +166,7 @@ describe("the detail of a price list", () => {
     const { router } = await openDetail();
     route("get", LISTS, { status: 200, body: { items: [], page: 0, size: 25, total: 0 }, contentType: "application/json" });
 
-    await user.click(screen.getByRole("link", { name: "Volver a las listas de precios" }));
+    await user.click(within(screen.getByRole("navigation", { name: "Ruta de navegación" })).getByRole("link", { name: "Listas de precios" }));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/catalog/price-lists");

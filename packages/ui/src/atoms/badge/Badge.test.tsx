@@ -87,4 +87,31 @@ describe("Badge", () => {
     expect(badge).toHaveClass("bg-(--status-badge-paid-bg)");
     expect(badge).not.toHaveClass("bg-(--badge-neutral-bg)");
   });
+  it("has the contained corner of the financial direction and not the pill", () => {
+    renderWithI18n(<Badge>Etiqueta</Badge>);
+
+    expect(screen.getByText("Etiqueta")).toHaveClass("rounded-sm");
+    expect(screen.getByText("Etiqueta")).not.toHaveClass("rounded-full");
+  });
+
+  it("reads the success tokens in its own variant, apart from the paid status", () => {
+    renderWithI18n(<Badge variant="success">Activo</Badge>);
+
+    expect(screen.getByText("Activo")).toHaveClass("bg-(--badge-success-bg)", "text-(--badge-success-fg)");
+  });
+
+  it.each(["filled", "hollow"] as const)("shows a decorative %s dot that is hidden from assistive technology", (dot) => {
+    renderWithI18n(<Badge dot={dot}>Activo</Badge>);
+
+    const mark = screen.getByText("Activo").children[0];
+    expect(mark).toHaveAttribute("data-dot", dot);
+    expect(mark).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("Activo")).toBeVisible();
+  });
+
+  it("renders no dot unless asked", () => {
+    renderWithI18n(<Badge>Etiqueta</Badge>);
+
+    expect(screen.getByText("Etiqueta").children).toHaveLength(0);
+  });
 });

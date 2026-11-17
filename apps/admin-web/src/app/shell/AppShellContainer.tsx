@@ -1,9 +1,18 @@
-import { Navigate, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+  Navigate,
+  Outlet,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
 import { SignedInPage } from "../../features/identity/signed-in/components/SignedInPage.tsx";
 import { useSignedInSession } from "../../features/identity/signed-in/use-signed-in-session.ts";
 import type { AccessSession } from "../../features/identity/session/index.ts";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
-import { isCurrentEntry, type NavigationEntry } from "../../shared/navigation/navigation-entry.ts";
+import {
+  isCurrentEntry,
+  NAVIGATION_GROUP_ORDER,
+  type NavigationEntry,
+} from "../../shared/navigation/navigation-entry.ts";
 import { AppShell } from "./components/AppShell.tsx";
 
 export interface AppShellContainerProps {
@@ -23,19 +32,43 @@ interface ShellFrameProps {
 // The router location is read here and not in the container: a change of location must not re-render the
 // component that holds the session query, or leaving the shell would rebuild a query the sign out just
 // emptied from the cache.
-function ShellFrame({ entries, signingOut, signOutFailed, onSignOut }: ShellFrameProps) {
+function ShellFrame({
+  entries,
+  signingOut,
+  signOutFailed,
+  onSignOut,
+}: ShellFrameProps) {
   const { t } = useAdminText();
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+
+  const toItem = (entry: NavigationEntry) => ({
+    id: entry.id,
+    label: t(entry.labelKey),
+    href: entry.to,
+    current: isCurrentEntry(entry, pathname),
+  });
+  const groups = NAVIGATION_GROUP_ORDER.flatMap((id) => {
+    const inGroup = entries.filter((entry) => entry.group === id);
+    return inGroup.length === 0
+      ? []
+      : [
+          {
+            id,
+            label: t(`navigation.groups.${id}`),
+            items: inGroup.map(toItem),
+          },
+        ];
+  });
 
   return (
     <AppShell
-      navigation={entries.map((entry) => ({
-        id: entry.id,
-        label: t(entry.labelKey),
-        href: entry.to,
-        current: isCurrentEntry(entry, pathname),
-      }))}
+      navigation={entries
+        .filter((entry) => entry.group === undefined)
+        .map(toItem)}
+      navigationGroups={groups}
       onNavigate={(href) => void navigate({ to: href })}
       signingOut={signingOut}
       signOutFailed={signOutFailed}
@@ -51,13 +84,31 @@ function ShellFrame({ entries, signingOut, signOutFailed, onSignOut }: ShellFram
  * that read as the full page the person already knew, and once the session is confirmed it draws the
  * shell around the outlet.
  */
-export function AppShellContainer({ session, signInPath, entries }: AppShellContainerProps) {
+export function AppShellContainer({
+  session,
+  signInPath,
+  entries,
+}: AppShellContainerProps) {
   const { t } = useAdminText();
   const signedIn = useSignedInSession(session);
 
   if (!signedIn.authenticated) return <Navigate to={signInPath} replace />;
-  if (signedIn.read === "error") return <SignedInPage status="error" message={t(signedIn.errorKey)} onRetry={signedIn.retry} />;
+  if (signedIn.read === "error")
+    return (
+      <SignedInPage
+        status="error"
+        message={t(signedIn.errorKey)}
+        onRetry={signedIn.retry}
+      />
+    );
   if (signedIn.read === "loading") return <SignedInPage status="loading" />;
 
-  return <ShellFrame entries={entries} signingOut={signedIn.signingOut} signOutFailed={signedIn.signOutFailed} onSignOut={signedIn.signOut} />;
+  return (
+    <ShellFrame
+      entries={entries}
+      signingOut={signedIn.signingOut}
+      signOutFailed={signedIn.signOutFailed}
+      onSignOut={signedIn.signOut}
+    />
+  );
 }

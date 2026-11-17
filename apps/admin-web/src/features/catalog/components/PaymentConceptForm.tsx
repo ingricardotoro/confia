@@ -1,7 +1,7 @@
 import { Alert, Button, Checkbox, Label } from "@confia/ui";
 import { useId } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { OptionField, ReadOnlyField, TextField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, OptionField, ReadOnlyField, TextField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { PAYMENT_CATEGORIES } from "../catalog-search.ts";
 import { CATEGORY_LABEL_KEYS } from "../category-options.ts";
@@ -36,7 +36,7 @@ interface CheckFieldProps {
 function CheckField({ controlId, label, help, checked, onChange }: CheckFieldProps) {
   const helpId = useId();
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
         <Checkbox
           id={controlId}
@@ -104,12 +104,14 @@ export function PaymentConceptForm({
       form={form}
       onClose={onClose}
     >
+      <FieldGrid>
       {mode === "create" ? (
         <TextField label={t("catalog.paymentConcepts.fields.code")} required description={t("catalog.paymentConcepts.codeHelp")} {...text("code")} />
       ) : (
         <ReadOnlyField label={t("catalog.paymentConcepts.fields.code")} controlId={PAYMENT_CONCEPT_CONTROL_IDS.code} value={values.code} />
       )}
       <TextField label={t("catalog.paymentConcepts.fields.name")} required {...text("name")} />
+      </FieldGrid>
       <OptionField
         label={t("catalog.paymentConcepts.fields.category")}
         required
@@ -117,14 +119,16 @@ export function PaymentConceptForm({
         placeholder={t("resource.chooseOption")}
         {...text("category")}
       />
+      <FieldGrid>
       {check("isRecurring", t("catalog.paymentConcepts.fields.isRecurring"), t("catalog.paymentConcepts.recurringHelp"))}
       {check("isTaxable", t("catalog.paymentConcepts.fields.isTaxable"), t("catalog.paymentConcepts.taxableHelp"))}
+      </FieldGrid>
       {needsTaxRate(values.isTaxable) ? (
         <>
           {taxRateLookupFailure === undefined ? null : (
             <Alert variant="warning">
               <p>{t("resource.optionsFailed")}</p>
-              <Button variant="secondary" size="sm" className="mt-2" onClick={taxRateLookupFailure.onRetry}>
+              <Button variant="secondary" size="xs" className="mt-2" onClick={taxRateLookupFailure.onRetry}>
                 {t("resource.retryOptions")}
               </Button>
             </Alert>

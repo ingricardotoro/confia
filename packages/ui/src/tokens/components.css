@@ -16,6 +16,18 @@
   --button-subtle-bg-active: var(--color-border-subtle);
   --button-destructive-bg: var(--color-status-overdue-solid-bg);
   --button-destructive-fg: var(--color-primary-fg);
+  /* Action colours (docs/ui-ux/07 section 11): success and warning reuse the solid state tokens, whose white
+     text contrast is already tested in both themes; the soft variants use the state badge pairs. */
+  --button-success-bg: var(--color-status-paid-solid-bg);
+  --button-success-fg: var(--color-primary-fg);
+  --button-warning-bg: var(--color-status-partial-solid-bg);
+  --button-warning-fg: var(--color-primary-fg);
+  --button-danger-soft-bg: var(--color-status-overdue-bg);
+  --button-danger-soft-fg: var(--color-status-overdue-fg);
+  --button-danger-soft-border: var(--color-status-overdue-border);
+  --button-success-soft-bg: var(--color-status-paid-bg);
+  --button-success-soft-fg: var(--color-status-paid-fg);
+  --button-success-soft-border: var(--color-status-paid-border);
   --badge-neutral-bg: var(--color-bg-canvas);
   --badge-neutral-fg: var(--color-text-secondary);
   --badge-neutral-border: var(--color-border-subtle);
@@ -74,6 +86,18 @@
   --alert-destructive-border: var(--color-status-overdue-border);
   --skeleton-bg: var(--color-border-subtle);
   --skeleton-animation: confia-pulse 2s ease-in-out infinite;
+  /* docs/ui-ux/07 sections 6.3, 6.6 and 6.7: tokens ready for the Table, Badge and Card changes of
+     the implementation brief (07 section 9). No component reads them yet. */
+  --table-header-bg: var(--color-bg-subtle);
+  --table-header-fg: var(--color-text-secondary);
+  --table-row-hover-bg: var(--color-bg-hover);
+  --table-border: var(--color-border-subtle);
+  --badge-success-bg: var(--color-feedback-success-bg);
+  --badge-success-fg: var(--color-feedback-success-fg);
+  --badge-success-border: var(--color-feedback-success-bg);
+  --card-bg: var(--color-bg-surface);
+  --card-border: var(--color-border-subtle);
+  --card-shadow: var(--shadow-sm);
 }
 
 /* The one keyframe set in the package. It is global on purpose: the Tailwind theme is reset, so the

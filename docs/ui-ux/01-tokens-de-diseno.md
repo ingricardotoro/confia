@@ -75,6 +75,12 @@ Escala fría (con matiz azulado, coherente con el primario institucional), de 50
 
 ### 2.2 Primario institucional
 
+> **Nota fechada 2026-11-16.** Los valores de esta tabla quedan sustituidos por el azul zafiro de
+> `07-direccion-visual-financiera.md` §3.1 (primario `#1D4FB0`, nuevo paso `950`), que también
+> agrega superficies de datos, tokens de barra lateral, colores de gráfico, radio `xl` de 10 px y
+> sombras nuevas, con sus razones de contraste en §3.6. Los nombres de token no cambian. Las cifras
+> de §5 para foco y enlace en claro y oscuro se leen ahora en `07` §3.6.
+
 Azul profundo. Transmite confianza y seriedad financiera sin la agresividad de un azul saturado
 de marca de consumo. Es el único color que aparece en la acción primaria de cada pantalla
 (principio 3 de `00-principios-de-diseno.md`).

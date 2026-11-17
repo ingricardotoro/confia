@@ -1,5 +1,5 @@
 import { useAdminText } from "../../../../i18n/use-admin-text.ts";
-import { OptionField, TextField } from "../../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, OptionField, TextField } from "../../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { MODALITY_CONTROL_IDS, type ModalityField, type ModalityValues } from "../modality-form.ts";
 
@@ -37,6 +37,7 @@ export function ModalityForm({ mode, values, fieldErrors, form, onChange, onBlur
       form={form}
       onClose={onClose}
     >
+      <FieldGrid>
       <TextField label={t("organization.modalities.fields.code")} required {...text("code")} />
       <TextField label={t("organization.modalities.fields.name")} required {...text("name")} />
       {mode === "edit" ? (
@@ -49,6 +50,7 @@ export function ModalityForm({ mode, values, fieldErrors, form, onChange, onBlur
           {...text("isActive")}
         />
       ) : null}
+      </FieldGrid>
     </ResourceFormDialog>
   );
 }

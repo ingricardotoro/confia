@@ -19,6 +19,8 @@ export interface DialogProps {
   /** Where the dialog mounts. Defaults to the document body; stories and tests may scope it. */
   container?: HTMLElement | null;
   className?: string;
+  /** Width by purpose: `sm` (28rem) a confirmation, `md` (34rem, default) a form, `lg` (44rem) a wide form or detail dialog. */
+  size?: "sm" | "md" | "lg";
 }
 
 // A modal dialog on Radix: focus is trapped inside, Escape closes it, the page behind is inert and the
@@ -27,7 +29,9 @@ export interface DialogProps {
 // the corner by CSS. Layout: the header and the footer are pinned and the body is the only scroll area,
 // so moving the focus to a control deep in a long form never scrolls the title out of view. On a very
 // short viewport (20rem) the panel itself scrolls instead, with a static header and footer.
-export function Dialog({ open, onOpenChange, title, description, children, footer, container, className }: DialogProps) {
+const WIDTH = { sm: "max-w-[28rem]", md: "max-w-[34rem]", lg: "max-w-[44rem]" } as const;
+
+export function Dialog({ open, onOpenChange, title, description, children, footer, container, className, size = "md" }: DialogProps) {
   const { t } = useUiText();
   // Radix returns the focus only to its own Trigger. This dialog is controlled, so whatever control
   // opened it (a button, a row action) is remembered here and gets the focus back on close.
@@ -48,29 +52,30 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
             }
           }}
           className={cn(
-            "fixed top-1/2 left-1/2 z-(--z-overlay) flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-border-subtle bg-bg-surface-elevated p-0 text-text-primary shadow-xl supports-[height:1dvh]:max-h-[90dvh] [@media(max-height:20rem)]:overflow-y-auto",
+            `fixed top-1/2 left-1/2 z-(--z-overlay) flex max-h-[90vh] w-[calc(100vw-2rem)] ${WIDTH[size]} -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-border-subtle bg-bg-surface-elevated p-0 text-text-primary shadow-xl supports-[height:1dvh]:max-h-[90dvh] [@media(max-height:20rem)]:overflow-y-auto`,
             className,
           )}
         >
-          <div className="flex shrink-0 flex-col gap-1 bg-bg-surface-elevated px-4 pt-6 pr-14 pb-4 sm:px-6">
-            <DialogPrimitive.Title className="text-lg font-semibold">{title}</DialogPrimitive.Title>
+          <div className="flex shrink-0 flex-col gap-0.5 border-b border-border-subtle bg-bg-surface-elevated px-4 pt-3.5 pr-12 pb-3 sm:px-5">
+            <DialogPrimitive.Title className="text-base font-semibold">{title}</DialogPrimitive.Title>
             <DialogPrimitive.Description className="text-sm text-text-secondary">{description}</DialogPrimitive.Description>
           </div>
           <div
             className={cn(
-              "min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 [@media(max-height:20rem)]:overflow-visible",
-              footer === undefined ? "pb-6" : "pb-4",
+              "min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5 [@media(max-height:20rem)]:overflow-visible",
+              "pt-3",
+              footer === undefined ? "pb-4" : "pb-3",
             )}
           >
             {children}
           </div>
           {footer === undefined ? null : (
-            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-border-subtle bg-bg-surface-elevated px-4 py-4 sm:px-6">
+            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-border-subtle bg-bg-subtle px-4 py-2.5 sm:px-5">
               {footer}
             </div>
           )}
           <DialogPrimitive.Close asChild>
-            <IconButton label={t("dialog.close")} variant="subtle" size="sm" className="absolute top-3 right-3">
+            <IconButton label={t("dialog.close")} variant="subtle" size="sm" className="absolute top-2.5 right-2.5">
               <X />
             </IconButton>
           </DialogPrimitive.Close>
