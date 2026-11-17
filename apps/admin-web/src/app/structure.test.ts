@@ -40,13 +40,15 @@ describe("the shape of the package", () => {
 describe("what this change leaves out", () => {
   const sources = filesUnder(join(PACKAGE_ROOT, "src")).filter((file) => /\.tsx?$/.test(file) && !/\.test(-d)?\.tsx?$/.test(file));
 
-  it("AW60: no page header or breadcrumb exists in the app or in the entry point of the design system", () => {
-    const shell = /\b(?:function|const|class|interface|type)\s+(?:Topbar|Sidebar|PageHeader|Breadcrumb)\b/;
+  // AW60 (no page header or breadcrumb in the app or in the entry point of the design system) was retired by the
+  // financial visual redesign, which ships PageHeader and Breadcrumb in `@confia/ui` (docs/ui-ux/07).
+  it("AW60 successor: no Topbar or Sidebar is declared in the app or exported by the entry point of the design system", () => {
+    const shell = /\b(?:function|const|class|interface|type)\s+(?:Topbar|Sidebar)\b/;
     const entry = readFileSync(join(PACKAGE_ROOT, "..", "..", "packages", "ui", "src", "index.ts"), "utf8");
 
     expect(sources.length).toBeGreaterThan(0);
     expect(sources.filter((file) => shell.test(readFileSync(file, "utf8")))).toEqual([]);
-    expect(entry).not.toMatch(/\b(?:Topbar|Sidebar|PageHeader|Breadcrumb)\b/);
+    expect(entry).not.toMatch(/\b(?:Topbar|Sidebar)\b/);
   });
 
   it("AW61: the portal app does not exist", () => {
