@@ -126,7 +126,7 @@ export function StudentPicker({ controlId, error, draft, onDraftChange, tooShort
       {search === "failed" ? (
         <Alert variant="warning">
           <p>{t("enrollments.student.failed")}</p>
-          <Button variant="secondary" size="sm" className="mt-2" onClick={onRetry}>
+          <Button variant="secondary" size="xs" className="mt-2" onClick={onRetry}>
             {t("enrollments.student.retry")}
           </Button>
         </Alert>

@@ -1,6 +1,6 @@
 import { Alert, Button } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { TextField } from "../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, FullRow, TextField } from "../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { TRANSFER_CONTROL_IDS, type TransferField, type TransferValues } from "../enrollment-forms.ts";
 import type { OptionGroup } from "../enrollment-model.ts";
@@ -50,11 +50,12 @@ export function TransferForm({ studentName, values, fieldErrors, sectionsState, 
       {sectionsState === "failed" ? (
         <Alert variant="warning">
           <p>{t("enrollments.enroll.optionsFailed")}</p>
-          <Button variant="secondary" size="sm" className="mt-2" onClick={onRetrySections}>
+          <Button variant="secondary" size="xs" className="mt-2" onClick={onRetrySections}>
             {t("enrollments.enroll.retryOptions")}
           </Button>
         </Alert>
       ) : null}
+      <FieldGrid>
       <SectionField
         label={t("enrollments.transfer.toSection")}
         required
@@ -63,7 +64,10 @@ export function TransferForm({ studentName, values, fieldErrors, sectionsState, 
         {...text("toSectionId")}
       />
       <TextField label={t("enrollments.transfer.date")} kind="date" required {...text("transferredOn")} />
-      <ReasonField label={t("enrollments.transfer.reason")} description={t("enrollments.transfer.reasonHelp")} {...text("reason")} />
+      <FullRow>
+        <ReasonField label={t("enrollments.transfer.reason")} description={t("enrollments.transfer.reasonHelp")} {...text("reason")} />
+      </FullRow>
+      </FieldGrid>
     </ResourceFormDialog>
   );
 }

@@ -155,8 +155,8 @@ function Cell({ standing, channel, purpose, onOpen }: CellProps) {
       <div className="flex flex-wrap gap-2">
         <Button
           id={consentActionId({ channel, purpose, action: "GRANT" })}
-          variant="secondary"
-          size="sm"
+          variant="success-soft"
+          size="xs"
           aria-label={t("guardians.consents.grantFor", names)}
           onClick={() => {
             onOpen({ channel, purpose, action: "GRANT" });
@@ -166,8 +166,8 @@ function Cell({ standing, channel, purpose, onOpen }: CellProps) {
         </Button>
         <Button
           id={consentActionId({ channel, purpose, action: "WITHDRAW" })}
-          variant="secondary"
-          size="sm"
+          variant="destructive-soft"
+          size="xs"
           aria-label={t("guardians.consents.withdrawFor", names)}
           onClick={() => {
             onOpen({ channel, purpose, action: "WITHDRAW" });
@@ -189,7 +189,7 @@ function ConsentForm({ form }: { readonly form: ConsentFormView }) {
     purpose: t(`guardians.consents.purpose.${target.purpose}`),
   };
   return (
-    <form noValidate onSubmit={submit} className="flex flex-col gap-3 rounded-md border border-border-subtle p-4">
+    <form noValidate onSubmit={submit} className="flex flex-col gap-3 rounded-md border border-border-subtle p-3">
       <h4 className="text-sm font-semibold text-text-primary">
         {t(grant ? "guardians.consents.form.grantTitle" : "guardians.consents.form.withdrawTitle", names)}
       </h4>
@@ -255,10 +255,10 @@ function ConsentForm({ form }: { readonly form: ConsentFormView }) {
         {liveMessage}
       </p>
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" loading={submitting}>
+        <Button type="submit" size="sm" variant={grant ? "success" : "destructive"} loading={submitting}>
           {t(grant ? "guardians.consents.grant" : "guardians.consents.withdraw")}
         </Button>
-        <Button type="button" variant="secondary" disabled={submitting} onClick={cancel}>
+        <Button type="button" size="sm" variant="secondary" disabled={submitting} onClick={cancel}>
           {t("guardians.consents.form.cancel")}
         </Button>
       </div>

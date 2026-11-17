@@ -1,10 +1,16 @@
 import { Alert, Button } from "@confia/ui";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { SideNavigation, type SideNavigationItem } from "./SideNavigation.tsx";
+import {
+  SideNavigation,
+  type SideNavigationGroup,
+  type SideNavigationItem,
+} from "./SideNavigation.tsx";
 
 export interface AppShellProps {
   readonly navigation: readonly SideNavigationItem[];
+  /** The labelled sections of the navigation, below the entries that have none. */
+  readonly navigationGroups?: readonly SideNavigationGroup[];
   readonly onNavigate: (href: string) => void;
   readonly signingOut: boolean;
   readonly signOutFailed: boolean;
@@ -19,29 +25,93 @@ export interface AppShellProps {
  * so the focus is not lost; the container ignores the clicks that come meanwhile. It shows nothing
  * about the person: the session read keeps its metadata in the query cache and out of the screen.
  */
-export function AppShell({ navigation, onNavigate, signingOut, signOutFailed, onSignOut, children }: AppShellProps) {
+export function AppShell({
+  navigation,
+  navigationGroups,
+  onNavigate,
+  signingOut,
+  signOutFailed,
+  onSignOut,
+  children,
+}: AppShellProps) {
   const { t } = useAdminText();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Below lg the sidebar is a panel the person opens; Escape closes it.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg-canvas text-text-primary">
+    <div className="flex min-h-screen bg-bg-canvas text-text-primary">
       <a
         href="#contenido"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-bg-surface focus:px-3 focus:py-2 focus:text-text-link focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
       >
         {t("shell.skipToContent")}
       </a>
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle bg-bg-surface px-4 py-2">
-        <p className="text-lg font-semibold">{t("shell.brand")}</p>
-        <div role="group" aria-label={t("shell.accountLabel")} className="flex flex-wrap items-center gap-3">
-          {signOutFailed ? <Alert variant="destructive">{t("signedIn.signOutFailed")}</Alert> : null}
-          <Button variant="secondary" size="sm" loading={signingOut} onClick={onSignOut}>
-            {signOutFailed ? t("signedIn.retrySignOut") : t("signedIn.signOut")}
+      <div
+        id="side-navigation"
+        className={`${menuOpen ? "fixed inset-y-0 left-0 z-40 flex shadow-xl" : "hidden"} lg:static lg:z-auto lg:flex lg:shadow-none`}
+      >
+        <SideNavigation
+          items={navigation}
+          {...(navigationGroups === undefined
+            ? {}
+            : { groups: navigationGroups })}
+          onNavigate={(href) => {
+            setMenuOpen(false);
+            onNavigate(href);
+          }}
+          className="min-h-screen"
+        />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-bg-surface px-6">
+          <Button
+            variant="subtle"
+            size="sm"
+            className="lg:hidden"
+            aria-expanded={menuOpen}
+            aria-controls="side-navigation"
+            onClick={() => {
+              setMenuOpen((open) => !open);
+            }}
+          >
+            {menuOpen ? t("shell.closeNavigation") : t("shell.openNavigation")}
           </Button>
-        </div>
-      </header>
-      <div className="flex flex-1">
-        <SideNavigation items={navigation} onNavigate={onNavigate} />
-        <main id="contenido" tabIndex={-1} className="min-w-0 flex-1 p-6">
+          <div
+            role="group"
+            aria-label={t("shell.accountLabel")}
+            className="ml-auto flex flex-wrap items-center gap-3"
+          >
+            {signOutFailed ? (
+              <Alert variant="destructive">{t("signedIn.signOutFailed")}</Alert>
+            ) : null}
+            <Button
+              variant="subtle"
+              size="sm"
+              loading={signingOut}
+              onClick={onSignOut}
+            >
+              {signOutFailed
+                ? t("signedIn.retrySignOut")
+                : t("signedIn.signOut")}
+            </Button>
+          </div>
+        </header>
+        <main
+          id="contenido"
+          tabIndex={-1}
+          className="min-w-0 flex-1 px-6 py-6 xl:px-8"
+        >
           {children}
         </main>
       </div>

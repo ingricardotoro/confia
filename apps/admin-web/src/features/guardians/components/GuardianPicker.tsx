@@ -97,7 +97,7 @@ export function GuardianPicker({ controlId, draft, onDraftChange, tooShort, full
       {search === "failed" ? (
         <Alert variant="warning">
           <p>{t("guardians.picker.failed")}</p>
-          <Button variant="secondary" size="sm" className="mt-2" onClick={onRetry}>
+          <Button variant="secondary" size="xs" className="mt-2" onClick={onRetry}>
             {t("guardians.picker.retry")}
           </Button>
         </Alert>

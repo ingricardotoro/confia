@@ -67,7 +67,7 @@ export function StudentsView({ rows, table, pagination, notice, togglingId, filt
           extra={
             <Button
               variant="secondary"
-              size="sm"
+              size="xs"
               aria-label={t("students.guardiansActionFor", { name: nameOf(row) })}
               onClick={() => {
                 onGuardians(row);

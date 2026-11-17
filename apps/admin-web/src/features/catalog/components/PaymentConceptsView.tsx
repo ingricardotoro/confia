@@ -74,6 +74,7 @@ export function PaymentConceptsView({ rows, table, pagination, notice, togglingI
   return (
     <ResourceScreen
       heading={t("catalog.paymentConcepts.heading")}
+      description={t("catalog.paymentConcepts.description")}
       createLabel={t("catalog.paymentConcepts.create")}
       onCreate={onCreate}
       notice={notice}

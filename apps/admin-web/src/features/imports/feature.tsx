@@ -26,7 +26,7 @@ function ImportsRoute() {
  * address; nothing about a file ever reaches it.
  */
 export const importsFeature: FeatureModule = {
-  navigation: { id: "imports", labelKey: "navigation.imports", to: IMPORTS_PATH },
+  navigation: { id: "imports", labelKey: "navigation.imports", to: IMPORTS_PATH, group: "settings" },
   createRoutes: (parent: AnyRoute) => [
     createRoute({
       getParentRoute: () => parent,

@@ -1,5 +1,5 @@
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { ReadOnlyField, TextField } from "../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, ReadOnlyField, TextField } from "../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { TAX_RATE_CONTROL_IDS, type TaxRateField, type TaxRateValues } from "../tax-rate-form.ts";
 
@@ -40,12 +40,14 @@ export function TaxRateForm({ mode, values, fieldErrors, form, onChange, onBlur,
       form={form}
       onClose={onClose}
     >
+      <FieldGrid>
       {mode === "create" ? (
         <TextField label={t("catalog.taxRates.fields.code")} required description={t("catalog.taxRates.codeHelp")} {...text("code")} />
       ) : (
         <ReadOnlyField label={t("catalog.taxRates.fields.code")} controlId={TAX_RATE_CONTROL_IDS.code} value={values.code} />
       )}
       <TextField label={t("catalog.taxRates.fields.name")} required description={t("catalog.taxRates.nameHelp")} {...text("name")} />
+      </FieldGrid>
     </ResourceFormDialog>
   );
 }

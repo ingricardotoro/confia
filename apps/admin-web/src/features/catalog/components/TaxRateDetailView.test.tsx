@@ -90,9 +90,9 @@ describe("TaxRateDetailView", () => {
 
     await user.click(screen.getByRole("button", { name: "Nueva vigencia" }));
     await user.click(screen.getByRole("button", { name: "Desactivar tasa Impuesto de prueba A" }));
-    fireEvent.click(screen.getByRole("link", { name: "Volver a las tasas de impuesto" }), { metaKey: true });
+    fireEvent.click(screen.getByRole("link", { name: "Tasas de impuesto" }), { metaKey: true });
     expect(handlers.onBack).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("link", { name: "Volver a las tasas de impuesto" }));
+    await user.click(screen.getByRole("link", { name: "Tasas de impuesto" }));
 
     expect(handlers.onAddPeriod).toHaveBeenCalledTimes(1);
     expect(handlers.onToggleStatus).toHaveBeenCalledTimes(1);

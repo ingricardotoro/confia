@@ -1,5 +1,5 @@
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { OptionField, TextField } from "../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, FullRow, OptionField, TextField } from "../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { EXIT_CONTROL_IDS, EXIT_KINDS, reasonRequiredFor, type ExitField, type ExitValues } from "../enrollment-forms.ts";
 import { ReasonField } from "./ReasonField.tsx";
@@ -42,7 +42,9 @@ export function ExitForm({ studentName, values, fieldErrors, form, onChange, onB
       submitLabel={t("enrollments.exit.submit")}
       form={form}
       onClose={onClose}
+      submitVariant="destructive"
     >
+      <FieldGrid>
       <OptionField
         label={t("enrollments.exit.kind")}
         required
@@ -50,12 +52,15 @@ export function ExitForm({ studentName, values, fieldErrors, form, onChange, onB
         {...text("status")}
       />
       <TextField label={t("enrollments.exit.date")} kind="date" required {...text("withdrawnOn")} />
+      <FullRow>
       <ReasonField
         label={t("enrollments.exit.reason")}
         required={required}
         description={t(required ? "enrollments.exit.reasonRequiredHelp" : "enrollments.exit.reasonOptionalHelp")}
         {...text("withdrawalReason")}
       />
+      </FullRow>
+      </FieldGrid>
     </ResourceFormDialog>
   );
 }

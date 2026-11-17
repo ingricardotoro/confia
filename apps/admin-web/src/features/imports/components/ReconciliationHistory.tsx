@@ -45,7 +45,7 @@ export function ReconciliationHistory({ rows, table, pagination, yearNames }: Re
 
   return (
     <section aria-labelledby="reconciliation-history-heading" className="flex flex-col gap-3">
-      <h3 id="reconciliation-history-heading" className="text-lg font-semibold text-text-primary">
+      <h3 id="reconciliation-history-heading" className="text-base font-semibold text-text-primary">
         {t("imports.reconciliation.history.heading")}
       </h3>
       <Table {...table} caption={t("imports.reconciliation.history.caption")} columns={columns} rows={rows} getRowId={(row) => row.id} />

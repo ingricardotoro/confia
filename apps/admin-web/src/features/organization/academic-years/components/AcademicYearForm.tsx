@@ -1,6 +1,6 @@
 import type { AdminKey } from "../../../../i18n/resources.ts";
 import { useAdminText } from "../../../../i18n/use-admin-text.ts";
-import { OptionField, TextField } from "../../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, FullRow, OptionField, TextField } from "../../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { YEAR_CONTROL_IDS, type YearField, type YearValues } from "../academic-year-form.ts";
 
@@ -48,7 +48,10 @@ export function AcademicYearForm({ mode, values, fieldErrors, form, onChange, on
       form={form}
       onClose={onClose}
     >
-      <TextField label={t("organization.academicYears.fields.name")} required {...text("name")} />
+      <FieldGrid>
+      <FullRow>
+        <TextField label={t("organization.academicYears.fields.name")} required {...text("name")} />
+      </FullRow>
       <TextField label={t("organization.academicYears.fields.startDate")} kind="date" required {...text("startDate")} />
       <TextField label={t("organization.academicYears.fields.endDate")} kind="date" required {...text("endDate")} />
       <OptionField
@@ -67,6 +70,7 @@ export function AcademicYearForm({ mode, values, fieldErrors, form, onChange, on
           {...text("isActive")}
         />
       ) : null}
+      </FieldGrid>
     </ResourceFormDialog>
   );
 }

@@ -13,7 +13,12 @@ function renderShell(props: Partial<AppShellProps> = {}) {
     <AppShell
       navigation={[
         { id: "home", label: "Inicio", href: "/", current: true },
-        { id: "organization", label: "Estructura académica", href: "/organization", current: false },
+        {
+          id: "organization",
+          label: "Estructura académica",
+          href: "/organization",
+          current: false,
+        },
       ]}
       onNavigate={vi.fn()}
       signingOut={false}
@@ -30,10 +35,21 @@ describe("AppShell", () => {
   it("AW57: has a banner with the account area, the navigation, and the page inside main", () => {
     renderShell();
 
-    expect(within(screen.getByRole("banner")).getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
+    expect(
+      within(screen.getByRole("banner")).getByRole("button", {
+        name: "Cerrar sesión",
+      }),
+    ).toBeVisible();
     expect(screen.getByRole("group", { name: "Su cuenta" })).toBeVisible();
-    expect(screen.getByRole("navigation", { name: "Navegación principal" })).toBeVisible();
-    expect(within(screen.getByRole("main")).getByRole("heading", { level: 1, name: "Página" })).toBeVisible();
+    expect(
+      screen.getByRole("navigation", { name: "Navegación principal" }),
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole("main")).getByRole("heading", {
+        level: 1,
+        name: "Página",
+      }),
+    ).toBeVisible();
   });
 
   it("offers a skip link as the first stop of the tab order, pointing at main", async () => {
@@ -74,7 +90,11 @@ describe("AppShell", () => {
   it("when the sign out failed it says so in an alert and offers to retry", () => {
     renderShell({ signOutFailed: true });
 
-    expect(screen.getByRole("alert")).toHaveTextContent("No se pudo cerrar la sesión.");
-    expect(screen.getByRole("button", { name: "Reintentar cierre de sesión" })).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "No se pudo cerrar la sesión.",
+    );
+    expect(
+      screen.getByRole("button", { name: "Reintentar cierre de sesión" }),
+    ).toBeVisible();
   });
 });

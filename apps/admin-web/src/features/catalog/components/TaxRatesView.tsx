@@ -81,6 +81,7 @@ export function TaxRatesView({ rows, table, pagination, notice, togglingId, filt
   return (
     <ResourceScreen
       heading={t("catalog.taxRates.heading")}
+      description={t("catalog.taxRates.description")}
       createLabel={t("catalog.taxRates.create")}
       onCreate={onCreate}
       notice={notice}

@@ -1,5 +1,5 @@
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { TextField } from "../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, TextField } from "../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { TAX_RATE_PERIOD_CONTROL_IDS, type TaxRatePeriodField, type TaxRatePeriodValues } from "../tax-rate-period-form.ts";
 
@@ -47,6 +47,7 @@ export function TaxRatePeriodForm({ values, fieldErrors, form, onChange, onBlur,
         description={t("catalog.taxRates.addPeriod.rateHelp")}
         {...bind("ratePercent")}
       />
+      <FieldGrid>
       <TextField label={t("catalog.taxRates.addPeriod.fields.validFrom")} required kind="date" {...bind("validFrom")} />
       <TextField
         label={t("catalog.taxRates.addPeriod.fields.validTo")}
@@ -54,6 +55,7 @@ export function TaxRatePeriodForm({ values, fieldErrors, form, onChange, onBlur,
         description={t("catalog.taxRates.addPeriod.validToHelp")}
         {...bind("validTo")}
       />
+      </FieldGrid>
     </ResourceFormDialog>
   );
 }

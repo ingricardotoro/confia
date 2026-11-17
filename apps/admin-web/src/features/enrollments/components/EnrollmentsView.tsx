@@ -61,11 +61,11 @@ export function EnrollmentsView({ rows, table, pagination, notice, filters, look
       cell: (row) => {
         const name = studentNameOf(row);
         return (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             <Button
               id={detailButtonId(row.id)}
               variant="secondary"
-              size="sm"
+              size="xs"
               aria-label={t("enrollments.actions.detailFor", { name })}
               onClick={() => {
                 onDetail(row);
@@ -77,7 +77,7 @@ export function EnrollmentsView({ rows, table, pagination, notice, filters, look
               <>
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size="xs"
                   aria-label={t("enrollments.actions.transferFor", { name })}
                   onClick={() => {
                     onTransfer(row);
@@ -86,8 +86,8 @@ export function EnrollmentsView({ rows, table, pagination, notice, filters, look
                   {t("enrollments.actions.transfer")}
                 </Button>
                 <Button
-                  variant="secondary"
-                  size="sm"
+                  variant="destructive-soft"
+                  size="xs"
                   aria-label={t("enrollments.actions.exitFor", { name })}
                   onClick={() => {
                     onExit(row);

@@ -5,11 +5,18 @@ import type { AdminKey } from "../../i18n/resources.ts";
  * One entry of the side navigation. A feature declares its own and the app registers it, so adding a
  * screen never means editing the shell. The label is a catalog key and not text: the shell resolves it.
  */
+export type NavigationGroupId = "community" | "finance" | "settings";
+
+/** The order the side navigation lists its groups in. An entry with no group is listed first, without a label. */
+export const NAVIGATION_GROUP_ORDER: readonly NavigationGroupId[] = ["community", "finance", "settings"];
+
 export interface NavigationEntry {
   readonly id: string;
   readonly labelKey: AdminKey;
   /** The path the entry leads to. It is current on this path and on any path below it. */
   readonly to: string;
+  /** The section of the side navigation the entry is listed under. Absent: listed first, with no section label. */
+  readonly group?: NavigationGroupId;
 }
 
 /**

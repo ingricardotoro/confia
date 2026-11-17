@@ -131,14 +131,14 @@ export function ReconciliationContainer({ search, onSearchChange }: Reconciliati
   const yearsState: YearsState = years.loading ? "loading" : years.failed ? "failed" : years.rows.length === 0 ? "empty" : "ready";
 
   return (
-    <section aria-labelledby="reconciliation-heading" className="flex flex-col gap-6">
+    <section aria-labelledby="reconciliation-heading" className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 id="reconciliation-heading" className="text-xl font-semibold text-text-primary">
+        <h2 id="reconciliation-heading" className="text-base font-semibold text-text-primary">
           {t("imports.reconciliation.heading")}
         </h2>
         <p className="max-w-prose text-sm text-text-secondary">{t("imports.reconciliation.intro")}</p>
       </div>
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <ReconciliationForm
           years={{ state: yearsState, options: optionsOf(years.rows), onRetry: years.retry }}
           values={form.values}

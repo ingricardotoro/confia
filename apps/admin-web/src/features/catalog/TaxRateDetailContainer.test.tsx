@@ -55,7 +55,7 @@ describe("the detail of a tax rate", () => {
   it("shows the data of the rate and every validity, closed and open, newest first, with each percentage as the server sent it", async () => {
     await openDetail();
 
-    expect(screen.getByRole("link", { name: "Tasas de impuesto" })).toHaveAttribute("aria-current", "page");
+    expect(within(screen.getByRole("navigation", { name: "Vistas del catálogo" })).getByRole("link", { name: "Tasas de impuesto" })).toHaveAttribute("aria-current", "page");
     const table = screen.getByRole("table", { name: "Vigencias de Impuesto de prueba A" });
     const [, newest, oldest] = within(table).getAllByRole("row");
     expect(within(newest as HTMLElement).getByText("12.3400 %")).toBeInTheDocument();
@@ -97,7 +97,7 @@ describe("the detail of a tax rate", () => {
     const { router } = await openDetail();
     route("get", RATES, taxRatePage([taxRate()]));
 
-    await user.click(screen.getByRole("link", { name: "Volver a las tasas de impuesto" }));
+    await user.click(within(screen.getByRole("navigation", { name: "Ruta de navegación" })).getByRole("link", { name: "Tasas de impuesto" }));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/catalog/tax-rates");

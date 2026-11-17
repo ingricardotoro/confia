@@ -40,7 +40,7 @@ function Count({ label, value }: { readonly label: string; readonly value: strin
   return (
     <div className="flex flex-col gap-0.5 rounded-md border border-border-subtle p-3">
       <dt className="text-sm text-text-secondary">{label}</dt>
-      <dd className="text-2xl font-semibold tabular-nums text-text-primary">{value}</dd>
+      <dd className="text-xl font-semibold tabular-nums text-text-primary">{value}</dd>
     </div>
   );
 }
@@ -61,7 +61,7 @@ export function ReconciliationPreview({ view, officialCount }: ReconciliationPre
 
   return (
     <section aria-labelledby="reconciliation-preview-heading" className="flex flex-col gap-3">
-      <h3 id="reconciliation-preview-heading" className="text-lg font-semibold text-text-primary">
+      <h3 id="reconciliation-preview-heading" className="text-base font-semibold text-text-primary">
         {t("imports.reconciliation.preview.heading")}
       </h3>
       <p className="text-sm text-text-secondary">{t("imports.reconciliation.preview.description")}</p>
