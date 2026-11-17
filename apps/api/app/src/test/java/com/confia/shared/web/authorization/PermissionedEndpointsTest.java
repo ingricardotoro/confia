@@ -78,6 +78,8 @@ class PermissionedEndpointsTest {
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/accrual-runs", Permission.CHARGES_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/accrual-runs/{runId}",
                 Permission.CHARGES_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/students/{studentId}/statement",
+                Permission.CHARGES_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/posting-accounts",
                 Permission.CHARGES_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/charges/posting-accounts",

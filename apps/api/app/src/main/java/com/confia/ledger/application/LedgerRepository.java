@@ -53,6 +53,16 @@ public interface LedgerRepository {
 
     Page<EntryView> listEntries(InstitutionId institution, UUID studentId, CurrencyCode currency, int page, int size);
 
+    /** The currencies in which the student has a sub-account, alphabetical. */
+    List<CurrencyCode> studentCurrencies(InstitutionId institution, UUID studentId);
+
+    /**
+     * The derived statement of the sub-account for the effective dates {@code from} to {@code to}: balances computed by the
+     * database, and one page of lines with their running balance. Reads only.
+     */
+    com.confia.ledger.application.api.LedgerStatementApi.Section statement(InstitutionId institution, UUID studentId,
+            CurrencyCode currency, LocalDate from, LocalDate to, int page, int size);
+
     /** Convenience for tests and callers that hold a collection. */
     default List<StudentCurrency> sorted(Collection<StudentCurrency> keys) {
         return keys.stream().distinct().sorted().toList();

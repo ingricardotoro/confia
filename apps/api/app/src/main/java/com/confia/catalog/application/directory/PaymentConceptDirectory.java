@@ -1,6 +1,8 @@
 package com.confia.catalog.application.directory;
 
 import com.confia.kernel.InstitutionId;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,4 +20,10 @@ public interface PaymentConceptDirectory {
      * between. Empty when it does not exist in the institution.
      */
     Optional<PaymentConceptRef> lockShare(InstitutionId institutionId, UUID paymentConceptId);
+
+    /**
+     * The code and the name of these concepts, by identifier, in one plain read (no lock); inactive concepts are included
+     * and unknown identifiers, or ones of another institution, are absent.
+     */
+    Map<UUID, PaymentConceptLabel> labels(InstitutionId institutionId, Collection<UUID> paymentConceptIds);
 }

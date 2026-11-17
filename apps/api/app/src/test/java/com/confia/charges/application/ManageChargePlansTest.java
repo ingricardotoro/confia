@@ -593,6 +593,12 @@ class ManageChargePlansTest {
             LOCKS.add("lock concept");
             return Optional.ofNullable(rows.get(new Ref(institutionId, paymentConceptId)));
         }
+
+        @Override
+        public Map<UUID, com.confia.catalog.application.directory.PaymentConceptLabel> labels(
+                InstitutionId institutionId, java.util.Collection<UUID> paymentConceptIds) {
+            return Map.of();
+        }
     }
 
     private static final class Plans implements ChargePlanRepository {

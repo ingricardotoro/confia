@@ -18,7 +18,8 @@ import java.util.UUID;
  * translates the plain types of the boundary to the domain of the ledger and delegates to {@link LedgerPosting}, in the
  * transaction of the caller. It adds no rule of its own.
  */
-public final class LedgerApi implements LedgerPostingApi, LedgerAccountDirectory {
+public final class LedgerApi implements LedgerPostingApi, LedgerAccountDirectory,
+        com.confia.ledger.application.api.LedgerStatementApi {
 
     private final LedgerPosting posting;
     private final LedgerRepository ledger;
@@ -74,6 +75,26 @@ public final class LedgerApi implements LedgerPostingApi, LedgerAccountDirectory
                     account.holdsStudentBalances(), account.active()));
         }
         return found;
+    }
+
+    @Override
+    public List<com.confia.kernel.CurrencyCode> currenciesOf(InstitutionId institutionId, UUID studentId) {
+        return ledger.studentCurrencies(institutionId, studentId);
+    }
+
+    @Override
+    public Section statement(InstitutionId institutionId, UUID studentId, com.confia.kernel.CurrencyCode currency,
+            java.time.LocalDate from, java.time.LocalDate to, int page, int size) {
+        Objects.requireNonNull(from, "from");
+        Objects.requireNonNull(to, "to");
+        if (from.isAfter(to)) {
+            throw new com.confia.ledger.domain.InvalidLedgerEntryException("the statement starts after it ends");
+        }
+        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
+            throw new com.confia.ledger.domain.InvalidLedgerEntryException(
+                    "the page is zero or more and the size is between 1 and " + MAX_PAGE_SIZE);
+        }
+        return ledger.statement(institutionId, studentId, currency, from, to, page, size);
     }
 
     private static LedgerActor toActor(Actor actor) {

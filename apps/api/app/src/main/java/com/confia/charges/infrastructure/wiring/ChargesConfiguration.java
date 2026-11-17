@@ -17,6 +17,8 @@ import com.confia.charges.infrastructure.JooqPostingAccountRepository;
 import com.confia.charges.infrastructure.PostingAccountUsage;
 import com.confia.ledger.application.api.LedgerAccountUsage;
 import com.confia.ledger.application.api.LedgerAccountDirectory;
+import com.confia.ledger.application.api.LedgerStatementApi;
+import com.confia.charges.application.ViewStudentStatement;
 import com.confia.organization.application.directory.PlacementDirectory;
 import com.confia.shared.jobs.JobScheduler;
 import com.confia.students.application.directory.EnrollmentRoster;
@@ -85,6 +87,15 @@ public class ChargesConfiguration {
     ManagePostingAccounts managePostingAccounts(TransactionRunner transactionRunner, PostingAccountRepository map,
             LedgerAccountDirectory ledgerAccounts, AuditLogWriter auditLogWriter, Clock clock) {
         return new ManagePostingAccounts(transactionRunner, map, ledgerAccounts, auditLogWriter, clock);
+    }
+
+    /** The derived statement of a student (docs/cortes/ledger-account-statement.md): a read, with one audit entry. */
+    @Bean
+    ViewStudentStatement viewStudentStatement(TransactionRunner transactionRunner, StudentDirectory students,
+            LedgerStatementApi ledgerStatements, ChargeRepository charges, PaymentConceptDirectory concepts,
+            AuditLogWriter auditLogWriter, Clock clock) {
+        return new ViewStudentStatement(transactionRunner, students, ledgerStatements, charges, concepts,
+                auditLogWriter, clock);
     }
 
     /** Tells the ledger which accounts the map points at, so it refuses to deactivate one of them. */

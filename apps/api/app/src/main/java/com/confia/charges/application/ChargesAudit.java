@@ -19,6 +19,7 @@ final class ChargesAudit {
     static final String PLAN = "charges.plan";
     static final String PLAN_ITEM = "charges.plan_item";
     static final String POSTING_ACCOUNT = "charges.posting_account";
+    static final String STATEMENT = "charges.statement";
 
     private static final String ACTOR_KIND_STAFF = "staff";
     private static final String OUTCOME_SUCCESS = "success";
@@ -55,6 +56,23 @@ final class ChargesAudit {
             PostingAccountRow after) {
         return entry(actor, requestId, POSTING_ACCOUNT + ".updated", POSTING_ACCOUNT, after.id(),
                 before == null ? null : json(before), json(after));
+    }
+
+    /**
+     * The reading of the statement of a student: access to the financial data of a minor is audited on every request. It
+     * carries the student identifier as the entity, and the filters asked for (currency, dates, page); never an amount or a
+     * name.
+     */
+    static AuditEntry statementViewed(AuthenticatedActor actor, UUID requestId, UUID studentId,
+            com.confia.kernel.CurrencyCode currency, java.time.LocalDate from, java.time.LocalDate to, int page,
+            int size) {
+        AuditJson.Builder json = AuditJson.object();
+        if (currency != null) {
+            json.text("currency", currency.name());
+        }
+        return entry(actor, requestId, STATEMENT + ".viewed", STATEMENT, studentId, null,
+                json.text("from", from.toString()).text("to", to.toString()).number("page", page)
+                        .number("size", size).toJson());
     }
 
     static String json(PostingAccountRow row) {

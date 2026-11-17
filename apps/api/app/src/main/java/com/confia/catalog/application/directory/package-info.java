@@ -4,6 +4,10 @@
  * com.confia.catalog.application.directory.PaymentConceptRef} it answers, which only say whether a concept exists in an
  * institution and whether it is active. Nothing else of the catalog is public.
  *
+ * <p>{@link com.confia.catalog.application.directory.PaymentConceptLabel} adds the code and the name of a concept for the
+ * statement of a student, whose lines name the concept of the charge that produced them
+ * (docs/cortes/ledger-account-statement.md); the same consumer, {@code charges}.
+ *
  * <p><b>{@code @NamedInterface}, and who consumes it</b> (ADR-0022: every new named interface names the real consumer
  * that justifies it). The consumer is {@code charges}, whose plan items name a payment concept that must exist in the
  * institution of the session and be active when the item is added, without importing the domain of {@code catalog} nor

@@ -6,6 +6,8 @@ import com.confia.charges.application.ManagePostingAccounts;
 import com.confia.charges.web.AccrualController;
 import com.confia.charges.web.ChargePlanController;
 import com.confia.charges.web.PostingAccountController;
+import com.confia.charges.application.ViewStudentStatement;
+import com.confia.charges.web.StatementController;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -29,6 +31,11 @@ public class ChargesWebConfiguration {
     @Bean
     AccrualController accrualController(ManageAccrual accrual) {
         return new AccrualController(accrual);
+    }
+
+    @Bean
+    StatementController statementController(ViewStudentStatement statement) {
+        return new StatementController(statement);
     }
 
     @Bean

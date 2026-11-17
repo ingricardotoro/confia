@@ -88,6 +88,27 @@ public final class JooqChargeRepository implements ChargeRepository {
     }
 
     @Override
+    public java.util.Map<UUID, StatementCharge> findByLedgerTransactions(InstitutionId institution,
+            java.util.Collection<UUID> ledgerTransactionIds) {
+        java.util.Map<UUID, StatementCharge> found = new java.util.HashMap<>();
+        if (ledgerTransactionIds.isEmpty()) {
+            return found;
+        }
+        dsl.select(CHARGES_CHARGE.LEDGER_TRANSACTION_ID, CHARGES_CHARGE.ID, CHARGES_CHARGE.PAYMENT_CONCEPT_ID,
+                CHARGES_CHARGE.CONCEPT_CATEGORY, CHARGES_CHARGE.PERIOD_LABEL, CHARGES_CHARGE.PERIOD_START,
+                CHARGES_CHARGE.PERIOD_END, CHARGES_CHARGE.DUE_ON, CHARGES_CHARGE.ORIGIN)
+                .from(CHARGES_CHARGE)
+                .where(CHARGES_CHARGE.INSTITUTION_ID.eq(institution.value()))
+                .and(CHARGES_CHARGE.LEDGER_TRANSACTION_ID.in(ledgerTransactionIds))
+                .forEach(row -> found.put(row.get(CHARGES_CHARGE.LEDGER_TRANSACTION_ID),
+                        new StatementCharge(row.get(CHARGES_CHARGE.ID), row.get(CHARGES_CHARGE.PAYMENT_CONCEPT_ID),
+                                row.get(CHARGES_CHARGE.CONCEPT_CATEGORY), row.get(CHARGES_CHARGE.PERIOD_LABEL),
+                                row.get(CHARGES_CHARGE.PERIOD_START), row.get(CHARGES_CHARGE.PERIOD_END),
+                                row.get(CHARGES_CHARGE.DUE_ON), row.get(CHARGES_CHARGE.ORIGIN))));
+        return found;
+    }
+
+    @Override
     public List<CurrencyTotals> totalsOfRun(InstitutionId institution, UUID runId) {
         List<CurrencyTotals> totals = new ArrayList<>();
         for (Record row : dsl.select(CHARGES_CHARGE.BASE_CURRENCY, DSL.count(), DSL.sum(CHARGES_CHARGE.BASE_AMOUNT),

@@ -25,6 +25,18 @@ public interface ChargeRepository {
     /** What the run created, by currency: the count and the exact sums of the base, the tax and the total. */
     List<CurrencyTotals> totalsOfRun(InstitutionId institution, UUID runId);
 
+    /**
+     * The charges whose ledger transaction is one of these, by transaction, in one query; a transaction that is not the
+     * posting of a charge (a payment, an adjustment, a reversal) is absent. A read for the statement of a student.
+     */
+    java.util.Map<UUID, StatementCharge> findByLedgerTransactions(InstitutionId institution,
+            java.util.Collection<UUID> ledgerTransactionIds);
+
+    /** What a statement line shows of the charge that produced it. */
+    record StatementCharge(UUID chargeId, UUID paymentConceptId, String conceptCategory, String periodLabel,
+            LocalDate periodStart, LocalDate periodEnd, LocalDate dueOn, String origin) {
+    }
+
     /** An automatic charge that is already there. */
     record ExistingCharge(UUID id, UUID planId, LocalDate periodStart, LocalDate periodEnd) {
 

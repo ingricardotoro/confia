@@ -15,6 +15,7 @@ import com.confia.ledger.application.Page;
 import com.confia.ledger.application.StoredTransaction;
 import com.confia.ledger.application.StudentAccountRef;
 import com.confia.ledger.application.StudentCurrency;
+import com.confia.ledger.application.api.LedgerStatementApi;
 import com.confia.ledger.domain.AccountRef;
 import com.confia.ledger.domain.EntrySide;
 import com.confia.ledger.domain.LedgerResourceNotFoundException;
@@ -36,6 +37,7 @@ import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record;
+import org.jooq.Record3;
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.postgresql.util.PSQLException;
@@ -225,6 +227,93 @@ public final class JooqLedgerRepository implements LedgerRepository {
                 .limit(size).offset(page * size)
                 .fetch(row -> toView(row));
         return new Page<>(items, total == null ? 0 : total, page, size);
+    }
+
+    @Override
+    public List<CurrencyCode> studentCurrencies(InstitutionId institution, UUID studentId) {
+        return dsl.selectDistinct(LEDGER_STUDENT_ACCOUNT.CURRENCY).from(LEDGER_STUDENT_ACCOUNT)
+                .where(LEDGER_STUDENT_ACCOUNT.INSTITUTION_ID.eq(institution.value()))
+                .and(LEDGER_STUDENT_ACCOUNT.STUDENT_ID.eq(studentId))
+                .orderBy(LEDGER_STUDENT_ACCOUNT.CURRENCY.asc())
+                .fetch(row -> CurrencyCode.valueOf(row.get(LEDGER_STUDENT_ACCOUNT.CURRENCY).trim()));
+    }
+
+    @Override
+    public LedgerStatementApi.Section statement(InstitutionId institution, UUID studentId, CurrencyCode currency,
+            LocalDate from, LocalDate to, int page, int size) {
+        Field<BigDecimal> signed = DSL.when(LEDGER_ENTRY.SIDE.eq(EntrySide.DEBIT.name()), LEDGER_ENTRY.AMOUNT)
+                .otherwise(LEDGER_ENTRY.AMOUNT.neg());
+        Condition ofAccount = LEDGER_ENTRY.INSTITUTION_ID.eq(institution.value())
+                .and(LEDGER_STUDENT_ACCOUNT.STUDENT_ID.eq(studentId))
+                .and(LEDGER_STUDENT_ACCOUNT.CURRENCY.eq(currency.name()));
+        Condition before = LEDGER_TRANSACTION.EFFECTIVE_ON.lt(from);
+        Condition inPeriod = LEDGER_TRANSACTION.EFFECTIVE_ON.ge(from).and(LEDGER_TRANSACTION.EFFECTIVE_ON.le(to));
+
+        // One statement, one snapshot: the opening balance, the net of the period and the count of its lines.
+        Record3<BigDecimal, BigDecimal, Integer> totals = dsl
+                .select(DSL.sum(signed).filterWhere(before), DSL.sum(signed).filterWhere(inPeriod),
+                        DSL.count().filterWhere(inPeriod))
+                .from(LEDGER_ENTRY)
+                .join(LEDGER_STUDENT_ACCOUNT)
+                .on(LEDGER_STUDENT_ACCOUNT.INSTITUTION_ID.eq(LEDGER_ENTRY.INSTITUTION_ID))
+                .and(LEDGER_STUDENT_ACCOUNT.ID.eq(LEDGER_ENTRY.STUDENT_ACCOUNT_ID))
+                .join(LEDGER_TRANSACTION)
+                .on(LEDGER_TRANSACTION.INSTITUTION_ID.eq(LEDGER_ENTRY.INSTITUTION_ID))
+                .and(LEDGER_TRANSACTION.ID.eq(LEDGER_ENTRY.TRANSACTION_ID))
+                .where(ofAccount.and(LEDGER_TRANSACTION.EFFECTIVE_ON.le(to)))
+                .fetchOne();
+        Money opening = money(totals.value1(), currency);
+        Money net = money(totals.value2(), currency);
+        long totalLines = totals.value3() == null ? 0 : totals.value3();
+
+        // The running balance is the opening balance plus the cumulative signed amount in the canonical order; the opening
+        // balance is a scalar subquery of the same statement, so a page is consistent in itself.
+        Field<BigDecimal> openingField = DSL.coalesce(
+                dsl.select(DSL.sum(signed)).from(LEDGER_ENTRY)
+                        .join(LEDGER_STUDENT_ACCOUNT)
+                        .on(LEDGER_STUDENT_ACCOUNT.INSTITUTION_ID.eq(LEDGER_ENTRY.INSTITUTION_ID))
+                        .and(LEDGER_STUDENT_ACCOUNT.ID.eq(LEDGER_ENTRY.STUDENT_ACCOUNT_ID))
+                        .join(LEDGER_TRANSACTION)
+                        .on(LEDGER_TRANSACTION.INSTITUTION_ID.eq(LEDGER_ENTRY.INSTITUTION_ID))
+                        .and(LEDGER_TRANSACTION.ID.eq(LEDGER_ENTRY.TRANSACTION_ID))
+                        .where(ofAccount.and(before)).asField(),
+                BigDecimal.ZERO);
+        Field<BigDecimal> running = openingField.add(DSL.sum(signed).over()
+                .orderBy(LEDGER_TRANSACTION.EFFECTIVE_ON, LEDGER_TRANSACTION.POSTED_AT, LEDGER_TRANSACTION.ID,
+                        LEDGER_ENTRY.LINE_NUMBER)
+                .rowsBetweenUnboundedPreceding().andCurrentRow()).as("running_balance");
+        Money zero = Money.zero(currency);
+        List<LedgerStatementApi.Line> lines = dsl
+                .select(LEDGER_TRANSACTION.ID, LEDGER_TRANSACTION.KIND, LEDGER_TRANSACTION.EFFECTIVE_ON,
+                        LEDGER_TRANSACTION.POSTED_AT, LEDGER_ENTRY.LINE_NUMBER, LEDGER_TRANSACTION.SOURCE_MODULE,
+                        LEDGER_TRANSACTION.REASON, LEDGER_TRANSACTION.REVERSES_TRANSACTION_ID, LEDGER_ENTRY.SIDE,
+                        LEDGER_ENTRY.AMOUNT, LEDGER_ENTRY.CURRENCY, running)
+                .from(LEDGER_ENTRY)
+                .join(LEDGER_STUDENT_ACCOUNT)
+                .on(LEDGER_STUDENT_ACCOUNT.INSTITUTION_ID.eq(LEDGER_ENTRY.INSTITUTION_ID))
+                .and(LEDGER_STUDENT_ACCOUNT.ID.eq(LEDGER_ENTRY.STUDENT_ACCOUNT_ID))
+                .join(LEDGER_TRANSACTION)
+                .on(LEDGER_TRANSACTION.INSTITUTION_ID.eq(LEDGER_ENTRY.INSTITUTION_ID))
+                .and(LEDGER_TRANSACTION.ID.eq(LEDGER_ENTRY.TRANSACTION_ID))
+                .where(ofAccount.and(inPeriod))
+                .orderBy(LEDGER_TRANSACTION.EFFECTIVE_ON.asc(), LEDGER_TRANSACTION.POSTED_AT.asc(),
+                        LEDGER_TRANSACTION.ID.asc(), LEDGER_ENTRY.LINE_NUMBER.asc())
+                .limit(size).offset((long) page * size)
+                .fetch(row -> {
+                    Money amount = MoneyColumns.toMoney(row.get(LEDGER_ENTRY.AMOUNT), row.get(LEDGER_ENTRY.CURRENCY));
+                    boolean debit = EntrySide.DEBIT.name().equals(row.get(LEDGER_ENTRY.SIDE));
+                    return new LedgerStatementApi.Line(row.get(LEDGER_TRANSACTION.ID),
+                            row.get(LEDGER_TRANSACTION.KIND), row.get(LEDGER_TRANSACTION.EFFECTIVE_ON),
+                            row.get(LEDGER_TRANSACTION.POSTED_AT).toInstant(), row.get(LEDGER_ENTRY.LINE_NUMBER),
+                            row.get(LEDGER_TRANSACTION.SOURCE_MODULE), row.get(LEDGER_TRANSACTION.REASON),
+                            row.get(LEDGER_TRANSACTION.REVERSES_TRANSACTION_ID), debit ? amount : zero,
+                            debit ? zero : amount, money(row.get(running), currency));
+                });
+        return new LedgerStatementApi.Section(currency, opening, opening.add(net), totalLines, page, size, lines);
+    }
+
+    private static Money money(BigDecimal sum, CurrencyCode currency) {
+        return sum == null ? Money.zero(currency) : MoneyColumns.toMoney(sum, currency.name());
     }
 
     private static EntryView toView(Record row) {
