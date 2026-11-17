@@ -2340,7 +2340,7 @@
             "type" : "string"
           },
           "taxRateId" : {
-            "description" : "A tax rate of the institution, active unless the concept already has it; required when isTaxable is true and absent when it is false",
+            "description" : "A tax rate of the institution, active unless the concept already has it and is not being reactivated; required when isTaxable is true (except for a legacy taxable concept that has none and stays so) and absent when it is false",
             "format" : "uuid",
             "type" : [ "string", "null" ]
           },

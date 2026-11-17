@@ -251,17 +251,27 @@ class ManagePaymentConceptsTest {
     }
 
     @Test
-    void anEditThatKeepsATaxableConceptWithoutARateOrMakesANonTaxableOneCarryOneIsRefused() {
+    void aLegacyTaxableConceptWithoutARateMayBeEditedAndToggledButNotMadeTaxableAgainWithoutOne() {
         TaxRate isv = rates.arrange(institution, "ISV", "Impuesto sobre ventas", true);
         PaymentConcept legacy = arranged(institution, "COLEG", "Colegiatura", PaymentCategory.TUITION, true);
 
-        assertThatThrownBy(() -> concepts.update(actor, requestId, legacy.id(), 0, "Colegiatura", "TUITION", true,
-                true, true, null)).isInstanceOf(InvalidCatalogValueException.class);
-        assertThatThrownBy(() -> concepts.update(actor, requestId, legacy.id(), 0, "Colegiatura", "TUITION", false,
-                true, true, isv.id())).isInstanceOf(InvalidCatalogValueException.class);
+        PaymentConceptView renamed = concepts.update(actor, requestId, legacy.id(), 0, "Nueva", "TUITION", true, true,
+                true, null);
+        PaymentConceptView off = concepts.update(actor, requestId, legacy.id(), 1, "Nueva", "TUITION", true, true,
+                false, null);
+        PaymentConceptView on = concepts.update(actor, requestId, legacy.id(), 2, "Nueva", "TUITION", true, true,
+                true, null);
+        concepts.update(actor, requestId, legacy.id(), 3, "Nueva", "TUITION", false, true, true, null);
 
-        assertThat(audit).isEmpty();
-        assertThat(store.rows.values()).containsExactly(legacy);
+        assertThat(renamed.taxRateId()).isNull();
+        assertThat(off.active()).isFalse();
+        assertThat(on.active()).isTrue();
+        assertThat(audit).hasSize(4);
+        assertThatThrownBy(() -> concepts.update(actor, requestId, legacy.id(), 4, "Nueva", "TUITION", true, true,
+                true, null)).isInstanceOf(InvalidCatalogValueException.class);
+        assertThatThrownBy(() -> concepts.update(actor, requestId, legacy.id(), 4, "Nueva", "TUITION", false, true,
+                true, isv.id())).isInstanceOf(InvalidCatalogValueException.class);
+        assertThat(audit).hasSize(4);
     }
 
     @Test
@@ -279,6 +289,11 @@ class ManagePaymentConceptsTest {
 
         assertThat(off.active()).isFalse();
         assertThat(off.taxRateId()).isEqualTo(isv.id());
+        assertThatThrownBy(() -> concepts.update(actor, requestId, created.id(), 1, "Colegiatura", "TUITION", true,
+                true, true, isv.id())).as("inactive to active needs an active rate")
+                .isInstanceOf(InactiveReferenceException.class);
+        assertThat(concepts.update(actor, requestId, created.id(), 1, "Colegiatura", "TUITION", true, true, false,
+                isv.id()).active()).isFalse();
     }
 
     @Test

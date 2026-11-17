@@ -24,7 +24,8 @@ import java.util.stream.Collectors;
  * <p>A taxable concept names its tax rate (cut 3) and a concept that is not taxable names none. The rate must exist in the
  * institution (404 otherwise) and be active (409 {@code inactive-reference}); it is read in share mode in the same
  * transaction as the write, so nobody deactivates it in between. An edit that keeps the rate the concept already has does
- * not ask for it to be active, so a concept can still be renamed or deactivated after its rate was deactivated.
+ * not ask for it to be active, so a concept can still be renamed or deactivated after its rate was deactivated; the
+ * exception is a concept that goes from inactive to active, which needs an active rate.
  */
 public final class ManagePaymentConcepts {
 
@@ -73,7 +74,7 @@ public final class ManagePaymentConcepts {
                     .orElseThrow(ResourceNotFoundException::new);
             PaymentConcept after = before.edit(version, name, PaymentCategory.parse(category), taxable, recurring,
                     active, taxRateId, clock.instant());
-            TaxRate rate = assignableRate(institution, after, before.taxRateId());
+            TaxRate rate = assignableRate(institution, after, before);
             concepts.update(institution, after, version);
             auditLogWriter.append(CatalogAudit.updated(actor, auditRequestId, id, CatalogAudit.json(before),
                     CatalogAudit.json(after)));
@@ -101,16 +102,20 @@ public final class ManagePaymentConcepts {
 
     /**
      * The tax rate the concept is about to be written with, read in share mode: it must exist in the institution and,
-     * unless the concept already had it, be active. {@code null} when the concept has none.
+     * unless the concept already had it and is not being reactivated, be active. {@code null} when the concept has none.
      */
-    private TaxRate assignableRate(InstitutionId institution, PaymentConcept concept, UUID currentRateId) {
+    private TaxRate assignableRate(InstitutionId institution, PaymentConcept concept, PaymentConcept before) {
         if (concept.taxRateId() == null) {
             return null;
         }
         TaxRate rate = taxRates.lockShareById(institution, concept.taxRateId())
                 .orElseThrow(ResourceNotFoundException::new);
-        if (!rate.active() && !rate.id().equals(currentRateId)) {
-            throw new InactiveReferenceException();
+        if (!rate.active()) {
+            boolean keptAsIs = before != null && rate.id().equals(before.taxRateId());
+            boolean reactivated = before != null && !before.active() && concept.active();
+            if (!keptAsIs || reactivated) {
+                throw new InactiveReferenceException();
+            }
         }
         return rate;
     }

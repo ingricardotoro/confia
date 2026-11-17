@@ -267,7 +267,7 @@ class CatalogTaxRateSchemaIT extends CommittingPostgresIntegrationTest {
         UUID institution = UUID.randomUUID();
         try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
             Base base = base(owner, institution);
-            UUID id = period(owner, base, "15", "2027-01-01", null);
+            UUID id = period(owner, base, "12.5", "2027-01-01", null);
 
             for (String change : List.of("rate_percent = 1", "tax_rate_id = '" + base.otherRate() + "'",
                     "valid_from = date '2027-02-01'", "created_by = gen_random_uuid()",
@@ -277,7 +277,7 @@ class CatalogTaxRateSchemaIT extends CommittingPostgresIntegrationTest {
                 assertThat(edit.getSQLState()).as(change).isEqualTo("23001");
                 assertThat(edit.getMessage()).contains("never edited");
             }
-            assertThat(count(owner, "select count(*) from catalog_tax_rate_period where rate_percent = 15"))
+            assertThat(count(owner, "select count(*) from catalog_tax_rate_period where rate_percent = 12.5"))
                     .isEqualTo(1);
             owner.rollback();
         }
@@ -289,7 +289,7 @@ class CatalogTaxRateSchemaIT extends CommittingPostgresIntegrationTest {
         UUID institution = UUID.randomUUID();
         try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
             Base base = base(owner, institution);
-            UUID open = period(owner, base, "15", "2027-01-01", null);
+            UUID open = period(owner, base, "12.5", "2027-01-01", null);
             UUID closed = period(owner, base, base.otherRate(), "8", "2027-01-01", "2027-03-31");
 
             SQLException moved = rejected(owner, () -> update(owner,
@@ -323,7 +323,7 @@ class CatalogTaxRateSchemaIT extends CommittingPostgresIntegrationTest {
         UUID open;
         try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
             Base base = base(owner, institution);
-            open = period(owner, base, "15", "2027-01-01", null);
+            open = period(owner, base, "12.5", "2027-01-01", null);
             owner.commit();
         }
         try (Connection admin = SharedPostgresContainer.connectionAs("confia_admin_app")) {
@@ -580,7 +580,7 @@ class CatalogTaxRateSchemaIT extends CommittingPostgresIntegrationTest {
     private static Base seed(UUID institution) throws SQLException {
         try (Connection owner = StaffRoleFixtures.ownerTransaction(institution)) {
             Base base = base(owner, institution);
-            period(owner, base, "15", "2027-01-01", null);
+            period(owner, base, "12.5", "2027-01-01", null);
             owner.commit();
             return base;
         }

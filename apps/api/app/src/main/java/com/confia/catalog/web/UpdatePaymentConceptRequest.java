@@ -28,6 +28,6 @@ public record UpdatePaymentConceptRequest(
         @Schema(requiredMode = RequiredMode.REQUIRED, description = "False deactivates the concept")
         @JsonProperty("isActive") @NotNull Boolean isActive,
         @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
-                description = "A tax rate of the institution, active unless the concept already has it; required when isTaxable is true and absent when it is false")
+                description = "A tax rate of the institution, active unless the concept already has it and is not being reactivated; required when isTaxable is true (except for a legacy taxable concept that has none and stays so) and absent when it is false")
         UUID taxRateId) {
 }

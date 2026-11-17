@@ -60,16 +60,19 @@ public final class JooqTaxRatePeriodRepository implements TaxRatePeriodRepositor
 
     @Override
     public void closeValidity(InstitutionId institutionId, UUID periodId, LocalDate lastDay) {
-        // Only valid_to is written, and only while it is still open: the statement cannot touch a closed validity.
-        int rows = dsl.update(CATALOG_TAX_RATE_PERIOD)
-                .set(CATALOG_TAX_RATE_PERIOD.VALID_TO, lastDay)
-                .where(CATALOG_TAX_RATE_PERIOD.INSTITUTION_ID.eq(institutionId.value()))
-                .and(CATALOG_TAX_RATE_PERIOD.ID.eq(periodId))
-                .and(CATALOG_TAX_RATE_PERIOD.VALID_TO.isNull())
-                .execute();
-        if (rows != 1) {
-            throw new IllegalStateException("the open validity to close was not found");
-        }
+        // Only valid_to is written, and only while it is still open: the statement cannot touch a closed validity. It goes
+        // through the same translation as the insert, so a violation of the database ends as a domain error.
+        CatalogWrites.translating(() -> {
+            int rows = dsl.update(CATALOG_TAX_RATE_PERIOD)
+                    .set(CATALOG_TAX_RATE_PERIOD.VALID_TO, lastDay)
+                    .where(CATALOG_TAX_RATE_PERIOD.INSTITUTION_ID.eq(institutionId.value()))
+                    .and(CATALOG_TAX_RATE_PERIOD.ID.eq(periodId))
+                    .and(CATALOG_TAX_RATE_PERIOD.VALID_TO.isNull())
+                    .execute();
+            if (rows != 1) {
+                throw new IllegalStateException("the open validity to close was not found");
+            }
+        });
     }
 
     private static TaxRatePeriod toDomain(CatalogTaxRatePeriodRecord row) {

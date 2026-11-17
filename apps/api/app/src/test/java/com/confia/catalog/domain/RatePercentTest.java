@@ -51,7 +51,7 @@ class RatePercentTest {
         assertThatThrownBy(() -> new RatePercent(BigDecimal.ZERO)).isInstanceOf(InvalidCatalogValueException.class);
         assertThatThrownBy(() -> new RatePercent(new BigDecimal("100.00001")))
                 .isInstanceOf(InvalidCatalogValueException.class);
-        assertThat(new RatePercent(new BigDecimal("15.00000")).value().scale()).isEqualTo(4);
+        assertThat(new RatePercent(new BigDecimal("12.50000")).value().scale()).isEqualTo(4);
     }
 
     @Property

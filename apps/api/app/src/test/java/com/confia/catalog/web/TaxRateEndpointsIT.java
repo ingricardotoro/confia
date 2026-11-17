@@ -115,15 +115,15 @@ class TaxRateEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(rate.get("version").asLong()).isZero();
         assertThat(HarnessProcess.json(get(RATES + "/" + id, admin)).get("periods")).as("no figure preloaded").isEmpty();
 
-        JsonNode first = created(post(periods(id), admin, periodBody("15", "2027-01-01", null)));
+        JsonNode first = created(post(periods(id), admin, periodBody("12.5", "2027-01-01", null)));
         assertThat(first.propertyNames()).containsExactly("id", "taxRateId", "ratePercent", "validFrom", "validTo",
                 "createdAt");
         assertThat(first.get("ratePercent").isString()).as("the percentage is a string").isTrue();
-        assertThat(first.get("ratePercent").asString()).isEqualTo("15.0000");
+        assertThat(first.get("ratePercent").asString()).isEqualTo("12.5000");
         assertThat(first.get("taxRateId").asString()).isEqualTo(id);
         assertThat(first.get("validTo").isNull()).isTrue();
-        JsonNode second = created(post(periods(id), admin, periodBody("18.5", "2027-07-01", null)));
-        assertThat(second.get("ratePercent").asString()).isEqualTo("18.5000");
+        JsonNode second = created(post(periods(id), admin, periodBody("13.25", "2027-07-01", null)));
+        assertThat(second.get("ratePercent").asString()).isEqualTo("13.2500");
 
         JsonNode concept = created(post(CONCEPTS, admin, conceptBody("COLEG", true, id)));
         assertThat(concept.get("taxRateId").asString()).isEqualTo(id);
@@ -134,10 +134,10 @@ class TaxRateEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(detail.propertyNames()).containsExactly("id", "code", "name", "isActive", "version", "createdAt",
                 "updatedAt", "periods");
         assertThat(detail.get("periods")).hasSize(2);
-        assertThat(detail.get("periods").get(0).get("ratePercent").asString()).isEqualTo("15.0000");
+        assertThat(detail.get("periods").get(0).get("ratePercent").asString()).isEqualTo("12.5000");
         assertThat(detail.get("periods").get(0).get("validFrom").asString()).isEqualTo("2027-01-01");
         assertThat(detail.get("periods").get(0).get("validTo").asString()).isEqualTo("2027-06-30");
-        assertThat(detail.get("periods").get(1).get("ratePercent").asString()).isEqualTo("18.5000");
+        assertThat(detail.get("periods").get(1).get("ratePercent").asString()).isEqualTo("13.2500");
         assertThat(detail.get("periods").get(1).get("validTo").isNull()).isTrue();
 
         List<String[]> entries = entriesOf(admin.institution());
@@ -145,10 +145,10 @@ class TaxRateEndpointsIT extends CommittingPostgresIntegrationTest {
                 "catalog.tax_rate_period.created", "catalog.tax_rate_period.created",
                 "catalog.payment_concept.created");
         assertThat(entries.get(0)[4]).contains("\"code\": \"ISV\"").doesNotContain("ratePercent");
-        assertThat(entries.get(1)[4]).contains("\"ratePercent\": \"15.0000\"").doesNotContain("closedPrevious");
+        assertThat(entries.get(1)[4]).contains("\"ratePercent\": \"12.5000\"").doesNotContain("closedPrevious");
         assertThat(entries.get(2)[1]).isEqualTo("catalog.tax_rate_period");
         assertThat(entries.get(2)[2]).isEqualTo(second.get("id").asString());
-        assertThat(entries.get(2)[4]).contains("\"ratePercent\": \"18.5000\"")
+        assertThat(entries.get(2)[4]).contains("\"ratePercent\": \"13.2500\"")
                 .contains("\"closedPreviousPeriodId\": \"" + first.get("id").asString() + "\"")
                 .contains("\"closedPreviousValidTo\": \"2027-06-30\"");
         assertThat(entries.get(3)[4]).contains("\"taxRateId\": \"" + id + "\"");
@@ -203,7 +203,7 @@ class TaxRateEndpointsIT extends CommittingPostgresIntegrationTest {
         assertProblem(post(RATES, admin, rateBody("ISV", "N".repeat(121))), 400, "validation-failed");
         assertProblem(post(RATES, admin, rateBody("ISV", "Con\\nsalto")), 400, "validation-failed");
         assertProblem(post(RATES, admin, "{\"code\":\"ISV\"}"), 400, "validation-failed");
-        assertProblem(post(RATES, admin, "{\"code\":\"ISV\",\"name\":\"N\",\"ratePercent\":\"15\"}"), 400,
+        assertProblem(post(RATES, admin, "{\"code\":\"ISV\",\"name\":\"N\",\"ratePercent\":\"12.5\"}"), 400,
                 "validation-failed");
         assertProblem(post(RATES, admin, "{\"code\":\"ISV\",\"name\":\"N\",\"institutionId\":\"" + UUID.randomUUID()
                 + "\"}"), 400, "validation-failed");
@@ -284,12 +284,12 @@ class TaxRateEndpointsIT extends CommittingPostgresIntegrationTest {
 
         for (String bad : new String[] {"\"0\"", "\"0.0000\"", "\"-1\"", "\"-0.0001\"", "\"100.0001\"", "\"101\"",
                 "\"1000\"", "\"5.00001\"", "\"abc\"", "\"\"", "\"+5\"", "\"1e1\"", "\" 5\"", "\"5,5\"", "\".5\"",
-                "\"5.\"", "15", "15.5", "0", "-5", "true", "null", "[\"15\"]", "{\"v\":15}"}) {
+                "\"5.\"", "12.5", "7.5", "0", "-5", "true", "null", "[\"12.5\"]", "{\"v\":7}"}) {
             assertProblem(post(periods(id), admin, periodBodyRaw(bad, "\"2027-01-01\"", null)), 400,
                     "validation-failed");
         }
         assertProblem(post(periods(id), admin, "{\"validFrom\":\"2027-01-01\"}"), 400, "validation-failed");
-        assertProblem(post(periods(id), admin, "{\"ratePercent\":\"15\"}"), 400, "validation-failed");
+        assertProblem(post(periods(id), admin, "{\"ratePercent\":\"12.5\"}"), 400, "validation-failed");
 
         assertThat(HarnessProcess.json(get(RATES + "/" + id, admin)).get("periods")).isEmpty();
         assertThat(entriesOf(admin.institution()).stream().filter(entry -> entry[0].contains("period"))).isEmpty();
@@ -371,7 +371,7 @@ class TaxRateEndpointsIT extends CommittingPostgresIntegrationTest {
         String id = created(post(RATES, admin, rateBody("ISV", "Impuesto"))).get("id").asString();
 
         List<Integer> statuses = concurrently(
-                () -> post(periods(id), admin, periodBody("15", "2027-01-01", null)).statusCode(),
+                () -> post(periods(id), admin, periodBody("12.5", "2027-01-01", null)).statusCode(),
                 () -> post(periods(id), admin, periodBody("16", "2027-01-01", null)).statusCode());
 
         assertThat(statuses).containsExactlyInAnyOrder(201, 409);
@@ -387,7 +387,7 @@ class TaxRateEndpointsIT extends CommittingPostgresIntegrationTest {
         created(post(periods(id), admin, periodBody("10", "2026-01-01", null)));
 
         List<Integer> statuses = concurrently(
-                () -> post(periods(id), admin, periodBody("15", "2027-01-01", null)).statusCode(),
+                () -> post(periods(id), admin, periodBody("12.5", "2027-01-01", null)).statusCode(),
                 () -> post(periods(id), admin, periodBody("16", "2028-01-01", null)).statusCode());
 
         // The lock serializes them: when the later day goes first, the earlier day starts before the open period and is an
@@ -551,11 +551,34 @@ class TaxRateEndpointsIT extends CommittingPostgresIntegrationTest {
         JsonNode listed = HarnessProcess.json(get(CONCEPTS, admin)).get("items").get(0);
         assertThat(listed.get("isTaxable").asBoolean()).isTrue();
         assertThat(listed.get("taxRateId").isNull()).isTrue();
-        assertProblem(put(CONCEPTS + "/" + legacy, admin, conceptPutBody(0, true, true, null)), 400,
-                "validation-failed");
-        HttpResponse<String> fixed = put(CONCEPTS + "/" + legacy, admin, conceptPutBody(0, true, true, rate));
+        String path = CONCEPTS + "/" + legacy;
+        assertThat(put(path, admin, conceptPutBody(0, true, false, null)).statusCode()).isEqualTo(200);
+        assertThat(put(path, admin, conceptPutBody(1, true, true, null)).statusCode()).isEqualTo(200);
+        JsonNode renamed = HarnessProcess.json(put(path, admin, conceptPutBody(2, true, true, null)));
+        assertThat(renamed.get("taxRateId").isNull()).isTrue();
+        assertThat(renamed.get("version").asLong()).isEqualTo(3);
+        // Becoming taxable again without a rate is refused: only the legacy state is tolerated.
+        assertThat(put(path, admin, conceptPutBody(3, false, true, null)).statusCode()).isEqualTo(200);
+        assertProblem(put(path, admin, conceptPutBody(4, true, true, null)), 400, "validation-failed");
+        HttpResponse<String> fixed = put(path, admin, conceptPutBody(4, true, true, rate));
         assertThat(fixed.statusCode()).as(fixed.body()).isEqualTo(200);
         assertThat(HarnessProcess.json(fixed).get("taxRateCode").asString()).isEqualTo("ISV");
+    }
+
+    @Test
+    void aConceptWithAnInactiveRateMayBeEditedAndDeactivatedButNotActivatedAgainUntilTheRateIsActive()
+            throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        String rate = created(post(RATES, admin, rateBody("ISV", "Impuesto"))).get("id").asString();
+        String id = created(post(CONCEPTS, admin, conceptBody("COLEG", true, rate))).get("id").asString();
+        put(rate, admin, updateBody(0, "Impuesto", false));
+        String path = CONCEPTS + "/" + id;
+
+        assertThat(put(path, admin, conceptPutBody(0, true, false, rate)).statusCode()).isEqualTo(200);
+        assertThat(put(path, admin, conceptPutBody(1, true, false, rate)).statusCode()).as("still inactive").isEqualTo(200);
+        assertProblem(put(path, admin, conceptPutBody(2, true, true, rate)), 409, "inactive-reference");
+        put(rate, admin, updateBody(1, "Impuesto", true));
+        assertThat(put(path, admin, conceptPutBody(2, true, true, rate)).statusCode()).isEqualTo(200);
     }
 
     // --- Lists ---

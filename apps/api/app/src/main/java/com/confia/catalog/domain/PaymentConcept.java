@@ -13,7 +13,8 @@ import java.util.UUID;
  *
  * <p>A taxable concept points at its {@code taxRateId} (cut 3): {@link #create} and {@link #edit} require one for a
  * taxable concept, and a concept that is not taxable never has one. A taxable concept read from the store may have none,
- * because it was created before the tax rates existed; it stays so until somebody edits it.
+ * because it was created before the tax rates existed; it may be edited, activated and deactivated without one, and
+ * needs a rate only when it becomes taxable or when a rate is set or changed.
  */
 public record PaymentConcept(UUID id, String code, String name, PaymentCategory category, boolean taxable,
         boolean recurring, boolean active, UUID taxRateId, long version, Instant createdAt, Instant updatedAt) {
@@ -47,7 +48,12 @@ public record PaymentConcept(UUID id, String code, String name, PaymentCategory 
         if (expectedVersion != version) {
             throw new StaleVersionException();
         }
-        requireRateWhenTaxable(newTaxable, newTaxRateId);
+        // A legacy concept (taxable, no rate) that stays taxable with no rate may still be edited, activated or
+        // deactivated; any other taxable concept needs a rate, in particular one that becomes taxable.
+        boolean legacyKept = taxable && taxRateId == null;
+        if (!legacyKept) {
+            requireRateWhenTaxable(newTaxable, newTaxRateId);
+        }
         return new PaymentConcept(id, code, newName, newCategory, newTaxable, newRecurring, newActive, newTaxRateId,
                 version + 1, createdAt, now);
     }

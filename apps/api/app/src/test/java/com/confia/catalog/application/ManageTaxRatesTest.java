@@ -158,11 +158,11 @@ class ManageTaxRatesTest {
         TaxRateView created = isv();
         audit.clear();
 
-        TaxRatePeriodView first = add(created.id(), "15", "2027-01-01", null);
-        TaxRatePeriodView second = add(created.id(), "18", "2027-07-01", null);
+        TaxRatePeriodView first = add(created.id(), "12.5", "2027-01-01", null);
+        TaxRatePeriodView second = add(created.id(), "13.25", "2027-07-01", null);
 
-        assertThat(first.ratePercent()).isEqualTo("15.0000");
-        assertThat(second.ratePercent()).isEqualTo("18.0000");
+        assertThat(first.ratePercent()).isEqualTo("12.5000");
+        assertThat(second.ratePercent()).isEqualTo("13.2500");
         assertThat(periods.findByTaxRate(institution, created.id())).satisfiesExactly(
                 closed -> {
                     assertThat(closed.id()).isEqualTo(first.id());
@@ -175,9 +175,9 @@ class ManageTaxRatesTest {
         assertThat(audit).hasSize(2);
         assertThat(audit.get(0).action()).isEqualTo("catalog.tax_rate_period.created");
         assertThat(audit.get(0).entityType()).isEqualTo("catalog.tax_rate_period");
-        assertThat(audit.get(0).afterValue()).contains("\"ratePercent\":\"15.0000\"").doesNotContain("closedPrevious");
+        assertThat(audit.get(0).afterValue()).contains("\"ratePercent\":\"12.5000\"").doesNotContain("closedPrevious");
         assertThat(audit.get(1).entityId()).isEqualTo(second.id().toString());
-        assertThat(audit.get(1).afterValue()).contains("\"ratePercent\":\"18.0000\"")
+        assertThat(audit.get(1).afterValue()).contains("\"ratePercent\":\"13.2500\"")
                 .contains("\"closedPreviousPeriodId\":\"" + first.id() + "\"")
                 .contains("\"closedPreviousValidTo\":\"2027-06-30\"");
         assertThat(rates.forUpdateLocks).as("the row of the rate is locked for each addition").isEqualTo(2);
@@ -186,12 +186,12 @@ class ManageTaxRatesTest {
     @Test
     void anOverlapIsRefusedAndTheOpenPeriodStaysOpenAndNothingIsAudited() {
         TaxRateView created = isv();
-        add(created.id(), "15", "2027-01-01", null);
+        add(created.id(), "12.5", "2027-01-01", null);
         audit.clear();
 
-        assertThatThrownBy(() -> add(created.id(), "18", "2027-01-01", null))
+        assertThatThrownBy(() -> add(created.id(), "13.25", "2027-01-01", null))
                 .isInstanceOf(TaxRatePeriodOverlapException.class);
-        assertThatThrownBy(() -> add(created.id(), "18", "2027-03-01", "2027-03-31"))
+        assertThatThrownBy(() -> add(created.id(), "13.25", "2027-03-01", "2027-03-31"))
                 .isInstanceOf(TaxRatePeriodOverlapException.class);
 
         assertThat(periods.all()).singleElement().satisfies(period -> assertThat(period.validTo()).isNull());
@@ -202,7 +202,7 @@ class ManageTaxRatesTest {
     @Test
     void aBoundedPeriodBeforeTheOpenOneIsAddedWithoutClosingAnything() {
         TaxRateView created = isv();
-        add(created.id(), "15", "2027-01-01", null);
+        add(created.id(), "12.5", "2027-01-01", null);
 
         add(created.id(), "10", "2026-01-01", "2026-12-31");
 
@@ -216,11 +216,11 @@ class ManageTaxRatesTest {
         TaxRate foreign = rates.arrange(new InstitutionId(UUID.randomUUID()), "AJENA", "Ajena", true);
         audit.clear();
 
-        assertThatThrownBy(() -> add(created.id(), "15", "2027-01-01", null))
+        assertThatThrownBy(() -> add(created.id(), "12.5", "2027-01-01", null))
                 .isInstanceOf(InactiveReferenceException.class);
-        assertThatThrownBy(() -> add(UUID.randomUUID(), "15", "2027-01-01", null))
+        assertThatThrownBy(() -> add(UUID.randomUUID(), "12.5", "2027-01-01", null))
                 .isInstanceOf(ResourceNotFoundException.class);
-        assertThatThrownBy(() -> add(foreign.id(), "15", "2027-01-01", null))
+        assertThatThrownBy(() -> add(foreign.id(), "12.5", "2027-01-01", null))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         assertThat(periods.all()).isEmpty();
@@ -252,8 +252,8 @@ class ManageTaxRatesTest {
     @Test
     void theDetailShowsEveryPeriodOldestFirstAndAnUnknownRateIsNotFound() {
         TaxRateView created = isv();
-        add(created.id(), "18", "2027-07-01", null);
-        add(created.id(), "15", "2027-01-01", "2027-06-30");
+        add(created.id(), "13.25", "2027-07-01", null);
+        add(created.id(), "12.5", "2027-01-01", "2027-06-30");
 
         TaxRateDetailView detail = service.get(actor, requestId, created.id());
 

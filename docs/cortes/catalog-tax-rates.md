@@ -35,9 +35,16 @@ concepto; no cambia), `name`, `is_active`, `version`, `created_at`, `updated_at`
   con la fila de la tasa bloqueada (`FOR UPDATE`). Sin `DELETE` para ningún rol.
 - La tasa se edita solo en `name` e `is_active`, con `version` (409 `stale-version` si no coincide). Una tasa inactiva no
   admite vigencias nuevas ni se puede asignar a un concepto.
-- **Concepto:** gana `tax_rate_id` (opcional en la base). Un concepto gravado debe indicar una tasa al crearse o
-  editarse; uno no gravado no puede tenerla (`CHECK`). Los conceptos gravados ya existentes sin tasa se toleran hasta que
-  se editen. La tasa debe ser de la institución y estar activa (404 si es de otra; 409 `inactive-reference` si está inactiva).
+- **Concepto:** gana `tax_rate_id` (opcional en la base). Un concepto gravado debe indicar una tasa al crearse, al pasar de
+  no gravado a gravado y siempre que se asigne o cambie la tasa; uno no gravado no puede tenerla (`CHECK`). Un concepto
+  gravado preexistente sin tasa (heredado) se tolera: puede editarse, activarse y desactivarse sin tasa mientras siga
+  gravado y sin tasa. La tasa debe ser de la institución y estar activa al asignarla (404 si es de otra; 409
+  `inactive-reference` si está inactiva). Un concepto puede conservar una tasa ya asignada que luego se desactivó, salvo
+  que pase de inactivo a activo: entonces la tasa debe estar activa (409 `inactive-reference`).
+- **Invariante para el motor de devengo (F3):** un concepto gravado cuya tasa no tiene una vigencia que cubra la fecha del
+  cargo, o un concepto gravado heredado sin tasa, es un **error** del motor de devengo y nunca un impuesto de 0 %.
+- Cerrar la vigencia anterior no genera un evento propio: queda registrado dentro del evento de auditoría
+  `catalog.tax_rate_period.created` (`closedPreviousPeriodId`, `closedPreviousValidTo`).
 - Aislamiento por RLS forzada; la institución sale de la sesión. Toda alta y cambio escribe en la bitácora de auditoría.
 
 ## API (permisos `catalog:read|create|update`)
@@ -89,7 +96,7 @@ el historial; la base rechaza cualquier solape y ningún usuario ve tasas de otr
   aplicación. Los conceptos gravados existentes sin tasa se toleran.
 - Dominio: `TaxRate`, `TaxRatePeriod` y el objeto de valor `RatePercent` (un porcentaje no es dinero: `BigDecimal` a escala
   cuatro, mayor que cero y hasta 100, un quinto decimal se rechaza y nunca se redondea). `PaymentConcept` incorpora
-  `taxRateId`: `create` y `edit` exigen tasa si es gravado; uno no gravado con tasa es inválido siempre.
+  `taxRateId`: `create` exige tasa si es gravado; `edit` la exige salvo que el concepto ya fuera gravado sin tasa y siga igual; uno no gravado con tasa es inválido siempre.
 - Casos de uso `ManageTaxRates` (crear, editar, listar, detalle, nueva vigencia) y `ManagePaymentConcepts` (ahora con
   `TaxRateRepository`); adaptadores jOOQ `JooqTaxRateRepository` y `JooqTaxRatePeriodRepository`; `TaxRateController` con
   las cinco rutas de `/api/v1/catalog/tax-rates`. «Nueva vigencia» bloquea la fila de la tasa (`FOR UPDATE`), cierra la
@@ -100,7 +107,9 @@ el historial; la base rechaza cualquier solape y ningún usuario ve tasas de otr
   lista las resuelve con una sola consulta por página.
 - Códigos nuevos: `duplicate-tax-rate-code` y `tax-rate-period-overlap` (409); se reutilizan `stale-version` e
   `inactive-reference`. Auditoría `catalog.tax_rate.created|updated` y `catalog.tax_rate_period.created` (con
-  `closedPreviousPeriodId` y `closedPreviousValidTo`); las entradas del concepto llevan `taxRateId`.
+  `closedPreviousPeriodId` y `closedPreviousValidTo`); las entradas del concepto llevan `taxRateId`. El cierre de la
+  vigencia (`UPDATE` de `valid_to`) pasa por la misma traducción de errores que el alta, así que una violación termina
+  en Problem Details y no en un 500.
 
 ### Decisiones y supuestos
 
@@ -108,9 +117,13 @@ el historial; la base rechaza cualquier solape y ningún usuario ve tasas de otr
   del mismo cuerpo, verificada en el dominio); tasa de otra institución o inexistente, `404 resource-not-found`; tasa
   inactiva, `409 inactive-reference`. El orden es 400, luego 404, luego 409.
 - **Tasa ya asignada y luego desactivada:** una edición que conserva la misma tasa no exige que esté activa, de modo que el
-  concepto sigue pudiendo renombrarse o desactivarse; solo asignar o cambiar a una tasa inactiva responde 409.
+  concepto sigue pudiendo renombrarse o desactivarse; asignar o cambiar a una tasa inactiva responde 409, y reactivar un
+  concepto (de inactivo a activo) cuya tasa sigue inactiva también responde 409 `inactive-reference`.
+- **Concepto gravado heredado sin tasa:** puede editarse, activarse y desactivarse sin tasa mientras siga gravado y sin
+  tasa; pasar de no gravado a gravado, o asignar o cambiar la tasa, sí la exige (400 si falta). El dominio lo decide en
+  `PaymentConcept.edit`.
 - **Porcentaje:** cadena JSON obligatoria (un número se rechaza con 400), patrón sin signo `^\d{1,3}(\.\d{1,4})?$`; el
-  dominio rechaza 0 y mayores que 100. Se devuelve siempre con cuatro decimales exactos (`"15.0000"`), tal como se guarda;
+  dominio rechaza 0 y mayores que 100. Se devuelve siempre con cuatro decimales exactos (`"12.5000"`), tal como se guarda;
   no se redondea.
 - Una tasa inactiva no admite vigencias nuevas (`409 inactive-reference`); sí admite edición, para reactivarla.
 - **Fechas:** igual que los precios, 2000-01-01…2100-12-31 en el borde (400), el dominio y la base.

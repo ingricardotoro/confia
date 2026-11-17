@@ -209,6 +209,21 @@ class PaymentConceptTest {
     }
 
     @Test
+    void aLegacyTaxableConceptWithoutARateStaysEditableButOneThatBecomesTaxableNeedsOne() {
+        PaymentConcept legacy = new PaymentConcept(UUID.randomUUID(), "COD", "Nombre", PaymentCategory.TUITION, true,
+                true, true, null, 0, T0, T0);
+
+        PaymentConcept off = legacy.edit(0, "Otro", PaymentCategory.TUITION, true, true, false, null, T1);
+        assertThat(off.taxRateId()).isNull();
+        assertThat(off.active()).isFalse();
+        assertThat(legacy.edit(0, "Otro", PaymentCategory.TUITION, true, true, true, RATE, T1).taxRateId())
+                .isEqualTo(RATE);
+        PaymentConcept plain = legacy.edit(0, "Otro", PaymentCategory.TUITION, false, true, true, null, T1);
+        assertThatThrownBy(() -> plain.edit(1, "Otro", PaymentCategory.TUITION, true, true, true, null, T1))
+                .isInstanceOf(InvalidCatalogValueException.class);
+    }
+
+    @Test
     void theErrorCodesAreTheOnesTheEdgePublishes() {
         assertThat(new InvalidCatalogValueException().code()).isEqualTo("validation-failed");
         assertThat(new DuplicateCodeException().code()).isEqualTo("duplicate-payment-concept-code");
