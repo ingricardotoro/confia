@@ -63,6 +63,19 @@ public final class LedgerApi implements LedgerPostingApi, LedgerAccountDirectory
         return found;
     }
 
+    @Override
+    public Map<UUID, LedgerAccountRef> lockShare(InstitutionId institutionId, Collection<UUID> accountIds) {
+        Map<UUID, LedgerAccountRef> found = new HashMap<>();
+        if (accountIds.isEmpty()) {
+            return found;
+        }
+        for (AccountDetails account : ledger.lockShareAccountDetails(institutionId, new java.util.HashSet<>(accountIds))) {
+            found.put(account.id(), new LedgerAccountRef(account.id(), account.code(), account.name(), account.type(),
+                    account.holdsStudentBalances(), account.active()));
+        }
+        return found;
+    }
+
     private static LedgerActor toActor(Actor actor) {
         return new LedgerActor(actor.institutionId(), actor.actorId(), actor.actorKind(), actor.requestId());
     }

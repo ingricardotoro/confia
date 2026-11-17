@@ -167,9 +167,11 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.charges.application", "com.confia.charges.web",
                     "com.confia.charges.web.wiring",
                     // The ledger module (docs/cortes/ledger-core.md): its jOOQ adapter, the named-interface package
-                    // of its configuration and its application services; no web package in cut 1.
+                    // of its configuration and its application services, and from the chart-of-accounts cut
+                    // (docs/cortes/ledger-chart-of-accounts.md) its controller and the named-interface package of the
+                    // configuration that registers it. Administrative only, each exact.
                     "com.confia.ledger.infrastructure", "com.confia.ledger.infrastructure.wiring",
-                    "com.confia.ledger.application"),
+                    "com.confia.ledger.application", "com.confia.ledger.web", "com.confia.ledger.web.wiring"),
             Map.of("com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON));

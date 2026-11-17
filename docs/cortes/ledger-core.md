@@ -248,4 +248,4 @@ base de datos; otra institución no ve nada.
   carga, reverso único y concurrente, reverso de reverso, otro módulo, otra institución y fecha anterior, descuadre, sin asientos, cero,
   negativo, tres decimales, monedas, dimensión del estudiante, asiento tardío, `UPDATE`/`DELETE`/`TRUNCATE` del dueño y la aplicación,
   RLS, concurrencia sobre la misma cuenta y orden opuesto sin interbloqueo).
-- **Pendiente para otros cortes**: eventos de dominio (sin consumidor), caché de saldo, plan de cuentas aprobado, rutas, `ledger:create`.
+- **Pendiente para otros cortes**: eventos de dominio (sin consumidor), caché de saldo, plan de cuentas aprobado, rutas, `ledger:create`. (`ledger:create` y las rutas de carga del plan de cuentas: `docs/cortes/ledger-chart-of-accounts.md`)

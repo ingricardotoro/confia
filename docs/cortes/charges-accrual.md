@@ -320,5 +320,5 @@ abiertas» donde difieren.
   la base a `UPDATE`/`DELETE`/`TRUNCATE` también del dueño, exclusión de solapes, redondeo del impuesto, asiento que no cuadra,
   vigencias referenciadas, máquina de estados y RLS) y `AccrualEndpointsIT` (las cinco rutas en el proceso administrativo real, la
   clave faltante, el rol sin permiso y el aislamiento).
-- **Pendiente:** pantalla de generación (corte 3a-2); `GET`/`PUT /charges/posting-accounts` y `GET`/`POST /ledger/accounts` con
-  `ledger:create`; reverso de cargo y trabajo nocturno de integridad (corte 3b); decisión fiscal del contador.
+- **Pendiente:** pantalla de generación (corte 3a-2); ~~`GET`/`PUT /charges/posting-accounts` y `GET`/`POST /ledger/accounts` con
+  `ledger:create`~~ (construidos en `docs/cortes/ledger-chart-of-accounts.md`); reverso de cargo y trabajo nocturno de integridad (corte 3b); decisión fiscal del contador.

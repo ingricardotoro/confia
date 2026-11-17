@@ -449,6 +449,8 @@ class PublicRouteAllowListTest {
             "GET /api/v1/charges/plans/{id}/accrual-periods", "POST /api/v1/charges/plans/{id}/accrual-preview",
             "POST /api/v1/charges/plans/{id}/accrual-runs", "GET /api/v1/charges/accrual-runs",
             "GET /api/v1/charges/accrual-runs/{runId}",
+            "GET /api/v1/charges/posting-accounts", "PUT /api/v1/charges/posting-accounts",
+            "GET /api/v1/ledger/accounts", "POST /api/v1/ledger/accounts", "PUT /api/v1/ledger/accounts/{id}",
             "GET /api/v1/students", "GET /api/v1/students/{id}", "POST /api/v1/students",
             "PUT /api/v1/students/{id}", "GET /api/v1/enrollments", "GET /api/v1/enrollments/{id}",
             "GET /api/v1/students/{studentId}/enrollments", "POST /api/v1/enrollments",

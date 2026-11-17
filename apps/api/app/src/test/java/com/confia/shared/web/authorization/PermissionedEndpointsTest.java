@@ -78,6 +78,15 @@ class PermissionedEndpointsTest {
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/accrual-runs", Permission.CHARGES_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/accrual-runs/{runId}",
                 Permission.CHARGES_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/posting-accounts",
+                Permission.CHARGES_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/charges/posting-accounts",
+                Permission.LEDGER_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/ledger/accounts", Permission.LEDGER_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/ledger/accounts",
+                Permission.LEDGER_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/ledger/accounts/{id}",
+                Permission.LEDGER_CREATE));
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/students", Permission.STUDENTS_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/students/{id}", Permission.STUDENTS_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/students", Permission.STUDENTS_CREATE));

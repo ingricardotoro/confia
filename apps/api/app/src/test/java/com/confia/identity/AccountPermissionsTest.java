@@ -76,7 +76,7 @@ class AccountPermissionsTest {
         }
         assignments.stored = Optional.of("super_admin");
         assertThat(permissions.resolve(actor())).as("non-vacuous: the exact code does grant")
-                .hasSize(88);
+                .hasSize(89);
     }
 
     @Test

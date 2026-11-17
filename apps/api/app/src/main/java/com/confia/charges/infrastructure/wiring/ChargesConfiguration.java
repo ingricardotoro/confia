@@ -7,12 +7,15 @@ import com.confia.charges.application.AccrualRunRepository;
 import com.confia.charges.application.AccrualRunScheduler;
 import com.confia.charges.application.ChargeRepository;
 import com.confia.charges.application.ManageAccrual;
+import com.confia.charges.application.ManagePostingAccounts;
 import com.confia.charges.application.PostingAccountRepository;
 import com.confia.charges.infrastructure.JobAccrualRunScheduler;
 import com.confia.charges.infrastructure.JooqAccrualRunItemRepository;
 import com.confia.charges.infrastructure.JooqAccrualRunRepository;
 import com.confia.charges.infrastructure.JooqChargeRepository;
 import com.confia.charges.infrastructure.JooqPostingAccountRepository;
+import com.confia.charges.infrastructure.PostingAccountUsage;
+import com.confia.ledger.application.api.LedgerAccountUsage;
 import com.confia.ledger.application.api.LedgerAccountDirectory;
 import com.confia.organization.application.directory.PlacementDirectory;
 import com.confia.shared.jobs.JobScheduler;
@@ -75,6 +78,19 @@ public class ChargesConfiguration {
     @Bean
     PostingAccountRepository postingAccountRepository(DSLContext dsl) {
         return new JooqPostingAccountRepository(dsl);
+    }
+
+    /** The map of posting accounts, read and set through the routes of the chart of accounts (docs/cortes/ledger-chart-of-accounts.md). */
+    @Bean
+    ManagePostingAccounts managePostingAccounts(TransactionRunner transactionRunner, PostingAccountRepository map,
+            LedgerAccountDirectory ledgerAccounts, AuditLogWriter auditLogWriter, Clock clock) {
+        return new ManagePostingAccounts(transactionRunner, map, ledgerAccounts, auditLogWriter, clock);
+    }
+
+    /** Tells the ledger which accounts the map points at, so it refuses to deactivate one of them. */
+    @Bean
+    LedgerAccountUsage postingAccountUsage(DSLContext dsl) {
+        return new PostingAccountUsage(dsl);
     }
 
     /** Schedules the accrual job in the transaction that creates the run; only the worker executes it (ADR-0016). */

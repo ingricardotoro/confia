@@ -11,6 +11,6 @@ public final class InactiveReferenceException extends DomainException {
     public static final String CODE = "inactive-reference";
 
     public InactiveReferenceException() {
-        super(CODE, "the payment concept is inactive");
+        super(CODE, "the referenced resource is inactive");
     }
 }

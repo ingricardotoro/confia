@@ -11,8 +11,8 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * The closed catalog of permissions (scenarios AZ04, AZ05 and AZ06; design.md, decision D2): 89
- * entries, 88 of them a module and one of the six verbs of {@code docs/03} section 5.1 and one the
+ * The closed catalog of permissions (scenarios AZ04, AZ05 and AZ06; design.md, decision D2): 90
+ * entries, 89 of them a module and one of the six verbs of {@code docs/03} section 5.1 and one the
  * request to void an invoice. The catalog is code and holds no role; which role grants what is
  * {@code StaffRole}'s matrix.
  */
@@ -27,10 +27,10 @@ class PermissionTest {
     private static final Set<String> VERBS = Set.of("create", "read", "update", "void", "approve", "export");
 
     @Test
-    void hasExactlyEightyNineDistinctCodes() {
+    void hasExactlyNinetyDistinctCodes() {
         List<String> codes = Arrays.stream(Permission.values()).map(Permission::code).toList();
 
-        assertThat(codes).hasSize(89).doesNotHaveDuplicates();
+        assertThat(codes).hasSize(90).doesNotHaveDuplicates();
     }
 
     @Test
@@ -41,12 +41,12 @@ class PermissionTest {
     }
 
     @Test
-    void eightyEightCodesPairAListedModuleWithOneOfTheSixVerbs() {
+    void eightyNineCodesPairAListedModuleWithOneOfTheSixVerbs() {
         List<Permission> moduleAndVerb = Arrays.stream(Permission.values())
                 .filter(permission -> VERBS.contains(permission.verb()))
                 .toList();
 
-        assertThat(moduleAndVerb).hasSize(88);
+        assertThat(moduleAndVerb).hasSize(89);
         assertThat(moduleAndVerb).allSatisfy(permission -> assertThat(MODULES).contains(permission.module()));
     }
 

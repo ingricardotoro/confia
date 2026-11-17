@@ -11,13 +11,14 @@ import java.util.UUID;
 /**
  * The entries of the charge plans: {@code charges.plan.created|updated|activated|archived} (an edit that moves the
  * status to active or to archived is recorded as that transition, with the state before and after) and {@code
- * charges.plan_item.added|removed}. They are built with {@link AuditJson} and never by concatenation, and carry only
+ * charges.plan_item.added|removed} and {@code charges.posting_account.updated}. They are built with {@link AuditJson} and never by concatenation, and carry only
  * names, identifiers, the frequency, the due day, the number of periods and dates: no personal datum exists in this module.
  */
 final class ChargesAudit {
 
     static final String PLAN = "charges.plan";
     static final String PLAN_ITEM = "charges.plan_item";
+    static final String POSTING_ACCOUNT = "charges.posting_account";
 
     private static final String ACTOR_KIND_STAFF = "staff";
     private static final String OUTCOME_SUCCESS = "success";
@@ -47,6 +48,21 @@ final class ChargesAudit {
 
     static AuditEntry itemRemoved(AuthenticatedActor actor, UUID requestId, ChargePlanItem item) {
         return entry(actor, requestId, PLAN_ITEM + ".removed", PLAN_ITEM, item.id(), json(item), null);
+    }
+
+    /** The setting of one entry of the posting map: {@code before} is null when the entry was first set. */
+    static AuditEntry postingAccountSet(AuthenticatedActor actor, UUID requestId, PostingAccountRow before,
+            PostingAccountRow after) {
+        return entry(actor, requestId, POSTING_ACCOUNT + ".updated", POSTING_ACCOUNT, after.id(),
+                before == null ? null : json(before), json(after));
+    }
+
+    static String json(PostingAccountRow row) {
+        AuditJson.Builder json = AuditJson.object().text("purpose", row.key().purpose().name());
+        if (row.key().conceptCategory() != null) {
+            json.text("conceptCategory", row.key().conceptCategory());
+        }
+        return json.text("ledgerAccountId", row.ledgerAccountId().toString()).number("version", row.version()).toJson();
     }
 
     private static AuditEntry entry(AuthenticatedActor actor, UUID requestId, String action, String entityType,

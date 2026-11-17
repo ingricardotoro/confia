@@ -95,6 +95,15 @@ public final class JooqLedgerRepository implements LedgerRepository {
     }
 
     @Override
+    public List<com.confia.ledger.application.AccountDetails> lockShareAccountDetails(InstitutionId institution,
+            Set<UUID> accountIds) {
+        return dsl.selectFrom(LEDGER_ACCOUNT).where(LEDGER_ACCOUNT.INSTITUTION_ID.eq(institution.value()))
+                .and(LEDGER_ACCOUNT.ID.in(accountIds)).orderBy(LEDGER_ACCOUNT.ID.asc()).forShare()
+                .fetch(row -> new com.confia.ledger.application.AccountDetails(row.getId(), row.getCode(),
+                        row.getName(), row.getAccountType(), row.getHoldsStudentBalances(), row.getIsActive()));
+    }
+
+    @Override
     public List<StudentAccountRef> openAndLock(InstitutionId institution, List<StudentCurrency> keys) {
         List<StudentAccountRef> result = new ArrayList<>();
         for (StudentCurrency key : keys) {

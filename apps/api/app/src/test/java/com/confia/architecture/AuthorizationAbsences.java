@@ -22,6 +22,15 @@ public final class AuthorizationAbsences {
     /** The one route of the identity module this change offers: the report of what each role can do. */
     public static final String ROLES_REPORT = "GET /api/v1/identity/roles";
 
+    /**
+     * The three routes of the chart of accounts of the ledger (docs/cortes/ledger-chart-of-accounts.md). Their path ends in
+     * {@code accounts}, but those are the accounts of the accounting plan, not staff accounts: they hold no credential, no role
+     * and no session, so AZ74 (no management of roles or of the accounts of staff) does not concern them. Exact routes, not a
+     * pattern, so a route that manages staff accounts under any other path is still a violation.
+     */
+    public static final Set<String> LEDGER_CHART_ROUTES = Set.of("GET /api/v1/ledger/accounts",
+            "POST /api/v1/ledger/accounts", "PUT /api/v1/ledger/accounts/{id}");
+
     /** The two routes that take a restricted second-factor token, and the only ones of the MFA path. */
     public static final List<String> RESTRICTED_MFA_ROUTES = List.of(
             "POST /api/v1/auth/mfa/enrollments", "POST /api/v1/auth/mfa/verifications");
@@ -76,7 +85,7 @@ public final class AuthorizationAbsences {
         Set<String> found = new TreeSet<>();
         for (String route : routes) {
             String path = route.substring(route.indexOf(' ') + 1);
-            if (route.equals(ROLES_REPORT)) {
+            if (route.equals(ROLES_REPORT) || LEDGER_CHART_ROUTES.contains(route)) {
                 continue;
             }
             if (ACCOUNT_OR_ROLE_PATH.matcher(path).matches()) {

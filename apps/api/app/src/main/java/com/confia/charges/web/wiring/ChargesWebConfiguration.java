@@ -2,8 +2,10 @@ package com.confia.charges.web.wiring;
 
 import com.confia.charges.application.ManageAccrual;
 import com.confia.charges.application.ManageChargePlans;
+import com.confia.charges.application.ManagePostingAccounts;
 import com.confia.charges.web.AccrualController;
 import com.confia.charges.web.ChargePlanController;
+import com.confia.charges.web.PostingAccountController;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -27,5 +29,10 @@ public class ChargesWebConfiguration {
     @Bean
     AccrualController accrualController(ManageAccrual accrual) {
         return new AccrualController(accrual);
+    }
+
+    @Bean
+    PostingAccountController postingAccountController(ManagePostingAccounts postingAccounts) {
+        return new PostingAccountController(postingAccounts);
     }
 }
