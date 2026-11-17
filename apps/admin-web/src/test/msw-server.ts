@@ -60,6 +60,28 @@ export function route(method: Method, path: string, ...replies: readonly [Reply,
   );
 }
 
+/**
+ * Answers `method path` with what `reply` makes of the query of each request, for a route that serves several lists from one
+ * path (the accounts of the chart, asked once for each type). Every request to it is recorded, whatever the answer.
+ */
+export function routeByQuery(method: Method, path: string, reply: (query: URLSearchParams) => Reply): void {
+  server.use(
+    http[method](path, async ({ request }) => {
+      const url = new URL(request.url);
+      recorded.push({
+        method: request.method,
+        path: url.pathname,
+        search: url.search,
+        headers: new Headers(request.headers),
+        body: await request.clone().text(),
+        credentials: request.credentials,
+        at: Date.now(),
+      });
+      return toHttpResponse(reply(url.searchParams));
+    }),
+  );
+}
+
 /** Every request the app made since the test began, in order. */
 export function requests(): readonly RecordedRequest[] {
   return [...recorded];

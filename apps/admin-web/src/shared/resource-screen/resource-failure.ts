@@ -36,6 +36,8 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "accrual-run-in-progress",
   "plan-item-invalid",
   "idempotency-payload-mismatch",
+  "account-in-use",
+  "posting-account-invalid",
 ]);
 
 /** The text of each reason the server gives for a split of the responsibility that does not hold. */
@@ -91,6 +93,10 @@ export function classifyOrganizationFailure(result: ApiFailureResult): AccessFai
   // The same for the code of a tax rate.
   if (result.kind === "problem" && result.problem.code === "duplicate-tax-rate-code") {
     return { kind: "fields", errors: [{ field: "code", reason: "duplicate-tax-rate-code" }] };
+  }
+  // The same for the code of an account of the chart.
+  if (result.kind === "problem" && result.problem.code === "duplicate-account-code") {
+    return { kind: "fields", errors: [{ field: "code", reason: "duplicate-account-code" }] };
   }
   if (result.kind === "problem" && result.problem.code === "invalid-responsibility-split") {
     const { errors, traceId } = result.problem;

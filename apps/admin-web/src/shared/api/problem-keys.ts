@@ -53,5 +53,8 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "plan-item-invalid": "problem.planItemInvalid",
   "idempotency-key-missing": "problem.unexpected",
   "idempotency-payload-mismatch": "problem.idempotencyPayloadMismatch",
+  "duplicate-account-code": "problem.duplicateAccountCode",
+  "account-in-use": "problem.accountInUse",
+  "posting-account-invalid": "problem.postingAccountInvalid",
   unknown: "problem.unexpected",
 };

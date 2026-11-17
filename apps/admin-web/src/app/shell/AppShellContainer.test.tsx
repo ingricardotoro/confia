@@ -54,6 +54,7 @@ describe("the signed in shell", () => {
         "Generación de cargos",
         "Estructura académica",
         "Importaciones",
+        "Plan de cuentas",
       ]);
       expect(
         within(screen.getByRole("banner")).getByRole("button", {

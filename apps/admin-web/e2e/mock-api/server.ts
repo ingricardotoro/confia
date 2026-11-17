@@ -18,6 +18,7 @@ import {
 } from "./scenarios.ts";
 import { CATALOG_BASE } from "./catalog-model.ts";
 import { CHARGES_BASE } from "./charges-model.ts";
+import { LEDGER_BASE, POSTING_ACCOUNTS_PATH } from "./ledger-model.ts";
 import { ORGANIZATION_BASE } from "./organization-model.ts";
 import { ENROLLMENTS_BASE } from "./enrollments-model.ts";
 import { STUDENTS_BASE } from "./students-model.ts";
@@ -86,6 +87,8 @@ const SUCCESS_SCHEMAS: Readonly<Record<Operation, Schema | undefined>> = {
   catalog: undefined,
   // The same for the charge plans (charges-model.ts).
   charges: undefined,
+  // The same for the chart of accounts and the map of posting accounts (ledger-model.ts).
+  ledger: undefined,
 };
 
 /** The fields of a response that break the contract; empty when it meets it. The `instance` of an error is not checked (I306). */
@@ -230,6 +233,15 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
       const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
       const answer = scenario.catalog.handle({ method, path, query: url.searchParams, body });
       if (answer !== undefined) { deliver(res, scenario, "catalog", answer); return; }
+    }
+    // The chart of accounts, and the map of posting accounts (a route below the charges that the ledger model owns, so it goes first).
+    if (path === POSTING_ACCOUNTS_PATH || path === `${LEDGER_BASE}/accounts` || path.startsWith(`${LEDGER_BASE}/accounts/`)) {
+      const session = scenario.model.currentSession(bearerOf(req));
+      if (session.status !== 200) { deliver(res, scenario, "ledger", session); return; }
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
+      const answer = scenario.ledger.handle({ method, path, query: url.searchParams, body });
+      if (answer !== undefined) { deliver(res, scenario, "ledger", answer); return; }
     }
     if (path.startsWith(`${CHARGES_BASE}/`)) {
       // Every operation of the charges is a bearer route: no access token, no answer.

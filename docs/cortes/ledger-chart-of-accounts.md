@@ -120,3 +120,31 @@ apuntar el mapa a otra; otra institución no ve ni toca nada; cada escritura ace
   las tres rutas del plan de cuentas (`LEDGER_CHART_ROUTES`), sin tocar el patrón, con una prueba de control de que otras rutas siguen siendo violación.
 - **Pendiente:** pantalla del plan de cuentas y del mapa; validación del plan con el contador; decidir en el corte 4 si el ajuste manual reutiliza
   `ledger:create`.
+
+## Construido (frontend)
+
+Feature nueva `apps/admin-web/src/features/ledger` (una feature no importa a otra: el mapa pertenece a `charges` en el backend, pero su pantalla
+necesita las cuentas del plan, así que vive aquí). En la navegación, grupo «Configuración», entrada «Plan de cuentas»; el área `/ledger` lleva a
+`/ledger/accounts` y tiene una segunda vista, `/ledger/posting-accounts` («Mapa de cuentas de cargos»). Las rutas se comparten por
+`shared/navigation/ledger-paths.ts`; el cliente está en `shared/api/ledger-operations.ts`.
+
+- **Plan de cuentas**: lista paginada, ordenada (código, nombre) y filtrada (tipo, estado) en el servidor, con el estado en la URL. Columnas: código,
+  nombre, tipo, saldos de estudiantes, estado. Diálogo de alta (código, nombre, tipo, marca de saldos de estudiantes, que solo se ofrece a `ASSET` o
+  `LIABILITY`) y de edición (solo nombre y estado; código, tipo y marca de solo lectura; se envía la `version`). Activar y desactivar desde la fila
+  con el color de su acción. `duplicate-account-code` se muestra bajo el campo código; `account-in-use` explica que el mapa aún apunta a la cuenta;
+  `stale-version` recarga y explica.
+- **Mapa de cuentas de cargos**: formulario con nueve renglones (por cobrar, impuesto por pagar, ingreso por defecto y un ingreso por cada una de las seis
+  categorías), cada uno con las cuentas **activas** del tipo que exige la regla (el servidor decide). Estado «Configurada»/«Sin configurar» en texto y
+  aviso de mapa incompleto que dice que la generación de cargos queda bloqueada. Guarda solo los renglones cambiados, con la `version` de cada fila; sin
+  actualización optimista; relee el mapa tras guardar. `stale-version` descarta lo elegido y recarga; `posting-account-invalid`, `inactive-reference` y 404
+  tienen texto propio; 403 vuelve el formulario de solo lectura con una nota. Estados de carga (esqueleto), error con reintento, vacío (sin cuentas
+  activas) y éxito.
+- **Generación de cargos**: el bloqueo `posting-accounts-incomplete` enlaza ahora al mapa (`href` por la constante compartida).
+- **Contrato**: tres códigos de problema nuevos en el cliente (`duplicate-account-code`, `account-in-use`, `posting-account-invalid`).
+- **Simulador** (`e2e/mock-api`): `ledger-seed`, `ledger-model` (con sus pruebas) y presets `ledger-map-empty`, `ledger-map-complete`, `ledger-empty`,
+  `ledger-stale-version`, `ledger-forbidden`, `ledger-server-error`, `ledger-map-server-error`. Los códigos son ficticios y solo existen en el simulador.
+- **Límite del contrato**: la sesión no entrega permisos a la interfaz, así que la pantalla no puede ocultar de antemano las acciones de escritura; se
+  apoya en el 403 del servidor. Los selectores del mapa leen hasta 200 cuentas activas por tipo (tope de la API).
+- **Pendiente**: recorridos de Playwright `ledger-chart-*`, estados de la matriz de accesibilidad (axe) de las dos vistas, y ejecutar Playwright (no se
+  ejecutó); el simulador debe reiniciarse para tomar los presets nuevos. La preview de devengo del simulador sigue bloqueándose por su propio preset, no
+  por el mapa del simulador.

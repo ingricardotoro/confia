@@ -5,6 +5,7 @@ import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
 import { useConceptLookup } from "../../shared/catalog-lookups/use-concept-lookup.ts";
 import { formatIsoDate } from "../../shared/format/format-date.ts";
+import { LEDGER_PATHS } from "../../shared/navigation/ledger-paths.ts";
 import { LOOKUP_PAGE_SIZE } from "../../shared/organization-lookups/use-organization-queries.ts";
 import { failureMessageOf, failureOf, loadFailureOf } from "../../shared/resource-screen/resource-failure.ts";
 import { useStudentLookup } from "../../shared/student-lookups/use-student-lookup.ts";
@@ -191,6 +192,7 @@ export function AccrualContainer({ search, onSearchChange }: AccrualContainerPro
         onOpenPlan={() => {
           if (planId !== undefined) void navigate({ to: chargePlanPath(planId) });
         }}
+        onOpenPostingAccounts={() => void navigate({ to: LEDGER_PATHS.postingMap })}
         onGoToPlans={() => void navigate({ to: CHARGES_PATHS.plans })}
       />
       {intent !== undefined && result.kind === "ready" ? (

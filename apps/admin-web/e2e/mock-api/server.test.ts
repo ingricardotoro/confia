@@ -1718,3 +1718,94 @@ describe("the accrual engine [charges-accrual]", { timeout: LIMIT }, () => {
     expect(preview.json).toMatchObject({ blockers: ["posting-accounts-incomplete"] });
   });
 });
+
+describe("the chart of accounts and the map of posting accounts [ledger-chart-of-accounts]", { timeout: LIMIT }, () => {
+  const ACCOUNTS = "/api/v1/ledger/accounts";
+  const MAP = "/api/v1/charges/posting-accounts";
+  const RECEIVABLE = "00000000-0000-4000-8000-000000008001";
+  const CASH = "00000000-0000-4000-8000-000000008002";
+
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const headers = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path: string, body?: unknown) => call(method, path, { headers, scenario: id, ...(body === undefined ? {} : { body }) });
+  }
+
+  const items = (reply: Reply) => (reply.json as { items: Record<string, unknown>[] }).items;
+
+  it("answers 401 to every operation without an access token, and 404 to a path it does not simulate", async () => {
+    const anonymous = [
+      await call("GET", ACCOUNTS, { scenario: "led-401" }),
+      await call("POST", ACCOUNTS, { scenario: "led-401", body: {} }),
+      await call("GET", MAP, { scenario: "led-401" }),
+      await call("PUT", MAP, { scenario: "led-401", body: {} }),
+    ];
+    const send = await session("led-404");
+
+    expect(anonymous.map((reply) => [reply.status, typeOf(reply)])).toEqual(Array.from({ length: 4 }, () => [401, "authentication-required"]));
+    expect((await send("DELETE", `${ACCOUNTS}/${CASH}`)).status).toBe(404);
+    expect((await send("GET", "/api/v1/ledger/other")).status).toBe(404);
+  });
+
+  it("serves the chart and the partial map of the default scenario, and keeps one set of both for each scenario", async () => {
+    const mine = await session("led-mine", "ledger-empty");
+    const theirs = await session("led-theirs");
+
+    const created = await mine("POST", ACCOUNTS, { code: "ACT-100", name: "Cuenta de prueba", type: "ASSET", holdsStudentBalances: false });
+
+    expect(created.status).toBe(201);
+    expect((await mine("GET", ACCOUNTS)).json).toMatchObject({ total: 1 });
+    expect((await theirs("GET", ACCOUNTS)).json).toMatchObject({ total: 28 });
+    expect(items(await theirs("GET", MAP)).map((row) => row["purpose"])).toEqual(["RECEIVABLE", "TAX_PAYABLE"]);
+  });
+
+  it("saves the map through the charges path, which the ledger model owns, and refuses a type that does not fit", async () => {
+    const send = await session("led-map");
+
+    const saved = await send("PUT", MAP, { entries: [{ purpose: "REVENUE", ledgerAccountId: "00000000-0000-4000-8000-000000008004" }] });
+    const refused = await send("PUT", MAP, { entries: [{ purpose: "RECEIVABLE", ledgerAccountId: CASH, version: 0 }] });
+
+    expect(saved.status).toBe(200);
+    expect(items(saved)).toHaveLength(3);
+    expect([refused.status, typeOf(refused)]).toEqual([409, "posting-account-invalid"]);
+  });
+
+  it.each([
+    ["ledger-map-empty", 0],
+    ["ledger-map-complete", 5],
+  ] as const)("serves the %s preset with %i rows in the map", async (name, rows) => {
+    const send = await session(`led-${name}`, name);
+
+    expect(items(await send("GET", MAP))).toHaveLength(rows);
+  });
+
+  it.each([
+    ["ledger-forbidden", "POST", 403, "forbidden"],
+    ["ledger-stale-version", "PUT", 409, "stale-version"],
+  ] as const)("serves the %s preset: the write is refused with %s", async (name, method, status, code) => {
+    const send = await session(`led-${name}`, name);
+
+    const refused = method === "POST"
+      ? await send("POST", ACCOUNTS, { code: "ACT-100", name: "Cuenta de prueba", type: "ASSET", holdsStudentBalances: false })
+      : await send("PUT", `${ACCOUNTS}/${RECEIVABLE}`, { version: 0, name: "Otro nombre", active: true });
+
+    expect([refused.status, typeOf(refused)]).toEqual([status, code]);
+  });
+
+  it("fails the first reads of the accounts or of the map, each in its own preset, and then recovers", async () => {
+    const accounts = await session("led-err-accounts", "ledger-server-error");
+    const mapOnly = await session("led-err-map", "ledger-map-server-error");
+
+    const statuses = async (send: Awaited<ReturnType<typeof session>>, path: string) => {
+      const seen: number[] = [];
+      for (let read = 0; read < 4; read += 1) seen.push((await send("GET", path)).status);
+      return seen;
+    };
+
+    expect(await statuses(accounts, ACCOUNTS)).toEqual([500, 500, 500, 200]);
+    expect((await accounts("GET", MAP)).status).toBe(200);
+    expect(await statuses(mapOnly, MAP)).toEqual([500, 500, 500, 200]);
+    expect((await mapOnly("GET", ACCOUNTS)).status).toBe(200);
+  });
+});

@@ -72,6 +72,9 @@ describe("the known codes", () => {
         "plan-item-invalid",
         "idempotency-key-missing",
         "idempotency-payload-mismatch",
+        "duplicate-account-code",
+        "account-in-use",
+        "posting-account-invalid",
       ].sort(),
     );
   });

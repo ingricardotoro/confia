@@ -85,6 +85,8 @@ export function fieldErrorKey(reason: string): AdminKey {
       return "catalog.priceLists.errors.validityOrder";
     case "duplicate-tax-rate-code":
       return "catalog.taxRates.errors.duplicateCode";
+    case "duplicate-account-code":
+      return "ledger.accounts.errors.duplicateCode";
     case "rate-format":
       return "catalog.taxRates.errors.rateFormat";
     case "due-day-range":

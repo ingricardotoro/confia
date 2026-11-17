@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { accrualPreview, accrualPreviewItem } from "../../../test/contract-responses.ts";
@@ -46,6 +46,7 @@ function props(override: Partial<AccrualViewProps> = {}): AccrualViewProps {
     onConfirm: vi.fn(),
     onViewRuns: vi.fn(),
     onOpenPlan: vi.fn(),
+    onOpenPostingAccounts: vi.fn(),
     onGoToPlans: vi.fn(),
     ...override,
   };
@@ -117,6 +118,25 @@ describe("AccrualView", () => {
     renderWithAdminI18n(<AccrualView {...props({ result: ready({ blockers: ["posting-accounts-incomplete"] }) })} />);
 
     expect(screen.queryByRole("link", { name: "Abrir el plan" })).not.toBeInTheDocument();
+  });
+
+  it("links the blocker of the posting accounts to the map of the chart of accounts, by its address, and leaves a modified click to the browser", async () => {
+    const user = userEvent.setup();
+    const onOpenPostingAccounts = vi.fn();
+    renderWithAdminI18n(<AccrualView {...props({ onOpenPostingAccounts, result: ready({ blockers: ["posting-accounts-incomplete"] }) })} />);
+    const link = screen.getByRole("link", { name: "Abrir el mapa de cuentas de cargos" });
+
+    expect(link).toHaveAttribute("href", "/ledger/posting-accounts");
+    fireEvent.click(link, { ctrlKey: true });
+    expect(onOpenPostingAccounts).not.toHaveBeenCalled();
+    await user.click(link);
+    expect(onOpenPostingAccounts).toHaveBeenCalledOnce();
+  });
+
+  it("does not link to the map when the posting accounts are not a blocker", () => {
+    renderWithAdminI18n(<AccrualView {...props({ result: ready({ blockers: ["plan-not-active"] }) })} />);
+
+    expect(screen.queryByRole("link", { name: "Abrir el mapa de cuentas de cargos" })).not.toBeInTheDocument();
   });
 
   it("says there is nothing to confirm when no charge would be created, and disables the confirmation", () => {

@@ -47,6 +47,9 @@ export const KNOWN_PROBLEM_CODES = [
   "plan-item-invalid",
   "idempotency-key-missing",
   "idempotency-payload-mismatch",
+  "duplicate-account-code",
+  "account-in-use",
+  "posting-account-invalid",
 ] as const;
 
 export type ProblemCode = (typeof KNOWN_PROBLEM_CODES)[number];

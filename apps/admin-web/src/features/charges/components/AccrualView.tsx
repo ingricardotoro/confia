@@ -3,6 +3,7 @@ import { useState, type SyntheticEvent } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import type { AccrualPreview } from "../../../shared/api/charges-operations.ts";
 import { OptionField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
+import { LEDGER_PATHS } from "../../../shared/navigation/ledger-paths.ts";
 import { ALL_ROWS, blockerKeyOf, ERROR_ROWS, filterPreviewRows, itemErrorHelpKeyOf, itemErrorKeyOf, pageOfRows, PREVIEW_PAGE_SIZE } from "../accrual-model.ts";
 import { AccrualOutcomeBadge } from "./AccrualOutcomeBadge.tsx";
 
@@ -59,6 +60,8 @@ export interface AccrualViewProps {
   readonly onConfirm: () => void;
   readonly onViewRuns: () => void;
   readonly onOpenPlan: () => void;
+  /** Leads to the map of posting accounts, which a blocker of the posting accounts is fixed in (another area: only its address is shared). */
+  readonly onOpenPostingAccounts: () => void;
   readonly onGoToPlans: () => void;
 }
 
@@ -146,11 +149,14 @@ function PreviewResult({
   state,
   onConfirm,
   onOpenPlan,
+  onOpenPostingAccounts,
   onRecalculate,
 }: {
   readonly state: Extract<AccrualResultState, { kind: "ready" }>;
   readonly onConfirm: () => void;
   readonly onOpenPlan: () => void;
+  /** Leads to the map of posting accounts, which a blocker of the posting accounts is fixed in (another area: only its address is shared). */
+  readonly onOpenPostingAccounts: () => void;
   readonly onRecalculate: () => void;
 }) {
   const { t } = useAdminText();
@@ -171,6 +177,9 @@ function PreviewResult({
               ))}
             </ul>
             {preview.blockers.some((blocker) => BLOCKERS_ABOUT_THE_PLAN.includes(blocker)) ? link(planHref, onOpenPlan, t("charges.accrual.blockers.openPlan")) : null}
+            {preview.blockers.includes("posting-accounts-incomplete")
+              ? link(LEDGER_PATHS.postingMap, onOpenPostingAccounts, t("charges.accrual.blockers.openPostingAccounts"))
+              : null}
           </div>
         </Alert>
       ) : null}
@@ -250,6 +259,7 @@ export function AccrualView({
   onConfirm,
   onViewRuns,
   onOpenPlan,
+  onOpenPostingAccounts,
   onGoToPlans,
 }: AccrualViewProps) {
   const { t } = useAdminText();
@@ -375,7 +385,7 @@ export function AccrualView({
         </div>
       ) : null}
       {result.kind === "error" ? <ErrorState title={t("charges.accrual.previewFailed")} description={result.description} onRetry={result.onRetry} /> : null}
-      {result.kind === "ready" ? <PreviewResult state={result} onConfirm={onConfirm} onOpenPlan={onOpenPlan} onRecalculate={onPreview} /> : null}
+      {result.kind === "ready" ? <PreviewResult state={result} onConfirm={onConfirm} onOpenPlan={onOpenPlan} onOpenPostingAccounts={onOpenPostingAccounts} onRecalculate={onPreview} /> : null}
     </section>
   );
 }

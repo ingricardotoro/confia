@@ -21,6 +21,10 @@ import {
   GradeResponse,
   GuardianPageResponse,
   GuardianResponse,
+  LedgerAccountPageResponse,
+  LedgerAccountResponse,
+  PostingAccountMapResponse,
+  PostingAccountResponse,
   ImportBatchPageResponse,
   ImportRunResponse,
   ModalityPageResponse,
@@ -63,7 +67,9 @@ import {
   type EnrollmentTransferResponseOutput,
   type GradeResponseOutput,
   type GuardianResponseOutput,
+  type LedgerAccountResponseOutput,
   type LinkedStudentResponseOutput,
+  type PostingAccountResponseOutput,
   type ModalityResponseOutput,
   type PaymentConceptResponseOutput,
   type PriceListDetailResponseOutput,
@@ -930,4 +936,57 @@ export function accrualRunDetailRecord(
     totalItems: paging.total ?? items.length,
   });
   return { status: 200, body, contentType: JSON_TYPE };
+}
+
+// The chart of accounts and the map of posting accounts (ledger-chart-of-accounts cut). The codes and names are fictitious.
+export function ledgerAccount(override: Partial<LedgerAccountResponseOutput> = {}): LedgerAccountResponseOutput {
+  return checked("LedgerAccountResponse", LedgerAccountResponse, {
+    id: crypto.randomUUID(),
+    code: "ACT-01",
+    name: "Cuentas por cobrar de prueba",
+    type: "ASSET",
+    holdsStudentBalances: true,
+    active: true,
+    version: 0,
+    createdAt: STAMP,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+/** One page of accounts, as the server serves it: `total` counts every page, `items` only this one. */
+export function ledgerAccountPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("ledger accounts page", LedgerAccountPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The account a create (201) or an edit (200) answers with. */
+export function ledgerAccountRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("ledger account record", LedgerAccountResponse, row), contentType: JSON_TYPE };
+}
+
+/** One row of the map of posting accounts. */
+export function postingAccount(override: Partial<PostingAccountResponseOutput> = {}): PostingAccountResponseOutput {
+  return checked("PostingAccountResponse", PostingAccountResponse, {
+    id: crypto.randomUUID(),
+    purpose: "RECEIVABLE",
+    conceptCategory: null,
+    ledgerAccountId: crypto.randomUUID(),
+    version: 0,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+/** The map as `GET` and `PUT /charges/posting-accounts` answer it: the rows that were ever set. */
+export function postingAccountMap(items: readonly unknown[]): ContractResponse {
+  return { status: 200, body: checked("posting account map", PostingAccountMapResponse, { items }), contentType: JSON_TYPE };
 }

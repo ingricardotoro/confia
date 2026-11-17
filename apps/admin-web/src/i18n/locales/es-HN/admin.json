@@ -102,7 +102,10 @@
     "staleVersion": "El registro cambió desde que lo abrió y sus cambios no se guardaron. Los datos ya se recargaron: cierre y vuelva a abrir el registro, revíselo y repita el cambio.",
     "accrualRunInProgress": "Ya hay una generación de cargos en curso para este plan y período. Espere a que termine y revise su resultado en las ejecuciones; no hace falta repetirla.",
     "planItemInvalid": "Un concepto de este plan de única vez tiene más de un período. Corrija el plan antes de generar cargos.",
-    "idempotencyPayloadMismatch": "Esta confirmación ya se había usado para otra solicitud distinta. Cierre la ventana, calcule la vista previa de nuevo y confirme otra vez."
+    "idempotencyPayloadMismatch": "Esta confirmación ya se había usado para otra solicitud distinta. Cierre la ventana, calcule la vista previa de nuevo y confirme otra vez.",
+    "duplicateAccountCode": "Ya existe una cuenta con ese código.",
+    "accountInUse": "La cuenta está en uso en el mapa de cuentas de cargos, que todavía apunta a ella, y no se puede desactivar. Cambie primero el mapa para que apunte a otra cuenta y después desactívela.",
+    "postingAccountInvalid": "Una de las cuentas elegidas no es del tipo que exige su renglón del mapa. Ya se recargaron las cuentas; revise las que eligió e intente de nuevo."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -168,6 +171,7 @@
     "catalog": "Catálogo",
     "charges": "Cobros",
     "accrual": "Generación de cargos",
+    "ledger": "Plan de cuentas",
     "groups": {
       "community": "Comunidad educativa",
       "finance": "Finanzas",
@@ -589,10 +593,11 @@
       "blockers": {
         "heading": "La generación no se puede confirmar todavía",
         "plan-not-active": "El plan no está activo. Solo un plan activo genera cargos.",
-        "posting-accounts-incomplete": "Falta configurar el mapa de cuentas contables de los cargos. Pida a un administrador que lo complete antes de generar.",
+        "posting-accounts-incomplete": "Falta configurar el mapa de cuentas contables de los cargos. Un Super Administrador lo completa en «Plan de cuentas», en la vista «Mapa de cuentas de cargos», antes de generar.",
         "plan-target-outside-year": "El grado o la sección del plan queda fuera del año lectivo del plan. Corrija el plan para poder generar.",
         "unknown": "Hay una condición del servidor que impide generar este período.",
-        "openPlan": "Abrir el plan"
+        "openPlan": "Abrir el plan",
+        "openPostingAccounts": "Abrir el mapa de cuentas de cargos"
       },
       "nothingToCreate": "Con esta vista previa no hay cargos nuevos que crear, así que no hay nada que confirmar.",
       "items": {
@@ -753,6 +758,116 @@
         "emptyTitle": "Esta ejecución no tiene renglones",
         "emptyDescription": "Esta ejecución no evaluó a ningún estudiante, por eso no hay nada que listar."
       }
+    }
+  },
+  "ledger": {
+    "title": "Plan de cuentas",
+    "tabsLabel": "Vistas del plan de cuentas",
+    "tabs": {
+      "accounts": "Plan de cuentas",
+      "postingMap": "Mapa de cuentas de cargos"
+    },
+    "common": {
+      "yes": "Sí",
+      "no": "No"
+    },
+    "types": {
+      "ASSET": "Activo",
+      "LIABILITY": "Pasivo",
+      "EQUITY": "Patrimonio",
+      "INCOME": "Ingreso",
+      "EXPENSE": "Gasto"
+    },
+    "accounts": {
+      "heading": "Cuentas contables",
+      "description": "Las cuentas donde se registran los cargos y los cobros. Una cuenta no se borra: se desactiva y deja de aceptar registros nuevos.",
+      "caption": "Cuentas contables de la institución",
+      "create": "Nueva cuenta",
+      "createTitle": "Nueva cuenta contable",
+      "createDescription": "Defina la cuenta. El código, el tipo y la marca de saldos de estudiantes no se pueden cambiar después de crearla.",
+      "editTitle": "Editar cuenta contable",
+      "editDescription": "Cambie el nombre o el estado de la cuenta. El código, el tipo y la marca de saldos de estudiantes no se pueden cambiar.",
+      "emptyTitle": "Todavía no hay cuentas contables",
+      "emptyDescription": "Cree las cuentas de la institución para poder configurar el mapa de cuentas de cargos y generar cargos.",
+      "emptyAction": "Crear la primera cuenta",
+      "loadFailed": "No se pudo cargar el plan de cuentas",
+      "codeHelp": "Letras, números, punto, guion y guion bajo; empiece por una letra o un número. Hasta 30 caracteres. No se distingue entre mayúsculas y minúsculas.",
+      "optionLabel": "{code} · {name}",
+      "columns": {
+        "code": "Código",
+        "name": "Nombre",
+        "type": "Tipo",
+        "studentBalances": "Saldos de estudiantes"
+      },
+      "filterType": "Tipo",
+      "filterActive": "Estado",
+      "fields": {
+        "code": "Código",
+        "name": "Nombre",
+        "type": "Tipo de cuenta",
+        "holdsStudentBalances": "Lleva los saldos de los estudiantes",
+        "active": "Cuenta activa"
+      },
+      "holdsHelp": "Marque esta opción solo en la cuenta que lleva el saldo de cada estudiante, como las cuentas por cobrar. Solo una cuenta de tipo Activo o Pasivo puede llevarla.",
+      "holdsUnavailable": "Solo una cuenta de tipo Activo o Pasivo puede llevar los saldos de los estudiantes.",
+      "activeHelp": "Una cuenta inactiva no acepta registros nuevos; lo ya registrado se conserva. Si el mapa de cuentas de cargos la usa, no se puede desactivar.",
+      "errors": {
+        "duplicateCode": "Ya existe una cuenta con ese código. El código no distingue entre mayúsculas y minúsculas."
+      }
+    },
+    "map": {
+      "heading": "Mapa de cuentas de cargos",
+      "description": "Dice a qué cuenta contable se registra cada cargo: las cuentas por cobrar, el impuesto por pagar y el ingreso de cada categoría de concepto. Solo un Super Administrador puede cambiarlo.",
+      "loading": "Cargando el mapa de cuentas de cargos.",
+      "loadFailed": "No se pudo cargar el mapa de cuentas de cargos",
+      "incompleteTitle": "El mapa de cuentas está incompleto",
+      "incompleteBody": "Mientras falten cuentas que el plan necesita, la generación de cargos queda bloqueada: la vista previa lo avisa y no se puede confirmar.",
+      "missingLead": "Falta configurar:",
+      "completeNote": "Todas las cuentas principales están configuradas.",
+      "noAccountsTitle": "Todavía no hay cuentas activas",
+      "noAccountsDescription": "Para configurar el mapa primero hace falta cargar el plan de cuentas.",
+      "noAccountsAction": "Ir al plan de cuentas",
+      "groups": {
+        "core": "Cuentas principales",
+        "coreDescription": "Las cuentas por cobrar y el impuesto por pagar son las mismas para todos los cargos.",
+        "revenue": "Ingresos por categoría",
+        "revenueDescription": "Cada categoría de concepto puede tener su cuenta de ingreso. Si una categoría no tiene cuenta propia, usa el ingreso por defecto."
+      },
+      "roles": {
+        "RECEIVABLE": "Cuentas por cobrar a estudiantes",
+        "TAX_PAYABLE": "Impuesto por pagar",
+        "REVENUE_DEFAULT": "Ingreso por defecto",
+        "REVENUE_TUITION": "Ingreso por colegiatura",
+        "REVENUE_ENROLLMENT": "Ingreso por matrícula",
+        "REVENUE_TRANSPORT": "Ingreso por transporte",
+        "REVENUE_MATERIAL": "Ingreso por materiales",
+        "REVENUE_FINE": "Ingreso por multas",
+        "REVENUE_OTHER": "Otros ingresos"
+      },
+      "help": {
+        "RECEIVABLE": "Se elige entre las cuentas activas de tipo Activo que llevan los saldos de los estudiantes. Cada cargo la debita.",
+        "TAX_PAYABLE": "Se elige entre las cuentas activas de tipo Pasivo que no llevan saldos de estudiantes. Recibe el impuesto de los conceptos gravados.",
+        "REVENUE_DEFAULT": "Se elige entre las cuentas activas de tipo Ingreso. La usan las categorías que no tienen una cuenta propia.",
+        "REVENUE": "Se elige entre las cuentas activas de tipo Ingreso. Si se deja sin configurar, la categoría usa el ingreso por defecto."
+      },
+      "status": {
+        "set": "Configurada",
+        "notSet": "Sin configurar"
+      },
+      "choose": "Elija una cuenta",
+      "noOptions": "No hay cuentas activas de este tipo. Créela en el plan de cuentas.",
+      "heldUnknown": "Cuenta no disponible en la lista",
+      "save": "Guardar mapa",
+      "reset": "Descartar cambios",
+      "pending": "{count, plural, one {# cambio sin guardar} other {# cambios sin guardar}}",
+      "nothingToSave": "No hay cambios por guardar.",
+      "saving": "Guardando el mapa de cuentas de cargos.",
+      "saved": "Se guardó el mapa de cuentas de cargos.",
+      "staleVersion": "El mapa cambió desde que lo abrió y no se guardó ningún cambio. Ya se recargó con los valores actuales: revíselos y repita su cambio.",
+      "accountMissing": "Una de las cuentas elegidas ya no existe. Ya se recargaron las cuentas; revise las que eligió e intente de nuevo.",
+      "readOnlyTitle": "Solo lectura",
+      "readOnlyBody": "Su rol no puede cambiar el mapa de cuentas de cargos: solo un Super Administrador lo hace. Aquí puede consultar cómo está configurado.",
+      "caption": "Cuentas de cargos"
     }
   },
   "resource": {
