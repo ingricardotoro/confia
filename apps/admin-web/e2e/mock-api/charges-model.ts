@@ -8,6 +8,7 @@ import {
   problem,
   type ContractResponse,
 } from "../../src/test/contract-responses.ts";
+import { createAccrualSimulator, type AccrualScenario, type AccrualSimulator } from "./accrual-model.ts";
 import type { CatalogModel } from "./catalog-model.ts";
 import {
   emptyPlans,
@@ -17,6 +18,7 @@ import {
 } from "./charges-seed.ts";
 import type { OrganizationModel } from "./organization-model.ts";
 import type { ModelResponse } from "./session-model.ts";
+import type { StudentsModel } from "./students-model.ts";
 
 /**
  * The charge plans of the simulated API (charges-plans cut): the six operations of `/api/v1/charges/plans`, over rows kept
@@ -49,9 +51,16 @@ export interface ChargesOptions {
   readonly writes: "allowed" | "forbidden" | "stale-first";
   /** `failing-first`: the first reads answer 500, then they recover. */
   readonly reads: "ok" | "failing-first";
+  /**
+   * The accrual engine (charges-accrual cut): `default` seeds four runs and lets a preview and a run go through; `empty` seeds none;
+   * `blocked` makes the preview report posting accounts that are not complete; `digest-changed` moves the calculation after the
+   * first preview, so the run is rejected; `in-progress` answers 409 to a request; `forbidden` refuses the preview and the request
+   * with 403; `preview-fails-first` fails the first preview with 500.
+   */
+  readonly accrual: AccrualScenario;
 }
 
-export const DEFAULT_CHARGES: ChargesOptions = { seed: "seeded", writes: "allowed", reads: "ok" };
+export const DEFAULT_CHARGES: ChargesOptions = { seed: "seeded", writes: "allowed", reads: "ok", accrual: "default" };
 
 export interface ChargesRequest {
   readonly method: string;
@@ -59,6 +68,8 @@ export interface ChargesRequest {
   readonly query: URLSearchParams;
   /** The parsed JSON body, or `undefined` when there was none or it was not JSON. */
   readonly body: unknown;
+  /** The headers of the request, with their names in lower case (the accrual request needs its `Idempotency-Key`). */
+  readonly headers?: Readonly<Record<string, string | undefined>>;
 }
 
 export interface ChargesModel {
@@ -67,6 +78,8 @@ export interface ChargesModel {
   /** What the scenario holds now, for a unit test; never the page. */
   plans(): readonly ChargePlanRow[];
   items(): readonly ChargePlanItemRow[];
+  /** The accrual engine of the scenario, for a unit test. */
+  accrual(): AccrualSimulator;
 }
 
 const wrap = (response: ContractResponse): ModelResponse => ({ ...response, headers: {}, setCookies: [] });
@@ -86,7 +99,7 @@ function schemaFailure(issues: readonly { path: PropertyKey[]; code: string }[])
 
 export function createChargesModel(
   options: ChargesOptions,
-  context: { readonly organization: OrganizationModel; readonly catalog: CatalogModel },
+  context: { readonly organization: OrganizationModel; readonly catalog: CatalogModel; readonly students?: StudentsModel },
   now: () => Date = () => new Date(),
 ): ChargesModel {
   const data = options.seed === "seeded" ? seededPlans() : emptyPlans();
@@ -95,6 +108,13 @@ export function createChargesModel(
   let staleServed = false;
 
   const org = () => context.organization.rows();
+  const accrual = createAccrualSimulator(options.accrual, {
+    plans: () => data,
+    students: () => context.students?.rows().students ?? [],
+    concepts: () => context.catalog.rows(),
+    readFailure,
+    now,
+  });
 
   /** The first edit of the `stale-first` scenario: someone else "saved" first, so the plan moves on and the edit is refused. */
   function staleFirst(plan: { version: number }): boolean {
@@ -253,7 +273,11 @@ export function createChargesModel(
   return {
     plans: () => data.plans,
     items: () => data.items,
-    handle({ method, path, query, body }) {
+    accrual: () => accrual,
+    handle({ method, path, query, body, headers }) {
+      // The accrual engine has its own routes: the periods and the preview and request of a plan, and the runs.
+      const accrued = accrual.handle({ method, path, query, body, ...(headers === undefined ? {} : { headers }) });
+      if (accrued !== undefined) return accrued;
       const match = /^\/api\/v1\/charges\/plans(?:\/([^/]+)(?:(\/items)(?:\/([^/]+))?)?)?$/.exec(path);
       if (match === null) return undefined;
       const [, id, items, itemId] = match;

@@ -1646,3 +1646,75 @@ describe("the charge plans [charges-plans]", { timeout: LIMIT }, () => {
     expect(removed.text).toBe("");
   });
 });
+
+describe("the accrual engine [charges-accrual]", { timeout: LIMIT }, () => {
+  const ACTIVE_PLAN = "00000000-0000-4000-8000-000000009001";
+  const PLAN = `/api/v1/charges/plans/${ACTIVE_PLAN}`;
+  const FRESH = { periodStart: "2026-05-01" };
+
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const bearer = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path: string, options: { body?: unknown; key?: string } = {}) =>
+      call(method, path, {
+        headers: { ...bearer, ...(options.key === undefined ? {} : { "Idempotency-Key": options.key }) },
+        scenario: id,
+        ...(options.body === undefined ? {} : { body: options.body }),
+      });
+  }
+
+  it("answers 401 to every operation without an access token", async () => {
+    const answers = [
+      await call("GET", `${PLAN}/accrual-periods`, { scenario: "acc-401" }),
+      await call("POST", `${PLAN}/accrual-preview`, { scenario: "acc-401", body: FRESH }),
+      await call("GET", "/api/v1/charges/accrual-runs", { scenario: "acc-401" }),
+    ];
+
+    expect(answers.map((answer) => answer.status)).toEqual([401, 401, 401]);
+  });
+
+  it("carries the Idempotency-Key of the request to the engine: without it 400, with it 202 and the same run for the same key", async () => {
+    const send = await session("acc-key");
+
+    const missing = await send("POST", `${PLAN}/accrual-runs`, { body: FRESH });
+    const first = await send("POST", `${PLAN}/accrual-runs`, { body: FRESH, key: "k-1" });
+    const again = await send("POST", `${PLAN}/accrual-runs`, { body: FRESH, key: "k-1" });
+
+    expect([missing.status, typeOf(missing)]).toEqual([400, "idempotency-key-missing"]);
+    expect(first.status).toBe(202);
+    expect(again.json).toMatchObject({ id: (first.json as { id: string }).id });
+  });
+
+  it("serves a run that progresses over its reads", async () => {
+    const send = await session("acc-run");
+    const queued = await send("POST", `${PLAN}/accrual-runs`, { body: FRESH, key: "k-1" });
+    const id = (queued.json as { id: string }).id;
+
+    const statuses = [await send("GET", `/api/v1/charges/accrual-runs/${id}`), await send("GET", `/api/v1/charges/accrual-runs/${id}`), await send("GET", `/api/v1/charges/accrual-runs/${id}`)];
+
+    expect(statuses.map((reply) => (reply.json as { run: { status: string } }).run.status)).toEqual(["QUEUED", "RUNNING", "COMPLETED_WITH_ERRORS"]);
+  });
+
+  it.each([
+    ["charges-accrual-forbidden", "forbidden", 403],
+    ["charges-accrual-in-progress", "accrual-run-in-progress", 409],
+  ] as const)("serves the %s preset: the request is refused with %s", async (name, code, status) => {
+    const send = await session(`acc-${name}`, name);
+
+    const refused = await send("POST", `${PLAN}/accrual-runs`, { body: FRESH, key: "k-1" });
+
+    expect([refused.status, typeOf(refused)]).toEqual([status, code]);
+  });
+
+  it("serves the empty and blocked presets", async () => {
+    const empty = await session("acc-empty", "charges-accrual-empty");
+    const blocked = await session("acc-blocked", "charges-accrual-blocked");
+
+    const runs = await empty("GET", "/api/v1/charges/accrual-runs");
+    const preview = await blocked("POST", `${PLAN}/accrual-preview`, { body: FRESH });
+
+    expect(runs.json).toMatchObject({ total: 0 });
+    expect(preview.json).toMatchObject({ blockers: ["posting-accounts-incomplete"] });
+  });
+});

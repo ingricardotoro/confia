@@ -9,3 +9,18 @@ export const chargePlanKeys = {
   details: () => [...chargePlanKeys.all, "detail"] as const,
   detail: (id: string) => [...chargePlanKeys.details(), id] as const,
 };
+
+/**
+ * Query keys of the accrual engine, general to specific, so a prefix invalidates what it covers: everything the engine
+ * shows, the periods of one plan, every list of runs, one list, every run, one run with the page of its items. The preview
+ * is a request that writes nothing and is not cached, so it has no key.
+ */
+export const accrualKeys = {
+  all: ["charges", "accrual"] as const,
+  periods: (planId: string) => [...accrualKeys.all, "periods", planId] as const,
+  runs: () => [...accrualKeys.all, "runs"] as const,
+  runLists: () => [...accrualKeys.runs(), "list"] as const,
+  runList: (params: object) => [...accrualKeys.runLists(), params] as const,
+  runDetails: () => [...accrualKeys.runs(), "detail"] as const,
+  runDetail: (id: string, params: object) => [...accrualKeys.runDetails(), id, params] as const,
+};

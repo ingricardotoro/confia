@@ -22,3 +22,30 @@ export const chargePlansSearch = z.object({
 });
 
 export type ChargePlansSearch = z.infer<typeof chargePlansSearch>;
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The plan and the period of the generation page, so a link opens it already pointed at what to generate. */
+export const accrualSearch = z.object({
+  planId: optionalId,
+  periodStart: z.string().regex(ISO_DAY).optional().catch(undefined),
+});
+
+export type AccrualSearch = z.infer<typeof accrualSearch>;
+
+/** The runs list: the common paging and the one filter the API takes, the plan. The API orders runs by itself, newest first. */
+export const accrualRunsSearch = z.object({
+  page,
+  pageSize,
+  planId: optionalId,
+});
+
+export type AccrualRunsSearch = z.infer<typeof accrualRunsSearch>;
+
+/** The page of items of one run. */
+export const accrualRunSearch = z.object({
+  page,
+  pageSize,
+});
+
+export type AccrualRunSearch = z.infer<typeof accrualRunSearch>;

@@ -39,7 +39,7 @@ export function createAppRouter({ session, history }: AppRouterOptions) {
 
   // One sender for the tab: it asks the session for a token on every request, so no screen ever holds one.
   const send: AuthorizedSend = (operation) => session.authorized(operation);
-  const entries = [HOME_ENTRY, ...FEATURES.map((feature) => feature.navigation)];
+  const entries = [HOME_ENTRY, ...FEATURES.flatMap((feature) => [feature.navigation, ...(feature.moreNavigation ?? [])])];
   const shellRoute = createRoute({
     getParentRoute: () => rootRoute,
     id: "shell",

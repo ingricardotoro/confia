@@ -51,6 +51,7 @@ describe("the signed in shell", () => {
         "Encargados",
         "Catálogo",
         "Cobros",
+        "Generación de cargos",
         "Estructura académica",
         "Importaciones",
       ]);
@@ -112,6 +113,7 @@ describe("the signed in shell", () => {
         "Encargados",
         "Catálogo",
         "Cobros",
+        "Generación de cargos",
         "Estructura académica",
       ]) {
         await user.tab();

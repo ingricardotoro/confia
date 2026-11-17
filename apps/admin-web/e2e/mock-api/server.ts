@@ -237,7 +237,14 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
       if (session.status !== 200) { deliver(res, scenario, "charges", session); return; }
       const url = new URL(req.url ?? "/", "http://localhost");
       const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
-      const answer = scenario.charges.handle({ method, path, query: url.searchParams, body });
+      const answer = scenario.charges.handle({
+        method,
+        path,
+        query: url.searchParams,
+        body,
+        // The request of an accrual run needs its `Idempotency-Key`.
+        headers: { "idempotency-key": typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : undefined },
+      });
       if (answer !== undefined) { deliver(res, scenario, "charges", answer); return; }
     }
     // The guardians, and the guardians of one student (a route below the students that this model owns).

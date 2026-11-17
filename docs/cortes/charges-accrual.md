@@ -322,3 +322,49 @@ abiertas» donde difieren.
   clave faltante, el rol sin permiso y el aislamiento).
 - **Pendiente:** pantalla de generación (corte 3a-2); ~~`GET`/`PUT /charges/posting-accounts` y `GET`/`POST /ledger/accounts` con
   `ledger:create`~~ (construidos en `docs/cortes/ledger-chart-of-accounts.md`); reverso de cargo y trabajo nocturno de integridad (corte 3b); decisión fiscal del contador.
+
+## Construido (frontend, corte 3a-2)
+
+Pantallas de `apps/admin-web` sobre las cinco rutas de `/api/v1/charges` del corte 3a-1. Está en la navegación, grupo «Finanzas», como
+segunda entrada de la feature `charges` («Generación de cargos»; la primera sigue siendo «Cobros», los planes). Una feature puede
+declarar ahora `moreNavigation` además de `navigation`.
+
+- **Generación de cargos** (`/charges/accrual?planId=&periodStart=`): se elige un plan **activo** y uno de los períodos que lista el
+  servidor (`accrual-periods`, con la última ejecución de cada uno; nunca una fecha libre). La selección vive en la URL. «Calcular vista
+  previa» (`accrual-preview`) muestra el resumen (estudiantes evaluados, cargos por crear, ya generados, generados por otro plan, con error),
+  los totales por moneda con `MoneyAmount` a partir de las cadenas del servidor (el navegador no suma, no redondea y no convierte a
+  `number`), los errores por código con texto legible y una explicación, y una tabla densa de renglones con base, impuesto, total y
+  resultado. Los bloqueos (`plan-not-active`, `posting-accounts-incomplete`, `plan-target-outside-year`) se explican en lenguaje claro,
+  con enlace al plan cuando es del plan, y deshabilitan la confirmación; sin cargos por crear tampoco hay nada que confirmar.
+- **Confirmación**: «Confirmar generación» abre un diálogo que dice qué se asentará en el libro mayor, el total por moneda y que no se
+  puede deshacer desde la pantalla. La confirmación es una **intención** con su `Idempotency-Key` (UUID, una sola vez al abrir el
+  diálogo) y el `previewDigest` de la vista previa vista; se reutiliza la misma clave si se reintenta con el mismo diálogo (respuesta
+  que nunca llegó) y se genera otra al abrir un diálogo nuevo. Sin actualización optimista; el botón espera y el diálogo no se cierra
+  mientras la petición está en vuelo. 409 `accrual-run-in-progress`, 422 `idempotency-payload-mismatch`, 403 y 400 se muestran dentro
+  del diálogo con textos propios y el identificador de soporte. Tras el 202 se invalida todo `accrualKeys` y `chargePlanKeys` y se sigue la
+  ejecución en su página (cuando existan estado de cuenta, saldo e indicadores se agregan sus prefijos).
+- **Ejecuciones** (`/charges/accrual/runs`): lista paginada por el servidor (más recientes primero), filtro por plan, página y plan en la URL;
+  si alguna está en cola o en curso la lista se relee sola. **Detalle** (`/charges/accrual/runs/$runId`): estado con punto, contadores,
+  fechas, región viva con el avance, y los renglones paginados por el servidor con el error en texto legible. Mientras la ejecución está
+  `QUEUED` o `RUNNING` se relee cada 2 s (`refetchInterval`) y se detiene en el primer estado terminal. Una ejecución `REJECTED` por
+  `preview-outdated` explica que los datos cambiaron y ofrece «Calcular de nuevo» con el plan y el período ya elegidos.
+- **Contrato**: cuatro códigos de problema nuevos (`accrual-run-in-progress`, `plan-item-invalid`, `idempotency-key-missing`,
+  `idempotency-payload-mismatch`). El cliente (`shared/api/charges-operations.ts`) descarta los `null` antes de validar (ver más abajo).
+  Nombres de estudiantes y conceptos por consultas de apoyo (`shared/student-lookups`, la de conceptos existente); los planes por la lista.
+- **Simulador** (`e2e/mock-api/accrual-model.ts`, pruebas en `accrual-model.test.ts` y `server.test.ts`): periodos derivados de los renglones del plan, vista previa con
+  `previewDigest`, solicitud con `Idempotency-Key` (misma clave y cuerpo: misma ejecución; otro cuerpo: 422; otra clave con ejecución
+  viva: 409), ejecución que pasa por `QUEUED`, `RUNNING` y un estado terminal en tres lecturas, cuatro ejecuciones sembradas (completada, con
+  errores, rechazada, fallida) y los presets `charges-accrual-empty|blocked|digest-changed|in-progress|forbidden|preview-error`. Los
+  importes se calculan allí porque hace de servidor.
+- **Pruebas**: Vitest de cliente, modelo de la pantalla, vistas, contenedores (MSW), simulador; Playwright `charges-accrual-preview|run|states|keyboard`
+  y 17 combinaciones nuevas de la matriz de accesibilidad (escritas; **no se ejecutaron** en este paso).
+- **Huecos del contrato (para el backend)**: (1) `GET accrual-runs` solo filtra por `planId`: no hay filtro por estado, así que la lista
+  no lo ofrece; (2) `GET accrual-runs/{id}` no filtra los renglones (p. ej. solo errores), así que el filtro de errores solo existe sobre la
+  vista previa, que llega completa (hasta 500 renglones) en una sola respuesta, y la página de una ejecución muestra todos sus renglones en
+  páginas; (3) la ejecución no trae quién la pidió (solo cuándo), así que la pantalla no muestra el solicitante; (4) los renglones traen
+  solo `studentId`: la pantalla nombra a los estudiantes con la primera página (200) del registro y muestra «No disponible» para los demás;
+  conviene un nombre y un código en el renglón o un filtro por ids; (5) el servidor escribe `null` en `lastRun`, `base`, `tax` y `total`, pero el
+  esquema generado los acepta solo ausentes (`$ref` con `nullable` no genera `nullish`); el cliente los descarta antes de validar, lo
+  correcto es declararlos anulables en el OpenAPI; (6) el período se muestra con la etiqueta `AAAA-MM` del servidor.
+- **No construido**: botón «Generar cargos» en el detalle del plan (la nota lo menciona; hoy se llega por la navegación y la URL admite
+  `?planId=`); mapa contable y plan de cuentas (siguen solo como rutas del backend).

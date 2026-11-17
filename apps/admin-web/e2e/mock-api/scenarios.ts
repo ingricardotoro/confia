@@ -107,6 +107,14 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   "charges-stale-version": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, writes: "stale-first" } },
   "charges-forbidden": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, writes: "forbidden" } },
   "charges-server-error": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, reads: "failing-first" } },
+  // The accrual engine (charges-accrual cut): no runs, a preview that is blocked, a run rejected by a changed digest, a run already in
+  // progress, a person who cannot generate, and a preview that fails once. Each one signs in as the default does.
+  "charges-accrual-empty": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, accrual: "empty" } },
+  "charges-accrual-blocked": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, accrual: "blocked" } },
+  "charges-accrual-digest-changed": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, accrual: "digest-changed" } },
+  "charges-accrual-in-progress": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, accrual: "in-progress" } },
+  "charges-accrual-forbidden": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, accrual: "forbidden" } },
+  "charges-accrual-preview-error": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, accrual: "preview-fails-first" } },
   "contract-violation": {
     login: "second-factor-enrollment-required",
     enrolled: false,
@@ -161,7 +169,7 @@ function build(preset: string, definition: PresetDefinition): Scenario {
     guardians: createGuardiansModel(definition.guardians ?? DEFAULT_GUARDIANS, { students }),
     imports: createImportsModel(definition.imports ?? DEFAULT_IMPORTS),
     catalog,
-    charges: createChargesModel(definition.charges ?? DEFAULT_CHARGES, { organization, catalog }),
+    charges: createChargesModel(definition.charges ?? DEFAULT_CHARGES, { organization, catalog, students }),
     calls: [],
     tamper: definition.tamper,
     async signIn(sleep) {

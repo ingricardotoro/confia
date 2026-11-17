@@ -68,6 +68,10 @@ describe("the known codes", () => {
         "plan-without-items",
         "duplicate-plan-item",
         "stale-version",
+        "accrual-run-in-progress",
+        "plan-item-invalid",
+        "idempotency-key-missing",
+        "idempotency-payload-mismatch",
       ].sort(),
     );
   });

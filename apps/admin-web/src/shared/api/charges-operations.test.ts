@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  accrualPeriod,
+  accrualPeriodsRecord,
+  accrualPreview,
+  accrualPreviewRecord,
+  accrualRun,
+  accrualRunDetailRecord,
+  accrualRunItem,
+  accrualRunPage,
+  accrualRunRecord,
   chargePlan,
   chargePlanDetail,
   chargePlanDetailRecord,
@@ -11,7 +20,19 @@ import {
   problem,
 } from "../../test/contract-responses.ts";
 import { installMswServer, requests, route } from "../../test/msw-server.ts";
-import { addChargePlanItem, createChargePlan, getChargePlan, listChargePlans, removeChargePlanItem, updateChargePlan } from "./charges-operations.ts";
+import {
+  addChargePlanItem,
+  createChargePlan,
+  getAccrualRun,
+  getChargePlan,
+  listAccrualPeriods,
+  listAccrualRuns,
+  listChargePlans,
+  previewAccrual,
+  removeChargePlanItem,
+  requestAccrualRun,
+  updateChargePlan,
+} from "./charges-operations.ts";
 
 // The six operations of /api/v1/charges/plans over the real transport and the test server: the path, the query, the
 // bearer token and the body of each, and the schema each answer must meet. None moves money, so none sends an
@@ -140,4 +161,129 @@ describe("the writes", () => {
       });
     },
   );
+});
+
+// The accrual engine: the periods, the preview, the request of a run (the one operation here that writes the ledger, so
+// the only one that sends an Idempotency-Key) and the reading of runs.
+describe("the accrual operations", () => {
+  const PLAN = `${BASE}/${ID}`;
+  const RUNS = "/api/v1/charges/accrual-runs";
+  const KEY = "5d0b6a82-6f7e-4e6c-8b7f-1b0a3f2f7c11";
+  const DIGEST = "c".repeat(64);
+
+  it("reads the periods of a plan with the bearer token, and a null last run reads as none", async () => {
+    route("get", `${PLAN}/accrual-periods`, accrualPeriodsRecord([accrualPeriod()]));
+
+    const result = await listAccrualPeriods("tok-1", ID);
+
+    expect(result.kind).toBe("ok");
+    const [sent] = requests();
+    expect(sent?.method).toBe("GET");
+    expect(sent?.headers.get("Authorization")).toBe("Bearer tok-1");
+    expect(sent?.headers.has("Idempotency-Key")).toBe(false);
+  });
+
+  it("accepts the null the server writes for an absent last run", async () => {
+    route("get", `${PLAN}/accrual-periods`, {
+      status: 200,
+      contentType: "application/json",
+      body: [{ ...accrualPeriod(), lastRun: null }],
+    });
+
+    const result = await listAccrualPeriods("tok", ID);
+
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") expect(result.data[0]?.lastRun).toBeUndefined();
+  });
+
+  it("previews a period with the period in the body and no Idempotency-Key, and keeps the amounts as the strings the server sent", async () => {
+    route("post", `${PLAN}/accrual-preview`, accrualPreviewRecord(accrualPreview()));
+
+    const result = await previewAccrual("tok", ID, { periodStart: "2027-02-01" });
+
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.data.totals[0]?.total).toEqual({ amount: "3450.00", currency: "HNL" });
+      expect(typeof result.data.totals[0]?.total.amount).toBe("string");
+    }
+    const [sent] = requests();
+    expect(JSON.parse(sent?.body ?? "{}")).toEqual({ periodStart: "2027-02-01" });
+    expect(sent?.headers.has("Idempotency-Key")).toBe(false);
+  });
+
+  it("accepts the nulls of an item in error (no amounts) in the preview", async () => {
+    const body = { ...accrualPreview(), items: [{ studentId: ID, paymentConceptId: ITEM, outcome: "ERROR", errorCode: "NO_PRICE", base: null, tax: null, total: null, existingChargeId: null }] };
+    route("post", `${PLAN}/accrual-preview`, { status: 200, contentType: "application/json", body });
+
+    const result = await previewAccrual("tok", ID, { periodStart: "2027-02-01" });
+
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") expect(result.data.items[0]?.base).toBeUndefined();
+  });
+
+  it("requests a run with the Idempotency-Key in the header, the period and the digest in the body, and the 202 answer", async () => {
+    route("post", `${PLAN}/accrual-runs`, accrualRunRecord(accrualRun({ status: "QUEUED" })));
+
+    const result = await requestAccrualRun("tok-2", ID, { periodStart: "2027-02-01", previewDigest: DIGEST }, KEY);
+
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.status).toBe(202);
+      expect(result.data.status).toBe("QUEUED");
+    }
+    const [sent] = requests();
+    expect(sent?.method).toBe("POST");
+    expect(sent?.headers.get("Idempotency-Key")).toBe(KEY);
+    expect(sent?.headers.get("Authorization")).toBe("Bearer tok-2");
+    expect(JSON.parse(sent?.body ?? "{}")).toEqual({ periodStart: "2027-02-01", previewDigest: DIGEST });
+  });
+
+  it("sends the same Idempotency-Key when the same intent is sent again", async () => {
+    route("post", `${PLAN}/accrual-runs`, "network-error", accrualRunRecord(accrualRun({ status: "QUEUED" })));
+
+    const first = await requestAccrualRun("tok", ID, { periodStart: "2027-02-01", previewDigest: DIGEST }, KEY);
+    const second = await requestAccrualRun("tok", ID, { periodStart: "2027-02-01", previewDigest: DIGEST }, KEY);
+
+    expect(first.kind).toBe("network");
+    expect(second.kind).toBe("ok");
+    expect(requests().map((sent) => sent.headers.get("Idempotency-Key"))).toEqual([KEY, KEY]);
+  });
+
+  it("gives the 409 of a run in progress as a problem", async () => {
+    route("post", `${PLAN}/accrual-runs`, problem("accrual-run-in-progress", 409));
+
+    const result = await requestAccrualRun("tok", ID, { periodStart: "2027-02-01" }, KEY);
+
+    expect(result.kind === "problem" && result.problem.code).toBe("accrual-run-in-progress");
+  });
+
+  it("lists runs with page, size and the plan as query parameters, and no sort", async () => {
+    route("get", RUNS, accrualRunPage([accrualRun()]));
+
+    const result = await listAccrualRuns("tok", { page: 1, size: 25, planId: ID });
+
+    expect(result.kind).toBe("ok");
+    const [sent] = requests();
+    expect(Object.fromEntries(new URLSearchParams(sent?.search))).toEqual({ page: "1", size: "25", planId: ID });
+  });
+
+  it("reads one run with a page of items", async () => {
+    const run = accrualRun({ id: ITEM });
+    route("get", `${RUNS}/${ITEM}`, accrualRunDetailRecord(run, [accrualRunItem()]));
+
+    const result = await getAccrualRun("tok", ITEM, { page: 2, size: 50 });
+
+    expect(result.kind).toBe("ok");
+    const [sent] = requests();
+    expect(sent?.path).toBe(`${RUNS}/${ITEM}`);
+    expect(Object.fromEntries(new URLSearchParams(sent?.search))).toEqual({ page: "2", size: "50" });
+  });
+
+  it("is the unexpected-response result when an answer does not meet the contract", async () => {
+    route("get", `${PLAN}/accrual-periods`, { status: 200, contentType: "application/json", body: [{ periodStart: "soon" }] });
+
+    const result = await listAccrualPeriods("tok", ID);
+
+    expect(result.kind).toBe("unexpected-response");
+  });
 });

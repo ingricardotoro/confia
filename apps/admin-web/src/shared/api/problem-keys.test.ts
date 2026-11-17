@@ -59,6 +59,10 @@ describe("PROBLEM_KEYS", () => {
     ["plan-without-items", "problem.planWithoutItems"],
     ["duplicate-plan-item", "problem.duplicatePlanItem"],
     ["stale-version", "problem.staleVersion"],
+    ["accrual-run-in-progress", "problem.accrualRunInProgress"],
+    ["plan-item-invalid", "problem.planItemInvalid"],
+    ["idempotency-key-missing", "problem.unexpected"],
+    ["idempotency-payload-mismatch", "problem.idempotencyPayloadMismatch"],
   ] as const)("maps %s to %s", (code, key) => {
     expect(PROBLEM_KEYS[code]).toBe(key);
   });

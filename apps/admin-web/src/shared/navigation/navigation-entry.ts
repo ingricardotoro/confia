@@ -25,6 +25,8 @@ export interface NavigationEntry {
  */
 export interface FeatureModule {
   readonly navigation: NavigationEntry;
+  /** Further entries of the same feature, when it has more than one view that earns its own place in the navigation. */
+  readonly moreNavigation?: readonly NavigationEntry[];
   readonly createRoutes: (parent: AnyRoute) => AnyRoute[];
 }
 

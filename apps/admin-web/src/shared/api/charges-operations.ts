@@ -1,8 +1,21 @@
 import {
+  AccrualPeriodResponse,
+  AccrualPreviewResponse,
+  AccrualRunDetailResponse,
+  AccrualRunPageResponse,
+  AccrualRunResponse,
   ChargePlanDetailResponse,
   ChargePlanItemResponse,
   ChargePlanPageResponse,
   ChargePlanResponse,
+  type AccrualPeriodResponseOutput,
+  type AccrualPreviewRequest,
+  type AccrualPreviewResponseOutput,
+  type AccrualRunDetailResponseOutput,
+  type AccrualRunItemResponseOutput,
+  type AccrualRunPageResponseOutput,
+  type AccrualRunRequest,
+  type AccrualRunResponseOutput,
   type AddChargePlanItemRequest,
   type ChargePlanDetailResponseOutput,
   type ChargePlanItemResponseOutput,
@@ -11,13 +24,13 @@ import {
   type CreateChargePlanRequest,
   type UpdateChargePlanRequest,
 } from "@confia/contracts/admin";
-import { request, requestEmpty, type ApiResult } from "./http.ts";
+import { request, requestEmpty, type ApiResult, type ResponseSchema } from "./http.ts";
 import { resourceClient, type PageParams } from "./resource-client.ts";
 
 /**
  * The operations of `/api/v1/charges`. Each takes the access token as a parameter, like the operations of access: this
- * module knows no session. None moves money (a plan books nothing in the ledger and holds no price), so none sends an
- * `Idempotency-Key`. Paging, order and filters are the server's: they travel as query parameters and nothing here, or
+ * module knows no session. The plans move no money (a plan books nothing in the ledger and holds no price), so none of their
+ * operations sends an `Idempotency-Key`; the request of an accrual run does, because it writes the ledger. Paging, order and filters are the server's: they travel as query parameters and nothing here, or
  * after it, sorts or filters a page in the browser.
  */
 const { list, create, update } = resourceClient("/api/v1/charges");
@@ -59,3 +72,99 @@ export const addChargePlanItem = (token: string, planId: string, body: AddCharge
 /** Removes an item of a draft plan: the server answers `204` with no body. */
 export const removeChargePlanItem = (token: string, planId: string, itemId: string): Promise<ApiResult<undefined>> =>
   requestEmpty({ method: "DELETE", path: `${planPath(planId)}/items/${encodeURIComponent(itemId)}`, headers: bearer(token) });
+
+// The accrual engine (charges-accrual cut): the periods of a plan, the preview of one, the request of a run and the reading
+// of runs. The amounts of the preview travel as `{ amount, currency }` strings the server has already rounded: nothing here
+// parses, adds or rounds them.
+
+export type AccrualPeriod = AccrualPeriodResponseOutput;
+export type AccrualPreview = AccrualPreviewResponseOutput;
+export type AccrualRun = AccrualRunResponseOutput;
+export type AccrualRunDetail = AccrualRunDetailResponseOutput;
+export type AccrualRunItem = AccrualRunItemResponseOutput;
+export type AccrualRunPage = AccrualRunPageResponseOutput;
+export type AccrualRunStatus = AccrualRunResponseOutput["status"];
+export type AccrualOutcome = AccrualRunItemResponseOutput["outcome"];
+
+/**
+ * The server writes an absent value as `null` (the API keeps Jackson's default of including nulls), while the generated
+ * schema of a nested object (`lastRun`, and `base`, `tax` and `total` of an item) accepts only an absent key. A null is
+ * the same fact as an absent key, so it is dropped before the schema reads the body; nothing else changes.
+ */
+function withoutNulls(value: unknown): unknown {
+  if (Array.isArray(value)) return (value as unknown[]).map(withoutNulls);
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, member]) => member !== null)
+        .map(([name, member]) => [name, withoutNulls(member)]),
+    );
+  }
+  return value;
+}
+
+function lenient<T>(schema: ResponseSchema<T>): ResponseSchema<T> {
+  return { safeParse: (input) => schema.safeParse(withoutNulls(input)) };
+}
+
+/** A list of `schema` rows, each read as the schema says: one that does not meet it fails the whole answer. */
+function listOf<T>(schema: ResponseSchema<T>): ResponseSchema<T[]> {
+  return {
+    safeParse(input) {
+      const rows: T[] = [];
+      if (!Array.isArray(input)) return { success: false };
+      for (const row of input as unknown[]) {
+        const parsed = schema.safeParse(withoutNulls(row));
+        if (!parsed.success) return { success: false };
+        rows.push(parsed.data);
+      }
+      return { success: true, data: rows };
+    },
+  };
+}
+
+export interface AccrualRunListParams {
+  readonly page: number;
+  readonly size: number;
+  readonly planId?: string | undefined;
+}
+
+export interface AccrualItemsParams {
+  readonly page: number;
+  readonly size: number;
+}
+
+/** The periods the plan accrues, each with its most recent run. The server derives them: the browser never computes a period. */
+export const listAccrualPeriods = (token: string, planId: string): Promise<ApiResult<AccrualPeriod[]>> =>
+  request({ method: "GET", path: `${planPath(planId)}/accrual-periods`, headers: bearer(token), schema: listOf(AccrualPeriodResponse) });
+
+/** What accruing a period would do, with nothing written, and the digest to send back when the person confirms. */
+export const previewAccrual = (token: string, planId: string, body: AccrualPreviewRequest): Promise<ApiResult<AccrualPreview>> =>
+  request({ method: "POST", path: `${planPath(planId)}/accrual-preview`, headers: bearer(token), body, schema: lenient(AccrualPreviewResponse) });
+
+/**
+ * Asks for the accrual of a period: the server answers `202` with the run, queued. It writes the ledger, so the request
+ * carries the `Idempotency-Key` of the person's intent: the same key and the same body answer the same run, whatever the
+ * number of tries.
+ */
+export const requestAccrualRun = (token: string, planId: string, body: AccrualRunRequest, idempotencyKey: string): Promise<ApiResult<AccrualRun>> =>
+  request({
+    method: "POST",
+    path: `${planPath(planId)}/accrual-runs`,
+    headers: { ...bearer(token), "Idempotency-Key": idempotencyKey },
+    body,
+    schema: lenient(AccrualRunResponse),
+  });
+
+/** One page of runs, most recent first, optionally of one plan. The order is the server's: it takes no `sort`. */
+export const listAccrualRuns = (token: string, params: AccrualRunListParams): Promise<ApiResult<AccrualRunPage>> =>
+  list("accrual-runs", lenient(AccrualRunPageResponse), token, params);
+
+/** One run with one page of its items (what happened to each student and concept). */
+export const getAccrualRun = (token: string, runId: string, params: AccrualItemsParams): Promise<ApiResult<AccrualRunDetail>> =>
+  request({
+    method: "GET",
+    path: `/api/v1/charges/accrual-runs/${encodeURIComponent(runId)}?page=${String(params.page)}&size=${String(params.size)}`,
+    headers: bearer(token),
+    schema: lenient(AccrualRunDetailResponse),
+  });

@@ -33,6 +33,9 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "plan-without-items",
   "duplicate-plan-item",
   "stale-version",
+  "accrual-run-in-progress",
+  "plan-item-invalid",
+  "idempotency-payload-mismatch",
 ]);
 
 /** The text of each reason the server gives for a split of the responsibility that does not hold. */

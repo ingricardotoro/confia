@@ -1,6 +1,11 @@
 import { randomBytes } from "node:crypto";
 import {
   AcademicYearPageResponse,
+  AccrualPeriodResponse,
+  AccrualPreviewResponse,
+  AccrualRunDetailResponse,
+  AccrualRunPageResponse,
+  AccrualRunResponse,
   ConsentChangeResponse,
   GuardianConsentsResponse,
   AcademicYearResponse,
@@ -42,6 +47,10 @@ import {
   type AuthenticatedSessionResponseOutput,
   type ChargePlanDetailResponseOutput,
   type ChargePlanItemResponseOutput,
+  type AccrualPeriodResponseOutput,
+  type AccrualPreviewResponseOutput,
+  type AccrualRunItemResponseOutput,
+  type AccrualRunResponseOutput,
   type ChargePlanResponseOutput,
   type ConsentChangeResponseOutput,
   type ConsentEventResponseOutput,
@@ -800,4 +809,125 @@ export function chargePlanDetailRecord(row: unknown): ContractResponse {
 /** The 201 of a new item. */
 export function chargePlanItemRecord(row: unknown): ContractResponse {
   return { status: 201, body: checked("charge plan item", ChargePlanItemResponse, row), contentType: JSON_TYPE };
+}
+
+// The accrual engine (charges-accrual cut). The amounts are strings the server already rounded: a test never computes one.
+const MONEY = (amount: string) => ({ amount, currency: "HNL" });
+
+/** One run, as the API answers it. */
+export function accrualRun(override: Partial<AccrualRunResponseOutput> = {}): AccrualRunResponseOutput {
+  return checked("AccrualRunResponse", AccrualRunResponse, {
+    id: crypto.randomUUID(),
+    planId: "00000000-0000-4000-8000-000000000c01",
+    periodStart: "2027-02-01",
+    status: "COMPLETED",
+    previewChecked: true,
+    queuedAt: STAMP,
+    startedAt: STAMP,
+    finishedAt: STAMP,
+    studentsEvaluated: 2,
+    chargesCreated: 2,
+    chargesExisting: 0,
+    chargesFailed: 0,
+    ...override,
+  });
+}
+
+/** One period of a plan, with its last run when it has one. */
+export function accrualPeriod(override: Partial<AccrualPeriodResponseOutput> = {}): AccrualPeriodResponseOutput {
+  return checked("AccrualPeriodResponse", AccrualPeriodResponse, {
+    periodStart: "2027-02-01",
+    label: "2027-02",
+    dueOn: "2027-02-05",
+    paymentConceptIds: ["00000000-0000-4000-8000-000000007001"],
+    ...override,
+  });
+}
+
+export function accrualPeriodsRecord(periods: readonly unknown[]): ContractResponse {
+  return { status: 200, body: periods.map((period) => checked("accrual period", AccrualPeriodResponse, period)), contentType: JSON_TYPE };
+}
+
+/** One row of a preview or of a run: the amounts are present only for a charge to create. */
+export function accrualPreviewItem(override: Partial<AccrualPreviewResponseOutput["items"][number]> = {}): AccrualPreviewResponseOutput["items"][number] {
+  return {
+    studentId: "00000000-0000-4000-8000-000000005001",
+    paymentConceptId: "00000000-0000-4000-8000-000000007001",
+    outcome: "CREATED",
+    base: MONEY("1500.00"),
+    tax: MONEY("225.00"),
+    total: MONEY("1725.00"),
+    ...override,
+  };
+}
+
+/** What a preview answers: two charges to create and one error by default. */
+export function accrualPreview(override: Partial<AccrualPreviewResponseOutput> = {}): AccrualPreviewResponseOutput {
+  return checked("AccrualPreviewResponse", AccrualPreviewResponse, {
+    planId: "00000000-0000-4000-8000-000000000c01",
+    periodStart: "2027-02-01",
+    studentsEvaluated: 3,
+    toCreate: 2,
+    alreadyAccrued: 0,
+    alreadyAccruedOtherPlan: 0,
+    errors: 1,
+    totals: [{ currency: "HNL", charges: 2, base: MONEY("3000.00"), tax: MONEY("450.00"), total: MONEY("3450.00") }],
+    errorsByCode: { NO_PRICE: 1 },
+    items: [
+      accrualPreviewItem({ studentId: "00000000-0000-4000-8000-000000005001" }),
+      accrualPreviewItem({ studentId: "00000000-0000-4000-8000-000000005002" }),
+      { studentId: "00000000-0000-4000-8000-000000005003", paymentConceptId: "00000000-0000-4000-8000-000000007001", outcome: "ERROR", errorCode: "NO_PRICE" },
+    ],
+    itemsTruncated: false,
+    blockers: [],
+    previewDigest: "a".repeat(64),
+    ...override,
+  });
+}
+
+export function accrualPreviewRecord(row: unknown): ContractResponse {
+  return { status: 200, body: checked("accrual preview", AccrualPreviewResponse, row), contentType: JSON_TYPE };
+}
+
+/** The 202 of a request: the run, queued. */
+export function accrualRunRecord(row: unknown, status: 200 | 202 = 202): ContractResponse {
+  return { status, body: checked("accrual run", AccrualRunResponse, row), contentType: JSON_TYPE };
+}
+
+export function accrualRunItem(override: Partial<AccrualRunItemResponseOutput> = {}): AccrualRunItemResponseOutput {
+  return {
+    studentId: "00000000-0000-4000-8000-000000005001",
+    paymentConceptId: "00000000-0000-4000-8000-000000007001",
+    outcome: "CREATED",
+    chargeId: "00000000-0000-4000-8000-000000008001",
+    ...override,
+  };
+}
+
+export function accrualRunPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("accrual runs page", AccrualRunPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+export function accrualRunDetailRecord(
+  run: unknown,
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("accrual run detail", AccrualRunDetailResponse, {
+    run,
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    totalItems: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
 }

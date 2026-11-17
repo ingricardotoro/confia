@@ -139,6 +139,24 @@ async function openCatalogRoute(page: Page, path: string = CATALOG): Promise<voi
 /** A route of the charges with the cookies of a signed in session: the same way in as the catalog's. */
 const openChargesRoute = (page: Page, path: string): Promise<void> => openCatalogRoute(page, path);
 
+/** The generation of charges (charges-accrual cut): the page, the list of runs and the seeded runs (completed with errors, rejected, failed). */
+const ACCRUAL = "/charges/accrual";
+const ACCRUAL_PLAN = "planId=00000000-0000-4000-8000-000000009001";
+const ACCRUAL_FRESH = `${ACCRUAL}?${ACCRUAL_PLAN}&periodStart=2026-05-01`;
+const RUNS = `${ACCRUAL}/runs`;
+const RUN_WITH_ERRORS = `${RUNS}/00000000-0000-4000-8000-00000000a002`;
+const RUN_REJECTED = `${RUNS}/00000000-0000-4000-8000-00000000a003`;
+const RUN_FAILED = `${RUNS}/00000000-0000-4000-8000-00000000a004`;
+
+/** The plan and the period come in the address; the preview is asked for with the button. */
+async function openPreview(page: Page): Promise<void> {
+  await openChargesRoute(page, ACCRUAL_FRESH);
+  // `selectOption` waits for the select to be enabled and its options to be there, which is when the periods have loaded.
+  await page.getByLabel(/^Período/).selectOption("2026-05-01", { timeout: 20_000 });
+  await page.getByRole("button", { name: "Calcular vista previa" }).click();
+  await page.getByRole("region", { name: "Resumen de la vista previa" }).waitFor();
+}
+
 const IMPORTS = "/imports";
 const IMPORT_HEADER = "legacyId,firstName,lastName,birthDate,nationalId,sex";
 
@@ -1446,5 +1464,137 @@ export const MATRIX: readonly GateCombination[] = [
     // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
     arrange: (page) => openChargesRoute(page, PLAN_DRAFT),
     expected: (page) => page.getByText("No se pudo cargar el plan de cobro"),
+  },
+  // The generation of charges (charges-accrual cut): the page idle, with a preview, with its confirmation, blocked, with nothing to
+  // confirm, with no active plan and with its errors; the list of runs; and the run in the states a person meets.
+  {
+    route: ACCRUAL,
+    state: "idle",
+    arrange: (page) => openChargesRoute(page, ACCRUAL),
+    expected: (page) => page.getByText("Elija un plan y un período"),
+  },
+  {
+    route: ACCRUAL,
+    state: "preview-ready",
+    arrange: (page) => openPreview(page),
+    expected: (page) => page.getByRole("table", { name: "Renglones de la vista previa: un estudiante y un concepto por renglón" }),
+  },
+  {
+    route: ACCRUAL,
+    state: "dialog-confirm",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openPreview(page);
+      await page.getByRole("button", { name: "Confirmar generación" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "¿Generar los cargos de Primaria 2026?" }),
+  },
+  {
+    route: ACCRUAL,
+    state: "dialog-confirm-refused",
+    preset: "charges-accrual-in-progress",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openPreview(page);
+      await page.getByRole("button", { name: "Confirmar generación" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Generar cargos" }).click();
+    },
+    expected: (page) => page.getByRole("dialog").getByRole("alert"),
+  },
+  {
+    route: ACCRUAL,
+    state: "blocked",
+    preset: "charges-accrual-blocked",
+    arrange: (page) => openPreview(page),
+    expected: (page) => page.getByText("La generación no se puede confirmar todavía"),
+  },
+  {
+    route: ACCRUAL,
+    state: "nothing-to-confirm",
+    arrange: async (page) => {
+      await openChargesRoute(page, `${ACCRUAL}?${ACCRUAL_PLAN}&periodStart=2026-01-01`);
+      await page.getByLabel(/^Período/).selectOption("2026-01-01", { timeout: 20_000 });
+      await page.getByRole("button", { name: "Calcular vista previa" }).click();
+    },
+    expected: (page) => page.getByText(/no hay cargos nuevos que crear/),
+  },
+  {
+    route: ACCRUAL,
+    state: "no-active-plans",
+    preset: "charges-empty",
+    arrange: (page) => openChargesRoute(page, ACCRUAL),
+    expected: (page) => page.getByText("No hay planes activos"),
+  },
+  {
+    route: ACCRUAL,
+    state: "preview-error",
+    preset: "charges-accrual-forbidden",
+    arrange: async (page) => {
+      await openChargesRoute(page, ACCRUAL_FRESH);
+      await page.getByLabel(/^Período/).selectOption("2026-05-01", { timeout: 20_000 });
+      await page.getByRole("button", { name: "Calcular vista previa" }).click();
+    },
+    expected: (page) => page.getByText("No se pudo calcular la vista previa"),
+  },
+  {
+    route: ACCRUAL,
+    state: "load-error",
+    preset: "charges-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openChargesRoute(page, ACCRUAL),
+    expected: (page) => page.getByText("No se pudieron cargar los planes activos"),
+  },
+  {
+    route: RUNS,
+    state: "ready",
+    arrange: (page) => openChargesRoute(page, RUNS),
+    expected: (page) => page.getByRole("link", { name: "2026-04", exact: true }),
+  },
+  {
+    route: RUNS,
+    state: "no-matches",
+    arrange: (page) => openChargesRoute(page, `${RUNS}?planId=00000000-0000-4000-8000-000000009002`),
+    expected: (page) => page.getByText("Ningún registro coincide con los filtros"),
+  },
+  {
+    route: RUNS,
+    state: "empty",
+    preset: "charges-accrual-empty",
+    arrange: (page) => openChargesRoute(page, RUNS),
+    expected: (page) => page.getByText("Todavía no hay ejecuciones"),
+  },
+  {
+    route: RUNS,
+    state: "load-error",
+    preset: "charges-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openChargesRoute(page, RUNS),
+    expected: (page) => page.getByText("No se pudieron cargar las ejecuciones"),
+  },
+  {
+    route: RUN_WITH_ERRORS,
+    state: "completed-with-errors",
+    arrange: (page) => openChargesRoute(page, RUN_WITH_ERRORS),
+    expected: (page) => page.getByRole("table", { name: "Renglones de la ejecución: un estudiante y un concepto por renglón" }),
+  },
+  {
+    route: RUN_REJECTED,
+    state: "rejected",
+    arrange: (page) => openChargesRoute(page, RUN_REJECTED),
+    expected: (page) => page.getByText(/Los datos cambiaron desde la vista previa/),
+  },
+  {
+    route: RUN_FAILED,
+    state: "failed",
+    arrange: (page) => openChargesRoute(page, RUN_FAILED),
+    expected: (page) => page.getByText(/El sistema agotó sus reintentos/),
+  },
+  {
+    route: RUN_WITH_ERRORS,
+    state: "load-error",
+    preset: "charges-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openChargesRoute(page, RUN_WITH_ERRORS),
+    expected: (page) => page.getByText("No se pudo cargar la ejecución"),
   },
 ];

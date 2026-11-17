@@ -240,6 +240,34 @@ describe("the states of the charge plans", () => {
   });
 });
 
+describe("the states of the generation of charges", () => {
+  const accrual = MATRIX.filter((combination) => combination.route.startsWith("/charges/accrual"));
+
+  it("holds the page idle, with a preview, with its confirmation (and the refusal in it), blocked, with nothing to confirm, with no plan and with its errors, the list of runs and the run in the states a person meets, each once", () => {
+    expect(accrual.map((combination) => [combination.route.replace(/\/0{8}-[\w-]+$/, "/<id>"), combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["/charges/accrual", "idle", undefined, undefined],
+      ["/charges/accrual", "preview-ready", undefined, undefined],
+      ["/charges/accrual", "dialog-confirm", undefined, true],
+      ["/charges/accrual", "dialog-confirm-refused", "charges-accrual-in-progress", true],
+      ["/charges/accrual", "blocked", "charges-accrual-blocked", undefined],
+      ["/charges/accrual", "nothing-to-confirm", undefined, undefined],
+      ["/charges/accrual", "no-active-plans", "charges-empty", undefined],
+      ["/charges/accrual", "preview-error", "charges-accrual-forbidden", undefined],
+      ["/charges/accrual", "load-error", "charges-server-error", undefined],
+      ["/charges/accrual/runs", "ready", undefined, undefined],
+      ["/charges/accrual/runs", "no-matches", undefined, undefined],
+      ["/charges/accrual/runs", "empty", "charges-accrual-empty", undefined],
+      ["/charges/accrual/runs", "load-error", "charges-server-error", undefined],
+      ["/charges/accrual/runs/<id>", "completed-with-errors", undefined, undefined],
+      ["/charges/accrual/runs/<id>", "rejected", undefined, undefined],
+      ["/charges/accrual/runs/<id>", "failed", undefined, undefined],
+      ["/charges/accrual/runs/<id>", "load-error", "charges-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...accrual])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+});
+
 describe("the states of the students registry", () => {
   const students = MATRIX.filter((combination) => combination.route === "/students");
 
