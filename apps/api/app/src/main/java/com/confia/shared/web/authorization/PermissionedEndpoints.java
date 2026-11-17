@@ -72,6 +72,16 @@ public final class PermissionedEndpoints {
                 Permission.CATALOG_UPDATE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/catalog/price-lists/{id}/items",
                 Permission.CATALOG_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/catalog/tax-rates",
+                Permission.CATALOG_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/catalog/tax-rates",
+                Permission.CATALOG_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/catalog/tax-rates/{id}",
+                Permission.CATALOG_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/catalog/tax-rates/{id}",
+                Permission.CATALOG_UPDATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/catalog/tax-rates/{id}/periods",
+                Permission.CATALOG_CREATE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/students", Permission.STUDENTS_READ));
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/students/{id}",
                 Permission.STUDENTS_READ));

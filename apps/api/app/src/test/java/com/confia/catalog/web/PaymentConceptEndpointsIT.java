@@ -98,11 +98,17 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
     void anAdministratorCreatesColegiaturaSeesItListedEditsItAndDeactivatesItAllAudited() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
 
-        JsonNode created = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true)));
+        UUID taxRate = seedTaxRate(admin.institution(), "ISV", "Impuesto sobre ventas");
+        JsonNode created = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true)
+                .replace("}", ",\"taxRateId\":\"" + taxRate + "\"}")));
         String id = created.get("id").asString();
 
         assertThat(created.propertyNames()).containsExactly("id", "code", "name", "category", "isTaxable",
-                "isRecurring", "isActive", "createdAt", "updatedAt", "version");
+                "isRecurring", "isActive", "taxRateId", "taxRateCode", "taxRateName", "createdAt", "updatedAt",
+                "version");
+        assertThat(created.get("taxRateId").asString()).isEqualTo(taxRate.toString());
+        assertThat(created.get("taxRateCode").asString()).isEqualTo("ISV");
+        assertThat(created.get("taxRateName").asString()).isEqualTo("Impuesto sobre ventas");
         assertThat(created.get("code").asString()).isEqualTo("COLEG");
         assertThat(created.get("category").asString()).isEqualTo("TUITION");
         assertThat(created.get("isTaxable").asBoolean()).isTrue();
@@ -122,6 +128,8 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(HarnessProcess.json(edited).get("code").asString()).isEqualTo("COLEG");
         assertThat(HarnessProcess.json(edited).get("category").asString()).isEqualTo("OTHER");
         assertThat(HarnessProcess.json(edited).get("isTaxable").asBoolean()).isFalse();
+        assertThat(HarnessProcess.json(edited).get("taxRateId").isNull()).isTrue();
+        assertThat(HarnessProcess.json(edited).get("taxRateCode").isNull()).isTrue();
 
         assertThat(created.get("version").asLong()).isZero();
         assertThat(HarnessProcess.json(edited).get("version").asLong()).isEqualTo(1);
@@ -147,7 +155,7 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
     void theResponsesCarryNoStoreAndNeverTheInstitutionOfTheToken() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
 
-        HttpResponse<String> response = post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true));
+        HttpResponse<String> response = post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", false, true));
 
         assertThat(response.statusCode()).isEqualTo(201);
         assertThat(response.headers().allValues("Cache-Control")).containsExactly("no-store");
@@ -160,7 +168,7 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
     @Test
     void aCodeRepeatedWithAnotherCapitalizationIsADuplicateNameAndLeavesNoRowNorEntry() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
-        created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true)));
+        created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", false, true)));
         int entries = conceptEntriesOf(admin.institution()).size();
 
         assertProblem(post(CONCEPTS, admin, body("COLEG", "Otro", "OTHER", false, false)), 409, "duplicate-payment-concept-code");
@@ -177,8 +185,8 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
         Member mine = member(StaffRole.ADMINISTRATOR.code());
         Member theirs = member(StaffRole.ADMINISTRATOR.code());
 
-        created(post(CONCEPTS, mine, body("COLEG", "Colegiatura", "TUITION", true, true)));
-        created(post(CONCEPTS, theirs, body("COLEG", "Colegiatura", "TUITION", true, true)));
+        created(post(CONCEPTS, mine, body("COLEG", "Colegiatura", "TUITION", false, true)));
+        created(post(CONCEPTS, theirs, body("COLEG", "Colegiatura", "TUITION", false, true)));
 
         assertThat(countOf(mine.institution())).isEqualTo(1);
         assertThat(countOf(theirs.institution())).isEqualTo(1);
@@ -187,7 +195,7 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
     @Test
     void theCodeIsImmutableAnEditThatCarriesOneIsRefusedAndTheStoredCodeNeverChanges() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
-        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true)))
+        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", false, true)))
                 .get("id").asString();
         int entries = conceptEntriesOf(admin.institution()).size();
 
@@ -203,7 +211,7 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
     @Test
     void anEditWithAStaleOrMissingVersionIsRefusedAndTheFirstEditSurvives() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
-        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true)))
+        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", false, true)))
                 .get("id").asString();
         assertThat(put(id, admin, putBody(0, "Primero", "OTHER", false, false, true)).statusCode()).isEqualTo(200);
         int entries = conceptEntriesOf(admin.institution()).size();
@@ -223,7 +231,7 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
     @Test
     void twoEditsWithTheSameVersionAtTheSameTimeLetExactlyOneWin() throws Exception {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
-        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true)))
+        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", false, true)))
                 .get("id").asString();
         java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
@@ -254,18 +262,18 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
     void aBlankOrTooLongCodeOrNameAndACategoryOutsideTheSetAreRefusedWith400AndLeaveNoRow() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
 
-        assertProblem(post(CONCEPTS, admin, body("", "Colegiatura", "TUITION", true, true)), 400,
+        assertProblem(post(CONCEPTS, admin, body("", "Colegiatura", "TUITION", false, true)), 400,
                 "validation-failed");
-        assertProblem(post(CONCEPTS, admin, body("   ", "Colegiatura", "TUITION", true, true)), 400,
+        assertProblem(post(CONCEPTS, admin, body("   ", "Colegiatura", "TUITION", false, true)), 400,
                 "validation-failed");
-        assertProblem(post(CONCEPTS, admin, body("C".repeat(31), "Colegiatura", "TUITION", true, true)), 400,
+        assertProblem(post(CONCEPTS, admin, body("C".repeat(31), "Colegiatura", "TUITION", false, true)), 400,
                 "validation-failed");
-        assertProblem(post(CONCEPTS, admin, body("COLEG", "", "TUITION", true, true)), 400, "validation-failed");
-        assertProblem(post(CONCEPTS, admin, body("COLEG", "N".repeat(121), "TUITION", true, true)), 400,
+        assertProblem(post(CONCEPTS, admin, body("COLEG", "", "TUITION", false, true)), 400, "validation-failed");
+        assertProblem(post(CONCEPTS, admin, body("COLEG", "N".repeat(121), "TUITION", false, true)), 400,
                 "validation-failed");
-        assertProblem(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "SCHOLARSHIP", true, true)), 400,
+        assertProblem(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "SCHOLARSHIP", false, true)), 400,
                 "validation-failed");
-        assertProblem(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "tuition", true, true)), 400,
+        assertProblem(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "tuition", false, true)), 400,
                 "validation-failed");
         assertProblem(post(CONCEPTS, admin, "{\"code\":\"COLEG\",\"name\":\"Colegiatura\","
                 + "\"isTaxable\":true,\"isRecurring\":true}"), 400, "validation-failed");
@@ -284,26 +292,26 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
 
         for (String code : List.of("CO\\u200bLEG", "\\u202eGELOC", "COLEG\\n", "CO\\nLEG", "=SUM(A1)", "-COLEG",
                 "CO LEG", " COLEG", "Matr\\u00edcula", "C.O", "C/O", "\\u200bCOLEG")) {
-            assertProblem(post(CONCEPTS, admin, body(code, "Colegiatura", "TUITION", true, true)), 400,
+            assertProblem(post(CONCEPTS, admin, body(code, "Colegiatura", "TUITION", false, true)), 400,
                     "validation-failed");
         }
 
         assertThat(countOf(admin.institution())).isZero();
         assertThat(conceptEntriesOf(admin.institution())).isEmpty();
-        created(post(CONCEPTS, admin, body("A-1_b", "Colegiatura", "TUITION", true, true)));
+        created(post(CONCEPTS, admin, body("A-1_b", "Colegiatura", "TUITION", false, true)));
     }
 
     @Test
     void aNameWithControlOrFormatCharactersIsRefusedWith400OnCreateAndOnEdit() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
-        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true)))
+        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", false, true)))
                 .get("id").asString();
 
         for (String name : List.of("Cole\\ngiatura", "Cole\\tgiatura", "Cole\\u200bgiatura", "\\u202earuta",
                 "Cole\\u0000g")) {
-            assertProblem(post(CONCEPTS, admin, body("OTRO", name, "TUITION", true, true)), 400,
+            assertProblem(post(CONCEPTS, admin, body("OTRO", name, "TUITION", false, true)), 400,
                     "validation-failed");
-            assertProblem(put(id, admin, putBody(name, "TUITION", true, true, true)), 400, "validation-failed");
+            assertProblem(put(id, admin, putBody(name, "TUITION", false, true, true)), 400, "validation-failed");
         }
 
         assertThat(countOf(admin.institution())).isEqualTo(1);
@@ -356,10 +364,10 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
     void theListPagesSortsAndFiltersOnTheServerAndShowsInactiveConcepts() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
         created(post(CONCEPTS, admin, body("b-multa", "Multa", "FINE", false, false)));
-        created(post(CONCEPTS, admin, body("A-coleg", "Colegiatura", "TUITION", true, true)));
-        String bus = created(post(CONCEPTS, admin, body("C-bus", "Bus", "TRANSPORT", true, true)))
+        created(post(CONCEPTS, admin, body("A-coleg", "Colegiatura", "TUITION", false, true)));
+        String bus = created(post(CONCEPTS, admin, body("C-bus", "Bus", "TRANSPORT", false, true)))
                 .get("id").asString();
-        put(bus, admin, putBody("Bus", "TRANSPORT", true, true, false));
+        put(bus, admin, putBody("Bus", "TRANSPORT", false, true, false));
 
         assertThat(codes(HarnessProcess.json(get(CONCEPTS, admin)))).containsExactly("A-coleg", "b-multa", "C-bus");
         assertThat(codes(HarnessProcess.json(get(CONCEPTS + "?sort=code,desc", admin))))
@@ -383,7 +391,7 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
     void aCashierMayReadButCannotCreateOrEditAndTheRefusalLeavesNoRowAndNoCatalogEntry() throws SQLException {
         Member cashier = member(StaffRole.CASHIER.code());
         Member admin = sameInstitution(cashier.institution(), StaffRole.ADMINISTRATOR.code());
-        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", true, true)))
+        String id = created(post(CONCEPTS, admin, body("COLEG", "Colegiatura", "TUITION", false, true)))
                 .get("id").asString();
         int entriesBefore = conceptEntriesOf(cashier.institution()).size();
 
@@ -403,7 +411,7 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
         Member nobody = member(null);
 
         assertProblem(get(CONCEPTS, nobody), 403, "forbidden");
-        assertProblem(post(CONCEPTS, nobody, body("COLEG", "Colegiatura", "TUITION", true, true)), 403,
+        assertProblem(post(CONCEPTS, nobody, body("COLEG", "Colegiatura", "TUITION", false, true)), 403,
                 "forbidden");
         assertProblem(put(UUID.randomUUID().toString(), nobody, putBody("X", "OTHER", false, false, true)), 403,
                 "forbidden");
@@ -420,7 +428,7 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
     void aUserOfAnotherInstitutionNeverSeesNorEditsTheConceptsOfThisOne() throws SQLException {
         Member mine = member(StaffRole.ADMINISTRATOR.code());
         Member theirs = member(StaffRole.ADMINISTRATOR.code());
-        String id = created(post(CONCEPTS, mine, body("COLEG", "Colegiatura", "TUITION", true, true)))
+        String id = created(post(CONCEPTS, mine, body("COLEG", "Colegiatura", "TUITION", false, true)))
                 .get("id").asString();
 
         JsonNode theirPage = HarnessProcess.json(get(CONCEPTS, theirs));
@@ -488,6 +496,22 @@ class PaymentConceptEndpointsIT extends CommittingPostgresIntegrationTest {
 
     private static Instant now() {
         return Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    }
+
+    /** A tax rate of the institution, inserted as the owner of the schema (it has no audit entry). */
+    private static UUID seedTaxRate(UUID institution, String code, String name) throws SQLException {
+        UUID id = UUID.randomUUID();
+        try (Connection owner = StaffRoleFixtures.ownerTransaction(institution);
+                PreparedStatement statement = owner.prepareStatement(
+                        "insert into catalog_tax_rate (institution_id, id, code, name) values (?, ?, ?, ?)")) {
+            statement.setObject(1, institution);
+            statement.setObject(2, id);
+            statement.setString(3, code);
+            statement.setString(4, name);
+            statement.executeUpdate();
+            owner.commit();
+        }
+        return id;
     }
 
     // --- Bodies and reading responses ---

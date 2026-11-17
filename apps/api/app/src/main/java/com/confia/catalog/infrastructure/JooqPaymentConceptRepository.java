@@ -63,6 +63,7 @@ public final class JooqPaymentConceptRepository implements PaymentConceptReposit
                 .set(CATALOG_PAYMENT_CONCEPT.IS_TAXABLE, concept.taxable())
                 .set(CATALOG_PAYMENT_CONCEPT.IS_RECURRING, concept.recurring())
                 .set(CATALOG_PAYMENT_CONCEPT.IS_ACTIVE, concept.active())
+                .set(CATALOG_PAYMENT_CONCEPT.TAX_RATE_ID, concept.taxRateId())
                 .set(CATALOG_PAYMENT_CONCEPT.VERSION, concept.version())
                 .set(CATALOG_PAYMENT_CONCEPT.CREATED_AT, CatalogWrites.toDatabase(concept.createdAt()))
                 .set(CATALOG_PAYMENT_CONCEPT.UPDATED_AT, CatalogWrites.toDatabase(concept.updatedAt()))
@@ -79,6 +80,7 @@ public final class JooqPaymentConceptRepository implements PaymentConceptReposit
                     .set(CATALOG_PAYMENT_CONCEPT.IS_TAXABLE, concept.taxable())
                     .set(CATALOG_PAYMENT_CONCEPT.IS_RECURRING, concept.recurring())
                     .set(CATALOG_PAYMENT_CONCEPT.IS_ACTIVE, concept.active())
+                    .set(CATALOG_PAYMENT_CONCEPT.TAX_RATE_ID, concept.taxRateId())
                     .set(CATALOG_PAYMENT_CONCEPT.VERSION, concept.version())
                     .set(CATALOG_PAYMENT_CONCEPT.UPDATED_AT, CatalogWrites.toDatabase(concept.updatedAt()))
                     .where(CATALOG_PAYMENT_CONCEPT.INSTITUTION_ID.eq(institutionId.value()))
@@ -124,7 +126,7 @@ public final class JooqPaymentConceptRepository implements PaymentConceptReposit
     private static PaymentConcept toDomain(CatalogPaymentConceptRecord row) {
         return new PaymentConcept(row.getId(), row.getCode(), row.getName(),
                 PaymentCategory.parse(row.getCategory()), row.getIsTaxable(), row.getIsRecurring(),
-                row.getIsActive(), row.getVersion(), CatalogWrites.fromDatabase(row.getCreatedAt()),
+                row.getIsActive(), row.getTaxRateId(), row.getVersion(), CatalogWrites.fromDatabase(row.getCreatedAt()),
                 CatalogWrites.fromDatabase(row.getUpdatedAt()));
     }
 }

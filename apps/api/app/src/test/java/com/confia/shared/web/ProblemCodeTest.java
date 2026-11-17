@@ -40,7 +40,7 @@ class ProblemCodeTest {
                         "invalid-enrollment-state", "transfer-year-mismatch", "invalid-responsibility-split",
                         "guardian-not-active", "consent-channel-unavailable", "import-not-simulated",
                         "import-file-changed", "duplicate-payment-concept-code", "price-validity-overlap",
-                        "price-list-archived", "stale-version");
+                        "price-list-archived", "duplicate-tax-rate-code", "tax-rate-period-overlap", "stale-version");
     }
 
     @Test
@@ -66,7 +66,7 @@ class ProblemCodeTest {
             "invalid-responsibility-split, 400", "guardian-not-active, 409",
             "consent-channel-unavailable, 409", "import-not-simulated, 409", "import-file-changed, 409",
             "duplicate-payment-concept-code, 409", "price-validity-overlap, 409", "price-list-archived, 409",
-            "stale-version, 409"})
+            "duplicate-tax-rate-code, 409", "tax-rate-period-overlap, 409", "stale-version, 409"})
     void eachCodeCarriesItsHttpStatus(String code, int status) {
         assertThat(ProblemCode.ofCode(code)).get().extracting(ProblemCode::status)
                 .isEqualTo(status);
@@ -85,7 +85,7 @@ class ProblemCodeTest {
             "transfer-year-mismatch", "invalid-responsibility-split", "guardian-not-active",
             "consent-channel-unavailable", "import-not-simulated", "import-file-changed",
             "duplicate-payment-concept-code", "price-validity-overlap", "price-list-archived",
-            "stale-version"})
+            "duplicate-tax-rate-code", "tax-rate-period-overlap", "stale-version"})
     void theTypeIsTheStableBaseFollowedByTheCodeAndNothingElse(String code) {
         ProblemCode problem = ProblemCode.ofCode(code).orElseThrow();
         assertThat(problem.type()).isEqualTo(URI.create("https://confia.hn/problems/" + code));

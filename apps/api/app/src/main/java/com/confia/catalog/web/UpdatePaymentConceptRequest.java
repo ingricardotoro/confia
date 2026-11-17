@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.UUID;
 
 /**
  * The body of {@code PUT /api/v1/catalog/payment-concepts/{id}}: every editable member, replaced as a whole, and the
@@ -25,5 +26,8 @@ public record UpdatePaymentConceptRequest(
         @Schema(requiredMode = RequiredMode.REQUIRED) @JsonProperty("isTaxable") @NotNull Boolean isTaxable,
         @Schema(requiredMode = RequiredMode.REQUIRED) @JsonProperty("isRecurring") @NotNull Boolean isRecurring,
         @Schema(requiredMode = RequiredMode.REQUIRED, description = "False deactivates the concept")
-        @JsonProperty("isActive") @NotNull Boolean isActive) {
+        @JsonProperty("isActive") @NotNull Boolean isActive,
+        @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
+                description = "A tax rate of the institution, active unless the concept already has it; required when isTaxable is true and absent when it is false")
+        UUID taxRateId) {
 }

@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.UUID;
 
 /** The body of {@code POST /api/v1/catalog/payment-concepts}. */
 public record CreatePaymentConceptRequest(
@@ -18,5 +19,8 @@ public record CreatePaymentConceptRequest(
                 allowableValues = {"TUITION", "ENROLLMENT", "TRANSPORT", "MATERIAL", "FINE", "OTHER"})
         @NotBlank @Pattern(regexp = "TUITION|ENROLLMENT|TRANSPORT|MATERIAL|FINE|OTHER") String category,
         @Schema(requiredMode = RequiredMode.REQUIRED) @JsonProperty("isTaxable") @NotNull Boolean isTaxable,
-        @Schema(requiredMode = RequiredMode.REQUIRED) @JsonProperty("isRecurring") @NotNull Boolean isRecurring) {
+        @Schema(requiredMode = RequiredMode.REQUIRED) @JsonProperty("isRecurring") @NotNull Boolean isRecurring,
+        @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
+                description = "An active tax rate of the institution; required when isTaxable is true and absent when it is false")
+        UUID taxRateId) {
 }

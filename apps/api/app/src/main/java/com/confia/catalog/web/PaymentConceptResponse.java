@@ -16,6 +16,11 @@ public record PaymentConceptResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED) @JsonProperty("isTaxable") boolean isTaxable,
         @Schema(requiredMode = RequiredMode.REQUIRED) @JsonProperty("isRecurring") boolean isRecurring,
         @Schema(requiredMode = RequiredMode.REQUIRED) @JsonProperty("isActive") boolean isActive,
+        @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
+                description = "The tax rate of the concept; null for a concept that is not taxable and for a taxable one created before the tax rates existed")
+        UUID taxRateId,
+        @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true, description = "Code of the tax rate; null when taxRateId is") String taxRateCode,
+        @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true, description = "Name of the tax rate; null when taxRateId is") String taxRateName,
         @Schema(requiredMode = RequiredMode.REQUIRED) Instant createdAt,
         @Schema(requiredMode = RequiredMode.REQUIRED) Instant updatedAt,
         @Schema(requiredMode = RequiredMode.REQUIRED, description = "Send it back in the next PUT") long version) {

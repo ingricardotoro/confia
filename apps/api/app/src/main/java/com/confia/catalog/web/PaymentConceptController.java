@@ -114,7 +114,9 @@ public class PaymentConceptController {
     @ApiResponse(responseCode = "201", description = "The payment concept created",
             content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                     schema = @Schema(implementation = PaymentConceptResponse.class)))
-    @ApiResponse(responseCode = "400", description = "The body is not valid (validation-failed)",
+    @ApiResponse(responseCode = "400",
+            description = "The body is not valid, a taxable concept has no tax rate or one that is not taxable has one "
+                    + "(validation-failed)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "401",
             description = "No credential (authentication-required), or a credential that cannot be "
@@ -124,13 +126,18 @@ public class PaymentConceptController {
             description = "The account does not hold catalog:create, or the Origin is missing or "
                     + "not allowed (forbidden, csrf-invalid)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
-    @ApiResponse(responseCode = "409", description = "The code is taken (duplicate-payment-concept-code)",
+    @ApiResponse(responseCode = "404",
+            description = "The tax rate does not exist in the institution of the token (resource-not-found)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "409",
+            description = "The code is taken (duplicate-payment-concept-code) or the tax rate is inactive "
+                    + "(inactive-reference)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     public PaymentConceptResponse create(@Valid @RequestBody CreatePaymentConceptRequest request) {
         return toResponse(concepts.create(RequestContext.actor(), RequestContext.requestId(), request.code(),
-                request.name(), request.category(), request.isTaxable(), request.isRecurring()));
+                request.name(), request.category(), request.isTaxable(), request.isRecurring(), request.taxRateId()));
     }
 
     @RateLimited(policy = "admin-write")
@@ -148,7 +155,8 @@ public class PaymentConceptController {
             content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                     schema = @Schema(implementation = PaymentConceptResponse.class)))
     @ApiResponse(responseCode = "400",
-            description = "The body or the identifier is not valid, or the body carries a code (validation-failed)",
+            description = "The body or the identifier is not valid, the body carries a code, a taxable concept has no "
+                    + "tax rate or one that is not taxable has one (validation-failed)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "401",
             description = "No credential (authentication-required), or a credential that cannot be "
@@ -159,10 +167,12 @@ public class PaymentConceptController {
                     + "not allowed (forbidden, csrf-invalid)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "404",
-            description = "The payment concept does not exist in the institution of the token (resource-not-found)",
+            description = "The payment concept or the tax rate does not exist in the institution of the token "
+                    + "(resource-not-found)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "409",
-            description = "The version of the body is not the current one (stale-version)",
+            description = "The version of the body is not the current one (stale-version) or the tax rate being "
+                    + "assigned is inactive (inactive-reference)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
@@ -170,11 +180,12 @@ public class PaymentConceptController {
             @Valid @RequestBody UpdatePaymentConceptRequest request) {
         return toResponse(concepts.update(RequestContext.actor(), RequestContext.requestId(), id, request.version(),
                 request.name(), request.category(), request.isTaxable(), request.isRecurring(),
-                request.isActive()));
+                request.isActive(), request.taxRateId()));
     }
 
     private static PaymentConceptResponse toResponse(PaymentConceptView view) {
         return new PaymentConceptResponse(view.id(), view.code(), view.name(), view.category(), view.taxable(),
-                view.recurring(), view.active(), view.createdAt(), view.updatedAt(), view.version());
+                view.recurring(), view.active(), view.taxRateId(), view.taxRateCode(), view.taxRateName(),
+                view.createdAt(), view.updatedAt(), view.version());
     }
 }
