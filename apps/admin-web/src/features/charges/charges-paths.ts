@@ -1,8 +1,11 @@
-/** The path of the charges area. It has the plans and the accrual of charges, and the area redirects to the plans. */
+import { STATEMENT_PATH } from "../../shared/navigation/statement-paths.ts";
+
+/** The path of the charges area. It has the plans, the accrual of charges and the statement of account, and the area redirects to the plans. */
 export const CHARGES_PATH = "/charges";
 
 export const CHARGES_PATHS = {
   plans: `${CHARGES_PATH}/plans`,
+  statement: STATEMENT_PATH,
   accrual: `${CHARGES_PATH}/accrual`,
   accrualRuns: `${CHARGES_PATH}/accrual/runs`,
 } as const;

@@ -6,6 +6,9 @@ import {
   AccrualRunDetailResponse,
   AccrualRunPageResponse,
   AccrualRunResponse,
+  StudentStatement,
+  StudentStatementLine,
+  StudentStatementSection,
   ConsentChangeResponse,
   GuardianConsentsResponse,
   AcademicYearResponse,
@@ -54,6 +57,9 @@ import {
   type AccrualPeriodResponseOutput,
   type AccrualPreviewResponseOutput,
   type AccrualRunItemResponseOutput,
+  type StudentStatementLineOutput,
+  type StudentStatementOutput,
+  type StudentStatementSectionOutput,
   type AccrualRunResponseOutput,
   type ChargePlanResponseOutput,
   type ConsentChangeResponseOutput,
@@ -989,4 +995,65 @@ export function postingAccount(override: Partial<PostingAccountResponseOutput> =
 /** The map as `GET` and `PUT /charges/posting-accounts` answer it: the rows that were ever set. */
 export function postingAccountMap(items: readonly unknown[]): ContractResponse {
   return { status: 200, body: checked("posting account map", PostingAccountMapResponse, { items }), contentType: JSON_TYPE };
+}
+
+// The statement of account of a student (ledger-account-statement cut). Every figure is the string a server would send; the
+// fixtures hold values chosen by hand and never compute one (the running balance of a line is typed, not summed).
+const ZERO_HNL = { amount: "0.00", currency: "HNL" };
+
+export function statementLine(override: Partial<StudentStatementLineOutput> = {}): StudentStatementLineOutput {
+  return checked("StudentStatementLine", StudentStatementLine, {
+    transactionId: "00000000-0000-4000-8000-00000000a001",
+    kind: "CHARGE",
+    effectiveOn: "2027-02-01",
+    postedAt: STAMP,
+    lineNumber: 1,
+    debit: { amount: "1500.00", currency: "HNL" },
+    credit: ZERO_HNL,
+    balance: { amount: "1500.00", currency: "HNL" },
+    charge: {
+      chargeId: "00000000-0000-4000-8000-00000000b001",
+      paymentConceptId: "00000000-0000-4000-8000-000000007001",
+      conceptCode: "COL",
+      conceptName: "Colegiatura",
+      conceptCategory: "TUITION",
+      periodLabel: "2027-02",
+      periodStart: "2027-02-01",
+      periodEnd: "2027-02-28",
+      dueOn: "2027-02-10",
+      origin: "AUTOMATIC",
+    },
+    ...override,
+  });
+}
+
+export function statementSection(override: Partial<StudentStatementSectionOutput> = {}): StudentStatementSectionOutput {
+  const lines = override.lines ?? [statementLine()];
+  return checked("StudentStatementSection", StudentStatementSection, {
+    currency: "HNL",
+    openingBalance: ZERO_HNL,
+    closingBalance: { amount: "1500.00", currency: "HNL" },
+    totalLines: lines.length,
+    page: 0,
+    size: 25,
+    lines,
+    ...override,
+  });
+}
+
+export function studentStatement(override: Partial<StudentStatementOutput> = {}): StudentStatementOutput {
+  return checked("StudentStatement", StudentStatement, {
+    studentId: "00000000-0000-4000-8000-000000005001",
+    studentCode: "E-000001",
+    firstName: "Ana",
+    lastName: "Aguilar",
+    from: "2026-11-17",
+    to: "2027-11-16",
+    sections: [statementSection()],
+    ...override,
+  });
+}
+
+export function statementRecord(body: StudentStatementOutput = studentStatement()): ContractResponse {
+  return { status: 200, body, contentType: JSON_TYPE };
 }

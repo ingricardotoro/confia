@@ -1,6 +1,8 @@
 import type { TableSort } from "@confia/ui";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { StudentGuardiansContainer } from "../guardians/StudentGuardiansContainer.tsx";
+import { STATEMENT_PATH, studentStatementPath } from "../../shared/navigation/statement-paths.ts";
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
 import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
 import { useListState } from "../../shared/resource-screen/use-list-state.ts";
@@ -25,6 +27,7 @@ const DEFAULT_SORT: TableSort = { columnId: "lastName", direction: "asc" };
  * and activate or deactivate from the row. The state of the table is the address's: the search box only follows it.
  */
 export function StudentsContainer({ search, onSearchChange }: StudentsContainerProps) {
+  const navigate = useNavigate();
   const list = useStudentList(toApiParams(search));
   const write = useStudentWrite();
   const view = useResourceView<Student>();
@@ -64,6 +67,8 @@ export function StudentsContainer({ search, onSearchChange }: StudentsContainerP
         }}
         onCreate={view.openCreate}
         onEdit={view.openEdit}
+        statementHrefOf={(row) => studentStatementPath(row.id)}
+        onStatement={(row) => void navigate({ to: STATEMENT_PATH, search: { studentId: row.id } })}
         onGuardians={(row) => {
           view.clearNotice();
           setGuardiansOf(row);

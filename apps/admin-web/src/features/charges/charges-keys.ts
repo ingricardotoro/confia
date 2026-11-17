@@ -11,6 +11,16 @@ export const chargePlanKeys = {
 };
 
 /**
+ * Query keys of the statement of account, general to specific: every statement, one student's statements, one statement with
+ * its currency, period and page. A write that moves money (a charge run, later a payment) invalidates the `all` prefix.
+ */
+export const statementKeys = {
+  all: ["charges", "statement"] as const,
+  student: (studentId: string) => [...statementKeys.all, studentId] as const,
+  detail: (studentId: string, params: object) => [...statementKeys.student(studentId), params] as const,
+};
+
+/**
  * Query keys of the accrual engine, general to specific, so a prefix invalidates what it covers: everything the engine
  * shows, the periods of one plan, every list of runs, one list, every run, one run with the page of its items. The preview
  * is a request that writes nothing and is not cached, so it has no key.

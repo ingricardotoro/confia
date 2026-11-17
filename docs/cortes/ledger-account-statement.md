@@ -121,3 +121,35 @@ otra institución responde `404`; sin `charges:read` responde `403`; cada consul
 - **Pendiente:** pantalla del estado de cuenta (siguiente pasada del corte), índice de lectura por subcuenta y fecha efectiva si el volumen lo pide
   (`confia-database`), trabajo nocturno de integridad, cierre de período y decisión sobre la caché (siguen fuera de este corte), y la línea de avance
   en `docs/09-roadmap-y-fases.md` al cerrar el PR.
+
+## Construido (frontend)
+
+- **Pantalla** `/charges/statement` («Estado de cuenta», grupo «Finanzas», junto a «Generación de cargos») en `features/charges`. El estado vive en la
+  URL (`studentId`, `currency`, `from`, `to`, `page`; tamaño de página fijo de 25 líneas), así que una vista se comparte y otras pantallas pueden
+  enlazarla con `?studentId=`. La ruta compartida vive en `shared/navigation/statement-paths.ts` (`STATEMENT_PATH`, `studentStatementPath`) para que
+  `students` enlace sin importar `charges`.
+- **Selector de estudiante** con búsqueda en el servidor (`shared/student-lookups/use-student-search.ts`, la lista de estudiantes con `q`, todos los
+  estados; combobox ARIA con flechas y Enter). Una vez elegido muestra código y nombre tomados del encabezado del estado de cuenta.
+- **Período** con «Desde» y «Hasta» (si se dejan vacíos, el servidor aplica los últimos 12 meses). Si `from > to` se avisa en el campo «Hasta» y
+  **no se consulta**. **Moneda**: el selector aparece solo si el estudiante tiene más de una; las monedas se recuerdan de la última lectura sin
+  filtrar, para que el selector sobreviva al filtro.
+- **Por moneda**: tarjetas «Saldo inicial» y «Saldo final» con el texto «Saldo a favor» junto a la cifra cuando es negativa (más una frase explícita
+  debajo; nunca solo signo o color), y tabla densa con fecha, descripción (concepto y período para un cargo; tipo y motivo para lo demás, con
+  insignia «Cargo»/«Abono»), vencimiento, columnas Cargo y Abono (un guion con texto para lectores de pantalla cuando es cero), saldo corrido y
+  paginación del servidor. El navegador solo mira el signo del texto (`balanceSideOf`); no suma, resta ni redondea.
+- **Estados**: sin estudiante (guía), cargando (esqueleto), vacío (estudiante sin cuenta), período inválido, error con reintento e identificador de
+  soporte, 404 (estudiante de otra institución) y 403 sin reintento, éxito. La invalidación: `statementKeys.all` se invalida al encolar una corrida
+  de devengo.
+- **Estudiantes**: enlace «Estado de cuenta» en cada fila del registro, por la ruta compartida.
+- **Simulador** (`e2e/mock-api/statement-*.ts`): cinco estudiantes sembrados (12 meses con 2 pagos; saldo a favor; sin movimientos; dos monedas;
+  60 líneas para paginar), saldos calculados en el simulador desde centavos enteros, período por omisión, validación, 404 (`FOREIGN_STUDENT_ID`),
+  y los presets `statement-empty`, `statement-forbidden` y `statement-server-error`. Pruebas del modelo y del servidor.
+- **Pruebas**: modelo puro, tarjetas y tabla, selector, vista y contenedor con MSW (guía, enlace profundo, página, período inválido, vacío, dos
+  monedas, 404, 403, 500 con reintento, búsqueda y elección). Pasaron `tsc --noEmit`, eslint sobre los archivos tocados y las pruebas citadas.
+- **Límite del contrato:** sin `currency`, un estudiante sin cuenta recibe cero secciones, así que la pantalla explica que no tiene movimientos pero
+  no puede mostrar saldos en cero (el navegador no inventa cifras). Mostrarlos exigiría que el servidor devolviera una sección en cero por la
+  moneda de la institución.
+- **Pendiente:** recorridos de Playwright y estados de la matriz de accesibilidad de la pantalla (no se corrieron en esta pasada; las puertas de axe
+  de `@confia/ui` y de rutas siguen sin cubrir esta ruta), `dependency-cruiser` sobre el árbol completo (no disponible localmente en esta pasada),
+  revisión visual con el simulador reiniciado, y la línea de avance en `docs/09-roadmap-y-fases.md` al cerrar el PR.
+

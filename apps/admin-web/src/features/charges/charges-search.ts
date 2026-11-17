@@ -49,3 +49,25 @@ export const accrualRunSearch = z.object({
 });
 
 export type AccrualRunSearch = z.infer<typeof accrualRunSearch>;
+
+/** Lines per page of a statement section: the server pages them, and the size is the screen's, not a choice in the address. */
+export const STATEMENT_PAGE_SIZE = 25;
+
+/**
+ * The statement of account: the student (so a link from another screen opens it already pointed at one), the currency, the
+ * period and the page of lines. A part that does not hold is dropped, so a bad address never breaks the screen; an empty
+ * period is the server's default, the last 12 months.
+ */
+export const statementSearch = z.object({
+  studentId: optionalId,
+  currency: z
+    .string()
+    .regex(/^[A-Z]{3}$/)
+    .optional()
+    .catch(undefined),
+  from: z.string().regex(ISO_DAY).optional().catch(undefined),
+  to: z.string().regex(ISO_DAY).optional().catch(undefined),
+  page,
+});
+
+export type StatementSearch = z.infer<typeof statementSearch>;

@@ -1809,3 +1809,63 @@ describe("the chart of accounts and the map of posting accounts [ledger-chart-of
     expect((await mapOnly("GET", ACCOUNTS)).status).toBe(200);
   });
 });
+
+describe("the statement of account [ledger-account-statement]", { timeout: LIMIT }, () => {
+  const ANA = "00000000-0000-4000-8000-000000005001";
+  const NO_MOVEMENTS = "00000000-0000-4000-8000-000000005003";
+  const FOREIGN = "00000000-0000-4000-8000-000000009404";
+  const statementOf = (id: string) => `/api/v1/charges/students/${id}/statement`;
+
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const headers = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path: string) => call(method, path, { headers, scenario: id });
+  }
+
+  it("answers 401 without an access token", async () => {
+    expect((await call("GET", statementOf(ANA), { scenario: "stm-401" })).status).toBe(401);
+  });
+
+  it("serves the statement of the seeded student with its sections and checks it against the contract", async () => {
+    const send = await session("stm-ok");
+
+    const reply = await send("GET", `${statementOf(ANA)}?size=25`);
+
+    const body = reply.json as { studentCode: string; sections: { currency: string; totalLines: number }[] };
+    expect(reply.status).toBe(200);
+    expect(body.studentCode).toBe("E-000001");
+    expect(body.sections.map((section) => [section.currency, section.totalLines])).toEqual([["HNL", 14]]);
+    const violations = await call("GET", "/__control/violations", { scenario: "stm-ok" });
+    expect(violations.json).toEqual([]);
+  });
+
+  it("answers 404 for a student of another institution and 400 for a period that ends before it starts", async () => {
+    const send = await session("stm-404");
+
+    expect([(await send("GET", statementOf(FOREIGN))).status, typeOf(await send("GET", statementOf(FOREIGN)))]).toEqual([404, "resource-not-found"]);
+    expect((await send("GET", `${statementOf(ANA)}?from=2026-02-01&to=2026-01-01`)).status).toBe(400);
+  });
+
+  it.each([
+    ["statement-forbidden", ANA, 403],
+    ["statement-empty", NO_MOVEMENTS, 200],
+  ] as const)("serves the %s preset", async (name, student, status) => {
+    const send = await session(`stm-${name}`, name);
+
+    const reply = await send("GET", statementOf(student));
+
+    expect(reply.status).toBe(status);
+    if (status === 200) expect((reply.json as { sections: unknown[] }).sections).toEqual([]);
+  });
+
+  it("fails the first reads of the failing preset and then recovers", async () => {
+    const send = await session("stm-err", "statement-server-error");
+
+    const seen: number[] = [];
+    for (let read = 0; read < 4; read += 1) seen.push((await send("GET", statementOf(ANA))).status);
+
+    expect(seen).toEqual([500, 500, 500, 200]);
+  });
+});
+

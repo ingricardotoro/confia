@@ -171,6 +171,7 @@
     "catalog": "Catálogo",
     "charges": "Cobros",
     "accrual": "Generación de cargos",
+    "statement": "Estado de cuenta",
     "ledger": "Plan de cuentas",
     "groups": {
       "community": "Comunidad educativa",
@@ -415,6 +416,90 @@
   },
   "charges": {
     "title": "Cobros",
+    "statement": {
+      "heading": "Estado de cuenta",
+      "description": "Lo que un estudiante debe, cargo por cargo, con el saldo después de cada movimiento. El servidor calcula todos los saldos a partir del libro mayor.",
+      "from": "Desde",
+      "to": "Hasta",
+      "currency": "Moneda",
+      "currencyOption": "{currency} ({code})",
+      "periodHelp": "Si deja las fechas vacías se muestran los últimos 12 meses.",
+      "idleTitle": "Elija un estudiante",
+      "idleDescription": "Busque al estudiante por nombre, apellido o código para ver su estado de cuenta.",
+      "idleAction": "Buscar un estudiante",
+      "invalidPeriodTitle": "Corrija el período",
+      "invalidPeriodDescription": "La fecha final debe ser igual o posterior a la inicial. Mientras tanto no se consulta el estado de cuenta.",
+      "invalidPeriodAction": "Corregir la fecha final",
+      "emptyTitle": "Este estudiante todavía no tiene movimientos",
+      "emptyDescription": "No tiene cargos ni pagos registrados, así que no debe nada y no tiene saldo a favor. Los cargos aparecen aquí cuando se genera el cobro de un período.",
+      "emptyAction": "Elegir otro estudiante",
+      "loading": "Cargando el estado de cuenta.",
+      "loadFailed": "No se pudo cargar el estado de cuenta.",
+      "notFoundTitle": "No encontramos a este estudiante",
+      "notFoundDescription": "El estudiante no existe o no pertenece a su institución. Vuelva a buscarlo por nombre o código.",
+      "forbiddenTitle": "No tiene permiso para ver este estado de cuenta",
+      "forbiddenDescription": "Si lo necesita para su trabajo, solicite el permiso de consulta de cobros a un administrador de su institución.",
+      "errors": {
+        "fromAfterTo": "La fecha final debe ser igual o posterior a la inicial."
+      },
+      "sectionTitle": "{currency} ({code})",
+      "opening": "Saldo inicial",
+      "closing": "Saldo final",
+      "openingLabel": "Antes del {date}.",
+      "closingLabel": "Al {date}.",
+      "credit": "Saldo a favor",
+      "sideOwed": "El estudiante debe este monto.",
+      "sideCredit": "Saldo a favor del estudiante.",
+      "sideZero": "Sin saldo pendiente.",
+      "noAmount": "Sin importe",
+      "noAmountMark": "–",
+      "noDueDate": "No aplica",
+      "caption": "Movimientos del estado de cuenta en {currency}",
+      "pagination": "Páginas de los movimientos en {currency}",
+      "noLinesTitle": "Sin movimientos en este período",
+      "noLinesDescription": "Cambie las fechas para ver otros movimientos. Los saldos de arriba siguen siendo los de este período.",
+      "noLinesAction": "Cambiar las fechas",
+      "chargeDescription": "{concept}, {period}",
+      "movementDescription": "{kind}: {reason}",
+      "columns": {
+        "effectiveOn": "Fecha",
+        "description": "Descripción",
+        "dueOn": "Vence",
+        "debit": "Cargo",
+        "credit": "Abono",
+        "balance": "Saldo"
+      },
+      "direction": {
+        "debit": "Cargo",
+        "credit": "Abono"
+      },
+      "kinds": {
+        "CHARGE": "Cargo",
+        "DISCOUNT": "Descuento",
+        "PAYMENT": "Pago",
+        "LATE_FEE": "Recargo por mora",
+        "CREDIT_NOTE": "Nota de crédito",
+        "REVERSAL": "Reverso",
+        "ADJUSTMENT": "Ajuste",
+        "WRITE_OFF": "Condonación"
+      },
+      "picker": {
+        "label": "Estudiante",
+        "chosen": "Estudiante elegido",
+        "chosenLoading": "Cargando al estudiante.",
+        "change": "Cambiar estudiante",
+        "searchLabel": "Estudiante",
+        "help": "Escriba al menos dos letras del nombre, del apellido o del código.",
+        "tooShort": "Escriba al menos dos caracteres para buscar.",
+        "searching": "Buscando estudiantes.",
+        "found": "{count, plural, one {Se encontró # estudiante.} other {Se encontraron # estudiantes.}}",
+        "none": "Ningún estudiante coincide con la búsqueda.",
+        "failed": "No se pudo buscar estudiantes.",
+        "retry": "Reintentar la búsqueda",
+        "resultsLabel": "Estudiantes encontrados",
+        "optionText": "{name} ({code})"
+      }
+    },
     "errors": {
       "dueDayRange": "Escriba un día del mes entre 1 y 28, para que exista en todos los meses.",
       "periodsRange": "Escriba un número entero de períodos entre 1 y 36.",
@@ -1074,7 +1159,9 @@
       "filter": "Estado"
     },
     "guardiansAction": "Encargados",
-    "guardiansActionFor": "Encargados de {name}"
+    "guardiansActionFor": "Encargados de {name}",
+    "statementAction": "Estado de cuenta",
+    "statementActionFor": "Estado de cuenta de {name}"
   },
   "enrollments": {
     "title": "Matrículas",

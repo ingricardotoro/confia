@@ -94,6 +94,7 @@ describe("the routes and the screens", () => {
       "/charges/accrual/runs/$runId",
       "/charges/plans",
       "/charges/plans/$planId",
+      "/charges/statement",
       "/enrollments",
       "/guardians",
       "/imports",

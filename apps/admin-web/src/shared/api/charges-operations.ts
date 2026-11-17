@@ -8,6 +8,7 @@ import {
   ChargePlanItemResponse,
   ChargePlanPageResponse,
   ChargePlanResponse,
+  StudentStatement,
   type AccrualPeriodResponseOutput,
   type AccrualPreviewRequest,
   type AccrualPreviewResponseOutput,
@@ -22,6 +23,9 @@ import {
   type ChargePlanPageResponseOutput,
   type ChargePlanResponseOutput,
   type CreateChargePlanRequest,
+  type StudentStatementLineOutput,
+  type StudentStatementOutput,
+  type StudentStatementSectionOutput,
   type UpdateChargePlanRequest,
 } from "@confia/contracts/admin";
 import { request, requestEmpty, type ApiResult, type ResponseSchema } from "./http.ts";
@@ -168,3 +172,39 @@ export const getAccrualRun = (token: string, runId: string, params: AccrualItems
     headers: bearer(token),
     schema: lenient(AccrualRunDetailResponse),
   });
+
+// The statement of account of a student (ledger-account-statement cut): read only. Every amount, the running balance of each line
+// and the opening and closing balances are `{ amount, currency }` strings the server computed and rounded; nothing here or after
+// it adds, subtracts or rounds them.
+
+export type StudentStatementResponse = StudentStatementOutput;
+export type StatementSection = StudentStatementSectionOutput;
+export type StatementLine = StudentStatementLineOutput;
+export type StatementLineKind = StudentStatementLineOutput["kind"];
+
+export interface StatementParams {
+  /** Absent: one section per currency the student has. */
+  readonly currency?: string | undefined;
+  /** `yyyy-MM-dd`; absent: the last 12 months. */
+  readonly from?: string | undefined;
+  readonly to?: string | undefined;
+  /** Counted from 0; it pages the lines of every section. */
+  readonly page: number;
+  readonly size: number;
+}
+
+/** The statement of one student: a section per currency, each with its balances and one page of lines. */
+export const getStudentStatement = (token: string, studentId: string, params: StatementParams): Promise<ApiResult<StudentStatementResponse>> => {
+  const query = new URLSearchParams();
+  if (params.currency !== undefined) query.set("currency", params.currency);
+  if (params.from !== undefined) query.set("from", params.from);
+  if (params.to !== undefined) query.set("to", params.to);
+  query.set("page", String(params.page));
+  query.set("size", String(params.size));
+  return request({
+    method: "GET",
+    path: `/api/v1/charges/students/${encodeURIComponent(studentId)}/statement?${query.toString()}`,
+    headers: bearer(token),
+    schema: lenient(StudentStatement),
+  });
+};

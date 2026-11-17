@@ -7,6 +7,7 @@ import {
 } from "./organization-model.ts";
 import { DEFAULT_CATALOG, createCatalogModel, type CatalogModel, type CatalogOptions } from "./catalog-model.ts";
 import { DEFAULT_CHARGES, createChargesModel, type ChargesModel, type ChargesOptions } from "./charges-model.ts";
+import { DEFAULT_STATEMENT, createStatementModel, type StatementModel, type StatementOptions } from "./statement-model.ts";
 import { DEFAULT_LEDGER, createLedgerModel, type LedgerModel, type LedgerOptions } from "./ledger-model.ts";
 import { DEFAULT_IMPORTS, createImportsModel, type ImportsModel, type ImportsOptions } from "./imports-model.ts";
 import { DEFAULT_GUARDIANS, createGuardiansModel, type GuardiansModel, type GuardiansOptions } from "./guardians-model.ts";
@@ -61,6 +62,8 @@ interface PresetDefinition {
   readonly charges?: ChargesOptions;
   /** The chart of accounts and the map of posting accounts the scenario holds; the seeded ones (a partial map), with every write allowed, when absent. */
   readonly ledger?: LedgerOptions;
+  /** The statements of account the scenario holds, over its students; the seeded ones, readable, when absent. */
+  readonly statement?: StatementOptions;
   /** A fault injected after the model answered, to prove the server refuses to send it. */
   readonly tamper?: (operation: Operation, response: ModelResponse) => ModelResponse;
 }
@@ -127,6 +130,11 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   "ledger-forbidden": { login: "authenticated", enrolled: false, ledger: { ...DEFAULT_LEDGER, writes: "forbidden" } },
   "ledger-server-error": { login: "authenticated", enrolled: false, ledger: { ...DEFAULT_LEDGER, reads: "failing-first" } },
   "ledger-map-server-error": { login: "authenticated", enrolled: false, ledger: { ...DEFAULT_LEDGER, mapReads: "failing-first" } },
+  // The statement of account (ledger-account-statement cut): no student has an account, a person without the permission, and reads
+  // that fail first. Each one signs in as the default does.
+  "statement-empty": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, seed: "empty" } },
+  "statement-forbidden": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, access: "forbidden" } },
+  "statement-server-error": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, reads: "failing-first" } },
   "contract-violation": {
     login: "second-factor-enrollment-required",
     enrolled: false,
@@ -151,6 +159,7 @@ export interface Scenario {
   readonly catalog: CatalogModel;
   readonly charges: ChargesModel;
   readonly ledger: LedgerModel;
+  readonly statement: StatementModel;
   readonly calls: RecordedCall[];
   readonly tamper: PresetDefinition["tamper"];
   signIn(sleep: (ms: number) => Promise<void>): Promise<ModelResponse>;
@@ -184,6 +193,7 @@ function build(preset: string, definition: PresetDefinition): Scenario {
     catalog,
     charges: createChargesModel(definition.charges ?? DEFAULT_CHARGES, { organization, catalog, students }),
     ledger: createLedgerModel(definition.ledger ?? DEFAULT_LEDGER),
+    statement: createStatementModel(definition.statement ?? DEFAULT_STATEMENT, { students }),
     calls: [],
     tamper: definition.tamper,
     async signIn(sleep) {

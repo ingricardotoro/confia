@@ -12,7 +12,7 @@ import {
   type AccrualRunListParams,
 } from "../../shared/api/charges-operations.ts";
 import { pollIntervalOf, RUN_POLL_MS, runBodyOf, type AccrualIntent, type AccrualSelection } from "./accrual-model.ts";
-import { accrualKeys, chargePlanKeys } from "./charges-keys.ts";
+import { accrualKeys, chargePlanKeys, statementKeys } from "./charges-keys.ts";
 
 /** The periods a plan accrues, with the most recent run of each, as the server derives them. Nothing is read until a plan is chosen. */
 export function useAccrualPeriods(planId: string | undefined) {
@@ -50,6 +50,8 @@ export function useAccrualRunRequest() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: accrualKeys.all }),
         queryClient.invalidateQueries({ queryKey: chargePlanKeys.all }),
+        // A run books charges in the ledger, so every statement of account is read again.
+        queryClient.invalidateQueries({ queryKey: statementKeys.all }),
       ]);
     },
   });

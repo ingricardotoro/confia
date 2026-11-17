@@ -249,6 +249,9 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
       if (session.status !== 200) { deliver(res, scenario, "charges", session); return; }
       const url = new URL(req.url ?? "/", "http://localhost");
       const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
+      // The statement of account of a student (a route below the charges that the statement model owns, so it goes first).
+      const statement = scenario.statement.handle({ method, path, query: url.searchParams });
+      if (statement !== undefined) { deliver(res, scenario, "charges", statement); return; }
       const answer = scenario.charges.handle({
         method,
         path,
