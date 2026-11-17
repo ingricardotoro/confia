@@ -120,3 +120,47 @@ el historial; la base rechaza cualquier solape y ningún usuario ve tasas de otr
   un gravado sin tasa responde 400. Rutas nuevas: las cinco de `/api/v1/catalog/tax-rates` y los esquemas
   `CreateTaxRateRequest`, `UpdateTaxRateRequest`, `AddTaxRatePeriodRequest`, `TaxRateResponse`, `TaxRateDetailResponse`,
   `TaxRatePeriodResponse` y `TaxRatePageResponse`.
+
+## Construido (frontend)
+
+Todo en `apps/admin-web`, dentro de la funcionalidad `catalog` (sin importar de otras funcionalidades; las tasas que
+ofrece el formulario del concepto se leen con el cliente propio de `catalog`).
+
+- **Pestaña «Tasas de impuesto»** en Catálogo (`/catalog/tax-rates`, hermana de «Conceptos de pago» y «Listas de precios»).
+  Lista paginada, ordenada (código, nombre) y filtrada por estado en el servidor, con el estado en la URL (parámetros
+  validados con Zod, igual que las otras listas). Alta de tasa con código y nombre (sin porcentaje), edición del nombre con
+  el código de solo lectura, y activar o desactivar desde la fila enviando la `version` leída.
+- **Detalle** (`/catalog/tax-rates/{id}`): datos de la tasa y el historial completo de vigencias, de la más nueva a la más
+  antigua, con las cerradas y la abierta, el porcentaje tal como lo entrega el servidor (cuatro decimales y el signo %
+  del catálogo de textos, formateado con `Intl.NumberFormat` sobre la cadena, sin convertirla a número), activar o
+  desactivar con `version`, y el diálogo «Nueva vigencia» (porcentaje como texto, desde, hasta opcional).
+- **Validación del cliente** del porcentaje sobre sus caracteres (nunca como número): patrón `^\d{1,3}(\.\d{1,4})?$`, mayor
+  que cero y no mayor que 100, y fechas dentro de 2000-01-01…2100-12-31 con el mismo mensaje que el servidor da a
+  `validity-day`; la autoridad sigue siendo el servidor. Sin ninguna cifra de porcentaje en el código, en los textos ni en
+  datos de producción: los porcentajes de los simuladores y de las pruebas son ficticios.
+- **Errores 409** con mensaje propio: `duplicate-tax-rate-code` (bajo el campo código), `tax-rate-period-overlap`,
+  `inactive-reference` (también cuando se desactiva la tasa mientras se edita) y `stale-version`, que además vuelve a leer
+  los datos. Sin actualización optimista y sin `Idempotency-Key` (no mueve dinero). Tras escribir se invalidan la lista, el
+  detalle y las listas de conceptos (que muestran la tasa).
+- **Formulario del concepto**: con «Gravado» marcado aparece la «Tasa de impuesto» (obligatoria, solo tasas activas más la que
+  el concepto ya tenga aunque se haya desactivado después); al desmarcarlo se oculta y se descarta lo elegido, y el cuerpo
+  no envía `taxRateId`. La lista de conceptos gana la columna «Tasa de impuesto» (código y nombre; «Sin tasa asignada» para un
+  gravado anterior al corte y «No aplica» para uno no gravado). Activar o desactivar desde la fila reenvía la tasa que el
+  concepto ya tiene.
+- **Simulador (`e2e/mock-api`)**: cinco rutas de tasas con las reglas que usan los recorridos (código repetido, versión
+  desfasada, solape, cierre del día previo, tasa inactiva, ventana de fechas, rango del porcentaje) y las reglas de
+  `taxRateId` en el concepto (400, 404, 409); preajuste `catalog-tax-rates-empty`. Siembra ficticia: dos tasas activas con
+  vigencias, una inactiva y veinticuatro genéricas.
+- **Pruebas**: Vitest (cliente, lógica de formularios, vistas, componentes, contenedores y simulador), recorridos de
+  Playwright (`catalog-tax-rates-crud|keyboard|lists|states`) y quince estados nuevos más uno del concepto en la matriz de
+  accesibilidad.
+
+### Decisiones y supuestos (frontend)
+
+- El porcentaje se formatea pasando la cadena a `Intl.NumberFormat` (lectura decimal exacta) en `shared/format/format-rate.ts`;
+  no se reutilizó `formatPercent`, que recibe un `number`.
+- La edición del nombre está en la lista; el detalle solo activa o desactiva y registra vigencias.
+- Un concepto gravado anterior al corte, sin tasa, no se puede activar ni desactivar desde la fila mientras no se edite y se
+  le asigne una: el servidor exige la tasa en toda edición y responde 400, que la pantalla muestra con el mensaje genérico de
+  datos no procesados. Si se quiere un mensaje propio, hace falta un código de error específico del backend.
+- La opción «inactiva» de la tasa que el concepto ya tiene se muestra con el sufijo «(inactiva)» en el selector.

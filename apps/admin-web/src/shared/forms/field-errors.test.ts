@@ -134,3 +134,14 @@ describe("the reasons of a price", () => {
     expect(fieldErrorKey(reason)).toBe(key);
   });
 });
+
+describe("the reasons of a tax rate", () => {
+  it.each([
+    ["duplicate-tax-rate-code", "catalog.taxRates.errors.duplicateCode"],
+    ["rate-format", "catalog.taxRates.errors.rateFormat"],
+    ["rate-range", "catalog.taxRates.errors.rateRange"],
+    ["validity-day", "catalog.priceLists.errors.dateRange"],
+  ] as const)("gives %s its own text", (reason, key) => {
+    expect(fieldErrorKey(reason)).toBe(key);
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { paymentConceptsSearch, priceListsSearch } from "./catalog-search.ts";
+import { paymentConceptsSearch, priceListsSearch, taxRatesSearch } from "./catalog-search.ts";
 
 describe("the search of the payment concepts list", () => {
   it("holds the defaults when the address says nothing", () => {
@@ -42,5 +42,21 @@ describe("the search of the price lists list", () => {
       page: 1,
       pageSize: 25,
     });
+  });
+});
+
+describe("the search of the tax rates list", () => {
+  it("holds the defaults when the address says nothing", () => {
+    expect(taxRatesSearch.parse({})).toEqual({ page: 1, pageSize: 25 });
+  });
+
+  it("keeps a valid page, order and the active filter", () => {
+    const search = { page: 2, pageSize: 50, sort: "name:desc", active: true };
+
+    expect(taxRatesSearch.parse(search)).toEqual(search);
+  });
+
+  it("drops each parameter that does not hold", () => {
+    expect(taxRatesSearch.parse({ page: 0, pageSize: 3, sort: "createdAt:asc", active: "yes" })).toEqual({ page: 1, pageSize: 25 });
   });
 });

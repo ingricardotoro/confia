@@ -116,6 +116,11 @@ const PRICE_LISTS = "/catalog/price-lists";
 const PRICE_LIST_DETAIL = `${PRICE_LISTS}/00000000-0000-4000-8000-000000009001`;
 const PRICE_LIST_BLANK = `${PRICE_LISTS}/00000000-0000-4000-8000-000000009002`;
 const PRICE_LIST_ARCHIVED = `${PRICE_LISTS}/00000000-0000-4000-8000-000000009003`;
+const TAX_RATES = "/catalog/tax-rates";
+/** The seeded rates: with two validities (one closed, one open), inactive, and active with none. */
+const TAX_RATE_DETAIL = `${TAX_RATES}/00000000-0000-4000-8000-000000006001`;
+const TAX_RATE_INACTIVE = `${TAX_RATES}/00000000-0000-4000-8000-000000006003`;
+const TAX_RATE_BLANK = `${TAX_RATES}/00000000-0000-4000-8000-000000006004`;
 
 /** The payment concepts list with the cookies of a signed in session, as the control of the simulator does. */
 async function openCatalogRoute(page: Page, path: string = CATALOG): Promise<void> {
@@ -984,6 +989,23 @@ export const MATRIX: readonly GateCombination[] = [
     expected: (page) => page.getByRole("group", { name: "Hay 1 campo con error." }),
   },
   {
+    // The field of the tax rate that a taxable concept asks for, with a required choice and its help.
+    route: CATALOG,
+    state: "dialog-taxable",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page);
+      await page.getByRole("button", { name: "Nuevo concepto" }).click();
+      const dialog = page.getByRole("dialog");
+      // The fields are filled first: leaving an empty one shows its error and moves the checkbox before it is pressed.
+      await dialog.getByLabel(/^Código/).fill("COL");
+      await dialog.getByLabel(/^Nombre/).fill("Colegiatura");
+      await dialog.getByLabel(/^Categoría/).selectOption({ label: "Colegiatura" });
+      await dialog.getByRole("checkbox", { name: "Gravado" }).check();
+    },
+    expected: (page) => page.getByRole("dialog").getByLabel(/^Tasa de impuesto/),
+  },
+  {
     route: CATALOG,
     state: "no-matches",
     arrange: (page) => openCatalogRoute(page, `${CATALOG}?category=FINE&active=false`),
@@ -1117,5 +1139,143 @@ export const MATRIX: readonly GateCombination[] = [
     // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
     arrange: (page) => openCatalogRoute(page, PRICE_LIST_DETAIL),
     expected: (page) => page.getByText("No se pudo cargar la lista de precios"),
+  },
+  // The tax rates (catalog-tax-rates cut): the list, the detail of a rate with its history, of one with none and of an
+  // inactive one, and the dialogs of a new rate and of a new validity.
+  {
+    route: TAX_RATES,
+    state: "ready",
+    arrange: (page) => openCatalogRoute(page, TAX_RATES),
+    expected: (page) => page.getByRole("link", { name: "IMP-A", exact: true }),
+  },
+  {
+    route: TAX_RATES,
+    state: "dialog-open",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATES);
+      await page.getByRole("button", { name: "Nueva tasa" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Nueva tasa de impuesto" }),
+  },
+  {
+    route: TAX_RATES,
+    state: "dialog-edit",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATES);
+      await page.getByRole("button", { name: "Editar Impuesto de prueba A" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Editar tasa de impuesto" }),
+  },
+  {
+    route: TAX_RATES,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATES);
+      await page.getByRole("button", { name: "Nueva tasa" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 2 campos con errores." }),
+  },
+  {
+    route: TAX_RATES,
+    state: "dialog-duplicate-code",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATES);
+      await page.getByRole("button", { name: "Nueva tasa" }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.getByLabel(/^Código/).fill("imp-a");
+      await dialog.getByLabel(/^Nombre/).fill("Otra tasa");
+      await dialog.getByRole("button", { name: "Guardar" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 1 campo con error." }),
+  },
+  {
+    route: TAX_RATES,
+    state: "no-matches",
+    preset: "catalog-tax-rates-empty",
+    arrange: (page) => openCatalogRoute(page, `${TAX_RATES}?active=true`),
+    expected: (page) => page.getByText("Ningún registro coincide con los filtros"),
+  },
+  {
+    route: TAX_RATES,
+    state: "empty",
+    preset: "catalog-tax-rates-empty",
+    arrange: (page) => openCatalogRoute(page, TAX_RATES),
+    expected: (page) => page.getByText("Todavía no hay tasas de impuesto"),
+  },
+  {
+    route: TAX_RATES,
+    state: "load-error",
+    preset: "catalog-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openCatalogRoute(page, TAX_RATES),
+    expected: (page) => page.getByText("No se pudo cargar la lista de tasas de impuesto"),
+  },
+  {
+    route: TAX_RATE_DETAIL,
+    state: "ready",
+    arrange: (page) => openCatalogRoute(page, TAX_RATE_DETAIL),
+    expected: (page) => page.getByRole("table", { name: "Vigencias de Impuesto de prueba A" }),
+  },
+  {
+    route: TAX_RATE_DETAIL,
+    state: "dialog-add-period",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATE_DETAIL);
+      await page.getByRole("button", { name: "Nueva vigencia" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Nueva vigencia" }),
+  },
+  {
+    route: TAX_RATE_DETAIL,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATE_DETAIL);
+      await page.getByRole("button", { name: "Nueva vigencia" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar vigencia" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 2 campos con errores." }),
+  },
+  {
+    route: TAX_RATE_DETAIL,
+    state: "dialog-overlap",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATE_DETAIL);
+      await page.getByRole("button", { name: "Nueva vigencia" }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.getByLabel(/^Porcentaje/).fill("5");
+      // Inside the open validity of the seed: the server refuses it with 409.
+      await dialog.getByLabel(/^Vigente desde/).fill("2026-08-01");
+      await dialog.getByLabel(/^Vigente hasta/).fill("2026-08-31");
+      await dialog.getByRole("button", { name: "Guardar vigencia" }).click();
+    },
+    expected: (page) => page.getByRole("dialog").getByRole("alert").filter({ hasText: "ya tiene una vigencia" }),
+  },
+  {
+    route: TAX_RATE_BLANK,
+    state: "empty",
+    arrange: (page) => openCatalogRoute(page, TAX_RATE_BLANK),
+    expected: (page) => page.getByText("Esta tasa todavía no tiene vigencias"),
+  },
+  {
+    route: TAX_RATE_INACTIVE,
+    state: "inactive",
+    arrange: (page) => openCatalogRoute(page, TAX_RATE_INACTIVE),
+    expected: (page) => page.getByText(/está inactiva y no admite vigencias nuevas/),
+  },
+  {
+    route: TAX_RATE_DETAIL,
+    state: "load-error",
+    preset: "catalog-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openCatalogRoute(page, TAX_RATE_DETAIL),
+    expected: (page) => page.getByText("No se pudo cargar la tasa de impuesto"),
   },
 ];

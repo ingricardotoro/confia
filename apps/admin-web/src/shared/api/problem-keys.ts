@@ -43,6 +43,8 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "import-file-changed": "problem.importFileChanged",
   "price-validity-overlap": "problem.priceValidityOverlap",
   "price-list-archived": "problem.priceListArchived",
+  "duplicate-tax-rate-code": "problem.duplicateTaxRateCode",
+  "tax-rate-period-overlap": "problem.taxRatePeriodOverlap",
   "stale-version": "problem.staleVersion",
   unknown: "problem.unexpected",
 };

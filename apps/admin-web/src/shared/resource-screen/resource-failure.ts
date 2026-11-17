@@ -28,6 +28,7 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "consent-channel-unavailable",
   "price-validity-overlap",
   "price-list-archived",
+  "tax-rate-period-overlap",
   "stale-version",
 ]);
 
@@ -50,6 +51,8 @@ function fieldOf(error: { readonly field: string; readonly reason: string }): { 
   // The price of a new validity travels nested (`price.amount`): the form has the amount and the currency as fields of its own.
   if (error.field === "price.amount") return { field: "amount", reason: error.reason === "pattern" ? "amount-format" : error.reason };
   if (error.field === "price.currency") return { field: "currency", reason: error.reason };
+  // The percentage of a tax rate period travels as text: the server names a text outside its pattern `pattern`.
+  if (error.field === "ratePercent" && error.reason === "pattern") return { field: "ratePercent", reason: "rate-format" };
   if (error.field === "nationalId" && error.reason === "pattern") return { field: "nationalId", reason: "national-id-format" };
   // The reason of a withdrawal or a transfer is 3 to 500 characters: `size` says it is too short as well as too long.
   if ((error.field === "withdrawalReason" || error.field === "reason") && error.reason === "size") return { field: error.field, reason: "reason-length" };
@@ -75,6 +78,10 @@ export function classifyOrganizationFailure(result: ApiFailureResult): AccessFai
   // A repeated code of a payment concept belongs to its `code` field, not to the form as a whole.
   if (result.kind === "problem" && result.problem.code === "duplicate-payment-concept-code") {
     return { kind: "fields", errors: [{ field: "code", reason: "duplicate-payment-concept-code" }] };
+  }
+  // The same for the code of a tax rate.
+  if (result.kind === "problem" && result.problem.code === "duplicate-tax-rate-code") {
+    return { kind: "fields", errors: [{ field: "code", reason: "duplicate-tax-rate-code" }] };
   }
   if (result.kind === "problem" && result.problem.code === "invalid-responsibility-split") {
     const { errors, traceId } = result.problem;

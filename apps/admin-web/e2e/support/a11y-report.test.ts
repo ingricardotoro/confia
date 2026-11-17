@@ -151,6 +151,7 @@ describe("the states of the catalog", () => {
       ["dialog-edit", undefined, true],
       ["dialog-error-summary", undefined, true],
       ["dialog-duplicate-code", undefined, true],
+      ["dialog-taxable", undefined, true],
       ["no-matches", undefined, undefined],
       ["empty", "catalog-empty", undefined],
       ["load-error", "catalog-server-error", undefined],
@@ -180,6 +181,32 @@ describe("the states of the price lists", () => {
       ["/catalog/price-lists/<id>", "load-error", "catalog-server-error", undefined],
     ]);
     expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...priceLists])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+});
+
+describe("the states of the tax rates", () => {
+  const taxRates = MATRIX.filter((combination) => combination.route.startsWith("/catalog/tax-rates"));
+
+  it("holds the list with its dialogs and its no-match, empty and load-error states, and the detail ready, empty, inactive, with the dialogs of a new validity and with its load error, each once", () => {
+    expect(taxRates.map((combination) => [combination.route.replace(/\/0{8}-[\w-]+$/, "/<id>"), combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["/catalog/tax-rates", "ready", undefined, undefined],
+      ["/catalog/tax-rates", "dialog-open", undefined, true],
+      ["/catalog/tax-rates", "dialog-edit", undefined, true],
+      ["/catalog/tax-rates", "dialog-error-summary", undefined, true],
+      ["/catalog/tax-rates", "dialog-duplicate-code", undefined, true],
+      ["/catalog/tax-rates", "no-matches", "catalog-tax-rates-empty", undefined],
+      ["/catalog/tax-rates", "empty", "catalog-tax-rates-empty", undefined],
+      ["/catalog/tax-rates", "load-error", "catalog-server-error", undefined],
+      ["/catalog/tax-rates/<id>", "ready", undefined, undefined],
+      ["/catalog/tax-rates/<id>", "dialog-add-period", undefined, true],
+      ["/catalog/tax-rates/<id>", "dialog-error-summary", undefined, true],
+      ["/catalog/tax-rates/<id>", "dialog-overlap", undefined, true],
+      ["/catalog/tax-rates/<id>", "empty", undefined, undefined],
+      ["/catalog/tax-rates/<id>", "inactive", undefined, undefined],
+      ["/catalog/tax-rates/<id>", "load-error", "catalog-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...taxRates])).toHaveLength(MATRIX.length * THEMES.length);
     expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
   });
 });

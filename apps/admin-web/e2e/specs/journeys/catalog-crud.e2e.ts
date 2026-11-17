@@ -51,11 +51,15 @@ test.describe("the payment concepts, creating and editing", () => {
     await field(page, "Categoría").selectOption({ label: "Colegiatura" });
     await checkbox(page, "Recurrente").check();
     await checkbox(page, "Gravado").check();
+    // A taxable concept names its tax rate, from the active ones the catalog lists.
+    await field(page, "Tasa de impuesto").selectOption({ label: "IMP-A — Impuesto de prueba A" });
     await save(page).click();
 
     await expect(dialog(page)).toBeHidden(SAVE_TIMEOUT);
     await expect(resultNotice(page)).toContainText("Se creó el registro «Colegiatura».");
-    await expect.poll(() => bodyRows(page)).toEqual([["COL", "Colegiatura", "Colegiatura", "Sí", "Sí", "Activo", "EditarDesactivar"]]);
+    await expect
+      .poll(() => bodyRows(page))
+      .toEqual([["COL", "Colegiatura", "Colegiatura", "Sí", "Sí", "IMP-A — Impuesto de prueba A", "Activo", "EditarDesactivar"]]);
   });
 
   test("shows the field errors of an empty form and sends nothing to the API", async ({ page, request, scenarioId }) => {

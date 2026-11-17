@@ -94,6 +94,8 @@
     "importFileChanged": "El archivo no es el mismo que se simuló la última vez. Simule de nuevo este archivo, revise el resultado y después aplíquelo.",
     "priceValidityOverlap": "Ese concepto ya tiene un precio vigente en parte de esas fechas. Ajuste las fechas para que no coincidan con otra vigencia e intente de nuevo.",
     "priceListArchived": "La lista de precios está archivada y no admite precios nuevos. Reactívela para agregar precios.",
+    "duplicateTaxRateCode": "Ya existe una tasa con ese código.",
+    "taxRatePeriodOverlap": "Esa tasa ya tiene una vigencia en parte de esas fechas. Ajuste las fechas para que no coincidan con otra vigencia e intente de nuevo.",
     "staleVersion": "El registro cambió desde que lo abrió y sus cambios no se guardaron. Los datos ya se recargaron: cierre y vuelva a abrir el registro, revíselo y repita el cambio."
   },
   "field": {
@@ -159,7 +161,8 @@
     "tabsLabel": "Vistas del catálogo",
     "tabs": {
       "paymentConcepts": "Conceptos de pago",
-      "priceLists": "Listas de precios"
+      "priceLists": "Listas de precios",
+      "taxRates": "Tasas de impuesto"
     },
     "common": {
       "yes": "Sí",
@@ -193,14 +196,15 @@
       "filterCategory": "Categoría",
       "filterActive": "Estado",
       "recurringHelp": "Marque esta casilla si el concepto se cobra de forma periódica, como la colegiatura mensual.",
-      "taxableHelp": "Marque esta casilla si el concepto está gravado con impuesto.",
+      "taxableHelp": "Marque esta casilla si el concepto está gravado con impuesto. Un concepto gravado debe tener una tasa de impuesto.",
       "activeHelp": "Un concepto desactivado deja de ofrecerse para listas nuevas. Lo ya registrado no cambia.",
       "columns": {
         "code": "Código",
         "name": "Nombre",
         "category": "Categoría",
         "recurring": "Recurrente",
-        "taxable": "Gravado"
+        "taxable": "Gravado",
+        "taxRate": "Tasa de impuesto"
       },
       "fields": {
         "code": "Código",
@@ -208,8 +212,14 @@
         "category": "Categoría",
         "isRecurring": "Recurrente",
         "isTaxable": "Gravado",
-        "isActive": "Activo"
-      }
+        "isActive": "Activo",
+        "taxRate": "Tasa de impuesto"
+      },
+      "taxRateHelp": "Elija la tasa que se aplica a este concepto. Solo se ofrecen las tasas activas.",
+      "taxRateNone": "No aplica",
+      "taxRateMissing": "Sin tasa asignada",
+      "taxRateInactive": "{code} — {name} (inactiva)",
+      "noActiveTaxRates": "No hay tasas de impuesto activas. Cree o active una en la pestaña Tasas de impuesto."
     },
     "priceLists": {
       "heading": "Listas de precios",
@@ -301,6 +311,77 @@
           "concept": "Concepto",
           "amount": "Importe",
           "currency": "Moneda",
+          "validFrom": "Vigente desde",
+          "validTo": "Vigente hasta (opcional)"
+        }
+      }
+    },
+    "taxRates": {
+      "heading": "Tasas de impuesto",
+      "caption": "Tasas de impuesto de la institución",
+      "create": "Nueva tasa",
+      "createTitle": "Nueva tasa de impuesto",
+      "createDescription": "Defina una tasa de impuesto, por ejemplo el impuesto sobre ventas. Aquí solo se registran su código y su nombre; el porcentaje se carga después, como una vigencia.",
+      "editTitle": "Editar tasa de impuesto",
+      "editDescription": "Cambie el nombre de la tasa. El código no se puede cambiar y el porcentaje no se edita: un cambio de porcentaje es una vigencia nueva. Una tasa no se borra: se desactiva.",
+      "emptyTitle": "Todavía no hay tasas de impuesto",
+      "emptyDescription": "Cree la primera tasa y registre su porcentaje con la fecha desde la que rige. El sistema no trae ningún porcentaje precargado.",
+      "emptyAction": "Crear la primera tasa",
+      "loadFailed": "No se pudo cargar la lista de tasas de impuesto",
+      "filterActive": "Estado",
+      "codeHelp": "Letras, números, guion y guion bajo; empiece por una letra o un número. Hasta 30 caracteres. No se puede repetir ni cambiar después.",
+      "nameHelp": "Hasta 120 caracteres.",
+      "percentValue": "{rate} %",
+      "optionLabel": "{code} — {name}",
+      "columns": {
+        "code": "Código",
+        "name": "Nombre"
+      },
+      "fields": {
+        "code": "Código",
+        "name": "Nombre"
+      },
+      "errors": {
+        "duplicateCode": "Ya existe una tasa con ese código.",
+        "rateFormat": "Escriba el porcentaje con punto decimal y hasta cuatro decimales, sin signo ni el símbolo %.",
+        "rateRange": "El porcentaje debe ser mayor que cero y no pasar de 100."
+      },
+      "detail": {
+        "back": "Volver a las tasas de impuesto",
+        "loadFailed": "No se pudo cargar la tasa de impuesto",
+        "summary": "Datos de la tasa",
+        "inactiveNote": "Esta tasa está inactiva y no admite vigencias nuevas. Actívela para agregar una.",
+        "activate": "Activar tasa",
+        "activateFor": "Activar tasa {name}",
+        "deactivate": "Desactivar tasa",
+        "deactivateFor": "Desactivar tasa {name}",
+        "activated": "Se activó la tasa «{name}».",
+        "deactivated": "Se desactivó la tasa «{name}».",
+        "periodsHeading": "Historial de vigencias",
+        "periodsCaption": "Vigencias de {name}",
+        "addPeriod": "Nueva vigencia",
+        "emptyTitle": "Esta tasa todavía no tiene vigencias",
+        "emptyDescription": "Registre el porcentaje con la fecha desde la que rige. Un cambio de porcentaje es una vigencia nueva: la abierta se cierra el día anterior y el historial se conserva.",
+        "emptyAction": "Registrar la primera vigencia",
+        "openEnded": "Sin fecha de fin",
+        "validityOpen": "Abierta",
+        "validityClosed": "Cerrada",
+        "columns": {
+          "rate": "Porcentaje",
+          "validFrom": "Vigente desde",
+          "validTo": "Vigente hasta",
+          "state": "Vigencia"
+        }
+      },
+      "addPeriod": {
+        "title": "Nueva vigencia",
+        "description": "Fije el porcentaje de la tasa desde una fecha. Si la tasa ya tiene una vigencia abierta, el sistema la cierra el día anterior y conserva el historial. Una vigencia guardada no se edita.",
+        "submit": "Guardar vigencia",
+        "saved": "Se registró la vigencia de «{name}» desde el {date}.",
+        "rateHelp": "Use punto decimal y hasta cuatro decimales. Debe ser mayor que cero y no pasar de 100.",
+        "validToHelp": "Déjela vacía si la vigencia no tiene fecha de fin. El último día cuenta como vigente.",
+        "fields": {
+          "ratePercent": "Porcentaje",
           "validFrom": "Vigente desde",
           "validTo": "Vigente hasta (opcional)"
         }

@@ -16,6 +16,8 @@ function props(override: Partial<PaymentConceptFormProps> = {}): PaymentConceptF
     values: initialPaymentConceptValues(),
     fieldErrors: {},
     form: formView(),
+    taxRateOptions: [],
+    noActiveTaxRates: false,
     onChange: vi.fn(),
     onBlur: vi.fn(),
     onClose: vi.fn(),
@@ -83,5 +85,50 @@ describe("PaymentConceptForm", () => {
     renderWithAdminI18n(<PaymentConceptForm {...props()} />);
 
     expect(screen.getByRole("checkbox", { name: "Gravado" })).toHaveAccessibleDescription(/gravado con impuesto/);
+  });
+});
+
+describe("PaymentConceptForm tax rate", () => {
+  const options = [
+    { value: "r1", label: "IMP-A — Impuesto de prueba A" },
+    { value: "r2", label: "IMP-B — Impuesto de prueba B" },
+  ];
+
+  it("shows no rate field while the concept is not taxable", () => {
+    renderWithAdminI18n(<PaymentConceptForm {...props({ taxRateOptions: options })} />);
+
+    expect(screen.queryByLabelText(/Tasa de impuesto/)).not.toBeInTheDocument();
+  });
+
+  it("shows a required rate field with the options once the concept is taxable, and reports the choice", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderWithAdminI18n(<PaymentConceptForm {...props({ values: { ...initialPaymentConceptValues(), isTaxable: "true" }, taxRateOptions: options, onChange })} />);
+
+    const select = screen.getByLabelText(/Tasa de impuesto/);
+    await user.selectOptions(select, "r2");
+
+    expect(select).toBeRequired();
+    expect(onChange).toHaveBeenCalledWith("taxRateId", "r2");
+  });
+
+  it("shows the error of the rate under the field, and says when there is no active rate or the rates failed to load", async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+    renderWithAdminI18n(
+      <PaymentConceptForm
+        {...props({
+          values: { ...initialPaymentConceptValues(), isTaxable: "true" },
+          fieldErrors: { taxRateId: "Este dato es obligatorio." },
+          noActiveTaxRates: true,
+          taxRateLookupFailure: { onRetry },
+        })}
+      />,
+    );
+
+    expect(screen.getByLabelText(/Tasa de impuesto/)).toHaveAccessibleDescription(/Este dato es obligatorio\./);
+    expect(screen.getByText(/No hay tasas de impuesto activas/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Reintentar" }));
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 });

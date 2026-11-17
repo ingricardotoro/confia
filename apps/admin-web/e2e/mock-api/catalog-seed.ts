@@ -16,6 +16,8 @@ export interface PaymentConceptRow {
   isTaxable: boolean;
   isRecurring: boolean;
   isActive: boolean;
+  /** The tax rate of a taxable concept (catalog-tax-rates cut); null for one that is not taxable. */
+  taxRateId: string | null;
   /** Bumped by every edit; an edit that sends another one is refused with 409 `stale-version`. */
   version: number;
   createdAt: string;
@@ -30,13 +32,20 @@ export const conceptId = (n: number): string => `00000000-0000-4000-8000-${Strin
 export const GENERIC_COUNT = 24;
 export const TOTAL = 6 + GENERIC_COUNT;
 
+/** A valid UUID (version 4, RFC variant) for a tax rate or a validity of one, ending in the kind and number given. */
+export const taxRateId = (n: number): string => `00000000-0000-4000-8000-${String(6000 + n).padStart(12, "0")}`;
+export const taxPeriodId = (n: number): string => `00000000-0000-4000-8000-${String(5000 + n).padStart(12, "0")}`;
+
+/** The rates of the seed, in the order a journey names them: two active ones with validities, and an inactive one. */
+export const RATE_IDS = { a: taxRateId(1), b: taxRateId(2), inactive: taxRateId(3) } as const;
+
 const named: readonly Omit<PaymentConceptRow, "id" | "version" | "createdAt" | "updatedAt">[] = [
-  { code: "COL", name: "Colegiatura", category: "TUITION", isTaxable: true, isRecurring: true, isActive: true },
-  { code: "MAT", name: "Matrícula anual", category: "ENROLLMENT", isTaxable: false, isRecurring: false, isActive: true },
-  { code: "TRA", name: "Transporte escolar", category: "TRANSPORT", isTaxable: true, isRecurring: true, isActive: true },
-  { code: "LIB", name: "Libros y útiles", category: "MATERIAL", isTaxable: true, isRecurring: false, isActive: true },
-  { code: "MUL", name: "Multa por retraso", category: "FINE", isTaxable: false, isRecurring: false, isActive: true },
-  { code: "OTR", name: "Otros ingresos", category: "OTHER", isTaxable: false, isRecurring: false, isActive: false },
+  { code: "COL", name: "Colegiatura", category: "TUITION", isTaxable: true, isRecurring: true, isActive: true, taxRateId: RATE_IDS.a },
+  { code: "MAT", name: "Matrícula anual", category: "ENROLLMENT", isTaxable: false, isRecurring: false, isActive: true, taxRateId: null },
+  { code: "TRA", name: "Transporte escolar", category: "TRANSPORT", isTaxable: true, isRecurring: true, isActive: true, taxRateId: RATE_IDS.b },
+  { code: "LIB", name: "Libros y útiles", category: "MATERIAL", isTaxable: true, isRecurring: false, isActive: true, taxRateId: RATE_IDS.a },
+  { code: "MUL", name: "Multa por retraso", category: "FINE", isTaxable: false, isRecurring: false, isActive: true, taxRateId: null },
+  { code: "OTR", name: "Otros ingresos", category: "OTHER", isTaxable: false, isRecurring: false, isActive: false, taxRateId: null },
 ];
 
 /** The name of a generic concept, which is also its text in the list. */
@@ -51,6 +60,7 @@ export function seededRows(): PaymentConceptRow[] {
     isTaxable: false,
     isRecurring: false,
     isActive: true,
+    taxRateId: null,
   }));
   return [...named, ...generic].map((row, index) => ({ id: conceptId(index + 1), ...row, version: 0, createdAt: STAMP, updatedAt: STAMP }));
 }
@@ -149,3 +159,72 @@ export function seededPriceLists(): PriceListRows {
 }
 
 export const emptyPriceLists = (): PriceListRows => ({ lists: [], items: [] });
+
+// The tax rates (catalog-tax-rates cut). The percentages are strings with four decimals, as they travel; the simulator
+// never turns one into a number. They are fictitious values for the simulator and are not rates that any institution uses.
+export interface TaxRateRow {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaxPeriodRow {
+  id: string;
+  taxRateId: string;
+  /** Exactly as stored: four decimals. Answered as stored. */
+  ratePercent: string;
+  validFrom: string;
+  /** Inclusive; null while the validity is open. */
+  validTo: string | null;
+  createdAt: string;
+}
+
+export interface TaxRateRows {
+  rates: TaxRateRow[];
+  periods: TaxPeriodRow[];
+}
+
+/** How many generic rates follow the three named ones, so the list needs a second page. */
+export const GENERIC_RATES = 24;
+export const TOTAL_RATES = 3 + GENERIC_RATES;
+export const genericRateName = (n: number): string => `Tasa genérica ${String(n).padStart(2, "0")}`;
+export const genericRateCode = (n: number): string => `TX-${String(n).padStart(2, "0")}`;
+
+export function seededTaxRates(): TaxRateRows {
+  const stamped = { version: 0, createdAt: STAMP, updatedAt: STAMP };
+  const named: TaxRateRow[] = [
+    { id: RATE_IDS.a, code: "IMP-A", name: "Impuesto de prueba A", isActive: true, ...stamped },
+    { id: RATE_IDS.b, code: "IMP-B", name: "Impuesto de prueba B", isActive: true, ...stamped },
+    { id: RATE_IDS.inactive, code: "IMP-C", name: "Impuesto de prueba C", isActive: false, ...stamped },
+  ];
+  const generic = Array.from({ length: GENERIC_RATES }, (_, index): TaxRateRow => ({
+    id: taxRateId(4 + index),
+    code: genericRateCode(index + 1),
+    name: genericRateName(index + 1),
+    isActive: true,
+    ...stamped,
+  }));
+  const period = (n: number, taxRateId: string, ratePercent: string, validFrom: string, validTo: string | null): TaxPeriodRow => ({
+    id: taxPeriodId(n),
+    taxRateId,
+    ratePercent,
+    validFrom,
+    validTo,
+    createdAt: STAMP,
+  });
+  return {
+    rates: [...named, ...generic],
+    // Rate A has a closed validity and the open one that replaced it; rate B one open validity; the inactive one none.
+    periods: [
+      period(1, RATE_IDS.a, "1.2300", "2026-01-01", "2026-06-30"),
+      period(2, RATE_IDS.a, "3.2100", "2026-07-01", null),
+      period(3, RATE_IDS.b, "6.5400", "2026-01-01", null),
+    ],
+  };
+}
+
+export const emptyTaxRates = (): TaxRateRows => ({ rates: [], periods: [] });

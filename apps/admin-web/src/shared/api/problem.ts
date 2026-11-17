@@ -37,6 +37,8 @@ export const KNOWN_PROBLEM_CODES = [
   "import-file-changed",
   "price-validity-overlap",
   "price-list-archived",
+  "duplicate-tax-rate-code",
+  "tax-rate-period-overlap",
   "stale-version",
 ] as const;
 

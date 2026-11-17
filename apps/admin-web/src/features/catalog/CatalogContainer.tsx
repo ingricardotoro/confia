@@ -5,7 +5,7 @@ import { CATALOG_VIEWS, isCurrentCatalogView } from "./catalog-paths.ts";
 import { CatalogTabs } from "./components/CatalogTabs.tsx";
 
 /**
- * The catalog area: the page heading, the sub navigation between its views (the payment concepts and the price lists)
+ * The catalog area: the page heading, the sub navigation between its views (the payment concepts, the price lists and the tax rates)
  * and the view below. The view is the route's child, so the address names it and a link to it can be shared.
  */
 export function CatalogContainer() {

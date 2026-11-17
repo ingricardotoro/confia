@@ -53,6 +53,8 @@ describe("PROBLEM_KEYS", () => {
     ["import-file-changed", "problem.importFileChanged"],
     ["price-validity-overlap", "problem.priceValidityOverlap"],
     ["price-list-archived", "problem.priceListArchived"],
+    ["duplicate-tax-rate-code", "problem.duplicateTaxRateCode"],
+    ["tax-rate-period-overlap", "problem.taxRatePeriodOverlap"],
     ["stale-version", "problem.staleVersion"],
   ] as const)("maps %s to %s", (code, key) => {
     expect(PROBLEM_KEYS[code]).toBe(key);

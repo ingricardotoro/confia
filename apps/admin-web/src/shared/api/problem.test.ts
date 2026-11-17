@@ -62,6 +62,8 @@ describe("the known codes", () => {
         "import-file-changed",
         "price-validity-overlap",
         "price-list-archived",
+        "duplicate-tax-rate-code",
+        "tax-rate-period-overlap",
         "stale-version",
       ].sort(),
     );

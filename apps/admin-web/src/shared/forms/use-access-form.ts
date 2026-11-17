@@ -24,6 +24,8 @@ export type FieldReason =
   | "code-format"
   | "amount-format"
   | "amount-positive"
+  | "rate-format"
+  | "rate-range"
   | "validity-order"
   | "date-range";
 

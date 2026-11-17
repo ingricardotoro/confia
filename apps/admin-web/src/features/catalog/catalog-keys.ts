@@ -16,3 +16,12 @@ export const priceListKeys = {
   details: () => [...priceListKeys.all, "detail"] as const,
   detail: (id: string) => [...priceListKeys.details(), id] as const,
 };
+
+/** The tax rates: every listing, and every detail (a rate with all the validities it has had). */
+export const taxRateKeys = {
+  all: ["catalog", "tax-rates"] as const,
+  lists: () => [...taxRateKeys.all, "list"] as const,
+  list: (params: object) => [...taxRateKeys.lists(), params] as const,
+  details: () => [...taxRateKeys.all, "detail"] as const,
+  detail: (id: string) => [...taxRateKeys.details(), id] as const,
+};

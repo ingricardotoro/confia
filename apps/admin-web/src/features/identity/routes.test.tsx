@@ -86,6 +86,8 @@ describe("the routes and the screens", () => {
       "/catalog",
       "/catalog/price-lists",
       "/catalog/price-lists/$priceListId",
+      "/catalog/tax-rates",
+      "/catalog/tax-rates/$taxRateId",
       "/enrollments",
       "/guardians",
       "/imports",

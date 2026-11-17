@@ -22,6 +22,10 @@ import {
   PriceListItemResponse,
   PriceListPageResponse,
   PriceListResponse,
+  TaxRateDetailResponse,
+  TaxRatePageResponse,
+  TaxRatePeriodResponse,
+  TaxRateResponse,
   ProblemDetail,
   SecondFactorPendingResponse,
   SectionPageResponse,
@@ -49,6 +53,9 @@ import {
   type PriceListDetailResponseOutput,
   type PriceListItemResponseOutput,
   type PriceListResponseOutput,
+  type TaxRateDetailResponseOutput,
+  type TaxRatePeriodResponseOutput,
+  type TaxRateResponseOutput,
   type SecondFactorPendingResponseOutput,
   type SectionResponseOutput,
   type StudentEnrollmentResponseOutput,
@@ -665,4 +672,62 @@ export function priceListDetailRecord(row: unknown): ContractResponse {
 /** The 201 of a new price. */
 export function priceListItemRecord(row: unknown): ContractResponse {
   return { status: 201, body: checked("price list item", PriceListItemResponse, row), contentType: JSON_TYPE };
+}
+
+// The catalog cut of the tax rates. A percentage is a string with four decimals, as the server sends it; the values the
+// tests give are fictitious, and nothing here is a rate that any institution uses.
+export function taxRate(override: Partial<TaxRateResponseOutput> = {}): TaxRateResponseOutput {
+  return checked("TaxRateResponse", TaxRateResponse, {
+    id: crypto.randomUUID(),
+    code: "IMP-A",
+    name: "Impuesto de prueba A",
+    version: 0,
+    ...stamped,
+    ...override,
+  });
+}
+
+/** One validity of a tax rate: a percentage as text and its dates (`validTo` null while it is open). */
+export function taxRatePeriod(override: Partial<TaxRatePeriodResponseOutput> = {}): TaxRatePeriodResponseOutput {
+  return checked("TaxRatePeriodResponse", TaxRatePeriodResponse, {
+    id: crypto.randomUUID(),
+    taxRateId: "00000000-0000-4000-8000-000000000c01",
+    ratePercent: "12.3400",
+    validFrom: "2027-01-01",
+    validTo: null,
+    createdAt: STAMP,
+    ...override,
+  });
+}
+
+/** The tax rate with all its validities, as `GET /tax-rates/{id}` answers. */
+export function taxRateDetail(override: Partial<TaxRateDetailResponseOutput> = {}): TaxRateDetailResponseOutput {
+  return checked("TaxRateDetailResponse", TaxRateDetailResponse, { ...taxRate(), periods: [], ...override });
+}
+
+export function taxRatePage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("tax rates page", TaxRatePageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The tax rate a create (201) or an edit (200) answers with. */
+export function taxRateRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("tax rate record", TaxRateResponse, row), contentType: JSON_TYPE };
+}
+
+export function taxRateDetailRecord(row: unknown): ContractResponse {
+  return { status: 200, body: checked("tax rate detail", TaxRateDetailResponse, row), contentType: JSON_TYPE };
+}
+
+/** The 201 of a new validity. */
+export function taxRatePeriodRecord(row: unknown): ContractResponse {
+  return { status: 201, body: checked("tax rate period", TaxRatePeriodResponse, row), contentType: JSON_TYPE };
 }

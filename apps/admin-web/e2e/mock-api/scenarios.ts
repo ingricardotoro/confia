@@ -92,8 +92,9 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   "imports-empty": { login: "authenticated", enrolled: false, imports: { ...DEFAULT_IMPORTS, seed: "empty" } },
   "imports-forbidden": { login: "authenticated", enrolled: false, imports: { ...DEFAULT_IMPORTS, writes: "forbidden" } },
   "imports-server-error": { login: "authenticated", enrolled: false, imports: { ...DEFAULT_IMPORTS, reads: "failing-first" } },
-  // The catalog (catalog-payment-concepts and catalog-price-lists cuts). Each one signs in as the default does.
+  // The catalog (catalog-payment-concepts, catalog-price-lists and catalog-tax-rates cuts). Each one signs in as the default does.
   "catalog-empty": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, seed: "empty", lists: "empty" } },
+  "catalog-tax-rates-empty": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, taxRates: "empty" } },
   "catalog-price-lists-empty": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, lists: "empty" } },
   "catalog-stale-version": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, writes: "stale-first" } },
   "catalog-forbidden": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, writes: "forbidden" } },
