@@ -124,25 +124,50 @@ public abstract class CommittingPostgresIntegrationTest extends PostgresIntegrat
      * Derived from the catalog, like the main set.
      */
     List<GuardedTable> guardedTablesReferencingTruncatedOnes() throws SQLException {
-        List<GuardedTable> guarded = new ArrayList<>();
+        // Every table with a TRUNCATE trigger, its trigger and the tables its foreign keys point at. A guarded table
+        // enters the set when it points at a truncated table or, transitively, at a guarded table that does (the
+        // entries of the ledger point at its transactions, which point at nothing truncated): a TRUNCATE of a
+        // referenced table fails unless every referencing table is truncated in the same statement.
+        java.util.Map<String, String> triggerOf = new java.util.LinkedHashMap<>();
+        java.util.Map<String, java.util.Set<String>> parentsOf = new java.util.HashMap<>();
+        java.util.Set<String> truncated = new java.util.HashSet<>(tablesWithoutABeforeTruncateTrigger());
         try (Connection connection = SharedPostgresContainer.connectionAs("confia_owner");
                 PreparedStatement statement = connection.prepareStatement("""
-                        select c.relname, t.tgname
+                        select c.relname, t.tgname, r.relname
                           from pg_class c
                           join pg_namespace n on n.oid = c.relnamespace
                           join pg_trigger t on t.tgrelid = c.oid and not t.tgisinternal and (t.tgtype & 32) <> 0
+                          left join pg_constraint k on k.conrelid = c.oid and k.contype = 'f'
+                          left join pg_class r on r.oid = k.confrelid and r.relnamespace = n.oid
                          where n.nspname = 'public' and c.relkind = 'r'
-                           and exists (select 1 from pg_constraint k
-                                         join pg_class r on r.oid = k.confrelid
-                                         where k.conrelid = c.oid and k.contype = 'f'
-                                           and r.relnamespace = n.oid
-                                           and not exists (select 1 from pg_trigger rt
-                                                            where rt.tgrelid = r.oid and not rt.tgisinternal
-                                                              and (rt.tgtype & 32) <> 0))
                         """);
                 ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
-                guarded.add(new GuardedTable(resultSet.getString(1), resultSet.getString(2)));
+                triggerOf.putIfAbsent(resultSet.getString(1), resultSet.getString(2));
+                if (resultSet.getString(3) != null) {
+                    parentsOf.computeIfAbsent(resultSet.getString(1), k -> new java.util.HashSet<>())
+                            .add(resultSet.getString(3));
+                }
+            }
+        }
+        List<GuardedTable> guarded = new ArrayList<>();
+        java.util.Set<String> chosen = new java.util.HashSet<>();
+        boolean grew = true;
+        while (grew) {
+            grew = false;
+            for (var entry : triggerOf.entrySet()) {
+                String table = entry.getKey();
+                if (chosen.contains(table)) {
+                    continue;
+                }
+                for (String parent : parentsOf.getOrDefault(table, java.util.Set.of())) {
+                    if (truncated.contains(parent) || chosen.contains(parent)) {
+                        chosen.add(table);
+                        guarded.add(new GuardedTable(table, entry.getValue()));
+                        grew = true;
+                        break;
+                    }
+                }
             }
         }
         return guarded;

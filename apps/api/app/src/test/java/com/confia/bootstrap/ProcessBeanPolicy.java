@@ -159,7 +159,11 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // (docs/cortes/catalog-payment-concepts.md). Administrative only, each exact.
                     "com.confia.catalog.infrastructure", "com.confia.catalog.infrastructure.wiring",
                     "com.confia.catalog.application", "com.confia.catalog.web",
-                    "com.confia.catalog.web.wiring"),
+                    "com.confia.catalog.web.wiring",
+                    // The ledger module (docs/cortes/ledger-core.md): its jOOQ adapter, the named-interface package
+                    // of its configuration and its application services; no web package in cut 1.
+                    "com.confia.ledger.infrastructure", "com.confia.ledger.infrastructure.wiring",
+                    "com.confia.ledger.application"),
             Map.of("com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.worker", OTHER_ENTRY_POINT,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON));
@@ -194,6 +198,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.guardians", ADMIN_MODULE,
                     "com.confia.imports", ADMIN_MODULE,
                     "com.confia.catalog", ADMIN_MODULE,
+                    "com.confia.ledger", ADMIN_MODULE,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON,
                     TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
                     CSRF_PACKAGE, CSRF_REASON,
@@ -250,6 +255,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.guardians", ADMIN_MODULE,
                     "com.confia.imports", ADMIN_MODULE,
                     "com.confia.catalog", ADMIN_MODULE,
+                    "com.confia.ledger", ADMIN_MODULE,
                     "com.confia.shared.observability.health",
                     "the worker serves no route; its health is a heartbeat file (WE100)"));
 
