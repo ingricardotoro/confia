@@ -5,6 +5,10 @@ import {
   GuardianConsentsResponse,
   AcademicYearResponse,
   AuthenticatedSessionResponse,
+  ChargePlanDetailResponse,
+  ChargePlanItemResponse,
+  ChargePlanPageResponse,
+  ChargePlanResponse,
   CurrentSessionResponse,
   EnrollmentPageResponse,
   EnrollmentResponse,
@@ -36,6 +40,9 @@ import {
   StudentResponse,
   type AcademicYearResponseOutput,
   type AuthenticatedSessionResponseOutput,
+  type ChargePlanDetailResponseOutput,
+  type ChargePlanItemResponseOutput,
+  type ChargePlanResponseOutput,
   type ConsentChangeResponseOutput,
   type ConsentEventResponseOutput,
   type ImportBatchResponseOutput,
@@ -730,4 +737,67 @@ export function taxRateDetailRecord(row: unknown): ContractResponse {
 /** The 201 of a new validity. */
 export function taxRatePeriodRecord(row: unknown): ContractResponse {
   return { status: 201, body: checked("tax rate period", TaxRatePeriodResponse, row), contentType: JSON_TYPE };
+}
+
+// The charges cut of the plans. A plan holds no price and no amount: it names who it covers, how often, and which concepts.
+export function chargePlan(override: Partial<ChargePlanResponseOutput> = {}): ChargePlanResponseOutput {
+  return checked("ChargePlanResponse", ChargePlanResponse, {
+    id: crypto.randomUUID(),
+    academicYearId: "00000000-0000-4000-8000-000000001030",
+    name: "Primaria 2027",
+    targetScope: "GRADE",
+    targetRefId: "00000000-0000-4000-8000-000000003001",
+    frequency: "MONTHLY",
+    dueDayOfMonth: 5,
+    status: "DRAFT",
+    version: 0,
+    createdAt: STAMP,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+/** One item of a plan: a concept, how many periods it accrues and the first day of the first one. */
+export function chargePlanItem(override: Partial<ChargePlanItemResponseOutput> = {}): ChargePlanItemResponseOutput {
+  return checked("ChargePlanItemResponse", ChargePlanItemResponse, {
+    id: crypto.randomUUID(),
+    planId: "00000000-0000-4000-8000-000000000c01",
+    paymentConceptId: "00000000-0000-4000-8000-000000007001",
+    periodsCount: 10,
+    firstPeriodOn: "2027-02-01",
+    createdAt: STAMP,
+    ...override,
+  });
+}
+
+/** The plan with its items, as `GET /plans/{id}` answers. */
+export function chargePlanDetail(override: Partial<ChargePlanDetailResponseOutput> = {}): ChargePlanDetailResponseOutput {
+  return checked("ChargePlanDetailResponse", ChargePlanDetailResponse, { ...chargePlan(), items: [], ...override });
+}
+
+export function chargePlanPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("charge plans page", ChargePlanPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The plan a create (201) or an edit (200) answers with. */
+export function chargePlanRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("charge plan record", ChargePlanResponse, row), contentType: JSON_TYPE };
+}
+
+export function chargePlanDetailRecord(row: unknown): ContractResponse {
+  return { status: 200, body: checked("charge plan detail", ChargePlanDetailResponse, row), contentType: JSON_TYPE };
+}
+
+/** The 201 of a new item. */
+export function chargePlanItemRecord(row: unknown): ContractResponse {
+  return { status: 201, body: checked("charge plan item", ChargePlanItemResponse, row), contentType: JSON_TYPE };
 }

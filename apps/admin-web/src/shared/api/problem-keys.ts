@@ -45,6 +45,9 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "price-list-archived": "problem.priceListArchived",
   "duplicate-tax-rate-code": "problem.duplicateTaxRateCode",
   "tax-rate-period-overlap": "problem.taxRatePeriodOverlap",
+  "plan-not-editable": "problem.planNotEditable",
+  "plan-without-items": "problem.planWithoutItems",
+  "duplicate-plan-item": "problem.duplicatePlanItem",
   "stale-version": "problem.staleVersion",
   unknown: "problem.unexpected",
 };

@@ -29,6 +29,9 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "price-validity-overlap",
   "price-list-archived",
   "tax-rate-period-overlap",
+  "plan-not-editable",
+  "plan-without-items",
+  "duplicate-plan-item",
   "stale-version",
 ]);
 
@@ -53,6 +56,9 @@ function fieldOf(error: { readonly field: string; readonly reason: string }): { 
   if (error.field === "price.currency") return { field: "currency", reason: error.reason };
   // The percentage of a tax rate period travels as text: the server names a text outside its pattern `pattern`.
   if (error.field === "ratePercent" && error.reason === "pattern") return { field: "ratePercent", reason: "rate-format" };
+  // The plan fields the server bounds: the due day (1 to 28) and the periods (1 to 36).
+  if (error.field === "dueDayOfMonth" && (error.reason === "min" || error.reason === "max")) return { field: "dueDayOfMonth", reason: "due-day-range" };
+  if (error.field === "periodsCount" && (error.reason === "min" || error.reason === "max")) return { field: "periodsCount", reason: "periods-range" };
   if (error.field === "nationalId" && error.reason === "pattern") return { field: "nationalId", reason: "national-id-format" };
   // The reason of a withdrawal or a transfer is 3 to 500 characters: `size` says it is too short as well as too long.
   if ((error.field === "withdrawalReason" || error.field === "reason") && error.reason === "size") return { field: error.field, reason: "reason-length" };

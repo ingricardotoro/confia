@@ -27,7 +27,10 @@ export type FieldReason =
   | "rate-format"
   | "rate-range"
   | "validity-order"
-  | "date-range";
+  | "date-range"
+  | "due-day-range"
+  | "periods-range"
+  | "first-of-month";
 
 export interface AccessFieldSpec {
   /** The fixed `id` of the control, which the error summary links to. */

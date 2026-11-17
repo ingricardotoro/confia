@@ -1,4 +1,4 @@
-import { listAcademicYears, listGrades, listModalities } from "../api/organization-operations.ts";
+import { listAcademicYears, listGrades, listModalities, listSections } from "../api/organization-operations.ts";
 import type { Option } from "../resource-screen/components/fields.tsx";
 import { LOOKUP_PAGE_SIZE, useResourceList } from "./use-organization-queries.ts";
 
@@ -29,6 +29,11 @@ export function useYearLookup(): Lookup<{ id: string; name: string; status: "PLA
 
 export function useGradeLookup(): Lookup<{ id: string; modalityId: string; name: string; isActive: boolean }> {
   const list = useResourceList("grades", { ...FIRST_PAGE, sort: "name,asc" }, listGrades);
+  return { rows: list.data?.items ?? [], failed: list.isError, loading: list.isPending, retry: () => void list.refetch() };
+}
+
+export function useSectionLookup(): Lookup<{ id: string; academicYearId: string; gradeId: string; name: string; isActive: boolean }> {
+  const list = useResourceList("sections", { ...FIRST_PAGE, sort: "name,asc" }, listSections);
   return { rows: list.data?.items ?? [], failed: list.isError, loading: list.isPending, retry: () => void list.refetch() };
 }
 

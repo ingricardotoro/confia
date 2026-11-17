@@ -55,6 +55,9 @@ describe("PROBLEM_KEYS", () => {
     ["price-list-archived", "problem.priceListArchived"],
     ["duplicate-tax-rate-code", "problem.duplicateTaxRateCode"],
     ["tax-rate-period-overlap", "problem.taxRatePeriodOverlap"],
+    ["plan-not-editable", "problem.planNotEditable"],
+    ["plan-without-items", "problem.planWithoutItems"],
+    ["duplicate-plan-item", "problem.duplicatePlanItem"],
     ["stale-version", "problem.staleVersion"],
   ] as const)("maps %s to %s", (code, key) => {
     expect(PROBLEM_KEYS[code]).toBe(key);

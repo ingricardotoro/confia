@@ -39,6 +39,9 @@ export const KNOWN_PROBLEM_CODES = [
   "price-list-archived",
   "duplicate-tax-rate-code",
   "tax-rate-period-overlap",
+  "plan-not-editable",
+  "plan-without-items",
+  "duplicate-plan-item",
   "stale-version",
 ] as const;
 

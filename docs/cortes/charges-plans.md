@@ -113,5 +113,41 @@ Puntos que la nota no fijaba y que el backend resolvió; el propietario puede ca
 - **Pruebas:** `ChargePlanTest`, `ChargePlanItemTest` y `ManageChargePlansTest` (reglas), `ChargesPlanSchemaIT` (base real: checks,
   referencias, estados, renglones solo en borrador, grants, RLS) y `ChargePlanEndpointsIT` (criterio de aceptación, casos límite,
   activaciones simultáneas, roles, aislamiento y auditoría).
-- **Pendiente para otros cortes:** pantallas (esperan al rediseño visual), generación de cargos (corte 3), resolver planes que cubren al
+- **Pendiente para otros cortes:** generación de cargos (corte 3), resolver planes que cubren al
   mismo estudiante.
+
+## Construido (frontend)
+
+Sección «Cobros» (grupo Finanzas) con «Planes de cobro», en `apps/admin-web`, sobre el rediseño visual consolidado.
+
+- **Rutas y navegación:** `/charges/plans` (lista) y `/charges/plans/$planId` (detalle); `/charges` redirige a la lista. La entrada «Cobros» está
+  en la navegación, grupo Finanzas, detrás del catálogo. Estado de la lista (página, tamaño, orden por nombre o fecha, año lectivo, ámbito y
+  estado) en la URL, validado con Zod; paginación, orden y filtros los hace el servidor.
+- **Lista:** tabla con nombre (enlace al detalle), año lectivo, ámbito, modalidad/grado/sección, periodicidad, día de vencimiento y estado
+  (insignia con punto); diálogo «Nuevo plan de cobro» (nombre, año, ámbito, referencia que sigue al ámbito y se vacía al cambiarlo,
+  periodicidad, día 1 a 28) que crea el borrador. La sección se nombra con su grado y su año («Primero A (Año lectivo 2026)»).
+- **Detalle:** tarjeta de resumen, tabla de renglones (concepto, períodos, primer período), diálogo «Agregar concepto» (solo conceptos activos que
+  el plan aún no tiene; períodos 1 a 36; primer día del primer período validado como primer día de mes, con mensaje claro), quitar renglón,
+  «Activar plan» (verde, confirmación que explica el congelamiento), «Archivar plan» (rojo, confirmación) y «Editar plan» (nombre, periodicidad y
+  día en borrador; solo el nombre en un plan activo). Un plan archivado es solo de consulta. Cada acción envía la `version` leída; ante 409 se
+  relee el plan y se muestra el mensaje en español de `plan-not-editable`, `plan-without-items`, `duplicate-plan-item`, `stale-version`,
+  `inactive-reference` y `resource-not-found`.
+- **Estados:** carga (esqueleto), vacío (con acción), error con reintento e identificador de soporte, y éxito en la región viva; todo el texto está
+  en el catálogo es-HN (`charges.*`, `problem.*`, `navigation.charges`). Los nombres de botón con `aria-label` contienen el texto visible.
+- **Arquitectura:** feature nueva `src/features/charges` (contenedores, componentes de presentación puros en `components/`, claves de consulta,
+  formularios y búsqueda propios) con su cliente en `shared/api/charges-operations.ts`. Para no importar otra feature se movieron a `shared/` lo
+  mínimo: las claves de los conceptos (`shared/query-keys/payment-concept-keys.ts`, que el catálogo reexporta con los mismos valores),
+  `useConceptLookup` (`shared/catalog-lookups`), `useSectionLookup` (`shared/organization-lookups`) y el diálogo `ConfirmDialog`
+  (`shared/resource-screen/components`). Los tres códigos de problema nuevos están en `problem.ts`, `problem-keys.ts` y `resource-failure.ts`.
+  Ninguna mutación es financiera (el plan no guarda precios ni asienta nada), por lo que no lleva `Idempotency-Key`; ninguna es optimista y
+  toda escritura invalida el prefijo `["charges", "plans"]`. El botón de confirmar queda ocupado mientras la solicitud está en vuelo.
+- **Simulador (`e2e/mock-api`):** `charges-model.ts` y `charges-seed.ts` (28 planes: activo, borrador vacío, archivado y borrador con renglón, más 24
+  borradores genéricos), con sus reglas de estados, renglones solo en borrador, concepto activo y no repetido, versión desfasada y 403; presets
+  `charges-empty`, `charges-stale-version`, `charges-forbidden` y `charges-server-error`. La sesión simulada no lleva permisos (la interfaz no los
+  decide), así que `charges:*` no cambia nada del lado del cliente: el 403 se simula por escritura.
+- **Pruebas:** cliente (`charges-operations.test.ts`), lógica de formularios y referencias, vistas, contenedores sobre MSW (lista, detalle, alta de
+  renglón, quitar, activar, archivar, editar, rechazos y estados de carga), `ConfirmDialog`, simulador (`charges-model.test.ts` y bloque en
+  `server.test.ts`), recorridos Playwright `charges-plans-crud|keyboard|lists|states` y 18 estados nuevos en la matriz de accesibilidad.
+- **Decisiones de interfaz:** el primer período se elige con un campo de fecha (no `type="month"`, que Firefox no admite) y se valida que sea el
+  día 1; el cálculo de qué períodos cubre un renglón no se hace en el navegador (sin columna «último período»). Los renglones de un plan se
+  quitan con confirmación aunque no sean datos financieros, porque quitarlos es irreversible mientras no se vuelva a agregar.

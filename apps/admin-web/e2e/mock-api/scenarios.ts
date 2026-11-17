@@ -6,6 +6,7 @@ import {
   type OrganizationOptions,
 } from "./organization-model.ts";
 import { DEFAULT_CATALOG, createCatalogModel, type CatalogModel, type CatalogOptions } from "./catalog-model.ts";
+import { DEFAULT_CHARGES, createChargesModel, type ChargesModel, type ChargesOptions } from "./charges-model.ts";
 import { DEFAULT_IMPORTS, createImportsModel, type ImportsModel, type ImportsOptions } from "./imports-model.ts";
 import { DEFAULT_GUARDIANS, createGuardiansModel, type GuardiansModel, type GuardiansOptions } from "./guardians-model.ts";
 import { DEFAULT_ENROLLMENTS, createEnrollmentsModel, type EnrollmentsModel, type EnrollmentsOptions } from "./enrollments-model.ts";
@@ -25,7 +26,7 @@ const RETRY_AFTER_SECONDS = "30";
 const TRACE_ID = "01J8Z4K2QF9P0X";
 const EXPIRY_PUSH_MS = 301_000;
 
-export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify" | "organization" | "students" | "enrollments" | "guardians" | "imports" | "catalog";
+export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify" | "organization" | "students" | "enrollments" | "guardians" | "imports" | "catalog" | "charges";
 
 type LoginBehavior =
   | "authenticated"
@@ -55,6 +56,8 @@ interface PresetDefinition {
   readonly imports?: ImportsOptions;
   /** The catalog the scenario holds; the seeded one, with every write allowed, when absent. */
   readonly catalog?: CatalogOptions;
+  /** The charge plans the scenario holds, over its academic structure and its catalog; the seeded ones, with every write allowed, when absent. */
+  readonly charges?: ChargesOptions;
   /** A fault injected after the model answered, to prove the server refuses to send it. */
   readonly tamper?: (operation: Operation, response: ModelResponse) => ModelResponse;
 }
@@ -99,6 +102,11 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   "catalog-stale-version": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, writes: "stale-first" } },
   "catalog-forbidden": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, writes: "forbidden" } },
   "catalog-server-error": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, reads: "failing-first" } },
+  // The charge plans (charges-plans cut). Each one signs in as the default does.
+  "charges-empty": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, seed: "empty" } },
+  "charges-stale-version": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, writes: "stale-first" } },
+  "charges-forbidden": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, writes: "forbidden" } },
+  "charges-server-error": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, reads: "failing-first" } },
   "contract-violation": {
     login: "second-factor-enrollment-required",
     enrolled: false,
@@ -121,6 +129,7 @@ export interface Scenario {
   readonly guardians: GuardiansModel;
   readonly imports: ImportsModel;
   readonly catalog: CatalogModel;
+  readonly charges: ChargesModel;
   readonly calls: RecordedCall[];
   readonly tamper: PresetDefinition["tamper"];
   signIn(sleep: (ms: number) => Promise<void>): Promise<ModelResponse>;
@@ -142,6 +151,7 @@ function build(preset: string, definition: PresetDefinition): Scenario {
   const model = createSessionModel({ now: () => Date.now() + offsetMs, enrolled: definition.enrolled });
   const organization = createOrganizationModel(definition.organization ?? DEFAULT_ORGANIZATION);
   const students = createStudentsModel(definition.students ?? DEFAULT_STUDENTS);
+  const catalog = createCatalogModel(definition.catalog ?? DEFAULT_CATALOG);
   return {
     preset,
     model,
@@ -150,7 +160,8 @@ function build(preset: string, definition: PresetDefinition): Scenario {
     enrollments: createEnrollmentsModel(definition.enrollments ?? DEFAULT_ENROLLMENTS, { organization, students }),
     guardians: createGuardiansModel(definition.guardians ?? DEFAULT_GUARDIANS, { students }),
     imports: createImportsModel(definition.imports ?? DEFAULT_IMPORTS),
-    catalog: createCatalogModel(definition.catalog ?? DEFAULT_CATALOG),
+    catalog,
+    charges: createChargesModel(definition.charges ?? DEFAULT_CHARGES, { organization, catalog }),
     calls: [],
     tamper: definition.tamper,
     async signIn(sleep) {

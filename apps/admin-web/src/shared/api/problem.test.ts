@@ -64,6 +64,9 @@ describe("the known codes", () => {
         "price-list-archived",
         "duplicate-tax-rate-code",
         "tax-rate-period-overlap",
+        "plan-not-editable",
+        "plan-without-items",
+        "duplicate-plan-item",
         "stale-version",
       ].sort(),
     );

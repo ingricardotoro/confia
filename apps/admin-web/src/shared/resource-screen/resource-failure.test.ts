@@ -26,6 +26,9 @@ describe("classifyOrganizationFailure", () => {
     ["price-validity-overlap", "problem.priceValidityOverlap"],
     ["price-list-archived", "problem.priceListArchived"],
     ["tax-rate-period-overlap", "problem.taxRatePeriodOverlap"],
+    ["plan-not-editable", "problem.planNotEditable"],
+    ["plan-without-items", "problem.planWithoutItems"],
+    ["duplicate-plan-item", "problem.duplicatePlanItem"],
     ["stale-version", "problem.staleVersion"],
   ] as const)("gives %s its own message, with the trace id", (code, key) => {
     expect(classifyOrganizationFailure(problem(code, 409, { traceId: "t-1" }))).toEqual({ kind: "message", key, traceId: "t-1" });

@@ -87,6 +87,12 @@ export function fieldErrorKey(reason: string): AdminKey {
       return "catalog.taxRates.errors.duplicateCode";
     case "rate-format":
       return "catalog.taxRates.errors.rateFormat";
+    case "due-day-range":
+      return "charges.errors.dueDayRange";
+    case "periods-range":
+      return "charges.errors.periodsRange";
+    case "first-of-month":
+      return "charges.errors.firstOfMonth";
     case "rate-range":
       return "catalog.taxRates.errors.rateRange";
     case "not-allowed":

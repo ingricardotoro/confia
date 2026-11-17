@@ -211,6 +211,35 @@ describe("the states of the tax rates", () => {
   });
 });
 
+describe("the states of the charge plans", () => {
+  const plans = MATRIX.filter((combination) => combination.route.startsWith("/charges/plans"));
+
+  it("holds the list with its dialogs and its no-match, empty and load-error states, and the detail ready, with the dialogs of an item and of each confirmation, empty, active, archived and with its load error, each once", () => {
+    expect(plans.map((combination) => [combination.route.replace(/\/0{8}-[\w-]+$/, "/<id>"), combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["/charges/plans", "ready", undefined, undefined],
+      ["/charges/plans", "dialog-open", undefined, true],
+      ["/charges/plans", "dialog-error-summary", undefined, true],
+      ["/charges/plans", "no-matches", undefined, undefined],
+      ["/charges/plans", "empty", "charges-empty", undefined],
+      ["/charges/plans", "load-error", "charges-server-error", undefined],
+      ["/charges/plans/<id>", "ready", undefined, undefined],
+      ["/charges/plans/<id>", "dialog-add-item", undefined, true],
+      ["/charges/plans/<id>", "dialog-error-summary", undefined, true],
+      ["/charges/plans/<id>", "dialog-first-of-month", undefined, true],
+      ["/charges/plans/<id>", "dialog-edit", undefined, true],
+      ["/charges/plans/<id>", "dialog-confirm-activate", undefined, true],
+      ["/charges/plans/<id>", "dialog-confirm-remove", undefined, true],
+      ["/charges/plans/<id>", "empty", undefined, undefined],
+      ["/charges/plans/<id>", "active", undefined, undefined],
+      ["/charges/plans/<id>", "dialog-confirm-archive", undefined, true],
+      ["/charges/plans/<id>", "archived", undefined, undefined],
+      ["/charges/plans/<id>", "load-error", "charges-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...plans])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+});
+
 describe("the states of the students registry", () => {
   const students = MATRIX.filter((combination) => combination.route === "/students");
 

@@ -96,6 +96,9 @@
     "priceListArchived": "La lista de precios está archivada y no admite precios nuevos. Reactívela para agregar precios.",
     "duplicateTaxRateCode": "Ya existe una tasa con ese código.",
     "taxRatePeriodOverlap": "Esa tasa ya tiene una vigencia en parte de esas fechas. Ajuste las fechas para que no coincidan con otra vigencia e intente de nuevo.",
+    "planNotEditable": "El plan ya no admite este cambio. Un plan activo solo cambia de nombre o se archiva, y uno archivado no cambia. Los datos ya se recargaron; para cambiar un plan activo, cree otro.",
+    "planWithoutItems": "El plan no tiene conceptos, por lo que no se puede activar. Agregue al menos un concepto e intente de nuevo.",
+    "duplicatePlanItem": "Ese concepto ya forma parte del plan. Un concepto aparece una sola vez por plan; si necesita cambiarlo, quite el existente y agréguelo de nuevo.",
     "staleVersion": "El registro cambió desde que lo abrió y sus cambios no se guardaron. Los datos ya se recargaron: cierre y vuelva a abrir el registro, revíselo y repita el cambio."
   },
   "field": {
@@ -160,6 +163,7 @@
     "guardians": "Encargados",
     "imports": "Importaciones",
     "catalog": "Catálogo",
+    "charges": "Cobros",
     "groups": {
       "community": "Comunidad educativa",
       "finance": "Finanzas",
@@ -397,6 +401,138 @@
           "ratePercent": "Porcentaje",
           "validFrom": "Vigente desde",
           "validTo": "Vigente hasta (opcional)"
+        }
+      }
+    }
+  },
+  "charges": {
+    "title": "Cobros",
+    "errors": {
+      "dueDayRange": "Escriba un día del mes entre 1 y 28, para que exista en todos los meses.",
+      "periodsRange": "Escriba un número entero de períodos entre 1 y 36.",
+      "firstOfMonth": "Elija el primer día de un mes, por ejemplo el 1 de febrero. Los períodos siempre empiezan el día 1."
+    },
+    "plans": {
+      "heading": "Planes de cobro",
+      "description": "Qué se cobra, cada cuánto y a quién: por modalidad, grado o sección. El precio lo resuelven las listas de precios.",
+      "caption": "Planes de cobro de la institución",
+      "create": "Nuevo plan de cobro",
+      "createTitle": "Nuevo plan de cobro",
+      "createDescription": "El plan nace como borrador: agréguele los conceptos y actívelo cuando esté listo. El año lectivo, el ámbito y su referencia no se pueden cambiar después.",
+      "emptyTitle": "Todavía no hay planes de cobro",
+      "emptyDescription": "Cree el primer plan de cobro para definir qué conceptos se cobran, cada cuánto y a qué estudiantes.",
+      "emptyAction": "Crear el primer plan",
+      "loadFailed": "No se pudieron cargar los planes de cobro",
+      "filterYear": "Año lectivo",
+      "filterScope": "Ámbito",
+      "filterStatus": "Estado",
+      "nameHelp": "Por ejemplo «Primaria 2027». Hasta 120 caracteres.",
+      "dueDayHelp": "Del 1 al 28, para que el día exista en todos los meses.",
+      "dueDayValue": "Día {day}",
+      "sectionOption": "{grade} {section} ({year})",
+      "columns": {
+        "name": "Nombre",
+        "year": "Año lectivo",
+        "scope": "Ámbito",
+        "reference": "Modalidad, grado o sección",
+        "frequency": "Periodicidad",
+        "dueDay": "Vencimiento",
+        "status": "Estado"
+      },
+      "fields": {
+        "academicYear": "Año lectivo",
+        "name": "Nombre",
+        "scope": "Ámbito",
+        "modality": "Modalidad",
+        "grade": "Grado",
+        "section": "Sección",
+        "frequency": "Periodicidad",
+        "dueDay": "Día de vencimiento"
+      },
+      "scopes": {
+        "MODALITY": "Una modalidad",
+        "GRADE": "Un grado",
+        "SECTION": "Una sección"
+      },
+      "statuses": {
+        "DRAFT": "Borrador",
+        "ACTIVE": "Activo",
+        "ARCHIVED": "Archivado"
+      },
+      "frequencies": {
+        "MONTHLY": "Mensual",
+        "BIMONTHLY": "Bimestral",
+        "ANNUAL": "Anual",
+        "ONE_TIME": "Única vez"
+      },
+      "edit": {
+        "title": "Editar plan de cobro",
+        "description": "Cambie el nombre, la periodicidad o el día de vencimiento. El año lectivo, el ámbito y su referencia no se pueden cambiar.",
+        "descriptionActive": "Un plan activo está congelado: solo puede cambiar el nombre. La periodicidad y el día de vencimiento quedan como están.",
+        "submit": "Guardar cambios",
+        "saved": "Se guardaron los cambios del plan «{name}»."
+      },
+      "detail": {
+        "back": "Volver a los planes de cobro",
+        "loadFailed": "No se pudo cargar el plan de cobro",
+        "summary": "Datos del plan",
+        "lookupFailed": "No se pudieron cargar los nombres de los conceptos, del año lectivo o de la modalidad, el grado o la sección. Mientras tanto aparecen como no disponibles.",
+        "draftNote": "Este plan es un borrador: puede agregar y quitar conceptos y cambiar su periodicidad. Al activarlo se congela.",
+        "activeNote": "Este plan está activo y congelado: no admite conceptos nuevos ni cambios de periodicidad. Solo puede cambiar el nombre o archivarlo.",
+        "archivedNote": "Este plan está archivado: es solo de consulta y ya no se puede cambiar ni reactivar. Para cobrar de otra forma, cree un plan nuevo.",
+        "edit": "Editar plan",
+        "editFor": "Editar plan {name}",
+        "activate": "Activar plan",
+        "activateFor": "Activar plan {name}",
+        "archive": "Archivar plan",
+        "archiveFor": "Archivar plan {name}",
+        "activated": "Se activó el plan «{name}». Ya no admite cambios en sus conceptos.",
+        "archived": "Se archivó el plan «{name}».",
+        "itemsHeading": "Conceptos del plan",
+        "addItem": "Agregar concepto",
+        "emptyTitle": "Este plan todavía no tiene conceptos",
+        "emptyDescription": "Agregue los conceptos que se cobran, cuántos períodos y desde cuándo. Un plan sin conceptos no se puede activar.",
+        "emptyAction": "Agregar el primer concepto",
+        "emptyArchived": "Este plan no tiene conceptos.",
+        "itemsCaption": "Conceptos del plan {name}",
+        "conceptLabel": "{code} — {name}",
+        "columns": {
+          "concept": "Concepto",
+          "periods": "Períodos",
+          "firstPeriod": "Primer período",
+          "actions": "Acciones"
+        },
+        "removeItem": "Quitar",
+        "removeItemFor": "Quitar {name} del plan",
+        "itemRemoved": "Se quitó «{name}» del plan.",
+        "activateConfirm": {
+          "title": "Activar el plan «{name}»",
+          "description": "Al activarlo, el plan queda congelado: ya no podrá agregar ni quitar conceptos, ni cambiar la periodicidad ni el día de vencimiento. Solo podrá cambiar el nombre o archivarlo. Para cambiar un plan activo, tendrá que crear otro.",
+          "confirm": "Activar plan"
+        },
+        "archiveConfirm": {
+          "title": "Archivar el plan «{name}»",
+          "description": "Un plan archivado queda solo de consulta: ya no se puede cambiar ni volver a activar. Para cobrar de otra forma, tendrá que crear otro plan.",
+          "confirm": "Archivar plan"
+        },
+        "removeConfirm": {
+          "title": "Quitar «{name}» del plan",
+          "description": "El concepto deja de formar parte de este borrador. Podrá agregarlo de nuevo mientras el plan siga siendo un borrador.",
+          "confirm": "Quitar concepto"
+        }
+      },
+      "addItem": {
+        "title": "Agregar concepto",
+        "description": "Elija el concepto, cuántos períodos se cobran y el primer día del primer período. Solo se ofrecen los conceptos activos que el plan todavía no tiene.",
+        "submit": "Agregar concepto",
+        "saved": "Se agregó «{name}» al plan.",
+        "noActiveConcepts": "No hay conceptos de pago activos para agregar. Cree o active un concepto en el catálogo.",
+        "periodsHelp": "Un número entero del 1 al 36.",
+        "firstPeriodHelp": "Elija el día 1 de un mes: los períodos siempre empiezan el primer día del mes.",
+        "fields": {
+          "concept": "Concepto",
+          "periods": "Cantidad de períodos",
+          "firstPeriod": "Primer día del primer período"
         }
       }
     }

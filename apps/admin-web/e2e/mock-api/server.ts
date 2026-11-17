@@ -17,6 +17,7 @@ import {
   type Scenario,
 } from "./scenarios.ts";
 import { CATALOG_BASE } from "./catalog-model.ts";
+import { CHARGES_BASE } from "./charges-model.ts";
 import { ORGANIZATION_BASE } from "./organization-model.ts";
 import { ENROLLMENTS_BASE } from "./enrollments-model.ts";
 import { STUDENTS_BASE } from "./students-model.ts";
@@ -83,6 +84,8 @@ const SUCCESS_SCHEMAS: Readonly<Record<Operation, Schema | undefined>> = {
   imports: undefined,
   // The same for the catalog (catalog-model.ts).
   catalog: undefined,
+  // The same for the charge plans (charges-model.ts).
+  charges: undefined,
 };
 
 /** The fields of a response that break the contract; empty when it meets it. The `instance` of an error is not checked (I306). */
@@ -227,6 +230,15 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
       const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
       const answer = scenario.catalog.handle({ method, path, query: url.searchParams, body });
       if (answer !== undefined) { deliver(res, scenario, "catalog", answer); return; }
+    }
+    if (path.startsWith(`${CHARGES_BASE}/`)) {
+      // Every operation of the charges is a bearer route: no access token, no answer.
+      const session = scenario.model.currentSession(bearerOf(req));
+      if (session.status !== 200) { deliver(res, scenario, "charges", session); return; }
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
+      const answer = scenario.charges.handle({ method, path, query: url.searchParams, body });
+      if (answer !== undefined) { deliver(res, scenario, "charges", answer); return; }
     }
     // The guardians, and the guardians of one student (a route below the students that this model owns).
     if (path === GUARDIANS_BASE || path.startsWith(`${GUARDIANS_BASE}/`) || /^\/api\/v1\/students\/[^/]+\/guardians$/.test(path)) {

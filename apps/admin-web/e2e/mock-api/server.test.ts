@@ -1561,3 +1561,88 @@ describe("the tax rates and the rate of a concept [catalog-tax-rates]", { timeou
     expect(kept.json).toMatchObject({ taxRateId: RATE_A });
   });
 });
+
+describe("the charge plans [charges-plans]", { timeout: LIMIT }, () => {
+  const PLANS = "/api/v1/charges/plans";
+  const YEAR = "00000000-0000-4000-8000-000000001030";
+  const GRADE = "00000000-0000-4000-8000-000000003001";
+  const SEEDED_DRAFT = "00000000-0000-4000-8000-000000009004";
+  const MATRICULA = "00000000-0000-4000-8000-000000007002";
+  const NEW_PLAN = { academicYearId: YEAR, name: "Primaria 2027", targetScope: "GRADE", targetRefId: GRADE, frequency: "MONTHLY", dueDayOfMonth: 5 };
+
+  /** Signs in on a scenario (after the preset, if any) and answers the call helper bound to its bearer token. */
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const headers = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path = "", body?: unknown) => call(method, `${PLANS}${path}`, { headers, scenario: id, ...(body === undefined ? {} : { body }) });
+  }
+
+  const verdict = (reply: Reply) => [reply.status, typeOf(reply)];
+  const total = (reply: Reply) => (reply.json as { total: number }).total;
+
+  it("answers 401 to every operation without an access token, and 404 to a path it does not simulate", async () => {
+    const anonymous = [await call("GET", PLANS, { scenario: "pln-401" }), await call("POST", PLANS, { scenario: "pln-401", body: NEW_PLAN })];
+    const send = await session("pln-404");
+
+    expect(anonymous.map(verdict)).toEqual([
+      [401, "authentication-required"],
+      [401, "authentication-required"],
+    ]);
+    expect((await send("DELETE", "")).status).toBe(404);
+    expect((await send("GET", "/x/y/z")).status).toBe(404);
+  });
+
+  it("lists the twenty eight seeded plans by name, creates one in draft, and keeps one set of plans for each scenario", async () => {
+    const mine = await session("pln-mine", "charges-empty");
+    const theirs = await session("pln-theirs");
+
+    const created = await mine("POST", "", NEW_PLAN);
+
+    expect(total(await theirs("GET"))).toBe(28);
+    expect(created.status).toBe(201);
+    expect(created.json).toMatchObject({ name: "Primaria 2027", status: "DRAFT", version: 0 });
+    expect(total(await mine("GET"))).toBe(1);
+  });
+
+  it("adds an item to a draft, activates the plan, and then refuses to change its items with plan-not-editable", async () => {
+    const send = await session("pln-flow");
+    const item = { paymentConceptId: MATRICULA, periodsCount: 1, firstPeriodOn: "2027-02-01" };
+
+    const added = await send("POST", `/${SEEDED_DRAFT}/items`, item);
+    const detail = await send("GET", `/${SEEDED_DRAFT}`);
+    const activated = await send("PUT", `/${SEEDED_DRAFT}`, { version: 1, name: "Segundo grado 2026", frequency: "MONTHLY", dueDayOfMonth: 5, status: "ACTIVE" });
+    const late = await send("POST", `/${SEEDED_DRAFT}/items`, { ...item, periodsCount: 2 });
+
+    expect(added.status).toBe(201);
+    expect((detail.json as { items: unknown[] }).items).toHaveLength(2);
+    expect(activated.json).toMatchObject({ status: "ACTIVE", version: 2 });
+    expect(verdict(late)).toEqual([409, "plan-not-editable"]);
+  });
+
+  it("serves the three presets of failure: stale-first, forbidden and failing-first", async () => {
+    const stale = await session("pln-stale", "charges-stale-version");
+    const forbidden = await session("pln-forbidden", "charges-forbidden");
+    const failing = await session("pln-failing", "charges-server-error");
+    const body = { version: 1, name: "Segundo grado 2026", frequency: "MONTHLY", dueDayOfMonth: 5, status: "DRAFT" };
+
+    const refused = await stale("PUT", `/${SEEDED_DRAFT}`, body);
+    const denied = await forbidden("POST", "", NEW_PLAN);
+    const failed = [await failing("GET"), await failing("GET"), await failing("GET")];
+    const recovered = await failing("GET");
+
+    expect(verdict(refused)).toEqual([409, "stale-version"]);
+    expect(verdict(denied)).toEqual([403, "forbidden"]);
+    expect(failed.map(verdict)).toEqual(Array(3).fill([500, "internal-error"]));
+    expect(recovered.status).toBe(200);
+  });
+
+  it("removes an item with a 204 and no body", async () => {
+    const send = await session("pln-remove");
+
+    const removed = await send("DELETE", `/${SEEDED_DRAFT}/items/00000000-0000-4000-8000-000000009504`);
+
+    expect(removed.status).toBe(204);
+    expect(removed.text).toBe("");
+  });
+});
