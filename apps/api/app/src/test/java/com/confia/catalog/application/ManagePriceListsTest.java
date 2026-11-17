@@ -473,6 +473,11 @@ class ManagePriceListsTest {
         public boolean gradeExists(InstitutionId institutionId, UUID gradeId) {
             return grades.contains(new Ref(institutionId, gradeId));
         }
+
+        @Override
+        public boolean sectionExists(InstitutionId institutionId, UUID sectionId) {
+            return false;
+        }
     }
 
     private static final class Concepts implements PaymentConceptRepository {

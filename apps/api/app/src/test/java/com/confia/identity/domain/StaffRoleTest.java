@@ -92,7 +92,7 @@ class StaffRoleTest {
 
     @Test
     void everyRoleGrantsTheCountOfPermissionsOfItsColumn() {
-        assertThat(sizes()).containsExactly(88, 61, 18, 31, 35, 23);
+        assertThat(sizes()).containsExactly(88, 62, 18, 31, 35, 23);
     }
 
     @Test

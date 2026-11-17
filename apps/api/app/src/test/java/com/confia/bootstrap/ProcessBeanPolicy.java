@@ -160,6 +160,12 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.catalog.infrastructure", "com.confia.catalog.infrastructure.wiring",
                     "com.confia.catalog.application", "com.confia.catalog.web",
                     "com.confia.catalog.web.wiring",
+                    // The charges module (docs/cortes/charges-plans.md): the jOOQ adapters of the plans, the
+                    // named-interface package of its configuration, its use case, its controller and the
+                    // named-interface package of the configuration that registers it. Administrative only, each exact.
+                    "com.confia.charges.infrastructure", "com.confia.charges.infrastructure.wiring",
+                    "com.confia.charges.application", "com.confia.charges.web",
+                    "com.confia.charges.web.wiring",
                     // The ledger module (docs/cortes/ledger-core.md): its jOOQ adapter, the named-interface package
                     // of its configuration and its application services; no web package in cut 1.
                     "com.confia.ledger.infrastructure", "com.confia.ledger.infrastructure.wiring",
@@ -198,6 +204,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.guardians", ADMIN_MODULE,
                     "com.confia.imports", ADMIN_MODULE,
                     "com.confia.catalog", ADMIN_MODULE,
+                    "com.confia.charges", ADMIN_MODULE,
                     "com.confia.ledger", ADMIN_MODULE,
                     SCHEDULER_PACKAGE, SCHEDULER_REASON,
                     TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
@@ -255,6 +262,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.guardians", ADMIN_MODULE,
                     "com.confia.imports", ADMIN_MODULE,
                     "com.confia.catalog", ADMIN_MODULE,
+                    "com.confia.charges", ADMIN_MODULE,
                     "com.confia.ledger", ADMIN_MODULE,
                     "com.confia.shared.observability.health",
                     "the worker serves no route; its health is a heartbeat file (WE100)"));

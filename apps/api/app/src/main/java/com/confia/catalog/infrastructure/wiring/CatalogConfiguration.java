@@ -8,6 +8,8 @@ import com.confia.catalog.application.PriceListRepository;
 import com.confia.catalog.application.ManageTaxRates;
 import com.confia.catalog.application.TaxRatePeriodRepository;
 import com.confia.catalog.application.TaxRateRepository;
+import com.confia.catalog.application.directory.PaymentConceptDirectory;
+import com.confia.catalog.infrastructure.JooqPaymentConceptDirectory;
 import com.confia.catalog.infrastructure.JooqPaymentConceptRepository;
 import com.confia.catalog.infrastructure.JooqPriceListItemRepository;
 import com.confia.catalog.infrastructure.JooqPriceListRepository;
@@ -36,6 +38,12 @@ public class CatalogConfiguration {
     @Bean
     PaymentConceptRepository paymentConceptRepository(DSLContext dsl) {
         return new JooqPaymentConceptRepository(dsl);
+    }
+
+    /** The existence and state check of the payment concepts that {@code charges} consumes (docs/cortes/charges-plans.md). */
+    @Bean
+    PaymentConceptDirectory paymentConceptDirectory(DSLContext dsl) {
+        return new JooqPaymentConceptDirectory(dsl);
     }
 
     @Bean
