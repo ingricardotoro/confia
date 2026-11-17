@@ -4,7 +4,7 @@ import { cn } from "../../lib/cn";
 import { Button, type ButtonProps } from "../button";
 
 const square = cva("px-0", {
-  variants: { size: { sm: "size-8", md: "size-10", lg: "size-11" } },
+  variants: { size: { xs: "size-7", sm: "size-8", md: "size-10", lg: "size-11" } },
   defaultVariants: { size: "md" },
 });
 

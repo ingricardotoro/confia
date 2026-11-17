@@ -18,6 +18,10 @@ export const Neutral: Story = { args: { variant: "neutral" } };
 
 export const Primary: Story = { args: { variant: "primary" } };
 
+export const Success: Story = { args: { variant: "success", dot: "filled", children: "Activo" } };
+
+export const HollowDot: Story = { args: { variant: "neutral", dot: "hollow", children: "Inactivo" } };
+
 export const Outline: Story = { args: { variant: "outline" } };
 
 export const WithIcon: Story = { args: { icon: <Info /> } };

@@ -4,7 +4,8 @@ import { cn } from "../../lib/cn";
 import { focusRing } from "../../lib/focus-ring";
 import { Spinner } from "../spinner";
 
-// docs/ui-ux/02 section 4: variants primary, secondary, subtle, destructive and link. Colors come
+// docs/ui-ux/02 section 4: variants primary, secondary, subtle, destructive (the danger action), success,
+// warning, the soft row variants and link. Colors come
 // from the Level 3 tokens of components.css (--button-*), never from a primitive. Heights are the
 // dense admin target (32 px), the default (40 px) and the portal touch target (44 px).
 export const buttonVariants = cva(
@@ -26,9 +27,17 @@ export const buttonVariants = cva(
           "bg-transparent text-(--button-subtle-fg) hover:bg-(--button-subtle-bg-hover) active:bg-(--button-subtle-bg-active)",
         destructive:
           "bg-(--button-destructive-bg) text-(--button-destructive-fg) hover:brightness-90 active:brightness-75",
+        success: "bg-(--button-success-bg) text-(--button-success-fg) hover:brightness-90 active:brightness-75",
+        warning: "bg-(--button-warning-bg) text-(--button-warning-fg) hover:brightness-90 active:brightness-75",
+        // Action colours for dense places such as table rows: tinted background, coloured text and border.
+        "destructive-soft":
+          "border border-(--button-danger-soft-border) bg-(--button-danger-soft-bg) text-(--button-danger-soft-fg) hover:brightness-95 active:brightness-90",
+        "success-soft":
+          "border border-(--button-success-soft-border) bg-(--button-success-soft-bg) text-(--button-success-soft-fg) hover:brightness-95 active:brightness-90",
         link: "bg-transparent text-text-link underline underline-offset-4 hover:brightness-90",
       },
       size: {
+        xs: "h-7 gap-1 px-2.5 text-xs",
         sm: "h-8 px-3 text-sm",
         md: "h-10 px-4 text-sm",
         lg: "h-11 px-6 text-base",

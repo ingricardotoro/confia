@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderWithI18n } from "../../test/render";
 import { Button, type ButtonProps } from "./Button";
 
-const variants = ["primary", "secondary", "subtle", "destructive", "link"] as const;
+const variants = ["primary", "secondary", "subtle", "destructive", "success", "warning", "destructive-soft", "success-soft", "link"] as const;
 
 function classesOf(variant: NonNullable<ButtonProps["variant"]>): string {
   const { unmount } = renderWithI18n(<Button variant={variant}>Guardar</Button>);

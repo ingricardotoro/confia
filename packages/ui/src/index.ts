@@ -12,6 +12,10 @@ export { Checkbox, type CheckboxProps, type CheckedState } from "./atoms/checkbo
 export { RadioGroup, RadioGroupItem, type RadioGroupItemProps, type RadioGroupProps } from "./atoms/radio-group";
 export { Select, type SelectProps } from "./atoms/select";
 export { Table, type SortDirection, type TableColumn, type TableProps, type TableSort } from "./molecules/table";
+export { Breadcrumb, type BreadcrumbItem, type BreadcrumbProps } from "./molecules/breadcrumb";
+export { PageHeader, type PageHeaderProps } from "./molecules/page-header";
+export { Card, type CardProps } from "./molecules/card";
+export { KeyFigure, type KeyFigureProps } from "./molecules/key-figure";
 export { Pagination, type PaginationProps } from "./molecules/pagination";
 export { Dialog, type DialogProps } from "./molecules/dialog";
 export { FormError, FormField, type FormErrorProps, type FormFieldControl, type FormFieldProps } from "./molecules/form-field";

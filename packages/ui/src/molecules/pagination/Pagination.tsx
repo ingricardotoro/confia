@@ -36,14 +36,14 @@ export function Pagination({ page, size, total, onPageChange, disabled = false, 
         {t("pagination.summary", { from, to, total })}
       </p>
       <div className="flex items-center gap-2">
-        <Button variant="secondary" size="sm" disabled={disabled || current === 0} onClick={() => {
+        <Button variant="secondary" size="xs" disabled={disabled || current === 0} onClick={() => {
             onPageChange(current - 1);
           }}>
           <ChevronLeft aria-hidden="true" />
           {t("pagination.previous")}
         </Button>
         <span className="text-text-secondary">{t("pagination.page", { page: current + 1, pages })}</span>
-        <Button variant="secondary" size="sm" disabled={disabled || current >= pages - 1} onClick={() => {
+        <Button variant="secondary" size="xs" disabled={disabled || current >= pages - 1} onClick={() => {
             onPageChange(current + 1);
           }}>
           {t("pagination.next")}

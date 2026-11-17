@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   Alert,
   Badge,
+  Breadcrumb,
   Button,
+  Card,
   Checkbox,
   Dialog,
   EmptyState,
@@ -16,8 +18,10 @@ import {
   FormField,
   IconButton,
   Input,
+  KeyFigure,
   Label,
   MoneyAmount,
+  PageHeader,
   Pagination,
   RadioGroup,
   RadioGroupItem,
@@ -42,7 +46,17 @@ const REQUESTS = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource"] as cons
 const FIXTURES: Record<string, ReactElement> = {
   Alert: <Alert>Aviso</Alert>,
   Badge: <Badge>Etiqueta</Badge>,
+  Breadcrumb: (
+    <Breadcrumb
+      label="Ruta"
+      items={[
+        { id: "a", label: "Catálogo", href: "/catalog" },
+        { id: "b", label: "Listas" },
+      ]}
+    />
+  ),
   Button: <Button>Guardar</Button>,
+  Card: <Card title="Resumen">Contenido</Card>,
   Checkbox: <Checkbox aria-label="Aceptar" />,
   Dialog: (
     <Dialog open onOpenChange={() => undefined} title="Nueva modalidad" description="Registre el nombre.">
@@ -60,8 +74,10 @@ const FIXTURES: Record<string, ReactElement> = {
     </IconButton>
   ),
   Input: <Input aria-label="Nombre" />,
+  KeyFigure: <KeyFigure label="Listas en total" value="24" />,
   Label: <Label>Nombre</Label>,
   MoneyAmount: <MoneyAmount value={{ amount: "3200.00", currency: "HNL" }} />,
+  PageHeader: <PageHeader title="Catálogo" description="Lo que se cobra." />,
   Pagination: <Pagination page={0} size={50} total={120} onPageChange={() => undefined} />,
   RadioGroup: (
     <RadioGroup aria-label="Método">

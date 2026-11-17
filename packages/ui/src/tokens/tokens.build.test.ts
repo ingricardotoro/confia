@@ -30,7 +30,7 @@ describe("the utilities Tailwind generates from the token entry point", () => {
   it("still emits every primitive as a variable, used or not", async () => {
     const css = await buildCss([]);
 
-    expect(css).toMatch(/--palette-primary-600:\s*#2563eb/i);
+    expect(css).toMatch(/--palette-primary-600:\s*#1d4fb0/i);
     expect(css).toMatch(/--palette-neutral-950:\s*#020617/i);
   });
 
