@@ -74,6 +74,61 @@ public final class LedgerPosting {
     }
 
     /**
+     * Posts a transaction INSIDE the database transaction of the caller (docs/cortes/charges-accrual.md, appendix B).
+     * {@link #post} opens its own transaction and retries inside it; joined to an outer transaction its retry would run
+     * on a transaction that PostgreSQL has already aborted. This variant requires a transaction opened by the
+     * transactional component, applies no security context of its own (the caller's holds), opens no transaction and
+     * retries nothing: a deadlock or a key race propagates and the OUTER transaction runner repeats the whole unit of
+     * work, so the caller's own writes that follow this call are repeated with it. The steps and the checks are those
+     * of {@link #post}.
+     *
+     * @throws IllegalStateException when no transaction is active
+     */
+    public Posted postWithinCurrentTransaction(LedgerActor actor, PostCommand command) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(command, "command");
+        requireActiveTransaction();
+        return doPost(actor, command);
+    }
+
+    /** The in-transaction variant of {@link #reverse}; same contract as {@link #postWithinCurrentTransaction}. */
+    public Posted reverseWithinCurrentTransaction(LedgerActor actor, ReverseCommand command) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(command, "command");
+        requireActiveTransaction();
+        return doReverse(actor, command);
+    }
+
+    /**
+     * Opens the missing sub-accounts of the students and locks each one with {@code FOR UPDATE}, in the fixed order
+     * student, currency, inside the transaction of the caller. A caller that decides something that depends on the
+     * balance or on what is already posted takes the locks first, reads under them and posts afterwards; the post then
+     * finds the accounts already locked. The opening of an account is audited here, in the same transaction. An account
+     * under review is returned, not refused: the caller decides.
+     *
+     * @throws IllegalStateException when no transaction is active
+     */
+    public List<StudentAccountRef> lockStudentAccounts(LedgerActor actor, java.util.Collection<StudentCurrency> keys) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(keys, "keys");
+        requireActiveTransaction();
+        InstitutionId institution = new InstitutionId(actor.institutionId());
+        List<StudentAccountRef> locked = ledger.openAndLock(institution, ledger.sorted(keys));
+        for (StudentAccountRef account : locked) {
+            if (account.opened()) {
+                auditLogWriter.append(LedgerAudit.studentAccountOpened(actor, account));
+            }
+        }
+        return locked;
+    }
+
+    private void requireActiveTransaction() {
+        if (!transactionRunner.isTransactionActive()) {
+            throw new IllegalStateException("this ledger operation runs inside a transaction of the caller and none is active");
+        }
+    }
+
+    /**
      * Two calls with the same key at once: the loser waits on the unique index and fails with a race error when the
      * winner commits. Running it again finds the winner by key and replays it.
      */

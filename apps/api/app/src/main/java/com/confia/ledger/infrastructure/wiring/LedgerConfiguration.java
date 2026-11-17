@@ -1,5 +1,6 @@
 package com.confia.ledger.infrastructure.wiring;
 
+import com.confia.ledger.application.LedgerApi;
 import com.confia.ledger.application.LedgerPosting;
 import com.confia.ledger.application.LedgerQueries;
 import com.confia.ledger.application.LedgerRepository;
@@ -26,6 +27,12 @@ public class LedgerConfiguration {
     LedgerPosting ledgerPosting(TransactionRunner transactionRunner, LedgerRepository ledger,
             AuditLogWriter auditLogWriter) {
         return new LedgerPosting(transactionRunner, ledger, auditLogWriter);
+    }
+
+    /** The public API that {@code charges} posts through (docs/cortes/charges-accrual.md): one bean, two ports. */
+    @Bean
+    LedgerApi ledgerApi(LedgerPosting ledgerPosting, LedgerRepository ledger) {
+        return new LedgerApi(ledgerPosting, ledger);
     }
 
     @Bean

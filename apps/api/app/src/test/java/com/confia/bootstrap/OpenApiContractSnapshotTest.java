@@ -232,7 +232,9 @@ class OpenApiContractSnapshotTest {
                 "/api/v1/catalog/price-lists/{id}", "/api/v1/catalog/price-lists/{id}/items",
                 "/api/v1/catalog/tax-rates", "/api/v1/catalog/tax-rates/{id}", "/api/v1/catalog/tax-rates/{id}/periods",
                 "/api/v1/charges/plans", "/api/v1/charges/plans/{id}", "/api/v1/charges/plans/{id}/items",
-                "/api/v1/charges/plans/{id}/items/{itemId}",
+                "/api/v1/charges/plans/{id}/items/{itemId}", "/api/v1/charges/plans/{id}/accrual-periods",
+                "/api/v1/charges/plans/{id}/accrual-preview", "/api/v1/charges/plans/{id}/accrual-runs",
+                "/api/v1/charges/accrual-runs", "/api/v1/charges/accrual-runs/{runId}",
                 "/api/v1/students", "/api/v1/students/{id}",
                 "/api/v1/enrollments", "/api/v1/enrollments/{id}", "/api/v1/enrollments/{id}/transfer",
                 "/api/v1/enrollments/{id}/exit", "/api/v1/students/{studentId}/enrollments", "/api/v1/guardians",
@@ -420,7 +422,7 @@ class OpenApiContractSnapshotTest {
             }
         }
 
-        assertThat(operations).isEqualTo(69);
+        assertThat(operations).isEqualTo(74);
         List<String> expected = new ArrayList<>(List.of("get " + ROLES_PATH,
                 "get /api/v1/catalog/payment-concepts", "post /api/v1/catalog/payment-concepts",
                 "put /api/v1/catalog/payment-concepts/{id}", "get /api/v1/catalog/price-lists",
@@ -430,7 +432,10 @@ class OpenApiContractSnapshotTest {
                 "get /api/v1/catalog/tax-rates/{id}", "put /api/v1/catalog/tax-rates/{id}",
                 "post /api/v1/catalog/tax-rates/{id}/periods", "get /api/v1/charges/plans",
                 "post /api/v1/charges/plans", "get /api/v1/charges/plans/{id}", "put /api/v1/charges/plans/{id}",
-                "post /api/v1/charges/plans/{id}/items", "delete /api/v1/charges/plans/{id}/items/{itemId}"));
+                "post /api/v1/charges/plans/{id}/items", "delete /api/v1/charges/plans/{id}/items/{itemId}",
+                "get /api/v1/charges/plans/{id}/accrual-periods", "post /api/v1/charges/plans/{id}/accrual-preview",
+                "post /api/v1/charges/plans/{id}/accrual-runs", "get /api/v1/charges/accrual-runs",
+                "get /api/v1/charges/accrual-runs/{runId}"));
         for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {
             String collection = "/api/v1/organization/" + resource;
             expected.addAll(List.of("get " + collection, "post " + collection,

@@ -13,6 +13,7 @@ import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -97,6 +98,15 @@ public final class TransactionRunner {
      */
     public <T> T executeReadOnly(SecurityContext context, Supplier<T> useCase) {
         return execute(context, readOnlyTemplate, useCase);
+    }
+
+    /**
+     * Whether the calling thread is inside a transaction this component (or its manager) opened. A service that is
+     * written to run inside the transaction of its caller, and never to open or retry one, uses it to refuse to run
+     * outside one.
+     */
+    public boolean isTransactionActive() {
+        return TransactionSynchronizationManager.isActualTransactionActive();
     }
 
     private <T> T execute(SecurityContext context, TransactionTemplate template,

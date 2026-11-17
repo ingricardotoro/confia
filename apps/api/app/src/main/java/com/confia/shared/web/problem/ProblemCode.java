@@ -107,6 +107,8 @@ public enum ProblemCode {
     TAX_RATE_PERIOD_OVERLAP("tax-rate-period-overlap", 409),
     PLAN_NOT_EDITABLE("plan-not-editable", 409),
     PLAN_WITHOUT_ITEMS("plan-without-items", 409),
+    PLAN_ITEM_INVALID("plan-item-invalid", 409),
+    ACCRUAL_RUN_IN_PROGRESS("accrual-run-in-progress", 409),
     DUPLICATE_PLAN_ITEM("duplicate-plan-item", 409),
     STALE_VERSION("stale-version", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),

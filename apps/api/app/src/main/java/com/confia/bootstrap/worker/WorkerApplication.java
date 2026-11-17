@@ -1,6 +1,11 @@
 package com.confia.bootstrap.worker;
 
+import com.confia.catalog.infrastructure.wiring.CatalogWorkerConfiguration;
+import com.confia.charges.infrastructure.wiring.ChargesWorkerConfiguration;
 import com.confia.identity.infrastructure.wiring.IdentityWorkerConfiguration;
+import com.confia.ledger.infrastructure.wiring.LedgerConfiguration;
+import com.confia.organization.infrastructure.wiring.OrganizationWorkerConfiguration;
+import com.confia.students.infrastructure.wiring.StudentsWorkerConfiguration;
 import com.confia.shared.infrastructure.wiring.SharedWorkerJobsConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.WorkerJobsConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.WorkerPlatformConfiguration;
@@ -14,10 +19,11 @@ import org.springframework.context.annotation.Import;
  * Background worker process entry point (ADR-0003, ADR-0013, ADR-0024), started without an HTTP
  * server ({@code ConfiaApplication} forces {@code WebApplicationType.NONE}). It declares its own
  * wiring here and never inherits the administrative bean graph, so it carries none of the OpenAPI
- * surface the web processes import. The only business module it registers is {@code identity},
- * through {@link IdentityWorkerConfiguration}, for the password-reset issuance job (ADR-0016;
- * background-jobs-with-db-scheduler design.md decision 18); the other jobs arrive with the modules
- * that need them.
+ * surface the web processes import. It registers {@code identity}, through {@link IdentityWorkerConfiguration},
+ * for the password-reset issuance job (ADR-0016; background-jobs-with-db-scheduler design.md decision 18), and the
+ * accrual of charges (docs/cortes/charges-accrual.md): {@code charges} with its adapters, use case and job, the
+ * read-only directories of {@code organization}, {@code students} and {@code catalog} that the job consumes, and the
+ * {@code ledger} that it posts to. The other jobs arrive with the modules that need them.
  *
  * <p>The worker has a {@code DataSource} (background-jobs-with-db-scheduler design.md decision 12,
  * which reverses decision D5 of web-edge-foundations for this process): Spring Boot's pool, with the
@@ -69,6 +75,8 @@ import org.springframework.context.annotation.Import;
         UserDetailsServiceAutoConfiguration.class}, excludeName = {
         "org.springframework.boot.servlet.autoconfigure.MultipartAutoConfiguration"})
 @Import({WorkerPlatformConfiguration.class, WorkerJobsConfiguration.class,
-        IdentityWorkerConfiguration.class, SharedWorkerJobsConfiguration.class})
+        IdentityWorkerConfiguration.class, SharedWorkerJobsConfiguration.class, OrganizationWorkerConfiguration.class,
+        StudentsWorkerConfiguration.class, CatalogWorkerConfiguration.class, LedgerConfiguration.class,
+        ChargesWorkerConfiguration.class})
 public class WorkerApplication {
 }

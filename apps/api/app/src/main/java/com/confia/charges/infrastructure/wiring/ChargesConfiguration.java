@@ -1,6 +1,23 @@
 package com.confia.charges.infrastructure.wiring;
 
 import com.confia.catalog.application.directory.PaymentConceptDirectory;
+import com.confia.catalog.application.directory.PricingDirectory;
+import com.confia.charges.application.AccrualRunItemRepository;
+import com.confia.charges.application.AccrualRunRepository;
+import com.confia.charges.application.AccrualRunScheduler;
+import com.confia.charges.application.ChargeRepository;
+import com.confia.charges.application.ManageAccrual;
+import com.confia.charges.application.PostingAccountRepository;
+import com.confia.charges.infrastructure.JobAccrualRunScheduler;
+import com.confia.charges.infrastructure.JooqAccrualRunItemRepository;
+import com.confia.charges.infrastructure.JooqAccrualRunRepository;
+import com.confia.charges.infrastructure.JooqChargeRepository;
+import com.confia.charges.infrastructure.JooqPostingAccountRepository;
+import com.confia.ledger.application.api.LedgerAccountDirectory;
+import com.confia.organization.application.directory.PlacementDirectory;
+import com.confia.shared.jobs.JobScheduler;
+import com.confia.students.application.directory.EnrollmentRoster;
+import com.confia.students.application.directory.StudentDirectory;
 import com.confia.charges.application.ChargePlanItemRepository;
 import com.confia.charges.application.ChargePlanRepository;
 import com.confia.charges.application.ManageChargePlans;
@@ -38,5 +55,41 @@ public class ChargesConfiguration {
             ChargePlanItemRepository items, PaymentConceptDirectory concepts, AcademicStructureDirectory structure,
             AuditLogWriter auditLogWriter, Clock clock) {
         return new ManageChargePlans(transactionRunner, plans, items, concepts, structure, auditLogWriter, clock);
+    }
+
+    @Bean
+    ChargeRepository chargeRepository(DSLContext dsl) {
+        return new JooqChargeRepository(dsl);
+    }
+
+    @Bean
+    AccrualRunRepository accrualRunRepository(DSLContext dsl) {
+        return new JooqAccrualRunRepository(dsl);
+    }
+
+    @Bean
+    AccrualRunItemRepository accrualRunItemRepository(DSLContext dsl) {
+        return new JooqAccrualRunItemRepository(dsl);
+    }
+
+    @Bean
+    PostingAccountRepository postingAccountRepository(DSLContext dsl) {
+        return new JooqPostingAccountRepository(dsl);
+    }
+
+    /** Schedules the accrual job in the transaction that creates the run; only the worker executes it (ADR-0016). */
+    @Bean
+    AccrualRunScheduler accrualRunScheduler(JobScheduler jobs, Clock clock) {
+        return new JobAccrualRunScheduler(jobs, clock);
+    }
+
+    @Bean
+    ManageAccrual manageAccrual(TransactionRunner transactionRunner, ChargePlanRepository plans,
+            ChargePlanItemRepository items, AccrualRunRepository runs, AccrualRunItemRepository runItems,
+            ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
+            PricingDirectory pricing, PostingAccountRepository postingAccounts, LedgerAccountDirectory ledgerAccounts,
+            AccrualRunScheduler scheduler, AuditLogWriter auditLogWriter, Clock clock) {
+        return new ManageAccrual(transactionRunner, plans, items, runs, runItems, charges, placements, roster, students,
+                pricing, postingAccounts, ledgerAccounts, scheduler, auditLogWriter, clock);
     }
 }

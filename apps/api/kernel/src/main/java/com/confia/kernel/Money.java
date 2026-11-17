@@ -215,6 +215,24 @@ public final class Money implements Comparable<Money> {
     }
 
     /**
+     * Applies a rate expressed in percentage points and rounds ONCE, explicitly, to this currency's minor unit:
+     * {@code amount x percentage / 100} is computed exactly (scale four plus scale four plus two never loses a digit)
+     * and then rounded a single time. {@link #percentage} followed by {@link #roundToMinorUnit} rounds twice (to scale
+     * four and then to two) and can round a share of 0.004995 up to 0.01; this operation cannot. The result is expressed
+     * at scale four. There is deliberately no overload with an implicit rounding mode.
+     *
+     * @throws InvalidMoneyAmountException {@link InvalidMoneyAmountException#OUT_OF_RANGE} if the rounded result
+     *     exceeds {@code 9999999999.9999} in absolute value
+     */
+    public Money percentageToMinorUnit(Percentage percentage, RoundingMode rounding) {
+        Objects.requireNonNull(percentage, "percentage");
+        Objects.requireNonNull(rounding, "rounding");
+        BigDecimal exactShare = amount.multiply(percentage.value()).movePointLeft(2);
+        BigDecimal rounded = exactShare.setScale(currency.minorUnitDigits(), rounding);
+        return new Money(rounded.setScale(SCALE, RoundingMode.UNNECESSARY), currency);
+    }
+
+    /**
      * Rounds to this currency's minor unit (two decimals for both HNL and USD today) and
      * re-expresses the result at scale four (design.md, decision 4). This is the only point where
      * an amount actually loses precision below scale four, and it always happens explicitly.

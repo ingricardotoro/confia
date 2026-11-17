@@ -28,6 +28,9 @@ public interface LedgerRepository {
 
     List<AccountRef> findAccounts(InstitutionId institution, Set<UUID> accountIds);
 
+    /** The accounts of the chart with these identifiers, with their code, name and type; unknown identifiers are absent. */
+    List<AccountDetails> findAccountDetails(InstitutionId institution, Set<UUID> accountIds);
+
     /**
      * Opens the missing sub-accounts and locks every one with {@code SELECT ... FOR UPDATE}, one by one in the order of
      * {@code keys}, which the caller sorts: the fixed lock order that keeps two transactions from deadlocking.

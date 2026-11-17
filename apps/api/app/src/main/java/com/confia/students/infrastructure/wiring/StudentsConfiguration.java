@@ -12,7 +12,9 @@ import com.confia.students.application.ReindexNationalIds;
 import com.confia.students.application.StudentImport;
 import com.confia.students.application.StudentRepository;
 import com.confia.students.application.importing.StudentImportGateway;
+import com.confia.students.application.directory.EnrollmentRoster;
 import com.confia.students.application.directory.StudentDirectory;
+import com.confia.students.infrastructure.JooqEnrollmentRoster;
 import com.confia.students.infrastructure.ColumnEncryptionNationalIdProtector;
 import com.confia.students.infrastructure.JooqStudentDirectory;
 import com.confia.students.infrastructure.JooqStudentRepository;
@@ -49,6 +51,12 @@ public class StudentsConfiguration {
     @Bean
     StudentDirectory studentDirectory(DSLContext dsl) {
         return new JooqStudentDirectory(dsl);
+    }
+
+    /** Who is enrolled in a set of sections during a period, which {@code charges} consumes (docs/cortes/charges-accrual.md). */
+    @Bean
+    EnrollmentRoster enrollmentRoster(DSLContext dsl) {
+        return new JooqEnrollmentRoster(dsl);
     }
 
     /** The institutions whose blind indexes are recomputed at startup (empty: none). */

@@ -64,6 +64,287 @@
         "required" : [ "createdAt", "endDate", "id", "isActive", "name", "startDate", "status", "updatedAt" ],
         "type" : "object"
       },
+      "AccrualMoney" : {
+        "description" : "A monetary amount as it travels over the API: never a JSON number",
+        "properties" : {
+          "amount" : {
+            "description" : "Decimal amount in the minor unit of the currency, as a string",
+            "pattern" : "^-?\\d{1,10}(\\.\\d{1,4})?$",
+            "type" : "string"
+          },
+          "currency" : {
+            "description" : "ISO 4217 currency code",
+            "pattern" : "^[A-Z]{3}$",
+            "type" : "string"
+          }
+        },
+        "required" : [ "amount", "currency" ],
+        "type" : "object"
+      },
+      "AccrualPeriodResponse" : {
+        "properties" : {
+          "dueOn" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "label" : {
+            "description" : "Year and month of the first day, like 2027-02",
+            "type" : "string"
+          },
+          "lastRun" : {
+            "$ref" : "#/components/schemas/AccrualRunResponse",
+            "type" : "null"
+          },
+          "paymentConceptIds" : {
+            "items" : {
+              "format" : "uuid",
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "periodStart" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "required" : [ "dueOn", "label", "paymentConceptIds", "periodStart" ],
+        "type" : "object"
+      },
+      "AccrualPreviewRequest" : {
+        "properties" : {
+          "periodStart" : {
+            "description" : "First day of one of the periods the plan lists",
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "required" : [ "periodStart" ],
+        "type" : "object"
+      },
+      "AccrualPreviewResponse" : {
+        "properties" : {
+          "alreadyAccrued" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "alreadyAccruedOtherPlan" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "blockers" : {
+            "description" : "Why a run would be rejected now: plan-not-active, posting-accounts-incomplete or plan-target-outside-year",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "errors" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "errorsByCode" : {
+            "additionalProperties" : {
+              "format" : "int32",
+              "type" : "integer"
+            },
+            "description" : "Error code to how many charges",
+            "type" : "object"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Item"
+            },
+            "type" : "array"
+          },
+          "itemsTruncated" : {
+            "description" : "Whether there are more rows than the 500 listed",
+            "type" : "boolean"
+          },
+          "periodStart" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "planId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "previewDigest" : {
+            "pattern" : "^[0-9a-f]{64}$",
+            "type" : "string"
+          },
+          "studentsEvaluated" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "toCreate" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totals" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Total"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "alreadyAccrued", "alreadyAccruedOtherPlan", "blockers", "errors", "errorsByCode", "items", "itemsTruncated", "periodStart", "planId", "previewDigest", "studentsEvaluated", "toCreate", "totals" ],
+        "type" : "object"
+      },
+      "AccrualRunDetailResponse" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AccrualRunItemResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "run" : {
+            "$ref" : "#/components/schemas/AccrualRunResponse"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalItems" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "items", "page", "run", "size", "totalItems" ],
+        "type" : "object"
+      },
+      "AccrualRunItemResponse" : {
+        "properties" : {
+          "chargeId" : {
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "errorCode" : {
+            "description" : "Present when the outcome is ERROR: NO_PRICE, AMBIGUOUS_PRICE, TAX_RATE_MISSING, TAX_RATE_INACTIVE, TAX_RATE_NOT_IN_FORCE, CONCEPT_INACTIVE, STUDENT_INACTIVE, ACCOUNT_UNDER_REVIEW, OVERLAPPING_CHARGE or POSTING_FAILED",
+            "type" : [ "string", "null" ]
+          },
+          "existingChargeId" : {
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "outcome" : {
+            "enum" : [ "CREATED", "ALREADY_ACCRUED", "ALREADY_ACCRUED_OTHER_PLAN", "ERROR" ],
+            "type" : "string"
+          },
+          "paymentConceptId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "studentId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "outcome", "paymentConceptId", "studentId" ],
+        "type" : "object"
+      },
+      "AccrualRunPageResponse" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AccrualRunResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "items", "page", "size", "total" ],
+        "type" : "object"
+      },
+      "AccrualRunRequest" : {
+        "properties" : {
+          "periodStart" : {
+            "description" : "First day of one of the periods the plan lists",
+            "format" : "date",
+            "type" : "string"
+          },
+          "previewDigest" : {
+            "description" : "The previewDigest of the preview the user confirmed",
+            "pattern" : "^[0-9a-f]{64}$",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "periodStart" ],
+        "type" : "object"
+      },
+      "AccrualRunResponse" : {
+        "properties" : {
+          "chargesCreated" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "chargesExisting" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "chargesFailed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "failureCode" : {
+            "description" : "Why a rejected or failed run did not run: plan-not-active, period-not-in-plan, posting-accounts-incomplete, period-in-future, plan-target-outside-year, preview-outdated or retries-exhausted",
+            "type" : [ "string", "null" ]
+          },
+          "finishedAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "periodStart" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "planId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "previewChecked" : {
+            "description" : "Whether the request carried a preview digest",
+            "type" : "boolean"
+          },
+          "queuedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "enum" : [ "QUEUED", "RUNNING", "COMPLETED", "COMPLETED_WITH_ERRORS", "REJECTED", "FAILED" ],
+            "type" : "string"
+          },
+          "studentsEvaluated" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "chargesCreated", "chargesExisting", "chargesFailed", "id", "periodStart", "planId", "previewChecked", "queuedAt", "status", "studentsEvaluated" ],
+        "type" : "object"
+      },
       "AddChargePlanItemRequest" : {
         "properties" : {
           "firstPeriodOn" : {
@@ -1238,6 +1519,43 @@
         "required" : [ "batch", "rejections", "rejectionsTruncated" ],
         "type" : "object"
       },
+      "Item" : {
+        "properties" : {
+          "base" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "type" : "null"
+          },
+          "errorCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "existingChargeId" : {
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "outcome" : {
+            "enum" : [ "CREATED", "ALREADY_ACCRUED", "ALREADY_ACCRUED_OTHER_PLAN", "ERROR" ],
+            "type" : "string"
+          },
+          "paymentConceptId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "studentId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "tax" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "type" : "null"
+          },
+          "total" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "type" : "null"
+          }
+        },
+        "required" : [ "outcome", "paymentConceptId", "studentId" ],
+        "type" : "object"
+      },
       "KindCountResponse" : {
         "properties" : {
           "created" : {
@@ -2384,6 +2702,28 @@
           }
         },
         "required" : [ "code", "createdAt", "id", "isActive", "name", "updatedAt", "version" ],
+        "type" : "object"
+      },
+      "Total" : {
+        "properties" : {
+          "base" : {
+            "$ref" : "#/components/schemas/AccrualMoney"
+          },
+          "charges" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "tax" : {
+            "$ref" : "#/components/schemas/AccrualMoney"
+          },
+          "total" : {
+            "$ref" : "#/components/schemas/AccrualMoney"
+          }
+        },
+        "required" : [ "base", "charges", "currency", "tax", "total" ],
         "type" : "object"
       },
       "TransferEnrollmentRequest" : {
@@ -4681,6 +5021,209 @@
         "x-required-permission" : "catalog:create"
       }
     },
+    "/api/v1/charges/accrual-runs" : {
+      "get" : {
+        "description" : "One page of the accrual runs of the institution of the token, most recent first, optionally of one plan. page counts from 0, size defaults to 50 and is at most 200. Needs the permission charges:read.",
+        "operationId" : "listChargeAccrualRuns",
+        "parameters" : [ {
+          "description" : "Only the runs of this plan",
+          "in" : "query",
+          "name" : "planId",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "Page, counted from 0",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Rows per page, 1 to 200; 50 when absent",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 50,
+            "format" : "int32",
+            "maximum" : 200,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccrualRunPageResponse"
+                }
+              }
+            },
+            "description" : "One page of accrual runs"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "A parameter is out of range (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold charges:read (forbidden)"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Lists the accrual runs",
+        "tags" : [ "charges-accrual" ],
+        "x-required-permission" : "charges:read"
+      }
+    },
+    "/api/v1/charges/accrual-runs/{runId}" : {
+      "get" : {
+        "description" : "The run, its counters and one page of its items (what happened to each student and concept, with the error code of the ones that failed). page counts from 0, size defaults to 50 and is at most 200. Needs the permission charges:read.",
+        "operationId" : "getChargeAccrualRun",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "runId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "Page of items, counted from 0",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Items per page, 1 to 200; 50 when absent",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 50,
+            "format" : "int32",
+            "maximum" : 200,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccrualRunDetailResponse"
+                }
+              }
+            },
+            "description" : "The run with one page of items"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "A parameter is out of range (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold charges:read (forbidden)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The run does not exist in the institution of the token (resource-not-found)"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Reads an accrual run",
+        "tags" : [ "charges-accrual" ],
+        "x-required-permission" : "charges:read"
+      }
+    },
     "/api/v1/charges/plans" : {
       "get" : {
         "description" : "One page of the charge plans of the institution of the token, optionally filtered by academic year, target scope and status. Needs the permission charges:read. page counts from 0, size defaults to 50 and is at most 200, sort is a field of name or createdAt optionally followed by ,asc or ,desc.",
@@ -5074,6 +5617,316 @@
         "summary" : "Edits, activates or archives a charge plan",
         "tags" : [ "charges-plans" ],
         "x-required-permission" : "charges:update"
+      }
+    },
+    "/api/v1/charges/plans/{id}/accrual-periods" : {
+      "get" : {
+        "description" : "The periods the plan accrues, each with its most recent run. The server derives them from the frequency and the items of the plan; the browser never computes a period. Needs the permission charges:read.",
+        "operationId" : "listChargeAccrualPeriods",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/AccrualPeriodResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "The periods of the plan"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold charges:read (forbidden)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The plan does not exist in the institution of the token (resource-not-found)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "A one-time plan has an item with more than one period (plan-item-invalid)"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Lists the accrual periods of a plan",
+        "tags" : [ "charges-accrual" ],
+        "x-required-permission" : "charges:read"
+      }
+    },
+    "/api/v1/charges/plans/{id}/accrual-preview" : {
+      "post" : {
+        "description" : "Calculates what accruing the period would do, with nothing written: counts, exact totals by currency, errors by code, up to 500 rows, what would make a run refuse, and the digest to send back when confirming. Needs the permission charges:create.",
+        "operationId" : "previewChargeAccrual",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AccrualPreviewRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccrualPreviewResponse"
+                }
+              }
+            },
+            "description" : "What the accrual would do"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body is not valid, or the period is not one of the periods of the plan (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold charges:create, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The plan does not exist in the institution of the token (resource-not-found)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "A one-time plan has an item with more than one period (plan-item-invalid)"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Previews the accrual of a period",
+        "tags" : [ "charges-accrual" ],
+        "x-required-permission" : "charges:create"
+      }
+    },
+    "/api/v1/charges/plans/{id}/accrual-runs" : {
+      "post" : {
+        "description" : "Queues the accrual of the period of an active plan; the worker executes it. The Idempotency-Key header is required and stored permanently on the run: the same key and the same body answer the same run, the same key with another body answers 422 idempotency-payload-mismatch, and another key while a run of the same plan and period is queued or running answers 409 accrual-run-in-progress. With the previewDigest, a calculation that changed since the preview ends the run rejected with preview-outdated and nothing written. Needs the permission charges:create.",
+        "operationId" : "requestChargeAccrualRun",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "1 to 128 visible characters, unique per request",
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AccrualRunRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccrualRunResponse"
+                }
+              }
+            },
+            "description" : "The run, queued (or the run the key already produced)"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body or the Idempotency-Key is not valid, or the period is not one of the periods of the plan (validation-failed, idempotency-key-missing)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold charges:create, or the Origin is missing or not allowed (forbidden, csrf-invalid)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The plan does not exist in the institution of the token (resource-not-found)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Another run of the plan and period is queued or running (accrual-run-in-progress)"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The Idempotency-Key was used for another request (idempotency-payload-mismatch)"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Requests the accrual of a period",
+        "tags" : [ "charges-accrual" ],
+        "x-required-permission" : "charges:create"
       }
     },
     "/api/v1/charges/plans/{id}/items" : {

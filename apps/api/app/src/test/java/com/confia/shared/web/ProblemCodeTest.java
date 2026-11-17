@@ -41,7 +41,7 @@ class ProblemCodeTest {
                         "guardian-not-active", "consent-channel-unavailable", "import-not-simulated",
                         "import-file-changed", "duplicate-payment-concept-code", "price-validity-overlap",
                         "price-list-archived", "duplicate-tax-rate-code", "tax-rate-period-overlap", "plan-not-editable", "plan-without-items",
-                        "duplicate-plan-item", "stale-version");
+                        "duplicate-plan-item", "plan-item-invalid", "accrual-run-in-progress", "stale-version");
     }
 
     @Test
@@ -68,7 +68,7 @@ class ProblemCodeTest {
             "consent-channel-unavailable, 409", "import-not-simulated, 409", "import-file-changed, 409",
             "duplicate-payment-concept-code, 409", "price-validity-overlap, 409", "price-list-archived, 409",
             "duplicate-tax-rate-code, 409", "tax-rate-period-overlap, 409", "plan-not-editable, 409",
-            "plan-without-items, 409", "duplicate-plan-item, 409", "stale-version, 409"})
+            "plan-without-items, 409", "duplicate-plan-item, 409", "plan-item-invalid, 409", "accrual-run-in-progress, 409", "stale-version, 409"})
     void eachCodeCarriesItsHttpStatus(String code, int status) {
         assertThat(ProblemCode.ofCode(code)).get().extracting(ProblemCode::status)
                 .isEqualTo(status);
@@ -88,7 +88,7 @@ class ProblemCodeTest {
             "consent-channel-unavailable", "import-not-simulated", "import-file-changed",
             "duplicate-payment-concept-code", "price-validity-overlap", "price-list-archived",
             "duplicate-tax-rate-code", "tax-rate-period-overlap", "plan-not-editable", "plan-without-items",
-            "duplicate-plan-item", "stale-version"})
+            "duplicate-plan-item", "plan-item-invalid", "accrual-run-in-progress", "stale-version"})
     void theTypeIsTheStableBaseFollowedByTheCodeAndNothingElse(String code) {
         ProblemCode problem = ProblemCode.ofCode(code).orElseThrow();
         assertThat(problem.type()).isEqualTo(URI.create("https://confia.hn/problems/" + code));

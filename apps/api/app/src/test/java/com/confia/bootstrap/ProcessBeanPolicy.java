@@ -245,7 +245,20 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // the configuration that declares them. No master key, no pepper, no request
                     // origin. Each is exact and contributes a bean.
                     "com.confia.identity.application", "com.confia.identity.infrastructure",
-                    "com.confia.identity.infrastructure.wiring"),
+                    "com.confia.identity.infrastructure.wiring",
+                    // The accrual of charges (docs/cortes/charges-accrual.md, ADR-0016), the only job that writes to
+                    // the ledger. A DELIBERATE change of this policy: until now charges and ledger were administrative
+                    // only. The worker holds the use case, the handler and the adapters of charges, the ledger it posts
+                    // through, and only the read-only directories (organization, students, catalog) the job consumes. The
+                    // controllers, the use cases of the registries and the adapters that hold a key or read a staff token
+                    // stay forbidden below. Each entry is exact and contributes a bean.
+                    "com.confia.charges.application", "com.confia.charges.infrastructure",
+                    "com.confia.charges.infrastructure.wiring",
+                    "com.confia.ledger.application", "com.confia.ledger.infrastructure",
+                    "com.confia.ledger.infrastructure.wiring",
+                    "com.confia.organization.infrastructure", "com.confia.organization.infrastructure.wiring",
+                    "com.confia.students.infrastructure", "com.confia.students.infrastructure.wiring",
+                    "com.confia.catalog.infrastructure", "com.confia.catalog.infrastructure.wiring"),
             forbidden("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     "com.confia.shared.crypto", WORKER_NO_COLUMN_KEY,
@@ -257,13 +270,18 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     TOKEN_PACKAGE, ADMIN_SIGNING_KEYS,
                     CSRF_PACKAGE, CSRF_REASON,
                     SESSION_PACKAGE, SESSION_COOKIE_REASON,
-                    "com.confia.organization", STAFF_INSTITUTION,
-                    "com.confia.students", ADMIN_MODULE,
+                    // Narrowed on purpose for the accrual job: the worker may hold the read-only directories and the
+                    // adapters of these modules, never their use cases, their controllers or their web wiring.
+                    "com.confia.organization.application", STAFF_INSTITUTION,
+                    "com.confia.organization.web", STAFF_INSTITUTION,
+                    "com.confia.students.application", ADMIN_MODULE,
+                    "com.confia.students.web", ADMIN_MODULE,
                     "com.confia.guardians", ADMIN_MODULE,
                     "com.confia.imports", ADMIN_MODULE,
-                    "com.confia.catalog", ADMIN_MODULE,
-                    "com.confia.charges", ADMIN_MODULE,
-                    "com.confia.ledger", ADMIN_MODULE,
+                    "com.confia.catalog.application", ADMIN_MODULE,
+                    "com.confia.catalog.web", ADMIN_MODULE,
+                    "com.confia.charges.web", ADMIN_MODULE,
+                    "com.confia.ledger.web", ADMIN_MODULE,
                     "com.confia.shared.observability.health",
                     "the worker serves no route; its health is a heartbeat file (WE100)"));
 
