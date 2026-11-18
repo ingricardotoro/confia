@@ -119,8 +119,9 @@ test.describe("the plans with the keyboard only", () => {
     await page.keyboard.press("Tab");
     await expect(dialog(page).getByLabel(/^Primer día del primer período/)).toBeFocused();
     await expectVisibleFocus(page);
-    await page.keyboard.type("01022026");
-    await expect(dialog(page).getByLabel(/^Primer día del primer período/)).toHaveValue("2026-02-01");
+    // Day and month are the same digits: the order of the segments of a date field follows the browser, not the page locale.
+    await page.keyboard.type("05052026");
+    await expect(dialog(page).getByLabel(/^Primer día del primer período/)).toHaveValue("2026-05-05");
     // The fields of a date are three stops and the button of its calendar a fourth, which the browser draws its own way
     // (it does not answer `:focus`), so from here only that the focus stays inside the dialog is checked until the buttons.
     const submit = dialog(page).getByRole("button", { name: "Agregar concepto" });
