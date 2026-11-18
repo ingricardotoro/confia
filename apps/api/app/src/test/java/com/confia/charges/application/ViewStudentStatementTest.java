@@ -7,6 +7,7 @@ import com.confia.catalog.application.directory.PaymentConceptDirectory;
 import com.confia.catalog.application.directory.PaymentConceptLabel;
 import com.confia.catalog.application.directory.PaymentConceptRef;
 import com.confia.charges.domain.ComputedCharge;
+import com.confia.charges.domain.IntegrityCheck;
 import com.confia.charges.domain.InvalidChargesValueException;
 import com.confia.charges.domain.ResourceNotFoundException;
 import com.confia.kernel.CurrencyCode;
@@ -245,6 +246,22 @@ class ViewStudentStatementTest {
 
         @Override
         public List<CurrencyTotals> totalsOfRun(InstitutionId institution, UUID runId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<ChargeForVoid> findForVoid(InstitutionId institution, UUID chargeId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Page<ChargeRow> listByStudent(InstitutionId institution, UUID studentId, ChargeFilter filter,
+                PageRequest page) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<IntegrityCheck.ChargeFact> integrityFacts(InstitutionId institution) {
             throw new UnsupportedOperationException();
         }
     }

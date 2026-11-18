@@ -4,7 +4,9 @@
  * INSIDE the database transaction of the caller, and {@link com.confia.ledger.application.api.LedgerAccountDirectory}, a
  * read-only view of the accounts of the chart, and {@link com.confia.ledger.application.api.LedgerStatementApi}, the
  * read-only derived statement of a student receivable sub-account that {@code charges} enriches with its charges
- * (docs/cortes/ledger-account-statement.md), with the plain types they take and answer (no type of the ledger domain
+ * (docs/cortes/ledger-account-statement.md), and {@link com.confia.ledger.application.api.LedgerIntegrityApi}, the read-only
+ * view of the postings of a source module that the nightly integrity check of {@code charges} compares with its charges
+ * (docs/cortes/charges-void-and-integrity.md), with the plain types they take and answer (no type of the ledger domain
  * crosses the boundary).
  *
  * <p><b>{@code @NamedInterface("api")}, and who consumes it</b> (ADR-0022: every new named interface names the real consumer

@@ -15,6 +15,7 @@ import com.confia.ledger.application.Page;
 import com.confia.ledger.application.StoredTransaction;
 import com.confia.ledger.application.StudentAccountRef;
 import com.confia.ledger.application.StudentCurrency;
+import com.confia.ledger.application.api.LedgerIntegrityApi;
 import com.confia.ledger.application.api.LedgerStatementApi;
 import com.confia.ledger.domain.AccountRef;
 import com.confia.ledger.domain.EntrySide;
@@ -314,6 +315,69 @@ public final class JooqLedgerRepository implements LedgerRepository {
 
     private static Money money(BigDecimal sum, CurrencyCode currency) {
         return sum == null ? Money.zero(currency) : MoneyColumns.toMoney(sum, currency.name());
+    }
+
+    @Override
+    public List<LedgerIntegrityApi.SourcePosting> postingsOfSource(InstitutionId institution, String sourceModule) {
+        Field<BigDecimal> debit = sideSum(EntrySide.DEBIT);
+        Field<BigDecimal> credit = sideSum(EntrySide.CREDIT);
+        return dsl.select(LEDGER_TRANSACTION.ID, LEDGER_TRANSACTION.KIND, LEDGER_TRANSACTION.SOURCE_REF_ID,
+                LEDGER_TRANSACTION.REVERSES_TRANSACTION_ID, LEDGER_ENTRY.CURRENCY, debit, credit)
+                .from(LEDGER_TRANSACTION)
+                .join(LEDGER_ENTRY).on(LEDGER_ENTRY.INSTITUTION_ID.eq(LEDGER_TRANSACTION.INSTITUTION_ID))
+                .and(LEDGER_ENTRY.TRANSACTION_ID.eq(LEDGER_TRANSACTION.ID))
+                .where(LEDGER_TRANSACTION.INSTITUTION_ID.eq(institution.value()))
+                .and(LEDGER_TRANSACTION.SOURCE_MODULE.eq(sourceModule))
+                .groupBy(LEDGER_TRANSACTION.ID, LEDGER_TRANSACTION.KIND, LEDGER_TRANSACTION.SOURCE_REF_ID,
+                        LEDGER_TRANSACTION.REVERSES_TRANSACTION_ID, LEDGER_ENTRY.CURRENCY)
+                .orderBy(LEDGER_TRANSACTION.ID)
+                .fetch(row -> new LedgerIntegrityApi.SourcePosting(row.get(LEDGER_TRANSACTION.ID),
+                        row.get(LEDGER_TRANSACTION.KIND), row.get(LEDGER_TRANSACTION.SOURCE_REF_ID),
+                        row.get(LEDGER_TRANSACTION.REVERSES_TRANSACTION_ID),
+                        MoneyColumns.toMoney(row.get(debit), row.get(LEDGER_ENTRY.CURRENCY)),
+                        MoneyColumns.toMoney(row.get(credit), row.get(LEDGER_ENTRY.CURRENCY))));
+    }
+
+    @Override
+    public List<LedgerIntegrityApi.UnbalancedTransaction> unbalancedTransactions(InstitutionId institution) {
+        Field<BigDecimal> debit = sideSum(EntrySide.DEBIT);
+        Field<BigDecimal> credit = sideSum(EntrySide.CREDIT);
+        return dsl.select(LEDGER_ENTRY.TRANSACTION_ID, LEDGER_ENTRY.CURRENCY, debit, credit)
+                .from(LEDGER_ENTRY)
+                .where(LEDGER_ENTRY.INSTITUTION_ID.eq(institution.value()))
+                .groupBy(LEDGER_ENTRY.TRANSACTION_ID, LEDGER_ENTRY.CURRENCY)
+                .having(debit.ne(credit))
+                .orderBy(LEDGER_ENTRY.TRANSACTION_ID)
+                .fetch(row -> new LedgerIntegrityApi.UnbalancedTransaction(row.get(LEDGER_ENTRY.TRANSACTION_ID),
+                        MoneyColumns.toMoney(row.get(debit), row.get(LEDGER_ENTRY.CURRENCY)),
+                        MoneyColumns.toMoney(row.get(credit), row.get(LEDGER_ENTRY.CURRENCY))));
+    }
+
+    @Override
+    public List<LedgerIntegrityApi.ReceivableMovement> receivableMovementOfSource(InstitutionId institution,
+            String sourceModule, java.util.Collection<String> kinds) {
+        Field<BigDecimal> debit = sideSum(EntrySide.DEBIT);
+        Field<BigDecimal> credit = sideSum(EntrySide.CREDIT);
+        return dsl.select(LEDGER_ENTRY.CURRENCY, debit, credit)
+                .from(LEDGER_ENTRY)
+                .join(LEDGER_TRANSACTION).on(LEDGER_TRANSACTION.INSTITUTION_ID.eq(LEDGER_ENTRY.INSTITUTION_ID))
+                .and(LEDGER_TRANSACTION.ID.eq(LEDGER_ENTRY.TRANSACTION_ID))
+                .where(LEDGER_ENTRY.INSTITUTION_ID.eq(institution.value()))
+                .and(LEDGER_TRANSACTION.SOURCE_MODULE.eq(sourceModule))
+                .and(LEDGER_TRANSACTION.KIND.in(kinds))
+                .and(LEDGER_ENTRY.STUDENT_ACCOUNT_ID.isNotNull())
+                .groupBy(LEDGER_ENTRY.CURRENCY)
+                .orderBy(LEDGER_ENTRY.CURRENCY)
+                .fetch(row -> new LedgerIntegrityApi.ReceivableMovement(
+                        CurrencyCode.valueOf(row.get(LEDGER_ENTRY.CURRENCY)),
+                        MoneyColumns.toMoney(row.get(debit), row.get(LEDGER_ENTRY.CURRENCY)),
+                        MoneyColumns.toMoney(row.get(credit), row.get(LEDGER_ENTRY.CURRENCY))));
+    }
+
+    /** The exact sum, computed by the database, of the entries of one side (zero when there is none). */
+    private static Field<BigDecimal> sideSum(EntrySide side) {
+        return DSL.coalesce(DSL.sum(DSL.when(LEDGER_ENTRY.SIDE.eq(side.name()), LEDGER_ENTRY.AMOUNT)),
+                BigDecimal.ZERO);
     }
 
     private static EntryView toView(Record row) {

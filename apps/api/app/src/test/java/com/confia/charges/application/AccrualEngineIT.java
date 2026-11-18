@@ -640,6 +640,11 @@ class AccrualEngineIT extends CommittingPostgresIntegrationTest {
             public List<LockedAccount> lockStudentAccounts(Actor actor, java.util.Collection<AccountKey> keys) {
                 return real.lockStudentAccounts(actor, keys);
             }
+
+            @Override
+            public Posted reverseCharge(Actor actor, ChargeReversal reversal) {
+                return real.reverseCharge(actor, reversal);
+            }
         };
         AccrualRunView run = request(env, "key-1", FEBRUARY, null);
 
@@ -679,6 +684,11 @@ class AccrualEngineIT extends CommittingPostgresIntegrationTest {
             @Override
             public List<LockedAccount> lockStudentAccounts(Actor actor, java.util.Collection<AccountKey> keys) {
                 return real.lockStudentAccounts(actor, keys);
+            }
+
+            @Override
+            public Posted reverseCharge(Actor actor, ChargeReversal reversal) {
+                return real.reverseCharge(actor, reversal);
             }
         };
         AccrualRunView run = request(env, "key-1", FEBRUARY, null);

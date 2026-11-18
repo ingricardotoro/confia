@@ -109,6 +109,8 @@ public enum ProblemCode {
     PLAN_WITHOUT_ITEMS("plan-without-items", 409),
     PLAN_ITEM_INVALID("plan-item-invalid", 409),
     ACCRUAL_RUN_IN_PROGRESS("accrual-run-in-progress", 409),
+    CHARGE_ALREADY_VOIDED("charge-already-voided", 409),
+    CHARGE_NOT_VOIDABLE("charge-not-voidable", 409),
     DUPLICATE_PLAN_ITEM("duplicate-plan-item", 409),
     DUPLICATE_ACCOUNT_CODE("duplicate-account-code", 409),
     ACCOUNT_IN_USE("account-in-use", 409),

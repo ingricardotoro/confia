@@ -45,7 +45,9 @@ public final class PermissionedEndpoints {
      * addition and the removal of its items {@code charges:update}, and the five routes of the chart of accounts: the
      * reads of the accounts need {@code ledger:read} and of the posting map {@code charges:read}, and the creation and
      * the edit of an account and the setting of the map {@code ledger:create}, which only the Super Administrator holds,
-     * and the statement of a student, which needs {@code charges:read}.
+     * and the statement of a student, which needs {@code charges:read}, and the five routes of cut 3b: the list of the
+     * charges of a student and the three reads of the integrity runs need {@code charges:read}, and the void of a charge
+     * {@code charges:void}.
      * A route of a later
      * change is added here, in the same commit as its controller.
      */
@@ -111,6 +113,16 @@ public final class PermissionedEndpoints {
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/accrual-runs/{runId}",
                 Permission.CHARGES_READ));
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/students/{studentId}/statement",
+                Permission.CHARGES_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/students/{studentId}/charges",
+                Permission.CHARGES_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/charges/{chargeId}/void",
+                Permission.CHARGES_VOID));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/integrity-runs",
+                Permission.CHARGES_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/integrity-runs/latest",
+                Permission.CHARGES_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/integrity-runs/{runId}",
                 Permission.CHARGES_READ));
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/posting-accounts",
                 Permission.CHARGES_READ));

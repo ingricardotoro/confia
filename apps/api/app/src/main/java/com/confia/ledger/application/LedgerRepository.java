@@ -63,6 +63,18 @@ public interface LedgerRepository {
     com.confia.ledger.application.api.LedgerStatementApi.Section statement(InstitutionId institution, UUID studentId,
             CurrencyCode currency, LocalDate from, LocalDate to, int page, int size);
 
+    /** Every transaction of the source module with the exact sums of its debits and credits (reads only). */
+    List<com.confia.ledger.application.api.LedgerIntegrityApi.SourcePosting> postingsOfSource(InstitutionId institution,
+            String sourceModule);
+
+    /** The transactions of the institution whose debits differ from their credits (reads only). */
+    List<com.confia.ledger.application.api.LedgerIntegrityApi.UnbalancedTransaction> unbalancedTransactions(
+            InstitutionId institution);
+
+    /** What the transactions of the source module debited and credited to student sub-accounts, by currency. */
+    List<com.confia.ledger.application.api.LedgerIntegrityApi.ReceivableMovement> receivableMovementOfSource(
+            InstitutionId institution, String sourceModule, Collection<String> kinds);
+
     /** Convenience for tests and callers that hold a collection. */
     default List<StudentCurrency> sorted(Collection<StudentCurrency> keys) {
         return keys.stream().distinct().sorted().toList();

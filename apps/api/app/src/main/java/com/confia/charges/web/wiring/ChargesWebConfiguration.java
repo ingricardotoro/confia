@@ -3,7 +3,12 @@ package com.confia.charges.web.wiring;
 import com.confia.charges.application.ManageAccrual;
 import com.confia.charges.application.ManageChargePlans;
 import com.confia.charges.application.ManagePostingAccounts;
+import com.confia.charges.application.ListStudentCharges;
+import com.confia.charges.application.ViewIntegrityRuns;
+import com.confia.charges.application.VoidCharge;
 import com.confia.charges.web.AccrualController;
+import com.confia.charges.web.ChargeController;
+import com.confia.charges.web.IntegrityController;
 import com.confia.charges.web.ChargePlanController;
 import com.confia.charges.web.PostingAccountController;
 import com.confia.charges.application.ViewStudentStatement;
@@ -31,6 +36,16 @@ public class ChargesWebConfiguration {
     @Bean
     AccrualController accrualController(ManageAccrual accrual) {
         return new AccrualController(accrual);
+    }
+
+    @Bean
+    ChargeController chargeController(VoidCharge voidCharge, ListStudentCharges listStudentCharges) {
+        return new ChargeController(voidCharge, listStudentCharges);
+    }
+
+    @Bean
+    IntegrityController integrityController(ViewIntegrityRuns runs) {
+        return new IntegrityController(runs);
     }
 
     @Bean

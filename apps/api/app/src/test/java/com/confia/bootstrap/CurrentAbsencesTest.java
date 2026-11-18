@@ -73,10 +73,11 @@ class CurrentAbsencesTest {
 
     /**
      * The one-time task and the eight recurring ones of the jobs change, plus the one-time accrual run task that the
-     * accrual cut registers (docs/cortes/charges-accrual.md; ADR-0016), and nothing else.
+     * accrual cut registers (docs/cortes/charges-accrual.md; ADR-0016) and the recurring integrity check of the charges
+     * (docs/cortes/charges-void-and-integrity.md), and nothing else.
      */
     private static final Set<String> THE_JOBS_OF_THIS_CHANGE = Set.of("identity.password-reset-issuance",
-            "charges.accrual-run",
+            "charges.accrual-run", "charges.integrity-check",
             "shared.audit-chain-verification-daily", "shared.audit-chain-verification-weekly",
             "identity.purge-password-reset-tokens", "identity.purge-refresh-tokens", "shared.purge-idempotency-keys",
             "identity.purge-login-backoff", "identity.purge-mfa-totp-backoff", "shared.queue-observation");
@@ -314,7 +315,7 @@ class CurrentAbsencesTest {
     @Test
     void theWorkerRegistersExactlyTheOneTimeTaskAndTheEightRecurringOnesOfThisChange() {
         assertThat(registryDifference(workerJobs)).as(BJ40_EXPIRES).isEmpty();
-        assertThat(workerJobs).as("non-vacuous").hasSize(10);
+        assertThat(workerJobs).as("non-vacuous").hasSize(11);
     }
 
     @Test
