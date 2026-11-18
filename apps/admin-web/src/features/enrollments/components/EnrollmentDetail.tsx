@@ -38,12 +38,12 @@ export function EnrollmentDetail({ state, onClose }: EnrollmentDetailProps) {
       title={t("enrollments.detail.title")}
       description={t("enrollments.detail.description")}
       footer={
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" size="sm" onClick={onClose}>
           {t("enrollments.detail.close")}
         </Button>
       }
     >
-      <div aria-live="polite" className="flex flex-col gap-4">
+      <div aria-live="polite" className="flex flex-col gap-3">
         {state.kind === "loading" ? (
           <div aria-busy="true" className="flex flex-col gap-3">
             <p className="sr-only">{t("enrollments.detail.loading")}</p>

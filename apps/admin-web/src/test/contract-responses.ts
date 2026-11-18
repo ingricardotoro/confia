@@ -1,10 +1,22 @@
 import { randomBytes } from "node:crypto";
 import {
   AcademicYearPageResponse,
+  AccrualPeriodResponse,
+  AccrualPreviewResponse,
+  AccrualRunDetailResponse,
+  AccrualRunPageResponse,
+  AccrualRunResponse,
+  StudentStatement,
+  StudentStatementLine,
+  StudentStatementSection,
   ConsentChangeResponse,
   GuardianConsentsResponse,
   AcademicYearResponse,
   AuthenticatedSessionResponse,
+  ChargePlanDetailResponse,
+  ChargePlanItemResponse,
+  ChargePlanPageResponse,
+  ChargePlanResponse,
   CurrentSessionResponse,
   EnrollmentPageResponse,
   EnrollmentResponse,
@@ -12,6 +24,10 @@ import {
   GradeResponse,
   GuardianPageResponse,
   GuardianResponse,
+  LedgerAccountPageResponse,
+  LedgerAccountResponse,
+  PostingAccountMapResponse,
+  PostingAccountResponse,
   ImportBatchPageResponse,
   ImportRunResponse,
   ModalityPageResponse,
@@ -22,6 +38,10 @@ import {
   PriceListItemResponse,
   PriceListPageResponse,
   PriceListResponse,
+  TaxRateDetailResponse,
+  TaxRatePageResponse,
+  TaxRatePeriodResponse,
+  TaxRateResponse,
   ProblemDetail,
   SecondFactorPendingResponse,
   SectionPageResponse,
@@ -32,6 +52,16 @@ import {
   StudentResponse,
   type AcademicYearResponseOutput,
   type AuthenticatedSessionResponseOutput,
+  type ChargePlanDetailResponseOutput,
+  type ChargePlanItemResponseOutput,
+  type AccrualPeriodResponseOutput,
+  type AccrualPreviewResponseOutput,
+  type AccrualRunItemResponseOutput,
+  type StudentStatementLineOutput,
+  type StudentStatementOutput,
+  type StudentStatementSectionOutput,
+  type AccrualRunResponseOutput,
+  type ChargePlanResponseOutput,
   type ConsentChangeResponseOutput,
   type ConsentEventResponseOutput,
   type ImportBatchResponseOutput,
@@ -43,12 +73,17 @@ import {
   type EnrollmentTransferResponseOutput,
   type GradeResponseOutput,
   type GuardianResponseOutput,
+  type LedgerAccountResponseOutput,
   type LinkedStudentResponseOutput,
+  type PostingAccountResponseOutput,
   type ModalityResponseOutput,
   type PaymentConceptResponseOutput,
   type PriceListDetailResponseOutput,
   type PriceListItemResponseOutput,
   type PriceListResponseOutput,
+  type TaxRateDetailResponseOutput,
+  type TaxRatePeriodResponseOutput,
+  type TaxRateResponseOutput,
   type SecondFactorPendingResponseOutput,
   type SectionResponseOutput,
   type StudentEnrollmentResponseOutput,
@@ -665,4 +700,360 @@ export function priceListDetailRecord(row: unknown): ContractResponse {
 /** The 201 of a new price. */
 export function priceListItemRecord(row: unknown): ContractResponse {
   return { status: 201, body: checked("price list item", PriceListItemResponse, row), contentType: JSON_TYPE };
+}
+
+// The catalog cut of the tax rates. A percentage is a string with four decimals, as the server sends it; the values the
+// tests give are fictitious, and nothing here is a rate that any institution uses.
+export function taxRate(override: Partial<TaxRateResponseOutput> = {}): TaxRateResponseOutput {
+  return checked("TaxRateResponse", TaxRateResponse, {
+    id: crypto.randomUUID(),
+    code: "IMP-A",
+    name: "Impuesto de prueba A",
+    version: 0,
+    ...stamped,
+    ...override,
+  });
+}
+
+/** One validity of a tax rate: a percentage as text and its dates (`validTo` null while it is open). */
+export function taxRatePeriod(override: Partial<TaxRatePeriodResponseOutput> = {}): TaxRatePeriodResponseOutput {
+  return checked("TaxRatePeriodResponse", TaxRatePeriodResponse, {
+    id: crypto.randomUUID(),
+    taxRateId: "00000000-0000-4000-8000-000000000c01",
+    ratePercent: "12.3400",
+    validFrom: "2027-01-01",
+    validTo: null,
+    createdAt: STAMP,
+    ...override,
+  });
+}
+
+/** The tax rate with all its validities, as `GET /tax-rates/{id}` answers. */
+export function taxRateDetail(override: Partial<TaxRateDetailResponseOutput> = {}): TaxRateDetailResponseOutput {
+  return checked("TaxRateDetailResponse", TaxRateDetailResponse, { ...taxRate(), periods: [], ...override });
+}
+
+export function taxRatePage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("tax rates page", TaxRatePageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The tax rate a create (201) or an edit (200) answers with. */
+export function taxRateRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("tax rate record", TaxRateResponse, row), contentType: JSON_TYPE };
+}
+
+export function taxRateDetailRecord(row: unknown): ContractResponse {
+  return { status: 200, body: checked("tax rate detail", TaxRateDetailResponse, row), contentType: JSON_TYPE };
+}
+
+/** The 201 of a new validity. */
+export function taxRatePeriodRecord(row: unknown): ContractResponse {
+  return { status: 201, body: checked("tax rate period", TaxRatePeriodResponse, row), contentType: JSON_TYPE };
+}
+
+// The charges cut of the plans. A plan holds no price and no amount: it names who it covers, how often, and which concepts.
+export function chargePlan(override: Partial<ChargePlanResponseOutput> = {}): ChargePlanResponseOutput {
+  return checked("ChargePlanResponse", ChargePlanResponse, {
+    id: crypto.randomUUID(),
+    academicYearId: "00000000-0000-4000-8000-000000001030",
+    name: "Primaria 2027",
+    targetScope: "GRADE",
+    targetRefId: "00000000-0000-4000-8000-000000003001",
+    frequency: "MONTHLY",
+    dueDayOfMonth: 5,
+    status: "DRAFT",
+    version: 0,
+    createdAt: STAMP,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+/** One item of a plan: a concept, how many periods it accrues and the first day of the first one. */
+export function chargePlanItem(override: Partial<ChargePlanItemResponseOutput> = {}): ChargePlanItemResponseOutput {
+  return checked("ChargePlanItemResponse", ChargePlanItemResponse, {
+    id: crypto.randomUUID(),
+    planId: "00000000-0000-4000-8000-000000000c01",
+    paymentConceptId: "00000000-0000-4000-8000-000000007001",
+    periodsCount: 10,
+    firstPeriodOn: "2027-02-01",
+    createdAt: STAMP,
+    ...override,
+  });
+}
+
+/** The plan with its items, as `GET /plans/{id}` answers. */
+export function chargePlanDetail(override: Partial<ChargePlanDetailResponseOutput> = {}): ChargePlanDetailResponseOutput {
+  return checked("ChargePlanDetailResponse", ChargePlanDetailResponse, { ...chargePlan(), items: [], ...override });
+}
+
+export function chargePlanPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("charge plans page", ChargePlanPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The plan a create (201) or an edit (200) answers with. */
+export function chargePlanRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("charge plan record", ChargePlanResponse, row), contentType: JSON_TYPE };
+}
+
+export function chargePlanDetailRecord(row: unknown): ContractResponse {
+  return { status: 200, body: checked("charge plan detail", ChargePlanDetailResponse, row), contentType: JSON_TYPE };
+}
+
+/** The 201 of a new item. */
+export function chargePlanItemRecord(row: unknown): ContractResponse {
+  return { status: 201, body: checked("charge plan item", ChargePlanItemResponse, row), contentType: JSON_TYPE };
+}
+
+// The accrual engine (charges-accrual cut). The amounts are strings the server already rounded: a test never computes one.
+const MONEY = (amount: string) => ({ amount, currency: "HNL" });
+
+/** One run, as the API answers it. */
+export function accrualRun(override: Partial<AccrualRunResponseOutput> = {}): AccrualRunResponseOutput {
+  return checked("AccrualRunResponse", AccrualRunResponse, {
+    id: crypto.randomUUID(),
+    planId: "00000000-0000-4000-8000-000000000c01",
+    periodStart: "2027-02-01",
+    status: "COMPLETED",
+    previewChecked: true,
+    queuedAt: STAMP,
+    startedAt: STAMP,
+    finishedAt: STAMP,
+    studentsEvaluated: 2,
+    chargesCreated: 2,
+    chargesExisting: 0,
+    chargesFailed: 0,
+    ...override,
+  });
+}
+
+/** One period of a plan, with its last run when it has one. */
+export function accrualPeriod(override: Partial<AccrualPeriodResponseOutput> = {}): AccrualPeriodResponseOutput {
+  return checked("AccrualPeriodResponse", AccrualPeriodResponse, {
+    periodStart: "2027-02-01",
+    label: "2027-02",
+    dueOn: "2027-02-05",
+    paymentConceptIds: ["00000000-0000-4000-8000-000000007001"],
+    ...override,
+  });
+}
+
+export function accrualPeriodsRecord(periods: readonly unknown[]): ContractResponse {
+  return { status: 200, body: periods.map((period) => checked("accrual period", AccrualPeriodResponse, period)), contentType: JSON_TYPE };
+}
+
+/** One row of a preview or of a run: the amounts are present only for a charge to create. */
+export function accrualPreviewItem(override: Partial<AccrualPreviewResponseOutput["items"][number]> = {}): AccrualPreviewResponseOutput["items"][number] {
+  return {
+    studentId: "00000000-0000-4000-8000-000000005001",
+    paymentConceptId: "00000000-0000-4000-8000-000000007001",
+    outcome: "CREATED",
+    base: MONEY("1500.00"),
+    tax: MONEY("225.00"),
+    total: MONEY("1725.00"),
+    ...override,
+  };
+}
+
+/** What a preview answers: two charges to create and one error by default. */
+export function accrualPreview(override: Partial<AccrualPreviewResponseOutput> = {}): AccrualPreviewResponseOutput {
+  return checked("AccrualPreviewResponse", AccrualPreviewResponse, {
+    planId: "00000000-0000-4000-8000-000000000c01",
+    periodStart: "2027-02-01",
+    studentsEvaluated: 3,
+    toCreate: 2,
+    alreadyAccrued: 0,
+    alreadyAccruedOtherPlan: 0,
+    errors: 1,
+    totals: [{ currency: "HNL", charges: 2, base: MONEY("3000.00"), tax: MONEY("450.00"), total: MONEY("3450.00") }],
+    errorsByCode: { NO_PRICE: 1 },
+    items: [
+      accrualPreviewItem({ studentId: "00000000-0000-4000-8000-000000005001" }),
+      accrualPreviewItem({ studentId: "00000000-0000-4000-8000-000000005002" }),
+      { studentId: "00000000-0000-4000-8000-000000005003", paymentConceptId: "00000000-0000-4000-8000-000000007001", outcome: "ERROR", errorCode: "NO_PRICE" },
+    ],
+    itemsTruncated: false,
+    blockers: [],
+    previewDigest: "a".repeat(64),
+    ...override,
+  });
+}
+
+export function accrualPreviewRecord(row: unknown): ContractResponse {
+  return { status: 200, body: checked("accrual preview", AccrualPreviewResponse, row), contentType: JSON_TYPE };
+}
+
+/** The 202 of a request: the run, queued. */
+export function accrualRunRecord(row: unknown, status: 200 | 202 = 202): ContractResponse {
+  return { status, body: checked("accrual run", AccrualRunResponse, row), contentType: JSON_TYPE };
+}
+
+export function accrualRunItem(override: Partial<AccrualRunItemResponseOutput> = {}): AccrualRunItemResponseOutput {
+  return {
+    studentId: "00000000-0000-4000-8000-000000005001",
+    paymentConceptId: "00000000-0000-4000-8000-000000007001",
+    outcome: "CREATED",
+    chargeId: "00000000-0000-4000-8000-000000008001",
+    ...override,
+  };
+}
+
+export function accrualRunPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("accrual runs page", AccrualRunPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+export function accrualRunDetailRecord(
+  run: unknown,
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("accrual run detail", AccrualRunDetailResponse, {
+    run,
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    totalItems: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+// The chart of accounts and the map of posting accounts (ledger-chart-of-accounts cut). The codes and names are fictitious.
+export function ledgerAccount(override: Partial<LedgerAccountResponseOutput> = {}): LedgerAccountResponseOutput {
+  return checked("LedgerAccountResponse", LedgerAccountResponse, {
+    id: crypto.randomUUID(),
+    code: "ACT-01",
+    name: "Cuentas por cobrar de prueba",
+    type: "ASSET",
+    holdsStudentBalances: true,
+    active: true,
+    version: 0,
+    createdAt: STAMP,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+/** One page of accounts, as the server serves it: `total` counts every page, `items` only this one. */
+export function ledgerAccountPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("ledger accounts page", LedgerAccountPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The account a create (201) or an edit (200) answers with. */
+export function ledgerAccountRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("ledger account record", LedgerAccountResponse, row), contentType: JSON_TYPE };
+}
+
+/** One row of the map of posting accounts. */
+export function postingAccount(override: Partial<PostingAccountResponseOutput> = {}): PostingAccountResponseOutput {
+  return checked("PostingAccountResponse", PostingAccountResponse, {
+    id: crypto.randomUUID(),
+    purpose: "RECEIVABLE",
+    conceptCategory: null,
+    ledgerAccountId: crypto.randomUUID(),
+    version: 0,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+/** The map as `GET` and `PUT /charges/posting-accounts` answer it: the rows that were ever set. */
+export function postingAccountMap(items: readonly unknown[]): ContractResponse {
+  return { status: 200, body: checked("posting account map", PostingAccountMapResponse, { items }), contentType: JSON_TYPE };
+}
+
+// The statement of account of a student (ledger-account-statement cut). Every figure is the string a server would send; the
+// fixtures hold values chosen by hand and never compute one (the running balance of a line is typed, not summed).
+const ZERO_HNL = { amount: "0.00", currency: "HNL" };
+
+export function statementLine(override: Partial<StudentStatementLineOutput> = {}): StudentStatementLineOutput {
+  return checked("StudentStatementLine", StudentStatementLine, {
+    transactionId: "00000000-0000-4000-8000-00000000a001",
+    kind: "CHARGE",
+    effectiveOn: "2027-02-01",
+    postedAt: STAMP,
+    lineNumber: 1,
+    debit: { amount: "1500.00", currency: "HNL" },
+    credit: ZERO_HNL,
+    balance: { amount: "1500.00", currency: "HNL" },
+    charge: {
+      chargeId: "00000000-0000-4000-8000-00000000b001",
+      paymentConceptId: "00000000-0000-4000-8000-000000007001",
+      conceptCode: "COL",
+      conceptName: "Colegiatura",
+      conceptCategory: "TUITION",
+      periodLabel: "2027-02",
+      periodStart: "2027-02-01",
+      periodEnd: "2027-02-28",
+      dueOn: "2027-02-10",
+      origin: "AUTOMATIC",
+    },
+    ...override,
+  });
+}
+
+export function statementSection(override: Partial<StudentStatementSectionOutput> = {}): StudentStatementSectionOutput {
+  const lines = override.lines ?? [statementLine()];
+  return checked("StudentStatementSection", StudentStatementSection, {
+    currency: "HNL",
+    openingBalance: ZERO_HNL,
+    closingBalance: { amount: "1500.00", currency: "HNL" },
+    totalLines: lines.length,
+    page: 0,
+    size: 25,
+    lines,
+    ...override,
+  });
+}
+
+export function studentStatement(override: Partial<StudentStatementOutput> = {}): StudentStatementOutput {
+  return checked("StudentStatement", StudentStatement, {
+    studentId: "00000000-0000-4000-8000-000000005001",
+    studentCode: "E-000001",
+    firstName: "Ana",
+    lastName: "Aguilar",
+    from: "2026-11-17",
+    to: "2027-11-16",
+    sections: [statementSection()],
+    ...override,
+  });
+}
+
+export function statementRecord(body: StudentStatementOutput = studentStatement()): ContractResponse {
+  return { status: 200, body, contentType: JSON_TYPE };
 }

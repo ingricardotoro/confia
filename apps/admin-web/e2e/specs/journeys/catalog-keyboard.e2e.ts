@@ -61,6 +61,13 @@ test.describe("the payment concepts with the keyboard only", () => {
     await expect(dialog(page).getByRole("checkbox", { name: "Gravado" })).toBeFocused();
     await page.keyboard.press("Space");
     await expect(dialog(page).getByRole("checkbox", { name: "Gravado" })).toBeChecked();
+    // A taxable concept names its rate: the field comes right after the checkbox, and an arrow key chooses the first active rate.
+    await expect(dialog(page).getByLabel(/^Tasa de impuesto/).locator("option", { hasText: "IMP-A — Impuesto de prueba A" })).toBeAttached();
+    await page.keyboard.press("Tab");
+    await expect(dialog(page).getByLabel(/^Tasa de impuesto/)).toBeFocused();
+    await expectVisibleFocus(page);
+    await page.keyboard.press("ArrowDown");
+    await expect(dialog(page).getByLabel(/^Tasa de impuesto/)).toHaveValue("00000000-0000-4000-8000-000000006001");
     await page.keyboard.press("Tab");
     await expect(dialog(page).getByRole("button", { name: "Cancelar" })).toBeFocused();
     await page.keyboard.press("Tab");

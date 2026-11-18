@@ -2,6 +2,10 @@ package com.confia.bootstrap.admin;
 
 import com.confia.catalog.infrastructure.wiring.CatalogConfiguration;
 import com.confia.catalog.web.wiring.CatalogWebConfiguration;
+import com.confia.charges.infrastructure.wiring.ChargesConfiguration;
+import com.confia.charges.web.wiring.ChargesWebConfiguration;
+import com.confia.ledger.infrastructure.wiring.LedgerConfiguration;
+import com.confia.ledger.web.wiring.LedgerWebConfiguration;
 import com.confia.guardians.infrastructure.wiring.GuardiansConfiguration;
 import com.confia.guardians.web.wiring.GuardiansWebConfiguration;
 import com.confia.identity.infrastructure.wiring.IdentityConfiguration;
@@ -96,7 +100,8 @@ import org.springframework.context.annotation.Import;
         StudentsConfiguration.class, StudentsWebConfiguration.class, EnrollmentsConfiguration.class,
         EnrollmentsWebConfiguration.class, GuardiansConfiguration.class, GuardiansWebConfiguration.class,
         ImportsConfiguration.class, ImportsWebConfiguration.class,
-        CatalogConfiguration.class, CatalogWebConfiguration.class,
+        CatalogConfiguration.class, CatalogWebConfiguration.class, ChargesConfiguration.class,
+        ChargesWebConfiguration.class, LedgerConfiguration.class, LedgerWebConfiguration.class,
         WebEdgeConfiguration.class, AdminSecurityConfiguration.class,
         ObservabilityMetricsConfiguration.class, RateLimiterConfiguration.class,
         ThrottlingConfiguration.class, RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,

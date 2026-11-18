@@ -38,3 +38,17 @@ export const priceListsSearch = z.object({
 });
 
 export type PriceListsSearch = z.infer<typeof priceListsSearch>;
+
+/**
+ * The search of the tax rates: the common parameters, the one filter the API takes (`active`) and the sort fields it
+ * accepts. A parameter that does not hold is dropped.
+ */
+export const taxRatesSearch = z.object({
+  page,
+  pageSize,
+  sort: sortOf(["code", "name"]),
+  // A boolean: the router reads the address as JSON, so `active=false` arrives as `false`.
+  active: z.boolean().optional().catch(undefined),
+});
+
+export type TaxRatesSearch = z.infer<typeof taxRatesSearch>;

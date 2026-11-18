@@ -22,6 +22,10 @@ export interface ResourceFormDialogProps {
   readonly submitLabel: string;
   readonly form: ResourceFormView;
   readonly onClose: () => void;
+  /** Width of the dialog by purpose; a form of short fields keeps the default. */
+  readonly size?: "sm" | "md" | "lg";
+  /** The colour of the submit button follows its action: the brand blue by default, red for an irreversible one, green for a positive state change. */
+  readonly submitVariant?: "primary" | "destructive" | "success";
   /** The fields, in one column. */
   readonly children: ReactNode;
 }
@@ -37,6 +41,8 @@ export function ResourceFormDialog({
   submitLabel,
   form: { summary, alert, countdown, liveMessage, submitting, summaryRef, alertRef, onSubmit },
   onClose,
+  size = "md",
+  submitVariant = "primary",
   children,
 }: ResourceFormDialogProps) {
   const { t } = useAdminText();
@@ -48,20 +54,21 @@ export function ResourceFormDialog({
       onOpenChange={(open) => {
         if (!open && !submitting) onClose();
       }}
+      size={size}
       title={title}
       description={description}
       footer={
         <>
-          <Button variant="secondary" disabled={submitting} onClick={onClose}>
+          <Button variant="secondary" size="sm" disabled={submitting} onClick={onClose}>
             {t("resource.cancel")}
           </Button>
-          <Button type="submit" form={formId} loading={submitting}>
+          <Button type="submit" size="sm" variant={submitVariant} form={formId} loading={submitting}>
             {submitLabel}
           </Button>
         </>
       }
     >
-      <form id={formId} noValidate onSubmit={onSubmit} className="flex flex-col gap-4">
+      <form id={formId} noValidate onSubmit={onSubmit} className="flex flex-col gap-3">
         <FormErrorSummary ref={summaryRef} errors={summary} />
         {alert === undefined ? null : (
           <Alert ref={alertRef} variant="destructive">

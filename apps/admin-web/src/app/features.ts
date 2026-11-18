@@ -1,7 +1,9 @@
 import { catalogFeature } from "../features/catalog/feature.tsx";
+import { chargesFeature } from "../features/charges/feature.tsx";
 import { enrollmentsFeature } from "../features/enrollments/feature.tsx";
 import { guardiansFeature } from "../features/guardians/feature.tsx";
 import { importsFeature } from "../features/imports/feature.tsx";
+import { ledgerFeature } from "../features/ledger/feature.tsx";
 import { organizationFeature } from "../features/organization/feature.tsx";
 import { studentsFeature } from "../features/students/feature.tsx";
 import type { FeatureModule } from "../shared/navigation/navigation-entry.ts";
@@ -13,8 +15,10 @@ import type { FeatureModule } from "../shared/navigation/navigation-entry.ts";
 export const FEATURES: readonly FeatureModule[] = [
   organizationFeature,
   catalogFeature,
+  chargesFeature,
   studentsFeature,
   enrollmentsFeature,
   guardiansFeature,
   importsFeature,
+  ledgerFeature,
 ];

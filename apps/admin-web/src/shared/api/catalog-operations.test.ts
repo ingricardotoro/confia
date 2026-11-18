@@ -11,9 +11,30 @@ import {
   priceListPage,
   priceListRecord,
   problem,
+  taxRate,
+  taxRateDetail,
+  taxRateDetailRecord,
+  taxRatePage,
+  taxRatePeriod,
+  taxRatePeriodRecord,
+  taxRateRecord,
 } from "../../test/contract-responses.ts";
 import { installMswServer, requests, route } from "../../test/msw-server.ts";
-import { addPrice, createPaymentConcept, createPriceList, getPriceList, listPaymentConcepts, listPriceLists, updatePaymentConcept, updatePriceList } from "./catalog-operations.ts";
+import {
+  addPrice,
+  addTaxRatePeriod,
+  createPaymentConcept,
+  createPriceList,
+  createTaxRate,
+  getPriceList,
+  getTaxRate,
+  listPaymentConcepts,
+  listPriceLists,
+  listTaxRates,
+  updatePaymentConcept,
+  updatePriceList,
+  updateTaxRate,
+} from "./catalog-operations.ts";
 
 // The three operations of /api/v1/catalog/payment-concepts over the real transport and the test server: the path,
 // the query, the bearer token and the body of each, and the schema each answer must meet. None moves money, so none
@@ -209,5 +230,87 @@ describe("the price lists", () => {
       kind: "problem",
       problem: { status, code },
     });
+  });
+});
+
+describe("the tax rates", () => {
+  const RATES = "/api/v1/catalog/tax-rates";
+
+  it("lists with page, size, sort and the active filter as query parameters, and leaves out the filter that is not set", async () => {
+    route("get", RATES, taxRatePage([taxRate()]));
+
+    const result = await listTaxRates("tok-1", { page: 2, size: 50, sort: "name,desc", active: "true" });
+
+    expect(result.kind).toBe("ok");
+    const [sent] = requests();
+    expect(sent?.path).toBe(RATES);
+    expect(Object.fromEntries(new URLSearchParams(sent?.search))).toEqual({ page: "2", size: "50", sort: "name,desc", active: "true" });
+    expect(sent?.headers.get("Authorization")).toBe("Bearer tok-1");
+    expect(sent?.headers.has("Idempotency-Key")).toBe(false);
+    await listTaxRates("tok-1", { page: 0, size: 25, active: undefined });
+    expect(requests()[1]?.search).toBe("?page=0&size=25");
+  });
+
+  it("POSTs a rate with its code and name only, and reads the 201", async () => {
+    route("post", RATES, taxRateRecord(taxRate({ code: "IMP-B" }), 201));
+
+    const result = await createTaxRate("tok", { code: "IMP-B", name: "Impuesto B" });
+
+    expect(result.kind).toBe("ok");
+    expect(JSON.parse(requests()[0]?.body ?? "{}")).toEqual({ code: "IMP-B", name: "Impuesto B" });
+    expect(requests()[0]?.headers.has("Idempotency-Key")).toBe(false);
+  });
+
+  it("GETs one rate with its validities, each percentage still as text", async () => {
+    const rate = taxRateDetail({ id: ID, periods: [taxRatePeriod({ ratePercent: "7.5000", validTo: "2026-12-31" }), taxRatePeriod()] });
+    route("get", `${RATES}/${ID}`, taxRateDetailRecord(rate));
+
+    const result = await getTaxRate("tok", ID);
+
+    expect(result).toMatchObject({ kind: "ok", data: { periods: [{ ratePercent: "7.5000" }, { ratePercent: "12.3400" }] } });
+  });
+
+  it("answers a validity whose percentage is a JSON number as an unexpected response", async () => {
+    route("get", `${RATES}/${ID}`, {
+      status: 200,
+      body: { ...taxRateDetail({ id: ID }), periods: [{ ...taxRatePeriod(), ratePercent: 12.34 }] },
+      contentType: "application/json",
+    });
+
+    expect(await getTaxRate("tok", ID)).toEqual({ kind: "unexpected-response", status: 200 });
+  });
+
+  it("PUTs the name, the state and the version to its own id, with the id encoded", async () => {
+    route("put", `${RATES}/${ID}`, taxRateRecord(taxRate({ id: ID, isActive: false, version: 3 })));
+
+    const result = await updateTaxRate("tok", ID, { version: 2, name: "Impuesto A", isActive: false });
+
+    expect(result.kind).toBe("ok");
+    expect(requests()[0]?.method).toBe("PUT");
+    expect(JSON.parse(requests()[0]?.body ?? "{}")).toEqual({ version: 2, name: "Impuesto A", isActive: false });
+    expect(requests()[0]?.path).toBe(`${RATES}/${ID}`);
+  });
+
+  it("POSTs a validity to the periods of its rate with the percentage as the text it was typed, and reads the 201", async () => {
+    route("post", `${RATES}/${ID}/periods`, taxRatePeriodRecord(taxRatePeriod({ taxRateId: ID })));
+
+    const result = await addTaxRatePeriod("tok", ID, { ratePercent: "12.34", validFrom: "2027-01-01" });
+
+    expect(result.kind).toBe("ok");
+    expect(requests()[0]?.method).toBe("POST");
+    expect(requests()[0]?.path).toBe(`${RATES}/${ID}/periods`);
+    expect(JSON.parse(requests()[0]?.body ?? "{}")).toEqual({ ratePercent: "12.34", validFrom: "2027-01-01" });
+    expect(requests()[0]?.headers.has("Idempotency-Key")).toBe(false);
+  });
+
+  it("answers an overlap and a repeated code as problems with their codes", async () => {
+    route("post", `${RATES}/${ID}/periods`, problem("tax-rate-period-overlap", 409));
+    route("post", RATES, problem("duplicate-tax-rate-code", 409));
+
+    expect(await addTaxRatePeriod("tok", ID, { ratePercent: "1", validFrom: "2027-01-01" })).toMatchObject({
+      kind: "problem",
+      problem: { status: 409, code: "tax-rate-period-overlap" },
+    });
+    expect(await createTaxRate("tok", { code: "X", name: "X" })).toMatchObject({ kind: "problem", problem: { code: "duplicate-tax-rate-code" } });
   });
 });

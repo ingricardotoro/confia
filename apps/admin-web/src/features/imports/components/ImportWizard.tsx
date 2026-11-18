@@ -43,7 +43,7 @@ function Count({ label, value }: { readonly label: string; readonly value: numbe
   return (
     <div className="flex flex-col gap-0.5 rounded-md border border-border-subtle p-3">
       <dt className="text-sm text-text-secondary">{label}</dt>
-      <dd className="text-2xl font-semibold tabular-nums text-text-primary">{NUMBERS.format(value)}</dd>
+      <dd className="text-xl font-semibold tabular-nums text-text-primary">{NUMBERS.format(value)}</dd>
     </div>
   );
 }
@@ -139,7 +139,7 @@ export function ImportWizard(props: ImportWizardProps) {
 
   return (
     <section aria-labelledby="imports-heading" aria-busy={busy} className="flex flex-col gap-4">
-      <h2 id="imports-heading" className="text-xl font-semibold text-text-primary">
+      <h2 id="imports-heading" className="text-base font-semibold text-text-primary">
         {t("imports.heading")}
       </h2>
       <p className="text-sm text-text-secondary">{t("imports.intro")}</p>
@@ -156,7 +156,7 @@ export function ImportWizard(props: ImportWizardProps) {
           </ul>
           {failure.traceId === undefined ? null : <p className="mt-1">{t("resource.trace", { traceId: failure.traceId })}</p>}
           {failure.kind === "other" ? null : (
-            <Button variant="secondary" size="sm" className="mt-2" loading={phase === "simulating"} onClick={props.onSimulate}>
+            <Button variant="secondary" size="xs" className="mt-2" loading={phase === "simulating"} onClick={props.onSimulate}>
               {t("imports.failed.simulateAgain")}
             </Button>
           )}
@@ -165,7 +165,7 @@ export function ImportWizard(props: ImportWizardProps) {
 
       {result !== undefined ? (
         <section aria-labelledby="imports-result-heading" className="flex flex-col gap-3">
-          <h3 id="imports-result-heading" ref={resultRef} tabIndex={-1} className="text-lg font-semibold text-text-primary">
+          <h3 id="imports-result-heading" ref={resultRef} tabIndex={-1} className="text-base font-semibold text-text-primary">
             {t("imports.result.heading")}
           </h3>
           <Alert variant="info">
@@ -179,7 +179,7 @@ export function ImportWizard(props: ImportWizardProps) {
           </dl>
           {result.rejections.length === 0 ? null : (
             <div className="flex flex-col gap-3">
-              <h4 className="text-base font-semibold text-text-primary">{t("imports.result.rejectionsHeading")}</h4>
+              <h4 className="text-sm font-semibold text-text-primary">{t("imports.result.rejectionsHeading")}</h4>
               <p className="text-sm text-text-secondary">{t(`imports.kinds.${kind}.resultRejections`)}</p>
               {result.rejectionsTruncated ? <Alert variant="warning">{t("imports.rejections.truncated")}</Alert> : null}
               <RejectionsTable
@@ -190,7 +190,7 @@ export function ImportWizard(props: ImportWizardProps) {
                 navigation={t("imports.result.rejectionsNavigation")}
               />
               <div>
-                <Button variant="secondary" onClick={props.onDownloadRejections}>
+                <Button variant="secondary" size="sm" onClick={props.onDownloadRejections}>
                   {t("imports.rejections.download")}
                 </Button>
               </div>
@@ -198,7 +198,7 @@ export function ImportWizard(props: ImportWizardProps) {
           )}
           <p className="text-sm text-text-secondary">{t(`imports.kinds.${kind}.resultNext`)}</p>
           <div>
-            <Button onClick={props.onReset}>{t("imports.result.another")}</Button>
+            <Button size="sm" onClick={props.onReset}>{t("imports.result.another")}</Button>
           </div>
         </section>
       ) : (
@@ -240,10 +240,10 @@ export function ImportWizard(props: ImportWizardProps) {
               )}
             </FormField>
             <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit" loading={phase === "simulating"} disabled={phase === "applying"}>
+              <Button type="submit" size="sm" loading={phase === "simulating"} disabled={phase === "applying"}>
                 {t("imports.simulate")}
               </Button>
-              <Button type="button" variant="secondary" onClick={props.onTemplate}>
+              <Button type="button" size="sm" variant="secondary" onClick={props.onTemplate}>
                 {t("imports.template")}
               </Button>
             </div>
@@ -251,7 +251,7 @@ export function ImportWizard(props: ImportWizardProps) {
 
           {simulation === undefined ? null : (
             <section aria-labelledby="imports-summary-heading" className="flex flex-col gap-3 border-t border-border-subtle pt-4">
-              <h3 id="imports-summary-heading" ref={summaryRef} tabIndex={-1} className="text-lg font-semibold text-text-primary">
+              <h3 id="imports-summary-heading" ref={summaryRef} tabIndex={-1} className="text-base font-semibold text-text-primary">
                 {t("imports.summary.heading")}
               </h3>
               <p className="text-sm text-text-secondary">{t(`imports.kinds.${kind}.summaryDescription`)}</p>
@@ -276,7 +276,7 @@ export function ImportWizard(props: ImportWizardProps) {
                     navigation={t("imports.rejections.navigation")}
                   />
                   <div>
-                    <Button variant="secondary" onClick={props.onDownloadRejections}>
+                    <Button variant="secondary" size="sm" onClick={props.onDownloadRejections}>
                       {t("imports.rejections.download")}
                     </Button>
                   </div>
@@ -284,7 +284,7 @@ export function ImportWizard(props: ImportWizardProps) {
               )}
               {simulation.batch.validRows > 0 ? (
                 <div>
-                  <Button onClick={props.onOpenApply}>{t("imports.apply.action")}</Button>
+                  <Button size="sm" onClick={props.onOpenApply}>{t("imports.apply.action")}</Button>
                 </div>
               ) : (
                 <Alert variant="warning" title={t("imports.noRows.title")}>
@@ -306,17 +306,17 @@ export function ImportWizard(props: ImportWizardProps) {
           description={t(`imports.kinds.${kind}.dialogDescription`)}
           footer={
             <>
-              <Button variant="secondary" disabled={phase === "applying"} onClick={props.onCloseApply}>
+              <Button variant="secondary" size="sm" disabled={phase === "applying"} onClick={props.onCloseApply}>
                 {t("imports.apply.cancel")}
               </Button>
-              <Button loading={phase === "applying"} onClick={props.onApply}>
+              <Button size="sm" loading={phase === "applying"} onClick={props.onApply}>
                 {t(`imports.kinds.${kind}.confirm`, { count: simulation.batch.validRows })}
               </Button>
             </>
           }
         >
           <div className="flex flex-col gap-2">
-            <p className="text-lg font-semibold text-text-primary">{t(`imports.kinds.${kind}.willCreate`, { count: simulation.batch.validRows })}</p>
+            <p className="text-base font-semibold text-text-primary">{t(`imports.kinds.${kind}.willCreate`, { count: simulation.batch.validRows })}</p>
             <p className="text-sm text-text-secondary">
               {t("imports.apply.notCreated", { rejected: simulation.batch.rejectedRows, skipped: simulation.batch.skippedRows })}
             </p>

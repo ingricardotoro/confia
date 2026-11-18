@@ -40,6 +40,26 @@ export async function checkCombination(
       `The expected content of ${combination.route} [${combination.state}] did not appear within ${String(timeout)} ms; the gate does not analyze a state it did not reach.`,
     );
   }
+  if (combination.opensDialog === true) await isolateDialogFromPage(page);
   const outcome = await new AxeBuilder({ page }).withTags([...A11Y_TAGS]).analyze();
   return { route: combination.route, state: combination.state, theme, ...partitionViolations(outcome.violations, outcome.incomplete) };
+}
+
+/**
+ * A modal dialog paints on an opaque panel, so nothing of the page behind it can change the contrast of its text. axe, however,
+ * builds the stack of every line of a text from all the elements geometrically under it and compares the stacks of the lines:
+ * a description of two lines that sits across the boundary of two rows of the table behind (the rows are compact now) has two
+ * different stacks, and axe answers "partially overlaps other elements", which this gate counts as blocking. Radix already
+ * makes the page behind inert and hidden from assistive technology while the dialog is open, so the gate hides it from the
+ * visual stack the same way (CSSOM, which the CSP allows). The dialog content is analyzed in full, and the same route has its
+ * own non-dialog states that analyze the page.
+ */
+async function isolateDialogFromPage(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    for (const element of Array.from(document.body.children)) {
+      if (element instanceof HTMLElement && element.querySelector('[role="dialog"]') === null && element.getAttribute("role") !== "dialog" && !element.hasAttribute("data-radix-focus-guard")) {
+        element.style.setProperty("visibility", "hidden");
+      }
+    }
+  });
 }

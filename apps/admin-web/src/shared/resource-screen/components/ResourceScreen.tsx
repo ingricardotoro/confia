@@ -1,4 +1,4 @@
-import { Alert, Button, Pagination, Table, type TableProps } from "@confia/ui";
+import { Alert, Button, PageHeader, Pagination, Table, type TableProps } from "@confia/ui";
 import type { ReactNode } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 
@@ -25,6 +25,8 @@ export interface ResourcePagination {
 export interface ResourceScreenProps<Row> {
   /** The level 2 heading of the view. The level 1 is the area's. */
   readonly heading: string;
+  /** Already translated. A line under the heading that says what the view is for. */
+  readonly description?: string | undefined;
   readonly createLabel: string;
   readonly onCreate: () => void;
   /** The filter controls of the view, if it has any. */
@@ -41,31 +43,32 @@ export interface ResourceScreenProps<Row> {
  * of the last action, and the table with its pages. The rows arrive already paged, ordered and filtered by the
  * server. The region is always in the document, so a message put in it is announced.
  */
-export function ResourceScreen<Row>({ heading, createLabel, onCreate, filters, notice, lookupFailure, table, pagination }: ResourceScreenProps<Row>) {
+export function ResourceScreen<Row>({ heading, description, createLabel, onCreate, filters, notice, lookupFailure, table, pagination }: ResourceScreenProps<Row>) {
   const { t } = useAdminText();
 
   return (
-    <section aria-labelledby="organization-view-heading" className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="organization-view-heading" className="text-xl font-semibold text-text-primary">
-          {heading}
-        </h2>
-        <Button onClick={onCreate}>{createLabel}</Button>
-      </div>
+    <section aria-labelledby="organization-view-heading" className="flex flex-col gap-3">
+      <PageHeader
+        title={heading}
+        headingLevel={2}
+        headingId="organization-view-heading"
+        {...(description === undefined ? {} : { description })}
+        actions={<Button size="sm" onClick={onCreate}>{createLabel}</Button>}
+      />
       {filters === undefined ? null : (
-        <div role="group" aria-label={t("resource.filters")} className="flex flex-wrap items-end gap-3">
+        <div role="group" aria-label={t("resource.filters")} className="flex flex-wrap items-end gap-x-3 gap-y-2 rounded-lg border border-border-subtle bg-bg-surface px-3 py-2">
           {filters}
         </div>
       )}
       {lookupFailure === undefined ? null : (
         <Alert variant="warning">
           <p>{t("resource.optionsFailed")}</p>
-          <Button variant="secondary" size="sm" className="mt-2" onClick={lookupFailure.onRetry}>
+          <Button variant="secondary" size="xs" className="mt-2" onClick={lookupFailure.onRetry}>
             {t("resource.retryOptions")}
           </Button>
         </Alert>
       )}
-      <div aria-live="polite" aria-atomic="true">
+      <div aria-live="polite" aria-atomic="true" className="empty:-mt-3">
         {notice === undefined ? null : (
           <Alert variant={notice.tone === "error" ? "destructive" : "info"}>
             <p>{notice.message}</p>
@@ -73,7 +76,7 @@ export function ResourceScreen<Row>({ heading, createLabel, onCreate, filters, n
           </Alert>
         )}
       </div>
-      <Table {...table} />
+      <Table stickyHeader captionHidden {...table} />
       <Pagination
         page={pagination.page}
         size={pagination.size}

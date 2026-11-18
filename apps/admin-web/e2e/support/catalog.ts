@@ -77,3 +77,46 @@ export async function validityRows(page: Page, tableName: string): Promise<strin
     .locator("tbody tr")
     .evaluateAll((rows) => rows.map((row) => [...row.querySelectorAll("td")].map((cell) => cell.textContent.trim())));
 }
+
+/** The path of the tax rates, and the seeded rates the journeys name (catalog-tax-rates cut). */
+export const TAX_RATES_PATH = "/catalog/tax-rates";
+export const SEEDED_RATES = {
+  a: "00000000-0000-4000-8000-000000006001",
+  b: "00000000-0000-4000-8000-000000006002",
+  inactive: "00000000-0000-4000-8000-000000006003",
+} as const;
+
+/** Opens the tax rates from the tab of the catalog, with a preset already applied when one is given. */
+export async function openTaxRates(page: Page, scenarioId: string, preset?: string): Promise<void> {
+  await openCatalog(page, scenarioId, preset);
+  await page.getByRole("navigation", { name: "Vistas del catálogo" }).getByRole("link", { name: "Tasas de impuesto" }).click();
+  await expect(page).toHaveURL(/\/catalog\/tax-rates$/);
+  await expect(page.getByRole("heading", { level: 2, name: "Tasas de impuesto" })).toBeVisible();
+}
+
+/** Opens the detail of a seeded rate by its address, with a preset already applied when one is given. */
+export async function openTaxRateDetail(page: Page, scenarioId: string, rateId: string, name: string, preset?: string): Promise<void> {
+  if (preset !== undefined) await applyPreset(page, scenarioId, preset);
+  await seedSession(page);
+  await page.goto(`${TAX_RATES_PATH}/${rateId}`);
+  await expect(page.getByRole("heading", { level: 2, name })).toBeVisible({ timeout: 20_000 });
+}
+
+/** The query of the requests the page makes to the listing of tax rates, decoded. */
+export function recordTaxRateQueries(page: Page): string[] {
+  const seen: string[] = [];
+  page.on("request", (request: Request) => {
+    const url = new URL(request.url());
+    if (request.method() === "GET" && url.pathname === "/api/v1/catalog/tax-rates") seen.push(decodeURIComponent(url.search));
+  });
+  return seen;
+}
+
+/** The rows of the history of validities of a tax rate, as text. */
+export async function periodRows(page: Page, tableName: string): Promise<string[][]> {
+  return page
+    // Hidden too: a dialog that is open hides the page behind it from the accessibility tree, and the table is still there.
+    .getByRole("table", { name: tableName, includeHidden: true })
+    .locator("tbody tr")
+    .evaluateAll((rows) => rows.map((row) => [...row.querySelectorAll("td")].map((cell) => cell.textContent.trim())));
+}

@@ -1,5 +1,5 @@
 import { useAdminText } from "../../../../i18n/use-admin-text.ts";
-import { OptionField, ReadOnlyField, TextField, type Option } from "../../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, OptionField, ReadOnlyField, TextField, type Option } from "../../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { GRADE_CONTROL_IDS, type GradeField, type GradeValues } from "../grade-form.ts";
 
@@ -41,6 +41,7 @@ export function GradeForm({ mode, values, fieldErrors, modalityOptions, modality
       form={form}
       onClose={onClose}
     >
+      <FieldGrid>
       {mode === "create" ? (
         <OptionField
           label={t("organization.grades.fields.modalityId")}
@@ -64,6 +65,7 @@ export function GradeForm({ mode, values, fieldErrors, modalityOptions, modality
           {...text("isActive")}
         />
       ) : null}
+      </FieldGrid>
     </ResourceFormDialog>
   );
 }

@@ -248,7 +248,9 @@ class PermissionEdgeTest {
     // --- Task 4: what the handler hands to the recorder ---
 
     @ParameterizedTest
-    @ValueSource(strings = {"123", "abc"})
+    // The sentinels contain an underscore, which a UUID (the request id checked below) never holds, so the
+    // assertion cannot fail by chance on a random identifier.
+    @ValueSource(strings = {"7_7_7", "q_z_q"})
     void aDenialByPermissionIsRecordedOncePerRequestWithTheTemplateAndNeverTheValue(String id) {
         process.denialRecorder().clear();
 

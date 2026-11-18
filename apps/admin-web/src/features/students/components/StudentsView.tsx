@@ -19,13 +19,16 @@ export interface StudentsViewProps {
   readonly onToggle: (row: Student) => void;
   /** Opens the dialog that manages the guardians of the student. */
   readonly onGuardians: (row: Student) => void;
+  /** The address of the statement of account of a student, so a link opens in a new tab and a plain click is a navigation of the router. */
+  readonly statementHrefOf: (row: Student) => string;
+  readonly onStatement: (row: Student) => void;
 }
 
 /**
  * The students as a table: code, last names, first names, birth date, sex, whether there is a document, state and actions,
  * with a text search and a status filter. The document column says only "registered" or a dash: the server never sends any digit.
  */
-export function StudentsView({ rows, table, pagination, notice, togglingId, filters, onCreate, onEdit, onToggle, onGuardians }: StudentsViewProps) {
+export function StudentsView({ rows, table, pagination, notice, togglingId, filters, onCreate, onEdit, onToggle, onGuardians, statementHrefOf, onStatement }: StudentsViewProps) {
   const { t } = useAdminText();
   const columns: readonly TableColumn<Student>[] = [
     { id: "studentCode", header: t("students.columns.studentCode"), sortable: true, cell: (row) => row.studentCode },
@@ -65,16 +68,30 @@ export function StudentsView({ rows, table, pagination, notice, togglingId, filt
             onToggle(row);
           }}
           extra={
-            <Button
-              variant="secondary"
-              size="sm"
-              aria-label={t("students.guardiansActionFor", { name: nameOf(row) })}
-              onClick={() => {
-                onGuardians(row);
-              }}
-            >
-              {t("students.guardiansAction")}
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                size="xs"
+                aria-label={t("students.guardiansActionFor", { name: nameOf(row) })}
+                onClick={() => {
+                  onGuardians(row);
+                }}
+              >
+                {t("students.guardiansAction")}
+              </Button>
+              <a
+                href={statementHrefOf(row)}
+                aria-label={t("students.statementActionFor", { name: nameOf(row) })}
+                className="inline-flex h-7 items-center rounded-md border border-border-default px-2 text-xs font-medium text-text-primary underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+                onClick={(event) => {
+                  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  event.preventDefault();
+                  onStatement(row);
+                }}
+              >
+                {t("students.statementAction")}
+              </a>
+            </>
           }
         />
       ),

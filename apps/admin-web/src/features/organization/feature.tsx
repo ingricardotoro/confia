@@ -48,7 +48,7 @@ function SectionsRoute() {
  * leads to the first view; each view validates its own search parameters.
  */
 export const organizationFeature: FeatureModule = {
-  navigation: { id: "organization", labelKey: "navigation.organization", to: ORGANIZATION_PATH },
+  navigation: { id: "organization", labelKey: "navigation.organization", to: ORGANIZATION_PATH, group: "settings" },
   createRoutes: (parent: AnyRoute) => {
     const area = createRoute({ getParentRoute: () => parent, path: ORGANIZATION_PATH, component: OrganizationContainer });
     const index = createRoute({

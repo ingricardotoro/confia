@@ -1,7 +1,9 @@
 package com.confia.catalog.infrastructure;
 
 import com.confia.catalog.domain.DuplicateCodeException;
+import com.confia.catalog.domain.DuplicateTaxRateCodeException;
 import com.confia.catalog.domain.PriceValidityOverlapException;
+import com.confia.catalog.domain.TaxRatePeriodOverlapException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -23,6 +25,8 @@ final class CatalogWrites {
     private static final String EXCLUSION_VIOLATION = "23P01";
     private static final String CODE_UNIQUE_INDEX = "catalog_payment_concept_code_uq";
     private static final String VALIDITY_EXCLUSION = "catalog_price_list_item_validity_excl";
+    private static final String TAX_RATE_CODE_UNIQUE_INDEX = "catalog_tax_rate_code_uq";
+    private static final String TAX_RATE_VALIDITY_EXCLUSION = "catalog_tax_rate_period_validity_excl";
 
     private CatalogWrites() {
     }
@@ -35,8 +39,15 @@ final class CatalogWrites {
             if (CODE_UNIQUE_INDEX.equals(violatedConstraint(e, UNIQUE_VIOLATION))) {
                 throw new DuplicateCodeException();
             }
-            if (VALIDITY_EXCLUSION.equals(violatedConstraint(e, EXCLUSION_VIOLATION))) {
+            if (TAX_RATE_CODE_UNIQUE_INDEX.equals(violatedConstraint(e, UNIQUE_VIOLATION))) {
+                throw new DuplicateTaxRateCodeException();
+            }
+            String exclusion = violatedConstraint(e, EXCLUSION_VIOLATION);
+            if (VALIDITY_EXCLUSION.equals(exclusion)) {
                 throw new PriceValidityOverlapException();
+            }
+            if (TAX_RATE_VALIDITY_EXCLUSION.equals(exclusion)) {
+                throw new TaxRatePeriodOverlapException();
             }
             throw e;
         }

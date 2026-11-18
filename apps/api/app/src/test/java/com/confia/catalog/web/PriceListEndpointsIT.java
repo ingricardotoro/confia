@@ -830,7 +830,7 @@ class PriceListEndpointsIT extends CommittingPostgresIntegrationTest {
     /** A payment concept created through the API by {@code member}; its identifier. */
     private static String concept(Member member, String code) {
         HttpResponse<String> response = post(CONCEPTS, member, "{\"code\":\"" + code + "\",\"name\":\"" + code
-                + "\",\"category\":\"TUITION\",\"isTaxable\":true,\"isRecurring\":true}");
+                + "\",\"category\":\"TUITION\",\"isTaxable\":false,\"isRecurring\":true}");
         return created(response).get("id").asString();
     }
 

@@ -25,6 +25,10 @@ describe("classifyOrganizationFailure", () => {
     ["resource-not-found", "problem.notFound"],
     ["price-validity-overlap", "problem.priceValidityOverlap"],
     ["price-list-archived", "problem.priceListArchived"],
+    ["tax-rate-period-overlap", "problem.taxRatePeriodOverlap"],
+    ["plan-not-editable", "problem.planNotEditable"],
+    ["plan-without-items", "problem.planWithoutItems"],
+    ["duplicate-plan-item", "problem.duplicatePlanItem"],
     ["stale-version", "problem.staleVersion"],
   ] as const)("gives %s its own message, with the trace id", (code, key) => {
     expect(classifyOrganizationFailure(problem(code, 409, { traceId: "t-1" }))).toEqual({ kind: "message", key, traceId: "t-1" });
@@ -168,6 +172,17 @@ describe("the codes of the catalog", () => {
     expect(classifyOrganizationFailure(problem("duplicate-payment-concept-code", 409, { traceId: "t-1" }))).toEqual({
       kind: "fields",
       errors: [{ field: "code", reason: "duplicate-payment-concept-code" }],
+    });
+  });
+
+  it("attaches a repeated tax rate code to the code field, and reads the pattern of a percentage as its own reason", () => {
+    expect(classifyOrganizationFailure(problem("duplicate-tax-rate-code", 409, { traceId: "t-1" }))).toEqual({
+      kind: "fields",
+      errors: [{ field: "code", reason: "duplicate-tax-rate-code" }],
+    });
+    expect(classifyOrganizationFailure(problem("validation-failed", 400, { errors: [{ field: "ratePercent", reason: "pattern" }] }))).toEqual({
+      kind: "fields",
+      errors: [{ field: "ratePercent", reason: "rate-format" }],
     });
   });
 

@@ -56,6 +56,10 @@ import java.util.Optional;
  * whose validity overlaps another of the same concept in the list), {@link #PRICE_LIST_ARCHIVED} ({@code 409}: a price
  * for an archived list) and {@link #STALE_VERSION} ({@code 409}: an edit of a list or of a payment concept that names a
  * version other than the current one), and reuse {@link #INACTIVE_REFERENCE} for a price of an inactive concept. The
+ * tax rates of {@code catalog} own {@link #DUPLICATE_TAX_RATE_CODE} ({@code 409}: a code the institution already uses,
+ * whatever its capitals) and {@link #TAX_RATE_PERIOD_OVERLAP} ({@code 409}: a period whose validity overlaps another of
+ * the same rate), and reuse {@link #STALE_VERSION} and {@link #INACTIVE_REFERENCE} (a period of an inactive rate, or a
+ * concept assigned an inactive rate). The
  * institution codes belong to a later change and do not exist yet. {@link
  * #AUTHENTICATION_REQUIRED} names the observable condition and never the cause, which is what
  * makes the denial uniform.
@@ -99,6 +103,16 @@ public enum ProblemCode {
     DUPLICATE_PAYMENT_CONCEPT_CODE("duplicate-payment-concept-code", 409),
     PRICE_VALIDITY_OVERLAP("price-validity-overlap", 409),
     PRICE_LIST_ARCHIVED("price-list-archived", 409),
+    DUPLICATE_TAX_RATE_CODE("duplicate-tax-rate-code", 409),
+    TAX_RATE_PERIOD_OVERLAP("tax-rate-period-overlap", 409),
+    PLAN_NOT_EDITABLE("plan-not-editable", 409),
+    PLAN_WITHOUT_ITEMS("plan-without-items", 409),
+    PLAN_ITEM_INVALID("plan-item-invalid", 409),
+    ACCRUAL_RUN_IN_PROGRESS("accrual-run-in-progress", 409),
+    DUPLICATE_PLAN_ITEM("duplicate-plan-item", 409),
+    DUPLICATE_ACCOUNT_CODE("duplicate-account-code", 409),
+    ACCOUNT_IN_USE("account-in-use", 409),
+    POSTING_ACCOUNT_INVALID("posting-account-invalid", 409),
     STALE_VERSION("stale-version", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
     IDEMPOTENCY_PAYLOAD_MISMATCH("idempotency-payload-mismatch", 422),

@@ -36,7 +36,7 @@ export function CatalogTabs({ tabs, onNavigate }: CatalogTabsProps) {
                 onNavigate(tab.href);
               }}
               className={[
-                "-mb-px block border-b-4 px-3 py-2 text-sm text-text-primary hover:bg-bg-canvas",
+                "-mb-px block border-b-2 px-3 py-1.5 text-sm text-text-primary hover:bg-bg-canvas",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus",
                 tab.current ? "border-border-focus font-semibold" : "border-transparent",
               ].join(" ")}

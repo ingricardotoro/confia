@@ -43,6 +43,12 @@ export interface TableProps<Row> extends Omit<ComponentProps<"div">, "children">
   /** The order the server applied. Sorting itself is the server's job: the table only reports clicks. */
   sort?: TableSort | undefined;
   onSortChange?: (sort: TableSort) => void;
+  /** Row height: comfortable by default, compact for dense data (docs/ui-ux/07 section 5.1). */
+  density?: "comfortable" | "compact";
+  /** Keeps the header in view while a long table scrolls inside its own container (capped in height). */
+  stickyHeader?: boolean;
+  /** Hides the caption visually but keeps it for assistive technology, when a visible title already names the table. */
+  captionHidden?: boolean;
 }
 
 const ARIA_SORT = { asc: "ascending", desc: "descending" } as const;
@@ -62,6 +68,9 @@ export function Table<Row>({
   empty,
   sort,
   onSortChange,
+  density = "comfortable",
+  stickyHeader = false,
+  captionHidden = false,
   className,
   ...rest
 }: TableProps<Row>) {
@@ -71,13 +80,15 @@ export function Table<Row>({
     return { columnId, direction: sort?.columnId === columnId && sort.direction === "asc" ? "desc" : "asc" };
   }
 
+  const cellY = density === "compact" ? "py-1" : "py-1.5";
+
   function body(): ReactNode {
     const span = columns.length;
     if (loading) {
       return Array.from({ length: skeletonRows }, (_, index) => (
         <tr key={index} className="border-t border-border-subtle">
           {columns.map((column) => (
-            <td key={column.id} className="px-3 py-3">
+            <td key={column.id} className="px-2.5 py-2">
               <Skeleton className="h-4 w-full max-w-40" />
             </td>
           ))}
@@ -102,10 +113,16 @@ export function Table<Row>({
         </tr>
       );
     }
-    return rows.map((row) => (
-      <tr key={getRowId(row)} className="border-t border-border-subtle">
+    return rows.map((row, index) => (
+      <tr
+        key={getRowId(row)}
+        className={cn(
+          "border-t border-border-subtle hover:bg-(--table-row-hover-bg)",
+          density === "compact" && index % 2 === 1 && "bg-(--table-row-hover-bg)",
+        )}
+      >
         {columns.map((column) => (
-          <td key={column.id} className={cn("px-3 py-2 text-text-primary", column.align === "end" && "text-right tabular-nums")}>
+          <td key={column.id} className={cn("px-2.5 align-middle text-text-primary", cellY, column.align === "end" && "text-right tabular-nums")}>
             {column.cell(row)}
           </td>
         ))}
@@ -114,15 +131,19 @@ export function Table<Row>({
   }
 
   return (
-    <div {...rest} className={cn("w-full overflow-x-auto rounded-md border border-border-subtle bg-bg-surface", className)}>
+    <div {...rest} className={cn(
+        "w-full overflow-x-auto rounded-lg border border-(--table-border) bg-bg-surface shadow-(--card-shadow)",
+        stickyHeader && "max-h-[70vh] overflow-y-auto",
+        className,
+      )}>
       {loading ? (
         <p role="status" className="sr-only">
           {t("common.loading")}
         </p>
       ) : null}
-      <table aria-busy={loading || undefined} className="w-full border-collapse text-left text-sm">
-        <caption className="px-3 py-2 text-left text-sm font-semibold text-text-primary">{caption}</caption>
-        <thead className="bg-bg-canvas">
+      <table aria-busy={loading || undefined} className="w-full border-collapse text-left text-[13px]">
+        <caption className={cn("px-2.5 py-1.5 text-left text-sm font-semibold text-text-primary", captionHidden && "sr-only")}>{caption}</caption>
+        <thead className="bg-(--table-header-bg)">
           <tr>
             {columns.map((column) => {
               const active = sort?.columnId === column.id ? sort.direction : undefined;
@@ -132,21 +153,25 @@ export function Table<Row>({
                   key={column.id}
                   scope="col"
                   aria-sort={column.sortable === true && active !== undefined ? ARIA_SORT[active] : undefined}
-                  className={cn("px-3 py-2 font-semibold text-text-secondary", alignEnd && "text-right")}
+                  className={cn(
+                    "bg-(--table-header-bg) px-2.5 py-1.5 text-[11px] font-semibold tracking-caps text-(--table-header-fg) uppercase",
+                    stickyHeader && "sticky top-0 z-10",
+                    alignEnd && "text-right",
+                  )}
                 >
                   {column.sortable === true ? (
                     <button
                       type="button"
                       onClick={() => onSortChange?.(nextSort(column.id))}
-                      className={cn("inline-flex min-h-8 items-center gap-1 rounded-sm font-semibold", alignEnd && "flex-row-reverse", focusRing)}
+                      className={cn("inline-flex min-h-6 items-center gap-1 rounded-sm font-semibold uppercase", alignEnd && "flex-row-reverse", focusRing)}
                     >
                       {column.header}
                       {active === "asc" ? (
-                        <ArrowUp className="size-4" />
+                        <ArrowUp className="size-3.5" />
                       ) : active === "desc" ? (
-                        <ArrowDown className="size-4" />
+                        <ArrowDown className="size-3.5" />
                       ) : (
-                        <ChevronsUpDown className="size-4 text-text-tertiary" />
+                        <ChevronsUpDown className="size-3.5 text-text-tertiary" />
                       )}
                     </button>
                   ) : (

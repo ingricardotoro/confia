@@ -12,7 +12,7 @@ export type SelectProps = ComponentProps<"select">;
 export function Select({ className, children, ...rest }: SelectProps) {
   return (
     <div className="relative">
-      <select {...rest} className={cn(fieldState, "h-10 appearance-none py-0 pr-9 pl-3 text-sm", className)}>
+      <select {...rest} className={cn(fieldState, "h-9 appearance-none py-0 pr-9 pl-3 text-sm", className)}>
         {children}
       </select>
       <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-text-secondary" />

@@ -1,22 +1,27 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import type { AddPriceRequest, CreatePriceListRequest, UpdatePriceListRequest } from "@confia/contracts/admin";
+import type { AddPriceRequest, AddTaxRatePeriodRequest, CreatePriceListRequest, UpdatePriceListRequest } from "@confia/contracts/admin";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
 import { useAuthorizedSend } from "../../shared/api/authorized-send.tsx";
 import {
   addPrice,
+  addTaxRatePeriod,
   createPriceList,
   getPriceList,
+  getTaxRate,
   listPaymentConcepts,
   listPriceLists,
+  listTaxRates,
   updatePriceList,
   type PaymentConceptListParams,
   type PriceListListParams,
+  type TaxRateListParams,
 } from "../../shared/api/catalog-operations.ts";
 import { LOOKUP_PAGE_SIZE } from "../../shared/organization-lookups/use-organization-queries.ts";
-import { paymentConceptKeys, priceListKeys } from "./catalog-keys.ts";
+import { paymentConceptKeys, priceListKeys, taxRateKeys } from "./catalog-keys.ts";
 import { writePaymentConcept, type PaymentConcept, type PaymentConceptSave } from "./payment-concept-form.ts";
 import type { PriceItem } from "./price-form.ts";
 import type { PriceList } from "./price-list-form.ts";
+import { writeTaxRate, type TaxRate, type TaxRatePeriod, type TaxRateSave } from "./tax-rate-form.ts";
 
 /** A listing of payment concepts, as the server pages, orders and filters it: the rows come back as they were served. */
 export function usePaymentConceptList(params: PaymentConceptListParams) {
@@ -135,6 +140,84 @@ export function usePriceAdd() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: priceListKeys.all }),
     onError: (error) => {
       refreshOnConflict(queryClient, error, priceListKeys.all, CONFLICT_CODES);
+    },
+  });
+}
+
+/** A listing of tax rates, as the server pages, orders and filters it. */
+export function useTaxRateList(params: TaxRateListParams) {
+  const send = useAuthorizedSend();
+  return useQuery({
+    queryKey: taxRateKeys.list(params),
+    queryFn: () => send((token) => listTaxRates(token, params)),
+  });
+}
+
+/** One tax rate with every validity it has had. */
+export function useTaxRateDetail(id: string) {
+  const send = useAuthorizedSend();
+  return useQuery({
+    queryKey: taxRateKeys.detail(id),
+    queryFn: () => send((token) => getTaxRate(token, id)),
+  });
+}
+
+/**
+ * The active tax rates a taxable concept can name, for the select of its form: one page of the largest size the API
+ * gives, in the order of the code. A lookup is a label and an option, never a filter of a table; the server decides
+ * what is active. It reads one page of `LOOKUP_PAGE_SIZE` rates, like the other lookups of the app; an institution with
+ * more active rates than that would need a searchable selector instead.
+ */
+export function useActiveTaxRateLookup() {
+  const list = useTaxRateList({ page: 0, size: LOOKUP_PAGE_SIZE, sort: "code,asc", active: "true" });
+  return { rows: list.data?.items ?? [], failed: list.isError, loading: list.isPending, retry: () => void list.refetch() };
+}
+
+/**
+ * A write of one tax rate: its creation, its name, or its state (a new body that keeps the name). Setting a rate books
+ * nothing in the ledger, so nothing is optimistic and no `Idempotency-Key` is sent, and it never repeats by itself. After
+ * it every list and detail of the rates is read again, and so is every list of the concepts, which name the rate they
+ * hold. A stale version refreshes them too, so the next open of the rate carries the version the server holds.
+ */
+export function useTaxRateWrite() {
+  const send = useAuthorizedSend();
+  const queryClient = useQueryClient();
+  return useMutation<TaxRate, Error, TaxRateSave>({
+    mutationFn: (save) => send((token) => writeTaxRate(token, save)),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: taxRateKeys.all }),
+        queryClient.invalidateQueries({ queryKey: paymentConceptKeys.all }),
+      ]);
+    },
+    onError: (error) => {
+      refreshOnConflict(queryClient, error, taxRateKeys.all, STALE_CODES);
+    },
+  });
+}
+
+interface TaxRatePeriodAdd {
+  readonly rateId: string;
+  readonly body: AddTaxRatePeriodRequest;
+}
+
+/** The codes that say the rate on screen is not what the server holds: a stale version, an overlap, or a rate that is no longer active. */
+const PERIOD_CONFLICT_CODES: ReadonlySet<string> = new Set(["stale-version", "tax-rate-period-overlap", "inactive-reference"]);
+
+/**
+ * A new validity of a rate. Setting a rate books nothing in the ledger, so there is no `Idempotency-Key`; it is still
+ * never optimistic and never repeats by itself. The server closes the previous open validity in the same transaction,
+ * so the whole detail is read again, and the listings with it. A refused add (overlap, inactive rate) changes nothing
+ * on the server, and reads the detail again because the screen was out of date.
+ */
+export function useTaxRatePeriodAdd() {
+  const send = useAuthorizedSend();
+  const queryClient = useQueryClient();
+  return useMutation<TaxRatePeriod, Error, TaxRatePeriodAdd>({
+    mutationFn: ({ rateId, body }) => send((token) => addTaxRatePeriod(token, rateId, body)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: taxRateKeys.all }),
+    onError: (error) => {
+      refreshOnConflict(queryClient, error, taxRateKeys.all, PERIOD_CONFLICT_CODES);
     },
   });
 }

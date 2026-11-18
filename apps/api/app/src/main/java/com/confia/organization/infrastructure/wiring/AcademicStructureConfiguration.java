@@ -9,6 +9,8 @@ import com.confia.organization.application.ManageSections;
 import com.confia.organization.application.ModalityRepository;
 import com.confia.organization.application.SectionRepository;
 import com.confia.organization.application.directory.AcademicStructureDirectory;
+import com.confia.organization.application.directory.PlacementDirectory;
+import com.confia.organization.infrastructure.JooqPlacementDirectory;
 import com.confia.organization.application.directory.SectionDirectory;
 import com.confia.organization.infrastructure.JooqAcademicStructureDirectory;
 import com.confia.organization.infrastructure.JooqAcademicYearRepository;
@@ -63,6 +65,12 @@ public class AcademicStructureConfiguration {
     @Bean
     AcademicStructureDirectory academicStructureDirectory(DSLContext dsl) {
         return new JooqAcademicStructureDirectory(dsl);
+    }
+
+    /** Where the students of a charge plan are: sections of a target, grade and modality of a section, time zone (docs/cortes/charges-accrual.md). */
+    @Bean
+    PlacementDirectory placementDirectory(DSLContext dsl) {
+        return new JooqPlacementDirectory(dsl);
     }
 
     @Bean

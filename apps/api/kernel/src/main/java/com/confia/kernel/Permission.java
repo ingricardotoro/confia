@@ -7,11 +7,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * The closed catalog of permissions: 89 entries named {@code module:verb} (docs/03-seguridad.md
+ * The closed catalog of permissions: 90 entries named {@code module:verb} (docs/03-seguridad.md
  * section 5.1; rbac-permission-matrix-and-audit-integration design.md, decision D2).
  *
- * <p>Eighty-eight entries pair one of the eighteen modules with one of the six verbs ({@code create},
- * {@code read}, {@code update}, {@code void}, {@code approve} and {@code export}); the eighty-ninth,
+ * <p>Eighty-nine entries pair one of the eighteen modules with one of the six verbs ({@code create},
+ * {@code read}, {@code update}, {@code void}, {@code approve} and {@code export}); the ninetieth,
  * {@link #INVOICING_REQUEST_VOID}, is the cashier's request to void an invoice, which is not the
  * authority to void it ({@link #INVOICING_VOID}). The catalog holds exactly the permissions that some
  * role grants, so a combination no role has (such as {@code ledger:update}) is not an entry at all.
@@ -47,8 +47,8 @@ public enum Permission {
     CHARGES_CREATE("charges:create"), CHARGES_READ("charges:read"), CHARGES_UPDATE("charges:update"),
     CHARGES_VOID("charges:void"), CHARGES_APPROVE("charges:approve"), CHARGES_EXPORT("charges:export"),
 
-    LEDGER_READ("ledger:read"), LEDGER_VOID("ledger:void"), LEDGER_APPROVE("ledger:approve"),
-    LEDGER_EXPORT("ledger:export"),
+    LEDGER_CREATE("ledger:create"), LEDGER_READ("ledger:read"), LEDGER_VOID("ledger:void"),
+    LEDGER_APPROVE("ledger:approve"), LEDGER_EXPORT("ledger:export"),
 
     PAYMENTS_CREATE("payments:create"), PAYMENTS_READ("payments:read"), PAYMENTS_VOID("payments:void"),
     PAYMENTS_APPROVE("payments:approve"), PAYMENTS_EXPORT("payments:export"),

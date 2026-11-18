@@ -43,6 +43,10 @@ import com.confia.guardians.infrastructure.wiring.GuardiansConfiguration;
 import com.confia.guardians.web.wiring.GuardiansWebConfiguration;
 import com.confia.catalog.infrastructure.wiring.CatalogConfiguration;
 import com.confia.catalog.web.wiring.CatalogWebConfiguration;
+import com.confia.charges.infrastructure.wiring.ChargesConfiguration;
+import com.confia.charges.web.wiring.ChargesWebConfiguration;
+import com.confia.ledger.infrastructure.wiring.LedgerConfiguration;
+import com.confia.ledger.web.wiring.LedgerWebConfiguration;
 import com.confia.imports.infrastructure.wiring.ImportsConfiguration;
 import com.confia.imports.web.wiring.ImportsWebConfiguration;
 import com.confia.organization.infrastructure.wiring.AcademicStructureConfiguration;
@@ -288,7 +292,7 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
         assertThat(endpoints.endpoints()).as("the walk is non-vacuous").hasSizeGreaterThanOrEqualTo(2)
                 .anyMatch(entry -> entry.pattern().contains("{"));
         // The routes of the academic structure, of the student registry and of the enrollments take a JSON body or a typed
-        // identifier, which this walk does not send; their revoked-session case has its own test in
+        // identifier, which this walk does not send (the catalog, the charges and the ledger routes included); their revoked-session case has its own test in
         // AcademicStructureEndpointsIT and StudentEndpointsIT.
         for (PermissionedEndpoint entry : endpoints.endpoints().stream()
                 .filter(candidate -> !candidate.pattern().startsWith("/api/v1/organization/")
@@ -296,7 +300,9 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
                         && !candidate.pattern().startsWith("/api/v1/enrollments")
                         && !candidate.pattern().startsWith("/api/v1/guardians")
                         && !candidate.pattern().startsWith("/api/v1/imports")
-                        && !candidate.pattern().startsWith("/api/v1/catalog/"))
+                        && !candidate.pattern().startsWith("/api/v1/catalog/")
+                        && !candidate.pattern().startsWith("/api/v1/charges/")
+                        && !candidate.pattern().startsWith("/api/v1/ledger/"))
                 .toList()) {
             Session holder = sessionOf(StaffRole.SUPER_ADMIN);
             assertThat(StaffRole.SUPER_ADMIN.permissions()).contains(entry.permission());
@@ -1072,7 +1078,8 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
             StudentsWebConfiguration.class, EnrollmentsConfiguration.class,
             EnrollmentsWebConfiguration.class, GuardiansConfiguration.class, GuardiansWebConfiguration.class,
             ImportsConfiguration.class, ImportsWebConfiguration.class, CatalogConfiguration.class,
-            CatalogWebConfiguration.class, WebEdgeConfiguration.class,
+            CatalogWebConfiguration.class, LedgerConfiguration.class, LedgerWebConfiguration.class,
+            ChargesConfiguration.class, ChargesWebConfiguration.class, WebEdgeConfiguration.class,
             AdminSecurityConfiguration.class, ObservabilityMetricsConfiguration.class,
             RateLimiterConfiguration.class, ThrottlingConfiguration.class,
             RequiredDelayConfiguration.class, IdempotencyEdgeConfiguration.class,

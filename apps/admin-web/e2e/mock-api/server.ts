@@ -17,6 +17,8 @@ import {
   type Scenario,
 } from "./scenarios.ts";
 import { CATALOG_BASE } from "./catalog-model.ts";
+import { CHARGES_BASE } from "./charges-model.ts";
+import { LEDGER_BASE, POSTING_ACCOUNTS_PATH } from "./ledger-model.ts";
 import { ORGANIZATION_BASE } from "./organization-model.ts";
 import { ENROLLMENTS_BASE } from "./enrollments-model.ts";
 import { STUDENTS_BASE } from "./students-model.ts";
@@ -83,6 +85,10 @@ const SUCCESS_SCHEMAS: Readonly<Record<Operation, Schema | undefined>> = {
   imports: undefined,
   // The same for the catalog (catalog-model.ts).
   catalog: undefined,
+  // The same for the charge plans (charges-model.ts).
+  charges: undefined,
+  // The same for the chart of accounts and the map of posting accounts (ledger-model.ts).
+  ledger: undefined,
 };
 
 /** The fields of a response that break the contract; empty when it meets it. The `instance` of an error is not checked (I306). */
@@ -227,6 +233,34 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
       const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
       const answer = scenario.catalog.handle({ method, path, query: url.searchParams, body });
       if (answer !== undefined) { deliver(res, scenario, "catalog", answer); return; }
+    }
+    // The chart of accounts, and the map of posting accounts (a route below the charges that the ledger model owns, so it goes first).
+    if (path === POSTING_ACCOUNTS_PATH || path === `${LEDGER_BASE}/accounts` || path.startsWith(`${LEDGER_BASE}/accounts/`)) {
+      const session = scenario.model.currentSession(bearerOf(req));
+      if (session.status !== 200) { deliver(res, scenario, "ledger", session); return; }
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
+      const answer = scenario.ledger.handle({ method, path, query: url.searchParams, body });
+      if (answer !== undefined) { deliver(res, scenario, "ledger", answer); return; }
+    }
+    if (path.startsWith(`${CHARGES_BASE}/`)) {
+      // Every operation of the charges is a bearer route: no access token, no answer.
+      const session = scenario.model.currentSession(bearerOf(req));
+      if (session.status !== 200) { deliver(res, scenario, "charges", session); return; }
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
+      // The statement of account of a student (a route below the charges that the statement model owns, so it goes first).
+      const statement = scenario.statement.handle({ method, path, query: url.searchParams });
+      if (statement !== undefined) { deliver(res, scenario, "charges", statement); return; }
+      const answer = scenario.charges.handle({
+        method,
+        path,
+        query: url.searchParams,
+        body,
+        // The request of an accrual run needs its `Idempotency-Key`.
+        headers: { "idempotency-key": typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : undefined },
+      });
+      if (answer !== undefined) { deliver(res, scenario, "charges", answer); return; }
     }
     // The guardians, and the guardians of one student (a route below the students that this model owns).
     if (path === GUARDIANS_BASE || path.startsWith(`${GUARDIANS_BASE}/`) || /^\/api\/v1\/students\/[^/]+\/guardians$/.test(path)) {

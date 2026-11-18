@@ -27,7 +27,18 @@
     font-family: var(--font-sans);
     background-color: var(--color-bg-canvas);
     color: var(--color-text-primary);
+    /* Crisper strokes on macOS for the dense panel (docs/ui-ux/07 section 4.4); no effect elsewhere. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+}
+
+/* Codes and identifiers (concept code, fiscal correlative, CAI, trace id): tabular figures, slashed
+   zero, l with tail and I with serif, so 0/O and 1/l/I never read alike (docs/ui-ux/07 section 4.3).
+   Inter exposes these as OpenType features; nothing is downloaded. */
+@utility font-identifier {
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-feature-settings: 'tnum' 1, 'zero' 1, 'cv05' 1, 'cv08' 1;
 }
 
 /* Mandatory reduced-motion block (docs/ui-ux/01 section 10). Durations shrink to almost nothing

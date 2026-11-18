@@ -8,5 +8,5 @@ import { fieldState } from "../../lib/field-state";
 export type InputProps = ComponentProps<"input">;
 
 export function Input({ className, type = "text", ...rest }: InputProps) {
-  return <input {...rest} type={type} className={cn(fieldState, "h-10 px-3 text-sm", className)} />;
+  return <input {...rest} type={type} className={cn(fieldState, "h-9 px-3 text-sm", className)} />;
 }

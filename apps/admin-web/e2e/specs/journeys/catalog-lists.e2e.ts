@@ -123,7 +123,7 @@ test.describe("the filters, on the server and in the URL", () => {
 
     await expect(page).toHaveURL(/active=false/);
     await expect(page).not.toHaveURL(/page=/);
-    await expect.poll(async () => (await bodyRows(page)).map((cells) => cells.slice(0, 2).concat(cells[5] ?? ""))).toEqual([["OTR", "Otros ingresos", "Inactivo"]]);
+    await expect.poll(async () => (await bodyRows(page)).map((cells) => cells.slice(0, 2).concat(cells[6] ?? ""))).toEqual([["OTR", "Otros ingresos", "Inactivo"]]);
 
     await page.goto("/catalog?active=true&category=OTHER");
 

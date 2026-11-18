@@ -87,6 +87,9 @@ class AuthorizationScopeExclusionInventoryTest {
                 AuthorizationAbsences.RESTRICTED_MFA_ROUTES.get(0),
                 AuthorizationAbsences.RESTRICTED_MFA_ROUTES.get(1), "POST /api/v1/auth/sessions")))
                 .as("the control: the report and the restricted routes are not violations").isEmpty();
+        assertThat(AuthorizationAbsences.forbiddenRoutes(List.of("PUT /api/v1/identity/accounts/{id}",
+                "GET /api/v1/ledger/accounts/{id}/role", "DELETE /api/v1/ledger/accounts/{id}")))
+                .as("the chart routes are exact: another path under accounts is still a violation").hasSize(3);
     }
 
     // --- AZ75: roles are assigned only by tests ---

@@ -652,7 +652,8 @@ describe("the academic structure [organization-academic-structure]", { timeout: 
 
 describe("the catalog [catalog-payment-concepts]", { timeout: LIMIT }, () => {
   const BASE = "/api/v1/catalog/payment-concepts";
-  const NEW_CONCEPT = { code: "NUE", name: "Nuevo concepto", category: "OTHER", isRecurring: false, isTaxable: true };
+  const RATE_A = "00000000-0000-4000-8000-000000006001";
+  const NEW_CONCEPT = { code: "NUE", name: "Nuevo concepto", category: "OTHER", isRecurring: false, isTaxable: true, taxRateId: RATE_A };
 
   /** Signs in on a scenario (after the preset, if any) and answers the call helper bound to its bearer token. */
   async function session(id: string, name?: string) {
@@ -727,17 +728,26 @@ describe("the catalog [catalog-payment-concepts]", { timeout: LIMIT }, () => {
     const edited = await send("PUT", `/${id}`, { version: 0, name: "Concepto editado", category: "FINE", isRecurring: true, isTaxable: false, isActive: false });
 
     expect(created.status).toBe(201);
-    expect(created.json).toMatchObject({ code: "NUE", name: "Nuevo concepto", category: "OTHER", isTaxable: true, isActive: true });
+    expect(created.json).toMatchObject({
+      code: "NUE",
+      name: "Nuevo concepto",
+      category: "OTHER",
+      isTaxable: true,
+      isActive: true,
+      taxRateId: RATE_A,
+      taxRateCode: "IMP-A",
+      taxRateName: "Impuesto de prueba A",
+    });
     expect(edited.status).toBe(200);
     expect(created.json).toMatchObject({ version: 0 });
-    expect(edited.json).toMatchObject({ id, code: "NUE", name: "Concepto editado", category: "FINE", isRecurring: true, isActive: false, version: 1 });
+    expect(edited.json).toMatchObject({ id, code: "NUE", name: "Concepto editado", category: "FINE", isRecurring: true, isActive: false, version: 1, taxRateId: null, taxRateCode: null });
     expect(rows(await send("GET")).map((row) => row.name)).toEqual(["Concepto editado"]);
   });
 
   it("refuses a repeated code whatever its capitals with 409 duplicate-payment-concept-code, and an edit that sends the code or targets a missing concept", async () => {
     const send = await session("cat-rules");
     const id = rows(await send("GET")).find((row) => row.code === "COL")?.id ?? "";
-    const edit = { version: 0, name: "x", category: "TUITION", isRecurring: true, isTaxable: true, isActive: true };
+    const edit = { version: 0, name: "x", category: "TUITION", isRecurring: true, isTaxable: true, taxRateId: RATE_A, isActive: true };
 
     const repeated = await send("POST", "", { ...NEW_CONCEPT, code: "col" });
     const withCode = await send("PUT", `/${id}`, { ...edit, code: "NEW" });
@@ -816,7 +826,7 @@ describe("the catalog versions and the price lists [catalog-price-lists]", { tim
   const SEEDED_LIST = "00000000-0000-4000-8000-000000009001";
   const ARCHIVED_LIST = "00000000-0000-4000-8000-000000009003";
   const NEW_LIST = { academicYearId: YEAR, name: "2027 — Institución", scope: "INSTITUTION" };
-  const edit = { version: 0, name: "x", category: "TUITION", isRecurring: true, isTaxable: true, isActive: true };
+  const edit = { version: 0, name: "x", category: "TUITION", isRecurring: true, isTaxable: true, taxRateId: "00000000-0000-4000-8000-000000006001", isActive: true };
 
   /** Signs in on a scenario (after the preset, if any) and answers the call helper bound to its bearer token. */
   async function session(id: string, name?: string) {
@@ -856,7 +866,7 @@ describe("the catalog versions and the price lists [catalog-price-lists]", { tim
     const first = await send("PUT", `${CONCEPTS}/${COL}`, edit);
     const repeated = await send("PUT", `${CONCEPTS}/${COL}`, edit);
     const next = await send("PUT", `${CONCEPTS}/${COL}`, { ...edit, version: 1 });
-    const missing = await send("PUT", `${CONCEPTS}/${COL}`, { name: "x", category: "TUITION", isRecurring: true, isTaxable: true, isActive: true });
+    const missing = await send("PUT", `${CONCEPTS}/${COL}`, { name: "x", category: "TUITION", isRecurring: true, isTaxable: true, taxRateId: edit.taxRateId, isActive: true });
 
     expect(first.json).toMatchObject({ version: 1 });
     expect(verdict(repeated)).toEqual([409, "stale-version"]);
@@ -1302,3 +1312,560 @@ describe("the students registry [students-registry]", { timeout: LIMIT }, () => 
     expect(total(await theirs("GET", ""))).toBe(60);
   });
 });
+
+describe("the tax rates and the rate of a concept [catalog-tax-rates]", { timeout: LIMIT }, () => {
+  const RATES = "/api/v1/catalog/tax-rates";
+  const CONCEPTS = "/api/v1/catalog/payment-concepts";
+  const RATE_A = "00000000-0000-4000-8000-000000006001";
+  const RATE_B = "00000000-0000-4000-8000-000000006002";
+  const RATE_INACTIVE = "00000000-0000-4000-8000-000000006003";
+  const COL = "00000000-0000-4000-8000-000000007001";
+  const MAT = "00000000-0000-4000-8000-000000007002";
+  const NEW_RATE = { code: "NUE-1", name: "Tasa nueva" };
+  const concept = { version: 0, name: "x", category: "TUITION", isRecurring: true, isActive: true };
+
+  /** Signs in on a scenario (after the preset, if any) and answers the call helper bound to its bearer token. */
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const headers = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path: string, body?: unknown) => call(method, path, { headers, scenario: id, ...(body === undefined ? {} : { body }) });
+  }
+
+  interface RateRow {
+    id: string;
+    code: string;
+    name: string;
+    isActive: boolean;
+    version: number;
+  }
+  interface PeriodRow {
+    ratePercent: string;
+    validFrom: string;
+    validTo: string | null;
+  }
+  const codes = (reply: Reply) => (reply.json as { items: RateRow[] }).items.map((row) => row.code);
+  const total = (reply: Reply) => (reply.json as { total: number }).total;
+  const verdict = (reply: Reply) => [reply.status, typeOf(reply)];
+  const periodsOf = async (send: Awaited<ReturnType<typeof session>>, id = RATE_A) =>
+    ((await send("GET", `${RATES}/${id}`)).json as { periods: PeriodRow[] }).periods.map((period) => [period.ratePercent, period.validFrom, period.validTo]);
+
+  it("answers 401 without an access token", async () => {
+    expect([(await call("GET", RATES, { scenario: "tax-401" })).status, (await call("POST", `${RATES}/${RATE_A}/periods`, { scenario: "tax-401", body: {} })).status]).toEqual([401, 401]);
+  });
+
+  it("lists the twenty seven seeded rates by code, paged, and filters by state and sorts by name on the server", async () => {
+    const send = await session("tax-list");
+
+    const first = await send("GET", `${RATES}?size=25`);
+    const second = await send("GET", `${RATES}?size=25&page=1`);
+
+    expect(total(first)).toBe(27);
+    expect(codes(first).slice(0, 4)).toEqual(["IMP-A", "IMP-B", "IMP-C", "TX-01"]);
+    expect(codes(second)).toHaveLength(2);
+    expect(codes(await send("GET", `${RATES}?active=false`))).toEqual(["IMP-C"]);
+    expect(total(await send("GET", `${RATES}?active=true`))).toBe(26);
+    expect(codes(await send("GET", `${RATES}?sort=name,desc&size=1`))).toEqual(["TX-24"]);
+  });
+
+  it("refuses a bad page, size, sort or filter with 400", async () => {
+    const send = await session("tax-bad");
+
+    for (const query of ["page=-1", "size=0", "size=201", "sort=version,asc", "sort=code,sideways", "active=maybe"]) {
+      const reply = await send("GET", `${RATES}?${query}`);
+      expect([query, ...verdict(reply)]).toEqual([query, 400, "validation-failed"]);
+    }
+  });
+
+  it("answers one rate with all its validities, each percentage as text with four decimals, and 404 to one that is not there", async () => {
+    const send = await session("tax-detail");
+
+    const detail = await send("GET", `${RATES}/${RATE_A}`);
+    const missing = await send("GET", `${RATES}/00000000-0000-4000-8000-000000000001`);
+
+    expect(detail.json).toMatchObject({ id: RATE_A, code: "IMP-A", version: 0, isActive: true });
+    expect(await periodsOf(send)).toEqual([
+      ["1.2300", "2026-01-01", "2026-06-30"],
+      ["3.2100", "2026-07-01", null],
+    ]);
+    expect(verdict(missing)).toEqual([404, "resource-not-found"]);
+  });
+
+  it("creates a rate with 201 and no percentage, lists it, and refuses a code that repeats whatever its capitals with 409", async () => {
+    const send = await session("tax-create", "catalog-tax-rates-empty");
+    expect(total(await send("GET", RATES))).toBe(0);
+
+    const created = await send("POST", RATES, NEW_RATE);
+    const repeated = await send("POST", RATES, { ...NEW_RATE, code: "nue-1" });
+    const blank = await send("POST", RATES, { ...NEW_RATE, name: "  " });
+    const pattern = await send("POST", RATES, { ...NEW_RATE, code: "NU E" });
+
+    expect(created.status).toBe(201);
+    expect(created.json).toMatchObject({ code: "NUE-1", name: "Tasa nueva", isActive: true, version: 0 });
+    expect(verdict(repeated)).toEqual([409, "duplicate-tax-rate-code"]);
+    expect(verdict(blank)).toEqual([400, "validation-failed"]);
+    expect((pattern.json as { errors: unknown[] }).errors).toEqual([{ field: "code", reason: "pattern" }]);
+    expect(codes(await send("GET", RATES))).toEqual(["NUE-1"]);
+    expect(await periodsOf(send, (created.json as { id: string }).id)).toEqual([]);
+  });
+
+  it("edits the name and the state with the version, refuses a code in the body and another version with 409, and moves the version on", async () => {
+    const send = await session("tax-edit");
+
+    const edited = await send("PUT", `${RATES}/${RATE_A}`, { version: 0, name: "Otro nombre", isActive: false });
+    const repeated = await send("PUT", `${RATES}/${RATE_A}`, { version: 0, name: "Otro nombre", isActive: false });
+    const withCode = await send("PUT", `${RATES}/${RATE_A}`, { version: 1, name: "x", isActive: true, code: "NEW" });
+    const missing = await send("PUT", `${RATES}/00000000-0000-4000-8000-000000000001`, { version: 0, name: "x", isActive: true });
+
+    expect(edited.json).toMatchObject({ code: "IMP-A", name: "Otro nombre", isActive: false, version: 1 });
+    expect(verdict(repeated)).toEqual([409, "stale-version"]);
+    expect(verdict(withCode)).toEqual([400, "validation-failed"]);
+    expect(verdict(missing)).toEqual([404, "resource-not-found"]);
+  });
+
+  it("serves a stale version first in the stale-first scenario, once, and moves the rate on", async () => {
+    const send = await session("tax-stale", "catalog-stale-version");
+
+    const first = await send("PUT", `${RATES}/${RATE_B}`, { version: 0, name: "x", isActive: true });
+    const retry = await send("PUT", `${RATES}/${RATE_B}`, { version: 1, name: "x", isActive: true });
+
+    expect(verdict(first)).toEqual([409, "stale-version"]);
+    expect(retry.status).toBe(200);
+  });
+
+  it("closes the open validity the day before a new one that starts later, and answers 201 with the percentage at four decimals", async () => {
+    const send = await session("tax-period");
+
+    const added = await send("POST", `${RATES}/${RATE_A}/periods`, { ratePercent: "9.5", validFrom: "2026-09-01" });
+
+    expect(added.status).toBe(201);
+    expect(added.json).toMatchObject({ taxRateId: RATE_A, ratePercent: "9.5000", validFrom: "2026-09-01", validTo: null });
+    expect(await periodsOf(send)).toEqual([
+      ["1.2300", "2026-01-01", "2026-06-30"],
+      ["3.2100", "2026-07-01", "2026-08-31"],
+      ["9.5000", "2026-09-01", null],
+    ]);
+  });
+
+  it("refuses an overlap with 409 and changes nothing, and takes a validity that only touches another", async () => {
+    const send = await session("tax-overlap");
+
+    const inside = await send("POST", `${RATES}/${RATE_A}/periods`, { ratePercent: "5", validFrom: "2026-02-01", validTo: "2026-03-31" });
+    const partial = await send("POST", `${RATES}/${RATE_A}/periods`, { ratePercent: "5", validFrom: "2026-06-15", validTo: "2026-07-15" });
+    const earlierOpen = await send("POST", `${RATES}/${RATE_A}/periods`, { ratePercent: "5", validFrom: "2025-01-01" });
+    const contiguous = await send("POST", `${RATES}/${RATE_B}/periods`, { ratePercent: "5", validFrom: "2024-01-01", validTo: "2025-12-31" });
+
+    expect([inside, partial, earlierOpen].map(verdict)).toEqual(Array(3).fill([409, "tax-rate-period-overlap"]));
+    expect(contiguous.status).toBe(201);
+    expect(await periodsOf(send)).toHaveLength(2);
+  });
+
+  it("refuses a percentage outside the pattern, zero, above 100 or sent as a number, and dates outside the window or reversed, with 400", async () => {
+    const send = await session("tax-invalid");
+    const at = (body: unknown) => send("POST", `${RATES}/${RATE_B}/periods`, body);
+
+    for (const ratePercent of ["abc", "-1", "12.34567", "1234", ""]) {
+      expect(((await at({ ratePercent, validFrom: "2030-01-01" })).json as { errors: unknown[] }).errors, ratePercent).toEqual([{ field: "ratePercent", reason: "pattern" }]);
+    }
+    expect(((await at({ ratePercent: 12.5, validFrom: "2030-01-01" })).json as { errors: unknown[] }).errors).toEqual([{ field: "ratePercent", reason: "invalid" }]);
+    for (const ratePercent of ["0", "0.0000", "100.0001", "101"]) {
+      expect(verdict(await at({ ratePercent, validFrom: "2030-01-01" })), ratePercent).toEqual([400, "validation-failed"]);
+    }
+    expect((await at({ ratePercent: "100", validFrom: "2030-01-01" })).status).toBe(201);
+    expect(((await at({ ratePercent: "5", validFrom: "1999-12-31" })).json as { errors: unknown[] }).errors).toEqual([{ field: "validFrom", reason: "validity-day" }]);
+    expect(((await at({ ratePercent: "5", validFrom: "2031-01-01", validTo: "2101-01-01" })).json as { errors: unknown[] }).errors).toEqual([
+      { field: "validTo", reason: "validity-day" },
+    ]);
+    expect(verdict(await at({ ratePercent: "5", validFrom: "2031-01-02", validTo: "2031-01-01" }))).toEqual([400, "validation-failed"]);
+  });
+
+  it("refuses a validity of an inactive rate with 409 inactive-reference, and of one that is not there with 404", async () => {
+    const send = await session("tax-inactive");
+
+    const inactive = await send("POST", `${RATES}/${RATE_INACTIVE}/periods`, { ratePercent: "5", validFrom: "2027-01-01" });
+    const missing = await send("POST", `${RATES}/00000000-0000-4000-8000-000000000001/periods`, { ratePercent: "5", validFrom: "2027-01-01" });
+
+    expect(verdict(inactive)).toEqual([409, "inactive-reference"]);
+    expect(verdict(missing)).toEqual([404, "resource-not-found"]);
+  });
+
+  it("refuses every write of a rate with 403 forbidden and changes nothing, while the reads keep answering", async () => {
+    const send = await session("tax-forbidden", "catalog-forbidden");
+
+    const replies = [
+      await send("POST", RATES, NEW_RATE),
+      await send("PUT", `${RATES}/${RATE_A}`, { version: 0, name: "x", isActive: true }),
+      await send("POST", `${RATES}/${RATE_A}/periods`, { ratePercent: "5", validFrom: "2027-01-01" }),
+    ];
+
+    expect(replies.map(verdict)).toEqual(Array(3).fill([403, "forbidden"]));
+    expect(total(await send("GET", RATES))).toBe(27);
+  });
+
+  it("fails the first three reads of the rates with 500 and a trace id, then recovers", async () => {
+    const send = await session("tax-server-error", "catalog-server-error");
+
+    const failed = [await send("GET", RATES), await send("GET", RATES), await send("GET", `${RATES}/${RATE_A}`)];
+    const recovered = await send("GET", RATES);
+
+    expect(failed.map(verdict)).toEqual(Array(3).fill([500, "internal-error"]));
+    expect(failed[0]?.json).toMatchObject({ traceId: "01J8Z4K2QF9P0X" });
+    expect(recovered.status).toBe(200);
+  });
+
+  it("keeps one set of rates for each scenario", async () => {
+    const mine = await session("tax-mine", "catalog-tax-rates-empty");
+    const theirs = await session("tax-theirs");
+    await mine("POST", RATES, NEW_RATE);
+
+    expect(total(await mine("GET", RATES))).toBe(1);
+    expect(total(await theirs("GET", RATES))).toBe(27);
+  });
+
+  it("answers the rate of a concept with its code and name, and null for a concept that is not taxable", async () => {
+    const send = await session("tax-concept-read");
+
+    const items = ((await send("GET", `${CONCEPTS}?size=200`)).json as { items: { id: string; taxRateId: string | null; taxRateCode: string | null; taxRateName: string | null }[] }).items;
+
+    expect(items.find((item) => item.id === COL)).toMatchObject({ taxRateId: RATE_A, taxRateCode: "IMP-A", taxRateName: "Impuesto de prueba A" });
+    expect(items.find((item) => item.id === MAT)).toMatchObject({ taxRateId: null, taxRateCode: null, taxRateName: null });
+  });
+
+  it("requires a rate for a taxable concept and refuses one for a concept that is not taxable, with 400 and the field", async () => {
+    const send = await session("tax-concept-rules");
+    const edit = (body: object) => send("PUT", `${CONCEPTS}/${COL}`, { ...concept, ...body });
+
+    const without = await edit({ isTaxable: true });
+    const withRate = await edit({ isTaxable: false, taxRateId: RATE_A });
+    const ok = await edit({ isTaxable: true, taxRateId: RATE_B });
+    const notTaxable = await edit({ version: 1, isTaxable: false });
+
+    expect((without.json as { errors: unknown[] }).errors).toEqual([{ field: "taxRateId", reason: "required" }]);
+    expect((withRate.json as { errors: unknown[] }).errors).toEqual([{ field: "taxRateId", reason: "not-allowed" }]);
+    expect(ok.json).toMatchObject({ taxRateId: RATE_B, taxRateCode: "IMP-B", version: 1 });
+    expect(notTaxable.json).toMatchObject({ isTaxable: false, taxRateId: null, taxRateCode: null, taxRateName: null, version: 2 });
+  });
+
+  it("answers 404 to a rate that does not exist and 409 inactive-reference to an inactive one, but lets a concept keep the one it holds", async () => {
+    const send = await session("tax-concept-ref");
+    const edit = (body: object) => send("PUT", `${CONCEPTS}/${COL}`, { ...concept, isTaxable: true, ...body });
+
+    const missing = await edit({ taxRateId: "00000000-0000-4000-8000-000000000001" });
+    const inactive = await edit({ taxRateId: RATE_INACTIVE });
+    await send("PUT", `${RATES}/${RATE_A}`, { version: 0, name: "Impuesto de prueba A", isActive: false });
+    const kept = await edit({ taxRateId: RATE_A });
+
+    expect(verdict(missing)).toEqual([404, "resource-not-found"]);
+    expect(verdict(inactive)).toEqual([409, "inactive-reference"]);
+    expect(kept.status).toBe(200);
+    expect(kept.json).toMatchObject({ taxRateId: RATE_A });
+  });
+});
+
+describe("the charge plans [charges-plans]", { timeout: LIMIT }, () => {
+  const PLANS = "/api/v1/charges/plans";
+  const YEAR = "00000000-0000-4000-8000-000000001030";
+  const GRADE = "00000000-0000-4000-8000-000000003001";
+  const SEEDED_DRAFT = "00000000-0000-4000-8000-000000009004";
+  const MATRICULA = "00000000-0000-4000-8000-000000007002";
+  const NEW_PLAN = { academicYearId: YEAR, name: "Primaria 2027", targetScope: "GRADE", targetRefId: GRADE, frequency: "MONTHLY", dueDayOfMonth: 5 };
+
+  /** Signs in on a scenario (after the preset, if any) and answers the call helper bound to its bearer token. */
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const headers = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path = "", body?: unknown) => call(method, `${PLANS}${path}`, { headers, scenario: id, ...(body === undefined ? {} : { body }) });
+  }
+
+  const verdict = (reply: Reply) => [reply.status, typeOf(reply)];
+  const total = (reply: Reply) => (reply.json as { total: number }).total;
+
+  it("answers 401 to every operation without an access token, and 404 to a path it does not simulate", async () => {
+    const anonymous = [await call("GET", PLANS, { scenario: "pln-401" }), await call("POST", PLANS, { scenario: "pln-401", body: NEW_PLAN })];
+    const send = await session("pln-404");
+
+    expect(anonymous.map(verdict)).toEqual([
+      [401, "authentication-required"],
+      [401, "authentication-required"],
+    ]);
+    expect((await send("DELETE", "")).status).toBe(404);
+    expect((await send("GET", "/x/y/z")).status).toBe(404);
+  });
+
+  it("lists the twenty eight seeded plans by name, creates one in draft, and keeps one set of plans for each scenario", async () => {
+    const mine = await session("pln-mine", "charges-empty");
+    const theirs = await session("pln-theirs");
+
+    const created = await mine("POST", "", NEW_PLAN);
+
+    expect(total(await theirs("GET"))).toBe(28);
+    expect(created.status).toBe(201);
+    expect(created.json).toMatchObject({ name: "Primaria 2027", status: "DRAFT", version: 0 });
+    expect(total(await mine("GET"))).toBe(1);
+  });
+
+  it("adds an item to a draft, activates the plan, and then refuses to change its items with plan-not-editable", async () => {
+    const send = await session("pln-flow");
+    const item = { paymentConceptId: MATRICULA, periodsCount: 1, firstPeriodOn: "2027-02-01" };
+
+    const added = await send("POST", `/${SEEDED_DRAFT}/items`, item);
+    const detail = await send("GET", `/${SEEDED_DRAFT}`);
+    const activated = await send("PUT", `/${SEEDED_DRAFT}`, { version: 1, name: "Segundo grado 2026", frequency: "MONTHLY", dueDayOfMonth: 5, status: "ACTIVE" });
+    const late = await send("POST", `/${SEEDED_DRAFT}/items`, { ...item, periodsCount: 2 });
+
+    expect(added.status).toBe(201);
+    expect((detail.json as { items: unknown[] }).items).toHaveLength(2);
+    expect(activated.json).toMatchObject({ status: "ACTIVE", version: 2 });
+    expect(verdict(late)).toEqual([409, "plan-not-editable"]);
+  });
+
+  it("serves the three presets of failure: stale-first, forbidden and failing-first", async () => {
+    const stale = await session("pln-stale", "charges-stale-version");
+    const forbidden = await session("pln-forbidden", "charges-forbidden");
+    const failing = await session("pln-failing", "charges-server-error");
+    const body = { version: 1, name: "Segundo grado 2026", frequency: "MONTHLY", dueDayOfMonth: 5, status: "DRAFT" };
+
+    const refused = await stale("PUT", `/${SEEDED_DRAFT}`, body);
+    const denied = await forbidden("POST", "", NEW_PLAN);
+    const failed = [await failing("GET"), await failing("GET"), await failing("GET")];
+    const recovered = await failing("GET");
+
+    expect(verdict(refused)).toEqual([409, "stale-version"]);
+    expect(verdict(denied)).toEqual([403, "forbidden"]);
+    expect(failed.map(verdict)).toEqual(Array(3).fill([500, "internal-error"]));
+    expect(recovered.status).toBe(200);
+  });
+
+  it("removes an item with a 204 and no body", async () => {
+    const send = await session("pln-remove");
+
+    const removed = await send("DELETE", `/${SEEDED_DRAFT}/items/00000000-0000-4000-8000-000000009504`);
+
+    expect(removed.status).toBe(204);
+    expect(removed.text).toBe("");
+  });
+});
+
+describe("the accrual engine [charges-accrual]", { timeout: LIMIT }, () => {
+  const ACTIVE_PLAN = "00000000-0000-4000-8000-000000009001";
+  const PLAN = `/api/v1/charges/plans/${ACTIVE_PLAN}`;
+  const FRESH = { periodStart: "2026-05-01" };
+
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const bearer = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path: string, options: { body?: unknown; key?: string } = {}) =>
+      call(method, path, {
+        headers: { ...bearer, ...(options.key === undefined ? {} : { "Idempotency-Key": options.key }) },
+        scenario: id,
+        ...(options.body === undefined ? {} : { body: options.body }),
+      });
+  }
+
+  it("answers 401 to every operation without an access token", async () => {
+    const answers = [
+      await call("GET", `${PLAN}/accrual-periods`, { scenario: "acc-401" }),
+      await call("POST", `${PLAN}/accrual-preview`, { scenario: "acc-401", body: FRESH }),
+      await call("GET", "/api/v1/charges/accrual-runs", { scenario: "acc-401" }),
+    ];
+
+    expect(answers.map((answer) => answer.status)).toEqual([401, 401, 401]);
+  });
+
+  it("carries the Idempotency-Key of the request to the engine: without it 400, with it 202 and the same run for the same key", async () => {
+    const send = await session("acc-key");
+
+    const missing = await send("POST", `${PLAN}/accrual-runs`, { body: FRESH });
+    const first = await send("POST", `${PLAN}/accrual-runs`, { body: FRESH, key: "k-1" });
+    const again = await send("POST", `${PLAN}/accrual-runs`, { body: FRESH, key: "k-1" });
+
+    expect([missing.status, typeOf(missing)]).toEqual([400, "idempotency-key-missing"]);
+    expect(first.status).toBe(202);
+    expect(again.json).toMatchObject({ id: (first.json as { id: string }).id });
+  });
+
+  it("serves a run that progresses over its reads", async () => {
+    const send = await session("acc-run");
+    const queued = await send("POST", `${PLAN}/accrual-runs`, { body: FRESH, key: "k-1" });
+    const id = (queued.json as { id: string }).id;
+
+    const statuses = [await send("GET", `/api/v1/charges/accrual-runs/${id}`), await send("GET", `/api/v1/charges/accrual-runs/${id}`), await send("GET", `/api/v1/charges/accrual-runs/${id}`)];
+
+    expect(statuses.map((reply) => (reply.json as { run: { status: string } }).run.status)).toEqual(["QUEUED", "RUNNING", "COMPLETED_WITH_ERRORS"]);
+  });
+
+  it.each([
+    ["charges-accrual-forbidden", "forbidden", 403],
+    ["charges-accrual-in-progress", "accrual-run-in-progress", 409],
+  ] as const)("serves the %s preset: the request is refused with %s", async (name, code, status) => {
+    const send = await session(`acc-${name}`, name);
+
+    const refused = await send("POST", `${PLAN}/accrual-runs`, { body: FRESH, key: "k-1" });
+
+    expect([refused.status, typeOf(refused)]).toEqual([status, code]);
+  });
+
+  it("serves the empty and blocked presets", async () => {
+    const empty = await session("acc-empty", "charges-accrual-empty");
+    const blocked = await session("acc-blocked", "charges-accrual-blocked");
+
+    const runs = await empty("GET", "/api/v1/charges/accrual-runs");
+    const preview = await blocked("POST", `${PLAN}/accrual-preview`, { body: FRESH });
+
+    expect(runs.json).toMatchObject({ total: 0 });
+    expect(preview.json).toMatchObject({ blockers: ["posting-accounts-incomplete"] });
+  });
+});
+
+describe("the chart of accounts and the map of posting accounts [ledger-chart-of-accounts]", { timeout: LIMIT }, () => {
+  const ACCOUNTS = "/api/v1/ledger/accounts";
+  const MAP = "/api/v1/charges/posting-accounts";
+  const RECEIVABLE = "00000000-0000-4000-8000-000000008001";
+  const CASH = "00000000-0000-4000-8000-000000008002";
+
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const headers = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path: string, body?: unknown) => call(method, path, { headers, scenario: id, ...(body === undefined ? {} : { body }) });
+  }
+
+  const items = (reply: Reply) => (reply.json as { items: Record<string, unknown>[] }).items;
+
+  it("answers 401 to every operation without an access token, and 404 to a path it does not simulate", async () => {
+    const anonymous = [
+      await call("GET", ACCOUNTS, { scenario: "led-401" }),
+      await call("POST", ACCOUNTS, { scenario: "led-401", body: {} }),
+      await call("GET", MAP, { scenario: "led-401" }),
+      await call("PUT", MAP, { scenario: "led-401", body: {} }),
+    ];
+    const send = await session("led-404");
+
+    expect(anonymous.map((reply) => [reply.status, typeOf(reply)])).toEqual(Array.from({ length: 4 }, () => [401, "authentication-required"]));
+    expect((await send("DELETE", `${ACCOUNTS}/${CASH}`)).status).toBe(404);
+    expect((await send("GET", "/api/v1/ledger/other")).status).toBe(404);
+  });
+
+  it("serves the chart and the partial map of the default scenario, and keeps one set of both for each scenario", async () => {
+    const mine = await session("led-mine", "ledger-empty");
+    const theirs = await session("led-theirs");
+
+    const created = await mine("POST", ACCOUNTS, { code: "ACT-100", name: "Cuenta de prueba", type: "ASSET", holdsStudentBalances: false });
+
+    expect(created.status).toBe(201);
+    expect((await mine("GET", ACCOUNTS)).json).toMatchObject({ total: 1 });
+    expect((await theirs("GET", ACCOUNTS)).json).toMatchObject({ total: 28 });
+    expect(items(await theirs("GET", MAP)).map((row) => row["purpose"])).toEqual(["RECEIVABLE", "TAX_PAYABLE"]);
+  });
+
+  it("saves the map through the charges path, which the ledger model owns, and refuses a type that does not fit", async () => {
+    const send = await session("led-map");
+
+    const saved = await send("PUT", MAP, { entries: [{ purpose: "REVENUE", ledgerAccountId: "00000000-0000-4000-8000-000000008004" }] });
+    const refused = await send("PUT", MAP, { entries: [{ purpose: "RECEIVABLE", ledgerAccountId: CASH, version: 0 }] });
+
+    expect(saved.status).toBe(200);
+    expect(items(saved)).toHaveLength(3);
+    expect([refused.status, typeOf(refused)]).toEqual([409, "posting-account-invalid"]);
+  });
+
+  it.each([
+    ["ledger-map-empty", 0],
+    ["ledger-map-complete", 5],
+  ] as const)("serves the %s preset with %i rows in the map", async (name, rows) => {
+    const send = await session(`led-${name}`, name);
+
+    expect(items(await send("GET", MAP))).toHaveLength(rows);
+  });
+
+  it.each([
+    ["ledger-forbidden", "POST", 403, "forbidden"],
+    ["ledger-stale-version", "PUT", 409, "stale-version"],
+  ] as const)("serves the %s preset: the write is refused with %s", async (name, method, status, code) => {
+    const send = await session(`led-${name}`, name);
+
+    const refused = method === "POST"
+      ? await send("POST", ACCOUNTS, { code: "ACT-100", name: "Cuenta de prueba", type: "ASSET", holdsStudentBalances: false })
+      : await send("PUT", `${ACCOUNTS}/${RECEIVABLE}`, { version: 0, name: "Otro nombre", active: true });
+
+    expect([refused.status, typeOf(refused)]).toEqual([status, code]);
+  });
+
+  it("fails the first reads of the accounts or of the map, each in its own preset, and then recovers", async () => {
+    const accounts = await session("led-err-accounts", "ledger-server-error");
+    const mapOnly = await session("led-err-map", "ledger-map-server-error");
+
+    const statuses = async (send: Awaited<ReturnType<typeof session>>, path: string) => {
+      const seen: number[] = [];
+      for (let read = 0; read < 4; read += 1) seen.push((await send("GET", path)).status);
+      return seen;
+    };
+
+    expect(await statuses(accounts, ACCOUNTS)).toEqual([500, 500, 500, 200]);
+    expect((await accounts("GET", MAP)).status).toBe(200);
+    expect(await statuses(mapOnly, MAP)).toEqual([500, 500, 500, 200]);
+    expect((await mapOnly("GET", ACCOUNTS)).status).toBe(200);
+  });
+});
+
+describe("the statement of account [ledger-account-statement]", { timeout: LIMIT }, () => {
+  const ANA = "00000000-0000-4000-8000-000000005001";
+  const NO_MOVEMENTS = "00000000-0000-4000-8000-000000005003";
+  const FOREIGN = "00000000-0000-4000-8000-000000009404";
+  const statementOf = (id: string) => `/api/v1/charges/students/${id}/statement`;
+
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const headers = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path: string) => call(method, path, { headers, scenario: id });
+  }
+
+  it("answers 401 without an access token", async () => {
+    expect((await call("GET", statementOf(ANA), { scenario: "stm-401" })).status).toBe(401);
+  });
+
+  it("serves the statement of the seeded student with its sections and checks it against the contract", async () => {
+    const send = await session("stm-ok");
+
+    const reply = await send("GET", `${statementOf(ANA)}?size=25`);
+
+    const body = reply.json as { studentCode: string; sections: { currency: string; totalLines: number }[] };
+    expect(reply.status).toBe(200);
+    expect(body.studentCode).toBe("E-000001");
+    expect(body.sections.map((section) => [section.currency, section.totalLines])).toEqual([["HNL", 14]]);
+    const violations = await call("GET", "/__control/violations", { scenario: "stm-ok" });
+    expect(violations.json).toEqual([]);
+  });
+
+  it("answers 404 for a student of another institution and 400 for a period that ends before it starts", async () => {
+    const send = await session("stm-404");
+
+    expect([(await send("GET", statementOf(FOREIGN))).status, typeOf(await send("GET", statementOf(FOREIGN)))]).toEqual([404, "resource-not-found"]);
+    expect((await send("GET", `${statementOf(ANA)}?from=2026-02-01&to=2026-01-01`)).status).toBe(400);
+  });
+
+  it.each([
+    ["statement-forbidden", ANA, 403],
+    ["statement-empty", NO_MOVEMENTS, 200],
+  ] as const)("serves the %s preset", async (name, student, status) => {
+    const send = await session(`stm-${name}`, name);
+
+    const reply = await send("GET", statementOf(student));
+
+    expect(reply.status).toBe(status);
+    if (status === 200) expect((reply.json as { sections: unknown[] }).sections).toEqual([]);
+  });
+
+  it("fails the first reads of the failing preset and then recovers", async () => {
+    const send = await session("stm-err", "statement-server-error");
+
+    const seen: number[] = [];
+    for (let read = 0; read < 4; read += 1) seen.push((await send("GET", statementOf(ANA))).status);
+
+    expect(seen).toEqual([500, 500, 500, 200]);
+  });
+});
+

@@ -72,7 +72,7 @@ export function FormField({
     .join(" ");
 
   return (
-    <div {...rest} className={cn("flex flex-col gap-1.5", className)}>
+    <div {...rest} className={cn("flex flex-col gap-1", className)}>
       <Label id={labelId} htmlFor={controlId} disabled={disabled}>
         {label}
         {required ? (

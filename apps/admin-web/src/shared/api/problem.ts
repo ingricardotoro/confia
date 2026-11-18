@@ -37,7 +37,19 @@ export const KNOWN_PROBLEM_CODES = [
   "import-file-changed",
   "price-validity-overlap",
   "price-list-archived",
+  "duplicate-tax-rate-code",
+  "tax-rate-period-overlap",
+  "plan-not-editable",
+  "plan-without-items",
+  "duplicate-plan-item",
   "stale-version",
+  "accrual-run-in-progress",
+  "plan-item-invalid",
+  "idempotency-key-missing",
+  "idempotency-payload-mismatch",
+  "duplicate-account-code",
+  "account-in-use",
+  "posting-account-invalid",
 ] as const;
 
 export type ProblemCode = (typeof KNOWN_PROBLEM_CODES)[number];

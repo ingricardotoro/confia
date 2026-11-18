@@ -114,8 +114,8 @@ function LinkRow({ row, errors, onChange, onRemove }: RowProps) {
           </div>
           <Button
             id={linkRemoveId(row.key)}
-            variant="secondary"
-            size="sm"
+            variant="destructive-soft"
+            size="xs"
             className="ml-auto"
             aria-label={t("guardians.links.removeFor", { name })}
             onClick={() => {
@@ -152,7 +152,7 @@ function ReadyForm({
 }: ReadyFormProps) {
   const { t } = useAdminText();
   return (
-    <form id={formId} noValidate onSubmit={onSubmit} className="flex flex-col gap-4">
+    <form id={formId} noValidate onSubmit={onSubmit} className="flex flex-col gap-3">
       <FormErrorSummary ref={attachSummary} errors={summary} />
       {alert === undefined ? null : (
         <Alert ref={attachAlert} variant="destructive">
@@ -202,14 +202,14 @@ export function StudentGuardiansDialog({ studentName, state, onChange, onRemove,
       }}
       title={t("guardians.links.title", { name: studentName })}
       description={t("guardians.links.description")}
-      className="max-w-3xl"
+      size="lg"
       footer={
         <>
-          <Button variant="secondary" disabled={submitting} onClick={onClose}>
+          <Button variant="secondary" size="sm" disabled={submitting} onClick={onClose}>
             {t("resource.cancel")}
           </Button>
           {ready === undefined ? null : (
-            <Button type="submit" form={formId} loading={submitting}>
+            <Button type="submit" size="sm" form={formId} loading={submitting}>
               {t("guardians.links.save")}
             </Button>
           )}

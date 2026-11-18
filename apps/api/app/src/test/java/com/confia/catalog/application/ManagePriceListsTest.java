@@ -80,7 +80,7 @@ class ManagePriceListsTest {
 
     private PaymentConcept concept(boolean active) {
         PaymentConcept concept = new PaymentConcept(UUID.randomUUID(), "COLEG", "Colegiatura",
-                PaymentCategory.TUITION, true, true, active, 0, NOW, NOW);
+                PaymentCategory.TUITION, true, true, active, null, 0, NOW, NOW);
         concepts.rows.put(new Key(institution, concept.id()), concept);
         return concept;
     }
@@ -346,7 +346,7 @@ class ManagePriceListsTest {
         PriceListView list = institutionList();
         PaymentConcept inactive = concept(false);
         PaymentConcept foreign = new PaymentConcept(UUID.randomUUID(), "AJENO", "Ajeno", PaymentCategory.OTHER,
-                false, false, true, 0, NOW, NOW);
+                false, false, true, null, 0, NOW, NOW);
         concepts.rows.put(new Key(new InstitutionId(UUID.randomUUID()), foreign.id()), foreign);
 
         assertThatThrownBy(() -> add(list.id(), inactive.id(), "1.00", "2027-01-01", null))
@@ -472,6 +472,11 @@ class ManagePriceListsTest {
         @Override
         public boolean gradeExists(InstitutionId institutionId, UUID gradeId) {
             return grades.contains(new Ref(institutionId, gradeId));
+        }
+
+        @Override
+        public boolean sectionExists(InstitutionId institutionId, UUID sectionId) {
+            return false;
         }
     }
 

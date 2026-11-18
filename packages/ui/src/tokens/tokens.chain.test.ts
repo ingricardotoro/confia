@@ -20,7 +20,7 @@ describe("the three-level token chain", () => {
   });
 
   it("resolves the component token down to the brand hex", () => {
-    expect(resolveToken("--button-primary-bg", declarations).toLowerCase()).toBe("#2563eb");
+    expect(resolveToken("--button-primary-bg", declarations).toLowerCase()).toBe("#1d4fb0");
   });
 
   it("changes a component color by editing only the primitive [DS07]", () => {

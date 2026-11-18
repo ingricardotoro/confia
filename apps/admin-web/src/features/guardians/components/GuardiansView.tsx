@@ -65,7 +65,7 @@ export function GuardiansView({ rows, table, pagination, notice, togglingId, fil
           extra={
             <Button
               variant="secondary"
-              size="sm"
+              size="xs"
               aria-label={t("guardians.actions.detailFor", { name: nameOf(row) })}
               onClick={() => {
                 onDetail(row);

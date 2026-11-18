@@ -84,13 +84,14 @@ export function PriceListsView({
     {
       id: "status",
       header: t("catalog.priceLists.columns.status"),
-      cell: (row) => <Badge variant={row.status === "ACTIVE" ? "primary" : "outline"}>{t(`catalog.priceLists.statuses.${row.status}`)}</Badge>,
+      cell: (row) => <Badge variant={row.status === "ACTIVE" ? "success" : "neutral"} dot={row.status === "ACTIVE" ? "filled" : "hollow"}>{t(`catalog.priceLists.statuses.${row.status}`)}</Badge>,
     },
   ];
 
   return (
     <ResourceScreen
       heading={t("catalog.priceLists.heading")}
+      description={t("catalog.priceLists.description")}
       createLabel={t("catalog.priceLists.create")}
       onCreate={onCreate}
       notice={notice}

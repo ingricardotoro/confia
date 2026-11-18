@@ -106,7 +106,7 @@ export function ReconciliationForm({
         <Alert variant={years.state === "failed" ? "destructive" : "warning"} title={t(years.state === "failed" ? "imports.reconciliation.year.failedTitle" : "imports.reconciliation.year.emptyTitle")}>
           <p>{t(years.state === "failed" ? "imports.reconciliation.year.failedDescription" : "imports.reconciliation.year.emptyDescription")}</p>
           {years.state === "failed" ? (
-            <Button variant="secondary" size="sm" className="mt-2" onClick={years.onRetry}>
+            <Button variant="secondary" size="xs" className="mt-2" onClick={years.onRetry}>
               {t("imports.reconciliation.year.retry")}
             </Button>
           ) : null}
@@ -131,7 +131,7 @@ export function ReconciliationForm({
 
       <p className="text-sm text-text-secondary">{t("imports.reconciliation.form.signHelp")}</p>
       <div>
-        <Button type="submit" loading={submitting}>
+        <Button type="submit" size="sm" loading={submitting}>
           {t("imports.reconciliation.form.submit")}
         </Button>
       </div>

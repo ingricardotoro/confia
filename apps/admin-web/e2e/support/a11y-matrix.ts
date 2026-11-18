@@ -116,12 +116,45 @@ const PRICE_LISTS = "/catalog/price-lists";
 const PRICE_LIST_DETAIL = `${PRICE_LISTS}/00000000-0000-4000-8000-000000009001`;
 const PRICE_LIST_BLANK = `${PRICE_LISTS}/00000000-0000-4000-8000-000000009002`;
 const PRICE_LIST_ARCHIVED = `${PRICE_LISTS}/00000000-0000-4000-8000-000000009003`;
+const TAX_RATES = "/catalog/tax-rates";
+/** The seeded rates: with two validities (one closed, one open), inactive, and active with none. */
+const TAX_RATE_DETAIL = `${TAX_RATES}/00000000-0000-4000-8000-000000006001`;
+const TAX_RATE_INACTIVE = `${TAX_RATES}/00000000-0000-4000-8000-000000006003`;
+const TAX_RATE_BLANK = `${TAX_RATES}/00000000-0000-4000-8000-000000006004`;
+
+const PLANS = "/charges/plans";
+/** The seeded plans: an active one with two items, a draft with one, a draft with none, and an archived one. */
+const PLAN_ACTIVE = `${PLANS}/00000000-0000-4000-8000-000000009001`;
+const PLAN_BLANK = `${PLANS}/00000000-0000-4000-8000-000000009002`;
+const PLAN_ARCHIVED = `${PLANS}/00000000-0000-4000-8000-000000009003`;
+const PLAN_DRAFT = `${PLANS}/00000000-0000-4000-8000-000000009004`;
 
 /** The payment concepts list with the cookies of a signed in session, as the control of the simulator does. */
 async function openCatalogRoute(page: Page, path: string = CATALOG): Promise<void> {
   await seed(page);
   await page.getByRole("heading", { level: 1, name: "Sesión iniciada." }).waitFor();
   await page.goto(path);
+}
+
+/** A route of the charges with the cookies of a signed in session: the same way in as the catalog's. */
+const openChargesRoute = (page: Page, path: string): Promise<void> => openCatalogRoute(page, path);
+
+/** The generation of charges (charges-accrual cut): the page, the list of runs and the seeded runs (completed with errors, rejected, failed). */
+const ACCRUAL = "/charges/accrual";
+const ACCRUAL_PLAN = "planId=00000000-0000-4000-8000-000000009001";
+const ACCRUAL_FRESH = `${ACCRUAL}?${ACCRUAL_PLAN}&periodStart=2026-05-01`;
+const RUNS = `${ACCRUAL}/runs`;
+const RUN_WITH_ERRORS = `${RUNS}/00000000-0000-4000-8000-00000000a002`;
+const RUN_REJECTED = `${RUNS}/00000000-0000-4000-8000-00000000a003`;
+const RUN_FAILED = `${RUNS}/00000000-0000-4000-8000-00000000a004`;
+
+/** The plan and the period come in the address; the preview is asked for with the button. */
+async function openPreview(page: Page): Promise<void> {
+  await openChargesRoute(page, ACCRUAL_FRESH);
+  // `selectOption` waits for the select to be enabled and its options to be there, which is when the periods have loaded.
+  await page.getByLabel(/^Período/).selectOption("2026-05-01", { timeout: 20_000 });
+  await page.getByRole("button", { name: "Calcular vista previa" }).click();
+  await page.getByRole("region", { name: "Resumen de la vista previa" }).waitFor();
 }
 
 const IMPORTS = "/imports";
@@ -984,6 +1017,23 @@ export const MATRIX: readonly GateCombination[] = [
     expected: (page) => page.getByRole("group", { name: "Hay 1 campo con error." }),
   },
   {
+    // The field of the tax rate that a taxable concept asks for, with a required choice and its help.
+    route: CATALOG,
+    state: "dialog-taxable",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page);
+      await page.getByRole("button", { name: "Nuevo concepto" }).click();
+      const dialog = page.getByRole("dialog");
+      // The fields are filled first: leaving an empty one shows its error and moves the checkbox before it is pressed.
+      await dialog.getByLabel(/^Código/).fill("COL");
+      await dialog.getByLabel(/^Nombre/).fill("Colegiatura");
+      await dialog.getByLabel(/^Categoría/).selectOption({ label: "Colegiatura" });
+      await dialog.getByRole("checkbox", { name: "Gravado" }).check();
+    },
+    expected: (page) => page.getByRole("dialog").getByLabel(/^Tasa de impuesto/),
+  },
+  {
     route: CATALOG,
     state: "no-matches",
     arrange: (page) => openCatalogRoute(page, `${CATALOG}?category=FINE&active=false`),
@@ -1117,5 +1167,434 @@ export const MATRIX: readonly GateCombination[] = [
     // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
     arrange: (page) => openCatalogRoute(page, PRICE_LIST_DETAIL),
     expected: (page) => page.getByText("No se pudo cargar la lista de precios"),
+  },
+  // The tax rates (catalog-tax-rates cut): the list, the detail of a rate with its history, of one with none and of an
+  // inactive one, and the dialogs of a new rate and of a new validity.
+  {
+    route: TAX_RATES,
+    state: "ready",
+    arrange: (page) => openCatalogRoute(page, TAX_RATES),
+    expected: (page) => page.getByRole("link", { name: "IMP-A", exact: true }),
+  },
+  {
+    route: TAX_RATES,
+    state: "dialog-open",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATES);
+      await page.getByRole("button", { name: "Nueva tasa" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Nueva tasa de impuesto" }),
+  },
+  {
+    route: TAX_RATES,
+    state: "dialog-edit",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATES);
+      await page.getByRole("button", { name: "Editar Impuesto de prueba A" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Editar tasa de impuesto" }),
+  },
+  {
+    route: TAX_RATES,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATES);
+      await page.getByRole("button", { name: "Nueva tasa" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 2 campos con errores." }),
+  },
+  {
+    route: TAX_RATES,
+    state: "dialog-duplicate-code",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATES);
+      await page.getByRole("button", { name: "Nueva tasa" }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.getByLabel(/^Código/).fill("imp-a");
+      await dialog.getByLabel(/^Nombre/).fill("Otra tasa");
+      await dialog.getByRole("button", { name: "Guardar" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 1 campo con error." }),
+  },
+  {
+    route: TAX_RATES,
+    state: "no-matches",
+    preset: "catalog-tax-rates-empty",
+    arrange: (page) => openCatalogRoute(page, `${TAX_RATES}?active=true`),
+    expected: (page) => page.getByText("Ningún registro coincide con los filtros"),
+  },
+  {
+    route: TAX_RATES,
+    state: "empty",
+    preset: "catalog-tax-rates-empty",
+    arrange: (page) => openCatalogRoute(page, TAX_RATES),
+    expected: (page) => page.getByText("Todavía no hay tasas de impuesto"),
+  },
+  {
+    route: TAX_RATES,
+    state: "load-error",
+    preset: "catalog-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openCatalogRoute(page, TAX_RATES),
+    expected: (page) => page.getByText("No se pudo cargar la lista de tasas de impuesto"),
+  },
+  {
+    route: TAX_RATE_DETAIL,
+    state: "ready",
+    arrange: (page) => openCatalogRoute(page, TAX_RATE_DETAIL),
+    expected: (page) => page.getByRole("table", { name: "Vigencias de Impuesto de prueba A" }),
+  },
+  {
+    route: TAX_RATE_DETAIL,
+    state: "dialog-add-period",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATE_DETAIL);
+      await page.getByRole("button", { name: "Nueva vigencia" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Nueva vigencia" }),
+  },
+  {
+    route: TAX_RATE_DETAIL,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATE_DETAIL);
+      await page.getByRole("button", { name: "Nueva vigencia" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar vigencia" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 2 campos con errores." }),
+  },
+  {
+    route: TAX_RATE_DETAIL,
+    state: "dialog-overlap",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCatalogRoute(page, TAX_RATE_DETAIL);
+      await page.getByRole("button", { name: "Nueva vigencia" }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.getByLabel(/^Porcentaje/).fill("5");
+      // Inside the open validity of the seed: the server refuses it with 409.
+      await dialog.getByLabel(/^Vigente desde/).fill("2026-08-01");
+      await dialog.getByLabel(/^Vigente hasta/).fill("2026-08-31");
+      await dialog.getByRole("button", { name: "Guardar vigencia" }).click();
+    },
+    expected: (page) => page.getByRole("dialog").getByRole("alert").filter({ hasText: "ya tiene una vigencia" }),
+  },
+  {
+    route: TAX_RATE_BLANK,
+    state: "empty",
+    arrange: (page) => openCatalogRoute(page, TAX_RATE_BLANK),
+    expected: (page) => page.getByText("Esta tasa todavía no tiene vigencias"),
+  },
+  {
+    route: TAX_RATE_INACTIVE,
+    state: "inactive",
+    arrange: (page) => openCatalogRoute(page, TAX_RATE_INACTIVE),
+    expected: (page) => page.getByText(/está inactiva y no admite vigencias nuevas/),
+  },
+  {
+    route: TAX_RATE_DETAIL,
+    state: "load-error",
+    preset: "catalog-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openCatalogRoute(page, TAX_RATE_DETAIL),
+    expected: (page) => page.getByText("No se pudo cargar la tasa de impuesto"),
+  },
+  // The charge plans (charges-plans cut): the list, the detail of a draft with an item, of a draft with none, of an active plan
+  // and of an archived one, and the dialogs of a new plan, of a new item and of each confirmation.
+  {
+    route: PLANS,
+    state: "ready",
+    arrange: (page) => openChargesRoute(page, PLANS),
+    expected: (page) => page.getByRole("link", { name: "Primaria 2026", exact: true }),
+  },
+  {
+    route: PLANS,
+    state: "dialog-open",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openChargesRoute(page, PLANS);
+      await page.getByRole("button", { name: "Nuevo plan de cobro" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Nuevo plan de cobro" }),
+  },
+  {
+    route: PLANS,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openChargesRoute(page, PLANS);
+      await page.getByRole("button", { name: "Nuevo plan de cobro" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 4 campos con errores." }),
+  },
+  {
+    route: PLANS,
+    state: "no-matches",
+    arrange: (page) => openChargesRoute(page, `${PLANS}?targetScope=MODALITY&status=ARCHIVED`),
+    expected: (page) => page.getByText("Ningún registro coincide con los filtros"),
+  },
+  {
+    route: PLANS,
+    state: "empty",
+    preset: "charges-empty",
+    arrange: (page) => openChargesRoute(page, PLANS),
+    expected: (page) => page.getByText("Todavía no hay planes de cobro"),
+  },
+  {
+    route: PLANS,
+    state: "load-error",
+    preset: "charges-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openChargesRoute(page, PLANS),
+    expected: (page) => page.getByText("No se pudieron cargar los planes de cobro"),
+  },
+  {
+    route: PLAN_DRAFT,
+    state: "ready",
+    arrange: (page) => openChargesRoute(page, PLAN_DRAFT),
+    expected: (page) => page.getByRole("table", { name: "Conceptos del plan Segundo grado 2026" }),
+  },
+  {
+    route: PLAN_DRAFT,
+    state: "dialog-add-item",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openChargesRoute(page, PLAN_DRAFT);
+      await page.getByRole("button", { name: "Agregar concepto" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Agregar concepto" }),
+  },
+  {
+    route: PLAN_DRAFT,
+    state: "dialog-error-summary",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openChargesRoute(page, PLAN_DRAFT);
+      await page.getByRole("button", { name: "Agregar concepto" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Agregar concepto" }).click();
+    },
+    expected: (page) => page.getByRole("group", { name: "Hay 3 campos con errores." }),
+  },
+  {
+    route: PLAN_DRAFT,
+    state: "dialog-first-of-month",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openChargesRoute(page, PLAN_DRAFT);
+      await page.getByRole("button", { name: "Agregar concepto" }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.getByLabel(/^Concepto/).selectOption({ label: "Matrícula anual" });
+      await dialog.getByLabel(/^Cantidad de períodos/).fill("1");
+      // Not the first of a month: refused before sending, with the message that says what to do.
+      await dialog.getByLabel(/^Primer día del primer período/).fill("2026-02-15");
+      await dialog.getByRole("button", { name: "Agregar concepto" }).click();
+    },
+    expected: (page) => page.getByRole("dialog").getByText(/Elija el primer día de un mes/).first(),
+  },
+  {
+    route: PLAN_DRAFT,
+    state: "dialog-edit",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openChargesRoute(page, PLAN_DRAFT);
+      await page.getByRole("button", { name: "Editar plan Segundo grado 2026" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Editar plan de cobro" }),
+  },
+  {
+    route: PLAN_DRAFT,
+    state: "dialog-confirm-activate",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openChargesRoute(page, PLAN_DRAFT);
+      await page.getByRole("button", { name: "Activar plan Segundo grado 2026" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Activar el plan «Segundo grado 2026»" }),
+  },
+  {
+    route: PLAN_DRAFT,
+    state: "dialog-confirm-remove",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openChargesRoute(page, PLAN_DRAFT);
+      await page.getByRole("button", { name: "Quitar Colegiatura del plan" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Quitar «Colegiatura» del plan" }),
+  },
+  {
+    route: PLAN_BLANK,
+    state: "empty",
+    arrange: (page) => openChargesRoute(page, PLAN_BLANK),
+    expected: (page) => page.getByText("Este plan todavía no tiene conceptos"),
+  },
+  {
+    route: PLAN_ACTIVE,
+    state: "active",
+    arrange: (page) => openChargesRoute(page, PLAN_ACTIVE),
+    expected: (page) => page.getByText(/Este plan está activo y congelado/),
+  },
+  {
+    route: PLAN_ACTIVE,
+    state: "dialog-confirm-archive",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openChargesRoute(page, PLAN_ACTIVE);
+      await page.getByRole("button", { name: "Archivar plan Primaria 2026" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Archivar el plan «Primaria 2026»" }),
+  },
+  {
+    route: PLAN_ARCHIVED,
+    state: "archived",
+    arrange: (page) => openChargesRoute(page, PLAN_ARCHIVED),
+    expected: (page) => page.getByText(/Este plan está archivado/),
+  },
+  {
+    route: PLAN_DRAFT,
+    state: "load-error",
+    preset: "charges-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openChargesRoute(page, PLAN_DRAFT),
+    expected: (page) => page.getByText("No se pudo cargar el plan de cobro"),
+  },
+  // The generation of charges (charges-accrual cut): the page idle, with a preview, with its confirmation, blocked, with nothing to
+  // confirm, with no active plan and with its errors; the list of runs; and the run in the states a person meets.
+  {
+    route: ACCRUAL,
+    state: "idle",
+    arrange: (page) => openChargesRoute(page, ACCRUAL),
+    expected: (page) => page.getByText("Elija un plan y un período"),
+  },
+  {
+    route: ACCRUAL,
+    state: "preview-ready",
+    arrange: (page) => openPreview(page),
+    expected: (page) => page.getByRole("table", { name: "Renglones de la vista previa: un estudiante y un concepto por renglón" }),
+  },
+  {
+    route: ACCRUAL,
+    state: "dialog-confirm",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openPreview(page);
+      await page.getByRole("button", { name: "Confirmar generación" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "¿Generar los cargos de Primaria 2026?" }),
+  },
+  {
+    route: ACCRUAL,
+    state: "dialog-confirm-refused",
+    preset: "charges-accrual-in-progress",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openPreview(page);
+      await page.getByRole("button", { name: "Confirmar generación" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Generar cargos" }).click();
+    },
+    expected: (page) => page.getByRole("dialog").getByRole("alert"),
+  },
+  {
+    route: ACCRUAL,
+    state: "blocked",
+    preset: "charges-accrual-blocked",
+    arrange: (page) => openPreview(page),
+    expected: (page) => page.getByText("La generación no se puede confirmar todavía"),
+  },
+  {
+    route: ACCRUAL,
+    state: "nothing-to-confirm",
+    arrange: async (page) => {
+      await openChargesRoute(page, `${ACCRUAL}?${ACCRUAL_PLAN}&periodStart=2026-01-01`);
+      await page.getByLabel(/^Período/).selectOption("2026-01-01", { timeout: 20_000 });
+      await page.getByRole("button", { name: "Calcular vista previa" }).click();
+    },
+    expected: (page) => page.getByText(/no hay cargos nuevos que crear/),
+  },
+  {
+    route: ACCRUAL,
+    state: "no-active-plans",
+    preset: "charges-empty",
+    arrange: (page) => openChargesRoute(page, ACCRUAL),
+    expected: (page) => page.getByText("No hay planes activos"),
+  },
+  {
+    route: ACCRUAL,
+    state: "preview-error",
+    preset: "charges-accrual-forbidden",
+    arrange: async (page) => {
+      await openChargesRoute(page, ACCRUAL_FRESH);
+      await page.getByLabel(/^Período/).selectOption("2026-05-01", { timeout: 20_000 });
+      await page.getByRole("button", { name: "Calcular vista previa" }).click();
+    },
+    expected: (page) => page.getByText("No se pudo calcular la vista previa"),
+  },
+  {
+    route: ACCRUAL,
+    state: "load-error",
+    preset: "charges-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openChargesRoute(page, ACCRUAL),
+    expected: (page) => page.getByText("No se pudieron cargar los planes activos"),
+  },
+  {
+    route: RUNS,
+    state: "ready",
+    arrange: (page) => openChargesRoute(page, RUNS),
+    expected: (page) => page.getByRole("link", { name: "2026-04", exact: true }),
+  },
+  {
+    route: RUNS,
+    state: "no-matches",
+    arrange: (page) => openChargesRoute(page, `${RUNS}?planId=00000000-0000-4000-8000-000000009002`),
+    expected: (page) => page.getByText("Ningún registro coincide con los filtros"),
+  },
+  {
+    route: RUNS,
+    state: "empty",
+    preset: "charges-accrual-empty",
+    arrange: (page) => openChargesRoute(page, RUNS),
+    expected: (page) => page.getByText("Todavía no hay ejecuciones"),
+  },
+  {
+    route: RUNS,
+    state: "load-error",
+    preset: "charges-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openChargesRoute(page, RUNS),
+    expected: (page) => page.getByText("No se pudieron cargar las ejecuciones"),
+  },
+  {
+    route: RUN_WITH_ERRORS,
+    state: "completed-with-errors",
+    arrange: (page) => openChargesRoute(page, RUN_WITH_ERRORS),
+    expected: (page) => page.getByRole("table", { name: "Renglones de la ejecución: un estudiante y un concepto por renglón" }),
+  },
+  {
+    route: RUN_REJECTED,
+    state: "rejected",
+    arrange: (page) => openChargesRoute(page, RUN_REJECTED),
+    expected: (page) => page.getByText(/Los datos cambiaron desde la vista previa/),
+  },
+  {
+    route: RUN_FAILED,
+    state: "failed",
+    arrange: (page) => openChargesRoute(page, RUN_FAILED),
+    expected: (page) => page.getByText(/El sistema agotó sus reintentos/),
+  },
+  {
+    route: RUN_WITH_ERRORS,
+    state: "load-error",
+    preset: "charges-server-error",
+    // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
+    arrange: (page) => openChargesRoute(page, RUN_WITH_ERRORS),
+    expected: (page) => page.getByText("No se pudo cargar la ejecución"),
   },
 ];

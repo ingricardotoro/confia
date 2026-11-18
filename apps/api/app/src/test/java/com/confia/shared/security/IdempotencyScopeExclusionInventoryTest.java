@@ -45,6 +45,14 @@ class IdempotencyScopeExclusionInventoryTest {
     private static final String EDGE_PACKAGE = "com.confia.shared.web.idempotency";
 
     /**
+     * The one class outside the edge that names the header: the accrual controller binds {@code @RequestHeader} because
+     * the key of an accrual run is stored permanently on the run (docs/cortes/charges-accrual.md), while the edge's keys
+     * expire; so it does not use {@code @IdempotentWrite}, which the architecture reserves to the edge. It reaches no
+     * type of {@code shared.security} for it: the allowlist of dependencies above still applies to it.
+     */
+    private static final Set<String> HEADER_LITERAL_ALSO_ALLOWED = Set.of("com.confia.charges.web.AccrualController");
+
+    /**
      * The only types of {@code com.confia.shared.security} that a class in a {@code ..web..} package
      * may depend on, by full class name. Add the next one here (2.3c added {@code RequestOrigin}; 3.2b
      * added the limiter and its answers, which the interceptor of the edge uses; 3.2c added
@@ -173,7 +181,7 @@ class IdempotencyScopeExclusionInventoryTest {
                 .contains("Idempotency-Key");
         JavaClasses everythingElse = classes.that(DescribedPredicate.describe(
                 "are not the idempotency edge",
-                javaClass -> !isInEdgePackage(javaClass)));
+                javaClass -> !isInEdgePackage(javaClass) && !HEADER_LITERAL_ALSO_ALLOWED.contains(javaClass.getName())));
         assertThat(concatenatedProductionBytecodeText(everythingElse))
                 .as("no production class outside %s may carry the Idempotency-Key header literal",
                         EDGE_PACKAGE)

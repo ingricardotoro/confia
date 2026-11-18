@@ -94,7 +94,18 @@
     "importFileChanged": "El archivo no es el mismo que se simuló la última vez. Simule de nuevo este archivo, revise el resultado y después aplíquelo.",
     "priceValidityOverlap": "Ese concepto ya tiene un precio vigente en parte de esas fechas. Ajuste las fechas para que no coincidan con otra vigencia e intente de nuevo.",
     "priceListArchived": "La lista de precios está archivada y no admite precios nuevos. Reactívela para agregar precios.",
-    "staleVersion": "El registro cambió desde que lo abrió y sus cambios no se guardaron. Los datos ya se recargaron: cierre y vuelva a abrir el registro, revíselo y repita el cambio."
+    "duplicateTaxRateCode": "Ya existe una tasa con ese código.",
+    "taxRatePeriodOverlap": "Esa tasa ya tiene una vigencia en parte de esas fechas. Ajuste las fechas para que no coincidan con otra vigencia e intente de nuevo.",
+    "planNotEditable": "El plan ya no admite este cambio. Un plan activo solo cambia de nombre o se archiva, y uno archivado no cambia. Los datos ya se recargaron; para cambiar un plan activo, cree otro.",
+    "planWithoutItems": "El plan no tiene conceptos, por lo que no se puede activar. Agregue al menos un concepto e intente de nuevo.",
+    "duplicatePlanItem": "Ese concepto ya forma parte del plan. Un concepto aparece una sola vez por plan; si necesita cambiarlo, quite el existente y agréguelo de nuevo.",
+    "staleVersion": "El registro cambió desde que lo abrió y sus cambios no se guardaron. Los datos ya se recargaron: cierre y vuelva a abrir el registro, revíselo y repita el cambio.",
+    "accrualRunInProgress": "Ya hay una generación de cargos en curso para este plan y período. Espere a que termine y revise su resultado en las ejecuciones; no hace falta repetirla.",
+    "planItemInvalid": "Un concepto de este plan de única vez tiene más de un período. Corrija el plan antes de generar cargos.",
+    "idempotencyPayloadMismatch": "Esta confirmación ya se había usado para otra solicitud distinta. Cierre la ventana, calcule la vista previa de nuevo y confirme otra vez.",
+    "duplicateAccountCode": "Ya existe una cuenta con ese código.",
+    "accountInUse": "La cuenta está en uso en el mapa de cuentas de cargos, que todavía apunta a ella, y no se puede desactivar. Cambie primero el mapa para que apunte a otra cuenta y después desactívela.",
+    "postingAccountInvalid": "Una de las cuentas elegidas no es del tipo que exige su renglón del mapa. Ya se recargaron las cuentas; revise las que eligió e intente de nuevo."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -141,9 +152,14 @@
   },
   "shell": {
     "brand": "CONFIA",
+    "logoAlt": "CONFIA, control financiero académico",
     "skipToContent": "Saltar al contenido",
     "navigationLabel": "Navegación principal",
-    "accountLabel": "Su cuenta"
+    "accountLabel": "Su cuenta",
+    "tagline": "Control financiero académico",
+    "breadcrumbLabel": "Ruta de navegación",
+    "openNavigation": "Abrir menú",
+    "closeNavigation": "Cerrar menú"
   },
   "navigation": {
     "home": "Inicio",
@@ -152,14 +168,24 @@
     "enrollments": "Matrículas",
     "guardians": "Encargados",
     "imports": "Importaciones",
-    "catalog": "Catálogo"
+    "catalog": "Catálogo",
+    "charges": "Cobros",
+    "accrual": "Generación de cargos",
+    "statement": "Estado de cuenta",
+    "ledger": "Plan de cuentas",
+    "groups": {
+      "community": "Comunidad educativa",
+      "finance": "Finanzas",
+      "settings": "Configuración"
+    }
   },
   "catalog": {
     "title": "Catálogo",
     "tabsLabel": "Vistas del catálogo",
     "tabs": {
       "paymentConcepts": "Conceptos de pago",
-      "priceLists": "Listas de precios"
+      "priceLists": "Listas de precios",
+      "taxRates": "Tasas de impuesto"
     },
     "common": {
       "yes": "Sí",
@@ -175,6 +201,7 @@
     },
     "paymentConcepts": {
       "heading": "Conceptos de pago",
+      "description": "Conceptos que la institución cobra, con su categoría y su condición fiscal.",
       "caption": "Conceptos de pago de la institución",
       "create": "Nuevo concepto",
       "createTitle": "Nuevo concepto de pago",
@@ -193,14 +220,15 @@
       "filterCategory": "Categoría",
       "filterActive": "Estado",
       "recurringHelp": "Marque esta casilla si el concepto se cobra de forma periódica, como la colegiatura mensual.",
-      "taxableHelp": "Marque esta casilla si el concepto está gravado con impuesto.",
+      "taxableHelp": "Marque esta casilla si el concepto está gravado con impuesto. Un concepto gravado debe tener una tasa de impuesto.",
       "activeHelp": "Un concepto desactivado deja de ofrecerse para listas nuevas. Lo ya registrado no cambia.",
       "columns": {
         "code": "Código",
         "name": "Nombre",
         "category": "Categoría",
         "recurring": "Recurrente",
-        "taxable": "Gravado"
+        "taxable": "Gravado",
+        "taxRate": "Tasa de impuesto"
       },
       "fields": {
         "code": "Código",
@@ -208,11 +236,18 @@
         "category": "Categoría",
         "isRecurring": "Recurrente",
         "isTaxable": "Gravado",
-        "isActive": "Activo"
-      }
+        "isActive": "Activo",
+        "taxRate": "Tasa de impuesto"
+      },
+      "taxRateHelp": "Elija la tasa que se aplica a este concepto. Solo se ofrecen las tasas activas.",
+      "taxRateNone": "No aplica",
+      "taxRateMissing": "Sin tasa asignada",
+      "taxRateInactive": "{code} — {name} (inactiva)",
+      "noActiveTaxRates": "No hay tasas de impuesto activas. Cree o active una en la pestaña Tasas de impuesto."
     },
     "priceLists": {
       "heading": "Listas de precios",
+      "description": "Precios por año lectivo y alcance, con su vigencia.",
       "caption": "Listas de precios de la institución",
       "create": "Nueva lista de precios",
       "createTitle": "Nueva lista de precios",
@@ -305,9 +340,623 @@
           "validTo": "Vigente hasta (opcional)"
         }
       }
+    },
+    "taxRates": {
+      "heading": "Tasas de impuesto",
+      "description": "Tasas de impuesto y sus períodos de vigencia.",
+      "caption": "Tasas de impuesto de la institución",
+      "create": "Nueva tasa",
+      "createTitle": "Nueva tasa de impuesto",
+      "createDescription": "Defina una tasa de impuesto, por ejemplo el impuesto sobre ventas. Aquí solo se registran su código y su nombre; el porcentaje se carga después, como una vigencia.",
+      "editTitle": "Editar tasa de impuesto",
+      "editDescription": "Cambie el nombre de la tasa. El código no se puede cambiar y el porcentaje no se edita: un cambio de porcentaje es una vigencia nueva. Una tasa no se borra: se desactiva.",
+      "emptyTitle": "Todavía no hay tasas de impuesto",
+      "emptyDescription": "Cree la primera tasa y registre su porcentaje con la fecha desde la que rige. El sistema no trae ningún porcentaje precargado.",
+      "emptyAction": "Crear la primera tasa",
+      "loadFailed": "No se pudo cargar la lista de tasas de impuesto",
+      "filterActive": "Estado",
+      "codeHelp": "Letras, números, guion y guion bajo; empiece por una letra o un número. Hasta 30 caracteres. No se puede repetir ni cambiar después.",
+      "nameHelp": "Hasta 120 caracteres.",
+      "percentValue": "{rate} %",
+      "optionLabel": "{code} — {name}",
+      "columns": {
+        "code": "Código",
+        "name": "Nombre"
+      },
+      "fields": {
+        "code": "Código",
+        "name": "Nombre"
+      },
+      "errors": {
+        "duplicateCode": "Ya existe una tasa con ese código.",
+        "rateFormat": "Escriba el porcentaje con punto decimal y hasta cuatro decimales, sin signo ni el símbolo %.",
+        "rateRange": "El porcentaje debe ser mayor que cero y no pasar de 100."
+      },
+      "detail": {
+        "back": "Volver a las tasas de impuesto",
+        "loadFailed": "No se pudo cargar la tasa de impuesto",
+        "summary": "Datos de la tasa",
+        "inactiveNote": "Esta tasa está inactiva y no admite vigencias nuevas. Actívela para agregar una.",
+        "activate": "Activar tasa",
+        "activateFor": "Activar tasa {name}",
+        "deactivate": "Desactivar tasa",
+        "deactivateFor": "Desactivar tasa {name}",
+        "activated": "Se activó la tasa «{name}».",
+        "deactivated": "Se desactivó la tasa «{name}».",
+        "periodsHeading": "Historial de vigencias",
+        "periodsCaption": "Vigencias de {name}",
+        "addPeriod": "Nueva vigencia",
+        "emptyTitle": "Esta tasa todavía no tiene vigencias",
+        "emptyDescription": "Registre el porcentaje con la fecha desde la que rige. Un cambio de porcentaje es una vigencia nueva: la abierta se cierra el día anterior y el historial se conserva.",
+        "emptyAction": "Registrar la primera vigencia",
+        "openEnded": "Sin fecha de fin",
+        "validityOpen": "Abierta",
+        "validityClosed": "Cerrada",
+        "columns": {
+          "rate": "Porcentaje",
+          "validFrom": "Vigente desde",
+          "validTo": "Vigente hasta",
+          "state": "Vigencia"
+        }
+      },
+      "addPeriod": {
+        "title": "Nueva vigencia",
+        "description": "Fije el porcentaje de la tasa desde una fecha. Si la tasa ya tiene una vigencia abierta, el sistema la cierra el día anterior y conserva el historial. Una vigencia guardada no se edita.",
+        "submit": "Guardar vigencia",
+        "saved": "Se registró la vigencia de «{name}» desde el {date}.",
+        "rateHelp": "Use punto decimal y hasta cuatro decimales. Debe ser mayor que cero y no pasar de 100.",
+        "validToHelp": "Déjela vacía si la vigencia no tiene fecha de fin. El último día cuenta como vigente.",
+        "fields": {
+          "ratePercent": "Porcentaje",
+          "validFrom": "Vigente desde",
+          "validTo": "Vigente hasta (opcional)"
+        }
+      }
+    }
+  },
+  "charges": {
+    "title": "Cobros",
+    "statement": {
+      "heading": "Estado de cuenta",
+      "description": "Lo que un estudiante debe, cargo por cargo, con el saldo después de cada movimiento. El servidor calcula todos los saldos a partir del libro mayor.",
+      "from": "Desde",
+      "to": "Hasta",
+      "currency": "Moneda",
+      "currencyOption": "{currency} ({code})",
+      "periodHelp": "Si deja las fechas vacías se muestran los últimos 12 meses.",
+      "idleTitle": "Elija un estudiante",
+      "idleDescription": "Busque al estudiante por nombre, apellido o código para ver su estado de cuenta.",
+      "idleAction": "Buscar un estudiante",
+      "invalidPeriodTitle": "Corrija el período",
+      "invalidPeriodDescription": "La fecha final debe ser igual o posterior a la inicial. Mientras tanto no se consulta el estado de cuenta.",
+      "invalidPeriodAction": "Corregir la fecha final",
+      "emptyTitle": "Este estudiante todavía no tiene movimientos",
+      "emptyDescription": "No tiene cargos ni pagos registrados, así que no debe nada y no tiene saldo a favor. Los cargos aparecen aquí cuando se genera el cobro de un período.",
+      "emptyAction": "Elegir otro estudiante",
+      "loading": "Cargando el estado de cuenta.",
+      "loadFailed": "No se pudo cargar el estado de cuenta.",
+      "notFoundTitle": "No encontramos a este estudiante",
+      "notFoundDescription": "El estudiante no existe o no pertenece a su institución. Vuelva a buscarlo por nombre o código.",
+      "forbiddenTitle": "No tiene permiso para ver este estado de cuenta",
+      "forbiddenDescription": "Si lo necesita para su trabajo, solicite el permiso de consulta de cobros a un administrador de su institución.",
+      "errors": {
+        "fromAfterTo": "La fecha final debe ser igual o posterior a la inicial."
+      },
+      "sectionTitle": "{currency} ({code})",
+      "opening": "Saldo inicial",
+      "closing": "Saldo final",
+      "openingLabel": "Antes del {date}.",
+      "closingLabel": "Al {date}.",
+      "credit": "Saldo a favor",
+      "sideOwed": "El estudiante debe este monto.",
+      "sideCredit": "Saldo a favor del estudiante.",
+      "sideZero": "Sin saldo pendiente.",
+      "noAmount": "Sin importe",
+      "noAmountMark": "–",
+      "noDueDate": "No aplica",
+      "caption": "Movimientos del estado de cuenta en {currency}",
+      "pagination": "Páginas de los movimientos en {currency}",
+      "noLinesTitle": "Sin movimientos en este período",
+      "noLinesDescription": "Cambie las fechas para ver otros movimientos. Los saldos de arriba siguen siendo los de este período.",
+      "noLinesAction": "Cambiar las fechas",
+      "chargeDescription": "{concept}, {period}",
+      "movementDescription": "{kind}: {reason}",
+      "columns": {
+        "effectiveOn": "Fecha",
+        "description": "Descripción",
+        "dueOn": "Vence",
+        "debit": "Cargo",
+        "credit": "Abono",
+        "balance": "Saldo"
+      },
+      "direction": {
+        "debit": "Cargo",
+        "credit": "Abono"
+      },
+      "kinds": {
+        "CHARGE": "Cargo",
+        "DISCOUNT": "Descuento",
+        "PAYMENT": "Pago",
+        "LATE_FEE": "Recargo por mora",
+        "CREDIT_NOTE": "Nota de crédito",
+        "REVERSAL": "Reverso",
+        "ADJUSTMENT": "Ajuste",
+        "WRITE_OFF": "Condonación"
+      },
+      "picker": {
+        "label": "Estudiante",
+        "chosen": "Estudiante elegido",
+        "chosenLoading": "Cargando al estudiante.",
+        "change": "Cambiar estudiante",
+        "searchLabel": "Estudiante",
+        "help": "Escriba al menos dos letras del nombre, del apellido o del código.",
+        "tooShort": "Escriba al menos dos caracteres para buscar.",
+        "searching": "Buscando estudiantes.",
+        "found": "{count, plural, one {Se encontró # estudiante.} other {Se encontraron # estudiantes.}}",
+        "none": "Ningún estudiante coincide con la búsqueda.",
+        "failed": "No se pudo buscar estudiantes.",
+        "retry": "Reintentar la búsqueda",
+        "resultsLabel": "Estudiantes encontrados",
+        "optionText": "{name} ({code})"
+      }
+    },
+    "errors": {
+      "dueDayRange": "Escriba un día del mes entre 1 y 28, para que exista en todos los meses.",
+      "periodsRange": "Escriba un número entero de períodos entre 1 y 36.",
+      "firstOfMonth": "Elija el primer día de un mes, por ejemplo el 1 de febrero. Los períodos siempre empiezan el día 1."
+    },
+    "plans": {
+      "heading": "Planes de cobro",
+      "description": "Qué se cobra, cada cuánto y a quién: por modalidad, grado o sección. El precio lo resuelven las listas de precios.",
+      "caption": "Planes de cobro de la institución",
+      "create": "Nuevo plan de cobro",
+      "createTitle": "Nuevo plan de cobro",
+      "createDescription": "El plan nace como borrador: agréguele los conceptos y actívelo cuando esté listo. El año lectivo, el ámbito y su referencia no se pueden cambiar después.",
+      "emptyTitle": "Todavía no hay planes de cobro",
+      "emptyDescription": "Cree el primer plan de cobro para definir qué conceptos se cobran, cada cuánto y a qué estudiantes.",
+      "emptyAction": "Crear el primer plan",
+      "loadFailed": "No se pudieron cargar los planes de cobro",
+      "filterYear": "Año lectivo",
+      "filterScope": "Ámbito",
+      "filterStatus": "Estado",
+      "nameHelp": "Por ejemplo «Primaria 2027». Hasta 120 caracteres.",
+      "dueDayHelp": "Del 1 al 28, para que el día exista en todos los meses.",
+      "dueDayValue": "Día {day}",
+      "sectionOption": "{grade} {section} ({year})",
+      "columns": {
+        "name": "Nombre",
+        "year": "Año lectivo",
+        "scope": "Ámbito",
+        "reference": "Modalidad, grado o sección",
+        "frequency": "Periodicidad",
+        "dueDay": "Vencimiento",
+        "status": "Estado"
+      },
+      "fields": {
+        "academicYear": "Año lectivo",
+        "name": "Nombre",
+        "scope": "Ámbito",
+        "modality": "Modalidad",
+        "grade": "Grado",
+        "section": "Sección",
+        "frequency": "Periodicidad",
+        "dueDay": "Día de vencimiento"
+      },
+      "scopes": {
+        "MODALITY": "Una modalidad",
+        "GRADE": "Un grado",
+        "SECTION": "Una sección"
+      },
+      "statuses": {
+        "DRAFT": "Borrador",
+        "ACTIVE": "Activo",
+        "ARCHIVED": "Archivado"
+      },
+      "frequencies": {
+        "MONTHLY": "Mensual",
+        "BIMONTHLY": "Bimestral",
+        "ANNUAL": "Anual",
+        "ONE_TIME": "Única vez"
+      },
+      "edit": {
+        "title": "Editar plan de cobro",
+        "description": "Cambie el nombre, la periodicidad o el día de vencimiento. El año lectivo, el ámbito y su referencia no se pueden cambiar.",
+        "descriptionActive": "Un plan activo está congelado: solo puede cambiar el nombre. La periodicidad y el día de vencimiento quedan como están.",
+        "submit": "Guardar cambios",
+        "saved": "Se guardaron los cambios del plan «{name}»."
+      },
+      "detail": {
+        "back": "Volver a los planes de cobro",
+        "loadFailed": "No se pudo cargar el plan de cobro",
+        "summary": "Datos del plan",
+        "lookupFailed": "No se pudieron cargar los nombres de los conceptos, del año lectivo o de la modalidad, el grado o la sección. Mientras tanto aparecen como no disponibles.",
+        "draftNote": "Este plan es un borrador: puede agregar y quitar conceptos y cambiar su periodicidad. Al activarlo se congela.",
+        "activeNote": "Este plan está activo y congelado: no admite conceptos nuevos ni cambios de periodicidad. Solo puede cambiar el nombre o archivarlo.",
+        "archivedNote": "Este plan está archivado: es solo de consulta y ya no se puede cambiar ni reactivar. Para cobrar de otra forma, cree un plan nuevo.",
+        "edit": "Editar plan",
+        "editFor": "Editar plan {name}",
+        "activate": "Activar plan",
+        "activateFor": "Activar plan {name}",
+        "archive": "Archivar plan",
+        "archiveFor": "Archivar plan {name}",
+        "activated": "Se activó el plan «{name}». Ya no admite cambios en sus conceptos.",
+        "archived": "Se archivó el plan «{name}».",
+        "itemsHeading": "Conceptos del plan",
+        "addItem": "Agregar concepto",
+        "emptyTitle": "Este plan todavía no tiene conceptos",
+        "emptyDescription": "Agregue los conceptos que se cobran, cuántos períodos y desde cuándo. Un plan sin conceptos no se puede activar.",
+        "emptyAction": "Agregar el primer concepto",
+        "emptyArchived": "Este plan no tiene conceptos.",
+        "itemsCaption": "Conceptos del plan {name}",
+        "conceptLabel": "{code} — {name}",
+        "columns": {
+          "concept": "Concepto",
+          "periods": "Períodos",
+          "firstPeriod": "Primer período",
+          "actions": "Acciones"
+        },
+        "removeItem": "Quitar",
+        "removeItemFor": "Quitar {name} del plan",
+        "itemRemoved": "Se quitó «{name}» del plan.",
+        "activateConfirm": {
+          "title": "Activar el plan «{name}»",
+          "description": "Al activarlo, el plan queda congelado: ya no podrá agregar ni quitar conceptos, ni cambiar la periodicidad ni el día de vencimiento. Solo podrá cambiar el nombre o archivarlo. Para cambiar un plan activo, tendrá que crear otro.",
+          "confirm": "Activar plan"
+        },
+        "archiveConfirm": {
+          "title": "Archivar el plan «{name}»",
+          "description": "Un plan archivado queda solo de consulta: ya no se puede cambiar ni volver a activar. Para cobrar de otra forma, tendrá que crear otro plan.",
+          "confirm": "Archivar plan"
+        },
+        "removeConfirm": {
+          "title": "Quitar «{name}» del plan",
+          "description": "El concepto deja de formar parte de este borrador. Podrá agregarlo de nuevo mientras el plan siga siendo un borrador.",
+          "confirm": "Quitar concepto"
+        }
+      },
+      "addItem": {
+        "title": "Agregar concepto",
+        "description": "Elija el concepto, cuántos períodos se cobran y el primer día del primer período. Solo se ofrecen los conceptos activos que el plan todavía no tiene.",
+        "submit": "Agregar concepto",
+        "saved": "Se agregó «{name}» al plan.",
+        "noActiveConcepts": "No hay conceptos de pago activos para agregar. Cree o active un concepto en el catálogo.",
+        "periodsHelp": "Un número entero del 1 al 36.",
+        "firstPeriodHelp": "Elija el día 1 de un mes: los períodos siempre empiezan el primer día del mes.",
+        "fields": {
+          "concept": "Concepto",
+          "periods": "Cantidad de períodos",
+          "firstPeriod": "Primer día del primer período"
+        }
+      }
+    },
+    "accrual": {
+      "heading": "Generación de cargos",
+      "description": "Calcule qué cargos corresponden a un período de un plan activo y, si todo está bien, genérelos. La vista previa no escribe nada; la generación asienta los cargos en el libro mayor.",
+      "viewRuns": "Ver ejecuciones",
+      "selectionLabel": "Qué generar",
+      "plan": "Plan de cobro",
+      "period": "Período",
+      "choosePlan": "Elija un plan",
+      "choosePeriod": "Elija un período",
+      "planHelp": "Solo aparecen los planes activos.",
+      "periodHelp": "Los períodos los define el plan: no se escribe una fecha.",
+      "periodOption": "{label}, vence el {dueOn}",
+      "periodOptionRun": "{label}, vence el {dueOn}. Última ejecución: {status}",
+      "preview": "Calcular vista previa",
+      "confirm": "Confirmar generación",
+      "noPlansTitle": "No hay planes activos",
+      "noPlansDescription": "Para generar cargos hace falta un plan activo. Active un plan desde su detalle.",
+      "noPlansAction": "Ir a los planes de cobro",
+      "plansFailed": "No se pudieron cargar los planes activos",
+      "periodsFailed": "No se pudieron cargar los períodos del plan",
+      "noPeriodsTitle": "Este plan no tiene períodos para generar",
+      "noPeriodsDescription": "Un plan sin conceptos no tiene períodos. Agregue conceptos al plan antes de generar cargos.",
+      "idleTitle": "Elija un plan y un período",
+      "idleDescription": "Después de elegirlos, calcule la vista previa para ver qué cargos se crearían. No se escribe nada hasta que confirme.",
+      "previewing": "Calculando la vista previa.",
+      "previewFailed": "No se pudo calcular la vista previa",
+      "summary": {
+        "title": "Resumen de la vista previa",
+        "description": "{plan}, período {period}",
+        "studentsEvaluated": "Estudiantes evaluados",
+        "toCreate": "Cargos por crear",
+        "alreadyAccrued": "Ya generados",
+        "alreadyAccruedOtherPlan": "Generados por otro plan",
+        "errors": "Con error",
+        "totalsHeading": "Importes por moneda",
+        "totalsCaption": "Importes de los cargos por crear, por moneda",
+        "currency": "Moneda",
+        "charges": "Cargos",
+        "base": "Base",
+        "tax": "Impuesto",
+        "total": "Total",
+        "errorsHeading": "Errores esperados",
+        "errorsDescription": "Estos renglones no se generarían. Quedan registrados en la ejecución con su código.",
+        "errorCount": "{count, plural, one {# renglón} other {# renglones}}",
+        "errorLead": "{name}: {count}."
+      },
+      "blockers": {
+        "heading": "La generación no se puede confirmar todavía",
+        "plan-not-active": "El plan no está activo. Solo un plan activo genera cargos.",
+        "posting-accounts-incomplete": "Falta configurar el mapa de cuentas contables de los cargos. Un Super Administrador lo completa en «Plan de cuentas», en la vista «Mapa de cuentas de cargos», antes de generar.",
+        "plan-target-outside-year": "El grado o la sección del plan queda fuera del año lectivo del plan. Corrija el plan para poder generar.",
+        "unknown": "Hay una condición del servidor que impide generar este período.",
+        "openPlan": "Abrir el plan",
+        "openPostingAccounts": "Abrir el mapa de cuentas de cargos"
+      },
+      "nothingToCreate": "Con esta vista previa no hay cargos nuevos que crear, así que no hay nada que confirmar.",
+      "items": {
+        "heading": "Renglones de la vista previa",
+        "caption": "Renglones de la vista previa: un estudiante y un concepto por renglón",
+        "student": "Estudiante",
+        "concept": "Concepto",
+        "base": "Base",
+        "tax": "Impuesto",
+        "total": "Total",
+        "result": "Resultado",
+        "filter": "Mostrar",
+        "filterAll": "Todos los renglones",
+        "filterErrors": "Solo con error",
+        "noAmount": "Sin importe",
+        "truncated": "Se muestran los primeros 500 renglones. Los totales y los conteos incluyen todos los renglones.",
+        "emptyTitle": "La vista previa no tiene renglones",
+        "emptyDescription": "Ningún estudiante está dentro del alcance de este plan en este período.",
+        "emptyFilteredTitle": "Ningún renglón coincide con el filtro",
+        "emptyFilteredDescription": "Cambie el filtro para ver los demás renglones.",
+        "emptyFilteredAction": "Mostrar todos los renglones",
+        "pagination": "Páginas de los renglones de la vista previa"
+      },
+      "studentLabel": "{name} ({code})",
+      "conceptLabel": "{code}, {name}",
+      "outcomes": {
+        "CREATED": "Se creará",
+        "ALREADY_ACCRUED": "Ya generado",
+        "ALREADY_ACCRUED_OTHER_PLAN": "Generado por otro plan",
+        "ERROR": "Con error"
+      },
+      "runOutcomes": {
+        "CREATED": "Creado",
+        "ALREADY_ACCRUED": "Ya generado",
+        "ALREADY_ACCRUED_OTHER_PLAN": "Generado por otro plan",
+        "ERROR": "Con error"
+      },
+      "errorCodes": {
+        "NO_PRICE": "Sin precio vigente",
+        "AMBIGUOUS_PRICE": "Precio ambiguo",
+        "TAX_RATE_MISSING": "Sin tasa de impuesto",
+        "TAX_RATE_INACTIVE": "Tasa de impuesto inactiva",
+        "TAX_RATE_NOT_IN_FORCE": "Tasa de impuesto fuera de vigencia",
+        "CONCEPT_INACTIVE": "Concepto inactivo",
+        "STUDENT_INACTIVE": "Estudiante inactivo",
+        "ACCOUNT_UNDER_REVIEW": "Cuenta en revisión",
+        "OVERLAPPING_CHARGE": "Cargo que se traslapa",
+        "POSTING_FAILED": "No se pudo asentar",
+        "unknown": "Error no reconocido"
+      },
+      "errorHelp": {
+        "NO_PRICE": "Ninguna lista de precios da precio a este concepto para el estudiante en la fecha del período.",
+        "AMBIGUOUS_PRICE": "Dos listas de precios del mismo nivel dan precio al concepto. Corrija las listas.",
+        "TAX_RATE_MISSING": "El concepto paga impuesto pero no tiene tasa asignada.",
+        "TAX_RATE_INACTIVE": "La tasa de impuesto del concepto está inactiva.",
+        "TAX_RATE_NOT_IN_FORCE": "La tasa de impuesto del concepto no está vigente en la fecha del período.",
+        "CONCEPT_INACTIVE": "El concepto de pago está inactivo.",
+        "STUDENT_INACTIVE": "El estudiante está inactivo.",
+        "ACCOUNT_UNDER_REVIEW": "La cuenta del estudiante está en revisión y no admite cargos nuevos.",
+        "OVERLAPPING_CHARGE": "Ya existe un cargo del mismo concepto cuyo período se traslapa con este.",
+        "POSTING_FAILED": "El libro mayor no aceptó el asiento y se revirtió todo lo del estudiante. Volver a generar el período lo reintenta.",
+        "unknown": "El servidor reportó un código que esta pantalla no conoce."
+      },
+      "confirmDialog": {
+        "title": "¿Generar los cargos de {plan}?",
+        "description": "Período {period}. Se asentarán {count, plural, one {# cargo} other {# cargos}} en el libro mayor.",
+        "totalsHeading": "Total que se asentará",
+        "irreversible": "Los cargos se asientan en el libro mayor y no se pueden deshacer desde esta pantalla. Si más adelante hay que corregir uno, se hace con un asiento nuevo y nunca editándolo.",
+        "errorsNote": "{count, plural, one {# renglón con error no se generará} other {# renglones con error no se generarán}}: quedan registrados en la ejecución.",
+        "retryNote": "Si la solicitud no llegó a confirmarse, puede intentarlo de nuevo: no se duplicarán los cargos.",
+        "confirm": "Generar cargos",
+        "cancel": "Cancelar"
+      },
+      "statuses": {
+        "QUEUED": "En cola",
+        "RUNNING": "En curso",
+        "COMPLETED": "Completada",
+        "COMPLETED_WITH_ERRORS": "Completada con errores",
+        "REJECTED": "Rechazada",
+        "FAILED": "Fallida"
+      }
+    },
+    "runs": {
+      "heading": "Ejecuciones de generación",
+      "description": "Cada vez que se confirma una generación queda una ejecución con su resultado, renglón por renglón.",
+      "caption": "Ejecuciones de generación de cargos",
+      "create": "Generar cargos",
+      "emptyTitle": "Todavía no hay ejecuciones",
+      "emptyDescription": "Cuando genere los cargos de un período, su ejecución aparece aquí.",
+      "emptyAction": "Generar cargos",
+      "loadFailed": "No se pudieron cargar las ejecuciones",
+      "filterPlan": "Plan de cobro",
+      "columns": {
+        "period": "Período",
+        "plan": "Plan",
+        "status": "Estado",
+        "studentsEvaluated": "Evaluados",
+        "chargesCreated": "Creados",
+        "chargesExisting": "Ya existían",
+        "chargesFailed": "Con error",
+        "queuedAt": "Solicitada",
+        "finishedAt": "Finalizada"
+      },
+      "notYet": "Todavía no"
+    },
+    "run": {
+      "title": "Ejecución de {plan}, período {period}",
+      "back": "Volver a las ejecuciones",
+      "loadFailed": "No se pudo cargar la ejecución",
+      "pollFailed": "No se pudo actualizar el avance. Se intentará de nuevo en unos segundos.",
+      "lookupFailed": "No se pudieron cargar los nombres de los estudiantes, de los conceptos o del plan. Mientras tanto aparecen como no disponibles.",
+      "summary": "Datos de la ejecución",
+      "plan": "Plan de cobro",
+      "openPlan": "Abrir el plan",
+      "period": "Período",
+      "queuedAt": "Solicitada",
+      "startedAt": "Iniciada",
+      "finishedAt": "Finalizada",
+      "notYet": "Todavía no",
+      "preview": "Vista previa",
+      "previewChecked": "Confirmada con una vista previa",
+      "previewNotChecked": "Sin vista previa",
+      "studentsEvaluated": "Estudiantes evaluados",
+      "chargesCreated": "Cargos creados",
+      "chargesExisting": "Cargos que ya existían",
+      "chargesFailed": "Renglones con error",
+      "progress": {
+        "QUEUED": "La ejecución está en cola. Esta página se actualiza sola.",
+        "RUNNING": "La ejecución está en curso: {evaluated, plural, one {# estudiante evaluado} other {# estudiantes evaluados}} hasta ahora. Esta página se actualiza sola.",
+        "COMPLETED": "La ejecución terminó: se crearon {created, plural, one {# cargo} other {# cargos}}.",
+        "COMPLETED_WITH_ERRORS": "La ejecución terminó con errores: se crearon {created, plural, one {# cargo} other {# cargos}} y {failed, plural, one {# renglón quedó con error} other {# renglones quedaron con error}}.",
+        "REJECTED": "La ejecución se rechazó y no se escribió nada en el libro mayor.",
+        "FAILED": "La ejecución falló y no se completó. Los cargos que alcanzaron a asentarse quedan registrados, y volver a generar el período no los duplica."
+      },
+      "errorsNote": "Revise los renglones con error: cada uno trae su código y lo que hay que corregir. Después puede generar el período de nuevo; los cargos ya creados no se duplican.",
+      "failureCodes": {
+        "plan-not-active": "El plan ya no estaba activo.",
+        "period-not-in-plan": "El período no es uno de los períodos del plan.",
+        "posting-accounts-incomplete": "Falta configurar el mapa de cuentas contables de los cargos.",
+        "period-in-future": "El período todavía no empieza: solo se genera desde su primer día.",
+        "plan-target-outside-year": "El grado o la sección del plan queda fuera del año lectivo del plan.",
+        "preview-outdated": "Los datos cambiaron desde la vista previa, por eso no se generó nada. Calcule la vista previa de nuevo y confirme otra vez.",
+        "retries-exhausted": "El sistema agotó sus reintentos. Intente generar el período de nuevo; si continúa, avise a soporte.",
+        "unknown": "El servidor reportó un motivo que esta pantalla no conoce."
+      },
+      "recalculate": "Calcular de nuevo",
+      "items": {
+        "heading": "Renglones de la ejecución",
+        "caption": "Renglones de la ejecución: un estudiante y un concepto por renglón",
+        "student": "Estudiante",
+        "concept": "Concepto",
+        "result": "Resultado",
+        "detail": "Detalle",
+        "noDetail": "Sin observaciones",
+        "pagination": "Páginas de los renglones de la ejecución",
+        "emptyPendingTitle": "Todavía no hay renglones",
+        "emptyPendingDescription": "Los renglones aparecen cuando la ejecución avanza. Esta página se actualiza sola.",
+        "emptyTitle": "Esta ejecución no tiene renglones",
+        "emptyDescription": "Esta ejecución no evaluó a ningún estudiante, por eso no hay nada que listar."
+      }
+    }
+  },
+  "ledger": {
+    "title": "Plan de cuentas",
+    "tabsLabel": "Vistas del plan de cuentas",
+    "tabs": {
+      "accounts": "Plan de cuentas",
+      "postingMap": "Mapa de cuentas de cargos"
+    },
+    "common": {
+      "yes": "Sí",
+      "no": "No"
+    },
+    "types": {
+      "ASSET": "Activo",
+      "LIABILITY": "Pasivo",
+      "EQUITY": "Patrimonio",
+      "INCOME": "Ingreso",
+      "EXPENSE": "Gasto"
+    },
+    "accounts": {
+      "heading": "Cuentas contables",
+      "description": "Las cuentas donde se registran los cargos y los cobros. Una cuenta no se borra: se desactiva y deja de aceptar registros nuevos.",
+      "caption": "Cuentas contables de la institución",
+      "create": "Nueva cuenta",
+      "createTitle": "Nueva cuenta contable",
+      "createDescription": "Defina la cuenta. El código, el tipo y la marca de saldos de estudiantes no se pueden cambiar después de crearla.",
+      "editTitle": "Editar cuenta contable",
+      "editDescription": "Cambie el nombre o el estado de la cuenta. El código, el tipo y la marca de saldos de estudiantes no se pueden cambiar.",
+      "emptyTitle": "Todavía no hay cuentas contables",
+      "emptyDescription": "Cree las cuentas de la institución para poder configurar el mapa de cuentas de cargos y generar cargos.",
+      "emptyAction": "Crear la primera cuenta",
+      "loadFailed": "No se pudo cargar el plan de cuentas",
+      "codeHelp": "Letras, números, punto, guion y guion bajo; empiece por una letra o un número. Hasta 30 caracteres. No se distingue entre mayúsculas y minúsculas.",
+      "optionLabel": "{code} · {name}",
+      "columns": {
+        "code": "Código",
+        "name": "Nombre",
+        "type": "Tipo",
+        "studentBalances": "Saldos de estudiantes"
+      },
+      "filterType": "Tipo",
+      "filterActive": "Estado",
+      "fields": {
+        "code": "Código",
+        "name": "Nombre",
+        "type": "Tipo de cuenta",
+        "holdsStudentBalances": "Lleva los saldos de los estudiantes",
+        "active": "Cuenta activa"
+      },
+      "holdsHelp": "Marque esta opción solo en la cuenta que lleva el saldo de cada estudiante, como las cuentas por cobrar. Solo una cuenta de tipo Activo o Pasivo puede llevarla.",
+      "holdsUnavailable": "Solo una cuenta de tipo Activo o Pasivo puede llevar los saldos de los estudiantes.",
+      "activeHelp": "Una cuenta inactiva no acepta registros nuevos; lo ya registrado se conserva. Si el mapa de cuentas de cargos la usa, no se puede desactivar.",
+      "errors": {
+        "duplicateCode": "Ya existe una cuenta con ese código. El código no distingue entre mayúsculas y minúsculas."
+      }
+    },
+    "map": {
+      "heading": "Mapa de cuentas de cargos",
+      "description": "Dice a qué cuenta contable se registra cada cargo: las cuentas por cobrar, el impuesto por pagar y el ingreso de cada categoría de concepto. Solo un Super Administrador puede cambiarlo.",
+      "loading": "Cargando el mapa de cuentas de cargos.",
+      "loadFailed": "No se pudo cargar el mapa de cuentas de cargos",
+      "incompleteTitle": "El mapa de cuentas está incompleto",
+      "incompleteBody": "Mientras falten cuentas que el plan necesita, la generación de cargos queda bloqueada: la vista previa lo avisa y no se puede confirmar.",
+      "missingLead": "Falta configurar:",
+      "completeNote": "Todas las cuentas principales están configuradas.",
+      "noAccountsTitle": "Todavía no hay cuentas activas",
+      "noAccountsDescription": "Para configurar el mapa primero hace falta cargar el plan de cuentas.",
+      "noAccountsAction": "Ir al plan de cuentas",
+      "groups": {
+        "core": "Cuentas principales",
+        "coreDescription": "Las cuentas por cobrar y el impuesto por pagar son las mismas para todos los cargos.",
+        "revenue": "Ingresos por categoría",
+        "revenueDescription": "Cada categoría de concepto puede tener su cuenta de ingreso. Si una categoría no tiene cuenta propia, usa el ingreso por defecto."
+      },
+      "roles": {
+        "RECEIVABLE": "Cuentas por cobrar a estudiantes",
+        "TAX_PAYABLE": "Impuesto por pagar",
+        "REVENUE_DEFAULT": "Ingreso por defecto",
+        "REVENUE_TUITION": "Ingreso por colegiatura",
+        "REVENUE_ENROLLMENT": "Ingreso por matrícula",
+        "REVENUE_TRANSPORT": "Ingreso por transporte",
+        "REVENUE_MATERIAL": "Ingreso por materiales",
+        "REVENUE_FINE": "Ingreso por multas",
+        "REVENUE_OTHER": "Otros ingresos"
+      },
+      "help": {
+        "RECEIVABLE": "Se elige entre las cuentas activas de tipo Activo que llevan los saldos de los estudiantes. Cada cargo la debita.",
+        "TAX_PAYABLE": "Se elige entre las cuentas activas de tipo Pasivo que no llevan saldos de estudiantes. Recibe el impuesto de los conceptos gravados.",
+        "REVENUE_DEFAULT": "Se elige entre las cuentas activas de tipo Ingreso. La usan las categorías que no tienen una cuenta propia.",
+        "REVENUE": "Se elige entre las cuentas activas de tipo Ingreso. Si se deja sin configurar, la categoría usa el ingreso por defecto."
+      },
+      "status": {
+        "set": "Configurada",
+        "notSet": "Sin configurar"
+      },
+      "choose": "Elija una cuenta",
+      "noOptions": "No hay cuentas activas de este tipo. Créela en el plan de cuentas.",
+      "heldUnknown": "Cuenta no disponible en la lista",
+      "save": "Guardar mapa",
+      "reset": "Descartar cambios",
+      "pending": "{count, plural, one {# cambio sin guardar} other {# cambios sin guardar}}",
+      "nothingToSave": "No hay cambios por guardar.",
+      "saving": "Guardando el mapa de cuentas de cargos.",
+      "saved": "Se guardó el mapa de cuentas de cargos.",
+      "staleVersion": "El mapa cambió desde que lo abrió y no se guardó ningún cambio. Ya se recargó con los valores actuales: revíselos y repita su cambio.",
+      "accountMissing": "Una de las cuentas elegidas ya no existe. Ya se recargaron las cuentas; revise las que eligió e intente de nuevo.",
+      "readOnlyTitle": "Solo lectura",
+      "readOnlyBody": "Su rol no puede cambiar el mapa de cuentas de cargos: solo un Super Administrador lo hace. Aquí puede consultar cómo está configurado.",
+      "caption": "Cuentas de cargos"
     }
   },
   "resource": {
+    "totalRecords": "{count, plural, one {# registro} other {# registros}}",
     "state": "Estado",
     "actions": "Acciones",
     "active": "Activo",
@@ -510,7 +1159,9 @@
       "filter": "Estado"
     },
     "guardiansAction": "Encargados",
-    "guardiansActionFor": "Encargados de {name}"
+    "guardiansActionFor": "Encargados de {name}",
+    "statementAction": "Estado de cuenta",
+    "statementActionFor": "Estado de cuenta de {name}"
   },
   "enrollments": {
     "title": "Matrículas",

@@ -36,6 +36,8 @@
   --tracking-tight: -0.01em;
   --tracking-normal: 0em;
   --tracking-wide: 0.02em;
+  /* Uppercase micro labels: sidebar sections, key-figure captions (docs/ui-ux/07 section 4) */
+  --tracking-caps: 0.06em;
 
   /* Spacing (4 px base, one multiplier) and breakpoints */
   --spacing: 0.25rem;
@@ -50,15 +52,16 @@
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
+  --radius-xl: 0.625rem;
   --radius-2xl: 1rem;
   --radius-full: 9999px;
 
-  /* Shadows, light theme */
-  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.06);
-  --shadow-md: 0 4px 8px -2px rgb(15 23 42 / 0.10), 0 2px 4px -2px rgb(15 23 42 / 0.06);
-  --shadow-lg: 0 12px 20px -4px rgb(15 23 42 / 0.12), 0 4px 8px -4px rgb(15 23 42 / 0.08);
-  --shadow-xl: 0 24px 36px -8px rgb(15 23 42 / 0.18), 0 8px 12px -6px rgb(15 23 42 / 0.10);
+  /* Shadows, light theme: short, cool and low (docs/ui-ux/07 section 5.3). Elevation is mostly told
+     by the hairline border; the shadow only separates a layer from the one below it. */
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-md: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 4px 12px -2px rgb(15 23 42 / 0.08);
+  --shadow-lg: 0 2px 6px -1px rgb(15 23 42 / 0.06), 0 12px 24px -6px rgb(15 23 42 / 0.12);
+  --shadow-xl: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 24px 48px -12px rgb(15 23 42 / 0.20);
 
   /* Easing curves */
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
@@ -79,6 +82,22 @@
   --color-border-interactive: var(--palette-neutral-500);
   --color-border-focus: var(--palette-primary-500);
 
+  /* Dense-data surfaces (docs/ui-ux/07 section 3.3). bg-subtle holds table headers and key-figure
+     strips and never tertiary text (4.34:1); bg-hover is the row hover and keeps tertiary at 4.55:1. */
+  --color-bg-subtle: var(--palette-neutral-100);
+  --color-bg-hover: var(--palette-neutral-50);
+
+  /* Application shell, admin panel only (docs/ui-ux/07 section 3.4). A navy sidebar in both themes. */
+  --color-sidebar-bg: var(--palette-primary-950);
+  --color-sidebar-fg: #C9D4E8;
+  --color-sidebar-fg-muted: #8FA0BF;
+  --color-sidebar-hover-bg: #13244A;
+  --color-sidebar-active-bg: #1B2E57;
+  --color-sidebar-active-fg: #FFFFFF;
+  --color-sidebar-indicator: var(--palette-primary-400);
+  --color-sidebar-focus: var(--palette-primary-300);
+  --color-sidebar-border: #1B2A47;
+
   /* Primary */
   --color-primary: var(--palette-primary-600);
   --color-primary-hover: var(--palette-primary-700);
@@ -92,6 +111,19 @@
   --color-feedback-warning: #EA580C;
   --color-feedback-danger: #DC2626;
   --color-feedback-info: #0284C7;
+  /* Soft pair for record lifecycle labels such as "Activo" (docs/ui-ux/07 section 3.5). Same values
+     as the paid pair today, but a distinct token: recoloring one never recolors the other. */
+  --color-feedback-success-bg: #F0FDF4;
+  --color-feedback-success-fg: #166534;
+
+  /* Categorical chart series (docs/ui-ux/07 section 3.7), each at least 3:1 on the surface. Charts
+     always carry direct labels: a series is never told by its color alone. */
+  --color-chart-1: var(--palette-primary-600);
+  --color-chart-2: #0F766E;
+  --color-chart-3: #B45309;
+  --color-chart-4: #6D28D9;
+  --color-chart-5: #0369A1;
+  --color-chart-6: var(--palette-neutral-600);
 
   /* Financial state: paid */
   --color-status-paid: #16A34A;
@@ -177,11 +209,12 @@
   --shadow-dark-md: 0 4px 12px -2px rgb(0 0 0 / 0.45);
   --shadow-dark-xl: 0 24px 48px -12px rgb(0 0 0 / 0.60);
 
-  /* Palette anchors for the dark theme. themes.css may not name a primitive, so the five dark
-     values that follow the brand are reached through these aliases and change with it. */
+  /* Palette anchors for the dark theme. themes.css may not name a primitive, so the dark values
+     that follow the brand are reached through these aliases and change with it. */
   --dark-text-link: var(--palette-primary-400);
   --dark-border-interactive: var(--palette-neutral-400);
   --dark-border-focus: var(--palette-primary-400);
   --dark-primary-soft-bg: var(--palette-primary-900);
   --dark-primary-soft-fg: var(--palette-primary-300);
+  --dark-chart-1: var(--palette-primary-400);
 }

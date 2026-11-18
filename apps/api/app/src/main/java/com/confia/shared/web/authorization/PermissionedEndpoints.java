@@ -40,7 +40,13 @@ public final class PermissionedEndpoints {
      * catalog}: the list needs {@code catalog:read}, {@code POST} needs {@code catalog:create} and {@code PUT}
      * needs {@code catalog:update}, and the five routes of the price lists of {@code catalog}: the list and the
      * detail need {@code catalog:read}, the creation of a list and of a price {@code catalog:create} and the edit
-     * of a list {@code catalog:update}. A route of a later
+     * of a list {@code catalog:update}, and the six routes of the charge plans of {@code charges}: the list and the
+     * detail need {@code charges:read}, the creation of a plan {@code charges:create} and the edit of a plan and the
+     * addition and the removal of its items {@code charges:update}, and the five routes of the chart of accounts: the
+     * reads of the accounts need {@code ledger:read} and of the posting map {@code charges:read}, and the creation and
+     * the edit of an account and the setting of the map {@code ledger:create}, which only the Super Administrator holds,
+     * and the statement of a student, which needs {@code charges:read}.
+     * A route of a later
      * change is added here, in the same commit as its controller.
      */
     public static PermissionedEndpoints forAdmin() {
@@ -72,6 +78,49 @@ public final class PermissionedEndpoints {
                 Permission.CATALOG_UPDATE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/catalog/price-lists/{id}/items",
                 Permission.CATALOG_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/catalog/tax-rates",
+                Permission.CATALOG_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/catalog/tax-rates",
+                Permission.CATALOG_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/catalog/tax-rates/{id}",
+                Permission.CATALOG_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/catalog/tax-rates/{id}",
+                Permission.CATALOG_UPDATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/catalog/tax-rates/{id}/periods",
+                Permission.CATALOG_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/plans",
+                Permission.CHARGES_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/charges/plans",
+                Permission.CHARGES_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/plans/{id}",
+                Permission.CHARGES_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/charges/plans/{id}",
+                Permission.CHARGES_UPDATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/charges/plans/{id}/items",
+                Permission.CHARGES_UPDATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.DELETE, "/api/v1/charges/plans/{id}/items/{itemId}",
+                Permission.CHARGES_UPDATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/plans/{id}/accrual-periods",
+                Permission.CHARGES_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/charges/plans/{id}/accrual-preview",
+                Permission.CHARGES_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/charges/plans/{id}/accrual-runs",
+                Permission.CHARGES_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/accrual-runs",
+                Permission.CHARGES_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/accrual-runs/{runId}",
+                Permission.CHARGES_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/students/{studentId}/statement",
+                Permission.CHARGES_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/posting-accounts",
+                Permission.CHARGES_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/charges/posting-accounts",
+                Permission.LEDGER_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/ledger/accounts", Permission.LEDGER_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/ledger/accounts",
+                Permission.LEDGER_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/ledger/accounts/{id}",
+                Permission.LEDGER_CREATE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/students", Permission.STUDENTS_READ));
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/students/{id}",
                 Permission.STUDENTS_READ));

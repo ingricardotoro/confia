@@ -28,7 +28,7 @@ export interface PaymentConceptsViewProps {
   readonly onToggle: (row: PaymentConcept) => void;
 }
 
-/** The payment concepts as a table: code, name, category, recurrence, tax condition, state and actions, with two filters. */
+/** The payment concepts as a table: code, name, category, recurrence, tax condition, tax rate, state and actions, with two filters. */
 export function PaymentConceptsView({ rows, table, pagination, notice, togglingId, filters, onCreate, onEdit, onToggle }: PaymentConceptsViewProps) {
   const { t } = useAdminText();
   const yesNo = (value: boolean) => t(value ? "catalog.common.yes" : "catalog.common.no");
@@ -43,6 +43,14 @@ export function PaymentConceptsView({ rows, table, pagination, notice, togglingI
     { id: "category", header: t("catalog.paymentConcepts.columns.category"), cell: (row) => t(CATEGORY_LABEL_KEYS[row.category]) },
     { id: "isRecurring", header: t("catalog.paymentConcepts.columns.recurring"), cell: (row) => yesNo(row.isRecurring) },
     { id: "isTaxable", header: t("catalog.paymentConcepts.columns.taxable"), cell: (row) => yesNo(row.isTaxable) },
+    {
+      id: "taxRate",
+      header: t("catalog.paymentConcepts.columns.taxRate"),
+      cell: (row) =>
+        row.taxRateCode === null || row.taxRateCode === undefined
+          ? t(row.isTaxable ? "catalog.paymentConcepts.taxRateMissing" : "catalog.paymentConcepts.taxRateNone")
+          : t("catalog.taxRates.optionLabel", { code: row.taxRateCode, name: row.taxRateName ?? "" }),
+    },
     { id: "isActive", header: t("resource.state"), cell: (row) => <ActiveBadge active={row.isActive} /> },
     {
       id: "actions",
@@ -66,6 +74,7 @@ export function PaymentConceptsView({ rows, table, pagination, notice, togglingI
   return (
     <ResourceScreen
       heading={t("catalog.paymentConcepts.heading")}
+      description={t("catalog.paymentConcepts.description")}
       createLabel={t("catalog.paymentConcepts.create")}
       onCreate={onCreate}
       notice={notice}

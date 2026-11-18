@@ -3,6 +3,7 @@ package com.confia.organization.infrastructure;
 import static confia.generated.jooq.tables.OrganizationAcademicYear.ORGANIZATION_ACADEMIC_YEAR;
 import static confia.generated.jooq.tables.OrganizationGrade.ORGANIZATION_GRADE;
 import static confia.generated.jooq.tables.OrganizationModality.ORGANIZATION_MODALITY;
+import static confia.generated.jooq.tables.OrganizationSection.ORGANIZATION_SECTION;
 
 import com.confia.kernel.InstitutionId;
 import com.confia.organization.application.directory.AcademicStructureDirectory;
@@ -38,5 +39,11 @@ public final class JooqAcademicStructureDirectory implements AcademicStructureDi
     public boolean gradeExists(InstitutionId institutionId, UUID gradeId) {
         return dsl.fetchExists(ORGANIZATION_GRADE, ORGANIZATION_GRADE.INSTITUTION_ID
                 .eq(institutionId.value()).and(ORGANIZATION_GRADE.ID.eq(gradeId)));
+    }
+
+    @Override
+    public boolean sectionExists(InstitutionId institutionId, UUID sectionId) {
+        return dsl.fetchExists(ORGANIZATION_SECTION, ORGANIZATION_SECTION.INSTITUTION_ID
+                .eq(institutionId.value()).and(ORGANIZATION_SECTION.ID.eq(sectionId)));
     }
 }

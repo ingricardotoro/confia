@@ -71,7 +71,7 @@ class AccountPermissionsIT extends CommittingPostgresIntegrationTest {
 
         assertThat(resolver().resolve(actor(first, account))).as("token of INS-1").isEmpty();
         assertThat(resolver().resolve(actor(second, account)))
-                .as("non-vacuous: under INS-2 the same account id is a Super Admin").hasSize(88);
+                .as("non-vacuous: under INS-2 the same account id is a Super Admin").hasSize(89);
     }
 
     @Test

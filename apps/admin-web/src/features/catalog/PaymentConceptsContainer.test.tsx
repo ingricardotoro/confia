@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import admin from "../../i18n/locales/es-HN/admin.json";
-import { paymentConcept, paymentConceptPage, paymentConceptRecord, problem } from "../../test/contract-responses.ts";
+import { paymentConcept, paymentConceptPage, paymentConceptRecord, problem, taxRate, taxRatePage } from "../../test/contract-responses.ts";
 import { installMswServer, requests, route } from "../../test/msw-server.ts";
 import { renderCatalog } from "../../test/render-catalog.tsx";
 
@@ -10,14 +10,24 @@ import { renderCatalog } from "../../test/render-catalog.tsx";
 installMswServer();
 
 const CONCEPTS = "/api/v1/catalog/payment-concepts";
+const RATES = "/api/v1/catalog/tax-rates";
 const TIMEOUT = { timeout: 10_000 };
+
+// Fictitious rates: nothing here is a rate that any institution uses.
+const RATE_A = taxRate({ id: "00000000-0000-4000-8000-0000000000a1", code: "IMP-A", name: "Impuesto de prueba A" });
+const RATE_B = taxRate({ id: "00000000-0000-4000-8000-0000000000a2", code: "IMP-B", name: "Impuesto de prueba B" });
+/** The rate a taxable concept holds, as the server answers it. */
+const WITH_RATE_A = { taxRateId: RATE_A.id, taxRateCode: RATE_A.code, taxRateName: RATE_A.name } as const;
 
 const gets = () => requests().filter((sent) => sent.method === "GET" && sent.path === CONCEPTS);
 const lastQuery = () => new URLSearchParams(gets().at(-1)?.search ?? "");
 const writes = (method: "POST" | "PUT") => requests().filter((sent) => sent.method === method);
 
+const rateGets = () => requests().filter((sent) => sent.method === "GET" && sent.path === RATES);
+
 async function openList(rows: unknown[] = [paymentConcept()], path = "/catalog") {
   route("get", CONCEPTS, paymentConceptPage(rows));
+  route("get", RATES, taxRatePage([RATE_A, RATE_B]));
   const rendered = renderCatalog(path);
   const table = await screen.findByRole("table", { name: "Conceptos de pago de la institución" }, TIMEOUT);
   await waitFor(() => {
@@ -132,12 +142,110 @@ describe("creating, editing and deactivating a payment concept", () => {
     await fillNew(dialog, user);
     await user.click(within(dialog).getByRole("checkbox", { name: "Recurrente" }));
     await user.click(within(dialog).getByRole("checkbox", { name: "Gravado" }));
+    await user.selectOptions(await within(dialog).findByLabelText(/Tasa de impuesto/), RATE_B.id);
 
     await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
 
     expect(await screen.findByText("Se creó el registro «Colegiatura».")).toBeInTheDocument();
-    expect(JSON.parse(writes("POST")[0]?.body ?? "{}")).toEqual({ code: "COL", name: "Colegiatura", category: "TUITION", isRecurring: true, isTaxable: true });
+    expect(JSON.parse(writes("POST")[0]?.body ?? "{}")).toEqual({
+      code: "COL",
+      name: "Colegiatura",
+      category: "TUITION",
+      isRecurring: true,
+      isTaxable: true,
+      taxRateId: RATE_B.id,
+    });
     expect(await screen.findByRole("row", { name: /Colegiatura/ })).toBeInTheDocument();
+  });
+
+  it("asks for a tax rate only when the concept is taxable, offers the active rates the server lists, and drops the choice when it is unchecked", async () => {
+    const user = userEvent.setup();
+    await openList([]);
+    route("post", CONCEPTS, paymentConceptRecord(paymentConcept({ code: "COL", name: "Colegiatura", isTaxable: false }), 201));
+    await user.click(screen.getByRole("button", { name: "Nuevo concepto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Nuevo concepto de pago" });
+    expect(within(dialog).queryByLabelText(/Tasa de impuesto/)).not.toBeInTheDocument();
+    await fillNew(dialog, user);
+
+    await user.click(within(dialog).getByRole("checkbox", { name: "Gravado" }));
+    const select = await within(dialog).findByLabelText(/Tasa de impuesto/);
+
+    expect(select).toBeRequired();
+    expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual(["Elija una opción", "IMP-A — Impuesto de prueba A", "IMP-B — Impuesto de prueba B"]);
+    // The server decides what is active: the page only asks for the active ones.
+    await waitFor(() => {
+      expect(new URLSearchParams(rateGets().at(-1)?.search).get("active")).toBe("true");
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
+    expect(await within(dialog).findByText("Hay 1 campo con error.")).toBeInTheDocument();
+    expect(writes("POST")).toHaveLength(0);
+
+    await user.selectOptions(select, RATE_A.id);
+    await user.click(within(dialog).getByRole("checkbox", { name: "Gravado" }));
+    expect(within(dialog).queryByLabelText(/Tasa de impuesto/)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
+
+    expect(await screen.findByText("Se creó el registro «Colegiatura».")).toBeInTheDocument();
+    expect(JSON.parse(writes("POST")[0]?.body ?? "{}")).toEqual({ code: "COL", name: "Colegiatura", category: "TUITION", isRecurring: false, isTaxable: false });
+  });
+
+  it("says there is no active rate to choose when the server lists none", async () => {
+    const user = userEvent.setup();
+    await openList([]);
+    route("get", RATES, taxRatePage([]));
+    await user.click(screen.getByRole("button", { name: "Nuevo concepto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Nuevo concepto de pago" });
+    await user.click(within(dialog).getByRole("checkbox", { name: "Gravado" }));
+
+    expect(await within(dialog).findByText(/No hay tasas de impuesto activas/)).toBeInTheDocument();
+  });
+
+  it("tells the rates could not be loaded, and offers them again on retry", async () => {
+    const user = userEvent.setup();
+    await openList([]);
+    route("get", RATES, problem("internal-error", 500), taxRatePage([RATE_A]));
+    await user.click(screen.getByRole("button", { name: "Nuevo concepto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Nuevo concepto de pago" });
+    await user.click(within(dialog).getByRole("checkbox", { name: "Gravado" }));
+
+    expect(await within(dialog).findByText("No se pudieron cargar las opciones de los filtros y de los formularios.", undefined, TIMEOUT)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Reintentar" }));
+
+    expect(await within(dialog).findByRole("option", { name: "IMP-A — Impuesto de prueba A" })).toBeInTheDocument();
+  });
+
+  it("keeps showing the rate a concept holds when it was deactivated since, and sends it back unchanged", async () => {
+    const user = userEvent.setup();
+    const row = paymentConcept({ name: "Colegiatura", version: 2, ...WITH_RATE_A });
+    await openList([row]);
+    route("get", RATES, taxRatePage([RATE_B]));
+    route("put", `${CONCEPTS}/${row.id}`, paymentConceptRecord({ ...row, version: 3 }));
+    await user.click(screen.getByRole("button", { name: "Editar Colegiatura" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar concepto de pago" });
+
+    const select = await within(dialog).findByLabelText(/Tasa de impuesto/);
+
+    expect(select).toHaveValue(RATE_A.id);
+    expect(within(select).getByRole("option", { name: "IMP-A — Impuesto de prueba A (inactiva)" })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
+    expect(await screen.findByText("Se guardaron los cambios de «Colegiatura».")).toBeInTheDocument();
+    expect(JSON.parse(writes("PUT")[0]?.body ?? "{}")).toMatchObject({ isTaxable: true, taxRateId: RATE_A.id });
+  });
+
+  it("tells a rate that is no longer active as the server answers it, and keeps what was typed", async () => {
+    const user = userEvent.setup();
+    await openList([]);
+    route("post", CONCEPTS, problem("inactive-reference", 409));
+    await user.click(screen.getByRole("button", { name: "Nuevo concepto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Nuevo concepto de pago" });
+    await fillNew(dialog, user);
+    await user.click(within(dialog).getByRole("checkbox", { name: "Gravado" }));
+    await user.selectOptions(await within(dialog).findByLabelText(/Tasa de impuesto/), RATE_A.id);
+
+    await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(admin.problem.inactiveReference);
+    expect(within(dialog).getByLabelText(/Tasa de impuesto/)).toHaveValue(RATE_A.id);
   });
 
   it("refuses an empty code, name and category before sending", async () => {
@@ -247,7 +355,7 @@ describe("creating, editing and deactivating a payment concept", () => {
 
   it("edits with every editable field and the state, in one PUT that carries no code", async () => {
     const user = userEvent.setup();
-    const row = paymentConcept({ code: "COL", name: "Colegiatura", version: 2 });
+    const row = paymentConcept({ code: "COL", name: "Colegiatura", version: 2, ...WITH_RATE_A });
     await openList([row]);
     route("put", `${CONCEPTS}/${row.id}`, paymentConceptRecord({ ...row, name: "Colegiatura mensual", isActive: false, version: 3 }));
     await user.click(screen.getByRole("button", { name: "Editar Colegiatura" }));
@@ -274,7 +382,7 @@ describe("creating, editing and deactivating a payment concept", () => {
 
   it("tells the concept changed, and reads the list again, when the edit answers 409 stale-version", async () => {
     const user = userEvent.setup();
-    const row = paymentConcept({ name: "Colegiatura", version: 1 });
+    const row = paymentConcept({ name: "Colegiatura", version: 1, ...WITH_RATE_A });
     await openList([row]);
     route("put", `${CONCEPTS}/${row.id}`, problem("stale-version", 409));
     route("get", CONCEPTS, paymentConceptPage([{ ...row, name: "Colegiatura nueva", version: 2 }]));
@@ -307,7 +415,7 @@ describe("creating, editing and deactivating a payment concept", () => {
 
   it("tells a concept that no longer exists when the edit answers 404", async () => {
     const user = userEvent.setup();
-    const row = paymentConcept({ name: "Colegiatura" });
+    const row = paymentConcept({ name: "Colegiatura", ...WITH_RATE_A });
     await openList([row]);
     route("put", `${CONCEPTS}/${row.id}`, problem("resource-not-found", 404));
     await user.click(screen.getByRole("button", { name: "Editar Colegiatura" }));
@@ -320,7 +428,7 @@ describe("creating, editing and deactivating a payment concept", () => {
 
   it("deactivates from the row with a PUT that keeps every other field, and activates it again", async () => {
     const user = userEvent.setup();
-    const row = paymentConcept({ name: "Colegiatura", isTaxable: true, version: 3 });
+    const row = paymentConcept({ name: "Colegiatura", isTaxable: true, version: 3, ...WITH_RATE_A });
     await openList([row]);
     route("put", `${CONCEPTS}/${row.id}`, paymentConceptRecord({ ...row, isActive: false, version: 4 }));
     route("get", CONCEPTS, paymentConceptPage([{ ...row, isActive: false }]));
@@ -334,6 +442,7 @@ describe("creating, editing and deactivating a payment concept", () => {
       category: "TUITION",
       isRecurring: true,
       isTaxable: true,
+      taxRateId: RATE_A.id,
       isActive: false,
     });
 

@@ -126,7 +126,8 @@ test.describe("the detail of a price list", () => {
 
     await expect(page).toHaveURL(new RegExp(`/catalog/price-lists/${SEEDED_LISTS.institution2026}$`));
     await expect(page.getByRole("heading", { level: 2, name: "2026 — Institución" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Listas de precios", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("navigation", { name: "Vistas del catálogo" }).getByRole("link", { name: "Listas de precios" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("navigation", { name: "Ruta de navegación" }).getByText("2026 — Institución")).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("heading", { level: 4, name: "COL — Colegiatura" })).toBeVisible();
     await expect.poll(() => validityRows(page, "Vigencias de Colegiatura")).toHaveLength(2);
     const [newest, oldest] = await validityRows(page, "Vigencias de Colegiatura");
@@ -228,7 +229,7 @@ test.describe("the detail of a price list", () => {
     await page.getByRole("button", { name: "Archivar lista 2026 — Institución" }).click();
     await expect(resultNotice(page)).toContainText("Se archivó");
 
-    await page.getByRole("link", { name: "Volver a las listas de precios" }).click();
+    await page.getByRole("navigation", { name: "Ruta de navegación" }).getByRole("link", { name: "Listas de precios" }).click();
 
     await expect(page).toHaveURL(/\/catalog\/price-lists$/);
     await expect(page.getByRole("row", { name: /2026 — Institución/ })).toContainText("Archivada");

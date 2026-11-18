@@ -6,6 +6,9 @@ import {
   type OrganizationOptions,
 } from "./organization-model.ts";
 import { DEFAULT_CATALOG, createCatalogModel, type CatalogModel, type CatalogOptions } from "./catalog-model.ts";
+import { DEFAULT_CHARGES, createChargesModel, type ChargesModel, type ChargesOptions } from "./charges-model.ts";
+import { DEFAULT_STATEMENT, createStatementModel, type StatementModel, type StatementOptions } from "./statement-model.ts";
+import { DEFAULT_LEDGER, createLedgerModel, type LedgerModel, type LedgerOptions } from "./ledger-model.ts";
 import { DEFAULT_IMPORTS, createImportsModel, type ImportsModel, type ImportsOptions } from "./imports-model.ts";
 import { DEFAULT_GUARDIANS, createGuardiansModel, type GuardiansModel, type GuardiansOptions } from "./guardians-model.ts";
 import { DEFAULT_ENROLLMENTS, createEnrollmentsModel, type EnrollmentsModel, type EnrollmentsOptions } from "./enrollments-model.ts";
@@ -25,7 +28,7 @@ const RETRY_AFTER_SECONDS = "30";
 const TRACE_ID = "01J8Z4K2QF9P0X";
 const EXPIRY_PUSH_MS = 301_000;
 
-export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify" | "organization" | "students" | "enrollments" | "guardians" | "imports" | "catalog";
+export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify" | "organization" | "students" | "enrollments" | "guardians" | "imports" | "catalog" | "charges" | "ledger";
 
 type LoginBehavior =
   | "authenticated"
@@ -55,6 +58,12 @@ interface PresetDefinition {
   readonly imports?: ImportsOptions;
   /** The catalog the scenario holds; the seeded one, with every write allowed, when absent. */
   readonly catalog?: CatalogOptions;
+  /** The charge plans the scenario holds, over its academic structure and its catalog; the seeded ones, with every write allowed, when absent. */
+  readonly charges?: ChargesOptions;
+  /** The chart of accounts and the map of posting accounts the scenario holds; the seeded ones (a partial map), with every write allowed, when absent. */
+  readonly ledger?: LedgerOptions;
+  /** The statements of account the scenario holds, over its students; the seeded ones, readable, when absent. */
+  readonly statement?: StatementOptions;
   /** A fault injected after the model answered, to prove the server refuses to send it. */
   readonly tamper?: (operation: Operation, response: ModelResponse) => ModelResponse;
 }
@@ -92,12 +101,40 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   "imports-empty": { login: "authenticated", enrolled: false, imports: { ...DEFAULT_IMPORTS, seed: "empty" } },
   "imports-forbidden": { login: "authenticated", enrolled: false, imports: { ...DEFAULT_IMPORTS, writes: "forbidden" } },
   "imports-server-error": { login: "authenticated", enrolled: false, imports: { ...DEFAULT_IMPORTS, reads: "failing-first" } },
-  // The catalog (catalog-payment-concepts and catalog-price-lists cuts). Each one signs in as the default does.
+  // The catalog (catalog-payment-concepts, catalog-price-lists and catalog-tax-rates cuts). Each one signs in as the default does.
   "catalog-empty": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, seed: "empty", lists: "empty" } },
+  "catalog-tax-rates-empty": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, taxRates: "empty" } },
   "catalog-price-lists-empty": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, lists: "empty" } },
   "catalog-stale-version": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, writes: "stale-first" } },
   "catalog-forbidden": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, writes: "forbidden" } },
   "catalog-server-error": { login: "authenticated", enrolled: false, catalog: { ...DEFAULT_CATALOG, reads: "failing-first" } },
+  // The charge plans (charges-plans cut). Each one signs in as the default does.
+  "charges-empty": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, seed: "empty" } },
+  "charges-stale-version": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, writes: "stale-first" } },
+  "charges-forbidden": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, writes: "forbidden" } },
+  "charges-server-error": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, reads: "failing-first" } },
+  // The accrual engine (charges-accrual cut): no runs, a preview that is blocked, a run rejected by a changed digest, a run already in
+  // progress, a person who cannot generate, and a preview that fails once. Each one signs in as the default does.
+  "charges-accrual-empty": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, accrual: "empty" } },
+  "charges-accrual-blocked": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, accrual: "blocked" } },
+  "charges-accrual-digest-changed": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, accrual: "digest-changed" } },
+  "charges-accrual-in-progress": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, accrual: "in-progress" } },
+  "charges-accrual-forbidden": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, accrual: "forbidden" } },
+  "charges-accrual-preview-error": { login: "authenticated", enrolled: false, charges: { ...DEFAULT_CHARGES, accrual: "preview-fails-first" } },
+  // The chart of accounts and the map of posting accounts (ledger-chart-of-accounts cut): the map empty, complete (an account the map
+  // uses cannot be deactivated), no accounts at all, a stale version, a person who cannot write, and reads that fail first. Each one signs in as the default does.
+  "ledger-map-empty": { login: "authenticated", enrolled: false, ledger: { ...DEFAULT_LEDGER, map: "empty" } },
+  "ledger-map-complete": { login: "authenticated", enrolled: false, ledger: { ...DEFAULT_LEDGER, map: "complete" } },
+  "ledger-empty": { login: "authenticated", enrolled: false, ledger: { ...DEFAULT_LEDGER, seed: "empty", map: "empty" } },
+  "ledger-stale-version": { login: "authenticated", enrolled: false, ledger: { ...DEFAULT_LEDGER, writes: "stale-first" } },
+  "ledger-forbidden": { login: "authenticated", enrolled: false, ledger: { ...DEFAULT_LEDGER, writes: "forbidden" } },
+  "ledger-server-error": { login: "authenticated", enrolled: false, ledger: { ...DEFAULT_LEDGER, reads: "failing-first" } },
+  "ledger-map-server-error": { login: "authenticated", enrolled: false, ledger: { ...DEFAULT_LEDGER, mapReads: "failing-first" } },
+  // The statement of account (ledger-account-statement cut): no student has an account, a person without the permission, and reads
+  // that fail first. Each one signs in as the default does.
+  "statement-empty": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, seed: "empty" } },
+  "statement-forbidden": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, access: "forbidden" } },
+  "statement-server-error": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, reads: "failing-first" } },
   "contract-violation": {
     login: "second-factor-enrollment-required",
     enrolled: false,
@@ -120,6 +157,9 @@ export interface Scenario {
   readonly guardians: GuardiansModel;
   readonly imports: ImportsModel;
   readonly catalog: CatalogModel;
+  readonly charges: ChargesModel;
+  readonly ledger: LedgerModel;
+  readonly statement: StatementModel;
   readonly calls: RecordedCall[];
   readonly tamper: PresetDefinition["tamper"];
   signIn(sleep: (ms: number) => Promise<void>): Promise<ModelResponse>;
@@ -141,6 +181,7 @@ function build(preset: string, definition: PresetDefinition): Scenario {
   const model = createSessionModel({ now: () => Date.now() + offsetMs, enrolled: definition.enrolled });
   const organization = createOrganizationModel(definition.organization ?? DEFAULT_ORGANIZATION);
   const students = createStudentsModel(definition.students ?? DEFAULT_STUDENTS);
+  const catalog = createCatalogModel(definition.catalog ?? DEFAULT_CATALOG);
   return {
     preset,
     model,
@@ -149,7 +190,10 @@ function build(preset: string, definition: PresetDefinition): Scenario {
     enrollments: createEnrollmentsModel(definition.enrollments ?? DEFAULT_ENROLLMENTS, { organization, students }),
     guardians: createGuardiansModel(definition.guardians ?? DEFAULT_GUARDIANS, { students }),
     imports: createImportsModel(definition.imports ?? DEFAULT_IMPORTS),
-    catalog: createCatalogModel(definition.catalog ?? DEFAULT_CATALOG),
+    catalog,
+    charges: createChargesModel(definition.charges ?? DEFAULT_CHARGES, { organization, catalog, students }),
+    ledger: createLedgerModel(definition.ledger ?? DEFAULT_LEDGER),
+    statement: createStatementModel(definition.statement ?? DEFAULT_STATEMENT, { students }),
     calls: [],
     tamper: definition.tamper,
     async signIn(sleep) {

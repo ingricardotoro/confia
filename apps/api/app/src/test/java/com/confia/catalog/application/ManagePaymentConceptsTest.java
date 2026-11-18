@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.catalog.domain.DuplicateCodeException;
+import com.confia.catalog.domain.InactiveReferenceException;
 import com.confia.catalog.domain.InvalidCatalogValueException;
 import com.confia.catalog.domain.PaymentCategory;
 import com.confia.catalog.domain.PaymentConcept;
 import com.confia.catalog.domain.ResourceNotFoundException;
 import com.confia.catalog.domain.StaleVersionException;
+import com.confia.catalog.domain.TaxRate;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.audit.AuditEntry;
 import com.confia.shared.audit.AuditLogWriter;
@@ -46,12 +48,13 @@ class ManagePaymentConceptsTest {
             NOW.plusSeconds(900));
     private final String requestId = UUID.randomUUID().toString();
     private final InMemoryConcepts store = new InMemoryConcepts();
-    private final ManagePaymentConcepts concepts = new ManagePaymentConcepts(runner, store, auditWriter, clock);
+    private final InMemoryTaxRates rates = new InMemoryTaxRates();
+    private final ManagePaymentConcepts concepts = new ManagePaymentConcepts(runner, store, rates, auditWriter, clock);
 
     private PaymentConcept arranged(InstitutionId owner, String code, String name, PaymentCategory category,
             boolean active) {
-        PaymentConcept concept = new PaymentConcept(UUID.randomUUID(), code, name, category, true, true, active, 0,
-                EARLIER, EARLIER);
+        PaymentConcept concept = new PaymentConcept(UUID.randomUUID(), code, name, category, true, true, active, null,
+                0, EARLIER, EARLIER);
         store.rows.put(new Key(owner, concept.id()), concept);
         return concept;
     }
@@ -60,9 +63,16 @@ class ManagePaymentConceptsTest {
 
     @Test
     void creatingAConceptStoresItAndWritesOneCreatedEntryInTheSameTransaction() {
-        PaymentConceptView view = concepts.create(actor, requestId, "COLEG", "Colegiatura", "TUITION", true, true);
+        TaxRate isv = rates.arrange(institution, "ISV", "Impuesto sobre ventas", true);
+
+        PaymentConceptView view = concepts.create(actor, requestId, "COLEG", "Colegiatura", "TUITION", true, true,
+                isv.id());
 
         assertThat(view.active()).isTrue();
+        assertThat(view.taxRateId()).isEqualTo(isv.id());
+        assertThat(view.taxRateCode()).isEqualTo("ISV");
+        assertThat(view.taxRateName()).isEqualTo("Impuesto sobre ventas");
+        assertThat(rates.forShareLocks).as("the rate is read in share mode in the same transaction").isEqualTo(1);
         assertThat(view.code()).isEqualTo("COLEG");
         assertThat(view.category()).isEqualTo("TUITION");
         assertThat(view.taxable()).isTrue();
@@ -74,17 +84,18 @@ class ManagePaymentConceptsTest {
             assertThat(entry.entityId()).isEqualTo(view.id().toString());
             assertThat(entry.beforeValue()).isNull();
             assertThat(entry.afterValue()).isEqualTo("{\"code\":\"COLEG\",\"name\":\"Colegiatura\","
-                    + "\"category\":\"TUITION\",\"isTaxable\":true,\"isRecurring\":true,\"isActive\":true}");
+                    + "\"category\":\"TUITION\",\"isTaxable\":true,\"isRecurring\":true,\"isActive\":true,"
+                    + "\"taxRateId\":\"" + isv.id() + "\"}");
         });
         assertThat(transactionCalls).contains("commit").doesNotContain("rollback");
     }
 
     @Test
     void aCodeAlreadyTakenWithAnotherCapitalizationIsADuplicateAndLeavesNoEntry() {
-        concepts.create(actor, requestId, "COLEG", "Colegiatura", "TUITION", true, true);
+        concepts.create(actor, requestId, "COLEG", "Colegiatura", "TUITION", false, true, null);
         audit.clear();
 
-        assertThatThrownBy(() -> concepts.create(actor, requestId, "coleg", "Otro", "OTHER", false, false))
+        assertThatThrownBy(() -> concepts.create(actor, requestId, "coleg", "Otro", "OTHER", false, false, null))
                 .isInstanceOf(DuplicateCodeException.class);
 
         assertThat(audit).isEmpty();
@@ -96,19 +107,20 @@ class ManagePaymentConceptsTest {
     void theSameCodeInAnotherInstitutionIsNotADuplicate() {
         arranged(new InstitutionId(UUID.randomUUID()), "COLEG", "Otra", PaymentCategory.TUITION, true);
 
-        assertThat(concepts.create(actor, requestId, "COLEG", "Colegiatura", "TUITION", true, true).code())
+        assertThat(concepts.create(actor, requestId, "COLEG", "Colegiatura", "TUITION", false, true, null).code())
                 .isEqualTo("COLEG");
     }
 
     @Test
     void aBlankCodeAnUnknownCategoryAndATooLongNameAreRefusedBeforeAnythingIsWritten() {
-        assertThatThrownBy(() -> concepts.create(actor, requestId, " ", "Nombre", "OTHER", false, false))
+        assertThatThrownBy(() -> concepts.create(actor, requestId, " ", "Nombre", "OTHER", false, false, null))
                 .isInstanceOf(InvalidCatalogValueException.class);
-        assertThatThrownBy(() -> concepts.create(actor, requestId, "C".repeat(31), "Nombre", "OTHER", false, false))
+        assertThatThrownBy(() -> concepts.create(actor, requestId, "C".repeat(31), "Nombre", "OTHER", false, false,
+                null))
                 .isInstanceOf(InvalidCatalogValueException.class);
-        assertThatThrownBy(() -> concepts.create(actor, requestId, "COD", "Nombre", "SCHOLARSHIP", false, false))
+        assertThatThrownBy(() -> concepts.create(actor, requestId, "COD", "Nombre", "SCHOLARSHIP", false, false, null))
                 .isInstanceOf(InvalidCatalogValueException.class);
-        assertThatThrownBy(() -> concepts.create(actor, requestId, "COD", "N".repeat(121), "OTHER", false, false))
+        assertThatThrownBy(() -> concepts.create(actor, requestId, "COD", "N".repeat(121), "OTHER", false, false, null))
                 .isInstanceOf(InvalidCatalogValueException.class);
 
         assertThat(audit).isEmpty();
@@ -122,9 +134,9 @@ class ManagePaymentConceptsTest {
         PaymentConcept concept = arranged(institution, "COLEG", "Colegiatura", PaymentCategory.TUITION, true);
 
         PaymentConceptView off = concepts.update(actor, requestId, concept.id(), 0, "Mensualidad", "OTHER", false,
-                false, false);
+                false, false, null);
         PaymentConceptView on = concepts.update(actor, requestId, concept.id(), 1, "Mensualidad", "OTHER", false,
-                false, true);
+                false, true, null);
 
         assertThat(off.code()).isEqualTo("COLEG");
         assertThat(off.version()).isEqualTo(1);
@@ -144,11 +156,11 @@ class ManagePaymentConceptsTest {
     @Test
     void anEditWithAStaleVersionIsRefusedAndLeavesTheRowAndTheAuditUntouched() {
         PaymentConcept concept = arranged(institution, "COLEG", "Colegiatura", PaymentCategory.TUITION, true);
-        concepts.update(actor, requestId, concept.id(), 0, "Primero", "OTHER", false, false, true);
+        concepts.update(actor, requestId, concept.id(), 0, "Primero", "OTHER", false, false, true, null);
         audit.clear();
 
         assertThatThrownBy(() -> concepts.update(actor, requestId, concept.id(), 0, "Segundo", "OTHER", false,
-                false, true)).isInstanceOf(StaleVersionException.class);
+                false, true, null)).isInstanceOf(StaleVersionException.class);
 
         assertThat(audit).isEmpty();
         assertThat(store.rows.values()).singleElement().satisfies(stored -> {
@@ -164,8 +176,9 @@ class ManagePaymentConceptsTest {
                 PaymentCategory.TUITION, true);
 
         assertThatThrownBy(() -> concepts.update(actor, requestId, UUID.randomUUID(), 0, "X", "OTHER", false, false,
-                true)).isInstanceOf(ResourceNotFoundException.class);
-        assertThatThrownBy(() -> concepts.update(actor, requestId, foreign.id(), 0, "X", "OTHER", false, false, true))
+                true, null)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> concepts.update(actor, requestId, foreign.id(), 0, "X", "OTHER", false, false, true,
+                null))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         assertThat(audit).isEmpty();
@@ -176,9 +189,126 @@ class ManagePaymentConceptsTest {
     void anEditWithAnUnknownCategoryIsRefused() {
         PaymentConcept concept = arranged(institution, "COLEG", "Colegiatura", PaymentCategory.TUITION, true);
 
-        assertThatThrownBy(() -> concepts.update(actor, requestId, concept.id(), 0, "X", "nope", false, false, true))
+        assertThatThrownBy(() -> concepts.update(actor, requestId, concept.id(), 0, "X", "nope", false, false, true,
+                null))
                 .isInstanceOf(InvalidCatalogValueException.class);
         assertThat(audit).isEmpty();
+    }
+
+    // --- the tax rate of a concept (cut 3) ---
+
+    @Test
+    void aTaxableConceptWithoutATaxRateAndAConceptThatIsNotTaxableWithOneAreRefusedAndLeaveNothing() {
+        TaxRate isv = rates.arrange(institution, "ISV", "Impuesto sobre ventas", true);
+
+        assertThatThrownBy(() -> concepts.create(actor, requestId, "COLEG", "Colegiatura", "TUITION", true, true, null))
+                .isInstanceOf(InvalidCatalogValueException.class);
+        assertThatThrownBy(() -> concepts.create(actor, requestId, "BUS", "Transporte", "TRANSPORT", false, true,
+                isv.id())).isInstanceOf(InvalidCatalogValueException.class);
+
+        assertThat(audit).isEmpty();
+        assertThat(store.rows).isEmpty();
+    }
+
+    @Test
+    void aTaxRateOfAnotherInstitutionOrUnknownIsNotFoundAndAnInactiveOneIsAnInactiveReference() {
+        TaxRate foreign = rates.arrange(new InstitutionId(UUID.randomUUID()), "ISV", "Ajena", true);
+        TaxRate inactive = rates.arrange(institution, "OLD", "Vieja", false);
+
+        assertThatThrownBy(() -> concepts.create(actor, requestId, "COLEG", "Colegiatura", "TUITION", true, true,
+                foreign.id())).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> concepts.create(actor, requestId, "COLEG", "Colegiatura", "TUITION", true, true,
+                UUID.randomUUID())).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> concepts.create(actor, requestId, "COLEG", "Colegiatura", "TUITION", true, true,
+                inactive.id())).isInstanceOf(InactiveReferenceException.class);
+
+        assertThat(audit).isEmpty();
+        assertThat(store.rows).isEmpty();
+    }
+
+    @Test
+    void anEditAssignsChangesAndClearsTheTaxRateAndAuditsItBeforeAndAfter() {
+        TaxRate isv = rates.arrange(institution, "ISV", "Impuesto sobre ventas", true);
+        TaxRate other = rates.arrange(institution, "TUR", "Turismo", true);
+        PaymentConcept concept = arranged(institution, "COLEG", "Colegiatura", PaymentCategory.TUITION, true);
+
+        PaymentConceptView assigned = concepts.update(actor, requestId, concept.id(), 0, "Colegiatura", "TUITION",
+                true, true, true, isv.id());
+        PaymentConceptView changed = concepts.update(actor, requestId, concept.id(), 1, "Colegiatura", "TUITION",
+                true, true, true, other.id());
+        PaymentConceptView cleared = concepts.update(actor, requestId, concept.id(), 2, "Colegiatura", "TUITION",
+                false, true, true, null);
+
+        assertThat(assigned.taxRateId()).isEqualTo(isv.id());
+        assertThat(changed.taxRateCode()).isEqualTo("TUR");
+        assertThat(cleared.taxRateId()).isNull();
+        assertThat(cleared.taxRateCode()).isNull();
+        assertThat(audit.get(0).beforeValue()).doesNotContain("taxRateId");
+        assertThat(audit.get(0).afterValue()).contains("\"taxRateId\":\"" + isv.id() + "\"");
+        assertThat(audit.get(1).beforeValue()).contains("\"taxRateId\":\"" + isv.id() + "\"");
+        assertThat(audit.get(1).afterValue()).contains("\"taxRateId\":\"" + other.id() + "\"");
+        assertThat(audit.get(2).afterValue()).doesNotContain("taxRateId");
+    }
+
+    @Test
+    void aLegacyTaxableConceptWithoutARateMayBeEditedAndToggledButNotMadeTaxableAgainWithoutOne() {
+        TaxRate isv = rates.arrange(institution, "ISV", "Impuesto sobre ventas", true);
+        PaymentConcept legacy = arranged(institution, "COLEG", "Colegiatura", PaymentCategory.TUITION, true);
+
+        PaymentConceptView renamed = concepts.update(actor, requestId, legacy.id(), 0, "Nueva", "TUITION", true, true,
+                true, null);
+        PaymentConceptView off = concepts.update(actor, requestId, legacy.id(), 1, "Nueva", "TUITION", true, true,
+                false, null);
+        PaymentConceptView on = concepts.update(actor, requestId, legacy.id(), 2, "Nueva", "TUITION", true, true,
+                true, null);
+        concepts.update(actor, requestId, legacy.id(), 3, "Nueva", "TUITION", false, true, true, null);
+
+        assertThat(renamed.taxRateId()).isNull();
+        assertThat(off.active()).isFalse();
+        assertThat(on.active()).isTrue();
+        assertThat(audit).hasSize(4);
+        assertThatThrownBy(() -> concepts.update(actor, requestId, legacy.id(), 4, "Nueva", "TUITION", true, true,
+                true, null)).isInstanceOf(InvalidCatalogValueException.class);
+        assertThatThrownBy(() -> concepts.update(actor, requestId, legacy.id(), 4, "Nueva", "TUITION", false, true,
+                true, isv.id())).isInstanceOf(InvalidCatalogValueException.class);
+        assertThat(audit).hasSize(4);
+    }
+
+    @Test
+    void anInactiveRateCannotBeAssignedButAConceptThatAlreadyHasItCanStillBeEditedAndDeactivated() {
+        TaxRate isv = rates.arrange(institution, "ISV", "Impuesto sobre ventas", true);
+        PaymentConceptView created = concepts.create(actor, requestId, "COLEG", "Colegiatura", "TUITION", true, true,
+                isv.id());
+        rates.rows.put(new InMemoryTaxRates.Key(institution, isv.id()), isv.edit(0, isv.name(), false, NOW));
+        TaxRate other = rates.arrange(institution, "TUR", "Turismo", false);
+
+        assertThatThrownBy(() -> concepts.update(actor, requestId, created.id(), 0, "Colegiatura", "TUITION", true,
+                true, true, other.id())).isInstanceOf(InactiveReferenceException.class);
+        PaymentConceptView off = concepts.update(actor, requestId, created.id(), 0, "Colegiatura", "TUITION", true,
+                true, false, isv.id());
+
+        assertThat(off.active()).isFalse();
+        assertThat(off.taxRateId()).isEqualTo(isv.id());
+        assertThatThrownBy(() -> concepts.update(actor, requestId, created.id(), 1, "Colegiatura", "TUITION", true,
+                true, true, isv.id())).as("inactive to active needs an active rate")
+                .isInstanceOf(InactiveReferenceException.class);
+        assertThat(concepts.update(actor, requestId, created.id(), 1, "Colegiatura", "TUITION", true, true, false,
+                isv.id()).active()).isFalse();
+    }
+
+    @Test
+    void theListShowsTheCodeAndTheNameOfTheTaxRateOfEachConcept() {
+        TaxRate isv = rates.arrange(institution, "ISV", "Impuesto sobre ventas", true);
+        concepts.create(actor, requestId, "COLEG", "Colegiatura", "TUITION", true, true, isv.id());
+        concepts.create(actor, requestId, "BUS", "Transporte", "TRANSPORT", false, true, null);
+
+        List<PaymentConceptView> items = concepts.list(actor, requestId, 0, 50, null, null, null).items();
+
+        assertThat(items).extracting(PaymentConceptView::code).containsExactly("BUS", "COLEG");
+        assertThat(items.get(0).taxRateId()).isNull();
+        assertThat(items.get(0).taxRateCode()).isNull();
+        assertThat(items.get(1).taxRateCode()).isEqualTo("ISV");
+        assertThat(items.get(1).taxRateName()).isEqualTo("Impuesto sobre ventas");
     }
 
     // --- list ---

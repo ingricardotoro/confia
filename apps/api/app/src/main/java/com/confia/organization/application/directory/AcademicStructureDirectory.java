@@ -18,4 +18,7 @@ public interface AcademicStructureDirectory {
 
     /** Whether the grade exists in the institution. */
     boolean gradeExists(InstitutionId institutionId, UUID gradeId);
+
+    /** Whether the section exists in the institution. */
+    boolean sectionExists(InstitutionId institutionId, UUID sectionId);
 }

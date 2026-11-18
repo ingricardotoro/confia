@@ -12,7 +12,7 @@ import { PaymentConceptsView, type PaymentConceptsViewProps } from "./PaymentCon
 function props(override: Partial<PaymentConceptsViewProps> = {}): PaymentConceptsViewProps {
   return {
     rows: [
-      paymentConcept({ code: "COL", name: "Colegiatura" }),
+      paymentConcept({ code: "COL", name: "Colegiatura", taxRateId: "00000000-0000-4000-8000-0000000000a1", taxRateCode: "IMP-A", taxRateName: "Impuesto de prueba A" }),
       paymentConcept({ code: "MUL", name: "Multa por retraso", category: "FINE", isRecurring: false, isTaxable: false, isActive: false }),
     ],
     table: loadedTable,
@@ -35,6 +35,7 @@ describe("PaymentConceptsView", () => {
       "Categoría",
       "Recurrente",
       "Gravado",
+      "Tasa de impuesto",
       "Estado",
       "Acciones",
     ]);
@@ -42,11 +43,19 @@ describe("PaymentConceptsView", () => {
     expect(first.getByText("COL")).toBeInTheDocument();
     expect(first.getAllByText("Colegiatura")).toHaveLength(2);
     expect(first.getAllByText("Sí")).toHaveLength(2);
+    expect(first.getByText("IMP-A — Impuesto de prueba A")).toBeInTheDocument();
     expect(first.getByText("Activo")).toBeInTheDocument();
     const second = within(screen.getByRole("row", { name: /Multa por retraso/ }));
     expect(second.getByText("Multa")).toBeInTheDocument();
     expect(second.getAllByText("No")).toHaveLength(2);
     expect(second.getByText("Inactivo")).toBeInTheDocument();
+    expect(second.getByText("No aplica")).toBeInTheDocument();
+  });
+
+  it("says a taxable concept has no rate yet when it was created before the rates existed", () => {
+    renderWithAdminI18n(<PaymentConceptsView {...props({ rows: [paymentConcept({ code: "LIB", name: "Libros", isTaxable: true })] })} />);
+
+    expect(within(screen.getByRole("row", { name: /Libros/ })).getByText("Sin tasa asignada")).toBeInTheDocument();
   });
 
   it("reports the row of the edit and of the toggle, and the creation", async () => {

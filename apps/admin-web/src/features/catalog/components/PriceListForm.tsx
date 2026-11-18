@@ -1,6 +1,6 @@
 import { Alert, Button } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import { OptionField, TextField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
+import { FieldGrid, OptionField, TextField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
 import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { PRICE_LIST_SCOPES } from "../catalog-search.ts";
 import { PRICE_LIST_CONTROL_IDS, needsReference, type PriceListField, type PriceListValues } from "../price-list-form.ts";
@@ -62,11 +62,12 @@ export function PriceListForm({
       {lookupFailure === undefined ? null : (
         <Alert variant="warning">
           <p>{t("resource.optionsFailed")}</p>
-          <Button variant="secondary" size="sm" className="mt-2" onClick={lookupFailure.onRetry}>
+          <Button variant="secondary" size="xs" className="mt-2" onClick={lookupFailure.onRetry}>
             {t("resource.retryOptions")}
           </Button>
         </Alert>
       )}
+      <FieldGrid>
       <OptionField
         label={t("catalog.priceLists.fields.academicYear")}
         required
@@ -75,6 +76,7 @@ export function PriceListForm({
         {...bind("academicYearId")}
       />
       <OptionField label={t("catalog.priceLists.fields.scope")} required options={scopeOptions} {...bind("scope")} />
+      </FieldGrid>
       {needsReference(values.scope) ? (
         <OptionField
           // A new control for each scope, so the choice made for one is never shown for the other.

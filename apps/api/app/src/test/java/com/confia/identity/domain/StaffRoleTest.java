@@ -92,15 +92,15 @@ class StaffRoleTest {
 
     @Test
     void everyRoleGrantsTheCountOfPermissionsOfItsColumn() {
-        assertThat(sizes()).containsExactly(88, 61, 18, 31, 35, 23);
+        assertThat(sizes()).containsExactly(89, 62, 18, 31, 35, 23);
     }
 
     @Test
-    void theSuperAdminHasTheEightyEightModuleAndVerbPermissionsAndNotTheRequest() {
+    void theSuperAdminHasTheEightyNineModuleAndVerbPermissionsAndNotTheRequest() {
         Set<Permission> expected = EnumSet.allOf(Permission.class);
         expected.remove(Permission.INVOICING_REQUEST_VOID);
 
-        assertThat(StaffRole.SUPER_ADMIN.permissions()).hasSize(88).isEqualTo(expected);
+        assertThat(StaffRole.SUPER_ADMIN.permissions()).hasSize(89).isEqualTo(expected);
     }
 
     @Test
@@ -200,6 +200,11 @@ class StaffRoleTest {
                 "settings", "identity")) {
             assertThat(permissionsOf(StaffRole.ACADEMIC_COORDINATOR, finance)).as(finance).isEmpty();
         }
+    }
+
+    @Test
+    void onlyTheSuperAdminLoadsTheChartOfAccounts() {
+        assertThat(rolesGranting(Permission.LEDGER_CREATE)).containsExactly(StaffRole.SUPER_ADMIN);
     }
 
     @Test

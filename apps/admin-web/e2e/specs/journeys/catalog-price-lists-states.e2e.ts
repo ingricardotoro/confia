@@ -74,7 +74,9 @@ test.describe("a rule of the server refuses a price", () => {
     await page.getByRole("button", { name: NEW_PRICE }).click();
     await fillPrice(page, { concept: "Matrícula anual", amount: "0.00", from: "2030-01-01", to: "2029-12-31" });
 
-    await dialog(page).getByRole("button", { name: SAVE_PRICE }).click();
+    // Enter in the last field submits, not the button: leaving that field shows its error, the dialog grows and its pinned footer
+    // moves under the pointer between the press and the release of a click, so a click right after typing an invalid value is lost.
+    await field(page, "Vigente hasta").press("Enter");
 
     await expect(dialog(page).getByRole("group", { name: "Hay 2 campos con errores." })).toBeVisible();
     await expect(field(page, "Importe")).toHaveAccessibleDescription(/El importe debe ser mayor que cero\./);

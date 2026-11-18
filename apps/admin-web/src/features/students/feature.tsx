@@ -26,7 +26,7 @@ function StudentsRoute() {
  * validated here and lives in the address.
  */
 export const studentsFeature: FeatureModule = {
-  navigation: { id: "students", labelKey: "navigation.students", to: STUDENTS_PATH },
+  navigation: { id: "students", labelKey: "navigation.students", to: STUDENTS_PATH, group: "community" },
   createRoutes: (parent: AnyRoute) => [
     createRoute({
       getParentRoute: () => parent,

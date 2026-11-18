@@ -91,3 +91,13 @@ overrides:
   # undici 7.30.0: GHSA-xjj6-f33q-929c, GHSA-4w7w-5xrc-9h26, GHSA-2m5v-pch6-74hx and GHSA-qrxm-fqhp-jwvm,
   # all high, fixed in 7.30.1 (published 2026-10-15, past the two-week age rule on 2026-10-29).
   "undici@>=7.29.1 <7.30.1": 7.30.1
+
+# Advisories with no fixed version, accepted with their reason (owner decision 2026-11-17). Review on
+# 2027-01-15, or as soon as the dependency ships a fix: then remove the entry and let the audit judge.
+auditConfig:
+  ignoreGhsas:
+    # picomatch <=4.0.7, GHSA-fc5q-39xc-vjpf: ReDoS through repeated extglobs, high, no patched version. It
+    # reaches the repository only through build, lint, test and code-generation tools (orval, vitest,
+    # typescript-eslint, storybook) that match patterns written by the team, never input from a user, and none of
+    # it is bundled into the admin app that runs in the browser.
+    - GHSA-fc5q-39xc-vjpf

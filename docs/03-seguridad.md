@@ -801,8 +801,8 @@ Trimestralmente se genera el reporte "quién puede hacer qué" y se revisa con e
 > | `guardians` | C L A N X | C L A X | L | L | L X | L |
 > | `catalog` | C L A N X | C L A X | L | L X | L X | L |
 > | `scholarships` | C L A N P X | C L A P X | L | L X | L X | C L |
-> | `charges` | C L A N P X | C L N P X | L | L X | L X | L |
-> | `ledger` | L N P X | L N X | L | L X | L X | — |
+> | `charges` | C L A N P X | C L A N P X | L | L X | L X | L |
+> | `ledger` | C L N P X | L N X | L | L X | L X | — |
 > | `payments` | C L N P X | L N P X | C L | L N X | L X | — |
 > | `cashbox` | C L N P X | L P X | C L | L X | L X | — |
 > | `invoicing` | C L N P X | L P X | C L S | C L N P X | L X | — |
@@ -826,6 +826,21 @@ Trimestralmente se genera el reporte "quién puede hacer qué" y se revisa con e
 > Tres iniciadores de §5.3 no tienen hoy un permiso en la matriz que los identifique: el ajuste manual del libro mayor (Administrador),
 > la baja por incobrable (Contabilidad) y el reembolso a un tercero (Contabilidad). Quedan anotados como pendientes de los cambios que
 > construyan cada operación, que declararán el permiso que les corresponda.
+
+> **Nota fechada 2026-11-16 (corte `charges-plans`, F3 corte 2): el Administrador gana `charges:update`.** La fila `charges` de la
+> matriz efectiva anterior era `C L N P X` para el Administrador; ahora es `C L A N P X`. Los planes de cobro (`docs/cortes/charges-plans.md`)
+> se editan, se activan y se archivan con `PUT /api/v1/charges/plans/{id}` y se les agregan o quitan renglones, y esas rutas
+> exigen `charges:update`; quien configura el sistema debe poder hacerlo. Los demás roles no cambian. `PermissionMatrixParityTest`
+> lee la tabla corregida de la nota anterior, de modo que el código (`StaffRole`) y el documento siguen iguales celda por celda.
+
+> **Nota fechada 2026-11-17 (corte `ledger-chart-of-accounts`, F3): el Super Administrador gana `ledger:create`.** La fila `ledger` de la
+> matriz efectiva era `L N P X` para el Super Administrador; ahora es `C L N P X`, y el catálogo pasa de 89 a 90 permisos (89 de módulo y
+> verbo más `invoicing:request-void`). `ledger:create` carga y edita el plan de cuentas (`POST` y `PUT /api/v1/ledger/accounts`) y fija el
+> mapa de contabilización de los cargos (`PUT /api/v1/charges/posting-accounts`): el plan de cuentas es un dato contable que decide a qué
+> cuenta va cada centavo, y solo lo configura el Super Administrador, con la validación posterior del contador. **El Administrador no lo
+> recibe**; los demás roles tampoco. No es una excepción a la regla 1: sigue sin existir `ledger:update` y ningún rol edita asientos. El
+> ajuste manual del libro (corte 4) decidirá si necesita otro permiso o reutiliza este. `PermissionMatrixParityTest` lee la tabla corregida
+> de la nota del 2026-11-04, de modo que el código (`StaffRole`) y el documento siguen iguales celda por celda.
 
 ### 5.3 Segregación de funciones
 

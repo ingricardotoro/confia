@@ -151,6 +151,7 @@ describe("the states of the catalog", () => {
       ["dialog-edit", undefined, true],
       ["dialog-error-summary", undefined, true],
       ["dialog-duplicate-code", undefined, true],
+      ["dialog-taxable", undefined, true],
       ["no-matches", undefined, undefined],
       ["empty", "catalog-empty", undefined],
       ["load-error", "catalog-server-error", undefined],
@@ -180,6 +181,89 @@ describe("the states of the price lists", () => {
       ["/catalog/price-lists/<id>", "load-error", "catalog-server-error", undefined],
     ]);
     expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...priceLists])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+});
+
+describe("the states of the tax rates", () => {
+  const taxRates = MATRIX.filter((combination) => combination.route.startsWith("/catalog/tax-rates"));
+
+  it("holds the list with its dialogs and its no-match, empty and load-error states, and the detail ready, empty, inactive, with the dialogs of a new validity and with its load error, each once", () => {
+    expect(taxRates.map((combination) => [combination.route.replace(/\/0{8}-[\w-]+$/, "/<id>"), combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["/catalog/tax-rates", "ready", undefined, undefined],
+      ["/catalog/tax-rates", "dialog-open", undefined, true],
+      ["/catalog/tax-rates", "dialog-edit", undefined, true],
+      ["/catalog/tax-rates", "dialog-error-summary", undefined, true],
+      ["/catalog/tax-rates", "dialog-duplicate-code", undefined, true],
+      ["/catalog/tax-rates", "no-matches", "catalog-tax-rates-empty", undefined],
+      ["/catalog/tax-rates", "empty", "catalog-tax-rates-empty", undefined],
+      ["/catalog/tax-rates", "load-error", "catalog-server-error", undefined],
+      ["/catalog/tax-rates/<id>", "ready", undefined, undefined],
+      ["/catalog/tax-rates/<id>", "dialog-add-period", undefined, true],
+      ["/catalog/tax-rates/<id>", "dialog-error-summary", undefined, true],
+      ["/catalog/tax-rates/<id>", "dialog-overlap", undefined, true],
+      ["/catalog/tax-rates/<id>", "empty", undefined, undefined],
+      ["/catalog/tax-rates/<id>", "inactive", undefined, undefined],
+      ["/catalog/tax-rates/<id>", "load-error", "catalog-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...taxRates])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+});
+
+describe("the states of the charge plans", () => {
+  const plans = MATRIX.filter((combination) => combination.route.startsWith("/charges/plans"));
+
+  it("holds the list with its dialogs and its no-match, empty and load-error states, and the detail ready, with the dialogs of an item and of each confirmation, empty, active, archived and with its load error, each once", () => {
+    expect(plans.map((combination) => [combination.route.replace(/\/0{8}-[\w-]+$/, "/<id>"), combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["/charges/plans", "ready", undefined, undefined],
+      ["/charges/plans", "dialog-open", undefined, true],
+      ["/charges/plans", "dialog-error-summary", undefined, true],
+      ["/charges/plans", "no-matches", undefined, undefined],
+      ["/charges/plans", "empty", "charges-empty", undefined],
+      ["/charges/plans", "load-error", "charges-server-error", undefined],
+      ["/charges/plans/<id>", "ready", undefined, undefined],
+      ["/charges/plans/<id>", "dialog-add-item", undefined, true],
+      ["/charges/plans/<id>", "dialog-error-summary", undefined, true],
+      ["/charges/plans/<id>", "dialog-first-of-month", undefined, true],
+      ["/charges/plans/<id>", "dialog-edit", undefined, true],
+      ["/charges/plans/<id>", "dialog-confirm-activate", undefined, true],
+      ["/charges/plans/<id>", "dialog-confirm-remove", undefined, true],
+      ["/charges/plans/<id>", "empty", undefined, undefined],
+      ["/charges/plans/<id>", "active", undefined, undefined],
+      ["/charges/plans/<id>", "dialog-confirm-archive", undefined, true],
+      ["/charges/plans/<id>", "archived", undefined, undefined],
+      ["/charges/plans/<id>", "load-error", "charges-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...plans])).toHaveLength(MATRIX.length * THEMES.length);
+    expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
+  });
+});
+
+describe("the states of the generation of charges", () => {
+  const accrual = MATRIX.filter((combination) => combination.route.startsWith("/charges/accrual"));
+
+  it("holds the page idle, with a preview, with its confirmation (and the refusal in it), blocked, with nothing to confirm, with no plan and with its errors, the list of runs and the run in the states a person meets, each once", () => {
+    expect(accrual.map((combination) => [combination.route.replace(/\/0{8}-[\w-]+$/, "/<id>"), combination.state, combination.preset, combination.opensDialog])).toEqual([
+      ["/charges/accrual", "idle", undefined, undefined],
+      ["/charges/accrual", "preview-ready", undefined, undefined],
+      ["/charges/accrual", "dialog-confirm", undefined, true],
+      ["/charges/accrual", "dialog-confirm-refused", "charges-accrual-in-progress", true],
+      ["/charges/accrual", "blocked", "charges-accrual-blocked", undefined],
+      ["/charges/accrual", "nothing-to-confirm", undefined, undefined],
+      ["/charges/accrual", "no-active-plans", "charges-empty", undefined],
+      ["/charges/accrual", "preview-error", "charges-accrual-forbidden", undefined],
+      ["/charges/accrual", "load-error", "charges-server-error", undefined],
+      ["/charges/accrual/runs", "ready", undefined, undefined],
+      ["/charges/accrual/runs", "no-matches", undefined, undefined],
+      ["/charges/accrual/runs", "empty", "charges-accrual-empty", undefined],
+      ["/charges/accrual/runs", "load-error", "charges-server-error", undefined],
+      ["/charges/accrual/runs/<id>", "completed-with-errors", undefined, undefined],
+      ["/charges/accrual/runs/<id>", "rejected", undefined, undefined],
+      ["/charges/accrual/runs/<id>", "failed", undefined, undefined],
+      ["/charges/accrual/runs/<id>", "load-error", "charges-server-error", undefined],
+    ]);
+    expect(assertCoversMinimum(MATRIX, [...MINIMUM, ...accrual])).toHaveLength(MATRIX.length * THEMES.length);
     expect(new Set(MATRIX.map((combination) => `${combination.route} ${combination.state}`)).size).toBe(MATRIX.length);
   });
 });
