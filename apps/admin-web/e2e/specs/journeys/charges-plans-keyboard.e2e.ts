@@ -45,8 +45,10 @@ test.describe("the plans with the keyboard only", () => {
     await page.keyboard.type("Primaria 2027");
     await page.keyboard.press("Tab");
     await expect(dialog(page).getByLabel(/^Año lectivo/)).toBeFocused();
-    // Typing the name of an option chooses it.
-    await page.keyboard.type("Año lectivo 2026");
+    // Typing the name of an option chooses it. Only its first letter is typed: Playwright sends a character that is not on the
+    // US layout (the "ñ" of "Año") as a text insertion with no key event, and Chromium then moves the focus out of the select,
+    // which no person typing on a keyboard of this language does.
+    await page.keyboard.type("A");
     await expect(dialog(page).getByLabel(/^Año lectivo/)).toHaveValue(/00000000-0000-4000-8000-0000000010/);
     await page.keyboard.press("Tab");
     await expect(dialog(page).getByLabel(/^Ámbito/)).toBeFocused();

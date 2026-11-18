@@ -1,6 +1,6 @@
 import { Card, KeyFigure, MoneyAmount, Pagination, Table, type TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import type { StatementLine, StatementSection } from "../../../shared/api/charges-operations.ts";
+import type { StatementLine, StatementSection } from "../charges-types.ts";
 import { formatIsoDate } from "../../../shared/format/format-date.ts";
 import { periodLabelOf } from "../accrual-model.ts";
 import { balanceSideOf, currencyNameOf, describeLine, directionOf, dueOnOf } from "../statement-model.ts";

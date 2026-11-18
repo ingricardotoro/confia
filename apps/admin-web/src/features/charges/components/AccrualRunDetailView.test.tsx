@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { AccrualRunItem } from "../../../shared/api/charges-operations.ts";
+import type { AccrualRunItem } from "../charges-types.ts";
 import { accrualRun, accrualRunItem } from "../../../test/contract-responses.ts";
 import { renderWithAdminI18n } from "../../../test/render.tsx";
 import type { AccrualNames } from "./AccrualView.tsx";

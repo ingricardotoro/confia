@@ -271,7 +271,7 @@ test.describe("the detail of a plan", () => {
     await dialog(page).getByRole("button", { name: "Archivar plan" }).click();
     await expect(resultNotice(page)).toContainText("Se archivó");
 
-    await page.getByRole("link", { name: "Volver a los planes de cobro" }).click();
+    await page.getByRole("navigation", { name: "Ruta de navegación" }).getByRole("link", { name: "Planes de cobro" }).click();
 
     await expect(page).toHaveURL(/\/charges\/plans$/);
     await page.getByRole("group", { name: "Filtros" }).getByLabel("Estado").selectOption({ label: "Archivado" });

@@ -6,11 +6,13 @@ import * as api from "./index";
 import { findComponentsWithoutStory, findComponentsWithoutTest, listComponents } from "./a11y/story-coverage";
 
 // design-system, requirement "El punto de entrada público": the components exported are exactly the
-// twenty-three of this delivery, and nothing else leaks (ADR-0018).
+// twenty-seven of this delivery, and nothing else leaks (ADR-0018).
 const COMPONENTS = [
   "Alert",
   "Badge",
+  "Breadcrumb",
   "Button",
+  "Card",
   "Checkbox",
   "Dialog",
   "EmptyState",
@@ -20,8 +22,10 @@ const COMPONENTS = [
   "FormField",
   "IconButton",
   "Input",
+  "KeyFigure",
   "Label",
   "MoneyAmount",
+  "PageHeader",
   "Pagination",
   "RadioGroup",
   "Select",
@@ -41,9 +45,9 @@ const SHARES_A_FILE = { FormError: "FormField" };
 const srcRoot = import.meta.dirname;
 
 describe("the public entry point of @confia/ui", () => {
-  it("DS02: exports exactly the twenty-three components and their two companions, twenty-five names", () => {
+  it("DS02: exports exactly the twenty-seven components and their two companions, twenty-nine names", () => {
     expect(Object.keys(api).sort()).toEqual([...COMPONENTS, ...COMPANIONS].sort());
-    expect(Object.keys(api)).toHaveLength(25);
+    expect(Object.keys(api)).toHaveLength(29);
   });
 
   it("DS02: no export is a token and the entry point reads no token file", () => {

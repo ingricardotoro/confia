@@ -1,6 +1,6 @@
 import { Badge } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import type { ChargePlanStatus } from "../../../shared/api/charges-operations.ts";
+import type { ChargePlanStatus } from "../charges-types.ts";
 
 /** The state of a plan in text, with a dot as a second carrier: a draft is hollow blue, an active plan filled green, an archived one hollow grey. */
 export function ChargePlanStatusBadge({ status }: { readonly status: ChargePlanStatus }) {

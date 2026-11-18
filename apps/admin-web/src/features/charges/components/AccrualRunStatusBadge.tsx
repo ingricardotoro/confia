@@ -1,6 +1,6 @@
 import { Badge } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import type { AccrualRunStatus } from "../../../shared/api/charges-operations.ts";
+import type { AccrualRunStatus } from "../charges-types.ts";
 
 const WARNING = "border-(--alert-warning-border) bg-(--alert-warning-bg) text-(--alert-warning-fg)";
 const DANGER = "border-(--alert-destructive-border) bg-(--alert-destructive-bg) text-(--alert-destructive-fg)";

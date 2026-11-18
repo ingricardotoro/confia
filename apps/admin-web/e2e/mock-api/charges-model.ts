@@ -35,6 +35,8 @@ export const FAILING_READS = 3;
 /** A fictitious trace id, the shape the backend gives. */
 const TRACE_ID = "01J8Z4K2QF9P0X";
 const DEFAULT_SIZE = 50;
+/** The page size of the lookups of the app (LOOKUP_PAGE_SIZE of the admin app): a read of this size is a lookup, not the list of a screen. */
+const LOOKUP_READ_SIZE = 200;
 const MAX_SIZE = 200;
 const SORT_FIELDS = ["name", "createdAt"] as const;
 const SCOPES: readonly string[] = ["MODALITY", "GRADE", "SECTION"];
@@ -133,10 +135,14 @@ export function createChargesModel(
   const itemBody = (item: ChargePlanItemRow) => ({ ...item });
 
   function list(query: URLSearchParams): ModelResponse {
-    const failed = readFailure();
+    const size = Number(query.get("size") ?? String(DEFAULT_SIZE));
+    // A read of the whole set of plans (the lookup that names the plan of a run, or fills a filter) runs beside the read the
+    // screen is about, and it must not use up the reads that fail first: the screen under test would then recover before its own
+    // retries are spent and never show its error state. The lookup of the active plans is the read of the generation screen
+    // itself (it has the status filter), so that one still fails.
+    const failed = size === LOOKUP_READ_SIZE && !query.has("status") ? undefined : readFailure();
     if (failed !== undefined) return failed;
     const page = Number(query.get("page") ?? "0");
-    const size = Number(query.get("size") ?? String(DEFAULT_SIZE));
     if (!Number.isInteger(page) || page < 0) return invalid([{ field: "page", reason: "invalid" }]);
     if (!Number.isInteger(size) || size < 1 || size > MAX_SIZE) return invalid([{ field: "size", reason: "invalid" }]);
     const [field = "", direction = "asc", ...rest] = (query.get("sort") ?? "name,asc").split(",");

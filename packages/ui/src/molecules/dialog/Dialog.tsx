@@ -56,7 +56,7 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
             className,
           )}
         >
-          <div className="flex shrink-0 flex-col gap-0.5 border-b border-border-subtle bg-bg-surface-elevated px-4 pt-3.5 pr-12 pb-3 sm:px-5">
+          <div className="flex shrink-0 flex-col gap-0.5 border-b border-border-subtle bg-bg-surface-elevated pt-3.5 pr-12 pb-3 pl-4 sm:pl-5">
             <DialogPrimitive.Title className="text-base font-semibold">{title}</DialogPrimitive.Title>
             <DialogPrimitive.Description className="text-sm text-text-secondary">{description}</DialogPrimitive.Description>
           </div>

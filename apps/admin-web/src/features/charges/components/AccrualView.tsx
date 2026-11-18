@@ -1,7 +1,7 @@
 import { Alert, Button, Card, EmptyState, ErrorState, KeyFigure, MoneyAmount, PageHeader, Pagination, Skeleton, Table, type TableColumn } from "@confia/ui";
 import { useState, type SyntheticEvent } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import type { AccrualPreview } from "../../../shared/api/charges-operations.ts";
+import type { AccrualPreview } from "../charges-types.ts";
 import { OptionField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
 import { LEDGER_PATHS } from "../../../shared/navigation/ledger-paths.ts";
 import { ALL_ROWS, blockerKeyOf, ERROR_ROWS, filterPreviewRows, itemErrorHelpKeyOf, itemErrorKeyOf, pageOfRows, PREVIEW_PAGE_SIZE } from "../accrual-model.ts";

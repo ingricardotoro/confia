@@ -309,18 +309,24 @@ describe("packages/ui keeps the rule and the message of every 13a violation (BX4
 
 // ADR-0018: a rule that evaluated nothing proves nothing. The app has no source yet; the task that
 // creates each kind of real file turns its entry into a test.
-describe("the real apps/admin-web tree", () => {
+describe("the real apps/admin-web tree", { timeout: 180_000 }, () => {
   const REAL_ROOT = join(import.meta.dirname, "..", "..", "apps", "admin-web");
   const NETWORK_RULES = ["no-restricted-globals", "no-restricted-properties"];
 
   // Lints the production files of the real app with the app rules. Tests, stories and fixtures are the
   // rules' own exceptions, so they are left out the same way the app's eslint.config.js leaves them.
-  async function lintRealTree() {
-    const eslint = new ESLint({ cwd: REAL_ROOT, overrideConfigFile: true, overrideConfig: appSourceRules() });
-    const results = await eslint.lintFiles(["src/**/*.{ts,tsx}"]);
-    return results
-      .map((result) => ({ file: relative(REAL_ROOT, result.filePath).replaceAll("\\", "/"), messages: result.messages }))
-      .filter(({ file }) => !/\.(test|test-d)\.tsx?$|__fixtures__/.test(file));
+  // The whole tree is linted once and shared by the four tests below: linting it per test took over 30 s each on a CI runner
+  // once the app grew, and every test reads the same immutable result. The first caller pays, so the describe budget is raised to 180 s.
+  let linted: Promise<{ file: string; messages: ESLint.LintResult["messages"] }[]> | undefined;
+  function lintRealTree() {
+    linted ??= (async () => {
+      const eslint = new ESLint({ cwd: REAL_ROOT, overrideConfigFile: true, overrideConfig: appSourceRules() });
+      const results = await eslint.lintFiles(["src/**/*.{ts,tsx}"]);
+      return results
+        .map((result) => ({ file: relative(REAL_ROOT, result.filePath).replaceAll("\\", "/"), messages: result.messages }))
+        .filter(({ file }) => !/\.(test|test-d)\.tsx?$|__fixtures__/.test(file));
+    })();
+    return linted;
   }
 
   const networkFindings = (tree: Awaited<ReturnType<typeof lintRealTree>>) =>

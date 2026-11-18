@@ -123,7 +123,7 @@ test.describe("the detail of a tax rate and its history of validities", () => {
 
     await expect(page).toHaveURL(new RegExp(`/catalog/tax-rates/${SEEDED_RATES.a}$`));
     await expect(page.getByRole("heading", { level: 2, name: "Impuesto de prueba A" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Tasas de impuesto", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("navigation", { name: "Vistas del catálogo" }).getByRole("link", { name: "Tasas de impuesto" })).toHaveAttribute("aria-current", "page");
     await expect.poll(() => periodRows(page, "Vigencias de Impuesto de prueba A")).toHaveLength(2);
     const [newest, oldest] = await periodRows(page, "Vigencias de Impuesto de prueba A");
     expect(newest?.join(" ")).toMatch(/3\.2100 %/);
@@ -208,7 +208,7 @@ test.describe("the detail of a tax rate and its history of validities", () => {
     await page.getByRole("button", { name: "Desactivar tasa Impuesto de prueba A" }).click();
     await expect(resultNotice(page)).toContainText("Se desactivó");
 
-    await page.getByRole("link", { name: "Volver a las tasas de impuesto" }).click();
+    await page.getByRole("navigation", { name: "Ruta de navegación" }).getByRole("link", { name: "Tasas de impuesto" }).click();
 
     await expect(page).toHaveURL(/\/catalog\/tax-rates$/);
     await expect(page.getByRole("row", { name: /IMP-A/ })).toContainText("Inactivo");

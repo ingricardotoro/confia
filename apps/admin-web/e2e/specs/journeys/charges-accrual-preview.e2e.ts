@@ -40,7 +40,7 @@ test.describe("the preview of a period", () => {
 
     const summary = page.getByRole("region", { name: "Resumen de la vista previa" });
     await expect(summary).toContainText("Primaria 2026, período 2026-05");
-    await expect(summary.getByText("Cargos por crear")).toBeVisible();
+    await expect(summary.getByText("Cargos por crear", { exact: true })).toBeVisible();
     await expect(summary.getByText("15,525.00 lempiras hondureños")).toBeVisible();
     await expect(summary.getByText("Sin precio vigente: 1 renglón.")).toBeVisible();
     await expect(summary.getByText("Precio ambiguo: 1 renglón.")).toBeVisible();

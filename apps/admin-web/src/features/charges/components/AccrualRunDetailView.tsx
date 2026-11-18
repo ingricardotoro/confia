@@ -1,7 +1,7 @@
 import { Alert, Breadcrumb, Button, Card, ErrorState, KeyFigure, PageHeader, Pagination, Skeleton, Table, type TableColumn } from "@confia/ui";
 import type { ReactNode } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import type { AccrualRun, AccrualRunItem } from "../../../shared/api/charges-operations.ts";
+import type { AccrualRun, AccrualRunItem } from "../charges-types.ts";
 import { formatInstant } from "../../../shared/format/format-date.ts";
 import type { ResourcePagination } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import { failureKeyOf, isActiveRun, itemErrorHelpKeyOf, periodLabelOf } from "../accrual-model.ts";

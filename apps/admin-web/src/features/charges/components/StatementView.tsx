@@ -1,6 +1,6 @@
 import { Alert, EmptyState, ErrorState, PageHeader, Skeleton } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import type { StudentStatementResponse } from "../../../shared/api/charges-operations.ts";
+import type { StudentStatementResponse } from "../charges-types.ts";
 import { OptionField, TextField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
 import { StatementSectionView } from "./StatementSectionView.tsx";
 import { StatementStudentPicker, type StatementStudentPickerProps } from "./StatementStudentPicker.tsx";

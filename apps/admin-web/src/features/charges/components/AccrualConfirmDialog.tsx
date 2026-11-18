@@ -1,6 +1,6 @@
 import { Alert, Button, Dialog, MoneyAmount } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import type { AccrualPreview } from "../../../shared/api/charges-operations.ts";
+import type { AccrualPreview } from "../charges-types.ts";
 
 export interface AccrualConfirmDialogProps {
   readonly planName: string;

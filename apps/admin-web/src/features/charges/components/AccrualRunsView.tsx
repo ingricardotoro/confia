@@ -1,6 +1,6 @@
 import type { TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
-import type { AccrualRun } from "../../../shared/api/charges-operations.ts";
+import type { AccrualRun } from "../charges-types.ts";
 import { formatInstant } from "../../../shared/format/format-date.ts";
 import { OptionField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
 import {
