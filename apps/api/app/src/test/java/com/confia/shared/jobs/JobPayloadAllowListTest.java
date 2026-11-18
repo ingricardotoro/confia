@@ -34,7 +34,10 @@ class JobPayloadAllowListTest {
     /** The approved payload keys of each registered type; the only place the list is written. */
     static final Map<String, Set<String>> APPROVED = Map.of(
             // The internal identifier of the account, and nothing else (decision 18; scenario I237).
-            "identity.password-reset-issuance", Set.of("accountId"));
+            "identity.password-reset-issuance", Set.of("accountId"),
+            // The internal identifier of the accrual run, and nothing else: the run holds the plan, the period and the
+            // key, and the handler loads them inside its transaction (docs/cortes/charges-accrual.md; ADR-0016).
+            "charges.accrual-run", Set.of("runId"));
 
     static final Set<String> APPROVED_META = Set.of("correlationId", "requestId", "actorId", "actorKind",
             "institutionId", "traceparent");

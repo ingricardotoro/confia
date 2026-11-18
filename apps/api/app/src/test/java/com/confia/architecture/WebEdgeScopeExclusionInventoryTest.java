@@ -96,7 +96,10 @@ class WebEdgeScopeExclusionInventoryTest {
             "com.confia.catalog.web",
             // The charge plans apply admin-read and admin-write, per address and per account
             // (docs/cortes/charges-plans.md).
-            "com.confia.charges.web");
+            "com.confia.charges.web",
+            // The chart of accounts applies admin-read and admin-write, per address and per account
+            // (docs/cortes/ledger-chart-of-accounts.md).
+            "com.confia.ledger.web");
 
     /** The types through which a class asks for a delay, and the packages that may. */
     private static final Set<String> MATERIALIZER_TYPES = Set.of(

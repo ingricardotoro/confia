@@ -71,8 +71,12 @@ class CurrentAbsencesTest {
     /** The Actuator artifacts the health probes need and nothing more (probe P-1). */
     static final Set<String> HEALTH_ARTIFACTS = Set.of("spring-boot-health", "spring-boot-actuator-autoconfigure");
 
-    /** The one-time task and the eight recurring ones this change registers, and nothing else. */
+    /**
+     * The one-time task and the eight recurring ones of the jobs change, plus the one-time accrual run task that the
+     * accrual cut registers (docs/cortes/charges-accrual.md; ADR-0016), and nothing else.
+     */
     private static final Set<String> THE_JOBS_OF_THIS_CHANGE = Set.of("identity.password-reset-issuance",
+            "charges.accrual-run",
             "shared.audit-chain-verification-daily", "shared.audit-chain-verification-weekly",
             "identity.purge-password-reset-tokens", "identity.purge-refresh-tokens", "shared.purge-idempotency-keys",
             "identity.purge-login-backoff", "identity.purge-mfa-totp-backoff", "shared.queue-observation");
@@ -219,6 +223,18 @@ class CurrentAbsencesTest {
                         "confia.generated.jooq.Tables").contains(className);
     }
 
+    /**
+     * The only organization surface the worker may reach since the accrual cut (docs/cortes/charges-accrual.md): the
+     * read-only placement port the accrual job asks where the students of a plan are (and the institution's time zone,
+     * by the id the job already holds), and the worker registration that provides it. None of them enumerates
+     * institutions, which is what BJ39 protects; any other organization class stays reported.
+     */
+    private static boolean approvedOrganizationSurface(String className) {
+        return className.equals("com.confia.organization.application.directory.PlacementDirectory")
+                || className.startsWith("com.confia.organization.application.directory.PlacementDirectory$")
+                || className.equals("com.confia.organization.infrastructure.wiring.OrganizationWorkerConfiguration");
+    }
+
     /** The classes of {@code com.confia} that {@code root} reaches through its dependencies, itself included. */
     static Set<JavaClass> reach(JavaClass root) {
         Set<JavaClass> seen = new HashSet<>(Set.of(root));
@@ -238,7 +254,8 @@ class CurrentAbsencesTest {
     /** Every dependency, of {@code root} or of what it reaches, on the organization module or the institutions table. */
     static List<String> institutionAccess(JavaClass root) {
         return reach(root).stream().flatMap(reached -> reached.getDirectDependenciesFromSelf().stream()
-                .filter(dependency -> institutionSide(dependency.getTargetClass().getFullName()))
+                .filter(dependency -> institutionSide(dependency.getTargetClass().getFullName())
+                        && !approvedOrganizationSurface(dependency.getTargetClass().getFullName()))
                 .map(dependency -> reached.getName() + " -> " + dependency.getTargetClass().getFullName())).toList();
     }
 
@@ -297,7 +314,7 @@ class CurrentAbsencesTest {
     @Test
     void theWorkerRegistersExactlyTheOneTimeTaskAndTheEightRecurringOnesOfThisChange() {
         assertThat(registryDifference(workerJobs)).as(BJ40_EXPIRES).isEmpty();
-        assertThat(workerJobs).as("non-vacuous").hasSize(9);
+        assertThat(workerJobs).as("non-vacuous").hasSize(10);
     }
 
     @Test

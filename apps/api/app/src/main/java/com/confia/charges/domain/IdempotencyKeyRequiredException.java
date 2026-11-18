@@ -11,6 +11,6 @@ public final class IdempotencyKeyRequiredException extends DomainException {
     public static final String CODE = "idempotency-key-missing";
 
     public IdempotencyKeyRequiredException() {
-        super(CODE, "a request that queues an accrual run carries an Idempotency-Key");
+        super(CODE, "a request that queues an accrual run carries an idempotency key");
     }
 }
