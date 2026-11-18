@@ -53,6 +53,8 @@ describe("the signed in shell", () => {
         "Cobros",
         "Generación de cargos",
         "Estado de cuenta",
+        "Cargos del estudiante",
+        "Integridad de cargos",
         "Estructura académica",
         "Importaciones",
         "Plan de cuentas",
@@ -117,6 +119,8 @@ describe("the signed in shell", () => {
         "Cobros",
         "Generación de cargos",
         "Estado de cuenta",
+        "Cargos del estudiante",
+        "Integridad de cargos",
         "Estructura académica",
       ]) {
         await user.tab();

@@ -42,6 +42,31 @@ export const accrualRunsSearch = z.object({
 
 export type AccrualRunsSearch = z.infer<typeof accrualRunsSearch>;
 
+/** The states a charge is listed in, as the server derives them. */
+export const STUDENT_CHARGE_STATUSES = ["ACTIVE", "VOIDED"] as const;
+
+/**
+ * The charges of a student: the student (so a link from another screen opens it already pointed at one), the common paging, the
+ * order the API accepts (the period, the due date or the total) and its two filters, the status and the first day of the period.
+ * A part that does not hold is dropped, so a bad address never breaks the screen.
+ */
+export const studentChargesSearch = z.object({
+  studentId: optionalId,
+  page,
+  pageSize,
+  sort: sortOf(["periodStart", "dueOn", "total"]),
+  status: z.enum(STUDENT_CHARGE_STATUSES).optional().catch(undefined),
+  periodFrom: z.string().regex(ISO_DAY).optional().catch(undefined),
+  periodTo: z.string().regex(ISO_DAY).optional().catch(undefined),
+});
+
+export type StudentChargesSearch = z.infer<typeof studentChargesSearch>;
+
+/** The integrity runs: only the common paging; the API orders them, newest first. */
+export const integrityRunsSearch = z.object({ page, pageSize });
+
+export type IntegrityRunsSearch = z.infer<typeof integrityRunsSearch>;
+
 /** The page of items of one run. */
 export const accrualRunSearch = z.object({
   page,

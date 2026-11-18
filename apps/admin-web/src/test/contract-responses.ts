@@ -6,6 +6,12 @@ import {
   AccrualRunDetailResponse,
   AccrualRunPageResponse,
   AccrualRunResponse,
+  ChargeVoidResponse,
+  IntegrityRunDetailResponse,
+  IntegrityRunPageResponse,
+  IntegrityRunResponse,
+  StudentChargePageResponse,
+  StudentChargeResponse,
   StudentStatement,
   StudentStatementLine,
   StudentStatementSection,
@@ -57,6 +63,10 @@ import {
   type AccrualPeriodResponseOutput,
   type AccrualPreviewResponseOutput,
   type AccrualRunItemResponseOutput,
+  type ChargeVoidResponseOutput,
+  type IntegrityRunDetailResponseOutput,
+  type IntegrityRunResponseOutput,
+  type StudentChargeResponseOutput,
   type StudentStatementLineOutput,
   type StudentStatementOutput,
   type StudentStatementSectionOutput,
@@ -1055,5 +1065,89 @@ export function studentStatement(override: Partial<StudentStatementOutput> = {})
 }
 
 export function statementRecord(body: StudentStatementOutput = studentStatement()): ContractResponse {
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+const money = (amount: string, currency = "HNL") => ({ amount, currency });
+
+/** One charge of a student as the list answers it: active, with its base, tax and total as the server rounds them. */
+export function studentCharge(override: Partial<StudentChargeResponseOutput> = {}): StudentChargeResponseOutput {
+  return checked("StudentChargeResponse", StudentChargeResponse, {
+    id: crypto.randomUUID(),
+    paymentConceptId: "00000000-0000-4000-8000-000000007001",
+    conceptCode: "MENS",
+    conceptName: "Mensualidad",
+    conceptCategory: "TUITION",
+    origin: "AUTOMATIC",
+    periodStart: "2027-02-01",
+    periodEnd: "2027-02-28",
+    periodLabel: "2027-02",
+    dueOn: "2027-02-05",
+    base: money("1000.00"),
+    tax: money("150.00"),
+    total: money("1150.00"),
+    status: "ACTIVE",
+    ...override,
+  });
+}
+
+export function studentChargePage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("student charges page", StudentChargePageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** The answer of a void: the charge is now voided and its reversal posted. */
+export function chargeVoid(override: Partial<ChargeVoidResponseOutput> = {}): ContractResponse {
+  const body = checked("ChargeVoidResponse", ChargeVoidResponse, {
+    id: crypto.randomUUID(),
+    chargeId: "00000000-0000-4000-8000-00000000d001",
+    status: "VOIDED",
+    reason: "Cargo generado por error en el período equivocado",
+    reversalTransactionId: crypto.randomUUID(),
+    voidedAt: STAMP,
+    voidedBy: "00000000-0000-4000-8000-0000000000a1",
+    ...override,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** One integrity run, as the list answers it. */
+export function integrityRun(override: Partial<IntegrityRunResponseOutput> = {}): IntegrityRunResponseOutput {
+  return checked("IntegrityRunResponse", IntegrityRunResponse, {
+    id: crypto.randomUUID(),
+    status: "OK",
+    startedAt: STAMP,
+    finishedAt: STAMP,
+    chargesChecked: 30,
+    postingsChecked: 31,
+    discrepancyCount: 0,
+    ...override,
+  });
+}
+
+export function integrityRunPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("integrity runs page", IntegrityRunPageResponse, {
+    items,
+    page: paging.page ?? 0,
+    size: paging.size ?? 25,
+    total: paging.total ?? items.length,
+  });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** One run with its confirmed discrepancies (none for a clean run). */
+export function integrityRunDetail(run: unknown, findings: readonly unknown[] = []): ContractResponse {
+  const body: IntegrityRunDetailResponseOutput = checked("IntegrityRunDetailResponse", IntegrityRunDetailResponse, { run, findings });
   return { status: 200, body, contentType: JSON_TYPE };
 }

@@ -1,6 +1,8 @@
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
+import { STUDENT_CHARGES_PATH } from "../../shared/navigation/student-charges-paths.ts";
 import { loadFailureOf } from "../../shared/resource-screen/resource-failure.ts";
 import { useDebouncedSearch } from "../../shared/resource-screen/use-debounced-search.ts";
 import { useStudentSearch } from "../../shared/student-lookups/use-student-search.ts";
@@ -29,6 +31,7 @@ interface KnownCurrencies {
  */
 export function StatementContainer({ search, onSearchChange }: StatementContainerProps) {
   const { t } = useAdminText();
+  const navigate = useNavigate();
   const box = useDebouncedSearch();
   const found = useStudentSearch(box.text);
   const [known, setKnown] = useState<KnownCurrencies>();
@@ -128,6 +131,13 @@ export function StatementContainer({ search, onSearchChange }: StatementContaine
       onPageChange={(page) => {
         onSearchChange({ ...search, page: page + 1 });
       }}
+      onViewCharges={
+        search.studentId === undefined
+          ? undefined
+          : () => {
+              void navigate({ to: STUDENT_CHARGES_PATH, search: { studentId: search.studentId } });
+            }
+      }
     />
   );
 }

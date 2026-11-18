@@ -16,8 +16,14 @@ import {
   chargePlanItemRecord,
   chargePlanPage,
   chargePlanRecord,
+  chargeVoid,
+  integrityRun,
+  integrityRunDetail,
+  integrityRunPage,
   noContent,
   problem,
+  studentCharge,
+  studentChargePage,
 } from "../../test/contract-responses.ts";
 import { installMswServer, requests, route } from "../../test/msw-server.ts";
 import {
@@ -25,6 +31,11 @@ import {
   createChargePlan,
   getAccrualRun,
   getChargePlan,
+  getIntegrityRun,
+  getLatestIntegrityRun,
+  listIntegrityRuns,
+  listStudentCharges,
+  voidCharge,
   listAccrualPeriods,
   listAccrualRuns,
   listChargePlans,
@@ -285,5 +296,90 @@ describe("the accrual operations", () => {
     const result = await listAccrualPeriods("tok", ID);
 
     expect(result.kind).toBe("unexpected-response");
+  });
+});
+
+describe("the charges of a student, their void and the integrity check", () => {
+  const CHARGE = "00000000-0000-4000-8000-0000000d0001";
+  const STUDENT = "00000000-0000-4000-8000-000000005001";
+  const KEY = "5d6a7c0e-1f2b-4c3d-8e4f-0a1b2c3d4e5f";
+
+  it("lists the charges of a student with the filters, the order and the page as query parameters, and leaves out one that is not set", async () => {
+    route("get", `/api/v1/charges/students/${STUDENT}/charges`, studentChargePage([studentCharge()]));
+
+    const result = await listStudentCharges("tok", STUDENT, { page: 1, size: 25, sort: "total,asc", status: "VOIDED", periodFrom: undefined, periodTo: "2027-06-01" });
+
+    expect(result.kind).toBe("ok");
+    const [sent] = requests();
+    expect(sent?.headers.get("Authorization")).toBe("Bearer tok");
+    expect(Object.fromEntries(new URLSearchParams(sent?.search))).toEqual({ page: "1", size: "25", sort: "total,asc", status: "VOIDED", periodTo: "2027-06-01" });
+  });
+
+  it("keeps the amounts of a charge as the strings the server sent and accepts the null of a charge that is not voided", async () => {
+    const row = { ...studentCharge(), voided: null };
+    route("get", `/api/v1/charges/students/${STUDENT}/charges`, { status: 200, contentType: "application/json", body: { items: [row], page: 0, size: 25, total: 1 } });
+
+    const result = await listStudentCharges("tok", STUDENT, { page: 0, size: 25 });
+
+    expect(result.kind === "ok" && result.data.items[0]?.total).toEqual({ amount: "1150.00", currency: "HNL" });
+  });
+
+  it("voids a charge with the Idempotency-Key in the header and only the reason in the body, and sends the same key when the same intent is sent again", async () => {
+    route("post", `/api/v1/charges/${CHARGE}/void`, "network-error", chargeVoid({ chargeId: CHARGE }));
+    const reason = "Cargo generado dos veces por error";
+
+    const first = await voidCharge("tok-2", CHARGE, { reason }, KEY);
+    const second = await voidCharge("tok-2", CHARGE, { reason }, KEY);
+
+    expect(first.kind).toBe("network");
+    expect(second.kind === "ok" && second.data.status).toBe("VOIDED");
+    const sent = requests();
+    expect(sent.map((one) => one.headers.get("Idempotency-Key"))).toEqual([KEY, KEY]);
+    expect(sent[0]?.headers.get("Authorization")).toBe("Bearer tok-2");
+    expect(JSON.parse(sent[0]?.body ?? "{}")).toEqual({ reason });
+  });
+
+  it.each([
+    ["charge-already-voided", 409],
+    ["charge-not-voidable", 409],
+    ["idempotency-payload-mismatch", 422],
+  ] as const)("gives the %s answer of a void as a problem with its code", async (code, status) => {
+    route("post", `/api/v1/charges/${CHARGE}/void`, problem(code, status));
+
+    const result = await voidCharge("tok", CHARGE, { reason: "Cargo generado dos veces por error" }, KEY);
+
+    expect(result.kind === "problem" && result.problem.code).toBe(code);
+  });
+
+  it("never lets an id change the path", async () => {
+    route("post", "/api/v1/charges/:id/void", problem("resource-not-found", 404));
+
+    await voidCharge("tok", "a/b?c", { reason: "Cargo generado dos veces por error" }, KEY);
+
+    expect(requests()[0]?.path).toBe("/api/v1/charges/a%2Fb%3Fc/void");
+  });
+
+  it("lists the integrity runs with the page and the size, reads the latest one and one run by its id", async () => {
+    const run = integrityRun();
+    route("get", "/api/v1/charges/integrity-runs", integrityRunPage([run]));
+    route("get", "/api/v1/charges/integrity-runs/latest", integrityRunDetail(run));
+    route("get", `/api/v1/charges/integrity-runs/${run.id}`, integrityRunDetail(run, [{ kind: "ORPHAN_POSTING", ledgerTransactionId: CHARGE }]));
+
+    const runs = await listIntegrityRuns("tok", { page: 2, size: 50 });
+    const latest = await getLatestIntegrityRun("tok");
+    const detail = await getIntegrityRun("tok", run.id);
+
+    expect(runs.kind).toBe("ok");
+    expect(Object.fromEntries(new URLSearchParams(requests()[0]?.search))).toEqual({ page: "2", size: "50" });
+    expect(latest.kind === "ok" && latest.data.findings).toEqual([]);
+    expect(detail.kind === "ok" && detail.data.findings[0]?.kind).toBe("ORPHAN_POSTING");
+  });
+
+  it("gives the 404 of a latest run that does not exist yet as a problem", async () => {
+    route("get", "/api/v1/charges/integrity-runs/latest", problem("resource-not-found", 404));
+
+    const result = await getLatestIntegrityRun("tok");
+
+    expect(result.kind === "problem" && result.problem.status).toBe(404);
   });
 });

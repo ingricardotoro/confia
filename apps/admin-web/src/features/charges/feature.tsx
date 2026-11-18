@@ -9,12 +9,16 @@ import {
   accrualRunsSearch,
   accrualSearch,
   chargePlansSearch,
+  integrityRunsSearch,
   statementSearch,
+  studentChargesSearch,
   type AccrualRunSearch,
   type AccrualRunsSearch,
   type AccrualSearch,
   type ChargePlansSearch,
+  type IntegrityRunsSearch,
   type StatementSearch,
+  type StudentChargesSearch,
 } from "./charges-search.ts";
 import { AccrualContainer } from "./AccrualContainer.tsx";
 import { AccrualRunDetailContainer } from "./AccrualRunDetailContainer.tsx";
@@ -22,7 +26,10 @@ import { AccrualRunsContainer } from "./AccrualRunsContainer.tsx";
 import { ChargePlanDetailContainer } from "./ChargePlanDetailContainer.tsx";
 import { ChargePlansContainer } from "./ChargePlansContainer.tsx";
 import { ChargesContainer } from "./ChargesContainer.tsx";
+import { IntegrityRunDetailContainer } from "./IntegrityRunDetailContainer.tsx";
+import { IntegrityRunsContainer } from "./IntegrityRunsContainer.tsx";
 import { StatementContainer } from "./StatementContainer.tsx";
+import { StudentChargesContainer } from "./StudentChargesContainer.tsx";
 
 export { CHARGES_PATH };
 
@@ -80,6 +87,22 @@ function AccrualRunRoute() {
   return runId === undefined ? null : <AccrualRunDetailContainer runId={runId} search={search} onSearchChange={onSearchChange} />;
 }
 
+function StudentChargesRoute() {
+  const [search, onSearchChange] = useListSearch<StudentChargesSearch>((raw) => studentChargesSearch.parse(raw));
+  return <StudentChargesContainer search={search} onSearchChange={onSearchChange} />;
+}
+
+function IntegrityRunsRoute() {
+  const [search, onSearchChange] = useListSearch<IntegrityRunsSearch>((raw) => integrityRunsSearch.parse(raw));
+  return <IntegrityRunsContainer search={search} onSearchChange={onSearchChange} />;
+}
+
+function IntegrityRunRoute() {
+  const params: unknown = useParams({ strict: false });
+  const { runId } = z.object({ runId: z.string().optional() }).parse(params);
+  return runId === undefined ? null : <IntegrityRunDetailContainer runId={runId} />;
+}
+
 /** The part of the address after the area, which is how a child route names itself. */
 const below = (path: string): string => path.slice(CHARGES_PATH.length + 1);
 
@@ -89,12 +112,16 @@ const below = (path: string): string => path.slice(CHARGES_PATH.length + 1);
  * plans list validates its own search (page, size, order and filters), which lives in the address, and the detail of one plan lives below it.
  * The generation of charges has its own entry beside it: its page (the plan and the period in the address), the list of runs and one run below it.
  * The statement of account of a student has an entry of its own too: its page keeps the student, the currency, the period and the page in the address.
+ * So do the charges of a student (the student, the status, the period, the order and the page in the address, and the void of a charge) and the integrity check
+ * (the nightly runs and one run below it).
  */
 export const chargesFeature: FeatureModule = {
   navigation: { id: "charges", labelKey: "navigation.charges", to: CHARGES_PATHS.plans, group: "finance" },
   moreNavigation: [
     { id: "charges-accrual", labelKey: "navigation.accrual", to: CHARGES_PATHS.accrual, group: "finance" },
     { id: "charges-statement", labelKey: "navigation.statement", to: CHARGES_PATHS.statement, group: "finance" },
+    { id: "charges-student-charges", labelKey: "navigation.studentCharges", to: CHARGES_PATHS.studentCharges, group: "finance" },
+    { id: "charges-integrity", labelKey: "navigation.integrity", to: CHARGES_PATHS.integrity, group: "finance" },
   ],
   createRoutes: (parent: AnyRoute) => {
     const area = createRoute({ getParentRoute: () => parent, path: CHARGES_PATH, component: ChargesContainer });
@@ -144,6 +171,21 @@ export const chargesFeature: FeatureModule = {
           search,
           component: AccrualRunRoute,
         }),
+        createRoute({
+          getParentRoute: () => area,
+          path: below(CHARGES_PATHS.studentCharges),
+          validateSearch: (raw: Record<string, unknown>) => studentChargesSearch.parse(raw),
+          search,
+          component: StudentChargesRoute,
+        }),
+        createRoute({
+          getParentRoute: () => area,
+          path: below(CHARGES_PATHS.integrity),
+          validateSearch: (raw: Record<string, unknown>) => integrityRunsSearch.parse(raw),
+          search,
+          component: IntegrityRunsRoute,
+        }),
+        createRoute({ getParentRoute: () => area, path: `${below(CHARGES_PATHS.integrity)}/$runId`, component: IntegrityRunRoute }),
       ]),
     ];
   },

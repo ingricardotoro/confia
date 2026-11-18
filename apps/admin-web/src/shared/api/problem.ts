@@ -50,6 +50,8 @@ export const KNOWN_PROBLEM_CODES = [
   "duplicate-account-code",
   "account-in-use",
   "posting-account-invalid",
+  "charge-already-voided",
+  "charge-not-voidable",
 ] as const;
 
 export type ProblemCode = (typeof KNOWN_PROBLEM_CODES)[number];

@@ -34,3 +34,23 @@ export const accrualKeys = {
   runDetails: () => [...accrualKeys.runs(), "detail"] as const,
   runDetail: (id: string, params: object) => [...accrualKeys.runDetails(), id, params] as const,
 };
+
+/**
+ * Query keys of the charges of a student, general to specific: every student's charges, one student's, one list with its filters,
+ * order and page. A void invalidates the `all` prefix, with the statements.
+ */
+export const studentChargeKeys = {
+  all: ["charges", "student-charges"] as const,
+  student: (studentId: string) => [...studentChargeKeys.all, studentId] as const,
+  list: (studentId: string, params: object) => [...studentChargeKeys.student(studentId), "list", params] as const,
+};
+
+/** Query keys of the integrity check, general to specific: every read, every list, one list, the latest run, every run, one run. */
+export const integrityKeys = {
+  all: ["charges", "integrity"] as const,
+  lists: () => [...integrityKeys.all, "list"] as const,
+  list: (params: object) => [...integrityKeys.lists(), params] as const,
+  latest: () => [...integrityKeys.all, "latest"] as const,
+  details: () => [...integrityKeys.all, "detail"] as const,
+  detail: (runId: string) => [...integrityKeys.details(), runId] as const,
+};

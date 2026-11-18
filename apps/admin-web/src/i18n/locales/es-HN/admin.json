@@ -105,7 +105,9 @@
     "idempotencyPayloadMismatch": "Esta confirmación ya se había usado para otra solicitud distinta. Cierre la ventana, calcule la vista previa de nuevo y confirme otra vez.",
     "duplicateAccountCode": "Ya existe una cuenta con ese código.",
     "accountInUse": "La cuenta está en uso en el mapa de cuentas de cargos, que todavía apunta a ella, y no se puede desactivar. Cambie primero el mapa para que apunte a otra cuenta y después desactívela.",
-    "postingAccountInvalid": "Una de las cuentas elegidas no es del tipo que exige su renglón del mapa. Ya se recargaron las cuentas; revise las que eligió e intente de nuevo."
+    "postingAccountInvalid": "Una de las cuentas elegidas no es del tipo que exige su renglón del mapa. Ya se recargaron las cuentas; revise las que eligió e intente de nuevo.",
+    "chargeAlreadyVoided": "Este cargo ya estaba anulado, así que no se hizo ningún cambio. La lista ya se actualizó.",
+    "chargeNotVoidable": "El libro mayor no permite anular este cargo y no se hizo ningún cambio. Si necesita anularlo, comparta el identificador con soporte."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -177,7 +179,9 @@
       "community": "Comunidad educativa",
       "finance": "Finanzas",
       "settings": "Configuración"
-    }
+    },
+    "studentCharges": "Cargos del estudiante",
+    "integrity": "Integridad de cargos"
   },
   "catalog": {
     "title": "Catálogo",
@@ -498,7 +502,8 @@
         "retry": "Reintentar la búsqueda",
         "resultsLabel": "Estudiantes encontrados",
         "optionText": "{name} ({code})"
-      }
+      },
+      "viewCharges": "Ver cargos del estudiante"
     },
     "errors": {
       "dueDayRange": "Escriba un día del mes entre 1 y 28, para que exista en todos los meses.",
@@ -843,6 +848,142 @@
         "emptyTitle": "Esta ejecución no tiene renglones",
         "emptyDescription": "Esta ejecución no evaluó a ningún estudiante, por eso no hay nada que listar."
       }
+    },
+    "studentCharges": {
+      "heading": "Cargos del estudiante",
+      "description": "Los cargos de un estudiante, uno por uno, con su estado. Desde aquí puede anular un cargo generado por error.",
+      "caption": "Cargos del estudiante",
+      "columns": {
+        "period": "Período",
+        "concept": "Concepto",
+        "dueOn": "Vence",
+        "base": "Base",
+        "tax": "Impuesto",
+        "total": "Total",
+        "status": "Estado",
+        "actions": "Acciones"
+      },
+      "statuses": {
+        "ACTIVE": "Vigente",
+        "VOIDED": "Anulado"
+      },
+      "filterStatus": "Estado",
+      "filterFrom": "Período desde",
+      "filterTo": "Período hasta",
+      "periodHelp": "Se filtra por el primer día de cada período. Si deja las fechas vacías se muestran todos los cargos.",
+      "errors": {
+        "fromAfterTo": "La fecha final debe ser igual o posterior a la inicial."
+      },
+      "invalidPeriodTitle": "Corrija el período",
+      "invalidPeriodDescription": "La fecha final debe ser igual o posterior a la inicial. Mientras tanto no se consultan los cargos.",
+      "invalidPeriodAction": "Corregir la fecha final",
+      "idleTitle": "Elija un estudiante",
+      "idleDescription": "Busque al estudiante por nombre, apellido o código para ver sus cargos.",
+      "idleAction": "Buscar un estudiante",
+      "studentUnnamed": "Estudiante elegido",
+      "changeStudent": "Cambiar estudiante",
+      "viewStatement": "Ver estado de cuenta",
+      "emptyTitle": "Este estudiante no tiene cargos",
+      "emptyDescription": "Los cargos aparecen aquí cuando se genera el cobro de un período.",
+      "emptyAction": "Ver estado de cuenta",
+      "loading": "Cargando los cargos.",
+      "loadFailed": "No se pudieron cargar los cargos",
+      "notFoundTitle": "No encontramos a este estudiante",
+      "notFoundDescription": "El estudiante no existe o no pertenece a su institución. Vuelva a buscarlo por nombre o código.",
+      "forbiddenTitle": "No tiene permiso para ver estos cargos",
+      "forbiddenDescription": "Si lo necesita para su trabajo, solicite el permiso de consulta de cobros a un administrador de su institución.",
+      "voidAction": "Anular cargo",
+      "voidActionFor": "Anular el cargo {concept}, {period}",
+      "voidedOn": "Anulado el {date}",
+      "voidedNotice": "Se anuló el cargo {concept}, {period}. Su reverso ya está en el libro mayor.",
+      "noConcept": "Concepto sin nombre"
+    },
+    "void": {
+      "title": "Anular cargo",
+      "description": "Anular el cargo {concept} del período {period}.",
+      "summaryConcept": "Concepto",
+      "summaryPeriod": "Período",
+      "summaryTotal": "Total del cargo",
+      "reasonLabel": "Motivo de la anulación",
+      "reasonHelp": "Explique por qué se anula el cargo, de {min} a {max} caracteres. No escriba nombres, números de documento ni datos de salud o familiares: el motivo queda registrado.",
+      "counter": "{count} de {max} caracteres",
+      "errors": {
+        "tooShort": "El motivo debe tener al menos {min} caracteres.",
+        "tooLong": "El motivo no puede tener más de {max} caracteres.",
+        "control": "El motivo no puede tener saltos de línea ni caracteres de control."
+      },
+      "irreversible": "La anulación no se puede deshacer. El libro mayor recibe un reverso exacto del cargo, y el cargo no se vuelve a generar en su período.",
+      "confirm": "Anular cargo",
+      "cancel": "Cancelar",
+      "retryNote": "No se recibió la respuesta del servidor. Puede intentar de nuevo: el cargo no se anulará dos veces."
+    },
+    "integrity": {
+      "heading": "Integridad de cargos",
+      "description": "Cada noche el sistema comprueba que los cargos y el libro mayor coinciden. Solo informa: nunca repara nada.",
+      "caption": "Comprobaciones de integridad",
+      "columns": {
+        "startedAt": "Inicio",
+        "finishedAt": "Fin",
+        "status": "Resultado",
+        "chargesChecked": "Cargos revisados",
+        "postingsChecked": "Asientos revisados",
+        "discrepancyCount": "Discrepancias"
+      },
+      "statuses": {
+        "OK": "Sin discrepancias",
+        "DISCREPANCIES": "Con discrepancias"
+      },
+      "banner": {
+        "loading": "Leyendo la última comprobación.",
+        "ok": "La última comprobación ({date}) no encontró discrepancias.",
+        "discrepancies": "La última comprobación ({date}) encontró {count, plural, one {# discrepancia} other {# discrepancias}}. Revise el detalle.",
+        "none": "La comprobación nocturna todavía no se ha ejecutado para su institución.",
+        "failed": "No se pudo leer la última comprobación.",
+        "retry": "Reintentar",
+        "viewDetail": "Ver detalle"
+      },
+      "emptyTitle": "Todavía no hay comprobaciones",
+      "emptyDescription": "La primera se ejecuta de madrugada, a las 2:30 hora de Honduras.",
+      "emptyAction": "Actualizar",
+      "loadFailed": "No se pudieron cargar las comprobaciones",
+      "openRun": "Comprobación del {date}",
+      "detail": {
+        "heading": "Comprobación del {date}",
+        "back": "Volver a las comprobaciones",
+        "started": "Inicio",
+        "finished": "Fin",
+        "chargesChecked": "Cargos revisados",
+        "postingsChecked": "Asientos revisados",
+        "findingsHeading": "Discrepancias",
+        "noFindingsTitle": "Sin discrepancias",
+        "noFindingsDescription": "Esta comprobación encontró que los cargos y el libro mayor coinciden.",
+        "noFindingsAction": "Volver a las comprobaciones",
+        "caption": "Discrepancias de la comprobación",
+        "columns": {
+          "kind": "Tipo",
+          "charge": "Cargo",
+          "transaction": "Asiento",
+          "expected": "Según los cargos",
+          "actual": "Según el libro mayor"
+        },
+        "notApplicable": "No aplica",
+        "loading": "Cargando la comprobación.",
+        "loadFailed": "No se pudo cargar la comprobación",
+        "notFoundTitle": "No encontramos esta comprobación",
+        "notFoundDescription": "No existe o no pertenece a su institución. Vuelva a la lista de comprobaciones."
+      },
+      "kinds": {
+        "UNBALANCED_TRANSACTION": "Asiento descuadrado",
+        "CHARGE_POSTING_MISSING": "Cargo sin asiento",
+        "CHARGE_POSTING_DUPLICATE": "Cargo con más de un asiento",
+        "CHARGE_TOTAL_MISMATCH": "El asiento no coincide con el total del cargo",
+        "VOID_REVERSAL_MISSING": "Cargo anulado sin reverso",
+        "VOID_REVERSAL_DUPLICATE": "Cargo anulado con más de un reverso",
+        "REVERSAL_WITHOUT_VOID": "Reverso de un cargo que no está anulado",
+        "ORPHAN_POSTING": "Asiento de cargos sin cargo",
+        "RECEIVABLE_MISMATCH": "Las cuentas por cobrar no coinciden con los cargos",
+        "unknown": "Discrepancia no reconocida"
+      }
     }
   },
   "ledger": {
@@ -1161,7 +1302,9 @@
     "guardiansAction": "Encargados",
     "guardiansActionFor": "Encargados de {name}",
     "statementAction": "Estado de cuenta",
-    "statementActionFor": "Estado de cuenta de {name}"
+    "statementActionFor": "Estado de cuenta de {name}",
+    "chargesAction": "Cargos",
+    "chargesActionFor": "Cargos de {name}"
   },
   "enrollments": {
     "title": "Matrículas",

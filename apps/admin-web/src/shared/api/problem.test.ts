@@ -75,6 +75,8 @@ describe("the known codes", () => {
         "duplicate-account-code",
         "account-in-use",
         "posting-account-invalid",
+        "charge-already-voided",
+        "charge-not-voidable",
       ].sort(),
     );
   });

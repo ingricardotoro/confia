@@ -63,6 +63,8 @@ describe("PROBLEM_KEYS", () => {
     ["plan-item-invalid", "problem.planItemInvalid"],
     ["idempotency-key-missing", "problem.unexpected"],
     ["idempotency-payload-mismatch", "problem.idempotencyPayloadMismatch"],
+    ["charge-already-voided", "problem.chargeAlreadyVoided"],
+    ["charge-not-voidable", "problem.chargeNotVoidable"],
   ] as const)("maps %s to %s", (code, key) => {
     expect(PROBLEM_KEYS[code]).toBe(key);
   });

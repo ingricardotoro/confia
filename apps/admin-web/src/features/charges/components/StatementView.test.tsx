@@ -109,6 +109,18 @@ describe("StatementView", () => {
     expect(screen.getByLabelText("Moneda")).toBeInTheDocument();
   });
 
+  it("offers the way to the charges of the student once there is a statement or an empty account, and not before", async () => {
+    const user = userEvent.setup();
+    const onViewCharges = vi.fn();
+    const { rerender } = renderWithAdminI18n(<StatementView {...props({ onViewCharges })} />);
+    expect(screen.queryByRole("button", { name: "Ver cargos del estudiante" })).not.toBeInTheDocument();
+
+    rerender(<StatementView {...props({ onViewCharges, state: { kind: "ready", statement: studentStatement(), busy: false } })} />);
+    await user.click(screen.getByRole("button", { name: "Ver cargos del estudiante" }));
+
+    expect(onViewCharges).toHaveBeenCalledOnce();
+  });
+
   it("shows no currency selector when none is given", () => {
     renderWithAdminI18n(<StatementView {...props()} />);
 
