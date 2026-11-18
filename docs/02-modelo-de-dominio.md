@@ -597,9 +597,11 @@ base de datos cuando se puede, prueba de dominio siempre.
 | INV-11 | Dos `PriceListItem` del mismo `PaymentConcept` dentro de la misma `PriceList` no pueden solapar su vigencia | Restricción `EXCLUDE USING gist` sobre `(payment_concept_id WITH =, daterange(valid_from, valid_to) WITH &&)` |
 | INV-12 | Un `PriceListItem` no se edita una vez que existe al menos un `Charge` que lo referencia. El cambio de precio crea una nueva vigencia | Regla de aplicación más ausencia de permiso de `UPDATE` sobre columnas de monto y vigencia |
 | INV-13 | Un `Charge` siempre referencia el `PriceListItem` que determinó su precio, o registra explícitamente que su origen es `manual` | `CHECK (price_list_item_id IS NOT NULL OR origin = 'manual')` |
-| INV-14 | La generación de cargos es idempotente: no pueden existir dos `Charge` activos para la misma tripleta `studentId`, `paymentConceptId`, `periodLabel` con origen `automatic` | Índice único parcial que excluye estados `reversed` |
+| INV-14 | La generación de cargos es idempotente: no pueden existir dos `Charge` automáticos para la misma tripleta `studentId`, `paymentConceptId`, `periodLabel`. **Un cargo anulado sigue contando** (ver INV-43): no se vuelve a devengar | Restricción `EXCLUDE` por rango de fechas (INV-43), sin excluir los cargos anulados |
 | INV-15 | Un `ScholarshipAward` y un `Discount` aplicados al mismo `Charge` no pueden reducir el monto por debajo de cero, y su acumulación solo es válida si todos los beneficios involucrados son acumulables | Validación de dominio con prueba de casos límite |
 | INV-16 | El beneficio de beca aplicado a un `Charge` corresponde a un `ScholarshipAward` vigente en la fecha de emisión del cargo | Validación en el motor de devengo |
+| INV-43 | No existen dos cargos automáticos del mismo estudiante y concepto con períodos que se solapan, aunque vengan de planes o periodicidades distintas; un cargo anulado también cuenta, y la corrección es anular y emitir un cargo manual | `EXCLUDE USING gist (institution_id, student_id, payment_concept_id, daterange(period_start, period_end, '[]')) WHERE origin = 'AUTOMATIC'` (V32); `docs/cortes/charges-accrual.md` |
+| INV-47 | Un cargo, su anulación, una corrida de integridad y sus discrepancias no se actualizan, no se borran ni se vacían, tampoco por el dueño; «anulado» se deriva de la fila de anulación | Sin `UPDATE`/`DELETE` concedido y disparadores `BEFORE UPDATE OR DELETE` y `BEFORE TRUNCATE` (V32, V33); `docs/cortes/charges-accrual.md` y `charges-void-and-integrity.md` |
 
 ### 5.3 Pagos y caja
 

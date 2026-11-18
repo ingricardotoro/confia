@@ -6,6 +6,14 @@ import com.confia.charges.application.AccrualRunItemRepository;
 import com.confia.charges.application.AccrualRunRepository;
 import com.confia.charges.application.AccrualRunScheduler;
 import com.confia.charges.application.ChargeRepository;
+import com.confia.charges.application.ChargeVoidRepository;
+import com.confia.charges.application.IntegrityRunRepository;
+import com.confia.charges.application.ListStudentCharges;
+import com.confia.charges.application.ViewIntegrityRuns;
+import com.confia.charges.application.VoidCharge;
+import com.confia.charges.infrastructure.JooqChargeVoidRepository;
+import com.confia.charges.infrastructure.JooqIntegrityRunRepository;
+import com.confia.ledger.application.api.LedgerPostingApi;
 import com.confia.charges.application.ManageAccrual;
 import com.confia.charges.application.ManagePostingAccounts;
 import com.confia.charges.application.PostingAccountRepository;
@@ -87,6 +95,36 @@ public class ChargesConfiguration {
     ManagePostingAccounts managePostingAccounts(TransactionRunner transactionRunner, PostingAccountRepository map,
             LedgerAccountDirectory ledgerAccounts, AuditLogWriter auditLogWriter, Clock clock) {
         return new ManagePostingAccounts(transactionRunner, map, ledgerAccounts, auditLogWriter, clock);
+    }
+
+    @Bean
+    ChargeVoidRepository chargeVoidRepository(DSLContext dsl) {
+        return new JooqChargeVoidRepository(dsl);
+    }
+
+    @Bean
+    IntegrityRunRepository integrityRunRepository(DSLContext dsl) {
+        return new JooqIntegrityRunRepository(dsl);
+    }
+
+    /** The void of a charge: the ledger reversal and the void record in one database transaction (charges:void). */
+    @Bean
+    VoidCharge voidCharge(TransactionRunner transactionRunner, ChargeRepository charges, ChargeVoidRepository voids,
+            LedgerPostingApi ledger, AuditLogWriter auditLogWriter, Clock clock) {
+        return new VoidCharge(transactionRunner, charges, voids, ledger, auditLogWriter, clock);
+    }
+
+    /** The charges of a student, to pick one to void. A read, with one audit entry. */
+    @Bean
+    ListStudentCharges listStudentCharges(TransactionRunner transactionRunner, StudentDirectory students,
+            ChargeRepository charges, PaymentConceptDirectory concepts, AuditLogWriter auditLogWriter) {
+        return new ListStudentCharges(transactionRunner, students, charges, concepts, auditLogWriter);
+    }
+
+    /** The results of the nightly integrity check, which only the worker produces. */
+    @Bean
+    ViewIntegrityRuns viewIntegrityRuns(TransactionRunner transactionRunner, IntegrityRunRepository runs) {
+        return new ViewIntegrityRuns(transactionRunner, runs);
     }
 
     /** The derived statement of a student (docs/cortes/ledger-account-statement.md): a read, with one audit entry. */

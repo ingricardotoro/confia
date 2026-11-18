@@ -10,9 +10,9 @@ import java.util.UUID;
 
 /**
  * What a source module asks of the ledger, inside the database transaction it already opened with the transactional
- * component (docs/cortes/charges-accrual.md, appendix B). Neither operation opens a transaction, applies a security context
+ * component (docs/cortes/charges-accrual.md, appendix B). No operation opens a transaction, applies a security context
  * or retries: a deadlock or a race propagates and the OUTER transaction runner repeats the whole unit of work of the caller.
- * Both refuse to run without an active transaction. The ledger checks everything it always checks (balance, idempotency
+ * Every one refuses to run without an active transaction. The ledger checks everything it always checks (balance, idempotency
  * key and content hash, accounts, student flag, minor unit) and the database repeats it at commit.
  */
 public interface LedgerPostingApi {
@@ -66,7 +66,56 @@ public interface LedgerPostingApi {
     record LockedAccount(AccountKey key, UUID accountId, boolean underReview) {
     }
 
+    /**
+     * The reversal of a {@code CHARGE} transaction that the caller posted: the original is named by its identifier, and the
+     * reversal is its exact mirror dated {@code effectiveOn} (not before the original). {@code callerModule} must be the
+     * module of origin of the original (INV-41). The reason is mandatory.
+     */
+    record ChargeReversal(UUID originalTransactionId, String callerModule, LocalDate effectiveOn, String reason,
+            String idempotencyKey) {
+
+        public ChargeReversal {
+            Objects.requireNonNull(originalTransactionId, "originalTransactionId");
+            Objects.requireNonNull(callerModule, "callerModule");
+            Objects.requireNonNull(effectiveOn, "effectiveOn");
+            Objects.requireNonNull(reason, "reason");
+            Objects.requireNonNull(idempotencyKey, "idempotencyKey");
+        }
+    }
+
+    /** Why the ledger refused a reversal; the caller decides what that means for its own operation. */
+    enum ReversalRefusal { NOT_FOUND, NOT_ALLOWED, ALREADY_REVERSED, ACCOUNT_UNDER_REVIEW }
+
+    /**
+     * The ledger refused a reversal. A plain exception on purpose: the domain errors of the ledger do not cross the module
+     * boundary (ADR-0022), so the caller receives the closed reason and publishes its own error.
+     */
+    final class ReversalRefusedException extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        private final transient ReversalRefusal refusal;
+
+        public ReversalRefusedException(ReversalRefusal refusal) {
+            super("the ledger refused the reversal: " + refusal);
+            this.refusal = Objects.requireNonNull(refusal, "refusal");
+        }
+
+        public ReversalRefusal refusal() {
+            return refusal;
+        }
+    }
+
     Posted postCharge(Actor actor, ChargePosting posting);
+
+    /**
+     * Posts the exact mirror of a charge transaction inside the transaction of the caller. Same contract as {@link
+     * #postCharge}: no transaction opened, no security context applied, no retry.
+     *
+     * @throws ReversalRefusedException when the ledger refuses (unknown transaction, not reversible, already reversed, or
+     *     the student account is under review)
+     */
+    Posted reverseCharge(Actor actor, ChargeReversal reversal);
 
     /** Opens the missing sub-accounts and locks each one {@code FOR UPDATE} in the order student, currency. */
     List<LockedAccount> lockStudentAccounts(Actor actor, Collection<AccountKey> keys);

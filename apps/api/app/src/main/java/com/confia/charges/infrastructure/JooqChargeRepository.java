@@ -1,8 +1,15 @@
 package com.confia.charges.infrastructure;
 
 import static confia.generated.jooq.tables.ChargesCharge.CHARGES_CHARGE;
+import static confia.generated.jooq.tables.ChargesChargeVoid.CHARGES_CHARGE_VOID;
 
+import com.confia.charges.application.ChargeFilter;
 import com.confia.charges.application.ChargeRepository;
+import com.confia.charges.application.ChargeRow;
+import com.confia.charges.application.Page;
+import com.confia.charges.application.PageRequest;
+import com.confia.charges.domain.ChargeStatus;
+import com.confia.charges.domain.IntegrityCheck;
 import com.confia.charges.domain.ComputedCharge;
 import com.confia.kernel.CurrencyCode;
 import com.confia.kernel.InstitutionId;
@@ -13,7 +20,9 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.OrderField;
 import org.jooq.Record;
 import org.jooq.impl.DSL;
 
@@ -106,6 +115,108 @@ public final class JooqChargeRepository implements ChargeRepository {
                                 row.get(CHARGES_CHARGE.PERIOD_START), row.get(CHARGES_CHARGE.PERIOD_END),
                                 row.get(CHARGES_CHARGE.DUE_ON), row.get(CHARGES_CHARGE.ORIGIN))));
         return found;
+    }
+
+    @Override
+    public java.util.Optional<ChargeForVoid> findForVoid(InstitutionId institution, UUID chargeId) {
+        return dsl.select(CHARGES_CHARGE.ID, CHARGES_CHARGE.STUDENT_ID, CHARGES_CHARGE.LEDGER_TRANSACTION_ID,
+                CHARGES_CHARGE.TOTAL_AMOUNT, CHARGES_CHARGE.TOTAL_CURRENCY, CHARGES_CHARGE.PERIOD_START)
+                .from(CHARGES_CHARGE)
+                .where(CHARGES_CHARGE.INSTITUTION_ID.eq(institution.value()))
+                .and(CHARGES_CHARGE.ID.eq(chargeId))
+                .fetchOptional(row -> new ChargeForVoid(row.get(CHARGES_CHARGE.ID), row.get(CHARGES_CHARGE.STUDENT_ID),
+                        row.get(CHARGES_CHARGE.LEDGER_TRANSACTION_ID),
+                        MoneyColumns.toMoney(row.get(CHARGES_CHARGE.TOTAL_AMOUNT), row.get(CHARGES_CHARGE.TOTAL_CURRENCY)),
+                        row.get(CHARGES_CHARGE.PERIOD_START)));
+    }
+
+    @Override
+    public Page<ChargeRow> listByStudent(InstitutionId institution, UUID studentId, ChargeFilter filter,
+            PageRequest page) {
+        Condition where = CHARGES_CHARGE.INSTITUTION_ID.eq(institution.value())
+                .and(CHARGES_CHARGE.STUDENT_ID.eq(studentId));
+        if (filter.periodFrom() != null) {
+            where = where.and(CHARGES_CHARGE.PERIOD_START.ge(filter.periodFrom()));
+        }
+        if (filter.periodTo() != null) {
+            where = where.and(CHARGES_CHARGE.PERIOD_START.le(filter.periodTo()));
+        }
+        if (filter.statusOrNull() == ChargeStatus.VOIDED) {
+            where = where.and(CHARGES_CHARGE_VOID.ID.isNotNull());
+        } else if (filter.statusOrNull() == ChargeStatus.ACTIVE) {
+            where = where.and(CHARGES_CHARGE_VOID.ID.isNull());
+        }
+        long total = dsl.selectCount().from(CHARGES_CHARGE).leftJoin(CHARGES_CHARGE_VOID)
+                .on(CHARGES_CHARGE_VOID.INSTITUTION_ID.eq(CHARGES_CHARGE.INSTITUTION_ID))
+                .and(CHARGES_CHARGE_VOID.CHARGE_ID.eq(CHARGES_CHARGE.ID))
+                .where(where).fetchOne(0, long.class);
+        List<ChargeRow> rows = dsl.select(CHARGES_CHARGE.ID, CHARGES_CHARGE.PAYMENT_CONCEPT_ID,
+                CHARGES_CHARGE.CONCEPT_CATEGORY, CHARGES_CHARGE.PERIOD_LABEL, CHARGES_CHARGE.PERIOD_START,
+                CHARGES_CHARGE.PERIOD_END, CHARGES_CHARGE.DUE_ON, CHARGES_CHARGE.ORIGIN, CHARGES_CHARGE.BASE_AMOUNT,
+                CHARGES_CHARGE.BASE_CURRENCY, CHARGES_CHARGE.TAX_AMOUNT, CHARGES_CHARGE.TAX_CURRENCY,
+                CHARGES_CHARGE.TOTAL_AMOUNT, CHARGES_CHARGE.TOTAL_CURRENCY, CHARGES_CHARGE_VOID.ID,
+                CHARGES_CHARGE_VOID.REVERSAL_TRANSACTION_ID, CHARGES_CHARGE_VOID.VOIDED_AT, CHARGES_CHARGE_VOID.REASON)
+                .from(CHARGES_CHARGE).leftJoin(CHARGES_CHARGE_VOID)
+                .on(CHARGES_CHARGE_VOID.INSTITUTION_ID.eq(CHARGES_CHARGE.INSTITUTION_ID))
+                .and(CHARGES_CHARGE_VOID.CHARGE_ID.eq(CHARGES_CHARGE.ID))
+                .where(where)
+                .orderBy(orders(page))
+                .limit(page.size()).offset(page.offset())
+                .fetch(JooqChargeRepository::toRow);
+        return new Page<>(rows, total, page.page(), page.size());
+    }
+
+    /** The sort field was checked against {@code ChargeFilter.SORT_FIELDS} by the request; anything else is a defect, not an input. */
+    private static OrderField<?> order(PageRequest page) {
+        var field = switch (page.sortField()) {
+            case "periodStart" -> CHARGES_CHARGE.PERIOD_START;
+            case "dueOn" -> CHARGES_CHARGE.DUE_ON;
+            case "total" -> CHARGES_CHARGE.TOTAL_AMOUNT;
+            default -> throw new IllegalArgumentException("unknown sort field");
+        };
+        return page.ascending() ? field.asc() : field.desc();
+    }
+
+    /** A sort by total goes by currency first: amounts of two currencies are not comparable. */
+    private static List<OrderField<?>> orders(PageRequest page) {
+        List<OrderField<?>> fields = new ArrayList<>();
+        if (page.sortField().equals("total")) {
+            fields.add(CHARGES_CHARGE.TOTAL_CURRENCY.asc());
+        }
+        fields.add(order(page));
+        fields.add(CHARGES_CHARGE.ID.asc());
+        return fields;
+    }
+
+    private static ChargeRow toRow(Record row) {
+        ChargeRow.VoidInfo voided = row.get(CHARGES_CHARGE_VOID.ID) == null ? null
+                : new ChargeRow.VoidInfo(row.get(CHARGES_CHARGE_VOID.ID),
+                        row.get(CHARGES_CHARGE_VOID.REVERSAL_TRANSACTION_ID),
+                        ChargesWrites.fromDatabase(row.get(CHARGES_CHARGE_VOID.VOIDED_AT)),
+                        row.get(CHARGES_CHARGE_VOID.REASON));
+        return new ChargeRow(row.get(CHARGES_CHARGE.ID), row.get(CHARGES_CHARGE.PAYMENT_CONCEPT_ID),
+                row.get(CHARGES_CHARGE.CONCEPT_CATEGORY), row.get(CHARGES_CHARGE.PERIOD_LABEL),
+                row.get(CHARGES_CHARGE.PERIOD_START), row.get(CHARGES_CHARGE.PERIOD_END), row.get(CHARGES_CHARGE.DUE_ON),
+                row.get(CHARGES_CHARGE.ORIGIN),
+                MoneyColumns.toMoney(row.get(CHARGES_CHARGE.BASE_AMOUNT), row.get(CHARGES_CHARGE.BASE_CURRENCY)),
+                MoneyColumns.toMoney(row.get(CHARGES_CHARGE.TAX_AMOUNT), row.get(CHARGES_CHARGE.TAX_CURRENCY)),
+                MoneyColumns.toMoney(row.get(CHARGES_CHARGE.TOTAL_AMOUNT), row.get(CHARGES_CHARGE.TOTAL_CURRENCY)),
+                voided);
+    }
+
+    @Override
+    public List<IntegrityCheck.ChargeFact> integrityFacts(InstitutionId institution) {
+        return dsl.select(CHARGES_CHARGE.ID, CHARGES_CHARGE.LEDGER_TRANSACTION_ID, CHARGES_CHARGE.TOTAL_AMOUNT,
+                CHARGES_CHARGE.TOTAL_CURRENCY, CHARGES_CHARGE_VOID.REVERSAL_TRANSACTION_ID)
+                .from(CHARGES_CHARGE).leftJoin(CHARGES_CHARGE_VOID)
+                .on(CHARGES_CHARGE_VOID.INSTITUTION_ID.eq(CHARGES_CHARGE.INSTITUTION_ID))
+                .and(CHARGES_CHARGE_VOID.CHARGE_ID.eq(CHARGES_CHARGE.ID))
+                .where(CHARGES_CHARGE.INSTITUTION_ID.eq(institution.value()))
+                .orderBy(CHARGES_CHARGE.ID)
+                .fetch(row -> new IntegrityCheck.ChargeFact(row.get(CHARGES_CHARGE.ID),
+                        row.get(CHARGES_CHARGE.LEDGER_TRANSACTION_ID),
+                        MoneyColumns.toMoney(row.get(CHARGES_CHARGE.TOTAL_AMOUNT), row.get(CHARGES_CHARGE.TOTAL_CURRENCY)),
+                        row.get(CHARGES_CHARGE_VOID.REVERSAL_TRANSACTION_ID)));
     }
 
     @Override

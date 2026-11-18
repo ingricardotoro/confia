@@ -235,7 +235,10 @@ class OpenApiContractSnapshotTest {
                 "/api/v1/charges/plans/{id}/items/{itemId}", "/api/v1/charges/plans/{id}/accrual-periods",
                 "/api/v1/charges/plans/{id}/accrual-preview", "/api/v1/charges/plans/{id}/accrual-runs",
                 "/api/v1/charges/accrual-runs", "/api/v1/charges/accrual-runs/{runId}",
-                "/api/v1/charges/students/{studentId}/statement", "/api/v1/charges/posting-accounts",
+                "/api/v1/charges/students/{studentId}/statement", "/api/v1/charges/students/{studentId}/charges",
+                "/api/v1/charges/{chargeId}/void", "/api/v1/charges/integrity-runs",
+                "/api/v1/charges/integrity-runs/latest", "/api/v1/charges/integrity-runs/{runId}",
+                "/api/v1/charges/posting-accounts",
                 "/api/v1/ledger/accounts", "/api/v1/ledger/accounts/{id}",
                 "/api/v1/students", "/api/v1/students/{id}",
                 "/api/v1/enrollments", "/api/v1/enrollments/{id}", "/api/v1/enrollments/{id}/transfer",
@@ -424,7 +427,7 @@ class OpenApiContractSnapshotTest {
             }
         }
 
-        assertThat(operations).isEqualTo(80);
+        assertThat(operations).isEqualTo(85);
         List<String> expected = new ArrayList<>(List.of("get " + ROLES_PATH,
                 "get /api/v1/catalog/payment-concepts", "post /api/v1/catalog/payment-concepts",
                 "put /api/v1/catalog/payment-concepts/{id}", "get /api/v1/catalog/price-lists",
@@ -438,7 +441,9 @@ class OpenApiContractSnapshotTest {
                 "get /api/v1/charges/plans/{id}/accrual-periods", "post /api/v1/charges/plans/{id}/accrual-preview",
                 "post /api/v1/charges/plans/{id}/accrual-runs", "get /api/v1/charges/accrual-runs",
                 "get /api/v1/charges/accrual-runs/{runId}", "get /api/v1/charges/students/{studentId}/statement",
-                "get /api/v1/charges/posting-accounts",
+                "get /api/v1/charges/students/{studentId}/charges", "post /api/v1/charges/{chargeId}/void",
+                "get /api/v1/charges/integrity-runs", "get /api/v1/charges/integrity-runs/latest",
+                "get /api/v1/charges/integrity-runs/{runId}", "get /api/v1/charges/posting-accounts",
                 "put /api/v1/charges/posting-accounts", "get /api/v1/ledger/accounts", "post /api/v1/ledger/accounts",
                 "put /api/v1/ledger/accounts/{id}"));
         for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {

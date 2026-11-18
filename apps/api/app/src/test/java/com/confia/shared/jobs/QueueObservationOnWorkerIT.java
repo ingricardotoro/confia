@@ -89,7 +89,7 @@ class QueueObservationOnWorkerIT extends WorkerJobIT {
                 "oldest_due_age_seconds");
         long counted = (long) fields.get("scheduled") + (long) fields.get("due") + (long) fields.get("running")
                 + (long) fields.get("failed");
-        assertThat(counted).as("the eight recurring jobs of the catalog").isEqualTo(8);
+        assertThat(counted).as("the nine recurring jobs of the catalog").isEqualTo(9);
         assertThat((long) fields.get("running")).as("the observation itself is running").isGreaterThanOrEqualTo(1);
         assertThat((long) fields.get("failed")).isZero();
         assertThat(logged.list).as("a healthy queue leaves no warning")
@@ -105,17 +105,17 @@ class QueueObservationOnWorkerIT extends WorkerJobIT {
     void theProductionReaderCountsEveryFailingRecurringJobOfTheCatalogAsFailed() {
         try (ConfigurableApplicationContext worker = WorkerHarness.startWith(NoFixtures.class, List.of(FIRST))) {
             Eventually.within(Duration.ofSeconds(60), () -> assertThat(PurgeProbeRows.scalar(
-                    "select count(*) from scheduled_tasks")).isEqualTo(8));
+                    "select count(*) from scheduled_tasks")).isEqualTo(9));
             PurgeProbeRows.run("update scheduled_tasks set consecutive_failures = 1, "
                     + "execution_time = now() + interval '1 day' where task_name <> ?", "shared.queue-observation");
 
             QueueSnapshot snapshot = worker.getBean(QueueStateReader.class).read(Instant.now());
 
-            assertThat(snapshot.failedByTask()).as("the seven failing recurring jobs, each counted once").hasSize(7)
+            assertThat(snapshot.failedByTask()).as("the eight failing recurring jobs, each counted once").hasSize(8)
                     .containsEntry("shared.audit-chain-verification-daily", 1L)
                     .containsEntry("shared.audit-chain-verification-weekly", 1L)
                     .doesNotContainKey("shared.queue-observation");
-            assertThat(snapshot.failed()).isEqualTo(7);
+            assertThat(snapshot.failed()).isEqualTo(8);
         }
     }
 }

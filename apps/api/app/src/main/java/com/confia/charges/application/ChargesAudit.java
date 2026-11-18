@@ -20,6 +20,9 @@ final class ChargesAudit {
     static final String PLAN_ITEM = "charges.plan_item";
     static final String POSTING_ACCOUNT = "charges.posting_account";
     static final String STATEMENT = "charges.statement";
+    static final String CHARGE = "charges.charge";
+    static final String STUDENT_CHARGES = "charges.student_charges";
+    static final String INTEGRITY_RUN = "charges.integrity_run";
 
     private static final String ACTOR_KIND_STAFF = "staff";
     private static final String OUTCOME_SUCCESS = "success";
@@ -73,6 +76,59 @@ final class ChargesAudit {
         return entry(actor, requestId, STATEMENT + ".viewed", STATEMENT, studentId, null,
                 json.text("from", from.toString()).text("to", to.toString()).number("page", page)
                         .number("size", size).toJson());
+    }
+
+    /**
+     * The void of a charge: who, which charge, for which student and with which ledger reversal. The reason is free text that
+     * may name a person, so only its length is recorded here; the text lives in the void record.
+     */
+    static AuditEntry chargeVoided(AuthenticatedActor actor, UUID requestId, UUID studentId,
+            com.confia.charges.domain.ChargeVoid charge) {
+        return entry(actor, requestId, CHARGE + ".voided", CHARGE, charge.chargeId(), null,
+                AuditJson.object().text("voidId", charge.id().toString()).text("studentId", studentId.toString())
+                        .text("reversalTransactionId", charge.reversalTransactionId().toString())
+                        .number("reasonLength", charge.reason().length()).toJson());
+    }
+
+    /** The reading of the charges of a student: the filters asked for, never an amount or a name. */
+    static AuditEntry studentChargesViewed(AuthenticatedActor actor, UUID requestId, UUID studentId, ChargeFilter filter,
+            PageRequest page) {
+        AuditJson.Builder json = AuditJson.object();
+        if (filter.status() != null) {
+            json.text("status", filter.status());
+        }
+        if (filter.periodFrom() != null) {
+            json.text("periodFrom", filter.periodFrom().toString());
+        }
+        if (filter.periodTo() != null) {
+            json.text("periodTo", filter.periodTo().toString());
+        }
+        return entry(actor, requestId, STUDENT_CHARGES + ".viewed", STUDENT_CHARGES, studentId, null,
+                json.number("page", page.page()).number("size", page.size()).toJson());
+    }
+
+    /**
+     * The result of one nightly integrity check, written by the {@code system} actor of the worker. The outcome is {@code
+     * error} when the check confirmed discrepancies, which is how a reader of the trail sees a failed night. Counts only.
+     */
+    static AuditEntry integrityRunCompleted(UUID institutionId, UUID runId, com.confia.charges.domain.IntegrityRun run,
+            java.util.Map<com.confia.charges.domain.IntegrityKind, Integer> byKind) {
+        AuditJson.Builder json = AuditJson.object().text("status", run.status())
+                .number("chargesChecked", run.chargesChecked()).number("postingsChecked", run.postingsChecked())
+                .number("discrepancyCount", run.discrepancyCount());
+        byKind.forEach((kind, count) -> json.number(memberName(kind), count));
+        return new AuditEntry(institutionId, null, "system", "charges-integrity", null, null, runId, null,
+                INTEGRITY_RUN + ".completed", INTEGRITY_RUN, runId.toString(),
+                run.discrepancyCount() == 0 ? OUTCOME_SUCCESS : "error", null, json.toJson(), null, null);
+    }
+
+    /** {@code ORPHAN_POSTING} as the audit member {@code orphanPosting}: members are camel case. */
+    private static String memberName(com.confia.charges.domain.IntegrityKind kind) {
+        StringBuilder name = new StringBuilder();
+        for (String word : kind.name().toLowerCase(java.util.Locale.ROOT).split("_")) {
+            name.append(name.length() == 0 ? word : Character.toUpperCase(word.charAt(0)) + word.substring(1));
+        }
+        return name.toString();
     }
 
     static String json(PostingAccountRow row) {

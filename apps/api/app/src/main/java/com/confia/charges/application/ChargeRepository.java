@@ -32,6 +32,22 @@ public interface ChargeRepository {
     java.util.Map<UUID, StatementCharge> findByLedgerTransactions(InstitutionId institution,
             java.util.Collection<UUID> ledgerTransactionIds);
 
+    /** The charge as the void needs it: who owes it, its ledger transaction and its total; absent for another institution. */
+    java.util.Optional<ChargeForVoid> findForVoid(InstitutionId institution, UUID chargeId);
+
+    /**
+     * The charges of the student with their derived state (a void record means voided), filtered, one page, sorted by a
+     * field of {@link ChargeFilter#SORT_FIELDS}. The sort is applied by the database and always ends on the identifier so pages are stable.
+     */
+    Page<ChargeRow> listByStudent(InstitutionId institution, UUID studentId, ChargeFilter filter, PageRequest page);
+
+    /** Every charge of the institution as the integrity check compares it: its transaction, its total and its void. */
+    List<com.confia.charges.domain.IntegrityCheck.ChargeFact> integrityFacts(InstitutionId institution);
+
+    /** What the void of a charge needs to know about it. */
+    record ChargeForVoid(UUID id, UUID studentId, UUID ledgerTransactionId, Money total, LocalDate periodStart) {
+    }
+
     /** What a statement line shows of the charge that produced it. */
     record StatementCharge(UUID chargeId, UUID paymentConceptId, String conceptCategory, String periodLabel,
             LocalDate periodStart, LocalDate periodEnd, LocalDate dueOn, String origin) {

@@ -321,7 +321,7 @@ abiertas» donde difieren.
   vigencias referenciadas, máquina de estados y RLS) y `AccrualEndpointsIT` (las cinco rutas en el proceso administrativo real, la
   clave faltante, el rol sin permiso y el aislamiento).
 - **Pendiente:** pantalla de generación (corte 3a-2); ~~`GET`/`PUT /charges/posting-accounts` y `GET`/`POST /ledger/accounts` con
-  `ledger:create`~~ (construidos en `docs/cortes/ledger-chart-of-accounts.md`); reverso de cargo y trabajo nocturno de integridad (corte 3b); decisión fiscal del contador.
+  `ledger:create`~~ (construidos en `docs/cortes/ledger-chart-of-accounts.md`); ~~reverso de cargo y trabajo nocturno de integridad~~ (construidos en `docs/cortes/charges-void-and-integrity.md`); decisión fiscal del contador.
 
 ## Construido (frontend, corte 3a-2)
 

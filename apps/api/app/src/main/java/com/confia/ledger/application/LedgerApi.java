@@ -19,7 +19,7 @@ import java.util.UUID;
  * transaction of the caller. It adds no rule of its own.
  */
 public final class LedgerApi implements LedgerPostingApi, LedgerAccountDirectory,
-        com.confia.ledger.application.api.LedgerStatementApi {
+        com.confia.ledger.application.api.LedgerStatementApi, com.confia.ledger.application.api.LedgerIntegrityApi {
 
     private final LedgerPosting posting;
     private final LedgerRepository ledger;
@@ -39,6 +39,44 @@ public final class LedgerApi implements LedgerPostingApi, LedgerAccountDirectory
                 new LedgerPosting.PostCommand(TransactionKind.CHARGE, charge.effectiveOn(), charge.sourceModule(),
                         charge.sourceRefId(), null, charge.idempotencyKey(), entries));
         return new Posted(posted.stored().transaction().id(), posted.created());
+    }
+
+    @Override
+    public Posted reverseCharge(Actor actor, ChargeReversal reversal) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(reversal, "reversal");
+        LedgerPosting.Posted posted;
+        try {
+            posted = posting.reverseWithinCurrentTransaction(toActor(actor),
+                    new LedgerPosting.ReverseCommand(reversal.originalTransactionId(), reversal.callerModule(),
+                            reversal.effectiveOn(), reversal.reason(), reversal.idempotencyKey()));
+        } catch (com.confia.ledger.domain.LedgerResourceNotFoundException e) {
+            throw new ReversalRefusedException(ReversalRefusal.NOT_FOUND);
+        } catch (com.confia.ledger.domain.TransactionAlreadyReversedException e) {
+            throw new ReversalRefusedException(ReversalRefusal.ALREADY_REVERSED);
+        } catch (com.confia.ledger.domain.StudentAccountUnderReviewException e) {
+            throw new ReversalRefusedException(ReversalRefusal.ACCOUNT_UNDER_REVIEW);
+        } catch (com.confia.ledger.domain.ReversalNotAllowedException
+                | com.confia.ledger.domain.LedgerIdempotencyConflictException e) {
+            throw new ReversalRefusedException(ReversalRefusal.NOT_ALLOWED);
+        }
+        return new Posted(posted.stored().transaction().id(), posted.created());
+    }
+
+    @Override
+    public List<SourcePosting> postingsOfSource(InstitutionId institutionId, String sourceModule) {
+        return ledger.postingsOfSource(institutionId, sourceModule);
+    }
+
+    @Override
+    public List<UnbalancedTransaction> unbalancedTransactions(InstitutionId institutionId) {
+        return ledger.unbalancedTransactions(institutionId);
+    }
+
+    @Override
+    public List<ReceivableMovement> receivableMovementOfSource(InstitutionId institutionId, String sourceModule,
+            Collection<String> kinds) {
+        return ledger.receivableMovementOfSource(institutionId, sourceModule, kinds);
     }
 
     @Override

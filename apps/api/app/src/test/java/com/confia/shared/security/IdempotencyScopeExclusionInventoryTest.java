@@ -45,12 +45,14 @@ class IdempotencyScopeExclusionInventoryTest {
     private static final String EDGE_PACKAGE = "com.confia.shared.web.idempotency";
 
     /**
-     * The one class outside the edge that names the header: the accrual controller binds {@code @RequestHeader} because
-     * the key of an accrual run is stored permanently on the run (docs/cortes/charges-accrual.md), while the edge's keys
-     * expire; so it does not use {@code @IdempotentWrite}, which the architecture reserves to the edge. It reaches no
-     * type of {@code shared.security} for it: the allowlist of dependencies above still applies to it.
+     * The classes outside the edge that name the header: the accrual controller binds {@code @RequestHeader} because the key
+     * of an accrual run is stored permanently on the run (docs/cortes/charges-accrual.md), and the charge controller does the
+     * same for the key of a void, stored permanently on the void (docs/cortes/charges-void-and-integrity.md), while the
+     * edge's keys expire; so neither uses {@code @IdempotentWrite}, which the architecture reserves to the edge. They reach
+     * no type of {@code shared.security} for it: the allowlist of dependencies above still applies to them.
      */
-    private static final Set<String> HEADER_LITERAL_ALSO_ALLOWED = Set.of("com.confia.charges.web.AccrualController");
+    private static final Set<String> HEADER_LITERAL_ALSO_ALLOWED = Set.of("com.confia.charges.web.AccrualController",
+            "com.confia.charges.web.ChargeController");
 
     /**
      * The only types of {@code com.confia.shared.security} that a class in a {@code ..web..} package
