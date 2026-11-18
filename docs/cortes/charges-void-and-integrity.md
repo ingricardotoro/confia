@@ -20,8 +20,8 @@ institución, que cargos y libro siguen de acuerdo, dejando el resultado consult
   disparador de la anulación pide un `REVERSAL` de `charges` que invierte el asiento del cargo y se creó en esta misma transacción.
 - **INV-43 incluye a los anulados** (decisión 4): el motor no vuelve a devengar el período; la corrección es un cargo manual (corte 4).
 - **Idempotencia.** `Idempotency-Key` obligatoria, guardada de forma permanente en la anulación con el hash de la petición: misma
-  clave y mismo cuerpo devuelven la misma anulación; misma clave con otro cuerpo, 422 `idempotency-payload-mismatch`; otra clave sobre
-  un cargo ya anulado, 409 `charge-already-voided`. Clave del libro: `charges:void:<chargeId>` (permanente).
+  clave, mismo cuerpo y mismo actor devuelven la misma anulación; misma clave con otro cuerpo u otro actor, 422 `idempotency-payload-mismatch`; otra clave sobre
+  un cargo ya anulado, 409 `charge-already-voided`. Clave del libro: `charges:void:<chargeId>` (permanente); el libro recibe una frase fija como motivo, no el texto libre.
 - **Integridad nocturna** (tarea recurrente de db-scheduler, solo `confia-worker`, 02:30 `America/Tegucigalpa`, por institución):
   (a) toda transacción del libro cuadra; (b) todo cargo tiene exactamente un asiento `CHARGE` por su total, todo cargo anulado
   exactamente un `REVERSAL` espejo, y no hay asientos de `charges` sin cargo ni reversos de cargos no anulados; (c) la suma de los
@@ -40,6 +40,13 @@ institución, que cargos y libro siguen de acuerdo, dejando el resultado consult
 
 Códigos nuevos: `charge-already-voided` (409) y `charge-not-voidable` (409, el libro rechaza el reverso). Otra institución y un
 identificador desconocido responden igual: 404 `resource-not-found`.
+
+## Decisiones del propietario
+
+- **2026-11-18: la anulación de un cargo no exige segundo aprobador** (excepción documentada en `docs/03-seguridad.md` §5.3). Se
+  compensa con motivo obligatorio, bitácora, reverso único y trabajo nocturno de integridad; revisar si se introduce cobranza con
+  montos altos.
+- El texto libre del motivo vive solo en `charges_charge_void`; el libro y su bitácora reciben una frase fija.
 
 ## Casos límite
 

@@ -28,6 +28,16 @@ class ChargeVoidRulesTest {
     }
 
     @Test
+    void theLengthCountsCodePointsLikeTheDatabaseCheckDoes() {
+        String astral = "\uD83D\uDE00".repeat(20);
+        assertThat(astral.length()).isEqualTo(40);
+        assertThat(VoidReason.of(astral).text()).isEqualTo(astral);
+        assertThat(VoidReason.of("\uD83D\uDE00".repeat(500)).text()).hasSize(1000);
+        assertThatThrownBy(() -> VoidReason.of("\uD83D\uDE00".repeat(19))).isInstanceOf(InvalidChargesValueException.class);
+        assertThatThrownBy(() -> VoidReason.of("\uD83D\uDE00".repeat(501))).isInstanceOf(InvalidChargesValueException.class);
+    }
+
+    @Test
     void theBorderSpacesDoNotCountTowardTheMinimum() {
         assertThatThrownBy(() -> VoidReason.of("   " + "x".repeat(19) + "   "))
                 .isInstanceOf(InvalidChargesValueException.class);

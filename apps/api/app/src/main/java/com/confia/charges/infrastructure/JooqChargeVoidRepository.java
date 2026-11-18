@@ -9,6 +9,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.Record;
+import org.jooq.exception.DataAccessException;
+import org.postgresql.util.PSQLException;
 
 /**
  * The jOOQ adapter of {@link ChargeVoidRepository} over {@code charges_charge_void}. It inserts and reads: no statement here
@@ -16,6 +18,9 @@ import org.jooq.Record;
  * ledger reversal was not posted by the same database transaction.
  */
 public final class JooqChargeVoidRepository implements ChargeVoidRepository {
+
+    private static final String UNIQUE_VIOLATION = "23505";
+    private static final String KEY_INDEX = "charges_charge_void_key_uq";
 
     private final DSLContext dsl;
 
@@ -25,6 +30,17 @@ public final class JooqChargeVoidRepository implements ChargeVoidRepository {
 
     @Override
     public void insert(InstitutionId institution, ChargeVoid charge) {
+        try {
+            insertRow(institution, charge);
+        } catch (DataAccessException e) {
+            if (KEY_INDEX.equals(violatedConstraint(e))) {
+                throw new RequestKeyTakenException();
+            }
+            throw e;
+        }
+    }
+
+    private void insertRow(InstitutionId institution, ChargeVoid charge) {
         dsl.insertInto(CHARGES_CHARGE_VOID)
                 .set(CHARGES_CHARGE_VOID.INSTITUTION_ID, institution.value())
                 .set(CHARGES_CHARGE_VOID.ID, charge.id())
@@ -52,6 +68,16 @@ public final class JooqChargeVoidRepository implements ChargeVoidRepository {
                 .where(CHARGES_CHARGE_VOID.INSTITUTION_ID.eq(institution.value()))
                 .and(CHARGES_CHARGE_VOID.CHARGE_ID.eq(chargeId))
                 .fetchOptional(JooqChargeVoidRepository::toVoid);
+    }
+
+    private static String violatedConstraint(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof PSQLException postgres && UNIQUE_VIOLATION.equals(postgres.getSQLState())
+                    && postgres.getServerErrorMessage() != null) {
+                return postgres.getServerErrorMessage().getConstraint();
+            }
+        }
+        return null;
     }
 
     private static ChargeVoid toVoid(Record row) {

@@ -194,6 +194,27 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
         }
     }
 
+    /**
+     * Counts ALL the rows of a table (no filter at all) as the least-privilege role of the application with the security
+     * context of one institution: what row-level security lets that institution see. {@code table} is a literal of the tests.
+     */
+    protected static long countVisibleAsApplication(UUID institutionContext, String table) throws SQLException {
+        try (Connection c = com.confia.support.SharedPostgresContainer.connectionAs("confia_admin_app")) {
+            c.setAutoCommit(false);
+            try (PreparedStatement context = c.prepareStatement("select set_config('app.institution_id', ?, true)")) {
+                context.setString(1, institutionContext.toString());
+                context.execute();
+            }
+            try (PreparedStatement s = c.prepareStatement("select count(*) from " + table);
+                    ResultSet rs = s.executeQuery()) {
+                rs.next();
+                long count = rs.getLong(1);
+                c.rollback();
+                return count;
+            }
+        }
+    }
+
     /** The balance of a student in the ledger: what its receivable debits exceed its credits by. */
     protected static BigDecimal balanceOf(Env env, UUID student) throws SQLException {
         return decimal(env.institution(), "select coalesce(sum(case when e.side = 'DEBIT' then e.amount else -e.amount end), 0) "

@@ -194,6 +194,12 @@ class ChargesIntegrityIT extends ChargesLedgerFixture {
         assertThatThrownBy(() -> viewIntegrityRuns().get(theirs.actor(), UUID.randomUUID().toString(), minesRun))
                 .isInstanceOf(ResourceNotFoundException.class);
         assertThat(scalar(theirs.institution(), "select count(*) from charges_integrity_discrepancy")).isZero();
+        // No WHERE at all, as the role of the application: only the policy decides what each context sees.
+        assertThat(countVisibleAsApplication(mine.institution(), "charges_integrity_run")).isEqualTo(1);
+        assertThat(countVisibleAsApplication(theirs.institution(), "charges_integrity_run")).isEqualTo(1);
+        assertThat(countVisibleAsApplication(mine.institution(), "charges_integrity_discrepancy")).isEqualTo(2);
+        assertThat(countVisibleAsApplication(theirs.institution(), "charges_integrity_discrepancy")).isZero();
+        assertThat(countVisibleAsApplication(UUID.randomUUID(), "charges_integrity_run")).isZero();
     }
 
     @Test

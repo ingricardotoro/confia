@@ -87,7 +87,9 @@ class VoidChargeTest {
         assertThat(ledger.reversal.originalTransactionId()).isEqualTo(chargeTransaction);
         assertThat(ledger.reversal.callerModule()).isEqualTo("charges");
         assertThat(ledger.reversal.idempotencyKey()).isEqualTo("charges:void:" + chargeId);
-        assertThat(ledger.reversal.reason()).as("stripped").isEqualTo(REASON);
+        assertThat(ledger.reversal.reason()).as("the ledger never gets the typed text")
+                .isEqualTo("Charge voided: see charges_charge_void").doesNotContain("secretaria");
+        assertThat(voids.byKey.get("key-1").reason()).as("stripped, kept only in the void").isEqualTo(REASON);
         assertThat(view.chargeId()).isEqualTo(chargeId);
         assertThat(view.reversalTransactionId()).isEqualTo(ledger.reversalId);
         assertThat(view.voidedBy()).isEqualTo(actor.accountId());
@@ -167,7 +169,8 @@ class VoidChargeTest {
     void aVoidThatAnotherRequestCommittedWhileThisOneWaitedForTheLockIsFoundUnderTheLock() {
         aChargeOfFebruary();
         ChargeVoid winner = new ChargeVoid(UUID.randomUUID(), chargeId, UUID.randomUUID(), REASON, "key-1",
-                VoidCharge.hashOf(chargeId, com.confia.charges.domain.VoidReason.of(REASON)), actor.accountId(), NOW);
+                VoidCharge.hashOf(actor.accountId(), chargeId, com.confia.charges.domain.VoidReason.of(REASON)),
+                actor.accountId(), NOW);
         ledger.onLock = () -> voids.put(winner);
 
         ChargeVoidView view = service().voidCharge(actor, requestId, "key-1", chargeId, REASON);
@@ -249,14 +252,43 @@ class VoidChargeTest {
     }
 
     @Test
+    void anotherStaffMemberWithTheSameKeyAndBodyGetsNoResultOfAColleague() {
+        aChargeOfFebruary();
+        service().voidCharge(actor, requestId, "key-1", chargeId, REASON);
+        AuthenticatedActor colleague = new AuthenticatedActor(UUID.randomUUID(), institutionUuid, UUID.randomUUID(),
+                UUID.randomUUID(), Set.of(AuthenticationMethod.PASSWORD), NOW, NOW.plusSeconds(900));
+
+        assertThatThrownBy(() -> service().voidCharge(colleague, requestId, "key-1", chargeId, REASON))
+                .isInstanceOf(IdempotencyPayloadMismatchException.class);
+        assertThat(voids.inserts).isEqualTo(1);
+    }
+
+    @Test
+    void aKeyThatAnotherRequestTookBetweenTheReadAndTheInsertIsReadAgainAndNeverAnInternalError() {
+        aChargeOfFebruary();
+        voids.failInsertsWithTakenKey = 1;
+        assertThat(service().voidCharge(actor, requestId, "key-1", chargeId, REASON).chargeId()).isEqualTo(chargeId);
+        assertThat(voids.inserts).as("the second pass inserted").isEqualTo(1);
+
+        UUID other = UUID.randomUUID();
+        charges.put(new ChargeRepository.ChargeForVoid(other, studentId, UUID.randomUUID(),
+                Money.of("10.00", CurrencyCode.HNL), LocalDate.parse("2027-02-01")));
+        voids.failInsertsWithTakenKey = 2;
+        assertThatThrownBy(() -> service().voidCharge(actor, requestId, "key-2", other, REASON))
+                .isInstanceOf(IdempotencyPayloadMismatchException.class);
+    }
+
+    @Test
     void theHashDependsOnTheChargeAndOnTheReason() {
         var reason = com.confia.charges.domain.VoidReason.of(REASON);
-        String hash = VoidCharge.hashOf(chargeId, reason);
+        UUID who = actor.accountId();
+        String hash = VoidCharge.hashOf(who, chargeId, reason);
 
         assertThat(hash).matches("[0-9a-f]{64}");
-        assertThat(VoidCharge.hashOf(chargeId, reason)).isEqualTo(hash);
-        assertThat(VoidCharge.hashOf(UUID.randomUUID(), reason)).isNotEqualTo(hash);
-        assertThat(VoidCharge.hashOf(chargeId, com.confia.charges.domain.VoidReason.of(REASON + "."))).isNotEqualTo(hash);
+        assertThat(VoidCharge.hashOf(who, chargeId, reason)).isEqualTo(hash);
+        assertThat(VoidCharge.hashOf(UUID.randomUUID(), chargeId, reason)).as("another staff member").isNotEqualTo(hash);
+        assertThat(VoidCharge.hashOf(who, UUID.randomUUID(), reason)).isNotEqualTo(hash);
+        assertThat(VoidCharge.hashOf(who, chargeId, com.confia.charges.domain.VoidReason.of(REASON + "."))).isNotEqualTo(hash);
     }
 
     // --- Fakes ---
@@ -316,6 +348,7 @@ class VoidChargeTest {
         final Map<String, ChargeVoid> byKey = new HashMap<>();
         final Map<UUID, ChargeVoid> byCharge = new HashMap<>();
         int inserts;
+        int failInsertsWithTakenKey;
 
         void put(ChargeVoid charge) {
             byKey.put(charge.requestKey(), charge);
@@ -324,6 +357,10 @@ class VoidChargeTest {
 
         @Override
         public void insert(InstitutionId institution, ChargeVoid charge) {
+            if (failInsertsWithTakenKey > 0) {
+                failInsertsWithTakenKey--;
+                throw new RequestKeyTakenException();
+            }
             inserts++;
             put(charge);
         }

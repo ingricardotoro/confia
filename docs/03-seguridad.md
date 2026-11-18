@@ -866,6 +866,11 @@ auditan. Una aprobación caduca a las 72 horas sin resolución y notifica.
 aprobar, y el sistema rechaza con 403 y un tipo de error específico. El reporte trimestral de
 segregación de funciones no debe listar ningún usuario con ambos permisos del mismo par.
 
+> **Nota fechada 2026-11-18 (corte `charges-void-and-integrity`, F3 corte 3b): excepción documentada, anulación de cargo sin segundo
+> aprobador.** Anulación de cargo: sin segundo aprobador, decisión del propietario 2026-11-18; compensado por motivo obligatorio,
+> bitácora, reverso único y trabajo nocturno de integridad; revisar si se introduce cobranza con montos altos. La tabla de arriba no
+> cambia (sigue en ocho operaciones): `charges:void` lo ejercen Administrador y Super Administrador en un solo paso.
+
 > **Nota fechada 2026-11-04 (cambio `rbac-permission-matrix-and-audit-integration`, PR 1 `permission-catalog-and-adr`): el informe
 > trimestral revisa operaciones.** El texto anterior no se reescribe. Con un rol por cuenta, un rol como Contabilidad tiene a la vez
 > `invoicing:create` e `invoicing:approve`, de modo que la verificación «ningún usuario con ambos permisos del mismo par» listaría a todo

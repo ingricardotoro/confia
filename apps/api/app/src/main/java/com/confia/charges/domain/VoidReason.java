@@ -24,7 +24,9 @@ public final class VoidReason {
             throw new InvalidChargesValueException();
         }
         String stripped = value.strip();
-        if (stripped.length() < MIN_LENGTH || stripped.length() > MAX_LENGTH
+        // Code points, like char_length in the database check: an emoji counts once, not twice.
+        int length = stripped.codePointCount(0, stripped.length());
+        if (length < MIN_LENGTH || length > MAX_LENGTH
                 || CONTROL_OR_FORMAT.matcher(stripped).find()) {
             throw new InvalidChargesValueException();
         }
@@ -38,6 +40,6 @@ public final class VoidReason {
     /** The reason is free text that may name a person: it never reaches a log through this method. */
     @Override
     public String toString() {
-        return "VoidReason[length=" + text.length() + "]";
+        return "VoidReason[length=" + text.codePointCount(0, text.length()) + "]";
     }
 }

@@ -160,7 +160,7 @@ public final class JooqChargeRepository implements ChargeRepository {
                 .on(CHARGES_CHARGE_VOID.INSTITUTION_ID.eq(CHARGES_CHARGE.INSTITUTION_ID))
                 .and(CHARGES_CHARGE_VOID.CHARGE_ID.eq(CHARGES_CHARGE.ID))
                 .where(where)
-                .orderBy(order(page), CHARGES_CHARGE.ID.asc())
+                .orderBy(orders(page))
                 .limit(page.size()).offset(page.offset())
                 .fetch(JooqChargeRepository::toRow);
         return new Page<>(rows, total, page.page(), page.size());
@@ -175,6 +175,17 @@ public final class JooqChargeRepository implements ChargeRepository {
             default -> throw new IllegalArgumentException("unknown sort field");
         };
         return page.ascending() ? field.asc() : field.desc();
+    }
+
+    /** A sort by total goes by currency first: amounts of two currencies are not comparable. */
+    private static List<OrderField<?>> orders(PageRequest page) {
+        List<OrderField<?>> fields = new ArrayList<>();
+        if (page.sortField().equals("total")) {
+            fields.add(CHARGES_CHARGE.TOTAL_CURRENCY.asc());
+        }
+        fields.add(order(page));
+        fields.add(CHARGES_CHARGE.ID.asc());
+        return fields;
     }
 
     private static ChargeRow toRow(Record row) {

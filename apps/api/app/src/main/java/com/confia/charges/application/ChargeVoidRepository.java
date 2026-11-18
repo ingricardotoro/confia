@@ -16,4 +16,14 @@ public interface ChargeVoidRepository {
     Optional<ChargeVoid> findByRequestKey(InstitutionId institution, String requestKey);
 
     Optional<ChargeVoid> findByChargeId(InstitutionId institution, UUID chargeId);
+
+    /** Another void took the request key a moment ago: the caller starts again and finds it by key. */
+    final class RequestKeyTakenException extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        public RequestKeyTakenException() {
+            super("the request key is already in use", null, false, false);
+        }
+    }
 }

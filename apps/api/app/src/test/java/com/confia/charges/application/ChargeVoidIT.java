@@ -162,8 +162,93 @@ class ChargeVoidIT extends ChargesLedgerFixture {
 
         assertThat(voids(mine)).isZero();
         assertThat(reversals(mine)).isZero();
-        assertThat(scalar(theirs.institution(), "select count(*) from charges_charge_void where charge_id = ?", charge))
-                .as("row-level security: the other institution sees no void of it").isZero();
+    }
+
+    @Test
+    void rowLevelSecurityShowsAVoidOnlyToTheInstitutionThatOwnsIt() throws SQLException {
+        Env mine = seed(1);
+        UUID charge = accruedCharge(mine);
+        Env theirs = seed(1);
+        voidCharge().voidCharge(mine.actor(), UUID.randomUUID().toString(), "void-1", charge, REASON);
+
+        // No WHERE at all, as the role of the application: only the policy decides what each context sees.
+        assertThat(countVisibleAsApplication(mine.institution(), "charges_charge_void")).isEqualTo(1);
+        assertThat(countVisibleAsApplication(theirs.institution(), "charges_charge_void")).isZero();
+        assertThat(countVisibleAsApplication(UUID.randomUUID(), "charges_charge_void")).isZero();
+    }
+
+    @Test
+    void theLedgerAndItsAuditEntryNeverReceiveTheTypedReason() throws SQLException {
+        Env env = seed(1);
+        UUID charge = accruedCharge(env);
+        voidCharge().voidCharge(env.actor(), UUID.randomUUID().toString(), "void-1", charge, REASON);
+
+        assertThat(scalar(env.institution(), "select count(*) from ledger_transaction where institution_id = ? "
+                + "and kind = 'REVERSAL' and reason = 'Charge voided: see charges_charge_void'", env.institution()))
+                        .isEqualTo(1);
+        assertThat(scalar(env.institution(), "select count(*) from shared_audit_log where institution_id = ? "
+                + "and action = 'ledger.transaction.reversed' and reason is not null "
+                + "and reason not like '%secretaria%' and coalesce(after_value::text, '') not like '%secretaria%'",
+                env.institution())).as("the ledger audit entry carries the fixed reason only").isEqualTo(1);
+        assertThat(scalar(env.institution(), "select count(*) from shared_audit_log where institution_id = ? "
+                + "and (coalesce(reason, '') like '%secretaria%' or coalesce(after_value::text, '') like '%secretaria%' "
+                + "or coalesce(before_value::text, '') like '%secretaria%')", env.institution())).isZero();
+        assertThat(scalar(env.institution(), "select count(*) from charges_charge_void where reason like '%secretaria%'"))
+                .as("the free text lives only in the void").isEqualTo(1);
+    }
+
+    @Test
+    void theVoidTriggerRefusesAReversalPostedOutsideTheVoidAndACreditThatIsNotTheTotal() throws SQLException {
+        Env env = seed(1);
+        UUID charge = accruedCharge(env);
+        UUID original = (UUID) objectOf(env, "select ledger_transaction_id from charges_charge where id = ?", charge);
+        transactionRunner().execute(env.system(), () -> ledger().reverseCharge(
+                new com.confia.ledger.application.api.LedgerPostingApi.Actor(env.institution(), env.admin(), "system",
+                        UUID.randomUUID()),
+                new com.confia.ledger.application.api.LedgerPostingApi.ChargeReversal(original, "charges",
+                        java.time.LocalDate.parse("2027-02-10"), REASON, "outside:" + charge)));
+        UUID outside = (UUID) objectOf(env, "select id from ledger_transaction where reverses_transaction_id = ?",
+                original);
+
+        // A genuine REVERSAL of the charge, but posted by another database transaction: not "this" one.
+        assertThat(refusedInsertOfAVoid(env, charge, outside)).isEqualTo("23514");
+        // Not a reversal at all (its credit to the student is not the total either way).
+        assertThat(refusedInsertOfAVoid(env, charge, original)).isEqualTo("23514");
+        assertThat(voids(env)).isZero();
+    }
+
+    @Test
+    void theVoidTriggerRefusesAReversalWhoseCreditToTheStudentIsNotTheTotalOfTheCharge() throws SQLException {
+        Env env = seed(1);
+        UUID charge = accruedCharge(env);
+        UUID student = env.students().get(0);
+        UUID original = (UUID) objectOf(env, "select ledger_transaction_id from charges_charge where id = ?", charge);
+        // One owner transaction posts a reversal of the right shape but one cent short and tries the void in it.
+        try (Connection c = StaffRoleFixtures.ownerTransaction(env.institution())) {
+            UUID reversal = UUID.randomUUID();
+            exec(c, "insert into ledger_transaction (institution_id, id, kind, effective_on, posting_xid, source_module, "
+                    + "source_ref_id, reverses_transaction_id, reason, idempotency_key, payload_hash, created_by) "
+                    + "values (?, ?, 'REVERSAL', date '2027-02-10', 0, 'charges', ?, ?, ?, ?, ?, ?)", env.institution(),
+                    reversal, charge, original, REASON, "short:" + charge, "b".repeat(64), env.admin());
+            UUID account = (UUID) objectOfIn(c, "select id from ledger_student_account where student_id = ?", student);
+            exec(c, "insert into ledger_entry (institution_id, id, transaction_id, line_number, account_id, "
+                    + "student_account_id, side, amount, currency) values (?, ?, ?, 1, ?, ?, 'CREDIT', 1649.99, 'HNL')",
+                    env.institution(), UUID.randomUUID(), reversal, env.receivable(), account);
+            exec(c, "insert into ledger_entry (institution_id, id, transaction_id, line_number, account_id, "
+                    + "side, amount, currency) values (?, ?, ?, 2, ?, 'DEBIT', 1649.99, 'HNL')", env.institution(),
+                    UUID.randomUUID(), reversal, env.revenue());
+            String state = null;
+            try {
+                exec(c, "insert into charges_charge_void (institution_id, id, charge_id, reversal_transaction_id, reason, "
+                        + "request_key, request_hash, voided_by) values (?, ?, ?, ?, ?, 'k', ?, ?)", env.institution(),
+                        UUID.randomUUID(), charge, reversal, REASON, "a".repeat(64), env.admin());
+            } catch (SQLException e) {
+                state = e.getSQLState();
+            }
+            c.rollback();
+            assertThat(state).as("a credit of 1,649.99 is not the total of 1,650.00").isEqualTo("23514");
+        }
+        assertThat(voids(env)).isZero();
     }
 
     @Test
@@ -342,6 +427,18 @@ class ChargeVoidIT extends ChargesLedgerFixture {
     private Object objectOf(Env env, String sql, Object... parameters) throws SQLException {
         try (Connection c = StaffRoleFixtures.ownerTransaction(env.institution());
                 var s = c.prepareStatement(sql)) {
+            for (int i = 0; i < parameters.length; i++) {
+                s.setObject(i + 1, parameters[i]);
+            }
+            try (var rs = s.executeQuery()) {
+                rs.next();
+                return rs.getObject(1);
+            }
+        }
+    }
+
+    private static Object objectOfIn(Connection c, String sql, Object... parameters) throws SQLException {
+        try (var s = c.prepareStatement(sql)) {
             for (int i = 0; i < parameters.length; i++) {
                 s.setObject(i + 1, parameters[i]);
             }

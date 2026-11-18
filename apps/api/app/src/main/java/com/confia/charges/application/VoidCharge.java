@@ -43,6 +43,12 @@ import java.util.regex.Pattern;
 public final class VoidCharge {
 
     static final String SOURCE_MODULE = "charges";
+
+    /**
+     * The reason the ledger keeps for the reversal. The free text the staff member typed may name a person, so it lives only
+     * in the void record of {@code charges}; the ledger and its audit entry get this fixed sentence (20 to 500 characters).
+     */
+    static final String LEDGER_REASON = "Charge voided: see charges_charge_void";
     private static final String STAFF = "staff";
     private static final Pattern KEY = Pattern.compile("[!-~]{1,128}");
     private static final ZoneId INSTITUTION_ZONE = ZoneId.of("America/Tegucigalpa");
@@ -87,8 +93,23 @@ public final class VoidCharge {
             throw new InvalidChargesValueException();
         }
         VoidReason voidReason = VoidReason.of(reason);
-        String hash = hashOf(chargeId, voidReason);
+        String hash = hashOf(actor.accountId(), chargeId, voidReason);
         InstitutionId institution = new InstitutionId(actor.institutionId());
+        try {
+            return attempt(actor, auditRequestId, institution, idempotencyKey, chargeId, voidReason, hash);
+        } catch (ChargeVoidRepository.RequestKeyTakenException lostTheRace) {
+            // Another request committed the same key first: the second pass finds it by key and answers a replay, or
+            // refuses it as another request. A second loss is the same answer, never an internal error.
+            try {
+                return attempt(actor, auditRequestId, institution, idempotencyKey, chargeId, voidReason, hash);
+            } catch (ChargeVoidRepository.RequestKeyTakenException again) {
+                throw new IdempotencyPayloadMismatchException();
+            }
+        }
+    }
+
+    private ChargeVoidView attempt(AuthenticatedActor actor, UUID auditRequestId, InstitutionId institution,
+            String idempotencyKey, UUID chargeId, VoidReason voidReason, String hash) {
         return transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
             Optional<ChargeVoid> replay = voids.findByRequestKey(institution, idempotencyKey);
             if (replay.isPresent()) {
@@ -113,7 +134,7 @@ public final class VoidCharge {
             LedgerPostingApi.Posted reversal;
             try {
                 reversal = ledger.reverseCharge(ledgerActor, new LedgerPostingApi.ChargeReversal(
-                        charge.ledgerTransactionId(), SOURCE_MODULE, effectiveOn, voidReason.text(),
+                        charge.ledgerTransactionId(), SOURCE_MODULE, effectiveOn, LEDGER_REASON,
                         "charges:void:" + chargeId));
             } catch (LedgerPostingApi.ReversalRefusedException refused) {
                 throw new ChargeNotVoidableException();
@@ -137,8 +158,9 @@ public final class VoidCharge {
         return ChargeVoidView.of(existing);
     }
 
-    static String hashOf(UUID chargeId, VoidReason reason) {
-        String text = "v1|" + chargeId + "|" + reason.text();
+    /** The actor is part of what the key vouches for: another staff member with the same key and body gets no result. */
+    static String hashOf(UUID actorId, UUID chargeId, VoidReason reason) {
+        String text = "v2|" + actorId + "|" + chargeId + "|" + reason.text();
         return HexFormat.of().formatHex(Digests.sha256(text.getBytes(StandardCharsets.UTF_8)));
     }
 }
