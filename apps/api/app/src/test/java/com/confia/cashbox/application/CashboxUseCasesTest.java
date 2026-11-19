@@ -192,11 +192,12 @@ class CashboxUseCasesTest {
 
     @Test
     void theLoserOfTheRaceStartsAgainAndFindsTheWinner() {
-        sessions.failNextInsertAfterOtherRequestWins = openedByOtherRequest("open-1", "500.00");
+        CashSession winner = openedByOtherRequest("open-1", "500.00");
+        sessions.failNextInsertAfterOtherRequestWins = winner;
 
         SessionDetail answered = openUseCase().open(cashier, requestId, "open-1", "500.00");
 
-        assertThat(answered.id()).isEqualTo(sessions.failNextInsertAfterOtherRequestWins.id());
+        assertThat(answered.id()).isEqualTo(winner.id());
         assertThat(sessions.rows).hasSize(1);
     }
 
