@@ -1,6 +1,7 @@
 import type { Locator, Page, Request } from "@playwright/test";
 import { applyPreset, dialog } from "./organization.ts";
 import { expect, seedSession } from "./scenario.ts";
+import { clickNavigationLink } from "./navigation.ts";
 
 export { applyPreset, dialog, test } from "./organization.ts";
 
@@ -10,7 +11,7 @@ export const IMPORTS_PATH = "/imports";
 /** Signs in with the seeded session and opens the imports screen from the navigation. */
 export async function openImportsPage(page: Page): Promise<void> {
   await seedSession(page);
-  await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Importaciones" }).click();
+  await clickNavigationLink(page, "Importaciones");
   await expect(page).toHaveURL(/\/imports$/);
   await expect(page.getByRole("heading", { level: 1, name: "Importaciones" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Importar datos" })).toBeVisible();

@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, MOCK_API_URL, seedSession, test as scenarioTest } from "./scenario.ts";
+import { clickNavigationLink } from "./navigation.ts";
 
 /** The `test` of the journeys that open a dialog: the one of `scenario.ts`. The scroll lock of the modal Dialog carries the nonce of the page, so it raises no CSP report (AW12 applies to it like to any other). */
 export const test = scenarioTest;
@@ -25,7 +26,7 @@ export async function applyPreset(page: Page, scenarioId: string, preset: string
 /** Signs in with the seeded session, as the simulator's own route does, and opens the area from the navigation. */
 export async function openOrganization(page: Page): Promise<void> {
   await seedSession(page);
-  await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Estructura académica" }).click();
+  await clickNavigationLink(page, "Estructura académica");
   await expect(page.getByRole("heading", { level: 1, name: "Estructura académica" })).toBeVisible();
 }
 

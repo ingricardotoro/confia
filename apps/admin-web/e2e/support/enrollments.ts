@@ -1,13 +1,14 @@
 import type { Locator, Page, Request } from "@playwright/test";
 import { applyPreset, dialog } from "./organization.ts";
 import { expect, seedSession } from "./scenario.ts";
+import { clickNavigationLink } from "./navigation.ts";
 
 export { applyPreset, bodyRows, dialog, field, firstColumn, resultNotice, SAVE_TIMEOUT, test } from "./organization.ts";
 
 /** Signs in with the seeded session and opens the enrollments from the navigation. */
 export async function openEnrollmentsPage(page: Page): Promise<void> {
   await seedSession(page);
-  await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Matrículas" }).click();
+  await clickNavigationLink(page, "Matrículas");
   await expect(page).toHaveURL(/\/enrollments$/);
   await expect(page.getByRole("heading", { level: 1, name: "Matrículas" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Lista de matrículas" })).toBeVisible();

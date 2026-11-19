@@ -14,6 +14,7 @@ import {
   type NavigationEntry,
 } from "../../shared/navigation/navigation-entry.ts";
 import { AppShell } from "./components/AppShell.tsx";
+import { useExpandedGroups } from "./use-expanded-groups.ts";
 
 export interface AppShellContainerProps {
   readonly session: AccessSession;
@@ -63,12 +64,19 @@ function ShellFrame({
         ];
   });
 
+  const activeGroupId = groups.find((group) =>
+    group.items.some((item) => item.current),
+  )?.id;
+  const { expandedGroupIds, toggleGroup } = useExpandedGroups(activeGroupId);
+
   return (
     <AppShell
       navigation={entries
         .filter((entry) => entry.group === undefined)
         .map(toItem)}
       navigationGroups={groups}
+      expandedGroupIds={expandedGroupIds}
+      onToggleGroup={toggleGroup}
       onNavigate={(href) => void navigate({ to: href })}
       signingOut={signingOut}
       signOutFailed={signOutFailed}

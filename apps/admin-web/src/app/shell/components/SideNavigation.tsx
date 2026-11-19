@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import { useId } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import confiaLogo from "../../../shared/brand/confia-logo.png";
@@ -25,8 +26,14 @@ export interface SideNavigationProps {
   readonly groups?: readonly SideNavigationGroup[];
   /** Called on a plain click, which the caller turns into a navigation of the router. */
   readonly onNavigate: (href: string) => void;
+  /** The ids of the sections that are open. The caller owns this state (and where it is kept). */
+  readonly expandedGroupIds?: ReadonlySet<string>;
+  /** Called with the id of the section whose header was activated. */
+  readonly onToggleGroup?: (groupId: string) => void;
   readonly className?: string;
 }
+
+const NO_GROUPS: ReadonlySet<string> = new Set();
 
 const LINK_CLASS = [
   "relative flex h-9 items-center rounded-md px-3 text-sm text-sidebar-fg hover:bg-sidebar-hover-bg",
@@ -69,23 +76,51 @@ function NavigationLinks({
   ));
 }
 
+// A section is a disclosure: its header is a button that shows or hides the list. The list stays in the
+// document (so aria-controls always points at something) and `hidden` takes it out of the tab order and
+// the accessibility tree while it is collapsed.
 function Group({
   group,
+  expanded,
+  onToggle,
   onNavigate,
 }: {
   readonly group: SideNavigationGroup;
+  readonly expanded: boolean;
+  readonly onToggle: () => void;
   readonly onNavigate: (href: string) => void;
 }) {
-  const labelId = useId();
+  const buttonId = useId();
+  const listId = useId();
   return (
-    <div className="flex flex-col">
-      <p
-        id={labelId}
-        className="px-3 pt-5 pb-1.5 text-xs font-semibold tracking-caps text-sidebar-fg-muted uppercase"
+    <div className="flex flex-col pt-3">
+      <button
+        type="button"
+        id={buttonId}
+        aria-expanded={expanded}
+        aria-controls={listId}
+        onClick={onToggle}
+        className={[
+          "flex h-8 w-full items-center justify-between rounded-md px-3 text-left text-xs font-semibold tracking-caps text-sidebar-fg-muted uppercase",
+          "hover:bg-sidebar-hover-bg hover:text-sidebar-fg",
+          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-focus",
+        ].join(" ")}
       >
         {group.label}
-      </p>
-      <ul aria-labelledby={labelId} className="flex flex-col gap-0.5">
+        <ChevronDown
+          aria-hidden="true"
+          className={[
+            "size-4 shrink-0 transition-transform duration-150 motion-reduce:transition-none",
+            expanded ? "rotate-180" : "",
+          ].join(" ")}
+        />
+      </button>
+      <ul
+        id={listId}
+        aria-labelledby={buttonId}
+        hidden={!expanded}
+        className="mt-0.5 flex flex-col gap-0.5"
+      >
         <NavigationLinks items={group.items} onNavigate={onNavigate} />
       </ul>
     </div>
@@ -101,6 +136,8 @@ export function SideNavigation({
   items,
   groups = [],
   onNavigate,
+  expandedGroupIds = NO_GROUPS,
+  onToggleGroup,
   className,
 }: SideNavigationProps) {
   const { t } = useAdminText();
@@ -128,7 +165,15 @@ export function SideNavigation({
           <NavigationLinks items={items} onNavigate={onNavigate} />
         </ul>
         {groups.map((group) => (
-          <Group key={group.id} group={group} onNavigate={onNavigate} />
+          <Group
+            key={group.id}
+            group={group}
+            expanded={expandedGroupIds.has(group.id)}
+            onToggle={() => {
+              onToggleGroup?.(group.id);
+            }}
+            onNavigate={onNavigate}
+          />
         ))}
       </div>
     </nav>

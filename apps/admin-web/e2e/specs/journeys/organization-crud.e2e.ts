@@ -16,6 +16,7 @@ import {
   test,
 } from "../../support/organization.ts";
 import { expect, recordedCalls } from "../../support/scenario.ts";
+import { clickNavigationLink } from "../../support/navigation.ts";
 
 // The academic structure through its screens (organization-academic-structure cut): sign in, open the area from the
 // navigation, create a year, a modality, a grade and a section, and edit and deactivate. Real Chromium, the production
@@ -31,7 +32,7 @@ test.describe("the academic structure, creating and editing", () => {
     await page.getByRole("button", { name: "Iniciar sesión" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Sesión iniciada." })).toBeVisible();
 
-    await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Estructura académica" }).click();
+    await clickNavigationLink(page, "Estructura académica");
 
     await expect(page).toHaveURL(/\/organization\/academic-years$/);
     await expect(page.getByRole("heading", { level: 1, name: "Estructura académica" })).toBeVisible();
