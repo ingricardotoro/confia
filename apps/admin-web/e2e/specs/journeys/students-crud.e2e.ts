@@ -16,6 +16,7 @@ import {
   test,
 } from "../../support/students.ts";
 import { expect, recordedCalls } from "../../support/scenario.ts";
+import { clickNavigationLink } from "../../support/navigation.ts";
 
 // The students registry through its screen (students-registry cut): sign in, open "Estudiantes" from the navigation,
 // register a student with a document and find them by last name, edit, replace and remove the document, and
@@ -35,7 +36,7 @@ test.describe("the students registry, registering and editing", () => {
     await page.getByRole("button", { name: "Iniciar sesión" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Sesión iniciada." })).toBeVisible();
 
-    await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Estudiantes" }).click();
+    await clickNavigationLink(page, "Estudiantes");
 
     await expect(page).toHaveURL(/\/students$/);
     await expect(page.getByRole("heading", { level: 1, name: "Estudiantes" })).toBeVisible();

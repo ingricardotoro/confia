@@ -1,6 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { applyPreset, dialog, test } from "./charges.ts";
 import { expect, seedSession } from "./scenario.ts";
+import { clickNavigationLink } from "./navigation.ts";
 
 export { applyPreset, dialog, test };
 export { SEEDED_PLANS } from "./charges.ts";
@@ -20,7 +21,7 @@ export const TERMINAL = { timeout: 30_000 } as const;
 export async function openAccrual(page: Page, scenarioId: string, preset?: string): Promise<void> {
   if (preset !== undefined) await applyPreset(page, scenarioId, preset);
   await seedSession(page);
-  await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Generación de cargos" }).click();
+  await clickNavigationLink(page, "Generación de cargos");
   await expect(page).toHaveURL(/\/charges\/accrual$/);
   await expect(page.getByRole("heading", { level: 1, name: "Cobros" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Generación de cargos" })).toBeVisible();

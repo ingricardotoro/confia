@@ -1,6 +1,7 @@
 import type { Page, Request } from "@playwright/test";
 import { applyPreset } from "./organization.ts";
 import { expect, seedSession } from "./scenario.ts";
+import { clickNavigationLink } from "./navigation.ts";
 
 export { applyPreset, bodyRows, dialog, field, firstColumn, openCreate, resultNotice, save, SAVE_TIMEOUT, test } from "./organization.ts";
 
@@ -10,7 +11,7 @@ export const CATALOG_PATH = "/catalog";
 /** Signs in with the seeded session, as the simulator's own route does, and opens the catalog from the navigation. */
 export async function openCatalogPage(page: Page): Promise<void> {
   await seedSession(page);
-  await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Catálogo" }).click();
+  await clickNavigationLink(page, "Catálogo");
   await expect(page).toHaveURL(/\/catalog$/);
   await expect(page.getByRole("heading", { level: 1, name: "Catálogo" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Conceptos de pago" })).toBeVisible();
