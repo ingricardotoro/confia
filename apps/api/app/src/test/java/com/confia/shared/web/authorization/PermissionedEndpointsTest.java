@@ -94,6 +94,20 @@ class PermissionedEndpointsTest {
                 Permission.CHARGES_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/charges/posting-accounts",
                 Permission.LEDGER_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/cashbox/sessions",
+                Permission.CASHBOX_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/cashbox/sessions/current",
+                Permission.CASHBOX_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/cashbox/sessions/{sessionId}/movements",
+                Permission.CASHBOX_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/cashbox/sessions/{sessionId}/close",
+                Permission.CASHBOX_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/cashbox/sessions/{sessionId}/approve",
+                Permission.CASHBOX_APPROVE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/cashbox/sessions",
+                Permission.CASHBOX_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/cashbox/sessions/{sessionId}",
+                Permission.CASHBOX_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/ledger/accounts", Permission.LEDGER_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/ledger/accounts",
                 Permission.LEDGER_CREATE));
