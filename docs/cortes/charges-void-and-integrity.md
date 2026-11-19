@@ -104,3 +104,33 @@ reverso en un período contable cerrado. Hoy el reverso se fecha el día de la a
   `CurrentAbsencesTest` y `RecurringJobCatalogTest` (la tarea `charges.integrity-check`), `QueueObservationOnWorkerIT` (nueve tareas
   recurrentes), `IdempotencyScopeExclusionInventoryTest` (`ChargeController` nombra la cabecera como `AccrualController`), `ProblemCodeTest`.
   `ProcessBeanPolicy` no cambió: el trabajador ya admite la aplicación e infraestructura de `charges` y `ledger`.
+
+## Construido (pantallas, corte 3b-2)
+
+- **Cargos del estudiante** (`/charges/student-charges`, entrada «Cargos del estudiante» en Finanzas): lista paginada, ordenada (período, vencimiento o
+  total) y filtrada (estado y período) **en el servidor**, con estudiante, filtros, orden y página en la URL. Importes `{amount, currency}` tal como los
+  entrega el servidor, a la derecha y con numeración tabular; insignia «Vigente»/«Anulado» (texto y punto) y, en los anulados, la fecha de anulación (el texto
+  libre del motivo nunca se muestra en la lista). Se llega desde el estado de cuenta («Ver cargos del estudiante») y desde el registro de estudiantes
+  («Cargos»).
+- **Anular cargo:** diálogo compacto con el resumen del cargo, aviso de que la anulación no se puede deshacer y deja un reverso exacto en el libro mayor,
+  motivo obligatorio de 20 a 500 caracteres con contador en vivo (por puntos de código, como el servidor, sin los espacios de los bordes y sin saltos de línea
+  ni caracteres de control), y advertencia de no escribir datos personales. Botón destructivo, un intento a la vez, sin actualización optimista. La
+  `Idempotency-Key` se genera una vez por intento y se reutiliza solo al reintentar lo mismo (red caída o respuesta ilegible); si cambia el motivo, o el
+  servidor responde 422 `idempotency-payload-mismatch`, el siguiente intento lleva una clave nueva. Errores 409 `charge-already-voided` y
+  `charge-not-voidable`, 422, 403 y 404 se dicen dentro del diálogo, con el identificador de soporte. Al confirmar se invalidan las listas de cargos del
+  estudiante y todos los estados de cuenta (el saldo y los indicadores del tablero aún no tienen consulta propia en el panel).
+- **Integridad de cargos** (`/charges/integrity` y `/charges/integrity/:runId`, entrada «Integridad de cargos» en Finanzas): lista de corridas nocturnas
+  (resultado, inicio, fin, conteos) paginada por el servidor, con un aviso de la última corrida (sin discrepancias, con N discrepancias, aún no ejecutada o
+  no se pudo leer) y el detalle con cada discrepancia (tipo en palabras, cargo, asiento, importe según los cargos e importe según el libro mayor).
+- **Estados y accesibilidad:** carga (esqueleto), vacío (con acción), error (con identificador de soporte y reintento) y éxito en cada vista; contenedor y
+  presentación separados; catálogo `es-HN` sin textos embebidos.
+- **Simulador (`e2e/mock-api`):** `charge-void-model.ts` con cargos sembrados (estudiante 1: 3 cargos; estudiante 5: 30 cargos para paginar), anulación con
+  `Idempotency-Key` y repetición, y corridas de integridad; escenarios `charge-void-empty`, `charge-void-already-voided`, `charge-void-not-voidable`,
+  `charge-void-forbidden`, `charge-void-read-forbidden`, `charge-void-server-error` e `integrity-discrepancies`.
+- **Pruebas:** componentes y contenedores con MSW (lista, filtros, orden, anulación, errores, reintento con la misma clave, integridad), modelo del
+  simulador, operaciones del cliente y un recorrido de Playwright (`charges-void.e2e.ts`: del estado de cuenta a la anulación).
+- **Límites conocidos:** (1) la sesión del panel no trae permisos, así que «Anular cargo» se ofrece en todo cargo vigente y el 403 del servidor se
+  explica en el diálogo (igual que el mapa de cuentas); ocultarlo por `charges:void` requiere un endpoint o un campo de permisos en la sesión.
+  (2) El detalle de una corrida muestra todas sus discrepancias de una vez porque el endpoint no pagina. (3) El nombre del estudiante en «Cargos del
+  estudiante» solo se conoce si se eligió en esa pantalla; al llegar por un enlace se muestra «Estudiante elegido» (los cargos no traen el nombre).
+  (4) Sin entradas de la matriz de accesibilidad de Playwright para las rutas nuevas (el estado de cuenta tampoco las tiene).

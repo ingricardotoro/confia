@@ -20,6 +20,8 @@ function props(override: Partial<StudentsViewProps> = {}): StudentsViewProps {
     onToggle: vi.fn(),
     onGuardians: vi.fn(),
     statementHrefOf: (row) => `/charges/statement?studentId=${row.id}`,
+    chargesHrefOf: (row) => `/charges/student-charges?studentId=${row.id}`,
+    onCharges: vi.fn(),
     onStatement: vi.fn(),
     ...override,
   };
@@ -172,5 +174,18 @@ describe("StudentsView", () => {
     await user.click(link);
 
     expect(onStatement).toHaveBeenCalledWith(ana);
+  });
+
+  it("links each student to their charges, as a real link a click turns into a navigation of the router", async () => {
+    const user = userEvent.setup();
+    const onCharges = vi.fn();
+    const ana = student({ firstName: "Ana", lastName: "Pérez" });
+    renderWithAdminI18n(<StudentsView {...props({ rows: [ana], onCharges })} />);
+
+    const link = screen.getByRole("link", { name: "Cargos de Ana Pérez" });
+    expect(link).toHaveAttribute("href", `/charges/student-charges?studentId=${ana.id}`);
+    await user.click(link);
+
+    expect(onCharges).toHaveBeenCalledWith(ana);
   });
 });

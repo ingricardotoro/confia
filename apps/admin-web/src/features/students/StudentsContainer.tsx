@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { StudentGuardiansContainer } from "../guardians/StudentGuardiansContainer.tsx";
 import { STATEMENT_PATH, studentStatementPath } from "../../shared/navigation/statement-paths.ts";
+import { STUDENT_CHARGES_PATH, studentChargesPath } from "../../shared/navigation/student-charges-paths.ts";
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
 import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
 import { useListState } from "../../shared/resource-screen/use-list-state.ts";
@@ -69,6 +70,8 @@ export function StudentsContainer({ search, onSearchChange }: StudentsContainerP
         onEdit={view.openEdit}
         statementHrefOf={(row) => studentStatementPath(row.id)}
         onStatement={(row) => void navigate({ to: STATEMENT_PATH, search: { studentId: row.id } })}
+        chargesHrefOf={(row) => studentChargesPath(row.id)}
+        onCharges={(row) => void navigate({ to: STUDENT_CHARGES_PATH, search: { studentId: row.id } })}
         onGuardians={(row) => {
           view.clearNotice();
           setGuardiansOf(row);

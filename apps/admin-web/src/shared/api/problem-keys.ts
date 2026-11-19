@@ -56,5 +56,7 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "duplicate-account-code": "problem.duplicateAccountCode",
   "account-in-use": "problem.accountInUse",
   "posting-account-invalid": "problem.postingAccountInvalid",
+  "charge-already-voided": "problem.chargeAlreadyVoided",
+  "charge-not-voidable": "problem.chargeNotVoidable",
   unknown: "problem.unexpected",
 };

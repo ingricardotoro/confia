@@ -1,4 +1,4 @@
-import { Alert, EmptyState, ErrorState, PageHeader, Skeleton } from "@confia/ui";
+import { Alert, Button, EmptyState, ErrorState, PageHeader, Skeleton } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import type { StudentStatementResponse } from "../charges-types.ts";
 import { OptionField, TextField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
@@ -33,6 +33,8 @@ export interface StatementViewProps {
   readonly currency?: { readonly value: string; readonly options: readonly Option[]; readonly onChange: (currency: string) => void } | undefined;
   /** Zero based, like the server; it pages the lines of every section. */
   readonly onPageChange: (page: number) => void;
+  /** The way to the charges of the student, where a charge is voided. Offered once a student is chosen and exists. */
+  readonly onViewCharges?: (() => void) | undefined;
 }
 
 const focusField = (id: string) => () => {
@@ -73,12 +75,26 @@ function Guidance({ state, onChooseAnother }: { readonly state: Extract<Statemen
  * which currency, then one section per currency with its balances and the lines the server returned. It renders what it is given:
  * it asks for nothing and every figure is the server's, shown through the money component and never added, subtracted or rounded.
  */
-export function StatementView({ state, picker, period, currency, onPageChange }: StatementViewProps) {
+export function StatementView({ state, picker, period, currency, onPageChange, onViewCharges }: StatementViewProps) {
   const { t } = useAdminText();
 
   return (
     <section aria-labelledby="charge-statement-heading" className="flex flex-col gap-3">
-      <PageHeader title={t("charges.statement.heading")} headingLevel={2} headingId="charge-statement-heading" description={t("charges.statement.description")} />
+      <PageHeader
+        title={t("charges.statement.heading")}
+        headingLevel={2}
+        headingId="charge-statement-heading"
+        description={t("charges.statement.description")}
+        {...(onViewCharges !== undefined && (state.kind === "ready" || state.kind === "empty")
+          ? {
+              actions: (
+                <Button variant="secondary" size="sm" onClick={onViewCharges}>
+                  {t("charges.statement.viewCharges")}
+                </Button>
+              ),
+            }
+          : {})}
+      />
       <div className="flex flex-col gap-3 rounded-lg border border-border-subtle p-3">
         <StatementStudentPicker {...picker} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

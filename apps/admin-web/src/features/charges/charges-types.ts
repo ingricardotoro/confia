@@ -3,6 +3,10 @@ import type {
   AccrualRunItemResponseOutput,
   AccrualRunResponseOutput,
   ChargePlanResponseOutput,
+  IntegrityFindingResponseOutput,
+  IntegrityRunDetailResponseOutput,
+  IntegrityRunResponseOutput,
+  StudentChargeResponseOutput,
   StudentStatementLineOutput,
   StudentStatementOutput,
   StudentStatementSectionOutput,
@@ -19,3 +23,10 @@ export type ChargePlanStatus = ChargePlanResponseOutput["status"];
 export type StudentStatementResponse = StudentStatementOutput;
 export type StatementSection = StudentStatementSectionOutput;
 export type StatementLine = StudentStatementLineOutput;
+export type StudentCharge = StudentChargeResponseOutput;
+export type StudentChargeStatus = StudentChargeResponseOutput["status"];
+export type IntegrityRun = IntegrityRunResponseOutput;
+export type IntegrityRunDetail = IntegrityRunDetailResponseOutput;
+export type IntegrityFinding = IntegrityFindingResponseOutput;
+export type IntegrityRunStatus = IntegrityRunResponseOutput["status"];
+export type IntegrityKind = IntegrityFindingResponseOutput["kind"];

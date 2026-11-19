@@ -7,6 +7,7 @@ import {
 } from "./organization-model.ts";
 import { DEFAULT_CATALOG, createCatalogModel, type CatalogModel, type CatalogOptions } from "./catalog-model.ts";
 import { DEFAULT_CHARGES, createChargesModel, type ChargesModel, type ChargesOptions } from "./charges-model.ts";
+import { DEFAULT_CHARGE_VOID, createChargeVoidModel, type ChargeVoidModel, type ChargeVoidOptions } from "./charge-void-model.ts";
 import { DEFAULT_STATEMENT, createStatementModel, type StatementModel, type StatementOptions } from "./statement-model.ts";
 import { DEFAULT_LEDGER, createLedgerModel, type LedgerModel, type LedgerOptions } from "./ledger-model.ts";
 import { DEFAULT_IMPORTS, createImportsModel, type ImportsModel, type ImportsOptions } from "./imports-model.ts";
@@ -64,6 +65,8 @@ interface PresetDefinition {
   readonly ledger?: LedgerOptions;
   /** The statements of account the scenario holds, over its students; the seeded ones, readable, when absent. */
   readonly statement?: StatementOptions;
+  /** The charges of a student, their void and the integrity check the scenario holds, over its students; the seeded ones, with every write allowed, when absent. */
+  readonly chargeVoid?: ChargeVoidOptions;
   /** A fault injected after the model answered, to prove the server refuses to send it. */
   readonly tamper?: (operation: Operation, response: ModelResponse) => ModelResponse;
 }
@@ -132,6 +135,16 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   "ledger-map-server-error": { login: "authenticated", enrolled: false, ledger: { ...DEFAULT_LEDGER, mapReads: "failing-first" } },
   // The statement of account (ledger-account-statement cut): no student has an account, a person without the permission, and reads
   // that fail first. Each one signs in as the default does.
+  // The charges of a student, their void and the integrity check (charges-void-and-integrity cut): no charges and no check yet, a charge
+  // someone else voided first, a ledger that refuses the reversal, a person who cannot void or cannot read, reads that fail first, and a latest
+  // run with discrepancies. Each one signs in as the default does.
+  "charge-void-empty": { login: "authenticated", enrolled: false, chargeVoid: { ...DEFAULT_CHARGE_VOID, seed: "empty", integrity: "none" } },
+  "charge-void-already-voided": { login: "authenticated", enrolled: false, chargeVoid: { ...DEFAULT_CHARGE_VOID, writes: "already-voided" } },
+  "charge-void-not-voidable": { login: "authenticated", enrolled: false, chargeVoid: { ...DEFAULT_CHARGE_VOID, writes: "not-voidable" } },
+  "charge-void-forbidden": { login: "authenticated", enrolled: false, chargeVoid: { ...DEFAULT_CHARGE_VOID, writes: "forbidden" } },
+  "charge-void-read-forbidden": { login: "authenticated", enrolled: false, chargeVoid: { ...DEFAULT_CHARGE_VOID, access: "forbidden" } },
+  "charge-void-server-error": { login: "authenticated", enrolled: false, chargeVoid: { ...DEFAULT_CHARGE_VOID, reads: "failing-first" } },
+  "integrity-discrepancies": { login: "authenticated", enrolled: false, chargeVoid: { ...DEFAULT_CHARGE_VOID, integrity: "discrepancies" } },
   "statement-empty": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, seed: "empty" } },
   "statement-forbidden": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, access: "forbidden" } },
   "statement-server-error": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, reads: "failing-first" } },
@@ -160,6 +173,7 @@ export interface Scenario {
   readonly charges: ChargesModel;
   readonly ledger: LedgerModel;
   readonly statement: StatementModel;
+  readonly chargeVoid: ChargeVoidModel;
   readonly calls: RecordedCall[];
   readonly tamper: PresetDefinition["tamper"];
   signIn(sleep: (ms: number) => Promise<void>): Promise<ModelResponse>;
@@ -194,6 +208,7 @@ function build(preset: string, definition: PresetDefinition): Scenario {
     charges: createChargesModel(definition.charges ?? DEFAULT_CHARGES, { organization, catalog, students }),
     ledger: createLedgerModel(definition.ledger ?? DEFAULT_LEDGER),
     statement: createStatementModel(definition.statement ?? DEFAULT_STATEMENT, { students }),
+    chargeVoid: createChargeVoidModel(definition.chargeVoid ?? DEFAULT_CHARGE_VOID, { students }),
     calls: [],
     tamper: definition.tamper,
     async signIn(sleep) {

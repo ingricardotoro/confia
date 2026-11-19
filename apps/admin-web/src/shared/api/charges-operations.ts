@@ -8,6 +8,10 @@ import {
   ChargePlanItemResponse,
   ChargePlanPageResponse,
   ChargePlanResponse,
+  ChargeVoidResponse,
+  IntegrityRunDetailResponse,
+  IntegrityRunPageResponse,
+  StudentChargePageResponse,
   StudentStatement,
   type AccrualPeriodResponseOutput,
   type AccrualPreviewRequest,
@@ -22,7 +26,15 @@ import {
   type ChargePlanItemResponseOutput,
   type ChargePlanPageResponseOutput,
   type ChargePlanResponseOutput,
+  type ChargeVoidBody,
+  type ChargeVoidResponseOutput,
   type CreateChargePlanRequest,
+  type IntegrityFindingResponseOutput,
+  type IntegrityRunDetailResponseOutput,
+  type IntegrityRunPageResponseOutput,
+  type IntegrityRunResponseOutput,
+  type StudentChargePageResponseOutput,
+  type StudentChargeResponseOutput,
   type StudentStatementLineOutput,
   type StudentStatementOutput,
   type StudentStatementSectionOutput,
@@ -208,3 +220,70 @@ export const getStudentStatement = (token: string, studentId: string, params: St
     schema: lenient(StudentStatement),
   });
 };
+
+// The charges of a student and their void (charges-void-and-integrity cut). The amounts travel as `{ amount, currency }` strings the
+// server already rounded; the status of a charge (`ACTIVE` or `VOIDED`) is derived by the server from the void row.
+
+export type StudentCharge = StudentChargeResponseOutput;
+export type StudentChargePage = StudentChargePageResponseOutput;
+export type StudentChargeStatus = StudentChargeResponseOutput["status"];
+export type ChargeVoid = ChargeVoidResponseOutput;
+
+export interface StudentChargesParams extends PageParams {
+  readonly status?: StudentChargeStatus | undefined;
+  /** `yyyy-MM-dd`: the first day of the period, from this date included. */
+  readonly periodFrom?: string | undefined;
+  /** `yyyy-MM-dd`: the first day of the period, up to this date included. */
+  readonly periodTo?: string | undefined;
+}
+
+/** One page of the charges of a student, as the server pages, filters and orders it. */
+export const listStudentCharges = (token: string, studentId: string, params: StudentChargesParams): Promise<ApiResult<StudentChargePage>> => {
+  const query = new URLSearchParams();
+  for (const [name, value] of Object.entries(params) as [string, unknown][]) {
+    if (typeof value === "string" || typeof value === "number") query.set(name, String(value));
+  }
+  return request({
+    method: "GET",
+    path: `/api/v1/charges/students/${encodeURIComponent(studentId)}/charges?${query.toString()}`,
+    headers: bearer(token),
+    schema: lenient(StudentChargePageResponse),
+  });
+};
+
+/**
+ * Voids a charge: the server posts the exact mirror of its entry in the ledger. It moves money, so the request carries the
+ * `Idempotency-Key` of the person's intent: the same key and the same body answer the same void, whatever the number of tries.
+ */
+export const voidCharge = (token: string, chargeId: string, body: ChargeVoidBody, idempotencyKey: string): Promise<ApiResult<ChargeVoid>> =>
+  request({
+    method: "POST",
+    path: `/api/v1/charges/${encodeURIComponent(chargeId)}/void`,
+    headers: { ...bearer(token), "Idempotency-Key": idempotencyKey },
+    body,
+    schema: lenient(ChargeVoidResponse),
+  });
+
+// The nightly integrity check (read only): the runs, the latest one and one run with its discrepancies.
+
+export type IntegrityRun = IntegrityRunResponseOutput;
+export type IntegrityRunPage = IntegrityRunPageResponseOutput;
+export type IntegrityRunDetail = IntegrityRunDetailResponseOutput;
+export type IntegrityFinding = IntegrityFindingResponseOutput;
+export type IntegrityRunStatus = IntegrityRunResponseOutput["status"];
+export type IntegrityKind = IntegrityFindingResponseOutput["kind"];
+
+export interface IntegrityRunsParams {
+  readonly page: number;
+  readonly size: number;
+}
+
+export const listIntegrityRuns = (token: string, params: IntegrityRunsParams): Promise<ApiResult<IntegrityRunPage>> =>
+  list("integrity-runs", lenient(IntegrityRunPageResponse), token, params);
+
+/** The most recent run with its discrepancies; `404` while the check has not run for the institution. */
+export const getLatestIntegrityRun = (token: string): Promise<ApiResult<IntegrityRunDetail>> =>
+  request({ method: "GET", path: "/api/v1/charges/integrity-runs/latest", headers: bearer(token), schema: lenient(IntegrityRunDetailResponse) });
+
+export const getIntegrityRun = (token: string, runId: string): Promise<ApiResult<IntegrityRunDetail>> =>
+  request({ method: "GET", path: `/api/v1/charges/integrity-runs/${encodeURIComponent(runId)}`, headers: bearer(token), schema: lenient(IntegrityRunDetailResponse) });

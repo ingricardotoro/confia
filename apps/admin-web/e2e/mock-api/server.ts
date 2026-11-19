@@ -252,6 +252,15 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
       // The statement of account of a student (a route below the charges that the statement model owns, so it goes first).
       const statement = scenario.statement.handle({ method, path, query: url.searchParams });
       if (statement !== undefined) { deliver(res, scenario, "charges", statement); return; }
+      // The charges of a student, their void and the integrity check (routes below the charges that the void model owns, so they go first).
+      const voidAnswer = scenario.chargeVoid.handle({
+        method,
+        path,
+        query: url.searchParams,
+        body,
+        headers: { "idempotency-key": typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : undefined },
+      });
+      if (voidAnswer !== undefined) { deliver(res, scenario, "charges", voidAnswer); return; }
       const answer = scenario.charges.handle({
         method,
         path,

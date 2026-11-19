@@ -38,6 +38,8 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "idempotency-payload-mismatch",
   "account-in-use",
   "posting-account-invalid",
+  "charge-already-voided",
+  "charge-not-voidable",
 ]);
 
 /** The text of each reason the server gives for a split of the responsibility that does not hold. */
