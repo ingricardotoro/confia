@@ -42,7 +42,8 @@ class ProblemCodeTest {
                         "import-file-changed", "duplicate-payment-concept-code", "price-validity-overlap",
                         "price-list-archived", "duplicate-tax-rate-code", "tax-rate-period-overlap", "plan-not-editable", "plan-without-items",
                         "duplicate-plan-item", "plan-item-invalid", "accrual-run-in-progress", "charge-already-voided", "charge-not-voidable",
-                        "duplicate-account-code", "account-in-use", "posting-account-invalid", "stale-version");
+                        "duplicate-account-code", "account-in-use", "posting-account-invalid", "stale-version",
+                        "cash-session-already-open", "cash-session-not-open", "cash-session-not-awaiting-approval", "cash-difference-reason-required", "cash-expected-negative", "cash-approval-same-actor");
     }
 
     @Test
@@ -70,7 +71,8 @@ class ProblemCodeTest {
             "duplicate-payment-concept-code, 409", "price-validity-overlap, 409", "price-list-archived, 409",
             "duplicate-tax-rate-code, 409", "tax-rate-period-overlap, 409", "plan-not-editable, 409",
             "plan-without-items, 409", "duplicate-plan-item, 409", "plan-item-invalid, 409", "accrual-run-in-progress, 409", "charge-already-voided, 409", "charge-not-voidable, 409",
-            "duplicate-account-code, 409", "account-in-use, 409", "posting-account-invalid, 409", "stale-version, 409"})
+            "duplicate-account-code, 409", "account-in-use, 409", "posting-account-invalid, 409", "stale-version, 409",
+            "cash-session-already-open, 409", "cash-session-not-open, 409", "cash-session-not-awaiting-approval, 409", "cash-difference-reason-required, 400", "cash-expected-negative, 409", "cash-approval-same-actor, 403"})
     void eachCodeCarriesItsHttpStatus(String code, int status) {
         assertThat(ProblemCode.ofCode(code)).get().extracting(ProblemCode::status)
                 .isEqualTo(status);
@@ -91,7 +93,8 @@ class ProblemCodeTest {
             "duplicate-payment-concept-code", "price-validity-overlap", "price-list-archived",
             "duplicate-tax-rate-code", "tax-rate-period-overlap", "plan-not-editable", "plan-without-items",
             "duplicate-plan-item", "plan-item-invalid", "accrual-run-in-progress", "charge-already-voided", "charge-not-voidable",
-            "duplicate-account-code", "account-in-use", "posting-account-invalid", "stale-version"})
+            "duplicate-account-code", "account-in-use", "posting-account-invalid", "stale-version",
+            "cash-session-already-open", "cash-session-not-open", "cash-session-not-awaiting-approval", "cash-difference-reason-required", "cash-expected-negative", "cash-approval-same-actor"})
     void theTypeIsTheStableBaseFollowedByTheCodeAndNothingElse(String code) {
         ProblemCode problem = ProblemCode.ofCode(code).orElseThrow();
         assertThat(problem.type()).isEqualTo(URI.create("https://confia.hn/problems/" + code));
