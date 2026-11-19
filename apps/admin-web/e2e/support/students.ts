@@ -1,6 +1,7 @@
 import type { Page, Request } from "@playwright/test";
 import { applyPreset, dialog, field, save } from "./organization.ts";
 import { expect, seedSession } from "./scenario.ts";
+import { clickNavigationLink } from "./navigation.ts";
 
 export { applyPreset, bodyRows, dialog, field, firstColumn, openCreate, resultNotice, save, SAVE_TIMEOUT, test } from "./organization.ts";
 
@@ -10,7 +11,7 @@ export const STUDENTS_PATH = "/students";
 /** Signs in with the seeded session, as the simulator's own route does, and opens the registry from the navigation. */
 export async function openStudentsPage(page: Page): Promise<void> {
   await seedSession(page);
-  await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Estudiantes" }).click();
+  await clickNavigationLink(page, "Estudiantes");
   await expect(page).toHaveURL(/\/students$/);
   await expect(page.getByRole("heading", { level: 1, name: "Estudiantes" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Lista de estudiantes" })).toBeVisible();

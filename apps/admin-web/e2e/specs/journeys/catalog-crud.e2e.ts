@@ -14,6 +14,7 @@ import {
   test,
 } from "../../support/catalog.ts";
 import { expect, recordedCalls } from "../../support/scenario.ts";
+import { clickNavigationLink } from "../../support/navigation.ts";
 
 // The payment concepts through their screen (catalog-payment-concepts cut): sign in, open the catalog from the
 // navigation, create, edit and deactivate. Real Chromium, the production build, and the SIMULATED API: a simulation of
@@ -30,7 +31,7 @@ test.describe("the payment concepts, creating and editing", () => {
     await page.getByRole("button", { name: "Iniciar sesión" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Sesión iniciada." })).toBeVisible();
 
-    await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Catálogo" }).click();
+    await clickNavigationLink(page, "Catálogo");
 
     await expect(page).toHaveURL(/\/catalog$/);
     await expect(page.getByRole("heading", { level: 1, name: "Catálogo" })).toBeVisible();

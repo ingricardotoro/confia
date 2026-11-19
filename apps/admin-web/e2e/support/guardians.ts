@@ -1,6 +1,7 @@
 import type { Locator, Page, Request } from "@playwright/test";
 import { applyPreset, dialog } from "./organization.ts";
 import { expect, seedSession } from "./scenario.ts";
+import { clickNavigationLink } from "./navigation.ts";
 
 export { applyPreset, bodyRows, dialog, field, firstColumn, openCreate, resultNotice, save, SAVE_TIMEOUT, test } from "./organization.ts";
 
@@ -10,7 +11,7 @@ export const GUARDIANS_PATH = "/guardians";
 /** Signs in with the seeded session, as the simulator's own route does, and opens the registry from the navigation. */
 export async function openGuardiansPage(page: Page): Promise<void> {
   await seedSession(page);
-  await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Encargados" }).click();
+  await clickNavigationLink(page, "Encargados");
   await expect(page).toHaveURL(/\/guardians$/);
   await expect(page.getByRole("heading", { level: 1, name: "Encargados" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Lista de encargados" })).toBeVisible();
@@ -26,7 +27,7 @@ export async function openGuardians(page: Page, scenarioId: string, preset?: str
 export async function openStudentsForLinks(page: Page, scenarioId: string, preset?: string): Promise<void> {
   if (preset !== undefined) await applyPreset(page, scenarioId, preset);
   await seedSession(page);
-  await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Estudiantes" }).click();
+  await clickNavigationLink(page, "Estudiantes");
   await expect(page.getByRole("heading", { level: 2, name: "Lista de estudiantes" })).toBeVisible();
 }
 

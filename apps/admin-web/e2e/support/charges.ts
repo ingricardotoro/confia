@@ -1,6 +1,7 @@
 import type { Page, Request } from "@playwright/test";
 import { applyPreset } from "./organization.ts";
 import { expect, seedSession } from "./scenario.ts";
+import { clickNavigationLink } from "./navigation.ts";
 
 export { applyPreset, bodyRows, dialog, field, firstColumn, openCreate, resultNotice, save, SAVE_TIMEOUT, test } from "./organization.ts";
 export { filters, summary } from "./catalog.ts";
@@ -18,7 +19,7 @@ export const SEEDED_PLANS = {
 export async function openPlans(page: Page, scenarioId: string, preset?: string): Promise<void> {
   if (preset !== undefined) await applyPreset(page, scenarioId, preset);
   await seedSession(page);
-  await page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Cobros" }).click();
+  await clickNavigationLink(page, "Cobros");
   await expect(page).toHaveURL(/\/charges\/plans$/);
   await expect(page.getByRole("heading", { level: 1, name: "Cobros" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Planes de cobro" })).toBeVisible();
