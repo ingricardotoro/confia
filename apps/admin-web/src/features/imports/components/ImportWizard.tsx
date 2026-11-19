@@ -1,5 +1,5 @@
 import type { ImportRunResponseOutput, RejectionResponseOutput } from "@confia/contracts/admin";
-import { Alert, Button, Dialog, FormField, Input, Pagination, Table, type TableColumn } from "@confia/ui";
+import { Alert, Button, Dialog, FormField, Input, PageHeader, Pagination, Table, type TableColumn } from "@confia/ui";
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import { IMPORT_KINDS, fieldNameOf, isImportKind, type FileProblem, type ImportFailure, type ImportKind, type ImportStep } from "../import-model.ts";
@@ -138,11 +138,8 @@ export function ImportWizard(props: ImportWizardProps) {
   };
 
   return (
-    <section aria-labelledby="imports-heading" aria-busy={busy} className="flex flex-col gap-4">
-      <h2 id="imports-heading" className="text-base font-semibold text-text-primary">
-        {t("imports.heading")}
-      </h2>
-      <p className="text-sm text-text-secondary">{t("imports.intro")}</p>
+    <section aria-labelledby="imports-heading" aria-busy={busy} className="flex flex-col gap-3">
+      <PageHeader title={t("imports.heading")} headingLevel={2} headingId="imports-heading" description={t("imports.intro")} />
       <ImportStepper current={step} />
       <div role="status" aria-live="polite" aria-atomic="true" className="min-h-5 text-sm text-text-secondary">
         {status}

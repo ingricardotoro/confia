@@ -161,7 +161,10 @@
     "tagline": "Control financiero académico",
     "breadcrumbLabel": "Ruta de navegación",
     "openNavigation": "Abrir menú",
-    "closeNavigation": "Cerrar menú"
+    "closeNavigation": "Cerrar menú",
+    "hideSidebar": "Ocultar el menú lateral",
+    "showSidebar": "Mostrar el menú lateral",
+    "closeSidebar": "Cerrar el menú lateral"
   },
   "navigation": {
     "home": "Inicio",

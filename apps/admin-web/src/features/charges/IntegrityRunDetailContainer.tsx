@@ -32,5 +32,5 @@ export function IntegrityRunDetailContainer({ runId }: IntegrityRunDetailContain
     return { kind: "loading" };
   }
 
-  return <IntegrityRunDetailView state={stateOf()} onBack={() => void navigate({ to: CHARGES_PATHS.integrity })} />;
+  return <IntegrityRunDetailView state={stateOf()} backHref={CHARGES_PATHS.integrity} onBack={() => void navigate({ to: CHARGES_PATHS.integrity })} />;
 }

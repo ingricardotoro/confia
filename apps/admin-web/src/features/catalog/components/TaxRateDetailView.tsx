@@ -17,6 +17,7 @@ import { formatIsoDate } from "../../../shared/format/format-date.ts";
 import { formatRatePercent } from "../../../shared/format/format-rate.ts";
 import type { ResourceNotice } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import type { TaxRateDetail, TaxRatePeriod } from "../tax-rate-form.ts";
+import { BackLink } from "../../../shared/layout/components/BackLink.tsx";
 
 export type TaxRateDetailState =
   | { readonly kind: "loading" }
@@ -78,27 +79,7 @@ export function TaxRateDetailView({
 }: TaxRateDetailViewProps) {
   const { t } = useAdminText();
 
-  const back = (
-    <a
-      href={backHref}
-      className="w-fit text-sm text-text-primary underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
-      onClick={(event) => {
-        if (
-          event.defaultPrevented ||
-          event.button !== 0 ||
-          event.metaKey ||
-          event.ctrlKey ||
-          event.shiftKey ||
-          event.altKey
-        )
-          return;
-        event.preventDefault();
-        onBack();
-      }}
-    >
-      {t("catalog.taxRates.detail.back")}
-    </a>
-  );
+  const back = <BackLink href={backHref} label={t("catalog.taxRates.detail.back")} onBack={onBack} />;
 
   if (state.kind === "loading") {
     return (
@@ -107,11 +88,7 @@ export function TaxRateDetailView({
         aria-busy="true"
         className="flex flex-col gap-3"
       >
-        {back}
-        <h2 id="tax-rate-heading" className="sr-only">
-          {t("catalog.taxRates.heading")}
-        </h2>
-        <Skeleton className="h-7 w-72" />
+        <PageHeader title={t("catalog.taxRates.heading")} headingLevel={2} headingId="tax-rate-heading" breadcrumb={back} />
         <Skeleton className="h-16 w-full max-w-xl" />
         <Skeleton className="h-40 w-full" />
       </section>
@@ -124,10 +101,7 @@ export function TaxRateDetailView({
         aria-labelledby="tax-rate-heading"
         className="flex flex-col gap-3"
       >
-        {back}
-        <h2 id="tax-rate-heading" className="sr-only">
-          {t("catalog.taxRates.heading")}
-        </h2>
+        <PageHeader title={t("catalog.taxRates.heading")} headingLevel={2} headingId="tax-rate-heading" breadcrumb={back} />
         <ErrorState
           title={state.title}
           description={state.description}

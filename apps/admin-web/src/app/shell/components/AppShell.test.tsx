@@ -97,4 +97,55 @@ describe("AppShell", () => {
       screen.getByRole("button", { name: "Reintentar cierre de sesión" }),
     ).toBeVisible();
   });
+  describe("hiding the side navigation", () => {
+    const wrapper = () => document.getElementById("side-navigation") as HTMLElement;
+
+    it("offers a toggle that names its action, reports the state and points at the navigation", async () => {
+      const user = userEvent.setup();
+      const onSidebarVisibleChange = vi.fn();
+      renderShell({ onSidebarVisibleChange });
+
+      const toggle = screen.getByRole("button", { name: "Ocultar el menú lateral", expanded: true });
+      expect(toggle).toHaveAttribute("aria-controls", "side-navigation");
+      expect(toggle).toHaveAttribute("title", "Ocultar el menú lateral");
+      await user.click(toggle);
+
+      expect(onSidebarVisibleChange).toHaveBeenCalledWith(false);
+    });
+
+    it("when hidden it leaves the layout on wide screens and the toggle offers to show it again", async () => {
+      const user = userEvent.setup();
+      const onSidebarVisibleChange = vi.fn();
+      renderShell({ sidebarVisible: false, onSidebarVisibleChange });
+
+      expect(wrapper()).toHaveClass("lg:hidden");
+      expect(wrapper()).not.toHaveClass("lg:flex");
+      const toggle = screen.getByRole("button", { name: "Mostrar el menú lateral", expanded: false });
+      await user.click(toggle);
+
+      expect(onSidebarVisibleChange).toHaveBeenCalledWith(true);
+    });
+
+    it("closes from inside the navigation and hands the focus to the toggle that stays", async () => {
+      const user = userEvent.setup();
+      const onSidebarVisibleChange = vi.fn();
+      renderShell({ onSidebarVisibleChange });
+
+      await user.click(within(screen.getByRole("navigation")).getByRole("button", { name: "Ocultar el menú lateral" }));
+
+      expect(onSidebarVisibleChange).toHaveBeenCalledWith(false);
+      expect(within(screen.getByRole("banner")).getByRole("button", { name: "Ocultar el menú lateral" })).toHaveFocus();
+    });
+  });
+
+  // The page must end where its content ends: a root as tall as the viewport, a sticky navigation of one viewport
+  // (so a tall page never leaves a band under it) and a main that takes the free height.
+  it("keeps the page height clean: dynamic viewport root, sticky navigation, main that fills", () => {
+    const { container } = renderShell();
+
+    expect(container.firstElementChild).toHaveClass("flex", "min-h-dvh");
+    expect(document.getElementById("side-navigation")).toHaveClass("lg:sticky", "lg:top-0", "lg:h-dvh", "lg:self-start");
+    expect(screen.getByRole("main")).toHaveClass("flex-1");
+    expect(container.innerHTML).not.toContain("min-h-screen");
+  });
 });

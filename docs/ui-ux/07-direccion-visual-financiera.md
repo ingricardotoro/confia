@@ -359,6 +359,34 @@ reconocible de una interfaz genérica; la esquina contenida es el de un sistema 
   importes agregados requieren un endpoint: no se calculan en el navegador y se marcan pendientes.
 - En pantallas de detalle, el título es el nombre del registro y la insignia de estado va junto a él.
 
+#### Encabezado de página estándar
+
+Toda pantalla del menú lateral arma su encabezado con `PageHeader` (`packages/ui`), nunca con un
+`<h1>` o `<h2>` escrito a mano ni con un encabezado oculto (`sr-only`) que sustituya al visible. Una
+prueba de estructura (`apps/admin-web/src/app/page-header-standard.test.ts`) lo verifica.
+
+- **Dos niveles, una sola vez cada uno.** El área (`PageContent`) pinta el `<h1>` solo con el nombre
+  del área (`text-xl`, sin descripción ni acciones), seguido de las pestañas si el área tiene varias
+  vistas. La vista pinta debajo un `PageHeader` de nivel 2 (`headingLevel={2}`, `text-base`).
+  Una pantalla sin pestañas (Importaciones) usa el mismo nivel 2 bajo el `<h1>`.
+- **Fila del título.** Título a la izquierda (con la insignia de estado junto a él en el detalle) y
+  las acciones a la derecha, alineadas al centro. Las secundarias van primero; la única primaria, al
+  final. Sin acciones, la fila ocupa solo el título.
+- **Descripción.** Una línea (`text-[13px]`, `text-text-secondary`) bajo el título, en la misma
+  columna. Es opcional y no se repite en el detalle, donde el título es el nombre del registro.
+- **Migas de pan y vuelta.** Solo en pantallas de detalle: `Breadcrumb` (`text-xs`) encima del
+  título con «lista padre / registro». Es la única vía de regreso; no se agregan botones «Volver».
+  Mientras el registro no se conoce (carga, error, no encontrado) no se puede armar la miga:
+  entonces el título es el de la lista padre y `BackLink`
+  (`apps/admin-web/src/shared/layout/components/BackLink.tsx`) ocupa el lugar de la miga, con el
+  mismo tamaño y peso. Las pantallas de lista no llevan miga.
+- **Pestañas.** Pertenecen al área, no a la vista: van entre el `<h1>` y el encabezado de la vista, y
+  el detalle de un registro no las repite.
+- **Espaciado.** Dentro del `PageHeader`: `gap-1.5` entre miga y fila, `gap-0.5` entre título y
+  descripción, `gap-x-4 gap-y-2` entre título y acciones. Entre el encabezado y el resto de la vista:
+  `gap-3` (la `<section>` de la vista es `flex flex-col gap-3`). No se usa `gap-4` ni márgenes sueltos.
+- **Subsecciones.** Dentro de una vista usan `<h3>` (`text-base font-semibold`), nunca otro nivel 2.
+
 ### 6.3 Tablas de datos
 
 ```

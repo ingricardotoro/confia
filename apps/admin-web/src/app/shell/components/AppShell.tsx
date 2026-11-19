@@ -1,5 +1,6 @@
 import { Alert, Button } from "@confia/ui";
-import { useEffect, useState, type ReactNode } from "react";
+import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import {
   SideNavigation,
@@ -15,6 +16,9 @@ export interface AppShellProps {
   /** The ids of the open sections of the navigation. */
   readonly expandedGroupIds?: ReadonlySet<string>;
   readonly onToggleGroup?: (groupId: string) => void;
+  /** Whether the navigation is shown on wide screens. The caller owns where the choice is kept. Default: shown. */
+  readonly sidebarVisible?: boolean;
+  readonly onSidebarVisibleChange?: (visible: boolean) => void;
   readonly signingOut: boolean;
   readonly signOutFailed: boolean;
   readonly onSignOut: () => void;
@@ -34,6 +38,8 @@ export function AppShell({
   onNavigate,
   expandedGroupIds,
   onToggleGroup,
+  sidebarVisible = true,
+  onSidebarVisibleChange,
   signingOut,
   signOutFailed,
   onSignOut,
@@ -41,6 +47,13 @@ export function AppShell({
 }: AppShellProps) {
   const { t } = useAdminText();
   const [menuOpen, setMenuOpen] = useState(false);
+  const sidebarToggle = useRef<HTMLButtonElement>(null);
+
+  const changeSidebarVisible = (visible: boolean) => {
+    onSidebarVisibleChange?.(visible);
+    // The control that was pressed may be about to leave the page: the focus goes to the one that always stays.
+    sidebarToggle.current?.focus();
+  };
 
   // Below lg the sidebar is a panel the person opens; Escape closes it.
   useEffect(() => {
@@ -55,7 +68,7 @@ export function AppShell({
   }, [menuOpen]);
 
   return (
-    <div className="flex min-h-screen bg-bg-canvas text-text-primary">
+    <div className="flex min-h-dvh bg-bg-canvas text-text-primary">
       <a
         href="#contenido"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-bg-surface focus:px-3 focus:py-2 focus:text-text-link focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
@@ -64,7 +77,10 @@ export function AppShell({
       </a>
       <div
         id="side-navigation"
-        className={`${menuOpen ? "fixed inset-y-0 left-0 z-40 flex shadow-xl" : "hidden"} lg:static lg:z-auto lg:flex lg:shadow-none`}
+        // Below lg: a panel over the page. From lg: a column that stays in view while the page scrolls (sticky, one
+        // viewport tall) so the page never grows a band below the content; hidden, it leaves the layout, the tab order
+        // and the accessibility tree (display: none).
+        className={`${menuOpen ? "fixed inset-y-0 left-0 z-40 flex shadow-xl" : "hidden"} lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:self-start lg:shadow-none ${sidebarVisible ? "lg:flex" : "lg:hidden"}`}
       >
         <SideNavigation
           items={navigation}
@@ -77,11 +93,54 @@ export function AppShell({
             setMenuOpen(false);
             onNavigate(href);
           }}
-          className="min-h-screen"
+          headerAction={
+            <>
+              <Button
+                variant="subtle"
+                size="sm"
+                className="shrink-0 px-2 lg:hidden"
+                aria-label={t("shell.closeSidebar")}
+                title={t("shell.closeSidebar")}
+                onClick={() => {
+                  setMenuOpen(false);
+                }}
+              >
+                <X aria-hidden="true" />
+              </Button>
+              <Button
+                variant="subtle"
+                size="sm"
+                className="hidden shrink-0 px-2 lg:inline-flex"
+                aria-label={t("shell.hideSidebar")}
+                title={t("shell.hideSidebar")}
+                onClick={() => {
+                  changeSidebarVisible(false);
+                }}
+              >
+                <PanelLeftClose aria-hidden="true" />
+              </Button>
+            </>
+          }
+          className="h-full"
         />
       </div>
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-bg-surface px-6">
+          <Button
+            ref={sidebarToggle}
+            variant="subtle"
+            size="sm"
+            className="hidden px-2 lg:inline-flex"
+            aria-expanded={sidebarVisible}
+            aria-controls="side-navigation"
+            aria-label={t(sidebarVisible ? "shell.hideSidebar" : "shell.showSidebar")}
+            title={t(sidebarVisible ? "shell.hideSidebar" : "shell.showSidebar")}
+            onClick={() => {
+              changeSidebarVisible(!sidebarVisible);
+            }}
+          >
+            {sidebarVisible ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}
+          </Button>
           <Button
             variant="subtle"
             size="sm"

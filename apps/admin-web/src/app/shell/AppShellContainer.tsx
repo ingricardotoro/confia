@@ -15,6 +15,7 @@ import {
 } from "../../shared/navigation/navigation-entry.ts";
 import { AppShell } from "./components/AppShell.tsx";
 import { useExpandedGroups } from "./use-expanded-groups.ts";
+import { useSidebarVisible } from "./use-sidebar-visible.ts";
 
 export interface AppShellContainerProps {
   readonly session: AccessSession;
@@ -68,6 +69,7 @@ function ShellFrame({
     group.items.some((item) => item.current),
   )?.id;
   const { expandedGroupIds, toggleGroup } = useExpandedGroups(activeGroupId);
+  const { sidebarVisible, setSidebarVisible } = useSidebarVisible();
 
   return (
     <AppShell
@@ -77,6 +79,8 @@ function ShellFrame({
       navigationGroups={groups}
       expandedGroupIds={expandedGroupIds}
       onToggleGroup={toggleGroup}
+      sidebarVisible={sidebarVisible}
+      onSidebarVisibleChange={setSidebarVisible}
       onNavigate={(href) => void navigate({ to: href })}
       signingOut={signingOut}
       signOutFailed={signOutFailed}

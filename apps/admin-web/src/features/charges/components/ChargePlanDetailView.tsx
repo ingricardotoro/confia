@@ -5,6 +5,7 @@ import { formatIsoDate } from "../../../shared/format/format-date.ts";
 import type { ResourceNotice } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import type { ChargePlanDetail } from "../charge-plan-form.ts";
 import { ChargePlanStatusBadge } from "./ChargePlanStatusBadge.tsx";
+import { BackLink } from "../../../shared/layout/components/BackLink.tsx";
 
 /** One item of the plan as the detail shows it. The code and the name are absent when the concept is not among the ones loaded. */
 export interface ChargePlanItemView {
@@ -75,28 +76,12 @@ export function ChargePlanDetailView({
 }: ChargePlanDetailViewProps) {
   const { t } = useAdminText();
 
-  const back = (
-    <a
-      href={backHref}
-      className="w-fit text-sm text-text-primary underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
-      onClick={(event) => {
-        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
-        onBack();
-      }}
-    >
-      {t("charges.plans.detail.back")}
-    </a>
-  );
+  const back = <BackLink href={backHref} label={t("charges.plans.detail.back")} onBack={onBack} />;
 
   if (state.kind === "loading") {
     return (
       <section aria-labelledby="charge-plan-heading" aria-busy="true" className="flex flex-col gap-3">
-        {back}
-        <h2 id="charge-plan-heading" className="sr-only">
-          {t("charges.plans.heading")}
-        </h2>
-        <Skeleton className="h-7 w-72" />
+        <PageHeader title={t("charges.plans.heading")} headingLevel={2} headingId="charge-plan-heading" breadcrumb={back} />
         <Skeleton className="h-16 w-full max-w-xl" />
         <Skeleton className="h-40 w-full" />
       </section>
@@ -106,10 +91,7 @@ export function ChargePlanDetailView({
   if (state.kind === "error") {
     return (
       <section aria-labelledby="charge-plan-heading" className="flex flex-col gap-3">
-        {back}
-        <h2 id="charge-plan-heading" className="sr-only">
-          {t("charges.plans.heading")}
-        </h2>
+        <PageHeader title={t("charges.plans.heading")} headingLevel={2} headingId="charge-plan-heading" breadcrumb={back} />
         <ErrorState title={state.title} description={state.description} onRetry={state.onRetry} />
       </section>
     );

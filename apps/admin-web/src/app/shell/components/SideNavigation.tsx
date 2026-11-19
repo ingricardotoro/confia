@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import confiaLogo from "../../../shared/brand/confia-logo.png";
 
@@ -30,6 +30,8 @@ export interface SideNavigationProps {
   readonly expandedGroupIds?: ReadonlySet<string>;
   /** Called with the id of the section whose header was activated. */
   readonly onToggleGroup?: (groupId: string) => void;
+  /** A control beside the logo (to close or hide the navigation). The caller owns what it does. */
+  readonly headerAction?: ReactNode;
   readonly className?: string;
 }
 
@@ -138,6 +140,7 @@ export function SideNavigation({
   onNavigate,
   expandedGroupIds = NO_GROUPS,
   onToggleGroup,
+  headerAction,
   className,
 }: SideNavigationProps) {
   const { t } = useAdminText();
@@ -151,14 +154,15 @@ export function SideNavigation({
       ].join(" ")}
     >
       {/* The logo is dark navy on transparent, so its strip is white in both themes (the sidebar-active white is fixed). */}
-      <div className="shrink-0 bg-sidebar-active-fg px-4 py-3">
+      <div className="flex shrink-0 items-center gap-2 bg-sidebar-active-fg px-4 py-3">
         <img
           src={confiaLogo}
           alt={t("shell.logoAlt")}
           width={720}
           height={181}
-          className="block h-auto w-full"
+          className="block h-auto min-w-0 flex-1"
         />
+        {headerAction}
       </div>
       <div className="flex flex-col gap-1 px-3 pb-4">
         <ul className="flex flex-col gap-0.5">
