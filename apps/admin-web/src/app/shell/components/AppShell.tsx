@@ -12,6 +12,9 @@ export interface AppShellProps {
   /** The labelled sections of the navigation, below the entries that have none. */
   readonly navigationGroups?: readonly SideNavigationGroup[];
   readonly onNavigate: (href: string) => void;
+  /** The ids of the open sections of the navigation. */
+  readonly expandedGroupIds?: ReadonlySet<string>;
+  readonly onToggleGroup?: (groupId: string) => void;
   readonly signingOut: boolean;
   readonly signOutFailed: boolean;
   readonly onSignOut: () => void;
@@ -29,6 +32,8 @@ export function AppShell({
   navigation,
   navigationGroups,
   onNavigate,
+  expandedGroupIds,
+  onToggleGroup,
   signingOut,
   signOutFailed,
   onSignOut,
@@ -66,6 +71,8 @@ export function AppShell({
           {...(navigationGroups === undefined
             ? {}
             : { groups: navigationGroups })}
+          {...(expandedGroupIds === undefined ? {} : { expandedGroupIds })}
+          {...(onToggleGroup === undefined ? {} : { onToggleGroup })}
           onNavigate={(href) => {
             setMenuOpen(false);
             onNavigate(href);
