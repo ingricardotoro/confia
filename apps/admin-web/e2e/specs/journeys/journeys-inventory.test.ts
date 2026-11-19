@@ -68,6 +68,7 @@ describe("the seven journeys of access", () => {
       "charges-plans-keyboard.e2e.ts",
       "charges-plans-lists.e2e.ts",
       "charges-plans-states.e2e.ts",
+      "charges-void.e2e.ts",
       "enrollment.e2e.ts",
       "enrollments-crud.e2e.ts",
       "enrollments-keyboard.e2e.ts",
