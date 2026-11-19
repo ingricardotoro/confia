@@ -529,8 +529,8 @@ Lucide sin cambios (`01` §12). Reglas de esta dirección:
 
 | Ancho | Comportamiento |
 |---|---|
-| ≥ 1280 px (`xl`) | Barra lateral fija, relleno 32 px, tablas con todas sus columnas |
-| 1024 a 1279 px (`lg`) | Barra lateral fija, relleno 24 px |
+| ≥ 1280 px (`xl`) | Barra lateral fija (expandida de 240 px o riel de 64 px, a elección de la persona), relleno 32 px, tablas con todas sus columnas |
+| 1024 a 1279 px (`lg`) | Barra lateral fija (expandida o riel de 64 px con solo el emblema del logo), relleno 24 px. El botón único del pie la contrae o expande y la elección se recuerda en el navegador |
 | < 1024 px | La barra lateral se oculta; aparece el botón `shell.openNavigation` en la barra superior, que la abre como panel superpuesto con foco atrapado y cierre con Esc |
 | 320 px | Tablas con desplazamiento horizontal dentro de su contenedor; encabezado de página apila título y acciones |
 

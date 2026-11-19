@@ -162,8 +162,8 @@
     "breadcrumbLabel": "Ruta de navegación",
     "openNavigation": "Abrir menú",
     "closeNavigation": "Cerrar menú",
-    "hideSidebar": "Ocultar el menú lateral",
-    "showSidebar": "Mostrar el menú lateral",
+    "collapseSidebar": "Contraer el menú lateral",
+    "expandSidebar": "Expandir el menú lateral",
     "closeSidebar": "Cerrar el menú lateral"
   },
   "navigation": {
