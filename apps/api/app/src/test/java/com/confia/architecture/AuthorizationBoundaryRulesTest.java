@@ -70,38 +70,38 @@ class AuthorizationBoundaryRulesTest {
                         + "the controller ran (design.md D1)");
     }
 
-    private static final String PERMISSION_SCOPES = "com.confia.identity.application.directory.PermissionScopes";
+    private static final String OWN_RECORD_POLICY = "com.confia.identity.application.directory.OwnRecordPolicy";
 
     /** The role directory is read by the infrastructure of {@code cashbox} and by nobody else outside {@code identity}. */
-    static ArchRule onlyCashboxInfrastructureDependsOnThePermissionScopes() {
+    static ArchRule onlyCashboxInfrastructureDependsOnTheOwnRecordPolicy() {
         return noClasses().that().resideOutsideOfPackages("com.confia.cashbox.infrastructure..", "com.confia.identity..")
-                .should().dependOnClassesThat().haveFullyQualifiedName(PERMISSION_SCOPES)
+                .should().dependOnClassesThat().haveFullyQualifiedName(OWN_RECORD_POLICY)
                 .because("the scope of a permission is read by one adapter of the module that enforces it, never decided "
                         + "inside a use case, a controller or another module (docs/03-seguridad.md section 5.4)");
     }
 
-    static ArchRule noApplicationClassOutsideIdentityDependsOnThePermissionScopes() {
+    static ArchRule noApplicationClassOutsideIdentityDependsOnTheOwnRecordPolicy() {
         return noClasses().that().resideInAPackage("..application..").and().resideOutsideOfPackage("com.confia.identity..")
-                .should().dependOnClassesThat().haveFullyQualifiedName(PERMISSION_SCOPES)
+                .should().dependOnClassesThat().haveFullyQualifiedName(OWN_RECORD_POLICY)
                 .because("a use case receives the scope through a port of its own module, whose adapter lives in "
                         + "infrastructure");
     }
 
     @Test
-    void onlyTheCashboxInfrastructureReadsThePermissionScopes() {
+    void onlyTheCashboxInfrastructureReadsTheOwnRecordPolicy() {
         assertThat(productionClasses().get("com.confia.cashbox.infrastructure.RoleDirectorySessionScope")
                 .getDirectDependenciesFromSelf().stream().map(d -> d.getTargetClass().getName()))
-                .as("non-vacuous: the one real consumer is seen").contains(PERMISSION_SCOPES);
-        onlyCashboxInfrastructureDependsOnThePermissionScopes().check(productionClasses());
-        noApplicationClassOutsideIdentityDependsOnThePermissionScopes().check(productionClasses());
+                .as("non-vacuous: the one real consumer is seen").contains(OWN_RECORD_POLICY);
+        onlyCashboxInfrastructureDependsOnTheOwnRecordPolicy().check(productionClasses());
+        noApplicationClassOutsideIdentityDependsOnTheOwnRecordPolicy().check(productionClasses());
     }
 
     @Test
-    void rejectsTheFixtureApplicationClassThatReadsThePermissionScopes() {
-        assertRuleRejects(onlyCashboxInfrastructureDependsOnThePermissionScopes(), fixtureClasses(),
-                "BadApplicationUsesThePermissionScopes");
-        assertRuleRejects(noApplicationClassOutsideIdentityDependsOnThePermissionScopes(), fixtureClasses(),
-                "BadApplicationUsesThePermissionScopes");
+    void rejectsTheFixtureApplicationClassThatReadsTheOwnRecordPolicy() {
+        assertRuleRejects(onlyCashboxInfrastructureDependsOnTheOwnRecordPolicy(), fixtureClasses(),
+                "BadApplicationUsesTheOwnRecordPolicy");
+        assertRuleRejects(noApplicationClassOutsideIdentityDependsOnTheOwnRecordPolicy(), fixtureClasses(),
+                "BadApplicationUsesTheOwnRecordPolicy");
     }
 
     @Test

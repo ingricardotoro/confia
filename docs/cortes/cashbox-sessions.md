@@ -102,8 +102,8 @@ Solo backend y contrato OpenAPI; la pantalla queda para el siguiente paso del co
 ### Pendientes y decisiones abiertas
 
 1. **Alcance «el cajero solo ve su sesión» en la lectura (`docs/03` §5.4): resuelto (2026-11-19).** `StaffRole.ownScoped()`
-   declara el alcance (solo el cajero, solo `cashbox:read`); `identity` lo publica con `PermissionScopes` (interfaz nombrada
-   `identity::directory`, adaptador `AccountPermissionScopes`, sin transacción propia y sin tocar `PermissionResolver`) y
+   declara el alcance (solo el cajero, solo `cashbox:read`); `identity` lo publica con `OwnRecordPolicy` (interfaz nombrada
+   `identity::directory`, adaptador `AccountOwnRecordPolicy`, sin transacción propia y sin tocar `PermissionResolver`) y
    `RoleDirectorySessionScope` lo traduce al puerto `SessionScope` de `cashbox`. Un cajero ve solo sus sesiones: el listado se
    limita aunque pida el id de otro cajero, el detalle ajeno es 404 y la sesión actual es la suya; Contabilidad, Auditor,
    Administrador y Super Administrador ven todas. Falla cerrado: sin rol o con código desconocido, solo lo propio.

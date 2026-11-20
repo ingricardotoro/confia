@@ -16,7 +16,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /** The scope of a permission by role: only the cashier is limited, and anything unknown is limited (fails closed). */
-class AccountPermissionScopesTest {
+class AccountOwnRecordPolicyTest {
 
     private static final Instant NOW = Instant.parse("2027-02-10T18:00:00Z");
 
@@ -25,8 +25,8 @@ class AccountPermissionScopesTest {
                 Set.of(AuthenticationMethod.PASSWORD), NOW, NOW.plusSeconds(900));
     }
 
-    private static AccountPermissionScopes withCode(String code) {
-        return new AccountPermissionScopes((institution, account) -> Optional.ofNullable(code));
+    private static AccountOwnRecordPolicy withCode(String code) {
+        return new AccountOwnRecordPolicy((institution, account) -> Optional.ofNullable(code));
     }
 
     @Test
@@ -61,7 +61,7 @@ class AccountPermissionScopesTest {
         AuthenticatedActor actor = actor();
         InstitutionId[] asked = new InstitutionId[1];
         StaffAccountId[] account = new StaffAccountId[1];
-        new AccountPermissionScopes((institution, id) -> {
+        new AccountOwnRecordPolicy((institution, id) -> {
             asked[0] = institution;
             account[0] = id;
             return Optional.of("accounting");
@@ -73,7 +73,7 @@ class AccountPermissionScopesTest {
 
     @Test
     void aFailureOfTheStorePropagatesAndNeverReadsAsUnrestricted() {
-        AccountPermissionScopes scopes = new AccountPermissionScopes((institution, account) -> {
+        AccountOwnRecordPolicy scopes = new AccountOwnRecordPolicy((institution, account) -> {
             throw new IllegalStateException("store down");
         });
 

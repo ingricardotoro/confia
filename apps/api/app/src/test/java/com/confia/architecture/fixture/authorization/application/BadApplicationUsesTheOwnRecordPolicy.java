@@ -1,6 +1,6 @@
 package com.confia.architecture.fixture.authorization.application;
 
-import com.confia.identity.application.directory.PermissionScopes;
+import com.confia.identity.application.directory.OwnRecordPolicy;
 import com.confia.kernel.Permission;
 import com.confia.shared.security.AuthenticatedActor;
 
@@ -9,11 +9,11 @@ import com.confia.shared.security.AuthenticatedActor;
  * role directory how far a permission reaches. Only an adapter of {@code cashbox} may; a use case learns the scope through a
  * port of its own.
  */
-public final class BadApplicationUsesThePermissionScopes {
+public final class BadApplicationUsesTheOwnRecordPolicy {
 
-    private final PermissionScopes scopes;
+    private final OwnRecordPolicy scopes;
 
-    public BadApplicationUsesThePermissionScopes(PermissionScopes scopes) {
+    public BadApplicationUsesTheOwnRecordPolicy(OwnRecordPolicy scopes) {
         this.scopes = scopes;
     }
 

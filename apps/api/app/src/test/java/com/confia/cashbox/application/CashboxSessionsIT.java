@@ -8,7 +8,7 @@ import com.confia.cashbox.domain.CashSessionAlreadyOpenException;
 import com.confia.cashbox.domain.CashSessionNotAwaitingApprovalException;
 import com.confia.cashbox.domain.CashSessionNotOpenException;
 import com.confia.cashbox.domain.ResourceNotFoundException;
-import com.confia.identity.application.AccountPermissionScopes;
+import com.confia.identity.application.AccountOwnRecordPolicy;
 import com.confia.identity.infrastructure.JooqStaffRoleAssignmentRepository;
 import com.confia.cashbox.infrastructure.JooqCashApprovalRepository;
 import com.confia.cashbox.infrastructure.JooqCashCloseRepository;
@@ -115,7 +115,7 @@ class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
 
     /** The real chain: the scope of the role, read from the assignment stored in the database. */
     private RoleDirectorySessionScope sessionScope() {
-        return new RoleDirectorySessionScope(new AccountPermissionScopes(new JooqStaffRoleAssignmentRepository(dsl)));
+        return new RoleDirectorySessionScope(new AccountOwnRecordPolicy(new JooqStaffRoleAssignmentRepository(dsl)));
     }
 
     private GetSession getSession() {

@@ -11,7 +11,7 @@ import com.confia.shared.security.AuthenticatedActor;
  * <p>It runs inside the transaction of the caller, opens none and takes no lock. It fails closed: an account without a role
  * assignment, or with a role code outside the catalog, is restricted to its own.
  */
-public interface PermissionScopes {
+public interface OwnRecordPolicy {
 
     /** Whether {@code permission} reaches only what the actor itself created; {@code true} when the role is unknown. */
     boolean restrictedToOwn(AuthenticatedActor actor, Permission permission);

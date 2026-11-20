@@ -1,6 +1,6 @@
 /**
  * The read-only view of the scope of the permissions that {@code identity} publishes to the other modules:
- * {@link com.confia.identity.application.directory.PermissionScopes}, which only says whether a permission of an account
+ * {@link com.confia.identity.application.directory.OwnRecordPolicy}, which only says whether a permission of an account
  * reaches all the data of its institution or only what the account itself created. Nothing else of the roles is public.
  *
  * <p><b>{@code @NamedInterface}, and who consumes it</b> (ADR-0022: every new named interface names the real consumer that

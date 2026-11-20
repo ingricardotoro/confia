@@ -1,7 +1,7 @@
 package com.confia.identity.infrastructure.wiring;
 
 import com.confia.identity.application.AccountPermissions;
-import com.confia.identity.application.AccountPermissionScopes;
+import com.confia.identity.application.AccountOwnRecordPolicy;
 import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.AuthenticateWithPassword;
 import com.confia.identity.application.CompleteSecondFactor;
@@ -257,8 +257,8 @@ public class IdentityConfiguration {
      * this class; it opens no transaction and never asks the permission resolver.
      */
     @Bean
-    AccountPermissionScopes accountPermissionScopes(StaffRoleAssignmentRepository assignments) {
-        return new AccountPermissionScopes(assignments);
+    AccountOwnRecordPolicy accountOwnRecordPolicy(StaffRoleAssignmentRepository assignments) {
+        return new AccountOwnRecordPolicy(assignments);
     }
 
     /**

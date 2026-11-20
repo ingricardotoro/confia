@@ -1,6 +1,6 @@
 package com.confia.identity.application;
 
-import com.confia.identity.application.directory.PermissionScopes;
+import com.confia.identity.application.directory.OwnRecordPolicy;
 import com.confia.identity.domain.StaffAccountId;
 import com.confia.identity.domain.StaffRole;
 import com.confia.kernel.InstitutionId;
@@ -9,7 +9,7 @@ import com.confia.shared.security.AuthenticatedActor;
 import java.util.Objects;
 
 /**
- * The one adapter of {@link PermissionScopes}: reads the role code stored for the account and asks the catalog whether the role
+ * The one adapter of {@link OwnRecordPolicy}: reads the role code stored for the account and asks the catalog whether the role
  * limits the permission to what the account itself created ({@link StaffRole#ownScoped()}). The scope is declared in the role
  * and not in the matrix of permissions (docs/03-seguridad.md section 5.4).
  *
@@ -18,11 +18,11 @@ import java.util.Objects;
  * assignment, or a code outside the catalog, answers {@code true} (restricted to its own); a failure of the store propagates and
  * never reads as "not restricted".
  */
-public final class AccountPermissionScopes implements PermissionScopes {
+public final class AccountOwnRecordPolicy implements OwnRecordPolicy {
 
     private final StaffRoleAssignmentRepository assignments;
 
-    public AccountPermissionScopes(StaffRoleAssignmentRepository assignments) {
+    public AccountOwnRecordPolicy(StaffRoleAssignmentRepository assignments) {
         this.assignments = Objects.requireNonNull(assignments, "assignments");
     }
 
