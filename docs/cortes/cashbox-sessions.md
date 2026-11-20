@@ -25,8 +25,10 @@ Que Contabilidad pueda consultar las sesiones y aprobar los cierres con diferenc
 
 ## Permisos (ya existen en `Permission`; sin cambio de matriz)
 
-`cashbox:create` (Cajero y Super Administrador: abrir, mover, cerrar), `cashbox:read` (Cajero solo su sesión; Contabilidad,
-Auditor y demás lectura), `cashbox:approve` (Contabilidad, Super Administrador). El Administrador no maneja efectivo.
+`cashbox:create` (Cajero y Super Administrador: abrir, mover, cerrar), `cashbox:read` (Cajero solo su sesión; Administrador,
+Contabilidad, Auditor y Super Administrador, todas), `cashbox:approve` (**Administrador y Super Administrador**, según la matriz
+efectiva de `docs/03-seguridad.md` §5.2 y la fila de §5.3 «Cierre de caja con diferencia»; Contabilidad solo lee y exporta). El
+Administrador aprueba pero no maneja efectivo (no tiene `cashbox:create`).
 
 ## Endpoints (`/api/v1/cashbox`)
 
@@ -61,10 +63,50 @@ aprobación, cajero que consulta la sesión de otro, sesión de otra institució
 ## Criterio de aceptación
 
 Un cajero abre con 500.00, deposita 100.00, retira 50.00 y cierra declarando 540.00: esperado 550.00, diferencia −10.00, queda
-`pending_approval`; el mismo cajero no puede aprobarla, Contabilidad sí, y la sesión queda `closed` con todo en la bitácora. Una
+`pending_approval`; el mismo cajero no puede aprobarla, el Administrador (o el Super Administrador) sí, y la sesión queda `closed` con todo en la bitácora. Una
 segunda apertura mientras hay una abierta responde 409. Con la sesión cerrada, ningún movimiento nuevo entra, ni por la API ni por SQL.
 
 ## Fuera de alcance
 
 Pagos y movimiento `payment_in` (corte 2), reembolsos (`refund_out`), conteo por denominaciones (`CashCount`), cajones físicos
 (`CashDrawer`) y asientos contables del efectivo.
+
+## Lo construido (backend, 2026-11-19)
+
+Solo backend y contrato OpenAPI; la pantalla queda para el siguiente paso del corte.
+
+- **Migración `V34__create_cashbox_sessions.sql`**: `cashbox_session`, `cashbox_movement`, `cashbox_session_close` (con la columna
+  generada `difference_amount = declared_amount - expected_amount`) y `cashbox_session_approval`. Índice único parcial
+  `(institution_id, cashier_id) WHERE status = 'open'` (INV-22). Disparadores: un movimiento solo entra en una sesión `open` y en su
+  moneda (INV-21, con `FOR SHARE` para que un movimiento que corre contra un cierre espere); el cierre recalcula el esperado desde
+  los movimientos, exige que cierre el cajero y que la diferencia tenga motivo de 20 a 500 caracteres (INV-23); la aprobación
+  rechaza al cajero de la sesión y a una sesión que no esté `pending_approval`. Movimientos, cierres y aprobaciones son de solo
+  inserción (UPDATE, DELETE y TRUNCATE rechazados a todo rol). La única columna mutable es `status` de la sesión: solo avanza
+  (`open → closed | pending_approval`, `pending_approval → closed`) y solo con el registro que lo justifica; `confia_admin_app` tiene
+  `UPDATE (status)` y nada más. RLS forzada por institución.
+- **Paquete `com.confia.cashbox`**: dominio puro con `Money` (`CashSession`, `CashMovement`, `CashClose`, `CashApproval`; el esperado
+  y la diferencia se calculan en `CashSession`/`CashClose`), casos de uso `OpenSession`, `RecordMovement`, `CloseSession`,
+  `ApproveClose`, `ListSessions`, `GetSession`, `GetCurrentSession`, adaptadores jOOQ, `CashboxController` con `Idempotency-Key`
+  permanente por operación (clave + hash que incluye al actor; misma clave y mismo cuerpo devuelve lo mismo, otro cuerpo u otro
+  actor 422 `idempotency-payload-mismatch`), bloqueo `FOR UPDATE` de la sesión en mover, cerrar y aprobar, y bitácora dentro de la
+  misma transacción (`cashbox.session.opened|closed|approved`, `cashbox.movement.recorded`; solo longitudes de los textos libres).
+- **Errores** (`ProblemCode`): `cash-session-already-open` 409, `cash-session-not-open` 409, `cash-session-not-awaiting-approval`
+  409, `cash-expected-negative` 409, `cash-difference-reason-required` 400, `cash-approval-same-actor` 403.
+- **Importes**: entran y salen como `{ amount, currency }` (HNL, a lo más dos decimales); el movimiento devuelve el esperado
+  posterior y el detalle el esperado, el cierre y la diferencia ya redondeados por el servidor.
+- **Pruebas**: `CashSessionTest` (dominio y casos límite de la nota), `CashboxUseCasesTest` (casos de uso con dobles),
+  `CashboxSessionsIT` (PostgreSQL real: flujo de aceptación, apertura simultánea, idempotencia, rechazos de la base por SQL, RLS
+  como `confia_admin_app` con conteos sin filtro), más las listas fijadas de rutas, permisos, OpenAPI y claves de idempotencia.
+
+### Pendientes y decisiones abiertas
+
+1. **Alcance «el cajero solo ve su sesión» en la lectura (`docs/03` §5.4).** Los casos de uso ya restringen cuando el puerto
+   `SessionScope` responde que el actor solo lee lo suyo, pero un caso de uso no puede conocer el rol (solo el decisor de permisos
+   puede consultar `PermissionResolver`, y ArchUnit lo exige). Hoy el adaptador `FullReadSessionScope` responde «todo» para quien
+   tiene `cashbox:read`. Falta que `identity` publique un directorio de roles (decisión de `confia-architect`) y cambiar ese único
+   bean. Mientras tanto un cajero puede leer (no modificar) la sesión de otro de su institución.
+2. **Moneda**: la sesión usa HNL fijo (`CashAmounts.CURRENCY`), la de la institución; leer `organization_institution.default_currency`
+   exigiría un directorio publicado por `organization`.
+3. La nota original atribuía `cashbox:approve` a Contabilidad; la matriz efectiva aprobada por el propietario lo da al
+   Administrador y al Super Administrador, y así quedó.
+
