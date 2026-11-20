@@ -63,7 +63,7 @@ export function AppShell({
     <div className="flex min-h-dvh bg-bg-canvas text-text-primary">
       <a
         href="#contenido"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-bg-surface focus:px-3 focus:py-2 focus:text-text-link focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+        className="print:hidden sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-bg-surface focus:px-3 focus:py-2 focus:text-text-link focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
       >
         {t("shell.skipToContent")}
       </a>
@@ -72,7 +72,7 @@ export function AppShell({
         // Below lg: a panel over the page. From lg: a column that never disappears and stays in view while the page
         // scrolls (sticky, one viewport tall), so the page never grows a band below the content. Its width is the
         // navigation's: full, or the slim rail.
-        className={`${menuOpen ? "fixed inset-y-0 left-0 z-40 flex shadow-xl" : "hidden"} lg:sticky lg:top-0 lg:z-auto lg:flex lg:h-dvh lg:self-start lg:shadow-none`}
+        className={`print:hidden ${menuOpen ? "fixed inset-y-0 left-0 z-40 flex shadow-xl" : "hidden"} lg:sticky lg:top-0 lg:z-auto lg:flex lg:h-dvh lg:self-start lg:shadow-none`}
       >
         <SideNavigation
           items={navigation}
@@ -96,7 +96,7 @@ export function AppShell({
         />
       </div>
       <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-bg-surface px-6">
+        <header className="flex h-14 print:hidden shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-bg-surface px-6">
           <Button
             variant="subtle"
             size="sm"
@@ -132,7 +132,7 @@ export function AppShell({
         <main
           id="contenido"
           tabIndex={-1}
-          className="min-w-0 flex-1 px-6 py-6 xl:px-8"
+          className="min-w-0 flex-1 px-6 py-6 xl:px-8 print:p-0"
         >
           {children}
         </main>

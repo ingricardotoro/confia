@@ -1,3 +1,4 @@
+import { cashboxFeature } from "../features/cashbox/feature.tsx";
 import { catalogFeature } from "../features/catalog/feature.tsx";
 import { chargesFeature } from "../features/charges/feature.tsx";
 import { enrollmentsFeature } from "../features/enrollments/feature.tsx";
@@ -16,6 +17,7 @@ export const FEATURES: readonly FeatureModule[] = [
   organizationFeature,
   catalogFeature,
   chargesFeature,
+  cashboxFeature,
   studentsFeature,
   enrollmentsFeature,
   guardiansFeature,
