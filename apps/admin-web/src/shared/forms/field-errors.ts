@@ -97,6 +97,12 @@ export function fieldErrorKey(reason: string): AdminKey {
       return "charges.errors.firstOfMonth";
     case "rate-range":
       return "catalog.taxRates.errors.rateRange";
+    case "cash-reason-length":
+      return "cashbox.errors.reasonLength";
+    case "cash-reason-control":
+      return "cashbox.errors.reasonControl";
+    case "difference-reason-required":
+      return "cashbox.errors.differenceReasonRequired";
     case "not-allowed":
       return "field.notAllowed";
     default:

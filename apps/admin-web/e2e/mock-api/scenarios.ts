@@ -7,6 +7,7 @@ import {
 } from "./organization-model.ts";
 import { DEFAULT_CATALOG, createCatalogModel, type CatalogModel, type CatalogOptions } from "./catalog-model.ts";
 import { DEFAULT_CHARGES, createChargesModel, type ChargesModel, type ChargesOptions } from "./charges-model.ts";
+import { DEFAULT_CASHBOX, createCashboxModel, type CashboxModel, type CashboxOptions } from "./cashbox-model.ts";
 import { DEFAULT_CHARGE_VOID, createChargeVoidModel, type ChargeVoidModel, type ChargeVoidOptions } from "./charge-void-model.ts";
 import { DEFAULT_STATEMENT, createStatementModel, type StatementModel, type StatementOptions } from "./statement-model.ts";
 import { DEFAULT_LEDGER, createLedgerModel, type LedgerModel, type LedgerOptions } from "./ledger-model.ts";
@@ -29,7 +30,7 @@ const RETRY_AFTER_SECONDS = "30";
 const TRACE_ID = "01J8Z4K2QF9P0X";
 const EXPIRY_PUSH_MS = 301_000;
 
-export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify" | "organization" | "students" | "enrollments" | "guardians" | "imports" | "catalog" | "charges" | "ledger";
+export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify" | "organization" | "students" | "enrollments" | "guardians" | "imports" | "catalog" | "charges" | "ledger" | "cashbox";
 
 type LoginBehavior =
   | "authenticated"
@@ -67,6 +68,8 @@ interface PresetDefinition {
   readonly statement?: StatementOptions;
   /** The charges of a student, their void and the integrity check the scenario holds, over its students; the seeded ones, with every write allowed, when absent. */
   readonly chargeVoid?: ChargeVoidOptions;
+  /** The cashbox sessions the scenario holds; the seeded ones, with every write allowed, when absent. */
+  readonly cashbox?: CashboxOptions;
   /** A fault injected after the model answered, to prove the server refuses to send it. */
   readonly tamper?: (operation: Operation, response: ModelResponse) => ModelResponse;
 }
@@ -145,6 +148,12 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   "charge-void-read-forbidden": { login: "authenticated", enrolled: false, chargeVoid: { ...DEFAULT_CHARGE_VOID, access: "forbidden" } },
   "charge-void-server-error": { login: "authenticated", enrolled: false, chargeVoid: { ...DEFAULT_CHARGE_VOID, reads: "failing-first" } },
   "integrity-discrepancies": { login: "authenticated", enrolled: false, chargeVoid: { ...DEFAULT_CHARGE_VOID, integrity: "discrepancies" } },
+  // The cashbox (cashbox-sessions cut): no session at all, the person with a session already open, a person without the permission, and reads that
+  // fail first. Each one signs in as the default does.
+  "cashbox-empty": { login: "authenticated", enrolled: false, cashbox: { ...DEFAULT_CASHBOX, seed: "none" } },
+  "cashbox-open": { login: "authenticated", enrolled: false, cashbox: { ...DEFAULT_CASHBOX, seed: "mine-open" } },
+  "cashbox-forbidden": { login: "authenticated", enrolled: false, cashbox: { ...DEFAULT_CASHBOX, access: "forbidden" } },
+  "cashbox-server-error": { login: "authenticated", enrolled: false, cashbox: { ...DEFAULT_CASHBOX, reads: "failing-first" } },
   "statement-empty": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, seed: "empty" } },
   "statement-forbidden": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, access: "forbidden" } },
   "statement-server-error": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, reads: "failing-first" } },
@@ -174,6 +183,7 @@ export interface Scenario {
   readonly ledger: LedgerModel;
   readonly statement: StatementModel;
   readonly chargeVoid: ChargeVoidModel;
+  readonly cashbox: CashboxModel;
   readonly calls: RecordedCall[];
   readonly tamper: PresetDefinition["tamper"];
   signIn(sleep: (ms: number) => Promise<void>): Promise<ModelResponse>;
@@ -209,6 +219,7 @@ function build(preset: string, definition: PresetDefinition): Scenario {
     ledger: createLedgerModel(definition.ledger ?? DEFAULT_LEDGER),
     statement: createStatementModel(definition.statement ?? DEFAULT_STATEMENT, { students }),
     chargeVoid: createChargeVoidModel(definition.chargeVoid ?? DEFAULT_CHARGE_VOID, { students }),
+    cashbox: createCashboxModel(definition.cashbox ?? DEFAULT_CASHBOX),
     calls: [],
     tamper: definition.tamper,
     async signIn(sleep) {

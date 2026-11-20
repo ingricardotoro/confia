@@ -40,6 +40,11 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "posting-account-invalid",
   "charge-already-voided",
   "charge-not-voidable",
+  "cash-session-already-open",
+  "cash-session-not-open",
+  "cash-session-not-awaiting-approval",
+  "cash-expected-negative",
+  "cash-approval-same-actor",
 ]);
 
 /** The text of each reason the server gives for a split of the responsibility that does not hold. */

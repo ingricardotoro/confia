@@ -1,4 +1,4 @@
-import { Badge, Button, FormField, Input, Select } from "@confia/ui";
+import { Badge, Button, FormField, Input, Select, Textarea } from "@confia/ui";
 import type { ReactNode } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 
@@ -113,6 +113,49 @@ export function TextField({
           {...(kind === "numeric" ? { inputMode: "numeric" as const } : {})}
           autoComplete="off"
           {...(sensitive ? { spellCheck: false, autoCorrect: "off" } : {})}
+          value={value}
+          onChange={(event) => {
+            onChange(event.target.value);
+          }}
+          onBlur={onBlur}
+        />
+      )}
+    </FormField>
+  );
+}
+
+export interface TextAreaFieldProps {
+  readonly label: string;
+  readonly controlId: string;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly onBlur: () => void;
+  readonly error?: string | undefined;
+  readonly description?: string;
+  readonly required?: boolean;
+  readonly rows?: number;
+  /** The most the server takes, so the control stops there. */
+  readonly maxLength?: number;
+}
+
+/** A labelled text area for a free text such as a reason or a note. The text is free: the browser must not spell-check or autofill it, because it may hold something personal. */
+export function TextAreaField({ label, controlId, value, onChange, onBlur, error, description, required = false, rows = 3, maxLength }: TextAreaFieldProps) {
+  return (
+    <FormField
+      label={label}
+      controlId={controlId}
+      required={required}
+      {...(error === undefined ? {} : { error })}
+      {...(description === undefined ? {} : { description })}
+    >
+      {(control) => (
+        <Textarea
+          {...control}
+          rows={rows}
+          {...(maxLength === undefined ? {} : { maxLength })}
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           value={value}
           onChange={(event) => {
             onChange(event.target.value);

@@ -12,6 +12,12 @@ describe("isCurrentEntry", () => {
     expect(isCurrentEntry({ to: "/organization" }, "/organizations")).toBe(false);
   });
 
+  it("matches an exact entry only on its own path, so a view below it does not light it up", () => {
+    expect(isCurrentEntry({ to: "/cashbox", exact: true }, "/cashbox")).toBe(true);
+    expect(isCurrentEntry({ to: "/cashbox", exact: true }, "/cashbox/")).toBe(true);
+    expect(isCurrentEntry({ to: "/cashbox", exact: true }, "/cashbox/sessions")).toBe(false);
+  });
+
   it("matches the root entry only on the root", () => {
     expect(isCurrentEntry({ to: "/" }, "/")).toBe(true);
     expect(isCurrentEntry({ to: "/" }, "/organization")).toBe(false);

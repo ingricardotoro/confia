@@ -30,7 +30,10 @@ export type FieldReason =
   | "date-range"
   | "due-day-range"
   | "periods-range"
-  | "first-of-month";
+  | "first-of-month"
+  | "cash-reason-length"
+  | "cash-reason-control"
+  | "difference-reason-required";
 
 export interface AccessFieldSpec {
   /** The fixed `id` of the control, which the error summary links to. */

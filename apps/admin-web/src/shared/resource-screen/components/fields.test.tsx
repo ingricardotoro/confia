@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithAdminI18n } from "../../../test/render.tsx";
-import { ActiveBadge, OptionField, ReadOnlyField, RowActions, TextField } from "./fields.tsx";
+import { ActiveBadge, OptionField, ReadOnlyField, RowActions, TextAreaField, TextField } from "./fields.tsx";
 
 // States. AW57, AW58: the pieces of the forms and of the rows, rendered with props alone. Loading does not apply:
 // they hold no data of their own. Error: a field with `error` is invalid and described by its message. Empty:
@@ -40,6 +40,28 @@ describe("TextField", () => {
     expect(screen.getByLabelText("Fecha")).toHaveAttribute("type", "date");
     expect(screen.getByLabelText("Orden")).toHaveAttribute("type", "text");
     expect(screen.getByLabelText("Orden")).toHaveAttribute("inputmode", "numeric");
+  });
+});
+
+describe("TextAreaField", () => {
+  it("names the area with its label, stops at the maximum and writes what is typed", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderWithAdminI18n(<TextAreaField label="Motivo" controlId="reason" value="" required maxLength={500} onChange={onChange} onBlur={vi.fn()} />);
+
+    const area = screen.getByLabelText(/Motivo/);
+    expect(area).toHaveAttribute("id", "reason");
+    expect(area).toHaveAttribute("maxlength", "500");
+    await user.type(area, "A");
+
+    expect(onChange).toHaveBeenCalledWith("A");
+  });
+
+  it("describes an error and marks the area invalid", () => {
+    renderWithAdminI18n(<TextAreaField label="Motivo" controlId="reason" value="" error="Este dato es obligatorio." onChange={vi.fn()} onBlur={vi.fn()} />);
+
+    expect(screen.getByLabelText("Motivo")).toBeInvalid();
+    expect(screen.getByLabelText("Motivo")).toHaveAccessibleDescription("Este dato es obligatorio.");
   });
 });
 

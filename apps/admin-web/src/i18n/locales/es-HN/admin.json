@@ -107,7 +107,13 @@
     "accountInUse": "La cuenta está en uso en el mapa de cuentas de cargos, que todavía apunta a ella, y no se puede desactivar. Cambie primero el mapa para que apunte a otra cuenta y después desactívela.",
     "postingAccountInvalid": "Una de las cuentas elegidas no es del tipo que exige su renglón del mapa. Ya se recargaron las cuentas; revise las que eligió e intente de nuevo.",
     "chargeAlreadyVoided": "Este cargo ya estaba anulado, así que no se hizo ningún cambio. La lista ya se actualizó.",
-    "chargeNotVoidable": "El libro mayor no permite anular este cargo y no se hizo ningún cambio. Si necesita anularlo, comparta el identificador con soporte."
+    "chargeNotVoidable": "El libro mayor no permite anular este cargo y no se hizo ningún cambio. Si necesita anularlo, comparta el identificador con soporte.",
+    "cashSessionAlreadyOpen": "Ya tiene una caja abierta. Solo puede haber una a la vez; actualice la página para verla.",
+    "cashSessionNotOpen": "La caja ya no está abierta, así que no se hizo ningún cambio. Actualice la página para ver su estado actual.",
+    "cashSessionNotAwaitingApproval": "Este cierre no está pendiente de aprobación, así que no se hizo ningún cambio. Actualice la página para ver su estado actual.",
+    "cashExpectedNegative": "El movimiento dejaría el efectivo esperado por debajo de cero, así que no se registró. Revise el importe.",
+    "cashDifferenceReasonRequired": "Lo contado es distinto de lo esperado: escriba el motivo de la diferencia.",
+    "cashApprovalSameActor": "Quien cerró la caja no puede aprobar su propio cierre. Pida a otra persona con permiso de aprobación que lo revise."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -184,7 +190,9 @@
       "settings": "Configuración"
     },
     "studentCharges": "Cargos del estudiante",
-    "integrity": "Integridad de cargos"
+    "integrity": "Integridad de cargos",
+    "cashbox": "Mi caja",
+    "cashSessions": "Sesiones de caja"
   },
   "catalog": {
     "title": "Catálogo",
@@ -1912,6 +1920,170 @@
       "errors": {
         "yearNotFound": "El año lectivo no existe o ya no está disponible. Elija otro año lectivo."
       }
+    }
+  },
+  "cashbox": {
+    "title": "Caja",
+    "statuses": {
+      "open": "Abierta",
+      "pending_approval": "Pendiente de aprobación",
+      "closed": "Cerrada"
+    },
+    "movementTypes": {
+      "deposit": "Depósito",
+      "withdrawal": "Retiro",
+      "adjustment": "Ajuste"
+    },
+    "actions": {
+      "deposit": "Registrar depósito",
+      "withdrawal": "Registrar retiro",
+      "adjustment": "Registrar ajuste",
+      "close": "Cerrar caja"
+    },
+    "errors": {
+      "reasonLength": "Escriba de 20 a 500 caracteres.",
+      "reasonControl": "El texto no puede tener saltos de línea ni caracteres de control.",
+      "differenceReasonRequired": "Lo contado es distinto de lo esperado: escriba el motivo de la diferencia, de 20 a 500 caracteres."
+    },
+    "summary": {
+      "status": "Estado",
+      "cashier": "Cajero",
+      "openedAt": "Abierta desde",
+      "closedAt": "Cerrada",
+      "openingFloat": "Fondo inicial",
+      "expected": "Efectivo esperado",
+      "declared": "Efectivo contado",
+      "difference": "Diferencia",
+      "differenceReason": "Motivo de la diferencia",
+      "approvedAt": "Aprobada",
+      "approvalNote": "Nota de la aprobación"
+    },
+    "movements": {
+      "heading": "Movimientos",
+      "caption": "Movimientos de la caja",
+      "columns": {
+        "createdAt": "Fecha y hora",
+        "type": "Tipo",
+        "amount": "Importe",
+        "notes": "Notas"
+      },
+      "noNotes": "Sin notas",
+      "emptyTitle": "Todavía no hay movimientos",
+      "emptyDescription": "Los depósitos, los retiros y los ajustes de esta caja aparecen aquí."
+    },
+    "mine": {
+      "heading": "Mi caja",
+      "description": "Su sesión de caja: el efectivo esperado, sus movimientos y el cierre con el conteo físico.",
+      "loading": "Cargando su caja.",
+      "loadFailed": "No se pudo cargar su caja",
+      "forbiddenTitle": "No tiene acceso a la caja",
+      "forbiddenDescription": "Su cuenta no tiene permiso para manejar efectivo. Si lo necesita para su trabajo, solicítelo a un administrador de su institución."
+    },
+    "open": {
+      "title": "Abrir mi caja",
+      "description": "Cuente el efectivo del cajón e indique el fondo inicial. Mientras la caja esté abierta puede registrar depósitos y retiros.",
+      "floatLabel": "Fondo inicial",
+      "floatHelp": "Escriba el importe en lempiras con punto decimal y hasta dos decimales, por ejemplo 500.00. Puede ser cero.",
+      "submit": "Abrir caja",
+      "opening": "Abriendo la caja.",
+      "openedNotice": "Su caja está abierta."
+    },
+    "movementForm": {
+      "titles": {
+        "deposit": "Registrar depósito",
+        "withdrawal": "Registrar retiro",
+        "adjustment": "Registrar ajuste"
+      },
+      "descriptions": {
+        "deposit": "Efectivo que entra a la caja fuera de un cobro, por ejemplo un reabastecimiento de cambio.",
+        "withdrawal": "Efectivo que sale de la caja, por ejemplo una entrega a tesorería. El efectivo esperado no puede quedar por debajo de cero.",
+        "adjustment": "Corrección de un movimiento anterior. Nada se edita ni se borra: el ajuste queda registrado con su motivo."
+      },
+      "submit": {
+        "deposit": "Registrar depósito",
+        "withdrawal": "Registrar retiro",
+        "adjustment": "Registrar ajuste"
+      },
+      "recorded": {
+        "deposit": "Se registró el depósito.",
+        "withdrawal": "Se registró el retiro.",
+        "adjustment": "Se registró el ajuste."
+      },
+      "expectedNow": "Efectivo esperado ahora:",
+      "amount": "Importe",
+      "amountHelp": "En lempiras, con punto decimal y hasta dos decimales, por ejemplo 100.00. Debe ser mayor que cero.",
+      "notes": "Notas",
+      "notesHelp": "Opcional, hasta {max} caracteres. No escriba nombres, números de documento ni datos de salud o familiares.",
+      "adjustmentNotesHelp": "Explique el ajuste, de {min} a {max} caracteres. No escriba nombres, números de documento ni datos de salud o familiares: queda registrado.",
+      "sending": "Registrando el movimiento."
+    },
+    "close": {
+      "title": "Cerrar caja",
+      "description": "Cuente el efectivo del cajón e indique el total. El sistema calcula la diferencia con lo esperado.",
+      "irreversible": "El cierre no se puede deshacer. Si hay diferencia, el cierre queda pendiente de la aprobación de otra persona.",
+      "expected": "Efectivo esperado",
+      "expectedHelp": "Lo calcula el servidor: fondo inicial, más depósitos, menos retiros y más ajustes.",
+      "declared": "Efectivo contado",
+      "declaredHelp": "El total que contó en el cajón, en lempiras, por ejemplo 540.00.",
+      "reason": "Motivo de la diferencia",
+      "reasonHelp": "Obligatorio si lo contado es distinto de lo esperado: de {min} a {max} caracteres. No escriba nombres ni datos personales.",
+      "submit": "Cerrar caja",
+      "sending": "Cerrando la caja."
+    },
+    "closedResult": {
+      "title": "Caja cerrada",
+      "closed": "La caja se cerró sin diferencia.",
+      "pending": "La caja se cerró con diferencia. Queda pendiente de la aprobación de otra persona con permiso para aprobar cierres.",
+      "viewReport": "Ver reporte de cierre"
+    },
+    "sessions": {
+      "heading": "Sesiones de caja",
+      "description": "Las sesiones de caja con su estado y sus importes. Abra una para ver sus movimientos, el reporte de cierre y, si corresponde, aprobarla.",
+      "caption": "Sesiones de caja",
+      "columns": {
+        "openedAt": "Apertura",
+        "cashier": "Cajero",
+        "status": "Estado",
+        "openingFloat": "Fondo inicial",
+        "expected": "Esperado",
+        "declared": "Contado",
+        "difference": "Diferencia"
+      },
+      "filterStatus": "Estado",
+      "filterFrom": "Abierta desde",
+      "filterTo": "Abierta hasta",
+      "errors": {
+        "fromAfterTo": "La fecha final debe ser igual o posterior a la inicial."
+      },
+      "loadFailed": "No se pudieron cargar las sesiones de caja",
+      "emptyTitle": "Todavía no hay sesiones de caja",
+      "emptyDescription": "Las sesiones aparecen aquí cuando un cajero abre su caja.",
+      "emptyAction": "Ir a Mi caja"
+    },
+    "detail": {
+      "heading": "Sesión de caja del {date}",
+      "back": "Volver a las sesiones de caja",
+      "backToList": "Volver a las sesiones",
+      "loading": "Cargando la sesión de caja.",
+      "loadFailed": "No se pudo cargar la sesión de caja",
+      "notFoundTitle": "No encontramos esta sesión de caja",
+      "notFoundDescription": "La sesión no existe, es de otra institución o no está entre las que puede consultar. Vuelva a la lista para elegir otra.",
+      "forbiddenTitle": "No tiene acceso a las sesiones de caja",
+      "forbiddenDescription": "Su cuenta no tiene permiso para consultar sesiones de caja. Si lo necesita para su trabajo, solicítelo a un administrador de su institución.",
+      "pendingNote": "Este cierre tiene diferencia y espera la aprobación de otra persona con permiso para aprobar cierres.",
+      "print": "Imprimir reporte",
+      "approve": "Aprobar cierre",
+      "signatureCashier": "Firma del cajero",
+      "signatureApprover": "Firma de quien aprueba"
+    },
+    "approve": {
+      "title": "Aprobar el cierre",
+      "description": "Confirme que revisó la diferencia. La aprobación queda registrada y no se puede deshacer.",
+      "note": "Nota de la aprobación",
+      "noteHelp": "Qué revisó y por qué aprueba, hasta {max} caracteres. No escriba nombres ni datos personales.",
+      "submit": "Aprobar cierre",
+      "sending": "Aprobando el cierre.",
+      "approvedNotice": "El cierre quedó aprobado y la sesión está cerrada."
     }
   }
 }

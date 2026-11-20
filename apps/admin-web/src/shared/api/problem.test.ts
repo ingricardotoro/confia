@@ -77,6 +77,12 @@ describe("the known codes", () => {
         "posting-account-invalid",
         "charge-already-voided",
         "charge-not-voidable",
+        "cash-session-already-open",
+        "cash-session-not-open",
+        "cash-session-not-awaiting-approval",
+        "cash-expected-negative",
+        "cash-difference-reason-required",
+        "cash-approval-same-actor",
       ].sort(),
     );
   });
