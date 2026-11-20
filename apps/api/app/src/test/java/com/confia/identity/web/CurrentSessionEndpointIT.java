@@ -7,11 +7,13 @@ import com.confia.bootstrap.AdminProcessLauncher;
 import com.confia.identity.domain.LoginIdentifier;
 import com.confia.identity.domain.PlainPassword;
 import com.confia.identity.domain.StaffAccountId;
+import com.confia.identity.domain.StaffRole;
 import com.confia.identity.domain.UserAgentFingerprint;
 import com.confia.identity.infrastructure.Argon2Pepper;
 import com.confia.identity.infrastructure.Argon2Profile;
 import com.confia.identity.infrastructure.BouncyCastleArgon2PasswordHasher;
 import com.confia.kernel.InstitutionId;
+import com.confia.kernel.Permission;
 import com.confia.shared.infrastructure.JooqAuditLogReader;
 import com.confia.shared.security.AuthenticationMethod;
 import com.confia.shared.security.SecurityContext;
@@ -24,6 +26,7 @@ import com.confia.shared.security.token.SigningKeyRing;
 import com.confia.shared.web.harness.HarnessProcess;
 import com.confia.support.CommittingPostgresIntegrationTest;
 import com.confia.support.SharedPostgresContainer;
+import com.confia.support.StaffRoleFixtures;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -33,11 +36,15 @@ import java.net.http.HttpResponse;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
@@ -176,6 +183,143 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
         return response.body() + " " + response.headers().map();
     }
 
+    // --- permissions of the session (identity-session-permissions) ---
+
+    private void assignRole(StaffAccountId account, String roleCode) throws SQLException {
+        try (Connection connection = StaffRoleFixtures.ownerTransaction(institution.value())) {
+            StaffRoleFixtures.assign(connection, institution.value(), account.value(), roleCode);
+            connection.commit();
+        }
+    }
+
+    private void changeRole(StaffAccountId account, String roleCode) throws SQLException {
+        try (Connection connection = StaffRoleFixtures.ownerTransaction(institution.value());
+                PreparedStatement update = connection.prepareStatement("""
+                        update identity_staff_account_role set role_code = ?
+                        where institution_id = ? and account_id = ?
+                        """)) {
+            update.setString(1, roleCode);
+            update.setObject(2, institution.value());
+            update.setObject(3, account.value());
+            assertThat(update.executeUpdate()).isEqualTo(1);
+            connection.commit();
+        }
+    }
+
+    /** The permissions the session lists, read with a token that proved both factors. */
+    private List<String> permissionsOf(StaffAccountId account, UUID family) {
+        return permissionsOf(account, family,
+                Set.of(AuthenticationMethod.PASSWORD, AuthenticationMethod.ONE_TIME_PASSWORD));
+    }
+
+    private List<String> permissionsOf(StaffAccountId account, UUID family,
+            Set<AuthenticationMethod> methods) {
+        JsonNode body = HarnessProcess.json(current(accessToken(account, institution, family,
+                methods, now()).compact()));
+        List<String> codes = new ArrayList<>();
+        body.get("permissions").forEach(code -> codes.add(code.asString()));
+        return codes;
+    }
+
+    private record ExpectedRole(String role, List<String> has, List<String> hasNot) {
+    }
+
+    /** Each role against its row of docs/03 section 5.2, written here and not read from the matrix. */
+    @Test
+    void eachOfTheSixRolesGetsItsOwnSortedPermissionsAsInTheMatrixOfTheSecurityDocument()
+            throws SQLException {
+        List<ExpectedRole> matrix = List.of(
+                new ExpectedRole("super_admin", List.of("cashbox:approve", "charges:void",
+                        "audit:read", "invoicing:void"), List.of("invoicing:request-void")),
+                new ExpectedRole("administrator", List.of("cashbox:approve", "cashbox:read",
+                        "charges:void", "settings:update"), List.of("cashbox:create",
+                        "payments:create", "audit:export")),
+                new ExpectedRole("cashier", List.of("cashbox:create", "cashbox:read",
+                        "payments:create", "invoicing:request-void"), List.of("cashbox:approve",
+                        "charges:void", "invoicing:void", "payments:void")),
+                new ExpectedRole("accounting", List.of("invoicing:void", "invoicing:approve",
+                        "reconciliation:approve", "payments:void"), List.of("cashbox:create",
+                        "cashbox:approve", "charges:void")),
+                new ExpectedRole("auditor", List.of("audit:read", "audit:export", "ledger:read"),
+                        List.of("cashbox:create", "cashbox:approve", "charges:void",
+                                "payments:create", "settings:update")),
+                new ExpectedRole("academic_coordinator", List.of("students:update",
+                        "documents:approve"), List.of("cashbox:read", "cashbox:approve",
+                        "payments:create", "charges:void")));
+        assertThat(matrix.stream().map(ExpectedRole::role)).containsExactlyInAnyOrderElementsOf(
+                Arrays.stream(StaffRole.values()).map(StaffRole::code).toList());
+
+        for (ExpectedRole expected : matrix) {
+            StaffAccountId account = seedAccount(institution, expected.role() + "@colegio.edu.hn");
+            assignRole(account, expected.role());
+            UUID family = seedLiveFamily(institution, account, true);
+
+            List<String> permissions = permissionsOf(account, family);
+
+            assertThat(permissions).as(expected.role()).isSorted().doesNotHaveDuplicates()
+                    .containsAll(expected.has()).doesNotContainAnyElementsOf(expected.hasNot());
+            assertThat(permissions).as(expected.role() + " is exactly its role")
+                    .isEqualTo(StaffRole.ofCode(expected.role()).orElseThrow().permissions().stream()
+                            .map(Permission::code).sorted().toList());
+        }
+    }
+
+    @Test
+    void anAccountWithoutAnAssignedRoleGetsAnEmptyList() {
+        StaffAccountId ana = seedAccount(institution, ANA);
+        UUID family = seedLiveFamily(institution, ana, false);
+
+        HttpResponse<String> response = current(accessToken(ana, institution, family,
+                Set.of(AuthenticationMethod.PASSWORD, AuthenticationMethod.ONE_TIME_PASSWORD),
+                now()).compact());
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        JsonNode permissions = HarnessProcess.json(response).get("permissions");
+        assertThat(permissions.isArray()).isTrue();
+        assertThat(permissions.size()).isZero();
+    }
+
+    /**
+     * The permission decider refuses every permissioned request of a session that has not proved the
+     * second factor, so the list of that session is empty: it never offers what the server denies.
+     */
+    @Test
+    void aSessionWithoutTheSecondFactorGetsAnEmptyListWhateverItsRole() throws SQLException {
+        StaffAccountId ana = seedAccount(institution, ANA);
+        assignRole(ana, "cashier");
+        UUID family = seedLiveFamily(institution, ana, true);
+
+        assertThat(permissionsOf(ana, family, Set.of(AuthenticationMethod.PASSWORD))).isEmpty();
+        assertThat(permissionsOf(ana, family)).contains("cashbox:create");
+    }
+
+    @Test
+    void aChangeOfRoleBetweenTwoReadsIsReflectedByTheSecondOne() throws SQLException {
+        StaffAccountId ana = seedAccount(institution, ANA);
+        assignRole(ana, "cashier");
+        UUID family = seedLiveFamily(institution, ana, true);
+
+        List<String> first = permissionsOf(ana, family);
+        changeRole(ana, "auditor");
+        List<String> second = permissionsOf(ana, family);
+
+        assertThat(first).contains("cashbox:create");
+        assertThat(second).doesNotContain("cashbox:create").contains("audit:read");
+    }
+
+    @Test
+    void theRoleOfAnotherInstitutionNeverReachesTheList() throws SQLException {
+        StaffAccountId ana = seedAccount(institution, ANA);
+        UUID family = seedLiveFamily(institution, ana, true);
+        try (Connection connection = StaffRoleFixtures.ownerTransaction(otherInstitution.value())) {
+            StaffRoleFixtures.insertAccount(connection, otherInstitution.value(), ana.value());
+            StaffRoleFixtures.assign(connection, otherInstitution.value(), ana.value(), "super_admin");
+            connection.commit();
+        }
+
+        assertThat(permissionsOf(ana, family)).isEmpty();
+    }
+
     // --- I129 and I130 ---
 
     @Test
@@ -200,9 +344,9 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
         JsonNode body = HarnessProcess.json(response);
         List<String> fields = new ArrayList<>();
         body.propertyNames().forEach(fields::add);
-        assertThat(fields).as("the closed list of seven fields, in this order").containsExactly(
+        assertThat(fields).as("the closed list of eight fields, in this order").containsExactly(
                 "sessionId", "accountId", "institutionId", "authenticationMethods",
-                "accessTokenExpiresAt", "sessionExpiresAt", "idleExpiresAt");
+                "accessTokenExpiresAt", "sessionExpiresAt", "idleExpiresAt", "permissions");
         assertThat(body.get("sessionId").asString()).isEqualTo(family.toString());
         assertThat(body.get("accountId").asString()).isEqualTo(ana.value().toString());
         assertThat(body.get("institutionId").asString()).isEqualTo(institution.value().toString());

@@ -9,7 +9,6 @@ import com.confia.shared.security.PermissionResolver;
 import com.confia.shared.security.RequestOrigin;
 import com.confia.shared.security.TransactionRunner;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -45,8 +44,7 @@ public final class AccountPermissions implements PermissionResolver {
                 .orElseGet(UUID::randomUUID).toString();
         InstitutionId institution = new InstitutionId(actor.institutionId());
         StaffAccountId account = new StaffAccountId(actor.accountId());
-        Optional<String> stored = runner.executeReadOnly(actor.securityContext(requestId),
-                () -> assignments.findRoleCode(institution, account));
-        return stored.flatMap(StaffRole::ofCode).map(StaffRole::permissions).orElse(Set.of());
+        return runner.executeReadOnly(actor.securityContext(requestId),
+                () -> EffectiveRolePermissions.of(assignments, institution, account));
     }
 }

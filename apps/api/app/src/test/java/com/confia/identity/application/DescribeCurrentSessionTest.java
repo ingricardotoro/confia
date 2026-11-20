@@ -6,7 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.confia.identity.domain.RefreshTokenFamily;
 import com.confia.identity.domain.RefreshTokenFamilyState;
 import com.confia.identity.domain.StaffAccountId;
+import com.confia.identity.domain.StaffRole;
 import com.confia.kernel.InstitutionId;
+import com.confia.kernel.Permission;
 import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.AuthenticationMethod;
 import com.confia.support.JdbcStubTransactions;
@@ -41,9 +43,13 @@ class DescribeCurrentSessionTest {
     private final List<String> transaction = new ArrayList<>();
     private final List<String> readOnlyFlags = new ArrayList<>();
     private final FakeFamilies families = new FakeFamilies();
+    private final FakeAssignments assignments = new FakeAssignments();
     private final DescribeCurrentSession describe = new DescribeCurrentSession(
-            JdbcStubTransactions.runner(transaction, readOnlyFlags), families,
+            JdbcStubTransactions.runner(transaction, readOnlyFlags), families, assignments,
             Clock.fixed(NOON, ZoneOffset.UTC));
+
+    private static final Set<AuthenticationMethod> BOTH_FACTORS =
+            Set.of(AuthenticationMethod.PASSWORD, AuthenticationMethod.ONE_TIME_PASSWORD);
 
     private static AuthenticatedActor actor(Set<AuthenticationMethod> methods) {
         return new AuthenticatedActor(ANA.value(), INSTITUTION, FAMILY, UUID.randomUUID(), methods,
@@ -145,7 +151,80 @@ class DescribeCurrentSessionTest {
         assertThatThrownBy(() -> view.authenticationMethods().add("x"))
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> new CurrentSessionView(null, ANA.value(), INSTITUTION, List.of(),
-                NOON, NOON, NOON)).isInstanceOf(NullPointerException.class);
+                NOON, NOON, NOON, List.of())).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void thePermissionsAreTheSortedCodesOfTheRoleOfTheAccountReadInTheSameTransaction() {
+        families.state = state(ANA, LAST_USED, null);
+        assignments.code = "cashier";
+
+        List<String> permissions = describe.execute(actor(BOTH_FACTORS)).orElseThrow().permissions();
+
+        assertThat(permissions).isSorted().contains("cashbox:create").doesNotContain("cashbox:approve")
+                .containsExactlyElementsOf(StaffRole.CASHIER.permissions().stream()
+                        .map(Permission::code).sorted().toList());
+        assertThat(assignments.asked).containsExactly(new InstitutionId(INSTITUTION) + "/" + ANA);
+        assertThat(transaction).as("one transaction for the family and the role")
+                .containsExactly("commit");
+    }
+
+    @Test
+    void noAssignmentOrAnUnknownRoleCodeIsAnEmptyList() {
+        families.state = state(ANA, LAST_USED, null);
+        AuthenticatedActor actor = actor(BOTH_FACTORS);
+
+        assignments.code = null;
+        assertThat(describe.execute(actor).orElseThrow().permissions()).isEmpty();
+
+        assignments.code = "superuser";
+        assertThat(describe.execute(actor).orElseThrow().permissions()).isEmpty();
+    }
+
+    @Test
+    void aFailureOfTheRoleReadReachesTheCallerAndRollsBack() {
+        families.state = state(ANA, LAST_USED, null);
+        IllegalStateException failure = new IllegalStateException("role store down");
+        assignments.failure = failure;
+
+        assertThatThrownBy(() -> describe.execute(actor(BOTH_FACTORS))).isSameAs(failure);
+        assertThat(transaction).containsExactly("rollback");
+    }
+
+    /** The permission decider refuses every request of a session without the second factor (docs/03 section 5). */
+    @Test
+    void aSessionWithoutTheSecondFactorListsNoPermissionAndDoesNotReadTheRole() {
+        families.state = state(ANA, LAST_USED, null);
+        assignments.code = "cashier";
+
+        assertThat(describe.execute(actor(Set.of(AuthenticationMethod.PASSWORD))).orElseThrow()
+                .permissions()).isEmpty();
+        assertThat(assignments.asked).isEmpty();
+    }
+
+    @Test
+    void theRoleIsNotReadWhenTheSessionIsNotLive() {
+        families.state = null;
+
+        describe.execute(actor(Set.of(AuthenticationMethod.PASSWORD)));
+
+        assertThat(assignments.asked).isEmpty();
+    }
+
+    private static final class FakeAssignments implements StaffRoleAssignmentRepository {
+
+        final List<String> asked = new ArrayList<>();
+        String code;
+        RuntimeException failure;
+
+        @Override
+        public Optional<String> findRoleCode(InstitutionId institutionId, StaffAccountId accountId) {
+            asked.add(institutionId + "/" + accountId);
+            if (failure != null) {
+                throw failure;
+            }
+            return Optional.ofNullable(code);
+        }
     }
 
     private static final class FakeFamilies implements RefreshTokenFamilyRepository {

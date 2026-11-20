@@ -267,8 +267,9 @@ public class IdentityConfiguration {
      */
     @Bean
     DescribeCurrentSession describeCurrentSession(TransactionRunner runner,
-            RefreshTokenFamilyRepository families, Clock clock) {
-        return new DescribeCurrentSession(runner, families, clock);
+            RefreshTokenFamilyRepository families, StaffRoleAssignmentRepository assignments,
+            Clock clock) {
+        return new DescribeCurrentSession(runner, families, assignments, clock);
     }
 
     /**

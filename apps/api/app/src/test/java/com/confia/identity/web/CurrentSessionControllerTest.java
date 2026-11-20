@@ -6,10 +6,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.confia.identity.application.DescribeCurrentSession;
 import com.confia.identity.application.RefreshTokenFamilyRepository;
 import com.confia.identity.application.SessionRevocationReason;
+import com.confia.identity.application.StaffRoleAssignmentRepository;
 import com.confia.identity.domain.RefreshTokenFamily;
 import com.confia.identity.domain.RefreshTokenFamilyState;
 import com.confia.identity.domain.StaffAccountId;
+import com.confia.identity.domain.StaffRole;
 import com.confia.kernel.InstitutionId;
+import com.confia.kernel.Permission;
 import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.AuthenticationMethod;
 import com.confia.shared.web.authentication.AccessTokenRejectedException;
@@ -31,7 +34,7 @@ import org.junit.jupiter.api.Test;
  * design.md decision 13): it takes the actor from the principal the filter bound and nothing from
  * the request, hands it to the real use case and copies the view into the DTO; a session that stopped
  * being live is the same {@code 401} as any other rejected credential; and the DTO has exactly the
- * seven approved members. The route, the filter and the database are {@code
+ * eight approved members. The route, the filter and the database are {@code
  * CurrentSessionEndpointIT}.
  */
 class CurrentSessionControllerTest {
@@ -47,9 +50,11 @@ class CurrentSessionControllerTest {
             NOON.plusSeconds(600));
 
     private final FakeFamilies families = new FakeFamilies();
+    private final StaffRoleAssignmentRepository assignments =
+            (institution, account) -> Optional.of("auditor");
     private final CurrentSessionController controller = new CurrentSessionController(
             new DescribeCurrentSession(JdbcStubTransactions.runner(new ArrayList<>()), families,
-                    Clock.fixed(NOON, ZoneOffset.UTC)));
+                    assignments, Clock.fixed(NOON, ZoneOffset.UTC)));
 
     private CurrentSessionResponse currentAs(AuthenticatedActor actor) {
         return ScopedValue.where(AuthenticatedActor.CURRENT, actor).call(controller::current);
@@ -66,7 +71,8 @@ class CurrentSessionControllerTest {
                 .containsExactly(new InstitutionId(INSTITUTION) + "/" + SESSION);
         assertThat(response).isEqualTo(new CurrentSessionResponse(SESSION, ACCOUNT, INSTITUTION,
                 List.of("pwd", "otp"), NOON.plusSeconds(600), NOON.plusSeconds(21_600),
-                NOON.plusSeconds(1_500)));
+                NOON.plusSeconds(1_500), StaffRole.AUDITOR.permissions().stream()
+                        .map(Permission::code).sorted().toList()));
     }
 
     @Test
@@ -85,19 +91,19 @@ class CurrentSessionControllerTest {
     }
 
     @Test
-    void theResponseHasExactlyTheSevenApprovedMembersInTheirOrder() {
+    void theResponseHasExactlyTheEightApprovedMembersInTheirOrder() {
         assertThat(Arrays.stream(CurrentSessionResponse.class.getRecordComponents())
                 .map(RecordComponent::getName).toList())
                 .containsExactly("sessionId", "accountId", "institutionId",
                         "authenticationMethods", "accessTokenExpiresAt", "sessionExpiresAt",
-                        "idleExpiresAt");
+                        "idleExpiresAt", "permissions");
     }
 
     @Test
     void theResponseKeepsItsOwnCopyOfTheMethods() {
         List<String> methods = new ArrayList<>(List.of("pwd"));
         CurrentSessionResponse response = new CurrentSessionResponse(SESSION, ACCOUNT,
-                INSTITUTION, methods, NOON, NOON, NOON);
+                INSTITUTION, methods, NOON, NOON, NOON, List.of());
         methods.add("otp");
 
         assertThat(response.authenticationMethods()).containsExactly("pwd");
