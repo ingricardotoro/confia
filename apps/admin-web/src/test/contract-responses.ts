@@ -50,8 +50,11 @@ import {
   TaxRateResponse,
   ProblemDetail,
   SecondFactorPendingResponse,
+  RecordedMovementResponse,
   SectionPageResponse,
   SectionResponse,
+  SessionPageResponse,
+  SessionResponse,
   StudentEnrollmentResponse,
   StudentGuardiansResponse,
   StudentPageResponse,
@@ -96,6 +99,8 @@ import {
   type TaxRateResponseOutput,
   type SecondFactorPendingResponseOutput,
   type SectionResponseOutput,
+  type SessionResponseOutput,
+  type SessionSummaryResponseOutput,
   type StudentEnrollmentResponseOutput,
   type StudentGuardianResponseOutput,
   type StudentGuardiansResponseOutput,
@@ -1149,5 +1154,66 @@ export function integrityRunPage(
 /** One run with its confirmed discrepancies (none for a clean run). */
 export function integrityRunDetail(run: unknown, findings: readonly unknown[] = []): ContractResponse {
   const body: IntegrityRunDetailResponseOutput = checked("IntegrityRunDetailResponse", IntegrityRunDetailResponse, { run, findings });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+// The cash sessions (cashbox-sessions cut). Every amount is a `{ amount, currency }` string the way the server rounds it.
+const HNL = (amount: string) => ({ amount, currency: "HNL" });
+type CashMovementBody = SessionResponseOutput["movements"][number];
+
+/** A session of the cashbox, open with its float by default, as the current session and the detail answer it. */
+export function cashSessionBody(override: Partial<SessionResponseOutput> = {}): SessionResponseOutput {
+  return checked("SessionResponse", SessionResponse, {
+    id: crypto.randomUUID(),
+    cashierId: "00000000-0000-4000-8000-0000000000a1",
+    status: "open",
+    openedAt: STAMP,
+    openingFloat: HNL("500.00"),
+    expectedAmount: HNL("500.00"),
+    movements: [],
+    ...override,
+  });
+}
+
+export function cashSession(override: Partial<SessionResponseOutput> = {}, status = 200): ContractResponse {
+  return { status, body: cashSessionBody(override), contentType: JSON_TYPE };
+}
+
+/** One movement of a session. */
+export function cashMovement(override: Partial<CashMovementBody> = {}): CashMovementBody {
+  return {
+    id: crypto.randomUUID(),
+    sessionId: "00000000-0000-4000-8000-0000000c0001",
+    type: "deposit",
+    amount: HNL("100.00"),
+    createdAt: STAMP,
+    createdBy: "00000000-0000-4000-8000-0000000000a1",
+    ...override,
+  };
+}
+
+/** The answer of a movement: the movement and the expected cash after it. */
+export function recordedMovement(movement: Partial<CashMovementBody> = {}, expectedAfter = "600.00"): ContractResponse {
+  const body = checked("RecordedMovementResponse", RecordedMovementResponse, { movement: cashMovement(movement), expectedAfter: HNL(expectedAfter) });
+  return { status: 201, body, contentType: JSON_TYPE };
+}
+
+/** One row of the list of sessions. */
+export function cashSessionRow(override: Partial<SessionSummaryResponseOutput> = {}): SessionSummaryResponseOutput {
+  return {
+    id: crypto.randomUUID(),
+    cashierId: "00000000-0000-4000-8000-0000000000a1",
+    status: "open",
+    openedAt: STAMP,
+    openingFloat: HNL("500.00"),
+    ...override,
+  };
+}
+
+export function cashSessionPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("sessions page", SessionPageResponse, { items, page: paging.page ?? 0, size: paging.size ?? 25, total: paging.total ?? items.length });
   return { status: 200, body, contentType: JSON_TYPE };
 }

@@ -58,5 +58,11 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "posting-account-invalid": "problem.postingAccountInvalid",
   "charge-already-voided": "problem.chargeAlreadyVoided",
   "charge-not-voidable": "problem.chargeNotVoidable",
+  "cash-session-already-open": "problem.cashSessionAlreadyOpen",
+  "cash-session-not-open": "problem.cashSessionNotOpen",
+  "cash-session-not-awaiting-approval": "problem.cashSessionNotAwaitingApproval",
+  "cash-expected-negative": "problem.cashExpectedNegative",
+  "cash-difference-reason-required": "problem.cashDifferenceReasonRequired",
+  "cash-approval-same-actor": "problem.cashApprovalSameActor",
   unknown: "problem.unexpected",
 };

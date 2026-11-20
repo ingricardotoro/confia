@@ -17,6 +17,8 @@ export interface NavigationEntry {
   readonly to: string;
   /** The section of the side navigation the entry is listed under. Absent: listed first, with no section label. */
   readonly group?: NavigationGroupId;
+  /** The entry is current only on its own path, not on the paths below it. For an area whose address is a view of its own and whose other views sit below it. */
+  readonly exact?: boolean;
 }
 
 /**
@@ -31,8 +33,8 @@ export interface FeatureModule {
 }
 
 /** Whether `entry` is the page being shown: the exact path, or a path below it (the root matches only itself). */
-export function isCurrentEntry(entry: Pick<NavigationEntry, "to">, pathname: string): boolean {
+export function isCurrentEntry(entry: Pick<NavigationEntry, "to" | "exact">, pathname: string): boolean {
   const current = pathname.replace(/\/+$/, "") || "/";
-  if (entry.to === "/") return current === "/";
+  if (entry.to === "/" || entry.exact === true) return current === entry.to;
   return current === entry.to || current.startsWith(`${entry.to}/`);
 }
