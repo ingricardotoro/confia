@@ -30,12 +30,17 @@ const below = (path: string): string => path.slice(CASHBOX_PATH.length + 1);
  * What the cashbox registers with the app: its entries in the side navigation and its routes, children of the signed in shell and so
  * already behind the session guard. The cashier's own cashbox is the area's address (an exact entry, so it is not current on the pages below
  * it); the sessions list validates its own search (page, size, order and filters), which lives in the address, and the report of one session
- * lives below the list. The session gives the interface no permissions, so the entries are offered to every signed in person and the server
- * answers a person without the permission with a 403 that each screen tells plainly.
+ * lives below the list. Each entry and route declares the permission of the operations it calls: the own cashbox opens, moves and closes
+ * (`cashbox:create`), the list and the report read (`cashbox:read`, the longer prefix wins), and the report offers the approval only with
+ * `cashbox:approve`. The interface only hides; the server decides every request again.
  */
 export const cashboxFeature: FeatureModule = {
-  navigation: { id: "cashbox", labelKey: "navigation.cashbox", to: CASHBOX_PATHS.mine, group: "finance", exact: true },
-  moreNavigation: [{ id: "cashbox-sessions", labelKey: "navigation.cashSessions", to: CASHBOX_PATHS.sessions, group: "finance" }],
+  navigation: { id: "cashbox", labelKey: "navigation.cashbox", to: CASHBOX_PATHS.mine, group: "finance", exact: true, permission: "cashbox:create" },
+  moreNavigation: [{ id: "cashbox-sessions", labelKey: "navigation.cashSessions", to: CASHBOX_PATHS.sessions, group: "finance", permission: "cashbox:read" }],
+  routePermissions: [
+    { path: CASHBOX_PATH, permission: "cashbox:create" },
+    { path: CASHBOX_PATHS.sessions, permission: "cashbox:read" },
+  ],
   createRoutes: (parent: AnyRoute) => {
     const area = createRoute({ getParentRoute: () => parent, path: CASHBOX_PATH, component: CashboxContainer });
     // A parameter that holds its default is not written in the address (docs/ui-ux/04, section 3.2, rule 1).

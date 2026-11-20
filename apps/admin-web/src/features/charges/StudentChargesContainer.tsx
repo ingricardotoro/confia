@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
 import { STATEMENT_PATH } from "../../shared/navigation/statement-paths.ts";
 import type { ResourceNotice } from "../../shared/resource-screen/components/ResourceScreen.tsx";
@@ -37,6 +38,7 @@ const NO_FILTERS = { status: undefined, periodFrom: undefined, periodTo: undefin
  * the list and the statements are read again and the person is told.
  */
 export function StudentChargesContainer({ search, onSearchChange }: StudentChargesContainerProps) {
+  const { can } = usePermissions();
   const { t } = useAdminText();
   const navigate = useNavigate();
   const box = useDebouncedSearch();
@@ -140,10 +142,14 @@ export function StudentChargesContainer({ search, onSearchChange }: StudentCharg
         table={state.table}
         pagination={state.pagination}
         notice={notice}
-        onVoid={(row) => {
-          setNotice(undefined);
-          setTarget(row);
-        }}
+        onVoid={
+          can("charges:void")
+            ? (row) => {
+                setNotice(undefined);
+                setTarget(row);
+              }
+            : undefined
+        }
       />
       {target === undefined ? null : (
         <VoidChargeContainer

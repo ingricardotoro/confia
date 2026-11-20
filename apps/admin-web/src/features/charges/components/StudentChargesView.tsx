@@ -32,7 +32,8 @@ export interface StudentChargesViewProps {
   readonly pagination: ResourcePagination;
   /** The result of the last void, already translated. */
   readonly notice?: ResourceNotice | undefined;
-  readonly onVoid: (row: StudentCharge) => void;
+  /** Absent when the person cannot void charges: the column of actions is not drawn. */
+  readonly onVoid?: ((row: StudentCharge) => void) | undefined;
 }
 
 const focusField = (id: string) => () => {
@@ -70,23 +71,27 @@ export function StudentChargesView({ state, picker, chosen, filters, rows, table
         </span>
       ),
     },
-    {
-      id: "actions",
-      header: t("charges.studentCharges.columns.actions"),
-      cell: (row) =>
-        row.status === "ACTIVE" ? (
-          <Button
-            variant="destructive-soft"
-            size="xs"
-            aria-label={t("charges.studentCharges.voidActionFor", { concept: conceptOf(row), period: row.periodLabel })}
-            onClick={() => {
-              onVoid(row);
-            }}
-          >
-            {t("charges.studentCharges.voidAction")}
-          </Button>
-        ) : null,
-    },
+    ...(onVoid === undefined
+      ? []
+      : [
+          {
+            id: "actions",
+            header: t("charges.studentCharges.columns.actions"),
+            cell: (row: StudentCharge) =>
+              row.status === "ACTIVE" ? (
+                <Button
+                  variant="destructive-soft"
+                  size="xs"
+                  aria-label={t("charges.studentCharges.voidActionFor", { concept: conceptOf(row), period: row.periodLabel })}
+                  onClick={() => {
+                    onVoid(row);
+                  }}
+                >
+                  {t("charges.studentCharges.voidAction")}
+                </Button>
+              ) : null,
+          },
+        ] satisfies TableColumn<StudentCharge>[]),
   ];
 
   return (

@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
 import type { LedgerAccountType } from "../../shared/api/ledger-operations.ts";
 import type { Lookup } from "../../shared/organization-lookups/use-lookups.ts";
@@ -21,6 +22,7 @@ import { useActiveAccountLookup, usePostingAccounts, usePostingAccountsSave } fr
  * the form then turns into a read-only view with a note. Nothing is optimistic: the map is read again after every save.
  */
 export function PostingMapContainer() {
+  const { can } = usePermissions();
   const { t } = useAdminText();
   const navigate = useNavigate();
   const map = usePostingAccounts();
@@ -113,7 +115,8 @@ export function PostingMapContainer() {
       rows={rows}
       missing={missingRoles(saved)}
       noAccounts={noAccounts}
-      readOnly={forbidden}
+      // The map is saved with the permission of the chart of accounts; the server refusal (403) still turns it read only as before.
+      readOnly={forbidden || !can("ledger:create")}
       notice={notice}
       lookupFailure={failedLookups.length === 0 ? undefined : { onRetry: () => { failedLookups.forEach((lookup) => { lookup.retry(); }); } }}
       pendingCount={pendingCount}

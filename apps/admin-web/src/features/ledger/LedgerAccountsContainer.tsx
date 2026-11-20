@@ -1,4 +1,5 @@
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
 import { useListState } from "../../shared/resource-screen/use-list-state.ts";
 import { useResourceView } from "../../shared/resource-screen/use-resource-view.ts";
@@ -25,6 +26,7 @@ export interface LedgerAccountsContainerProps {
  * server refuses to deactivate one the map of posting accounts still points at.
  */
 export function LedgerAccountsContainer({ search, onSearchChange }: LedgerAccountsContainerProps) {
+  const { can } = usePermissions();
   const list = useLedgerAccountList({ ...toApiParams(search), active: activeParamOf(search.active) });
   const write = useLedgerAccountWrite();
   const view = useResourceView<LedgerAccount>();
@@ -34,7 +36,7 @@ export function LedgerAccountsContainer({ search, onSearchChange }: LedgerAccoun
     onSearchChange,
     filtered: search.type !== undefined || search.active !== undefined,
     cleared: { page: 1, pageSize: search.pageSize, sort: search.sort, type: undefined, active: undefined },
-    onCreate: view.openCreate,
+    onCreate: can("ledger:create") ? view.openCreate : undefined,
     loadFailedKey: "ledger.accounts.loadFailed",
     emptyKeys: {
       title: "ledger.accounts.emptyTitle",
@@ -66,11 +68,11 @@ export function LedgerAccountsContainer({ search, onSearchChange }: LedgerAccoun
             },
           },
         }}
-        onCreate={view.openCreate}
-        onEdit={view.openEdit}
-        onToggle={(row) => {
+        onCreate={can("ledger:create") ? view.openCreate : undefined}
+        onEdit={can("ledger:create") ? view.openEdit : undefined}
+        onToggle={can("ledger:create") ? (row) => {
           void view.toggle(row.id, row.name, !row.active, () => write.mutateAsync({ mode: "update", id: row.id, body: updateBodyOf(row, !row.active) }));
-        }}
+        } : undefined}
       />
       {view.dialog.kind === "closed" ? null : (
         <LedgerAccountFormContainer

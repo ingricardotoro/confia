@@ -26,7 +26,12 @@ const below = (path: string): string => path.slice(LEDGER_PATH.length + 1);
  * in the backend, but its screen needs the accounts of the chart, so it lives here and a feature never imports another.
  */
 export const ledgerFeature: FeatureModule = {
-  navigation: { id: "ledger", labelKey: "navigation.ledger", to: LEDGER_PATH, group: "settings" },
+  navigation: { id: "ledger", labelKey: "navigation.ledger", to: LEDGER_PATH, group: "settings", permission: "ledger:read" },
+  // The map of posting accounts is read from the charges, so it asks for their permission and not the chart's.
+  routePermissions: [
+    { path: LEDGER_PATH, permission: "ledger:read" },
+    { path: LEDGER_PATHS.postingMap, permission: "charges:read" },
+  ],
   createRoutes: (parent: AnyRoute) => {
     const area = createRoute({ getParentRoute: () => parent, path: LEDGER_PATH, component: LedgerContainer });
     // A parameter that holds its default is not written in the address (docs/ui-ux/04, section 3.2, rule 1).

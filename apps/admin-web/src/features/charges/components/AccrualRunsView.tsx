@@ -27,7 +27,8 @@ export interface AccrualRunsViewProps {
   readonly hrefOf: (row: AccrualRun) => string;
   readonly onOpen: (row: AccrualRun) => void;
   /** The way to the generation page. */
-  readonly onCreate: () => void;
+  /** Absent when the person cannot create: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
 }
 
 /** The runs as a table, newest first as the server orders them: period (a link to the run), plan, state, the four counters and the dates. */

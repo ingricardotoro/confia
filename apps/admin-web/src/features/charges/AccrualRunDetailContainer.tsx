@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { useConceptLookup } from "../../shared/catalog-lookups/use-concept-lookup.ts";
 import { nameMapOf } from "../../shared/organization-lookups/use-lookups.ts";
 import { LOOKUP_PAGE_SIZE } from "../../shared/organization-lookups/use-organization-queries.ts";
@@ -25,6 +26,7 @@ export interface AccrualRunDetailContainerProps {
  * the counters and the states are the server's.
  */
 export function AccrualRunDetailContainer({ runId, search, onSearchChange }: AccrualRunDetailContainerProps) {
+  const { can } = usePermissions();
   const { t } = useAdminText();
   const navigate = useNavigate();
   const detail = useAccrualRunDetail(runId, { page: search.page - 1, size: search.pageSize });
@@ -106,9 +108,13 @@ export function AccrualRunDetailContainer({ runId, search, onSearchChange }: Acc
       onOpenGeneration={() => void navigate({ to: CHARGES_PATHS.accrual })}
       planHref={planHref}
       onOpenPlan={() => void navigate({ to: planHref })}
-      onRecalculate={() => {
-        if (run !== undefined) void navigate({ to: CHARGES_PATHS.accrual, search: { planId: run.planId, periodStart: run.periodStart } });
-      }}
+      onRecalculate={
+        can("charges:create")
+          ? () => {
+              if (run !== undefined) void navigate({ to: CHARGES_PATHS.accrual, search: { planId: run.planId, periodStart: run.periodStart } });
+            }
+          : undefined
+      }
     />
   );
 }
