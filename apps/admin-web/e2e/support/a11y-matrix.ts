@@ -139,6 +139,14 @@ async function openCatalogRoute(page: Page, path: string = CATALOG): Promise<voi
 /** A route of the charges with the cookies of a signed in session: the same way in as the catalog's. */
 const openChargesRoute = (page: Page, path: string): Promise<void> => openCatalogRoute(page, path);
 
+/** The cashbox (cashbox-sessions cut): the cashier's page, the list of sessions and the seeded session that awaits its approval. */
+const CASHBOX = "/cashbox";
+const CASH_SESSIONS = "/cashbox/sessions";
+const CASH_SESSION_PENDING = `${CASH_SESSIONS}/00000000-0000-4000-8000-000000400002`;
+
+/** A route of the cashbox with the cookies of a signed in session: the same way in as the catalog's. */
+const openCashboxRoute = (page: Page, path: string): Promise<void> => openCatalogRoute(page, path);
+
 /** The generation of charges (charges-accrual cut): the page, the list of runs and the seeded runs (completed with errors, rejected, failed). */
 const ACCRUAL = "/charges/accrual";
 const ACCRUAL_PLAN = "planId=00000000-0000-4000-8000-000000009001";
@@ -1596,5 +1604,80 @@ export const MATRIX: readonly GateCombination[] = [
     // The page retries a read twice by itself (1 s and 2 s) and the simulator fails exactly those three reads, so the state shows after about 3 s.
     arrange: (page) => openChargesRoute(page, RUN_WITH_ERRORS),
     expected: (page) => page.getByText("No se pudo cargar la ejecución"),
+  },
+  // The cashbox (cashbox-sessions cut): the cashier's own page with no session (the form to open one), with an open session, its close dialog and
+  // its movement dialog, and a read that fails; the list of sessions, empty and with rows; and the report of a close that awaits its approval, with
+  // the approval dialog open.
+  {
+    route: CASHBOX,
+    state: "no-session",
+    preset: "cashbox-empty",
+    arrange: (page) => openCashboxRoute(page, CASHBOX),
+    expected: (page) => page.getByRole("button", { name: "Abrir caja" }),
+  },
+  {
+    route: CASHBOX,
+    state: "open-session",
+    preset: "cashbox-open",
+    arrange: (page) => openCashboxRoute(page, CASHBOX),
+    expected: (page) => page.getByRole("table", { name: "Movimientos de la caja" }),
+  },
+  {
+    route: CASHBOX,
+    state: "close-dialog",
+    preset: "cashbox-open",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCashboxRoute(page, CASHBOX);
+      await page.getByRole("button", { name: "Cerrar caja" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Cerrar caja" }),
+  },
+  {
+    route: CASHBOX,
+    state: "movement-dialog",
+    preset: "cashbox-open",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCashboxRoute(page, CASHBOX);
+      await page.getByRole("button", { name: "Registrar retiro" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Registrar retiro" }),
+  },
+  {
+    route: CASHBOX,
+    state: "load-error",
+    preset: "cashbox-server-error",
+    arrange: (page) => openCashboxRoute(page, CASHBOX),
+    expected: (page) => page.getByText("No se pudo cargar su caja"),
+  },
+  {
+    route: CASH_SESSIONS,
+    state: "ready",
+    arrange: (page) => openCashboxRoute(page, CASH_SESSIONS),
+    expected: (page) => page.getByRole("table", { name: "Sesiones de caja" }).getByRole("row").nth(1),
+  },
+  {
+    route: CASH_SESSIONS,
+    state: "empty",
+    preset: "cashbox-empty",
+    arrange: (page) => openCashboxRoute(page, CASH_SESSIONS),
+    expected: (page) => page.getByText("Todavía no hay sesiones de caja"),
+  },
+  {
+    route: CASH_SESSION_PENDING,
+    state: "pending-approval",
+    arrange: (page) => openCashboxRoute(page, CASH_SESSION_PENDING),
+    expected: (page) => page.getByRole("button", { name: "Aprobar cierre" }),
+  },
+  {
+    route: CASH_SESSION_PENDING,
+    state: "approve-dialog",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openCashboxRoute(page, CASH_SESSION_PENDING);
+      await page.getByRole("button", { name: "Aprobar cierre" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Aprobar el cierre" }),
   },
 ];

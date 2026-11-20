@@ -16,6 +16,7 @@ import {
   type Operation,
   type Scenario,
 } from "./scenarios.ts";
+import { CASHBOX_BASE } from "./cashbox-model.ts";
 import { CATALOG_BASE } from "./catalog-model.ts";
 import { CHARGES_BASE } from "./charges-model.ts";
 import { LEDGER_BASE, POSTING_ACCOUNTS_PATH } from "./ledger-model.ts";
@@ -89,6 +90,8 @@ const SUCCESS_SCHEMAS: Readonly<Record<Operation, Schema | undefined>> = {
   charges: undefined,
   // The same for the chart of accounts and the map of posting accounts (ledger-model.ts).
   ledger: undefined,
+  // The same for the cashbox sessions (cashbox-model.ts).
+  cashbox: undefined,
 };
 
 /** The fields of a response that break the contract; empty when it meets it. The `instance` of an error is not checked (I306). */
@@ -242,6 +245,21 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
       const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
       const answer = scenario.ledger.handle({ method, path, query: url.searchParams, body });
       if (answer !== undefined) { deliver(res, scenario, "ledger", answer); return; }
+    }
+    // The cashbox: its sessions, their movements, the close and the approval.
+    if (path.startsWith(`${CASHBOX_BASE}/`)) {
+      const session = scenario.model.currentSession(bearerOf(req));
+      if (session.status !== 200) { deliver(res, scenario, "cashbox", session); return; }
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body = method === "POST" ? await readBody(req) : undefined;
+      const answer = scenario.cashbox.handle({
+        method,
+        path,
+        query: url.searchParams,
+        body,
+        headers: { "idempotency-key": typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : undefined },
+      });
+      if (answer !== undefined) { deliver(res, scenario, "cashbox", answer); return; }
     }
     if (path.startsWith(`${CHARGES_BASE}/`)) {
       // Every operation of the charges is a bearer route: no access token, no answer.
