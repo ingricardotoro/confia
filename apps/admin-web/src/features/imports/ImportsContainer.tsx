@@ -1,6 +1,7 @@
 import type { ImportRunResponseOutput } from "@confia/contracts/admin";
 import { useRef, useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
 import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
 import { useListState } from "../../shared/resource-screen/use-list-state.ts";
@@ -20,6 +21,8 @@ import {
   type ImportFailure,
   type ImportKind,
   type ImportStep,
+  IMPORT_KINDS,
+  IMPORT_PERMISSIONS,
 } from "./import-model.ts";
 import type { ImportsSearch } from "./imports-search.ts";
 import { useApplyImport, useImportHistory, useSimulateImport } from "./use-imports-queries.ts";
@@ -38,8 +41,12 @@ export interface ImportsContainerProps {
  * is refused by it when the file is not the one that was simulated.
  */
 export function ImportsContainer({ search, onSearchChange }: ImportsContainerProps) {
+  const { can } = usePermissions();
   const { t } = useAdminText();
-  const [kind, setKind] = useState<ImportKind>("students");
+  // Each kind is loaded with the permission that creates what it brings: the students and their enrollments, or the guardians and their links.
+  const kinds = IMPORT_KINDS.filter((candidate) => can(IMPORT_PERMISSIONS[candidate]));
+  const [chosenKind, setKind] = useState<ImportKind>("students");
+  const kind: ImportKind = kinds.includes(chosenKind) ? chosenKind : (kinds[0] ?? chosenKind);
   const simulate = useSimulateImport(kind);
   const apply = useApplyImport(kind);
   const history = useImportHistory(toApiParams({ page: search.page, pageSize: search.pageSize, kind: search.kind }));
@@ -59,9 +66,13 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
     onSearchChange,
     filtered: search.kind !== undefined,
     cleared: { page: 1, pageSize: search.pageSize, kind: undefined, actsPage: search.actsPage },
-    onCreate: () => {
-      document.getElementById("import-file")?.focus();
-    },
+    // Without a kind to load there is no file field to go to.
+    onCreate:
+      kinds.length === 0
+        ? undefined
+        : () => {
+            document.getElementById("import-file")?.focus();
+          },
     loadFailedKey: "imports.history.loadFailed",
     emptyKeys: { title: "imports.history.emptyTitle", description: "imports.history.emptyDescription", action: "imports.history.emptyAction" },
   });
@@ -155,48 +166,51 @@ export function ImportsContainer({ search, onSearchChange }: ImportsContainerPro
 
   return (
     <div className="flex flex-col gap-5">
-      <ImportWizard
-        kind={kind}
-        onKindChange={onKindChange}
-        step={step}
-        phase={phase}
-        inputKey={inputKey}
-        fileProblem={fileProblem}
-        failure={failure}
-        simulation={simulation}
-        result={result}
-        confirming={confirming}
-        onFileChange={onFileChange}
-        onSimulate={() => void onSimulate()}
-        onTemplate={() => {
-          downloadText(TEMPLATE_FILE_NAMES[kind], templateTextOf(kind));
-        }}
-        onDownloadRejections={() => {
-          // On the result step the list is the one the apply answered, which may hold more rows than the simulation showed.
-          const shown = result ?? simulation;
-          if (shown === undefined) return;
-          downloadText(
-            REJECTIONS_FILE_NAME,
-            rejectionsCsv(
-              shown.rejections,
-              [t("imports.rejections.csvHeader.line"), t("imports.rejections.csvHeader.field"), t("imports.rejections.csvHeader.reason")],
-              (field) => {
-                const named = fieldNameOf(field, kind);
-                return named.kind === "column" ? named.name : named.kind === "row" ? t("imports.rejections.rowField") : t("imports.rejections.unknownField");
-              },
-              (reason) => t(`imports.reason.${reason}`),
-            ),
-          );
-        }}
-        onOpenApply={() => {
-          setConfirming(true);
-        }}
-        onCloseApply={() => {
-          setConfirming(false);
-        }}
-        onApply={() => void onApply()}
-        onReset={onReset}
-      />
+      {kinds.length === 0 ? null : (
+        <ImportWizard
+          kind={kind}
+          kinds={kinds}
+          onKindChange={onKindChange}
+          step={step}
+          phase={phase}
+          inputKey={inputKey}
+          fileProblem={fileProblem}
+          failure={failure}
+          simulation={simulation}
+          result={result}
+          confirming={confirming}
+          onFileChange={onFileChange}
+          onSimulate={() => void onSimulate()}
+          onTemplate={() => {
+            downloadText(TEMPLATE_FILE_NAMES[kind], templateTextOf(kind));
+          }}
+          onDownloadRejections={() => {
+            // On the result step the list is the one the apply answered, which may hold more rows than the simulation showed.
+            const shown = result ?? simulation;
+            if (shown === undefined) return;
+            downloadText(
+              REJECTIONS_FILE_NAME,
+              rejectionsCsv(
+                shown.rejections,
+                [t("imports.rejections.csvHeader.line"), t("imports.rejections.csvHeader.field"), t("imports.rejections.csvHeader.reason")],
+                (field) => {
+                  const named = fieldNameOf(field, kind);
+                  return named.kind === "column" ? named.name : named.kind === "row" ? t("imports.rejections.rowField") : t("imports.rejections.unknownField");
+                },
+                (reason) => t(`imports.reason.${reason}`),
+              ),
+            );
+          }}
+          onOpenApply={() => {
+            setConfirming(true);
+          }}
+          onCloseApply={() => {
+            setConfirming(false);
+          }}
+          onApply={() => void onApply()}
+          onReset={onReset}
+        />
+      )}
       <ReconciliationContainer search={search} onSearchChange={onSearchChange} />
       <ImportHistory
         rows={historyState.rows}

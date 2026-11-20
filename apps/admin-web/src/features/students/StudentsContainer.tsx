@@ -5,6 +5,7 @@ import { StudentGuardiansContainer } from "../guardians/StudentGuardiansContaine
 import { STATEMENT_PATH, studentStatementPath } from "../../shared/navigation/statement-paths.ts";
 import { STUDENT_CHARGES_PATH, studentChargesPath } from "../../shared/navigation/student-charges-paths.ts";
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
 import { useListState } from "../../shared/resource-screen/use-list-state.ts";
 import { useResourceView } from "../../shared/resource-screen/use-resource-view.ts";
@@ -28,6 +29,7 @@ const DEFAULT_SORT: TableSort = { columnId: "lastName", direction: "asc" };
  * and activate or deactivate from the row. The state of the table is the address's: the search box only follows it.
  */
 export function StudentsContainer({ search, onSearchChange }: StudentsContainerProps) {
+  const { can } = usePermissions();
   const navigate = useNavigate();
   const list = useStudentList(toApiParams(search));
   const write = useStudentWrite();
@@ -43,7 +45,7 @@ export function StudentsContainer({ search, onSearchChange }: StudentsContainerP
     onSearchChange,
     filtered: search.q !== undefined || search.status !== undefined,
     cleared: { page: 1, pageSize: search.pageSize, sort: search.sort, q: undefined, status: undefined },
-    onCreate: view.openCreate,
+    onCreate: can("students:create") ? view.openCreate : undefined,
     loadFailedKey: "students.loadFailed",
     emptyKeys: { title: "students.emptyTitle", description: "students.emptyDescription", action: "students.emptyAction" },
     defaultSort: DEFAULT_SORT,
@@ -66,20 +68,24 @@ export function StudentsContainer({ search, onSearchChange }: StudentsContainerP
             },
           },
         }}
-        onCreate={view.openCreate}
-        onEdit={view.openEdit}
+        onCreate={can("students:create") ? view.openCreate : undefined}
+        onEdit={can("students:update") ? view.openEdit : undefined}
         statementHrefOf={(row) => studentStatementPath(row.id)}
         onStatement={(row) => void navigate({ to: STATEMENT_PATH, search: { studentId: row.id } })}
         chargesHrefOf={(row) => studentChargesPath(row.id)}
         onCharges={(row) => void navigate({ to: STUDENT_CHARGES_PATH, search: { studentId: row.id } })}
-        onGuardians={(row) => {
-          view.clearNotice();
-          setGuardiansOf(row);
-        }}
-        onToggle={(row) => {
+        onGuardians={
+          can("guardians:update")
+            ? (row) => {
+                view.clearNotice();
+                setGuardiansOf(row);
+              }
+            : undefined
+        }
+        onToggle={can("students:update") ? (row) => {
           const next = row.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
           void view.toggle(row.id, nameOf(row), next === "ACTIVE", () => write({ mode: "update", id: row.id, body: toggleBodyOf(row, next) }));
-        }}
+        } : undefined}
       />
       {guardiansOf === undefined ? null : (
         <StudentGuardiansContainer

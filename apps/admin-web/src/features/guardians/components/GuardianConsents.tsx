@@ -32,7 +32,8 @@ export interface GuardianConsentsProps {
   readonly form: ConsentFormView | undefined;
   /** The text of the last change, already translated; empty until there is one. */
   readonly message: string;
-  readonly onOpen: (target: ConsentTarget) => void;
+  /** Absent when the person cannot change consents: the grant and withdraw buttons are not drawn. */
+  readonly onOpen?: ((target: ConsentTarget) => void) | undefined;
 }
 
 /** The most events the server serves in the history. */
@@ -152,30 +153,32 @@ function Cell({ standing, channel, purpose, onOpen }: CellProps) {
           <p className="text-text-secondary">{t(`guardians.consents.evidence.${standing.evidenceSource}`)}</p>
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          id={consentActionId({ channel, purpose, action: "GRANT" })}
-          variant="success-soft"
-          size="xs"
-          aria-label={t("guardians.consents.grantFor", names)}
-          onClick={() => {
-            onOpen({ channel, purpose, action: "GRANT" });
-          }}
-        >
-          {t("guardians.consents.grant")}
-        </Button>
-        <Button
-          id={consentActionId({ channel, purpose, action: "WITHDRAW" })}
-          variant="destructive-soft"
-          size="xs"
-          aria-label={t("guardians.consents.withdrawFor", names)}
-          onClick={() => {
-            onOpen({ channel, purpose, action: "WITHDRAW" });
-          }}
-        >
-          {t("guardians.consents.withdraw")}
-        </Button>
-      </div>
+      {onOpen === undefined ? null : (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            id={consentActionId({ channel, purpose, action: "GRANT" })}
+            variant="success-soft"
+            size="xs"
+            aria-label={t("guardians.consents.grantFor", names)}
+            onClick={() => {
+              onOpen({ channel, purpose, action: "GRANT" });
+            }}
+          >
+            {t("guardians.consents.grant")}
+          </Button>
+          <Button
+            id={consentActionId({ channel, purpose, action: "WITHDRAW" })}
+            variant="destructive-soft"
+            size="xs"
+            aria-label={t("guardians.consents.withdrawFor", names)}
+            onClick={() => {
+              onOpen({ channel, purpose, action: "WITHDRAW" });
+            }}
+          >
+            {t("guardians.consents.withdraw")}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

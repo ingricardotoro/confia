@@ -1,6 +1,7 @@
 import type { TableSort } from "@confia/ui";
 import { useEffect, useRef, useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
 import type { ResourceNotice } from "../../shared/resource-screen/components/ResourceScreen.tsx";
 import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
@@ -35,6 +36,7 @@ const DEFAULT_SORT: TableSort = { columnId: "studentLastName", direction: "asc" 
  * is the address's. With no year in the address the server lists the year in progress, and so does the year filter show it.
  */
 export function EnrollmentsContainer({ search, onSearchChange }: EnrollmentsContainerProps) {
+  const { can } = usePermissions();
   const { t } = useAdminText();
   const years = useYearLookup();
   const grades = useGradeLabels();
@@ -76,9 +78,11 @@ export function EnrollmentsContainer({ search, onSearchChange }: EnrollmentsCont
     onSearchChange,
     filtered: search.gradeId !== undefined || search.sectionId !== undefined || search.status !== undefined || search.academicYearId !== undefined,
     cleared: { page: 1, pageSize: search.pageSize, sort: search.sort, academicYearId: undefined, gradeId: undefined, sectionId: undefined, status: undefined },
-    onCreate: () => {
-      open({ kind: "enroll" });
-    },
+    onCreate: can("students:create")
+      ? () => {
+          open({ kind: "enroll" });
+        }
+      : undefined,
     loadFailedKey: "enrollments.loadFailed",
     emptyKeys: { title: "enrollments.emptyTitle", description: "enrollments.emptyDescription", action: "enrollments.emptyAction" },
     defaultSort: DEFAULT_SORT,
@@ -138,18 +142,30 @@ export function EnrollmentsContainer({ search, onSearchChange }: EnrollmentsCont
               }
             : undefined
         }
-        onCreate={() => {
-          open({ kind: "enroll" });
-        }}
+        onCreate={
+          can("students:create")
+            ? () => {
+                open({ kind: "enroll" });
+              }
+            : undefined
+        }
         onDetail={(row) => {
           open({ kind: "detail", row });
         }}
-        onTransfer={(row) => {
-          open({ kind: "transfer", row });
-        }}
-        onExit={(row) => {
-          open({ kind: "exit", row });
-        }}
+        onTransfer={
+          can("students:update")
+            ? (row) => {
+                open({ kind: "transfer", row });
+              }
+            : undefined
+        }
+        onExit={
+          can("students:update")
+            ? (row) => {
+                open({ kind: "exit", row });
+              }
+            : undefined
+        }
       />
       {dialog.kind === "enroll" ? (
         <EnrollFormContainer

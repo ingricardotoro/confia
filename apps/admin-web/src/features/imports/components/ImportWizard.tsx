@@ -11,6 +11,8 @@ export type ImportPhase = "idle" | "simulating" | "applying";
 export interface ImportWizardProps {
   /** What the file loads. It decides the template, the texts and the route the container sends the file to. */
   readonly kind: ImportKind;
+  /** The kinds the person may load, in order. Every kind when absent. */
+  readonly kinds?: readonly ImportKind[] | undefined;
   readonly onKindChange: (kind: ImportKind) => void;
   readonly step: ImportStep;
   readonly phase: ImportPhase;
@@ -206,7 +208,7 @@ export function ImportWizard(props: ImportWizardProps) {
                 label={t("imports.kindLabel")}
                 controlId={KIND_ID}
                 value={kind}
-                options={IMPORT_KINDS.map((option) => ({ value: option, label: t(`imports.kinds.${option}.option`) }))}
+                options={(props.kinds ?? IMPORT_KINDS).map((option) => ({ value: option, label: t(`imports.kinds.${option}.option`) }))}
                 description={t("imports.kindOrder")}
                 disabled={busy}
                 onChange={(value) => {

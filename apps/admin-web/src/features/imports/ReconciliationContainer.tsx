@@ -1,6 +1,7 @@
 import { PageHeader } from "@confia/ui";
 import { useEffect, useRef, useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { useAccessForm } from "../../shared/forms/use-access-form.ts";
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
 import { fieldSpecs } from "../../shared/resource-screen/resource-form.ts";
@@ -40,6 +41,7 @@ export interface ReconciliationContainerProps {
  * blocked while one is in flight; afterwards the preview and the actas are read again.
  */
 export function ReconciliationContainer({ search, onSearchChange }: ReconciliationContainerProps) {
+  const { can } = usePermissions();
   const { t } = useAdminText();
   const years = useYearLookup();
   const sign = useSignReconciliation();
@@ -118,9 +120,12 @@ export function ReconciliationContainer({ search, onSearchChange }: Reconciliati
     },
     filtered: false,
     cleared: { page: 1, pageSize: ACTS_PAGE_SIZE },
-    onCreate: () => {
-      document.getElementById(RECONCILIATION_CONTROL_IDS.officialReference)?.focus();
-    },
+    // Without the permission to register there is no form to go to.
+    onCreate: can("students:create")
+      ? () => {
+          document.getElementById(RECONCILIATION_CONTROL_IDS.officialReference)?.focus();
+        }
+      : undefined,
     loadFailedKey: "imports.reconciliation.history.loadFailed",
     emptyKeys: {
       title: "imports.reconciliation.history.emptyTitle",
@@ -134,24 +139,26 @@ export function ReconciliationContainer({ search, onSearchChange }: Reconciliati
   return (
     <section aria-labelledby="reconciliation-heading" className="flex flex-col gap-3">
       <PageHeader title={t("imports.reconciliation.heading")} headingLevel={2} headingId="reconciliation-heading" description={t("imports.reconciliation.intro")} />
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <ReconciliationForm
-          years={{ state: yearsState, options: optionsOf(years.rows), onRetry: years.retry }}
-          values={form.values}
-          fieldErrors={form.fieldErrors}
-          summary={form.summary}
-          alert={form.alert}
-          countdown={form.countdown}
-          liveMessage={form.liveMessage}
-          submitting={form.submitting}
-          summaryRef={form.summaryRef}
-          alertRef={form.alertRef}
-          signed={signed}
-          signedRef={signedRef}
-          onChange={form.onChange}
-          onBlur={form.onBlur}
-          onSubmit={form.onSubmit}
-        />
+      <div className={can("students:create") ? "grid grid-cols-1 gap-5 lg:grid-cols-2" : "grid grid-cols-1 gap-5"}>
+        {can("students:create") ? (
+          <ReconciliationForm
+            years={{ state: yearsState, options: optionsOf(years.rows), onRetry: years.retry }}
+            values={form.values}
+            fieldErrors={form.fieldErrors}
+            summary={form.summary}
+            alert={form.alert}
+            countdown={form.countdown}
+            liveMessage={form.liveMessage}
+            submitting={form.submitting}
+            summaryRef={form.summaryRef}
+            alertRef={form.alertRef}
+            signed={signed}
+            signedRef={signedRef}
+            onChange={form.onChange}
+            onBlur={form.onBlur}
+            onSubmit={form.onSubmit}
+          />
+        ) : null}
         <ReconciliationPreview view={previewView} officialCount={officialCountOf(form.values.officialEnrollmentCount)} />
       </div>
       <ReconciliationHistory rows={historyState.rows} table={historyState.table} pagination={historyState.pagination} yearNames={yearNames} />

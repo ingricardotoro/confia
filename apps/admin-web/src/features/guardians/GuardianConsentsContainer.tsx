@@ -1,4 +1,5 @@
 import { useAdminText } from "../../i18n/use-admin-text.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { loadFailureOf } from "../../shared/resource-screen/resource-failure.ts";
 import { GuardianConsents } from "./components/GuardianConsents.tsx";
 import { useGuardianConsents, useRecordConsent } from "./use-guardians-queries.ts";
@@ -14,6 +15,7 @@ export interface GuardianConsentsContainerProps {
  * withdrawal. Nothing is decided here: the server says what is granted, what is refused and whether a request wrote an event.
  */
 export function GuardianConsentsContainer({ guardianId, guardianActive }: GuardianConsentsContainerProps) {
+  const { can } = usePermissions();
   const { t } = useAdminText();
   const consents = useGuardianConsents(guardianId);
   const record = useRecordConsent(guardianId);
@@ -29,7 +31,7 @@ export function GuardianConsentsContainer({ guardianId, guardianActive }: Guardi
       guardianActive={guardianActive}
       form={form}
       message={message}
-      onOpen={open}
+      onOpen={can("guardians:update") ? open : undefined}
       state={
         consents.isPending
           ? { kind: "loading" }

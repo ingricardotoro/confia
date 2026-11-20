@@ -13,9 +13,12 @@ export interface GuardiansViewProps {
   /** The id of the row being activated or deactivated, if any. */
   readonly togglingId?: string | undefined;
   readonly filters: GuardianFiltersProps;
-  readonly onCreate: () => void;
-  readonly onEdit: (row: Guardian) => void;
-  readonly onToggle: (row: Guardian) => void;
+  /** Absent when the person cannot create: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
+  /** Absent when the person cannot edit: the button is not drawn. */
+  readonly onEdit?: ((row: Guardian) => void) | undefined;
+  /** Absent when the person cannot change the state: the button is not drawn. */
+  readonly onToggle?: ((row: Guardian) => void) | undefined;
   readonly onDetail: (row: Guardian) => void;
 }
 
@@ -56,12 +59,8 @@ export function GuardiansView({ rows, table, pagination, notice, togglingId, fil
           name={nameOf(row)}
           active={row.status === "ACTIVE"}
           busy={togglingId === row.id}
-          onEdit={() => {
-            onEdit(row);
-          }}
-          onToggle={() => {
-            onToggle(row);
-          }}
+          onEdit={onEdit === undefined ? undefined : () => { onEdit(row); }}
+          onToggle={onToggle === undefined ? undefined : () => { onToggle(row); }}
           extra={
             <Button
               variant="secondary"
