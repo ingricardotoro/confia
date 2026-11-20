@@ -257,6 +257,27 @@ describe("signing out", () => {
   });
 });
 
+describe("the permissions of the current session", () => {
+  const bodyOf = (response: ModelResponse) => response.body as { permissions: string[] };
+
+  it("lists every code the panel knows, in order, unless the scenario narrows the role", () => {
+    const { model } = fixture();
+    const session = open(model);
+
+    const { permissions } = bodyOf(model.currentSession(session.accessToken));
+
+    expect(permissions).toContain("charges:void");
+    expect(permissions).toEqual([...permissions].sort());
+  });
+
+  it("lists only the codes of the role the scenario gives, sorted", () => {
+    const model = createSessionModel({ now: () => START, permissions: ["students:read", "catalog:read"] });
+    const session = open(model);
+
+    expect(bodyOf(model.currentSession(session.accessToken)).permissions).toEqual(["catalog:read", "students:read"]);
+  });
+});
+
 describe("the current session", () => {
   it("answers the session of the access token, with the same ids on every read", () => {
     const { model } = fixture();

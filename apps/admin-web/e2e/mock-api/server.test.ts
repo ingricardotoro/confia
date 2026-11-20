@@ -360,6 +360,37 @@ describe("the seeded test session", { timeout: LIMIT }, () => {
     ]);
   });
 
+  it("lists the permissions of the role the preset gives: the auditor reads and writes nothing, the cashier works its cashbox and approves nothing, the administrator approves and has no cashbox, the other role cannot void", async () => {
+    const roles = [
+      ["auditor", "role-auditor"],
+      ["no-void", "role-without-void"],
+      ["cashier", "role-cashier"],
+      ["administrator", "role-administrator"],
+    ] as const;
+    for (const [scenario, name] of roles) {
+      await preset(scenario, name);
+      const seeded = await call("POST", `/__control/seed-session?scenario=${scenario}`);
+      const refreshed = await call("POST", "/api/v1/auth/sessions/refresh", { headers: cookieRoute(seeded), scenario });
+      const current = await call("GET", "/api/v1/auth/sessions/current", {
+        headers: { Authorization: `Bearer ${(refreshed.json as { accessToken: string }).accessToken}` },
+        scenario,
+      });
+      const { permissions } = current.json as { permissions: string[] };
+
+      if (name === "role-auditor") expect(permissions.every((code) => code.endsWith(":read"))).toBe(true);
+      else if (name === "role-cashier") {
+        expect(permissions).toContain("cashbox:create");
+        expect(permissions).not.toContain("cashbox:approve");
+      } else if (name === "role-administrator") {
+        expect(permissions).toContain("cashbox:approve");
+        expect(permissions).not.toContain("cashbox:create");
+      } else {
+        expect(permissions).toContain("charges:create");
+        expect(permissions).not.toContain("charges:void");
+      }
+    }
+  });
+
   it("seeds the scenario the query names, so a journey can keep its own", async () => {
     const seeded = await call("POST", "/__control/seed-session?scenario=mine");
 

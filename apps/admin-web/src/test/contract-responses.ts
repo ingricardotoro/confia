@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { PERMISSION_CODES } from "../shared/permissions/permission-codes.ts";
 import {
   AcademicYearPageResponse,
   AccrualPeriodResponse,
@@ -207,8 +208,8 @@ export function currentSession(options: BuildOptions<CurrentSessionResponseOutpu
     authenticationMethods: ["pwd", "otp"],
     idleExpiresAt: after(now, 30),
     institutionId: crypto.randomUUID(),
-    // The panel does not read the permissions yet; the list is here because the contract requires it.
-    permissions: [],
+    // Every code the panel knows: the journeys run with a role that can do all of them, and a scenario narrows it.
+    permissions: [...PERMISSION_CODES].sort(),
     sessionExpiresAt: after(now, 8 * 60),
     sessionId: crypto.randomUUID(),
     ...options.override,

@@ -158,6 +158,11 @@
     "title": "Esta página no existe.",
     "link": "Ir a inicio de sesión"
   },
+  "noAccess": {
+    "title": "Sin acceso",
+    "message": "Su rol no tiene permiso para ver esta página. Si la necesita para su trabajo, solicítela a un Super Administrador.",
+    "link": "Volver al inicio"
+  },
   "shell": {
     "brand": "CONFIA",
     "logoAlt": "CONFIA, control financiero académico",
@@ -1108,6 +1113,8 @@
     }
   },
   "resource": {
+    "emptyReadOnlyDescription": "Todavía no hay registros. Su rol solo puede consultar esta información.",
+    "refreshList": "Actualizar la lista",
     "totalRecords": "{count, plural, one {# registro} other {# registros}}",
     "state": "Estado",
     "actions": "Acciones",

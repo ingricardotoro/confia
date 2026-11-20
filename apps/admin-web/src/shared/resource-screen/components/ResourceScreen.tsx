@@ -28,7 +28,8 @@ export interface ResourceScreenProps<Row> {
   /** Already translated. A line under the heading that says what the view is for. */
   readonly description?: string | undefined;
   readonly createLabel: string;
-  readonly onCreate: () => void;
+  /** Absent when the person cannot create: the heading carries no action. */
+  readonly onCreate?: (() => void) | undefined;
   /** The filter controls of the view, if it has any. */
   readonly filters?: ReactNode;
   readonly notice?: ResourceNotice | undefined;
@@ -53,7 +54,7 @@ export function ResourceScreen<Row>({ heading, description, createLabel, onCreat
         headingLevel={2}
         headingId="organization-view-heading"
         {...(description === undefined ? {} : { description })}
-        actions={<Button size="sm" onClick={onCreate}>{createLabel}</Button>}
+        {...(onCreate === undefined ? {} : { actions: <Button size="sm" onClick={onCreate}>{createLabel}</Button> })}
       />
       {filters === undefined ? null : (
         <div role="group" aria-label={t("resource.filters")} className="flex flex-wrap items-end gap-x-3 gap-y-2 rounded-lg border border-border-subtle bg-bg-surface px-3 py-2">

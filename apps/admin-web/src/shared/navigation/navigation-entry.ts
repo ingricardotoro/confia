@@ -1,5 +1,7 @@
 import type { AnyRoute } from "@tanstack/react-router";
 import type { AdminKey } from "../../i18n/resources.ts";
+import type { Permission } from "../permissions/permission-codes.ts";
+import type { RoutePermission } from "../permissions/route-permissions.ts";
 
 /**
  * One entry of the side navigation. A feature declares its own and the app registers it, so adding a
@@ -17,6 +19,8 @@ export interface NavigationEntry {
   readonly to: string;
   /** The section of the side navigation the entry is listed under. Absent: listed first, with no section label. */
   readonly group?: NavigationGroupId;
+  /** The permission the entry needs. The side navigation lists the entry only when the session has it. */
+  readonly permission?: Permission;
   /** The entry is current only on its own path, not on the paths below it. For an area whose address is a view of its own and whose other views sit below it. */
   readonly exact?: boolean;
 }
@@ -29,6 +33,11 @@ export interface FeatureModule {
   readonly navigation: NavigationEntry;
   /** Further entries of the same feature, when it has more than one view that earns its own place in the navigation. */
   readonly moreNavigation?: readonly NavigationEntry[];
+  /**
+   * The permission each part of the address needs (a prefix covers the pages below it). Without it the shell shows "Sin acceso"
+   * in place of the page. A part that declares none is open to every signed in person.
+   */
+  readonly routePermissions?: readonly RoutePermission[];
   readonly createRoutes: (parent: AnyRoute) => AnyRoute[];
 }
 
