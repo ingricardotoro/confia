@@ -56,8 +56,10 @@ export interface PriceListDetailViewProps {
   /** The address of the list of lists, and the navigation to it. */
   readonly backHref: string;
   readonly onBack: () => void;
-  readonly onAddPrice: () => void;
-  readonly onToggleStatus: () => void;
+  /** Absent when the person cannot add a price: the button is not drawn and the empty state leads back to the lists. */
+  readonly onAddPrice?: (() => void) | undefined;
+  /** Absent when the person cannot archive or reactivate: the button is not drawn. */
+  readonly onToggleStatus?: (() => void) | undefined;
 }
 
 function Summary({
@@ -165,27 +167,31 @@ export function PriceListDetailView({
         }
         actions={
           <>
-            <Button
-              variant={archived ? "success" : "destructive"}
-              size="sm"
-              loading={changingStatus}
-              aria-label={t(
-                archived
-                  ? "catalog.priceLists.detail.reactivateFor"
-                  : "catalog.priceLists.detail.archiveFor",
-                { name: list.name },
-              )}
-              onClick={onToggleStatus}
-            >
-              {t(
-                archived
-                  ? "catalog.priceLists.detail.reactivate"
-                  : "catalog.priceLists.detail.archive",
-              )}
-            </Button>
-            <Button size="sm" disabled={archived} onClick={onAddPrice}>
-              {t("catalog.priceLists.detail.addPrice")}
-            </Button>
+            {onToggleStatus === undefined ? null : (
+              <Button
+                variant={archived ? "success" : "destructive"}
+                size="sm"
+                loading={changingStatus}
+                aria-label={t(
+                  archived
+                    ? "catalog.priceLists.detail.reactivateFor"
+                    : "catalog.priceLists.detail.archiveFor",
+                  { name: list.name },
+                )}
+                onClick={onToggleStatus}
+              >
+                {t(
+                  archived
+                    ? "catalog.priceLists.detail.reactivate"
+                    : "catalog.priceLists.detail.archive",
+                )}
+              </Button>
+            )}
+            {onAddPrice === undefined ? null : (
+              <Button size="sm" disabled={archived} onClick={onAddPrice}>
+                {t("catalog.priceLists.detail.addPrice")}
+              </Button>
+            )}
           </>
         }
       />
@@ -251,11 +257,12 @@ export function PriceListDetailView({
       {concepts.length === 0 ? (
         <EmptyState
           title={t("catalog.priceLists.detail.emptyTitle")}
-          description={t("catalog.priceLists.detail.emptyDescription")}
-          action={{
-            label: t("catalog.priceLists.detail.emptyAction"),
-            onAction: onAddPrice,
-          }}
+          description={t(onAddPrice === undefined ? "resource.emptyReadOnlyDescription" : "catalog.priceLists.detail.emptyDescription")}
+          action={
+            onAddPrice === undefined
+              ? { label: t("catalog.priceLists.detail.back"), onAction: onBack }
+              : { label: t("catalog.priceLists.detail.emptyAction"), onAction: onAddPrice }
+          }
         />
       ) : (
         concepts.map((concept) => (
@@ -263,6 +270,7 @@ export function PriceListDetailView({
             key={concept.paymentConceptId}
             concept={concept}
             onAddPrice={onAddPrice}
+            onBack={onBack}
           />
         ))
       )}
@@ -273,9 +281,11 @@ export function PriceListDetailView({
 function ConceptTable({
   concept,
   onAddPrice,
+  onBack,
 }: {
   readonly concept: ConceptPricesView;
-  readonly onAddPrice: () => void;
+  readonly onAddPrice?: (() => void) | undefined;
+  readonly onBack: () => void;
 }) {
   const { t } = useAdminText();
   const label =
@@ -347,10 +357,10 @@ function ConceptTable({
         getRowId={(item) => item.id}
         empty={{
           title: t("catalog.priceLists.detail.emptyTitle"),
-          action: {
-            label: t("catalog.priceLists.detail.emptyAction"),
-            onAction: onAddPrice,
-          },
+          action:
+            onAddPrice === undefined
+              ? { label: t("catalog.priceLists.detail.back"), onAction: onBack }
+              : { label: t("catalog.priceLists.detail.emptyAction"), onAction: onAddPrice },
         }}
       />
     </div>

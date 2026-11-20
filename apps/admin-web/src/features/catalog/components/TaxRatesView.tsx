@@ -23,9 +23,12 @@ export interface TaxRatesViewProps {
   /** The address of a rate, so a link opens in a new tab and a plain click is a navigation of the router. */
   readonly hrefOf: (row: TaxRate) => string;
   readonly onOpen: (row: TaxRate) => void;
-  readonly onCreate: () => void;
-  readonly onEdit: (row: TaxRate) => void;
-  readonly onToggle: (row: TaxRate) => void;
+  /** Absent when the person cannot create: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
+  /** Absent when the person cannot edit: the button is not drawn. */
+  readonly onEdit?: ((row: TaxRate) => void) | undefined;
+  /** Absent when the person cannot change the state: the button is not drawn. */
+  readonly onToggle?: ((row: TaxRate) => void) | undefined;
 }
 
 /**
@@ -67,12 +70,8 @@ export function TaxRatesView({ rows, table, pagination, notice, togglingId, filt
           name={row.name}
           active={row.isActive}
           busy={togglingId === row.id}
-          onEdit={() => {
-            onEdit(row);
-          }}
-          onToggle={() => {
-            onToggle(row);
-          }}
+          onEdit={onEdit === undefined ? undefined : () => { onEdit(row); }}
+          onToggle={onToggle === undefined ? undefined : () => { onToggle(row); }}
         />
       ),
     },

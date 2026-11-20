@@ -31,7 +31,8 @@ export interface PriceListsViewProps {
   /** The address of a list, so a link opens in a new tab and a plain click is a navigation of the router. */
   readonly hrefOf: (row: PriceList) => string;
   readonly onOpen: (row: PriceList) => void;
-  readonly onCreate: () => void;
+  /** Absent when the person cannot create: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
 }
 
 /** The price lists as a table: name (a link to its detail), year, scope, the modality or grade it points to, and state. */

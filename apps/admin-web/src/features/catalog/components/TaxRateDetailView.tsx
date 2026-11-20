@@ -42,8 +42,10 @@ export interface TaxRateDetailViewProps {
   /** The address of the list of rates, and the navigation to it. */
   readonly backHref: string;
   readonly onBack: () => void;
-  readonly onAddPeriod: () => void;
-  readonly onToggleStatus: () => void;
+  /** Absent when the person cannot add a validity: the button is not drawn and the empty state leads back to the rates. */
+  readonly onAddPeriod?: (() => void) | undefined;
+  /** Absent when the person cannot activate or deactivate: the button is not drawn. */
+  readonly onToggleStatus?: (() => void) | undefined;
 }
 
 function Summary({
@@ -114,12 +116,13 @@ export function TaxRateDetailView({
   const { rate, periods } = state;
   const inactive = !rate.isActive;
   // An inactive rate takes no new validity, so what the empty state offers is to activate it first.
-  const emptyAction = inactive
-    ? { label: t("catalog.taxRates.detail.activate"), onAction: onToggleStatus }
-    : {
-        label: t("catalog.taxRates.detail.emptyAction"),
-        onAction: onAddPeriod,
-      };
+  // A person who cannot write is led back to the list: there is nothing for them to resolve here.
+  const emptyAction =
+    inactive && onToggleStatus !== undefined
+      ? { label: t("catalog.taxRates.detail.activate"), onAction: onToggleStatus }
+      : onAddPeriod !== undefined && !inactive
+        ? { label: t("catalog.taxRates.detail.emptyAction"), onAction: onAddPeriod }
+        : { label: t("catalog.taxRates.detail.back"), onAction: onBack };
 
   const columns: readonly TableColumn<TaxRatePeriod>[] = [
     {
@@ -201,27 +204,31 @@ export function TaxRateDetailView({
         }
         actions={
           <>
-            <Button
-              variant={inactive ? "success" : "destructive"}
-              size="sm"
-              loading={changingStatus}
-              aria-label={t(
-                inactive
-                  ? "catalog.taxRates.detail.activateFor"
-                  : "catalog.taxRates.detail.deactivateFor",
-                { name: rate.name },
-              )}
-              onClick={onToggleStatus}
-            >
-              {t(
-                inactive
-                  ? "catalog.taxRates.detail.activate"
-                  : "catalog.taxRates.detail.deactivate",
-              )}
-            </Button>
-            <Button size="sm" disabled={inactive} onClick={onAddPeriod}>
-              {t("catalog.taxRates.detail.addPeriod")}
-            </Button>
+            {onToggleStatus === undefined ? null : (
+              <Button
+                variant={inactive ? "success" : "destructive"}
+                size="sm"
+                loading={changingStatus}
+                aria-label={t(
+                  inactive
+                    ? "catalog.taxRates.detail.activateFor"
+                    : "catalog.taxRates.detail.deactivateFor",
+                  { name: rate.name },
+                )}
+                onClick={onToggleStatus}
+              >
+                {t(
+                  inactive
+                    ? "catalog.taxRates.detail.activate"
+                    : "catalog.taxRates.detail.deactivate",
+                )}
+              </Button>
+            )}
+            {onAddPeriod === undefined ? null : (
+              <Button size="sm" disabled={inactive} onClick={onAddPeriod}>
+                {t("catalog.taxRates.detail.addPeriod")}
+              </Button>
+            )}
           </>
         }
       />
@@ -269,7 +276,7 @@ export function TaxRateDetailView({
       {periods.length === 0 ? (
         <EmptyState
           title={t("catalog.taxRates.detail.emptyTitle")}
-          description={t("catalog.taxRates.detail.emptyDescription")}
+          description={t(emptyAction.onAction === onBack ? "resource.emptyReadOnlyDescription" : "catalog.taxRates.detail.emptyDescription")}
           action={emptyAction}
         />
       ) : (
