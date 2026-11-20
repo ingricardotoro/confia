@@ -166,6 +166,11 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.charges.infrastructure", "com.confia.charges.infrastructure.wiring",
                     "com.confia.charges.application", "com.confia.charges.web",
                     "com.confia.charges.web.wiring",
+                    // The cashbox module (docs/cortes/cashbox-sessions.md): its jOOQ adapters, the named-interface
+                    // package of its configuration, its use cases, its controller and the named-interface package of
+                    // the configuration that registers it. Administrative only, each exact.
+                    "com.confia.cashbox.infrastructure", "com.confia.cashbox.infrastructure.wiring",
+                    "com.confia.cashbox.application", "com.confia.cashbox.web", "com.confia.cashbox.web.wiring",
                     // The ledger module (docs/cortes/ledger-core.md): its jOOQ adapter, the named-interface package
                     // of its configuration and its application services, and from the chart-of-accounts cut
                     // (docs/cortes/ledger-chart-of-accounts.md) its controller and the named-interface package of the
@@ -283,6 +288,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.catalog.application", ADMIN_MODULE,
                     "com.confia.catalog.web", ADMIN_MODULE,
                     "com.confia.charges.web", ADMIN_MODULE,
+                    "com.confia.cashbox.web", ADMIN_MODULE,
                     "com.confia.ledger.web", ADMIN_MODULE,
                     "com.confia.shared.observability.health",
                     "the worker serves no route; its health is a heartbeat file (WE100)"));

@@ -52,7 +52,7 @@ class IdempotencyScopeExclusionInventoryTest {
      * no type of {@code shared.security} for it: the allowlist of dependencies above still applies to them.
      */
     private static final Set<String> HEADER_LITERAL_ALSO_ALLOWED = Set.of("com.confia.charges.web.AccrualController",
-            "com.confia.charges.web.ChargeController");
+            "com.confia.charges.web.ChargeController", "com.confia.cashbox.web.CashboxController");
 
     /**
      * The only types of {@code com.confia.shared.security} that a class in a {@code ..web..} package

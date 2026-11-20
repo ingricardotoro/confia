@@ -453,6 +453,7 @@ class PublicRouteAllowListTest {
             "POST /api/v1/charges/{chargeId}/void", "GET /api/v1/charges/integrity-runs",
             "GET /api/v1/charges/integrity-runs/latest", "GET /api/v1/charges/integrity-runs/{runId}",
             "GET /api/v1/charges/posting-accounts", "PUT /api/v1/charges/posting-accounts",
+            "POST /api/v1/cashbox/sessions", "GET /api/v1/cashbox/sessions/current", "POST /api/v1/cashbox/sessions/{sessionId}/movements", "POST /api/v1/cashbox/sessions/{sessionId}/close", "POST /api/v1/cashbox/sessions/{sessionId}/approve", "GET /api/v1/cashbox/sessions", "GET /api/v1/cashbox/sessions/{sessionId}",
             "GET /api/v1/ledger/accounts", "POST /api/v1/ledger/accounts", "PUT /api/v1/ledger/accounts/{id}",
             "GET /api/v1/students", "GET /api/v1/students/{id}", "POST /api/v1/students",
             "PUT /api/v1/students/{id}", "GET /api/v1/enrollments", "GET /api/v1/enrollments/{id}",

@@ -918,6 +918,15 @@ Reglas:
 patrón: actor A crea el objeto, actor B lo solicita, se espera 404 y cero filas en el registro de
 consulta. Esta prueba es obligatoria en la definición de terminado.
 
+**Nota fechada (2026-11-19): el alcance «solo lo propio» se declara en `StaffRole`, no en la matriz.** El cajero lee solo su
+propia sesión de caja (`cashbox:read`). Esa restricción no es una celda de la matriz de la sección 5.2, que dice si un permiso se
+tiene y no hasta dónde llega: se declara en el rol (`StaffRole.ownScoped()`, hoy solo el cajero y solo `cashbox:read`) y
+`identity` la publica por el puerto `OwnRecordPolicy` (interfaz nombrada `identity::directory`, consumida solo por la
+infraestructura de `cashbox`). El caso de uso la aplica dentro de su transacción: el listado siempre se limita a las sesiones
+del cajero, aunque pida otro, y el detalle de una sesión ajena responde 404, no 403. Falla cerrado: una cuenta sin rol o con un
+código desconocido queda limitada a lo propio. `PermissionMatrixParityTest` no cambia. Contabilidad, Auditor, Administrador y
+Super Administrador leen todas las sesiones de su institución.
+
 ---
 
 ## 6. Seguridad a nivel de fila en PostgreSQL
@@ -1046,6 +1055,14 @@ Tablas con política obligatoria y su criterio:
 | `notification_log` | Institución, y el propio destinatario si es encargado | Todos |
 | `cashbox_session` | Institución, y el propio cajero salvo rol supervisor | Personal |
 | `shared_audit_log` | Institución | Personal con permiso `audit:read` |
+
+> **Nota (2026-11-19), `cashbox_session`.** La política de base de datos de `cashbox_session` aísla por institución. El límite por
+> cajero de esta fila («el propio cajero salvo rol supervisor») **se aplica hoy en la aplicación**, a través de `OwnRecordPolicy`
+> (`identity`) y del puerto `SessionScope` de `cashbox`, y falla cerrado: sin rol o con un código desconocido, solo lo propio. Una
+> prueba de arquitectura exige que toda lectura de `CashSessionRepository` pase por `SessionScope` y que la capa `web` nunca
+> lea el repositorio. Un límite también en la base de datos exige una variable de contexto de alcance del actor en
+> `TransactionRunner` (hoy solo fija `app.actor_id`, `app.actor_kind`, `app.institution_id` y `app.request_id`); esa decisión
+> corresponde a `confia-architect` y debe tomarse **antes del módulo `reporting`**, que leerá estas filas con otro camino.
 
 ### 6.3.1 Extensiones de PostgreSQL (`btree_gist`)
 

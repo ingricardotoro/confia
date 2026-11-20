@@ -70,6 +70,89 @@ class AuthorizationBoundaryRulesTest {
                         + "the controller ran (design.md D1)");
     }
 
+    private static final String OWN_RECORD_POLICY = "com.confia.identity.application.directory.OwnRecordPolicy";
+
+    /** The role directory is read by the infrastructure of {@code cashbox} and by nobody else outside {@code identity}. */
+    static ArchRule onlyCashboxInfrastructureDependsOnTheOwnRecordPolicy() {
+        return noClasses().that().resideOutsideOfPackages("com.confia.cashbox.infrastructure..", "com.confia.identity..")
+                .should().dependOnClassesThat().haveFullyQualifiedName(OWN_RECORD_POLICY)
+                .because("the scope of a permission is read by one adapter of the module that enforces it, never decided "
+                        + "inside a use case, a controller or another module (docs/03-seguridad.md section 5.4)");
+    }
+
+    static ArchRule noApplicationClassOutsideIdentityDependsOnTheOwnRecordPolicy() {
+        return noClasses().that().resideInAPackage("..application..").and().resideOutsideOfPackage("com.confia.identity..")
+                .should().dependOnClassesThat().haveFullyQualifiedName(OWN_RECORD_POLICY)
+                .because("a use case receives the scope through a port of its own module, whose adapter lives in "
+                        + "infrastructure");
+    }
+
+    @Test
+    void onlyTheCashboxInfrastructureReadsTheOwnRecordPolicy() {
+        assertThat(productionClasses().get("com.confia.cashbox.infrastructure.RoleDirectorySessionScope")
+                .getDirectDependenciesFromSelf().stream().map(d -> d.getTargetClass().getName()))
+                .as("non-vacuous: the one real consumer is seen").contains(OWN_RECORD_POLICY);
+        onlyCashboxInfrastructureDependsOnTheOwnRecordPolicy().check(productionClasses());
+        noApplicationClassOutsideIdentityDependsOnTheOwnRecordPolicy().check(productionClasses());
+    }
+
+    @Test
+    void rejectsTheFixtureApplicationClassThatReadsTheOwnRecordPolicy() {
+        assertRuleRejects(onlyCashboxInfrastructureDependsOnTheOwnRecordPolicy(), fixtureClasses(),
+                "BadApplicationUsesTheOwnRecordPolicy");
+        assertRuleRejects(noApplicationClassOutsideIdentityDependsOnTheOwnRecordPolicy(), fixtureClasses(),
+                "BadApplicationUsesTheOwnRecordPolicy");
+    }
+
+    private static final String SESSION_REPOSITORY = "com.confia.cashbox.application.CashSessionRepository";
+    private static final String SESSION_SCOPE = "com.confia.cashbox.application.SessionScope";
+    /** Reads only the session that the caller itself has open, so it has no scope to apply (docs/cortes/cashbox-sessions.md). */
+    private static final String CURRENT_SESSION_READ = "com.confia.cashbox.application.GetCurrentSession";
+
+    /**
+     * The row limit per cashier of {@code cashbox_session} is enforced by the application (docs/03-seguridad.md section 6.3,
+     * dated note), so the web layer never reads the repository: it goes through a use case.
+     */
+    static ArchRule noWebClassDependsOnTheCashSessionRepository() {
+        return noClasses().that().resideInAPackage("..web..")
+                .should().dependOnClassesThat().haveFullyQualifiedName(SESSION_REPOSITORY)
+                .because("a read of the cash sessions goes through a use case that applies the SessionScope, so a cashier "
+                        + "reads only its own session (docs/03-seguridad.md sections 5.4 and 6.3)");
+    }
+
+    /** Every read use case of the cash sessions (Get* or List*) applies the SessionScope, except the one of the caller. */
+    static ArchRule everyReadUseCaseOfTheCashSessionsAppliesTheSessionScope() {
+        DescribedPredicate<JavaClass> readUseCase = describe("a read use case of the cash sessions", type ->
+                type.getPackageName().contains(".application")
+                        && (type.getSimpleName().startsWith("Get") || type.getSimpleName().startsWith("List"))
+                        && !type.getName().equals(CURRENT_SESSION_READ)
+                        && type.getDirectDependenciesFromSelf().stream()
+                                .anyMatch(dependency -> dependency.getTargetClass().getName().equals(SESSION_REPOSITORY)));
+        return classes().that(readUseCase).should().dependOnClassesThat().haveFullyQualifiedName(SESSION_SCOPE)
+                .because("the per-cashier limit of cashbox_session is enforced in the application and fails closed "
+                        + "(docs/03-seguridad.md section 6.3)");
+    }
+
+    @Test
+    void theCashSessionsAreReadOnlyThroughAUseCaseThatAppliesTheSessionScope() {
+        noWebClassDependsOnTheCashSessionRepository().check(productionClasses());
+        everyReadUseCaseOfTheCashSessionsAppliesTheSessionScope().check(productionClasses());
+        assertThat(productionClasses().get("com.confia.cashbox.application.GetSession")
+                .getDirectDependenciesFromSelf().stream().map(d -> d.getTargetClass().getName()))
+                .as("non-vacuous: the real read use cases are seen").contains(SESSION_REPOSITORY, SESSION_SCOPE);
+        assertThat(productionClasses().get("com.confia.cashbox.application.ListSessions")
+                .getDirectDependenciesFromSelf().stream().map(d -> d.getTargetClass().getName()))
+                .contains(SESSION_REPOSITORY, SESSION_SCOPE);
+    }
+
+    @Test
+    void rejectsTheFixturesThatReadTheCashSessionsWithoutTheScope() {
+        assertRuleRejects(noWebClassDependsOnTheCashSessionRepository(), fixtureClasses(),
+                "BadWebReadsTheCashSessionRepository");
+        assertRuleRejects(everyReadUseCaseOfTheCashSessionsAppliesTheSessionScope(), fixtureClasses(),
+                "GetEverySessionWithoutTheScope");
+    }
+
     @Test
     void productionCarriesNoPermissionAnnotationAndEnablesNoMethodSecurity() {
         noClassEnablesMethodSecurityOrIsAnnotatedWithAPermission().check(productionClasses());
