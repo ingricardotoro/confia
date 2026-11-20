@@ -6,6 +6,7 @@ import com.confia.cashbox.application.CashMovementRepository;
 import com.confia.cashbox.domain.CashMovement;
 import com.confia.cashbox.domain.MovementType;
 import com.confia.kernel.InstitutionId;
+import com.confia.kernel.Money;
 import com.confia.shared.infrastructure.money.MoneyColumns;
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +48,17 @@ public final class JooqCashMovementRepository implements CashMovementRepository 
     public Optional<CashMovement> findByRequestKey(InstitutionId institution, String requestKey) {
         return dsl.selectFrom(CASHBOX_MOVEMENT).where(CASHBOX_MOVEMENT.INSTITUTION_ID.eq(institution.value()))
                 .and(CASHBOX_MOVEMENT.REQUEST_KEY.eq(requestKey)).fetchOptional(JooqCashMovementRepository::toMovement);
+    }
+
+    @Override
+    public Money expectedAfter(InstitutionId institution, UUID movementId) {
+        Record row = dsl.select(CASHBOX_MOVEMENT.EXPECTED_AFTER, CASHBOX_MOVEMENT.CURRENCY).from(CASHBOX_MOVEMENT)
+                .where(CASHBOX_MOVEMENT.INSTITUTION_ID.eq(institution.value()))
+                .and(CASHBOX_MOVEMENT.ID.eq(movementId)).fetchOne();
+        if (row == null) {
+            throw new IllegalStateException("the movement was just read and is gone");
+        }
+        return MoneyColumns.toMoney(row.get(CASHBOX_MOVEMENT.EXPECTED_AFTER), row.get(CASHBOX_MOVEMENT.CURRENCY));
     }
 
     @Override

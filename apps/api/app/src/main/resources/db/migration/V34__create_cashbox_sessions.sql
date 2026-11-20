@@ -9,6 +9,10 @@
 --     difference is not zero without a reason of 20 to 500 characters, or that is not made by the cashier of the session;
 --     the difference is a GENERATED column: declared - expected;
 --   * an approval of a session that is not pending approval, or by the cashier of the session (segregation of duties);
+--   * a session opened by anyone but the actor of the transaction (app.actor_id), not open, or stamped with a time that is
+--     not now; a movement, a close or an approval written by anyone but the actor of the transaction;
+--   * a movement whose accumulated expected amount would end below zero (the trigger locks the session and recomputes it, so
+--     two simultaneous withdrawals cannot overdraw it); the resulting expected amount is stored on the movement row;
 --   * a DELETE or a TRUNCATE of anything, and an UPDATE of a movement, a close or an approval;
 --   * an UPDATE of a session other than the advance of its status along open -> closed | pending_approval and
 --     pending_approval -> closed, and only together with the record that justifies it (the close, the approval).
@@ -71,6 +75,9 @@ CREATE TABLE cashbox_movement (
     amount         NUMERIC(14,4) NOT NULL,
     currency       CHAR(3)       NOT NULL,
     notes          TEXT,
+    -- The expected cash of the session right after this movement. The trigger computes it under the lock of the session and
+    -- overwrites whatever was sent, so an idempotent replay answers the figure of the original call.
+    expected_after NUMERIC(14,4) NOT NULL,
     request_key    VARCHAR(128)  NOT NULL,
     request_hash   CHAR(64)      NOT NULL,
     created_by     UUID          NOT NULL,
@@ -87,6 +94,7 @@ CREATE TABLE cashbox_movement (
         (notes IS NULL AND type <> 'adjustment')
         OR (notes IS NOT NULL AND char_length(btrim(notes)) >= CASE WHEN type = 'adjustment' THEN 20 ELSE 1 END
             AND char_length(notes) <= 500)),
+    CONSTRAINT cashbox_movement_after_chk CHECK (expected_after >= 0),
     CONSTRAINT cashbox_movement_key_chk CHECK (request_key ~ '^[!-~]{1,128}$'),
     CONSTRAINT cashbox_movement_hash_chk CHECK (request_hash ~ '^[0-9a-f]{64}$')
 );
@@ -154,8 +162,32 @@ CREATE TABLE cashbox_session_approval (
 -- Trigger functions
 -- ---------------------------------------------------------------------------------------------------------------------
 
--- INV-21: a movement enters only an open session, in its currency. FOR SHARE makes a movement that races a close wait for it
--- and then see the session closed.
+-- The cashier opens its own session, now, open. The actor comes from the security context of the transaction, never from the
+-- statement. The opening time is the one of the database, within a minute (the application sends its own clock).
+CREATE FUNCTION cashbox_session_before_insert() RETURNS trigger
+    LANGUAGE plpgsql
+    SECURITY INVOKER
+    SET search_path = pg_catalog, public
+AS $$
+DECLARE
+    actor uuid := NULLIF(current_setting('app.actor_id', true), '')::uuid;
+BEGIN
+    IF actor IS NULL OR NEW.cashier_id <> actor THEN
+        RAISE EXCEPTION 'a cash session is opened by its cashier' USING ERRCODE = 'check_violation';
+    END IF;
+    IF NEW.status <> 'open' THEN
+        RAISE EXCEPTION 'a cash session is born open' USING ERRCODE = 'check_violation';
+    END IF;
+    IF NEW.opened_at NOT BETWEEN clock_timestamp() - interval '1 minute' AND clock_timestamp() + interval '1 minute' THEN
+        RAISE EXCEPTION 'a cash session is opened now' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+-- INV-21: a movement enters only an open session, in its currency, written by its cashier. FOR UPDATE serializes the
+-- movements and the close of the session, so the accumulated expected amount computed here is the real one: a movement that
+-- races a close waits for it and then sees the session closed, and two withdrawals cannot both pass.
 CREATE FUNCTION cashbox_movement_before_insert() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY INVOKER
@@ -163,9 +195,11 @@ CREATE FUNCTION cashbox_movement_before_insert() RETURNS trigger
 AS $$
 DECLARE
     owner_session cashbox_session%ROWTYPE;
+    actor         uuid := NULLIF(current_setting('app.actor_id', true), '')::uuid;
+    moved         numeric;
 BEGIN
     SELECT * INTO owner_session FROM cashbox_session
-        WHERE institution_id = NEW.institution_id AND id = NEW.session_id FOR SHARE;
+        WHERE institution_id = NEW.institution_id AND id = NEW.session_id FOR UPDATE;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'a movement names a session of the institution' USING ERRCODE = 'check_violation';
     END IF;
@@ -174,6 +208,18 @@ BEGIN
     END IF;
     IF owner_session.currency <> NEW.currency THEN
         RAISE EXCEPTION 'a movement is in the currency of its session' USING ERRCODE = 'check_violation';
+    END IF;
+    IF actor IS NULL OR NEW.created_by <> actor OR NEW.created_by <> owner_session.cashier_id THEN
+        RAISE EXCEPTION 'a movement is written by the cashier of its session' USING ERRCODE = 'check_violation';
+    END IF;
+    SELECT COALESCE(sum(CASE type WHEN 'deposit' THEN amount WHEN 'withdrawal' THEN -amount ELSE amount END), 0)
+      INTO moved
+      FROM cashbox_movement
+     WHERE institution_id = NEW.institution_id AND session_id = NEW.session_id;
+    NEW.expected_after := owner_session.opening_float + moved
+        + CASE NEW.type WHEN 'deposit' THEN NEW.amount WHEN 'withdrawal' THEN -NEW.amount ELSE NEW.amount END;
+    IF NEW.expected_after < 0 THEN
+        RAISE EXCEPTION 'the expected amount of a session is never negative' USING ERRCODE = 'check_violation';
     END IF;
     RETURN NEW;
 END;
@@ -187,6 +233,7 @@ CREATE FUNCTION cashbox_session_close_before_insert() RETURNS trigger
 AS $$
 DECLARE
     owner_session cashbox_session%ROWTYPE;
+    actor         uuid := NULLIF(current_setting('app.actor_id', true), '')::uuid;
     moved         numeric;
 BEGIN
     SELECT * INTO owner_session FROM cashbox_session
@@ -194,7 +241,8 @@ BEGIN
     IF NOT FOUND OR owner_session.status <> 'open' THEN
         RAISE EXCEPTION 'only an open session is closed' USING ERRCODE = 'check_violation';
     END IF;
-    IF owner_session.cashier_id <> NEW.closed_by OR owner_session.currency <> NEW.currency THEN
+    IF actor IS NULL OR NEW.closed_by <> actor OR owner_session.cashier_id <> NEW.closed_by
+            OR owner_session.currency <> NEW.currency THEN
         RAISE EXCEPTION 'a session is closed by its cashier, in its currency' USING ERRCODE = 'check_violation';
     END IF;
     SELECT COALESCE(sum(CASE type WHEN 'deposit' THEN amount WHEN 'withdrawal' THEN -amount ELSE amount END), 0)
@@ -212,7 +260,8 @@ BEGIN
 END;
 $$;
 
--- Segregation of duties: the approver is never the cashier, and only a pending close is approved.
+-- Segregation of duties: the approver is never the cashier, is the actor of the transaction, and only a pending close is
+-- approved.
 CREATE FUNCTION cashbox_session_approval_before_insert() RETURNS trigger
     LANGUAGE plpgsql
     SECURITY INVOKER
@@ -220,11 +269,15 @@ CREATE FUNCTION cashbox_session_approval_before_insert() RETURNS trigger
 AS $$
 DECLARE
     owner_session cashbox_session%ROWTYPE;
+    actor         uuid := NULLIF(current_setting('app.actor_id', true), '')::uuid;
 BEGIN
     SELECT * INTO owner_session FROM cashbox_session
         WHERE institution_id = NEW.institution_id AND id = NEW.session_id FOR UPDATE;
     IF NOT FOUND OR owner_session.status <> 'pending_approval' THEN
         RAISE EXCEPTION 'only a session pending approval is approved' USING ERRCODE = 'check_violation';
+    END IF;
+    IF actor IS NULL OR NEW.approved_by <> actor THEN
+        RAISE EXCEPTION 'an approval is written by its approver' USING ERRCODE = 'check_violation';
     END IF;
     IF owner_session.cashier_id = NEW.approved_by THEN
         RAISE EXCEPTION 'the approver of a close is never its cashier' USING ERRCODE = 'check_violation';
@@ -269,11 +322,15 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION cashbox_session_before_insert() FROM PUBLIC;
 REVOKE ALL ON FUNCTION cashbox_movement_before_insert() FROM PUBLIC;
 REVOKE ALL ON FUNCTION cashbox_session_close_before_insert() FROM PUBLIC;
 REVOKE ALL ON FUNCTION cashbox_session_approval_before_insert() FROM PUBLIC;
 REVOKE ALL ON FUNCTION cashbox_session_status_guard() FROM PUBLIC;
 
+CREATE TRIGGER cashbox_session_before_insert_trg
+    BEFORE INSERT ON cashbox_session
+    FOR EACH ROW EXECUTE FUNCTION cashbox_session_before_insert();
 CREATE TRIGGER cashbox_movement_before_insert_trg
     BEFORE INSERT ON cashbox_movement
     FOR EACH ROW EXECUTE FUNCTION cashbox_movement_before_insert();

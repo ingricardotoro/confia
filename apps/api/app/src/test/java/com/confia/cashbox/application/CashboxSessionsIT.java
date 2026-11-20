@@ -29,8 +29,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -51,7 +51,9 @@ import org.junit.jupiter.api.Test;
  */
 class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
 
-    private static final Clock CLOCK = Clock.fixed(Instant.parse("2027-02-10T18:00:00Z"), ZoneOffset.UTC);
+    /** The database stamps a session with its own now (the trigger allows a minute), so the tests run on the real clock. */
+    private static final Clock CLOCK = Clock.systemUTC();
+    private static final LocalDate TODAY = LocalDate.now(ZoneId.of("America/Tegucigalpa"));
     private static final String REASON = "Falto un billete de cien lempiras";
     private static final String CHECK_VIOLATION = "23514";
     private static final String UNIQUE_VIOLATION = "23505";
@@ -296,9 +298,10 @@ class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
 
         assertThatThrownBy(() -> recordMovement().record(env.cashier(), request(), "late-1", session, "deposit", "1.00",
                 null)).isInstanceOf(CashSessionNotOpenException.class);
-        assertThat(insertMovement(env, session, "deposit", "1.00", "HNL"))
+        assertThat(insertMovement(env, session, env.cashier().accountId(), "deposit", "1.00", "HNL"))
                 .isEqualTo(CHECK_VIOLATION);
-        assertThat(insertMovement(env, pending, "deposit", "1.00", "HNL")).isEqualTo(CHECK_VIOLATION);
+        assertThat(insertMovement(env, pending, env.otherCashier().accountId(), "deposit", "1.00", "HNL"))
+                .isEqualTo(CHECK_VIOLATION);
         assertThat(count(env, "cashbox_movement")).isEqualTo(2);
     }
 
@@ -346,9 +349,8 @@ class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
         assertThat(refused(env, "update cashbox_session set status = 'closed' where institution_id = ? and id = ?",
                 env.institution(), pending)).as("closing without the approval").isEqualTo(RESTRICT_VIOLATION);
         // INV-22 by SQL.
-        assertThat(refused(env, "insert into cashbox_session (institution_id, id, cashier_id, currency, opening_float, "
-                + "request_key, request_hash) values (?, ?, ?, 'HNL', 1, 'forged-1', ?)", env.institution(),
-                UUID.randomUUID(), env.accountant().accountId(), "a".repeat(64))).isEqualTo(UNIQUE_VIOLATION);
+        assertThat(insertSession(env, env.accountant().accountId(), env.accountant().accountId(), "open", "now()"))
+                .isEqualTo(UNIQUE_VIOLATION);
         // INV-23 by SQL: the expected amount is recomputed, the reason is required, the closer is the cashier.
         assertThat(insertClose(env, open, env.accountant().accountId(), "10.00", "999.00", null))
                 .as("a forged expected amount").isEqualTo(CHECK_VIOLATION);
@@ -366,15 +368,169 @@ class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
         assertThat(insertApproval(env, open, cashier)).as("approving an open session").isEqualTo(CHECK_VIOLATION);
         assertThat(insertApproval(env, closed, cashier)).as("approving a closed session").isEqualTo(CHECK_VIOLATION);
         // The movements.
-        assertThat(insertMovement(env, open, "deposit", "0", "HNL")).isEqualTo(CHECK_VIOLATION);
-        assertThat(insertMovement(env, open, "withdrawal", "-5", "HNL")).isEqualTo(CHECK_VIOLATION);
-        assertThat(insertMovement(env, open, "adjustment", "0", "HNL")).isEqualTo(CHECK_VIOLATION);
-        assertThat(insertMovement(env, open, "payment_in", "5", "HNL")).isEqualTo(CHECK_VIOLATION);
-        assertThat(insertMovement(env, open, "deposit", "5", "USD")).as("another currency").isEqualTo(CHECK_VIOLATION);
-        assertThat(refused(env, "insert into cashbox_movement (institution_id, id, session_id, type, amount, currency, "
-                + "notes, request_key, request_hash, created_by) values (?, ?, ?, 'adjustment', 5, 'HNL', 'corta', "
-                + "'forged-adj', ?, ?)", env.institution(), UUID.randomUUID(), open, "a".repeat(64), cashier))
-                .as("an adjustment without a proper reason").isEqualTo(CHECK_VIOLATION);
+        UUID owner = env.accountant().accountId();
+        assertThat(insertMovement(env, open, owner, "deposit", "0", "HNL")).isEqualTo(CHECK_VIOLATION);
+        assertThat(insertMovement(env, open, owner, "withdrawal", "-5", "HNL")).isEqualTo(CHECK_VIOLATION);
+        assertThat(insertMovement(env, open, owner, "adjustment", "0", "HNL")).isEqualTo(CHECK_VIOLATION);
+        assertThat(insertMovement(env, open, owner, "payment_in", "5", "HNL")).isEqualTo(CHECK_VIOLATION);
+        assertThat(insertMovement(env, open, owner, "deposit", "5", "USD")).as("another currency")
+                .isEqualTo(CHECK_VIOLATION);
+        assertThat(applicationActing(env, owner, "insert into cashbox_movement (institution_id, id, session_id, type, "
+                + "amount, currency, notes, request_key, request_hash, created_by) values (?, ?, ?, 'adjustment', 5, "
+                + "'HNL', 'corta', 'forged-adj', ?, ?)", env.institution(), UUID.randomUUID(), open, "a".repeat(64),
+                owner)).as("an adjustment without a proper reason").isEqualTo(CHECK_VIOLATION);
+        assertThat(insertMovement(env, open, owner, "deposit", "5", "HNL")).as("the valid one is not refused").isNull();
+    }
+
+    // --- SECURITY: who writes (app.actor_id) and the accumulated expected amount, by SQL as the application role ---
+
+    @Test
+    void theDatabaseRefusesASessionOpenedByAnotherActorNotOpenOrNotStampedNow() throws SQLException {
+        Env env = seed();
+        UUID cashier = env.cashier().accountId();
+        UUID other = env.otherCashier().accountId();
+
+        assertThat(insertSession(env, other, other, "open", "now()")).as("the valid one is not refused").isNull();
+        assertThat(insertSession(env, null, other, "open", "now()")).as("no actor in the transaction")
+                .isEqualTo(CHECK_VIOLATION);
+        assertThat(insertSession(env, cashier, other, "open", "now()")).as("opened on behalf of another person")
+                .isEqualTo(CHECK_VIOLATION);
+        assertThat(insertSession(env, other, other, "closed", "now()")).as("born closed").isEqualTo(CHECK_VIOLATION);
+        assertThat(insertSession(env, other, other, "pending_approval", "now()")).as("born pending")
+                .isEqualTo(CHECK_VIOLATION);
+        assertThat(insertSession(env, other, other, "open", "now() - interval '1 day'")).as("backdated")
+                .isEqualTo(CHECK_VIOLATION);
+        assertThat(insertSession(env, other, other, "open", "now() + interval '1 day'")).as("postdated")
+                .isEqualTo(CHECK_VIOLATION);
+    }
+
+    @Test
+    void theDatabaseRefusesAMovementACloseAndAnApprovalWrittenByAnyoneButTheActor() throws SQLException {
+        Env env = seed();
+        UUID cashier = env.cashier().accountId();
+        UUID other = env.otherCashier().accountId();
+        UUID accountant = env.accountant().accountId();
+        UUID open = openSession().open(env.cashier(), request(), "open-1", "100.00").id();
+        UUID pending = pendingApproval(actorEnv(env, env.otherCashier()));
+
+        assertThat(insertMovementFor(env, open, cashier, cashier, "deposit", "5", "HNL")).as("valid").isNull();
+        assertThat(insertMovementFor(env, open, cashier, null, "deposit", "5", "HNL")).as("no actor")
+                .isEqualTo(CHECK_VIOLATION);
+        assertThat(insertMovementFor(env, open, cashier, other, "deposit", "5", "HNL")).as("created_by is not the actor")
+                .isEqualTo(CHECK_VIOLATION);
+        assertThat(insertMovementFor(env, open, other, other, "deposit", "5", "HNL"))
+                .as("not the cashier of the session").isEqualTo(CHECK_VIOLATION);
+        assertThat(insertMovementFor(env, open, accountant, accountant, "deposit", "5", "HNL"))
+                .as("not the cashier of the session").isEqualTo(CHECK_VIOLATION);
+
+        assertThat(insertClose(env, open, cashier, cashier, "100.00", "100.00", null)).as("valid").isNull();
+        assertThat(insertClose(env, open, cashier, null, "100.00", "100.00", null)).as("no actor")
+                .isEqualTo(CHECK_VIOLATION);
+        assertThat(insertClose(env, open, cashier, other, "100.00", "100.00", null)).as("closed_by is not the actor")
+                .isEqualTo(CHECK_VIOLATION);
+
+        assertThat(insertApprovalFor(env, pending, accountant, accountant)).as("valid").isNull();
+        assertThat(insertApprovalFor(env, pending, accountant, null)).as("no actor").isEqualTo(CHECK_VIOLATION);
+        assertThat(insertApprovalFor(env, pending, accountant, cashier)).as("approved_by is not the actor")
+                .isEqualTo(CHECK_VIOLATION);
+    }
+
+    @Test
+    void theDatabaseRefusesAMovementThatWouldLeaveTheExpectedCashBelowZero() throws SQLException {
+        Env env = seed();
+        UUID cashier = env.cashier().accountId();
+        UUID session = openSession().open(env.cashier(), request(), "open-1", "100.00").id();
+        recordMovement().record(env.cashier(), request(), "wd-1", session, "withdrawal", "60.00", null);
+
+        assertThat(insertMovement(env, session, cashier, "withdrawal", "40.01", "HNL")).as("40.01 of the 40.00 left")
+                .isEqualTo(CHECK_VIOLATION);
+        assertThat(insertMovementFor(env, session, cashier, cashier, "adjustment", "-40.01", "HNL"))
+                .as("an adjustment is no way around it").isEqualTo(CHECK_VIOLATION);
+        assertThat(insertMovement(env, session, cashier, "withdrawal", "40.00", "HNL")).as("exactly what is left")
+                .isNull();
+    }
+
+    // --- concurrency ---
+
+    @Test
+    void simultaneousWithdrawalsBeyondTheExpectedCashOnlyThoseThatFitSucceed() throws Exception {
+        Env env = seed();
+        UUID session = openSession().open(env.cashier(), request(), "open-1", "500.00").id();
+
+        List<Object> results = race(8, index -> recordMovement().record(env.cashier(), request(), "wd-" + index, session,
+                "withdrawal", "100.00", null));
+
+        assertThat(results.stream().filter(MovementResult.class::isInstance)).hasSize(5);
+        assertThat(results.stream().filter(com.confia.cashbox.domain.CashExpectedNegativeException.class::isInstance))
+                .hasSize(3);
+        assertThat(count(env, "cashbox_movement")).isEqualTo(5);
+        assertThat(getSession().get(env.accountant(), request(), session).expected()).isEqualTo(hnl("0.00"));
+        assertThat(decimal(env, "select min(expected_after) from cashbox_movement where institution_id = ?",
+                env.institution())).isEqualByComparingTo("0.00");
+        assertThat(auditCount(env, "cashbox.movement.recorded")).isEqualTo(5);
+    }
+
+    @Test
+    void simultaneousRawWithdrawalsCannotOverdrawTheSessionEvenWithoutTheApplicationLock() throws Exception {
+        Env env = seed();
+        UUID cashier = env.cashier().accountId();
+        UUID session = openSession().open(env.cashier(), request(), "open-1", "100.00").id();
+
+        List<Object> results = race(4, index -> commitRawWithdrawal(env, session, cashier, "60.00", "raw-" + index));
+
+        assertThat(results.stream().filter("ok"::equals)).hasSize(1);
+        assertThat(results.stream().filter(CHECK_VIOLATION::equals)).hasSize(3);
+        assertThat(decimal(env, "select min(expected_after) from cashbox_movement where institution_id = ?",
+                env.institution())).isEqualByComparingTo("40.00");
+    }
+
+    @Test
+    void aMovementRacingTheCloseIsEitherInTheExpectedAmountOrRefusedAndNeverAfterTheClose() throws Exception {
+        for (int round = 0; round < 5; round++) {
+            Env env = seed();
+            UUID session = openSession().open(env.cashier(), request(), "open-1", "500.00").id();
+
+            List<Object> results = race(7, index -> index == 0
+                    ? closeSession().close(env.cashier(), request(), "close-1", session, "500.00", REASON)
+                    : recordMovement().record(env.cashier(), request(), "dep-" + index, session, "deposit", "10.00",
+                            null));
+
+            assertThat(results.get(0)).as("the close").isInstanceOf(SessionDetail.class);
+            List<Object> movementResults = results.subList(1, results.size());
+            assertThat(movementResults).allMatch(result -> result instanceof MovementResult
+                    || result instanceof CashSessionNotOpenException);
+            long accepted = movementResults.stream().filter(MovementResult.class::isInstance).count();
+            assertThat(count(env, "cashbox_movement")).isEqualTo(accepted);
+            // Every accepted movement is inside the expected amount of the close; none came after it.
+            assertThat(decimal(env, "select expected_amount from cashbox_session_close where institution_id = ?",
+                    env.institution())).isEqualByComparingTo(new java.math.BigDecimal(500 + 10 * accepted));
+            assertThat(decimal(env, "select 500 + coalesce(sum(amount), 0) from cashbox_movement where institution_id = ?",
+                    env.institution())).isEqualByComparingTo(new java.math.BigDecimal(500 + 10 * accepted));
+            assertThat(auditCount(env, "cashbox.movement.recorded")).isEqualTo(accepted);
+        }
+    }
+
+    // --- idempotent replay of a movement ---
+
+    @Test
+    void theReplayOfAnEarlierMovementAnswersTheExpectedCashOfThatCallNotOfToday() throws SQLException {
+        Env env = seed();
+        UUID session = openSession().open(env.cashier(), request(), "open-1", "500.00").id();
+        MovementResult a = recordMovement().record(env.cashier(), request(), "mov-a", session, "deposit", "100.00", null);
+        MovementResult b = recordMovement().record(env.cashier(), request(), "mov-b", session, "withdrawal", "30.00",
+                null);
+
+        MovementResult replayOfA = recordMovement().record(env.cashier(), request(), "mov-a", session, "deposit",
+                "100.00", null);
+        MovementResult replayOfB = recordMovement().record(env.cashier(), request(), "mov-b", session, "withdrawal",
+                "30.00", null);
+
+        assertThat(a.expectedAfter()).isEqualTo(hnl("600.00"));
+        assertThat(b.expectedAfter()).isEqualTo(hnl("570.00"));
+        assertThat(replayOfA.movement().id()).isEqualTo(a.movement().id());
+        assertThat(replayOfA.expectedAfter()).isEqualTo(hnl("600.00"));
+        assertThat(replayOfB.expectedAfter()).isEqualTo(hnl("570.00"));
+        assertThat(count(env, "cashbox_movement")).isEqualTo(2);
     }
 
     @Test
@@ -478,9 +634,11 @@ class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
         Env a = seed();
         Env b = seed();
 
-        assertThat(asApplication(a.institution(), "insert into cashbox_session (institution_id, id, cashier_id, "
+        // The actor is the cashier, so the triggers pass and it is the row-level security that refuses.
+        UUID cashier = UUID.randomUUID();
+        assertThat(applicationActing(a, cashier, "insert into cashbox_session (institution_id, id, cashier_id, "
                 + "currency, opening_float, request_key, request_hash) values (?, ?, ?, 'HNL', 1, 'cross-1', ?)",
-                b.institution(), UUID.randomUUID(), UUID.randomUUID(), "a".repeat(64))).isEqualTo(INSUFFICIENT_PRIVILEGE);
+                b.institution(), UUID.randomUUID(), cashier, "a".repeat(64))).isEqualTo(INSUFFICIENT_PRIVILEGE);
     }
 
     // --- the lists ---
@@ -500,10 +658,10 @@ class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
         assertThat(ids(listSessions().list(env.accountant(), request(),
                 new SessionFilter(null, env.otherCashier().accountId(), null, null), page))).containsExactly(clean);
         assertThat(ids(listSessions().list(env.accountant(), request(), new SessionFilter("open", null,
-                java.time.LocalDate.parse("2027-02-10"), java.time.LocalDate.parse("2027-02-10")), page)))
+                TODAY, TODAY), page)))
                 .containsExactly(open);
         assertThat(ids(listSessions().list(env.accountant(), request(), new SessionFilter("open", null,
-                java.time.LocalDate.parse("2027-02-11"), null), page))).isEmpty();
+                TODAY.plusDays(1), null), page))).isEmpty();
         Page<SessionSummary> firstPage = listSessions().list(env.accountant(), request(),
                 new SessionFilter(null, null, null, null),
                 PageRequest.of(0, 2, "status,asc", SessionFilter.SORT_FIELDS, "openedAt", false));
@@ -548,26 +706,94 @@ class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
         }
     }
 
-    private String insertMovement(Env env, UUID session, String type, String amount, String currency)
+    /** A movement written by {@code by}, who is also the actor of the transaction. */
+    private String insertMovement(Env env, UUID session, UUID by, String type, String amount, String currency)
             throws SQLException {
-        return refused(env, "insert into cashbox_movement (institution_id, id, session_id, type, amount, currency, "
-                + "request_key, request_hash, created_by) values (?, ?, ?, ?, ?::numeric, ?, ?, ?, ?)",
+        return insertMovementFor(env, session, by, by, type, amount, currency);
+    }
+
+    private String insertMovementFor(Env env, UUID session, UUID createdBy, UUID actor, String type, String amount,
+            String currency) throws SQLException {
+        return applicationActing(env, actor, "insert into cashbox_movement (institution_id, id, session_id, type, "
+                + "amount, currency, request_key, request_hash, created_by) values (?, ?, ?, ?, ?::numeric, ?, ?, ?, ?)",
                 env.institution(), UUID.randomUUID(), session, type, amount, currency, "forged-" + UUID.randomUUID(),
-                "a".repeat(64), env.cashier().accountId());
+                "a".repeat(64), createdBy);
     }
 
     private String insertClose(Env env, UUID session, UUID closedBy, String declared, String expected, String reason)
             throws SQLException {
-        return refused(env, "insert into cashbox_session_close (institution_id, id, session_id, currency, "
-                + "declared_amount, expected_amount, difference_reason, closed_by, request_key, request_hash) "
+        return insertClose(env, session, closedBy, closedBy, declared, expected, reason);
+    }
+
+    private String insertClose(Env env, UUID session, UUID closedBy, UUID actor, String declared, String expected,
+            String reason) throws SQLException {
+        return applicationActing(env, actor, "insert into cashbox_session_close (institution_id, id, session_id, "
+                + "currency, declared_amount, expected_amount, difference_reason, closed_by, request_key, request_hash) "
                 + "values (?, ?, ?, 'HNL', ?::numeric, ?::numeric, ?, ?, ?, ?)", env.institution(), UUID.randomUUID(),
                 session, declared, expected, reason, closedBy, "forged-" + UUID.randomUUID(), "a".repeat(64));
     }
 
     private String insertApproval(Env env, UUID session, UUID approvedBy) throws SQLException {
-        return refused(env, "insert into cashbox_session_approval (institution_id, id, session_id, approved_by, note, "
-                + "request_key, request_hash) values (?, ?, ?, ?, 'forged', ?, ?)", env.institution(),
-                UUID.randomUUID(), session, approvedBy, "forged-" + UUID.randomUUID(), "a".repeat(64));
+        return insertApprovalFor(env, session, approvedBy, approvedBy);
+    }
+
+    private String insertApprovalFor(Env env, UUID session, UUID approvedBy, UUID actor) throws SQLException {
+        return applicationActing(env, actor, "insert into cashbox_session_approval (institution_id, id, session_id, "
+                + "approved_by, note, request_key, request_hash) values (?, ?, ?, ?, 'forged', ?, ?)",
+                env.institution(), UUID.randomUUID(), session, approvedBy, "forged-" + UUID.randomUUID(),
+                "a".repeat(64));
+    }
+
+    /** {@code openedAt} is a SQL expression written by the test itself, never an input. */
+    private String insertSession(Env env, UUID actor, UUID cashier, String status, String openedAt)
+            throws SQLException {
+        return applicationActing(env, actor, "insert into cashbox_session (institution_id, id, cashier_id, currency, "
+                + "opening_float, status, opened_at, request_key, request_hash) values (?, ?, ?, 'HNL', 1, ?, "
+                + openedAt + ", ?, ?)", env.institution(), UUID.randomUUID(), cashier, status,
+                "forged-" + UUID.randomUUID(), "a".repeat(64));
+    }
+
+    /**
+     * Runs the statement as the least-privilege role of the application, with the institution and, when given, the actor
+     * of the security context (app.actor_id, as the transaction runner sets it), and rolls back; returns the SQLState or null.
+     */
+    private String applicationActing(Env env, UUID actor, String sql, Object... parameters) throws SQLException {
+        try (Connection c = SharedPostgresContainer.connectionAs("confia_admin_app")) {
+            c.setAutoCommit(false);
+            StaffRoleFixtures.fixInstitution(c, env.institution());
+            if (actor != null) {
+                exec(c, "select set_config('app.actor_id', ?, true)", actor.toString());
+            }
+            try {
+                exec(c, sql, parameters);
+                c.rollback();
+                return null;
+            } catch (SQLException e) {
+                c.rollback();
+                return e.getSQLState();
+            }
+        }
+    }
+
+    /** A withdrawal straight into the table, as the application role, committed: "ok" or the SQLState of the refusal. */
+    private String commitRawWithdrawal(Env env, UUID session, UUID cashier, String amount, String key) {
+        try (Connection c = SharedPostgresContainer.connectionAs("confia_admin_app")) {
+            c.setAutoCommit(false);
+            StaffRoleFixtures.fixInstitution(c, env.institution());
+            exec(c, "select set_config('app.actor_id', ?, true)", cashier.toString());
+            try {
+                exec(c, "insert into cashbox_movement (institution_id, id, session_id, type, amount, currency, "
+                        + "request_key, request_hash, created_by) values (?, ?, ?, 'withdrawal', ?::numeric, 'HNL', ?, ?, ?)",
+                        env.institution(), UUID.randomUUID(), session, amount, key, "a".repeat(64), cashier);
+                c.commit();
+                return "ok";
+            } catch (SQLException e) {
+                c.rollback();
+                return e.getSQLState();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("the raw withdrawal could not run", e);
+        }
     }
 
     /** Runs the statement as the owner of the schema (bound by every trigger) and rolls back; returns the SQLState or null. */

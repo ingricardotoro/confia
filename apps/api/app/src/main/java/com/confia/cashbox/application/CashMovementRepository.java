@@ -2,6 +2,7 @@ package com.confia.cashbox.application;
 
 import com.confia.cashbox.domain.CashMovement;
 import com.confia.kernel.InstitutionId;
+import com.confia.kernel.Money;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,6 +14,9 @@ public interface CashMovementRepository {
     void insert(InstitutionId institution, CashMovement movement);
 
     Optional<CashMovement> findByRequestKey(InstitutionId institution, String requestKey);
+
+    /** The expected cash of the session right after the movement, as the database stored it with the movement. */
+    Money expectedAfter(InstitutionId institution, UUID movementId);
 
     /** The movements of the session, oldest first. */
     List<CashMovement> findBySession(InstitutionId institution, UUID sessionId);

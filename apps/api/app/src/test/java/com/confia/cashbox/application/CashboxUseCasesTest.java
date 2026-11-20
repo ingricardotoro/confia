@@ -217,6 +217,21 @@ class CashboxUseCasesTest {
     // --- movements ---
 
     @Test
+    void theReplayOfAnEarlierMovementAnswersTheExpectedCashOfThatCallNotOfToday() {
+        UUID session = opened("500.00").id();
+        MovementResult first = moveUseCase().record(cashier, requestId, "m-1", session, "deposit", "100.00", null);
+        moveUseCase().record(cashier, requestId, "m-2", session, "withdrawal", "50.00", "Pago de proveedor");
+        audit.clear();
+
+        MovementResult replay = moveUseCase().record(cashier, requestId, "m-1", session, "deposit", "100.00", null);
+
+        assertThat(replay.expectedAfter()).isEqualTo(Money.of("600.00", CurrencyCode.HNL))
+                .isEqualTo(first.expectedAfter());
+        assertThat(replay.movement().id()).isEqualTo(first.movement().id());
+        assertThat(audit).isEmpty();
+    }
+
+    @Test
     void aMovementIsRecordedWithTheExpectedCashAfterItAndAudited() {
         UUID session = opened("500.00").id();
         audit.clear();
@@ -591,7 +606,7 @@ class CashboxUseCasesTest {
         }
     }
 
-    private static final class FakeMovements implements CashMovementRepository {
+    private final class FakeMovements implements CashMovementRepository {
         final List<CashMovement> rows = new ArrayList<>();
 
         @Override
@@ -602,6 +617,14 @@ class CashboxUseCasesTest {
         @Override
         public Optional<CashMovement> findByRequestKey(InstitutionId inst, String key) {
             return rows.stream().filter(row -> row.requestKey().equals(key)).findFirst();
+        }
+
+        /** What the database trigger stores: the float plus the movements of the session up to and including this one. */
+        @Override
+        public Money expectedAfter(InstitutionId inst, UUID movementId) {
+            CashMovement target = rows.stream().filter(row -> row.id().equals(movementId)).findFirst().orElseThrow();
+            List<CashMovement> upTo = rows.stream().filter(row -> row.sessionId().equals(target.sessionId())).toList();
+            return sessions.rows.get(target.sessionId()).expected(upTo.subList(0, upTo.indexOf(target) + 1));
         }
 
         @Override

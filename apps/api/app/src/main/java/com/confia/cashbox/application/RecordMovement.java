@@ -95,8 +95,7 @@ public final class RecordMovement {
         if (!existing.answers(hash)) {
             throw new IdempotencyPayloadMismatchException();
         }
-        CashSession session = sessions.findById(institution, existing.sessionId())
-                .orElseThrow(ResourceNotFoundException::new);
-        return MovementResult.of(existing, session.expected(movements.findBySession(institution, session.id())));
+        // The figure of the original call, stored with the movement, not the expected of today.
+        return MovementResult.of(existing, movements.expectedAfter(institution, existing.id()));
     }
 }
