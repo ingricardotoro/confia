@@ -97,15 +97,19 @@ Solo backend y contrato OpenAPI; la pantalla queda para el siguiente paso del co
 - **Pruebas**: `CashSessionTest` (dominio y casos límite de la nota), `CashboxUseCasesTest` (casos de uso con dobles),
   `CashboxSessionsIT` (PostgreSQL real: flujo de aceptación, apertura simultánea, idempotencia, rechazos de la base por SQL, RLS
   como `confia_admin_app` con conteos sin filtro), `CashboxEndpointsIT` (proceso administrativo real: flujo de aceptación por HTTP,
-  permiso de cada rol, códigos de error, aislamiento entre instituciones), más las listas fijadas de rutas, permisos, OpenAPI y claves de idempotencia.
+  permiso de cada rol, códigos de error, aislamiento entre instituciones y el alcance del cajero sobre su propia sesión), más las listas fijadas de rutas, permisos, OpenAPI y claves de idempotencia.
 
 ### Pendientes y decisiones abiertas
 
-1. **Alcance «el cajero solo ve su sesión» en la lectura (`docs/03` §5.4).** Los casos de uso ya restringen cuando el puerto
-   `SessionScope` responde que el actor solo lee lo suyo, pero un caso de uso no puede conocer el rol (solo el decisor de permisos
-   puede consultar `PermissionResolver`, y ArchUnit lo exige). Hoy el adaptador `FullReadSessionScope` responde «todo» para quien
-   tiene `cashbox:read`. Falta que `identity` publique un directorio de roles (decisión de `confia-architect`) y cambiar ese único
-   bean. Mientras tanto un cajero puede leer (no modificar) la sesión de otro de su institución.
+1. **Alcance «el cajero solo ve su sesión» en la lectura (`docs/03` §5.4): resuelto (2026-11-19).** `StaffRole.ownScoped()`
+   declara el alcance (solo el cajero, solo `cashbox:read`); `identity` lo publica con `PermissionScopes` (interfaz nombrada
+   `identity::directory`, adaptador `AccountPermissionScopes`, sin transacción propia y sin tocar `PermissionResolver`) y
+   `RoleDirectorySessionScope` lo traduce al puerto `SessionScope` de `cashbox`. Un cajero ve solo sus sesiones: el listado se
+   limita aunque pida el id de otro cajero, el detalle ajeno es 404 y la sesión actual es la suya; Contabilidad, Auditor,
+   Administrador y Super Administrador ven todas. Falla cerrado: sin rol o con código desconocido, solo lo propio.
+   Pendiente aparte: `docs/03` §6.3 (tabla de RLS, línea ~1056) dice que la fila de `cashbox_session` se limita al propio cajero salvo
+   supervisor, pero la migración V34 solo aísla por institución; el alcance por cajero lo hace la aplicación (se reporta, no se
+   edita la migración).
 2. **Moneda**: la sesión usa HNL fijo (`CashAmounts.CURRENCY`), la de la institución; leer `organization_institution.default_currency`
    exigiría un directorio publicado por `organization`.
 3. La nota original atribuía `cashbox:approve` a Contabilidad; la matriz efectiva aprobada por el propietario lo da al
