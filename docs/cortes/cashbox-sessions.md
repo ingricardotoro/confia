@@ -96,7 +96,8 @@ Solo backend y contrato OpenAPI; la pantalla queda para el siguiente paso del co
   posterior y el detalle el esperado, el cierre y la diferencia ya redondeados por el servidor.
 - **Pruebas**: `CashSessionTest` (dominio y casos límite de la nota), `CashboxUseCasesTest` (casos de uso con dobles),
   `CashboxSessionsIT` (PostgreSQL real: flujo de aceptación, apertura simultánea, idempotencia, rechazos de la base por SQL, RLS
-  como `confia_admin_app` con conteos sin filtro), más las listas fijadas de rutas, permisos, OpenAPI y claves de idempotencia.
+  como `confia_admin_app` con conteos sin filtro), `CashboxEndpointsIT` (proceso administrativo real: flujo de aceptación por HTTP,
+  permiso de cada rol, códigos de error, aislamiento entre instituciones), más las listas fijadas de rutas, permisos, OpenAPI y claves de idempotencia.
 
 ### Pendientes y decisiones abiertas
 
