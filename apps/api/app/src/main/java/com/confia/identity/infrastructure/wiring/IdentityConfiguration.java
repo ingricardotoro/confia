@@ -1,6 +1,7 @@
 package com.confia.identity.infrastructure.wiring;
 
 import com.confia.identity.application.AccountPermissions;
+import com.confia.identity.application.AccountPermissionScopes;
 import com.confia.identity.application.AccountSessionRevoker;
 import com.confia.identity.application.AuthenticateWithPassword;
 import com.confia.identity.application.CompleteSecondFactor;
@@ -248,6 +249,16 @@ public class IdentityConfiguration {
     AccountPermissions accountPermissions(TransactionRunner runner,
             StaffRoleAssignmentRepository assignments) {
         return new AccountPermissions(runner, assignments);
+    }
+
+    /**
+     * The adapter of the scope port that {@code cashbox} reads through the named interface {@code identity::directory}:
+     * whether the role of the account limits a permission to its own data. Administrative process only, like the rest of
+     * this class; it opens no transaction and never asks the permission resolver.
+     */
+    @Bean
+    AccountPermissionScopes accountPermissionScopes(StaffRoleAssignmentRepository assignments) {
+        return new AccountPermissionScopes(assignments);
     }
 
     /**

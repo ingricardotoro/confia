@@ -55,7 +55,8 @@ public enum StaffRole {
             ORGANIZATION_READ, STUDENTS_READ, GUARDIANS_READ, CATALOG_READ, SCHOLARSHIPS_READ, CHARGES_READ,
             LEDGER_READ, PAYMENTS_CREATE, PAYMENTS_READ, CASHBOX_CREATE, CASHBOX_READ,
             INVOICING_CREATE, INVOICING_READ, INVOICING_REQUEST_VOID,
-            COLLECTIONS_READ, DOCUMENTS_READ, REPORTING_READ, NOTIFICATIONS_READ)),
+            COLLECTIONS_READ, DOCUMENTS_READ, REPORTING_READ, NOTIFICATIONS_READ),
+            EnumSet.of(CASHBOX_READ)),
 
     /** Voids and approves invoices, reconciles the bank and reads the rest of the money flow. */
     ACCOUNTING("accounting", EnumSet.of(
@@ -84,10 +85,16 @@ public enum StaffRole {
 
     private final String code;
     private final Set<Permission> permissions;
+    private final Set<Permission> ownScoped;
 
     StaffRole(String code, Set<Permission> permissions) {
+        this(code, permissions, Set.of());
+    }
+
+    StaffRole(String code, Set<Permission> permissions, Set<Permission> ownScoped) {
         this.code = code;
         this.permissions = Set.copyOf(permissions);
+        this.ownScoped = Set.copyOf(ownScoped);
     }
 
     private static Set<Permission> complementOf(Permission excluded) {
@@ -102,6 +109,16 @@ public enum StaffRole {
     /** What the role grants; an immutable set. */
     public Set<Permission> permissions() {
         return permissions;
+    }
+
+    /**
+     * The permissions of the role that reach only what the account itself created ("a cashier reads only its own cash
+     * session", docs/03-seguridad.md section 5.4). It is a subset of {@link #permissions()} and is not part of the matrix
+     * that {@code PermissionMatrixParityTest} compares: the matrix says whether a permission is held, this says how far it
+     * reaches. An immutable set; empty for every role but the cashier.
+     */
+    public Set<Permission> ownScoped() {
+        return ownScoped;
     }
 
     /** The role with {@code code}, or empty when the catalog has none; never a default role. */
