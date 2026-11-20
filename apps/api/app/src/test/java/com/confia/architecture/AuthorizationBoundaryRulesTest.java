@@ -70,6 +70,40 @@ class AuthorizationBoundaryRulesTest {
                         + "the controller ran (design.md D1)");
     }
 
+    private static final String PERMISSION_SCOPES = "com.confia.identity.application.directory.PermissionScopes";
+
+    /** The role directory is read by the infrastructure of {@code cashbox} and by nobody else outside {@code identity}. */
+    static ArchRule onlyCashboxInfrastructureDependsOnThePermissionScopes() {
+        return noClasses().that().resideOutsideOfPackages("com.confia.cashbox.infrastructure..", "com.confia.identity..")
+                .should().dependOnClassesThat().haveFullyQualifiedName(PERMISSION_SCOPES)
+                .because("the scope of a permission is read by one adapter of the module that enforces it, never decided "
+                        + "inside a use case, a controller or another module (docs/03-seguridad.md section 5.4)");
+    }
+
+    static ArchRule noApplicationClassOutsideIdentityDependsOnThePermissionScopes() {
+        return noClasses().that().resideInAPackage("..application..").and().resideOutsideOfPackage("com.confia.identity..")
+                .should().dependOnClassesThat().haveFullyQualifiedName(PERMISSION_SCOPES)
+                .because("a use case receives the scope through a port of its own module, whose adapter lives in "
+                        + "infrastructure");
+    }
+
+    @Test
+    void onlyTheCashboxInfrastructureReadsThePermissionScopes() {
+        assertThat(productionClasses().get("com.confia.cashbox.infrastructure.RoleDirectorySessionScope")
+                .getDirectDependenciesFromSelf().stream().map(d -> d.getTargetClass().getName()))
+                .as("non-vacuous: the one real consumer is seen").contains(PERMISSION_SCOPES);
+        onlyCashboxInfrastructureDependsOnThePermissionScopes().check(productionClasses());
+        noApplicationClassOutsideIdentityDependsOnThePermissionScopes().check(productionClasses());
+    }
+
+    @Test
+    void rejectsTheFixtureApplicationClassThatReadsThePermissionScopes() {
+        assertRuleRejects(onlyCashboxInfrastructureDependsOnThePermissionScopes(), fixtureClasses(),
+                "BadApplicationUsesThePermissionScopes");
+        assertRuleRejects(noApplicationClassOutsideIdentityDependsOnThePermissionScopes(), fixtureClasses(),
+                "BadApplicationUsesThePermissionScopes");
+    }
+
     @Test
     void productionCarriesNoPermissionAnnotationAndEnablesNoMethodSecurity() {
         noClassEnablesMethodSecurityOrIsAnnotatedWithAPermission().check(productionClasses());

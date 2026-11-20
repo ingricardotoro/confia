@@ -269,6 +269,35 @@ class CashboxEndpointsIT extends CommittingPostgresIntegrationTest {
         assertProblem(get(BASE + "?sort=password", cashier), 400, "validation-failed");
     }
 
+    // --- Object-level scope of the reads ---
+
+    @Test
+    void aCashierReadsOnlyItsOwnSessionAndTheSupervisingRolesReadAll() throws SQLException {
+        UUID institution = institution();
+        Member cashierA = member(institution, StaffRole.CASHIER);
+        Member cashierB = member(institution, StaffRole.CASHIER);
+        Member accounting = member(institution, StaffRole.ACCOUNTING);
+        Member auditor = member(institution, StaffRole.AUDITOR);
+        String sessionA = HarnessProcess.json(post(BASE, cashierA, openBody("100.00"), "open-a")).get("id").asString();
+        String sessionB = HarnessProcess.json(post(BASE, cashierB, openBody("200.00"), "open-b")).get("id").asString();
+
+        for (String path : new String[] {BASE, BASE + "?cashier=" + cashierB.account()}) {
+            JsonNode listed = HarnessProcess.json(get(path, cashierA));
+            assertThat(listed.get("total").asLong()).as(path).isEqualTo(1);
+            assertThat(listed.get("items").get(0).get("id").asString()).isEqualTo(sessionA);
+        }
+        assertProblem(get(BASE + "/" + sessionB, cashierA), 404, "resource-not-found");
+        assertThat(get(BASE + "/" + sessionA, cashierA).statusCode()).isEqualTo(200);
+        assertThat(HarnessProcess.json(get(BASE + "/current", cashierA)).get("id").asString()).isEqualTo(sessionA);
+        assertThat(HarnessProcess.json(get(BASE + "/current", cashierB)).get("id").asString()).isEqualTo(sessionB);
+
+        for (Member supervisor : new Member[] {accounting, auditor}) {
+            assertThat(HarnessProcess.json(get(BASE, supervisor)).get("total").asLong()).isEqualTo(2);
+            assertThat(get(BASE + "/" + sessionA, supervisor).statusCode()).isEqualTo(200);
+            assertThat(get(BASE + "/" + sessionB, supervisor).statusCode()).isEqualTo(200);
+        }
+    }
+
     // --- Isolation between institutions ---
 
     @Test

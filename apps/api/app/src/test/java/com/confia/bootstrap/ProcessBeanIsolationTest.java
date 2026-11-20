@@ -11,6 +11,7 @@ import com.confia.shared.observability.queue.LogQueueMetrics;
 import com.confia.shared.observability.queue.QueueMetrics;
 import com.confia.shared.observability.queue.QueueObservation;
 import com.github.kagkarlsson.scheduler.Scheduler;
+import com.confia.identity.application.directory.PermissionScopes;
 import com.confia.shared.security.PermissionResolver;
 import com.confia.shared.security.RateLimiter;
 import com.confia.shared.security.TransactionRunner;
@@ -287,11 +288,14 @@ class ProcessBeanIsolationTest {
                         .anyMatch(bean -> bean.endsWith(PermissionDecider.class.getName()));
                 assertThat(context.getBeansOfType(PermissionedEndpoints.class)).hasSize(1);
                 assertThat(context.getBeansOfType(PermissionResolver.class)).hasSize(1);
+                assertThat(context.getBeansOfType(PermissionScopes.class)).hasSize(1);
             } else {
                 assertThat(held).as("no authorization bean in the %s process", policy.process())
                         .isEmpty();
                 assertThat(context.getBeansOfType(PermissionResolver.class))
                         .as("no permission resolver in the %s process", policy.process()).isEmpty();
+                assertThat(context.getBeansOfType(PermissionScopes.class))
+                        .as("no permission scopes in the %s process", policy.process()).isEmpty();
             }
         } finally {
             if (context != null) {

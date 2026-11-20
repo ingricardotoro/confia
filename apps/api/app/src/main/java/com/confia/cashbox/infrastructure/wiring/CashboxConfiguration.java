@@ -13,11 +13,12 @@ import com.confia.cashbox.application.OpenSession;
 import com.confia.cashbox.application.RecordMovement;
 import com.confia.cashbox.application.SessionDetails;
 import com.confia.cashbox.application.SessionScope;
-import com.confia.cashbox.infrastructure.FullReadSessionScope;
 import com.confia.cashbox.infrastructure.JooqCashApprovalRepository;
 import com.confia.cashbox.infrastructure.JooqCashCloseRepository;
 import com.confia.cashbox.infrastructure.JooqCashMovementRepository;
 import com.confia.cashbox.infrastructure.JooqCashSessionRepository;
+import com.confia.cashbox.infrastructure.RoleDirectorySessionScope;
+import com.confia.identity.application.directory.PermissionScopes;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.TransactionRunner;
 import java.time.Clock;
@@ -54,10 +55,10 @@ public class CashboxConfiguration {
         return new JooqCashApprovalRepository(dsl);
     }
 
-    /** How far a read reaches (a cashier only its own session): see {@link FullReadSessionScope} for what is pending. */
+    /** How far a read reaches (a cashier only its own session), answered by the role directory of {@code identity}. */
     @Bean
-    SessionScope cashSessionScope() {
-        return new FullReadSessionScope();
+    SessionScope cashSessionScope(PermissionScopes scopes) {
+        return new RoleDirectorySessionScope(scopes);
     }
 
     @Bean

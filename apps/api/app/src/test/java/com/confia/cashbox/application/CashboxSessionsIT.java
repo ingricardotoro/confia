@@ -8,11 +8,13 @@ import com.confia.cashbox.domain.CashSessionAlreadyOpenException;
 import com.confia.cashbox.domain.CashSessionNotAwaitingApprovalException;
 import com.confia.cashbox.domain.CashSessionNotOpenException;
 import com.confia.cashbox.domain.ResourceNotFoundException;
-import com.confia.cashbox.infrastructure.FullReadSessionScope;
+import com.confia.identity.application.AccountPermissionScopes;
+import com.confia.identity.infrastructure.JooqStaffRoleAssignmentRepository;
 import com.confia.cashbox.infrastructure.JooqCashApprovalRepository;
 import com.confia.cashbox.infrastructure.JooqCashCloseRepository;
 import com.confia.cashbox.infrastructure.JooqCashMovementRepository;
 import com.confia.cashbox.infrastructure.JooqCashSessionRepository;
+import com.confia.cashbox.infrastructure.RoleDirectorySessionScope;
 import com.confia.kernel.CurrencyCode;
 import com.confia.kernel.Money;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
@@ -69,7 +71,11 @@ class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
                     + "'America/Tegucigalpa')", institution);
             c.commit();
         }
-        return new Env(institution, actor(institution), actor(institution), actor(institution));
+        Env env = new Env(institution, actor(institution), actor(institution), actor(institution));
+        StaffRoleFixtures.committed(institution, env.cashier().accountId(), "cashier");
+        StaffRoleFixtures.committed(institution, env.accountant().accountId(), "accounting");
+        StaffRoleFixtures.committed(institution, env.otherCashier().accountId(), "cashier");
+        return env;
     }
 
     private static AuthenticatedActor actor(UUID institution) {
@@ -107,9 +113,14 @@ class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
                 new JooqCashApprovalRepository(dsl), details(), new JooqAuditLogWriter(dsl), CLOCK);
     }
 
+    /** The real chain: the scope of the role, read from the assignment stored in the database. */
+    private RoleDirectorySessionScope sessionScope() {
+        return new RoleDirectorySessionScope(new AccountPermissionScopes(new JooqStaffRoleAssignmentRepository(dsl)));
+    }
+
     private GetSession getSession() {
         return new GetSession(transactionRunner(), new JooqCashSessionRepository(dsl), details(),
-                new FullReadSessionScope());
+                sessionScope());
     }
 
     private GetCurrentSession currentSession() {
@@ -118,7 +129,7 @@ class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
 
     private ListSessions listSessions() {
         return new ListSessions(transactionRunner(), new JooqCashSessionRepository(dsl),
-                new JooqCashCloseRepository(dsl), new JooqCashApprovalRepository(dsl), new FullReadSessionScope());
+                new JooqCashCloseRepository(dsl), new JooqCashApprovalRepository(dsl), sessionScope());
     }
 
     private static Money hnl(String amount) {
@@ -417,6 +428,49 @@ class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
                 PageRequest.of(0, 50, null, SessionFilter.SORT_FIELDS, "openedAt", false));
         assertThat(listedByB.total()).isEqualTo(2);
         assertThat(listedByB.items()).noneMatch(row -> row.id().equals(sessionA));
+    }
+
+    @Test
+    void aCashierReadsOnlyItsOwnSessionWhileAccountingSeesBoth() throws SQLException {
+        Env env = seed();
+        AuthenticatedActor cashierA = env.cashier();
+        AuthenticatedActor cashierB = env.otherCashier();
+        UUID sessionA = closedClean(env, cashierA);
+        UUID sessionB = openSession().open(cashierB, request(), "open-b", "100.00").id();
+        UUID currentA = openSession().open(cashierA, request(), "open-a2", "50.00").id();
+
+        SessionFilter everyone = new SessionFilter(null, null, null, null);
+        SessionFilter askingForB = new SessionFilter(null, cashierB.accountId(), null, null);
+        PageRequest page = PageRequest.of(0, 50, null, SessionFilter.SORT_FIELDS, "openedAt", false);
+
+        assertThat(listSessions().list(cashierA, request(), everyone, page).items()).extracting(SessionSummary::id)
+                .containsExactlyInAnyOrder(sessionA, currentA);
+        assertThat(listSessions().list(cashierA, request(), askingForB, page).items()).as("filtering by B's cashier id")
+                .extracting(SessionSummary::id).containsExactlyInAnyOrder(sessionA, currentA).doesNotContain(sessionB);
+        assertThat(listSessions().list(cashierA, request(), askingForB, page).total()).isEqualTo(2);
+
+        assertThatThrownBy(() -> getSession().get(cashierA, request(), sessionB))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThat(getSession().get(cashierA, request(), sessionA).id()).isEqualTo(sessionA);
+        assertThat(currentSession().current(cashierA, request()).id()).isEqualTo(currentA);
+        assertThat(currentSession().current(cashierB, request()).id()).isEqualTo(sessionB);
+
+        assertThat(listSessions().list(env.accountant(), request(), everyone, page).items())
+                .extracting(SessionSummary::id).containsExactlyInAnyOrder(sessionA, sessionB, currentA);
+        assertThat(getSession().get(env.accountant(), request(), sessionB).id()).isEqualTo(sessionB);
+    }
+
+    @Test
+    void anAccountWithoutARoleAssignmentReadsOnlyItsOwnSessions() throws SQLException {
+        Env env = seed();
+        AuthenticatedActor unassigned = actor(env.institution());
+        StaffRoleFixtures.committed(env.institution(), unassigned.accountId(), null);
+        UUID session = closedClean(env, env.cashier());
+
+        assertThatThrownBy(() -> getSession().get(unassigned, request(), session))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThat(listSessions().list(unassigned, request(), new SessionFilter(null, null, null, null),
+                PageRequest.of(0, 50, null, SessionFilter.SORT_FIELDS, "openedAt", false)).total()).isZero();
     }
 
     @Test
