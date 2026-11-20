@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { useId } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import confiaLogo from "../../../shared/brand/confia-logo.png";
@@ -30,8 +30,17 @@ export interface SideNavigationProps {
   readonly expandedGroupIds?: ReadonlySet<string>;
   /** Called with the id of the section whose header was activated. */
   readonly onToggleGroup?: (groupId: string) => void;
+  /** From lg up the navigation is a slim rail: the emblem of the logo and the toggle. The caller owns where the choice is kept. */
+  readonly collapsed?: boolean;
+  /** Called by the toggle at the foot of the navigation (from lg up). */
+  readonly onToggleCollapsed?: () => void;
+  /** Called by the close control of the small screen panel. */
+  readonly onClosePanel?: () => void;
   readonly className?: string;
 }
+
+/** The list region the toggle controls. */
+const LIST_ID = "side-navigation-list";
 
 const NO_GROUPS: ReadonlySet<string> = new Set();
 
@@ -138,6 +147,9 @@ export function SideNavigation({
   onNavigate,
   expandedGroupIds = NO_GROUPS,
   onToggleGroup,
+  collapsed = false,
+  onToggleCollapsed,
+  onClosePanel,
   className,
 }: SideNavigationProps) {
   const { t } = useAdminText();
@@ -146,21 +158,47 @@ export function SideNavigation({
     <nav
       aria-label={t("shell.navigationLabel")}
       className={[
-        "flex w-60 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar-bg",
+        "flex h-full w-60 shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar-bg whitespace-nowrap",
+        "lg:transition-[width] lg:duration-200 lg:ease-standard",
+        collapsed ? "lg:w-16" : "",
         className ?? "",
       ].join(" ")}
     >
-      {/* The logo is dark navy on transparent, so its strip is white in both themes (the sidebar-active white is fixed). */}
-      <div className="shrink-0 bg-sidebar-active-fg px-4 py-3">
-        <img
-          src={confiaLogo}
-          alt={t("shell.logoAlt")}
-          width={720}
-          height={181}
-          className="block h-auto w-full"
-        />
+      {/* The logo is dark navy on transparent, so its strip is white in both themes (the sidebar-active white is fixed).
+          In the rail a fixed box shows only the left part of the image, the emblem; the alt text stays. */}
+      <div
+        className={[
+          "flex h-18 shrink-0 items-center justify-between gap-2 bg-sidebar-active-fg px-4",
+          collapsed ? "lg:justify-center lg:px-0" : "",
+        ].join(" ")}
+      >
+        <div className={["min-w-0 overflow-hidden", collapsed ? "lg:h-8 lg:w-11" : ""].join(" ")}>
+          <img
+            src={confiaLogo}
+            alt={t("shell.logoAlt")}
+            width={720}
+            height={181}
+            className={["block h-12 w-auto max-w-none", collapsed ? "lg:h-8" : ""].join(" ")}
+          />
+        </div>
+        {onClosePanel === undefined ? null : (
+          <button
+            type="button"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-sidebar-bg hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-bg lg:hidden"
+            aria-label={t("shell.closeSidebar")}
+            title={t("shell.closeSidebar")}
+            onClick={onClosePanel}
+          >
+            <X aria-hidden="true" className="size-5" />
+          </button>
+        )}
       </div>
-      <div className="flex flex-col gap-1 px-3 pb-4">
+      {/* Collapsed, the list leaves with display: none, so it is out of the tab order and the accessibility tree. The
+          scroll belongs to the list, so the footer stays pinned to the bottom of the column. */}
+      <div
+        id={LIST_ID}
+        className={["flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 pb-4", collapsed ? "lg:hidden" : ""].join(" ")}
+      >
         <ul className="flex flex-col gap-0.5">
           <NavigationLinks items={items} onNavigate={onNavigate} />
         </ul>
@@ -175,6 +213,26 @@ export function SideNavigation({
             onNavigate={onNavigate}
           />
         ))}
+      </div>
+      {/* One toggle for both states: the same element keeps the focus when it changes. Wide screens only. */}
+      <div className="mt-auto hidden shrink-0 border-t border-sidebar-border p-3 lg:flex">
+        <button
+          type="button"
+          aria-expanded={!collapsed}
+          aria-controls={LIST_ID}
+          aria-label={t(collapsed ? "shell.expandSidebar" : "shell.collapseSidebar")}
+          title={t(collapsed ? "shell.expandSidebar" : "shell.collapseSidebar")}
+          onClick={onToggleCollapsed}
+          className={[
+            "inline-flex items-center rounded-md text-sidebar-fg transition-colors duration-100",
+            "hover:bg-sidebar-hover-bg active:bg-sidebar-active-bg active:text-sidebar-active-fg",
+            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-focus",
+            collapsed ? "size-10 justify-center" : "h-10 w-full justify-start gap-2 px-3 text-sm",
+          ].join(" ")}
+        >
+          {collapsed ? <PanelLeftOpen aria-hidden="true" className="size-5 shrink-0" /> : <PanelLeftClose aria-hidden="true" className="size-5 shrink-0" />}
+          {collapsed ? null : t("shell.collapseSidebar")}
+        </button>
       </div>
     </nav>
   );

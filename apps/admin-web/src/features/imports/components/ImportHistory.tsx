@@ -1,5 +1,5 @@
 import type { ImportBatchResponseOutput } from "@confia/contracts/admin";
-import { Badge, Pagination, Table, type TableColumn, type TableProps } from "@confia/ui";
+import { Badge, PageHeader, Pagination, Table, type TableColumn, type TableProps } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import type { ResourcePagination } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import { formatInstant } from "../../../shared/format/format-date.ts";
@@ -44,9 +44,7 @@ export function ImportHistory({ rows, table, pagination, kind, onKindChange }: I
 
   return (
     <section aria-labelledby="imports-history-heading" className="flex flex-col gap-3">
-      <h2 id="imports-history-heading" className="text-base font-semibold text-text-primary">
-        {t("imports.history.heading")}
-      </h2>
+      <PageHeader title={t("imports.history.heading")} headingLevel={2} headingId="imports-history-heading" />
       <div className="max-w-xs">
         <OptionField
           label={t("imports.history.kindFilter")}

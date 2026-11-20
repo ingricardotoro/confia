@@ -15,6 +15,9 @@ export interface AppShellProps {
   /** The ids of the open sections of the navigation. */
   readonly expandedGroupIds?: ReadonlySet<string>;
   readonly onToggleGroup?: (groupId: string) => void;
+  /** Whether the navigation is a slim rail on wide screens. The caller owns where the choice is kept. Default: expanded. */
+  readonly sidebarCollapsed?: boolean;
+  readonly onSidebarCollapsedChange?: (collapsed: boolean) => void;
   readonly signingOut: boolean;
   readonly signOutFailed: boolean;
   readonly onSignOut: () => void;
@@ -34,6 +37,8 @@ export function AppShell({
   onNavigate,
   expandedGroupIds,
   onToggleGroup,
+  sidebarCollapsed = false,
+  onSidebarCollapsedChange,
   signingOut,
   signOutFailed,
   onSignOut,
@@ -55,7 +60,7 @@ export function AppShell({
   }, [menuOpen]);
 
   return (
-    <div className="flex min-h-screen bg-bg-canvas text-text-primary">
+    <div className="flex min-h-dvh bg-bg-canvas text-text-primary">
       <a
         href="#contenido"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-bg-surface focus:px-3 focus:py-2 focus:text-text-link focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
@@ -64,7 +69,10 @@ export function AppShell({
       </a>
       <div
         id="side-navigation"
-        className={`${menuOpen ? "fixed inset-y-0 left-0 z-40 flex shadow-xl" : "hidden"} lg:static lg:z-auto lg:flex lg:shadow-none`}
+        // Below lg: a panel over the page. From lg: a column that never disappears and stays in view while the page
+        // scrolls (sticky, one viewport tall), so the page never grows a band below the content. Its width is the
+        // navigation's: full, or the slim rail.
+        className={`${menuOpen ? "fixed inset-y-0 left-0 z-40 flex shadow-xl" : "hidden"} lg:sticky lg:top-0 lg:z-auto lg:flex lg:h-dvh lg:self-start lg:shadow-none`}
       >
         <SideNavigation
           items={navigation}
@@ -77,10 +85,17 @@ export function AppShell({
             setMenuOpen(false);
             onNavigate(href);
           }}
-          className="min-h-screen"
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={() => {
+            onSidebarCollapsedChange?.(!sidebarCollapsed);
+          }}
+          onClosePanel={() => {
+            setMenuOpen(false);
+          }}
+          className="h-full"
         />
       </div>
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-bg-surface px-6">
           <Button
             variant="subtle"

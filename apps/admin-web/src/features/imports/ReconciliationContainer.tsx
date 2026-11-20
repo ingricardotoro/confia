@@ -1,3 +1,4 @@
+import { PageHeader } from "@confia/ui";
 import { useEffect, useRef, useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { useAccessForm } from "../../shared/forms/use-access-form.ts";
@@ -131,13 +132,8 @@ export function ReconciliationContainer({ search, onSearchChange }: Reconciliati
   const yearsState: YearsState = years.loading ? "loading" : years.failed ? "failed" : years.rows.length === 0 ? "empty" : "ready";
 
   return (
-    <section aria-labelledby="reconciliation-heading" className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 id="reconciliation-heading" className="text-base font-semibold text-text-primary">
-          {t("imports.reconciliation.heading")}
-        </h2>
-        <p className="max-w-prose text-sm text-text-secondary">{t("imports.reconciliation.intro")}</p>
-      </div>
+    <section aria-labelledby="reconciliation-heading" className="flex flex-col gap-3">
+      <PageHeader title={t("imports.reconciliation.heading")} headingLevel={2} headingId="reconciliation-heading" description={t("imports.reconciliation.intro")} />
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <ReconciliationForm
           years={{ state: yearsState, options: optionsOf(years.rows), onRetry: years.retry }}
