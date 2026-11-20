@@ -110,8 +110,30 @@ Solo backend y contrato OpenAPI; la pantalla queda para el siguiente paso del co
    Pendiente aparte: `docs/03` §6.3 (tabla de RLS, línea ~1056) dice que la fila de `cashbox_session` se limita al propio cajero salvo
    supervisor, pero la migración V34 solo aísla por institución; el alcance por cajero lo hace la aplicación (se reporta, no se
    edita la migración).
+   **Actualización (2026-11-19, auditoría de seguridad M2):** `docs/03` §6.3 lleva ahora una nota fechada que lo declara
+   (límite por cajero en la aplicación, fallo cerrado; el límite en base de datos exige una variable de alcance del actor en
+   `TransactionRunner`, decisión de `confia-architect` antes del módulo `reporting`). Una prueba de arquitectura
+   (`AuthorizationBoundaryRulesTest`, con dos fixtures que debe rechazar) exige que la capa `web` no lea `CashSessionRepository` y
+   que todo caso de uso de lectura (`Get*`, `List*`, salvo `GetCurrentSession`, que lee solo la sesión del propio actor) aplique
+   `SessionScope`.
 2. **Moneda**: la sesión usa HNL fijo (`CashAmounts.CURRENCY`), la de la institución; leer `organization_institution.default_currency`
    exigiría un directorio publicado por `organization`.
 3. La nota original atribuía `cashbox:approve` a Contabilidad; la matriz efectiva aprobada por el propietario lo da al
    Administrador y al Super Administrador, y así quedó.
 
+4. **Ronda de revisión y auditoría (2026-11-19), corregida en V34 (no estaba fusionada ni aplicada, se enmendó en sitio):**
+   - Disparador de apertura: exige `status = 'open'`, `cashier_id = app.actor_id` (rechaza si es nulo) y `opened_at` dentro de un
+     minuto de `clock_timestamp()` (la aplicación envía su reloj; las pruebas de integración usan el reloj real). Los disparadores
+     de movimiento, cierre y aprobación exigen `created_by`, `closed_by` y `approved_by` igual a `app.actor_id`; el movimiento
+     además exige que sea el cajero de la sesión.
+   - El disparador de movimiento toma `FOR UPDATE` (antes `FOR SHARE`) y recalcula el esperado acumulado: rechaza un movimiento que
+     lo dejaría negativo aunque se escriba por SQL sin el bloqueo de la aplicación, y guarda el resultante en
+     `cashbox_movement.expected_after` (lo calcula el disparador, no se envía).
+   - La repetición idempotente de un movimiento devuelve el esperado de la llamada original (`expected_after`), no el de hoy.
+   - Pruebas nuevas en `CashboxSessionsIT`: retiros simultáneos que suman más que lo esperado (solo caben los que caben, el esperado
+     final es 0), la misma carrera por SQL directo sin el bloqueo de la aplicación, un movimiento contra el cierre (queda dentro
+     del esperado o se rechaza con `cash-session-not-open`, nunca después), repetición de A después de B, y los rechazos por SQL
+     como `confia_admin_app` de cada regla de actor.
+5. **Abiertos, fuera de esta ronda:** (B1) auditar los intentos denegados (cierre ajeno, aprobación del propio cajero, etc.);
+   (B2) la clave de idempotencia por actor: hoy la clave es única por institución y otro actor con la misma clave recibe
+   `idempotency-payload-mismatch` (422) en vez de una clave propia.

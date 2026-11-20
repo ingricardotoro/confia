@@ -1056,6 +1056,14 @@ Tablas con política obligatoria y su criterio:
 | `cashbox_session` | Institución, y el propio cajero salvo rol supervisor | Personal |
 | `shared_audit_log` | Institución | Personal con permiso `audit:read` |
 
+> **Nota (2026-11-19), `cashbox_session`.** La política de base de datos de `cashbox_session` aísla por institución. El límite por
+> cajero de esta fila («el propio cajero salvo rol supervisor») **se aplica hoy en la aplicación**, a través de `OwnRecordPolicy`
+> (`identity`) y del puerto `SessionScope` de `cashbox`, y falla cerrado: sin rol o con un código desconocido, solo lo propio. Una
+> prueba de arquitectura exige que toda lectura de `CashSessionRepository` pase por `SessionScope` y que la capa `web` nunca
+> lea el repositorio. Un límite también en la base de datos exige una variable de contexto de alcance del actor en
+> `TransactionRunner` (hoy solo fija `app.actor_id`, `app.actor_kind`, `app.institution_id` y `app.request_id`); esa decisión
+> corresponde a `confia-architect` y debe tomarse **antes del módulo `reporting`**, que leerá estas filas con otro camino.
+
 ### 6.3.1 Extensiones de PostgreSQL (`btree_gist`)
 
 La migración `V28` instala la extensión `btree_gist` para la restricción de exclusión que impide que dos vigencias de
