@@ -16,8 +16,8 @@ const send = (target: CashboxModel, method: "GET" | "POST", path: string, body?:
   target.handle({ method, path, query: new URLSearchParams(query), body, headers: { "idempotency-key": key ?? undefined } });
 const money = (amount: string) => ({ amount, currency: "HNL" });
 const code = (response: { body?: unknown } | undefined): string => (response?.body as { type: string }).type.split("/").at(-1) ?? "";
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the type is the caller's reading of the body, and a response body is `unknown`.
-const body = <T,>(response: { body?: unknown } | undefined): T => response?.body as T;
+// The body as the test reads it: a response body is `unknown`, so each call site states the shape it expects with `as`.
+const body = (response: { body?: unknown } | undefined): unknown => response?.body;
 
 interface Session {
   id: string;
@@ -28,25 +28,25 @@ interface Session {
 }
 
 function openWith(target: CashboxModel, float = "500.00", key = "open-1"): Session {
-  return body<Session>(send(target, "POST", BASE, { openingFloat: money(float) }, key));
+  return (body(send(target, "POST", BASE, { openingFloat: money(float) }, key)) as Session);
 }
 
 describe("the list", () => {
   it("serves the seeded sessions newest first with the amounts as text, none for a session still open, and nothing for an empty scenario", () => {
-    const page = body<{ items: { id: string; status: string; differenceAmount?: { amount: string } }[]; total: number }>(send(model(), "GET", BASE));
+    const page = (body(send(model(), "GET", BASE)) as { items: { id: string; status: string; differenceAmount?: { amount: string } }[]; total: number });
 
     expect(page.total).toBe(2);
     expect(page.items.map((row) => row.status)).toEqual(["pending_approval", "closed"]);
     expect(page.items[0]?.differenceAmount).toEqual(money("-10.00"));
-    expect(body<{ total: number }>(send(model({ seed: "none" }), "GET", BASE)).total).toBe(0);
+    expect((body(send(model({ seed: "none" }), "GET", BASE)) as { total: number }).total).toBe(0);
   });
 
   it("filters by status, orders and pages on the server, and refuses a query that does not hold", () => {
     const target = model();
 
-    expect(body<{ items: unknown[] }>(send(target, "GET", BASE, undefined, null, "status=closed")).items).toHaveLength(1);
-    expect(body<{ items: { status: string }[] }>(send(target, "GET", BASE, undefined, null, "sort=status,asc")).items.map((row) => row.status)).toEqual(["closed", "pending_approval"]);
-    expect(body<{ items: unknown[]; total: number }>(send(target, "GET", BASE, undefined, null, "size=1&page=1"))).toMatchObject({ total: 2, items: [{}] });
+    expect((body(send(target, "GET", BASE, undefined, null, "status=closed")) as { items: unknown[] }).items).toHaveLength(1);
+    expect((body(send(target, "GET", BASE, undefined, null, "sort=status,asc")) as { items: { status: string }[] }).items.map((row) => row.status)).toEqual(["closed", "pending_approval"]);
+    expect((body(send(target, "GET", BASE, undefined, null, "size=1&page=1")) as { items: unknown[]; total: number })).toMatchObject({ total: 2, items: [{}] });
     expect(send(target, "GET", BASE, undefined, null, "status=nonsense")?.status).toBe(400);
     expect(send(target, "GET", BASE, undefined, null, "size=500")?.status).toBe(400);
   });
@@ -61,7 +61,7 @@ describe("opening", () => {
 
     expect(opened.status).toBe("open");
     expect(opened.expectedAmount).toEqual(money("500.00"));
-    expect(body<Session>(send(target, "GET", `${BASE}/current`)).id).toBe(opened.id);
+    expect((body(send(target, "GET", `${BASE}/current`)) as Session).id).toBe(opened.id);
   });
 
   it("refuses a second session, a float that does not hold, and a request with no key", () => {
@@ -93,7 +93,7 @@ describe("the movements and the close", () => {
     const withdrawal = send(target, "POST", `${BASE}/${id}/movements`, { type: "withdrawal", amount: money("50.00") }, "m2");
 
     expect(deposit?.status).toBe(201);
-    expect(body<{ expectedAfter: unknown }>(withdrawal).expectedAfter).toEqual(money("550.00"));
+    expect((body(withdrawal) as { expectedAfter: unknown }).expectedAfter).toEqual(money("550.00"));
     expect(code(send(target, "POST", `${BASE}/${id}/movements`, { type: "withdrawal", amount: money("9999.00") }, "m3"))).toBe("cash-expected-negative");
   });
 
@@ -112,7 +112,7 @@ describe("the movements and the close", () => {
     send(target, "POST", `${BASE}/${id}/movements`, { type: "withdrawal", amount: money("50.00") }, "m2");
 
     expect(code(send(target, "POST", `${BASE}/${id}/close`, { declaredAmount: money("540.00") }, "c1"))).toBe("cash-difference-reason-required");
-    const closed = body<Session>(send(target, "POST", `${BASE}/${id}/close`, { declaredAmount: money("540.00"), differenceReason: REASON }, "c2"));
+    const closed = (body(send(target, "POST", `${BASE}/${id}/close`, { declaredAmount: money("540.00"), differenceReason: REASON }, "c2")) as Session);
 
     expect(closed.status).toBe("pending_approval");
     expect(closed.expectedAmount).toEqual(money("550.00"));
@@ -121,7 +121,7 @@ describe("the movements and the close", () => {
 
     const exact = model();
     const other = openWith(exact);
-    expect(body<Session>(send(exact, "POST", `${BASE}/${other.id}/close`, { declaredAmount: money("500.00") }, "c1")).status).toBe("closed");
+    expect((body(send(exact, "POST", `${BASE}/${other.id}/close`, { declaredAmount: money("500.00") }, "c1")) as Session).status).toBe("closed");
   });
 });
 
@@ -131,7 +131,7 @@ describe("the approval", () => {
     const pending = cashSessionId(2);
 
     expect(code(send(target, "POST", `${BASE}/${cashSessionId(3)}/approve`, { note: "Revisado" }, "a0"))).toBe("cash-session-not-awaiting-approval");
-    expect(body<Session>(send(target, "POST", `${BASE}/${pending}/approve`, { note: "Revisado con el cajero" }, "a1")).status).toBe("closed");
+    expect((body(send(target, "POST", `${BASE}/${pending}/approve`, { note: "Revisado con el cajero" }, "a1")) as Session).status).toBe("closed");
 
     const { id } = openWith(target);
     send(target, "POST", `${BASE}/${id}/close`, { declaredAmount: money("400.00"), differenceReason: REASON }, "c1");
@@ -159,7 +159,7 @@ describe("the refusals the scenarios inject", () => {
   it("holds an open session of the person in the mine-open scenario, with its expected cash", () => {
     const target = model({ seed: "mine-open" });
 
-    expect(body<Session>(send(target, "GET", `${BASE}/current`))).toMatchObject({ status: "open", expectedAmount: money("550.00") });
+    expect((body(send(target, "GET", `${BASE}/current`)) as Session)).toMatchObject({ status: "open", expectedAmount: money("550.00") });
   });
 
   it("answers nothing for a path that is not the cashbox's", () => {
