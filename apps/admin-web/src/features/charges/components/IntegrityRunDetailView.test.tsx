@@ -9,7 +9,7 @@ import { IntegrityRunDetailView, type IntegrityRunDetailViewProps } from "./Inte
 // a retry. Blocked: a run that is not in the institution, with no retry. Empty: a run with no discrepancies, with a way back. Success: the
 // discrepancies with what the charges say and what the ledger holds, as the server sent them.
 function props(override: Partial<IntegrityRunDetailViewProps> = {}): IntegrityRunDetailViewProps {
-  return { state: { kind: "ready", detail: { run: integrityRun({ status: "DISCREPANCIES", discrepancyCount: 1 }), findings: [] } }, onBack: vi.fn(), ...override };
+  return { state: { kind: "ready", detail: { run: integrityRun({ status: "DISCREPANCIES", discrepancyCount: 1 }), findings: [] } }, backHref: "/charges/integrity", onBack: vi.fn(), ...override };
 }
 
 describe("IntegrityRunDetailView", () => {

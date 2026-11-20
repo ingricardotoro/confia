@@ -8,6 +8,7 @@ import { failureKeyOf, isActiveRun, itemErrorHelpKeyOf, periodLabelOf } from "..
 import { AccrualOutcomeBadge } from "./AccrualOutcomeBadge.tsx";
 import { AccrualRunStatusBadge } from "./AccrualRunStatusBadge.tsx";
 import type { AccrualNames } from "./AccrualView.tsx";
+import { BackLink } from "../../../shared/layout/components/BackLink.tsx";
 
 export type AccrualRunDetailState =
   | { readonly kind: "loading" }
@@ -100,28 +101,12 @@ function RunItems({ state, onBack }: { readonly state: Extract<AccrualRunDetailS
 export function AccrualRunDetailView({ state, lookupFailure, backHref, onBack, generationHref, onOpenGeneration, planHref, onOpenPlan, onRecalculate }: AccrualRunDetailViewProps) {
   const { t } = useAdminText();
 
-  const back = (
-    <a
-      href={backHref}
-      className="w-fit text-sm text-text-primary underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
-      onClick={(event) => {
-        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
-        onBack();
-      }}
-    >
-      {t("charges.run.back")}
-    </a>
-  );
+  const back = <BackLink href={backHref} label={t("charges.run.back")} onBack={onBack} />;
 
   if (state.kind === "loading") {
     return (
       <section aria-labelledby="accrual-run-heading" aria-busy="true" className="flex flex-col gap-3">
-        {back}
-        <h2 id="accrual-run-heading" className="sr-only">
-          {t("charges.runs.heading")}
-        </h2>
-        <Skeleton className="h-7 w-72" />
+        <PageHeader title={t("charges.runs.heading")} headingLevel={2} headingId="accrual-run-heading" breadcrumb={back} />
         <Skeleton className="h-16 w-full max-w-xl" />
         <Skeleton className="h-40 w-full" />
       </section>
@@ -131,10 +116,7 @@ export function AccrualRunDetailView({ state, lookupFailure, backHref, onBack, g
   if (state.kind === "error") {
     return (
       <section aria-labelledby="accrual-run-heading" className="flex flex-col gap-3">
-        {back}
-        <h2 id="accrual-run-heading" className="sr-only">
-          {t("charges.runs.heading")}
-        </h2>
+        <PageHeader title={t("charges.runs.heading")} headingLevel={2} headingId="accrual-run-heading" breadcrumb={back} />
         <ErrorState title={state.title} description={state.description} onRetry={state.onRetry} />
       </section>
     );

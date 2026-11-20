@@ -1,5 +1,6 @@
-import { Alert, Button, EmptyState, ErrorState, MoneyAmount, PageHeader, Skeleton, Table, type TableColumn } from "@confia/ui";
+import { Alert, Breadcrumb, EmptyState, ErrorState, MoneyAmount, PageHeader, Skeleton, Table, type TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
+import { BackLink } from "../../../shared/layout/components/BackLink.tsx";
 import { formatInstant } from "../../../shared/format/format-date.ts";
 import type { IntegrityFinding, IntegrityRunDetail } from "../charges-types.ts";
 import { findingKindKeyOf } from "../integrity-model.ts";
@@ -14,11 +15,12 @@ export type IntegrityRunDetailState =
 
 export interface IntegrityRunDetailViewProps {
   readonly state: IntegrityRunDetailState;
+  readonly backHref: string;
   readonly onBack: () => void;
 }
 
 /** One run of the integrity check: how it went, and each discrepancy it confirmed with what the charges say and what the ledger holds. */
-export function IntegrityRunDetailView({ state, onBack }: IntegrityRunDetailViewProps) {
+export function IntegrityRunDetailView({ state, backHref, onBack }: IntegrityRunDetailViewProps) {
   const { t } = useAdminText();
   const notApplicable = t("charges.integrity.detail.notApplicable");
 
@@ -42,10 +44,18 @@ export function IntegrityRunDetailView({ state, onBack }: IntegrityRunDetailView
         title={title}
         headingLevel={2}
         headingId="integrity-run-heading"
-        actions={
-          <Button variant="secondary" size="sm" onClick={onBack}>
-            {t("charges.integrity.detail.back")}
-          </Button>
+        breadcrumb={
+          state.kind === "ready" ? (
+            <Breadcrumb
+              label={t("shell.breadcrumbLabel")}
+              items={[
+                { id: "runs", label: t("charges.integrity.heading"), href: backHref, onNavigate: onBack },
+                { id: "run", label: title },
+              ]}
+            />
+          ) : (
+            <BackLink href={backHref} label={t("charges.integrity.detail.back")} onBack={onBack} />
+          )
         }
       />
       {state.kind === "loading" ? (

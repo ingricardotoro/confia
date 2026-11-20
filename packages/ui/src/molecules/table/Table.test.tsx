@@ -42,6 +42,13 @@ describe("Table", () => {
     expect(screen.getByRole("cell", { name: "Nocturna" })).toBeVisible();
   });
 
+  it("contains the absolutely positioned sr-only texts of its rows: the scroller is a positioned box", () => {
+    renderTable();
+
+    // Without a positioned scroller those texts escape it and stretch the page, leaving a blank band under the content.
+    expect(screen.getByRole("table", { name: "Modalidades" }).parentElement).toHaveClass("relative", "overflow-x-auto");
+  });
+
   it("marks only the ordered column with aria-sort", () => {
     renderTable({ sort: { columnId: "name", direction: "desc" } });
 

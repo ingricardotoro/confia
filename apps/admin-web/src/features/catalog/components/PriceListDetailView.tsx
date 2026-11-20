@@ -18,6 +18,7 @@ import { formatIsoDate } from "../../../shared/format/format-date.ts";
 import type { ResourceNotice } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import type { PriceItem } from "../price-form.ts";
 import type { PriceListDetail } from "../price-list-form.ts";
+import { BackLink } from "../../../shared/layout/components/BackLink.tsx";
 
 /** The prices of one concept, as the detail shows them: the newest validity first. */
 export interface ConceptPricesView {
@@ -93,27 +94,7 @@ export function PriceListDetailView({
 }: PriceListDetailViewProps) {
   const { t } = useAdminText();
 
-  const back = (
-    <a
-      href={backHref}
-      className="w-fit text-sm text-text-primary underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
-      onClick={(event) => {
-        if (
-          event.defaultPrevented ||
-          event.button !== 0 ||
-          event.metaKey ||
-          event.ctrlKey ||
-          event.shiftKey ||
-          event.altKey
-        )
-          return;
-        event.preventDefault();
-        onBack();
-      }}
-    >
-      {t("catalog.priceLists.detail.back")}
-    </a>
-  );
+  const back = <BackLink href={backHref} label={t("catalog.priceLists.detail.back")} onBack={onBack} />;
 
   if (state.kind === "loading") {
     return (
@@ -122,11 +103,7 @@ export function PriceListDetailView({
         aria-busy="true"
         className="flex flex-col gap-3"
       >
-        {back}
-        <h2 id="price-list-heading" className="sr-only">
-          {t("catalog.priceLists.heading")}
-        </h2>
-        <Skeleton className="h-7 w-72" />
+        <PageHeader title={t("catalog.priceLists.heading")} headingLevel={2} headingId="price-list-heading" breadcrumb={back} />
         <Skeleton className="h-16 w-full max-w-xl" />
         <Skeleton className="h-40 w-full" />
       </section>
@@ -139,10 +116,7 @@ export function PriceListDetailView({
         aria-labelledby="price-list-heading"
         className="flex flex-col gap-3"
       >
-        {back}
-        <h2 id="price-list-heading" className="sr-only">
-          {t("catalog.priceLists.heading")}
-        </h2>
+        <PageHeader title={t("catalog.priceLists.heading")} headingLevel={2} headingId="price-list-heading" breadcrumb={back} />
         <ErrorState
           title={state.title}
           description={state.description}

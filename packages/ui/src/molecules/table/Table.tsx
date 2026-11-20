@@ -132,7 +132,9 @@ export function Table<Row>({
 
   return (
     <div {...rest} className={cn(
-        "w-full overflow-x-auto rounded-lg border border-(--table-border) bg-bg-surface shadow-(--card-shadow)",
+        // `relative` makes the scroller the containing block of the absolutely positioned `sr-only` texts of its rows;
+        // without it they escape the scroll box and stretch the document, leaving a blank band under the page.
+        "relative w-full overflow-x-auto rounded-lg border border-(--table-border) bg-bg-surface shadow-(--card-shadow)",
         stickyHeader && "max-h-[70vh] overflow-y-auto",
         className,
       )}>

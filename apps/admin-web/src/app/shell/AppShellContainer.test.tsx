@@ -181,6 +181,10 @@ describe("the signed in shell", () => {
       expect(
         screen.getByRole("link", { name: "Saltar al contenido" }),
       ).toHaveFocus();
+      // The control that closes the small screen panel comes first; jsdom applies no stylesheet, a browser shows it
+      // only below lg.
+      await user.tab();
+      expect(screen.getByRole("button", { name: "Cerrar el menú lateral" })).toHaveFocus();
       await user.tab();
       expect(screen.getByRole("link", { name: "Inicio" })).toHaveFocus();
       // Closed sections add only their header to the tab order, in group order. Space opens the last one,
