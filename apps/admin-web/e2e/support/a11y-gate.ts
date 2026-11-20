@@ -54,7 +54,7 @@ export async function checkCombination(
  * visual stack the same way (CSSOM, which the CSP allows). The dialog content is analyzed in full, and the same route has its
  * own non-dialog states that analyze the page.
  */
-async function isolateDialogFromPage(page: Page): Promise<void> {
+export async function isolateDialogFromPage(page: Page): Promise<void> {
   await page.evaluate(() => {
     for (const element of Array.from(document.body.children)) {
       if (element instanceof HTMLElement && element.querySelector('[role="dialog"]') === null && element.getAttribute("role") !== "dialog" && !element.hasAttribute("data-radix-focus-guard")) {

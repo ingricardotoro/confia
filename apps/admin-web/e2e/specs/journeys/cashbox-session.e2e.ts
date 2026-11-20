@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { A11Y_TAGS, partitionViolations } from "@confia/config/a11y";
 import { dialog, test } from "../../support/organization.ts";
+import { isolateDialogFromPage } from "../../support/a11y-gate.ts";
 import { clickNavigationLink } from "../../support/navigation.ts";
 import { expect, recordedCalls, seedSession } from "../../support/scenario.ts";
 
@@ -13,8 +14,12 @@ const SAVE = { timeout: 15_000 } as const;
 const writes = async (page: Page, request: Parameters<typeof recordedCalls>[0], scenarioId: string, suffix: string) =>
   (await recordedCalls(request, scenarioId)).filter((call) => call.method === "POST" && call.path.endsWith(suffix));
 
-/** The accessibility gate over the page as it stands: axe with the project policy, and nothing that blocks. */
-async function expectNoBlockingViolations(page: Page): Promise<void> {
+/**
+ * The accessibility gate over the page as it stands: axe with the project policy, and nothing that blocks. With a dialog open, the page behind is
+ * hidden first, as the gate does (see isolateDialogFromPage): it is inert anyway, and it leaves the page hidden, so only the last step may ask for it.
+ */
+async function expectNoBlockingViolations(page: Page, options: { readonly dialogOpen?: boolean } = {}): Promise<void> {
+  if (options.dialogOpen === true) await isolateDialogFromPage(page);
   const outcome = await new AxeBuilder({ page }).withTags([...A11Y_TAGS]).analyze();
   expect(partitionViolations(outcome.violations, outcome.incomplete).blocking.map((violation) => violation.id)).toEqual([]);
 }
@@ -83,7 +88,7 @@ test.describe("the cashier's cashbox", () => {
     await dialog(page).getByLabel(/^Nota de la aprobación/).fill("Revisado");
     await dialog(page).getByRole("button", { name: "Aprobar cierre" }).click();
     await expect(dialog(page).getByText("Quien cerró la caja no puede aprobar su propio cierre.")).toBeVisible(SAVE);
-    await expectNoBlockingViolations(page);
+    await expectNoBlockingViolations(page, { dialogOpen: true });
   });
 });
 
