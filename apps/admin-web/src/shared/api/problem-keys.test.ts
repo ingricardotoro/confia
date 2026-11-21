@@ -71,6 +71,11 @@ describe("PROBLEM_KEYS", () => {
     ["cash-expected-negative", "problem.cashExpectedNegative"],
     ["cash-difference-reason-required", "problem.cashDifferenceReasonRequired"],
     ["cash-approval-same-actor", "problem.cashApprovalSameActor"],
+    ["posting-accounts-incomplete", "problem.postingAccountsIncomplete"],
+    ["duplicate-transfer-reference", "problem.duplicateTransferReference"],
+    ["self-approval-forbidden", "problem.selfApprovalForbidden"],
+    ["payment-not-declared", "problem.paymentNotDeclared"],
+    ["charge-has-payments", "problem.chargeHasPayments"],
   ] as const)("maps %s to %s", (code, key) => {
     expect(PROBLEM_KEYS[code]).toBe(key);
   });

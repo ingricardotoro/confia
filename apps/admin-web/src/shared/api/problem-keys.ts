@@ -64,5 +64,10 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "cash-expected-negative": "problem.cashExpectedNegative",
   "cash-difference-reason-required": "problem.cashDifferenceReasonRequired",
   "cash-approval-same-actor": "problem.cashApprovalSameActor",
+  "posting-accounts-incomplete": "problem.postingAccountsIncomplete",
+  "duplicate-transfer-reference": "problem.duplicateTransferReference",
+  "self-approval-forbidden": "problem.selfApprovalForbidden",
+  "payment-not-declared": "problem.paymentNotDeclared",
+  "charge-has-payments": "problem.chargeHasPayments",
   unknown: "problem.unexpected",
 };
