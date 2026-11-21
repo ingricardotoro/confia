@@ -42,6 +42,18 @@ public final class LedgerApi implements LedgerPostingApi, LedgerAccountDirectory
     }
 
     @Override
+    public Posted postPayment(Actor actor, PaymentPosting payment) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(payment, "payment");
+        List<LedgerEntry> entries = payment.lines().stream().map(line -> new LedgerEntry(line.accountId(),
+                line.studentId(), line.side() == Side.DEBIT ? EntrySide.DEBIT : EntrySide.CREDIT, line.amount())).toList();
+        LedgerPosting.Posted posted = posting.postWithinCurrentTransaction(toActor(actor),
+                new LedgerPosting.PostCommand(TransactionKind.PAYMENT, payment.effectiveOn(), payment.sourceModule(),
+                        payment.sourceRefId(), null, payment.idempotencyKey(), entries));
+        return new Posted(posted.stored().transaction().id(), posted.created());
+    }
+
+    @Override
     public Posted reverseCharge(Actor actor, ChargeReversal reversal) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(reversal, "reversal");

@@ -637,6 +637,11 @@ class AccrualEngineIT extends CommittingPostgresIntegrationTest {
             }
 
             @Override
+            public Posted postPayment(Actor actor, PaymentPosting posting) {
+                return real.postPayment(actor, posting);
+            }
+
+            @Override
             public List<LockedAccount> lockStudentAccounts(Actor actor, java.util.Collection<AccountKey> keys) {
                 return real.lockStudentAccounts(actor, keys);
             }
@@ -679,6 +684,11 @@ class AccrualEngineIT extends CommittingPostgresIntegrationTest {
                     throw new Error("simulated crash of the process");
                 }
                 return real.postCharge(actor, posting);
+            }
+
+            @Override
+            public Posted postPayment(Actor actor, PaymentPosting posting) {
+                return real.postPayment(actor, posting);
             }
 
             @Override

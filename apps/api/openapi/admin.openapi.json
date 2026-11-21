@@ -2041,7 +2041,8 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "deposit", "withdrawal", "adjustment" ],
+            "description" : "payment_in is the cash left by a cash payment (docs/cortes/payments-register.md)",
+            "enum" : [ "deposit", "withdrawal", "adjustment", "payment_in" ],
             "type" : "string"
           }
         },

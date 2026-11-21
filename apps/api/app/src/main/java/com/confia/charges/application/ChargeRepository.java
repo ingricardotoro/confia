@@ -5,6 +5,7 @@ import com.confia.kernel.CurrencyCode;
 import com.confia.kernel.InstitutionId;
 import com.confia.kernel.Money;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,11 +42,44 @@ public interface ChargeRepository {
      */
     Page<ChargeRow> listByStudent(InstitutionId institution, UUID studentId, ChargeFilter filter, PageRequest page);
 
+    /**
+     * Every charge of the student that matches the part of {@code filter} that the query applies (status and period), read page by
+     * page through {@link #listByStudent}, ordered by period and identifier. For the lists that narrow by what is outstanding,
+     * which the payments derive and a query of this module cannot see; the charges of one student are few.
+     */
+    default List<ChargeRow> listAllByStudent(InstitutionId institution, UUID studentId, ChargeFilter filter) {
+        List<ChargeRow> all = new ArrayList<>();
+        int page = 0;
+        Page<ChargeRow> read;
+        do {
+            read = listByStudent(institution, studentId, filter, new PageRequest(page++, PageRequest.MAX_SIZE, "periodStart", true));
+            all.addAll(read.items());
+        } while (!read.items().isEmpty() && all.size() < read.total());
+        return all;
+    }
+
+    /**
+     * The charges of the student in this currency that have no void record, in no particular order: what a payment can be
+     * applied to (docs/cortes/payments-register.md). Read under the lock of the student sub-account, which the caller takes.
+     */
+    List<ChargeForPayment> findActiveByStudent(InstitutionId institution, UUID studentId, CurrencyCode currency);
+
     /** Every charge of the institution as the integrity check compares it: its transaction, its total and its void. */
     List<com.confia.charges.domain.IntegrityCheck.ChargeFact> integrityFacts(InstitutionId institution);
 
     /** What the void of a charge needs to know about it. */
     record ChargeForVoid(UUID id, UUID studentId, UUID ledgerTransactionId, Money total, LocalDate periodStart) {
+    }
+
+    /** The charges with these identifiers, in one query, voided ones included: what a payment shows of what it paid. */
+    List<ChargeLabelRow> findLabels(InstitutionId institution, java.util.Collection<UUID> chargeIds);
+
+    /** A charge as a payment labels it. */
+    record ChargeLabelRow(UUID id, UUID paymentConceptId, String periodLabel, LocalDate dueOn) {
+    }
+
+    /** An active charge as a payment needs it. */
+    record ChargeForPayment(UUID id, UUID paymentConceptId, LocalDate periodStart, LocalDate dueOn, Money total) {
     }
 
     /** What a statement line shows of the charge that produced it. */

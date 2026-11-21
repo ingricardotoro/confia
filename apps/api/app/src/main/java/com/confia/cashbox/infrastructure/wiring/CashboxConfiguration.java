@@ -11,6 +11,7 @@ import com.confia.cashbox.application.GetSession;
 import com.confia.cashbox.application.ListSessions;
 import com.confia.cashbox.application.OpenSession;
 import com.confia.cashbox.application.RecordMovement;
+import com.confia.cashbox.application.RecordPaymentIn;
 import com.confia.cashbox.application.SessionDetails;
 import com.confia.cashbox.application.SessionScope;
 import com.confia.cashbox.infrastructure.JooqCashApprovalRepository;
@@ -77,6 +78,13 @@ public class CashboxConfiguration {
     RecordMovement recordMovement(TransactionRunner transactionRunner, CashSessionRepository sessions,
             CashMovementRepository movements, AuditLogWriter auditLogWriter, Clock clock) {
         return new RecordMovement(transactionRunner, sessions, movements, auditLogWriter, clock);
+    }
+
+    /** The cash a payment leaves in the open session of the cashier, in the transaction of the payment (payments). */
+    @Bean
+    RecordPaymentIn recordPaymentIn(TransactionRunner transactionRunner, CashSessionRepository sessions,
+            CashMovementRepository movements, AuditLogWriter auditLogWriter, Clock clock) {
+        return new RecordPaymentIn(transactionRunner, sessions, movements, auditLogWriter, clock);
     }
 
     @Bean
