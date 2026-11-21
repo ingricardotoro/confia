@@ -82,6 +82,36 @@ describe("the void of a charge", () => {
     expect(target.voids()).toEqual([{ chargeId: charge.id, reason: REASON, idempotencyKey: "key-1" }]);
   });
 
+  it("shows what a payment covered of a charge as paid and owed, and refuses to void a charge that has payments (409)", () => {
+    const target = model();
+    const [oldest, next] = target.payable(studentId(1));
+    if (oldest === undefined || next === undefined) throw new Error("student 1 has charges");
+    target.cover(oldest.id, 50_000);
+
+    const row = pageOf(list(target, 1)).items.find((item) => item.id === oldest.id) as Row & { paid: { amount: string }; outstanding: { amount: string } };
+    expect(row.paid.amount).toBe("500.00");
+    expect(row.outstanding.amount).toBe("650.00");
+    expect(target.payable(studentId(1)).find((charge) => charge.id === oldest.id)?.outstandingCents).toBe(65_000);
+    expect(codeOf(voidIt(target, oldest.id, { reason: REASON }))).toBe("charge-has-payments");
+    expect(voidIt(target, next.id, { reason: REASON })?.status).toBe(200);
+  });
+
+  it("lists only the charges with something outstanding in allocation order when asked, and says which are settled", () => {
+    const target = model();
+    const [oldest] = target.payable(studentId(1));
+    if (oldest === undefined) throw new Error("student 1 has charges");
+    target.cover(oldest.id, oldest.outstandingCents);
+
+    const all = pageOf(list(target, 1)).items as (Row & { settled: boolean })[];
+    expect(all.find((row) => row.id === oldest.id)?.settled).toBe(true);
+    expect(all.filter((row) => row.id !== oldest.id).every((row) => !row.settled)).toBe(true);
+    const owed = pageOf(list(target, 1, "outstanding=true&status=ACTIVE&page=0&size=10")).items as (Row & { dueOn: string })[];
+    expect(owed.map((row) => row.id)).toEqual(target.payable(studentId(1)).map((charge) => charge.id));
+    expect(owed.map((row) => row.dueOn)).toEqual([...owed.map((row) => row.dueOn)].sort());
+    expect(pageOf(list(target, 1, "outstanding=true")).total).toBe(owed.length);
+    expect(list(target, 1, "outstanding=maybe")?.status).toBe(400);
+  });
+
   it("refuses the same key with another body (422) and another key on a voided charge (409)", () => {
     const target = model();
     const charge = first(target);

@@ -65,9 +65,23 @@ export interface RecordedVoid {
   readonly idempotencyKey: string;
 }
 
+/** A charge in force with something left to pay, as the payments model needs it to allocate a payment. */
+export interface PayableCharge {
+  readonly id: string;
+  readonly conceptCode: string;
+  readonly conceptName: string;
+  readonly periodLabel: string;
+  readonly dueOn: string;
+  readonly outstandingCents: number;
+}
+
 export interface ChargeVoidModel {
   /** The answer to a request of the cut, or `undefined` when the path is not one of its operations. */
   handle(request: ChargeVoidRequest): ModelResponse | undefined;
+  /** The charges in force of a student with something left to pay, oldest due date first: what the payments allocate to (INV-17). */
+  payable(studentId: string): readonly PayableCharge[];
+  /** Records that a payment covered `cents` of a charge, so the list shows it as paid and a void of it is refused (409 `charge-has-payments`). */
+  cover(chargeId: string, cents: number): void;
   /** The voids that took effect, in order. */
   voids(): readonly RecordedVoid[];
 }
@@ -129,6 +143,8 @@ export function createChargeVoidModel(options: ChargeVoidOptions, dependencies: 
   const charges = options.seed === "seeded" ? seededCharges() : [];
   const done = new Map<string, { readonly fingerprint: string; readonly response: ContractResponse }>();
   const recorded: RecordedVoid[] = [];
+  /** What the payments covered of each charge, in cents. The simulated server keeps it, the way the real one derives it from the allocations. */
+  const covered = new Map<string, number>();
   let reads = 0;
   const clean = (n: number) => integrityRun({ id: runIdOf(n), startedAt: `2026-11-${String(18 - n).padStart(2, "0")}T08:30:00Z`, finishedAt: `2026-11-${String(18 - n).padStart(2, "0")}T08:30:41Z` });
   const dirty = integrityRun({ id: runIdOf(0), status: "DISCREPANCIES", discrepancyCount: 2, startedAt: "2026-11-18T08:30:00Z", finishedAt: "2026-11-18T08:30:41Z" });
@@ -152,6 +168,9 @@ export function createChargeVoidModel(options: ChargeVoidOptions, dependencies: 
 
   const statusOf = (charge: SeedCharge): "ACTIVE" | "VOIDED" => (charge.voidedAt === undefined ? "ACTIVE" : "VOIDED");
 
+  /** What is still to pay of a charge in force: its total less what the payments covered. */
+  const owedCents = (charge: SeedCharge): number => charge.baseCents + charge.taxCents - (covered.get(charge.id) ?? 0);
+
   function rowOf(charge: SeedCharge) {
     const totalCents = charge.baseCents + charge.taxCents;
     return studentCharge({
@@ -164,7 +183,10 @@ export function createChargeVoidModel(options: ChargeVoidOptions, dependencies: 
       base: amountOf(charge.baseCents),
       tax: amountOf(charge.taxCents),
       total: amountOf(totalCents),
+      paid: amountOf(covered.get(charge.id) ?? 0),
+      outstanding: amountOf(charge.voidedAt === undefined ? totalCents - (covered.get(charge.id) ?? 0) : 0),
       status: statusOf(charge),
+      settled: charge.voidedAt === undefined && owedCents(charge) === 0,
       ...(charge.voidedAt === undefined
         ? {}
         : { voided: { reason: charge.voidReason ?? "", reversalTransactionId: runIdOf(900), voidId: runIdOf(901), voidedAt: charge.voidedAt } }),
@@ -183,8 +205,12 @@ export function createChargeVoidModel(options: ChargeVoidOptions, dependencies: 
     const to = query.get("periodTo");
     if (from !== null && !DAY.test(from)) errors.push({ field: "periodFrom", reason: "invalid" });
     if (to !== null && !DAY.test(to)) errors.push({ field: "periodTo", reason: "invalid" });
+    const outstanding = query.get("outstanding");
+    if (outstanding !== null && outstanding !== "true" && outstanding !== "false") errors.push({ field: "outstanding", reason: "invalid" });
+    const onlyOwed = outstanding === "true";
     const sort = query.get("sort");
-    const [field = "periodStart", direction = "asc"] = (sort ?? "periodStart,desc").split(",");
+    // With outstanding=true and no sort the order is the one in which a payment is allocated: due date, period, concept and identifier.
+    const [field = "periodStart", direction = "asc"] = (sort ?? (onlyOwed ? "dueOn,asc" : "periodStart,desc")).split(",");
     if (!(SORT_FIELDS as readonly string[]).includes(field) || (direction !== "asc" && direction !== "desc")) errors.push({ field: "sort", reason: "invalid" });
     const page = Number(query.get("page") ?? "0");
     const size = Number(query.get("size") ?? String(DEFAULT_SIZE));
@@ -195,6 +221,7 @@ export function createChargeVoidModel(options: ChargeVoidOptions, dependencies: 
     const matching = charges
       .filter((charge) => charge.studentId === id)
       .filter((charge) => status === null || statusOf(charge) === status)
+      .filter((charge) => !onlyOwed || (charge.voidedAt === undefined && owedCents(charge) > 0))
       .filter((charge) => from === null || charge.periodStart >= from)
       .filter((charge) => to === null || charge.periodStart <= to);
     const key = (charge: SeedCharge): string | number => (field === "total" ? charge.baseCents + charge.taxCents : field === "dueOn" ? charge.dueOn : charge.periodStart);
@@ -202,7 +229,8 @@ export function createChargeVoidModel(options: ChargeVoidOptions, dependencies: 
       const left = key(a);
       const right = key(b);
       const order = left < right ? -1 : left > right ? 1 : 0;
-      return direction === "desc" ? -order : order;
+      if (order !== 0) return direction === "desc" ? -order : order;
+      return a.dueOn.localeCompare(b.dueOn) || a.periodStart.localeCompare(b.periodStart) || a.id.localeCompare(b.id);
     });
     return wrap(studentChargePage(ordered.slice(page * size, (page + 1) * size).map(rowOf), { page, size, total: ordered.length }));
   }
@@ -227,6 +255,7 @@ export function createChargeVoidModel(options: ChargeVoidOptions, dependencies: 
     const text = (reason as string).trim();
     const charge = charges.find((row) => row.id === id);
     if (charge === undefined) return failure("resource-not-found", 404);
+    if ((covered.get(id) ?? 0) > 0) return failure("charge-has-payments", 409);
 
     const fingerprint = `${id}\n${text}`;
     const previous = done.get(key);
@@ -283,5 +312,21 @@ export function createChargeVoidModel(options: ChargeVoidOptions, dependencies: 
       return undefined;
     },
     voids: () => recorded,
+    payable: (studentId) =>
+      charges
+        .filter((charge) => charge.studentId === studentId && charge.voidedAt === undefined)
+        .map((charge) => ({
+          id: charge.id,
+          conceptCode: "COL",
+          conceptName: "Colegiatura",
+          periodLabel: charge.periodStart.slice(0, 7),
+          dueOn: charge.dueOn,
+          outstandingCents: charge.baseCents + charge.taxCents - (covered.get(charge.id) ?? 0),
+        }))
+        .filter((charge) => charge.outstandingCents > 0)
+        .sort((a, b) => a.dueOn.localeCompare(b.dueOn) || a.periodLabel.localeCompare(b.periodLabel) || a.id.localeCompare(b.id)),
+    cover: (chargeId, cents) => {
+      covered.set(chargeId, (covered.get(chargeId) ?? 0) + cents);
+    },
   };
 }

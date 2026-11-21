@@ -9,6 +9,7 @@ import {
 import { DEFAULT_CATALOG, createCatalogModel, type CatalogModel, type CatalogOptions } from "./catalog-model.ts";
 import { DEFAULT_CHARGES, createChargesModel, type ChargesModel, type ChargesOptions } from "./charges-model.ts";
 import { DEFAULT_CASHBOX, createCashboxModel, type CashboxModel, type CashboxOptions } from "./cashbox-model.ts";
+import { DEFAULT_PAYMENTS, createPaymentsModel, type PaymentsModel, type PaymentsOptions } from "./payments-model.ts";
 import { DEFAULT_CHARGE_VOID, createChargeVoidModel, type ChargeVoidModel, type ChargeVoidOptions } from "./charge-void-model.ts";
 import { DEFAULT_STATEMENT, createStatementModel, type StatementModel, type StatementOptions } from "./statement-model.ts";
 import { DEFAULT_LEDGER, createLedgerModel, type LedgerModel, type LedgerOptions } from "./ledger-model.ts";
@@ -31,7 +32,7 @@ const RETRY_AFTER_SECONDS = "30";
 const TRACE_ID = "01J8Z4K2QF9P0X";
 const EXPIRY_PUSH_MS = 301_000;
 
-export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify" | "organization" | "students" | "enrollments" | "guardians" | "imports" | "catalog" | "charges" | "ledger" | "cashbox";
+export type Operation = "log-in" | "refresh" | "sign-out" | "current" | "enroll" | "verify" | "organization" | "students" | "enrollments" | "guardians" | "imports" | "catalog" | "charges" | "ledger" | "cashbox" | "payments";
 
 type LoginBehavior =
   | "authenticated"
@@ -73,6 +74,8 @@ interface PresetDefinition {
   readonly chargeVoid?: ChargeVoidOptions;
   /** The cashbox sessions the scenario holds; the seeded ones, with every write allowed, when absent. */
   readonly cashbox?: CashboxOptions;
+  /** The payments the scenario holds; the seeded ones, with every write allowed and the cash and bank accounts set, when absent. */
+  readonly payments?: PaymentsOptions;
   /** A fault injected after the model answered, to prove the server refuses to send it. */
   readonly tamper?: (operation: Operation, response: ModelResponse) => ModelResponse;
 }
@@ -172,6 +175,11 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   "cashbox-open": { login: "authenticated", enrolled: false, cashbox: { ...DEFAULT_CASHBOX, seed: "mine-open" } },
   "cashbox-forbidden": { login: "authenticated", enrolled: false, cashbox: { ...DEFAULT_CASHBOX, access: "forbidden" } },
   "cashbox-server-error": { login: "authenticated", enrolled: false, cashbox: { ...DEFAULT_CASHBOX, reads: "failing-first" } },
+  // The payments (payments-register cut): none at all, reads that fail first, a person without the permission, and the cash and bank accounts not set.
+  "payments-empty": { login: "authenticated", enrolled: false, payments: { ...DEFAULT_PAYMENTS, seed: "none" } },
+  "payments-forbidden": { login: "authenticated", enrolled: false, payments: { ...DEFAULT_PAYMENTS, access: "forbidden" } },
+  "payments-server-error": { login: "authenticated", enrolled: false, payments: { ...DEFAULT_PAYMENTS, reads: "failing-first" } },
+  "payments-accounts-incomplete": { login: "authenticated", enrolled: false, payments: { ...DEFAULT_PAYMENTS, accounts: "incomplete" } },
   "statement-empty": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, seed: "empty" } },
   "statement-forbidden": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, access: "forbidden" } },
   "statement-server-error": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, reads: "failing-first" } },
@@ -202,6 +210,7 @@ export interface Scenario {
   readonly statement: StatementModel;
   readonly chargeVoid: ChargeVoidModel;
   readonly cashbox: CashboxModel;
+  readonly payments: PaymentsModel;
   readonly calls: RecordedCall[];
   readonly tamper: PresetDefinition["tamper"];
   signIn(sleep: (ms: number) => Promise<void>): Promise<ModelResponse>;
@@ -228,6 +237,9 @@ function build(preset: string, definition: PresetDefinition): Scenario {
   const organization = createOrganizationModel(definition.organization ?? DEFAULT_ORGANIZATION);
   const students = createStudentsModel(definition.students ?? DEFAULT_STUDENTS);
   const catalog = createCatalogModel(definition.catalog ?? DEFAULT_CATALOG);
+  const statement = createStatementModel(definition.statement ?? DEFAULT_STATEMENT, { students });
+  const chargeVoid = createChargeVoidModel(definition.chargeVoid ?? DEFAULT_CHARGE_VOID, { students });
+  const cashbox = createCashboxModel(definition.cashbox ?? DEFAULT_CASHBOX);
   return {
     preset,
     model,
@@ -239,9 +251,10 @@ function build(preset: string, definition: PresetDefinition): Scenario {
     catalog,
     charges: createChargesModel(definition.charges ?? DEFAULT_CHARGES, { organization, catalog, students }),
     ledger: createLedgerModel(definition.ledger ?? DEFAULT_LEDGER),
-    statement: createStatementModel(definition.statement ?? DEFAULT_STATEMENT, { students }),
-    chargeVoid: createChargeVoidModel(definition.chargeVoid ?? DEFAULT_CHARGE_VOID, { students }),
-    cashbox: createCashboxModel(definition.cashbox ?? DEFAULT_CASHBOX),
+    statement,
+    chargeVoid,
+    cashbox,
+    payments: createPaymentsModel(definition.payments ?? DEFAULT_PAYMENTS, { students, charges: chargeVoid, statement, cashbox }),
     calls: [],
     tamper: definition.tamper,
     async signIn(sleep) {
