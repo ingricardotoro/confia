@@ -47,7 +47,9 @@ public final class PermissionedEndpoints {
      * the edit of an account and the setting of the map {@code ledger:create}, which only the Super Administrator holds,
      * and the statement of a student, which needs {@code charges:read}, and the five routes of cut 3b: the list of the
      * charges of a student and the three reads of the integrity runs need {@code charges:read}, and the void of a charge
-     * {@code charges:void}.
+     * {@code charges:void}, and the seven routes of the payments of F4 cut 2: the registration needs {@code payments:create}, the list
+     * and the detail {@code payments:read}, the confirmation and the rejection of a transfer {@code payments:approve}, and the map of
+     * the cash and bank accounts {@code ledger:read} to read and {@code ledger:create} to set.
      * A route of a later
      * change is added here, in the same commit as its controller.
      */
@@ -141,6 +143,17 @@ public final class PermissionedEndpoints {
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/cashbox/sessions", Permission.CASHBOX_READ));
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/cashbox/sessions/{sessionId}",
                 Permission.CASHBOX_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/payments", Permission.PAYMENTS_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/payments", Permission.PAYMENTS_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/payments/posting-accounts",
+                Permission.LEDGER_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/payments/posting-accounts",
+                Permission.LEDGER_CREATE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/payments/{id}", Permission.PAYMENTS_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/payments/{id}/confirm",
+                Permission.PAYMENTS_APPROVE));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/payments/{id}/reject",
+                Permission.PAYMENTS_APPROVE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/ledger/accounts", Permission.LEDGER_READ));
         endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/ledger/accounts",
                 Permission.LEDGER_CREATE));

@@ -100,6 +100,9 @@ class WebEdgeScopeExclusionInventoryTest {
             // The cash sessions apply admin-read and admin-write, per address and per account
             // (docs/cortes/cashbox-sessions.md).
             "com.confia.cashbox.web",
+            // The payments apply admin-read and admin-write, per address and per account
+            // (docs/cortes/payments-register.md).
+            "com.confia.payments.web",
             // The chart of accounts applies admin-read and admin-write, per address and per account
             // (docs/cortes/ledger-chart-of-accounts.md).
             "com.confia.ledger.web");
