@@ -7,6 +7,7 @@ import com.confia.cashbox.web.wiring.CashboxWebConfiguration;
 import com.confia.charges.infrastructure.wiring.ChargesConfiguration;
 import com.confia.charges.web.wiring.ChargesWebConfiguration;
 import com.confia.payments.infrastructure.wiring.PaymentsConfiguration;
+import com.confia.payments.web.wiring.PaymentsWebConfiguration;
 import com.confia.ledger.infrastructure.wiring.LedgerConfiguration;
 import com.confia.ledger.web.wiring.LedgerWebConfiguration;
 import com.confia.guardians.infrastructure.wiring.GuardiansConfiguration;
@@ -105,6 +106,7 @@ import org.springframework.context.annotation.Import;
         ImportsConfiguration.class, ImportsWebConfiguration.class,
         CatalogConfiguration.class, CatalogWebConfiguration.class, ChargesConfiguration.class,
         ChargesWebConfiguration.class, CashboxConfiguration.class, CashboxWebConfiguration.class, PaymentsConfiguration.class,
+        PaymentsWebConfiguration.class,
         LedgerConfiguration.class, LedgerWebConfiguration.class,
         WebEdgeConfiguration.class, AdminSecurityConfiguration.class,
         ObservabilityMetricsConfiguration.class, RateLimiterConfiguration.class,

@@ -241,6 +241,8 @@ class OpenApiContractSnapshotTest {
                 "/api/v1/charges/posting-accounts",
                 "/api/v1/cashbox/sessions", "/api/v1/cashbox/sessions/current", "/api/v1/cashbox/sessions/{sessionId}",
                 "/api/v1/cashbox/sessions/{sessionId}/movements", "/api/v1/cashbox/sessions/{sessionId}/close", "/api/v1/cashbox/sessions/{sessionId}/approve",
+                "/api/v1/payments", "/api/v1/payments/posting-accounts", "/api/v1/payments/{id}", "/api/v1/payments/{id}/confirm",
+                "/api/v1/payments/{id}/reject",
                 "/api/v1/ledger/accounts", "/api/v1/ledger/accounts/{id}",
                 "/api/v1/students", "/api/v1/students/{id}",
                 "/api/v1/enrollments", "/api/v1/enrollments/{id}", "/api/v1/enrollments/{id}/transfer",
@@ -429,7 +431,7 @@ class OpenApiContractSnapshotTest {
             }
         }
 
-        assertThat(operations).isEqualTo(92);
+        assertThat(operations).isEqualTo(99);
         List<String> expected = new ArrayList<>(List.of("get " + ROLES_PATH,
                 "get /api/v1/catalog/payment-concepts", "post /api/v1/catalog/payment-concepts",
                 "put /api/v1/catalog/payment-concepts/{id}", "get /api/v1/catalog/price-lists",
@@ -449,7 +451,9 @@ class OpenApiContractSnapshotTest {
                 "put /api/v1/charges/posting-accounts", "post /api/v1/cashbox/sessions", "get /api/v1/cashbox/sessions/current",
                 "post /api/v1/cashbox/sessions/{sessionId}/movements", "post /api/v1/cashbox/sessions/{sessionId}/close",
                 "post /api/v1/cashbox/sessions/{sessionId}/approve", "get /api/v1/cashbox/sessions",
-                "get /api/v1/cashbox/sessions/{sessionId}", "get /api/v1/ledger/accounts", "post /api/v1/ledger/accounts",
+                "get /api/v1/cashbox/sessions/{sessionId}", "post /api/v1/payments", "get /api/v1/payments", "get /api/v1/payments/posting-accounts",
+                "put /api/v1/payments/posting-accounts", "get /api/v1/payments/{id}", "post /api/v1/payments/{id}/confirm",
+                "post /api/v1/payments/{id}/reject", "get /api/v1/ledger/accounts", "post /api/v1/ledger/accounts",
                 "put /api/v1/ledger/accounts/{id}"));
         for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {
             String collection = "/api/v1/organization/" + resource;
