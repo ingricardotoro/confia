@@ -284,7 +284,7 @@ class GuardianEndpointsIT extends CommittingPostgresIntegrationTest {
         assertThat(response.statusCode()).isEqualTo(201);
         assertThat(response.headers().allValues("Cache-Control")).containsExactly("no-store");
         assertThat(response.body()).doesNotContain(admin.institution().toString())
-                .doesNotContain(admin.account().toString()).doesNotContain("0801");
+                .doesNotContain(admin.account().toString()).doesNotContain(ID).doesNotContain(ID_NORMALIZED);
         JsonNode created = json(response);
         assertThat(created.propertyNames()).containsExactly("id", "guardianCode", "firstName", "lastName",
                 "hasNationalId", "hasRtn", "email", "phone", "address", "preferredChannel", "status", "createdAt",

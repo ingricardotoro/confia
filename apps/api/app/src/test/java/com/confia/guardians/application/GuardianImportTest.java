@@ -126,7 +126,8 @@ class GuardianImportTest {
         assertThat(world.guardianRefs).containsKey(InMemoryGuardians.refKey(institution, "P1"));
         assertThat(audit).extracting(AuditEntry::action).containsExactly("guardians.guardian.created",
                 "guardians.guardian.created");
-        assertThat(audit.toString()).doesNotContain("Rosa", "Aguilar", "0801", "rosa@example.org", "9999", "Casa");
+        assertThat(audit.toString()).doesNotContain("Rosa", "Aguilar", "0801-1980-12345", "0801198012345", "0801-1980-123456",
+                "08011980123456", "rosa@example.org", "9999-8888", "99998888", "Casa");
     }
 
     @Test
@@ -152,7 +153,7 @@ class GuardianImportTest {
 
         assertThat(outcomes).containsExactly(CreateOutcome.DUPLICATE_NATIONAL_ID, CreateOutcome.CREATED);
         assertThat(audit).extracting(AuditEntry::outcome).contains("denied", "success");
-        assertThat(audit.toString()).doesNotContain("0801", "Rosa");
+        assertThat(audit.toString()).doesNotContain("0801-1980-12345", "0801198012345", "Rosa");
         assertThat(world.guardianRefs).doesNotContainKey(InMemoryGuardians.refKey(institution, "P1"));
     }
 

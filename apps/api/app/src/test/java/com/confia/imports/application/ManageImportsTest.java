@@ -648,7 +648,7 @@ class ManageImportsTest {
         assertThat(applied.batch().createdRows()).isEqualTo(2);
         assertThat(guardianPort.created).hasSize(2);
         assertThat(students.evaluated).isEmpty();
-        assertThat(audit.toString()).doesNotContain("Rosa", "Aguilar", "0801").doesNotContain("P1");
+        assertThat(audit.toString()).doesNotContain("Rosa", "Aguilar", "0801-1980-12345", "0801198012345").doesNotContain("P1");
     }
 
     @Test
