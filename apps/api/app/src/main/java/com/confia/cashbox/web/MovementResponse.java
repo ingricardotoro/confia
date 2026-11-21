@@ -9,7 +9,9 @@ import java.util.UUID;
 public record MovementResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED) UUID id,
         @Schema(requiredMode = RequiredMode.REQUIRED) UUID sessionId,
-        @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"deposit", "withdrawal", "adjustment"})
+        @Schema(requiredMode = RequiredMode.REQUIRED,
+                allowableValues = {"deposit", "withdrawal", "adjustment", "payment_in"},
+                description = "payment_in is the cash left by a cash payment (docs/cortes/payments-register.md)")
         String type,
         @Schema(requiredMode = RequiredMode.REQUIRED) CashMoney amount,
         String notes,

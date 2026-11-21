@@ -303,6 +303,17 @@ class VoidChargeTest {
         }
 
         @Override
+        public List<ChargeLabelRow> findLabels(InstitutionId institution, java.util.Collection<UUID> chargeIds) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<ChargeForPayment> findActiveByStudent(InstitutionId institution, UUID studentId,
+                com.confia.kernel.CurrencyCode currency) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Optional<ChargeForVoid> findForVoid(InstitutionId institution, UUID chargeId) {
             askedInstitution = institution;
             return Optional.ofNullable(byId.get(chargeId));
@@ -389,6 +400,11 @@ class VoidChargeTest {
 
         @Override
         public Posted postCharge(Actor actor, ChargePosting posting) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Posted postPayment(Actor actor, PaymentPosting posting) {
             throw new UnsupportedOperationException();
         }
 

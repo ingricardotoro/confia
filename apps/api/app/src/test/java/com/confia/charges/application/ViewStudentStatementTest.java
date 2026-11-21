@@ -250,6 +250,17 @@ class ViewStudentStatementTest {
         }
 
         @Override
+        public List<ChargeLabelRow> findLabels(InstitutionId institution, java.util.Collection<UUID> chargeIds) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<ChargeForPayment> findActiveByStudent(InstitutionId institution, UUID studentId,
+                com.confia.kernel.CurrencyCode currency) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Optional<ChargeForVoid> findForVoid(InstitutionId institution, UUID chargeId) {
             throw new UnsupportedOperationException();
         }

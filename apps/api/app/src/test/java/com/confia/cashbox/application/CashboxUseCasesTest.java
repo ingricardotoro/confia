@@ -216,6 +216,65 @@ class CashboxUseCasesTest {
 
     // --- movements ---
 
+    // The payment_in movement of a cash payment (docs/cortes/payments-register.md), written inside the transaction of the payment.
+
+    private RecordPaymentIn paymentInUseCase(com.confia.shared.security.TransactionRunner runner) {
+        return new RecordPaymentIn(runner, sessions, movements, auditWriter, clock);
+    }
+
+    @Test
+    void aCashPaymentLeavesAPaymentInMovementInTheOpenSessionOfTheCashierThatSumsIntoTheExpectedCash() {
+        UUID session = opened("500.00").id();
+        UUID payment = UUID.randomUUID();
+        com.confia.shared.security.TransactionRunner runner = JdbcStubTransactions.runner(transactionCalls);
+        audit.clear();
+
+        Optional<com.confia.cashbox.application.api.CashPayments.PaymentIn> in = runner.execute(
+                cashier.securityContext(requestId), () -> paymentInUseCase(runner).recordPaymentIn(cashier,
+                        UUID.fromString(requestId), payment, Money.of("1500.00", CurrencyCode.HNL)));
+
+        assertThat(in).isPresent();
+        assertThat(in.get().sessionId()).isEqualTo(session);
+        assertThat(movements.rows).singleElement().satisfies(movement -> {
+            assertThat(movement.type().code()).isEqualTo("payment_in");
+            assertThat(movement.requestKey()).isEqualTo("payment-in:" + payment);
+            assertThat(movement.createdBy()).isEqualTo(cashier.accountId());
+        });
+        assertThat(sessions.rows.get(session).expected(movements.rows)).isEqualTo(Money.of("2000.00", CurrencyCode.HNL));
+        assertThat(audit).singleElement().satisfies(entry -> assertThat(entry.action()).isEqualTo("cashbox.movement.recorded"));
+    }
+
+    @Test
+    void aCashierWithoutAnOpenSessionGetsNothingAndAnotherCashiersSessionIsNeverUsed() {
+        opened("500.00");
+        com.confia.shared.security.TransactionRunner runner = JdbcStubTransactions.runner(transactionCalls);
+
+        Optional<com.confia.cashbox.application.api.CashPayments.PaymentIn> in = runner.execute(
+                accountant.securityContext(requestId), () -> paymentInUseCase(runner).recordPaymentIn(accountant,
+                        UUID.fromString(requestId), UUID.randomUUID(), Money.of("10.00", CurrencyCode.HNL)));
+
+        assertThat(in).isEmpty();
+        assertThat(movements.rows).isEmpty();
+    }
+
+    @Test
+    void aPaymentInOutsideATransactionIsADefect() {
+        opened("500.00");
+
+        assertThatThrownBy(() -> paymentInUseCase(JdbcStubTransactions.runner(transactionCalls)).recordPaymentIn(cashier,
+                UUID.fromString(requestId), UUID.randomUUID(), Money.of("10.00", CurrencyCode.HNL)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void aCashierCannotTypeAPaymentInMovementThroughTheRoutesOfTheMovements() {
+        UUID session = opened("500.00").id();
+
+        assertThatThrownBy(() -> moveUseCase().record(cashier, requestId, "m-pi", session, "payment_in", "10.00", null))
+                .isInstanceOf(InvalidCashboxValueException.class);
+        assertThat(movements.rows).isEmpty();
+    }
+
     @Test
     void theReplayOfAnEarlierMovementAnswersTheExpectedCashOfThatCallNotOfToday() {
         UUID session = opened("500.00").id();
