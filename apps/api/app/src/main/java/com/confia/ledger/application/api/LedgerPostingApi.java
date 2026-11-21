@@ -54,6 +54,23 @@ public interface LedgerPostingApi {
         }
     }
 
+    /**
+     * A transaction of kind {@code PAYMENT} to post (docs/cortes/payments-register.md): money received from a student, dated the
+     * day it was received, with its origin, its permanent key and its entries (the cash or bank account debited and the receivable
+     * of the student credited).
+     */
+    record PaymentPosting(LocalDate effectiveOn, String sourceModule, UUID sourceRefId, String idempotencyKey,
+            List<Line> lines) {
+
+        public PaymentPosting {
+            Objects.requireNonNull(effectiveOn, "effectiveOn");
+            Objects.requireNonNull(sourceModule, "sourceModule");
+            Objects.requireNonNull(sourceRefId, "sourceRefId");
+            Objects.requireNonNull(idempotencyKey, "idempotencyKey");
+            lines = List.copyOf(lines);
+        }
+    }
+
     /** The transaction as posted and whether this call created it ({@code false} when the key was already posted). */
     record Posted(UUID transactionId, boolean created) {
     }
@@ -107,6 +124,13 @@ public interface LedgerPostingApi {
     }
 
     Posted postCharge(Actor actor, ChargePosting posting);
+
+    /**
+     * Posts a {@code PAYMENT} transaction inside the transaction of the caller. Same contract as {@link #postCharge}: no
+     * transaction opened, no security context applied, no retry; the missing sub-account of the student is opened and locked
+     * first, and an account under review refuses the write.
+     */
+    Posted postPayment(Actor actor, PaymentPosting posting);
 
     /**
      * Posts the exact mirror of a charge transaction inside the transaction of the caller. Same contract as {@link

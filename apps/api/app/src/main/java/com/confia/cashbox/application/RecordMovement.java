@@ -52,7 +52,8 @@ public final class RecordMovement {
         Objects.requireNonNull(sessionId, "sessionId");
         UUID auditRequestId = CashboxRequests.requestId(Objects.requireNonNull(requestId, "requestId"));
         String key = CashboxRequests.key(idempotencyKey);
-        MovementType movementType = MovementType.ofCode(type).orElseThrow(InvalidCashboxValueException::new);
+        MovementType movementType = MovementType.ofCode(type).filter(MovementType::recordedByTheCashier)
+                .orElseThrow(InvalidCashboxValueException::new);
         Money money = CashAmounts.parse(amount);
         String hash = CashboxRequests.hash("movement", actor.accountId(), sessionId, movementType.code(),
                 money.toPlainString(), notes == null ? "" : notes.strip());

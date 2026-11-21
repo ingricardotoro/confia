@@ -131,6 +131,36 @@ public final class JooqChargeRepository implements ChargeRepository {
     }
 
     @Override
+    public List<ChargeLabelRow> findLabels(InstitutionId institution, java.util.Collection<UUID> chargeIds) {
+        if (chargeIds.isEmpty()) {
+            return List.of();
+        }
+        return dsl.select(CHARGES_CHARGE.ID, CHARGES_CHARGE.PAYMENT_CONCEPT_ID, CHARGES_CHARGE.PERIOD_LABEL,
+                CHARGES_CHARGE.DUE_ON).from(CHARGES_CHARGE)
+                .where(CHARGES_CHARGE.INSTITUTION_ID.eq(institution.value()))
+                .and(CHARGES_CHARGE.ID.in(chargeIds))
+                .fetch(row -> new ChargeLabelRow(row.get(CHARGES_CHARGE.ID), row.get(CHARGES_CHARGE.PAYMENT_CONCEPT_ID),
+                        row.get(CHARGES_CHARGE.PERIOD_LABEL), row.get(CHARGES_CHARGE.DUE_ON)));
+    }
+
+    @Override
+    public List<ChargeForPayment> findActiveByStudent(InstitutionId institution, UUID studentId, CurrencyCode currency) {
+        return dsl.select(CHARGES_CHARGE.ID, CHARGES_CHARGE.PAYMENT_CONCEPT_ID, CHARGES_CHARGE.PERIOD_START,
+                CHARGES_CHARGE.DUE_ON, CHARGES_CHARGE.TOTAL_AMOUNT, CHARGES_CHARGE.TOTAL_CURRENCY)
+                .from(CHARGES_CHARGE)
+                .where(CHARGES_CHARGE.INSTITUTION_ID.eq(institution.value()))
+                .and(CHARGES_CHARGE.STUDENT_ID.eq(studentId))
+                .and(CHARGES_CHARGE.TOTAL_CURRENCY.eq(currency.name()))
+                .andNotExists(dsl.selectOne().from(CHARGES_CHARGE_VOID)
+                        .where(CHARGES_CHARGE_VOID.INSTITUTION_ID.eq(CHARGES_CHARGE.INSTITUTION_ID))
+                        .and(CHARGES_CHARGE_VOID.CHARGE_ID.eq(CHARGES_CHARGE.ID)))
+                .fetch(row -> new ChargeForPayment(row.get(CHARGES_CHARGE.ID), row.get(CHARGES_CHARGE.PAYMENT_CONCEPT_ID),
+                        row.get(CHARGES_CHARGE.PERIOD_START), row.get(CHARGES_CHARGE.DUE_ON),
+                        MoneyColumns.toMoney(row.get(CHARGES_CHARGE.TOTAL_AMOUNT),
+                                row.get(CHARGES_CHARGE.TOTAL_CURRENCY))));
+    }
+
+    @Override
     public Page<ChargeRow> listByStudent(InstitutionId institution, UUID studentId, ChargeFilter filter,
             PageRequest page) {
         Condition where = CHARGES_CHARGE.INSTITUTION_ID.eq(institution.value())
