@@ -207,6 +207,8 @@ export function currentSession(options: BuildOptions<CurrentSessionResponseOutpu
     authenticationMethods: ["pwd", "otp"],
     idleExpiresAt: after(now, 30),
     institutionId: crypto.randomUUID(),
+    // The panel does not read the permissions yet; the list is here because the contract requires it.
+    permissions: [],
     sessionExpiresAt: after(now, 8 * 60),
     sessionId: crypto.randomUUID(),
     ...options.override,
