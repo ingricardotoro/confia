@@ -372,7 +372,7 @@ class CashboxSessionsIT extends CommittingPostgresIntegrationTest {
         assertThat(insertMovement(env, open, owner, "deposit", "0", "HNL")).isEqualTo(CHECK_VIOLATION);
         assertThat(insertMovement(env, open, owner, "withdrawal", "-5", "HNL")).isEqualTo(CHECK_VIOLATION);
         assertThat(insertMovement(env, open, owner, "adjustment", "0", "HNL")).isEqualTo(CHECK_VIOLATION);
-        assertThat(insertMovement(env, open, owner, "payment_in", "5", "HNL")).isEqualTo(CHECK_VIOLATION);
+        // payment_in is a valid type since the payments cut: its claim by a payment is proven in RegisterPaymentIT.
         assertThat(insertMovement(env, open, owner, "deposit", "5", "USD")).as("another currency")
                 .isEqualTo(CHECK_VIOLATION);
         assertThat(applicationActing(env, owner, "insert into cashbox_movement (institution_id, id, session_id, type, "
