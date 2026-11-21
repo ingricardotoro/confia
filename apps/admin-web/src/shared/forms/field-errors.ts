@@ -103,6 +103,12 @@ export function fieldErrorKey(reason: string): AdminKey {
       return "cashbox.errors.reasonControl";
     case "difference-reason-required":
       return "cashbox.errors.differenceReasonRequired";
+    case "reference-length":
+      return "payments.errors.referenceLength";
+    case "cash-received-today":
+      return "payments.errors.cashReceivedToday";
+    case "duplicate-transfer-reference":
+      return "payments.errors.duplicateReference";
     case "not-allowed":
       return "field.notAllowed";
     default:

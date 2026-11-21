@@ -202,7 +202,9 @@
     "studentCharges": "Cargos del estudiante",
     "integrity": "Integridad de cargos",
     "cashbox": "Mi caja",
-    "cashSessions": "Sesiones de caja"
+    "cashSessions": "Sesiones de caja",
+    "payments": "Pagos",
+    "paymentsRegister": "Cobrar"
   },
   "catalog": {
     "title": "Catálogo",
@@ -1070,7 +1072,7 @@
       "loading": "Cargando el mapa de cuentas de cargos.",
       "loadFailed": "No se pudo cargar el mapa de cuentas de cargos",
       "incompleteTitle": "El mapa de cuentas está incompleto",
-      "incompleteBody": "Mientras falten cuentas que el plan necesita, la generación de cargos queda bloqueada: la vista previa lo avisa y no se puede confirmar.",
+      "incompleteBody": "Mientras falten cuentas que el plan necesita, la generación de cargos queda bloqueada: la vista previa lo avisa y no se puede confirmar. Sin la caja o el banco, tampoco se puede cobrar en efectivo ni confirmar transferencias.",
       "missingLead": "Falta configurar:",
       "completeNote": "Todas las cuentas principales están configuradas.",
       "noAccountsTitle": "Todavía no hay cuentas activas",
@@ -1080,7 +1082,9 @@
         "core": "Cuentas principales",
         "coreDescription": "Las cuentas por cobrar y el impuesto por pagar son las mismas para todos los cargos.",
         "revenue": "Ingresos por categoría",
-        "revenueDescription": "Cada categoría de concepto puede tener su cuenta de ingreso. Si una categoría no tiene cuenta propia, usa el ingreso por defecto."
+        "revenueDescription": "Cada categoría de concepto puede tener su cuenta de ingreso. Si una categoría no tiene cuenta propia, usa el ingreso por defecto.",
+        "payments": "Cuentas de pagos",
+        "paymentsDescription": "Dicen a qué cuenta se asienta el dinero recibido: la caja para el efectivo y el banco para las transferencias confirmadas."
       },
       "roles": {
         "RECEIVABLE": "Cuentas por cobrar a estudiantes",
@@ -1091,13 +1095,17 @@
         "REVENUE_TRANSPORT": "Ingreso por transporte",
         "REVENUE_MATERIAL": "Ingreso por materiales",
         "REVENUE_FINE": "Ingreso por multas",
-        "REVENUE_OTHER": "Otros ingresos"
+        "REVENUE_OTHER": "Otros ingresos",
+        "CASH": "Caja (efectivo)",
+        "BANK": "Banco (transferencias)"
       },
       "help": {
         "RECEIVABLE": "Se elige entre las cuentas activas de tipo Activo que llevan los saldos de los estudiantes. Cada cargo la debita.",
         "TAX_PAYABLE": "Se elige entre las cuentas activas de tipo Pasivo que no llevan saldos de estudiantes. Recibe el impuesto de los conceptos gravados.",
         "REVENUE_DEFAULT": "Se elige entre las cuentas activas de tipo Ingreso. La usan las categorías que no tienen una cuenta propia.",
-        "REVENUE": "Se elige entre las cuentas activas de tipo Ingreso. Si se deja sin configurar, la categoría usa el ingreso por defecto."
+        "REVENUE": "Se elige entre las cuentas activas de tipo Ingreso. Si se deja sin configurar, la categoría usa el ingreso por defecto.",
+        "CASH": "Se elige entre las cuentas activas de tipo Activo que no llevan saldos de estudiantes. Cada pago en efectivo la debita.",
+        "BANK": "Se elige entre las cuentas activas de tipo Activo que no llevan saldos de estudiantes. Cada transferencia confirmada la debita."
       },
       "status": {
         "set": "Configurada",
@@ -1116,7 +1124,8 @@
       "accountMissing": "Una de las cuentas elegidas ya no existe. Ya se recargaron las cuentas; revise las que eligió e intente de nuevo.",
       "readOnlyTitle": "Solo lectura",
       "readOnlyBody": "Su rol no puede cambiar el mapa de cuentas de cargos: solo un Super Administrador lo hace. Aquí puede consultar cómo está configurado.",
-      "caption": "Cuentas de cargos"
+      "caption": "Cuentas de cargos",
+      "partialSave": "Las cuentas de cargos se guardaron, pero las de pagos no. Revise los valores y guarde de nuevo."
     }
   },
   "resource": {
@@ -2099,6 +2108,168 @@
       "submit": "Aprobar cierre",
       "sending": "Aprobando el cierre.",
       "approvedNotice": "El cierre quedó aprobado y la sesión está cerrada."
+    }
+  },
+  "payments": {
+    "title": "Pagos",
+    "statuses": {
+      "declared": "Pendiente de confirmación",
+      "confirmed": "Confirmado",
+      "rejected": "Rechazado"
+    },
+    "methods": {
+      "CASH": "Efectivo",
+      "BANK_TRANSFER": "Transferencia"
+    },
+    "errors": {
+      "referenceLength": "La referencia debe tener de 4 a 40 caracteres.",
+      "duplicateReference": "Esa referencia de ese banco ya está registrada en otro pago.",
+      "cashReceivedToday": "El efectivo se recibe el día de hoy: la fecha de recepción debe ser la de hoy."
+    },
+    "list": {
+      "heading": "Pagos",
+      "description": "Los pagos registrados, de efectivo y de transferencia. Una transferencia queda pendiente hasta que una persona autorizada la confirma.",
+      "caption": "Pagos registrados",
+      "loadFailed": "No se pudieron cargar los pagos",
+      "emptyTitle": "Todavía no hay pagos",
+      "emptyDescription": "Cuando se registre un pago aparecerá aquí.",
+      "emptyAction": "Registrar un pago",
+      "filterStatus": "Estado",
+      "filterMethod": "Método",
+      "filterFrom": "Recibido desde",
+      "filterTo": "Recibido hasta",
+      "columns": {
+        "receivedOn": "Recibido el",
+        "student": "Estudiante",
+        "method": "Método",
+        "reference": "Referencia",
+        "amount": "Importe",
+        "status": "Estado",
+        "registeredAt": "Registrado"
+      },
+      "errors": {
+        "fromAfterTo": "La fecha final no puede ser anterior a la inicial."
+      },
+      "noReference": "—"
+    },
+    "register": {
+      "heading": "Registrar pago",
+      "description": "Cobre en efectivo o declare una transferencia. El servidor reparte el pago entre los cargos pendientes, del más antiguo al más reciente.",
+      "chargesHeading": "Cargos pendientes del estudiante",
+      "chargesCaption": "Cargos vigentes del estudiante, del vencimiento más antiguo al más reciente",
+      "chargesLoading": "Cargando los cargos del estudiante.",
+      "chargesFailed": "No se pudieron cargar los cargos del estudiante",
+      "chargesEmptyTitle": "El estudiante no tiene cargos pendientes",
+      "chargesEmptyDescription": "Si registra el pago, quedará completo como saldo a favor del estudiante.",
+      "chargesLink": "Ver los cargos del estudiante",
+      "balanceLabel": "Saldo del estudiante:",
+      "balanceHelp": "Un saldo negativo es saldo a favor del estudiante.",
+      "balanceUnavailable": "No disponible",
+      "columns": {
+        "period": "Período",
+        "concept": "Concepto",
+        "dueOn": "Vence",
+        "total": "Total",
+        "paid": "Pagado",
+        "outstanding": "Pendiente"
+      },
+      "noConcept": "Sin concepto",
+      "method": "Método de pago",
+      "amount": "Importe recibido",
+      "amountHelp": "Con punto decimal y hasta dos decimales, por ejemplo 1500.00. Está en lempiras.",
+      "receivedOn": "Fecha de recepción",
+      "receivedOnHelp": "El día en que se recibió el dinero. No puede ser futura.",
+      "reference": "Referencia bancaria",
+      "referenceHelp": "De 4 a 40 caracteres, tal como aparece en el comprobante del banco.",
+      "bankName": "Banco",
+      "bankNameHelp": "El banco desde el que se hizo la transferencia.",
+      "notes": "Notas",
+      "notesHelp": "Opcional, hasta 500 caracteres. No escriba datos personales.",
+      "submit": "Registrar pago",
+      "submitting": "Registrando el pago.",
+      "cashHelp": "El efectivo se asienta en el libro mayor y se aplica a los cargos en este momento.",
+      "transferHelp": "Una transferencia declarada no cambia el saldo hasta que una persona autorizada la confirme.",
+      "noSession": {
+        "title": "No tiene una caja abierta",
+        "description": "El efectivo solo se cobra con una caja abierta a su nombre. Abra su caja y vuelva a esta pantalla.",
+        "action": "Ir a Mi caja",
+        "checking": "Verificando su caja."
+      },
+      "result": {
+        "titleConfirmed": "Pago registrado",
+        "titleDeclared": "Transferencia declarada",
+        "confirmedNote": "El pago quedó asentado en el libro mayor y aplicado a los cargos como lo calculó el servidor.",
+        "declaredNote": "La transferencia queda pendiente de confirmación. No cambia el saldo del estudiante ni se aplica a cargos hasta que una persona autorizada la confirme.",
+        "newPayment": "Registrar otro pago",
+        "viewPayment": "Ver el pago",
+        "viewStatement": "Ver el estado de cuenta"
+      }
+    },
+    "detail": {
+      "heading": "Pago del {date}",
+      "back": "Volver a los pagos",
+      "backToList": "Volver a los pagos",
+      "loading": "Cargando el pago.",
+      "loadFailed": "No se pudo cargar el pago",
+      "notFoundTitle": "No encontramos este pago",
+      "notFoundDescription": "El pago no existe, es de otra institución o no está entre los que puede consultar. Vuelva a la lista para elegir otro.",
+      "forbiddenTitle": "No tiene acceso a los pagos",
+      "forbiddenDescription": "Su cuenta no tiene permiso para consultar pagos. Si lo necesita para su trabajo, solicítelo a un administrador de su institución.",
+      "declaredNote": "Esta transferencia está pendiente de confirmación. No cambia el saldo del estudiante ni se aplica a cargos hasta que otra persona con permiso para confirmar la revise.",
+      "rejectedNote": "Esta transferencia fue rechazada. No dejó ningún asiento en el libro mayor y el saldo del estudiante no cambió.",
+      "confirm": "Confirmar",
+      "reject": "Rechazar",
+      "summaryHeading": "Datos del pago",
+      "allocationsHeading": "Aplicación a cargos",
+      "fields": {
+        "student": "Estudiante",
+        "method": "Método",
+        "status": "Estado",
+        "amount": "Importe",
+        "receivedOn": "Fecha de recepción",
+        "registeredAt": "Registrado",
+        "reference": "Referencia",
+        "bankName": "Banco",
+        "notes": "Notas",
+        "allocated": "Aplicado a cargos",
+        "unallocated": "Queda a favor del estudiante",
+        "decision": "Decisión",
+        "decisionReason": "Motivo del rechazo"
+      },
+      "decisions": {
+        "confirmed": "Confirmada el {date}",
+        "rejected": "Rechazada el {date}"
+      },
+      "noValue": "—",
+      "viewStatement": "Ver el estado de cuenta"
+    },
+    "allocations": {
+      "caption": "Cargos a los que se aplicó el pago",
+      "columns": {
+        "period": "Período",
+        "concept": "Concepto",
+        "dueOn": "Vence",
+        "amount": "Aplicado"
+      },
+      "noConcept": "Sin concepto",
+      "emptyTitle": "El pago no se aplicó a ningún cargo",
+      "emptyDescription": "No había cargos pendientes: el importe completo quedó a favor del estudiante."
+    },
+    "confirm": {
+      "title": "Confirmar la transferencia",
+      "description": "Al confirmar, el pago se asienta en el libro mayor y se aplica a los cargos pendientes del estudiante. No se puede deshacer.",
+      "submit": "Confirmar transferencia",
+      "sending": "Confirmando la transferencia.",
+      "confirmedNotice": "La transferencia quedó confirmada y aplicada a los cargos."
+    },
+    "reject": {
+      "title": "Rechazar la transferencia",
+      "description": "El rechazo no deja ningún asiento y el saldo del estudiante no cambia. Queda registrado y no se puede deshacer.",
+      "reason": "Motivo del rechazo",
+      "reasonHelp": "De 20 a 500 caracteres. No escriba datos personales.",
+      "submit": "Rechazar transferencia",
+      "sending": "Rechazando la transferencia.",
+      "rejectedNotice": "La transferencia quedó rechazada. El saldo del estudiante no cambió."
     }
   }
 }
