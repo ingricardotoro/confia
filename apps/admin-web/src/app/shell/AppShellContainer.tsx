@@ -8,12 +8,15 @@ import { SignedInPage } from "../../features/identity/signed-in/components/Signe
 import { useSignedInSession } from "../../features/identity/signed-in/use-signed-in-session.ts";
 import type { AccessSession } from "../../features/identity/session/index.ts";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
+import { PermissionsProvider, usePermissions } from "../../shared/permissions/permissions.tsx";
+import { requiredPermissionFor, type RoutePermission } from "../../shared/permissions/route-permissions.ts";
 import {
   isCurrentEntry,
   NAVIGATION_GROUP_ORDER,
   type NavigationEntry,
 } from "../../shared/navigation/navigation-entry.ts";
 import { AppShell } from "./components/AppShell.tsx";
+import { NoAccess } from "./components/NoAccess.tsx";
 import { useExpandedGroups } from "./use-expanded-groups.ts";
 import { useSidebarCollapsed } from "./use-sidebar-collapsed.ts";
 
@@ -22,10 +25,16 @@ export interface AppShellContainerProps {
   /** Where the person goes when the session is over, by any road. A prop, so this file does not import the routes. */
   readonly signInPath: string;
   readonly entries: readonly NavigationEntry[];
+  /** The start page, where "Sin acceso" leads back to. */
+  readonly homePath: string;
+  /** The permission each part of the address needs. A part that is not listed is open to every signed in person. */
+  readonly guards: readonly RoutePermission[];
 }
 
 interface ShellFrameProps {
   readonly entries: readonly NavigationEntry[];
+  readonly guards: readonly RoutePermission[];
+  readonly homePath: string;
   readonly signingOut: boolean;
   readonly signOutFailed: boolean;
   readonly onSignOut: () => void;
@@ -35,16 +44,22 @@ interface ShellFrameProps {
 // component that holds the session query, or leaving the shell would rebuild a query the sign out just
 // emptied from the cache.
 function ShellFrame({
-  entries,
+  entries: allEntries,
+  guards,
+  homePath,
   signingOut,
   signOutFailed,
   onSignOut,
 }: ShellFrameProps) {
   const { t } = useAdminText();
   const navigate = useNavigate();
+  const { can } = usePermissions();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
+  // The menu lists only what the session can use (a group with no entry left disappears); the server decides each request.
+  const entries = allEntries.filter((entry) => entry.permission === undefined || can(entry.permission));
+  const required = requiredPermissionFor(pathname, guards);
 
   const toItem = (entry: NavigationEntry) => ({
     id: entry.id,
@@ -86,7 +101,11 @@ function ShellFrame({
       signOutFailed={signOutFailed}
       onSignOut={onSignOut}
     >
-      <Outlet />
+      {required === undefined || can(required) ? (
+        <Outlet />
+      ) : (
+        <NoAccess homeHref={homePath} onNavigate={() => void navigate({ to: homePath })} />
+      )}
     </AppShell>
   );
 }
@@ -100,6 +119,8 @@ export function AppShellContainer({
   session,
   signInPath,
   entries,
+  guards,
+  homePath,
 }: AppShellContainerProps) {
   const { t } = useAdminText();
   const signedIn = useSignedInSession(session);
@@ -116,11 +137,15 @@ export function AppShellContainer({
   if (signedIn.read === "loading") return <SignedInPage status="loading" />;
 
   return (
-    <ShellFrame
-      entries={entries}
-      signingOut={signedIn.signingOut}
-      signOutFailed={signedIn.signOutFailed}
-      onSignOut={signedIn.signOut}
-    />
+    <PermissionsProvider permissions={signedIn.permissions}>
+      <ShellFrame
+        entries={entries}
+        guards={guards}
+        homePath={homePath}
+        signingOut={signedIn.signingOut}
+        signOutFailed={signedIn.signOutFailed}
+        onSignOut={signedIn.signOut}
+      />
+    </PermissionsProvider>
   );
 }

@@ -5,6 +5,7 @@ import { useAdminText } from "../i18n/use-admin-text.ts";
 import { AuthorizedSendProvider, type AuthorizedSend } from "../shared/api/authorized-send.tsx";
 import { PageContent } from "../shared/layout/components/PageContent.tsx";
 import type { NavigationEntry } from "../shared/navigation/navigation-entry.ts";
+import type { RoutePermission } from "../shared/permissions/route-permissions.ts";
 import { FEATURES } from "./features.ts";
 import { NotFoundContainer } from "./NotFoundContainer.tsx";
 import { AppShellContainer } from "./shell/AppShellContainer.tsx";
@@ -40,6 +41,7 @@ export function createAppRouter({ session, history }: AppRouterOptions) {
   // One sender for the tab: it asks the session for a token on every request, so no screen ever holds one.
   const send: AuthorizedSend = (operation) => session.authorized(operation);
   const entries = [HOME_ENTRY, ...FEATURES.flatMap((feature) => [feature.navigation, ...(feature.moreNavigation ?? [])])];
+  const guards: readonly RoutePermission[] = FEATURES.flatMap((feature) => feature.routePermissions ?? []);
   const shellRoute = createRoute({
     getParentRoute: () => rootRoute,
     id: "shell",
@@ -48,7 +50,7 @@ export function createAppRouter({ session, history }: AppRouterOptions) {
     },
     component: () => (
       <AuthorizedSendProvider send={send}>
-        <AppShellContainer session={session} signInPath={ACCESS_PATHS.signIn} entries={entries} />
+        <AppShellContainer session={session} signInPath={ACCESS_PATHS.signIn} entries={entries} guards={guards} homePath={ACCESS_PATHS.home} />
       </AuthorizedSendProvider>
     ),
   });

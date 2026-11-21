@@ -53,6 +53,8 @@ export interface SessionModelOptions {
   readonly allowedOrigins?: readonly string[];
   /** Start with the second factor already enrolled. */
   readonly enrolled?: boolean;
+  /** The permission codes the current session lists; every code the panel knows when absent. */
+  readonly permissions?: readonly string[];
 }
 
 export interface SessionModel {
@@ -205,7 +207,12 @@ export function createSessionModel(options: SessionModelOptions = {}): SessionMo
     return wrap(
       currentSession({
         now: new Date(clock()),
-        override: { accountId, institutionId, sessionId: found.family.sessionId },
+        override: {
+          accountId,
+          institutionId,
+          sessionId: found.family.sessionId,
+          ...(options.permissions === undefined ? {} : { permissions: [...options.permissions].sort() }),
+        },
       }),
     );
   }

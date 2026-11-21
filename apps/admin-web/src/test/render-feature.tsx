@@ -6,6 +6,8 @@ import { createAdminI18n } from "../i18n/create-admin-i18n.ts";
 import { ApiFailure } from "../shared/api/api-failure.ts";
 import { AuthorizedSendProvider, type AuthorizedSend } from "../shared/api/authorized-send.tsx";
 import type { FeatureModule } from "../shared/navigation/navigation-entry.ts";
+import { PERMISSION_CODES } from "../shared/permissions/permission-codes.ts";
+import { PermissionsProvider } from "../shared/permissions/permissions.tsx";
 
 /** The token the test sender gives every request. The real one comes from the session; these tests are about the screens. */
 export const TEST_TOKEN = "test-access-token";
@@ -22,12 +24,17 @@ export interface RenderedFeature extends RenderResult {
   readonly queryClient: QueryClient;
 }
 
+export interface RenderFeatureOptions {
+  /** The permissions of the session. Every code the panel knows when absent, so the screens are tested with a role that can do everything. */
+  readonly permissions?: readonly string[];
+}
+
 /**
  * A feature as the app mounts it, under a bare root route: its real routes and search validation, the real query
  * layer and the real transport over the test server. Only the session is replaced, by a sender that gives every
  * request a fixed token; the shell and the session guard have their own tests. Reads do not retry.
  */
-export function renderFeature(feature: FeatureModule, path: string): RenderedFeature {
+export function renderFeature(feature: FeatureModule, path: string, options: RenderFeatureOptions = {}): RenderedFeature {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false }, mutations: { retry: 0 } } });
   const rootRoute = createRootRoute({ component: Outlet });
   const router = createRouter({
@@ -37,7 +44,9 @@ export function renderFeature(feature: FeatureModule, path: string): RenderedFea
   const rendered = render(
     <AppProviders queryClient={queryClient} i18n={createAdminI18n()}>
       <AuthorizedSendProvider send={send}>
-        <RouterProvider router={router} />
+        <PermissionsProvider permissions={options.permissions ?? PERMISSION_CODES}>
+          <RouterProvider router={router} />
+        </PermissionsProvider>
       </AuthorizedSendProvider>
     </AppProviders>,
   );

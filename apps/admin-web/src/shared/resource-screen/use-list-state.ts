@@ -27,7 +27,8 @@ export interface ListStateOptions<Row, S extends ListSearch> {
   readonly filtered: boolean;
   /** The search with no filters and on the first page. */
   readonly cleared: S;
-  readonly onCreate: () => void;
+  /** Absent when the person cannot create: the empty state then offers no way to create. */
+  readonly onCreate?: (() => void) | undefined;
   readonly loadFailedKey: AdminKey;
   readonly emptyKeys: { readonly title: AdminKey; readonly description: AdminKey; readonly action: AdminKey };
   /** The order the server applies when the URL names none, so the header can show it. */
@@ -84,7 +85,14 @@ export function useListState<Row, S extends ListSearch>({
               },
             },
           }
-        : { title: t(emptyKeys.title), description: t(emptyKeys.description), action: { label: t(emptyKeys.action), onAction: onCreate } },
+        : onCreate === undefined
+          ? // Nothing to create for this person: the way forward is to read the list again, never a dead end (ADR-0018).
+            {
+              title: t(emptyKeys.title),
+              description: t("resource.emptyReadOnlyDescription"),
+              action: { label: t("resource.refreshList"), onAction: () => void list.refetch() },
+            }
+          : { title: t(emptyKeys.title), description: t(emptyKeys.description), action: { label: t(emptyKeys.action), onAction: onCreate } },
       sort,
       onSortChange: (next) => {
         onSearchChange({ ...search, sort: searchSortOf(next), page: 1 });

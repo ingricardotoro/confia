@@ -1,3 +1,4 @@
+import { PERMISSION_CODES } from "../../src/shared/permissions/permission-codes.ts";
 import { problem, type ProblemOptions } from "../../src/test/contract-responses.ts";
 import {
   DEFAULT_ORGANIZATION,
@@ -48,6 +49,8 @@ type LoginBehavior =
 interface PresetDefinition {
   readonly login: LoginBehavior;
   readonly enrolled: boolean;
+  /** The permissions the current session lists (a restricted role); every code the panel knows when absent. */
+  readonly permissions?: readonly string[];
   /** The academic structure the scenario holds; the seeded one, with every write allowed, when absent. */
   readonly organization?: OrganizationOptions;
   /** The students registry the scenario holds; the seeded one, with every write allowed, when absent. */
@@ -74,8 +77,23 @@ interface PresetDefinition {
   readonly tamper?: (operation: Operation, response: ModelResponse) => ModelResponse;
 }
 
+/** What the auditor lists: every read, no write (the only absolutely read-only role). */
+const AUDITOR_PERMISSIONS: readonly string[] = PERMISSION_CODES.filter((code) => code.endsWith(":read"));
+
+/** What the cashier lists, narrowed to the cashbox and the reads its screens need: it works its own cashbox and approves nothing. */
+const CASHIER_PERMISSIONS: readonly string[] = ["cashbox:create", "cashbox:read", "charges:read", "students:read"];
+
+/** What the administrator lists: everything the panel knows except working a cashbox of its own (no `cashbox:create`). */
+const ADMINISTRATOR_PERMISSIONS: readonly string[] = PERMISSION_CODES.filter((code) => code !== "cashbox:create");
+
 const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   default: { login: "authenticated", enrolled: false },
+  // The roles of docs/03 section 5.2, narrowed to the codes the panel knows: the auditor only reads; the cashier works its own cashbox; the
+  // administrator approves closes but has no cashbox of its own; the last writes everything but voiding a charge.
+  "role-cashier": { login: "authenticated", enrolled: false, permissions: CASHIER_PERMISSIONS },
+  "role-administrator": { login: "authenticated", enrolled: false, permissions: ADMINISTRATOR_PERMISSIONS },
+  "role-auditor": { login: "authenticated", enrolled: false, permissions: AUDITOR_PERMISSIONS },
+  "role-without-void": { login: "authenticated", enrolled: false, permissions: PERMISSION_CODES.filter((code) => code !== "charges:void") },
   "second-factor-required": { login: "second-factor-required", enrolled: true },
   "enrollment-required": { login: "second-factor-enrollment-required", enrolled: false },
   "authentication-failed": { login: "authentication-failed", enrolled: false },
@@ -202,7 +220,11 @@ const failure = (
 
 function build(preset: string, definition: PresetDefinition): Scenario {
   let offsetMs = 0;
-  const model = createSessionModel({ now: () => Date.now() + offsetMs, enrolled: definition.enrolled });
+  const model = createSessionModel({
+    now: () => Date.now() + offsetMs,
+    enrolled: definition.enrolled,
+    ...(definition.permissions === undefined ? {} : { permissions: definition.permissions }),
+  });
   const organization = createOrganizationModel(definition.organization ?? DEFAULT_ORGANIZATION);
   const students = createStudentsModel(definition.students ?? DEFAULT_STUDENTS);
   const catalog = createCatalogModel(definition.catalog ?? DEFAULT_CATALOG);

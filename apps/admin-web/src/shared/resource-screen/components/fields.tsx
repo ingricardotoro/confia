@@ -188,8 +188,10 @@ export interface RowActionsProps {
   readonly name: string;
   readonly active: boolean;
   readonly busy: boolean;
-  readonly onEdit: () => void;
-  readonly onToggle: () => void;
+  /** Absent: the edit button is not drawn. */
+  readonly onEdit?: (() => void) | undefined;
+  /** Absent: the activate or deactivate button is not drawn. */
+  readonly onToggle?: (() => void) | undefined;
   /** More buttons of the row, after the two common ones. */
   readonly extra?: ReactNode;
 }
@@ -197,20 +199,25 @@ export interface RowActionsProps {
 /** The actions of a row: edit, and activate or deactivate. Each button says on which record it acts. */
 export function RowActions({ name, active, busy, onEdit, onToggle, extra }: RowActionsProps) {
   const { t } = useAdminText();
+  if (onEdit === undefined && onToggle === undefined && extra === undefined) return null;
   return (
     <div className="flex flex-wrap gap-1.5">
-      <Button variant="secondary" size="xs" aria-label={t("resource.editFor", { name })} onClick={onEdit}>
-        {t("resource.edit")}
-      </Button>
-      <Button
-        variant={active ? "destructive-soft" : "success-soft"}
-        size="xs"
-        loading={busy}
-        aria-label={t(active ? "resource.deactivateFor" : "resource.activateFor", { name })}
-        onClick={onToggle}
-      >
-        {t(active ? "resource.deactivate" : "resource.activate")}
-      </Button>
+      {onEdit === undefined ? null : (
+        <Button variant="secondary" size="xs" aria-label={t("resource.editFor", { name })} onClick={onEdit}>
+          {t("resource.edit")}
+        </Button>
+      )}
+      {onToggle === undefined ? null : (
+        <Button
+          variant={active ? "destructive-soft" : "success-soft"}
+          size="xs"
+          loading={busy}
+          aria-label={t(active ? "resource.deactivateFor" : "resource.activateFor", { name })}
+          onClick={onToggle}
+        >
+          {t(active ? "resource.deactivate" : "resource.activate")}
+        </Button>
+      )}
       {extra}
     </div>
   );

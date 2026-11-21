@@ -21,6 +21,8 @@ export type SignedInSession =
   | {
       readonly authenticated: true;
       readonly read: "ready";
+      /** The codes the current session lists, from the query that is already cached: no copy is kept anywhere else. */
+      readonly permissions: readonly string[];
       readonly signingOut: boolean;
       readonly signOutFailed: boolean;
       readonly signOut: () => void;
@@ -62,6 +64,7 @@ export function useSignedInSession(session: AccessSession): SignedInSession {
   return {
     authenticated: true,
     read: "ready",
+    permissions: read.data.permissions,
     signingOut: signOut.isPending,
     signOutFailed: signOut.isError,
     signOut: () => {
