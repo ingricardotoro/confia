@@ -1,6 +1,6 @@
 import { reportUnknownProblem, stripQueryAndFragment, type UnknownProblemFinding } from "./report-unknown-problem.ts";
 
-/** The codes the backend publishes today (docs/ui-ux/04, §9, its dated note, and the cuts of the academic structure, the students, the enrollments, the guardians, the imports, the catalog, the charges and the cashbox). */
+/** The codes the backend publishes today (docs/ui-ux/04, §9, its dated note, and the cuts of the academic structure, the students, the enrollments, the guardians, the imports, the catalog, the charges, the cashbox and the payments). */
 export const KNOWN_PROBLEM_CODES = [
   "authentication-failed",
   "second-factor-invalid",
@@ -58,6 +58,11 @@ export const KNOWN_PROBLEM_CODES = [
   "cash-expected-negative",
   "cash-difference-reason-required",
   "cash-approval-same-actor",
+  "posting-accounts-incomplete",
+  "duplicate-transfer-reference",
+  "self-approval-forbidden",
+  "payment-not-declared",
+  "charge-has-payments",
 ] as const;
 
 export type ProblemCode = (typeof KNOWN_PROBLEM_CODES)[number];

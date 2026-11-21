@@ -45,6 +45,10 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "cash-session-not-awaiting-approval",
   "cash-expected-negative",
   "cash-approval-same-actor",
+  "posting-accounts-incomplete",
+  "self-approval-forbidden",
+  "payment-not-declared",
+  "charge-has-payments",
 ]);
 
 /** The text of each reason the server gives for a split of the responsibility that does not hold. */

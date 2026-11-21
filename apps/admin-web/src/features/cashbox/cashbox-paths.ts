@@ -1,5 +1,7 @@
+import { MY_CASHBOX_PATH } from "../../shared/navigation/cashbox-paths.ts";
+
 /** The path of the cashbox area. It has the cashier's own session (the area's address) and the list of sessions below it. */
-export const CASHBOX_PATH = "/cashbox";
+export const CASHBOX_PATH = MY_CASHBOX_PATH;
 
 export const CASHBOX_PATHS = {
   mine: CASHBOX_PATH,

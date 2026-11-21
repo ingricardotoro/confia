@@ -33,7 +33,9 @@ export type FieldReason =
   | "first-of-month"
   | "cash-reason-length"
   | "cash-reason-control"
-  | "difference-reason-required";
+  | "difference-reason-required"
+  | "reference-length"
+  | "cash-received-today";
 
 export interface AccessFieldSpec {
   /** The fixed `id` of the control, which the error summary links to. */

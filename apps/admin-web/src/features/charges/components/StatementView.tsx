@@ -3,7 +3,7 @@ import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import type { StudentStatementResponse } from "../charges-types.ts";
 import { OptionField, TextField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
 import { StatementSectionView } from "./StatementSectionView.tsx";
-import { StatementStudentPicker, type StatementStudentPickerProps } from "./StatementStudentPicker.tsx";
+import { StatementStudentPicker, type StatementStudentPickerProps } from "../../../shared/student-lookups/components/StatementStudentPicker.tsx";
 
 export type StatementState =
   /** No student is chosen: the page says how to start. */

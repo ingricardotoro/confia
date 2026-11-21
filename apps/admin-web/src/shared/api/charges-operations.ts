@@ -235,13 +235,15 @@ export interface StudentChargesParams extends PageParams {
   readonly periodFrom?: string | undefined;
   /** `yyyy-MM-dd`: the first day of the period, up to this date included. */
   readonly periodTo?: string | undefined;
+  /** Only the charges with something outstanding, as the server derives it; with no `sort` the order is the one in which a payment is allocated. */
+  readonly outstanding?: boolean | undefined;
 }
 
 /** One page of the charges of a student, as the server pages, filters and orders it. */
 export const listStudentCharges = (token: string, studentId: string, params: StudentChargesParams): Promise<ApiResult<StudentChargePage>> => {
   const query = new URLSearchParams();
   for (const [name, value] of Object.entries(params) as [string, unknown][]) {
-    if (typeof value === "string" || typeof value === "number") query.set(name, String(value));
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") query.set(name, String(value));
   }
   return request({
     method: "GET",

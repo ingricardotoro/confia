@@ -5,7 +5,7 @@ import { OptionField, TextField, type Option } from "../../../shared/resource-sc
 import type { ListTableState, ResourceNotice, ResourcePagination } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import type { StudentCharge } from "../charges-types.ts";
 import { ChargeStatusBadge } from "./ChargeStatusBadge.tsx";
-import { StatementStudentPicker, type StatementStudentPickerProps } from "./StatementStudentPicker.tsx";
+import { StatementStudentPicker, type StatementStudentPickerProps } from "../../../shared/student-lookups/components/StatementStudentPicker.tsx";
 
 export type StudentChargesState =
   /** No student is chosen: the page says how to start. */
@@ -60,6 +60,8 @@ export function StudentChargesView({ state, picker, chosen, filters, rows, table
     { id: "base", header: t("charges.studentCharges.columns.base"), align: "end", cell: (row) => <MoneyAmount value={row.base} size="sm" /> },
     { id: "tax", header: t("charges.studentCharges.columns.tax"), align: "end", cell: (row) => <MoneyAmount value={row.tax} size="sm" /> },
     { id: "total", header: t("charges.studentCharges.columns.total"), sortable: true, align: "end", cell: (row) => <MoneyAmount value={row.total} size="sm" emphasis="strong" /> },
+    { id: "paid", header: t("charges.studentCharges.columns.paid"), align: "end", cell: (row) => <MoneyAmount value={row.paid} size="sm" /> },
+    { id: "outstanding", header: t("charges.studentCharges.columns.outstanding"), align: "end", cell: (row) => <MoneyAmount value={row.outstanding} size="sm" emphasis="strong" /> },
     {
       id: "status",
       header: t("charges.studentCharges.columns.status"),

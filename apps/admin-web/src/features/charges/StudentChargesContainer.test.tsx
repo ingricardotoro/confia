@@ -222,6 +222,7 @@ describe("voiding a charge", () => {
   it.each([
     ["charge-already-voided", 409, /Este cargo ya estaba anulado/],
     ["charge-not-voidable", 409, /El libro mayor no permite anular este cargo/],
+    ["charge-has-payments", 409, /ya tiene pagos aplicados y no se puede anular/],
     ["idempotency-payload-mismatch", 422, /Esta confirmación ya se había usado para otra solicitud distinta/],
     ["forbidden", 403, /No tiene permiso para realizar esta acción/],
     ["resource-not-found", 404, /El registro ya no existe o no está disponible/],

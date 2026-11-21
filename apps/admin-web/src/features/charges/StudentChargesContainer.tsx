@@ -9,7 +9,7 @@ import type { SearchChange } from "../../shared/resource-screen/search-change.ts
 import { useDebouncedSearch } from "../../shared/resource-screen/use-debounced-search.ts";
 import { useListState } from "../../shared/resource-screen/use-list-state.ts";
 import { useStudentSearch } from "../../shared/student-lookups/use-student-search.ts";
-import type { StatementStudentSearchState } from "./components/StatementStudentPicker.tsx";
+import type { StatementStudentSearchState } from "../../shared/student-lookups/components/StatementStudentPicker.tsx";
 import { StudentChargesView, type StudentChargesState } from "./components/StudentChargesView.tsx";
 import type { StudentChargesSearch } from "./charges-search.ts";
 import type { StudentCharge } from "./charges-types.ts";
