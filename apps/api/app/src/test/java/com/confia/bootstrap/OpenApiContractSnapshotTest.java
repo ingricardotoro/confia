@@ -308,17 +308,17 @@ class OpenApiContractSnapshotTest {
     }
 
     @Test
-    void theDtoSchemaIsTheClosedListOfSevenRequiredMembers() {
+    void theDtoSchemaIsTheClosedListOfEightRequiredMembers() {
         Map<String, Object> dto = schemaOf(parse(normalizedDocumentOf("admin")),
                 "CurrentSessionResponse");
 
         Map<String, Object> properties = asMap(dto.get("properties"));
         assertThat(properties).containsOnlyKeys("sessionId", "accountId", "institutionId",
                 "authenticationMethods", "accessTokenExpiresAt", "sessionExpiresAt",
-                "idleExpiresAt");
+                "idleExpiresAt", "permissions");
         assertThat(asList(dto.get("required"))).containsExactlyInAnyOrder("sessionId", "accountId",
                 "institutionId", "authenticationMethods", "accessTokenExpiresAt",
-                "sessionExpiresAt", "idleExpiresAt");
+                "sessionExpiresAt", "idleExpiresAt", "permissions");
         for (String instant : List.of("accessTokenExpiresAt", "sessionExpiresAt", "idleExpiresAt")) {
             assertThat(asMap(properties.get(instant))).containsEntry("format", "date-time");
         }

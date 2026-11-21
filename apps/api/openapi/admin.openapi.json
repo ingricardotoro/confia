@@ -1183,6 +1183,13 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "permissions" : {
+            "description" : "Sorted permission codes (module:verb) of the account's effective role; empty without a role. Only a hint to hide actions: the server decides every request",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
           "sessionExpiresAt" : {
             "description" : "The absolute end of the session, whatever its use",
             "format" : "date-time",
@@ -1194,7 +1201,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "accessTokenExpiresAt", "accountId", "authenticationMethods", "idleExpiresAt", "institutionId", "sessionExpiresAt", "sessionId" ],
+        "required" : [ "accessTokenExpiresAt", "accountId", "authenticationMethods", "idleExpiresAt", "institutionId", "permissions", "sessionExpiresAt", "sessionId" ],
         "type" : "object"
       },
       "EnrollStudentRequest" : {

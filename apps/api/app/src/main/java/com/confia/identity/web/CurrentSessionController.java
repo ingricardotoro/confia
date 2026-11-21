@@ -76,6 +76,6 @@ public class CurrentSessionController {
                 .orElseThrow(AccessTokenRejectedException::new);
         return new CurrentSessionResponse(view.sessionId(), view.accountId(), view.institutionId(),
                 view.authenticationMethods(), view.accessTokenExpiresAt(), view.sessionExpiresAt(),
-                view.idleExpiresAt());
+                view.idleExpiresAt(), view.permissions());
     }
 }

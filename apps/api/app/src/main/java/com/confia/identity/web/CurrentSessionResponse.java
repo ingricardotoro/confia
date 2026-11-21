@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * The body of {@code GET /api/v1/auth/sessions/current} (session-tokens-and-web-layer design.md
- * decision 13): a closed list of seven members and no personal datum, with dates in ISO 8601 in UTC.
+ * decision 13): a closed list of eight members and no personal datum, with dates in ISO 8601 in UTC.
  * It is the explicit output DTO of the route (CLAUDE.md, rule 10): plain values only, no type of
  * {@code domain} and none of jOOQ, so nothing the store adds to a family can reach the client.
  *
@@ -21,6 +21,8 @@ import java.util.UUID;
  * @param accessTokenExpiresAt when the access token stops being valid
  * @param sessionExpiresAt the absolute end of the session, whatever its use
  * @param idleExpiresAt when the session becomes idle if it is not used again
+ * @param permissions the codes of the permissions of the account's effective role, sorted; empty when
+ *     it has no role. A hint for the interface to hide what the server would refuse: it grants nothing
  */
 public record CurrentSessionResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED, description = "Identifier of the session")
@@ -42,7 +44,12 @@ public record CurrentSessionResponse(
         Instant sessionExpiresAt,
         @Schema(requiredMode = RequiredMode.REQUIRED,
                 description = "When the session becomes idle if it is not used again")
-        Instant idleExpiresAt) {
+        Instant idleExpiresAt,
+        @Schema(requiredMode = RequiredMode.REQUIRED,
+                description = "Sorted permission codes (module:verb) of the account's effective "
+                        + "role; empty without a role. Only a hint to hide actions: the server "
+                        + "decides every request")
+        List<String> permissions) {
 
     public CurrentSessionResponse {
         Objects.requireNonNull(sessionId, "sessionId");
@@ -53,5 +60,6 @@ public record CurrentSessionResponse(
         Objects.requireNonNull(accessTokenExpiresAt, "accessTokenExpiresAt");
         Objects.requireNonNull(sessionExpiresAt, "sessionExpiresAt");
         Objects.requireNonNull(idleExpiresAt, "idleExpiresAt");
+        permissions = List.copyOf(Objects.requireNonNull(permissions, "permissions"));
     }
 }

@@ -3,6 +3,7 @@ package com.confia.identity.application;
 import com.confia.identity.domain.RefreshTokenFamilyState;
 import com.confia.identity.domain.SessionLifetimePolicy;
 import com.confia.identity.domain.StaffAccountId;
+import com.confia.kernel.Permission;
 import com.confia.kernel.InstitutionId;
 import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.AuthenticationMethod;
@@ -33,13 +34,15 @@ public final class DescribeCurrentSession {
 
     private final TransactionRunner runner;
     private final RefreshTokenFamilyRepository families;
+    private final StaffRoleAssignmentRepository assignments;
     private final Clock clock;
     private final SessionLifetimePolicy policy = new SessionLifetimePolicy();
 
     public DescribeCurrentSession(TransactionRunner runner, RefreshTokenFamilyRepository families,
-            Clock clock) {
+            StaffRoleAssignmentRepository assignments, Clock clock) {
         this.runner = Objects.requireNonNull(runner, "runner");
         this.families = Objects.requireNonNull(families, "families");
+        this.assignments = Objects.requireNonNull(assignments, "assignments");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -53,13 +56,30 @@ public final class DescribeCurrentSession {
         return runner.executeReadOnly(actor.securityContext(requestId), () -> families
                 .readById(institution, actor.sessionId())
                 .filter(family -> policy.isLive(family, owner, clock.instant()))
-                .map(family -> viewOf(actor, family)));
+                .map(family -> viewOf(actor, family, institution, owner)));
     }
 
-    private CurrentSessionView viewOf(AuthenticatedActor actor, RefreshTokenFamilyState family) {
+    private CurrentSessionView viewOf(AuthenticatedActor actor, RefreshTokenFamilyState family,
+            InstitutionId institution, StaffAccountId owner) {
         return new CurrentSessionView(actor.sessionId(), actor.accountId(), actor.institutionId(),
                 methodsOf(actor), actor.expiresAt(), family.absoluteExpiresAt(),
-                policy.idleExpiresAt(family.lastUsedAt()));
+                policy.idleExpiresAt(family.lastUsedAt()), permissionsOf(actor, institution, owner));
+    }
+
+    /**
+     * The permission codes the server would grant this session, read inside the transaction of the
+     * session read with the same translation the resolver uses ({@link EffectiveRolePermissions}). It
+     * does not call the resolver port, which only the permission decider may ask. Like the decider, a
+     * session that has not proved the second factor holds nothing, and its role is not read. No role, or
+     * a code outside the catalog, is an empty list.
+     */
+    private List<String> permissionsOf(AuthenticatedActor actor, InstitutionId institution,
+            StaffAccountId owner) {
+        if (!actor.methods().contains(AuthenticationMethod.ONE_TIME_PASSWORD)) {
+            return List.of();
+        }
+        return EffectiveRolePermissions.of(assignments, institution, owner).stream()
+                .map(Permission::code).sorted().toList();
     }
 
     /** The {@code amr} values in the order the token writes them: the declaration order of the enum. */

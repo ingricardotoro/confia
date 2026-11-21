@@ -354,6 +354,7 @@ describe("the seeded test session", { timeout: LIMIT }, () => {
       "authenticationMethods",
       "idleExpiresAt",
       "institutionId",
+      "permissions",
       "sessionExpiresAt",
       "sessionId",
     ]);
