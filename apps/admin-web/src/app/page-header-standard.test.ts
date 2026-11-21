@@ -30,6 +30,15 @@ describe("page headers of the signed in screens", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("builds the heading of each payments view with PageHeader at level 2, under the level 1 of the area, with the breadcrumb of a detail (and the standard BackLink while it is unknown)", () => {
+    const views = ["PaymentsView", "RegisterPaymentView", "PaymentDetailView"].map((name) => readFileSync(join(SRC, "features", "payments", "components", `${name}.tsx`), "utf8"));
+
+    for (const source of views) expect(source).toMatch(/<PageHeader[\s\S]*?headingLevel=\{2\}/);
+    expect(views[2]).toContain("<Breadcrumb");
+    expect(views[2]).toContain("<BackLink");
+    expect(readFileSync(join(SRC, "features", "payments", "PaymentsAreaContainer.tsx"), "utf8")).toContain("<PageContent");
+  });
+
   it("builds the heading of each cashbox view with PageHeader at level 2, under the level 1 of the area, with the breadcrumb of a detail (and the standard BackLink while it is unknown)", () => {
     const views = ["MyCashboxView", "CashSessionsView", "CashSessionDetailView"].map((name) => readFileSync(join(SRC, "features", "cashbox", "components", `${name}.tsx`), "utf8"));
 
