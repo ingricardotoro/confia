@@ -23,9 +23,12 @@ export interface SectionsViewProps {
   readonly yearFilter: SelectFilter;
   readonly gradeFilter: SelectFilter;
   readonly lookupFailure?: { readonly onRetry: () => void } | undefined;
-  readonly onCreate: () => void;
-  readonly onEdit: (row: Section) => void;
-  readonly onToggle: (row: Section) => void;
+  /** Absent when the person cannot create: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
+  /** Absent when the person cannot edit: the button is not drawn. */
+  readonly onEdit?: ((row: Section) => void) | undefined;
+  /** Absent when the person cannot change the state: the button is not drawn. */
+  readonly onToggle?: ((row: Section) => void) | undefined;
 }
 
 /** The sections as a table: name, year, grade, capacity, state and actions, with filters by year and by grade. */
@@ -66,12 +69,8 @@ export function SectionsView({
           name={row.name}
           active={row.isActive}
           busy={togglingId === row.id}
-          onEdit={() => {
-            onEdit(row);
-          }}
-          onToggle={() => {
-            onToggle(row);
-          }}
+          onEdit={onEdit === undefined ? undefined : () => { onEdit(row); }}
+          onToggle={onToggle === undefined ? undefined : () => { onToggle(row); }}
         />
       ),
     },

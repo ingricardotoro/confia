@@ -5,6 +5,7 @@ import { formatIsoDate } from "../../shared/format/format-date.ts";
 import { nameMapOf, optionsOf, useGradeLookup, useModalityLookup, useYearLookup } from "../../shared/organization-lookups/use-lookups.ts";
 import type { ResourceNotice } from "../../shared/resource-screen/components/ResourceScreen.tsx";
 import { failureMessageOf, failureOf, loadFailureOf } from "../../shared/resource-screen/resource-failure.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { CATALOG_PATHS } from "./catalog-paths.ts";
 import { PriceListDetailView, type PriceListDetailState } from "./components/PriceListDetailView.tsx";
 import { PriceFormContainer } from "./PriceFormContainer.tsx";
@@ -23,6 +24,7 @@ export interface PriceListDetailContainerProps {
  */
 export function PriceListDetailContainer({ priceListId }: PriceListDetailContainerProps) {
   const { t } = useAdminText();
+  const { can } = usePermissions();
   const navigate = useNavigate();
   const detail = usePriceListDetail(priceListId);
   const update = usePriceListUpdate();
@@ -101,11 +103,15 @@ export function PriceListDetailContainer({ priceListId }: PriceListDetailContain
         changingStatus={update.isPending}
         backHref={CATALOG_PATHS.priceLists}
         onBack={() => void navigate({ to: CATALOG_PATHS.priceLists })}
-        onAddPrice={() => {
-          setNotice(undefined);
-          setAdding(true);
-        }}
-        onToggleStatus={() => void toggleStatus()}
+        onAddPrice={
+          can("catalog:create")
+            ? () => {
+                setNotice(undefined);
+                setAdding(true);
+              }
+            : undefined
+        }
+        onToggleStatus={can("catalog:update") ? () => void toggleStatus() : undefined}
       />
       {adding ? (
         <PriceFormContainer

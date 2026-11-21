@@ -23,9 +23,12 @@ export interface PaymentConceptsViewProps {
     readonly category: { readonly value: string; readonly onChange: (category: string) => void };
     readonly active: { readonly value: string; readonly onChange: (active: string) => void };
   };
-  readonly onCreate: () => void;
-  readonly onEdit: (row: PaymentConcept) => void;
-  readonly onToggle: (row: PaymentConcept) => void;
+  /** Absent when the person cannot create: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
+  /** Absent when the person cannot edit: the button is not drawn. */
+  readonly onEdit?: ((row: PaymentConcept) => void) | undefined;
+  /** Absent when the person cannot change the state: the button is not drawn. */
+  readonly onToggle?: ((row: PaymentConcept) => void) | undefined;
 }
 
 /** The payment concepts as a table: code, name, category, recurrence, tax condition, tax rate, state and actions, with two filters. */
@@ -60,12 +63,8 @@ export function PaymentConceptsView({ rows, table, pagination, notice, togglingI
           name={row.name}
           active={row.isActive}
           busy={togglingId === row.id}
-          onEdit={() => {
-            onEdit(row);
-          }}
-          onToggle={() => {
-            onToggle(row);
-          }}
+          onEdit={onEdit === undefined ? undefined : () => { onEdit(row); }}
+          onToggle={onToggle === undefined ? undefined : () => { onToggle(row); }}
         />
       ),
     },

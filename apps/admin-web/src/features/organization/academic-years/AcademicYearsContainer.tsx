@@ -1,6 +1,7 @@
 import { listAcademicYears } from "../../../shared/api/organization-operations.ts";
 import { type AcademicYearsSearch } from "../organization-search.ts";
 import { toApiParams } from "../../../shared/resource-screen/list-search.ts";
+import { usePermissions } from "../../../shared/permissions/permissions.tsx";
 import type { SearchChange } from "../../../shared/resource-screen/search-change.ts";
 import { useListState } from "../../../shared/resource-screen/use-list-state.ts";
 import { useResourceList, useResourceWrite } from "../../../shared/organization-lookups/use-organization-queries.ts";
@@ -16,6 +17,7 @@ export interface AcademicYearsContainerProps {
 
 /** The academic years: the list as the server serves it, the form in a dialog, and activate or deactivate. */
 export function AcademicYearsContainer({ search, onSearchChange }: AcademicYearsContainerProps) {
+  const { can } = usePermissions();
   const list = useResourceList("academic-years", toApiParams(search), listAcademicYears);
   const write = useResourceWrite<YearSave, AcademicYear>(writeYear);
   const view = useResourceView<AcademicYear>();
@@ -25,7 +27,7 @@ export function AcademicYearsContainer({ search, onSearchChange }: AcademicYears
     onSearchChange,
     filtered: false,
     cleared: { ...search, page: 1 },
-    onCreate: view.openCreate,
+    onCreate: can("organization:create") ? view.openCreate : undefined,
     loadFailedKey: "organization.academicYears.loadFailed",
     emptyKeys: {
       title: "organization.academicYears.emptyTitle",
@@ -44,13 +46,13 @@ export function AcademicYearsContainer({ search, onSearchChange }: AcademicYears
         pagination={state.pagination}
         notice={view.notice}
         togglingId={view.togglingId}
-        onCreate={view.openCreate}
-        onEdit={view.openEdit}
-        onToggle={(row) => {
+        onCreate={can("organization:create") ? view.openCreate : undefined}
+        onEdit={can("organization:update") ? view.openEdit : undefined}
+        onToggle={can("organization:update") ? (row) => {
           void view.toggle(row.id, row.name, !row.isActive, () =>
             write.mutateAsync({ mode: "update", id: row.id, body: updateBodyOf(row, !row.isActive) }),
           );
-        }}
+        } : undefined}
       />
       {view.dialog.kind === "closed" ? null : (
         <AcademicYearFormContainer

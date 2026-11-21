@@ -2,6 +2,7 @@ import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import { listGrades } from "../../../shared/api/organization-operations.ts";
 import { type GradesSearch } from "../organization-search.ts";
 import { toApiParams } from "../../../shared/resource-screen/list-search.ts";
+import { usePermissions } from "../../../shared/permissions/permissions.tsx";
 import type { SearchChange } from "../../../shared/resource-screen/search-change.ts";
 import { useListState } from "../../../shared/resource-screen/use-list-state.ts";
 import { nameMapOf, optionsOf, useModalityLookup } from "../../../shared/organization-lookups/use-lookups.ts";
@@ -18,6 +19,7 @@ export interface GradesContainerProps {
 
 /** The grades: the list as the server serves it (filtered by modality there), the form in a dialog, and activate or deactivate. */
 export function GradesContainer({ search, onSearchChange }: GradesContainerProps) {
+  const { can } = usePermissions();
   const { t } = useAdminText();
   const list = useResourceList("grades", toApiParams(search), listGrades);
   const modalities = useModalityLookup();
@@ -30,7 +32,7 @@ export function GradesContainer({ search, onSearchChange }: GradesContainerProps
     onSearchChange,
     filtered: search.modalityId !== undefined,
     cleared: { page: 1, pageSize: search.pageSize, sort: search.sort, modalityId: undefined },
-    onCreate: view.openCreate,
+    onCreate: can("organization:create") ? view.openCreate : undefined,
     loadFailedKey: "organization.grades.loadFailed",
     emptyKeys: {
       title: "organization.grades.emptyTitle",
@@ -56,13 +58,13 @@ export function GradesContainer({ search, onSearchChange }: GradesContainerProps
           },
         }}
         lookupFailure={modalities.failed ? { onRetry: modalities.retry } : undefined}
-        onCreate={view.openCreate}
-        onEdit={view.openEdit}
-        onToggle={(row) => {
+        onCreate={can("organization:create") ? view.openCreate : undefined}
+        onEdit={can("organization:update") ? view.openEdit : undefined}
+        onToggle={can("organization:update") ? (row) => {
           void view.toggle(row.id, row.name, !row.isActive, () =>
             write.mutateAsync({ mode: "update", id: row.id, body: updateBodyOf(row, !row.isActive) }),
           );
-        }}
+        } : undefined}
       />
       {view.dialog.kind === "closed" ? null : (
         <GradeFormContainer

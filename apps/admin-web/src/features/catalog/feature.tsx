@@ -58,7 +58,8 @@ const below = (path: string): string => path.slice(CATALOG_PATH.length + 1);
  * validates its own search (page, size, order and filters), which lives in the address.
  */
 export const catalogFeature: FeatureModule = {
-  navigation: { id: "catalog", labelKey: "navigation.catalog", to: CATALOG_PATH, group: "finance" },
+  navigation: { id: "catalog", labelKey: "navigation.catalog", to: CATALOG_PATH, group: "finance", permission: "catalog:read" },
+  routePermissions: [{ path: CATALOG_PATH, permission: "catalog:read" }],
   createRoutes: (parent: AnyRoute) => {
     const area = createRoute({ getParentRoute: () => parent, path: CATALOG_PATH, component: CatalogContainer });
     // A parameter that holds its default is not written in the address (docs/ui-ux/04, section 3.2, rule 1).

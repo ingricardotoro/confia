@@ -15,9 +15,12 @@ export interface GradesViewProps {
   readonly modalityNames: ReadonlyMap<string, string>;
   readonly modalityFilter: { readonly value: string; readonly options: readonly Option[]; readonly onChange: (modalityId: string) => void };
   readonly lookupFailure?: { readonly onRetry: () => void } | undefined;
-  readonly onCreate: () => void;
-  readonly onEdit: (row: Grade) => void;
-  readonly onToggle: (row: Grade) => void;
+  /** Absent when the person cannot create: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
+  /** Absent when the person cannot edit: the button is not drawn. */
+  readonly onEdit?: ((row: Grade) => void) | undefined;
+  /** Absent when the person cannot change the state: the button is not drawn. */
+  readonly onToggle?: ((row: Grade) => void) | undefined;
 }
 
 /** The grades as a table: name, order, modality, state and actions, with a filter by modality. */
@@ -52,12 +55,8 @@ export function GradesView({
           name={row.name}
           active={row.isActive}
           busy={togglingId === row.id}
-          onEdit={() => {
-            onEdit(row);
-          }}
-          onToggle={() => {
-            onToggle(row);
-          }}
+          onEdit={onEdit === undefined ? undefined : () => { onEdit(row); }}
+          onToggle={onToggle === undefined ? undefined : () => { onToggle(row); }}
         />
       ),
     },

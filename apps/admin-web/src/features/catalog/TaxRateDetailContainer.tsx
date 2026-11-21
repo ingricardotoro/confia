@@ -4,6 +4,7 @@ import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { formatIsoDate } from "../../shared/format/format-date.ts";
 import type { ResourceNotice } from "../../shared/resource-screen/components/ResourceScreen.tsx";
 import { failureMessageOf, failureOf, loadFailureOf } from "../../shared/resource-screen/resource-failure.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { CATALOG_PATHS } from "./catalog-paths.ts";
 import { TaxRateDetailView, type TaxRateDetailState } from "./components/TaxRateDetailView.tsx";
 import { stateBodyOf } from "./tax-rate-form.ts";
@@ -22,6 +23,7 @@ export interface TaxRateDetailContainerProps {
  */
 export function TaxRateDetailContainer({ taxRateId }: TaxRateDetailContainerProps) {
   const { t } = useAdminText();
+  const { can } = usePermissions();
   const navigate = useNavigate();
   const detail = useTaxRateDetail(taxRateId);
   const write = useTaxRateWrite();
@@ -69,11 +71,15 @@ export function TaxRateDetailContainer({ taxRateId }: TaxRateDetailContainerProp
         changingStatus={write.isPending}
         backHref={CATALOG_PATHS.taxRates}
         onBack={() => void navigate({ to: CATALOG_PATHS.taxRates })}
-        onAddPeriod={() => {
-          setNotice(undefined);
-          setAdding(true);
-        }}
-        onToggleStatus={() => void toggleStatus()}
+        onAddPeriod={
+          can("catalog:create")
+            ? () => {
+                setNotice(undefined);
+                setAdding(true);
+              }
+            : undefined
+        }
+        onToggleStatus={can("catalog:update") ? () => void toggleStatus() : undefined}
       />
       {adding ? (
         <TaxRatePeriodFormContainer

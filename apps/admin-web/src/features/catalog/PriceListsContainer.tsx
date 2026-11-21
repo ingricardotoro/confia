@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { nameMapOf, optionsOf, useGradeLookup, useModalityLookup, useYearLookup } from "../../shared/organization-lookups/use-lookups.ts";
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
 import { useListState } from "../../shared/resource-screen/use-list-state.ts";
 import { useResourceView } from "../../shared/resource-screen/use-resource-view.ts";
@@ -22,6 +23,7 @@ export interface PriceListsContainerProps {
  * detail, and its year, scope and reference never change.
  */
 export function PriceListsContainer({ search, onSearchChange }: PriceListsContainerProps) {
+  const { can } = usePermissions();
   const navigate = useNavigate();
   const list = usePriceListList(toApiParams(search));
   const create = usePriceListCreate();
@@ -42,7 +44,7 @@ export function PriceListsContainer({ search, onSearchChange }: PriceListsContai
     onSearchChange,
     filtered: search.academicYearId !== undefined || search.scope !== undefined || search.status !== undefined,
     cleared: { page: 1, pageSize: search.pageSize, sort: search.sort, academicYearId: undefined, scope: undefined, status: undefined },
-    onCreate: view.openCreate,
+    onCreate: can("catalog:create") ? view.openCreate : undefined,
     loadFailedKey: "catalog.priceLists.loadFailed",
     emptyKeys: {
       title: "catalog.priceLists.emptyTitle",
@@ -86,7 +88,7 @@ export function PriceListsContainer({ search, onSearchChange }: PriceListsContai
         }}
         hrefOf={(row) => priceListPath(row.id)}
         onOpen={(row) => void navigate({ to: priceListPath(row.id) })}
-        onCreate={view.openCreate}
+        onCreate={can("catalog:create") ? view.openCreate : undefined}
       />
       {view.dialog.kind === "create" ? (
         <PriceListFormContainer

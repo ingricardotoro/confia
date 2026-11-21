@@ -13,9 +13,12 @@ export interface AcademicYearsViewProps {
   readonly notice?: ResourceNotice | undefined;
   /** The id of the row being activated or deactivated, if any. */
   readonly togglingId?: string | undefined;
-  readonly onCreate: () => void;
-  readonly onEdit: (row: AcademicYear) => void;
-  readonly onToggle: (row: AcademicYear) => void;
+  /** Absent when the person cannot create: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
+  /** Absent when the person cannot edit: the button is not drawn. */
+  readonly onEdit?: ((row: AcademicYear) => void) | undefined;
+  /** Absent when the person cannot change the state: the button is not drawn. */
+  readonly onToggle?: ((row: AcademicYear) => void) | undefined;
 }
 
 /** The academic years as a table: name, the two dates, the stage, the state and the actions. */
@@ -35,12 +38,8 @@ export function AcademicYearsView({ rows, table, pagination, notice, togglingId,
           name={row.name}
           active={row.isActive}
           busy={togglingId === row.id}
-          onEdit={() => {
-            onEdit(row);
-          }}
-          onToggle={() => {
-            onToggle(row);
-          }}
+          onEdit={onEdit === undefined ? undefined : () => { onEdit(row); }}
+          onToggle={onToggle === undefined ? undefined : () => { onToggle(row); }}
         />
       ),
     },

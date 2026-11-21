@@ -1,4 +1,5 @@
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
 import { useListState } from "../../shared/resource-screen/use-list-state.ts";
 import { useResourceView } from "../../shared/resource-screen/use-resource-view.ts";
@@ -24,6 +25,7 @@ export interface PaymentConceptsContainerProps {
  * and activate or deactivate from the row. There is no delete: a concept that is not offered any more is deactivated.
  */
 export function PaymentConceptsContainer({ search, onSearchChange }: PaymentConceptsContainerProps) {
+  const { can } = usePermissions();
   const list = usePaymentConceptList({ ...toApiParams(search), active: activeParamOf(search.active) });
   const write = usePaymentConceptWrite();
   const view = useResourceView<PaymentConcept>();
@@ -33,7 +35,7 @@ export function PaymentConceptsContainer({ search, onSearchChange }: PaymentConc
     onSearchChange,
     filtered: search.category !== undefined || search.active !== undefined,
     cleared: { page: 1, pageSize: search.pageSize, sort: search.sort, category: undefined, active: undefined },
-    onCreate: view.openCreate,
+    onCreate: can("catalog:create") ? view.openCreate : undefined,
     loadFailedKey: "catalog.paymentConcepts.loadFailed",
     emptyKeys: {
       title: "catalog.paymentConcepts.emptyTitle",
@@ -65,11 +67,11 @@ export function PaymentConceptsContainer({ search, onSearchChange }: PaymentConc
             },
           },
         }}
-        onCreate={view.openCreate}
-        onEdit={view.openEdit}
-        onToggle={(row) => {
+        onCreate={can("catalog:create") ? view.openCreate : undefined}
+        onEdit={can("catalog:update") ? view.openEdit : undefined}
+        onToggle={can("catalog:update") ? (row) => {
           void view.toggle(row.id, row.name, !row.isActive, () => write.mutateAsync({ mode: "update", id: row.id, body: updateBodyOf(row, !row.isActive) }));
-        }}
+        } : undefined}
       />
       {view.dialog.kind === "closed" ? null : (
         <PaymentConceptFormContainer

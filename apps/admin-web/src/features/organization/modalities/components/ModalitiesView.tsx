@@ -11,9 +11,12 @@ export interface ModalitiesViewProps {
   readonly notice?: ResourceNotice | undefined;
   /** The id of the row being activated or deactivated, if any. */
   readonly togglingId?: string | undefined;
-  readonly onCreate: () => void;
-  readonly onEdit: (row: Modality) => void;
-  readonly onToggle: (row: Modality) => void;
+  /** Absent when the person cannot create: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
+  /** Absent when the person cannot edit: the button is not drawn. */
+  readonly onEdit?: ((row: Modality) => void) | undefined;
+  /** Absent when the person cannot change the state: the button is not drawn. */
+  readonly onToggle?: ((row: Modality) => void) | undefined;
 }
 
 /** The modalities as a table: code, name, state and actions. */
@@ -31,12 +34,8 @@ export function ModalitiesView({ rows, table, pagination, notice, togglingId, on
           name={row.name}
           active={row.isActive}
           busy={togglingId === row.id}
-          onEdit={() => {
-            onEdit(row);
-          }}
-          onToggle={() => {
-            onToggle(row);
-          }}
+          onEdit={onEdit === undefined ? undefined : () => { onEdit(row); }}
+          onToggle={onToggle === undefined ? undefined : () => { onToggle(row); }}
         />
       ),
     },
