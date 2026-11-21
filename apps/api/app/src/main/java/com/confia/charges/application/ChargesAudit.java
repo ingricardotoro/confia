@@ -103,6 +103,9 @@ final class ChargesAudit {
         if (filter.periodTo() != null) {
             json.text("periodTo", filter.periodTo().toString());
         }
+        if (filter.outstandingOnly()) {
+            json.bool("outstandingOnly", true);
+        }
         return entry(actor, requestId, STUDENT_CHARGES + ".viewed", STUDENT_CHARGES, studentId, null,
                 json.number("page", page.page()).number("size", page.size()).toJson());
     }

@@ -7,13 +7,18 @@ import java.util.Set;
 
 /**
  * What a list of the charges of a student may be narrowed by, all optional: the derived status ({@code ACTIVE} or {@code
- * VOIDED}) and the first day of the period between two dates, both included. The status travels as text so that the web layer
+ * VOIDED}), the first day of the period between two dates (both included) and {@code outstandingOnly}: only the charges with something
+ * still owed, which is derived from the allocations of the payments (so it is applied by the use case, not by the query). The status travels as text so that the web layer
  * never names a type of the domain; a value outside the set is refused here.
  */
-public record ChargeFilter(String status, LocalDate periodFrom, LocalDate periodTo) {
+public record ChargeFilter(String status, LocalDate periodFrom, LocalDate periodTo, boolean outstandingOnly) {
 
     /** The fields a list of charges may be sorted by; a field outside the set is refused before it reaches a query. */
     public static final Set<String> SORT_FIELDS = Set.of("periodStart", "dueOn", "total");
+
+    public ChargeFilter(String status, LocalDate periodFrom, LocalDate periodTo) {
+        this(status, periodFrom, periodTo, false);
+    }
 
     public ChargeFilter {
         if (status != null) {
@@ -25,7 +30,7 @@ public record ChargeFilter(String status, LocalDate periodFrom, LocalDate period
     }
 
     public static ChargeFilter none() {
-        return new ChargeFilter(null, null, null);
+        return new ChargeFilter(null, null, null, false);
     }
 
     /** The status asked for, or {@code null} when the list is not narrowed by it. */

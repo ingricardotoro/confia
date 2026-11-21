@@ -61,10 +61,11 @@ class VoidChargeTest {
     private final FakeCharges charges = new FakeCharges();
     private final FakeVoids voids = new FakeVoids();
     private final FakeLedger ledger = new FakeLedger();
+    private final FakePayments payments = new FakePayments();
 
     private VoidCharge service(Instant now) {
-        return new VoidCharge(JdbcStubTransactions.runner(transactionCalls), charges, voids, ledger, auditWriter,
-                Clock.fixed(now, ZoneOffset.UTC));
+        return new VoidCharge(JdbcStubTransactions.runner(transactionCalls), charges, voids, ledger, payments,
+                auditWriter, Clock.fixed(now, ZoneOffset.UTC));
     }
 
     private VoidCharge service() {
@@ -279,6 +280,30 @@ class VoidChargeTest {
     }
 
     @Test
+    void aChargeWithPaymentsIsRefusedAfterTheLockAndNothingIsReversedNorWritten() {
+        aChargeOfFebruary();
+        payments.allocated.add(chargeId);
+
+        assertThatThrownBy(() -> service().voidCharge(actor, requestId, "key-1", chargeId, REASON))
+                .isInstanceOf(com.confia.charges.domain.ChargeHasPaymentsException.class);
+
+        assertThat(ledger.calls).as("the lock is taken first, then the answer; no reversal").containsExactly("lock");
+        assertThat(voids.inserts).isZero();
+        assertThat(audit).isEmpty();
+        assertThat(transactionCalls).containsExactly("rollback");
+    }
+
+    @Test
+    void aChargeWithoutPaymentsIsStillVoidedWhenOtherChargesOfTheStudentHaveThem() {
+        aChargeOfFebruary();
+        payments.allocated.add(UUID.randomUUID());
+
+        service().voidCharge(actor, requestId, "key-1", chargeId, REASON);
+
+        assertThat(ledger.calls).containsExactly("lock", "reverse");
+    }
+
+    @Test
     void theHashDependsOnTheChargeAndOnTheReason() {
         var reason = com.confia.charges.domain.VoidReason.of(REASON);
         UUID who = actor.accountId();
@@ -292,6 +317,21 @@ class VoidChargeTest {
     }
 
     // --- Fakes ---
+
+    private static final class FakePayments implements com.confia.charges.application.api.ChargePayments {
+
+        final java.util.Set<UUID> allocated = new java.util.HashSet<>();
+
+        @Override
+        public Map<UUID, Money> allocatedByCharge(InstitutionId institution, Collection<UUID> chargeIds) {
+            return Map.of();
+        }
+
+        @Override
+        public boolean hasAllocations(InstitutionId institution, UUID chargeId) {
+            return allocated.contains(chargeId);
+        }
+    }
 
     private static final class FakeCharges implements ChargeRepository {
 

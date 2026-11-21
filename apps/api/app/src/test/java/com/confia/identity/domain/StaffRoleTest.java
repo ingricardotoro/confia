@@ -36,7 +36,7 @@ class StaffRoleTest {
     void onlyTheCashierIsLimitedToWhatItCreatedAndOnlyForCashboxRead() {
         for (StaffRole role : StaffRole.values()) {
             if (role == StaffRole.CASHIER) {
-                assertThat(role.ownScoped()).containsExactly(Permission.CASHBOX_READ);
+                assertThat(role.ownScoped()).containsExactlyInAnyOrder(Permission.CASHBOX_READ, Permission.PAYMENTS_READ);
                 assertThat(role.permissions()).containsAll(role.ownScoped());
             } else {
                 assertThat(role.ownScoped()).as(role.code()).isEmpty();

@@ -1,6 +1,8 @@
 package com.confia.charges.application;
 
+import com.confia.charges.application.api.ChargePayments;
 import com.confia.charges.domain.ChargeAlreadyVoidedException;
+import com.confia.charges.domain.ChargeHasPaymentsException;
 import com.confia.charges.domain.ChargeNotVoidableException;
 import com.confia.charges.domain.ChargeVoid;
 import com.confia.charges.domain.IdempotencyKeyRequiredException;
@@ -57,15 +59,17 @@ public final class VoidCharge {
     private final ChargeRepository charges;
     private final ChargeVoidRepository voids;
     private final LedgerPostingApi ledger;
+    private final ChargePayments payments;
     private final AuditLogWriter auditLogWriter;
     private final Clock clock;
 
     public VoidCharge(TransactionRunner transactionRunner, ChargeRepository charges, ChargeVoidRepository voids,
-            LedgerPostingApi ledger, AuditLogWriter auditLogWriter, Clock clock) {
+            LedgerPostingApi ledger, ChargePayments payments, AuditLogWriter auditLogWriter, Clock clock) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.charges = Objects.requireNonNull(charges, "charges");
         this.voids = Objects.requireNonNull(voids, "voids");
         this.ledger = Objects.requireNonNull(ledger, "ledger");
+        this.payments = Objects.requireNonNull(payments, "payments");
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -79,6 +83,7 @@ public final class VoidCharge {
      * @throws IdempotencyPayloadMismatchException when the key was used for another request
      * @throws ChargeAlreadyVoidedException when the charge was voided with another key
      * @throws ChargeNotVoidableException when the ledger refuses the reversal
+     * @throws ChargeHasPaymentsException when a payment has been allocated to the charge
      * @throws ResourceNotFoundException when the charge does not exist in the institution of the actor
      */
     public ChargeVoidView voidCharge(AuthenticatedActor actor, String requestId, String idempotencyKey, UUID chargeId,
@@ -128,6 +133,10 @@ public final class VoidCharge {
             }
             if (voids.findByChargeId(institution, chargeId).isPresent()) {
                 throw new ChargeAlreadyVoidedException();
+            }
+            // Under the same lock every payment of the student takes, so a payment that committed first is seen now (INV-17).
+            if (payments.hasAllocations(institution, chargeId)) {
+                throw new ChargeHasPaymentsException();
             }
             LocalDate today = LocalDate.now(clock.withZone(INSTITUTION_ZONE));
             LocalDate effectiveOn = today.isBefore(charge.periodStart()) ? charge.periodStart() : today;
