@@ -1095,6 +1095,9 @@ export function studentCharge(override: Partial<StudentChargeResponseOutput> = {
     tax: money("150.00"),
     total: money("1150.00"),
     status: "ACTIVE",
+    paid: money("0.00"),
+    outstanding: money("1150.00"),
+    settled: false,
     ...override,
   });
 }
