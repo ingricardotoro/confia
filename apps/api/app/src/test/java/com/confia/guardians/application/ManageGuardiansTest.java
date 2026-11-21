@@ -429,7 +429,7 @@ class ManageGuardiansTest {
         assertThat(entry.beforeValue()).isNull();
         assertThat(entry.afterValue()).isNull();
         assertThat(entry.actorId()).isEqualTo(actor.accountId());
-        assertThat(entry.toString()).doesNotContain("Eva", "Mejia", "0801", "12345");
+        assertThat(entry.toString()).doesNotContain("Eva", "Mejia", ID, ID_NORMALIZED);
     }
 
     @Test
