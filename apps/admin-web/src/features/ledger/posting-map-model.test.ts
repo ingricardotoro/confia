@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { postingAccount } from "../../test/contract-responses.ts";
-import { POSTING_ROLES, REVENUE_CATEGORIES, accountFits, changedEntries, missingRoles, savedByRole } from "./posting-map-model.ts";
+import { POSTING_ROLES, REVENUE_CATEGORIES, accountFits, changedEntries, changedPaymentEntries, missingPaymentRoles, missingRoles, savedByRole } from "./posting-map-model.ts";
 
 const A = "00000000-0000-4000-8000-0000000000a1";
 const B = "00000000-0000-4000-8000-0000000000a2";
 
 describe("the roles of the map", () => {
-  it("has the receivable, the tax payable, the default revenue and one revenue for each of the six categories", () => {
+  it("has the receivable, the tax payable, the default revenue, one revenue for each of the six categories, and the cash and the bank of the payments", () => {
     expect(POSTING_ROLES.map((role) => role.id)).toEqual([
       "RECEIVABLE",
       "TAX_PAYABLE",
       "REVENUE_DEFAULT",
       ...REVENUE_CATEGORIES.map((category) => `REVENUE_${category}`),
+      "CASH",
+      "BANK",
     ]);
     expect(REVENUE_CATEGORIES).toHaveLength(6);
   });
@@ -30,6 +32,11 @@ describe("the roles of the map", () => {
     expect(accountFits(role("TAX_PAYABLE"), { type: "LIABILITY", holdsStudentBalances: true })).toBe(false);
     expect(accountFits(role("REVENUE_TUITION"), { type: "INCOME", holdsStudentBalances: false })).toBe(true);
     expect(accountFits(role("REVENUE_TUITION"), asset)).toBe(false);
+    // The cash and the bank are assets that carry no student balance.
+    expect(accountFits(role("CASH"), { type: "ASSET", holdsStudentBalances: false })).toBe(true);
+    expect(accountFits(role("CASH"), asset)).toBe(false);
+    expect(accountFits(role("BANK"), { type: "ASSET", holdsStudentBalances: false })).toBe(true);
+    expect(accountFits(role("BANK"), { type: "INCOME", holdsStudentBalances: false })).toBe(false);
   });
 });
 
@@ -92,5 +99,34 @@ describe("the entries to send", () => {
       { purpose: "REVENUE", ledgerAccountId: A },
       { purpose: "REVENUE", conceptCategory: "FINE", ledgerAccountId: A },
     ]);
+  });
+});
+
+describe("the map of the payments", () => {
+  const cash = { id: "00000000-0000-4000-8000-0000000000c1", purpose: "CASH" as const, ledgerAccountId: A, version: 3, updatedAt: "2026-11-01T12:00:00Z" };
+
+  it("puts the cash under its role with its version, apart from the map of the charges", () => {
+    const saved = savedByRole([], [cash]);
+
+    expect(saved.get("CASH")).toEqual({ id: cash.id, ledgerAccountId: A, version: 3 });
+    expect(saved.has("BANK")).toBe(false);
+    expect(saved.has("RECEIVABLE")).toBe(false);
+  });
+
+  it("names the cash and the bank that are not set, and leaves them out of the missing of the charges", () => {
+    expect(missingPaymentRoles(new Map())).toEqual(["CASH", "BANK"]);
+    expect(missingPaymentRoles(savedByRole([], [cash]))).toEqual(["BANK"]);
+    expect(missingRoles(new Map())).toEqual(["RECEIVABLE", "TAX_PAYABLE", "REVENUE_DEFAULT"]);
+  });
+
+  it("sends the cash and the bank only in the payments entries, a saved one with its version and a new one with none", () => {
+    const saved = savedByRole([], [cash]);
+
+    expect(changedPaymentEntries(saved, { CASH: B, BANK: B })).toEqual([
+      { purpose: "CASH", ledgerAccountId: B, version: 3 },
+      { purpose: "BANK", ledgerAccountId: B },
+    ]);
+    expect(changedEntries(saved, { CASH: B, BANK: B })).toEqual([]);
+    expect(changedPaymentEntries(saved, { CASH: A, RECEIVABLE: B })).toEqual([]);
   });
 });

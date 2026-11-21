@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import type { PostingAccountMapResponseOutput, SetPostingAccountsRequest } from "@confia/contracts/admin";
+import type { PostingAccountMapResponseOutput, SetPaymentPostingAccountsRequest, SetPostingAccountsRequest } from "@confia/contracts/admin";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
 import { useAuthorizedSend } from "../../shared/api/authorized-send.tsx";
 import {
@@ -9,10 +9,11 @@ import {
   type LedgerAccountListParams,
   type LedgerAccountType,
 } from "../../shared/api/ledger-operations.ts";
+import { getPaymentPostingAccounts, setPaymentPostingAccounts, type PaymentPostingAccountMap } from "../../shared/api/payments-operations.ts";
 import { LOOKUP_PAGE_SIZE } from "../../shared/organization-lookups/use-organization-queries.ts";
 import type { Lookup } from "../../shared/organization-lookups/use-lookups.ts";
 import { writeAccount, type LedgerAccount, type AccountSave } from "./account-form.ts";
-import { ledgerAccountKeys, postingAccountKeys } from "./ledger-keys.ts";
+import { ledgerAccountKeys, paymentPostingAccountKeys, postingAccountKeys } from "./ledger-keys.ts";
 
 /** A listing of accounts, as the server pages, orders and filters it: the rows come back as they were served. */
 export function useLedgerAccountList(params: LedgerAccountListParams) {
@@ -72,6 +73,28 @@ export function usePostingAccountsSave() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: postingAccountKeys.all }),
     onError: (error) => {
       refreshOnConflict(queryClient, error, [postingAccountKeys.all, ledgerAccountKeys.all], MAP_REFRESH_CODES);
+    },
+  });
+}
+
+/** The map of the accounts the payments post to (the cash and the bank), as the server holds it. */
+export function usePaymentPostingAccounts() {
+  const send = useAuthorizedSend();
+  return useQuery({
+    queryKey: paymentPostingAccountKeys.map(),
+    queryFn: () => send((token) => getPaymentPostingAccounts(token)),
+  });
+}
+
+/** The save of the cash and bank accounts: only the entries that changed, each with the version of its row. Nothing is optimistic; the map is read again after it. */
+export function usePaymentPostingAccountsSave() {
+  const send = useAuthorizedSend();
+  const queryClient = useQueryClient();
+  return useMutation<PaymentPostingAccountMap, Error, SetPaymentPostingAccountsRequest>({
+    mutationFn: (body) => send((token) => setPaymentPostingAccounts(token, body)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: paymentPostingAccountKeys.all }),
+    onError: (error) => {
+      refreshOnConflict(queryClient, error, [paymentPostingAccountKeys.all, ledgerAccountKeys.all], MAP_REFRESH_CODES);
     },
   });
 }
