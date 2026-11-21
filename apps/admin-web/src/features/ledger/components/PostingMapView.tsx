@@ -8,7 +8,7 @@ import type { RoleId } from "../posting-map-model.ts";
 /** One row of the map as the form shows it: the role, the account chosen now and the accounts it may take. */
 export interface PostingMapRow {
   readonly id: RoleId;
-  readonly group: "core" | "revenue";
+  readonly group: "core" | "revenue" | "payments";
   /** The id of the chosen account, or an empty text when none is. It may be a change that is not saved yet. */
   readonly value: string;
   /** The accounts the row takes (active, of the type its role needs), already translated, plus the one it holds if it is not among them. */
@@ -43,13 +43,14 @@ export interface PostingMapViewProps {
 }
 
 /** The key of the help of a row: each category of revenue shares one. */
-const helpKeyOf = (id: RoleId) => (id === "RECEIVABLE" || id === "TAX_PAYABLE" || id === "REVENUE_DEFAULT" ? (`ledger.map.help.${id}` as const) : ("ledger.map.help.REVENUE" as const));
+const helpKeyOf = (id: RoleId) =>
+  id === "RECEIVABLE" || id === "TAX_PAYABLE" || id === "REVENUE_DEFAULT" || id === "CASH" || id === "BANK" ? (`ledger.map.help.${id}` as const) : ("ledger.map.help.REVENUE" as const);
 
 function MapSkeleton() {
   return (
     <div className="flex flex-col gap-3" data-testid="posting-map-skeleton">
-      {[2, 7].map((rows) => (
-        <div key={rows} className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-bg-surface p-4">
+      {[2, 7, 2].map((rows, group) => (
+        <div key={group} className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-bg-surface p-4">
           <Skeleton className="h-5 w-48" />
           {Array.from({ length: rows }, (_, index) => (
             <div key={index} className="flex flex-col gap-1.5">
@@ -64,8 +65,8 @@ function MapSkeleton() {
 }
 
 /**
- * The map of posting accounts as a form: one select for each role of the map (the receivable, the tax payable and the revenue
- * by category), each with the accounts it may take and a status that is told in text. It says what is missing and what that
+ * The map of posting accounts as a form: one select for each role of the map (the receivable, the tax payable, the revenue
+ * by category, and the cash and the bank that the payments post to), each with the accounts it may take and a status that is told in text. It says what is missing and what that
  * blocks, and it saves only what the person changed. Nothing here fetches, sends or decides what the server allows.
  */
 export function PostingMapView({
@@ -169,6 +170,9 @@ export function PostingMapView({
         </Card>
         <Card title={t("ledger.map.groups.revenue")} description={t("ledger.map.groups.revenueDescription")}>
           <div className="flex flex-col gap-3">{groupRows("revenue").map(field)}</div>
+        </Card>
+        <Card title={t("ledger.map.groups.payments")} description={t("ledger.map.groups.paymentsDescription")}>
+          <div className="flex flex-col gap-3">{groupRows("payments").map(field)}</div>
         </Card>
         {readOnly ? null : (
           <div className="flex flex-wrap items-center gap-3">
