@@ -1,6 +1,7 @@
 import type { TableSort } from "@confia/ui";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
 import { useListState } from "../../shared/resource-screen/use-list-state.ts";
 import { useResourceView } from "../../shared/resource-screen/use-resource-view.ts";
@@ -28,6 +29,7 @@ const DEFAULT_SORT: TableSort = { columnId: "lastName", direction: "asc" };
  * server keeps the links and the staff decides what to do with them.
  */
 export function GuardiansContainer({ search, onSearchChange }: GuardiansContainerProps) {
+  const { can } = usePermissions();
   const { t } = useAdminText();
   const list = useGuardianList(toApiParams(search));
   const write = useGuardianWrite();
@@ -42,7 +44,7 @@ export function GuardiansContainer({ search, onSearchChange }: GuardiansContaine
     onSearchChange,
     filtered: search.q !== undefined || search.status !== undefined,
     cleared: { page: 1, pageSize: search.pageSize, sort: search.sort, q: undefined, status: undefined },
-    onCreate: view.openCreate,
+    onCreate: can("guardians:create") ? view.openCreate : undefined,
     loadFailedKey: "guardians.loadFailed",
     emptyKeys: { title: "guardians.emptyTitle", description: "guardians.emptyDescription", action: "guardians.emptyAction" },
     defaultSort: DEFAULT_SORT,
@@ -71,15 +73,15 @@ export function GuardiansContainer({ search, onSearchChange }: GuardiansContaine
             },
           },
         }}
-        onCreate={view.openCreate}
-        onEdit={view.openEdit}
+        onCreate={can("guardians:create") ? view.openCreate : undefined}
+        onEdit={can("guardians:update") ? view.openEdit : undefined}
         onDetail={(row) => {
           setDetailOf(row);
         }}
-        onToggle={(row) => {
+        onToggle={can("guardians:update") ? (row) => {
           const next = row.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
           void view.toggle(row.id, nameOf(row), next === "ACTIVE", () => write({ mode: "update", id: row.id, body: toggleBodyOf(row, next) }), warningOf);
-        }}
+        } : undefined}
       />
       {view.dialog.kind === "closed" ? null : (
         <GuardianFormContainer

@@ -13,10 +13,12 @@ export interface EnrollmentsViewProps {
   readonly filters: EnrollmentFiltersProps;
   /** Set when the lists behind the filters failed to load. */
   readonly lookupFailure?: { readonly onRetry: () => void } | undefined;
-  readonly onCreate: () => void;
+  /** Absent when the person cannot enroll: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
   readonly onDetail: (row: Enrollment) => void;
-  readonly onTransfer: (row: Enrollment) => void;
-  readonly onExit: (row: Enrollment) => void;
+  /** Absent when the person cannot update enrollments: the buttons are not drawn. */
+  readonly onTransfer?: ((row: Enrollment) => void) | undefined;
+  readonly onExit?: ((row: Enrollment) => void) | undefined;
 }
 
 /**
@@ -73,28 +75,32 @@ export function EnrollmentsView({ rows, table, pagination, notice, filters, look
             >
               {t("enrollments.actions.detail")}
             </Button>
-            {row.status === "ACTIVE" ? (
+            {row.status === "ACTIVE" && (onTransfer !== undefined || onExit !== undefined) ? (
               <>
-                <Button
-                  variant="secondary"
-                  size="xs"
-                  aria-label={t("enrollments.actions.transferFor", { name })}
-                  onClick={() => {
-                    onTransfer(row);
-                  }}
-                >
-                  {t("enrollments.actions.transfer")}
-                </Button>
-                <Button
-                  variant="destructive-soft"
-                  size="xs"
-                  aria-label={t("enrollments.actions.exitFor", { name })}
-                  onClick={() => {
-                    onExit(row);
-                  }}
-                >
-                  {t("enrollments.actions.exit")}
-                </Button>
+                {onTransfer === undefined ? null : (
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    aria-label={t("enrollments.actions.transferFor", { name })}
+                    onClick={() => {
+                      onTransfer(row);
+                    }}
+                  >
+                    {t("enrollments.actions.transfer")}
+                  </Button>
+                )}
+                {onExit === undefined ? null : (
+                  <Button
+                    variant="destructive-soft"
+                    size="xs"
+                    aria-label={t("enrollments.actions.exitFor", { name })}
+                    onClick={() => {
+                      onExit(row);
+                    }}
+                  >
+                    {t("enrollments.actions.exit")}
+                  </Button>
+                )}
               </>
             ) : null}
           </div>

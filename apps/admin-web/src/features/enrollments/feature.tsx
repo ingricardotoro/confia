@@ -26,7 +26,8 @@ function EnrollmentsRoute() {
  * status) is validated here and lives in the address.
  */
 export const enrollmentsFeature: FeatureModule = {
-  navigation: { id: "enrollments", labelKey: "navigation.enrollments", to: ENROLLMENTS_PATH, group: "community" },
+  navigation: { id: "enrollments", labelKey: "navigation.enrollments", to: ENROLLMENTS_PATH, group: "community", permission: "students:read" },
+  routePermissions: [{ path: ENROLLMENTS_PATH, permission: "students:read" }],
   createRoutes: (parent: AnyRoute) => [
     createRoute({
       getParentRoute: () => parent,

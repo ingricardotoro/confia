@@ -2,6 +2,7 @@ import type { ImportBatchResponseOutput, RejectionResponseOutput } from "@confia
 import type { AdminKey } from "../../i18n/resources.ts";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
 import { PROBLEM_KEYS } from "../../shared/api/problem-keys.ts";
+import type { Permission } from "../../shared/permissions/permission-codes.ts";
 
 /** The most a file may weigh. The check in the browser is a convenience: the server decides. */
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -9,6 +10,14 @@ export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 /** What a file loads, named as the routes of the API name it. The recommended order is the order of this list. */
 export const IMPORT_KINDS = ["students", "guardians", "guardian-links", "enrollments"] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
+
+/** The permission the API asks to simulate and apply each kind (`x-required-permission` of its operations). */
+export const IMPORT_PERMISSIONS: Readonly<Record<ImportKind, Permission>> = {
+  students: "students:create",
+  guardians: "guardians:create",
+  "guardian-links": "guardians:create",
+  enrollments: "students:create",
+};
 
 export function isImportKind(value: unknown): value is ImportKind {
   return typeof value === "string" && (IMPORT_KINDS as readonly string[]).includes(value);

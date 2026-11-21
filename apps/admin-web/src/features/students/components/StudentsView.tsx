@@ -14,11 +14,15 @@ export interface StudentsViewProps {
   /** The id of the row being activated or deactivated, if any. */
   readonly togglingId?: string | undefined;
   readonly filters: StudentFiltersProps;
-  readonly onCreate: () => void;
-  readonly onEdit: (row: Student) => void;
-  readonly onToggle: (row: Student) => void;
+  /** Absent when the person cannot create: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
+  /** Absent when the person cannot edit: the button is not drawn. */
+  readonly onEdit?: ((row: Student) => void) | undefined;
+  /** Absent when the person cannot change the state: the button is not drawn. */
+  readonly onToggle?: ((row: Student) => void) | undefined;
   /** Opens the dialog that manages the guardians of the student. */
-  readonly onGuardians: (row: Student) => void;
+  /** Absent when the person cannot manage guardians: the button is not drawn. */
+  readonly onGuardians?: ((row: Student) => void) | undefined;
   /** The address of the statement of account of a student, so a link opens in a new tab and a plain click is a navigation of the router. */
   readonly statementHrefOf: (row: Student) => string;
   readonly onStatement: (row: Student) => void;
@@ -64,24 +68,22 @@ export function StudentsView({ rows, table, pagination, notice, togglingId, filt
           name={nameOf(row)}
           active={row.status === "ACTIVE"}
           busy={togglingId === row.id}
-          onEdit={() => {
-            onEdit(row);
-          }}
-          onToggle={() => {
-            onToggle(row);
-          }}
+          onEdit={onEdit === undefined ? undefined : () => { onEdit(row); }}
+          onToggle={onToggle === undefined ? undefined : () => { onToggle(row); }}
           extra={
             <>
-              <Button
-                variant="secondary"
-                size="xs"
-                aria-label={t("students.guardiansActionFor", { name: nameOf(row) })}
-                onClick={() => {
-                  onGuardians(row);
-                }}
-              >
-                {t("students.guardiansAction")}
-              </Button>
+              {onGuardians === undefined ? null : (
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  aria-label={t("students.guardiansActionFor", { name: nameOf(row) })}
+                  onClick={() => {
+                    onGuardians(row);
+                  }}
+                >
+                  {t("students.guardiansAction")}
+                </Button>
+              )}
               <a
                 href={statementHrefOf(row)}
                 aria-label={t("students.statementActionFor", { name: nameOf(row) })}
