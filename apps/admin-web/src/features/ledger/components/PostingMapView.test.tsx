@@ -42,17 +42,20 @@ function props(override: Partial<PostingMapViewProps> = {}): PostingMapViewProps
 }
 
 describe("PostingMapView", () => {
-  it("lists one select for each of the nine roles, in two groups, with the status of each told in text", () => {
+  it("lists one select for each of the eleven roles, in three groups, with the status of each told in text", () => {
     renderWithAdminI18n(<PostingMapView {...props({ rows: rows(["RECEIVABLE"]) })} />);
 
     expect(screen.getByRole("heading", { level: 2, name: "Mapa de cuentas de cargos" })).toBeInTheDocument();
-    expect(screen.getAllByRole("combobox")).toHaveLength(9);
+    expect(screen.getAllByRole("combobox")).toHaveLength(11);
     expect(screen.getByLabelText("Cuentas por cobrar a estudiantes")).toHaveValue(ASSET);
     expect(screen.getByLabelText("Ingreso por colegiatura")).toHaveValue("");
     expect(screen.getByRole("region", { name: "Cuentas principales" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Ingresos por categoría" })).toBeInTheDocument();
     expect(screen.getAllByText("Configurada")).toHaveLength(1);
-    expect(screen.getAllByText("Sin configurar")).toHaveLength(8);
+    expect(screen.getByRole("region", { name: "Cuentas de pagos" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Caja (efectivo)")).toHaveValue("");
+    expect(screen.getByLabelText("Banco (transferencias)")).toHaveValue("");
+    expect(screen.getAllByText("Sin configurar")).toHaveLength(10);
   });
 
   it("explains that an incomplete map blocks the generation of charges and names what is missing", () => {
