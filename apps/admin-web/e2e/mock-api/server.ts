@@ -17,6 +17,7 @@ import {
   type Scenario,
 } from "./scenarios.ts";
 import { CASHBOX_BASE } from "./cashbox-model.ts";
+import { PAYMENTS_BASE } from "./payments-model.ts";
 import { CATALOG_BASE } from "./catalog-model.ts";
 import { CHARGES_BASE } from "./charges-model.ts";
 import { LEDGER_BASE, POSTING_ACCOUNTS_PATH } from "./ledger-model.ts";
@@ -92,6 +93,8 @@ const SUCCESS_SCHEMAS: Readonly<Record<Operation, Schema | undefined>> = {
   ledger: undefined,
   // The same for the cashbox sessions (cashbox-model.ts).
   cashbox: undefined,
+  // The same for the payments (payments-model.ts).
+  payments: undefined,
 };
 
 /** The fields of a response that break the contract; empty when it meets it. The `instance` of an error is not checked (I306). */
@@ -245,6 +248,21 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
       const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
       const answer = scenario.ledger.handle({ method, path, query: url.searchParams, body });
       if (answer !== undefined) { deliver(res, scenario, "ledger", answer); return; }
+    }
+    // The payments: the register, the list, the detail, the decision of a declared transfer and the map of the cash and bank accounts.
+    if (path === PAYMENTS_BASE || path.startsWith(`${PAYMENTS_BASE}/`)) {
+      const session = scenario.model.currentSession(bearerOf(req));
+      if (session.status !== 200) { deliver(res, scenario, "payments", session); return; }
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
+      const answer = scenario.payments.handle({
+        method,
+        path,
+        query: url.searchParams,
+        body,
+        headers: { "idempotency-key": typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : undefined },
+      });
+      if (answer !== undefined) { deliver(res, scenario, "payments", answer); return; }
     }
     // The cashbox: its sessions, their movements, the close and the approval.
     if (path.startsWith(`${CASHBOX_BASE}/`)) {

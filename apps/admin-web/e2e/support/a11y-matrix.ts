@@ -144,6 +144,22 @@ const CASHBOX = "/cashbox";
 const CASH_SESSIONS = "/cashbox/sessions";
 const CASH_SESSION_PENDING = `${CASH_SESSIONS}/00000000-0000-4000-8000-000000400002`;
 
+/** The payments (payments-register cut): the list, the register form and the seeded transfer that another person declared. */
+const PAYMENTS = "/payments";
+const PAYMENTS_REGISTER = "/payments/register";
+const PAYMENT_DECLARED = `${PAYMENTS}/00000000-0000-4000-8000-000000600001`;
+const PAYMENT_CONFIRMED = `${PAYMENTS}/00000000-0000-4000-8000-000000600003`;
+
+/** A route of the payments with the cookies of a signed in session: the same way in as the catalog's. */
+const openPaymentsRoute = (page: Page, path: string): Promise<void> => openCatalogRoute(page, path);
+
+/** Types a search in the student picker of the register and chooses the first student found, as a cashier would. */
+async function chooseStudent(page: Page): Promise<void> {
+  await page.getByRole("combobox", { name: "Estudiante" }).fill("Aguilar");
+  await page.getByRole("option", { name: /E-000001/ }).click();
+  await page.getByRole("table", { name: /Cargos vigentes del estudiante/ }).waitFor();
+}
+
 /** A route of the cashbox with the cookies of a signed in session: the same way in as the catalog's. */
 const openCashboxRoute = (page: Page, path: string): Promise<void> => openCatalogRoute(page, path);
 
@@ -1679,5 +1695,84 @@ export const MATRIX: readonly GateCombination[] = [
       await page.getByRole("button", { name: "Aprobar cierre" }).click();
     },
     expected: (page) => page.getByRole("dialog", { name: "Aprobar el cierre" }),
+  },
+  // The payments (payments-register cut): the list with rows, empty and with a read that fails; the register form, with cash and no open cashbox, with a
+  // student chosen and their pending charges, and for a transfer; the detail of a declared transfer with its two decision dialogs, and of a confirmed payment.
+  {
+    route: PAYMENTS,
+    state: "ready",
+    arrange: (page) => openPaymentsRoute(page, PAYMENTS),
+    expected: (page) => page.getByRole("table", { name: "Pagos registrados" }).getByRole("row").nth(1),
+  },
+  {
+    route: PAYMENTS,
+    state: "empty",
+    preset: "payments-empty",
+    arrange: (page) => openPaymentsRoute(page, PAYMENTS),
+    expected: (page) => page.getByText("Todavía no hay pagos"),
+  },
+  {
+    route: PAYMENTS,
+    state: "load-error",
+    preset: "payments-server-error",
+    arrange: (page) => openPaymentsRoute(page, PAYMENTS),
+    expected: (page) => page.getByText("No se pudieron cargar los pagos"),
+  },
+  {
+    route: PAYMENTS_REGISTER,
+    state: "no-session",
+    arrange: (page) => openPaymentsRoute(page, PAYMENTS_REGISTER),
+    expected: (page) => page.getByText("No tiene una caja abierta"),
+  },
+  {
+    route: PAYMENTS_REGISTER,
+    state: "student-chosen",
+    preset: "cashbox-open",
+    arrange: async (page) => {
+      await openPaymentsRoute(page, PAYMENTS_REGISTER);
+      await chooseStudent(page);
+    },
+    expected: (page) => page.getByRole("table", { name: /Cargos vigentes del estudiante/ }),
+  },
+  {
+    route: PAYMENTS_REGISTER,
+    state: "transfer",
+    arrange: async (page) => {
+      await openPaymentsRoute(page, PAYMENTS_REGISTER);
+      await page.getByRole("combobox", { name: /Método de pago/ }).selectOption("BANK_TRANSFER");
+    },
+    expected: (page) => page.getByRole("textbox", { name: /Referencia bancaria/ }),
+  },
+  {
+    route: PAYMENT_DECLARED,
+    state: "declared",
+    arrange: (page) => openPaymentsRoute(page, PAYMENT_DECLARED),
+    expected: (page) => page.getByRole("button", { name: "Confirmar" }),
+  },
+  {
+    route: PAYMENT_DECLARED,
+    state: "confirm-dialog",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openPaymentsRoute(page, PAYMENT_DECLARED);
+      await page.getByRole("button", { name: "Confirmar" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Confirmar la transferencia" }),
+  },
+  {
+    route: PAYMENT_DECLARED,
+    state: "reject-dialog",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openPaymentsRoute(page, PAYMENT_DECLARED);
+      await page.getByRole("button", { name: "Rechazar" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Rechazar la transferencia" }),
+  },
+  {
+    route: PAYMENT_CONFIRMED,
+    state: "confirmed",
+    arrange: (page) => openPaymentsRoute(page, PAYMENT_CONFIRMED),
+    expected: (page) => page.getByRole("heading", { level: 3, name: "Datos del pago" }),
   },
 ];

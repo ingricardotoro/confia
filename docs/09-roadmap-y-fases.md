@@ -478,11 +478,24 @@ adversarial del diseño antes de escribir código.
 10. Comprobante interno imprimible, previo a la factura fiscal de F5.
 11. **Manual de usuario del cajero** y ambiente de práctica con datos ficticios.
 
+**Avance (2026-11-21).**
+- Entregable 5 construido en el corte `cashbox-sessions`: backend en el PR #333, pantallas en el #334.
+- Entregables 1 (efectivo y transferencia declarada), 2 (aplicación automática por antigüedad), 3, 4, 6 y 7 construidos en el corte
+  `payments-register`, en revisión.
+  - Una transferencia declarada no toca el saldo hasta que la confirma otra persona.
+  - El efectivo se fecha el día de la sesión.
+- Siguen:
+  - tarjeta y aplicación manual por selección;
+  - saldos a favor y reembolsos;
+  - reverso de pago;
+  - comprobante imprimible;
+  - manual del cajero.
+
 **Criterios de salida:**
 
 - [ ] No se puede registrar un pago en efectivo sin sesión de caja abierta (INV-20). Verificado por prueba de extremo a extremo.
-- [ ] Un usuario no puede tener dos sesiones abiertas a la vez (INV-22).
-- [ ] Un cierre con diferencia distinta de cero exige motivo y aprobador distinto del cajero (INV-23).
+- [x] Un usuario no puede tener dos sesiones abiertas a la vez (INV-22). PR #333.
+- [x] Un cierre con diferencia distinta de cero exige motivo y aprobador distinto del cajero (INV-23). PR #333.
 - [ ] Una aplicación de pago no puede exceder el saldo pendiente del cargo (INV-17).
 - [ ] Un doble envío con la misma clave de idempotencia produce un solo cobro (INV-24).
 - [ ] El registro completo de un pago se ejecuta en 90 segundos o menos, medido con un cajero real (OB-01).
