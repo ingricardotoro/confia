@@ -139,3 +139,60 @@ Que un cajero registre en ventanilla el pago de un estudiante, en efectivo o com
 - Saldos a favor aplicados a deuda futura, transferidos a un hermano o reembolsados (corte 4).
 - Conciliación bancaria automática (F7) y factura fiscal (F5).
 - Elegir al encargado que paga: se guarda el `guardianId` si viene, pero la pantalla no lo pide en este corte.
+
+## Lo construido (backend, 2026-11-20)
+
+Esta sección describe el backend y el contrato OpenAPI. Las pantallas y los contratos del frontend quedan para la tarea siguiente.
+
+- **Migración `V35__create_payments_core.sql`**: `payments_posting_account` (mapa `CASH` y `BANK`, con versión), `payments_payment`,
+  `payments_payment_decision` y `payments_payment_allocation`. Un pago de efectivo nace `confirmed` con su sesión de caja, su
+  movimiento `payment_in` y su asiento; una transferencia nace `declared` sin sesión, sin movimiento y sin asiento. La decisión
+  (confirmar o rechazar) es una fila de solo inserción, una por pago; el estado del pago es la única columna mutable, solo avanza
+  `declared → confirmed | reversed` y solo con la decisión que lo justifica. Pagos, decisiones y aplicaciones rechazan UPDATE (salvo
+  ese avance), DELETE y TRUNCATE a todo rol. Reglas que la base repite por disparador: importe mayor que cero y en la unidad menor
+  (INV-19); el efectivo exige la sesión abierta del cajero que registra y un movimiento `payment_in` del mismo importe escrito por
+  él (INV-20); un asiento `PAYMENT` del módulo `payments` que nombra al pago, con la fecha de recepción y débitos iguales al importe;
+  quien registra no decide (segregación); la pareja banco y referencia no se repite entre los no rechazados (índice único parcial
+  sin distinguir mayúsculas); una aplicación nunca excede el total del cargo ni el importe del pago, solo a cargos del mismo
+  estudiante, en la misma moneda y no anulados (INV-17, INV-18; el disparador toma primero el bloqueo de la subcuenta del estudiante
+  en el libro mayor); un `payment_in` que ningún pago reclama al confirmar la transacción (disparador diferido); y la anulación de
+  un cargo con aplicaciones. En `cashbox_movement` el tipo `payment_in` es nuevo; la fórmula de lo esperado no cambia. RLS forzada
+  por institución; `confia_admin_app` solo tiene `SELECT`, `INSERT` y `UPDATE (status)` (y las columnas del mapa).
+- **Paquete `com.confia.payments`**: dominio puro con `Money` (`Payment`, `PaymentRequest`, `AllocationPlan`, `OpenCharge`,
+  `PaymentCoverage`, `PaymentDecision`, `TransferReference`, `RejectionReason`, `PostingAccounts`); el reparto es
+  `AllocationPlan` (vencimiento, período, código de concepto e identificador como desempate estable) y el remanente queda
+  acreditado en la misma cuenta por cobrar. Casos de uso `RegisterPayment`, `ConfirmPayment`, `RejectPayment`, `ListPayments`,
+  `GetPayment`, `ManagePostingAccounts`; adaptadores jOOQ; `PaymentController` y `PaymentPostingAccountController`.
+- **Integración sin ciclos entre módulos** (todo por API publicada, sin importar dominios): `ledger` publica `postPayment`;
+  `cashbox` publica `CashPayments` (la sesión abierta del cajero se bloquea `FOR UPDATE` y el movimiento se escribe en la
+  transacción del pago); `charges` publica `PayableCharges` (cuenta por cobrar, cargos vigentes y rótulos de cargo) y el puerto
+  `ChargePayments`, que `payments` implementa (lo pagado por cargo y si un cargo tiene aplicaciones). Así `payments` depende de
+  `charges` y nunca al revés. `VoidCharge` responde `409 charge-has-payments` bajo el mismo bloqueo de la subcuenta;
+  `GET /charges/students/{studentId}/charges` agrega `paid` y `outstanding`, derivados.
+- **Orden de bloqueo** (efectivo y confirmación): subcuenta del estudiante en el libro mayor, luego la sesión de caja (efectivo) o la
+  fila del pago (confirmación). El rechazo solo bloquea la fila del pago y no abre la subcuenta. Confirmar y rechazar a la vez
+  dejan un solo ganador. La tabla de cargos no concede `UPDATE` (INV-47), así que la fila del cargo no se bloquea: la serialización
+  es la subcuenta del estudiante, que toman todos los que escriben cargos o pagos de ese estudiante, y el disparador de aplicaciones
+  lo repite en la base.
+- **Idempotencia**: `Idempotency-Key` permanente en el pago (registrar) y en la decisión (confirmar y rechazar), con el hash de lo
+  pedido incluido el actor; misma clave y mismo cuerpo devuelve lo mismo, otro cuerpo u otro actor 422
+  `idempotency-payload-mismatch`. Un doble envío simultáneo produce un solo pago.
+- **Errores** (`ProblemCode`): `posting-accounts-incomplete`, `duplicate-transfer-reference`, `self-approval-forbidden`,
+  `payment-not-declared` y `charge-has-payments`, todos 409; el efectivo sin sesión abierta responde `cash-session-not-open` (409,
+  código existente). `posting-account-invalid`, `inactive-reference`, `stale-version` y `resource-not-found` se reutilizan en el mapa.
+- **Decisiones del corte que la nota no fijaba**: (1) el mapa se exige completo (`CASH` y `BANK`, más la cuenta por cobrar de los
+  cargos) para registrar efectivo o confirmar; declarar una transferencia no lo necesita; (2) la fecha de recepción no puede ser
+  futura ni anterior al año 2000; (3) el efectivo no admite referencia ni banco (se rechaza, no se ignora); (4) `guardianId` se guarda
+  si viene y un encargado que no es de la institución responde 400; (5) la referencia se guarda completa en el pago y se enmascara
+  (últimos cuatro caracteres) en la bitácora y en `toString`; el motivo del rechazo solo vive en la decisión; (6) el Cajero queda
+  limitado a sus pagos con `StaffRole.ownScoped` (`payments:read`), como en la caja; las lecturas no se auditan (la nota audita solo
+  las escrituras).
+- **Pruebas**: `AllocationPlanTest` (con jqwik), `PaymentRequestTest`, `PaymentTest`, `ChargeBalanceTest`, `VoidChargeTest`,
+  `CashboxUseCasesTest` (dominio y casos de uso con dobles); `RegisterPaymentIT` y `DecidePaymentIT` (PostgreSQL real: ejemplo de
+  aceptación, exacto, remanente a favor, sin cargos, parcial, sin sesión, sesión cerrada, sesión de otro cajero, mapa incompleto,
+  doble envío simultáneo, dos pagos simultáneos del mismo estudiante, anulación de un cargo con pagos, RLS, alcance del cajero,
+  paginación, bitácora, rechazos de la base por SQL, confirmar y rechazar a la vez, autoaprobación, referencia repetida, confirmar
+  después de anular un cargo); `PaymentEndpointsIT` (proceso administrativo real: flujo por HTTP, permiso de cada rol, validación
+  del borde, códigos de error, mapa de cuentas, aislamiento entre instituciones); más las listas fijadas de rutas, permisos, OpenAPI,
+  claves de idempotencia, aislamiento de beans por proceso y las reglas de ArchUnit (lectura de pagos solo por casos de uso con
+  alcance, con sus dos fixtures inválidos permanentes).
