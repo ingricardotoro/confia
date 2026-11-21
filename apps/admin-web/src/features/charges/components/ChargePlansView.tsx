@@ -32,7 +32,8 @@ export interface ChargePlansViewProps {
   /** The address of a plan, so a link opens in a new tab and a plain click is a navigation of the router. */
   readonly hrefOf: (row: ChargePlan) => string;
   readonly onOpen: (row: ChargePlan) => void;
-  readonly onCreate: () => void;
+  /** Absent when the person cannot create: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
 }
 
 /** The plans as a table: name (a link to its detail), year, scope, the target it points to, frequency, due day and state. */

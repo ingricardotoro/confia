@@ -41,11 +41,12 @@ export interface ChargePlanDetailViewProps {
   /** The address of the list of plans, and the navigation to it. */
   readonly backHref: string;
   readonly onBack: () => void;
-  readonly onEdit: () => void;
-  readonly onActivate: () => void;
-  readonly onArchive: () => void;
-  readonly onAddItem: () => void;
-  readonly onRemoveItem: (item: ChargePlanItemView) => void;
+  /** The five actions on the plan are absent when the person cannot update plans: their buttons are not drawn. */
+  readonly onEdit?: (() => void) | undefined;
+  readonly onActivate?: (() => void) | undefined;
+  readonly onArchive?: (() => void) | undefined;
+  readonly onAddItem?: (() => void) | undefined;
+  readonly onRemoveItem?: ((item: ChargePlanItemView) => void) | undefined;
 }
 
 function Summary({ term, children }: { readonly term: string; readonly children: ReactNode }) {
@@ -112,7 +113,7 @@ export function ChargePlanDetailView({
     },
     { id: "periods", header: t("charges.plans.detail.columns.periods"), align: "end", cell: (item) => String(item.periodsCount) },
     { id: "firstPeriod", header: t("charges.plans.detail.columns.firstPeriod"), cell: (item) => formatIsoDate(item.firstPeriodOn) },
-    ...(draft
+    ...(draft && onRemoveItem !== undefined
       ? [
           {
             id: "actions",
@@ -159,22 +160,22 @@ export function ChargePlanDetailView({
         status={<ChargePlanStatusBadge status={plan.status} />}
         actions={
           <>
-            {archived ? null : (
+            {archived || onEdit === undefined ? null : (
               <Button variant="secondary" size="sm" aria-label={t("charges.plans.detail.editFor", { name: plan.name })} onClick={onEdit}>
                 {t("charges.plans.detail.edit")}
               </Button>
             )}
-            {draft ? (
+            {draft && onActivate !== undefined ? (
               <Button variant="success" size="sm" aria-label={t("charges.plans.detail.activateFor", { name: plan.name })} onClick={onActivate}>
                 {t("charges.plans.detail.activate")}
               </Button>
             ) : null}
-            {active ? (
+            {active && onArchive !== undefined ? (
               <Button variant="destructive" size="sm" aria-label={t("charges.plans.detail.archiveFor", { name: plan.name })} onClick={onArchive}>
                 {t("charges.plans.detail.archive")}
               </Button>
             ) : null}
-            {draft ? (
+            {draft && onAddItem !== undefined ? (
               <Button size="sm" onClick={onAddItem}>
                 {t("charges.plans.detail.addItem")}
               </Button>
@@ -219,9 +220,9 @@ export function ChargePlanDetailView({
       {items.length === 0 ? (
         <EmptyState
           title={t("charges.plans.detail.emptyTitle")}
-          description={t(draft ? "charges.plans.detail.emptyDescription" : "charges.plans.detail.emptyArchived")}
-          // A draft can be given its first item; a plan that is no longer a draft only offers the way back.
-          action={draft ? { label: t("charges.plans.detail.emptyAction"), onAction: onAddItem } : { label: t("charges.plans.detail.back"), onAction: onBack }}
+          description={t(draft ? (onAddItem === undefined ? "resource.emptyReadOnlyDescription" : "charges.plans.detail.emptyDescription") : "charges.plans.detail.emptyArchived")}
+          // A draft can be given its first item by who may update plans; otherwise (no longer a draft, or no permission) only the way back is offered.
+          action={draft && onAddItem !== undefined ? { label: t("charges.plans.detail.emptyAction"), onAction: onAddItem } : { label: t("charges.plans.detail.back"), onAction: onBack }}
         />
       ) : (
         <Table

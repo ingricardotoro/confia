@@ -116,12 +116,18 @@ const below = (path: string): string => path.slice(CHARGES_PATH.length + 1);
  * (the nightly runs and one run below it).
  */
 export const chargesFeature: FeatureModule = {
-  navigation: { id: "charges", labelKey: "navigation.charges", to: CHARGES_PATHS.plans, group: "finance" },
+  navigation: { id: "charges", labelKey: "navigation.charges", to: CHARGES_PATHS.plans, group: "finance", permission: "charges:read" },
   moreNavigation: [
-    { id: "charges-accrual", labelKey: "navigation.accrual", to: CHARGES_PATHS.accrual, group: "finance" },
-    { id: "charges-statement", labelKey: "navigation.statement", to: CHARGES_PATHS.statement, group: "finance" },
-    { id: "charges-student-charges", labelKey: "navigation.studentCharges", to: CHARGES_PATHS.studentCharges, group: "finance" },
-    { id: "charges-integrity", labelKey: "navigation.integrity", to: CHARGES_PATHS.integrity, group: "finance" },
+    { id: "charges-accrual", labelKey: "navigation.accrual", to: CHARGES_PATHS.accrual, group: "finance", permission: "charges:create" },
+    { id: "charges-statement", labelKey: "navigation.statement", to: CHARGES_PATHS.statement, group: "finance", permission: "charges:read" },
+    { id: "charges-student-charges", labelKey: "navigation.studentCharges", to: CHARGES_PATHS.studentCharges, group: "finance", permission: "charges:read" },
+    { id: "charges-integrity", labelKey: "navigation.integrity", to: CHARGES_PATHS.integrity, group: "finance", permission: "charges:read" },
+  ],
+  // The page that generates charges previews and runs them (charges:create); the list of runs below it only reads.
+  routePermissions: [
+    { path: CHARGES_PATH, permission: "charges:read" },
+    { path: CHARGES_PATHS.accrual, permission: "charges:create" },
+    { path: CHARGES_PATHS.accrualRuns, permission: "charges:read" },
   ],
   createRoutes: (parent: AnyRoute) => {
     const area = createRoute({ getParentRoute: () => parent, path: CHARGES_PATH, component: ChargesContainer });
