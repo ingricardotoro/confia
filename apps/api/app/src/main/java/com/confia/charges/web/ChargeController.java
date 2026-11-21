@@ -145,14 +145,21 @@ public class ChargeController {
             @Parameter(description = "First day of the period, up to this date included (yyyy-MM-dd)")
             @RequestParam(name = "periodTo", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodTo,
-            @Parameter(description = "periodStart, dueOn or total, with ,asc or ,desc; periodStart,desc when absent")
+            @Parameter(description = "Only charges with something outstanding (derived from the payments); the order is then the one in "
+                    + "which a payment is allocated, unless sort is given")
+            @RequestParam(name = "outstanding", required = false) Boolean outstanding,
+            @Parameter(description = "periodStart, dueOn or total, with ,asc or ,desc; periodStart,desc when absent, or the "
+                    + "allocation order (due date, period, concept code, identifier) when outstanding is true")
             @RequestParam(name = "sort", required = false) String sort,
             @Parameter(description = "Page, counted from 0")
             @RequestParam(name = "page", defaultValue = "0") @Min(0) int page,
             @Parameter(description = "Rows per page, 1 to 200; 50 when absent")
             @RequestParam(name = "size", defaultValue = "50") @Min(1) @Max(200) int size) {
-        ChargeFilter filter = new ChargeFilter(status, periodFrom, periodTo);
-        PageRequest request = PageRequest.of(page, size, sort, ChargeFilter.SORT_FIELDS, "periodStart", false);
+        boolean outstandingOnly = Boolean.TRUE.equals(outstanding);
+        ChargeFilter filter = new ChargeFilter(status, periodFrom, periodTo, outstandingOnly);
+        PageRequest request = outstandingOnly && (sort == null || sort.isBlank())
+                ? new PageRequest(page, size, ListStudentCharges.ALLOCATION_ORDER, true)
+                : PageRequest.of(page, size, sort, ChargeFilter.SORT_FIELDS, "periodStart", false);
         Page<StudentChargeView> result = listStudentCharges.list(RequestContext.actor(), RequestContext.requestId(),
                 studentId, filter, request);
         return new StudentChargePageResponse(result.items().stream().map(ChargeController::toResponse).toList(),
@@ -167,6 +174,7 @@ public class ChargeController {
         return new StudentChargeResponse(row.id(), row.paymentConceptId(), view.conceptCode(), view.conceptName(),
                 row.conceptCategory(), row.periodLabel(), row.periodStart(), row.periodEnd(), row.dueOn(), row.origin(),
                 AccrualMoney.of(row.base()), AccrualMoney.of(row.tax()), AccrualMoney.of(row.total()),
-                row.statusName(), voided);
+                AccrualMoney.of(view.paid()), AccrualMoney.of(view.outstanding()), view.settled(), row.statusName(),
+                voided);
     }
 }

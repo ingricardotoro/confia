@@ -36,7 +36,7 @@ class AccountOwnRecordPolicyTest {
 
     @Test
     void aCashierIsNotRestrictedOnAPermissionThatIsNotOwnScoped() {
-        assertThat(withCode("cashier").restrictedToOwn(actor(), Permission.PAYMENTS_READ)).isFalse();
+        assertThat(withCode("cashier").restrictedToOwn(actor(), Permission.CHARGES_READ)).isFalse();
     }
 
     @Test

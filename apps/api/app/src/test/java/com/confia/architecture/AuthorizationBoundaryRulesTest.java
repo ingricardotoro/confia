@@ -72,9 +72,10 @@ class AuthorizationBoundaryRulesTest {
 
     private static final String OWN_RECORD_POLICY = "com.confia.identity.application.directory.OwnRecordPolicy";
 
-    /** The role directory is read by the infrastructure of {@code cashbox} and by nobody else outside {@code identity}. */
+    /** The role directory is read by the infrastructure of {@code cashbox} and of {@code payments} and by nobody else outside {@code identity}. */
     static ArchRule onlyCashboxInfrastructureDependsOnTheOwnRecordPolicy() {
-        return noClasses().that().resideOutsideOfPackages("com.confia.cashbox.infrastructure..", "com.confia.identity..")
+        return noClasses().that().resideOutsideOfPackages("com.confia.cashbox.infrastructure..", "com.confia.payments.infrastructure..",
+                "com.confia.identity..")
                 .should().dependOnClassesThat().haveFullyQualifiedName(OWN_RECORD_POLICY)
                 .because("the scope of a permission is read by one adapter of the module that enforces it, never decided "
                         + "inside a use case, a controller or another module (docs/03-seguridad.md section 5.4)");
@@ -143,6 +144,59 @@ class AuthorizationBoundaryRulesTest {
         assertThat(productionClasses().get("com.confia.cashbox.application.ListSessions")
                 .getDirectDependenciesFromSelf().stream().map(d -> d.getTargetClass().getName()))
                 .contains(SESSION_REPOSITORY, SESSION_SCOPE);
+    }
+
+    private static final String PAYMENT_REPOSITORY = "com.confia.payments.application.PaymentRepository";
+    private static final String PAYMENT_SCOPE = "com.confia.payments.application.PaymentScope";
+
+    /**
+     * The row limit per cashier of {@code payments_payment} is enforced by the application, so the web layer never reads the
+     * repository: it goes through a use case that applies the scope.
+     */
+    static ArchRule noWebClassDependsOnThePaymentRepository() {
+        return noClasses().that().resideInAPackage("..web..")
+                .should().dependOnClassesThat().haveFullyQualifiedName(PAYMENT_REPOSITORY)
+                .because("a read of the payments goes through a use case that applies the PaymentScope, so a cashier "
+                        + "reads only its own payments (docs/03-seguridad.md sections 5.4 and 6.3)");
+    }
+
+    /**
+     * Every class of an application package that reads a payment through {@code PaymentRepository.findById} or {@code list}
+     * depends on the PaymentScope, whatever its name (the use cases that decide a payment read it through {@code
+     * ScopedPayments}, which applies the scope).
+     */
+    static ArchRule everyApplicationClassThatReadsThePaymentsAppliesThePaymentScope() {
+        DescribedPredicate<JavaClass> readsPayments = describe("a class that reads payments by id or as a list", type ->
+                type.getPackageName().contains(".application")
+                        && type.getMethodCallsFromSelf().stream().anyMatch(call ->
+                                call.getTargetOwner().getName().equals(PAYMENT_REPOSITORY)
+                                        && (call.getName().equals("findById") || call.getName().equals("list"))));
+        return classes().that(readsPayments).should().dependOnClassesThat().haveFullyQualifiedName(PAYMENT_SCOPE)
+                .because("the per-cashier limit of payments_payment is enforced in the application and fails closed "
+                        + "(docs/03-seguridad.md section 6.3)");
+    }
+
+    @Test
+    void thePaymentsAreReadOnlyThroughAUseCaseThatAppliesThePaymentScope() {
+        noWebClassDependsOnThePaymentRepository().check(productionClasses());
+        everyApplicationClassThatReadsThePaymentsAppliesThePaymentScope().check(productionClasses());
+        assertThat(productionClasses().get("com.confia.payments.application.GetPayment")
+                .getDirectDependenciesFromSelf().stream().map(d -> d.getTargetClass().getName()))
+                .as("non-vacuous: the real read use cases are seen").contains(PAYMENT_REPOSITORY, PAYMENT_SCOPE);
+        assertThat(productionClasses().get("com.confia.payments.application.ListPayments")
+                .getDirectDependenciesFromSelf().stream().map(d -> d.getTargetClass().getName()))
+                .contains(PAYMENT_REPOSITORY, PAYMENT_SCOPE);
+        assertThat(productionClasses().get("com.confia.payments.application.ScopedPayments")
+                .getDirectDependenciesFromSelf().stream().map(d -> d.getTargetClass().getName()))
+                .as("the decision use cases read through the one class that applies the scope")
+                .contains(PAYMENT_REPOSITORY, PAYMENT_SCOPE);
+    }
+
+    @Test
+    void rejectsTheFixturesThatReadThePaymentsWithoutTheScope() {
+        assertRuleRejects(noWebClassDependsOnThePaymentRepository(), fixtureClasses(), "BadWebReadsThePaymentRepository");
+        assertRuleRejects(everyApplicationClassThatReadsThePaymentsAppliesThePaymentScope(), fixtureClasses(),
+                "GetEveryPaymentWithoutTheScope", "ApprovePaymentWithoutTheScope");
     }
 
     @Test

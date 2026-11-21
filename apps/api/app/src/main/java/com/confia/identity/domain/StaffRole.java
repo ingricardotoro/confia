@@ -56,7 +56,7 @@ public enum StaffRole {
             LEDGER_READ, PAYMENTS_CREATE, PAYMENTS_READ, CASHBOX_CREATE, CASHBOX_READ,
             INVOICING_CREATE, INVOICING_READ, INVOICING_REQUEST_VOID,
             COLLECTIONS_READ, DOCUMENTS_READ, REPORTING_READ, NOTIFICATIONS_READ),
-            EnumSet.of(CASHBOX_READ)),
+            EnumSet.of(CASHBOX_READ, PAYMENTS_READ)),
 
     /** Voids and approves invoices, reconciles the bank and reads the rest of the money flow. */
     ACCOUNTING("accounting", EnumSet.of(
