@@ -3027,6 +3027,14 @@
             "enum" : [ "AUTOMATIC", "MANUAL" ],
             "type" : "string"
           },
+          "outstanding" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "description" : "What is still owed on the charge (total minus paid; zero when voided), derived and never stored"
+          },
+          "paid" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "description" : "What the payments have covered of the charge, derived from their allocations"
+          },
           "paymentConceptId" : {
             "format" : "uuid",
             "type" : "string"
@@ -3043,6 +3051,10 @@
             "format" : "date",
             "type" : "string"
           },
+          "settled" : {
+            "description" : "Derived, never stored: the charge is active and nothing is outstanding on it (a voided charge is not settled)",
+            "type" : "boolean"
+          },
           "status" : {
             "enum" : [ "ACTIVE", "VOIDED" ],
             "type" : "string"
@@ -3058,7 +3070,7 @@
             "description" : "Present only when the charge is voided"
           }
         },
-        "required" : [ "base", "conceptCategory", "dueOn", "id", "origin", "paymentConceptId", "periodEnd", "periodLabel", "periodStart", "status", "tax", "total" ],
+        "required" : [ "base", "conceptCategory", "dueOn", "id", "origin", "outstanding", "paid", "paymentConceptId", "periodEnd", "periodLabel", "periodStart", "settled", "status", "tax", "total" ],
         "type" : "object"
       },
       "StudentEnrollmentResponse" : {
@@ -8189,7 +8201,15 @@
             "type" : "string"
           }
         }, {
-          "description" : "periodStart, dueOn or total, with ,asc or ,desc; periodStart,desc when absent",
+          "description" : "Only charges with something outstanding (derived from the payments); the order is then the one in which a payment is allocated, unless sort is given",
+          "in" : "query",
+          "name" : "outstanding",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "description" : "periodStart, dueOn or total, with ,asc or ,desc; periodStart,desc when absent, or the allocation order (due date, period, concept code, identifier) when outstanding is true",
           "in" : "query",
           "name" : "sort",
           "required" : false,

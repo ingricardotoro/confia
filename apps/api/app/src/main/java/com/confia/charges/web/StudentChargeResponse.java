@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * A charge of a student, as the API answers it. {@code status} is derived: {@code VOIDED} when a void record exists. Every
+ * A charge of a student, as the API answers it, with what has been paid and what is outstanding. {@code status} is derived: {@code VOIDED} when a void record exists. Every
  * amount is rounded by the server to the minor unit of its currency. {@code voided} is absent for an active charge.
  */
 public record StudentChargeResponse(
@@ -25,6 +25,14 @@ public record StudentChargeResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED) AccrualMoney base,
         @Schema(requiredMode = RequiredMode.REQUIRED) AccrualMoney tax,
         @Schema(requiredMode = RequiredMode.REQUIRED) AccrualMoney total,
+        @Schema(requiredMode = RequiredMode.REQUIRED,
+                description = "What the payments have covered of the charge, derived from their allocations") AccrualMoney paid,
+        @Schema(requiredMode = RequiredMode.REQUIRED,
+                description = "What is still owed on the charge (total minus paid; zero when voided), derived and never stored")
+        AccrualMoney outstanding,
+        @Schema(requiredMode = RequiredMode.REQUIRED,
+                description = "Derived, never stored: the charge is active and nothing is outstanding on it (a voided charge is not settled)")
+        boolean settled,
         @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"ACTIVE", "VOIDED"}) String status,
         @Schema(requiredMode = RequiredMode.NOT_REQUIRED, description = "Present only when the charge is voided")
         @JsonInclude(JsonInclude.Include.NON_NULL) VoidInfo voided) {
