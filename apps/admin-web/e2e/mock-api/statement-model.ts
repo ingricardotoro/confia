@@ -43,6 +43,8 @@ export interface StatementRequest {
 export interface StatementModel {
   /** The answer to a request for a statement, or `undefined` when the path is not that operation. */
   handle(request: StatementRequest): ModelResponse | undefined;
+  /** Posts a confirmed payment to the account of a student, in lempiras: a credit line the next statement shows (docs/cortes/payments-register.md). */
+  postPayment(studentId: string, cents: number, effectiveOn: string, transactionId: string): void;
 }
 
 const wrap = (response: ContractResponse): ModelResponse => ({ ...response, headers: {}, setCookies: [] });
@@ -163,6 +165,13 @@ export function createStatementModel(
       const match = STATEMENT_PATH_PATTERN.exec(request.path);
       if (request.method !== "GET" || match === null) return undefined;
       return statement(decodeURIComponent(match[1] ?? ""), request.query);
+    },
+    postPayment(studentId, cents, effectiveOn, transactionId) {
+      const account = book.get(studentId) ?? new Map<string, SeedLine[]>();
+      const lines = account.get("HNL") ?? [];
+      lines.push({ transactionId, kind: "PAYMENT", effectiveOn, postedAt: `${effectiveOn}T16:00:00Z`, lineNumber: 1, debitCents: 0, creditCents: cents, reason: "Pago" });
+      account.set("HNL", lines);
+      book.set(studentId, account);
     },
   };
 }

@@ -70,11 +70,15 @@ export interface CashboxModel {
   handle(request: CashboxRequest): ModelResponse | undefined;
   /** The writes that took effect, in order. */
   writes(): readonly RecordedCashWrite[];
+  /** Whether the person has an open session, which a cash payment needs (INV-20). */
+  hasOpenSession(): boolean;
+  /** Writes the `payment_in` movement of a cash payment into the open session of the person, so its expected cash rises; `false` when there is none. */
+  recordPaymentIn(cents: number): boolean;
 }
 
 interface Movement {
   readonly id: string;
-  readonly type: (typeof TYPES)[number];
+  readonly type: (typeof TYPES)[number] | "payment_in";
   readonly cents: number;
   readonly notes?: string;
   readonly createdAt: string;
@@ -383,5 +387,13 @@ export function createCashboxModel(options: CashboxOptions, now: () => Date = ()
       return undefined;
     },
     writes: () => recorded,
+    hasOpenSession: () => sessions.some((session) => session.cashier === ME && session.status === "open"),
+    recordPaymentIn(cents) {
+      const current = sessions.find((session) => session.cashier === ME && session.status === "open");
+      if (current === undefined) return false;
+      counter += 1;
+      current.movements.push({ id: cashSessionId(counter), type: "payment_in", cents, createdAt: now().toISOString() });
+      return true;
+    },
   };
 }

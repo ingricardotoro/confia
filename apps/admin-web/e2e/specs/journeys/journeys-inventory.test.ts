@@ -92,6 +92,7 @@ describe("the seven journeys of access", () => {
       "organization-keyboard.e2e.ts",
       "organization-lists.e2e.ts",
       "organization-states.e2e.ts",
+      "payments-register.e2e.ts",
       "permissions.e2e.ts",
       "second-factor.e2e.ts",
       "secrets.e2e.ts",
