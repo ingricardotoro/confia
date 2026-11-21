@@ -1939,7 +1939,8 @@
     "movementTypes": {
       "deposit": "Depósito",
       "withdrawal": "Retiro",
-      "adjustment": "Ajuste"
+      "adjustment": "Ajuste",
+      "payment_in": "Cobro en efectivo"
     },
     "actions": {
       "deposit": "Registrar depósito",
