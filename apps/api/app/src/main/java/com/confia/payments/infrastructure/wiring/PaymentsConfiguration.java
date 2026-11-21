@@ -7,6 +7,7 @@ import com.confia.identity.application.directory.OwnRecordPolicy;
 import com.confia.ledger.application.api.LedgerAccountDirectory;
 import com.confia.ledger.application.api.LedgerAccountUsage;
 import com.confia.ledger.application.api.LedgerPostingApi;
+import com.confia.payments.application.ConfirmPayment;
 import com.confia.payments.application.GetPayment;
 import com.confia.payments.application.ListPayments;
 import com.confia.payments.application.ManagePostingAccounts;
@@ -16,6 +17,7 @@ import com.confia.payments.application.PaymentRepository;
 import com.confia.payments.application.PaymentScope;
 import com.confia.payments.application.PostingAccountRepository;
 import com.confia.payments.application.RegisterPayment;
+import com.confia.payments.application.RejectPayment;
 import com.confia.payments.infrastructure.AllocationChargePayments;
 import com.confia.payments.infrastructure.JooqPaymentAllocationRepository;
 import com.confia.payments.infrastructure.JooqPaymentDecisionRepository;
@@ -88,6 +90,23 @@ public class PaymentsConfiguration {
             AuditLogWriter auditLogWriter, Clock clock) {
         return new RegisterPayment(transactionRunner, payments, decisions, allocations, postingAccounts, students, cash,
                 ledger, ledgerAccounts, charges, auditLogWriter, clock);
+    }
+
+    @Bean
+    ConfirmPayment confirmPayment(TransactionRunner transactionRunner, PaymentRepository payments,
+            PaymentDecisionRepository decisions, PaymentAllocationRepository allocations,
+            PostingAccountRepository postingAccounts, StudentDirectory students, LedgerPostingApi ledger,
+            LedgerAccountDirectory ledgerAccounts, PayableCharges charges, PaymentScope scope, AuditLogWriter auditLogWriter, Clock clock) {
+        return new ConfirmPayment(transactionRunner, payments, decisions, allocations, postingAccounts, students, ledger,
+                ledgerAccounts, charges, scope, auditLogWriter, clock);
+    }
+
+    @Bean
+    RejectPayment rejectPayment(TransactionRunner transactionRunner, PaymentRepository payments,
+            PaymentDecisionRepository decisions, PaymentAllocationRepository allocations, StudentDirectory students,
+            PayableCharges charges, PaymentScope scope, AuditLogWriter auditLogWriter, Clock clock) {
+        return new RejectPayment(transactionRunner, payments, decisions, allocations, students, charges, scope, auditLogWriter,
+                clock);
     }
 
     @Bean
