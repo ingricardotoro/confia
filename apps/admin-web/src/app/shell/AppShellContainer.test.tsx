@@ -75,6 +75,8 @@ describe("the signed in shell", () => {
         "Integridad de cargos",
         "Mi caja",
         "Sesiones de caja",
+        "Pagos",
+        "Cobrar",
         "Estructura académica",
         "Importaciones",
         "Plan de cuentas",

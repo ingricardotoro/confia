@@ -115,6 +115,9 @@ describe("the routes and the screens", () => {
       "/organization/grades",
       "/organization/modalities",
       "/organization/sections",
+      "/payments",
+      "/payments/$paymentId",
+      "/payments/register",
       "/students",
     ]);
   });
