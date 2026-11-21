@@ -24,10 +24,12 @@ import com.confia.charges.infrastructure.JooqChargeRepository;
 import com.confia.charges.infrastructure.JooqChargeVoidRepository;
 import com.confia.identity.application.AccountOwnRecordPolicy;
 import com.confia.identity.infrastructure.JooqStaffRoleAssignmentRepository;
+import com.confia.payments.application.ConfirmPayment;
 import com.confia.payments.application.GetPayment;
 import com.confia.payments.application.ListPayments;
 import com.confia.payments.application.ManagePostingAccounts;
 import com.confia.payments.application.RegisterPayment;
+import com.confia.payments.application.RejectPayment;
 import com.confia.payments.infrastructure.AllocationChargePayments;
 import com.confia.payments.infrastructure.JooqPaymentAllocationRepository;
 import com.confia.payments.infrastructure.JooqPaymentDecisionRepository;
@@ -111,6 +113,19 @@ public abstract class PaymentsFixture extends ChargesLedgerFixture {
                 new JooqPaymentDecisionRepository(dsl), new JooqPaymentAllocationRepository(dsl),
                 new JooqPostingAccountRepository(dsl), new JooqStudentDirectory(dsl), cashPayments(), ledger(), ledger(),
                 payable(), new JooqAuditLogWriter(dsl), NOW);
+    }
+
+    protected ConfirmPayment confirmPayment() {
+        return new ConfirmPayment(transactionRunner(), new JooqPaymentRepository(dsl),
+                new JooqPaymentDecisionRepository(dsl), new JooqPaymentAllocationRepository(dsl),
+                new JooqPostingAccountRepository(dsl), new JooqStudentDirectory(dsl), ledger(), ledger(), payable(), paymentScope(),
+                new JooqAuditLogWriter(dsl), NOW);
+    }
+
+    protected RejectPayment rejectPayment() {
+        return new RejectPayment(transactionRunner(), new JooqPaymentRepository(dsl),
+                new JooqPaymentDecisionRepository(dsl), new JooqPaymentAllocationRepository(dsl),
+                new JooqStudentDirectory(dsl), payable(), paymentScope(), new JooqAuditLogWriter(dsl), NOW);
     }
 
     /** The real chain: the scope of the role, read from the assignment stored in the database. */
