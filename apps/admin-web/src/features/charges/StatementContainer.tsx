@@ -7,7 +7,7 @@ import { loadFailureOf } from "../../shared/resource-screen/resource-failure.ts"
 import { useDebouncedSearch } from "../../shared/resource-screen/use-debounced-search.ts";
 import { useStudentSearch } from "../../shared/student-lookups/use-student-search.ts";
 import { StatementView, type StatementState } from "./components/StatementView.tsx";
-import type { StatementStudentSearchState } from "./components/StatementStudentPicker.tsx";
+import type { StatementStudentSearchState } from "../../shared/student-lookups/components/StatementStudentPicker.tsx";
 import { STATEMENT_PAGE_SIZE, type StatementSearch } from "./charges-search.ts";
 import { currencyNameOf, periodProblemOf } from "./statement-model.ts";
 import { useStudentStatement } from "./use-statement-queries.ts";

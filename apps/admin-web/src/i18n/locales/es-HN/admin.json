@@ -113,7 +113,12 @@
     "cashSessionNotAwaitingApproval": "Este cierre no está pendiente de aprobación, así que no se hizo ningún cambio. Actualice la página para ver su estado actual.",
     "cashExpectedNegative": "El movimiento dejaría el efectivo esperado por debajo de cero, así que no se registró. Revise el importe.",
     "cashDifferenceReasonRequired": "Lo contado es distinto de lo esperado: escriba el motivo de la diferencia.",
-    "cashApprovalSameActor": "Quien cerró la caja no puede aprobar su propio cierre. Pida a otra persona con permiso de aprobación que lo revise."
+    "cashApprovalSameActor": "Quien cerró la caja no puede aprobar su propio cierre. Pida a otra persona con permiso de aprobación que lo revise.",
+    "postingAccountsIncomplete": "Faltan las cuentas de caja o de banco en el plan de cuentas, así que no se hizo ningún cambio. Pida a quien administra el plan de cuentas que las configure e intente de nuevo.",
+    "duplicateTransferReference": "Esa referencia de ese banco ya está registrada en otro pago. Revise la referencia o consulte la lista de pagos.",
+    "selfApprovalForbidden": "Quien registró el pago no puede confirmarlo ni rechazarlo. Pida a otra persona con permiso de aprobación que lo revise.",
+    "paymentNotDeclared": "Este pago ya no está pendiente de confirmación, así que no se hizo ningún cambio. El detalle ya se actualizó.",
+    "chargeHasPayments": "Este cargo ya tiene pagos aplicados y no se puede anular. Primero hay que reversar el pago."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -876,6 +881,8 @@
         "base": "Base",
         "tax": "Impuesto",
         "total": "Total",
+        "paid": "Pagado",
+        "outstanding": "Pendiente",
         "status": "Estado",
         "actions": "Acciones"
       },

@@ -60,7 +60,7 @@ function withoutNulls(value: unknown): unknown {
   return value;
 }
 
-function lenient<T>(schema: ResponseSchema<T>): ResponseSchema<T> {
+export function lenient<T>(schema: ResponseSchema<T>): ResponseSchema<T> {
   return { safeParse: (input) => schema.safeParse(withoutNulls(input)) };
 }
 

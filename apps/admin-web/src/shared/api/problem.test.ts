@@ -83,6 +83,11 @@ describe("the known codes", () => {
         "cash-expected-negative",
         "cash-difference-reason-required",
         "cash-approval-same-actor",
+        "posting-accounts-incomplete",
+        "duplicate-transfer-reference",
+        "self-approval-forbidden",
+        "payment-not-declared",
+        "charge-has-payments",
       ].sort(),
     );
   });
