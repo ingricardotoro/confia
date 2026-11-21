@@ -8,6 +8,7 @@ import {
   useSectionLookup,
   useYearLookup,
 } from "../../shared/organization-lookups/use-lookups.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
 import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
 import { useListState } from "../../shared/resource-screen/use-list-state.ts";
@@ -31,6 +32,7 @@ export interface ChargePlansContainerProps {
  * archived from its detail, and a plan is never deleted.
  */
 export function ChargePlansContainer({ search, onSearchChange }: ChargePlansContainerProps) {
+  const { can } = usePermissions();
   const { t } = useAdminText();
   const navigate = useNavigate();
   const list = useChargePlanList(toApiParams(search));
@@ -54,7 +56,7 @@ export function ChargePlansContainer({ search, onSearchChange }: ChargePlansCont
     onSearchChange,
     filtered: search.academicYearId !== undefined || search.targetScope !== undefined || search.status !== undefined,
     cleared: { page: 1, pageSize: search.pageSize, sort: search.sort, academicYearId: undefined, targetScope: undefined, status: undefined },
-    onCreate: view.openCreate,
+    onCreate: can("charges:create") ? view.openCreate : undefined,
     loadFailedKey: "charges.plans.loadFailed",
     emptyKeys: {
       title: "charges.plans.emptyTitle",
@@ -105,7 +107,7 @@ export function ChargePlansContainer({ search, onSearchChange }: ChargePlansCont
         }}
         hrefOf={(row) => chargePlanPath(row.id)}
         onOpen={(row) => void navigate({ to: chargePlanPath(row.id) })}
-        onCreate={view.openCreate}
+        onCreate={can("charges:create") ? view.openCreate : undefined}
       />
       {view.dialog.kind === "create" ? (
         <ChargePlanFormContainer

@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { LOOKUP_PAGE_SIZE } from "../../shared/organization-lookups/use-organization-queries.ts";
 import { nameMapOf, optionsOf } from "../../shared/organization-lookups/use-lookups.ts";
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
@@ -20,6 +21,7 @@ export interface AccrualRunsContainerProps {
  * filter in the address), and a link from each row to the run. A list that holds a run that has not finished reads itself again.
  */
 export function AccrualRunsContainer({ search, onSearchChange }: AccrualRunsContainerProps) {
+  const { can } = usePermissions();
   const navigate = useNavigate();
   const list = useAccrualRunList(toApiParams(search));
   const plans = useChargePlanList({ page: 0, size: LOOKUP_PAGE_SIZE, sort: "name,asc" });
@@ -31,7 +33,7 @@ export function AccrualRunsContainer({ search, onSearchChange }: AccrualRunsCont
     onSearchChange,
     filtered: search.planId !== undefined,
     cleared: { page: 1, pageSize: search.pageSize, planId: undefined },
-    onCreate: goToGeneration,
+    onCreate: can("charges:create") ? goToGeneration : undefined,
     loadFailedKey: "charges.runs.loadFailed",
     emptyKeys: { title: "charges.runs.emptyTitle", description: "charges.runs.emptyDescription", action: "charges.runs.emptyAction" },
   });
@@ -54,7 +56,7 @@ export function AccrualRunsContainer({ search, onSearchChange }: AccrualRunsCont
       }}
       hrefOf={(row) => accrualRunPath(row.id)}
       onOpen={(row) => void navigate({ to: accrualRunPath(row.id) })}
-      onCreate={goToGeneration}
+      onCreate={can("charges:create") ? goToGeneration : undefined}
     />
   );
 }

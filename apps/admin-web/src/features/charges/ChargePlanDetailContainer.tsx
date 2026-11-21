@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { useConceptLookup } from "../../shared/catalog-lookups/use-concept-lookup.ts";
 import {
   nameMapOf,
@@ -41,6 +42,7 @@ type Dialog =
  * What the plan can do is the server's decision; the screen only hides what its state does not allow.
  */
 export function ChargePlanDetailContainer({ planId }: ChargePlanDetailContainerProps) {
+  const canUpdate = usePermissions().can("charges:update");
   const { t } = useAdminText();
   const navigate = useNavigate();
   const detail = useChargePlanDetail(planId);
@@ -140,13 +142,17 @@ export function ChargePlanDetailContainer({ planId }: ChargePlanDetailContainerP
         lookupFailure={lookupFailure}
         backHref={CHARGES_PATHS.plans}
         onBack={() => void navigate({ to: CHARGES_PATHS.plans })}
-        onEdit={open({ kind: "edit" })}
-        onActivate={open({ kind: "activate" })}
-        onArchive={open({ kind: "archive" })}
-        onAddItem={open({ kind: "add-item" })}
-        onRemoveItem={(item) => {
-          open({ kind: "remove-item", item })();
-        }}
+        onEdit={canUpdate ? open({ kind: "edit" }) : undefined}
+        onActivate={canUpdate ? open({ kind: "activate" }) : undefined}
+        onArchive={canUpdate ? open({ kind: "archive" }) : undefined}
+        onAddItem={canUpdate ? open({ kind: "add-item" }) : undefined}
+        onRemoveItem={
+          canUpdate
+            ? (item) => {
+                open({ kind: "remove-item", item })();
+              }
+            : undefined
+        }
       />
       {plan !== undefined && dialog.kind === "edit" ? (
         <ChargePlanEditContainer

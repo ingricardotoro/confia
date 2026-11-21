@@ -36,7 +36,8 @@ export interface AccrualRunDetailViewProps {
   readonly planHref: string;
   readonly onOpenPlan: () => void;
   /** Calculate the preview again for the plan and the period of this run. */
-  readonly onRecalculate: () => void;
+  /** Absent when the person cannot generate charges: the button is not drawn. */
+  readonly onRecalculate?: (() => void) | undefined;
 }
 
 function Summary({ term, children }: { readonly term: string; readonly children: ReactNode }) {
@@ -145,7 +146,7 @@ export function AccrualRunDetailView({ state, lookupFailure, backHref, onBack, g
         }
         status={<AccrualRunStatusBadge status={run.status} />}
         actions={
-          rejected || failed || run.status === "COMPLETED_WITH_ERRORS" ? (
+          (rejected || failed || run.status === "COMPLETED_WITH_ERRORS") && onRecalculate !== undefined ? (
             <Button variant="secondary" size="sm" onClick={onRecalculate}>
               {t("charges.run.recalculate")}
             </Button>

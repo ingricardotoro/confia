@@ -22,9 +22,12 @@ export interface LedgerAccountsViewProps {
     readonly type: { readonly value: string; readonly onChange: (type: string) => void };
     readonly active: { readonly value: string; readonly onChange: (active: string) => void };
   };
-  readonly onCreate: () => void;
-  readonly onEdit: (row: LedgerAccount) => void;
-  readonly onToggle: (row: LedgerAccount) => void;
+  /** Absent when the person cannot create: the button is not drawn. */
+  readonly onCreate?: (() => void) | undefined;
+  /** Absent when the person cannot edit: the button is not drawn. */
+  readonly onEdit?: ((row: LedgerAccount) => void) | undefined;
+  /** Absent when the person cannot change the state: the button is not drawn. */
+  readonly onToggle?: ((row: LedgerAccount) => void) | undefined;
 }
 
 /** The chart of accounts as a table: code, name, type, whether the account carries student balances, state and actions, with two filters. */
@@ -61,12 +64,8 @@ export function LedgerAccountsView({ rows, table, pagination, notice, togglingId
           name={row.name}
           active={row.active}
           busy={togglingId === row.id}
-          onEdit={() => {
-            onEdit(row);
-          }}
-          onToggle={() => {
-            onToggle(row);
-          }}
+          onEdit={onEdit === undefined ? undefined : () => { onEdit(row); }}
+          onToggle={onToggle === undefined ? undefined : () => { onToggle(row); }}
         />
       ),
     },

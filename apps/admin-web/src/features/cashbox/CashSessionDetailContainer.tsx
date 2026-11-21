@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import type { ResourceNotice } from "../../shared/resource-screen/components/ResourceScreen.tsx";
 import { loadFailureOf } from "../../shared/resource-screen/resource-failure.ts";
 import { ApproveCloseContainer } from "./ApproveCloseContainer.tsx";
@@ -42,9 +43,11 @@ export function CashSessionDetailContainer({ sessionId }: CashSessionDetailConta
     return { kind: "loading" };
   }
 
+  const canApprove = usePermissions().can("cashbox:approve");
   const state = stateOf();
   const session = state.kind === "ready" ? state.session : undefined;
-  const awaiting = session?.status === "pending_approval" && session.close !== undefined;
+  // Only a person who may approve is offered the approval; the server decides the request again.
+  const awaiting = session?.status === "pending_approval" && session.close !== undefined && canApprove;
 
   return (
     <>
