@@ -171,6 +171,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // the configuration that registers it. Administrative only, each exact.
                     "com.confia.cashbox.infrastructure", "com.confia.cashbox.infrastructure.wiring",
                     "com.confia.cashbox.application", "com.confia.cashbox.web", "com.confia.cashbox.web.wiring",
+                    // The payments module (docs/cortes/payments-register.md): its adapters, wiring and use cases; its web packages join with its routes. Administrative only.
+                    "com.confia.payments.infrastructure", "com.confia.payments.infrastructure.wiring",
+                    "com.confia.payments.application",
                     // The ledger module (docs/cortes/ledger-core.md): its jOOQ adapter, the named-interface package
                     // of its configuration and its application services, and from the chart-of-accounts cut
                     // (docs/cortes/ledger-chart-of-accounts.md) its controller and the named-interface package of the

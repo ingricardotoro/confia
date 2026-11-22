@@ -164,7 +164,10 @@ export function createChargeVoidModel(options: ChargeVoidOptions, dependencies: 
       base: amountOf(charge.baseCents),
       tax: amountOf(charge.taxCents),
       total: amountOf(totalCents),
+      paid: amountOf(0),
+      outstanding: amountOf(charge.voidedAt === undefined ? totalCents : 0),
       status: statusOf(charge),
+      settled: false,
       ...(charge.voidedAt === undefined
         ? {}
         : { voided: { reason: charge.voidReason ?? "", reversalTransactionId: runIdOf(900), voidId: runIdOf(901), voidedAt: charge.voidedAt } }),

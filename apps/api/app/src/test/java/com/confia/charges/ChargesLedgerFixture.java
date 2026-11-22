@@ -85,12 +85,13 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
 
     protected VoidCharge voidCharge() {
         return new VoidCharge(transactionRunner(), new JooqChargeRepository(dsl), new JooqChargeVoidRepository(dsl),
-                ledger(), new JooqAuditLogWriter(dsl), CLOCK);
+                ledger(), com.confia.charges.NoChargePayments.INSTANCE, new JooqAuditLogWriter(dsl), CLOCK);
     }
 
     protected ListStudentCharges listStudentCharges() {
         return new ListStudentCharges(transactionRunner(), new JooqStudentDirectory(dsl), new JooqChargeRepository(dsl),
-                new JooqPaymentConceptDirectory(dsl), new JooqAuditLogWriter(dsl));
+                new JooqPaymentConceptDirectory(dsl), com.confia.charges.NoChargePayments.INSTANCE,
+                new JooqAuditLogWriter(dsl));
     }
 
     protected ViewIntegrityRuns viewIntegrityRuns() {

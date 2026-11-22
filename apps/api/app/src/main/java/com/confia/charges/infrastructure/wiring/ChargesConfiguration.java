@@ -7,6 +7,9 @@ import com.confia.charges.application.AccrualRunRepository;
 import com.confia.charges.application.AccrualRunScheduler;
 import com.confia.charges.application.ChargeRepository;
 import com.confia.charges.application.ChargeVoidRepository;
+import com.confia.charges.application.PayableChargesService;
+import com.confia.charges.application.api.ChargePayments;
+import com.confia.charges.application.api.PayableCharges;
 import com.confia.charges.application.IntegrityRunRepository;
 import com.confia.charges.application.ListStudentCharges;
 import com.confia.charges.application.ViewIntegrityRuns;
@@ -107,18 +110,33 @@ public class ChargesConfiguration {
         return new JooqIntegrityRunRepository(dsl);
     }
 
-    /** The void of a charge: the ledger reversal and the void record in one database transaction (charges:void). */
+    /**
+     * The void of a charge: the ledger reversal and the void record in one database transaction (charges:void). It REQUIRES the
+     * {@link ChargePayments} that {@code payments} publishes: a process that loads this configuration without the payments fails at
+     * startup, instead of voiding charges that have payments with a silent "no payments" fallback.
+     */
     @Bean
     VoidCharge voidCharge(TransactionRunner transactionRunner, ChargeRepository charges, ChargeVoidRepository voids,
-            LedgerPostingApi ledger, AuditLogWriter auditLogWriter, Clock clock) {
-        return new VoidCharge(transactionRunner, charges, voids, ledger, auditLogWriter, clock);
+            LedgerPostingApi ledger, ChargePayments payments, AuditLogWriter auditLogWriter,
+            Clock clock) {
+        return new VoidCharge(transactionRunner, charges, voids, ledger, payments,
+                auditLogWriter, clock);
     }
 
     /** The charges of a student, to pick one to void. A read, with one audit entry. */
     @Bean
     ListStudentCharges listStudentCharges(TransactionRunner transactionRunner, StudentDirectory students,
-            ChargeRepository charges, PaymentConceptDirectory concepts, AuditLogWriter auditLogWriter) {
-        return new ListStudentCharges(transactionRunner, students, charges, concepts, auditLogWriter);
+            ChargeRepository charges, PaymentConceptDirectory concepts, ChargePayments payments,
+            AuditLogWriter auditLogWriter) {
+        return new ListStudentCharges(transactionRunner, students, charges, concepts,
+                payments, auditLogWriter);
+    }
+
+    /** What a payment can be applied to: the receivable account and the active charges of a student (payments). */
+    @Bean
+    PayableCharges payableCharges(ChargeRepository charges, PostingAccountRepository postingAccounts,
+            PaymentConceptDirectory concepts) {
+        return new PayableChargesService(charges, postingAccounts, concepts);
     }
 
     /** The results of the nightly integrity check, which only the worker produces. */

@@ -1064,6 +1064,13 @@ Tablas con política obligatoria y su criterio:
 > `TransactionRunner` (hoy solo fija `app.actor_id`, `app.actor_kind`, `app.institution_id` y `app.request_id`); esa decisión
 > corresponde a `confia-architect` y debe tomarse **antes del módulo `reporting`**, que leerá estas filas con otro camino.
 
+> **Nota (2026-11-21), `payments_payment` (tabla `payment`).** Igual que en `cashbox_session`: la política de base de datos aísla por
+> institución y el límite del cajero sobre los pagos («solo los que él registró», `payments:read`) **se aplica en la aplicación**,
+> a través de `OwnRecordPolicy` (`identity`) y del puerto `PaymentScope` de `payments`, y falla cerrado. Toda lectura de un pago
+> por identificador o en lista pasa por `PaymentScope` (los casos de uso que deciden un pago leen por `ScopedPayments`); una prueba
+> de arquitectura lo exige por lo que la clase llama, no por su nombre, y la capa `web` nunca lee el repositorio. Un límite
+> también en la base de datos queda sujeto a la misma decisión pendiente de `confia-architect` que la nota anterior.
+
 ### 6.3.1 Extensiones de PostgreSQL (`btree_gist`)
 
 La migración `V28` instala la extensión `btree_gist` para la restricción de exclusión que impide que dos vigencias de
