@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { studentStatementPath } from "../../shared/navigation/statement-paths.ts";
 import type { ResourceNotice } from "../../shared/resource-screen/components/ResourceScreen.tsx";
 import { loadFailureOf } from "../../shared/resource-screen/resource-failure.ts";
@@ -17,13 +18,14 @@ export interface PaymentDetailContainerProps {
 type Decision = "confirm" | "reject";
 
 /**
- * One payment with its allocations and its decision. A declared transfer offers Confirm and Reject, each an explicit dialog; the interface cannot
- * know who may decide, so the actions are offered and the server decides: it refuses the person who registered the payment and anyone without the
- * permission, and the dialog says so. When the server confirms, the payment is read again before the dialog closes, and the person is told.
+ * One payment with its allocations and its decision. A declared transfer offers Confirm and Reject, each an explicit dialog, only to a session
+ * with `payments:approve`. The interface cannot know who registered the payment, so the server still decides: it refuses that person and anyone
+ * without the permission, and the dialog says so. When the server confirms, the payment is read again before the dialog closes, and the person is told.
  */
 export function PaymentDetailContainer({ paymentId }: PaymentDetailContainerProps) {
   const { t } = useAdminText();
   const navigate = useNavigate();
+  const canApprove = usePermissions().can("payments:approve");
   const detail = usePaymentDetail(paymentId);
   const [deciding, setDeciding] = useState<Decision>();
   const [notice, setNotice] = useState<ResourceNotice>();
@@ -47,7 +49,7 @@ export function PaymentDetailContainer({ paymentId }: PaymentDetailContainerProp
 
   const state = stateOf();
   const payment = state.kind === "ready" ? state.payment : undefined;
-  const declared = payment?.status === "declared";
+  const decidable = payment?.status === "declared" && canApprove;
   const open = (decision: Decision) => () => {
     setNotice(undefined);
     setDeciding(decision);
@@ -60,11 +62,11 @@ export function PaymentDetailContainer({ paymentId }: PaymentDetailContainerProp
         backHref={PAYMENTS_PATHS.list}
         onBack={() => void navigate({ to: PAYMENTS_PATHS.list })}
         notice={notice}
-        onConfirm={declared ? open("confirm") : undefined}
-        onReject={declared ? open("reject") : undefined}
+        onConfirm={decidable ? open("confirm") : undefined}
+        onReject={decidable ? open("reject") : undefined}
         onViewStatement={(studentId) => void navigate({ to: studentStatementPath(studentId) })}
       />
-      {payment === undefined || !declared || deciding === undefined ? null : deciding === "confirm" ? (
+      {payment === undefined || !decidable || deciding === undefined ? null : deciding === "confirm" ? (
         <ConfirmPaymentContainer
           payment={payment}
           onClose={() => {

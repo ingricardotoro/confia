@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useAdminText } from "../../i18n/use-admin-text.ts";
+import { usePermissions } from "../../shared/permissions/permissions.tsx";
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
 import type { SearchChange } from "../../shared/resource-screen/search-change.ts";
 import { useListState } from "../../shared/resource-screen/use-list-state.ts";
@@ -21,6 +22,7 @@ export interface PaymentsContainerProps {
 export function PaymentsContainer({ search, onSearchChange }: PaymentsContainerProps) {
   const { t } = useAdminText();
   const navigate = useNavigate();
+  const { can } = usePermissions();
   const list = usePaymentList(toApiParams(search));
   const filtered = search.status !== undefined || search.method !== undefined || search.from !== undefined || search.to !== undefined;
   const periodProblem = search.from !== undefined && search.to !== undefined && search.to < search.from;
@@ -30,8 +32,8 @@ export function PaymentsContainer({ search, onSearchChange }: PaymentsContainerP
     onSearchChange,
     filtered,
     cleared: { ...search, page: 1, status: undefined, method: undefined, from: undefined, to: undefined },
-    // Nothing exists yet: the way forward is to register a payment.
-    onCreate: () => void navigate({ to: PAYMENTS_PATHS.register }),
+    // Nothing exists yet: the way forward is to register a payment, offered only to a session that may register one.
+    onCreate: can("payments:create") ? () => void navigate({ to: PAYMENTS_PATHS.register }) : undefined,
     loadFailedKey: "payments.list.loadFailed",
     emptyKeys: { title: "payments.list.emptyTitle", description: "payments.list.emptyDescription", action: "payments.list.emptyAction" },
     defaultSort: { columnId: "registeredAt", direction: "desc" },
