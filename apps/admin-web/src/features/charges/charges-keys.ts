@@ -1,3 +1,5 @@
+export { statementKeys, studentChargeKeys } from "../../shared/query-keys/charge-read-keys.ts";
+
 /**
  * Query keys of the charges plans, general to specific, so a prefix invalidates what it covers: every plan, every
  * listing, one listing, every detail, one detail. Nothing writes a literal key inline.
@@ -8,16 +10,6 @@ export const chargePlanKeys = {
   list: (params: object) => [...chargePlanKeys.lists(), params] as const,
   details: () => [...chargePlanKeys.all, "detail"] as const,
   detail: (id: string) => [...chargePlanKeys.details(), id] as const,
-};
-
-/**
- * Query keys of the statement of account, general to specific: every statement, one student's statements, one statement with
- * its currency, period and page. A write that moves money (a charge run, later a payment) invalidates the `all` prefix.
- */
-export const statementKeys = {
-  all: ["charges", "statement"] as const,
-  student: (studentId: string) => [...statementKeys.all, studentId] as const,
-  detail: (studentId: string, params: object) => [...statementKeys.student(studentId), params] as const,
 };
 
 /**
@@ -33,16 +25,6 @@ export const accrualKeys = {
   runList: (params: object) => [...accrualKeys.runLists(), params] as const,
   runDetails: () => [...accrualKeys.runs(), "detail"] as const,
   runDetail: (id: string, params: object) => [...accrualKeys.runDetails(), id, params] as const,
-};
-
-/**
- * Query keys of the charges of a student, general to specific: every student's charges, one student's, one list with its filters,
- * order and page. A void invalidates the `all` prefix, with the statements.
- */
-export const studentChargeKeys = {
-  all: ["charges", "student-charges"] as const,
-  student: (studentId: string) => [...studentChargeKeys.all, studentId] as const,
-  list: (studentId: string, params: object) => [...studentChargeKeys.student(studentId), "list", params] as const,
 };
 
 /** Query keys of the integrity check, general to specific: every read, every list, one list, the latest run, every run, one run. */

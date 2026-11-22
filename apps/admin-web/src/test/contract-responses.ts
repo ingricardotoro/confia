@@ -40,6 +40,10 @@ import {
   ModalityPageResponse,
   ModalityResponse,
   PaymentConceptPageResponse,
+  PaymentPageResponse,
+  PaymentPostingAccountMapResponse,
+  PaymentPostingAccountResponse,
+  PaymentResponse,
   PaymentConceptResponse,
   PriceListDetailResponse,
   PriceListItemResponse,
@@ -92,6 +96,9 @@ import {
   type PostingAccountResponseOutput,
   type ModalityResponseOutput,
   type PaymentConceptResponseOutput,
+  type PaymentPostingAccountResponseOutput,
+  type PaymentResponseOutput,
+  type PaymentSummaryResponseOutput,
   type PriceListDetailResponseOutput,
   type PriceListItemResponseOutput,
   type PriceListResponseOutput,
@@ -1222,4 +1229,80 @@ export function cashSessionPage(
 ): ContractResponse {
   const body = checked("sessions page", SessionPageResponse, { items, page: paging.page ?? 0, size: paging.size ?? 25, total: paging.total ?? items.length });
   return { status: 200, body, contentType: JSON_TYPE };
+}
+
+// The payments (payments-register cut). Every amount is a string the server rounded and every allocation is the server's: the fixtures
+// hold values chosen by hand and never compute one.
+
+/** A payment as the detail and the writes answer it: a confirmed cash payment that covered one charge, by default. */
+export function paymentBody(override: Partial<PaymentResponseOutput> = {}): PaymentResponseOutput {
+  return checked("PaymentResponse", PaymentResponse, {
+    id: crypto.randomUUID(),
+    studentId: "00000000-0000-4000-8000-0000000000b1",
+    studentCode: "EST-0001",
+    method: "CASH",
+    status: "confirmed",
+    amount: HNL("1150.00"),
+    receivedOn: "2026-11-20",
+    registeredAt: STAMP,
+    registeredBy: "00000000-0000-4000-8000-0000000000a1",
+    allocated: HNL("1150.00"),
+    unallocated: HNL("0.00"),
+    allocations: [
+      {
+        chargeId: "00000000-0000-4000-8000-000000c10001",
+        conceptCode: "MENS",
+        conceptName: "Mensualidad",
+        periodLabel: "2026-11",
+        dueOn: "2026-11-05",
+        amount: HNL("1150.00"),
+        allocatedAt: STAMP,
+      },
+    ],
+    ...override,
+  });
+}
+
+export function paymentRecord(override: Partial<PaymentResponseOutput> = {}, status = 200): ContractResponse {
+  return { status, body: paymentBody(override), contentType: JSON_TYPE };
+}
+
+/** One row of the list of payments. */
+export function paymentSummary(override: Partial<PaymentSummaryResponseOutput> = {}): PaymentSummaryResponseOutput {
+  return {
+    id: crypto.randomUUID(),
+    studentId: "00000000-0000-4000-8000-0000000000b1",
+    studentCode: "EST-0001",
+    method: "CASH",
+    status: "confirmed",
+    amount: HNL("1150.00"),
+    receivedOn: "2026-11-20",
+    registeredAt: STAMP,
+    registeredBy: "00000000-0000-4000-8000-0000000000a1",
+    ...override,
+  };
+}
+
+export function paymentPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("payments page", PaymentPageResponse, { items, page: paging.page ?? 0, size: paging.size ?? 25, total: paging.total ?? items.length });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+export function paymentPostingAccount(override: Partial<PaymentPostingAccountResponseOutput> = {}): PaymentPostingAccountResponseOutput {
+  return checked("PaymentPostingAccountResponse", PaymentPostingAccountResponse, {
+    id: crypto.randomUUID(),
+    purpose: "CASH",
+    ledgerAccountId: crypto.randomUUID(),
+    version: 0,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+/** The map as `GET` and `PUT /payments/posting-accounts` answer it: the rows that were ever set. */
+export function paymentPostingAccountMap(items: readonly unknown[]): ContractResponse {
+  return { status: 200, body: checked("payment posting account map", PaymentPostingAccountMapResponse, { items }), contentType: JSON_TYPE };
 }

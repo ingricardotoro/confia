@@ -59,6 +59,23 @@ describe("StudentChargesView", () => {
     expect(onVoid).toHaveBeenCalledWith(ACTIVE);
   });
 
+  it("shows what each charge has paid and what is still owed, as the server derived them, and never adds them", () => {
+    const partly = studentCharge({
+      id: "00000000-0000-4000-8000-0000000d0003",
+      periodLabel: "2027-03",
+      total: { amount: "1265.00", currency: "HNL" },
+      paid: { amount: "235.00", currency: "HNL" },
+      outstanding: { amount: "1030.00", currency: "HNL" },
+    });
+    renderWithAdminI18n(<StudentChargesView {...props({ rows: [partly] })} />);
+
+    expect(screen.getByRole("columnheader", { name: "Pagado" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Pendiente" })).toBeInTheDocument();
+    const row = within(screen.getByRole("row", { name: /2027-03/ }));
+    expect(row.getAllByText(/235.00/).length).toBeGreaterThan(0);
+    expect(row.getAllByText(/1,030.00/).length).toBeGreaterThan(0);
+  });
+
   it("shows the status in words and the date a charge was voided", () => {
     renderWithAdminI18n(<StudentChargesView {...props()} />);
 
