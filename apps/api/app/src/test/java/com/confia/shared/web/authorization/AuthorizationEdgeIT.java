@@ -46,6 +46,7 @@ import com.confia.catalog.web.wiring.CatalogWebConfiguration;
 import com.confia.cashbox.infrastructure.wiring.CashboxConfiguration;
 import com.confia.cashbox.web.wiring.CashboxWebConfiguration;
 import com.confia.payments.infrastructure.wiring.PaymentsConfiguration;
+import com.confia.payments.web.wiring.PaymentsWebConfiguration;
 import com.confia.charges.infrastructure.wiring.ChargesConfiguration;
 import com.confia.charges.web.wiring.ChargesWebConfiguration;
 import com.confia.ledger.infrastructure.wiring.LedgerConfiguration;
@@ -306,6 +307,7 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
                         && !candidate.pattern().startsWith("/api/v1/catalog/")
                         && !candidate.pattern().startsWith("/api/v1/charges/")
                         && !candidate.pattern().startsWith("/api/v1/cashbox/")
+                        && !candidate.pattern().startsWith("/api/v1/payments")
                         && !candidate.pattern().startsWith("/api/v1/ledger/"))
                 .toList()) {
             Session holder = sessionOf(StaffRole.SUPER_ADMIN);
@@ -1084,7 +1086,7 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
             ImportsConfiguration.class, ImportsWebConfiguration.class, CatalogConfiguration.class,
             CatalogWebConfiguration.class, LedgerConfiguration.class, LedgerWebConfiguration.class,
             ChargesConfiguration.class, ChargesWebConfiguration.class, CashboxConfiguration.class,
-            CashboxWebConfiguration.class, PaymentsConfiguration.class,
+            CashboxWebConfiguration.class, PaymentsConfiguration.class, PaymentsWebConfiguration.class,
             WebEdgeConfiguration.class,
             AdminSecurityConfiguration.class, ObservabilityMetricsConfiguration.class,
             RateLimiterConfiguration.class, ThrottlingConfiguration.class,

@@ -596,6 +596,7 @@ class CurrentSessionEndpointIT extends CommittingPostgresIntegrationTest {
                 "GET /api/v1/charges/integrity-runs", "GET /api/v1/charges/integrity-runs/latest",
                 "GET /api/v1/charges/integrity-runs/{runId}",
                 "PUT /api/v1/charges/posting-accounts", "POST /api/v1/cashbox/sessions", "GET /api/v1/cashbox/sessions/current", "POST /api/v1/cashbox/sessions/{sessionId}/movements", "POST /api/v1/cashbox/sessions/{sessionId}/close", "POST /api/v1/cashbox/sessions/{sessionId}/approve", "GET /api/v1/cashbox/sessions", "GET /api/v1/cashbox/sessions/{sessionId}",
+                "POST /api/v1/payments", "GET /api/v1/payments", "GET /api/v1/payments/posting-accounts", "PUT /api/v1/payments/posting-accounts", "GET /api/v1/payments/{id}", "POST /api/v1/payments/{id}/confirm", "POST /api/v1/payments/{id}/reject",
                 "GET /api/v1/ledger/accounts", "POST /api/v1/ledger/accounts",
                 "PUT /api/v1/ledger/accounts/{id}"));
         expected.addAll(List.of("GET /api/v1/students", "GET /api/v1/students/{id}", "POST /api/v1/students",
