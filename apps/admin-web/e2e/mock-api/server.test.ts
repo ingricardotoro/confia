@@ -1901,3 +1901,68 @@ describe("the statement of account [ledger-account-statement]", { timeout: LIMIT
   });
 });
 
+
+describe("the payments [payments-register]", { timeout: LIMIT }, () => {
+  /** The day of the institution, the only one a cash payment may be received on. */
+const TODAY = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Tegucigalpa", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+const PAYMENTS = "/api/v1/payments";
+  const STUDENT = "00000000-0000-4000-8000-000000005001";
+  const items = (reply: Reply) => (reply.json as { items: Record<string, unknown>[] }).items;
+
+  async function session(id: string, name?: string) {
+    if (name !== undefined) await preset(id, name);
+    const login = await call("POST", "/api/v1/auth/sessions", { body: credentials, scenario: id });
+    const headers = { Authorization: `Bearer ${(login.json as { accessToken: string }).accessToken}` };
+    return (method: string, path: string, body?: unknown, key?: string) =>
+      call(method, path, { headers: { ...headers, ...(key === undefined ? {} : { "Idempotency-Key": key }) }, scenario: id, ...(body === undefined ? {} : { body }) });
+  }
+
+  it("answers 401 without an access token, and 404 to a path it does not simulate", async () => {
+    const anonymous = [await call("GET", PAYMENTS, { scenario: "pay-401" }), await call("POST", PAYMENTS, { scenario: "pay-401", body: {} })];
+    const send = await session("pay-404");
+
+    expect(anonymous.map((reply) => [reply.status, typeOf(reply)])).toEqual([[401, "authentication-required"], [401, "authentication-required"]]);
+    expect((await send("DELETE", `${PAYMENTS}/00000000-0000-4000-8000-000000600001`)).status).toBe(404);
+  });
+
+  it("registers cash against the open cashbox, allocates it, raises the expected cash, and serves the payment in the list and the paid amount of the charges", async () => {
+    const send = await session("pay-cash", "cashbox-open");
+    const body = { studentId: STUDENT, method: "CASH", amount: { amount: "1500.00", currency: "HNL" }, receivedOn: TODAY };
+
+    const created = await send("POST", PAYMENTS, body, "pay-key-1");
+    const again = await send("POST", PAYMENTS, body, "pay-key-1");
+    const current = await send("GET", "/api/v1/cashbox/sessions/current");
+
+    expect(created.status).toBe(201);
+    expect(again.json).toEqual(created.json);
+    expect((created.json as { allocations: unknown[] }).allocations).toHaveLength(2);
+    expect((current.json as { expectedAmount: { amount: string } }).expectedAmount.amount).toBe("2050.00");
+    expect((await send("GET", PAYMENTS)).json).toMatchObject({ total: 4 });
+    const charges = await send("GET", `/api/v1/charges/students/${STUDENT}/charges?sort=dueOn,asc`);
+    expect(items(charges)[0]).toMatchObject({ paid: { amount: "1150.00" }, outstanding: { amount: "0.00" } });
+  });
+
+  it("refuses cash with no open cashbox, and decides a declared transfer", async () => {
+    const send = await session("pay-decide");
+    const refused = await send("POST", PAYMENTS, { studentId: STUDENT, method: "CASH", amount: { amount: "10.00", currency: "HNL" }, receivedOn: TODAY }, "pay-key-2");
+    const confirmed = await send("POST", `${PAYMENTS}/00000000-0000-4000-8000-000000600001/confirm`, undefined, "pay-key-3");
+    const own = await send("POST", `${PAYMENTS}/00000000-0000-4000-8000-000000600002/confirm`, undefined, "pay-key-4");
+
+    expect([refused.status, typeOf(refused)]).toEqual([409, "cash-session-not-open"]);
+    expect(confirmed.status).toBe(200);
+    expect([own.status, typeOf(own)]).toEqual([403, "self-approval-forbidden"]);
+  });
+
+  it.each([
+    ["payments-empty", "GET", 200],
+    ["payments-forbidden", "GET", 403],
+    ["payments-accounts-incomplete", "POST", 409],
+  ] as const)("serves the %s preset", async (name, method, status) => {
+    const send = await session(`pay-${name}`, name);
+    const reply = method === "GET"
+      ? await send("GET", PAYMENTS)
+      : await send("POST", PAYMENTS, { studentId: STUDENT, method: "CASH", amount: { amount: "10.00", currency: "HNL" }, receivedOn: TODAY }, "pay-key-5");
+
+    expect(reply.status).toBe(status);
+  });
+});

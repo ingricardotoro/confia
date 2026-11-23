@@ -16,12 +16,17 @@ Que un cajero registre en ventanilla el pago de un estudiante, en efectivo o com
 
 - **Estados (docs/02 §6.2).**
   - El efectivo nace `confirmed`.
-  - La transferencia nace `declared` y pasa a `confirmed` o a `reversed` (rechazada).
+  - La transferencia nace `declared` y pasa a `confirmed` o a `rejected` (rechazada). `reversed` queda reservado al reverso de un
+    pago confirmado (corte 4).
   - Solo `confirmed` produce asiento. Un pago `declared` no cambia el saldo, no se aplica a cargos y no aparece en el estado de cuenta.
   - Este corte no usa `draft`, ni el reverso de un pago confirmado (corte 4).
 - **INV-19.** El importe es mayor que cero, con hasta dos decimales y en la moneda de la institución (HNL).
 - **INV-20.** El efectivo exige una sesión de caja `open` del usuario que registra. El pago y su movimiento `payment_in` en esa sesión se
   escriben en la misma transacción.
+  - **Fecha del efectivo (decisión del propietario, 2026-11-21: «Solo el día de la sesión»).** `receivedOn` de un pago en efectivo es
+    el día de negocio de la sesión abierta, es decir, hoy en la zona horaria de la institución mientras la sesión está abierta. Otro
+    día se rechaza con `400 validation-failed` y el campo `receivedOn`. La base lo repite por disparador. La transferencia conserva su
+    regla: ni futura ni anterior al año 2000.
   - Lo esperado de la caja suma los `payment_in` sin cambiar la fórmula del corte 1.
   - La transferencia no toca la caja.
 - **Asiento al confirmar:**
@@ -34,7 +39,9 @@ Que un cajero registre en ventanilla el pago de un estudiante, en efectivo o com
 - **Aplicación automática a cargos (INV-17).**
   - Al confirmar, el servidor reparte el importe entre los cargos vigentes con saldo pendiente, ordenados por vencimiento, período y
     código de concepto.
-  - Nunca excede el pendiente de un cargo. Bloquea las filas de esos cargos.
+  - Nunca excede el pendiente de un cargo. La serialización es el bloqueo de la subcuenta del estudiante en el libro mayor: la tabla
+    de cargos no concede `UPDATE` (INV-47), así que no se bloquean las filas de los cargos. Quien escribe cargos, pagos o anulaciones
+    de ese estudiante toma primero ese bloqueo, y los disparadores de la base lo repiten.
   - Se admiten pagos parciales: un cargo puede quedar con pendiente.
 - **Remanente (INV-18).** Lo que sobra después de cubrir todo lo pendiente queda acreditado en la misma cuenta por cobrar. El saldo
   del estudiante queda negativo y el estado de cuenta ya lo rotula «Saldo a favor». La suma de aplicaciones nunca excede el pago.
@@ -43,7 +50,8 @@ Que un cajero registre en ventanilla el pago de un estudiante, en efectivo o com
   - Para anularlo, primero se reversa el pago (corte 4).
 - **Confirmación y rechazo de una transferencia.**
   - Requieren `payments:approve` (Super Administrador y Administrador, `docs/03` §5.2).
-  - Quien confirma o rechaza no puede ser quien registró el pago (segregación de funciones; `409 self-approval-forbidden`).
+  - Quien confirma o rechaza no puede ser quien registró el pago (segregación de funciones; `403 self-approval-forbidden`, como
+    `cash-approval-same-actor` en la caja, `docs/03` §5.3).
   - El rechazo exige un motivo de 20 a 500 caracteres, que no se copia al libro mayor ni a la bitácora.
 - **Transferencia.** Exige una referencia bancaria de 4 a 40 caracteres. La pareja referencia y banco no se repite entre los pagos no
   rechazados de la institución (`409 duplicate-transfer-reference`).
@@ -73,7 +81,7 @@ Que un cajero registre en ventanilla el pago de un estudiante, en efectivo o com
 - `POST /payments/{id}/reject` (`payments:approve`): rechaza una transferencia `declared`. Cuerpo: `{reason}`.
 - `GET` y `PUT /payments/posting-accounts` (`ledger:read` y `ledger:create`): el mapa `CASH` y `BANK`, con un upsert parcial
   versionado como el mapa de cargos.
-- `GET /charges/students/{studentId}/charges`: agrega a cada cargo `outstanding` (pendiente derivado) y `paid`.
+- `GET /charges/students/{studentId}/charges`: agrega a cada cargo `outstanding` (pendiente derivado), `paid` y `settled`.
 
 ## Pantallas (admin-web)
 
@@ -148,7 +156,7 @@ Esta sección describe el backend y el contrato OpenAPI. Las pantallas y los con
   `payments_payment_decision` y `payments_payment_allocation`. Un pago de efectivo nace `confirmed` con su sesión de caja, su
   movimiento `payment_in` y su asiento; una transferencia nace `declared` sin sesión, sin movimiento y sin asiento. La decisión
   (confirmar o rechazar) es una fila de solo inserción, una por pago; el estado del pago es la única columna mutable, solo avanza
-  `declared → confirmed | reversed` y solo con la decisión que lo justifica. Pagos, decisiones y aplicaciones rechazan UPDATE (salvo
+  `declared → confirmed | rejected` y solo con la decisión que lo justifica. Pagos, decisiones y aplicaciones rechazan UPDATE (salvo
   ese avance), DELETE y TRUNCATE a todo rol. Reglas que la base repite por disparador: importe mayor que cero y en la unidad menor
   (INV-19); el efectivo exige la sesión abierta del cajero que registra y un movimiento `payment_in` del mismo importe escrito por
   él (INV-20); un asiento `PAYMENT` del módulo `payments` que nombra al pago, con la fecha de recepción y débitos iguales al importe;
@@ -178,7 +186,7 @@ Esta sección describe el backend y el contrato OpenAPI. Las pantallas y los con
   pedido incluido el actor; misma clave y mismo cuerpo devuelve lo mismo, otro cuerpo u otro actor 422
   `idempotency-payload-mismatch`. Un doble envío simultáneo produce un solo pago.
 - **Errores** (`ProblemCode`): `posting-accounts-incomplete`, `duplicate-transfer-reference`, `self-approval-forbidden`,
-  `payment-not-declared` y `charge-has-payments`, todos 409; el efectivo sin sesión abierta responde `cash-session-not-open` (409,
+  `payment-not-declared` y `charge-has-payments`, todos 409 salvo `self-approval-forbidden`, que responde 403; el efectivo sin sesión abierta responde `cash-session-not-open` (409,
   código existente). `posting-account-invalid`, `inactive-reference`, `stale-version` y `resource-not-found` se reutilizan en el mapa.
 - **Decisiones del corte que la nota no fijaba**: (1) el mapa se exige completo (`CASH` y `BANK`, más la cuenta por cobrar de los
   cargos) para registrar efectivo o confirmar; declarar una transferencia no lo necesita; (2) la fecha de recepción no puede ser
@@ -196,3 +204,59 @@ Esta sección describe el backend y el contrato OpenAPI. Las pantallas y los con
   del borde, códigos de error, mapa de cuentas, aislamiento entre instituciones); más las listas fijadas de rutas, permisos, OpenAPI,
   claves de idempotencia, aislamiento de beans por proceso y las reglas de ArchUnit (lectura de pagos solo por casos de uso con
   alcance, con sus dos fixtures inválidos permanentes).
+
+## Lo construido (frontend, 2026-11-20)
+
+Esta sección describe las pantallas de `apps/admin-web`, su API simulada y las pruebas. El contrato (`packages/contracts`) se regeneró con orval y no se versiona.
+
+- **Registrar pago** (`/payments/register`, Finanzas › Cobrar).
+  - Se busca al estudiante en el servidor y se muestran sus cargos vigentes, del vencimiento más antiguo al más reciente, con lo pagado y lo pendiente tal como los entrega el servidor. El saldo del estudiante es el cierre de su estado de cuenta; el navegador no suma importes. Un cargo cuyo pendiente es cero no se ofrece como pendiente: se juzga el texto, no un número.
+  - Método, importe, fecha y, en transferencia, referencia (4 a 40 caracteres) y banco. La validación del cliente solo mira caracteres; el servidor decide el resto y sus errores se muestran bajo su campo (importe, referencia repetida, fecha).
+  - Con efectivo y sin caja abierta la pantalla lo dice, deshabilita el botón y ofrece «Ir a Mi caja». Si la sesión se cierra entre la vista y el envío, el rechazo `cash-session-not-open` se cuenta en el formulario y la caja se vuelve a leer. Una transferencia no pide caja.
+  - La clave `Idempotency-Key` se crea una vez por intención (la misma si la respuesta no llegó, otra si cambió el cuerpo) y un doble clic envía una sola petición. El resultado reemplaza al formulario y muestra las aplicaciones y el remanente que calculó el servidor; una transferencia declarada dice que no cambia el saldo.
+- **Pagos** (`/payments`, Finanzas › Pagos) y detalle (`/payments/:id`). La lista pagina, ordena y filtra en el servidor (estado, método, fechas) y todo vive en la dirección. El detalle muestra los datos, las aplicaciones de un pago confirmado y la decisión. Una transferencia declarada ofrece «Confirmar» y «Rechazar» en diálogos explícitos; el rechazo exige un motivo de 20 a 500 caracteres. Los rechazos del servidor (`self-approval-forbidden`, `payment-not-declared`, `posting-accounts-incomplete`, 403) se cuentan dentro del diálogo.
+- **Plan de cuentas**: el mapa agrega el grupo «Cuentas de pagos» con «Caja» y «Banco» (activos que no llevan saldos de estudiantes). Son otro endpoint, así que el guardado hace dos peticiones, primero cargos y luego pagos, cada una solo con lo que cambió y con su versión; si la segunda falla tras guardar la primera, el aviso lo dice y queda pendiente solo lo de pagos.
+- **Cargos del estudiante**: columnas «Pagado» y «Pendiente». El servidor responde `charge-has-payments` al anular un cargo con pagos y la pantalla lo dice.
+- **Estado de cuenta**: sin cambios; ya rotulaba el tipo `PAYMENT` y el abono llega tal como lo devuelve el servidor. **Caja**: el movimiento `payment_in` aparece en la tabla de movimientos como «Cobro en efectivo».
+- **Invalidación tras una escritura**: registrar, confirmar y rechazar invalidan los pagos, los estados de cuenta, los cargos del estudiante y la caja. Los indicadores del tablero no tienen consulta todavía. No hay actualización optimista.
+- **Piezas compartidas movidas a `src/shared`** (los features no se importan entre sí): las claves de consulta de la caja, de los estados de cuenta y de los cargos del estudiante, el selector de estudiante, la clave de idempotencia por intención y las reglas de texto de importes y notas. Las rutas y las claves anteriores se reexportan, así que la caja y los cargos no cambiaron de comportamiento.
+- **API simulada** (`e2e/mock-api/payments-model.ts`): aplica las reglas que necesitan los recorridos (efectivo con caja abierta, reparto del más antiguo al más reciente con remanente, transferencia declarada, autoaprobación, referencia repetida, mapa incompleto, clave de idempotencia). Se acopla a los cargos (pagado y pendiente, `charge-has-payments`), al estado de cuenta (línea de abono) y a la caja (movimiento `payment_in`). Presets: `payments-empty`, `payments-forbidden`, `payments-server-error`, `payments-accounts-incomplete`.
+- **Pruebas** (comandos desde `apps/admin-web` con `CONFIA_VITEST_API_PORT=45731 pnpm exec vitest run ... --maxWorkers=2`):
+  - suite completa de Vitest, una sola vez: 271 archivos, 3270 pruebas aprobadas, 2 pendientes que ya existían;
+  - `tsc -b --noEmit` y eslint sobre lo tocado sin hallazgos, y sin `eslint-disable`;
+  - pruebas de contenedor con MSW: registro (cargos y saldo, efectivo sin caja, doble clic, errores del servidor bajo su campo, misma clave tras un fallo de red, transferencia, referencia repetida, resultado verbatim), lista (filtros en la dirección y en el servidor, vacío, error con reintento), detalle y decisiones (clave de idempotencia, autoaprobación, motivo corto);
+  - pruebas de presentación con sus estados, del cliente de la API, del mapa de cuentas y del modelo simulado, y la ruta del servidor simulado.
+- **Recorrido de Playwright** (`e2e/specs/journeys/payments-register.e2e.ts`) y puerta de accesibilidad (diez estados nuevos en `e2e/support/a11y-matrix.ts`): ejecutados el 2026-11-21 con los puertos libres. Pasan las 4 pruebas del recorrido (`pnpm exec playwright test specs/journeys/payments-register.e2e.ts --workers=1`) y los 20 casos de la puerta, diez estados en tema claro y oscuro (`pnpm exec playwright test specs/a11y/gate.e2e.ts -g "payment|Pago|pago"`).
+- **Fuera de este corte**: no se agregó código de ocultación por permisos (`usePermissions` todavía no está en `main`); el servidor responde 403 y cada pantalla lo cuenta. El selector de encargado que paga no se pide, como dice la nota.
+- **Correcciones del frontend (2026-11-21).** La pantalla Registrar pago ya no decide en el navegador qué cargo está pendiente: pide al servidor `outstanding=true` (sin `sort`: el orden es el de la asignación), pagina de a 10 en el servidor y muestra las filas tal como llegan. Estado `rejected` en etiquetas, filtro, detalle y servidor simulado; `self-approval-forbidden` llega como 403; el efectivo arranca con la fecha de hoy (zona de la institución) y vuelve a hoy al volver al método efectivo, y `cash-received-today` se muestra bajo la fecha. El servidor simulado soporta `outstanding`, `settled`, el orden de asignación, `rejected`, el 403 y la regla de la fecha del efectivo. Los `as` del mapa de cuentas se sustituyeron por una unión discriminada (m6). Vitest completo: 271 archivos, 3275 pruebas aprobadas, 2 pendientes que ya existían; recorrido (4) y puerta de accesibilidad (20) de Playwright aprobados.
+
+## Correcciones de la revisión (2026-11-21)
+
+Revisión de código y auditoría de seguridad del backend. Se corrigió `V35` en su lugar (nunca se aplicó en producción y no está
+integrada, así que no hay `V36`).
+
+- **Estado `rejected`.** Una transferencia rechazada pasa a `rejected`, distinto de `reversed` (corte 4). Cambian el estado, el tipo de
+  decisión, el índice único parcial de la referencia (solo excluye `rejected`), el enum de la API y los filtros.
+- **Anulación y asignación.** El disparador `payments_charge_void_guard` bloquea la subcuenta del estudiante (`FOR UPDATE`, mismo
+  orden que el disparador de asignaciones) antes de ver si el cargo tiene aplicaciones: una anulación directa y una asignación a la
+  vez dejan un solo ganador.
+- **Decisión y estado.** Un disparador diferido sobre `payments_payment_decision` exige al confirmar la transacción que una decisión
+  `confirmed` tenga el pago `confirmed` y una `rejected` lo tenga `rejected`: una decisión no se confirma sin el avance del estado.
+- **Fecha del efectivo.** Solo el día de la sesión (aplicación y disparador).
+- **Autoaprobación.** Responde `403 self-approval-forbidden` (antes 409).
+- **Asiento.** `payments_require_posting` exige además que el crédito vaya a la subcuenta del estudiante del pago; la comparación de
+  fecha de la confirmación, que se comparaba con sí misma, ahora compara con la fecha de recepción del pago.
+- **Referencia enmascarada.** Nunca se muestra completa: cuatro caracteres, o dos si la referencia tiene menos de ocho.
+- **Huella de la solicitud.** `PaymentRequest.canonical()` antepone la longitud a cada campo; mover un separador entre la referencia y
+  el banco ya no da la misma huella.
+- **Avance de estado.** `advanceStatus` exige exactamente una fila actualizada.
+- **Sin pagos en el proceso.** `charges` ya no tiene un `ChargePayments.NONE` de producción: un proceso que carga los casos de uso de
+  cargos sin `payments` falla al arrancar. El trabajador no los carga.
+- **Regla de arquitectura.** Toda clase de `application` que llame a `PaymentRepository.findById` o `list` depende de `PaymentScope`,
+  sea cual sea su nombre. Anular o decidir un pago lee por `ScopedPayments`.
+- **Cargos del estudiante.** `GET /charges/students/{studentId}/charges` agrega `settled` (derivado: cargo vigente sin pendiente) y
+  el filtro `outstanding=true`. Con ese filtro y sin `sort`, el orden es el de la asignación (vencimiento, período, código de
+  concepto, identificador). Lo pendiente se deriva de las asignaciones, que `charges` no puede consultar en SQL, así que el caso de
+  uso lee los cargos del estudiante, filtra, ordena y corta la página.
+- **Pruebas.** Sesión revocada (escritura y lectura) en `PaymentEndpointsIT`; la nota de `docs/03-seguridad.md` §6.3 deja dicho que el
+  límite del cajero sobre los pagos vive en la aplicación.
