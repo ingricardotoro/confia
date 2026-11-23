@@ -481,7 +481,7 @@ adversarial del diseño antes de escribir código.
 **Avance (2026-11-21).**
 - Entregable 5 construido en el corte `cashbox-sessions`: backend en el PR #333, pantallas en el #334.
 - Entregables 1 (efectivo y transferencia declarada), 2 (aplicación automática por antigüedad), 3, 4, 6 y 7 construidos en el corte
-  `payments-register`, en revisión.
+  `payments-register`, integrado en `main` en los PR #341 a #349 (2026-11-23).
   - Una transferencia declarada no toca el saldo hasta que la confirma otra persona.
   - El efectivo se fecha el día de la sesión.
 - Siguen:
@@ -493,11 +493,12 @@ adversarial del diseño antes de escribir código.
 
 **Criterios de salida:**
 
-- [ ] No se puede registrar un pago en efectivo sin sesión de caja abierta (INV-20). Verificado por prueba de extremo a extremo.
+- [x] No se puede registrar un pago en efectivo sin sesión de caja abierta (INV-20). Verificado por prueba de extremo a extremo. PR #343
+  (`RegisterPaymentIT`) y #349 (recorrido `payments-register.e2e.ts` sobre la API simulada).
 - [x] Un usuario no puede tener dos sesiones abiertas a la vez (INV-22). PR #333.
 - [x] Un cierre con diferencia distinta de cero exige motivo y aprobador distinto del cajero (INV-23). PR #333.
-- [ ] Una aplicación de pago no puede exceder el saldo pendiente del cargo (INV-17).
-- [ ] Un doble envío con la misma clave de idempotencia produce un solo cobro (INV-24).
+- [x] Una aplicación de pago no puede exceder el saldo pendiente del cargo (INV-17). PR #341 y #343, incluso con dos pagos simultáneos.
+- [x] Un doble envío con la misma clave de idempotencia produce un solo cobro (INV-24). PR #343 y #345.
 - [ ] El registro completo de un pago se ejecuta en 90 segundos o menos, medido con un cajero real (OB-01).
 - [ ] Al menos dos cajeros ejecutan el flujo completo sin asistencia del desarrollador.
 
