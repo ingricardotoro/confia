@@ -260,3 +260,30 @@ integrada, así que no hay `V36`).
   uso lee los cargos del estudiante, filtra, ordena y corta la página.
 - **Pruebas.** Sesión revocada (escritura y lectura) en `PaymentEndpointsIT`; la nota de `docs/03-seguridad.md` §6.3 deja dicho que el
   límite del cajero sobre los pagos vive en la aplicación.
+
+## Integración en `main` (2026-11-23)
+
+El corte superó las ochocientas líneas y se dividió en nueve PR encadenados, integrados uno a uno con integración continua en verde:
+
+| PR | Contenido |
+|---|---|
+| #341 | Migración y dominio puro con las reglas de asignación |
+| #342 | API de `ledger`, `cashbox` y `charges` que usa `payments` |
+| #343 | Cobro en efectivo con su asiento, su asignación y el alcance del cajero |
+| #344 | Declarar, confirmar y rechazar transferencias |
+| #345 | Lecturas, mapa de cuentas, guardas e instantánea del OpenAPI |
+| #346 | Cliente de la API y columnas de pagado y pendiente de los cargos del estudiante |
+| #347 | Pantallas de registro, lista y detalle |
+| #348 | Cuentas de caja y banco en el mapa de asientos |
+| #349 | API simulada, recorridos y estados de la puerta de accesibilidad |
+
+Ajustes que exigió la división (cada parte debía pasar sola):
+
+- **#342.** El tipo de movimiento `payment_in` de la caja y su etiqueta pasaron a esta parte, porque el contrato de `cashbox` ya lo
+  listaba.
+- **#343.** `AuthorizationEdgeIT` carga `PaymentsConfiguration`. Las respuestas de prueba de los cargos del estudiante y el modelo de
+  anulación de la API simulada incluyen `paid`, `outstanding` y `settled`.
+- **#347.** Los permisos de sesión (PR #336 a #339) ya estaban en `main`. Pagos declara `payments:read`, `payments:create` y
+  `payments:approve` en la navegación y en las rutas, oculta «Registrar un pago» sin `payments:create` y oculta «Confirmar» y
+  «Rechazar» sin `payments:approve`. El servidor sigue decidiendo cada solicitud.
+- **#349.** La línea de avance del roadmap obligó a fijar de nuevo el texto de `docs/09` en `docs-notes.test.ts`.
