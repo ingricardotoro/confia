@@ -209,6 +209,39 @@ class CashboxUseCasesTest {
                 .isInstanceOf(CashSessionAlreadyOpenException.class);
     }
 
+    @Test
+    void aRequestWithTheSameKeyThatCommitsBetweenTheTwoReadsIsAnsweredAsAReplay() {
+        CashSession winner = openedByOtherRequest("open-1", "500.00");
+        sessions.commitAfterTheLookupOf("open-1", winner);
+
+        SessionDetail answered = openUseCase().open(cashier, requestId, "open-1", "500.00");
+
+        assertThat(answered.id()).isEqualTo(winner.id());
+        assertThat(sessions.rows).hasSize(1);
+        assertThat(sessions.inserts).isZero();
+        assertThat(audit).isEmpty();
+    }
+
+    @Test
+    void aRequestWithTheSameKeyAndAnotherFloatThatCommitsBetweenTheTwoReadsIsRefusedAsAMismatch() {
+        sessions.commitAfterTheLookupOf("open-1", openedByOtherRequest("open-1", "600.00"));
+
+        assertThatThrownBy(() -> openUseCase().open(cashier, requestId, "open-1", "500.00"))
+                .isInstanceOf(IdempotencyPayloadMismatchException.class);
+        assertThat(sessions.inserts).isZero();
+        assertThat(audit).isEmpty();
+    }
+
+    @Test
+    void anotherKeyThatCommitsBetweenTheTwoReadsIsStillAnAlreadyOpenSession() {
+        sessions.commitAfterTheLookupOf("open-1", openedByOtherRequest("open-other", "500.00"));
+
+        assertThatThrownBy(() -> openUseCase().open(cashier, requestId, "open-1", "500.00"))
+                .isInstanceOf(CashSessionAlreadyOpenException.class);
+        assertThat(sessions.inserts).isZero();
+        assertThat(audit).isEmpty();
+    }
+
     private CashSession openedByOtherRequest(String key, String openingFloat) {
         return CashSession.open(UUID.randomUUID(), cashier.accountId(), Money.of(openingFloat, CurrencyCode.HNL), NOW, key,
                 CashboxRequests.hash("open", cashier.accountId(), Money.of(openingFloat, CurrencyCode.HNL).toPlainString()));
@@ -615,6 +648,14 @@ class CashboxUseCasesTest {
         final Map<UUID, CashSession> rows = new LinkedHashMap<>();
         int inserts;
         CashSession failNextInsertAfterOtherRequestWins;
+        // Another request commits right after the lookup of a given key misses it, so only the lookup of the open session sees it.
+        private String committingAfterTheLookupOf;
+        private CashSession commitsAfterTheKeyLookup;
+
+        void commitAfterTheLookupOf(String key, CashSession other) {
+            committingAfterTheLookupOf = key;
+            commitsAfterTheKeyLookup = other;
+        }
 
         @Override
         public void insert(InstitutionId inst, CashSession session) {
@@ -630,7 +671,12 @@ class CashboxUseCasesTest {
 
         @Override
         public Optional<CashSession> findByRequestKey(InstitutionId inst, String key) {
-            return rows.values().stream().filter(row -> row.requestKey().equals(key)).findFirst();
+            Optional<CashSession> found = rows.values().stream().filter(row -> row.requestKey().equals(key)).findFirst();
+            if (commitsAfterTheKeyLookup != null && key.equals(committingAfterTheLookupOf)) {
+                rows.put(commitsAfterTheKeyLookup.id(), commitsAfterTheKeyLookup);
+                commitsAfterTheKeyLookup = null;
+            }
+            return found;
         }
 
         @Override
