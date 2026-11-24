@@ -86,9 +86,11 @@ public final class DecideAward {
      */
     public AwardView reject(AuthenticatedActor actor, String requestId, String idempotencyKey, UUID awardId, String reason) {
         Objects.requireNonNull(awardId, "awardId");
-        DecisionReason because = DecisionReason.of(reason);
-        return decide(actor, requestId, idempotencyKey, awardId, because, "reject",
-                (award, id, now, key, hash) -> award.reject(id, actor.accountId(), because, now, key, hash));
+        return ScholarshipRequests.naming(() -> {
+            DecisionReason because = DecisionReason.of(reason);
+            return decide(actor, requestId, idempotencyKey, awardId, because, "reject",
+                    (award, id, now, key, hash) -> award.reject(id, actor.accountId(), because, now, key, hash));
+        });
     }
 
     /**
@@ -99,9 +101,11 @@ public final class DecideAward {
      */
     public AwardView revoke(AuthenticatedActor actor, String requestId, String idempotencyKey, UUID awardId, String reason) {
         Objects.requireNonNull(awardId, "awardId");
-        DecisionReason because = DecisionReason.of(reason);
-        return decide(actor, requestId, idempotencyKey, awardId, because, "revoke",
-                (award, id, now, key, hash) -> award.revoke(id, actor.accountId(), because, now, key, hash));
+        return ScholarshipRequests.naming(() -> {
+            DecisionReason because = DecisionReason.of(reason);
+            return decide(actor, requestId, idempotencyKey, awardId, because, "revoke",
+                    (award, id, now, key, hash) -> award.revoke(id, actor.accountId(), because, now, key, hash));
+        });
     }
 
     private AwardView decide(AuthenticatedActor actor, String requestId, String idempotencyKey, UUID awardId,

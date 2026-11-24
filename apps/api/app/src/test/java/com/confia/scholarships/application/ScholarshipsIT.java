@@ -132,14 +132,14 @@ class ScholarshipsIT extends ScholarshipsFixture {
     void aValueOutOfItsRuleOrAConceptThatDoesNotExistIsRefused() throws SQLException {
         World w = world();
 
-        assertThatThrownBy(() -> scholarship(w, "B1", "100.01")).isInstanceOf(InvalidScholarshipsValueException.class);
+        assertThatThrownBy(() -> scholarship(w, "B1", "100.01")).isInstanceOf(RejectedScholarshipFieldException.class);
         assertThatThrownBy(() -> manageScholarships().create(w.administrator(), request(), "B2",
                 new ManageScholarships.Draft("N", "PERCENTAGE", "5", "5.00", null, Set.of(w.env().concept()))))
-                .isInstanceOf(InvalidScholarshipsValueException.class);
+                .isInstanceOf(RejectedScholarshipFieldException.class);
         assertThatThrownBy(() -> manageScholarships().create(w.administrator(), request(), "B3",
                 new ManageScholarships.Draft("N", "PERCENTAGE", "5", null, null, Set.of(UUID.randomUUID()))))
-                .isInstanceOf(InvalidScholarshipsValueException.class)
-                .satisfies(e -> assertThat(((InvalidScholarshipsValueException) e).field()).isEqualTo("conceptIds"));
+                .isInstanceOf(RejectedScholarshipFieldException.class)
+                .satisfies(e -> assertThat(((RejectedScholarshipFieldException) e).field()).isEqualTo("conceptIds"));
         assertThat(manageScholarships().list(w.administrator(), request(), new ScholarshipFilter(null, null),
                 PageRequest.of(0, 50, null, ScholarshipFilter.SORT_FIELDS, "code", true)).total()).isZero();
     }
@@ -263,11 +263,11 @@ class ScholarshipsIT extends ScholarshipsFixture {
         ScholarshipView created = scholarship(w, "BECA-25", "25");
 
         assertThatThrownBy(() -> requested(w, created, 0, LocalDate.parse("2026-12-31"), JUN))
-                .isInstanceOf(InvalidScholarshipsValueException.class)
-                .satisfies(e -> assertThat(((InvalidScholarshipsValueException) e).reason()).isEqualTo("outside-academic-year"));
+                .isInstanceOf(RejectedScholarshipFieldException.class)
+                .satisfies(e -> assertThat(((RejectedScholarshipFieldException) e).reason()).isEqualTo("outside-academic-year"));
         assertThatThrownBy(() -> requested(w, created, 0, FEB, LocalDate.parse("2027-12-01")))
-                .isInstanceOf(InvalidScholarshipsValueException.class);
-        assertThatThrownBy(() -> requested(w, created, 0, JUN, FEB)).isInstanceOf(InvalidScholarshipsValueException.class);
+                .isInstanceOf(RejectedScholarshipFieldException.class);
+        assertThatThrownBy(() -> requested(w, created, 0, JUN, FEB)).isInstanceOf(RejectedScholarshipFieldException.class);
         assertThatThrownBy(() -> requestAward().request(w.coordinator(), request(), new RequestAward.Command(created.id(),
                 UUID.randomUUID(), w.year(), FEB, JUN))).isInstanceOf(ResourceNotFoundException.class);
         assertThatThrownBy(() -> requestAward().request(w.coordinator(), request(), new RequestAward.Command(created.id(),
@@ -419,9 +419,9 @@ class ScholarshipsIT extends ScholarshipsFixture {
         AwardView award = requested(w, scholarship(w, "BECA-25", "25"), 0, FEB, JUN);
 
         assertThatThrownBy(() -> decideAward().reject(w.administrator(), request(), "short", award.id(), "x".repeat(19)))
-                .isInstanceOf(InvalidScholarshipsValueException.class);
+                .isInstanceOf(RejectedScholarshipFieldException.class);
         assertThatThrownBy(() -> decideAward().reject(w.administrator(), request(), "long", award.id(), "x".repeat(501)))
-                .isInstanceOf(InvalidScholarshipsValueException.class);
+                .isInstanceOf(RejectedScholarshipFieldException.class);
         assertThat(viewAwards().get(w.administrator(), request(), award.id()).status()).isEqualTo("pending");
     }
 

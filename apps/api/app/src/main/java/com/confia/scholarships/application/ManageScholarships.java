@@ -66,6 +66,10 @@ public final class ManageScholarships {
      * @throws InactiveReferenceException when a covered concept is inactive
      */
     public ScholarshipView create(AuthenticatedActor actor, String requestId, String code, Draft draft) {
+        return ScholarshipRequests.naming(() -> doCreate(actor, requestId, code, draft));
+    }
+
+    private ScholarshipView doCreate(AuthenticatedActor actor, String requestId, String code, Draft draft) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(draft, "draft");
         UUID auditRequestId = ScholarshipRequests.requestId(Objects.requireNonNull(requestId, "requestId"));
@@ -90,6 +94,10 @@ public final class ManageScholarships {
      * @throws com.confia.scholarships.domain.ScholarshipBenefitLockedException when the benefit changes and an award was approved
      */
     public ScholarshipView update(AuthenticatedActor actor, String requestId, UUID id, long version, Draft draft) {
+        return ScholarshipRequests.naming(() -> doUpdate(actor, requestId, id, version, draft));
+    }
+
+    private ScholarshipView doUpdate(AuthenticatedActor actor, String requestId, UUID id, long version, Draft draft) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(draft, "draft");

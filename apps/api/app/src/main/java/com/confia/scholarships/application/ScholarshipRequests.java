@@ -6,6 +6,7 @@ import com.confia.shared.security.Digests;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 /**
@@ -33,6 +34,21 @@ final class ScholarshipRequests {
     /** The identifier of the request for the entry; a blank one gets a fresh identifier. */
     static UUID requestId(String requestId) {
         return requestId.isBlank() ? UUID.randomUUID() : UUID.fromString(requestId);
+    }
+
+    /**
+     * Runs a use case and names for the edge the field of a rule of the domain that is about one member of the request body, as {@link
+     * RejectedScholarshipFieldException}; any other failure goes through untouched.
+     */
+    static <T> T naming(Supplier<T> useCase) {
+        try {
+            return useCase.get();
+        } catch (InvalidScholarshipsValueException e) {
+            if (e.field() == null || e.reason() == null) {
+                throw e;
+            }
+            throw new RejectedScholarshipFieldException(e.field(), e.reason());
+        }
     }
 
     /** SHA-256 of the parts, in order and separated, in lowercase hexadecimal. */

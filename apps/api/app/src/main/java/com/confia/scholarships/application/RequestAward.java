@@ -57,6 +57,10 @@ public final class RequestAward {
      * @throws com.confia.scholarships.domain.InvalidScholarshipsValueException when the validity is wrong or outside the year
      */
     public AwardView request(AuthenticatedActor actor, String requestId, Command command) {
+        return ScholarshipRequests.naming(() -> doRequest(actor, requestId, command));
+    }
+
+    private AwardView doRequest(AuthenticatedActor actor, String requestId, Command command) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(command, "command");
         UUID auditRequestId = ScholarshipRequests.requestId(Objects.requireNonNull(requestId, "requestId"));
