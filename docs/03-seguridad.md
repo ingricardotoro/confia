@@ -101,6 +101,14 @@ privilegio. La amenaza dominante aquí no es el atacante externo sino el abuso i
 | **D** Denegación | Consulta de reporte que bloquea la base | Reporte sin índice sobre todo el histórico | Operación de caja detenida | `statement_timeout` por rol, reportes pesados en cola con réplica de lectura desde fase dos, presupuesto de consulta en revisión de código |
 | **E** Elevación | Autoasignación de rol | Un Administrador se concede permisos de Super Administrador | Compromiso total del control interno | La asignación de roles es permiso exclusivo de Super Administrador, no puede autoasignarse un rol, y todo cambio de rol genera alerta al canal de seguridad y a un segundo destinatario |
 
+> **Riesgo aceptado (2026-11-24): una clave de idempotencia ajena revela que existe.** La clave `Idempotency-Key` es única por
+> institución, no por persona. Si un miembro del personal envía una clave que otra persona ya usó, la respuesta es
+> `422 idempotency-payload-mismatch`, porque la huella de la solicitud incluye la cuenta de quien la envía. Esa respuesta confirma que
+> la clave existe, pero no entrega ningún dato de la operación ajena. Es la misma regla en `cashbox`, `payments` y `charges`. Se
+> acepta porque el cliente genera cada clave al azar, de modo que adivinar una ajena no es practicable, y porque el actor ya es
+> personal autenticado de la misma institución. Cerrarlo exigiría buscar la clave también por persona y responder igual exista o no
+> la clave en todos los módulos: un cambio transversal de bajo valor. Hallazgo bajo de la auditoría de seguridad del PR #351.
+
 ### 2.3 Superficie C: base de datos
 
 | STRIDE | Amenaza | Vector | Impacto | Control |
