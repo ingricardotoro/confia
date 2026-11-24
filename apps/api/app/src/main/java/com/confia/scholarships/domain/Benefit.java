@@ -32,6 +32,20 @@ public record Benefit(BenefitType type, Percentage percent, Money fixedAmount) {
         }
     }
 
+    /**
+     * The benefit as the request names it: {@code PERCENTAGE} with only {@code percent}, or {@code FIXED_AMOUNT} with only {@code
+     * fixedAmount}.
+     */
+    public static Benefit of(String type, String percent, String fixedAmount) {
+        if (BenefitType.PERCENTAGE.name().equals(type) && percent != null && fixedAmount == null) {
+            return percentage(percent);
+        }
+        if (BenefitType.FIXED_AMOUNT.name().equals(type) && fixedAmount != null && percent == null) {
+            return fixed(fixedAmount);
+        }
+        throw new InvalidScholarshipsValueException("benefitType", "invalid");
+    }
+
     /** A percentage given as the text of the API, in percentage points: greater than 0, up to 100 and with at most two decimals. */
     public static Benefit percentage(String points) {
         Percentage percent;
