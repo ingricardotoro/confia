@@ -6,6 +6,7 @@ import com.confia.identity.infrastructure.wiring.IdentityWorkerConfiguration;
 import com.confia.ledger.infrastructure.wiring.LedgerConfiguration;
 import com.confia.organization.infrastructure.wiring.OrganizationWorkerConfiguration;
 import com.confia.students.infrastructure.wiring.StudentsWorkerConfiguration;
+import com.confia.scholarships.infrastructure.wiring.ScholarshipsWorkerConfiguration;
 import com.confia.shared.infrastructure.wiring.SharedWorkerJobsConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.WorkerJobsConfiguration;
 import com.confia.shared.jobs.infrastructure.wiring.WorkerPlatformConfiguration;
@@ -77,6 +78,6 @@ import org.springframework.context.annotation.Import;
 @Import({WorkerPlatformConfiguration.class, WorkerJobsConfiguration.class,
         IdentityWorkerConfiguration.class, SharedWorkerJobsConfiguration.class, OrganizationWorkerConfiguration.class,
         StudentsWorkerConfiguration.class, CatalogWorkerConfiguration.class, LedgerConfiguration.class,
-        ChargesWorkerConfiguration.class})
+        ChargesWorkerConfiguration.class, ScholarshipsWorkerConfiguration.class})
 public class WorkerApplication {
 }

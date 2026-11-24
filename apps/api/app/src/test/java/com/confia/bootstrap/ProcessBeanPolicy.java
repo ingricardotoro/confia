@@ -271,7 +271,12 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.ledger.infrastructure.wiring",
                     "com.confia.organization.infrastructure", "com.confia.organization.infrastructure.wiring",
                     "com.confia.students.infrastructure", "com.confia.students.infrastructure.wiring",
-                    "com.confia.catalog.infrastructure", "com.confia.catalog.infrastructure.wiring"),
+                    "com.confia.catalog.infrastructure", "com.confia.catalog.infrastructure.wiring",
+                    // The approved awards the accrual applies (docs/cortes/scholarships-awards.md): the read-only
+                    // AwardBenefits and its adapter, and nothing of the writes, the use cases or the web of the
+                    // scholarships. Each entry is exact and contributes a bean.
+                    "com.confia.scholarships.application", "com.confia.scholarships.infrastructure",
+                    "com.confia.scholarships.infrastructure.wiring"),
             forbidden("com.confia.bootstrap.admin", OTHER_ENTRY_POINT,
                     "com.confia.bootstrap.portal", OTHER_ENTRY_POINT,
                     "com.confia.shared.crypto", WORKER_NO_COLUMN_KEY,
