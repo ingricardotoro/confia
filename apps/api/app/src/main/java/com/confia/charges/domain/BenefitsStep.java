@@ -1,19 +1,19 @@
 package com.confia.charges.domain;
 
 import com.confia.kernel.Money;
+import java.util.List;
 
 /**
- * The extension point of scholarships and discounts (owner decision: deferred). The pipeline is {@code BasePrice ->
- * BenefitsStep -> TaxableBase -> Tax -> Total}; in this cut the step is the identity, a discount of zero. A future benefit
- * will be posted as its own {@code DISCOUNT} ledger transaction (key {@code charges:benefit:<chargeId>}) in the same database
- * transaction, so neither the key nor the shape of the posting of a charge changes.
+ * The extension point of the benefits in the pipeline of a charge: {@code BasePrice -> BenefitsStep -> TaxableBase -> Tax -> Total}.
+ * Given the base the price produced, it answers what each award in force offers on it; the charge applies the greatest (see {@link
+ * BenefitSelection}) and the tax is computed on what is left. The identity, {@link #NONE}, offers nothing.
  */
 @FunctionalInterface
 public interface BenefitsStep {
 
-    /** The discount on the base price, never negative and never above the base. */
-    Money discountOn(Money base);
+    /** What the awards in force offer on this base, in no particular order; never {@code null}. */
+    List<BenefitOffer> offersOn(Money base);
 
-    /** The identity: no benefits are granted. */
-    BenefitsStep NONE = base -> Money.zero(base.currency());
+    /** The identity: no benefits are offered. */
+    BenefitsStep NONE = base -> List.of();
 }

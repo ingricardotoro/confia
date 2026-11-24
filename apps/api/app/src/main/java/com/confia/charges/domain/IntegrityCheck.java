@@ -37,13 +37,29 @@ public final class IntegrityCheck {
     private IntegrityCheck() {
     }
 
-    /** A charge as the module holds it: its transaction, its total and, when voided, the reversal its void names. */
-    public record ChargeFact(UUID chargeId, UUID ledgerTransactionId, Money total, UUID voidReversalTransactionId) {
+    /**
+     * A charge as the module holds it: its transaction, its total, its benefit and, when voided, the reversal its void names. The
+     * transaction of a charge debits the total on the student sub-account and the benefit on the benefits account, so each side of
+     * it, and of its reversal, adds up to the total plus the benefit.
+     */
+    public record ChargeFact(UUID chargeId, UUID ledgerTransactionId, Money total, Money benefit,
+            UUID voidReversalTransactionId) {
 
         public ChargeFact {
             Objects.requireNonNull(chargeId, "chargeId");
             Objects.requireNonNull(ledgerTransactionId, "ledgerTransactionId");
             Objects.requireNonNull(total, "total");
+            Objects.requireNonNull(benefit, "benefit");
+        }
+
+        /** A charge without a benefit. */
+        public ChargeFact(UUID chargeId, UUID ledgerTransactionId, Money total, UUID voidReversalTransactionId) {
+            this(chargeId, ledgerTransactionId, total, Money.zero(total.currency()), voidReversalTransactionId);
+        }
+
+        /** What each side of the transaction of the charge adds up to: the total plus the benefit. */
+        public Money posted() {
+            return total.add(benefit);
         }
 
         public boolean voided() {
@@ -181,15 +197,15 @@ public final class IntegrityCheck {
     private static void chargePosting(ChargeFact charge, List<PostingFact> postings, List<IntegrityFinding> findings) {
         if (postings.isEmpty()) {
             findings.add(new IntegrityFinding(IntegrityKind.CHARGE_POSTING_MISSING, charge.chargeId(),
-                    charge.ledgerTransactionId(), charge.total(), Money.zero(charge.total().currency())));
+                    charge.ledgerTransactionId(), charge.posted(), Money.zero(charge.total().currency())));
             return;
         }
         PostingFact own = postings.stream().filter(p -> p.transactionId().equals(charge.ledgerTransactionId()))
                 .findFirst().orElse(null);
         if (own == null) {
             findings.add(new IntegrityFinding(IntegrityKind.CHARGE_POSTING_MISSING, charge.chargeId(),
-                    charge.ledgerTransactionId(), charge.total(), Money.zero(charge.total().currency())));
-        } else if (!sameCurrencyAndEqual(own.debitTotal(), charge.total())) {
+                    charge.ledgerTransactionId(), charge.posted(), Money.zero(charge.total().currency())));
+        } else if (!sameCurrencyAndEqual(own.debitTotal(), charge.posted())) {
             findings.add(totalMismatch(charge, own.transactionId(), own.debitTotal()));
         }
         for (PostingFact extra : postings) {
@@ -212,10 +228,10 @@ public final class IntegrityCheck {
                 .filter(p -> p.transactionId().equals(charge.voidReversalTransactionId())).findFirst().orElse(null);
         if (named == null) {
             findings.add(new IntegrityFinding(IntegrityKind.VOID_REVERSAL_MISSING, charge.chargeId(),
-                    charge.voidReversalTransactionId(), charge.total(), Money.zero(charge.total().currency())));
-        } else if (!sameCurrencyAndEqual(named.creditTotal(), charge.total())) {
+                    charge.voidReversalTransactionId(), charge.posted(), Money.zero(charge.total().currency())));
+        } else if (!sameCurrencyAndEqual(named.creditTotal(), charge.posted())) {
             findings.add(totalMismatch(charge, named.transactionId(), named.creditTotal()));
-        } else if (!sameCurrencyAndEqual(named.debitTotal(), charge.total())) {
+        } else if (!sameCurrencyAndEqual(named.debitTotal(), charge.posted())) {
             findings.add(totalMismatch(charge, named.transactionId(), named.debitTotal()));
         }
         for (PostingFact extra : reversals) {
@@ -270,14 +286,14 @@ public final class IntegrityCheck {
         });
     }
 
-    /** A total that is not the charge total; in another currency the two cannot be set side by side, so none is carried. */
+    /** A side that is not what the charge posts; in another currency the two cannot be set side by side, so none is carried. */
     private static IntegrityFinding totalMismatch(ChargeFact charge, UUID transactionId, Money found) {
         if (found.currency() != charge.total().currency()) {
             return new IntegrityFinding(IntegrityKind.CHARGE_TOTAL_MISMATCH, charge.chargeId(), transactionId, null,
                     null);
         }
         return new IntegrityFinding(IntegrityKind.CHARGE_TOTAL_MISMATCH, charge.chargeId(), transactionId,
-                charge.total(), found);
+                charge.posted(), found);
     }
 
     private static boolean sameCurrencyAndEqual(Money left, Money right) {

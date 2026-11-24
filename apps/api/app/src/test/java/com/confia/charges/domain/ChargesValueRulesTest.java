@@ -74,7 +74,7 @@ class ChargesValueRulesTest {
 
     @Test
     void noBenefitsMeansADiscountOfZero() {
-        assertThat(BenefitsStep.NONE.discountOn(hnl("10.00"))).isEqualTo(hnl("0.00"));
+        assertThat(BenefitsStep.NONE.offersOn(hnl("10.00"))).isEmpty();
     }
 
     // --- ChargeAmounts ---
@@ -161,6 +161,18 @@ class ChargesValueRulesTest {
         assertThat(PostingPurpose.RECEIVABLE.accepts("ASSET", false)).isFalse();
         assertThat(PostingPurpose.REVENUE.accepts("ASSET", false)).isFalse();
         assertThat(PostingPurpose.TAX_PAYABLE.accepts("LIABILITY", false)).isTrue();
+    }
+
+    @Test
+    void theBenefitsPurposeAcceptsAContraRevenueOrExpenseAccountThatHoldsNoStudentBalances() {
+        // Assumption S4 of docs/cortes/scholarships-awards.md, pending the accountant.
+        assertThat(PostingPurpose.BENEFITS.holdsStudentBalances()).isFalse();
+        assertThat(PostingPurpose.BENEFITS.accepts("EXPENSE", false)).isTrue();
+        assertThat(PostingPurpose.BENEFITS.accepts("INCOME", false)).isTrue();
+        assertThat(PostingPurpose.BENEFITS.accepts("ASSET", false)).isFalse();
+        assertThat(PostingPurpose.BENEFITS.accepts("LIABILITY", false)).isFalse();
+        assertThat(PostingPurpose.BENEFITS.accepts("EXPENSE", true)).isFalse();
+        assertThat(PostingPurpose.parse("BENEFITS")).isEqualTo(PostingPurpose.BENEFITS);
     }
 
     @Test
