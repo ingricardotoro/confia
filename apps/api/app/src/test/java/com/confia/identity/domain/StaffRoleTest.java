@@ -106,7 +106,7 @@ class StaffRoleTest {
 
     @Test
     void everyRoleGrantsTheCountOfPermissionsOfItsColumn() {
-        assertThat(sizes()).containsExactly(89, 62, 18, 31, 35, 23);
+        assertThat(sizes()).containsExactly(89, 63, 18, 31, 35, 23);
     }
 
     @Test
@@ -146,6 +146,12 @@ class StaffRoleTest {
         assertThat(StaffRole.ADMINISTRATOR.permissions()).doesNotContain(Permission.PAYMENTS_CREATE,
                 Permission.CASHBOX_CREATE);
         assertThat(permissionsOf(StaffRole.ADMINISTRATOR, "audit")).isEmpty();
+    }
+
+    @Test
+    void theAdministratorRevokesScholarshipsAndTheAcademicCoordinatorDoesNot() {
+        assertThat(rolesGranting(Permission.SCHOLARSHIPS_VOID))
+                .containsExactlyInAnyOrder(StaffRole.SUPER_ADMIN, StaffRole.ADMINISTRATOR);
     }
 
     @Test
