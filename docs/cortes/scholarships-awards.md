@@ -64,12 +64,13 @@ junto a pagos.
   - Se auditan la creación y el cambio de una beca, y la solicitud, aprobación, rechazo y revocación de un otorgamiento.
   - La consulta del simulador se audita porque son datos de un menor.
 
-## Permisos (ya existen en `Permission`; sin cambio de matriz, `docs/03` §5.2)
+## Permisos (ya existen en `Permission`; el Administrador gana `scholarships:void`, `docs/03` §5.2, nota del 2026-11-24)
 
 - `scholarships:create`: Super Administrador, Administrador y Coordinador Académico (definir becas y solicitar otorgamientos).
 - `scholarships:read`: además Cajero, Contabilidad y Auditor.
 - `scholarships:approve`: Super Administrador y Administrador (aprobar y rechazar otorgamientos).
-- `scholarships:void`: revocar un otorgamiento; también lo tienen solo esos dos roles.
+- `scholarships:void`: revocar un otorgamiento; también lo tienen solo esos dos roles. Decisión del propietario, 2026-11-24: «si, si puede el
+  adminsitrador revocar una beca, con justificacion». La justificación es el motivo obligatorio de 20 a 500 caracteres.
 
 ## Endpoints (`/api/v1/scholarships`)
 
@@ -159,8 +160,10 @@ Backend de T1 completo: migración, dominio, casos de uso, adaptadores, capa web
 
 - La autoaprobación responde `403 self-approval-forbidden` (convención de caja y pagos), no `409`.
 - Permisos usados: `scholarships:create` para definir, editar, desactivar, reactivar y solicitar; `approve` para aprobar y rechazar;
-  `void` para revocar. En `StaffRole`, el Administrador no tiene `scholarships:void` (solo Super Administrador); la nota decía que
-  ambos. No se cambió la matriz: decisión pendiente del propietario.
+  `void` para revocar. El worker anterior encontró que `StaffRole` no daba `scholarships:void` al Administrador; el propietario decidió el
+  2026-11-24 que sí puede revocar, con justificación. Se agregó `SCHOLARSHIPS_VOID` a `ADMINISTRATOR`, la fila `scholarships` de la matriz
+  efectiva de `docs/03` §5.2 pasó a `C L A N P X` y hay una nota fechada 2026-11-24. Pruebas: `StaffRoleTest`, `PermissionMatrixParityTest` y
+  `ScholarshipsIT` (el Administrador revoca con motivo válido y se le rechaza con uno corto).
 - El valor del beneficio queda bloqueado si existe un otorgamiento aprobado o revocado alguna vez; nombre, tope y conceptos siguen editables.
 - Crear y solicitar no llevan `Idempotency-Key` (convención del catálogo); desactivar y reactivar son idempotentes por estado.
 - Que la vigencia esté dentro del año lo valida el trigger de la base, porque `organization` no publica las fechas del año.
@@ -175,6 +178,4 @@ Backend de T1 completo: migración, dominio, casos de uso, adaptadores, capa web
 
 ### Preguntas abiertas
 
-- `scholarships:void` (revocar) lo tiene solo el Super Administrador, porque `StaffRole` no lo da al Administrador y la matriz no se
-  cambió. La nota original decía que ambos roles; el propietario debe decidir si se amplía.
 - El mensaje de `self-approval-forbidden` en `problems.properties` habla de pagos; conviene redactarlo de forma neutra.
