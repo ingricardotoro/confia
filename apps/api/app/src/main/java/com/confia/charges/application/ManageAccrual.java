@@ -12,6 +12,7 @@ import com.confia.charges.domain.ResourceNotFoundException;
 import com.confia.catalog.application.directory.PricingDirectory;
 import com.confia.ledger.application.api.LedgerAccountDirectory;
 import com.confia.organization.application.directory.PlacementDirectory;
+import com.confia.scholarships.application.api.AwardBenefits;
 import com.confia.students.application.directory.EnrollmentRoster;
 import com.confia.students.application.directory.StudentDirectory;
 import com.confia.kernel.InstitutionId;
@@ -58,18 +59,32 @@ public final class ManageAccrual {
     private final AuditLogWriter auditLogWriter;
     private final Clock clock;
 
+    /**
+     * The accrual with no scholarship ever in force: for a fixture of another capability that does not exercise them. A process
+     * wires the constructor that takes the {@link AwardBenefits} that {@code scholarships} publishes.
+     */
     public ManageAccrual(TransactionRunner transactionRunner, ChargePlanRepository plans,
             ChargePlanItemRepository items, AccrualRunRepository runs, AccrualRunItemRepository runItems,
             ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
             PricingDirectory pricing, PostingAccountRepository postingAccounts, LedgerAccountDirectory ledgerAccounts,
             AccrualRunScheduler scheduler, AuditLogWriter auditLogWriter, Clock clock) {
+        this(transactionRunner, plans, items, runs, runItems, charges, placements, roster, students, pricing,
+                postingAccounts, ledgerAccounts, AwardBenefits.NONE, scheduler, auditLogWriter, clock);
+    }
+
+    public ManageAccrual(TransactionRunner transactionRunner, ChargePlanRepository plans,
+            ChargePlanItemRepository items, AccrualRunRepository runs, AccrualRunItemRepository runItems,
+            ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
+            PricingDirectory pricing, PostingAccountRepository postingAccounts, LedgerAccountDirectory ledgerAccounts,
+            AwardBenefits awards, AccrualRunScheduler scheduler, AuditLogWriter auditLogWriter, Clock clock) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.plans = Objects.requireNonNull(plans, "plans");
         this.items = Objects.requireNonNull(items, "items");
         this.runs = Objects.requireNonNull(runs, "runs");
         this.runItems = Objects.requireNonNull(runItems, "runItems");
-        this.calculator = new AccrualPreviewCalculator(new AccrualEngine(placements, roster, students, pricing, charges),
-                pricing, postingAccounts, ledgerAccounts);
+        this.calculator = new AccrualPreviewCalculator(
+                new AccrualEngine(placements, roster, students, pricing, charges, awards), pricing, postingAccounts,
+                ledgerAccounts, awards);
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
         this.clock = Objects.requireNonNull(clock, "clock");

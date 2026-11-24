@@ -106,6 +106,8 @@ public final class PermissionedEndpoints {
                 Permission.CHARGES_UPDATE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/plans/{id}/accrual-periods",
                 Permission.CHARGES_READ));
+        endpoints.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/plans/{planId}/simulation",
+                Permission.CHARGES_READ));
         endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/charges/plans/{id}/accrual-preview",
                 Permission.CHARGES_CREATE));
         endpoints.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/charges/plans/{id}/accrual-runs",

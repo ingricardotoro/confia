@@ -272,13 +272,15 @@ public class AccrualController {
     private static AccrualPreviewResponse toResponse(AccrualPreviewResult preview) {
         List<AccrualPreviewResponse.Total> totals = preview.totals().stream()
                 .map(total -> new AccrualPreviewResponse.Total(total.currency(), total.charges(),
-                        AccrualMoney.of(total.base()), AccrualMoney.of(total.tax()), AccrualMoney.of(total.total())))
+                        AccrualMoney.of(total.base()), AccrualMoney.of(total.benefit()), AccrualMoney.of(total.netBase()),
+                        AccrualMoney.of(total.tax()), AccrualMoney.of(total.total())))
                 .toList();
         Map<String, Integer> errors = new LinkedHashMap<>(preview.errorCounts());
         List<AccrualPreviewResponse.Item> items = preview.items().stream()
                 .map(item -> new AccrualPreviewResponse.Item(item.studentId(), item.paymentConceptId(),
                         item.outcome().name(), item.error(),
-                        AccrualMoney.of(item.base()), AccrualMoney.of(item.tax()), AccrualMoney.of(item.total()),
+                        AccrualMoney.of(item.base()), AccrualMoney.of(item.benefit()), AccrualMoney.of(item.netBase()),
+                        AccrualMoney.of(item.tax()), AccrualMoney.of(item.total()), item.awardId(), item.scholarshipCode(),
                         item.existingChargeId()))
                 .toList();
         return new AccrualPreviewResponse(preview.planId(), preview.periodStart(), preview.studentsEvaluated(),

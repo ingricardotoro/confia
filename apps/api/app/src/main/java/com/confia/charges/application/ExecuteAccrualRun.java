@@ -19,6 +19,7 @@ import com.confia.kernel.Money;
 import com.confia.ledger.application.api.LedgerAccountDirectory;
 import com.confia.ledger.application.api.LedgerPostingApi;
 import com.confia.organization.application.directory.PlacementDirectory;
+import com.confia.scholarships.application.api.AwardBenefits;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.SecurityContext;
 import com.confia.shared.security.TransactionRunner;
@@ -76,11 +77,24 @@ public final class ExecuteAccrualRun {
     private final AuditLogWriter auditLogWriter;
     private final Clock clock;
 
+    /**
+     * The execution with no scholarship ever in force: for a fixture of another capability that does not exercise them. A process
+     * wires the constructor that takes the {@link AwardBenefits} that {@code scholarships} publishes.
+     */
     public ExecuteAccrualRun(TransactionRunner transactionRunner, ChargePlanRepository plans,
             ChargePlanItemRepository planItems, AccrualRunRepository runs, AccrualRunItemRepository runItems,
             ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
             PricingDirectory pricing, PostingAccountRepository postingAccounts, LedgerAccountDirectory ledgerAccounts,
             LedgerPostingApi ledger, AuditLogWriter auditLogWriter, Clock clock) {
+        this(transactionRunner, plans, planItems, runs, runItems, charges, placements, roster, students, pricing,
+                postingAccounts, ledgerAccounts, AwardBenefits.NONE, ledger, auditLogWriter, clock);
+    }
+
+    public ExecuteAccrualRun(TransactionRunner transactionRunner, ChargePlanRepository plans,
+            ChargePlanItemRepository planItems, AccrualRunRepository runs, AccrualRunItemRepository runItems,
+            ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
+            PricingDirectory pricing, PostingAccountRepository postingAccounts, LedgerAccountDirectory ledgerAccounts,
+            AwardBenefits awards, LedgerPostingApi ledger, AuditLogWriter auditLogWriter, Clock clock) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.plans = Objects.requireNonNull(plans, "plans");
         this.planItems = Objects.requireNonNull(planItems, "planItems");
@@ -90,8 +104,8 @@ public final class ExecuteAccrualRun {
         this.postingAccounts = Objects.requireNonNull(postingAccounts, "postingAccounts");
         this.ledger = Objects.requireNonNull(ledger, "ledger");
         this.placements = Objects.requireNonNull(placements, "placements");
-        this.engine = new AccrualEngine(placements, roster, students, pricing, charges);
-        this.calculator = new AccrualPreviewCalculator(engine, pricing, postingAccounts, ledgerAccounts);
+        this.engine = new AccrualEngine(placements, roster, students, pricing, charges, awards);
+        this.calculator = new AccrualPreviewCalculator(engine, pricing, postingAccounts, ledgerAccounts, awards);
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -185,8 +199,13 @@ public final class ExecuteAccrualRun {
         if (run.periodStart().isAfter(LocalDate.now(clock.withZone(zone)))) {
             return Optional.of(AccrualRejection.PERIOD_IN_FUTURE);
         }
-        if (engine.population(institution, plan, periods.get(0).period()).isEmpty()) {
+        Optional<List<StudentPlacement>> population = engine.population(institution, plan, periods.get(0).period());
+        if (population.isEmpty()) {
             return Optional.of(AccrualRejection.PLAN_TARGET_OUTSIDE_YEAR);
+        }
+        // A period in which a scholarship may apply needs the account of the benefits, as one with revenue needs its own.
+        if (!calculator.benefitsAccountReady(institution, periods, population.get())) {
+            return Optional.of(AccrualRejection.POSTING_ACCOUNTS_INCOMPLETE);
         }
         if (run.previewDigest() != null) {
             String digest = calculator.calculate(institution, plan, items, run.periodStart(), false).digest();
@@ -272,23 +291,29 @@ public final class ExecuteAccrualRun {
     }
 
     /**
-     * The ledger transaction of a charge: debit the receivable of the student for the total, credit the revenue of the
-     * category for the base and, when there is tax, credit the tax payable. It balances because the total is the base plus
-     * the tax. A discount would be a transaction of its own and is deferred, so a charge with one is refused here.
+     * The ledger transaction of a charge, in one transaction: debit the receivable of the student for the total (the net base
+     * plus the tax), credit the revenue of the category for the GROSS base, debit the benefits account for the benefit and, when
+     * there is tax, credit the tax payable. It balances because the total is the base minus the benefit plus the tax, so the
+     * debits (total plus benefit) are the credits (base plus tax). Nothing is posted to the receivable when the benefit takes the
+     * whole base, because the ledger refuses an entry of zero.
      */
     private LedgerPostingApi.ChargePosting postingOf(PostingAccountMap map, ComputedCharge charge, UUID chargeId) {
         Money base = charge.amounts().base();
         Money tax = charge.amounts().tax();
-        if (!charge.amounts().discount().isZero()) {
-            throw new IllegalStateException("a discount is posted by its own transaction and is deferred");
-        }
+        Money benefit = charge.amounts().discount();
         UUID receivable = map.receivable().orElseThrow(() -> new IllegalStateException("no receivable account"));
         UUID revenue = map.revenueFor(charge.conceptCategory())
                 .orElseThrow(() -> new IllegalStateException("no revenue account for the category"));
         List<LedgerPostingApi.Line> lines = new ArrayList<>();
-        lines.add(new LedgerPostingApi.Line(receivable, charge.studentId(), LedgerPostingApi.Side.DEBIT,
-                charge.amounts().total()));
+        if (charge.amounts().total().isPositive()) {
+            lines.add(new LedgerPostingApi.Line(receivable, charge.studentId(), LedgerPostingApi.Side.DEBIT,
+                    charge.amounts().total()));
+        }
         lines.add(new LedgerPostingApi.Line(revenue, null, LedgerPostingApi.Side.CREDIT, base));
+        if (benefit.isPositive()) {
+            UUID benefits = map.benefits().orElseThrow(() -> new IllegalStateException("no benefits account"));
+            lines.add(new LedgerPostingApi.Line(benefits, null, LedgerPostingApi.Side.DEBIT, benefit));
+        }
         if (tax.isPositive()) {
             UUID taxPayable = map.taxPayable().orElseThrow(() -> new IllegalStateException("no tax payable account"));
             lines.add(new LedgerPostingApi.Line(taxPayable, null, LedgerPostingApi.Side.CREDIT, tax));

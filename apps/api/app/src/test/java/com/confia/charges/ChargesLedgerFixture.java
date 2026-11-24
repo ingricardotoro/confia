@@ -21,6 +21,9 @@ import com.confia.charges.infrastructure.JooqPostingAccountRepository;
 import com.confia.ledger.application.LedgerApi;
 import com.confia.ledger.application.LedgerPosting;
 import com.confia.ledger.infrastructure.JooqLedgerRepository;
+import com.confia.scholarships.application.AwardBenefitsService;
+import com.confia.scholarships.application.api.AwardBenefits;
+import com.confia.scholarships.infrastructure.JooqAwardsInForceRepository;
 import com.confia.organization.infrastructure.JooqPlacementDirectory;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.shared.jobs.infrastructure.DbSchedulerJobScheduler;
@@ -112,7 +115,7 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
                 new JooqChargePlanItemRepository(dsl), new JooqAccrualRunRepository(dsl),
                 new JooqAccrualRunItemRepository(dsl), new JooqChargeRepository(dsl), new JooqPlacementDirectory(dsl),
                 new JooqEnrollmentRoster(dsl), new JooqStudentDirectory(dsl), new JooqPricingDirectory(dsl),
-                new JooqPostingAccountRepository(dsl), ledger(),
+                new JooqPostingAccountRepository(dsl), ledger(), awardBenefits(),
                 new JobAccrualRunScheduler(
                         new DbSchedulerJobScheduler(new TransactionalDataSource(dataSource()), new TracedJobSerializer()),
                         CLOCK),
@@ -124,7 +127,12 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
                 new JooqChargePlanItemRepository(dsl), new JooqAccrualRunRepository(dsl),
                 new JooqAccrualRunItemRepository(dsl), new JooqChargeRepository(dsl), new JooqPlacementDirectory(dsl),
                 new JooqEnrollmentRoster(dsl), new JooqStudentDirectory(dsl), new JooqPricingDirectory(dsl),
-                new JooqPostingAccountRepository(dsl), ledger(), ledger(), new JooqAuditLogWriter(dsl), CLOCK);
+                new JooqPostingAccountRepository(dsl), ledger(), awardBenefits(), ledger(), new JooqAuditLogWriter(dsl), CLOCK);
+    }
+
+    /** What the approved awards in force offer, read from the real database as the accrual of every process reads it. */
+    protected AwardBenefits awardBenefits() {
+        return new AwardBenefitsService(new JooqAwardsInForceRepository(dsl));
     }
 
     /** Requests and executes the accrual of February for the plan: one charge per student. */
@@ -216,6 +224,23 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
         }
     }
 
+    /**
+     * Adds to the map of posting accounts the account of the benefits, of the type given (assumption S4: {@code INCOME} as a
+     * contra-revenue or {@code EXPENSE}), and answers its identifier. Fictional account.
+     */
+    protected static UUID addBenefitsAccount(Env env, String accountType) throws SQLException {
+        UUID account = UUID.randomUUID();
+        try (Connection c = StaffRoleFixtures.ownerTransaction(env.institution())) {
+            exec(c, "insert into ledger_account (institution_id, id, code, name, account_type, holds_student_balances) "
+                    + "values (?, ?, '5105', 'Becas y descuentos otorgados', ?, false)", env.institution(), account,
+                    accountType);
+            exec(c, "insert into charges_posting_account (institution_id, id, purpose, ledger_account_id) "
+                    + "values (?, ?, 'BENEFITS', ?)", env.institution(), UUID.randomUUID(), account);
+            c.commit();
+        }
+        return account;
+    }
+
     /** The balance of a student in the ledger: what its receivable debits exceed its credits by. */
     protected static BigDecimal balanceOf(Env env, UUID student) throws SQLException {
         return decimal(env.institution(), "select coalesce(sum(case when e.side = 'DEBIT' then e.amount else -e.amount end), 0) "
@@ -226,6 +251,13 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
 
     /** An active monthly plan of one grade from February 2027, priced at a fictional 1,500.00 with a fictional 10 % tax. */
     protected Env seed(int students) throws SQLException {
+        return seed(students, "1500.00", "10", "HNL");
+    }
+
+    /**
+     * As {@link #seed(int)} with the price of the concept, the percentage of its fictional tax and the currency of the price given.
+     */
+    protected Env seed(int students, String price, String taxPercent, String currency) throws SQLException {
         UUID institution = UUID.randomUUID();
         UUID year = UUID.randomUUID();
         UUID modality = UUID.randomUUID();
@@ -255,16 +287,16 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
             exec(c, "insert into catalog_tax_rate (institution_id, id, code, name) values (?, ?, 'TAXA', 'Tasa ficticia')",
                     institution, rate);
             exec(c, "insert into catalog_tax_rate_period (institution_id, id, tax_rate_id, rate_percent, valid_from, "
-                    + "created_by) values (?, ?, ?, 10, date '2027-01-01', ?)", institution, UUID.randomUUID(), rate,
-                    admin);
+                    + "created_by) values (?, ?, ?, ?::numeric, date '2027-01-01', ?)", institution, UUID.randomUUID(), rate,
+                    taxPercent, admin);
             exec(c, "insert into catalog_payment_concept (institution_id, id, code, name, category, is_taxable, "
                     + "is_recurring, tax_rate_id) values (?, ?, 'COL', 'Colegiatura', 'TUITION', true, true, ?)",
                     institution, concept, rate);
             exec(c, "insert into catalog_price_list (institution_id, id, academic_year_id, name, scope) "
                     + "values (?, ?, ?, 'General 2027', 'INSTITUTION')", institution, list, year);
             exec(c, "insert into catalog_price_list_item (institution_id, id, price_list_id, payment_concept_id, "
-                    + "amount, currency, valid_from, created_by) values (?, ?, ?, ?, 1500.00, 'HNL', date '2027-01-01', ?)",
-                    institution, UUID.randomUUID(), list, concept, admin);
+                    + "amount, currency, valid_from, created_by) values (?, ?, ?, ?, ?::numeric, ?, date '2027-01-01', ?)",
+                    institution, UUID.randomUUID(), list, concept, price, currency, admin);
             for (Object[] account : new Object[][] {{receivable, "1105", "ASSET", true},
                     {revenue, "4105", "INCOME", false}, {taxAccount, "2105", "LIABILITY", false}}) {
                 exec(c, "insert into ledger_account (institution_id, id, code, name, account_type, "

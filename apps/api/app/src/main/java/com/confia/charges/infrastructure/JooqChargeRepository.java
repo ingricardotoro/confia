@@ -91,6 +91,8 @@ public final class JooqChargeRepository implements ChargeRepository {
                 .set(CHARGES_CHARGE.TAX_RATE_ID, charge.taxRateId())
                 .set(CHARGES_CHARGE.TAX_RATE_PERIOD_ID, charge.taxRatePeriodId())
                 .set(CHARGES_CHARGE.TAX_RATE_PERCENT, charge.taxPercent() == null ? null : charge.taxPercent().value())
+                .set(CHARGES_CHARGE.SCHOLARSHIP_AWARD_ID, charge.benefit() == null ? null : charge.benefit().awardId())
+                .set(CHARGES_CHARGE.SCHOLARSHIP_CODE, charge.benefit() == null ? null : charge.benefit().scholarshipCode())
                 .set(CHARGES_CHARGE.LEDGER_TRANSACTION_ID, ledgerTransactionId)
                 .set(CHARGES_CHARGE.CREATED_BY, createdBy)
                 .execute();
@@ -151,6 +153,8 @@ public final class JooqChargeRepository implements ChargeRepository {
                 .where(CHARGES_CHARGE.INSTITUTION_ID.eq(institution.value()))
                 .and(CHARGES_CHARGE.STUDENT_ID.eq(studentId))
                 .and(CHARGES_CHARGE.TOTAL_CURRENCY.eq(currency.name()))
+                // A charge that a scholarship left with nothing to pay has nothing a payment can cover.
+                .and(CHARGES_CHARGE.TOTAL_AMOUNT.gt(BigDecimal.ZERO))
                 .andNotExists(dsl.selectOne().from(CHARGES_CHARGE_VOID)
                         .where(CHARGES_CHARGE_VOID.INSTITUTION_ID.eq(CHARGES_CHARGE.INSTITUTION_ID))
                         .and(CHARGES_CHARGE_VOID.CHARGE_ID.eq(CHARGES_CHARGE.ID)))
@@ -183,7 +187,9 @@ public final class JooqChargeRepository implements ChargeRepository {
         List<ChargeRow> rows = dsl.select(CHARGES_CHARGE.ID, CHARGES_CHARGE.PAYMENT_CONCEPT_ID,
                 CHARGES_CHARGE.CONCEPT_CATEGORY, CHARGES_CHARGE.PERIOD_LABEL, CHARGES_CHARGE.PERIOD_START,
                 CHARGES_CHARGE.PERIOD_END, CHARGES_CHARGE.DUE_ON, CHARGES_CHARGE.ORIGIN, CHARGES_CHARGE.BASE_AMOUNT,
-                CHARGES_CHARGE.BASE_CURRENCY, CHARGES_CHARGE.TAX_AMOUNT, CHARGES_CHARGE.TAX_CURRENCY,
+                CHARGES_CHARGE.BASE_CURRENCY, CHARGES_CHARGE.DISCOUNT_AMOUNT, CHARGES_CHARGE.DISCOUNT_CURRENCY,
+                CHARGES_CHARGE.NET_BASE_AMOUNT, CHARGES_CHARGE.NET_BASE_CURRENCY, CHARGES_CHARGE.SCHOLARSHIP_AWARD_ID,
+                CHARGES_CHARGE.SCHOLARSHIP_CODE, CHARGES_CHARGE.TAX_AMOUNT, CHARGES_CHARGE.TAX_CURRENCY,
                 CHARGES_CHARGE.TOTAL_AMOUNT, CHARGES_CHARGE.TOTAL_CURRENCY, CHARGES_CHARGE_VOID.ID,
                 CHARGES_CHARGE_VOID.REVERSAL_TRANSACTION_ID, CHARGES_CHARGE_VOID.VOIDED_AT, CHARGES_CHARGE_VOID.REASON)
                 .from(CHARGES_CHARGE).leftJoin(CHARGES_CHARGE_VOID)
@@ -229,6 +235,9 @@ public final class JooqChargeRepository implements ChargeRepository {
                 row.get(CHARGES_CHARGE.PERIOD_START), row.get(CHARGES_CHARGE.PERIOD_END), row.get(CHARGES_CHARGE.DUE_ON),
                 row.get(CHARGES_CHARGE.ORIGIN),
                 MoneyColumns.toMoney(row.get(CHARGES_CHARGE.BASE_AMOUNT), row.get(CHARGES_CHARGE.BASE_CURRENCY)),
+                MoneyColumns.toMoney(row.get(CHARGES_CHARGE.DISCOUNT_AMOUNT), row.get(CHARGES_CHARGE.DISCOUNT_CURRENCY)),
+                MoneyColumns.toMoney(row.get(CHARGES_CHARGE.NET_BASE_AMOUNT), row.get(CHARGES_CHARGE.NET_BASE_CURRENCY)),
+                row.get(CHARGES_CHARGE.SCHOLARSHIP_AWARD_ID), row.get(CHARGES_CHARGE.SCHOLARSHIP_CODE),
                 MoneyColumns.toMoney(row.get(CHARGES_CHARGE.TAX_AMOUNT), row.get(CHARGES_CHARGE.TAX_CURRENCY)),
                 MoneyColumns.toMoney(row.get(CHARGES_CHARGE.TOTAL_AMOUNT), row.get(CHARGES_CHARGE.TOTAL_CURRENCY)),
                 voided);
@@ -237,7 +246,8 @@ public final class JooqChargeRepository implements ChargeRepository {
     @Override
     public List<IntegrityCheck.ChargeFact> integrityFacts(InstitutionId institution) {
         return dsl.select(CHARGES_CHARGE.ID, CHARGES_CHARGE.LEDGER_TRANSACTION_ID, CHARGES_CHARGE.TOTAL_AMOUNT,
-                CHARGES_CHARGE.TOTAL_CURRENCY, CHARGES_CHARGE_VOID.REVERSAL_TRANSACTION_ID)
+                CHARGES_CHARGE.TOTAL_CURRENCY, CHARGES_CHARGE.DISCOUNT_AMOUNT, CHARGES_CHARGE.DISCOUNT_CURRENCY,
+                CHARGES_CHARGE_VOID.REVERSAL_TRANSACTION_ID)
                 .from(CHARGES_CHARGE).leftJoin(CHARGES_CHARGE_VOID)
                 .on(CHARGES_CHARGE_VOID.INSTITUTION_ID.eq(CHARGES_CHARGE.INSTITUTION_ID))
                 .and(CHARGES_CHARGE_VOID.CHARGE_ID.eq(CHARGES_CHARGE.ID))
@@ -246,6 +256,8 @@ public final class JooqChargeRepository implements ChargeRepository {
                 .fetch(row -> new IntegrityCheck.ChargeFact(row.get(CHARGES_CHARGE.ID),
                         row.get(CHARGES_CHARGE.LEDGER_TRANSACTION_ID),
                         MoneyColumns.toMoney(row.get(CHARGES_CHARGE.TOTAL_AMOUNT), row.get(CHARGES_CHARGE.TOTAL_CURRENCY)),
+                        MoneyColumns.toMoney(row.get(CHARGES_CHARGE.DISCOUNT_AMOUNT),
+                                row.get(CHARGES_CHARGE.DISCOUNT_CURRENCY)),
                         row.get(CHARGES_CHARGE_VOID.REVERSAL_TRANSACTION_ID)));
     }
 

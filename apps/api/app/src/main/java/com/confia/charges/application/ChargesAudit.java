@@ -23,6 +23,7 @@ final class ChargesAudit {
     static final String CHARGE = "charges.charge";
     static final String STUDENT_CHARGES = "charges.student_charges";
     static final String INTEGRITY_RUN = "charges.integrity_run";
+    static final String SIMULATION = "charges.simulation";
 
     private static final String ACTOR_KIND_STAFF = "staff";
     private static final String OUTCOME_SUCCESS = "success";
@@ -88,6 +89,16 @@ final class ChargesAudit {
                 AuditJson.object().text("voidId", charge.id().toString()).text("studentId", studentId.toString())
                         .text("reversalTransactionId", charge.reversalTransactionId().toString())
                         .number("reasonLength", charge.reason().length()).toJson());
+    }
+
+    /**
+     * The consultation of the simulator for a student: the data are those of a minor, so each one is audited. It carries the
+     * student as the entity, the plan and the first day of the period; never an amount, a name or a scholarship.
+     */
+    static AuditEntry simulationViewed(AuthenticatedActor actor, UUID requestId, UUID studentId, UUID planId,
+            java.time.LocalDate periodStart) {
+        return entry(actor, requestId, SIMULATION + ".viewed", SIMULATION, studentId, null,
+                AuditJson.object().text("planId", planId.toString()).text("periodStart", periodStart.toString()).toJson());
     }
 
     /** The reading of the charges of a student: the filters asked for, never an amount or a name. */
