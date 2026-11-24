@@ -53,7 +53,7 @@ class IdempotencyScopeExclusionInventoryTest {
      */
     private static final Set<String> HEADER_LITERAL_ALSO_ALLOWED = Set.of("com.confia.charges.web.AccrualController",
             "com.confia.charges.web.ChargeController", "com.confia.cashbox.web.CashboxController",
-            "com.confia.payments.web.PaymentController");
+            "com.confia.payments.web.PaymentController", "com.confia.scholarships.web.ScholarshipAwardController");
 
     /**
      * The only types of {@code com.confia.shared.security} that a class in a {@code ..web..} package

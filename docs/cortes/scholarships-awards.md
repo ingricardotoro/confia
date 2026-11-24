@@ -142,8 +142,7 @@ junto a pagos.
 
 ## Lo construido (backend T1, 2026-11-24)
 
-Parcial: migración, dominio, casos de uso y adaptadores están construidos y probados; la capa web está escrita pero sin registrar en una
-construcción verde (ver "Pendiente").
+Backend de T1 completo: migración, dominio, casos de uso, adaptadores, capa web y contrato. Quedan T2 (devengo y simulador) y T3.
 
 - **Migración `V36__create_scholarships_core.sql`.** Tablas `scholarships_scholarship`, `scholarships_scholarship_concept`,
   `scholarships_award` y `scholarships_award_decision`, con RLS forzada por institución, `NUMERIC(14,4)` más moneda y sin borrado.
@@ -166,9 +165,16 @@ construcción verde (ver "Pendiente").
 - Crear y solicitar no llevan `Idempotency-Key` (convención del catálogo); desactivar y reactivar son idempotentes por estado.
 - Que la vigencia esté dentro del año lo valida el trigger de la base, porque `organization` no publica las fechas del año.
 
-### Pendiente
+### Capa web y contrato
 
-Requiere editar archivos fuera de la superficie autorizada: `PermissionedEndpoints.java` (12 rutas), `ProblemCode.java` y
-`i18n/problems.properties` (códigos `duplicate-scholarship-code`, `scholarship-benefit-locked`, `scholarship-award-overlap`,
-`invalid-award-state`) y `IdempotencyScopeExclusionInventoryTest` (`ScholarshipAwardController`). Después: registrar la capa web, regenerar
-`admin.openapi.json` y `packages/contracts`.
+- Controladores `ScholarshipController` (`/api/v1/scholarships`) y `ScholarshipAwardController` (`/api/v1/scholarship-awards`) con DTO
+  explícitos, Bean Validation, importes `{ amount, currency }` y paginación por servidor (máximo 200). Registrados solo en el punto de
+  entrada administrativo. Las 12 rutas están en `PermissionedEndpoints`; hay cuatro códigos nuevos (`duplicate-scholarship-code`,
+  `scholarship-benefit-locked`, `scholarship-award-overlap`, `invalid-award-state`, todos 409).
+- `admin.openapi.json` regenerado (12 operaciones nuevas; el portal no cambia) y `packages/contracts` regenerado con `pnpm generate`.
+
+### Preguntas abiertas
+
+- `scholarships:void` (revocar) lo tiene solo el Super Administrador, porque `StaffRole` no lo da al Administrador y la matriz no se
+  cambió. La nota original decía que ambos roles; el propietario debe decidir si se amplía.
+- El mensaje de `self-approval-forbidden` en `problems.properties` habla de pagos; conviene redactarlo de forma neutra.

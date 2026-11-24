@@ -174,6 +174,9 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     // The payments module (docs/cortes/payments-register.md): the same five packages. Administrative only.
                     "com.confia.payments.infrastructure", "com.confia.payments.infrastructure.wiring",
                     "com.confia.payments.application", "com.confia.payments.web", "com.confia.payments.web.wiring",
+                    // The scholarships module (docs/cortes/scholarships-awards.md): the same five packages. Administrative only.
+                    "com.confia.scholarships.infrastructure", "com.confia.scholarships.infrastructure.wiring",
+                    "com.confia.scholarships.application", "com.confia.scholarships.web", "com.confia.scholarships.web.wiring",
                     // The ledger module (docs/cortes/ledger-core.md): its jOOQ adapter, the named-interface package
                     // of its configuration and its application services, and from the chart-of-accounts cut
                     // (docs/cortes/ledger-chart-of-accounts.md) its controller and the named-interface package of the
@@ -293,6 +296,7 @@ record ProcessBeanPolicy(String process, String entryPackage, Set<String> allowe
                     "com.confia.charges.web", ADMIN_MODULE,
                     "com.confia.cashbox.web", ADMIN_MODULE,
                     "com.confia.payments.web", ADMIN_MODULE,
+                    "com.confia.scholarships.web", ADMIN_MODULE,
                     "com.confia.ledger.web", ADMIN_MODULE,
                     "com.confia.shared.observability.health",
                     "the worker serves no route; its health is a heartbeat file (WE100)"));
