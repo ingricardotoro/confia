@@ -41,7 +41,10 @@ jobs:
     # in the parallel `backend mutation` job below (ci-green-main, owner decision 2026-10-29).
     # Raised from 15 to 25 minutes on 2026-11-16: the suite grew with the catalog cuts and the
     # job reached 14m46s on #316 and was cancelled at 15m19s on #317 with no failing test.
-    timeout-minutes: 25
+    # Raised from 25 to 40 minutes on 2026-11-24: with the cashbox and payments cuts the job
+    # reached 24m54s on #348 and 24m52s on #351, and was cancelled at 25 minutes on #345 with no
+    # failing test.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -104,7 +107,9 @@ jobs:
   frontend:
     name: frontend verify
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Raised from 10 to 20 minutes on 2026-11-24: the job takes 6 to 10 minutes and was cancelled
+    # at 10m7s on #350 with no failing test.
+    timeout-minutes: 20
     # The TypeScript workspace (frontend-monorepo-and-contracts-pipeline, design.md decision 10). It
     # needs neither a JDK nor Docker: packages/contracts is generated from the approved snapshots in
     # apps/api/openapi/, whose agreement with the Java code the backend job proves on every run.
