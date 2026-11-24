@@ -14,7 +14,7 @@ Branch: `feat/scholarships-awards`. Delivery: ask-on-risk (split PRs over 800 li
 
 | ID | Specs | Route | Status | Evidence |
 |---|---|---|---|---|
-| T1 | S1 | delegated (context backstop) to confia-backend-dev | partial: backend, contract and permission change done; ScholarshipsIT, AuthorizationEdgeIT and RolesReportEndpointIT not run to completion (run killed for lack of memory) | bb9a094c, c656dadb, dfdcaafa, e86328aa, 1a65686a, 32eba0ba |
+| T1 | S1 | delegated (context backstop) to confia-backend-dev | done: ScholarshipsIT 29/29, AuthorizationEdgeIT 25/25, RolesReportEndpointIT 17/17 (2026-11-24) | bb9a094c, c656dadb, dfdcaafa, e86328aa, 1a65686a, 32eba0ba, ca52eb03, 265d5b83, 6b1325f8 |
 | T2 | S1, S2, S4 | delegated (context backstop) to confia-backend-dev | pending | |
 | T3 | S1, S3 | delegated to confia-frontend-dev | pending | |
 | T4 | S3 | delegated reviewers | pending | |
@@ -30,3 +30,4 @@ T3 = contracts and screens. T4 = reviews and fixes. T5 = roadmap line and cut no
 - L2: cut note committed as `68f30a0b`, rebased onto main as `2e32b2d4`.
 
 - L3 (2026-11-24, user): "si, si puede el adminsitrador revocar una beca, con justificacion". The Administrator gains `scholarships:void`; the reason of 20 to 500 characters stays.
+- L4 (2026-11-24): the parent ran the three integration tests one at a time: ScholarshipsIT 29/29, AuthorizationEdgeIT 25/25 after loading the scholarships configuration in its harness and leaving the scholarships routes out of the revoked-session walk (the harness opens no database), RolesReportEndpointIT 17/17. Gap for T4: no web-level test of a revoked session on the scholarships routes.
