@@ -153,6 +153,73 @@ class AccrualEndpointsIT extends CommittingPostgresIntegrationTest {
     }
 
     @Test
+    void theSimulatorAnswersWhatTheAccrualWouldProduceForOneStudentWithTheNewAmountsAndAuditsTheConsultation()
+            throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        Seeded seeded = seed(admin);
+        Member cashier = sameInstitution(admin.institution(), StaffRole.CASHIER.code());
+        String planPath = PLANS + "/" + seeded.plan();
+        JsonNode preview = HarnessProcess.json(post(planPath + "/accrual-preview", admin,
+                "{\"periodStart\":\"2027-02-01\"}", null));
+        JsonNode previewItem = preview.get("items").get(0);
+        assertThat(previewItem.get("benefitAmount").get("amount").asString()).isEqualTo("0.00");
+        assertThat(previewItem.get("netBase").get("amount").asString()).isEqualTo("1500.00");
+        assertThat(previewItem.get("scholarshipAwardId").isNull()).isTrue();
+        assertThat(preview.get("totals").get(0).get("benefitAmount").get("amount").asString()).isEqualTo("0.00");
+        assertThat(preview.get("totals").get(0).get("netBase").get("amount").asString()).isEqualTo("3000.00");
+        String student = previewItem.get("studentId").asString();
+        String path = planPath + "/simulation?studentId=" + student + "&period=2027-02-01";
+
+        HttpResponse<String> response = get(path, cashier);
+
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
+        JsonNode simulation = HarnessProcess.json(response);
+        assertThat(simulation.get("planId").asString()).isEqualTo(seeded.plan().toString());
+        assertThat(simulation.get("studentId").asString()).isEqualTo(student);
+        assertThat(simulation.get("periodStart").asString()).isEqualTo("2027-02-01");
+        assertThat(simulation.get("periodLabel").asString()).isEqualTo("2027-02");
+        assertThat(simulation.get("lines")).hasSize(1);
+        JsonNode line = simulation.get("lines").get(0);
+        assertThat(line.get("paymentConceptId").asString()).isEqualTo(seeded.concept().toString());
+        assertThat(line.get("outcome").asString()).isEqualTo("CREATED");
+        assertThat(line.get("base").get("amount").asString()).isEqualTo("1500.00");
+        assertThat(line.get("base").get("currency").asString()).isEqualTo("HNL");
+        assertThat(line.get("benefitAmount").get("amount").asString()).isEqualTo("0.00");
+        assertThat(line.get("netBase").get("amount").asString()).isEqualTo("1500.00");
+        assertThat(line.get("tax").get("amount").asString()).isEqualTo("150.00");
+        assertThat(line.get("total").get("amount").asString()).isEqualTo("1650.00");
+        assertThat(line.get("scholarshipAwardId").isNull()).isTrue();
+        assertThat(line.get("scholarshipCode").isNull()).isTrue();
+        // It wrote nothing but the audit entry of the consultation: no charge, no job, and no amount in the entry.
+        assertThat(taskCount()).isZero();
+        assertThat(count(admin.institution(), "charges_charge")).isZero();
+        assertThat(auditEntries(admin.institution(), "charges.simulation.viewed")).isEqualTo(1);
+    }
+
+    @Test
+    void theSimulatorNeedsAStudentAndAPeriodOfThePlanAndAnotherInstitutionSeesNothing() throws SQLException {
+        Member mine = member(StaffRole.ADMINISTRATOR.code());
+        Seeded seeded = seed(mine);
+        Member theirs = member(StaffRole.ADMINISTRATOR.code());
+        String planPath = PLANS + "/" + seeded.plan();
+        String student = HarnessProcess.json(post(planPath + "/accrual-preview", mine,
+                "{\"periodStart\":\"2027-02-01\"}", null)).get("items").get(0).get("studentId").asString();
+
+        assertProblem(get(planPath + "/simulation?period=2027-02-01", mine), 400, "validation-failed");
+        assertProblem(get(planPath + "/simulation?studentId=" + student, mine), 400, "validation-failed");
+        assertProblem(get(planPath + "/simulation?studentId=not-a-uuid&period=2027-02-01", mine), 400,
+                "validation-failed");
+        assertProblem(get(planPath + "/simulation?studentId=" + student + "&period=2027-02-15", mine), 400,
+                "validation-failed");
+        assertProblem(get(planPath + "/simulation?studentId=" + UUID.randomUUID() + "&period=2027-02-01", mine), 404,
+                "resource-not-found");
+        assertProblem(get(planPath + "/simulation?studentId=" + student + "&period=2027-02-01", theirs), 404,
+                "resource-not-found");
+        assertThat(send("GET", planPath + "/simulation?studentId=" + student + "&period=2027-02-01", null, null)
+                .statusCode()).isEqualTo(401);
+    }
+
+    @Test
     void theRequestNeedsItsKeyAndAValidBodyAndAPeriodOfThePlan() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
         String planPath = PLANS + "/" + seed(admin).plan();
@@ -325,6 +392,32 @@ class AccrualEndpointsIT extends CommittingPostgresIntegrationTest {
             c.commit();
         }
         return new Seeded(plan, concept);
+    }
+
+    /** The rows of a table of the institution, counted as the owner. {@code table} is a literal of the tests. */
+    private static long count(UUID institution, String table) throws SQLException {
+        try (Connection connection = StaffRoleFixtures.ownerTransaction(institution);
+                PreparedStatement statement = connection
+                        .prepareStatement("select count(*) from " + table + " where institution_id = ?")) {
+            statement.setObject(1, institution);
+            try (var result = statement.executeQuery()) {
+                result.next();
+                return result.getLong(1);
+            }
+        }
+    }
+
+    private static long auditEntries(UUID institution, String action) throws SQLException {
+        try (Connection connection = StaffRoleFixtures.ownerTransaction(institution);
+                PreparedStatement statement = connection.prepareStatement(
+                        "select count(*) from shared_audit_log where institution_id = ? and action = ?")) {
+            statement.setObject(1, institution);
+            statement.setString(2, action);
+            try (var result = statement.executeQuery()) {
+                result.next();
+                return result.getLong(1);
+            }
+        }
     }
 
     private static long taskCount() throws SQLException {
