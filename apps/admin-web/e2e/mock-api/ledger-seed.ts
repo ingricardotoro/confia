@@ -6,7 +6,7 @@
  * an equity account, and twenty generic expense accounts after them, so the list needs a second page.
  */
 export type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
-export type PostingPurpose = "RECEIVABLE" | "REVENUE" | "TAX_PAYABLE";
+export type PostingPurpose = "RECEIVABLE" | "REVENUE" | "TAX_PAYABLE" | "BENEFITS";
 export type RevenueCategory = "TUITION" | "ENROLLMENT" | "TRANSPORT" | "MATERIAL" | "FINE" | "OTHER";
 
 export interface LedgerAccountRow {

@@ -102,6 +102,9 @@ function fits(purpose: PostingPurpose, account: LedgerAccountRow): boolean {
       return account.type === "LIABILITY" && !account.holdsStudentBalances;
     case "REVENUE":
       return account.type === "INCOME" && !account.holdsStudentBalances;
+    // Becas y descuentos: a contra-revenue (income) or an expense account that holds no student balance, until the accountant answers.
+    case "BENEFITS":
+      return (account.type === "INCOME" || account.type === "EXPENSE") && !account.holdsStudentBalances;
   }
 }
 
