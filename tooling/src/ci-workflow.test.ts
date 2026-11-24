@@ -37,9 +37,9 @@ const UPLOAD = "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
 describe("the existing jobs of the CI workflow [BX19]", () => {
   it("keep their names and time limits", () => {
     expect(Object.entries(jobs).slice(0, 4).map(([key, job]) => [key, job.name, job["timeout-minutes"]])).toEqual([
-      ["backend", "backend verify", 25],
+      ["backend", "backend verify", 40],
       ["backend-mutation", "backend mutation", 75],
-      ["frontend", "frontend verify", 10],
+      ["frontend", "frontend verify", 20],
       ["security", "security scanning", undefined],
     ]);
   });
