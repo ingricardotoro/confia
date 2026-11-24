@@ -19,7 +19,8 @@ import java.util.UUID;
  * permanently on the session with the hash of what it asked: the same key from the same cashier with the same float answers the
  * same session, the same key with another request answers {@code 422 idempotency-payload-mismatch}, and another key while a
  * session is open answers {@code 409 cash-session-already-open}. The unique partial index of the database decides two
- * simultaneous openings; the loser starts again and finds the winner.
+ * simultaneous openings; the loser starts again and finds the winner. A request with the same key that commits between the
+ * lookup of the key and the lookup of the open session is found by the second one, and is answered as a replay too.
  */
 public final class OpenSession {
 
@@ -64,12 +65,14 @@ public final class OpenSession {
         return transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
             Optional<CashSession> replay = sessions.findByRequestKey(institution, key);
             if (replay.isPresent()) {
-                if (!replay.get().answers(hash)) {
-                    throw new IdempotencyPayloadMismatchException();
-                }
-                return details.load(institution, replay.get());
+                return replayOf(institution, replay.get(), hash);
             }
-            if (sessions.findOpenByCashier(institution, actor.accountId()).isPresent()) {
+            Optional<CashSession> open = sessions.findOpenByCashier(institution, actor.accountId());
+            if (open.isPresent()) {
+                // A request with this same key can commit between the two reads: its session is then a replay, not a second opening.
+                if (open.get().requestKey().equals(key)) {
+                    return replayOf(institution, open.get(), hash);
+                }
                 throw new CashSessionAlreadyOpenException();
             }
             CashSession session = CashSession.open(UUID.randomUUID(), actor.accountId(), floatAmount, clock.instant(), key,
@@ -78,5 +81,12 @@ public final class OpenSession {
             auditLogWriter.append(CashboxAudit.sessionOpened(actor, auditRequestId, session));
             return details.load(institution, session);
         });
+    }
+
+    private SessionDetail replayOf(InstitutionId institution, CashSession session, String hash) {
+        if (!session.answers(hash)) {
+            throw new IdempotencyPayloadMismatchException();
+        }
+        return details.load(institution, session);
     }
 }
