@@ -179,3 +179,71 @@ Backend de T1 completo: migración, dominio, casos de uso, adaptadores, capa web
 ### Preguntas abiertas
 
 - El mensaje de `self-approval-forbidden` en `problems.properties` habla de pagos; conviene redactarlo de forma neutra.
+
+## Lo construido (backend T2, 2026-11-24)
+
+Integración con el devengo completa en el backend: la beca aprobada y vigente se aplica al cargo, el asiento registra el ingreso bruto y la
+beca, la vista previa, los cargos del estudiante y el simulador muestran el detalle. Queda T3 (contrato y pantallas).
+
+- **Migración `V37__add_scholarship_benefit_to_charges.sql`** (solo agrega; ningún cargo existente se toca):
+  - El cargo guarda el otorgamiento aplicado (`scholarship_award_id`, con clave foránea) y el código de la beca (`scholarship_code`). La base
+    neta (`net_base_amount`, `net_base_currency`) es una columna generada: base menos beneficio. El beneficio es la columna `discount_amount`
+    que ya existía desde V32, así que base bruta, beneficio, base neta, impuesto y total quedan en `NUMERIC(14,4)` con su moneda.
+  - La base de datos rechaza un beneficio sin otorgamiento (y al revés) y un otorgamiento que no esté aprobado, que sea de otro estudiante,
+    que no cubra la fecha del cargo (ambos extremos incluidos), que sea de una beca inactiva o que no cubra el concepto. También rechaza un
+    beneficio distinto del que da la beca (porcentaje o monto fijo, limitado al tope y a la base) y un asiento cuyo único otro débito no sea
+    el beneficio.
+  - El propósito `BENEFITS` entra al mapa de cuentas.
+- **Dominio de `charges` (puro, con `Money` y `HALF_UP`).** `BenefitOffer` y `BenefitSelection` eligen la oferta de mayor beneficio y, con
+  empate, la beca de código menor; `ChargeEvaluator` calcula el impuesto sobre la base reducida con un solo redondeo y el beneficio nunca deja
+  la base neta por debajo de cero. `IntegrityCheck` compara cada lado del asiento contra total más beneficio.
+- **`scholarships` publica `AwardBenefits`** (`application/api`, interfaz nombrada `api`): para un estudiante, un concepto, una fecha y una
+  base, qué ofrece cada otorgamiento aprobado y vigente. El beneficio lo calcula `Benefit.on` de la beca, la única fórmula; `charges` no importa
+  el dominio de `scholarships`. El proceso trabajador carga solo el adaptador de lectura (`ScholarshipsWorkerConfiguration`).
+- **Motor.** La vista previa, la ejecución del trabajador y el simulador pasan por el mismo `AccrualEngine`. La fecha de vigencia es el primer
+  día del período, que es también la fecha de precio y la del asiento. Los cargos ya emitidos nunca cambian: generar de nuevo los encuentra y no
+  crea nada (INV-14), aunque el otorgamiento se apruebe o se revoque después.
+- **Libro mayor.** Una sola transacción por cargo: débito a la cuenta por cobrar por el total, crédito al ingreso por la base bruta, débito a
+  `BENEFITS` por el beneficio y crédito al impuesto por pagar. El ejemplo del criterio de aceptación (base 1,100.00, beca 25 %, impuesto 15 %)
+  da base neta 825.00, impuesto 123.75, total 948.75, ingreso 1,100.00 y becas 275.00; el asiento cuadra.
+- **Lectura.** La vista previa agrega `benefitAmount` y `netBase` por fila y por total, y `scholarshipAwardId` y `scholarshipCode` por fila.
+  Los cargos del estudiante agregan los cuatro campos. El simulador es `GET /api/v1/charges/plans/{planId}/simulation?studentId&period`
+  (`charges:read`, `period` es el primer día del período, `yyyy-MM-dd`) y responde por concepto: resultado, base, `benefitAmount`, `netBase`,
+  beca (otorgamiento y código), impuesto y total. Se audita cada consulta (`charges.simulation.viewed`, sin importes ni nombres).
+- **Pruebas.** Unitarias de dominio (selección, evaluador, mapa, verificación de integridad, servicio de ofertas), `AwardBenefitsIT` (9) y
+  `AccrualScholarshipsIT` (25) contra PostgreSQL real, y dos de ruta en `AccrualEndpointsIT`.
+
+### Supuestos pendientes del contador (S4)
+
+Siguen en la lista de validaciones externas y están implementados así hasta que el contador responda:
+
+- El impuesto se calcula sobre la base reducida.
+- `BENEFITS` acepta una cuenta de ingreso (resta del ingreso) o de gasto que no lleve saldos de estudiantes. Una cuenta de otro tipo deja el
+  mapa incompleto para un período con becas aplicables.
+
+### Desviaciones
+
+- **Un cargo puede quedar en cero.** Una beca del 100 % (o un monto fijo que alcanza la base) deja el total en cero, y el libro mayor no admite
+  una línea de monto cero. Por eso la migración relaja `total_amount > 0` a `>= 0`, el asiento no lleva línea a la cuenta del estudiante y el
+  trigger del cargo y el de la anulación esperan cero líneas en ese caso. Ese cargo no aparece en el estado de cuenta (que sale de las
+  líneas del libro), no se ofrece a un pago (`findActiveByStudent` lo excluye) y se puede anular; la verificación nocturna lo revisa.
+- **El asiento es una sola transacción**, no una transacción `DISCOUNT` aparte como anticipaba el comentario de `BenefitsStep`; el trigger de
+  V32 que exigía un único débito se reemplazó.
+- **La fórmula del beneficio no se repite en `charges`.** `scholarships` calcula el monto de cada oferta (`Benefit.on`) y `charges` solo elige
+  y aplica; la base de datos repite la regla en un `CHECK`/trigger, como ya hacía con el impuesto.
+- **Bloqueo bajo `posting-accounts-incomplete`.** Solo bloquea (vista previa y ejecución) cuando algún estudiante de la población tiene un
+  otorgamiento aplicable a un concepto del período; sin becas aplicables no se pide la cuenta `BENEFITS`.
+- **Resumen de la vista previa:** el digest pasó a la versión `v2` e incluye el beneficio y el otorgamiento, de modo que revocar entre la vista
+  previa y la confirmación rechaza la ejecución con `preview-outdated`.
+- **Simulador:** un estudiante que no está matriculado en el destino del plan en ese período responde `404 resource-not-found`; una fecha que
+  no es el inicio de un período responde `400 validation-failed`.
+- **Compatibilidad:** `ManageAccrual` y `ExecuteAccrualRun` conservan el constructor sin `AwardBenefits` (sin becas) porque `PaymentsFixture`,
+  fuera de esta superficie, lo usa; los procesos reales usan el constructor nuevo.
+- La auditoría de la ejecución (`CurrencyTotals`) sigue sumando base, impuesto y total; no suma el beneficio.
+
+### Preguntas abiertas
+
+- ¿El contador acepta el tratamiento de S4 (impuesto sobre la base reducida y cuenta `BENEFITS` de ingreso o gasto)?
+- ¿Debe el estado de cuenta mostrar el cargo de total cero de una beca del 100 %? Hoy no aparece porque no mueve el auxiliar del estudiante.
+- No hay prueba de concurrencia del bloqueo `FOR SHARE` de las becas (revocar mientras el trabajador evalúa un estudiante); la lectura bajo
+  bloqueo se prueba, la espera no.
