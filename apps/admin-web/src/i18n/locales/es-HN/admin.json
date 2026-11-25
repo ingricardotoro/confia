@@ -2298,6 +2298,7 @@
     "title": "Becas",
     "errors": {
       "duplicateCode": "Ya existe una beca con ese código.",
+      "outsideAcademicYear": "La vigencia debe quedar dentro del año lectivo elegido.",
       "selfApproval": "Quien solicitó el otorgamiento no puede aprobarlo ni rechazarlo. Pida a otra persona con permiso de aprobación que lo revise."
     },
     "statuses": {

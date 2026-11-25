@@ -87,6 +87,8 @@ export function fieldErrorKey(reason: string): AdminKey {
       return "catalog.taxRates.errors.duplicateCode";
     case "duplicate-scholarship-code":
       return "scholarships.errors.duplicateCode";
+    case "outside-academic-year":
+      return "scholarships.errors.outsideAcademicYear";
     case "duplicate-account-code":
       return "ledger.accounts.errors.duplicateCode";
     case "rate-format":

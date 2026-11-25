@@ -237,6 +237,19 @@ describe("the request of an award", () => {
     expect(screen.getByRole("dialog", { name: "Solicitar un otorgamiento" })).toBeInTheDocument();
   });
 
+  it("puts the outside-academic-year refusal under the start of the validity and keeps the dialog open", async () => {
+    const user = userEvent.setup();
+    await openList();
+    route("post", AWARDS, problem("validation-failed", 400, { errors: [{ field: "validFrom", reason: "outside-academic-year" }] }));
+    const dialog = await openRequest(user);
+
+    await fillRequest(dialog, user);
+    await user.click(within(dialog).getByRole("button", { name: "Solicitar otorgamiento" }));
+
+    expect((await within(dialog).findAllByText("La vigencia debe quedar dentro del año lectivo elegido.", undefined, TIMEOUT)).length).toBeGreaterThan(0);
+    expect(screen.getByRole("dialog", { name: "Solicitar un otorgamiento" })).toBeInTheDocument();
+  });
+
   it("is not offered to a session without scholarships:create", async () => {
     await openList([PENDING], "/scholarships/awards", without("scholarships:create"));
 

@@ -145,3 +145,9 @@ describe("the reasons of a tax rate", () => {
     expect(fieldErrorKey(reason)).toBe(key);
   });
 });
+
+describe("the reasons of a scholarship award", () => {
+  it("gives outside-academic-year its own text", () => {
+    expect(fieldErrorKey("outside-academic-year")).toBe("scholarships.errors.outsideAcademicYear");
+  });
+});
