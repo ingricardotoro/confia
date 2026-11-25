@@ -19,6 +19,13 @@ public interface ChargeRepository {
     List<ExistingCharge> findOverlapping(InstitutionId institution, UUID studentId, UUID paymentConceptId,
             LocalDate periodStart, LocalDate periodEnd);
 
+    /**
+     * The benefit that the non-voided charges of an award already carry in the period that starts on {@code periodStart}, in HNL, the
+     * currency of the scholarships; zero when there is none. A void releases the benefit of the voided charge. It is what the cap per
+     * period of the award has already consumed (docs/cortes/scholarships-awards.md), read inside the transaction of the caller.
+     */
+    Money benefitGiven(InstitutionId institution, UUID awardId, LocalDate periodStart);
+
     /** Inserts the automatic charge the engine computed, with the ledger transaction that posted it. */
     void insertAutomatic(InstitutionId institution, UUID chargeId, ComputedCharge charge, UUID runId,
             UUID ledgerTransactionId, UUID createdBy);

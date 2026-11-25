@@ -15,6 +15,7 @@ import com.confia.charges.domain.PriceScope;
 import com.confia.charges.domain.StudentPlacement;
 import com.confia.charges.domain.TaxRateInfo;
 import com.confia.kernel.InstitutionId;
+import com.confia.kernel.Money;
 import com.confia.organization.application.directory.PlacementDirectory;
 import com.confia.scholarships.application.api.AwardBenefits;
 import com.confia.students.application.directory.EnrollmentRoster;
@@ -23,6 +24,7 @@ import com.confia.students.application.directory.StudentRef;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -114,12 +116,20 @@ final class AccrualEngine {
      * existing charge is looked up first, so a student already charged is never reported as a price error after the price
      * list changed. Lines come in the order of the concepts.
      *
+     * <p>The cap per period of a scholarship is shared by the charges of the award in the period: what the award already gave in
+     * charges that exist (not voided) is read from the charges, and what it gives to the charges of this very evaluation, which are
+     * not written yet, is added as each one is computed. The concepts are evaluated in the order they are written in (by identifier),
+     * so the database, which checks each charge as it is inserted, finds the same remainder the engine used.
+     *
      * @param lockShare whether the price and the tax rows are locked {@code FOR SHARE} until the end of the transaction
      */
     List<Line> evaluateStudent(InstitutionId institution, ChargePlan plan, StudentPlacement student,
             List<AccrualPeriods.PlanPeriod> periods, boolean lockShare) {
         List<Line> lines = new ArrayList<>();
-        for (AccrualPeriods.PlanPeriod planPeriod : periods) {
+        Map<UUID, Money> given = new HashMap<>();
+        List<AccrualPeriods.PlanPeriod> ordered = periods.stream()
+                .sorted(Comparator.comparing(AccrualPeriods.PlanPeriod::paymentConceptId)).toList();
+        for (AccrualPeriods.PlanPeriod planPeriod : ordered) {
             UUID conceptId = planPeriod.paymentConceptId();
             AccrualPeriod period = planPeriod.period();
             Optional<Line> already = alreadyAccrued(institution, plan.id(), student.studentId(), conceptId, period,
@@ -129,7 +139,11 @@ final class AccrualEngine {
                 continue;
             }
             try {
-                lines.add(Line.created(compute(institution, plan, student, planPeriod, lockShare)));
+                ComputedCharge charge = compute(institution, plan, student, planPeriod, given, lockShare);
+                if (charge.benefit() != null) {
+                    given.merge(charge.benefit().awardId(), charge.benefit().amount(), Money::add);
+                }
+                lines.add(Line.created(charge));
             } catch (AccrualFailure failure) {
                 lines.add(Line.error(student.studentId(), conceptId, failure.errorCode()));
             }
@@ -159,7 +173,7 @@ final class AccrualEngine {
     }
 
     private ComputedCharge compute(InstitutionId institution, ChargePlan plan, StudentPlacement student,
-            AccrualPeriods.PlanPeriod planPeriod, boolean lockShare) {
+            AccrualPeriods.PlanPeriod planPeriod, Map<UUID, Money> given, boolean lockShare) {
         UUID conceptId = planPeriod.paymentConceptId();
         AccrualPeriod period = planPeriod.period();
         PricingDirectory.ConceptTerms terms = pricing.concept(institution, conceptId, lockShare)
@@ -175,9 +189,17 @@ final class AccrualEngine {
             rate = pricing.taxRate(institution, concept.taxRateId(), lockShare).map(AccrualEngine::toInfo).orElse(null);
         }
         ChargeEvaluator evaluator = new ChargeEvaluator(base -> awards
-                .offers(institution, student.studentId(), conceptId, period.start(), base, lockShare).stream()
+                .offers(institution, student.studentId(), conceptId, period.start(), base,
+                        awardId -> alreadyGiven(institution, awardId, period.start(), given), lockShare).stream()
                 .map(offer -> new BenefitOffer(offer.awardId(), offer.scholarshipCode(), offer.amount())).toList());
         return evaluator.evaluate(student, plan.id(), planPeriod, concept, prices, rate);
+    }
+
+    /** What the award gave in the period: the charges that exist plus the earlier ones of this evaluation. */
+    private Money alreadyGiven(InstitutionId institution, UUID awardId, LocalDate periodStart, Map<UUID, Money> given) {
+        Money issued = charges.benefitGiven(institution, awardId, periodStart);
+        Money pending = given.get(awardId);
+        return pending == null ? issued : issued.add(pending);
     }
 
     private static TaxRateInfo toInfo(PricingDirectory.TaxRateTerms terms) {

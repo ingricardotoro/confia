@@ -10,11 +10,13 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 
 /**
  * What the approved awards in force of a student offer on a charge (docs/cortes/scholarships-awards.md, INV-16). It does no
  * arithmetic of its own: the benefit of each award is {@link Benefit#on}, the one rule of the scholarship (the share or the fixed
- * amount, rounded {@code HALF_UP} once, limited to its cap per period and to the base). It reads and writes nothing else and opens no
+ * amount, rounded {@code HALF_UP} once, limited to what is left of its cap per period after what the award already gave in the
+ * period, and to the base). It reads and writes nothing else and opens no
  * transaction: it runs in the transaction of the accrual that asks.
  */
 public final class AwardBenefitsService implements AwardBenefits {
@@ -30,14 +32,16 @@ public final class AwardBenefitsService implements AwardBenefits {
 
     @Override
     public List<Offer> offers(InstitutionId institution, UUID studentId, UUID paymentConceptId, LocalDate on, Money base,
-            boolean lockShare) {
+            Function<UUID, Money> alreadyGiven, boolean lockShare) {
         Objects.requireNonNull(base, "base");
+        Objects.requireNonNull(alreadyGiven, "alreadyGiven");
         if (base.currency() != Benefit.CURRENCY) {
             return List.of();
         }
         List<Offer> offers = new ArrayList<>();
         for (AwardsInForceRepository.InForce award : awards.find(institution, studentId, paymentConceptId, on, lockShare)) {
-            offers.add(new Offer(award.awardId(), award.scholarshipCode(), award.benefit().on(base, award.periodCap())));
+            Money given = award.periodCap() == null ? Money.zero(Benefit.CURRENCY) : alreadyGiven.apply(award.awardId());
+            offers.add(new Offer(award.awardId(), award.scholarshipCode(), award.benefit().on(base, award.periodCap(), given)));
         }
         return List.copyOf(offers);
     }
