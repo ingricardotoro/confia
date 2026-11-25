@@ -28,6 +28,9 @@ export interface StudentsViewProps {
   readonly onStatement: (row: Student) => void;
   /** The address of the charges of a student, so a link opens in a new tab and a plain click is a navigation of the router. */
   readonly chargesHrefOf: (row: Student) => string;
+  /** The address of the scholarship awards of a student. Absent when the person cannot read them: the link is not drawn. */
+  readonly awardsHrefOf?: ((row: Student) => string) | undefined;
+  readonly onAwards?: ((row: Student) => void) | undefined;
   readonly onCharges: (row: Student) => void;
 }
 
@@ -35,7 +38,7 @@ export interface StudentsViewProps {
  * The students as a table: code, last names, first names, birth date, sex, whether there is a document, state and actions,
  * with a text search and a status filter. The document column says only "registered" or a dash: the server never sends any digit.
  */
-export function StudentsView({ rows, table, pagination, notice, togglingId, filters, onCreate, onEdit, onToggle, onGuardians, statementHrefOf, onStatement, chargesHrefOf, onCharges }: StudentsViewProps) {
+export function StudentsView({ rows, table, pagination, notice, togglingId, filters, onCreate, onEdit, onToggle, onGuardians, statementHrefOf, onStatement, chargesHrefOf, onCharges, awardsHrefOf, onAwards }: StudentsViewProps) {
   const { t } = useAdminText();
   const columns: readonly TableColumn<Student>[] = [
     { id: "studentCode", header: t("students.columns.studentCode"), sortable: true, cell: (row) => row.studentCode },
@@ -108,6 +111,20 @@ export function StudentsView({ rows, table, pagination, notice, togglingId, filt
               >
                 {t("students.chargesAction")}
               </a>
+              {awardsHrefOf === undefined || onAwards === undefined ? null : (
+                <a
+                  href={awardsHrefOf(row)}
+                  aria-label={t("students.awardsActionFor", { name: nameOf(row) })}
+                  className="inline-flex h-7 items-center rounded-md border border-border-default px-2 text-xs font-medium text-text-primary underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus"
+                  onClick={(event) => {
+                    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                    event.preventDefault();
+                    onAwards(row);
+                  }}
+                >
+                  {t("students.awardsAction")}
+                </a>
+              )}
             </>
           }
         />

@@ -1,4 +1,4 @@
-import { createRoute, redirect, stripSearchParams, useParams, type AnyRoute } from "@tanstack/react-router";
+import { createRoute, redirect, stripSearchParams, useNavigate, useParams, useSearch, type AnyRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import type { FeatureModule } from "../../shared/navigation/navigation-entry.ts";
 import { DEFAULT_PAGE_SIZE } from "../../shared/resource-screen/list-search.ts";
@@ -11,9 +11,12 @@ import { SCHOLARSHIPS_PATH, SCHOLARSHIPS_PATHS } from "./scholarships-paths.ts";
 import {
   awardsSearch,
   scholarshipsSearch,
+  simulatorSearch,
   type AwardsSearch,
   type ScholarshipsSearch,
+  type SimulatorSearch,
 } from "./scholarships-search.ts";
+import { SimulatorContainer } from "./SimulatorContainer.tsx";
 
 export { SCHOLARSHIPS_PATH };
 
@@ -33,6 +36,21 @@ function AwardRoute() {
   return awardId === undefined ? null : <AwardDetailContainer awardId={awardId} />;
 }
 
+function SimulatorRoute() {
+  const raw: unknown = useSearch({ strict: false });
+  const navigate = useNavigate();
+  const search = simulatorSearch.parse(raw);
+  return (
+    <SimulatorContainer
+      search={search}
+      onSearchChange={(next: SimulatorSearch) => {
+        // The choice is in the address, so it is shareable; a part that is not chosen is not written.
+        void navigate({ search: Object.fromEntries(Object.entries(next).filter(([, value]) => value !== undefined)) as never, replace: true });
+      }}
+    />
+  );
+}
+
 /** The part of the address after the area, which is how a child route names itself. */
 const below = (path: string): string => path.slice(SCHOLARSHIPS_PATH.length + 1);
 
@@ -47,9 +65,11 @@ export const scholarshipsFeature: FeatureModule = {
   navigation: { id: "scholarships", labelKey: "navigation.scholarships", to: SCHOLARSHIPS_PATHS.list, group: "finance", permission: "scholarships:read" },
   moreNavigation: [
     { id: "scholarships-awards", labelKey: "navigation.awards", to: SCHOLARSHIPS_PATHS.awards, group: "finance", permission: "scholarships:read" },
+    { id: "scholarships-simulator", labelKey: "navigation.simulator", to: SCHOLARSHIPS_PATHS.simulator, group: "finance", permission: "charges:read" },
   ],
   routePermissions: [
     { path: SCHOLARSHIPS_PATH, permission: "scholarships:read" },
+    { path: SCHOLARSHIPS_PATHS.simulator, permission: "charges:read" },
   ],
   createRoutes: (parent: AnyRoute) => {
     const area = createRoute({ getParentRoute: () => parent, path: SCHOLARSHIPS_PATH, component: ScholarshipsAreaContainer });
@@ -80,6 +100,12 @@ export const scholarshipsFeature: FeatureModule = {
           component: AwardsRoute,
         }),
         createRoute({ getParentRoute: () => area, path: `${below(SCHOLARSHIPS_PATHS.awards)}/$awardId`, component: AwardRoute }),
+        createRoute({
+          getParentRoute: () => area,
+          path: below(SCHOLARSHIPS_PATHS.simulator),
+          validateSearch: (raw: Record<string, unknown>) => simulatorSearch.parse(raw),
+          component: SimulatorRoute,
+        }),
       ]),
     ];
   },

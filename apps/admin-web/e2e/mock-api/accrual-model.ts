@@ -3,6 +3,7 @@ import { AccrualRunRequest } from "@confia/contracts/admin";
 import {
   accrualPeriodsRecord,
   accrualPreviewRecord,
+  chargeSimulationRecord,
   accrualRunDetailRecord,
   accrualRunPage,
   accrualRunRecord,
@@ -76,6 +77,11 @@ export interface AccrualContext {
   readonly concepts: () => readonly PaymentConceptRow[];
   /** The failure the reads answer first in the `failing-first` behavior, or `undefined`. */
   readonly readFailure: () => ModelResponse | undefined;
+  /**
+   * The scholarship an approved award gives a student on a concept at the first day of a period (docs/cortes/scholarships-awards.md), in hundredths of a
+   * percent (2500 is 25 %), or `undefined`. The scenario that holds no scholarships answers none.
+   */
+  readonly benefitFor?: (studentId: string, conceptId: string, periodStart: string) => { readonly awardId: string; readonly code: string; readonly hundredths: number } | undefined;
   readonly now: () => Date;
 }
 
@@ -85,6 +91,7 @@ const TRACE_ID = "01J8Z4K2QF9P0X";
 const MAX_SIZE = 200;
 const DEFAULT_SIZE = 50;
 const PLAN_ROUTE = /^\/api\/v1\/charges\/plans\/([^/]+)\/(accrual-periods|accrual-preview|accrual-runs)$/;
+const SIMULATION_ROUTE = /^\/api\/v1\/charges\/plans\/([^/]+)\/simulation$/;
 const RUN_ROUTE = /^\/api\/v1\/charges\/accrual-runs(?:\/([^/]+))?$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STEP: Record<ChargePlanRow["frequency"], number> = { MONTHLY: 1, BIMONTHLY: 2, ANNUAL: 12, ONE_TIME: 1 };
@@ -339,6 +346,50 @@ export function createAccrualSimulator(scenario: AccrualScenario, context: Accru
     return served((checked) => accrualPeriodsRecord(checked as unknown[]), rows);
   }
 
+  /**
+   * What accruing a period would do for one student, by concept, with nothing written: the same rules as the preview (the first concept carries the
+   * errors by position), and the benefit of an approved award taken off the base before the tax is computed on what is left. A student outside the scope
+   * of the plan answers 404. Integer cents, half up: this file plays the server.
+   */
+  function simulationResponse(plan: ChargePlanRow, query: URLSearchParams): ModelResponse {
+    const failed = context.readFailure();
+    if (failed !== undefined) return failed;
+    const studentId = query.get("studentId") ?? "";
+    const period = query.get("period") ?? "";
+    if (!UUID.test(studentId)) return invalid([{ field: "studentId", reason: "invalid" }]);
+    const found = periodsOf(plan).find((row) => row.periodStart === period);
+    if (found === undefined) return invalid([{ field: "period", reason: "invalid" }]);
+    const studentIndex = scope().findIndex((row) => row.id === studentId);
+    if (studentIndex < 0) return failure("resource-not-found", 404);
+    const concepts = context.concepts();
+    const lines = found.concepts.flatMap((id): Record<string, unknown>[] => {
+      const index = concepts.findIndex((row) => row.id === id);
+      const concept = concepts[index];
+      if (concept === undefined) return [];
+      const error = index === 0 ? ({ 2: "NO_PRICE", 5: "AMBIGUOUS_PRICE", 8: "TAX_RATE_MISSING" } as Record<number, string>)[studentIndex] : undefined;
+      if (error !== undefined) return [{ paymentConceptId: id, outcome: "ERROR", errorCode: error }];
+      const base = baseCentsOf(index);
+      const offer = context.benefitFor?.(studentId, id, period);
+      const benefit = offer === undefined ? 0 : Math.floor((base * offer.hundredths + 5_000) / 10_000);
+      const net = base - benefit;
+      const tax = taxCentsOf(concept, net);
+      return [
+        {
+          paymentConceptId: id,
+          outcome: charges.has(chargeKey(plan.id, period, studentId, id)) ? "ALREADY_ACCRUED" : "CREATED",
+          base: money(base),
+          scholarshipAwardId: offer?.awardId ?? null,
+          scholarshipCode: offer?.code ?? null,
+          benefitAmount: money(benefit),
+          netBase: money(net),
+          tax: money(tax),
+          total: money(net + tax),
+        },
+      ];
+    });
+    return served(chargeSimulationRecord, { planId: plan.id, studentId, periodStart: period, periodLabel: period.slice(0, 7), lines });
+  }
+
   function previewResponse(plan: ChargePlanRow, body: unknown): ModelResponse {
     if (scenario === "forbidden") return failure("forbidden", 403);
     const period = typeof (body as { periodStart?: unknown } | undefined)?.periodStart === "string" ? periodsOf(plan).find((row) => row.periodStart === (body as { periodStart: string }).periodStart) : undefined;
@@ -442,6 +493,12 @@ export function createAccrualSimulator(scenario: AccrualScenario, context: Accru
   return {
     runs: () => runs,
     handle({ method, path, query, body, headers }) {
+      const onSimulation = SIMULATION_ROUTE.exec(path);
+      if (onSimulation !== null) {
+        if (method !== "GET") return undefined;
+        const plan = context.plans().plans.find((row) => row.id === onSimulation[1]);
+        return plan === undefined ? failure("resource-not-found", 404) : simulationResponse(plan, query);
+      }
       const onPlan = PLAN_ROUTE.exec(path);
       if (onPlan !== null) {
         const [, id = "", operation] = onPlan;

@@ -7,7 +7,7 @@ export const REVENUE_CATEGORIES = ["TUITION", "ENROLLMENT", "TRANSPORT", "MATERI
 export type RevenueCategory = (typeof REVENUE_CATEGORIES)[number];
 
 /** The name of one row of the map: the purpose, and for the revenue the category (or `DEFAULT`). It is also the end of its catalog keys. */
-export type RoleId = "RECEIVABLE" | "TAX_PAYABLE" | "REVENUE_DEFAULT" | `REVENUE_${RevenueCategory}` | PaymentPurpose;
+export type RoleId = "RECEIVABLE" | "TAX_PAYABLE" | "BENEFITS" | "REVENUE_DEFAULT" | `REVENUE_${RevenueCategory}` | PaymentPurpose;
 
 /**
  * One row of the map and the kind of account it needs. The type rule is the one the server applies (docs/cortes/ledger-chart-of-accounts.md):
@@ -19,6 +19,8 @@ interface RoleBase {
   /** Only the revenue has a category; `null` is the receivable, the tax payable and the default revenue. */
   readonly category: RevenueCategory | null;
   readonly accountType: LedgerAccountType;
+  /** A second type of account the row also takes (the scholarships row takes an income or an expense account, until the accountant answers). */
+  readonly alsoAccountType?: LedgerAccountType;
   readonly holdsStudentBalances: boolean;
 }
 
@@ -39,6 +41,8 @@ export type PostingRole = ChargesRole | PaymentsRole;
 export const POSTING_ROLES: readonly PostingRole[] = [
   { id: "RECEIVABLE", purpose: "RECEIVABLE", category: null, accountType: "ASSET", holdsStudentBalances: true, group: "core" },
   { id: "TAX_PAYABLE", purpose: "TAX_PAYABLE", category: null, accountType: "LIABILITY", holdsStudentBalances: false, group: "core" },
+  // Becas y descuentos otorgados: the benefit of a scholarship is debited here, a contra-revenue (income) or an expense account (docs/cortes/scholarships-awards.md).
+  { id: "BENEFITS", purpose: "BENEFITS", category: null, accountType: "INCOME", alsoAccountType: "EXPENSE", holdsStudentBalances: false, group: "core" },
   { id: "REVENUE_DEFAULT", purpose: "REVENUE", category: null, accountType: "INCOME", holdsStudentBalances: false, group: "revenue" },
   ...REVENUE_CATEGORIES.map(
     (category): PostingRole => ({
@@ -78,12 +82,13 @@ export function savedByRole(items: readonly PostingAccountResponseOutput[], paym
 
 /** Whether an account meets the type rule of a row. */
 export const accountFits = (role: PostingRole, account: { readonly type: string; readonly holdsStudentBalances: boolean }): boolean =>
-  account.type === role.accountType && account.holdsStudentBalances === role.holdsStudentBalances;
+  (account.type === role.accountType || account.type === role.alsoAccountType) && account.holdsStudentBalances === role.holdsStudentBalances;
 
 /**
  * The rows that are not set and keep the accrual from running: the receivable, the tax payable, and the default revenue
  * while a category has none of its own. (The server refuses a run only for the categories and the tax the plan really uses,
- * so this is a warning about the map, not a verdict on a run: the preview of the accrual has the verdict.)
+ * so this is a warning about the map, not a verdict on a run: the preview of the accrual has the verdict. The scholarships account is not listed:
+ * only a period with an applicable scholarship asks for it, and the preview says so.)
  */
 export function missingRoles(saved: ReadonlyMap<RoleId, SavedEntry>): readonly RoleId[] {
   const missing: RoleId[] = [];

@@ -30,6 +30,7 @@ export function PostingMapContainer() {
   const assets = useActiveAccountLookup("ASSET");
   const incomes = useActiveAccountLookup("INCOME");
   const liabilities = useActiveAccountLookup("LIABILITY");
+  const expenses = useActiveAccountLookup("EXPENSE");
   const save = usePostingAccountsSave();
   const savePayments = usePaymentPostingAccountsSave();
   // What the person chose and has not saved, by row; a row that is not here shows what the server holds.
@@ -39,18 +40,21 @@ export function PostingMapContainer() {
   const sending = useRef(false);
 
   const saved = useMemo(() => savedByRole(map.data?.items ?? [], paymentMap.data?.items ?? []), [map.data, paymentMap.data]);
-  const lookups: Readonly<Record<Extract<LedgerAccountType, "ASSET" | "INCOME" | "LIABILITY">, Lookup<LedgerAccount>>> = {
+  const lookups: Readonly<Record<Extract<LedgerAccountType, "ASSET" | "INCOME" | "LIABILITY" | "EXPENSE">, Lookup<LedgerAccount>>> = {
     ASSET: assets,
     INCOME: incomes,
     LIABILITY: liabilities,
+    EXPENSE: expenses,
   };
-  const all = [assets, incomes, liabilities];
+  const all = [assets, incomes, liabilities, expenses];
   const lookupsLoading = all.some((lookup) => lookup.loading);
   const failedLookups = all.filter((lookup) => lookup.failed);
 
   const rows: PostingMapRow[] = POSTING_ROLES.map((role) => {
     const lookup = lookups[role.accountType as keyof typeof lookups];
-    const options: Option[] = lookup.rows
+    // A row that takes a second type of account is offered the accounts of both.
+    const candidates = role.alsoAccountType === undefined ? lookup.rows : [...lookup.rows, ...lookups[role.alsoAccountType as keyof typeof lookups].rows];
+    const options: Option[] = candidates
       .filter((account) => accountFits(role, account))
       .map((account) => ({ value: account.id, label: t("ledger.accounts.optionLabel", { code: account.code, name: account.name }) }));
     const held = saved.get(role.id)?.ledgerAccountId;

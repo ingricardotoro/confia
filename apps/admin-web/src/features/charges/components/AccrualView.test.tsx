@@ -53,6 +53,43 @@ function props(override: Partial<AccrualViewProps> = {}): AccrualViewProps {
 }
 
 describe("AccrualView", () => {
+  it("shows the scholarship of a row with its code, the benefit and the net base, and the totals with the scholarships and the net base, as the server sent them", () => {
+    const money = (amount: string) => ({ amount, currency: "HNL" });
+    renderWithAdminI18n(
+      <AccrualView
+        {...props({
+          result: ready({
+            items: [
+              accrualPreviewItem({
+                studentId: STUDENT_A,
+                base: money("1100.00"),
+                scholarshipAwardId: "00000000-0000-4000-8000-0000000f0001",
+                scholarshipCode: "BECA25",
+                benefitAmount: money("275.00"),
+                netBase: money("825.00"),
+                tax: money("123.75"),
+                total: money("948.75"),
+              }),
+              accrualPreviewItem({ studentId: STUDENT_B }),
+            ],
+            totals: [{ currency: "HNL", charges: 2, base: money("2600.00"), benefitAmount: money("275.00"), netBase: money("2325.00"), tax: money("348.75"), total: money("2673.75") }],
+          }),
+        })}
+      />,
+    );
+
+    const totals = within(screen.getByRole("table", { name: "Importes de los cargos por crear, por moneda" }));
+    expect(totals.getByText("275.00 lempiras hondureños")).toBeInTheDocument();
+    expect(totals.getByText("2,325.00 lempiras hondureños")).toBeInTheDocument();
+    const rows = screen.getByRole("table", { name: "Renglones de la vista previa: un estudiante y un concepto por renglón" });
+    const withScholarship = within(within(rows).getByRole("row", { name: /Aguilar, Ana/ }));
+    expect(withScholarship.getByText("BECA25")).toBeInTheDocument();
+    expect(withScholarship.getByText("L 1,100.00")).toBeInTheDocument();
+    expect(withScholarship.getByText("L 275.00")).toBeInTheDocument();
+    expect(withScholarship.getByText("L 825.00")).toBeInTheDocument();
+    expect(within(within(rows).getByRole("row", { name: /Aguilar, Luis/ })).getByText("Sin beca")).toBeInTheDocument();
+  });
+
   it("shows the summary of the preview with the figures and the totals exactly as the server sent them", () => {
     renderWithAdminI18n(<AccrualView {...props()} />);
 
@@ -61,7 +98,8 @@ describe("AccrualView", () => {
     expect(summary.getByText("Estudiantes evaluados")).toBeInTheDocument();
     expect(summary.getByText("Cargos por crear")).toBeInTheDocument();
     const totals = within(screen.getByRole("table", { name: "Importes de los cargos por crear, por moneda" }));
-    expect(totals.getByText("3,000.00 lempiras hondureños")).toBeInTheDocument();
+    // With no scholarship the net base is the base, so the figure is drawn in both columns.
+    expect(totals.getAllByText("3,000.00 lempiras hondureños")).toHaveLength(2);
     expect(totals.getByText("450.00 lempiras hondureños")).toBeInTheDocument();
     expect(totals.getByText("3,450.00 lempiras hondureños")).toBeInTheDocument();
     expect(summary.getByText("Sin precio vigente: 1 renglón.")).toBeInTheDocument();
@@ -76,7 +114,8 @@ describe("AccrualView", () => {
     expect(created.getByText("1,725.00 lempiras hondureños")).toBeInTheDocument();
     const failed = within(within(table).getByRole("row", { name: /Banegas, Sofía/ }));
     expect(failed.getByText("Sin precio vigente")).toBeInTheDocument();
-    expect(failed.getAllByText("Sin importe")).toHaveLength(3);
+    // The base, the benefit, the net base, the tax and the total: each has no amount.
+    expect(failed.getAllByText("Sin importe")).toHaveLength(5);
   });
 
   it("filters the rows the server sent by error and by error code, and offers the way back when none match", async () => {
