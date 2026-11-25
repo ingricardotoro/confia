@@ -81,7 +81,7 @@ class AccrualEndpointsIT extends CommittingPostgresIntegrationTest {
         process.close();
     }
 
-    private record Member(UUID account, UUID institution, String token) {
+    private record Member(UUID account, UUID institution, String token, UUID family) {
     }
 
     /** What the owner seeded for an institution: an active plan of a grade with two students and the map of accounts. */
@@ -220,6 +220,42 @@ class AccrualEndpointsIT extends CommittingPostgresIntegrationTest {
     }
 
     @Test
+    void theSimulatorNeedsTheChargesReadPermissionAndRefusesARevokedSession() throws SQLException {
+        Member admin = member(StaffRole.ADMINISTRATOR.code());
+        Seeded seeded = seed(admin);
+        Member withoutRole = sameInstitution(admin.institution(), null);
+        Member cashier = sameInstitution(admin.institution(), StaffRole.CASHIER.code());
+        String planPath = PLANS + "/" + seeded.plan();
+        String student = HarnessProcess.json(post(planPath + "/accrual-preview", admin,
+                "{\"periodStart\":\"2027-02-01\"}", null)).get("items").get(0).get("studentId").asString();
+        String path = planPath + "/simulation?studentId=" + student + "&period=2027-02-01";
+        assertThat(get(path, cashier).statusCode()).as("a role that reads the charges simulates").isEqualTo(200);
+
+        assertProblem(get(path, withoutRole), 403, "forbidden");
+        revoke(cashier);
+
+        assertProblem(get(path, cashier), 401, "token-invalid");
+        assertThat(send("GET", path, null, null).statusCode()).isEqualTo(401);
+        assertThat(auditEntries(admin.institution(), "charges.simulation.viewed"))
+                .as("only the permitted consultation was audited").isEqualTo(1);
+    }
+
+    /** Revokes the family of refresh tokens of the session: the access token that names it is refused from then on. */
+    private static void revoke(Member member) throws SQLException {
+        try (Connection connection = StaffRoleFixtures.ownerTransaction(member.institution());
+                PreparedStatement statement = connection.prepareStatement("""
+                        update identity_refresh_token_family
+                           set revoked_at = now(), revoked_reason = 'password_change'
+                         where institution_id = ? and id = ?
+                        """)) {
+            statement.setObject(1, member.institution());
+            statement.setObject(2, member.family());
+            assertThat(statement.executeUpdate()).isEqualTo(1);
+            connection.commit();
+        }
+    }
+
+    @Test
     void theRequestNeedsItsKeyAndAValidBodyAndAPeriodOfThePlan() throws SQLException {
         Member admin = member(StaffRole.ADMINISTRATOR.code());
         String planPath = PLANS + "/" + seed(admin).plan();
@@ -313,7 +349,7 @@ class AccrualEndpointsIT extends CommittingPostgresIntegrationTest {
                 .issueAccess(account, institution, family,
                         Set.of(AuthenticationMethod.PASSWORD, AuthenticationMethod.ONE_TIME_PASSWORD))
                 .compact();
-        return new Member(account, institution, token);
+        return new Member(account, institution, token, family);
     }
 
     private static void execute(Connection connection, String sql, Object... parameters) throws SQLException {
