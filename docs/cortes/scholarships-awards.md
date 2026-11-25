@@ -291,3 +291,27 @@ Corrige los hallazgos de la revisión (confia-code-reviewer y confia-security-au
   institución; `requestedBy` en el `before_value` de la bitácora de aprobación; import duplicado de `ChargeEvaluator` eliminado.
 - **Documentación de seguridad.** `docs/03-seguridad.md` §5.3: excepción de la revocación sin segundo aprobador (L3) y brecha de control
   registrada: las aprobaciones pendientes no caducan a las 72 horas (becas y pagos); no se implementó el vencimiento.
+
+## Lo construido (pantallas T3 y correcciones T4 del frontend, 2026-11-24)
+
+- **Pantallas nuevas** en `apps/admin-web/src/features/scholarships`, dentro del grupo Finanzas:
+  - Becas: lista con filtros, alta y edición, desactivar y reactivar. Con otorgamientos aprobados, el tipo y el valor quedan de solo
+    lectura y el formulario explica que el tope solo puede bajar y los conceptos solo pueden quitarse.
+  - Otorgamientos: lista con filtros por estado, beca y estudiante; solicitud; detalle con «Aprobar», «Rechazar» y «Revocar». Cada
+    decisión envía una `Idempotency-Key` que se reutiliza al reintentar; rechazar y revocar exigen un motivo de 20 a 500 caracteres.
+  - Simulador de cargos en `/scholarships/simulator`, con el permiso `charges:read`: muestra la tabla que devuelve el servidor.
+- **Pantallas existentes:** «Generación de cargos» y «Cargos del estudiante» muestran la beca, el beneficio y la base neta; el mapa de
+  cuentas agrega «Becas y descuentos» (cuenta de ingreso o de gasto, S4); la lista de estudiantes enlaza a los otorgamientos de cada uno.
+- **Errores:** `outside-academic-year` se muestra bajo el inicio de la vigencia y `scholarship-scope-locked` dentro del diálogo de edición.
+- **Pruebas:** componente con Vitest, Testing Library y MSW (estados, decisiones, validación del motivo y las cifras del criterio de
+  aceptación en el simulador: L 1,100.00, L 275.00, L 825.00, L 123.75 y L 948.75), recorrido de Playwright solicitud → aprobación →
+  simulación con el rechazo de la autoaprobación, y la puerta de axe sobre los once estados nuevos en tema claro y oscuro.
+
+### Desviaciones y pendientes
+
+- Los otorgamientos muestran solo el código del estudiante: el contrato no trae su nombre.
+- La fila «Becas y descuentos» no entra en el aviso de mapa incompleto; la vista previa del devengo ya bloquea con
+  `posting-accounts-incomplete` cuando una beca se aplica.
+- La API simulada aplica becas solo en el simulador, no en la vista previa ni en la corrida.
+- `dependency-cruiser` no se ejecutó en local (no está instalado); se revisó a mano que ninguna feature importe a otra.
+- Las aprobaciones pendientes no caducan a las 72 horas (brecha registrada en `docs/03-seguridad.md` §5.3).
