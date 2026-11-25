@@ -92,6 +92,7 @@ public final class ManageScholarships {
      * @throws ResourceNotFoundException when it does not exist in the institution of the actor
      * @throws com.confia.scholarships.domain.StaleVersionException when the version is not the current one
      * @throws com.confia.scholarships.domain.ScholarshipBenefitLockedException when the benefit changes and an award was approved
+     * @throws com.confia.scholarships.domain.ScholarshipScopeLockedException when an award was approved and the cap is raised or removed or a concept is added
      */
     public ScholarshipView update(AuthenticatedActor actor, String requestId, UUID id, long version, Draft draft) {
         return ScholarshipRequests.naming(() -> doUpdate(actor, requestId, id, version, draft));

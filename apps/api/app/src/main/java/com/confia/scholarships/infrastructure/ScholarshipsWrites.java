@@ -7,6 +7,7 @@ import com.confia.scholarships.domain.InactiveReferenceException;
 import com.confia.scholarships.domain.InvalidAwardStateException;
 import com.confia.scholarships.domain.InvalidScholarshipsValueException;
 import com.confia.scholarships.domain.ScholarshipBenefitLockedException;
+import com.confia.scholarships.domain.ScholarshipScopeLockedException;
 import com.confia.scholarships.domain.SelfApprovalForbiddenException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -75,6 +76,9 @@ final class ScholarshipsWrites {
     private static void restricted(String constraint, DataAccessException e) {
         if ("scholarships_scholarship_benefit_locked_chk".equals(constraint)) {
             throw new ScholarshipBenefitLockedException();
+        }
+        if ("scholarships_scholarship_scope_locked_chk".equals(constraint)) {
+            throw new ScholarshipScopeLockedException();
         }
         throw e;
     }

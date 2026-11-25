@@ -129,6 +129,7 @@ public enum ProblemCode {
     PAYMENT_NOT_DECLARED("payment-not-declared", 409),
     DUPLICATE_SCHOLARSHIP_CODE("duplicate-scholarship-code", 409),
     SCHOLARSHIP_BENEFIT_LOCKED("scholarship-benefit-locked", 409),
+    SCHOLARSHIP_SCOPE_LOCKED("scholarship-scope-locked", 409),
     SCHOLARSHIP_AWARD_OVERLAP("scholarship-award-overlap", 409),
     INVALID_AWARD_STATE("invalid-award-state", 409),
     UNSUPPORTED_MEDIA_TYPE("unsupported-media-type", 415),
