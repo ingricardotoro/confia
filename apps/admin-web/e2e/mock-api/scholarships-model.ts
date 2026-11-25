@@ -111,14 +111,13 @@ export interface ScholarshipsModel {
   /** The answer to a request below the two bases, or `undefined` when the path is not one of the operations. */
   handle(request: ScholarshipsRequest): ModelResponse | undefined;
   /** The approved award in force that gives a student a percentage on a concept at the first day of a period, for the simulator of charges. */
-  benefitFor(studentId: string, conceptId: string, periodStart: string): { readonly awardId: string; readonly code: string; readonly hundredths: number } | undefined;
+  readonly benefitFor: (studentId: string, conceptId: string, periodStart: string) => { readonly awardId: string; readonly code: string; readonly hundredths: number } | undefined;
 }
 
 const wrap = (response: ContractResponse): ModelResponse => ({ ...response, headers: {}, setCookies: [] });
 const failure = (code: Parameters<typeof problem>[0], status: number, options: Parameters<typeof problem>[2] = {}): ModelResponse => wrap(problem(code, status, options));
 const invalid = (errors: { field: string; reason: string }[] = []): ModelResponse => failure("validation-failed", 400, { errors });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const money = (amount: string): Money => ({ amount, currency: "HNL" });
 const schemaErrors = (issues: readonly { path: PropertyKey[]; code: string }[]) =>
   invalid(issues.map((issue) => ({ field: issue.path.map(String).join(".") || "body", reason: issue.code === "invalid_format" ? "pattern" : "invalid" })));
 
@@ -256,7 +255,7 @@ export function createScholarshipsModel(options: ScholarshipsOptions, context: S
     const active = query.get("active");
     const type = query.get("benefitType");
     const matching = scholarships.filter((row) => (active === null || row.active === (active === "true")) && (type === null || row.benefitType === type));
-    const sorted = sortBy(matching, query.get("sort"), ["code", "name", "createdAt"], "code,asc", (value, field) => String(value[field as "code" | "name" | "createdAt"]));
+    const sorted = sortBy(matching, query.get("sort"), ["code", "name", "createdAt"], "code,asc", (value, field) => value[field as "code" | "name" | "createdAt"]);
     if (!Array.isArray(sorted)) return sorted;
     const paged = pageOf(sorted, query);
     if (!("slice" in paged)) return paged;
@@ -341,7 +340,7 @@ export function createScholarshipsModel(options: ScholarshipsOptions, context: S
         (query.get("scholarshipId") === null || row.scholarshipId === query.get("scholarshipId")) &&
         (query.get("academicYearId") === null || row.academicYearId === query.get("academicYearId")),
     );
-    const sorted = sortBy(matching, query.get("sort"), ["requestedAt", "validFrom", "validTo"], "requestedAt,desc", (value, field) => String(value[field as "requestedAt" | "validFrom" | "validTo"]));
+    const sorted = sortBy(matching, query.get("sort"), ["requestedAt", "validFrom", "validTo"], "requestedAt,desc", (value, field) => value[field as "requestedAt" | "validFrom" | "validTo"]);
     if (!Array.isArray(sorted)) return sorted;
     const paged = pageOf(sorted, query);
     if (!("slice" in paged)) return paged;
