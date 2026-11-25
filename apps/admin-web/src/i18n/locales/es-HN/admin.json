@@ -122,7 +122,8 @@
     "duplicateScholarshipCode": "Ya existe una beca con ese código.",
     "scholarshipBenefitLocked": "Esta beca ya tiene otorgamientos aprobados, por lo que su tipo y su valor no se pueden cambiar. Cree otra beca con el nuevo valor y los cargos ya emitidos seguirán explicándose con la beca que tenían.",
     "scholarshipAwardOverlap": "El estudiante ya tiene aprobado un otorgamiento de esta beca con fechas que se cruzan con las de este. Ajuste la vigencia o revoque el otorgamiento anterior.",
-    "invalidAwardState": "El otorgamiento ya no está en el estado que se mostraba, por lo que no admite esta acción. Los datos ya se recargaron: revise su estado actual."
+    "invalidAwardState": "El otorgamiento ya no está en el estado que se mostraba, por lo que no admite esta acción. Los datos ya se recargaron: revise su estado actual.",
+    "scholarshipScopeLocked": "Esta beca ya tiene otorgamientos aprobados: el tope solo puede bajar y los conceptos solo pueden quitarse. Para ampliar la beca, cree otra."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -2347,7 +2348,7 @@
       "code": "Código",
       "codeHelp": "Letras, números, guion y guion bajo, hasta 30 caracteres. No se puede cambiar después.",
       "name": "Nombre",
-      "benefitLocked": "Esta beca ya tiene otorgamientos aprobados: su tipo y su valor no se pueden cambiar. Para otro valor, cree otra beca.",
+      "benefitLocked": "Esta beca ya tiene otorgamientos aprobados: su tipo y su valor no se pueden cambiar, el tope solo puede bajar y los conceptos solo pueden quitarse. Para otro valor o un alcance mayor, cree otra beca.",
       "benefitType": "Tipo de beneficio",
       "fixedAmount": "Monto fijo por cargo",
       "fixedAmountHelp": "En lempiras, mayor que cero y con hasta dos decimales, por ejemplo 250.00.",

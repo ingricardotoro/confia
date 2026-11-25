@@ -271,6 +271,18 @@ describe("creating, editing and deactivating a scholarship", () => {
     expect(JSON.parse(put?.body ?? "{}")).toMatchObject({ version: 3, name: "Beca de excelencia 2027", benefitType: "PERCENTAGE", percent: "25.00", conceptIds: [MENS.id] });
   });
 
+  it("tells inside the dialog that a scholarship with approved awards cannot widen its cap or its concepts", async () => {
+    const user = userEvent.setup();
+    await openList([scholarship({ name: "Beca de excelencia", benefitLocked: true })]);
+    route("put", `${SCHOLARSHIPS}/:id`, problem("scholarship-scope-locked", 409, { traceId: "01J8Z4K2QF9P0X" }));
+    await user.click(screen.getByRole("button", { name: "Editar Beca de excelencia" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar la beca" }, TIMEOUT);
+    await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
+
+    expect(await within(dialog).findByText(/Para ampliar la beca, cree otra./, undefined, TIMEOUT)).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Editar la beca" })).toBeInTheDocument();
+  });
+
   it("shows the benefit of a scholarship with approved awards for reading only, and says why", async () => {
     const user = userEvent.setup();
     await openList([scholarship({ name: "Beca de excelencia", benefitLocked: true })]);
