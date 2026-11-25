@@ -24,7 +24,7 @@ function backendBody(code: string, extra: Record<string, unknown> = {}) {
 }
 
 describe("the known codes", () => {
-  it("AW46: lists the thirty-five codes of the specification", () => {
+  it("AW46: lists the thirty-nine codes of the specification", () => {
     expect([...KNOWN_PROBLEM_CODES].sort()).toEqual(
       [
         "authentication-failed",
@@ -88,6 +88,10 @@ describe("the known codes", () => {
         "self-approval-forbidden",
         "payment-not-declared",
         "charge-has-payments",
+        "duplicate-scholarship-code",
+        "scholarship-benefit-locked",
+        "scholarship-award-overlap",
+        "invalid-award-state",
       ].sort(),
     );
   });

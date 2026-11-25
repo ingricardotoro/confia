@@ -73,6 +73,8 @@ describe("the signed in shell", () => {
         "Estado de cuenta",
         "Cargos del estudiante",
         "Integridad de cargos",
+        "Becas",
+        "Otorgamientos",
         "Mi caja",
         "Sesiones de caja",
         "Pagos",
