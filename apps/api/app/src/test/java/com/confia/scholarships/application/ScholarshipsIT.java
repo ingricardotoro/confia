@@ -445,6 +445,19 @@ class ScholarshipsIT extends ScholarshipsFixture {
                 .isInstanceOf(InvalidAwardStateException.class);
     }
 
+    @Test
+    void anApprovedAwardIsNotRevokedWithAReasonOutOfItsBounds() throws SQLException {
+        World w = world();
+        AwardView award = approved(w, requested(w, scholarship(w, "BECA-25", "25"), 0, FEB, JUN));
+
+        assertThatThrownBy(() -> decideAward().revoke(w.administrator(), request(), "short", award.id(), "x".repeat(19)))
+                .isInstanceOf(RejectedScholarshipFieldException.class);
+        assertThatThrownBy(() -> decideAward().revoke(w.administrator(), request(), "long", award.id(), "x".repeat(501)))
+                .isInstanceOf(RejectedScholarshipFieldException.class);
+        assertThat(viewAwards().get(w.administrator(), request(), award.id()).status()).isEqualTo("approved");
+        assertThat(auditEntries(w, "scholarships.award.revoked")).isZero();
+    }
+
     // --- The keys ---
 
     @Test

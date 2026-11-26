@@ -119,6 +119,30 @@ class PermissionedEndpointsTest {
                 Permission.PAYMENTS_APPROVE));
         expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/payments/{id}/reject",
                 Permission.PAYMENTS_APPROVE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/scholarships",
+                Permission.SCHOLARSHIPS_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships",
+                Permission.SCHOLARSHIPS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/scholarships/{id}",
+                Permission.SCHOLARSHIPS_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/scholarships/{id}",
+                Permission.SCHOLARSHIPS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/{id}/deactivate",
+                Permission.SCHOLARSHIPS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/{id}/reactivate",
+                Permission.SCHOLARSHIPS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/scholarship-awards",
+                Permission.SCHOLARSHIPS_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarship-awards",
+                Permission.SCHOLARSHIPS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/scholarship-awards/{id}",
+                Permission.SCHOLARSHIPS_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarship-awards/{id}/approve",
+                Permission.SCHOLARSHIPS_APPROVE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarship-awards/{id}/reject",
+                Permission.SCHOLARSHIPS_APPROVE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarship-awards/{id}/revoke",
+                Permission.SCHOLARSHIPS_VOID));
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/ledger/accounts", Permission.LEDGER_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/ledger/accounts",
                 Permission.LEDGER_CREATE));

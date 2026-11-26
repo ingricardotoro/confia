@@ -103,6 +103,9 @@ class WebEdgeScopeExclusionInventoryTest {
             // The payments apply admin-read and admin-write, per address and per account
             // (docs/cortes/payments-register.md).
             "com.confia.payments.web",
+            // The scholarships and their awards apply admin-read and admin-write, per address and per account
+            // (docs/cortes/scholarships-awards.md).
+            "com.confia.scholarships.web",
             // The chart of accounts applies admin-read and admin-write, per address and per account
             // (docs/cortes/ledger-chart-of-accounts.md).
             "com.confia.ledger.web");

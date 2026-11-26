@@ -808,7 +808,7 @@ Trimestralmente se genera el reporte "quién puede hacer qué" y se revisa con e
 > | `students` | C L A N X | C L A X | L | L | L X | C L A X |
 > | `guardians` | C L A N X | C L A X | L | L | L X | L |
 > | `catalog` | C L A N X | C L A X | L | L X | L X | L |
-> | `scholarships` | C L A N P X | C L A P X | L | L X | L X | C L |
+> | `scholarships` | C L A N P X | C L A N P X | L | L X | L X | C L |
 > | `charges` | C L A N P X | C L A N P X | L | L X | L X | L |
 > | `ledger` | C L N P X | L N X | L | L X | L X | — |
 > | `payments` | C L N P X | L N P X | C L | L N X | L X | — |
@@ -849,6 +849,12 @@ Trimestralmente se genera el reporte "quién puede hacer qué" y se revisa con e
 > recibe**; los demás roles tampoco. No es una excepción a la regla 1: sigue sin existir `ledger:update` y ningún rol edita asientos. El
 > ajuste manual del libro (corte 4) decidirá si necesita otro permiso o reutiliza este. `PermissionMatrixParityTest` lee la tabla corregida
 > de la nota del 2026-11-04, de modo que el código (`StaffRole`) y el documento siguen iguales celda por celda.
+
+> **Nota fechada 2026-11-24 (corte `scholarships-awards`, F2): el Administrador gana `scholarships:void`.** La fila `scholarships` de la
+> matriz efectiva era `C L A P X` para el Administrador; ahora es `C L A N P X`. Decisión del propietario, 2026-11-24: «si, si puede el
+> adminsitrador revocar una beca, con justificacion». `scholarships:void` revoca una beca aprobada (`POST /api/v1/scholarship-awards/{id}/revoke`)
+> y exige un motivo de 20 a 500 caracteres, que queda en la bitácora. Los demás roles no cambian. `PermissionMatrixParityTest` lee la tabla
+> corregida de la nota del 2026-11-04, de modo que el código (`StaffRole`) y el documento siguen iguales celda por celda.
 
 ### 5.3 Segregación de funciones
 
