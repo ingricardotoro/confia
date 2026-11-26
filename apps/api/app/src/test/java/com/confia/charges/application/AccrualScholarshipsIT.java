@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.charges.domain.ResourceNotFoundException;
+import com.confia.kernel.CurrencyCode;
+import com.confia.kernel.Money;
+import com.confia.scholarships.application.api.AwardBenefits;
 import com.confia.scholarships.ScholarshipsFixture;
 import com.confia.scholarships.application.ManageScholarships;
 import com.confia.scholarships.application.RequestAward;
@@ -314,6 +317,138 @@ class AccrualScholarshipsIT extends ScholarshipsFixture {
         assertAmount(stored.netBase(), "800.00");
         assertAmount(stored.tax(), "120.00");
         assertAmount(stored.total(), "920.00");
+    }
+
+    // --- The cap per period is shared by the charges of the award in the period (L8) ---
+
+    private World twoConcepts(Concepts concepts) throws SQLException {
+        Env env = seed(1, "1100.00", "15", "HNL", concepts);
+        return new World(env, yearOf(env.institution()), actorOf(env.institution(), "academic_coordinator"),
+                actorOf(env.institution(), "administrator"));
+    }
+
+    /** A scholarship of the percentage and the cap given that covers both concepts. */
+    private ManageScholarships.Draft bothConcepts(World w, String points, String cap) throws SQLException {
+        return new ManageScholarships.Draft("Beca del " + points + " %", "PERCENTAGE", points, null, cap,
+                Set.of(w.env().concept(), secondConcept(w.env())));
+    }
+
+    private AccrualRunView accruePlan(World w, UUID plan, String key) {
+        AccrualRunView run = manageAccrual().request(w.env().actor(), UUID.randomUUID().toString(), key, plan, FEBRUARY, null);
+        executeAccrualRun().execute(w.env().system(), run.id());
+        return manageAccrual().get(w.env().actor(), UUID.randomUUID().toString(), run.id(), 0, 200).run();
+    }
+
+    private UUID chargeOf(World w, UUID concept) throws SQLException {
+        return firstId(w.institution(), "select id from charges_charge where institution_id = ? and payment_concept_id = ?",
+                w.institution(), concept);
+    }
+
+    @Test
+    void theCapIsSharedByTheTwoConceptsOfOneRunAndTheTaxIsOnWhatIsLeftOfEach() throws SQLException {
+        World w = twoConcepts(Concepts.TWO_IN_ONE_PLAN);
+        addBenefitsAccount(w.env(), "EXPENSE");
+        UUID award = approvedAward(w, "TOPE", bothConcepts(w, "50", "600.00"), FEB_1, JUN_30);
+
+        AccrualRunView run = accrue(w, "key-1");
+
+        assertThat(run.chargesCreated()).isEqualTo(2);
+        List<Stored> stored = new ArrayList<>(charges(w));
+        stored.sort(java.util.Comparator.comparing(Stored::discount));
+        // 50 % of 1,100.00 is 550.00 on the first charge; only 50.00 is left of the cap of 600.00 for the second.
+        assertAmount(stored.get(0).discount(), "50.00");
+        assertAmount(stored.get(0).netBase(), "1050.00");
+        assertAmount(stored.get(0).tax(), "157.50");
+        assertAmount(stored.get(0).total(), "1207.50");
+        assertAmount(stored.get(1).discount(), "550.00");
+        assertAmount(stored.get(1).netBase(), "550.00");
+        assertAmount(stored.get(1).tax(), "82.50");
+        assertAmount(stored.get(1).total(), "632.50");
+        assertThat(stored).allSatisfy(charge -> assertThat(charge.awardId()).isEqualTo(award));
+        assertAmount(stored.get(0).discount().add(stored.get(1).discount()), "600.00");
+    }
+
+    @Test
+    void thePreviewAndTheSimulatorShowTheSharedCapAndTheRunCreatesWhatTheyShow() throws SQLException {
+        World w = twoConcepts(Concepts.TWO_IN_ONE_PLAN);
+        addBenefitsAccount(w.env(), "EXPENSE");
+        approvedAward(w, "TOPE", bothConcepts(w, "50", "600.00"), FEB_1, JUN_30);
+
+        AccrualPreviewResult preview = preview(w);
+
+        assertThat(preview.items()).hasSize(2);
+        assertThat(preview.items()).extracting(item -> item.benefit().amount().toPlainString())
+                .containsExactlyInAnyOrder("550.0000", "50.0000");
+        assertAmount(preview.totals().get(0).benefit().amount(), "600.00");
+        accrue(w, "key-1");
+        assertThat(charges(w)).extracting(Stored::discount).extracting(BigDecimal::toPlainString)
+                .containsExactlyInAnyOrder("550.0000", "50.0000");
+    }
+
+    @Test
+    void theCapIsSharedAcrossTwoRunsOfTheSamePeriod() throws SQLException {
+        World w = twoConcepts(Concepts.TWO_IN_TWO_PLANS);
+        addBenefitsAccount(w.env(), "EXPENSE");
+        approvedAward(w, "TOPE", bothConcepts(w, "50", "600.00"), FEB_1, JUN_30);
+
+        AccrualRunView first = accruePlan(w, w.env().plan(), "key-1");
+        AccrualRunView second = accruePlan(w, secondPlan(w.env()), "key-2");
+
+        assertThat(first.chargesCreated()).isEqualTo(1);
+        assertThat(second.chargesCreated()).isEqualTo(1);
+        List<Stored> stored = charges(w);
+        assertThat(stored).hasSize(2);
+        BigDecimal given = stored.get(0).discount().add(stored.get(1).discount());
+        assertAmount(given, "600.00");
+        assertThat(stored).extracting(Stored::discount).extracting(BigDecimal::toPlainString)
+                .containsExactlyInAnyOrder("550.0000", "50.0000");
+    }
+
+    @Test
+    void aVoidedChargeReleasesItsBenefitToTheNextChargeOfThePeriod() throws SQLException {
+        World w = twoConcepts(Concepts.TWO_IN_TWO_PLANS);
+        addBenefitsAccount(w.env(), "EXPENSE");
+        approvedAward(w, "TOPE", bothConcepts(w, "50", "600.00"), FEB_1, JUN_30);
+        accruePlan(w, w.env().plan(), "key-1");
+        voidCharge().voidCharge(w.env().actor(), UUID.randomUUID().toString(), "void-1", chargeOf(w, w.env().concept()), REASON);
+
+        accruePlan(w, secondPlan(w.env()), "key-2");
+
+        // The 550.00 of the voided charge no longer counts: the second charge takes its whole share, not the 50.00 that was left.
+        assertThat(charges(w)).extracting(Stored::discount).extracting(BigDecimal::toPlainString)
+                .containsExactly("550.0000", "550.0000");
+    }
+
+    @Test
+    void theDatabaseRefusesACapThatTheEngineWouldExceedBecauseItIgnoredWhatTheAwardAlreadyGave() throws SQLException {
+        World w = twoConcepts(Concepts.TWO_IN_TWO_PLANS);
+        addBenefitsAccount(w.env(), "EXPENSE");
+        approvedAward(w, "TOPE", bothConcepts(w, "50", "600.00"), FEB_1, JUN_30);
+        accruePlan(w, w.env().plan(), "key-1");
+        // An engine that forgets what the award gave in the period offers 550.00 again.
+        AwardBenefits real = awardBenefits();
+        AwardBenefits forgetful = new AwardBenefits() {
+            @Override
+            public List<Offer> offers(InstitutionId institution, UUID student, UUID concept, LocalDate on, Money base,
+                    java.util.function.Function<UUID, Money> alreadyGiven, boolean lock) {
+                return real.offers(institution, student, concept, on, base, award -> Money.zero(CurrencyCode.HNL), lock);
+            }
+
+            @Override
+            public boolean anyApplicable(InstitutionId institution, java.util.Collection<UUID> students,
+                    java.util.Collection<UUID> concepts, LocalDate on) {
+                return real.anyApplicable(institution, students, concepts, on);
+            }
+        };
+        AccrualRunView run = manageAccrual().request(w.env().actor(), UUID.randomUUID().toString(), "key-2",
+                secondPlan(w.env()), FEBRUARY, null);
+
+        executeAccrualRun(forgetful).execute(w.env().system(), run.id());
+
+        AccrualRunView after = manageAccrual().get(w.env().actor(), UUID.randomUUID().toString(), run.id(), 0, 200).run();
+        assertThat(after.chargesCreated()).isZero();
+        assertThat(after.chargesFailed()).isEqualTo(1);
+        assertThat(charges(w)).hasSize(1);
     }
 
     @Test

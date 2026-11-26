@@ -4,7 +4,6 @@ import com.confia.kernel.Money;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Optional;
 
 /**
  * The pure rules of one charge (docs/cortes/charges-accrual.md, engine points 3 to 6): given the student, the period of a plan

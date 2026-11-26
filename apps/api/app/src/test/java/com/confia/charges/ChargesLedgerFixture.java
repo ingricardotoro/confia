@@ -123,11 +123,16 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
     }
 
     protected ExecuteAccrualRun executeAccrualRun() {
+        return executeAccrualRun(awardBenefits());
+    }
+
+    /** The execution of a run with the scholarships given, to prove what the database refuses when the engine is wrong. */
+    protected ExecuteAccrualRun executeAccrualRun(AwardBenefits awards) {
         return new ExecuteAccrualRun(transactionRunner(), new JooqChargePlanRepository(dsl),
                 new JooqChargePlanItemRepository(dsl), new JooqAccrualRunRepository(dsl),
                 new JooqAccrualRunItemRepository(dsl), new JooqChargeRepository(dsl), new JooqPlacementDirectory(dsl),
                 new JooqEnrollmentRoster(dsl), new JooqStudentDirectory(dsl), new JooqPricingDirectory(dsl),
-                new JooqPostingAccountRepository(dsl), ledger(), awardBenefits(), ledger(), new JooqAuditLogWriter(dsl), CLOCK);
+                new JooqPostingAccountRepository(dsl), ledger(), awards, ledger(), new JooqAuditLogWriter(dsl), CLOCK);
     }
 
     /** What the approved awards in force offer, read from the real database as the accrual of every process reads it. */
@@ -249,6 +254,31 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
                 env.institution(), student);
     }
 
+    /** The second payment concept of an institution seeded with {@link Concepts#TWO_IN_ONE_PLAN} or {@link Concepts#TWO_IN_TWO_PLANS}. */
+    protected static UUID secondConcept(Env env) throws SQLException {
+        return firstId(env.institution(), "select id from catalog_payment_concept where institution_id = ? and code = 'COL2'",
+                env.institution());
+    }
+
+    /** The second plan of an institution seeded with {@link Concepts#TWO_IN_TWO_PLANS}. */
+    protected static UUID secondPlan(Env env) throws SQLException {
+        return firstId(env.institution(), "select id from charges_plan where institution_id = ? and name = 'Plan B'",
+                env.institution());
+    }
+
+    protected static UUID firstId(UUID institution, String sql, Object... parameters) throws SQLException {
+        try (Connection c = StaffRoleFixtures.ownerTransaction(institution);
+                PreparedStatement s = c.prepareStatement(sql)) {
+            for (int i = 0; i < parameters.length; i++) {
+                s.setObject(i + 1, parameters[i]);
+            }
+            try (ResultSet rs = s.executeQuery()) {
+                rs.next();
+                return rs.getObject(1, UUID.class);
+            }
+        }
+    }
+
     /** An active monthly plan of one grade from February 2027, priced at a fictional 1,500.00 with a fictional 10 % tax. */
     protected Env seed(int students) throws SQLException {
         return seed(students, "1500.00", "10", "HNL");
@@ -258,6 +288,21 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
      * As {@link #seed(int)} with the price of the concept, the percentage of its fictional tax and the currency of the price given.
      */
     protected Env seed(int students, String price, String taxPercent, String currency) throws SQLException {
+        return seed(students, price, taxPercent, currency, Concepts.ONE);
+    }
+
+    /** The concepts the seeded plans charge: one, or two (code {@code COL2}) in the same plan or each in its own plan. */
+    protected enum Concepts {
+        ONE, TWO_IN_ONE_PLAN, TWO_IN_TWO_PLANS
+    }
+
+    /**
+     * As {@link #seed(int, String, String, String)} with a second payment concept, {@code COL2}, priced like the first and taxed like
+     * it: in the plan of the first ({@link Concepts#TWO_IN_ONE_PLAN}) or alone in a second plan, {@code Plan B}, of the same grade
+     * ({@link Concepts#TWO_IN_TWO_PLANS}). The identifiers of the second concept and plan are read with {@link #secondConcept} and
+     * {@link #secondPlan}.
+     */
+    protected Env seed(int students, String price, String taxPercent, String currency, Concepts concepts) throws SQLException {
         UUID institution = UUID.randomUUID();
         UUID year = UUID.randomUUID();
         UUID modality = UUID.randomUUID();
@@ -315,6 +360,28 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
             exec(c, "insert into charges_plan_item (institution_id, id, plan_id, payment_concept_id, periods_count, "
                     + "first_period_on) values (?, ?, ?, ?, 3, date '2027-02-01')", institution, UUID.randomUUID(), plan,
                     concept);
+            if (concepts != Concepts.ONE) {
+                UUID second = UUID.randomUUID();
+                exec(c, "insert into catalog_payment_concept (institution_id, id, code, name, category, is_taxable, "
+                        + "is_recurring, tax_rate_id) values (?, ?, 'COL2', 'Colegiatura 2', 'TUITION', true, true, ?)",
+                        institution, second, rate);
+                exec(c, "insert into catalog_price_list_item (institution_id, id, price_list_id, payment_concept_id, "
+                        + "amount, currency, valid_from, created_by) values (?, ?, ?, ?, ?::numeric, ?, date '2027-01-01', ?)",
+                        institution, UUID.randomUUID(), list, second, price, currency, admin);
+                UUID itemPlan = plan;
+                if (concepts == Concepts.TWO_IN_TWO_PLANS) {
+                    itemPlan = UUID.randomUUID();
+                    exec(c, "insert into charges_plan (institution_id, id, academic_year_id, name, target_scope, target_ref_id, "
+                            + "frequency, due_day_of_month) values (?, ?, ?, 'Plan B', 'GRADE', ?, 'MONTHLY', 5)",
+                            institution, itemPlan, year, grade);
+                }
+                exec(c, "insert into charges_plan_item (institution_id, id, plan_id, payment_concept_id, periods_count, "
+                        + "first_period_on) values (?, ?, ?, ?, 3, date '2027-02-01')", institution, UUID.randomUUID(),
+                        itemPlan, second);
+                if (concepts == Concepts.TWO_IN_TWO_PLANS) {
+                    exec(c, "update charges_plan set status = 'ACTIVE' where institution_id = ? and id = ?", institution, itemPlan);
+                }
+            }
             exec(c, "update charges_plan set status = 'ACTIVE' where institution_id = ? and id = ?", institution, plan);
             for (int i = 0; i < students; i++) {
                 UUID student = UUID.randomUUID();

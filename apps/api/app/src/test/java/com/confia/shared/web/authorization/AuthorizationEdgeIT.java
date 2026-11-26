@@ -299,7 +299,9 @@ class AuthorizationEdgeIT extends CommittingPostgresIntegrationTest {
                 .anyMatch(entry -> entry.pattern().contains("{"));
         // The routes of the academic structure, of the student registry and of the enrollments take a JSON body or a typed
         // identifier, or read a database this harness does not open (the catalog, the charges, the scholarships and the ledger routes included); their revoked-session case has its own test in
-        // AcademicStructureEndpointsIT and StudentEndpointsIT.
+        // AcademicStructureEndpointsIT and StudentEndpointsIT. The scholarships routes (/api/v1/scholarships and
+        // /api/v1/scholarship-awards) are covered by ScholarshipsEndpointsIT.aRevokedSessionIsRefusedOnTheWritesAndOnTheReadsOfTheScholarships,
+        // and the simulator of charges by AccrualEndpointsIT.theSimulatorNeedsTheChargesReadPermissionAndRefusesARevokedSession.
         for (PermissionedEndpoint entry : endpoints.endpoints().stream()
                 .filter(candidate -> !candidate.pattern().startsWith("/api/v1/organization/")
                         && !candidate.pattern().startsWith("/api/v1/students")

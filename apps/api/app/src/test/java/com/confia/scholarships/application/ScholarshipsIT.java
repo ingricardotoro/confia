@@ -14,13 +14,19 @@ import com.confia.scholarships.domain.InvalidAwardStateException;
 import com.confia.scholarships.domain.InvalidScholarshipsValueException;
 import com.confia.scholarships.domain.ResourceNotFoundException;
 import com.confia.scholarships.domain.ScholarshipBenefitLockedException;
+import com.confia.scholarships.domain.ScholarshipScopeLockedException;
 import com.confia.scholarships.domain.SelfApprovalForbiddenException;
 import com.confia.scholarships.domain.StaleVersionException;
 import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.IdempotencyPayloadMismatchException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -60,6 +66,18 @@ class ScholarshipsIT extends ScholarshipsFixture {
         UUID institution = env.institution();
         return new World(env, yearOf(institution), actorOf(institution, "academic_coordinator"),
                 actorOf(institution, "administrator"), actorOf(institution, "super_admin"), actorOf(institution, "cashier"));
+    }
+
+    /** As {@link #world()} with a second payment concept, {@code COL2}. */
+    private World twoConceptsWorld() throws SQLException {
+        Env env = seed(2, "1500.00", "10", "HNL", Concepts.TWO_IN_ONE_PLAN);
+        UUID institution = env.institution();
+        return new World(env, yearOf(institution), actorOf(institution, "academic_coordinator"),
+                actorOf(institution, "administrator"), actorOf(institution, "super_admin"), actorOf(institution, "cashier"));
+    }
+
+    private ManageScholarships.Draft capped(World w, String cap, Set<UUID> concepts) {
+        return new ManageScholarships.Draft("Beca del 25 %", "PERCENTAGE", "25", null, cap, concepts);
     }
 
     private ManageScholarships.Draft percent(World w, String points) {
@@ -173,6 +191,7 @@ class ScholarshipsIT extends ScholarshipsFixture {
         assertThatThrownBy(() -> manageScholarships().update(w.administrator(), request(), created.id(), 0,
                 new ManageScholarships.Draft("N", "FIXED_AMOUNT", null, "25.00", null, Set.of(w.env().concept()))))
                 .isInstanceOf(ScholarshipBenefitLockedException.class);
+        // Setting a cap where there was none only narrows the scholarship, so it is allowed after an approval.
         ScholarshipView renamed = manageScholarships().update(w.administrator(), request(), created.id(), 0,
                 new ManageScholarships.Draft("Solo el nombre", "PERCENTAGE", "25.00", null, "50.00",
                         Set.of(w.env().concept())));
@@ -190,6 +209,109 @@ class ScholarshipsIT extends ScholarshipsFixture {
 
         assertThatThrownBy(() -> manageScholarships().update(w.administrator(), request(), created.id(), 0,
                 percent(w, "30"))).isInstanceOf(ScholarshipBenefitLockedException.class);
+    }
+
+    @Test
+    void onceAnAwardWasApprovedTheCapOnlyGoesDown() throws SQLException {
+        World w = twoConceptsWorld();
+        Set<UUID> concept = Set.of(w.env().concept());
+        ScholarshipView created = manageScholarships().create(w.administrator(), request(), "BECA-25", capped(w, "500.00", concept));
+        approved(w, requested(w, created, 0, FEB, JUN));
+
+        assertThatThrownBy(() -> manageScholarships().update(w.administrator(), request(), created.id(), 0,
+                capped(w, "500.01", concept))).isInstanceOf(ScholarshipScopeLockedException.class);
+        assertThatThrownBy(() -> manageScholarships().update(w.administrator(), request(), created.id(), 0,
+                capped(w, null, concept))).isInstanceOf(ScholarshipScopeLockedException.class);
+        ScholarshipView lowered = manageScholarships().update(w.administrator(), request(), created.id(), 0,
+                capped(w, "400.00", concept));
+
+        assertThat(lowered.periodCap().compareTo(Money.of("400.00", CurrencyCode.HNL))).isZero();
+        assertThat(lowered.version()).isEqualTo(1);
+        assertThatThrownBy(() -> manageScholarships().update(w.administrator(), request(), created.id(), 1,
+                capped(w, "400.01", concept))).isInstanceOf(ScholarshipScopeLockedException.class);
+        assertThat(manageScholarships().get(w.administrator(), request(), created.id()).periodCap()
+                .compareTo(Money.of("400.00", CurrencyCode.HNL))).isZero();
+    }
+
+    @Test
+    void onceAnAwardWasApprovedConceptsAreOnlyRemovedNeverAdded() throws SQLException {
+        World w = twoConceptsWorld();
+        UUID first = w.env().concept();
+        UUID second = secondConcept(w.env());
+        ScholarshipView created = manageScholarships().create(w.administrator(), request(), "BECA-25",
+                capped(w, null, Set.of(first, second)));
+        approved(w, requested(w, created, 0, FEB, JUN));
+
+        ScholarshipView fewer = manageScholarships().update(w.administrator(), request(), created.id(), 0,
+                capped(w, null, Set.of(first)));
+
+        assertThat(fewer.concepts()).extracting(ScholarshipView.ConceptView::code).containsExactly("COL");
+        assertThatThrownBy(() -> manageScholarships().update(w.administrator(), request(), created.id(), 1,
+                capped(w, null, Set.of(first, second)))).isInstanceOf(ScholarshipScopeLockedException.class);
+        assertThatThrownBy(() -> manageScholarships().update(w.administrator(), request(), created.id(), 1,
+                capped(w, null, Set.of(second)))).isInstanceOf(ScholarshipScopeLockedException.class);
+        assertThat(manageScholarships().get(w.administrator(), request(), created.id()).concepts())
+                .extracting(ScholarshipView.ConceptView::code).containsExactly("COL");
+    }
+
+    @Test
+    void theScopeStaysLockedWhenTheOnlyApprovedAwardWasRevoked() throws SQLException {
+        World w = twoConceptsWorld();
+        ScholarshipView created = manageScholarships().create(w.administrator(), request(), "BECA-25",
+                capped(w, "500.00", Set.of(w.env().concept())));
+        AwardView award = approved(w, requested(w, created, 0, FEB, JUN));
+        decideAward().revoke(w.administrator(), request(), "revoke-1", award.id(), REASON);
+
+        assertThatThrownBy(() -> manageScholarships().update(w.administrator(), request(), created.id(), 0,
+                capped(w, "600.00", Set.of(w.env().concept())))).isInstanceOf(ScholarshipScopeLockedException.class);
+    }
+
+    @Test
+    void withoutApprovedAwardsTheCapAndTheConceptsChangeFreely() throws SQLException {
+        World w = twoConceptsWorld();
+        ScholarshipView created = manageScholarships().create(w.administrator(), request(), "BECA-25",
+                capped(w, "500.00", Set.of(w.env().concept())));
+        requested(w, created, 0, FEB, JUN);
+
+        ScholarshipView widened = manageScholarships().update(w.administrator(), request(), created.id(), 0,
+                capped(w, null, Set.of(w.env().concept(), secondConcept(w.env()))));
+
+        assertThat(widened.periodCap()).isNull();
+        assertThat(widened.concepts()).hasSize(2);
+    }
+
+    @Test
+    void theDatabaseItselfRefusesToWidenTheScopeOfAScholarshipWithApprovedAwards() throws SQLException {
+        World w = twoConceptsWorld();
+        ScholarshipView created = manageScholarships().create(w.administrator(), request(), "BECA-25",
+                capped(w, "500.00", Set.of(w.env().concept())));
+        approved(w, requested(w, created, 0, FEB, JUN));
+        UUID second = secondConcept(w.env());
+
+        assertThatThrownBy(() -> execAsOwner(w, "update scholarships_scholarship set period_cap = 500.01 "
+                + "where institution_id = ? and id = ?", w.institution(), created.id()))
+                .isInstanceOf(SQLException.class).hasMessageContaining("only goes down");
+        assertThatThrownBy(() -> execAsOwner(w, "update scholarships_scholarship set period_cap = null "
+                + "where institution_id = ? and id = ?", w.institution(), created.id()))
+                .isInstanceOf(SQLException.class).hasMessageContaining("only goes down");
+        assertThatThrownBy(() -> execAsOwner(w, "insert into scholarships_scholarship_concept (institution_id, scholarship_id, "
+                + "payment_concept_id) values (?, ?, ?)", w.institution(), created.id(), second))
+                .isInstanceOf(SQLException.class).hasMessageContaining("no new concept");
+        execAsOwner(w, "update scholarships_scholarship set period_cap = 499.99 where institution_id = ? and id = ?",
+                w.institution(), created.id());
+        assertThat(scalar(w.institution(), "select count(*) from scholarships_scholarship_concept where institution_id = ?",
+                w.institution())).isEqualTo(1);
+    }
+
+    private static void execAsOwner(World w, String sql, Object... parameters) throws SQLException {
+        try (Connection c = com.confia.support.StaffRoleFixtures.ownerTransaction(w.institution());
+                PreparedStatement s = c.prepareStatement(sql)) {
+            for (int i = 0; i < parameters.length; i++) {
+                s.setObject(i + 1, parameters[i]);
+            }
+            s.executeUpdate();
+            c.commit();
+        }
     }
 
     @Test
@@ -414,6 +536,69 @@ class ScholarshipsIT extends ScholarshipsFixture {
     }
 
     @Test
+    void theAuditReasonOfARejectionAndOfARevocationIsTheSha256OfTheReasonOfTheDecision() throws SQLException {
+        World w = world();
+        ScholarshipView created = scholarship(w, "BECA-25", "25");
+        AwardView toReject = requested(w, created, 0, FEB, JUN);
+        AwardView toRevoke = approved(w, requested(w, created, 1, FEB, JUN));
+
+        AwardView rejected = decideAward().reject(w.administrator(), request(), "reject-1", toReject.id(), "  " + REASON + "  ");
+        AwardView revoked = decideAward().revoke(w.administrator(), request(), "revoke-1", toRevoke.id(), REASON + " (otra)");
+
+        assertThat(auditReason(w, "scholarships.award.rejected")).isEqualTo(sha256(rejected.decision().reason()))
+                .hasSize(64).matches("[0-9a-f]{64}");
+        assertThat(auditReason(w, "scholarships.award.revoked")).isEqualTo(sha256(revoked.revocation().reason()))
+                .isNotEqualTo(sha256(rejected.decision().reason()));
+        assertThat(storedReason(w, rejected.decision().id())).isEqualTo(rejected.decision().reason());
+        assertThat(auditReason(w, "scholarships.award.approved")).as("an approval has no reason").isNull();
+    }
+
+    @Test
+    void theApprovalAuditNamesWhoRequestedTheAward() throws SQLException {
+        World w = world();
+        AwardView award = requested(w, scholarship(w, "BECA-25", "25"), 0, FEB, JUN);
+        approved(w, award);
+
+        assertThat(scalar(w.institution(), "select count(*) from shared_audit_log where institution_id = ? and action = "
+                + "'scholarships.award.approved' and before_value->>'requestedBy' = ? and approver_id = ?", w.institution(),
+                w.coordinator().accountId().toString(), w.administrator().accountId())).isEqualTo(1);
+    }
+
+    private String auditReason(World w, String action) throws SQLException {
+        try (Connection c = com.confia.support.StaffRoleFixtures.ownerTransaction(w.institution());
+                PreparedStatement s = c.prepareStatement(
+                        "select reason from shared_audit_log where institution_id = ? and action = ?")) {
+            s.setObject(1, w.institution());
+            s.setString(2, action);
+            try (var rs = s.executeQuery()) {
+                rs.next();
+                return rs.getString(1);
+            }
+        }
+    }
+
+    private String storedReason(World w, UUID decisionId) throws SQLException {
+        try (Connection c = com.confia.support.StaffRoleFixtures.ownerTransaction(w.institution());
+                PreparedStatement s = c.prepareStatement(
+                        "select reason from scholarships_award_decision where institution_id = ? and id = ?")) {
+            s.setObject(1, w.institution());
+            s.setObject(2, decisionId);
+            try (var rs = s.executeQuery()) {
+                rs.next();
+                return rs.getString(1);
+            }
+        }
+    }
+
+    private static String sha256(String text) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Test
     void aReasonOutOfItsBoundsIsRefusedBeforeAnythingIsWritten() throws SQLException {
         World w = world();
         AwardView award = requested(w, scholarship(w, "BECA-25", "25"), 0, FEB, JUN);
@@ -578,6 +763,14 @@ class ScholarshipsIT extends ScholarshipsFixture {
                 .isInstanceOf(ResourceNotFoundException.class);
         assertThatThrownBy(() -> decideAward().approve(theirs.administrator(), request(), "x-1", award.id()))
                 .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> decideAward().reject(theirs.administrator(), request(), "x-2", award.id(), REASON))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> decideAward().revoke(theirs.administrator(), request(), "x-3", award.id(), REASON))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> manageScholarships().deactivate(theirs.administrator(), request(), created.id()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> manageScholarships().reactivate(theirs.administrator(), request(), created.id()))
+                .isInstanceOf(ResourceNotFoundException.class);
         assertThatThrownBy(() -> requestAward().request(theirs.coordinator(), request(),
                 new RequestAward.Command(created.id(), theirs.student(0), theirs.year(), FEB, JUN)))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -590,6 +783,61 @@ class ScholarshipsIT extends ScholarshipsFixture {
         assertThat(countVisibleAsApplication(theirs.institution(), "scholarships_award_decision")).isZero();
         assertThat(countVisibleAsApplication(theirs.institution(), "scholarships_scholarship_concept")).isZero();
         assertThat(countVisibleAsApplication(mine.institution(), "scholarships_scholarship")).isEqualTo(1);
+    }
+
+    @Test
+    void theDecisionsOfAnInstitutionAreInvisibleToTheOtherOneOnceTheyExist() throws SQLException {
+        World mine = world();
+        World theirs = world();
+        ScholarshipView created = scholarship(mine, "BECA-25", "25");
+        AwardView award = requested(mine, created, 0, FEB, JUN);
+        approved(mine, award);
+
+        // There is one decision, so a count of zero is the work of the row-level security and not an empty table.
+        assertThat(countVisibleAsApplication(mine.institution(), "scholarships_award_decision")).isEqualTo(1);
+        assertThat(countVisibleAsApplication(theirs.institution(), "scholarships_award_decision")).isZero();
+        assertThat(countVisibleAsApplication(mine.institution(), "scholarships_award")).isEqualTo(1);
+        assertThat(countVisibleAsApplication(theirs.institution(), "scholarships_award")).isZero();
+    }
+
+    @Test
+    void theApplicationRoleCannotWriteRowsOfAnotherInstitutionNorChangeThem() throws SQLException {
+        World mine = world();
+        World theirs = world();
+        ScholarshipView created = scholarship(mine, "BECA-25", "25");
+        AwardView award = approved(mine, requested(mine, created, 0, FEB, JUN));
+
+        // WITH CHECK: with the context of the other institution a row of this one cannot be written.
+        assertThatThrownBy(() -> asApplication(theirs.institution(), "insert into scholarships_scholarship (institution_id, id, "
+                + "code, name, benefit_type, percent, created_by) values (?, ?, 'ROBADA', 'Beca', 'PERCENTAGE', 10, ?)",
+                mine.institution(), UUID.randomUUID(), UUID.randomUUID()))
+                .isInstanceOf(SQLException.class).hasMessageContaining("row-level security");
+        // USING: the rows of this institution are not even found by an update with the context of the other one.
+        assertThat(asApplication(theirs.institution(), "update scholarships_award set status = 'revoked' where institution_id = ? "
+                + "and id = ?", mine.institution(), award.id())).isZero();
+        assertThat(asApplication(theirs.institution(), "update scholarships_scholarship set is_active = false "
+                + "where institution_id = ? and id = ?", mine.institution(), created.id())).isZero();
+        assertThat(viewAwards().get(mine.administrator(), request(), award.id()).status()).isEqualTo("approved");
+        assertThat(manageScholarships().get(mine.administrator(), request(), created.id()).active()).isTrue();
+    }
+
+    /** One statement as the least-privilege role of the application with the context of an institution; answers the rows changed. */
+    private static int asApplication(UUID institutionContext, String sql, Object... parameters) throws SQLException {
+        try (Connection c = com.confia.support.SharedPostgresContainer.connectionAs("confia_admin_app")) {
+            c.setAutoCommit(false);
+            try (PreparedStatement context = c.prepareStatement("select set_config('app.institution_id', ?, true)")) {
+                context.setString(1, institutionContext.toString());
+                context.execute();
+            }
+            try (PreparedStatement s = c.prepareStatement(sql)) {
+                for (int i = 0; i < parameters.length; i++) {
+                    s.setObject(i + 1, parameters[i]);
+                }
+                int changed = s.executeUpdate();
+                c.rollback();
+                return changed;
+            }
+        }
     }
 
     @Test

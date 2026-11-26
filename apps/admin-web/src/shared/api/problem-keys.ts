@@ -73,5 +73,6 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "scholarship-benefit-locked": "problem.scholarshipBenefitLocked",
   "scholarship-award-overlap": "problem.scholarshipAwardOverlap",
   "invalid-award-state": "problem.invalidAwardState",
+  "scholarship-scope-locked": "problem.scholarshipScopeLocked",
   unknown: "problem.unexpected",
 };

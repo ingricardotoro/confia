@@ -79,6 +79,7 @@ describe("PROBLEM_KEYS", () => {
     ["duplicate-scholarship-code", "problem.duplicateScholarshipCode"],
     ["scholarship-benefit-locked", "problem.scholarshipBenefitLocked"],
     ["scholarship-award-overlap", "problem.scholarshipAwardOverlap"],
+    ["scholarship-scope-locked", "problem.scholarshipScopeLocked"],
     ["invalid-award-state", "problem.invalidAwardState"],
   ] as const)("maps %s to %s", (code, key) => {
     expect(PROBLEM_KEYS[code]).toBe(key);

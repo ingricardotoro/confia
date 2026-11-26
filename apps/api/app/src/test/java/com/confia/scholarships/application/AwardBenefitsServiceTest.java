@@ -51,7 +51,11 @@ class AwardBenefitsServiceTest {
     }
 
     private static List<AwardBenefits.Offer> offers(AwardBenefitsService service, Money base) {
-        return service.offers(INSTITUTION, STUDENT, CONCEPT, ON, base, false);
+        return service.offers(INSTITUTION, STUDENT, CONCEPT, ON, base, award -> Money.zero(CurrencyCode.HNL), false);
+    }
+
+    private static List<AwardBenefits.Offer> offers(AwardBenefitsService service, Money base, String alreadyGiven) {
+        return service.offers(INSTITUTION, STUDENT, CONCEPT, ON, base, award -> hnl(alreadyGiven), false);
     }
 
     @Test
@@ -106,6 +110,29 @@ class AwardBenefitsServiceTest {
                 offer -> offer.amount().toString()).hasSize(2);
         assertThat(offers(service, hnl("1000.00"))).extracting(offer -> offer.amount().amount().toPlainString())
                 .containsExactlyInAnyOrder("100.0000", "200.0000");
+    }
+
+    @Test
+    void whatTheAwardAlreadyGaveInThePeriodIsTakenFromItsCap() {
+        AwardBenefitsService service = serviceOf(award("TOPE", Benefit.percentage("50"), "600.00"));
+
+        assertThat(offers(service, hnl("1100.00"), "0.00")).singleElement()
+                .satisfies(offer -> assertThat(offer.amount()).isEqualTo(hnl("550.00")));
+        assertThat(offers(service, hnl("1100.00"), "550.00")).singleElement()
+                .satisfies(offer -> assertThat(offer.amount()).isEqualTo(hnl("50.00")));
+        assertThat(offers(service, hnl("1100.00"), "600.00")).singleElement()
+                .satisfies(offer -> assertThat(offer.amount().isZero()).isTrue());
+    }
+
+    @Test
+    void anAwardWithoutACapNeverAsksWhatItAlreadyGave() {
+        AwardBenefitsService service = serviceOf(award("LIBRE", Benefit.percentage("50"), null));
+
+        List<AwardBenefits.Offer> offers = service.offers(INSTITUTION, STUDENT, CONCEPT, ON, hnl("1100.00"), award -> {
+            throw new AssertionError("an award without a cap has nothing consumed");
+        }, false);
+
+        assertThat(offers).singleElement().satisfies(offer -> assertThat(offer.amount()).isEqualTo(hnl("550.00")));
     }
 
     @Test
@@ -166,7 +193,7 @@ class AwardBenefitsServiceTest {
 
     @Test
     void theNoneOfferNothingAndApplyNothing() {
-        assertThat(AwardBenefits.NONE.offers(INSTITUTION, STUDENT, CONCEPT, ON, hnl("10.00"), false)).isEmpty();
+        assertThat(AwardBenefits.NONE.offers(INSTITUTION, STUDENT, CONCEPT, ON, hnl("10.00"), a -> hnl("0.00"), false)).isEmpty();
         assertThat(AwardBenefits.NONE.anyApplicable(INSTITUTION, List.of(STUDENT), List.of(CONCEPT), ON)).isFalse();
     }
 }

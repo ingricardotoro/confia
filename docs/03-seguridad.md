@@ -853,7 +853,9 @@ Trimestralmente se genera el reporte "quién puede hacer qué" y se revisa con e
 > **Nota fechada 2026-11-24 (corte `scholarships-awards`, F2): el Administrador gana `scholarships:void`.** La fila `scholarships` de la
 > matriz efectiva era `C L A P X` para el Administrador; ahora es `C L A N P X`. Decisión del propietario, 2026-11-24: «si, si puede el
 > adminsitrador revocar una beca, con justificacion». `scholarships:void` revoca una beca aprobada (`POST /api/v1/scholarship-awards/{id}/revoke`)
-> y exige un motivo de 20 a 500 caracteres, que queda en la bitácora. Los demás roles no cambian. `PermissionMatrixParityTest` lee la tabla
+> y exige un motivo de 20 a 500 caracteres. El texto del motivo se guarda en la decisión del otorgamiento (`scholarships_award_decision`, solo
+> inserción); la bitácora guarda su huella SHA-256 en hexadecimal (decisión del propietario, 2026-11-24), no el texto, porque puede nombrar a una
+> persona. Los demás roles no cambian. `PermissionMatrixParityTest` lee la tabla
 > corregida de la nota del 2026-11-04, de modo que el código (`StaffRole`) y el documento siguen iguales celda por celda.
 
 ### 5.3 Segregación de funciones
@@ -884,6 +886,20 @@ segregación de funciones no debe listar ningún usuario con ambos permisos del 
 > aprobador.** Anulación de cargo: sin segundo aprobador, decisión del propietario 2026-11-18; compensado por motivo obligatorio,
 > bitácora, reverso único y trabajo nocturno de integridad; revisar si se introduce cobranza con montos altos. La tabla de arriba no
 > cambia (sigue en ocho operaciones): `charges:void` lo ejercen Administrador y Super Administrador en un solo paso.
+
+> **Nota fechada 2026-11-24 (corte `scholarships-awards`, F2): excepción documentada, revocación de un otorgamiento de beca sin segundo
+> aprobador.** La solicitud, la aprobación y el rechazo de un otorgamiento sí exigen una segunda persona (`403 self-approval-forbidden`). La
+> revocación de un otorgamiento aprobado no la exige: decisión del propietario, 2026-11-24 («si, si puede el adminsitrador revocar una beca,
+> con justificacion»); `scholarships:void` lo ejercen Administrador y Super Administrador en un solo paso. Se compensa con el motivo
+> obligatorio de 20 a 500 caracteres (guardado en `scholarships_award_decision`, con su huella SHA-256 en la bitácora), la bitácora, el efecto
+> solo hacia adelante (un cargo emitido no cambia) y que revocar solo quita un beneficio. La tabla de arriba no cambia. Revisar si se
+> introducen becas de monto alto.
+
+> **Brecha de control registrada 2026-11-24 (corte `scholarships-awards`, F2): las aprobaciones pendientes no caducan.** El párrafo de
+> implementación de esta sección dice que una aprobación caduca a las 72 horas sin resolución y notifica. Hoy no existe esa caducidad ni en
+> `scholarships` (otorgamientos `pending`) ni en `payments` (transferencias por confirmar): una solicitud pendiente sigue vigente
+> indefinidamente. No es una excepción aceptada sino una brecha abierta; la implementación del vencimiento y de su notificación queda para un
+> corte propio de ambos módulos, y hasta entonces la revisión trimestral de operaciones debe listar las solicitudes pendientes de más de 72 horas.
 
 > **Nota fechada 2026-11-04 (cambio `rbac-permission-matrix-and-audit-integration`, PR 1 `permission-catalog-and-adr`): el informe
 > trimestral revisa operaciones.** El texto anterior no se reescribe. Con un rol por cuenta, un rol como Contabilidad tiene a la vez

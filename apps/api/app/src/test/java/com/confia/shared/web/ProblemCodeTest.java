@@ -44,7 +44,7 @@ class ProblemCodeTest {
                         "duplicate-plan-item", "plan-item-invalid", "accrual-run-in-progress", "charge-already-voided", "charge-not-voidable",
                         "duplicate-account-code", "account-in-use", "posting-account-invalid", "stale-version",
                         "cash-session-already-open", "cash-session-not-open", "cash-session-not-awaiting-approval", "cash-difference-reason-required", "cash-expected-negative", "cash-approval-same-actor",
-                        "charge-has-payments", "posting-accounts-incomplete", "duplicate-transfer-reference", "self-approval-forbidden", "payment-not-declared", "duplicate-scholarship-code", "scholarship-benefit-locked", "scholarship-award-overlap", "invalid-award-state");
+                        "charge-has-payments", "posting-accounts-incomplete", "duplicate-transfer-reference", "self-approval-forbidden", "payment-not-declared", "duplicate-scholarship-code", "scholarship-benefit-locked", "scholarship-scope-locked", "scholarship-award-overlap", "invalid-award-state");
     }
 
     @Test
@@ -74,7 +74,7 @@ class ProblemCodeTest {
             "plan-without-items, 409", "duplicate-plan-item, 409", "plan-item-invalid, 409", "accrual-run-in-progress, 409", "charge-already-voided, 409", "charge-not-voidable, 409",
             "duplicate-account-code, 409", "account-in-use, 409", "posting-account-invalid, 409", "stale-version, 409",
             "cash-session-already-open, 409", "cash-session-not-open, 409", "cash-session-not-awaiting-approval, 409", "cash-difference-reason-required, 400", "cash-expected-negative, 409", "cash-approval-same-actor, 403",
-            "charge-has-payments, 409", "posting-accounts-incomplete, 409", "duplicate-transfer-reference, 409", "self-approval-forbidden, 403", "payment-not-declared, 409", "duplicate-scholarship-code, 409", "scholarship-benefit-locked, 409", "scholarship-award-overlap, 409", "invalid-award-state, 409"})
+            "charge-has-payments, 409", "posting-accounts-incomplete, 409", "duplicate-transfer-reference, 409", "self-approval-forbidden, 403", "payment-not-declared, 409", "duplicate-scholarship-code, 409", "scholarship-benefit-locked, 409", "scholarship-scope-locked, 409", "scholarship-award-overlap, 409", "invalid-award-state, 409"})
     void eachCodeCarriesItsHttpStatus(String code, int status) {
         assertThat(ProblemCode.ofCode(code)).get().extracting(ProblemCode::status)
                 .isEqualTo(status);
@@ -97,7 +97,7 @@ class ProblemCodeTest {
             "duplicate-plan-item", "plan-item-invalid", "accrual-run-in-progress", "charge-already-voided", "charge-not-voidable",
             "duplicate-account-code", "account-in-use", "posting-account-invalid", "stale-version",
             "cash-session-already-open", "cash-session-not-open", "cash-session-not-awaiting-approval", "cash-difference-reason-required", "cash-expected-negative", "cash-approval-same-actor",
-            "charge-has-payments", "posting-accounts-incomplete", "duplicate-transfer-reference", "self-approval-forbidden", "payment-not-declared", "duplicate-scholarship-code", "scholarship-benefit-locked", "scholarship-award-overlap", "invalid-award-state"})
+            "charge-has-payments", "posting-accounts-incomplete", "duplicate-transfer-reference", "self-approval-forbidden", "payment-not-declared", "duplicate-scholarship-code", "scholarship-benefit-locked", "scholarship-scope-locked", "scholarship-award-overlap", "invalid-award-state"})
     void theTypeIsTheStableBaseFollowedByTheCodeAndNothingElse(String code) {
         ProblemCode problem = ProblemCode.ofCode(code).orElseThrow();
         assertThat(problem.type()).isEqualTo(URI.create("https://confia.hn/problems/" + code));

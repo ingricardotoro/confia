@@ -52,6 +52,7 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "scholarship-benefit-locked",
   "scholarship-award-overlap",
   "invalid-award-state",
+  "scholarship-scope-locked",
 ]);
 
 /** The text of each reason the server gives for a split of the responsibility that does not hold. */

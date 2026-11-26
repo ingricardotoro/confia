@@ -20,12 +20,18 @@ junto a pagos.
   - Se desactiva y se reactiva; no se borra.
   - Cambiar el porcentaje o el monto de una beca con otorgamientos aprobados no está permitido: se crea otra beca. Así un cargo
     emitido siempre se explica con la beca que tenía.
+  - **Solo se puede reducir el alcance** (decisión del propietario, 2026-11-24, «Solo reducir»). Con otorgamientos aprobados o revocados
+    alguna vez, el tope por período solo baja (no se sube ni se quita; poner un tope donde no había es bajarlo) y los conceptos que cubre
+    solo se quitan (no se agregan). Ampliar significa crear otra beca. Lo exigen el dominio (`409 scholarship-scope-locked`) y la base de
+    datos. Sin otorgamientos aprobados, el tope y los conceptos se editan sin restricción.
 - **Otorgamiento** (`ScholarshipAward`):
   - Liga una beca a un estudiante, para un año lectivo, con una vigencia (`validFrom`, `validTo`) dentro de ese año.
   - Nace `pending`. Pasa a `approved` o `rejected`; un otorgamiento aprobado puede pasar a `revoked`.
   - Quien lo solicita no puede aprobarlo ni rechazarlo (segregación de funciones; `403 self-approval-forbidden`, igual que caja y
     pagos desde la revisión de pagos; la nota decía `409` y se corrige aquí).
-  - El rechazo y la revocación exigen un motivo de 20 a 500 caracteres, que no se copia a la bitácora.
+  - El rechazo y la revocación exigen un motivo de 20 a 500 caracteres. El texto vive solo en la decisión del otorgamiento
+    (`scholarships_award_decision`); la bitácora guarda en `reason` su huella SHA-256 en hexadecimal (decisión del propietario,
+    2026-11-24, «Hash en bitácora») y su longitud, porque el texto libre puede nombrar a una persona.
   - Un estudiante no puede tener dos otorgamientos aprobados de la misma beca con vigencias que se solapen (restricción en la base de datos).
 - **Solo hacia adelante.**
   - La beca solo afecta los cargos que se generen después de aprobarla y dentro de su vigencia. Los cargos ya emitidos no cambian
@@ -38,6 +44,13 @@ junto a pagos.
   - Beneficio de monto fijo: el monto.
   - En ambos casos se limita al tope por período, si existe, y a la base del cargo. El beneficio nunca deja la base por debajo de
     cero (INV-15).
+  - **El tope es por otorgamiento y por período** (decisión del propietario, 2026-11-24, «Tope por período»): el beneficio de todos los
+    cargos de un período para un otorgamiento nunca supera el tope. La oferta de un cargo es el menor entre el beneficio y lo que queda
+    del tope, que es el tope menos el beneficio que ese otorgamiento ya dio en el mismo período (cargos emitidos no anulados, de
+    cualquier corrida, y cargos anteriores de la misma evaluación). Un período es el de `period_start` del cargo. Los cargos de un
+    estudiante se evalúan en orden de identificador de concepto, y la base de datos verifica la misma suma al insertar cada cargo.
+    **Anular un cargo libera su beneficio**: deja de contar para el tope, de modo que un cargo emitido después en ese período puede
+    tomarlo. Los cargos ya emitidos nunca cambian (INV-14).
 - **Impuesto sobre la base reducida.**
   - En un concepto gravado, el impuesto se calcula sobre la base menos la beca. Ejemplo: una base de 1,000.00 con 20 % de beca deja
     una base de 800.00, y el impuesto se calcula sobre 800.00.
@@ -102,6 +115,9 @@ junto a pagos.
 - beca del 100 %;
 - monto fijo mayor que la base (queda en cero);
 - tope por período menor que el beneficio;
+- beca de dos conceptos con un tope menor que la suma de sus beneficios, en una corrida y en dos corridas del mismo período (el tope se
+  comparte);
+- anular un cargo y generar otro del mismo período (el beneficio anulado se libera);
 - redondeo `HALF_UP` en porcentajes con fracciones;
 - concepto no cubierto;
 - concepto gravado con beca (impuesto sobre la base reducida);
@@ -115,6 +131,7 @@ junto a pagos.
 - revocar y volver a generar un período ya generado (no cambia, INV-14);
 - otorgamiento pendiente o rechazado (no se aplica);
 - aprobación de quien lo solicitó;
+- subir o quitar el tope, o agregar un concepto, de una beca con otorgamientos aprobados (409); bajar el tope o quitar un concepto (permitido);
 - otorgamientos con vigencias que se solapan;
 - cambio del otorgamiento entre la vista previa y la confirmación;
 - beca desactivada con otorgamientos aprobados (deja de aplicarse a cargos futuros).
@@ -153,7 +170,7 @@ Backend de T1 completo: migración, dominio, casos de uso, adaptadores, capa web
   misma beca y estudiante con vigencias solapadas (restricción de exclusión sobre `daterange`).
 - **Dominio puro** (`Benefit`, `Scholarship`, `ScholarshipAward`, `AwardDecision`, `DecisionReason`) con `Money` y `HALF_UP` una sola vez.
 - **Casos de uso:** `ManageScholarships`, `RequestAward`, `DecideAward` (aprobar, rechazar, revocar con `Idempotency-Key` permanente en la
-  decisión) y `ViewAwards`. Auditoría de todas las acciones de la nota; el motivo solo se audita por su longitud.
+  decisión) y `ViewAwards`. Auditoría de todas las acciones de la nota; el motivo se audita por su huella SHA-256 y su longitud (corregido en T4; antes solo la longitud).
 - **Pruebas:** 81 unitarias de dominio y 28 de integración contra PostgreSQL real (`ScholarshipsIT`).
 
 ### Desviaciones
@@ -164,7 +181,8 @@ Backend de T1 completo: migración, dominio, casos de uso, adaptadores, capa web
   2026-11-24 que sí puede revocar, con justificación. Se agregó `SCHOLARSHIPS_VOID` a `ADMINISTRATOR`, la fila `scholarships` de la matriz
   efectiva de `docs/03` §5.2 pasó a `C L A N P X` y hay una nota fechada 2026-11-24. Pruebas: `StaffRoleTest`, `PermissionMatrixParityTest` y
   `ScholarshipsIT` (el Administrador revoca con motivo válido y se le rechaza con uno corto).
-- El valor del beneficio queda bloqueado si existe un otorgamiento aprobado o revocado alguna vez; nombre, tope y conceptos siguen editables.
+- El valor del beneficio queda bloqueado si existe un otorgamiento aprobado o revocado alguna vez; el nombre sigue editable. El tope y los
+  conceptos solo se reducen (decisión del propietario del 2026-11-24, ver «Reglas e invariantes»; en T1 seguían editables sin límite).
 - Crear y solicitar no llevan `Idempotency-Key` (convención del catálogo); desactivar y reactivar son idempotentes por estado.
 - Que la vigencia esté dentro del año lo valida el trigger de la base, porque `organization` no publica las fechas del año.
 
@@ -178,7 +196,7 @@ Backend de T1 completo: migración, dominio, casos de uso, adaptadores, capa web
 
 ### Preguntas abiertas
 
-- El mensaje de `self-approval-forbidden` en `problems.properties` habla de pagos; conviene redactarlo de forma neutra.
+- ~~El mensaje de `self-approval-forbidden` habla de pagos.~~ Resuelto en T4: el texto es neutro y vale para pagos y otorgamientos.
 
 ## Lo construido (backend T2, 2026-11-24)
 
@@ -247,3 +265,53 @@ Siguen en la lista de validaciones externas y están implementados así hasta qu
 - ¿Debe el estado de cuenta mostrar el cargo de total cero de una beca del 100 %? Hoy no aparece porque no mueve el auxiliar del estudiante.
 - No hay prueba de concurrencia del bloqueo `FOR SHARE` de las becas (revocar mientras el trabajador evalúa un estudiante); la lectura bajo
   bloqueo se prueba, la espera no.
+
+## Lo construido (T4, correcciones de la revisión, 2026-11-24)
+
+Corrige los hallazgos de la revisión (confia-code-reviewer y confia-security-auditor) con las decisiones del propietario L8 a L10.
+
+- **Tope por período compartido (B1).** `Benefit.on(base, tope, consumido)` resta lo que el otorgamiento ya dio en el período;
+  `AwardBenefits.offers` recibe la función `alreadyGiven` (los cargos son de `charges`, no de `scholarships`) y `AccrualEngine` suma los
+  cargos emitidos no anulados (`ChargeRepository.benefitGiven`) y los de la misma evaluación, en orden de concepto. La migración
+  `V38__share_scholarship_cap_per_period_and_narrow_scope.sql` hace que el trigger del cargo verifique la misma suma (V37 no se edita).
+  Pruebas: `BenefitTest`, `AwardBenefitsServiceTest`, y en `AccrualScholarshipsIT` una beca de dos conceptos en una corrida, en dos
+  corridas, con la vista previa, con un cargo anulado y con un motor que olvida lo consumido (la base lo rechaza con `POSTING_FAILED`).
+  El cambio de período (marzo, con el tope completo otra vez) no tiene prueba de integración porque el reloj fijo del fixture impide
+  generar un período futuro; lo cubre la condición `period_start` del trigger y de la consulta.
+- **Alcance reducible (A1).** `Scholarship.edit` lanza `ScholarshipScopeLockedException` (`409 scholarship-scope-locked`); el trigger de la
+  beca (V38) rechaza subir o quitar el tope y un trigger `BEFORE INSERT` sobre los conceptos rechaza agregar uno. Pruebas de dominio, de
+  integración (`ScholarshipsIT`, incluidas las sentencias directas a la base) y de ruta (`ScholarshipsEndpointsIT`).
+- **Hash del motivo (M2).** El `reason` de la bitácora del rechazo y de la revocación es el SHA-256 del motivo de la decisión.
+  `docs/03-seguridad.md` §5.2 (nota del 2026-11-24) quedó corregido.
+- **Pruebas HTTP (M1).** `ScholarshipsEndpointsIT` (403 de Cajero en aprobar y rechazar, 403 de Coordinador en revocar, 401 con sesión
+  revocada, 400 con motivo corto y con propiedad no declarada, 400 `idempotency-key-missing`, 404 de otra institución,
+  403 `self-approval-forbidden`) y una prueba del simulador en `AccrualEndpointsIT`. Justifican la exclusión de `/api/v1/scholarship` en
+  `AuthorizationEdgeIT`.
+- **Otros.** Mensaje neutro de `self-approval-forbidden`; pruebas de RLS con una decisión existente y con escrituras de otra
+  institución; `requestedBy` en el `before_value` de la bitácora de aprobación; import duplicado de `ChargeEvaluator` eliminado.
+- **Documentación de seguridad.** `docs/03-seguridad.md` §5.3: excepción de la revocación sin segundo aprobador (L3) y brecha de control
+  registrada: las aprobaciones pendientes no caducan a las 72 horas (becas y pagos); no se implementó el vencimiento.
+
+## Lo construido (pantallas T3 y correcciones T4 del frontend, 2026-11-24)
+
+- **Pantallas nuevas** en `apps/admin-web/src/features/scholarships`, dentro del grupo Finanzas:
+  - Becas: lista con filtros, alta y edición, desactivar y reactivar. Con otorgamientos aprobados, el tipo y el valor quedan de solo
+    lectura y el formulario explica que el tope solo puede bajar y los conceptos solo pueden quitarse.
+  - Otorgamientos: lista con filtros por estado, beca y estudiante; solicitud; detalle con «Aprobar», «Rechazar» y «Revocar». Cada
+    decisión envía una `Idempotency-Key` que se reutiliza al reintentar; rechazar y revocar exigen un motivo de 20 a 500 caracteres.
+  - Simulador de cargos en `/scholarships/simulator`, con el permiso `charges:read`: muestra la tabla que devuelve el servidor.
+- **Pantallas existentes:** «Generación de cargos» y «Cargos del estudiante» muestran la beca, el beneficio y la base neta; el mapa de
+  cuentas agrega «Becas y descuentos» (cuenta de ingreso o de gasto, S4); la lista de estudiantes enlaza a los otorgamientos de cada uno.
+- **Errores:** `outside-academic-year` se muestra bajo el inicio de la vigencia y `scholarship-scope-locked` dentro del diálogo de edición.
+- **Pruebas:** componente con Vitest, Testing Library y MSW (estados, decisiones, validación del motivo y las cifras del criterio de
+  aceptación en el simulador: L 1,100.00, L 275.00, L 825.00, L 123.75 y L 948.75), recorrido de Playwright solicitud → aprobación →
+  simulación con el rechazo de la autoaprobación, y la puerta de axe sobre los once estados nuevos en tema claro y oscuro.
+
+### Desviaciones y pendientes
+
+- Los otorgamientos muestran solo el código del estudiante: el contrato no trae su nombre.
+- La fila «Becas y descuentos» no entra en el aviso de mapa incompleto; la vista previa del devengo ya bloquea con
+  `posting-accounts-incomplete` cuando una beca se aplica.
+- La API simulada aplica becas solo en el simulador, no en la vista previa ni en la corrida.
+- `dependency-cruiser` no se ejecutó en local (no está instalado); se revisó a mano que ninguna feature importe a otra.
+- Las aprobaciones pendientes no caducan a las 72 horas (brecha registrada en `docs/03-seguridad.md` §5.3).

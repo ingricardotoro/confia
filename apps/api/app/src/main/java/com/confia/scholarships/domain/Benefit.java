@@ -86,7 +86,7 @@ public record Benefit(BenefitType type, Percentage percent, Money fixedAmount) {
 
     /**
      * The benefit on a charge whose base is {@code base}: the share or the fixed amount, limited to {@code periodCap} when it is not
-     * {@code null} and to the base. A base that is zero or negative gets zero.
+     * {@code null} (here the cap still available) and to the base. A base that is zero or negative gets zero.
      */
     public Money on(Money base, Money periodCap) {
         Objects.requireNonNull(base, "base");
@@ -98,6 +98,23 @@ public record Benefit(BenefitType type, Percentage percent, Money fixedAmount) {
             benefit = periodCap;
         }
         return benefit.isGreaterThan(base) ? base : benefit;
+    }
+
+    /**
+     * The benefit on a charge when the cap per period is shared by every charge of the award in the period (docs/cortes/scholarships-awards.md,
+     * owner decision of 2026-11-24): what the award already gave in the period, {@code consumed}, is taken from the cap first, so the
+     * benefit of all the charges of one award in one period never exceeds the cap. With no cap the consumed amount does not matter.
+     *
+     * @param consumed the benefit already given by this award in this period (non-voided issued charges and the earlier charges of the
+     *     same evaluation); never {@code null}
+     */
+    public Money on(Money base, Money periodCap, Money consumed) {
+        Objects.requireNonNull(consumed, "consumed");
+        if (periodCap == null) {
+            return on(base, null);
+        }
+        Money remaining = periodCap.subtract(consumed);
+        return on(base, remaining.isPositive() ? remaining : Money.zero(periodCap.currency()));
     }
 
     /** Whether the two benefits are the same type and value. */

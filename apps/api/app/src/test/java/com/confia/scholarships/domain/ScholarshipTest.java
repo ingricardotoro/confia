@@ -120,14 +120,71 @@ class ScholarshipTest {
     }
 
     @Test
-    void withApprovedAwardsTheNameTheCapAndTheConceptsStillChangeIfTheBenefitIsTheSame() {
+    void withApprovedAwardsTheNameStillChangesIfTheBenefitIsTheSame() {
         Scholarship before = scholarship();
 
-        Scholarship after = before.edit(0, "Nuevo nombre", Benefit.percentage("25.00"), Benefit.cap("100.00"),
-                Set.of(OTHER_CONCEPT), true, LATER);
+        Scholarship after = before.edit(0, "Nuevo nombre", Benefit.percentage("25.00"), null, before.concepts(), true, LATER);
 
         assertThat(after.name()).isEqualTo("Nuevo nombre");
         assertThat(after.version()).isEqualTo(1);
+    }
+
+    @Test
+    void withApprovedAwardsTheCapMayOnlyGoDown() {
+        Scholarship capped = scholarship().edit(0, "N", Benefit.percentage("25"), Benefit.cap("500.00"), Set.of(CONCEPT), false, LATER);
+
+        Scholarship lower = capped.edit(1, "N", Benefit.percentage("25"), Benefit.cap("400.00"), Set.of(CONCEPT), true, LATER);
+        Scholarship same = capped.edit(1, "N", Benefit.percentage("25"), Benefit.cap("500.00"), Set.of(CONCEPT), true, LATER);
+
+        assertThat(lower.periodCap()).isEqualTo(Benefit.cap("400.00"));
+        assertThat(same.periodCap()).isEqualTo(Benefit.cap("500.00"));
+    }
+
+    @Test
+    void withApprovedAwardsTheCapIsNeverRaisedNorRemoved() {
+        Scholarship capped = scholarship().edit(0, "N", Benefit.percentage("25"), Benefit.cap("500.00"), Set.of(CONCEPT), false, LATER);
+
+        assertThatThrownBy(() -> capped.edit(1, "N", Benefit.percentage("25"), Benefit.cap("500.01"), Set.of(CONCEPT), true, LATER))
+                .isInstanceOf(ScholarshipScopeLockedException.class);
+        assertThatThrownBy(() -> capped.edit(1, "N", Benefit.percentage("25"), null, Set.of(CONCEPT), true, LATER))
+                .isInstanceOf(ScholarshipScopeLockedException.class);
+    }
+
+    @Test
+    void withApprovedAwardsACapCanBeSetOnAScholarshipThatHadNone() {
+        Scholarship before = scholarship();
+
+        Scholarship after = before.edit(0, "N", Benefit.percentage("25"), Benefit.cap("100.00"), Set.of(CONCEPT), true, LATER);
+
+        assertThat(after.periodCap()).isEqualTo(Benefit.cap("100.00"));
+    }
+
+    @Test
+    void withApprovedAwardsConceptsMayOnlyBeRemoved() {
+        Scholarship two = scholarship().edit(0, "N", Benefit.percentage("25"), null, Set.of(CONCEPT, OTHER_CONCEPT), false, LATER);
+
+        Scholarship fewer = two.edit(1, "N", Benefit.percentage("25"), null, Set.of(CONCEPT), true, LATER);
+
+        assertThat(fewer.concepts()).containsExactly(CONCEPT);
+        assertThatThrownBy(() -> fewer.edit(2, "N", Benefit.percentage("25"), null, Set.of(CONCEPT, OTHER_CONCEPT), true, LATER))
+                .isInstanceOf(ScholarshipScopeLockedException.class);
+        assertThatThrownBy(() -> fewer.edit(2, "N", Benefit.percentage("25"), null, Set.of(OTHER_CONCEPT), true, LATER))
+                .isInstanceOf(ScholarshipScopeLockedException.class);
+    }
+
+    @Test
+    void withoutApprovedAwardsTheCapAndTheConceptsChangeFreely() {
+        Scholarship capped = scholarship().edit(0, "N", Benefit.percentage("25"), Benefit.cap("100.00"), Set.of(CONCEPT), false, LATER);
+
+        Scholarship after = capped.edit(1, "N", Benefit.percentage("25"), null, Set.of(OTHER_CONCEPT, CONCEPT), false, LATER);
+
+        assertThat(after.periodCap()).isNull();
+        assertThat(after.concepts()).containsExactlyInAnyOrder(CONCEPT, OTHER_CONCEPT);
+    }
+
+    @Test
+    void theLockedScopeIsAConflictWithItsOwnCode() {
+        assertThat(new ScholarshipScopeLockedException().code()).isEqualTo("scholarship-scope-locked");
     }
 
     @Test

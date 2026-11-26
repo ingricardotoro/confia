@@ -212,6 +212,11 @@ class RunChargesIntegrityCheckTest {
         }
 
         @Override
+        public com.confia.kernel.Money benefitGiven(InstitutionId institution, UUID awardId, LocalDate periodStart) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public void insertAutomatic(InstitutionId institution, UUID chargeId, ComputedCharge charge, UUID runId,
                 UUID ledgerTransactionId, UUID createdBy) {
             throw new UnsupportedOperationException();

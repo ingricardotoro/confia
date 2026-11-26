@@ -59,6 +59,22 @@ public final class JooqChargeRepository implements ChargeRepository {
     }
 
     @Override
+    public Money benefitGiven(InstitutionId institution, UUID awardId, LocalDate periodStart) {
+        Record row = dsl.select(DSL.sum(CHARGES_CHARGE.DISCOUNT_AMOUNT), DSL.min(CHARGES_CHARGE.DISCOUNT_CURRENCY))
+                .from(CHARGES_CHARGE)
+                .where(CHARGES_CHARGE.INSTITUTION_ID.eq(institution.value()))
+                .and(CHARGES_CHARGE.SCHOLARSHIP_AWARD_ID.eq(awardId))
+                .and(CHARGES_CHARGE.PERIOD_START.eq(periodStart))
+                .andNotExists(dsl.selectOne().from(CHARGES_CHARGE_VOID)
+                        .where(CHARGES_CHARGE_VOID.INSTITUTION_ID.eq(CHARGES_CHARGE.INSTITUTION_ID))
+                        .and(CHARGES_CHARGE_VOID.CHARGE_ID.eq(CHARGES_CHARGE.ID)))
+                .fetchOne();
+        BigDecimal sum = row.get(0, BigDecimal.class);
+        String currency = row.get(1, String.class);
+        return sum == null ? Money.zero(CurrencyCode.HNL) : MoneyColumns.toMoney(sum, currency);
+    }
+
+    @Override
     public void insertAutomatic(InstitutionId institution, UUID chargeId, ComputedCharge charge, UUID runId,
             UUID ledgerTransactionId, UUID createdBy) {
         Money base = charge.amounts().base();

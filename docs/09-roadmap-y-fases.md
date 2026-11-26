@@ -404,6 +404,11 @@ precios por año lectivo y ámbito, con vigencias que no se solapan (INV-11) y c
 Entregable 3 construido en el corte `catalog-tax-rates`: tasas de impuesto con vigencia sin solape, sin ninguna cifra
 precargada, y el concepto gravado apunta a su tasa. Siguen becas, descuentos y el simulador.
 
+**Avance (2026-11-24).** Entregables 4, 5 y 7 construidos en el corte `scholarships-awards` (rama `feat/scholarships-awards`, PR
+pendiente): becas con cobertura por concepto, porcentaje o monto fijo y tope compartido por período; otorgamiento con vigencia y
+aprobación de una persona distinta de quien lo solicita; el devengo aplica la mayor beca vigente sobre la base y registra el beneficio
+en «Becas y descuentos»; y el simulador muestra el resultado antes de generar. Sigue el entregable 6 (descuentos).
+
 **Criterios de salida:**
 
 - [ ] Dos vigencias del mismo concepto en la misma lista no pueden solaparse. La base de datos lo rechaza (INV-11).

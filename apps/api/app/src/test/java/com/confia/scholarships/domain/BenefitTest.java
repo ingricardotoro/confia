@@ -114,6 +114,35 @@ class BenefitTest {
         assertSame(Benefit.percentage("10").on(hnl("1100.00"), hnl("400.00")), "110.00");
     }
 
+    // --- Cap per period shared by all the charges of the period (L8) ---
+
+    @Test
+    void whatTheAwardAlreadyConsumedInThePeriodIsTakenFromTheCap() {
+        assertSame(Benefit.percentage("50").on(hnl("1100.00"), hnl("600.00"), hnl("400.00")), "200.00");
+        assertSame(Benefit.fixed("900.00").on(hnl("1100.00"), hnl("600.00"), hnl("100.00")), "500.00");
+    }
+
+    @Test
+    void whenTheRemainderOfTheCapExceedsTheBenefitTheBenefitIsTheShare() {
+        assertSame(Benefit.percentage("10").on(hnl("1100.00"), hnl("600.00"), hnl("100.00")), "110.00");
+    }
+
+    @Test
+    void aCapThatIsConsumedOrExceededLeavesNothing() {
+        assertSame(Benefit.percentage("50").on(hnl("1100.00"), hnl("600.00"), hnl("600.00")), "0.00");
+        assertSame(Benefit.percentage("50").on(hnl("1100.00"), hnl("600.00"), hnl("700.00")), "0.00");
+    }
+
+    @Test
+    void withoutACapWhatWasConsumedDoesNotMatter() {
+        assertSame(Benefit.percentage("50").on(hnl("1100.00"), null, hnl("9999.00")), "550.00");
+    }
+
+    @Test
+    void nothingConsumedIsTheSameAsTheCapAlone() {
+        assertSame(Benefit.percentage("50").on(hnl("1100.00"), hnl("400.00"), Money.zero(CurrencyCode.HNL)), "400.00");
+    }
+
     @Test
     void aCapGreaterThanTheBaseStillLeavesTheBaseAtZero() {
         assertSame(Benefit.fixed("5000.00").on(hnl("1100.00"), hnl("4000.00")), "1100.00");

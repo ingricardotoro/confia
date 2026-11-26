@@ -2,7 +2,7 @@ package com.confia.scholarships.domain;
 
 /**
  * Why an award was rejected or revoked: free text of 20 to 500 characters. It may name a person, so it lives only in the decision
- * record; it is never copied to the audit trail (only its length is), and it never reaches a log through {@code toString}.
+ * record; it is never copied to the audit trail (only its SHA-256 and its length are), and it never reaches a log through {@code toString}.
  */
 public record DecisionReason(String text) {
 

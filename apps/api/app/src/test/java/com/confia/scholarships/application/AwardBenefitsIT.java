@@ -69,7 +69,8 @@ class AwardBenefitsIT extends ScholarshipsFixture {
         var context = new com.confia.shared.security.SecurityContext("", "system", sessionInstitution.toString(),
                 UUID.randomUUID().toString());
         return transactionRunner().execute(context,
-                () -> awardBenefits().offers(new InstitutionId(institution), student, concept, on, base, lockShare));
+                () -> awardBenefits().offers(new InstitutionId(institution), student, concept, on, base,
+                        award -> Money.zero(CurrencyCode.HNL), lockShare));
     }
 
     /** Whether any award is applicable, asked inside a transaction of the institution of the session. */

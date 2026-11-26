@@ -9,14 +9,19 @@ import com.confia.scholarships.domain.ScholarshipAward;
 import com.confia.shared.audit.AuditEntry;
 import com.confia.shared.audit.AuditJson;
 import com.confia.shared.security.AuthenticatedActor;
+import com.confia.shared.security.Digests;
+import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
  * The entries of the scholarships: {@code scholarships.scholarship.created|updated|deactivated|reactivated} (with the state before
  * and after when something changed) and {@code scholarships.award.requested|approved|rejected|revoked}. They are built with {@link
- * AuditJson} and carry identifiers, codes, the benefit, the status and dates. They never carry the reason of a rejection or of a
- * revocation (only its length): the free text may name a person. The name of the student is never recorded, only its identifier.
+ * AuditJson} and carry identifiers, codes, the benefit, the status and dates. They never carry the text of the reason of a rejection
+ * or of a revocation: the free text may name a person. The {@code reason} of the entry holds the SHA-256 of that text in lowercase
+ * hexadecimal (owner decision of 2026-11-24), so the entry can be matched with the decision record, where the text lives, without
+ * copying it; its length is kept too. The name of the student is never recorded, only its identifier.
  */
 final class ScholarshipsAudit {
 
@@ -59,8 +64,14 @@ final class ScholarshipsAudit {
         }
         AwardStatus from = decision.kind().leadsTo() == AwardStatus.REVOKED ? AwardStatus.APPROVED : AwardStatus.PENDING;
         UUID approver = decision.kind().leadsTo() == AwardStatus.REVOKED ? null : decision.decidedBy();
-        return entry(actor, requestId, AWARD + "." + decision.kind().code(), AWARD, award.id(),
-                AuditJson.object().text("status", from.code()).toJson(), after.toJson(), approver);
+        String before = AuditJson.object().text("status", from.code()).text("requestedBy", award.requestedBy().toString()).toJson();
+        return entry(actor, requestId, AWARD + "." + decision.kind().code(), AWARD, award.id(), before, after.toJson(),
+                reason == null ? null : sha256Hex(reason.text()), approver);
+    }
+
+    /** The SHA-256 of a text in UTF-8, as 64 lowercase hexadecimal characters. */
+    static String sha256Hex(String text) {
+        return HexFormat.of().formatHex(Digests.sha256(text.getBytes(StandardCharsets.UTF_8)));
     }
 
     private static String json(Scholarship scholarship) {
@@ -88,7 +99,12 @@ final class ScholarshipsAudit {
 
     private static AuditEntry entry(AuthenticatedActor actor, UUID requestId, String action, String entityType, UUID entityId,
             String before, String after, UUID approverId) {
+        return entry(actor, requestId, action, entityType, entityId, before, after, null, approverId);
+    }
+
+    private static AuditEntry entry(AuthenticatedActor actor, UUID requestId, String action, String entityType, UUID entityId,
+            String before, String after, String reason, UUID approverId) {
         return new AuditEntry(actor.institutionId(), actor.accountId(), ACTOR_KIND_STAFF, actor.accountId().toString(), null, null,
-                requestId, null, action, entityType, entityId.toString(), OUTCOME_SUCCESS, before, after, null, approverId);
+                requestId, null, action, entityType, entityId.toString(), OUTCOME_SUCCESS, before, after, reason, approverId);
     }
 }

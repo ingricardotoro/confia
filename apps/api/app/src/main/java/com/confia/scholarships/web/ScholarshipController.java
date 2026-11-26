@@ -176,7 +176,8 @@ public class ScholarshipController {
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "409",
             description = "The version is not the current one (stale-version), the benefit cannot change because an award was approved "
-                    + "(scholarship-benefit-locked), or a newly covered concept is inactive (inactive-reference)",
+                    + "(scholarship-benefit-locked), the cap is raised or removed or a concept is added once an award was approved "
+                    + "(scholarship-scope-locked), or a newly covered concept is inactive (inactive-reference)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
